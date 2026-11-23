@@ -16,8 +16,36 @@
 //! - `agents.defaults.workspace`: the lamp's own work folder
 //!   (`runtime::LAMP_PROJECT`), where OpenClaw reads its `AGENTS.md`, the
 //!   lamp's guidance, and its tools run, as Hermes works in it;
-//! - `tools.exec.mode` = [`EXEC_MODE`]: OpenClaw asks before a command
-//!   not allowed already (Hermes' `approvals.mode: manual`);
+//! - with [`V1_TOOLS_SWITCH`] on (the product's, #7245): V1's tool grants,
+//!   mirrored from the platform's `runtimes/openclaw/service_setup.go`
+//!   (lines 136 and 237-250, the design source): `tools.profile` =
+//!   `full`; `tools.exec` = `{host: gateway, mode: full}` (V1's
+//!   `security: full, ask: off`, written as the one `mode` that means
+//!   exactly that in OpenClaw 2026.11.2, `resolveExecPolicyForMode`; see
+//!   below for why never `security`/`ask`); `tools.elevated.enabled` =
+//!   `true` with `allowFrom.`[`ELEVATED_CHANNEL`] = `["*"]` (V1 keys it by
+//!   its messaging channel; a Harness turn comes in on OpenClaw's own
+//!   `webchat`), the other channels kept; `agents.defaults.elevatedDefault`
+//!   = `full`; `agents.defaults.sandbox.mode` = `off`; and
+//!   [`NO_ASK_TOOLS`] in `tools.deny` (#7906), the tools that stop a turn
+//!   on a question in the pane (`ask_user`'s choice, `secrets`' masked
+//!   prompt, `suggest_task`'s offer), a person's own denies kept. So the
+//!   lamp's OpenClaw runs a command headless as V1's did, with no ask
+//!   nobody can answer, and no tool it may call waits for a person; its
+//!   namespace (`openclaw-ns`) still bounds what it sees;
+//! - with it off: `tools.exec.mode` = [`EXEC_MODE`], OpenClaw asking
+//!   before a command not allowed already (Hermes' `approvals.mode:
+//!   manual`), and V1's values above taken out where they are V1's, so the
+//!   file is today's again;
+//! - either way `security` and `ask` are never written and always taken
+//!   out of `tools.exec`: OpenClaw refuses `mode` beside either (exit 78,
+//!   the gateway down), and today's stable lamp-tasks, the rollback
+//!   target, inserts `mode = "ask"` into the exec object and removes
+//!   nothing else (#7245, Twelve's P1 on #7737). A file with `mode` alone
+//!   stays one OpenClaw takes after that writer. (The intermediate V1-tools
+//!   build that wrote `security`/`ask` and kept `mode` was never stable; a
+//!   rollback to it breaks this shape and every other that keeps V1's
+//!   policy, so the stable target wins.);
 //! - with [`SKILLS_SWITCH`] on, [`SKILLS_DIR`] in `skills.load.extraDirs`:
 //!   OpenClaw reads the lamp's own skills where they are, read-only, never
 //!   copied into its state; the dirs a person added there are kept;
@@ -30,16 +58,75 @@
 //! key of ours that holds something else than what is set, is refused and
 //! left as it is, never rewritten. A file already right is not written.
 //!
+//! A new text is checked by OpenClaw itself before it is renamed into
+//! place (#7108; on 15 Nov a merge OpenClaw 2026.11.2 refused took
+//! lamp-52e6's gateway down, 78/CONFIG): [`validate`] runs `config
+//! validate --json` on the new file beside `openclaw.json`, never the live
+//! one, through lamp-update's wrapper ([`VALIDATOR`]) into the running
+//! gateway, or with no gateway running in OpenClaw's own namespace, as
+//! lamp-update and lamp-setup check theirs (#8060). Refused, the file
+//! is left byte for byte and [`write`] fails with OpenClaw's words. With
+//! no wrapper there (OpenClaw not installed) the text is written as
+//! before.
+//!
 //! [`write`] must run as OpenClaw's own user (`lampos`), so the file it
 //! writes is OpenClaw's and no one else's; never through a link.
 use std::fs;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use serde_json::{Map, Value, json};
 
 pub use crate::hermes_config::{MODEL, Refused, SKILLS_DIR, TOKEN_ENV};
-use crate::hermes_config::{read_or_empty, replace};
+use crate::hermes_config::{read_or_empty, replace_checked};
+
+/// OpenClaw's wrapper lamp-update installs
+/// (`lamp_update::openclaw_install::WRAPPER`), the one way OpenClaw runs
+/// on the lamp; [`validate`] runs its own config check through it.
+pub const VALIDATOR: &str = "/usr/local/bin/openclaw";
+/// The longest OpenClaw's config check runs before it is killed, not a
+/// refusal but tried again as a killed check is
+/// (`lamp_checked_replace::VALIDATE_WITHIN`, #8225).
+pub use lamp_checked_replace::VALIDATE_WITHIN;
+
+/// How OpenClaw's own check of a new text runs (#8060): through
+/// `wrapper`, joined to the running gateway's namespaces, while
+/// `main_pid` prints the gateway's unit's `MainPID`; else, with no
+/// gateway and so no lock to clash with, `own(file)` in OpenClaw's
+/// namespace of its own. With no `wrapper` there (OpenClaw not
+/// installed) nothing checks it.
+pub struct Check {
+    /// OpenClaw's wrapper ([`VALIDATOR`] on the lamp).
+    pub wrapper: PathBuf,
+    /// What prints the gateway's unit's `MainPID`.
+    pub main_pid: Vec<String>,
+    /// The check of `file` in OpenClaw's namespace of its own.
+    pub own: OwnCheck,
+}
+
+/// [`Check::own`]: the command that checks a file in OpenClaw's namespace
+/// of its own.
+pub type OwnCheck = Box<dyn Fn(&str) -> Vec<String>>;
+
+impl Check {
+    /// The lamp's: lamp-update's wrapper, its gateway's unit's `MainPID`
+    /// and its own-namespace check as lamp-update's `gateway` block and
+    /// lamp-setup's reset run it
+    /// (`lamp_update::openclaw_install::own_namespace_validate_argv`),
+    /// with lamp-tasks' own ids (`lampos`, OpenClaw's).
+    pub fn lamp() -> Self {
+        let uid = rustix::process::getuid().as_raw().to_string();
+        let gid = rustix::process::getgid().as_raw().to_string();
+        Check {
+            wrapper: VALIDATOR.into(),
+            main_pid: lamp_update::openclaw_install::main_pid_argv(),
+            own: Box::new(move |file: &str| {
+                lamp_update::openclaw_install::own_namespace_validate_argv(&uid, &gid, file)
+            }),
+        }
+    }
+}
 
 /// OpenClaw's settings file, in its state folder.
 pub const CONFIG_FILE: &str = "openclaw.json";
@@ -52,6 +139,9 @@ pub const CONTEXT_WINDOW: u64 = 128_000;
 pub const MAX_TOKENS: u64 = 8_192;
 /// OpenClaw's exec mode that asks before a command not allowed already.
 pub const EXEC_MODE: &str = "ask";
+/// OpenClaw's exec mode for V1's `security: full, ask: off`: exactly that
+/// policy (`resolveExecPolicyForMode("full")`, OpenClaw 2026.11.2).
+pub const EXEC_MODE_V1: &str = "full";
 /// The plugins OpenClaw loads on the lamp when no `plugins.allow` is set
 /// (#6226, measured on lamp-c0a4): with OpenClaw's default 41 of 69
 /// bundled plugins on, a turn stalled 92 s and timed out; with only these
@@ -62,6 +152,28 @@ pub const PLUGINS_ALLOW: [&str; 2] = ["openai", "memory-core"];
 /// The switch for the lamp's skills in OpenClaw, as `LAMP_HERMES_SKILLS`
 /// for Hermes: on unless `off` ([`skills_on`]).
 pub const SKILLS_SWITCH: &str = "LAMP_OPENCLAW_SKILLS";
+/// The kill switch for V1's tool grants (#7245): on unless `off`
+/// ([`v1_tools_on`]), on in the product's lamp-tasks unit.
+pub const V1_TOOLS_SWITCH: &str = "LAMP_OPENCLAW_V1_TOOLS";
+/// The channel `tools.elevated.allowFrom` names with V1's tools on:
+/// OpenClaw's own internal channel (its `INTERNAL_MESSAGE_CHANNEL`), the
+/// one a Harness turn on the gateway comes in on.
+pub const ELEVATED_CHANNEL: &str = "webchat";
+/// The tools denied with V1's tools on (#7906): each one, when the model
+/// calls it, shows a prompt in the OpenClaw pane and waits for a person
+/// (OpenClaw 2026.11.2 docs: `tools/ask-user.md`, up to 900 s by default;
+/// `tools/secrets.md`, "to remove it, deny it like any other tool";
+/// `suggest_task`, "a Gateway-backed TUI shows an equivalent interactive
+/// prompt", `gateway/config-tools/tool-policy.md`). Harness then reads the
+/// pane as `needs-input`, and the task ends with its kept conversation
+/// deleted. Denying them only takes tools away; without `ask_user` the
+/// agent goes on with its best judgment, as after OpenClaw's `no_answer`.
+pub const NO_ASK_TOOLS: [&str; 3] = ["ask_user", "secrets", "suggest_task"];
+
+/// Whether [`V1_TOOLS_SWITCH`] is on: anything but `off` exactly.
+pub fn v1_tools_on(value: Option<&str>) -> bool {
+    value != Some("off")
+}
 
 /// Whether [`SKILLS_SWITCH`] is on: anything but `off` exactly, the
 /// product's default being on.
@@ -110,15 +222,121 @@ fn same_path(left: &str, right: &str) -> bool {
     left.trim_end_matches('/') == right.trim_end_matches('/')
 }
 
+/// `key` taken out of `map` when it holds `value`, V1's.
+fn take(map: &mut Map<String, Value>, key: &str, value: &Value) {
+    if map.get(key) == Some(value) {
+        map.remove(key);
+    }
+}
+
+/// `key` taken out of `map` when it is an empty object.
+fn take_empty(map: &mut Map<String, Value>, key: &str) {
+    if map
+        .get(key)
+        .and_then(Value::as_object)
+        .is_some_and(Map::is_empty)
+    {
+        map.remove(key);
+    }
+}
+
+/// V1's tool grants (`runtimes/openclaw/service_setup.go`, lines 136 and
+/// 237-250) in `root`, or with `on` false taken out where they are V1's,
+/// with `tools.exec.mode` = [`EXEC_MODE`] as before #7245; `security` and
+/// `ask` never written, always taken out.
+fn v1_tools(root: &mut Map<String, Value>, on: bool) -> Result<(), Refused> {
+    let defaults = object(
+        object(root, "agents", "agents")?,
+        "defaults",
+        "agents.defaults",
+    )?;
+    if on {
+        defaults.insert("elevatedDefault".into(), json!("full"));
+        object(defaults, "sandbox", "agents.defaults.sandbox")?.insert("mode".into(), json!("off"));
+    } else {
+        take(defaults, "elevatedDefault", &json!("full"));
+        if let Some(sandbox) = defaults.get_mut("sandbox").and_then(Value::as_object_mut) {
+            take(sandbox, "mode", &json!("off"));
+        }
+        take_empty(defaults, "sandbox");
+    }
+    let tools = object(root, "tools", "tools")?;
+    if on {
+        tools.insert("profile".into(), json!("full"));
+        let exec = object(tools, "exec", "tools.exec")?;
+        // V1's `security: full, ask: off` as its one `mode`: OpenClaw
+        // refuses `mode` beside `security` or `ask`, and the stable
+        // rollback target inserts `mode` without removing them.
+        exec.remove("security");
+        exec.remove("ask");
+        exec.insert("host".into(), json!("gateway"));
+        exec.insert("mode".into(), json!(EXEC_MODE_V1));
+        let elevated = object(tools, "elevated", "tools.elevated")?;
+        elevated.insert("enabled".into(), json!(true));
+        object(elevated, "allowFrom", "tools.elevated.allowFrom")?
+            .insert(ELEVATED_CHANNEL.into(), json!(["*"]));
+        let deny = deny_list(tools)?;
+        for tool in NO_ASK_TOOLS {
+            // OpenClaw matches tool names case-insensitively.
+            if !deny
+                .iter()
+                .filter_map(Value::as_str)
+                .any(|name| name.eq_ignore_ascii_case(tool))
+            {
+                deny.push(json!(tool));
+            }
+        }
+    } else {
+        take(tools, "profile", &json!("full"));
+        let exec = object(tools, "exec", "tools.exec")?;
+        take(exec, "host", &json!("gateway"));
+        // Left beside `mode`, they would make the file one OpenClaw refuses.
+        exec.remove("security");
+        exec.remove("ask");
+        exec.insert("mode".into(), json!(EXEC_MODE));
+        if let Some(elevated) = tools.get_mut("elevated").and_then(Value::as_object_mut) {
+            if let Some(from) = elevated.get_mut("allowFrom").and_then(Value::as_object_mut) {
+                take(from, ELEVATED_CHANNEL, &json!(["*"]));
+            }
+            take_empty(elevated, "allowFrom");
+            take(elevated, "enabled", &json!(true));
+        }
+        take_empty(tools, "elevated");
+        if tools.get("deny").is_some_and(|deny| !deny.is_null()) {
+            let deny = deny_list(tools)?;
+            deny.retain(|name| !NO_ASK_TOOLS.iter().any(|tool| name == tool));
+            if deny.is_empty() {
+                tools.remove("deny");
+            }
+        }
+    }
+    Ok(())
+}
+
+/// `tools.deny`, made when missing or `null`; refused when it is not a
+/// list of tool names.
+fn deny_list(tools: &mut Map<String, Value>) -> Result<&mut Vec<Value>, Refused> {
+    let deny = tools.entry("deny").or_insert(Value::Null);
+    if deny.is_null() {
+        *deny = json!([]);
+    }
+    match deny.as_array_mut() {
+        Some(list) if list.iter().all(Value::is_string) => Ok(list),
+        _ => Err(Refused("`tools.deny` is not a list of tool names".into())),
+    }
+}
+
 /// `openclaw.json`'s text with the lamp's keys merged in, on the
-/// forwarder's `port`, with `workspace` the lamp's work folder and the
-/// lamp's skills when `skills`. The text given back unchanged when nothing
-/// changes, so a second merge is idle.
+/// forwarder's `port`, with `workspace` the lamp's work folder, the
+/// lamp's skills when `skills` and V1's tool grants when `v1` ([`v1_tools`]).
+/// The text given back unchanged when nothing changes, so a second merge
+/// is idle.
 pub fn merge_config(
     text: &str,
     port: u16,
     workspace: &Path,
     skills: bool,
+    v1: bool,
 ) -> Result<String, Refused> {
     let workspace = workspace
         .to_str()
@@ -148,8 +366,7 @@ pub fn merge_config(
         .insert("primary".into(), json!(format!("{PROVIDER}/{MODEL}")));
     defaults.insert("workspace".into(), json!(workspace));
 
-    let tools = object(root, "tools", "tools")?;
-    object(tools, "exec", "tools.exec")?.insert("mode".into(), json!(EXEC_MODE));
+    v1_tools(root, v1)?;
 
     // Only an allow list not there yet: a person's own is theirs.
     let plugins = object(root, "plugins", "plugins")?;
@@ -191,11 +408,51 @@ pub fn merge_config(
 
 /// `openclaw.json` under `state_dir` merged ([`merge_config`]); `true`
 /// when it was written, `false` when it was right already. Nothing is
-/// written when it can't be merged.
-pub fn write(state_dir: &Path, port: u16, workspace: &Path, skills: bool) -> io::Result<bool> {
+/// written when it can't be merged, or when OpenClaw's own check
+/// ([`validate`]) refuses it: joined to the running gateway, or with none
+/// in OpenClaw's own namespace (#8060). A gateway the check could not join
+/// yet, or one that came up under it, is tried again over [`GATEWAY_WAITS`]
+/// ([`write_waiting`]), so it can take minutes. Run at every
+/// lamp-tasks start, so an existing lamp's file gets V1's tools (or loses
+/// them) on its next start or update, its model, workspace and every other
+/// key kept; the gateway takes `tools` hot and reads `agents` per turn,
+/// with no restart.
+pub fn write(
+    state_dir: &Path,
+    port: u16,
+    workspace: &Path,
+    skills: bool,
+    v1: bool,
+) -> io::Result<bool> {
+    write_waiting(
+        state_dir,
+        port,
+        workspace,
+        skills,
+        v1,
+        &Check::lamp(),
+        &GATEWAY_WAITS,
+        &mut |line| eprintln!("{line}"),
+    )
+}
+
+/// [`write`], with OpenClaw's own check run as `check` says.
+pub fn write_checked(
+    state_dir: &Path,
+    port: u16,
+    workspace: &Path,
+    skills: bool,
+    v1: bool,
+    check: &Check,
+) -> io::Result<bool> {
     let path = state_dir.join(CONFIG_FILE);
+    // Seventh's P2 on #7872: held from the read to the rename, as every
+    // writer of this file does, so lamp-update's `gateway` block and this
+    // merge never drop each other's.
+    fs::create_dir_all(state_dir)?;
+    let _held = lamp_checked_replace::hold(state_dir, lamp_checked_replace::LOCK_WITHIN)?;
     let text = read_or_empty(&path)?;
-    let merged = merge_config(&text, port, workspace, skills).map_err(|refused| {
+    let merged = merge_config(&text, port, workspace, skills, v1).map_err(|refused| {
         io::Error::other(format!(
             "OpenClaw's {CONFIG_FILE} is not merged: {}",
             refused.0
@@ -204,9 +461,98 @@ pub fn write(state_dir: &Path, port: u16, workspace: &Path, skills: bool) -> io:
     if merged == text {
         return Ok(false);
     }
-    fs::create_dir_all(state_dir)?;
-    replace(&path, &merged)?;
+    if check.wrapper.exists() {
+        replace_checked(&path, &merged, &mut |file| validate(check, file))?;
+    } else {
+        eprintln!(
+            "[lamp-tasks] OpenClaw's {CONFIG_FILE} written unchecked: no OpenClaw at {}",
+            check.wrapper.display()
+        );
+        replace_checked(&path, &merged, &mut |_| Ok(()))?;
+    }
     Ok(true)
+}
+
+/// OpenClaw's own check of the config text in `file`: `config validate
+/// --json`, pointed at `file` by `OPENCLAW_CONFIG_PATH` (never the live
+/// `openclaw.json`). While the gateway's unit has a `MainPID`, through its
+/// wrapper, joined to the running gateway's namespaces as the wrapper's
+/// every other call is (never `LAMP_OPENCLAW_GATEWAY`: namespaces of its
+/// own are refused by OpenClaw 2026.11.2 while its gateway runs,
+/// `GatewayLockNamespaceError`, #7268's ROW FAIL on lamp-52e6). With none
+/// (`MainPID` 0), in OpenClaw's namespace of its own (`check.own`, #8060),
+/// where no gateway holds the lock: so a config OpenClaw refuses, already
+/// in place and keeping its gateway down, can still be replaced by one it
+/// takes. Either way a refusal writes nothing. With OpenClaw's own environment
+/// (`crate::gateway::APPROVALS_ENV`) and nothing else, killed with its
+/// process group past [`VALIDATE_WITHIN`]. `Ok` only on status 0; else
+/// what OpenClaw said, on one line and short.
+pub fn validate(check: &Check, file: &Path) -> Result<(), String> {
+    let file = file
+        .to_str()
+        .ok_or("OpenClaw's config check: the new file's path is not UTF-8")?;
+    let mut env = crate::gateway::APPROVALS_ENV.to_vec();
+    env.push(("OPENCLAW_CONFIG_PATH", file));
+    let argv = if lamp_update::openclaw_install::gateway_is_running(&check.main_pid) {
+        [check.wrapper.to_string_lossy().into_owned()]
+            .into_iter()
+            .chain(["config", "validate", "--json"].map(str::to_owned))
+            .collect::<Vec<_>>()
+    } else {
+        (check.own)(file)
+    };
+    lamp_checked_replace::validate(&argv, &env, VALIDATE_WITHIN)
+}
+
+// Shared with lamp-update's one-shot (#7868), which can't take lamp-tasks.
+// `KILLED`: a check ended by a signal, #7268's FINDING, a check racing the
+// gateway's own start when both restart together.
+pub use lamp_checked_replace::{
+    GATEWAY_WAITS, KILLED, NO_GATEWAY, NODE_NOT_READY, check_did_not_finish, gateway_not_there,
+};
+
+/// [`write_checked`] tried again after each of `waits` while OpenClaw's
+/// gateway is not there to check the text ([`gateway_not_there`]) or the
+/// check was killed before it answered, by a signal ([`KILLED`]) or past
+/// [`VALIDATE_WITHIN`] ([`check_did_not_finish`], #8225), each wait said in one
+/// line with no value of the file; anything else (written, right already,
+/// refused for its text) ends it at once, and past the last wait the
+/// refusal is returned.
+#[allow(clippy::too_many_arguments)]
+pub fn write_waiting(
+    state_dir: &Path,
+    port: u16,
+    workspace: &Path,
+    skills: bool,
+    v1: bool,
+    check: &Check,
+    waits: &[Duration],
+    say: &mut dyn FnMut(&str),
+) -> io::Result<bool> {
+    let mut waits = waits.iter();
+    loop {
+        match write_checked(state_dir, port, workspace, skills, v1, check) {
+            Err(error)
+                if gateway_not_there(&error.to_string())
+                    || check_did_not_finish(&error.to_string()) =>
+            {
+                let Some(wait) = waits.next() else {
+                    return Err(error);
+                };
+                let why = if gateway_not_there(&error.to_string()) {
+                    "wait for its gateway to check them"
+                } else {
+                    "were not checked, OpenClaw's check was killed before it answered"
+                };
+                say(&format!(
+                    "tasks: OpenClaw's settings {why}; tried again in {} s",
+                    wait.as_secs()
+                ));
+                std::thread::sleep(*wait);
+            }
+            done => return done,
+        }
+    }
 }
 
 /// The lamp's guidance for OpenClaw: the same words as Hermes'
@@ -240,8 +586,11 @@ mod tests {
 }
 "#;
 
+    /// What lamp-tasks wrote from [`INSTALLED`] before #7245 (bda127adf1).
+    const TODAY_INSTALLED: &str = include_str!("openclaw_config_today.json");
+
     fn merged(text: &str, skills: bool) -> Value {
-        serde_json::from_str(&merge_config(text, 7741, Path::new(WORKSPACE), skills).unwrap())
+        serde_json::from_str(&merge_config(text, 7741, Path::new(WORKSPACE), skills, true).unwrap())
             .unwrap()
     }
 
@@ -267,7 +616,20 @@ mod tests {
             "lampos/deepseek-flash"
         );
         assert_eq!(value["agents"]["defaults"]["workspace"], WORKSPACE);
-        assert_eq!(value["tools"]["exec"]["mode"], "ask");
+        assert_eq!(
+            value["tools"],
+            json!({
+                "profile": "full",
+                "exec": {"host": "gateway", "mode": "full"},
+                "elevated": {"enabled": true, "allowFrom": {"webchat": ["*"]}},
+                "deny": ["ask_user", "secrets", "suggest_task"],
+            })
+        );
+        assert_eq!(value["agents"]["defaults"]["elevatedDefault"], "full");
+        assert_eq!(
+            value["agents"]["defaults"]["sandbox"],
+            json!({"mode": "off"})
+        );
         assert_eq!(
             value["skills"]["load"]["extraDirs"],
             json!(["/var/lib/lampOS/skills"])
@@ -306,17 +668,227 @@ mod tests {
             assert_eq!(value["models"], fresh["models"]);
             assert_eq!(value["agents"], fresh["agents"]);
         }
-        assert!(merge_config("{\"plugins\": []}", 7741, Path::new(WORKSPACE), true).is_err());
+        assert!(merge_config("{\"plugins\": []}", 7741, Path::new(WORKSPACE), true, true).is_err());
+    }
+
+    /// #7245: V1's tool grants (`runtimes/openclaw/service_setup.go`,
+    /// lines 136 and 237-250) on an existing lamp's file, the one written
+    /// before: today's `exec.mode: ask` becomes V1's `full`, the model,
+    /// workspace, gateway and a person's own keys stay.
+    #[test]
+    fn an_existing_lamps_file_gets_v1s_tools_and_keeps_its_keys() {
+        let before = merge_config(INSTALLED, 7741, Path::new(WORKSPACE), true, false).unwrap();
+        let mut old: Value = serde_json::from_str(&before).unwrap();
+        old["tools"]["exec"]["askFallback"] = json!("deny");
+        old["tools"]["elevated"] = json!({"allowFrom": {"telegram": ["42"]}});
+        old["agents"]["defaults"]["sandbox"] = json!({"mode": "all", "scope": "agent"});
+        let value = merged(&old.to_string(), true);
+        assert_eq!(value["gateway"], old["gateway"]);
+        assert_eq!(value["models"], old["models"]);
+        assert_eq!(
+            value["agents"]["defaults"]["model"],
+            old["agents"]["defaults"]["model"]
+        );
+        assert_eq!(value["agents"]["defaults"]["workspace"], WORKSPACE);
+        assert_eq!(
+            value["tools"]["exec"],
+            json!({"host": "gateway", "mode": "full", "askFallback": "deny"})
+        );
+        assert_eq!(
+            value["tools"]["elevated"],
+            json!({"enabled": true, "allowFrom": {"telegram": ["42"], "webchat": ["*"]}})
+        );
+        assert_eq!(
+            value["agents"]["defaults"]["sandbox"],
+            json!({"mode": "off", "scope": "agent"})
+        );
+        assert!(v1_tools_on(None) && v1_tools_on(Some("on")) && v1_tools_on(Some("x")));
+        assert!(!v1_tools_on(Some("off")));
+    }
+
+    /// #7245's kill switch: off writes today's file byte for byte (the
+    /// text before #7245, its `tools` only `exec.mode: ask`), and turns a
+    /// file written with V1's tools back into that one.
+    #[test]
+    fn with_the_v1_tools_switch_off_the_file_is_todays() {
+        let off = |text: &str| merge_config(text, 7741, Path::new(WORKSPACE), true, false).unwrap();
+        assert_eq!(off(INSTALLED), TODAY_INSTALLED);
+        let on = merge_config(INSTALLED, 7741, Path::new(WORKSPACE), true, true).unwrap();
+        assert_ne!(on, TODAY_INSTALLED);
+        assert_eq!(off(&on), TODAY_INSTALLED);
+        assert_eq!(
+            off(""),
+            off(&merge_config("", 7741, Path::new(WORKSPACE), true, true).unwrap())
+        );
+    }
+
+    /// OpenClaw 2026.11.2's own check of one exec object
+    /// (`addExecPolicyModeConflictIssue`): `mode` beside `security` or
+    /// `ask` is refused, and the gateway exits 78.
+    fn openclaw_takes(exec: &Value) -> bool {
+        exec.get("mode").is_none() || (exec.get("security").is_none() && exec.get("ask").is_none())
+    }
+
+    /// Today's stable lamp-tasks' writer of `tools.exec`, the rollback
+    /// target (`openclaw_config.rs` on lamp-voice, 14202): it inserts
+    /// `mode = "ask"` and removes nothing else.
+    fn stable_writer(exec: &mut Map<String, Value>) {
+        exec.insert("mode".into(), json!("ask"));
+    }
+
+    /// #7245, Twelve's P1 on #7737: a rollback to stable from either
+    /// switch's file, or from an older one with `security`/`ask` in it,
+    /// leaves a file OpenClaw takes: ours never has `security` or `ask`,
+    /// and V1's policy is the one `mode` that means it.
+    #[test]
+    fn a_rollback_to_stables_writer_leaves_a_file_openclaw_takes() {
+        let mut old: Value = serde_json::from_str(INSTALLED).unwrap();
+        old["tools"]["exec"] = json!({"host": "gateway", "security": "full", "ask": "off"});
+        let old = serde_json::to_string(&old).unwrap();
+        for v1 in [true, false] {
+            for text in [INSTALLED, "", old.as_str()] {
+                let merged = merge_config(text, 7741, Path::new(WORKSPACE), true, v1).unwrap();
+                let mut value: Value = serde_json::from_str(&merged).unwrap();
+                assert!(openclaw_takes(&value["tools"]["exec"]), "{v1}: {merged}");
+                let exec = value["tools"]["exec"].as_object_mut().unwrap();
+                assert!(
+                    !exec.contains_key("security") && !exec.contains_key("ask"),
+                    "{v1}"
+                );
+                stable_writer(exec);
+                assert!(openclaw_takes(&value["tools"]["exec"]), "{v1}: rolled back");
+            }
+        }
+        let exec = |v1| {
+            let merged = merge_config("", 7741, Path::new(WORKSPACE), true, v1).unwrap();
+            serde_json::from_str::<Value>(&merged).unwrap()["tools"]["exec"].clone()
+        };
+        assert_eq!(exec(true), json!({"host": "gateway", "mode": EXEC_MODE_V1}));
+        assert_eq!(exec(false), json!({"mode": EXEC_MODE}));
+    }
+
+    /// #7906: with V1's tools on, the tools that wait for a person in the
+    /// pane are denied, a person's own denies (any case) kept and nothing
+    /// doubled; off takes ours out and keeps theirs; a deny that is not a
+    /// list of names is refused.
+    #[test]
+    fn the_tools_that_wait_for_a_person_are_denied_with_v1s_tools() {
+        let deny = |text: &str, v1| {
+            let merged = merge_config(text, 7741, Path::new(WORKSPACE), true, v1).unwrap();
+            serde_json::from_str::<Value>(&merged).unwrap()["tools"]
+                .get("deny")
+                .cloned()
+        };
+        assert_eq!(deny("", true), Some(json!(NO_ASK_TOOLS)));
+        assert_eq!(deny("", false), None);
+        let own = r#"{"tools": {"deny": ["browser", "ASK_USER"]}}"#;
+        assert_eq!(
+            deny(own, true),
+            Some(json!(["browser", "ASK_USER", "secrets", "suggest_task"]))
+        );
+        let on = merge_config(own, 7741, Path::new(WORKSPACE), true, true).unwrap();
+        assert_eq!(deny(&on, false), Some(json!(["browser", "ASK_USER"])));
+        let ours = merge_config("", 7741, Path::new(WORKSPACE), true, true).unwrap();
+        assert_eq!(deny(&ours, false), None, "an empty deny is taken out");
+        for text in [
+            r#"{"tools": {"deny": "secrets"}}"#,
+            r#"{"tools": {"deny": [1]}}"#,
+        ] {
+            for v1 in [true, false] {
+                assert!(
+                    merge_config(text, 7741, Path::new(WORKSPACE), true, v1).is_err(),
+                    "{text} {v1}"
+                );
+            }
+        }
+    }
+
+    /// `INSTALLED` with its `tools.exec` set to `exec`.
+    fn with_exec(exec: Value) -> String {
+        let mut old: Value = serde_json::from_str(INSTALLED).unwrap();
+        old["tools"]["exec"] = exec;
+        serde_json::to_string(&old).unwrap()
+    }
+
+    fn exec_of(text: &str, v1: bool) -> Value {
+        let merged = merge_config(text, 7741, Path::new(WORKSPACE), true, v1).unwrap();
+        serde_json::from_str::<Value>(&merged).unwrap()["tools"]["exec"].clone()
+    }
+
+    /// The `tools.exec` either switch writes, with `askFallback` a key of
+    /// a person's that is kept.
+    fn ours(v1: bool) -> Value {
+        if v1 {
+            json!({"host": "gateway", "mode": EXEC_MODE_V1, "askFallback": "deny"})
+        } else {
+            json!({"mode": EXEC_MODE, "askFallback": "deny"})
+        }
+    }
+
+    /// #7859: an older build's `security` + `ask`, no `mode`: after the
+    /// update the file has `mode` alone, every other exec key kept.
+    #[test]
+    fn an_old_security_and_ask_become_mode_alone() {
+        let old = with_exec(json!({"security": "full", "ask": "off", "askFallback": "deny"}));
+        for v1 in [true, false] {
+            let exec = exec_of(&old, v1);
+            assert_eq!(exec, ours(v1), "{v1}");
+            assert!(openclaw_takes(&exec), "{v1}");
+        }
+    }
+
+    /// #7859, lamp-c0a4: `mode` already beside a stale `security` + `ask`,
+    /// the file OpenClaw refuses (exit 78), is repaired to `mode` alone.
+    #[test]
+    fn a_mode_beside_security_and_ask_is_repaired() {
+        for mode in [EXEC_MODE, EXEC_MODE_V1] {
+            let broken = with_exec(
+                json!({"security": "full", "ask": "off", "mode": mode, "askFallback": "deny"}),
+            );
+            for v1 in [true, false] {
+                let exec = exec_of(&broken, v1);
+                assert_eq!(exec, ours(v1), "{mode} {v1}");
+                assert!(openclaw_takes(&exec), "{mode} {v1}");
+            }
+        }
+    }
+
+    /// #7859: a file already migrated (`mode` alone) is given back byte for
+    /// byte, so it is never written again.
+    #[test]
+    fn an_already_migrated_file_is_unchanged() {
+        for v1 in [true, false] {
+            let once = merge_config(INSTALLED, 7741, Path::new(WORKSPACE), true, v1).unwrap();
+            assert_eq!(
+                merge_config(&once, 7741, Path::new(WORKSPACE), true, v1).unwrap(),
+                once,
+                "{v1}"
+            );
+        }
+    }
+
+    /// #7859: a fresh file, empty or `{}`, gets `mode` alone.
+    #[test]
+    fn a_fresh_file_gets_mode_alone() {
+        for text in ["", "{}"] {
+            assert_eq!(
+                exec_of(text, true),
+                json!({"host": "gateway", "mode": EXEC_MODE_V1})
+            );
+            assert_eq!(exec_of(text, false), json!({"mode": EXEC_MODE}));
+        }
     }
 
     #[test]
     fn merging_twice_changes_nothing() {
-        for text in [INSTALLED, "", "{}"] {
-            let once = merge_config(text, 7741, Path::new(WORKSPACE), true).unwrap();
-            assert_eq!(
-                merge_config(&once, 7741, Path::new(WORKSPACE), true).unwrap(),
-                once
-            );
+        for v1 in [true, false] {
+            for text in [INSTALLED, "", "{}"] {
+                let once = merge_config(text, 7741, Path::new(WORKSPACE), true, v1).unwrap();
+                assert_eq!(
+                    merge_config(&once, 7741, Path::new(WORKSPACE), true, v1).unwrap(),
+                    once
+                );
+            }
         }
     }
 
@@ -376,16 +948,19 @@ mod tests {
             "{\"models\": {\"providers\": \"x\"}}",
             "{\"agents\": {\"defaults\": 1}}",
             "{\"tools\": {\"exec\": true}}",
+            "{\"tools\": {\"elevated\": []}}",
+            "{\"tools\": {\"elevated\": {\"allowFrom\": 1}}}",
+            "{\"agents\": {\"defaults\": {\"sandbox\": \"x\"}}}",
             "{\"skills\": {\"load\": {\"extraDirs\": \"/a\"}}}",
             "{\"skills\": {\"load\": {\"extraDirs\": [1]}}}",
             "{\"plugins\": true}",
         ] {
             assert!(
-                merge_config(text, 7741, Path::new(WORKSPACE), true).is_err(),
+                merge_config(text, 7741, Path::new(WORKSPACE), true, true).is_err(),
                 "{text:?}"
             );
         }
-        assert!(merge_config("{}", 7741, Path::new("relative"), true).is_err());
+        assert!(merge_config("{}", 7741, Path::new("relative"), true, true).is_err());
     }
 
     #[test]
@@ -393,15 +968,15 @@ mod tests {
         let state = tempfile::tempdir().unwrap();
         let path = state.path().join(CONFIG_FILE);
         fs::write(&path, INSTALLED).unwrap();
-        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true).unwrap());
-        assert!(!write(state.path(), 7741, Path::new(WORKSPACE), true).unwrap());
+        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true, true).unwrap());
+        assert!(!write(state.path(), 7741, Path::new(WORKSPACE), true, true).unwrap());
         let text = fs::read_to_string(&path).unwrap();
         assert!(text.contains("kept-gateway-token"));
         assert!(!text.contains("AUTONOMOUS_API_KEY") && !text.contains("campaign-api"));
         let mode = fs::metadata(&path).unwrap().permissions().mode();
         assert_eq!(mode & 0o777, 0o600);
         fs::write(&path, "{\"models\": []}").unwrap();
-        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true).is_err());
+        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true, true).is_err());
         assert_eq!(fs::read_to_string(&path).unwrap(), "{\"models\": []}");
     }
 
@@ -412,7 +987,7 @@ mod tests {
         let target = elsewhere.path().join(CONFIG_FILE);
         fs::write(&target, "{}").unwrap();
         std::os::unix::fs::symlink(&target, state.path().join(CONFIG_FILE)).unwrap();
-        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true).is_err());
+        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true, true).is_err());
         assert_eq!(fs::read_to_string(&target).unwrap(), "{}");
     }
 
@@ -433,5 +1008,474 @@ mod tests {
             fs::read_to_string(folder.path().join("AGENTS.md")).unwrap(),
             text
         );
+    }
+
+    /// #7108: the new text is checked by OpenClaw's own `config validate`,
+    /// through its wrapper, on a file beside `openclaw.json`, never the
+    /// live one: refused, `write` fails with OpenClaw's words and the old
+    /// file stays byte for byte with nothing left beside it; taken, the new
+    /// text is in place. With no wrapper there it is written as before.
+    /// The check joins the running gateway's namespaces, as the wrapper's
+    /// every other call does (#7268's ROW FAIL on lamp-52e6: run with
+    /// `LAMP_OPENCLAW_GATEWAY=on`, the wrapper gave it namespaces of its
+    /// own and OpenClaw 2026.11.2 refused with `GatewayLockNamespaceError`
+    /// whatever the text): never that switch, OpenClaw's own environment.
+    /// A `MainPID` the wrapper finds no gateway behind (one stopping or
+    /// just started) fails closed, and so does the write.
+    #[test]
+    fn a_text_openclaws_own_validate_refuses_never_lands() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        let path = state.join(CONFIG_FILE);
+        fs::write(&path, INSTALLED).unwrap();
+        // A stand-in wrapper, as lamp-update's: `LAMP_OPENCLAW_GATEWAY`
+        // set gives the call namespaces of its own, which OpenClaw refuses
+        // while its gateway runs; unset, the call joins the gateway's
+        // (`running` there) or fails closed with none. Joined, its `config
+        // validate` keeps a copy of the file it was pointed at and answers
+        // with the verdict file's status.
+        let verdict = dir.path().join("verdict");
+        let checked = dir.path().join("checked");
+        let running = dir.path().join("running");
+        let wrapper = dir.path().join("openclaw");
+        fs::write(
+            &wrapper,
+            format!(
+                "#!/bin/sh\n[ \"$*\" = \"config validate --json\" ] && [ \"$OPENCLAW_CONFIG_PATH\" != {live} ] && [ \"$HOME\" = /var/lib/lampos-openclaw ] && [ \"$OPENCLAW_STATE_DIR\" = /var/lib/lampos-openclaw/state ] || exit 2\n[ -z \"${{LAMP_OPENCLAW_GATEWAY+set}}\" ] || {{ echo 'GatewayLockNamespaceError: cannot verify Gateway ownership from this namespace'; exit 1; }}\n[ -e {running} ] || {{ echo 'openclaw: its gateway (lamp-openclaw-gateway.service) is not running in its own namespaces; nothing runs without it'; exit 1; }}\ncp \"$OPENCLAW_CONFIG_PATH\" {checked}\necho 'models.providers.lampos: Unrecognized key'\nexit \"$(cat {verdict})\"\n",
+                live = path.display(),
+                running = running.display(),
+                checked = checked.display(),
+                verdict = verdict.display()
+            ),
+        )
+        .unwrap();
+        fs::write(&running, "").unwrap();
+        fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
+        let write = |validator: &Path| {
+            write_checked(
+                &state,
+                7741,
+                Path::new(WORKSPACE),
+                true,
+                true,
+                &joined(validator),
+            )
+        };
+
+        fs::write(&verdict, "1").unwrap();
+        let error = write(&wrapper).unwrap_err().to_string();
+        assert!(error.contains("Unrecognized key"), "{error}");
+        assert!(error.contains("status 1"), "{error}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+        let given = fs::read_to_string(&checked).unwrap();
+        assert!(given.contains("kept-gateway-token") && given != INSTALLED);
+
+        fs::write(&verdict, "0").unwrap();
+        assert!(write(&wrapper).unwrap());
+        assert_eq!(fs::read_to_string(&path).unwrap(), given);
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+
+        fs::write(&path, INSTALLED).unwrap();
+        fs::remove_file(&running).unwrap();
+        let error = write(&wrapper).unwrap_err().to_string();
+        assert!(error.contains("is not running"), "{error}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+
+        assert!(write(&dir.path().join("none")).unwrap());
+        assert_eq!(fs::read_to_string(&path).unwrap(), given);
+    }
+
+    /// A [`Check`] through the stand-in `wrapper`, the gateway's unit
+    /// naming a `MainPID` (its `own` never run).
+    fn joined(wrapper: &Path) -> Check {
+        Check {
+            wrapper: wrapper.into(),
+            main_pid: vec!["echo".into(), "4242".into()],
+            own: Box::new(|_: &str| vec!["false".into()]),
+        }
+    }
+
+    /// A stand-in script at `path`, 0755.
+    fn script(path: &Path, text: &str) {
+        fs::write(path, text).unwrap();
+        fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    /// A [`Check`] under `dir`: the gateway's unit's `MainPID` read from
+    /// `dir/pid`; the stand-in wrapper (`dir/openclaw`) joins the gateway,
+    /// failing closed with none, and logs `joined`; OpenClaw in its own
+    /// namespace (`dir/own`, given the new file) logs `own`. Either
+    /// refuses a text with `"ask"` in it, as OpenClaw 2026.11.2 refuses
+    /// `mode` beside `ask` (78, the gateway down), and else answers with
+    /// `dir/verdict`'s status. Neither is ever given the live file.
+    fn standing_in(dir: &Path, live: &Path) -> Check {
+        let check = |name: &str, file: &str| {
+            format!(
+                "[ \"{file}\" != {live} ] && [ -f \"{file}\" ] || exit 2\necho {name} >> {log}\n! grep -q '\"ask\"' \"{file}\" || {{ echo 'tools.exec: mode beside ask'; exit 1; }}\nexit \"$(cat {verdict})\"\n",
+                live = live.display(),
+                log = dir.join("log").display(),
+                verdict = dir.join("verdict").display(),
+            )
+        };
+        script(
+            &dir.join("openclaw"),
+            &format!(
+                "#!/bin/sh\n[ \"$*\" = \"config validate --json\" ] || exit 2\n[ \"$(cat {pid})\" != 0 ] || {{ echo 'openclaw: its gateway (lamp-openclaw-gateway.service) is not running in its own namespaces; nothing runs without it'; exit 1; }}\n{}",
+                check("joined", "$OPENCLAW_CONFIG_PATH"),
+                pid = dir.join("pid").display(),
+            ),
+        );
+        script(
+            &dir.join("own"),
+            &format!("#!/bin/sh\n{}", check("own", "$1")),
+        );
+        fs::write(dir.join("verdict"), "0").unwrap();
+        let own = dir.join("own").to_string_lossy().into_owned();
+        Check {
+            wrapper: dir.join("openclaw"),
+            main_pid: vec!["cat".into(), dir.join("pid").to_string_lossy().into_owned()],
+            own: Box::new(move |file: &str| vec![own.clone(), file.to_owned()]),
+        }
+    }
+
+    /// What the stand-ins of [`standing_in`] logged since the last call.
+    fn logged(dir: &Path) -> String {
+        let log = dir.join("log");
+        let said = fs::read_to_string(&log).unwrap_or_default();
+        let _ = fs::remove_file(&log);
+        said
+    }
+
+    /// #8060: with no gateway running (its unit's `MainPID` is 0) the
+    /// check runs in OpenClaw's namespace of its own, where no gateway
+    /// holds the lock, never failing closed for want of a gateway; with
+    /// one running it still joins it through the wrapper. Either way the
+    /// text is checked, on the new file, never the live one.
+    #[test]
+    fn with_no_gateway_running_the_check_runs_in_openclaws_own_namespace() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        let path = state.join(CONFIG_FILE);
+        let check = standing_in(dir.path(), &path);
+        let write = || write_checked(&state, 7741, Path::new(WORKSPACE), true, true, &check);
+
+        fs::write(&path, INSTALLED).unwrap();
+        fs::write(dir.path().join("pid"), "0\n").unwrap();
+        assert!(write().unwrap());
+        assert_eq!(logged(dir.path()), "own\n");
+        assert_ne!(fs::read_to_string(&path).unwrap(), INSTALLED);
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+
+        fs::write(&path, INSTALLED).unwrap();
+        fs::write(dir.path().join("pid"), "4242\n").unwrap();
+        assert!(write().unwrap());
+        assert_eq!(logged(dir.path()), "joined\n");
+        assert_ne!(fs::read_to_string(&path).unwrap(), INSTALLED);
+
+        // Refused in its own namespace: nothing written there either.
+        fs::write(&path, INSTALLED).unwrap();
+        fs::write(dir.path().join("pid"), "0\n").unwrap();
+        fs::write(dir.path().join("verdict"), "1").unwrap();
+        let error = write().unwrap_err().to_string();
+        assert!(error.contains("status 1"), "{error}");
+        assert_eq!(logged(dir.path()), "own\n");
+        assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+    }
+
+    /// #8060: a config OpenClaw refuses already in `openclaw.json` keeps
+    /// its gateway down (Restart=on-failure, then "Start request repeated
+    /// too quickly"), so no gateway runs to join. lamp-tasks' next write
+    /// still heals it: the merged text, which OpenClaw takes, is checked
+    /// in OpenClaw's own namespace and replaces the refused file. A merged
+    /// text OpenClaw refuses writes nothing.
+    #[test]
+    fn a_refused_file_in_place_is_healed_through_the_check() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        let path = state.join(CONFIG_FILE);
+        let check = standing_in(dir.path(), &path);
+        fs::write(dir.path().join("pid"), "0\n").unwrap();
+        let refused = with_exec(json!({"host": "gateway", "mode": "ask", "ask": "off"}));
+        let write = || write_checked(&state, 7741, Path::new(WORKSPACE), true, true, &check);
+
+        fs::write(&path, &refused).unwrap();
+        assert!(write().unwrap());
+        assert_eq!(logged(dir.path()), "own\n");
+        let healed = fs::read_to_string(&path).unwrap();
+        assert!(!healed.contains("\"ask\""), "{healed}");
+        assert!(healed.contains("kept-gateway-token"), "{healed}");
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+
+        fs::write(&path, &refused).unwrap();
+        fs::write(dir.path().join("verdict"), "1").unwrap();
+        assert!(write().is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), refused);
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+    }
+
+    /// Whether `folder`'s lock (an exclusive `flock` on the folder) is held
+    /// by another writer just now.
+    fn folder_lock_held(folder: &Path) -> bool {
+        use rustix::fs::{FlockOperation, Mode, OFlags};
+        let dir = rustix::fs::open(
+            folder,
+            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .unwrap();
+        match rustix::fs::flock(&dir, FlockOperation::NonBlockingLockExclusive) {
+            Ok(()) => false,
+            Err(rustix::io::Errno::WOULDBLOCK) => true,
+            Err(error) => panic!("flock: {error}"),
+        }
+    }
+
+    /// Seventh's P2 on #7872: `openclaw.json` has two read-merge-check-rename
+    /// writers (this one and lamp-update's `gateway` block), and a rename
+    /// landing inside the other's check drops the other's block. So the
+    /// state folder's lock is held from before the read until after the
+    /// rename, through OpenClaw's own check (seconds), and let go after.
+    #[test]
+    fn the_state_folders_lock_is_held_from_the_read_through_the_check_to_the_rename() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        fs::write(state.join(CONFIG_FILE), INSTALLED).unwrap();
+        let inside = dir.path().join("inside");
+        let release = dir.path().join("release");
+        let wrapper = dir.path().join("openclaw");
+        fs::write(
+            &wrapper,
+            format!(
+                "#!/bin/sh\n: > {inside}\nwhile [ ! -e {release} ]; do :; done\nexit 0\n",
+                inside = inside.display(),
+                release = release.display()
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
+        let writing = std::thread::spawn({
+            let (state, wrapper) = (state.clone(), wrapper.clone());
+            move || {
+                write_checked(
+                    &state,
+                    7741,
+                    Path::new(WORKSPACE),
+                    true,
+                    true,
+                    &joined(&wrapper),
+                )
+            }
+        });
+        let began = std::time::Instant::now();
+        while !inside.exists() {
+            assert!(began.elapsed() < Duration::from_secs(30), "no check ran");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let held = folder_lock_held(&state);
+        fs::write(&release, "").unwrap();
+        assert!(writing.join().unwrap().unwrap());
+        assert!(held, "the state folder was not locked through the check");
+        assert!(!folder_lock_held(&state), "the lock outlived the write");
+    }
+
+    /// #7268's HOLD at 950bb215dd: lamp-tasks can start with OpenClaw's
+    /// gateway (at a boot, or an update that restarts both), and the
+    /// wrapper fails closed while it finds no gateway behind a `MainPID`.
+    /// So the write is tried again while the wrapper finds none, after
+    /// each of a bounded list of waits: nothing is written before the
+    /// gateway is there, then the text lands through the check. Past the
+    /// last wait it fails as before; a text OpenClaw refuses is never
+    /// tried again.
+    #[test]
+    fn a_write_waits_for_the_gateway_bounded() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        let path = state.join(CONFIG_FILE);
+        let verdict = dir.path().join("verdict");
+        let running = dir.path().join("running");
+        let wrapper = dir.path().join("openclaw");
+        fs::write(
+            &wrapper,
+            format!(
+                "#!/bin/sh\n[ -e {running} ] || {{ echo 'openclaw: its gateway (lamp-openclaw-gateway.service) is not running in its own namespaces; nothing runs without it'; exit 1; }}\necho 'models.providers.lampos: Unrecognized key'\nexit \"$(cat {verdict})\"\n",
+                running = running.display(),
+                verdict = verdict.display()
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::write(&verdict, "0").unwrap();
+        let waits = [Duration::from_millis(1); 3];
+        let write = |say: &mut dyn FnMut(&str)| {
+            write_waiting(
+                &state,
+                7741,
+                Path::new(WORKSPACE),
+                true,
+                true,
+                &joined(&wrapper),
+                &waits,
+                say,
+            )
+        };
+
+        // No gateway at the start: nothing written, a try pending; the
+        // gateway comes up during the second wait, and the text lands.
+        fs::write(&path, INSTALLED).unwrap();
+        let mut said = Vec::new();
+        let written = write(&mut |line| {
+            assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+            assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+            said.push(line.to_owned());
+            if said.len() == 2 {
+                fs::write(&running, "").unwrap();
+            }
+        });
+        assert!(written.unwrap());
+        assert_eq!(said.len(), 2, "{said:?}");
+        assert!(said[0].contains("gateway"), "{said:?}");
+        assert_ne!(fs::read_to_string(&path).unwrap(), INSTALLED);
+
+        // Never a gateway: tried once and after each wait, then refused.
+        fs::remove_file(&running).unwrap();
+        fs::write(&path, INSTALLED).unwrap();
+        let mut tries = 0;
+        let error = write(&mut |_| tries += 1).unwrap_err().to_string();
+        assert_eq!(tries, waits.len());
+        assert!(error.contains("is not running"), "{error}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+
+        // A text refused with the gateway there is not tried again.
+        fs::write(&running, "").unwrap();
+        fs::write(&verdict, "1").unwrap();
+        let mut tries = 0;
+        let error = write(&mut |_| tries += 1).unwrap_err().to_string();
+        assert_eq!(tries, 0);
+        assert!(error.contains("Unrecognized key"), "{error}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+    }
+
+    /// Seventh's P1 on #8064: a gateway that came up between `MainPID` 0
+    /// and the check in OpenClaw's own namespace makes OpenClaw say
+    /// `GatewayLockNamespaceError`. That is not a refusal of the text: it
+    /// is tried again, and the text lands after one wait.
+    #[test]
+    fn a_gateway_that_came_up_under_the_check_is_tried_again() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        let path = state.join(CONFIG_FILE);
+        let came = dir.path().join("came");
+        let wrapper = dir.path().join("openclaw");
+        fs::write(
+            &wrapper,
+            format!(
+                "#!/bin/sh\n[ -e {came} ] && {{ rm {came}; echo 'GatewayLockNamespaceError: gateway already running'; exit 1; }}\nexit 0\n",
+                came = came.display()
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::write(&path, INSTALLED).unwrap();
+        fs::write(&came, "").unwrap();
+        let mut said = Vec::new();
+        let written = write_waiting(
+            &state,
+            7741,
+            Path::new(WORKSPACE),
+            true,
+            true,
+            &joined(&wrapper),
+            &[Duration::from_millis(1); 3],
+            &mut |line| {
+                assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+                said.push(line.to_owned());
+            },
+        );
+        assert!(written.unwrap());
+        assert_eq!(said.len(), 1, "{said:?}");
+        assert!(said[0].contains("wait for its gateway"), "{said:?}");
+        assert_ne!(fs::read_to_string(&path).unwrap(), INSTALLED);
+    }
+
+    /// #7268's FINDING on b958d31455 (lamp-52e6, lamp-tasks and the gateway
+    /// restarted together): the check raced the gateway's own start and was
+    /// killed, "status killed", with no verdict from OpenClaw. A killed check
+    /// is tried again over the same bounded waits, each said with no value;
+    /// a text OpenClaw refuses still is not.
+    #[test]
+    fn a_killed_check_is_tried_again_bounded() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        let path = state.join(CONFIG_FILE);
+        let verdict = dir.path().join("verdict");
+        let killed = dir.path().join("killed");
+        let wrapper = dir.path().join("openclaw");
+        fs::write(
+            &wrapper,
+            format!(
+                "#!/bin/sh\n[ -e {killed} ] && kill -9 $$\necho 'models.providers.lampos: Unrecognized key'\nexit \"$(cat {verdict})\"\n",
+                killed = killed.display(),
+                verdict = verdict.display()
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::write(&verdict, "0").unwrap();
+        let waits = [Duration::from_millis(1); 3];
+        let write = |say: &mut dyn FnMut(&str)| {
+            write_waiting(
+                &state,
+                7741,
+                Path::new(WORKSPACE),
+                true,
+                true,
+                &joined(&wrapper),
+                &waits,
+                say,
+            )
+        };
+
+        // Killed once, then a good check: written on the retry.
+        fs::write(&path, INSTALLED).unwrap();
+        fs::write(&killed, "").unwrap();
+        let mut said = Vec::new();
+        let written = write(&mut |line| {
+            assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+            said.push(line.to_owned());
+            fs::remove_file(&killed).unwrap();
+        });
+        assert!(written.unwrap());
+        assert_eq!(said.len(), 1, "{said:?}");
+        assert!(said[0].contains("tried again in"), "{said:?}");
+        assert!(!said[0].contains("kept-gateway-token"), "{said:?}");
+        assert_ne!(fs::read_to_string(&path).unwrap(), INSTALLED);
+
+        // Killed every time: bounded, not written, a clear final line.
+        fs::write(&path, INSTALLED).unwrap();
+        fs::write(&killed, "").unwrap();
+        let mut tries = 0;
+        let error = write(&mut |_| tries += 1).unwrap_err().to_string();
+        assert_eq!(tries, waits.len());
+        assert!(error.contains("status killed"), "{error}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
+
+        // A text refusal is never tried again.
+        fs::remove_file(&killed).unwrap();
+        fs::write(&verdict, "1").unwrap();
+        let mut tries = 0;
+        let error = write(&mut |_| tries += 1).unwrap_err().to_string();
+        assert_eq!(tries, 0);
+        assert!(error.contains("Unrecognized key"), "{error}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), INSTALLED);
     }
 }

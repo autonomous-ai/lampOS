@@ -12,6 +12,10 @@ pub enum Verb {
     Restart,
     Stop,
     ResetFailed,
+    /// `systemctl clean --what=state`: systemd removes the unit's own state
+    /// (a dynamic user's private folder and its link); the helper writes
+    /// nothing there. First real on a lamp.
+    Clean,
 }
 
 impl Verb {
@@ -21,6 +25,7 @@ impl Verb {
             Verb::Restart => "restart",
             Verb::Stop => "stop",
             Verb::ResetFailed => "reset-failed",
+            Verb::Clean => "clean",
         }
     }
 }
@@ -28,21 +33,69 @@ impl Verb {
 /// The command line, whole: the program by its absolute path, and `--`
 /// before the unit so a name can never be read as an option.
 pub fn argv(verb: Verb, unit: &str) -> Vec<String> {
-    vec![
-        SYSTEMCTL.into(),
-        verb.word().into(),
-        "--".into(),
-        unit.into(),
-    ]
+    let mut line = vec![SYSTEMCTL.into(), verb.word().into()];
+    if verb == Verb::Clean {
+        line.push("--what=state".into());
+    }
+    line.push("--".into());
+    line.push(unit.into());
+    line
+}
+
+/// What `systemctl` said for a verb: its exit status and what it wrote to stderr. A unit that is not loaded
+/// IS the wanted end of a stop, a reset of the failed state and a clean of its state (a remove cut at
+/// `reset-failed` because the unit had unloaded left the app half removed, 18 Nov and 20 Nov, on 0c89),
+/// however `systemctl` words it: exit 5 (a stop), or exit 1 with "not loaded" or "not found" (a reset, a
+/// clean, and a stop on some versions, seen on systemd 255). A start or a restart of a unit that is not
+/// loaded is an error, as is every other exit.
+pub fn judge_status(verb: Verb, unit: &str, code: Option<i32>, said: &str) -> Result<(), String> {
+    let gone_is_done = matches!(verb, Verb::Stop | Verb::ResetFailed | Verb::Clean);
+    let said_gone = {
+        let said = said.to_ascii_lowercase();
+        said.contains("not loaded") || said.contains("not found")
+    };
+    match code {
+        Some(0) => Ok(()),
+        Some(5) if gone_is_done => Ok(()),
+        Some(1) if gone_is_done && said_gone => Ok(()),
+        other => Err(format!(
+            "{SYSTEMCTL} {} {unit}: {}",
+            verb.word(),
+            other.map_or_else(|| "killed by a signal".to_owned(), |c| format!("exit {c}"))
+        )),
+    }
 }
 
 pub trait Effects {
     fn systemctl(&mut self, verb: Verb, unit: &str) -> Result<(), String>;
     /// Whether the unit's cgroup has no process left (or has none at all).
     fn unit_empty(&mut self, unit: &str) -> Result<bool, String>;
+    /// Tells lamp-control the app is gone (`{"app_forget": NAME}`), so what it
+    /// kept of the app goes too. Called only after both unit variants have
+    /// stopped; an error leaves the remove cut, to be resumed.
+    fn forget(&mut self, name: &str) -> Result<(), String>;
     /// A short wait between two `unit_empty` asks.
     fn pause(&mut self) {}
+    /// The one cap the apps share (`lampos-apps.slice`), set at runtime before the first app
+    /// starts: the slice has no unit file (no round could carry one), and `--runtime` keeps it in
+    /// `/run`, set again at each boot. An error means no app is started.
+    fn limit_apps(&mut self) -> Result<(), String> {
+        Ok(())
+    }
 }
+
+/// What the shared cap is: the slice, its ceiling (`MemoryMax`, `TasksMax`) and the shares the old slice file
+/// gave (`CPUWeight`, `IOWeight`, `MemoryHigh`), so the apps never get the voice's CPU or disk share.
+pub const APPS_SLICE_LIMIT: [&str; 8] = [
+    "set-property",
+    "--runtime",
+    "lampos-apps.slice",
+    "CPUWeight=50",
+    "IOWeight=50",
+    "MemoryHigh=192M",
+    "MemoryMax=256M",
+    "TasksMax=128",
+];
 
 /// Whether a unit has no process left, from what `systemctl show
 /// --property=ControlGroup --value` said and the unit's `cgroup.events`
@@ -85,18 +138,22 @@ pub fn judge_unit_empty(
 pub struct RealEffects;
 
 impl Effects for RealEffects {
+    fn forget(&mut self, name: &str) -> Result<(), String> {
+        crate::client::AdminYes::product().forget(name)
+    }
+
     fn systemctl(&mut self, verb: Verb, unit: &str) -> Result<(), String> {
         let line = argv(verb, unit);
-        let status = Command::new(&line[0])
+        let output = Command::new(&line[0])
             .args(&line[1..])
             .env_clear()
-            .status()
+            .stdin(std::process::Stdio::null())
+            .output()
             .map_err(|error| format!("{}: {error}", line[0]))?;
-        if status.success() {
-            Ok(())
-        } else {
-            Err(format!("{} {} {unit}: {status}", line[0], verb.word()))
-        }
+        // Only the start of what it said is read: a unit name and a reason.
+        let said =
+            String::from_utf8_lossy(&output.stderr[..output.stderr.len().min(512)]).into_owned();
+        judge_status(verb, unit, output.status.code(), &said)
     }
 
     fn unit_empty(&mut self, unit: &str) -> Result<bool, String> {
@@ -115,5 +172,23 @@ impl Effects for RealEffects {
 
     fn pause(&mut self) {
         std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+
+    fn limit_apps(&mut self) -> Result<(), String> {
+        let status = Command::new(SYSTEMCTL)
+            .args(APPS_SLICE_LIMIT)
+            .env_clear()
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .status()
+            .map_err(|error| format!("{SYSTEMCTL}: {error}"))?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(format!(
+                "{SYSTEMCTL} {}: {status}",
+                APPS_SLICE_LIMIT.join(" ")
+            ))
+        }
     }
 }

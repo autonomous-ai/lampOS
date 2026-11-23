@@ -48,6 +48,21 @@ pub(super) fn set_for_test(on: Option<bool>) {
     FOR_TEST.with(|cell| cell.set(on));
 }
 
+/// Whether a spoken line refused only by 429s (the usage limit among them)
+/// is sent all the same, for the route to do a plain light or volume ask
+/// with no model (`LAMP_LIMIT_LOCAL_ASKS`, #7346): that switch, with the
+/// down line that tells the limit and keeps other lines quiet
+/// (`LAMP_SECOND_DOWN_LINE`), and the owner's language English, the only
+/// one its words are matched in.
+pub(super) fn limit_local_on() -> bool {
+    crate::second_provider::limit_local::on()
+        && std::env::var(crate::second_provider::worker::DOWN_LINE_ENVIRONMENT)
+            .ok()
+            .as_deref()
+            == Some("on")
+        && crate::language::at_start().is_none()
+}
+
 /// While refusing, one turn is sent to find the service back this often.
 pub(super) const TRY_AGAIN_EVERY_US: u64 = 60_000_000;
 
@@ -133,6 +148,12 @@ impl ModelRefusing {
 
     pub(super) fn refusing(&self) -> bool {
         self.since_us.is_some()
+    }
+
+    /// Refusing, and only ever with 429s ("rate_limited"), the usage
+    /// limit's status ([`limit_local_on`]).
+    pub(super) fn only_rate_limited(&self) -> bool {
+        self.refusing() && self.said.iter().all(|kind| *kind == "rate_limited")
     }
 
     /// Whether a turn heard now is held, not sent: refusing, and a turn
@@ -290,5 +311,26 @@ mod tests {
         let mut well = ModelRefusing::default();
         well.tried(5);
         assert!(!well.holds(6) && well.health(6).is_none());
+    }
+
+    /// `LAMP_LIMIT_LOCAL_ASKS` (#7346): the coordinator sends a spoken line
+    /// held only for 429s (the usage limit's status), so the route can do a
+    /// plain light or volume ask with no model; a refusal that is or was
+    /// ever anything else (a 402, a key, unreachable) still holds it.
+    #[test]
+    fn only_rate_limited_is_a_refusal_of_429s_alone() {
+        use crate::second_provider::{fault, net::Error};
+        let mut limited = ModelRefusing::default();
+        assert!(!limited.only_rate_limited(), "not refusing");
+        limited.observe(&failed(1, fault(&Error::UsageLimit(None))), 0, false);
+        limited.observe(&failed(2, fault(&Error::Status(429))), 1, false);
+        assert!(limited.holds(2) && limited.only_rate_limited());
+        limited.observe(&failed(3, fault(&Error::Status(402))), 3, false);
+        assert!(limited.holds(4) && !limited.only_rate_limited());
+        let mut quota = ModelRefusing::default();
+        quota.observe(&failed(1, fault(&Error::Status(402))), 0, false);
+        assert!(quota.holds(1) && !quota.only_rate_limited());
+        limited.observe(&answered(4), 5, false);
+        assert!(!limited.holds(6) && !limited.only_rate_limited());
     }
 }

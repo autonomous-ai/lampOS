@@ -42,9 +42,10 @@ coord_pr_comments() {
 }
 
 # The Queue's issues, oldest first: #4710 hit GitHub's 2,500-comment limit on 5 Nov and the Queue went on in #5385,
-# which hit it on 10 Nov, and #6059, which hit it on 13 Nov; the Queue goes on in #6811 (#6809, opened beside it the same minute, is read too).
+# which hit it on 10 Nov, and #6059, which hit it on 13 Nov; then #6811 (#6809, opened beside it the same minute, is
+# read too), which hit it on 19 Nov at about 00:26 GMT+7; the Queue goes on in #7814.
 # The one place their numbers live: every one is read, so a HOLD on an older one still counts; the bot posts on the last.
-COORD_QUEUE_ISSUES=(4710 5385 6059 6809 6811)
+COORD_QUEUE_ISSUES=(4710 5385 6059 6809 6811 7814)
 COORD_QUEUE_POST=${COORD_QUEUE_ISSUES[-1]}
 
 # coord_queue OUT: the comments of the last 3 days on every Queue issue, where Queue HOLDs are posted, as one list of
@@ -97,6 +98,20 @@ coord_switch_on() {
 # the same patch by range-diff.
 patch_of() { local b; b=$(git merge-base origin/lamp-voice $1 2>/dev/null) || return 1; git diff -U0 $b $1 -- . | git patch-id --stable | cut -d' ' -f1; }
 
+# code_patch_of COMMIT: patch_of with the docs left out (Markdown files under a `docs/` folder), "none" for a change of
+# docs alone. 18 Nov (Jarvis's ask on #6543): a rebase that merges a PR's own docs rows with rows another train touched
+# changes its patch but not its code. coord_same_patch then names such a head "code:<sha>", and reads2.py counts a
+# READ-OK on it only beside a read of the head's own patch: one reader's restate covers the docs, and the other's
+# earlier read still covers the code. 15:1x and 15:2x (the Reviewer-lead's P2s on #7710): only Markdown under docs/
+# is docs. Every other file counts as code: a skill's SKILL.md or README.md (the product installs them), an
+# `include_str!` guide, the realtime prompts, and whatever else lives in docs/ (the model the sim ships, the protocol
+# schemas the SDKs copy, test fixtures).
+code_patch_of() {
+  local b p; b=$(git merge-base origin/lamp-voice $1 2>/dev/null) || return 1
+  p=$(git diff -U0 $b $1 -- . ':(exclude,glob)**/docs/**/*.md' | git patch-id --stable | cut -d' ' -f1) || return 1
+  print -r -- ${p:-none}
+}
+
 # coord_same_patch HEAD COMMENTS [QUEUE]: prints HEAD, then each commit a READ-OK in the COMMENTS file names whose patch
 # is HEAD's (a plain rebase), one a line, for reads2.py. reads2.py still decides which READ-OKs count (writers, markers).
 # 7 Nov (El's HOLD on #5653): with QUEUE (the Queue's JSON lines, coord_queue), the shas Queue READ ASKs name are
@@ -120,19 +135,38 @@ coord_cached_patch() {
   REPLY=${coord_patch_cache[$k]}
   [[ $REPLY != - ]]
 }
+# coord_cached_code_patch FULL_SHA LV: sets REPLY to the commit's code_patch_of, cached as coord_cached_patch's is, or
+# fails when it can't be worked out.
+typeset -gA coord_code_patch_cache
+coord_cached_code_patch() {
+  local k="$2:$1" p
+  if (( ! ${+coord_code_patch_cache[$k]} )); then
+    p=$(code_patch_of $1) && [[ -n $p ]] && coord_code_patch_cache[$k]=$p || coord_code_patch_cache[$k]=-
+  fi
+  REPLY=${coord_code_patch_cache[$k]}
+  [[ $REPLY != - ]]
+}
+# 18 Nov: a commit a READ-OK in COMMENTS names whose code is HEAD's but whose .md lines differ is printed as
+# "code:<sha>" (code_patch_of, above). A Queue sha never is: it only matches asks, which need the head's own patch.
 coord_same_patch() {
-  local hp s lv; local -a seen
+  local hp hc s lv full; local -a seen reads
   print -r -- $1
   lv=$(git rev-parse -q --verify origin/lamp-voice 2>/dev/null) || return 0
   coord_cached_patch $1 $lv && hp=${REPLY#* } || return 0
   seen=(${REPLY%% *})
-  for s in ${(u)${(f)"$( grep -oE 'READ-OK[*]{0,2}[[:space:]]+`?[0-9a-f]{7,40}' $2 2>/dev/null | grep -oE '[0-9a-f]{7,40}$'
+  reads=(${(f)"$( grep -oE 'READ-OK[*]{0,2}[[:space:]]+`?[0-9a-f]{7,40}' $2 2>/dev/null | grep -oE '[0-9a-f]{7,40}$' )"})
+  for s in ${(u)${(f)"$( print -rl -- $reads
                        [[ -n $3 ]] && $PYTHON -I $TOOLS_DIR/reads2.py --queue-shas $3 2>/dev/null )"}}; do
     [[ $1 == $s* ]] && continue
     coord_cached_patch $s $lv || continue
-    (( ${seen[(Ie)${REPLY%% *}]} )) && continue
-    seen+=(${REPLY%% *})
-    [[ ${REPLY#* } == $hp ]] && print -r -- ${REPLY%% *}
+    full=${REPLY%% *}
+    (( ${seen[(Ie)$full]} )) && continue
+    seen+=($full)
+    if [[ ${REPLY#* } == $hp ]]; then print -r -- $full; continue; fi
+    (( ${reads[(Ie)$s]} )) || continue
+    [[ -n $hc ]] || { coord_cached_code_patch $seen[1] $lv && hc=$REPLY || hc=- }
+    # 15:1x (the Reviewer-lead's P2 on #7710): a PR of docs alone has no code to carry a read over, so none is offered.
+    [[ $hc != - && $hc != none ]] && coord_cached_code_patch $full $lv && [[ $REPLY == $hc ]] && print -r -- code:$full
   done
   return 0
 }

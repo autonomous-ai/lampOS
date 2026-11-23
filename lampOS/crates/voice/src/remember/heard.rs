@@ -75,6 +75,9 @@ const LEAD_INS: &[&str] = &[
     "can you remember that",
     "could you remember that",
     "keep in mind that",
+    // Thirteen's P3 at f3cccc815d on #5701: "Keep in mind my goldfish is
+    // called Pip." is the goldfish's line.
+    "keep in mind",
     "remember that",
     "remember",
     "hãy nhớ giúp tôi là",
@@ -309,8 +312,11 @@ pub fn yes_alone(
         return None;
     }
     // Read before the thread is locked: the two locks are never held
-    // together.
-    let done = super::done_last_in(lease);
+    // together. The same lookup as [`done_already`]'s, so a one-face yes's
+    // call is told the same done keep its note was, never "Nothing was
+    // kept" beside it (Seventh's P2 on #5798). Its one-face fallback never
+    // finds a forget, so a `forget` call runs as before.
+    let done = super::done_for_yes_in(lease);
     let thread = crate::thread::THREAD.lock().ok()?;
     yes_alone_in(
         &thread,
@@ -413,16 +419,21 @@ fn yes_alone_told(done: Option<super::MemoryDone>, forget: bool) -> Value {
 /// is done already, by what was done, and what was done. On lamp-06c1 at
 /// build 10538 (6 Nov, S13 req 339) "Yes. Please forget it." after a done
 /// forget was answered with a `recall`, not a `forget`, so [`yes_alone`]
-/// never saw it, and the lamp asked again what to forget. `None` else.
+/// never saw it, and the lamp asked again what to forget. The note is
+/// `None` for a line that only acknowledges or hesitates ([`affirms`]:
+/// "Okay.", "Um."), while the done write is still given: it backs that
+/// turn's "Pip is kept." all the same (Thirteen's P2 on #5701). `None`
+/// else.
 pub(crate) fn done_already(
     request: u64,
     lease: Option<&crate::memory_scope::ScopeLease>,
-) -> Option<(String, super::MemoryDone)> {
+) -> Option<(Option<String>, super::MemoryDone)> {
     if !on() || released(lease).is_some() {
         return None;
     }
     // Read before the thread is locked, as [`yes_alone`] does.
-    let done = super::done_last_in(lease)?;
+    // A one-face line's yes, the scope its keep went to (#5607 on 06c1).
+    let done = super::done_for_yes_in(lease)?;
     let thread = crate::thread::THREAD.lock().ok()?;
     done_already_in(
         &thread,
@@ -437,7 +448,7 @@ pub(super) fn done_already_in(
     thread: &crate::thread::Thread,
     (request, whose, now): (u64, Option<&str>, Instant),
     done: Option<super::DoneWrite>,
-) -> Option<(String, super::MemoryDone)> {
+) -> Option<(Option<String>, super::MemoryDone)> {
     use super::MemoryDone;
     let done = done_last_turn(thread, request, done)?;
     // A lamp's answer that asked nothing offers nothing to keep
@@ -454,13 +465,20 @@ pub(super) fn done_already_in(
                 only_a_yes(&rest.join(" "))
             })
     };
-    if !said.as_deref().is_some_and(yes)
-        || thread.lamp_asked_by_its_end(request)
+    let said = said.filter(|line| yes(line))?;
+    if thread.lamp_asked_by_its_end(request)
         || thread
             .offered_line(request, whose, now, offers_to_keep, only_a_yes)
             .is_some()
     {
         return None;
+    }
+    // Only a real yes, or an ask to keep or forget, is told to confirm; a
+    // bare "Okay." still has the done write back its turn (Thirteen's P2
+    // on #5701: else "Great, Pip is kept." was held as a claim, and the
+    // lamp said it didn't keep what it had).
+    if !affirms(&said) {
+        return Some((None, done));
     }
     let note = match done {
         MemoryDone::Kept => DONE_ALREADY_KEPT,
@@ -468,7 +486,84 @@ pub(super) fn done_already_in(
         MemoryDone::Forgotten => DONE_ALREADY_FORGOTTEN,
     };
     eprintln!("{DONE_ALREADY_TOLD_LINE}");
-    Some((format!("{DONE_ALREADY_TOLD} {note})"), done))
+    Some((Some(format!("{DONE_ALREADY_TOLD} {note})")), done))
+}
+
+/// What heard line `request`, only a yes, answers: the line the lamp's
+/// offer before it was about ([`crate::thread::Thread::offered_line`]),
+/// else the person's line of the exchange just before it, when that says
+/// more than yes, its lead-in ([`LEAD_INS`]: "Keep in mind …") left out. A
+/// said-back keep after a found `recall` must name what this line holds
+/// (`remember::said_kept_found`, Thirteen's P2 and P3 on #5701).
+pub(crate) fn yes_answers(
+    request: u64,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Option<String> {
+    let thread = crate::thread::THREAD.lock().ok()?;
+    thread
+        .offered_line(
+            request,
+            writes_for(lease),
+            Instant::now(),
+            offers_to_keep,
+            only_a_yes,
+        )
+        .or_else(|| {
+            thread
+                .said_last_but(request, &[])
+                .map(|(person, _)| person)
+                .filter(|person| !only_a_yes(person))
+        })
+        .map(|line| yes_line(&line).to_owned())
+}
+
+/// [`yes_answers`]'s line without its lead-in ([`without_lead_in`]),
+/// unless a negation comes before the lead-in ([`super::negates`]): "I
+/// never said remember that my bike is red." stays whole, so its "never"
+/// is kept (Thirteen's P3 at aed324db5d on #5701).
+fn yes_line(line: &str) -> &str {
+    let rest = without_lead_in(line);
+    let before = &line[..line.len() - rest.len()];
+    if super::negates(before) { line } else { rest }
+}
+
+/// Whether [`done_already`]'s answer backs this turn's keep claim
+/// (`second_provider`'s `kept_now`): a done keep or change does, with its
+/// note or without ("Okay." after a done keep, Thirteen's P2 on #5701); a
+/// done forget does not.
+pub(crate) fn done_backs_a_keep(done: Option<&(Option<String>, super::MemoryDone)>) -> bool {
+    done.is_some_and(|(_, done)| *done != super::MemoryDone::Forgotten)
+}
+
+/// The words of a line that is only a yes that make it a real yes, or an
+/// ask to keep or forget, without accents ([`affirms`]): "Yes.", "Yeah.",
+/// "Please.", "Keep that.", "Go ahead.", "Vâng.", "Có.", "Ừ.".
+const AFFIRMS: &[&str] = &[
+    "yes",
+    "yeah",
+    "yep",
+    "yup",
+    "please",
+    "keep",
+    "go",
+    "do",
+    "absolutely",
+    "definitely",
+    "vang",
+    "co",
+    "da",
+    "u",
+    "giup",
+];
+
+/// Whether `line` says a real yes, or asks to keep or forget ([`AFFIRMS`]),
+/// for [`done_already_in`]: the first builder's P3 on #5607, after a done
+/// keep "Okay.", "Okay, thanks.", "Um.", "Right." and "Sure." only
+/// acknowledge or hesitate, and a person would not answer them that it is
+/// kept. [`only_a_yes`] stays as it is for [`yes_alone`], where the model
+/// has already called.
+fn affirms(line: &str) -> bool {
+    words(line).any(|word| AFFIRMS.contains(&bare(&word).as_str()) || asks_to_forget(&word))
 }
 
 /// What of `done`, the scope's last memory write done and the request it
@@ -743,6 +838,28 @@ pub fn near_held_told(near: &[(String, String)]) -> Value {
     })
 }
 
+/// What the model is told of a `remember` with [`near_heard`] words when
+/// an unsure line is not kept (`doubted::UNSURE_ENVIRONMENT`, #7739):
+/// nothing kept, the person told so in one line that asks nothing
+/// (`doubted::NOT_CAUGHT_LINE`), never "is that ...?" or "did you say
+/// ...?", and never said kept or noted. Their words alone, not the
+/// model's. Only in place of [`NEAR_ENVIRONMENT`]'s ask: with that switch
+/// off a near spelling is kept as before (Twelve's P2 on #7966).
+pub fn near_not_kept_told(near: &[(String, String)]) -> Value {
+    let heard = near
+        .iter()
+        .map(|(heard, _)| format!("\"{heard}\""))
+        .collect::<Vec<_>>()
+        .join(" and ");
+    json!({
+        "remembered": false,
+        "note": format!(
+            "Not kept: they were heard saying {heard}, not your words, and the lamp may have misheard, so nothing is kept. Tell them so in a few words, with no question, for example \"{}\", and end your reply there: never ask \"is that ...?\" or \"did you say ...?\", or ask them to say it again, spell it or say more, and never say it is kept or noted.",
+            super::doubted::NOT_CAUGHT_LINE
+        ),
+    })
+}
+
 /// For a `remember` the voice runs for heard line `request`: the call with
 /// the heard words in place of the model's, and those words, when
 /// [`heard_instead`] keeps them. `heard` is false for a line not heard at
@@ -815,9 +932,15 @@ fn call_kept_with(
     let mut call = call.clone();
     let on = call.args.get("on").cloned();
     let replaces = call.args.get("replaces").cloned();
+    // C81: a kept thing said again (`again`) stays so: it is sent in the
+    // words it was shown, never the heard line's or the model's.
+    let again = call.args.get("again").cloned();
     call.args = json!({"text": kept});
     if let Some(on) = on {
         call.args["on"] = on;
+    }
+    if let Some(again) = again.filter(|id| !id.is_null()) {
+        call.args["again"] = again;
     }
     if let Some(replaces) = replaces.filter(|id| keeps_replaces && !id.is_null()) {
         call.args["replaces"] = replaces;
@@ -869,6 +992,41 @@ pub fn answered(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// C81: a heard line kept in place of the model's sentence keeps its
+    /// `again`, so a kept thing said again stays itself.
+    #[test]
+    fn a_heard_line_kept_instead_keeps_again() {
+        let call = ToolCall {
+            id: String::new(),
+            name: super::super::REMEMBER.into(),
+            args: json!({"text":"Gym locker number is 441 forever.","again":1835}),
+        };
+        let (sent, _) = call_with(&call, Some("my gym locker number is 441"), || None).unwrap();
+        assert_eq!(sent.args["again"], 1835);
+        assert_ne!(sent.args["text"], call.args["text"]);
+    }
+
+    /// #7739: a near spelling not kept is told whole: nothing kept, the
+    /// not-caught line, and the reply ends there with nothing asked (the
+    /// 06c1 ROW at ac50913437 heard "… could you spell or say it again?").
+    #[test]
+    fn a_near_spelling_not_kept_is_said_and_asks_nothing() {
+        let told = near_not_kept_told(&[("renunculus".into(), "ranunculus".into())]);
+        assert_eq!(told["remembered"], false);
+        let note = told["note"].as_str().unwrap();
+        assert!(
+            note.contains(super::super::doubted::NOT_CAUGHT_LINE),
+            "{note}"
+        );
+        assert!(note.contains("end your reply there"), "{note}");
+        assert!(
+            note.contains("say it again, spell it or say more"),
+            "{note}"
+        );
+        assert!(note.contains("never say it is kept"), "{note}");
+        assert!(!note.contains("ranunculus"), "{note}");
+    }
     use std::time::Duration;
 
     const TEA: &str = "please remember that my favourite tea is jasmine";
@@ -1581,6 +1739,7 @@ mod tests {
                 Some((done, Some(1))),
             )
             .unwrap();
+            let told = told.unwrap();
             assert_eq!(was, done);
             assert!(told.starts_with(DONE_ALREADY_TOLD), "{told}");
             assert!(told.contains(note), "{told}");
@@ -1626,6 +1785,60 @@ mod tests {
                 None,
                 "{lamp} / {person}"
             );
+        }
+    }
+
+    /// The first builder's P3 on #5607: after a done keep, a line that only
+    /// acknowledges or hesitates ("Okay.", "Okay, thanks.", "Um.", "Right.",
+    /// "Sure.") is not told before it answers that it is kept; a real yes or
+    /// an ask to keep ("Yes.", "Yeah.", "Please.", "Keep that.", "Go
+    /// ahead.", "Vâng.") is. [`only_a_yes`] itself is unchanged, for
+    /// [`yes_alone`], where the model has already called. The done write is
+    /// still given for the bare one, so it backs that turn's "Pip is kept."
+    /// (Thirteen's P2 on #5701).
+    #[test]
+    fn a_bare_okay_or_um_after_a_done_keep_is_not_told_it_is_kept() {
+        use super::super::MemoryDone;
+        use crate::thread::Thread;
+        let now = Instant::now();
+        let after = |person: &str| {
+            let mut thread = Thread::new();
+            thread.person("My goldfish is called Pip.", true, now);
+            thread.lamp(1, "Kept: your goldfish is Pip.", now);
+            thread.person(person, true, now);
+            thread
+        };
+        let kept = Some((MemoryDone::Kept, Some(1)));
+        for said in [
+            "Okay.",
+            "Okay, thanks.",
+            "Um.",
+            "Right.",
+            "Sure.",
+            "Alright.",
+        ] {
+            assert!(only_a_yes(said), "{said}");
+            let told = done_already_in(&after(said), (2, None, now), kept);
+            assert_eq!(told, Some((None, MemoryDone::Kept)), "{said}");
+            // Thirteen's P2 on #5701: the done keep still backs "Great, Pip
+            // is kept.", so it is said, never "I didn't keep that".
+            assert!(done_backs_a_keep(told.as_ref()), "{said}");
+        }
+        for said in [
+            "Yes.",
+            "Yeah.",
+            "Please.",
+            "Keep that.",
+            "Go ahead.",
+            "Okay, please.",
+            "Vâng.",
+        ] {
+            let told = done_already_in(&after(said), (2, None, now), kept);
+            assert!(
+                told.as_ref().is_some_and(|(note, _)| note.is_some()),
+                "{said}"
+            );
+            assert!(done_backs_a_keep(told.as_ref()), "{said}");
         }
     }
 
@@ -1775,5 +1988,40 @@ mod tests {
                 .contains("\"Is that ranunculus?\""),
             "{told}"
         );
+    }
+
+    /// Thirteen's P3 at f3cccc815d on #5701: "keep in mind" is a lead-in,
+    /// cut from the line a yes answers as "keep in mind that" is.
+    #[test]
+    fn keep_in_mind_is_a_lead_in() {
+        assert_eq!(
+            without_lead_in("Keep in mind my goldfish is called Pip."),
+            "my goldfish is called Pip."
+        );
+        assert_eq!(
+            without_lead_in("Keep in mind that my goldfish is called Pip."),
+            "my goldfish is called Pip."
+        );
+    }
+
+    /// Thirteen's P3 at aed324db5d on #5701: the line a yes answers loses
+    /// its lead-in only when nothing before it negates the line.
+    #[test]
+    fn a_yes_line_keeps_a_negation_before_its_lead_in() {
+        assert_eq!(
+            yes_line("Keep in mind my goldfish is called Pip."),
+            "my goldfish is called Pip."
+        );
+        assert_eq!(
+            yes_line("Hey Lamp, please remember that my tea is green."),
+            "my tea is green."
+        );
+        for line in [
+            "I never said remember that my bike is red.",
+            "I didn't say remember that my bike is red.",
+            "No, don't remember that my bike is red.",
+        ] {
+            assert_eq!(yes_line(line), line);
+        }
     }
 }

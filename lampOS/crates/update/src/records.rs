@@ -309,6 +309,11 @@ pub struct Journal {
     /// written before.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub exit_notes: Vec<String>,
+    /// The factory's acceleration drop-ins the switch moves aside (#7946),
+    /// each as it was: put back where it was with the rest. Absent from a
+    /// journal written before.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub aside: Vec<SetAside>,
     /// Why the build was being put back, when a put-back for a fault of the
     /// build (a part not well, a failed watch) could not put every file back
     /// and left the journal (#6266). Its recovery refuses the build for this
@@ -342,6 +347,17 @@ impl Journal {
         }
         Ok(())
     }
+}
+
+/// A lamp-body drop-in a switch moved aside (#7946): a copy kept in the
+/// records' `aside/` folder, never deleted, and this, to put it back.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SetAside {
+    /// As the lamp names it:
+    /// `/etc/systemd/system/lamp-body.service.d/zz-acceleration-50.conf`.
+    pub path: String,
+    /// Its text, as it was.
+    pub text: String,
 }
 
 /// A product skill's file as it was before a round wrote it.
@@ -890,6 +906,7 @@ mod tests {
             models: Vec::new(),
             settings: false,
             exit_notes: vec!["/etc/systemd/system/lamp-tasks.service.d/exit-note.conf".into()],
+            aside: Vec::new(),
             refusing: None,
         };
         records.save_journal(&journal).unwrap();
@@ -1049,6 +1066,7 @@ mod tests {
                 made: Vec::new(),
             }],
             exit_notes: Vec::new(),
+            aside: Vec::new(),
             refusing: None,
         };
         (state, journal)

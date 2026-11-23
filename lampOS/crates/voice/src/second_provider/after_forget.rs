@@ -13,9 +13,15 @@ pub(super) fn is_memory_forget(name: &str) -> bool {
 /// Only outcome fields, never a tool's arbitrary strings, arguments or ids.
 /// Earlier actions remain accounted for without retaining what they read.
 pub(super) fn status(name: &str, result: &Value) -> Value {
+    // A make that waited its turn (`LAMP_MAKE_QUEUE`, #7679): kept by its
+    // name and `queued`, so `LAMP_ACTION_CLAIM_CHECKED` never takes it as a
+    // skill made (`action_claim::stands_on`). Only with the switch on can a
+    // result say `queued`, so off every status is as before.
+    let queued = name == crate::made_skill::MAKE && result["queued"] == true;
     // A hallucinated or user-defined function name can itself hold private
     // words. Only built-in names survive the boundary.
-    let name = if is_memory_forget(name)
+    let name = if queued
+        || is_memory_forget(name)
         || matches!(
             name,
             crate::remember::REMEMBER | crate::remember::RECALL | crate::tools::THE_TIME
@@ -25,6 +31,8 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
         || crate::known_faces::is_tool(name)
         || crate::rules::is_tool(name)
         || crate::action_claim::unplug_tool(name, &Value::Null).is_some()
+        || crate::action_claim::nudge_tool(name, &Value::Null).is_some()
+        || name == crate::made_skill::MAKE
         || matches!(
             name,
             "light_on"
@@ -41,6 +49,9 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
         "other_call"
     };
     let mut outcome = serde_json::Map::new();
+    if queued {
+        outcome.insert("queued".into(), json!(true));
+    }
     for field in ["ok", "forgotten", "everything", "all", "remembered"] {
         if let Some(value) = result[field].as_bool() {
             outcome.insert(field.to_owned(), json!(value));
@@ -64,6 +75,55 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
     }
     if result.get("error").is_some() {
         outcome.insert("error".into(), json!(true));
+    }
+    // What `make_skill` did to a skill the person made (#7683): removed (a
+    // remove's yes, or a clash's replace that took others off), turned off
+    // or turned on (put on included), each by the made skill's own name
+    // from `made.json` as its answer gives it, never the words heard, so a
+    // claim is bound to its own skill and kind
+    // (`action_claim::skill_stands`).
+    if name == crate::made_skill::MAKE {
+        // A skill's name as lamp-skills writes one, nothing else.
+        fn made(value: &Value) -> Option<&str> {
+            value.as_str().filter(|made| {
+                !made.is_empty()
+                    && made.len() <= 64
+                    && made
+                        .chars()
+                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+            })
+        }
+        let removed: Vec<&str> = made(&result["removed"])
+            .into_iter()
+            .chain(
+                result["replaced"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(made),
+            )
+            .collect();
+        if !removed.is_empty() {
+            outcome.insert("removed".into(), json!(removed));
+        }
+        for (field, kept, off) in [
+            (crate::made_turn::TURN_OFF, "turned_off", true),
+            (crate::made_turn::TURN_ON, "turned_on", false),
+        ] {
+            if let Some(turned) = made(&result[field])
+                && result["off"] == off
+            {
+                outcome.insert(kept.into(), json!(turned));
+            }
+        }
+        // Put on: a make or a clash's keep or replace (`{"made", "on":
+        // true}`), or a code make's yes, whose answer names the skill it put
+        // on the same way (Twelve's P2 at c881d48f19 on #7730).
+        if let Some(on) = made(&result["made"])
+            && result["on"] == true
+        {
+            outcome.insert("turned_on".into(), json!(on));
+        }
     }
     if result.get("face").is_some() {
         outcome.insert(
@@ -156,9 +216,12 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
                 let state = match value.as_str() {
                     Some("cleared") => "cleared",
                     Some("kept") => "kept",
+                    Some(crate::remember::CONSENT_KEPT_AS_NO) => {
+                        crate::remember::CONSENT_KEPT_AS_NO
+                    }
                     _ => "uncertain",
                 };
-                incomplete |= state != "cleared";
+                incomplete |= state != "cleared" && state != crate::remember::CONSENT_KEPT_AS_NO;
                 outcome.insert(field.into(), json!(state));
             }
         }
@@ -269,6 +332,21 @@ mod tests {
         );
         // The refusal's words never pass the reset.
         assert!(!said.contains("graduation date"), "{said}");
+    }
+
+    /// Twelve's P3 4 on #7928 (#7767): a consent the forget left as a kept
+    /// no passes as `"kept as a no"`, and is no incomplete step.
+    #[test]
+    fn a_consent_kept_as_a_no_passes_and_is_no_failed_step() {
+        let result = json!({"forgotten":true,"everything":true,
+            "sound_consent_result":"cleared",
+            "face_expression_consent_result":"kept as a no"});
+        let kept = status("forget_everything", &result);
+        assert_eq!(
+            kept["outcome"]["face_expression_consent_result"],
+            "kept as a no"
+        );
+        assert_eq!(kept["outcome"]["everything"], true);
     }
 
     #[test]

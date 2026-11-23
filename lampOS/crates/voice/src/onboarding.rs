@@ -19,6 +19,7 @@ pub(crate) mod giving_way;
 pub(crate) mod hardware;
 pub(crate) mod harness_line;
 mod in_language;
+pub(crate) mod learn_later;
 #[cfg(test)]
 pub(crate) mod legacy_words;
 pub(crate) mod near;
@@ -240,6 +241,29 @@ impl Step {
             "preferences" => Some(Self::Preferences),
             _ => None,
         }
+    }
+
+    /// A step as the model may give it to `redo_setup`, said as it is
+    /// spoken: lowercased and trimmed, spaces and hyphens as `_`, a leading
+    /// "the " and a trailing " step" gone, and a few clear names. On
+    /// lamp-06c1 on 18 Nov "where", "sitting", "where you sit" and "who you
+    /// are" were each refused, and the owner said it again and again.
+    /// `all` is never taken here: a whole redo stays explicit.
+    pub fn spoken(said: &str) -> Option<Self> {
+        let lower = said.trim().to_lowercase();
+        let mut name = lower.replace([' ', '-'], "_");
+        while name.contains("__") {
+            name = name.replace("__", "_");
+        }
+        let name = name.strip_prefix("the_").unwrap_or(&name);
+        let name = name.strip_suffix("_step").unwrap_or(name);
+        Self::named(name).or(match name {
+            "where" | "sit" | "sitting" | "seat" | "where_i_sit" => Some(Self::WhereYouSit),
+            "who" | "name" | "my_name" | "who_i_am" => Some(Self::WhoYouAre),
+            "pet" | "head" => Some(Self::Touch),
+            "voice" | "sound" | "how_i_sound" => Some(Self::HowYouSound),
+            _ => None,
+        })
     }
 
     /// PLACEHOLDER (#841): the steps whose parts other builders own. Each
@@ -584,6 +608,13 @@ pub struct Progress {
     /// A reset wipes it with the file. An older build reads past it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub walk_id: Option<u64>,
+    /// "What should I call you?" on a lamp whose eyes know nobody
+    /// (`LAMP_FACE_LEARN_LATER`, #7876): when it was last asked, its asks
+    /// unanswered, and whether a no or "forget my face" stopped it for good.
+    /// Kept through a redo of the whole walk; a reset wipes it with the
+    /// file. An older build reads past it.
+    #[serde(default, skip_serializing_if = "learn_later::Kept::is_empty")]
+    pub learn_later: learn_later::Kept,
 }
 
 impl Progress {
@@ -598,6 +629,7 @@ impl Progress {
             yes_taken_back: self.yes_taken_back.clone(),
             done_at_unix_ms: self.done_at_unix_ms,
             done_waits_closing: self.done_waits_closing,
+            learn_later: self.learn_later.clone(),
             ..Self::default()
         };
         for step in [ROOM_SOUNDS, FACE_EXPRESSIONS] {
@@ -1181,10 +1213,29 @@ pub struct Onboarding {
     /// [`FIRST_UPDATE_ENVIRONMENT`]): `None` with the switch off, and once
     /// the walk is let go, for the rest of this voice start.
     first_update: Option<FirstUpdateHold>,
+    /// What the last line [`Self::tick_line`] gave is, for `lamp/did`
+    /// (#7757): never a word of it.
+    line_moment: Option<crate::did_voice::Moment>,
     /// Whether the voice can save a face (`remember_my_face`, the eyes' who
     /// socket set): "who you are" then asks for the face, and is done when it
     /// is saved, not on a name and a yes (#3883's follow-up).
     face_kept: bool,
+    /// With a face to keep, names checked and `LAMP_FACE_NO_ASK=on`
+    /// (`known_faces::FACE_NO_ASK_ENVIRONMENT`, the product owner's no-asks
+    /// rule, 18 Nov): "who you are" keeps the face once the name is heard,
+    /// with nothing asked ([`skill::WHO_YOU_ARE_NO_ASK`]); the walk never
+    /// asks the face question itself, nor once more after the walk.
+    face_no_ask: bool,
+    /// [`Self::face_no_ask`] with `LAMP_FACE_LEARN_LATER` and
+    /// `LAMP_REMEMBER_SPEAKER` on ([`learn_later::switched`], #7876): with
+    /// the eyes knowing nobody, "What should I call you?" once after a
+    /// conversation's greeting.
+    learn_later: bool,
+    /// How many people the eyes know, read by its own thread, only with
+    /// [`Self::learn_later`] ([`learn_later::start`]).
+    learn_known: Option<learn_later::Known>,
+    /// The conversation as heard, for [`Self::learn_later`]'s moment.
+    moment: learn_later::Moment,
     /// Whether no hand was on the lamp at the body's last reading.
     released: bool,
     /// Since when a face at least [`NEAR`] has been seen without a break.
@@ -1598,6 +1649,23 @@ impl Onboarding {
         }
         walk.face_kept =
             std::env::var(crate::known_faces::ENVIRONMENT).is_ok_and(|socket| !socket.is_empty());
+        // As the second route's face save reads it: names checked too.
+        walk.face_no_ask = walk.face_kept
+            && crate::known_faces::face_no_ask_on()
+            && std::env::var(crate::known_faces::NAMES_ENVIRONMENT).as_deref() == Ok("checked");
+        walk.learn_later = learn_later::switched(
+            std::env::var(learn_later::ENVIRONMENT).ok().as_deref(),
+            walk.face_no_ask,
+            std::env::var(crate::remember_speaker::ENVIRONMENT)
+                .ok()
+                .as_deref(),
+        );
+        if walk.learn_later {
+            walk.learn_known = std::env::var(crate::known_faces::ENVIRONMENT)
+                .ok()
+                .map(PathBuf::from)
+                .and_then(learn_later::start);
+        }
         // The head pads' touches, from `--touch` Controls, only with the
         // voice's bus on.
         if std::env::var(crate::bus_out::ENVIRONMENT).ok().as_deref() == Some("on") {
@@ -1704,7 +1772,12 @@ impl Onboarding {
             model_refusing: false,
             model_held: false,
             first_update: None,
+            line_moment: None,
             face_kept: false,
+            face_no_ask: false,
+            learn_later: false,
+            learn_known: None,
+            moment: learn_later::Moment::default(),
             released: true,
             near_since: None,
             touches: None,
@@ -1747,6 +1820,7 @@ impl Onboarding {
             near_call: file.parent().unwrap().join("near-call.json"),
             room_sounds: file.parent().unwrap().join("room-sounds.json"),
             room_sounds_group: None,
+            noticing_by_default: false,
         })
         .unwrap();
         let mut walk = Self::with_storage(file, owner.client());
@@ -2061,6 +2135,30 @@ impl Onboarding {
             .collect();
         let at = offered.iter().position(|offered| *offered == step)?;
         Some((at + 1, offered.len()))
+    }
+
+    /// What the last line [`Self::tick_line`] gave is, for `lamp/did`.
+    pub(crate) fn line_moment(&self) -> Option<crate::did_voice::Moment> {
+        self.line_moment
+    }
+
+    /// What `note` is: an update line, or a line of the step now led with its
+    /// number in the walk's order (the steps this voice has, as the counter
+    /// counts them, whether or not it is shown).
+    fn moment_of(&self, note: &str) -> crate::did_voice::Moment {
+        use crate::did_voice::Moment;
+        if note.contains(FIRST_UPDATE_LINE) || note.contains(FIRST_UPDATE_DONE_LINE) {
+            return Moment::UpdateLine;
+        }
+        let place = self.led.as_ref().and_then(|led| {
+            self.definition
+                .order
+                .iter()
+                .copied()
+                .filter(|step| self.step_available(*step))
+                .position(|step| step == led.step)
+        });
+        Moment::Onboarding(place.and_then(|at| u8::try_from(at + 1).ok()))
     }
 
     /// A step's first ask with its counter (#4080): "Step N of M." opens
@@ -3006,6 +3104,7 @@ impl Onboarding {
         self.heard_words(text);
         if text.chars().any(char::is_alphanumeric) {
             self.lamp_spoke_last = false;
+            self.learn_later_heard(text, now_us);
         }
         let nudge = self.nudge;
         let face_kept = self.face_kept;
@@ -3270,9 +3369,12 @@ impl Onboarding {
         match self.looked {
             Some((at, face)) if now_us.saturating_sub(at) < READ_EVERY_US / 2 => face,
             _ => {
-                let (face, faces) = self.look();
+                let (face, faces, speaking) = self.look();
                 self.looked = Some((now_us, face));
                 self.faces_in_view = faces;
+                if self.learn_later {
+                    self.moment.saw(now_us, faces, speaking);
+                }
                 face
             }
         }
@@ -3339,31 +3441,37 @@ impl Onboarding {
         head && released
     }
 
-    /// The near face on the eyes' topic now, and how many faces they see
-    /// (none read fresh: `None`).
-    fn look(&self) -> (Option<Framing>, Option<usize>) {
+    /// The near face on the eyes' topic now, how many faces they see (none
+    /// read fresh: `None`), and whether one reads speaking.
+    fn look(&self) -> (Option<Framing>, Option<usize>, bool) {
         let Some(message) = self
             .eyes
             .as_ref()
             .and_then(|eyes| eyes.latest(lamp_msgs::Faces::TOPIC).ok().flatten())
         else {
-            return (None, None);
+            return (None, None, false);
         };
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |since| since.as_millis() as u64);
         if message.expired || now_ms.saturating_sub(message.header.at_unix_ms) > FRESH_MS {
-            return (None, None);
+            return (None, None, false);
         }
         let Ok(faces) = message.parse::<lamp_msgs::Faces>() else {
-            return (None, None);
+            return (None, None, false);
         };
         let count = faces
             .faces
             .iter()
             .filter(|face| face.check().is_ok())
             .count();
-        (nearest(&faces), Some(count))
+        let speaking = faces.faces.iter().any(|face| {
+            face.check().is_ok()
+                && face
+                    .speaking
+                    .is_some_and(|speaking| speaking.state == lamp_msgs::SpeakingState::Yes)
+        });
+        (nearest(&faces), Some(count), speaking)
     }
 
     /// A line the person finished saying: with the nudge on, an answer to
@@ -3404,6 +3512,9 @@ impl Onboarding {
     /// its latest words ([`FACE_SAVE_WAIT_US`]).
     pub fn lamp_said(&mut self, now_us: u64) {
         self.lamp_spoke_last = true;
+        if self.learn_later {
+            self.moment.lamp_said(now_us);
+        }
         if let Some(led) = self.led.as_mut().filter(|led| led.asked_us.is_some()) {
             led.spoke = true;
             led.lamp_said_us = Some(now_us);
@@ -3486,7 +3597,9 @@ impl Onboarding {
         face: Option<Framing>,
         still: bool,
     ) -> Option<String> {
+        self.line_moment = None;
         let note = self.tick(now_us, quiet_us, can_speak, paused, face, still)?;
+        self.line_moment = Some(self.moment_of(&note));
         // A line with none in the owner's language stays a note, for the
         // model to say in it: never an own line in English.
         Some(if self.untranslated {
@@ -3660,7 +3773,9 @@ impl Onboarding {
                 self.records
                     .push(json!({"kind":"onboarding_finished","at_us":now_us}));
             }
-            return self.ask_face_again(now_us, quiet_us, can_speak, face);
+            return self
+                .ask_face_again(now_us, quiet_us, can_speak, face)
+                .or_else(|| self.ask_learn_later(now_us, can_speak, face));
         };
         // The walk begins with its first step asked, or a redo's (#5979): its
         // id, kept till a redo of the whole walk. Not by a re-offer after it.
@@ -3789,14 +3904,14 @@ impl Onboarding {
                 );
                 if again.is_some() {
                     self.save();
-                    self.owed = Some(self.definition.visit_reoffer(step).to_owned());
+                    self.owed = Some(self.step_note(step, true, true));
                     return None;
                 }
                 let opened = step == Step::WhereYouSit && self.desired.opened;
                 // Bound to its turn, so one never said is asked again at
                 // once ([`Self::first_note_finished`]).
                 self.opener_said = true;
-                let note = self.definition.note(step, opened).to_owned();
+                let note = self.step_note(step, opened, false);
                 let intro = step == Step::WhereYouSit && !opened;
                 return Some(self.counted_note(step, note, intro));
             }
@@ -3888,6 +4003,7 @@ impl Onboarding {
         // from the question, as from any of the lamp's words.
         if step == Step::WhoYouAre
             && self.face_kept
+            && !self.face_no_ask
             && !led.face_only
             && !led.heard.face_asked
             && led.heard.name
@@ -4625,6 +4741,23 @@ impl Onboarding {
         self.owed = Some(self.later_line(Step::WhoYouAre));
     }
 
+    /// The note a step is asked with: the file's (`again`, its reoffer; on a
+    /// later `visit`, [`skill::Definition::visit_reoffer`]), except "who you
+    /// are" with nothing asked ([`Self::face_no_ask`]), whose note is the
+    /// walk's own ([`skill::WHO_YOU_ARE_NO_ASK`]): the file's asks for the
+    /// face and a read-back's yes first, and an older lamp-skills refuses a
+    /// new key.
+    fn step_note(&self, step: Step, again: bool, visit: bool) -> String {
+        if step == Step::WhoYouAre && self.face_no_ask {
+            return skill::WHO_YOU_ARE_NO_ASK.to_owned();
+        }
+        if visit {
+            self.definition.visit_reoffer(step).to_owned()
+        } else {
+            self.definition.note(step, again).to_owned()
+        }
+    }
+
     /// "Who you are" just ended done with no face saved, on a lamp that
     /// keeps faces (#5139): a conversation with nobody known in view keeps
     /// nothing, so the walk says that what it remembers waits for a face,
@@ -4635,6 +4768,17 @@ impl Onboarding {
         if !self.face_kept || face_only {
             return;
         }
+        // With nothing asked (`LAMP_FACE_NO_ASK`): the name only, the face
+        // never asked for once more, and a line that promises nothing about
+        // the face ([`skill::NAME_ONLY_NO_ASK`]).
+        if self.face_no_ask {
+            eprintln!(
+                "lamp-voice: onboarding: who_you_are done with the name only: memory waits for a face, not asked for again (LAMP_FACE_NO_ASK)"
+            );
+            self.owed_after = self.owed.replace(skill::NAME_ONLY_NO_ASK.to_owned());
+            self.save();
+            return;
+        }
         self.desired.face_again_names = told.into_iter().take(MOST_TOLD_IDS).collect();
         eprintln!(
             "lamp-voice: onboarding: who_you_are done with the name only: memory waits for a face, asked for once more later"
@@ -4643,6 +4787,89 @@ impl Onboarding {
         // A last line the step's end owed is said after it (#5499).
         self.owed_after = self.owed.replace(skill::NAME_ONLY.to_owned());
         self.save();
+    }
+
+    /// A line the person finished, for [`Self::learn_later`]: "forget my
+    /// face" stops the ask for good. Whether it was answered or declined
+    /// is the model's to judge ([`learn_later::declined`]), told by the
+    /// mailbox ([`Self::learn_later_told`]).
+    fn learn_later_heard(&mut self, text: &str, now_us: u64) {
+        if self.learn_later && self.moment.heard(text, now_us) {
+            self.learn_later_stopped("forget my face");
+        }
+    }
+
+    /// The model's judgment of the ask's answer, from the mailbox: answered
+    /// gives the ask back; declined stops it for good.
+    fn learn_later_told(&mut self, told: &str) {
+        if self.desired.learn_later.asked_at_unix_s.is_none() {
+            return;
+        }
+        match told {
+            "answered" => {
+                self.desired.learn_later.unanswered =
+                    self.desired.learn_later.unanswered.saturating_sub(1);
+                self.save();
+            }
+            "declined" => self.learn_later_stopped("declined"),
+            _ => {}
+        }
+    }
+
+    /// Never asked again, kept in the file.
+    fn learn_later_stopped(&mut self, why: &str) {
+        if !self.desired.learn_later.stopped {
+            eprintln!(
+                "lamp-voice: onboarding: \"What should I call you?\" is never asked again: {why} (LAMP_FACE_LEARN_LATER)"
+            );
+        }
+        self.desired.learn_later.stopped = true;
+        self.save();
+    }
+
+    /// "What should I call you?" once (`LAMP_FACE_LEARN_LATER`, #7876),
+    /// the walk over and nothing of it led: the eyes know nobody, one face
+    /// in view, seen saying the conversation's first line, a greeting only,
+    /// the lamp's answer to it over a moment ago, and the bounds kept in the
+    /// file ([`learn_later::Kept::may_ask`]). English only, as the walk's
+    /// name reading is. Its own line: no chat, so nothing is read from
+    /// memory for it, and the second route keeps it out of memory
+    /// ([`learn_later::is_ask`]).
+    fn ask_learn_later(
+        &mut self,
+        now_us: u64,
+        can_speak: bool,
+        face: Option<Framing>,
+    ) -> Option<String> {
+        let knows_nobody = || {
+            self.learn_known
+                .as_ref()
+                .and_then(|known| known.lock().ok().and_then(|known| *known))
+                == Some(0)
+        };
+        let now_s = (self.unix_clock)() / 1_000;
+        let due = self.learn_later
+            && can_speak
+            && self.led.is_none()
+            && self.language.is_none()
+            && face.is_some()
+            && self.faces_in_view == Some(1)
+            && self.moment.is_now(now_us)
+            && self.desired.learn_later.may_ask(now_s)
+            && knows_nobody();
+        if !due {
+            return None;
+        }
+        self.moment.asked(now_us);
+        self.desired.learn_later.asked(now_s);
+        self.save();
+        self.records
+            .push(json!({"kind":"onboarding_learn_later","asked":true,
+                "unanswered":self.desired.learn_later.unanswered,"at_us":now_us}));
+        eprintln!(
+            "lamp-voice: onboarding: the eyes know nobody: \"What should I call you?\" asked after the greeting (LAMP_FACE_LEARN_LATER)"
+        );
+        Some(learn_later::ASK.to_owned())
     }
 
     /// The face asked for once more ([`Progress::face_again`]), once the
@@ -4662,6 +4889,7 @@ impl Onboarding {
         // one's in particular, nor is the face a save takes.
         let due = self.desired.face_again
             && self.face_kept
+            && !self.face_no_ask
             && can_speak
             && face.is_some()
             && self.faces_in_view.is_none_or(|faces| faces == 1)
@@ -4963,6 +5191,12 @@ impl Onboarding {
                     .push(json!({"kind":"onboarding_redo","at_us":now_us}));
                 self.save();
                 self.fence_storage();
+                continue;
+            }
+            // The model's judgment of "What should I call you?"'s answer
+            // (`LAMP_FACE_LEARN_LATER`, #7876).
+            if let Some(learn) = told.get("learn_later").and_then(Value::as_str) {
+                self.learn_later_told(learn);
                 continue;
             }
             if let Some(step) = told
@@ -6232,6 +6466,36 @@ fn run_in(file: &Path, call: &ToolCall, order: Option<&[Step]>) -> (Value, bool)
     (told, answered)
 }
 
+/// One step's `redo_setup`: privacy only with `all`, and a step out of the
+/// walk's order refused (#5499), so the lamp never says it will redo and then
+/// says nothing (the Reviewer-lead's P3 on #5521). The order is the one read
+/// as this worker started ([`installed_order`]).
+/// `Ok` is the runner's mailbox line; `Err` what the model is told instead.
+fn redo_one(step: Step, order: Option<&[Step]>) -> Result<Value, Value> {
+    if step == Step::Privacy {
+        return Err(
+            json!({"error":"Privacy can't be redone on its own. Ask whether they want to go through the whole setup again."}),
+        );
+    }
+    if order.is_some_and(|order| !order.contains(&step)) {
+        return Err(
+            json!({"error":"That part is not in my setup now, so nothing was redone. Tell them so, and offer to go through the whole setup again."}),
+        );
+    }
+    Ok(json!({"redo_step": step.name()}))
+}
+
+/// No step `redo_setup` knows: the step ids in the order named, so a one-step
+/// redo needs no guess (El's P3 on #5521).
+fn refuse_redo(order: Option<&[Step]>) -> (Value, bool) {
+    let mut error = "Nothing was redone. Ask them which step to redo, or whether to go through the whole setup again, then call this again with it.".to_owned();
+    if let Some(order) = order {
+        let ids: Vec<&str> = order.iter().map(|step| step.name()).collect();
+        error.push_str(&format!(" The steps are: {}.", ids.join(", ")));
+    }
+    (json!({ "error": error }), true)
+}
+
 fn answer(file: &Path, call: &ToolCall, order: Option<&[Step]>) -> (Value, bool) {
     let line = match call.name.as_str() {
         // One step, or the whole walk only when it was asked for by name:
@@ -6239,36 +6503,14 @@ fn answer(file: &Path, call: &ToolCall, order: Option<&[Step]>) -> (Value, bool)
         // step, which reopened every step (#3754).
         REDO => match call.args.get("step").and_then(Value::as_str) {
             Some(REDO_ALL) => json!({"redo": true}),
-            Some(name) if Step::named(name) == Some(Step::Privacy) => {
-                return (
-                    json!({"error":"Privacy can't be redone on its own. Ask whether they want to go through the whole setup again."}),
-                    true,
-                );
-            }
-            // A step out of the walk's order, which the runner refuses
-            // (#5499): said refused, so the lamp never says it will redo
-            // and then says nothing (the Reviewer-lead's P3 on #5521). The
-            // order is the one read as this worker started ([`installed_order`]).
-            Some(name)
-                if Step::named(name)
-                    .is_some_and(|step| order.is_some_and(|order| !order.contains(&step))) =>
-            {
-                return (
-                    json!({"error":"That part is not in my setup now, so nothing was redone. Tell them so, and offer to go through the whole setup again."}),
-                    true,
-                );
-            }
-            Some(name) if Step::named(name).is_some() => json!({"redo_step": name}),
-            // The step ids in the order named, so a one-step redo needs no
-            // guess (El's P3 on #5521).
-            _ => {
-                let mut error = "Nothing was redone. Ask them which step to redo, or whether to go through the whole setup again, then call this again with it.".to_owned();
-                if let Some(order) = order {
-                    let ids: Vec<&str> = order.iter().map(|step| step.name()).collect();
-                    error.push_str(&format!(" The steps are: {}.", ids.join(", ")));
-                }
-                return (json!({ "error": error }), true);
-            }
+            Some(said) => match Step::spoken(said) {
+                Some(step) => match redo_one(step, order) {
+                    Ok(line) => line,
+                    Err(error) => return (error, true),
+                },
+                None => return refuse_redo(order),
+            },
+            None => return refuse_redo(order),
         },
         STEP => {
             let step = call.args.get("step").and_then(Value::as_str);
@@ -7199,7 +7441,7 @@ mod tests {
         // step, and every step but privacy was reopened.
         for args in [
             json!({}),
-            json!({"step": "touch step"}),
+            json!({"step": "dance step"}),
             json!({"step": "privacy"}),
         ] {
             let redo = ToolCall {
@@ -7213,6 +7455,141 @@ mod tests {
         }
         assert_eq!(room.wait(4 * S, Some(SIDE)), NONE);
         assert_eq!(*room.walk.kept(), before, "nothing reopened");
+    }
+
+    /// The four steps of the walk, as `skill.toml`'s `order` has them.
+    const WALK: [Step; 4] = [
+        Step::WhereYouSit,
+        Step::WhoYouAre,
+        Step::Touch,
+        Step::HowYouSound,
+    ];
+
+    /// What one `redo_setup` with `step` told the model, and what it put in
+    /// the runner's mailbox.
+    fn redo_named(name: &str, step: &str) -> (Value, String) {
+        let walk = file(name);
+        let call = ToolCall {
+            id: "r".into(),
+            name: REDO.into(),
+            args: json!({ "step": step }),
+        };
+        let (told, answered) = run_in(&walk, &call, Some(&WALK));
+        assert!(answered, "{step}");
+        (
+            told,
+            std::fs::read_to_string(mailbox_of(&walk)).unwrap_or_default(),
+        )
+    }
+
+    fn assert_redoes(name: &str, said: &[&str], id: &str) {
+        for step in said {
+            let (told, mailbox) = redo_named(name, step);
+            assert_eq!(told, json!({"ok": true}), "{step}: {told}");
+            assert_eq!(
+                mailbox.trim(),
+                json!({ "redo_step": id }).to_string(),
+                "{step}"
+            );
+        }
+    }
+
+    /// lamp-06c1, 18 Nov ~12:20-12:55 (stable 14072/14100): the model gave
+    /// `redo_setup` "where", "sitting" and "where you sit", each refused, and
+    /// only `where_you_sit` redid the step; the owner said it again and again.
+    #[test]
+    fn a_redo_takes_where_you_sit_by_its_spoken_names() {
+        assert_redoes(
+            "redo-sit-names",
+            &[
+                "where",
+                "sitting",
+                "where you sit",
+                "Where You Sit",
+                " the where-you-sit step ",
+                "sit",
+                "seat",
+                "where i sit",
+            ],
+            "where_you_sit",
+        );
+    }
+
+    /// The same lamp, the same hour: "who you are" four times, each refused.
+    #[test]
+    fn a_redo_takes_who_you_are_by_its_spoken_names() {
+        assert_redoes(
+            "redo-who-names",
+            &[
+                "who you are",
+                "the who you are step",
+                "who",
+                "name",
+                "my name",
+                "who i am",
+            ],
+            "who_you_are",
+        );
+    }
+
+    #[test]
+    fn a_redo_takes_touch_by_its_spoken_names() {
+        assert_redoes(
+            "redo-touch-names",
+            &["pet", "head", "Touch", "the touch step"],
+            "touch",
+        );
+    }
+
+    #[test]
+    fn a_redo_takes_how_you_sound_by_its_spoken_names() {
+        assert_redoes(
+            "redo-sound-names",
+            &[
+                "voice",
+                "sound",
+                "how i sound",
+                "how you sound",
+                "how-you-sound",
+            ],
+            "how_you_sound",
+        );
+    }
+
+    /// A whole redo stays explicit: only `all` exactly, as before.
+    #[test]
+    fn a_whole_redo_still_needs_all_exactly() {
+        let (told, mailbox) = redo_named("redo-all-exact", "all");
+        assert_eq!(told, json!({"ok": true}), "{told}");
+        assert_eq!(mailbox.trim(), json!({"redo": true}).to_string());
+        for step in [
+            "All",
+            " all ",
+            "the all step",
+            "everything",
+            "the whole setup",
+        ] {
+            let (told, mailbox) = redo_named("redo-all-loose", step);
+            assert!(told["error"].is_string(), "{step}: {told}");
+            assert!(mailbox.is_empty(), "{step}: {mailbox}");
+        }
+    }
+
+    /// A name that is no step's still reopens nothing and is told the ids.
+    #[test]
+    fn a_redo_of_an_unknown_name_is_still_refused() {
+        for step in ["dance", "the lights step", "", "where you are"] {
+            let (told, mailbox) = redo_named("redo-unknown-name", step);
+            assert!(
+                told["error"].as_str().is_some_and(|error| error
+                    .starts_with("Nothing was redone.")
+                    && error.ends_with(
+                        "The steps are: where_you_sit, who_you_are, touch, how_you_sound."
+                    )),
+                "{step}: {told}"
+            );
+            assert!(mailbox.is_empty(), "{step}: {mailbox}");
+        }
     }
 
     /// Ticks every quarter second for `for_us` with what the body says on
@@ -8691,6 +9068,294 @@ mod tests {
             "{notes:?}"
         );
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+    }
+
+    /// `LAMP_FACE_NO_ASK` (the product owner's no-asks rule, 18 Nov): "who
+    /// you are" is asked with the walk's own note, which keeps the face once
+    /// the name is heard and asks nothing about it. A face saved ends it
+    /// done with the owner kept; a name and a yes with no face saved never
+    /// get the walk's face question, end with the name only on a line that
+    /// promises nothing about the face ([`skill::NAME_ONLY_NO_ASK`]), and
+    /// the face is never asked for again. A redo of "who you are" is asked the same.
+    #[test]
+    fn with_no_ask_who_you_are_keeps_the_face_with_nothing_asked() {
+        assert!(!skill::WHO_YOU_ARE_NO_ASK.contains("May I remember"));
+        let start = |name: &str| {
+            let mut room = Room::new(name);
+            room.walk.face_kept = true;
+            room.walk.face_no_ask = true;
+            assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+            assert_eq!(
+                room.wait(20 * S, Some(NEAR_MIDDLE)),
+                [skill::WHO_YOU_ARE_NO_ASK]
+            );
+            room
+        };
+
+        // The name heard and the face saved at once: done, the owner kept.
+        let mut room = start("no-ask-kept");
+        room.walk.heard("My name is Walter.", room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        face_saved(&room.walk.file, Some("Walter"));
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert_eq!(room.walk.desired.owner.as_deref(), Some("Walter"));
+        // Asked again: the same note, nothing asked.
+        post(&room.walk.file, &json!({"redo_step": "who_you_are"})).unwrap();
+        let notes = room.wait(30 * S, Some(NEAR_MIDDLE));
+        assert!(
+            notes.iter().any(|note| note == skill::WHO_YOU_ARE_NO_ASK),
+            "{notes:?}"
+        );
+
+        // A name and a yes, no face saved (two faces in view): the walk
+        // never asks for the face, and ends with the name only.
+        let mut room = start("no-ask-not-kept");
+        room.walk.heard("My name is Walter.", room.at);
+        room.walk.lamp_said(room.at);
+        room.walk.lamp_words("Walter, did I get that right?");
+        room.walk.heard("Yes. That's my name.", room.at);
+        room.walk.lamp_said(room.at);
+        room.walk.lamp_words("Okay.");
+        let notes = room.wait(2 * NAME_WAIT_US, Some(NEAR_MIDDLE));
+        assert!(
+            !notes.iter().any(|note| note == skill::FACE_ASK),
+            "{notes:?}"
+        );
+        assert!(
+            notes.iter().any(|note| note == skill::NAME_ONLY_NO_ASK),
+            "{notes:?}"
+        );
+        assert!(
+            !notes
+                .iter()
+                .any(|note| note.contains("once I've seen your face")),
+            "{notes:?}"
+        );
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        assert!(room.walk.kept().owner.is_none());
+        assert!(!room.walk.kept().face_again, "never asked for again");
+    }
+
+    /// A walk over with the name only and nothing asked
+    /// (`LAMP_FACE_NO_ASK`), `LAMP_FACE_LEARN_LATER` on and the eyes
+    /// knowing nobody, one face in view, the walk's last words a minute
+    /// gone.
+    fn learning_later(name: &str) -> Room {
+        let mut room = Room::new(name);
+        room.walk.face_kept = true;
+        room.walk.face_no_ask = true;
+        room.walk.learn_later = true;
+        room.walk.learn_known = Some(Arc::new(std::sync::Mutex::new(Some(0))));
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(
+            room.wait(20 * S, Some(NEAR_MIDDLE)),
+            [skill::WHO_YOU_ARE_NO_ASK]
+        );
+        room.walk.heard("My name is Walter.", room.at);
+        report(&room.walk, "who_you_are", "done");
+        assert_eq!(
+            room.wait(4 * S, Some(NEAR_MIDDLE)),
+            [skill::NAME_ONLY_NO_ASK, PREFERENCES_NOTE]
+        );
+        report(&room.walk, "preferences", "done");
+        assert_eq!(
+            room.wait(30 * S, Some(NEAR_MIDDLE)),
+            [skill::PREFERENCES_DONE]
+        );
+        room.walk.faces_in_view = Some(1);
+        assert_eq!(room.wait(61 * S, Some(NEAR_MIDDLE)), NONE);
+        room
+    }
+
+    /// A new conversation's first line, a face read `speaking` as it is
+    /// said, the lamp's answer a second on; the notes of the next 4 s.
+    fn greeted(room: &mut Room, line: &str, speaking: bool) -> Vec<String> {
+        room.walk
+            .moment
+            .saw(room.at, room.walk.faces_in_view, speaking);
+        room.walk.heard(line, room.at);
+        room.at += S;
+        room.walk.lamp_said(room.at);
+        room.wait(4 * S, Some(NEAR_MIDDLE))
+    }
+
+    /// `LAMP_FACE_LEARN_LATER` (#7876): with the eyes knowing nobody, one
+    /// face in view seen saying a greeting, the lamp asks "What should I
+    /// call you?" once, as its own line, after its answer to the greeting;
+    /// not again in that conversation, nor again that day. The answer gives
+    /// the ask back; the save and its line are the speaker-bound route's
+    /// (`remember_speaker`'s tests).
+    #[test]
+    fn with_nobody_known_one_face_greeting_is_asked_its_name_once() {
+        let mut room = learning_later("learn-later-asked");
+        assert_eq!(greeted(&mut room, "Hi lamp.", true), [learn_later::ASK]);
+        assert_eq!(room.walk.kept().learn_later.unanswered, 1);
+        assert!(room.walk.kept().learn_later.asked_at_unix_s.is_some());
+        // Not twice in the conversation.
+        assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), NONE);
+        // A line alone decides nothing; the model's `remember_my_face` on
+        // it is the answer, told by the mailbox, and gives the ask back.
+        room.walk.heard("Walter.", room.at);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.walk.kept().learn_later.unanswered, 1);
+        post(&room.walk.file, &json!({"learn_later": "answered"})).unwrap();
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.walk.kept().learn_later.unanswered, 0);
+        assert!(!room.walk.kept().learn_later.stopped);
+        // Asked today: a new conversation that day is not asked.
+        room.wait(61 * S, Some(NEAR_MIDDLE));
+        assert_eq!(greeted(&mut room, "Hello.", true), NONE);
+        // A day on, asked again (the eyes still know nobody).
+        room.wait(61 * S, Some(NEAR_MIDDLE));
+        room.walk.desired.learn_later.asked_at_unix_s =
+            Some(unix_ms() / 1_000 - learn_later::DAY_S);
+        assert_eq!(greeted(&mut room, "Hello.", true), [learn_later::ASK]);
+        // Someone known now: never.
+        room.wait(61 * S, Some(NEAR_MIDDLE));
+        room.walk.desired.learn_later = learn_later::Kept::default();
+        room.walk.learn_known = Some(Arc::new(std::sync::Mutex::new(Some(1))));
+        assert_eq!(greeted(&mut room, "Hello.", true), NONE);
+        // The eyes not answering yet: no.
+        room.wait(61 * S, Some(NEAR_MIDDLE));
+        room.walk.learn_known = Some(Arc::new(std::sync::Mutex::new(None)));
+        assert_eq!(greeted(&mut room, "Hello.", true), NONE);
+    }
+
+    /// Never with a second face in view, at the ask or since the
+    /// conversation began; never with no face seen saying the greeting;
+    /// never on a first line that is a task, nor mid-conversation.
+    #[test]
+    fn learn_later_is_never_asked_with_two_faces_unseen_or_mid_task() {
+        let mut room = learning_later("learn-later-never");
+        // Two faces at the ask.
+        room.walk.faces_in_view = Some(2);
+        assert_eq!(greeted(&mut room, "Hi lamp.", true), NONE);
+        // A second face since the greeting, one again at the ask.
+        room.wait(61 * S, Some(NEAR_MIDDLE));
+        room.walk.faces_in_view = Some(1);
+        room.walk.heard("Hi lamp.", room.at);
+        room.walk.moment.saw(room.at, Some(2), true);
+        room.at += S;
+        room.walk.lamp_said(room.at);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), NONE);
+        // No face seen saying it (a TV, a voice off camera).
+        room.wait(61 * S, Some(NEAR_MIDDLE));
+        assert_eq!(greeted(&mut room, "Hi lamp.", false), NONE);
+        // A task, not a greeting.
+        room.wait(61 * S, Some(NEAR_MIDDLE));
+        assert_eq!(
+            greeted(&mut room, "Hi, set a timer for ten minutes.", true),
+            NONE
+        );
+        // Mid-conversation: a greeting as its second line.
+        room.walk.heard("Hello.", room.at);
+        room.at += S;
+        room.walk.lamp_said(room.at);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(room.walk.kept().learn_later, learn_later::Kept::default());
+        // Then a plain greeting with one face: asked.
+        room.wait(61 * S, Some(NEAR_MIDDLE));
+        assert_eq!(greeted(&mut room, "Hi lamp.", true), [learn_later::ASK]);
+    }
+
+    /// Three asks left unanswered, on three days: never again. The model's
+    /// decline of it (told by the mailbox), or "forget my face" at any time,
+    /// stops it for good, kept in the file. No word of the line decides a
+    /// decline: "I don't mind, call me Sam" stops nothing.
+    #[test]
+    fn learn_later_stops_after_three_unanswered_days_or_a_no() {
+        let mut room = learning_later("learn-later-unanswered");
+        for day in 0..3 {
+            room.walk.desired.learn_later.asked_at_unix_s =
+                (day > 0).then(|| unix_ms() / 1_000 - learn_later::DAY_S);
+            assert_eq!(
+                greeted(&mut room, "Hi lamp.", true),
+                [learn_later::ASK],
+                "day {day}"
+            );
+            room.wait(61 * S, Some(NEAR_MIDDLE));
+        }
+        assert_eq!(room.walk.kept().learn_later.unanswered, 3);
+        room.walk.desired.learn_later.asked_at_unix_s =
+            Some(unix_ms() / 1_000 - 30 * learn_later::DAY_S);
+        assert_eq!(greeted(&mut room, "Hi lamp.", true), NONE);
+
+        let mut room = learning_later("learn-later-dont-mind");
+        assert_eq!(greeted(&mut room, "Hi lamp.", true), [learn_later::ASK]);
+        room.walk.heard("I don't mind, call me Sam.", room.at);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert!(!room.walk.kept().learn_later.stopped);
+
+        for (name, answer, declined) in [
+            ("learn-later-declined", "No, thanks.", true),
+            ("learn-later-forget", "Forget my face.", false),
+        ] {
+            let mut room = learning_later(name);
+            assert_eq!(greeted(&mut room, "Hi lamp.", true), [learn_later::ASK]);
+            room.walk.heard(answer, room.at);
+            room.wait(S, Some(NEAR_MIDDLE));
+            if declined {
+                // The words alone stop nothing: the model's judgment does.
+                assert!(!room.walk.kept().learn_later.stopped, "{answer}");
+                post(&room.walk.file, &json!({"learn_later": "declined"})).unwrap();
+                room.wait(S, Some(NEAR_MIDDLE));
+            }
+            assert!(room.walk.kept().learn_later.stopped, "{answer}");
+            let file = std::fs::read_to_string(&room.walk.file)
+                .unwrap()
+                .replace([' ', '\n'], "");
+            assert!(
+                file.contains("\"learn_later\":{") && file.contains("\"stopped\":true"),
+                "{answer}: kept in the file: {file}"
+            );
+            room.wait(61 * S, Some(NEAR_MIDDLE));
+            room.walk.desired.learn_later.asked_at_unix_s =
+                Some(unix_ms() / 1_000 - 2 * learn_later::DAY_S);
+            assert_eq!(greeted(&mut room, "Hi lamp.", true), NONE, "{answer}");
+        }
+    }
+
+    /// Any of the three switches off (`learn_later::switched`): never asked.
+    #[test]
+    fn learn_later_off_is_never_asked() {
+        let mut room = learning_later("learn-later-off");
+        room.walk.learn_later = false;
+        assert_eq!(greeted(&mut room, "Hi lamp.", true), NONE);
+        assert_eq!(room.walk.kept().learn_later, learn_later::Kept::default());
+        for (learn, no_ask, speaker) in [
+            (None, true, Some("on")),
+            (Some("on"), false, Some("on")),
+            (Some("on"), true, None),
+        ] {
+            assert!(!learn_later::switched(learn, no_ask, speaker));
+        }
+    }
+
+    /// What a line is, for `lamp/did` (`LAMP_DID_VOICE`): the update's two
+    /// lines are the update line, any other line of the walk is the walk's,
+    /// and a line that is not begun leaves no moment.
+    #[test]
+    fn a_line_is_told_as_an_update_line_or_a_walk_line_and_only_when_begun() {
+        use crate::did_voice::Moment;
+        let mut room = Room::new("moment-of");
+        assert_eq!(room.walk.moment_of(FIRST_UPDATE_LINE), Moment::UpdateLine);
+        assert_eq!(
+            room.walk.moment_of(FIRST_UPDATE_DONE_LINE),
+            Moment::UpdateLine
+        );
+        assert!(matches!(
+            room.walk.moment_of(FIRST_UPDATE_WAIT_LINE),
+            Moment::Onboarding(_)
+        ));
+        // Nothing begun: no moment is kept.
+        let quiet = 0;
+        assert_eq!(
+            room.walk
+                .tick_line(room.at, quiet, false, false, Some(NEAR_MIDDLE), true),
+            None
+        );
+        assert_eq!(room.walk.line_moment(), None);
     }
 
     /// Every fixed line the walk begins ("Say only this: ...") is its own

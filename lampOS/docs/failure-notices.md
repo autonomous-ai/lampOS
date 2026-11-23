@@ -189,6 +189,21 @@ outage says the line again. The recording goes through the same speaker path, pe
 retirement as `turn_lost`. With no recording provisioned the turn is
 `Skipped` and the lamp is silent, as before.
 
+**In a long outage, the line every time (#8235, `LAMP_OUTAGE_LINE_AGAIN=on`,
+on in the product beside `LAMP_OFFLINE_VOICE=on`).** Seen on lamp-06c1 on 21
+November: in one 48-minute outage the line played twice and 75 turns let
+through after the lamp's name ended in nothing. With the switch, every speech turn of an outage says the
+existing line of its cause, not only the first: never silence (the owner's
+call on #8235, 22 November). No time limit is added and no words are new:
+
+| Cause | Line | From |
+|---|---|---|
+| No internet (`provider_unavailable`) | "Sorry, I can't reach the internet right now. I'll be back soon." | the release's file, as before |
+| The internet up, the service alone down (`voice_service_unreachable`, `LAMP_SERVICE_DOWN_LINE`) | "Sorry, my thoughts are slow just now. Ask me again in a moment." (`second_provider::DOWN_LINE`, what a turn the service fails says) | the speech cache, warmed at start in the lamp's voice on an English lamp too (`TtsCache::keeping_outage_lines`), in the owner's language when kept; recorded under `voice_service_unreachable` with `wav_sha256` `speech-cache:<key>`. Not kept yet, the release's service line, as before |
+
+A turn still says one failure line at most (#4332). A sound let through still
+gets nothing. Off, every turn is as above, the release's files only.
+
 **Back online.** When the link is ready again after an outage in which the
 line was said, "I'm back online." (`back_online`) is owed for 60 s
 (`BACK_ONLINE_OWED_US`). It is said once by a turn the lamp takes for itself
@@ -368,6 +383,17 @@ recorded under the release's kind, its `wav_sha256` `speech-cache:<key>`.
 again?"); the release has no `turn_lost` file, so with the line not kept
 the sigh stands in. An English lamp plays the files exactly as before.
 
+**`turn_lost` on an English lamp (#8235, `LAMP_OUTAGE_LINE_AGAIN=on`).**
+The release has no `turn_lost` file, so on the product it is
+`not_provisioned` and a lost turn got only the sigh (40 such turns on
+lamp-06c1, 21 November). With the switch, the speech cache warms
+`language::TURN_LOST` at start in the lamp's own voice on an English lamp
+too (`TtsCache::keeping_outage_lines`), as it warms the sleep line, and a lost
+turn whose release file is missing says the kept line, recorded under
+`turn_lost` with `wav_sha256` `speech-cache:<key>`. Not kept yet (a lamp
+started offline), the sigh stands in as before. A release file, when one is
+published, is said first.
+
 `wifi_recovering` (#3743, the words agreed with Sixth on #3020) is new in
 `notices-2026-11-03`. On a lamp without that release, `lamp-setup recover`
 asks for it, the voice answers `not_provisioned`, the journal says so and
@@ -440,7 +466,10 @@ One failure line a turn (#4332). When the second route has already said its
 down line for the failed request ("Sorry, my thoughts are slow just now. Ask
 me again in a moment.", the shorter "Still slow, sorry.", or "I've hit my
 usage limit." for a usage-limit 429, second-voice.md; and a later ask in
-the same usage-limit run, which hears nothing since the limit was said once),
+the same usage-limit run, which hears nothing since the limit was said once;
+or, with `LAMP_LIMIT_LOCAL_ASKS`, a light or volume ask done at the limit
+with no model, which says its own short line instead, or the time asked
+there, said from the lamp's clock),
 it tells the coordinator so with `DownLineSaid`, after the line's audio and
 before the turn's `TurnFailed`, and `select_failure_notice_in` selects no
 `turn_lost` for that turn: the person was already told it broke. Before, on
@@ -450,7 +479,9 @@ the key, not whether the turn had audio: a turn that played part of its
 answer and then failed mid-sentence still says `turn_lost`, since nothing
 told the person it broke, and so does a turn with nothing played. The route's
 "Sorry, I can't answer just now." (`DOWN_LINE_CANNOT`) sends no
-`DownLineSaid`.
+`DownLineSaid`. A due timer or reminder rung at the usage limit with
+`LAMP_LIMIT_LOCAL_ASKS` ("Your timer is done.", "You have a reminder.",
+#7642) is no failure: its turn ends answered, so no notice is selected.
 
 `failure_notice_selected`, `failure_notice_attempted`,
 `failure_notice_first_write` and `failure_notice_final_sample_retired` describe

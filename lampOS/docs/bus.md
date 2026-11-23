@@ -44,6 +44,12 @@ again (`lamp-update` does, onto each new build). So a subscriber that finds
 its name taken (`.new` or `.sock`) connects to it: refused, nobody is bound
 there, and it removes the file and takes the name; answered, it takes the
 next count, and after 8 it fails with `no free socket name` (#7439).
+A publisher does the same when it reads `subs/`: it connects to each
+newcomer before it links it, and to those it links when the newcomers would
+not fit, and removes every file nobody is bound to. So a dead subscriber
+never takes a place under the cap of 64, and the sockets a voice leaves at
+each restart go at the next publish, however seldom the topic is published
+(#8272).
 
 A publisher's entry in `pubs/` is a file whose time says when the
 publisher last showed that it was alive. It is empty unless the publisher
@@ -162,7 +168,9 @@ that subscriber's queue is full; or refused because nobody holds the socket,
 whose file is then removed. `publish` answers `{delivered, dropped, removed}`
 and keeps totals, for each subscriber too. It is an error only for a message
 too large or badly labelled, and once, not with every message, for a root it
-cannot use or more than 64 subscribers. `subs/` is read at most every 200 ms
+cannot use or more than 64 live subscribers, with how many were found.
+Past the cap a read tries at most 64 more, so a flood of live sockets costs
+it a bounded number of connects. `subs/` is read at most every 200 ms
 and when a subscriber is found dead; between reads, an event with nobody
 subscribed costs no system call but the publisher's own entry, once a second.
 A publisher that declares its topic is the one case that fails at the start:
@@ -531,7 +539,7 @@ that owns it:
 |---|---|---|
 | `room/state` | the voice's provider worker, on each change and once a second | the policy, and Expression |
 | `room/presence` | the eyes, with `LAMP_PRESENCE=on`, from their looks and `voice/heard` ([presence.md](presence.md)) | `lamp-skills` (Light out when you leave; Who was here's record, #1685); Messages (#1673) |
-| `room/activity`, `room/stood_up` | the eyes, with `LAMP_ACTIVITY=on`, from their looks ([eyes.md](eyes.md)) | `lamp-skills` (Stretch break waits for a look up); "watches you leave" (#1669) |
+| `room/activity`, `room/stood_up` | the eyes, with `LAMP_ACTIVITY=on`, from their looks ([eyes.md](eyes.md)) | `lamp-skills` (Stretch break waits for a look up); "watches you leave" (#1669); with `LAMP_DESK_TIME=on`, the wellbeing notes' `{sitting}` and the voice's `desk_time`, the current sitting only, told only when asked (#7694, second-voice.md) |
 | `humans/doing`, `humans/doing_seen`, `humans/posture` | `lamp-seen` (`lamp_seen`), from pictures sent to be labelled (#6543); declared in `lamp_msgs::doing_topics()`; `humans/doing` and `humans/doing_seen` published by `lamp-seen` from phase 2 (off unless `LAMP_SEEN_ACTIVITY=on`), `humans/posture` by nobody yet | the voice (`humans/doing`, with `LAMP_SECOND_DOING=on`, second-voice.md), memory, the policy and skills, each as it is built (#6543); a skill names them in `[permissions] topics`, the `seen` use ([cloud.md](cloud.md)) |
 | `humans/doing_more` | `lamp-seen` (`lamp_seen`), only with `LAMP_SEEN_MORE_DOINGS=on`: tiredness, desk work as a coarse kind and celebrating, timed from the same bursts (#6543); declared in `lamp_msgs::doing_topics()` | nobody yet; a skill names it in `[permissions] topics`, the `seen_more` use, apart from `seen` ([cloud.md](cloud.md)) |
 | `voice/timing`, `voice/activity`, `voice/playout` | the voice, with `LAMP_EXPRESSION_OUT=on` ([expression.md](expression.md), "What the voice says, as built") | Expression |
@@ -569,8 +577,8 @@ service, and keeps trying`, with for how long.
 ## Optional Expression topics (Third, 2026-10-14)
 
 The new `lamp-expression` process subscribes to existing context and new
-`voice/timing`, `voice/activity`, `voice/playout` and
-`attention/concentration` messages. It publishes `expression/state` and
+`voice/timing`, `voice/activity`, `voice/playout` and, with
+`LAMP_EXPRESSION_HEAD_DOWN=on`, `room/activity` messages. It publishes `expression/state` and
 its `diagnostics`, and only with `--enable` may publish leased
 `expression/body` and `expression/light` requests. It does not publish on
 the existing Actions-owned `light/command`. Their types, periods and
@@ -702,6 +710,7 @@ switched and off unless set. The task's number is the same one
 | Topic | Kind | Published by | Intended reader |
 |---|---|---|---|
 | `skills/events` | event, no period, no lifespan | `lamp-skills` | People and the lamp's app: what each physical skill did and why ([skills.md](skills.md)); `lamp-peek`'s timeline, skill and stage only ([peek.md](peek.md)) |
+| `skills/tasks` | event, no period, no lifespan | `lamp-tasks` (with `--progress`), `lamp-skills` | `lamp-peek`'s Tasks and Timeline (#7873): each skill's `do.task` run, its engine and end, and its answer held for its gate, then told or dropped ([msgs.md](msgs.md) `SkillTask`, [peek.md](peek.md)) |
 
 The [`SkillEvent` message](msgs.md#the-skills-contract) says one stage of a
 run: triggered, asked, answered (with whether it was allowed) and done,
@@ -838,3 +847,30 @@ The request survives service restarts until reboot or a matching kept
 500 ms and carries the matching request identifier. [unplug.md](unplug.md)
 defines the payloads, ownership and proof. No readiness reader treats ordinary
 `body/joint_states`, pause or successful publication alone as safe completion.
+
+## `lamp/did`: what the lamp did, and why (#7757)
+
+An event for each outward action (spoke, moved, lit, started a task): who decided
+(the part, and the skill or rule), a short fact in plain words as the reason (at
+most 120 characters, what the lamp measured or decided, never a word a person
+said), when and how it went (done, refused, cut). lamp-skills tells each run it
+makes with `LAMP_DID_PUBLISH=on`; the voice keeps the last hour (200 at most) in
+memory with `LAMP_DID_KEEP=on` for the conversation's look-up; nothing survives a
+restart and nothing else reads it. A run is told when it ends, so how it went
+is known (done, cut, or refused at once); a skill made on the lamp is told as
+"a made skill", never by a name that may carry a person's words; and the voice
+keeps only dids published by the names in `did_history::TELLERS`: `skills`,
+`body`, `ring` and `voice`; the body's dids have a share of at most 100 of the 200 kept, its own oldest dropped first, so with the presence on they never push the skills' out. The body tells (`LAMP_DID_BODY=on`) what it chooses: a shift at rest
+and the turn to a call, once each ends, from its publishing thread and at most one
+in 2 s, with fixed words and a clip's name as the reason. The ring tells (`LAMP_DID_RING=on`, source `ring`, a share of at most 20 of the 200)
+the four faces it shows on its own as each begins: the asleep face, the night's
+sleep face, the unplug picture and the physical-mute red breath, once each, from
+a thread of its own and at most one in 2 s, with a fixed sentence as the reason
+(the privacy one records only that the lamp was private). The voice tells
+(`LAMP_DID_VOICE=on`, source `voice`, a share of at most 20 of the 200) the
+lines it begins itself with nobody speaking to it and no skill asking: news of
+a task, a step of the first minutes with a new person (with the step's number in
+the walk's order) and the update line, once each as its first audio is queued,
+from a thread of its own and at most one in 2 s, `Spoke`, with a fixed sentence
+as the reason: no task's text, no agent's answer and no name. A skill's say, a
+reminder and an answer are not told by it (lamp-skills tells the says).

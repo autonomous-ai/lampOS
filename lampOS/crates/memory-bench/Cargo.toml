@@ -11,7 +11,10 @@ path = "src/main.rs"
 
 [dependencies]
 serde.workspace = true
-serde_json.workspace = true
+# raw_value: the ledger hashes each row's data as written, never a re-serialized
+# parse (run 7, 3 Nov). Product crates already turn it on; never float_roundtrip,
+# which feature unification would turn on for every shipped lamp binary.
+serde_json = { workspace = true, features = ["raw_value"] }
 sha2.workspace = true
 jiff = { version = "0.2", features = ["tzdb-bundle-always"] }
 hmac = "=0.12.1"

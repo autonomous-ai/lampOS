@@ -26,6 +26,7 @@ pub mod mcp_server;
 pub mod net;
 pub mod reads;
 pub mod refresh;
+pub mod run_calls;
 pub mod serve;
 pub mod skill_secrets;
 pub mod skill_writes;

@@ -11,6 +11,14 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::time::Duration;
 
+/// The shared cap, asked before an app is started.
+fn cap() -> String {
+    format!(
+        "systemctl {}",
+        lamp_apps::effects::APPS_SLICE_LIMIT.join(" ")
+    )
+}
+
 fn package(name: &str, version: &str, grants: &[&str], net: bool) -> AppPackage {
     let mut files = BTreeMap::new();
     files.insert("src/app/main.py".to_owned(), b"print('hi')\n".to_vec());
@@ -114,7 +122,7 @@ fn a_fresh_install_lays_everything_and_starts_the_app() {
     let mut rig = rig();
     let pkg = package("english-lessons", "1.0.0", &["speak", "hear"], false);
     let done = put(&mut rig, &pkg, "a", Op::Install, &["hear", "speak"]).unwrap();
-    assert_eq!(done.unit, "lampapp@english-lessons.service");
+    assert_eq!(done.unit, "lamp-app@english-lessons.service");
     assert!(done.started);
     let app = rig.layout.code.join("english-lessons");
     assert_eq!(
@@ -137,7 +145,11 @@ fn a_fresh_install_lays_everything_and_starts_the_app() {
     assert_eq!((record.version.as_str(), record.net), ("1.0.0", false));
     assert_eq!(
         rig.fx.calls,
-        ["/usr/bin/systemctl restart -- lampapp@english-lessons.service"]
+        [
+            cap(),
+            "/usr/bin/systemctl reset-failed -- lamp-app@english-lessons.service".to_owned(),
+            "/usr/bin/systemctl restart -- lamp-app@english-lessons.service".to_owned()
+        ]
     );
     assert_eq!(
         rig.skills.placed,
@@ -162,7 +174,11 @@ fn net_in_the_manifest_picks_the_net_unit() {
     put(&mut rig, &pkg, "a", Op::Install, &["speak"]).unwrap();
     assert_eq!(
         rig.fx.calls,
-        ["/usr/bin/systemctl restart -- lampapp-net@x.service"]
+        [
+            cap(),
+            "/usr/bin/systemctl reset-failed -- lamp-app-net@x.service".to_owned(),
+            "/usr/bin/systemctl restart -- lamp-app-net@x.service".to_owned()
+        ]
     );
 }
 
@@ -546,12 +562,14 @@ fn flipping_net_stops_the_other_variant_before_the_new_one_starts() {
         &[],
     )
     .unwrap();
-    assert_eq!(done.unit, "lampapp-net@x.service");
+    assert_eq!(done.unit, "lamp-app-net@x.service");
     assert_eq!(
         rig.fx.calls,
         [
-            "/usr/bin/systemctl stop -- lampapp@x.service",
-            "/usr/bin/systemctl restart -- lampapp-net@x.service"
+            "/usr/bin/systemctl stop -- lamp-app@x.service".to_owned(),
+            cap(),
+            "/usr/bin/systemctl reset-failed -- lamp-app-net@x.service".to_owned(),
+            "/usr/bin/systemctl restart -- lamp-app-net@x.service".to_owned()
         ]
     );
     // Back again.
@@ -567,8 +585,10 @@ fn flipping_net_stops_the_other_variant_before_the_new_one_starts() {
     assert_eq!(
         rig.fx.calls,
         [
-            "/usr/bin/systemctl stop -- lampapp-net@x.service",
-            "/usr/bin/systemctl restart -- lampapp@x.service"
+            "/usr/bin/systemctl stop -- lamp-app-net@x.service".to_owned(),
+            cap(),
+            "/usr/bin/systemctl reset-failed -- lamp-app@x.service".to_owned(),
+            "/usr/bin/systemctl restart -- lamp-app@x.service".to_owned()
         ]
     );
 }
@@ -577,11 +597,13 @@ fn flipping_net_stops_the_other_variant_before_the_new_one_starts() {
 fn a_failure_at_any_step_then_a_sweep_and_a_retry_ends_installed_once() {
     // The yes is the first thing that can fail; then the companions; then
     // the start; then the folder itself.
-    for case in ["start", "companions", "folder"] {
+    for case in ["cap", "reset", "start", "companions", "folder"] {
         let mut rig = rig();
         let pkg = package("x", "1.0.0", &["speak"], false);
         match case {
-            "start" => rig.fx.fail_at = Some(0),
+            "cap" => rig.fx.fail_at = Some(0),
+            "reset" => rig.fx.fail_at = Some(1),
+            "start" => rig.fx.fail_at = Some(2),
             "companions" => rig.skills.fail_place = true,
             _ => {
                 fs::create_dir_all(&rig.layout.code).unwrap();
@@ -606,8 +628,22 @@ fn a_failure_at_any_step_then_a_sweep_and_a_retry_ends_installed_once() {
             put(&mut rig, &pkg, "a", Op::Install, &["speak"]).is_ok(),
             "{case}"
         );
-        assert_eq!(rig.fx.calls.len(), 1, "{case}");
+        assert_eq!(rig.fx.calls.len(), 3, "{case}");
     }
+}
+
+/// Heron's HOLD at d8b0816094: the install's start must not run an app with no shared cap. When the cap cannot be
+/// set nothing is started, the install fails and a fresh one leaves no code.
+#[test]
+fn an_install_whose_shared_cap_cannot_be_set_starts_no_unit() {
+    let mut rig = rig();
+    rig.fx.fail_at = Some(0);
+    let pkg = package("x", "1.0.0", &["speak"], false);
+    let error = put(&mut rig, &pkg, "a", Op::Install, &["speak"]).unwrap_err();
+    assert!(error.contains("shared limit"), "{error}");
+    assert_eq!(rig.fx.calls.len(), 1, "{:?}", rig.fx.calls);
+    assert!(!rig.fx.calls.iter().any(|call| call.contains("restart")));
+    assert!(!rig.layout.code.join("x").exists());
 }
 
 #[test]
@@ -656,15 +692,23 @@ fn remove_still_works_on_what_install_laid() {
     );
 }
 
-/// Another caller's whole install of `name`, run on the rig's folders while
-/// the first one has let the apps lock go to place its skills.
-fn other_install(layout: Layout, pkg: AppPackage, tag: &'static str) -> Box<dyn FnMut()> {
+/// Another caller's whole install of `name`, tried on the rig's folders while
+/// the first one has let the apps lock go to place its skills: what it was
+/// told, and how often its yes was asked.
+type Told = std::rc::Rc<std::cell::RefCell<Option<(Result<(), String>, usize)>>>;
+
+fn other_install(
+    layout: Layout,
+    pkg: AppPackage,
+    tag: &'static str,
+    told: Told,
+) -> Box<dyn FnMut()> {
     Box::new(move || {
         let bytes = bytes_of(tag);
         let mut fx = FakeEffects::default();
         let mut skills = FakeCompanions::default();
         let mut yes = FakeYes::granting(vec![key(Op::Install, &pkg, &bytes, &["speak"])]);
-        install(
+        let result = install(
             &layout,
             &mut fx,
             &mut skills,
@@ -673,32 +717,28 @@ fn other_install(layout: Layout, pkg: AppPackage, tag: &'static str) -> Box<dyn 
             &bytes,
             Some(200),
         )
-        .unwrap();
+        .map(|_| ());
+        *told.borrow_mut() = Some((result, yes.asked));
     })
 }
 
 #[test]
-fn a_failed_fresh_install_never_removes_another_install_of_the_same_name() {
+fn a_second_install_of_the_same_name_in_the_gap_is_refused_before_its_yes_and_the_first_stands() {
     let mut rig = rig();
     let pkg = package("x", "1.0.0", &["speak"], false);
-    // B starts fresh; A (a repackaged 1.0.0) finishes in the gap; B then
-    // fails its re-check.
+    let told: Told = Default::default();
     let other = package("x", "1.0.0", &["speak"], false);
-    rig.skills.on_place = Some(other_install(rig.layout.clone(), other, "a"));
-    let error = put(&mut rig, &pkg, "b", Op::Install, &["speak"]).unwrap_err();
-    assert!(error.contains(ALREADY), "{error}");
+    rig.skills.on_place = Some(other_install(rig.layout.clone(), other, "a", told.clone()));
+    put(&mut rig, &pkg, "b", Op::Install, &["speak"]).unwrap();
+    let (result, asked) = told.borrow_mut().take().expect("the other install ran");
+    assert!(result.unwrap_err().contains("being changed"));
+    assert_eq!(asked, 0, "its yes was spent");
     let app = rig.layout.code.join("x");
     assert_eq!(
         fs::read_link(app.join("current")).unwrap().to_str(),
         Some("1.0.0")
     );
-    assert!(app.join("1.0.0/src/app/main.py").is_file());
-    assert_eq!(installed_record(&rig.layout, "x").unwrap().version, "1.0.0");
-    assert!(
-        rig.skills.removed.is_empty(),
-        "A's companions were taken: {:?}",
-        rig.skills.removed
-    );
+    assert!(rig.skills.removed.is_empty());
     assert!(!has(&rig.layout.state, "x", Mark::Installing));
 }
 
@@ -802,4 +842,54 @@ fn logs_are_asked_like_net() {
     );
     assert!(put(&mut rig, &pkg, "a", Op::Install, &["speak"]).is_ok());
     assert!(installed_record(&rig.layout, "x").unwrap().logs);
+}
+
+#[test]
+fn an_app_being_installed_or_removed_is_refused_before_the_yes_is_spent() {
+    for mark in [Mark::Installing, Mark::Removing] {
+        let mut rig = rig();
+        let pkg = package("x", "1.0.0", &["speak"], false);
+        set(&rig.layout.state, "x", mark).unwrap();
+        let bytes = bytes_of("a");
+        let mut yes = FakeYes::granting(vec![key(Op::Install, &pkg, &bytes, &["speak"])]);
+        let error = install(
+            &rig.layout,
+            &mut rig.fx,
+            &mut rig.skills,
+            &mut yes,
+            &StubReader::new(pkg.clone()),
+            &bytes,
+            Some(200),
+        )
+        .unwrap_err();
+        assert!(error.contains("being changed"), "{error}");
+        assert_eq!(yes.asked, 0, "{mark:?}: the yes was spent");
+        assert!(!rig.layout.code.join("x").exists());
+    }
+}
+
+/// An update of an app that crashed five times in 600 s is `start-limit-hit`: the restart of the fixed version
+/// is refused unless the failed state is cleared first, so the install clears it right before the restart,
+/// after the shared cap (and a unit that is not loaded is nothing to clear: the restart goes on).
+#[test]
+fn an_install_clears_the_failed_state_of_the_unit_just_before_restarting_it() {
+    let mut rig = rig();
+    let pkg = package("x", "1.0.0", &["speak"], false);
+    put(&mut rig, &pkg, "a", Op::Install, &["speak"]).unwrap();
+    let calls = rig.fx.calls.clone();
+    let reset = calls
+        .iter()
+        .position(|c| c == "/usr/bin/systemctl reset-failed -- lamp-app@x.service")
+        .unwrap();
+    assert_eq!(
+        calls[reset + 1],
+        "/usr/bin/systemctl restart -- lamp-app@x.service"
+    );
+    assert!(
+        reset
+            > calls
+                .iter()
+                .position(|c| c.contains("set-property"))
+                .unwrap()
+    );
 }

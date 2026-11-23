@@ -504,8 +504,21 @@ impl Tracker {
         for task in watched.iter().filter(|w| w.machine_id == machine) {
             let row = listed.iter().find(|row| row.agent_id == task.agent_id);
             let state = row.map_or(AgentState::Missing, |row| agent_state(&row.state));
-            let about = row.and_then(|row| row.about.clone());
             let working_s = task.accepted_ago_ms.map(|ms| ms / 1_000);
+            // `ps` is per agent: on a kept session the agent's line and its
+            // last activity may be an earlier task's (c0a4-17 HW: task 224's
+            // "one-page draft with three picks" and "quiet for an hour and a
+            // quarter" told of task 225, 3 min old). A row last active
+            // before this task was handed over says nothing of this task:
+            // neither its line nor its time is kept.
+            let started_unix_ms = task.accepted_ago_ms.map(|ago| wall_ms.saturating_sub(ago));
+            let row = row.filter(|row| {
+                !matches!(
+                    (row.last_active_unix_ms, started_unix_ms),
+                    (Some(active), Some(started)) if active < started
+                )
+            });
+            let about = row.and_then(|row| row.about.clone());
             let last_active_unix_ms = row.and_then(|row| row.last_active_unix_ms);
             match self.tasks.get_mut(&task.task_id) {
                 None => {
@@ -741,6 +754,7 @@ mod tests {
             state: state.into(),
             last_active_unix_ms: Some(1_791_964_800_000),
             about: about.map(str::to_owned),
+            agent: None,
         }
     }
     const RUN: u64 = 1_791_964_000_000;
@@ -748,6 +762,48 @@ mod tests {
     const B: &str = "22222222-2222-4222-8222-222222222222";
     const OFFICE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const HOME: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    /// c0a4-17 HW: on a kept session `ps` is per agent, so before the new
+    /// task's first activity it shows the earlier task's line and its last
+    /// activity. Neither is the new task's: its words and its time stay
+    /// empty until the agent is active after its hand-over, and the work
+    /// record's last activity with them.
+    #[test]
+    fn an_earlier_tasks_line_on_the_same_agent_is_not_the_new_tasks() {
+        let mut tracker = Tracker::started(RUN);
+        let earlier_active = 1_791_964_800_000;
+        // Task 225, handed over 3 min ago, 75 min after the agent was last
+        // active on task 224.
+        let now = earlier_active + 78 * 60_000;
+        let watched = vec![watched(225, OFFICE, A, Some(3 * 60_000))];
+        let stale = Listed {
+            last_active_unix_ms: Some(earlier_active),
+            ..listed(
+                A,
+                "working",
+                Some("Saved a one-page draft with three picks"),
+            )
+        };
+        let _ = tracker.read(OFFICE, Ok(vec![stale]), &watched, now, 10);
+        let words = tracker.words(225).unwrap();
+        assert_eq!(words["about"], Value::Null, "{words}");
+        assert_eq!(words["last_active_unix_ms"], Value::Null, "{words}");
+        let line = tracker.line(225).unwrap();
+        assert_eq!((line.about, line.last_active_unix_ms), (None, None));
+        assert_eq!(
+            crate::works::line_of(Some(&tracker), 225),
+            Some((Some(crate::works::State::Working), None))
+        );
+        // Active after its hand-over: its own line and time.
+        let own = Listed {
+            last_active_unix_ms: Some(now + 5_000),
+            ..listed(A, "working", Some("Reading the first news site"))
+        };
+        let _ = tracker.read(OFFICE, Ok(vec![own]), &watched, now + 10_000, 10);
+        let words = tracker.words(225).unwrap();
+        assert_eq!(words["about"], "Reading the first news site");
+        assert_eq!(words["last_active_unix_ms"], now + 5_000);
+    }
 
     #[test]
     fn a_task_new_to_the_watch_is_read_at_once_then_on_the_watchs_schedule() {

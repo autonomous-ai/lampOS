@@ -30,6 +30,7 @@ pub mod hold_in;
 pub mod inspection;
 #[cfg(unix)]
 pub mod linux;
+pub mod miss_in;
 #[cfg(any(unix, test))]
 pub mod name_in;
 pub mod night_in;

@@ -98,3 +98,11 @@ test('where an output pixel comes from, as fixed vectors another implementation 
   // Far to the side of a wide lens the ray leaves the source: black.
   assert.equal(sourcePixel(w, h, f, reference, frameFromForward([1, 0, 0.05]), 0, 90), null);
 });
+
+test('a head pitched up looks higher, and one pitched down lower (lamp-52e6: more counts is down, and degrees are up-positive)', () => {
+  // docs/body.md, 14 Oct: folded, the head met the base at 2,010 counts going down and rose free to 1,474 going up.
+  const up = (pitch) => cameraFrame(model, { ...STAND, pitch }).forward[1];
+  assert.ok(up(10) > up(0) && up(0) > up(-10), `${up(10)} ${up(0)} ${up(-10)}`);
+  const turned = (Math.asin(up(10)) - Math.asin(up(0))) * 180 / Math.PI;
+  assert.ok(Math.abs(turned - 10) < 1, `${turned}`);
+});

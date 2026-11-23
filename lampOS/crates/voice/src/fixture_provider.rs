@@ -953,6 +953,8 @@ mod reminder_tests {
                         late_by_ms: None,
                         also: Vec::new(),
                         again: false,
+                        ids: Vec::new(),
+                        timer: false,
                     },
                 )
                 .unwrap();

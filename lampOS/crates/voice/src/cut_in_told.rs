@@ -54,6 +54,32 @@ pub const FLAG: &str = "--cut-in-told";
 /// What the model is told beside a request that cut in over its answer.
 pub const NOTE: &str = "(They cut in: they spoke while you were speaking, and you stopped there. This time your first words are a short, natural sign that you heard them, such as \"Oh, sure —\", and then the answer to what they said: for this reply the rule against acknowledgments does not hold. For example, cut in with \"What's two plus two?\", say \"Oh, sure — it's four.\" If all they said is to stop or wait, such as \"stop\", \"pause\", \"wait\" or \"hold on\", with nothing else asked, say only a short \"Okay, I'll stop.\" in the language of the conversation, and nothing more. Never apologise at length. Go back to what you were saying only if they ask you to; then first say in a few words where you were, and go on from where you stopped, not from the start.)";
 
+/// For a cut-in that says a stop word and asks more (#7285, [`note`]): only
+/// the facts of [`NOTE`], with no stop sentence and no first words to say,
+/// so the ask reads as a plain ask. Told the "first words" sentence and its
+/// spoken example, "Hold on, hey Lamp, make the light a little warmer." over
+/// a story got no call in about 35 of 146 core gate tries, against about 3
+/// of 131 for the same ask with no cut-in (#7285, w2).
+pub const ASKED_MORE: &str = "(They cut in: they spoke while you were speaking, and you stopped there. Go back to what you were saying only if they ask you to; then first say in a few words where you were, and go on from where you stopped, not from the start.)";
+
+/// The second route's note for a cut-in whose words are `heard`.
+///
+/// On lamp-52e6's core gates (#7285, builds 13360 to 13894) "Hold on, hey
+/// Lamp, make the light a little warmer" over a story was answered with no
+/// call 8 times in 29, 7 of them 16 characters ("Okay, I'll stop.", the
+/// stop sentence's own words) and one 5 ("Okay."); 19 of the 21 answers with the call
+/// were "Warmer.". The model took the line's "hold on" as all that was
+/// said. A line with a stop word and more ([`crate::stop_words::a_stop_and_more`])
+/// is told [`ASKED_MORE`], which has no stop sentence; any other is told
+/// [`NOTE`].
+pub fn note(heard: &str) -> &'static str {
+    if crate::stop_words::a_stop_and_more(heard) {
+        ASKED_MORE
+    } else {
+        NOTE
+    }
+}
+
 /// Told in the history right after an answer of the lamp's that was cut
 /// while it played and is kept as heard (`LAMP_SAID_AS_HEARD`), with this
 /// switch.
@@ -133,6 +159,62 @@ mod tests {
         }
         // Told to answer now: no longer "not to answer".
         assert!(!NOTE.contains("not to answer"));
+    }
+
+    /// #7285: a stop word with an ask after it is told the note without its
+    /// stop sentence; a stop alone, or a line with no stop word, the whole.
+    #[test]
+    fn a_stop_word_with_an_ask_is_not_told_to_only_stop() {
+        // Only the facts: no stop sentence, no first words, no example.
+        for not_told in [
+            "Okay, I'll stop.",
+            "your first words",
+            "Oh, sure",
+            "apologise",
+        ] {
+            assert!(!ASKED_MORE.contains(not_told), "{not_told}");
+        }
+        assert!(ASKED_MORE.starts_with(
+            "(They cut in: they spoke while you were speaking, and you stopped there."
+        ));
+        assert!(ASKED_MORE.contains("Go back to what you were saying only if they ask you to"));
+        // One predicate decides a bare stop (`wait_words::only_a_stop`, the
+        // answer wait's too): a stop with a name, filler or a short time is
+        // told the whole note, a stop with anything else said is not.
+        for (heard, told) in [
+            (
+                "Hold on, hey Lamp, make the light a little warmer.",
+                ASKED_MORE,
+            ),
+            (
+                "Hold on. Hey, Lamp. Make the light a little warm.",
+                ASKED_MORE,
+            ),
+            ("Hold on, make the light warmer", ASKED_MORE),
+            ("Wait… make the light warmer", ASKED_MORE),
+            ("Wait, what time is it?", ASKED_MORE),
+            // Says why they stop it: answered as said ("Sure, take your
+            // time."), not with the set "Okay, I'll stop.".
+            ("Hold on, I'm thinking.", ASKED_MORE),
+            // A question after the stop is answered (#7613, the reviewer's
+            // HOLD).
+            ("Wait, is there a story?", ASKED_MORE),
+            ("Wait, is that the one?", ASKED_MORE),
+            ("Hold on, is that it?", ASKED_MORE),
+            ("Wait, is it now?", ASKED_MORE),
+            ("Wait, is there one?", ASKED_MORE),
+            ("Hold on.", NOTE),
+            ("Wait, wait.", NOTE),
+            ("Wait a sec.", NOTE),
+            ("Wait a minute, Lamp.", NOTE),
+            ("Hold on a second, Lamp.", NOTE),
+            ("Okay, that is enough", NOTE),
+            ("Stop telling the story.", NOTE),
+            ("What's two plus two?", NOTE),
+            ("Don't stop, make it warmer.", NOTE),
+        ] {
+            assert_eq!(note(heard), told, "{heard}");
+        }
     }
 
     #[test]

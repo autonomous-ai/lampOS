@@ -135,7 +135,9 @@ let go, and nothing is written after that, when:
 
 The same let-go ends every run that stops on a surprise, not only one in
 the loop: taking hold, a profile or force limit that does not write or read
-back at start, a wake that does not reach home, and a shoulder that does
+back at start (a read-back with no clean answer is asked three times in all,
+20 ms apart, before it counts, #6591; one that answers a wrong value counts at
+once), a wake that does not reach home, and a shoulder that does
 not come down when it is lowered all end with torque off on all five, after
 the hold where there is one. Every way a run ends passes through one place
 (`run_alive`) that does this. It is not done when the body is asked to
@@ -955,7 +957,22 @@ rest by itself and then stands as ever:
    (10 min), is let down slowly: its force drops to `GIVE_WAY_FORCE` (12%)
    and stays there, so it sinks under its own weight. With the arm already
    resting the run ends held, as before, and systemd's start limit bounds
-   the retries. The base and the roll keep inside one turn by their own
+   the retries, with one exception: a fold that stops on the load of an arm
+   joint it is folding, with the arm within `ARM_LET_GO_NEAR` of folded, has
+   met its rest (a factory lamp, 23 Nov: the elbow lay 61 counts above
+   folded, its head askew under it, at a load of 252 against `--recover-load
+   250`). The arm is folded there: its goals are walked to where it lies, a
+   goal step a write, so it stops pushing, and the lamp wakes and may
+   stand. Before, the hold was refused (61 counts from the last goal), the
+   elbow went on pushing and heating, and each restart ended on `Window`
+   until the unit failed. Likewise an arm joint found held with torque on,
+   pushing (over `STALL_LOAD`) at a goal more than a goal step from where it
+   reads, is held where it lies rather than at that goal. The fold's order is:
+   the head's pitch lifted clear of the base if it droops, then the head's
+   roll and the base's yaw brought home with the arm held where it was
+   found (so the head lies straight under the arm as it comes down, and the
+   lamp is seen to face front first; a joint more than half a turn from
+   home is left), then the arm. The base and the roll keep inside one turn by their own
    stored limits; a head or base joint found more than half a turn from
    home is refused rather than woken across the seam. The arm is let go for a hand only within
    `ARM_LET_GO_NEAR` (150) of folded; raised, let go, it would fall. The load
@@ -1125,17 +1142,31 @@ of an arm that did lift is as before: nothing let go, no count.
 
 Always on. Fully stood up (`stand` 1.0) and asked its stand goal and nothing
 else, a shoulder or elbow held more than 20 counts short of that goal
-(`STAND_EASE_SHORT`) at a load over 150 (`STAND_EASE_LOAD`) for 60 s
-(`STAND_EASE_STEPS`, 3,000 steps) has its stand goal eased to where it
+(`STAND_EASE_SHORT`) at a load over 150 (`STAND_EASE_LOAD`) for 60 s of
+strain (`STAND_EASE_STEPS`, 3,000 steps, counted leakily as below) has its
+stand goal eased to where it
 holds plus 5 counts toward the goal (`STAND_EASE_MARGIN`), for the rest of
 the run. The servo stops pushing at a goal it can't reach. On lamp-74ff
 (13373) the elbow held 41 to 47 short of its measured 2,562 at loads of
 176 to 200, reached 62 °C in about 40 min and sat down hot; lamp-52e6's
 elbow holds 3 short at 24 and is left as it is.
 
-- A gesture, a lean, a hold, a cut by the anti-tip rule or a sit-down
-  writes another goal; while it does, the count pauses. It resets only
-  when the joint is at its goal or unloaded.
+- The count is leaky (#7281). At its stand goal, a step short and loaded
+  adds one; every 3 steps that are not (at its goal, or load 150 or under)
+  take one off (`STAND_EASE_DECAY`), down to 0. A minute settled undoes
+  20 s of strain, and no single settle zeroes it. A gesture, a lean, a
+  hold, a cut by the anti-tip rule or a sit-down writes another goal;
+  while it does, the count pauses.
+  - lamp-52e6's 15:06 ROW: the shoulder spent 20 to 40 s at 38 short and
+    load 164 between landings at its stand (load 20) and heated to 52-53
+    °C. A count that each landing zeroed never reached 60 s; the leaky
+    count gains about 20 s a minute on 30 s spells and eases it within
+    3 min.
+  - The other bound: 5 s spells among 25 s settled stay at 0 and are
+    never eased, nor is a joint short but settled.
+  - The same rule counts the 60 s after an ease below: spells of load
+    still undo an ease that leaves it loaded, and a load that settles
+    keeps the ease. The rate 3 is tuned on one lamp's day (`ponytail:`).
 - Never above the measured stand (the eased goal lies between where the
   joint holds and the goal), and never more than 80 counts under it
   (`STAND_EASE_FLOOR`): a joint held farther short is a hand pushing it
@@ -1145,6 +1176,15 @@ elbow holds 3 short at 24 and is left as it is.
 - An ease is one journal line: `elbow_pitch held short of its stand: goal
   2600 eased to 2560, held at 2555, load 190`. A start begins from the
   measured stand again.
+- An ease is kept only if the load comes under 150 (`STAND_EASE_LOAD`).
+  Over it for another 60 s of strain at the eased goal (leaky, as above), the joint goes back to
+  its measured stand and is not eased again that run, said once: `elbow_pitch
+  eased stand did not lower its load: goal 2565, held at 2525, load 172
+  (over 150); back to its stand goal 2600, not eased again this run`.
+  lamp-74ff on 13508 (19:57 to 20:05) eased 2,562 to 2,527 to 2,494 and
+  drooped ~40 under each at the same load of 164 to 172: an ease that
+  doesn't lower the load only lowers the lamp. The strain guard and the
+  cool-down seat bound the heat instead.
 - The strain guard, the load bound and the heat bound below judge every
   step as before: a real strain still sits it down.
 
@@ -1152,7 +1192,15 @@ The numbers are from two lamps (`ponytail:` in the code); retune them from
 more arms' journals. Shown by tests only
 (`a_standing_elbow_held_45_short_at_load_190_has_its_stand_goal_eased`,
 `a_standing_elbow_3_short_at_load_24_keeps_its_stand_goal`,
-`a_standing_elbow_pushed_120_down_by_a_hand_is_not_eased`); not yet on a lamp.
+`a_standing_elbow_pushed_120_down_by_a_hand_is_not_eased`,
+`a_standing_elbow_still_loaded_after_its_ease_goes_back_to_its_stand_and_eases_no_more`,
+`a_standing_elbow_whose_load_drops_after_its_ease_keeps_it`,
+`a_standing_elbow_whose_load_dips_once_every_30_s_between_leans_is_still_eased`,
+`a_standing_elbow_loaded_in_30_s_spells_between_landings_is_eased_within_3_min`,
+`a_standing_elbow_held_short_at_a_steady_220_is_eased_at_60_s`,
+`a_standing_elbow_short_but_settled_for_10_min_is_never_eased`,
+`a_standing_elbow_loaded_in_5_s_spells_among_25_s_settled_is_never_eased`,
+`a_standing_elbow_loaded_in_spells_after_its_ease_has_the_ease_undone`); not yet on a lamp.
 
 ### The strain guard (`LAMP_BODY_STRAIN_GUARD=on`, #4390, #4501)
 
@@ -1279,7 +1327,7 @@ reached it by moving all five joints together over five seconds.
 
 Without it a lamp folds 90 s after the last talk and then only breathes,
 which reads as switched off with a person still at the desk. With
-`LAMP_BODY_PRESENCE=on` (off unless exactly `on`; off in the product until its lamp-52e6 row)
+`LAMP_BODY_PRESENCE=on` (off unless exactly `on`; on in the product unit)
 the body reads `room/presence` ([presence.md](presence.md)) at most once a
 second (`presence_in.rs`):
 
@@ -1344,7 +1392,17 @@ ROW on lamp-52e6 is to come (#7301).
 With `LAMP_BODY_ENERGY=on` (off unless exactly `on`; on in the product, set on Body, Expression, Skills and Voice together: lamp-52e6, row-6893h, 15 Nov, level 5 PASS, #6893) the body reads the character's
 energy level, 1 to 5, from `character/energy` (`{"level": 1..5, "chosen": bool}`) at most once a second
 (`energy_in.rs`). A level outside 1 to 5 or a message that does not read is not taken; a publisher gone
-keeps the last level, not 1. Off, the body never reads it and runs at level 1. Level 1 is today exactly:
+keeps the last level, not 1. A new level is taken once the lamp is settled: no gesture playing or
+waiting, the head still (every joint under 1 count a second, so a turn keeps the pace it began with) or,
+after `LEVEL_PATIENCE` 2 s of waiting, no head joint faster than the new level lets it go (a glance or
+talk moving the head slower then no longer holds it), the stand not rising or folding. A shift at rest found playing does not keep it waiting: it is
+eased to rest as a hand's yield eases a gesture (`easing_out`), but no joint faster than the clip's own
+pace or than it was moving, the ease stretched past 0.7 s as needed (`settle`'s 54-count sag about
+2.5 s, `look_up` about 1.3 s), so it only slows. A shift or an idle-priority gesture waiting (Expression's
+`lively`) is dropped, and no shift begins while a level waits, so the level is taken within 5 s of the
+send, energy_in's 1 s read included. A gesture asked of it (a skill, a
+nod while talking, a turn to a voice) is never cut for a level; the level waits for its end (#7749).
+Off, the body never reads it and runs at level 1. Level 1 is today exactly:
 the limits and the stand pace the unit gives (`Limits::at(1)` returns them unchanged, a test pins it
 against `deploy/product/lamp-body.service`). Levels 2 to 5 (`energy.rs` `TABLE`) only go livelier, never
 under what the unit gives:
@@ -1366,8 +1424,10 @@ The idle wait is only the wait between shifts at rest (`Idler::share`). The awak
 never sits down sooner (#7314, `at_every_level_the_lamp_folds_no_sooner_than_at_level_one`).
 
 A new level is taken only once the lamp is settled: no gesture playing or waiting, the pose's filter
-still (every joint under 1 count a second) and the arm not rising or folding, so a speed cap never drops
-under a joint still moving. On the host, a 480-count turn of the base lands in 1.12 s at level 5 and
+still (every joint under 1 count a second), or after `LEVEL_PATIENCE` 2 s no joint faster than the new
+level's pace, and the arm not rising or folding, so a speed cap never drops under a joint still moving.
+At the 2 s mark nothing is cut or eased: a turn still going speeds up to the new pace, slewed as any
+change of speed. On the host, a 480-count turn of the base lands in 1.12 s at level 5 and
 1.92 s at level 1. Every other bound (strain, load, tip, reach, the servo's own speed) is untouched.
 The same level also sets the head's roll standing, a lean toward a listener and the size of a nod
 while it speaks (`energy.rs` `TABLE`):
@@ -1411,14 +1471,195 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
 | level | fill (answers with no cue) | fill gap, s | pause nod gap, s | `lively` cooldown | rearm |
 |---|---|---|---|---|---|
 | 1 | none | - | the catalogue's (4) | as written (music sway 30 min) | as written |
-| 2 | 10% | 60 | 3.75 | 20 min | as written |
-| 3 | 20% | 45 | 3.5 | 15 min | as written |
-| 4 | 30% | 30 | 3.25 | 10 min | none |
-| 5 | 40% | 20 | 3 | 6 min | none |
+| 2 | 25% | 40 | 3.75 | 20 min | as written |
+| 3 | 50% | 25 | 3.5 | 15 min | as written |
+| 4 | 75% | 15 | 3.25 | 10 min | none |
+| 5 | every one | 8 | 3 | 6 min | none |
 
 - **Fill.** The voice (`body_link::Cue::heard_lively`): an answer whose opening `cue_for` gives no
   gesture gets a nod, an acknowledge or a curious at the level's share, never within the gap of the
-  last fill and never the last fill again. A matched cue is sent as before at every level.
+  last fill and never the last fill again. A matched cue is sent as before at every level. At level
+  5 (#8153) every answer gets a clip, its own cue's or a fill, at least 8 s after the last fill:
+  with an answer every 25 to 45 s about 1.3 to 2.4 a minute, plus matched cues, against V1's 2.7 to
+  5.8 starts a minute by its code (an emotion clip per answer and `idle.csv` after each). At rest
+  nothing is added at any level: the shifts at rest as in the first table, no clip of its own, and
+  no V1-style return clip after a gesture (a lamp that fidgets alone reads as a machine).
+- **Clip size and pace (#8153).** A built-in clip (`clips::ALL`) asked of the body under the switch
+  is played at the level's `clip_size` and `clip_pace` (`energy::livelier`, from the level taken when
+  it is asked): each joint that many times as far, held to the gesture's reach (`GESTURE_REACH`,
+  220, 220, 250, 360 and 360 counts), and its frames that many times as quick, each step still
+  stretched under the servo's 1,000 counts a second (`Limits::clip_ceiling`, below). The reach and
+  the anti-tip check at play time see the clip as played. Level 1, a move from a file, a shift at
+  rest and the call's glance are played as they are, so level 1 is today exactly.
+
+  Level 5 is almost V1 and never past it (the lead, 21 Nov): no joint swings, peak to peak over
+  all a level plays, past V1's own swing of it over all of its recording (`clips::V1_SWING`, which
+  the generator writes from `hal/recordings`), and no safety bound is loosened for it. Each
+  joint's gain is the least of the level's size; what takes the farthest frame of the stretch V2
+  cut, as that level plays it, to the reach (the rest of a longer recording held at the reach);
+  what swings the joint as far as V1 did (never under x1: a joint the generator's own gains already
+  took past V1 keeps level 1's size, grown no further: excited's and dance_jazz's head pitch,
+  confused's, dance_waltz's elbow, and the base yaw that confused and dance_jazz carry for V1's
+  head roll); and the base's hold below. A level takes no more than any level above it would, so
+  over the stretch V2 cut no joint swings less at a level than at the one under it
+  (`energy::tests::level_five_swings_no_joint_past_v1`,
+  `the_swing_over_the_cut_never_drops_below_the_level_under_it`). At level 5 V1's swing holds
+  sleepy on every joint, happy's head and shoulder, excited's shoulder, dance_chill's base, and
+  dance_hype's and dance_waltz's shoulder.
+
+  | level | clip size x | clip pace x |
+  |---|---|---|
+  | 1 | 1.0 | 1.0 |
+  | 2 | 1.15 | 1.125 |
+  | 3 | 1.3 | 1.25 |
+  | 4 | 1.45 | 1.375 |
+  | 5 | 1.6 | 1.5 |
+
+  Three clips are held under that size, each at the largest gain (to 0.01) that keeps it inside V1's
+  anti-tip rule on the deployed lamps' stand with a margin: no frame past 21.5 mm off the axis,
+  half a millimetre under the 22 mm at which a clip is refused at play time, because a mood's lean
+  at play time (listening, speaking) adds to the stand pose the host check uses; and none leaning
+  the lamp back past 16 mm (`energy::CLIP_SIZE_CAP`,
+  `cog::every_built_in_clip_at_every_level_passes_v1s_rule`; no bound moved): greeting 1.54,
+  surprised 1.27 and dance_groove 1.59 (its lean back), found on the clips as cut; sleepy (1.44)
+  and excited (1.27) were held too until V1's swing held them under it at level 5, and still are at
+  levels 2 to 4, which play as before #8201 (`energy::UNDER_FIVE_CAP`, "Clip length" below). On the host at level 5,
+  at the length played ("Clip length" below), the clips' worst frame is 3.9 to 21.46 mm off the
+  axis (greeting 21.46, scanning 21.40, excited 20.13; level 1: 3.1 to 17.99), so seven clips
+  come within 85% of 22 mm and are said in the journal as V1 said them (`tipping.close`), and the
+  farthest back is 13.40 mm (laugh). The fastest joint of 13 of the 21 clips as cut reaches the
+  servo's 1,000 counts a second (#8183's count; level 1: headshake alone). The eight clips not cut
+  from a longer recording take 0.68 to 0.76 of their level-1 time (headshake 1.02, below); the
+  others play all of their recording at level 5 ("Clip length" below).
+
+  The base (base yaw) carries the lamp's weight, so a level never asks it to change speed from one
+  step to the next harder than level 1 already asks of it in some clip: `energy::BASE_BEND`, 7,690
+  counts a second a second (headshake's 7,689.4, rounded up). On lamp-52e6 'curious' at x1.6 and
+  x1.5 asked the base for about 11,200 and the base rang for half a second (row-8155b, 21 Nov).
+  `energy::sized` first plays such a clip at a slower step, never slower than its own, and where even
+  its own pace would ask more, keeps the base at the clip's own size while the head and arm still
+  grow (headshake, dance_chill). At level 5, 15 clips play at the full x1.5 step; headshake,
+  acknowledge, curious, dance_chill, dance_hype and dance_waltz at a slower one, headshake and
+  dance_hype at their own (headshake 1.02 of its level-1 time, the larger head stretched under the
+  servo's speed; dance_hype all of its recording, 15.97 s). The bend is measured as the clip is played, each step at its
+  own time once the servo's speed has stretched it, so a step stretched next to one that is not
+  counts as it is (`energy::tests::no_level_bends_the_base_harder_than_level_one_does`, the slowed
+  list in `level_five_plays_clips_bigger_and_quicker_never_past_the_reach_or_the_servo`).
+
+  Level 5 against V1 (#6893's bar), peak to peak in counts over all of V1's `excited.csv` and
+  `happy_wiggle.csv`, which level 5 plays (`energy::tests::level_five_sizes_excited_and_happy_against_v1`:
+  none past V1 but where level 1's own gain is, none under 0.75 of V1 but a known gap):
+
+  | clip | joint | V1 | level 5 | share | held by |
+  |---|---|---|---|---|---|
+  | excited | head pitch | 154 | 207 | 1.34 | over V1: level 1's own gain, 1.35 of V1, not grown |
+  | excited | shoulder | 337 | 337 | 1.00 | V1 |
+  | excited | elbow | 676 | 450 | 0.67 | the reach, 360 |
+  | happy | head pitch | 314 | 314 | 1.00 | V1 |
+  | happy | base yaw | 697 | 246 | 0.35 | x1.6 of a base cut to 0.22 of V1 |
+  | happy | shoulder | 228 | 228 | 1.00 | V1 |
+  | happy | elbow | 627 | 488 | 0.78 | |
+
+  **Where V1 stays out of reach, and why.** V1 played its recordings at their recorded speed with
+  no servo ceiling: its emotion clips peak at a median of about 2,000 counts a second (excited's
+  elbow 1,579 in the stretch kept, 1,923 over the whole clip). Level 5 stops at the servo's 1,000,
+  the speed the servos are written to follow (`Tuning::SERVO_SPEED_CAP`), so V1's fastest flicks
+  come out slower and longer. Its size stops at the gesture's reach: happy's base yaw swung 697
+  counts in V1 and swings 246 at level 5, about a third, because the reach holds yaw to 250 either
+  way of the pose. Surprised stops at 1.27 because V1's own tip rule (`cog`, 22 mm, kept 0.5 mm
+  clear) leaves it no room at 1.6. Closing any of these needs a servo, reach or tip bound
+  raised, which #8153 does not do.
+- **Clip length (#8153).** Thirteen built-in clips are a stretch V2 cut from a V1 recording (2 to
+  9 s, "Gestures" below); the generator also writes all of each recording at the cut's size and
+  frame time (`clips::WHOLE`, `NAME_WHOLE`, never played as it is). At level 5 such a clip plays
+  all of it (`energy::longer`), taken from the first frame kept so it begins at nothing and, ended
+  before the recording does, brought back to nothing over its last ten frames, never shorter than
+  the clip itself, then sized and paced as above. The size, the reach, the servo's 1,000 counts a second
+  and V1's tip rule are as above, none raised: a recording that would cross the tip rule (21.5 mm)
+  or the lean back (16 mm) at its level-5 size is trimmed to as much as stays inside
+  (`energy::WHOLE_TRIM`, found on the host by
+  `cog::level_five_keeps_as_much_of_each_recording_as_v1s_rule_allows`), and every frame of every
+  clip at levels 2 to 5 is checked against both
+  (`cog::every_built_in_clip_at_every_level_passes_v1s_rule`; at level 5 the worst is 21.46 mm off
+  the axis, greeting, and 13.40 mm back, laugh). The other eight clips are already all of
+  their recording. Level 1 plays the clip itself.
+
+  **Levels 2 to 4 play as before #8201** (the lead's call, V2 on #8153, 22 Nov 16:3x, the first
+  builder's (b)): the clip itself, as long as level 1, at the level's size and pace in the table
+  above, sleepy and excited held at 1.44 and 1.27 (`energy::UNDER_FIVE_CAP`), byte for byte what
+  they were, except that no level moves a joint more than the level above it: where a joint would
+  swing farther (peak to peak) or step faster (its largest step, counts a second) than the level
+  above moves it over the stretch of the cut that level plays, that joint alone is lowered to it,
+  the step kept (`energy::under_five`; `energy::tests::levels_two_to_four_play_as_before_8201_never_more_than_the_level_above`,
+  which keeps the pre-#8201 builder as its reference and pins where the cap holds).
+
+  Where the cap holds, 55 joint-levels in all (pinned in that test): there that joint moves
+  no more than the level above it, so less than before #8201; every other joint of every clip
+  at 2 to 4 is byte for byte as before, but the three floored below.
+
+  | clip | joint: levels capped |
+  |---|---|
+  | curious | base yaw: 2, 3, 4 |
+  | happy | shoulder: 2, 3, 4 |
+  | caring | head pitch: 4 |
+  | surprised | head pitch: 2, 3, 4; shoulder: 2, 3, 4 |
+  | confused | head pitch: 2, 3, 4; base yaw: 2, 3, 4 |
+  | sleepy | base yaw: 2, 3, 4; head pitch, head roll, shoulder, elbow: 3, 4 |
+  | excited | shoulder: 2, 3, 4 |
+  | scanning | head roll: 2, 3, 4 |
+  | dance_chill | base yaw: 2 |
+  | dance_hype | head pitch: 2, 3, 4; shoulder: 2, 3, 4; base yaw: 3, 4; elbow: 4 |
+  | dance_waltz | base yaw: 4 |
+  | dance_jazz | head pitch: 2, 3, 4; base yaw: 2, 3, 4; elbow: 3, 4 |
+
+  Four more joints are capped to exactly level 1's own, so nothing changes there: confused's
+  head pitch at 4, sleepy's base yaw at 2 to 4, dance_chill's base yaw at 2 and dance_jazz's head
+  pitch at 2 to 4.
+
+  **The floor** (V2 and the first builder on #8307, 22 Nov 20:2x; `energy::FLOOR`): where the cap
+  alone would take a joint more than 10% under level 1's swing, levels 2 to 4 play level 1's own
+  on that joint (the clip as it is, at the level's step). Three joints, at 2, 3 and 4, nine
+  entries: caring's elbow (level 1 338 counts; the cap alone 231), dance_waltz's shoulder (48; 42,
+  43, 43) and dance_waltz's elbow (307; 257). The accepted cost: level 5 (V1) moves those joints a
+  little less than 2 to 4 do. The head roll is left out (`energy::UNFLOORED_ROLL`, V2 on #8307,
+  23 Nov, after row-8307a): the product unit's `--reach 150,15,1,250`
+  (`deploy/product/lamp-body.service`) gives the roll 1 count and `stand_roll` is 0 at levels 1
+  and 2, so level 1 plays about 2 counts of a clip's roll, not its frames' 309 (scanning), and a
+  floor there would protect nothing; scanning's roll is capped at the level above like any other.
+
+  On seven capped joints levels 2 to 4 sit just below level 1 as the clip's frames have it (V2's
+  (A) on #8307): V1 at level 5 moves the joint less than the clip itself does, and the cap carries
+  that down while level 1 stays the clip. They are curious's base yaw (level 1 142, level 2 133),
+  happy's shoulder (171, 160), surprised's head pitch (190, 186), confused's head pitch (190, 178)
+  and base yaw (142, 129), scanning's head roll (309, 199; the roll the floor leaves out, which
+  level 1 plays at about 2 on the product unit) and dance_hype's shoulder (155, 143) (pinned in
+  the same test, `BELOW_ONE`; only a joint capped at level 2 may).
+
+  Level 5 on the host
+  (`energy::level_five_plays_each_clip_for_all_of_its_v1_recording`; played seconds at the 1.5
+  pace, each step stretched under the servo's speed):
+
+  | clip | level 1, s | V1, s (rows) | level 5, s (rows) | trimmed by |
+  |---|---|---|---|---|
+  | acknowledge | 1.95 | 5.00 (101) | 4.37 (101) | none |
+  | curious | 3.00 | 9.95 (200) | 8.36 (200) | none |
+  | happy | 4.00 | 12.95 (260) | 8.94 (260) | none |
+  | caring | 5.00 | 9.95 (200) | 5.62 (166) | rows 0 to 165: the tip rule |
+  | surprised | 2.00 | 5.95 (120) | 4.16 (120) | none |
+  | confused | 3.00 | 7.95 (160) | 5.41 (160) | none |
+  | excited | 4.00 | 11.95 (240) | 8.53 (240) | none; the clip's bounce twice below level 5 |
+  | scanning | 9.00 | 17.95 (360) | 11.25 (332) | rows 28 to 359: the tip rule |
+  | dance_chill | 9.00 | 10.00 (201) | 8.00 (201) | none |
+  | dance_groove | 8.00 | 15.95 (320) | 10.88 (320) | none |
+  | dance_hype | 7.00 | 15.95 (320) | 15.97 (320) | none; at its own step, the base held |
+  | dance_waltz | 9.54 | 10.00 (201) | 8.40 (201) | none |
+  | dance_jazz | 9.00 | 11.95 (240) | 8.13 (240) | none |
+
+  The time is under V1's by level 5's 1.5 pace, or less where the base holds the step (dance_hype at
+  its own); the moves are all of V1's, no joint past V1's swing. A skill waits for a
+  gesture's end as long as the longest level plays it (`energy::longest_us`). A longer clip holds
+  a new energy level until it ends; a fill or a matched cue asked while it plays is dropped
+  ("dropped: another gesture plays", as for any gesture: `--arbitration` is off in the product).
 - **Pause nod.** Expression's pause clip waits `pause_cooldown_us`: the catalogue's cooldown at level 1,
   else the level's gap, never longer than the catalogue's and never under 3 s.
 - **Music.** A skill trigger with `lively = true` (Music sway, [skills.md](skills.md)): its cooldown at
@@ -2023,7 +2264,8 @@ each is the most active stretch of its recording of the length given, begun at i
 into the reach the test below allows (at most 80% of the recording), ended at nothing over its last half second and
 slowed under the same speeds. They are what skills and expressions ask for by name. Filmed from the iMac on
 lamp-4ace at 10:4x: `acknowledge`, `curious`, `happy`, `excited` and `caring` read from the front; `surprised`,
-`confused` and `sleepy` are small there.
+`confused` and `sleepy` are small there. At energy level 5 those cut from a longer recording play
+all of it ("Clip length (#8153)" above, `clips::WHOLE`).
 
 | Clip | From | Lasts | Mostly |
 | --- | --- | --- | --- |
@@ -2131,6 +2373,7 @@ What the body does with the request:
   lamp-body: step N gesture nod dropped: another was asked after it
   lamp-body: step N gesture nod dropped: stale, it was not standing 3 s after it could have been
   lamp-body: step N gesture nod dropped: a joint could not keep up with it
+  lamp-body: step N gesture nod ended: 5 servo reads in a row were missed
   lamp-body: step N gesture past_the_line dropped: it would tip
   lamp-body: step N gesture over, as the run stopped
   lamp-body: step N gesture stretching dropped: held by a hand (asked by skill:stretch-break)
@@ -2140,6 +2383,20 @@ What the body does with the request:
   lamp-body: step N gesture stretching ended: by a hand (the hand from a test input, --hold-from)
   lamp-body: dropped from the mood socket, not a mood or a gesture this body has: {"gesture":"dance"}
   ```
+
+  A read or a write that fails for a moment does not end a gesture playing
+  (#8266): the joints hold the frame they have for that step (nothing new
+  is asked while the wire fails), the clip's clock goes on, and it plays to
+  its end. A miss that lasts five steps in a row (a tenth of a second)
+  ends it as `ended: 5 servo reads in a row were missed`, which no `over`
+  follows; one of the body's own (an idle shift, the glance for a call)
+  says the same line without being told outward. The run itself still
+  stops on a wire failing for half a second (25 steps, above). Until 22
+  November one missed read ended it at once as a plain `over`: on
+  lamp-52e6 a level 5 waltz played 4.78 s of its 8.40 s with
+  `missed_reads=3` (row-8201b). A lamp's row need not wait for the wire
+  to miss: `--miss-from` (a test input, under "Test input: --miss-from")
+  misses reads on purpose at this same point.
 
   The same line is said at most once in five seconds, and the next time
   with how many like it were held back (`(N more like it before this)`), so
@@ -2728,7 +2985,7 @@ four rows, "Without it" is what `off` leaves.
 | `--reach UP,DOWN,ROLL,YAW` | farthest a goal may be from home, in counts | 45,15,30,40 | 180,25,100,250 |
 | `--speed N` | fastest the commanded pose moves, counts a second | 50 | 300 |
 | `--servo-speed N` | goal speed written to the three servos | 150 | 1,000 |
-| `--servo-acceleration N` | acceleration written to them | 50 | 150 |
+| `--servo-acceleration N` | acceleration written to them; each joint runs at the lower of this and its servo's own EEPROM cap (register 85, #7946), or of this and 50 when the cap can't be read, said once a start | 50 | 150 |
 | `--stand P,R,Y,S,E` with `--folded-arm S,E` | the pose it stands in and the arm's folded one, in counts | never stands | shoulder and elbow each at most 1,400 from folded |
 | `--stand-share N` | how much of the way up it goes, percent | 100 | 1 to 100 |
 | `--stand-seconds N` | fastest the whole way is travelled | 5 | 2 to 20 |
@@ -2753,6 +3010,7 @@ four rows, "Without it" is what `off` leaves.
 | `--lease-socket ABSOLUTE_PATH` | lamp-control may hold the body for up to 30 s at a time, renewed, while the lamp's own life stands back (see "Held by lamp-control") | no lease: nobody can ask the lamp's own life to stand back | a short absolute path |
 | `--lease-holder-uid N` | with `--lease-socket`: a caller running as user id N (above 0) may hold the body too, whatever its unit; for the virtual lamp only | only `lamp-control.service` as `lampos`, or root | a user id above 0, given once, and only with `--lease-socket` |
 | `--hold-from ABSOLUTE_FILE` | a test input, for tests on a lamp only: while the file's first word is `held`, the head's pitch is taken as held by a hand (see "Test input: --hold-from" under "Giving way to a hand") | off: only a joint that gave way is a hand. No product unit passes it | an absolute file; `held`, or anything else for no hand |
+| `--miss-from ABSOLUTE_FILE` | a test input, for tests on a lamp only: each write of the file whose first words are `miss N` (N from 1 to 25) makes the next N reads of the servos fail where a read with no reply fails (see "Test input: --miss-from" under "Giving way to a hand") | off: only the wire misses a read. No product unit passes it | an absolute file; `miss N`, or anything else for no miss |
 | `--head-stall-load LOAD` | the head pitch's stall bound, this lamp's own (see "Giving way to a hand": a head that holds more than 100 to stand) | 100 | 100 to 230 |
 | `--stand-roll N` | the head's tilt reach once the lamp has stood up, where that is more than the roll of `--reach` | no more than folded | 200 |
 | `--pitch-window LOW,HIGH` | the window the head's pitch goal is kept in while the head is beside the base, this lamp's own; checked at start against the head pitch servo's own limits (registers 9 and 11), and the run refused with nothing written if it is not inside them | lamp-4ace's, 1,740 to 2,030, and the servo's limits are not read | LOW at least 1,670 (the head's floor) and under HIGH, and around `--home`'s pitch |
@@ -3047,7 +3305,7 @@ before.
 | `body/joint_states` | `lamp_msgs/JointState` | every fourth step: 12.5 a second | Where each joint is, how fast it is turning, how hard its servo is working, and where it was last asked to be |
 | `diagnostics` | `lamp_msgs/Diagnostic` | once a second, and once more when it stops; let go for its pose, once per change and the same again every 2 s | How the body is, under the name `body` |
 | `body/hand` | `lamp_msgs/Hand` | with every step passed on | Whether a hand pushes it (below, "A hand on the bus") |
-| `body/gesture` | `lamp_msgs/BodyGesture` | an event, each time, whatever the step | What became of a gesture: `{"name", "state"}`, `began` when the body begins it, `over` when it ends (played out, let go as it played, replaced by another, whose `began` follows its `over`, or ended by the run stopping: a goal refused, a surprise, asked to), `dropped` when one asked is dropped before it began (paused, a hand, held by a hand or busy under arbitration, another playing or asked after it, slumped, stale, refused whole by the anti-tip rule as `dropped: it would tip`) or one playing is ended for a higher ask (`ended: by WHO`, #1239) or by lamp-control's `replace` (`ended: replaced by a newer motion`), which no `over` follows. A gesture still waiting to begin when the run stops is not in the body's last step, so nothing is said of it. Several in one step are each said. Said where the journal says `gesture NAME`, `gesture over` and `gesture NAME dropped: ...` (one `GestureSaid` reads both), so the two never differ, but for the journal saying a repeated drop once in five seconds. Read-only: it asks nothing and changes no motion. A gesture let go as it played (a joint could not keep up) began, so it says `over`, not `dropped`, though its journal line says `dropped: a joint could not keep up with it`. One the publishing thread has no room for is let go and counted apart from the steps (`gestures_let_go`); lamp-body's last line says both counts. Under `--arbitration on` (#940), a `dropped` also says whose it was, why and who holds the body, so the asker that lost is told: `source`, the name its datagram gave (kept only up to 64 printable bytes, inline, so the motor loop never allocates; a longer one is not kept); `why`, the journal's own reason (`dropped: busy, skill`, `ended: by conversation`); and `by`, the holder's name, only when a skill or the conversation that named itself holds the body, never for a hand, a pause or a lamp that doesn't stand. The body carries each name with its priority (`playing_by`, `pending_by`), and who wins, and every goal it writes, is as without them. Of two asks read in the same step, the one dropped as it is read (`kept_of`) is told on `body/gesture` too, with its asker and the one that keeps the body as `by` (the reviewer on #1473: two skills asking at once). Each is left out when not known, and with the switch off the message is byte for byte `{"name", "state"}` |
+| `body/gesture` | `lamp_msgs/BodyGesture` | an event, each time, whatever the step | What became of a gesture: `{"name", "state"}`, `began` when the body begins it, `over` when it ends (played out, let go as it played, replaced by another, whose `began` follows its `over`, or ended by the run stopping: a goal refused, a surprise, asked to), `dropped` when one asked is dropped before it began (paused, a hand, held by a hand or busy under arbitration, another playing or asked after it, slumped, stale, refused whole by the anti-tip rule as `dropped: it would tip`) or one playing is ended for a higher ask (`ended: by WHO`, #1239) or by lamp-control's `replace` (`ended: replaced by a newer motion`) or by reads that failed five steps in a row (`ended: 5 servo reads in a row were missed`, #8266), which no `over` follows. A gesture still waiting to begin when the run stops is not in the body's last step, so nothing is said of it. Several in one step are each said. Said where the journal says `gesture NAME`, `gesture over` and `gesture NAME dropped: ...` (one `GestureSaid` reads both), so the two never differ, but for the journal saying a repeated drop once in five seconds. Read-only: it asks nothing and changes no motion. A gesture let go as it played (a joint could not keep up) began, so it says `over`, not `dropped`, though its journal line says `dropped: a joint could not keep up with it`. One the publishing thread has no room for is let go and counted apart from the steps (`gestures_let_go`); lamp-body's last line says both counts. Under `--arbitration on` (#940), a `dropped` also says whose it was, why and who holds the body, so the asker that lost is told: `source`, the name its datagram gave (kept only up to 64 printable bytes, inline, so the motor loop never allocates; a longer one is not kept); `why`, the journal's own reason (`dropped: busy, skill`, `ended: by conversation`); and `by`, the holder's name, only when a skill or the conversation that named itself holds the body, never for a hand, a pause or a lamp that doesn't stand. The body carries each name with its priority (`playing_by`, `pending_by`), and who wins, and every goal it writes, is as without them. Of two asks read in the same step, the one dropped as it is read (`kept_of`) is told on `body/gesture` too, with its asker and the one that keeps the body as `by` (the reviewer on #1473: two skills asking at once). Each is left out when not known, and with the switch off the message is byte for byte `{"name", "state"}` |
 
 The joints are `base_yaw`, `shoulder`, `elbow`, `head_roll`, `head_pitch`,
 in the order of their servos' numbers, 1 to 5.
@@ -3621,7 +3879,7 @@ been made.
 `--hold-from ABSOLUTE_FILE` is for tests on a lamp only, so a row a hand
 on the head has shown once can run again with no person there. No product
 unit passes it, and a test checks every file under `deploy/`
-(`nothing_deployed_passes_hold_from`). The file's first word is read at
+(`nothing_deployed_passes_a_test_flag`). The file's first word is read at
 most every 100 ms (`hold_in::LOOK_EVERY`, a small read, never waited on):
 `held` is the head's pitch held by a hand; `free`, any other word, an
 empty file or none is no hand, and a file removed is a hand let go.
@@ -3651,6 +3909,36 @@ search and the voice's, can be run from it. Tests:
 `a_skill_gesture_playing_ends_by_a_hand_from_the_test_input_eased_out`,
 `a_skill_gesture_still_waiting_is_dropped_by_a_hand_from_the_test_input`,
 and `hold_in`'s own for the file.
+
+### Test input: --miss-from (#8266)
+
+`--miss-from ABSOLUTE_FILE` is for tests on a lamp only, so a row about a
+gesture that meets a missed servo read need not wait for the wire to miss
+one (0 in a night's run on lamp-52e6, 3 in 17,124 steps in another). No
+product unit passes it, and a test checks every file under `deploy/` and
+every lamp unit anywhere else in lampOS (`nothing_deployed_passes_a_test_flag`).
+The file is read at most every 100 ms (`hold_in::LOOK_EVERY`, a small
+read, never waited on). Each write of it whose first words are `miss N`,
+N from 1 to 25, asks once: the body's next N reads of the servos in its
+run fail at the point a read with no reply fails (`Asked::missed_by_test`),
+so what follows is the wire's own miss path and nothing else changes: no
+goal, torque or motion of its own. A write is told from the last by its
+time or its text, so the same text written again within the clock's tick
+is not seen; write another, or remove the file first. Any other text, an
+empty file or none asks nothing, and a file already there at start asks
+nothing, so a body started again does not miss for an old test. An ask
+while some are still to miss keeps the larger count. Per the rules above,
+1 to 4 hold a playing gesture's frame and it plays on to its `over`; 5 or
+more end it as `ended: 5 servo reads in a row were missed`; 25 end the
+run as a wire silent for half a second does.
+
+The journal says at start `lamp-body: missed reads from a test input:
+FILE (--miss-from, a test flag no product unit passes)`, then `lamp-body:
+N servo reads to miss, from a test input (--miss-from)` for each write it
+takes. Tests:
+`one_or_three_reads_missed_on_purpose_leave_a_gesture_playing_to_its_end`,
+`five_reads_missed_on_purpose_end_a_playing_gesture_and_say_so`,
+`no_reads_missed_on_purpose_unless_asked`, and `miss_in`'s own for the file.
 
 ## Letting go under overload
 

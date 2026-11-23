@@ -74,6 +74,8 @@ fn reminder(request: u64, handoff: &InputHandoff, text: &str) -> ProviderInput {
         late_by_ms: Some(0),
         also: Vec::new(),
         again: false,
+        ids: Vec::new(),
+        timer: false,
     }
 }
 
@@ -199,6 +201,8 @@ fn reminder_preserves_authority_and_session_validation_before_policy() {
                 late_by_ms: None,
                 also: Vec::new(),
                 again: false,
+                ids: Vec::new(),
+                timer: false,
             },
             NOW,
             &sink,
@@ -249,6 +253,8 @@ fn reminder_text_is_quoted_data_and_lateness_is_preserved_with_no_picture() {
                 late_by_ms: Some(7 * 60_000 + 20_000),
                 also: Vec::new(),
                 again: false,
+                ids: Vec::new(),
+                timer: false,
             },
             NOW,
             &sink,
@@ -371,6 +377,8 @@ impl LiveRig {
                 late_by_ms: Some(0),
                 also: Vec::new(),
                 again: false,
+                ids: Vec::new(),
+                timer: false,
             })
             .unwrap();
         owner.turn()
@@ -876,6 +884,8 @@ async fn reminder_tools_are_denied_even_in_quiet_and_do_not_change_the_next_turn
         sleep_asked: false,
         seen_activity: false,
         seen_posture: false,
+        seen_voice_offer: false,
+        desk_time: false,
         shutdown_from_app: false,
         services: None,
         decline: true,
@@ -918,6 +928,7 @@ async fn reminder_tools_are_denied_even_in_quiet_and_do_not_change_the_next_turn
         onboarding: None,
         reports_stop: false,
         devices: false,
+        watch: false,
     };
     let mut rig = LiveRig::start_with(quick_policy(), chosen);
     let mut dial = rig.ready().await;

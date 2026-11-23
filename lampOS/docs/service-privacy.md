@@ -107,7 +107,12 @@ allowed no longer ends the conversation at once (`privacy_gap.rs`):
   worker has published an allowed capture lease, a missing fresh acquisition
   sends `PrivacyUnavailable { since_us }`, closes the worker's `voice/privacy`
   lease, and keeps reading in the same worker. `since_us` is the last accepted
-  acquisition plus the unchanged 50 ms freshness. The coordinator treats it
+  acquisition plus the unchanged 50 ms freshness. A state Controls still
+  publishes whose acquisition is 50 ms old or more, or has no level or a
+  fault, is ridden the same way (#7224): the fence keeps its envelope, so the
+  next state continues the order, but not its acquisition, and the worker
+  keeps its last fresh reading. Another clock or a reading ahead of now
+  still ends it. The coordinator treats it
   as unavailable even if recovery is queued in the same batch, so the cut and
   hold below still happen. The muted wait and direct GPIO route are unchanged.
 - **From the lapse:** no capture frame is taken, including those capture still
@@ -311,3 +316,51 @@ matched, and all 192 previously retained drivers remained unchanged. These
 are selected host fixture results, not a full-suite, Linux, device or original
 failure-clearance result. This result paragraph was added after execution and
 is not a compiled or runtime input to these cases.
+
+## The weather's DNS-over-HTTPS lookup (`LAMP_WEATHER_DOH`)
+
+The weather (`LAMP_SECOND_WEATHER=on`) can ask one more service besides
+Open-Meteo: Google's public DNS-over-HTTPS resolver, `https://8.8.8.8/resolve`
+(Google Public DNS, `dns.google`), reached by its address over TLS with the
+lamp's verified roots (`net::public::ELSEWHERE`, #7593, #7700). It runs only
+with `LAMP_WEATHER_DOH=on` exactly; unset or any other value is off, and no
+product unit sets it, so a product lamp never asks it. Even with the switch on,
+it is asked only when an Open-Meteo request's connection has not opened: once
+1.5 s have passed from its first try with none open (`ELSEWHERE_AFTER`), or
+once a try to every address the lamp's own resolver gave has failed outright;
+a healthy open never asks it. What goes to it is the Open-Meteo host name being
+looked up (`geocoding-api.open-meteo.com` or `api.open-meteo.com`) and the
+record type (`A`, `AAAA`), the same name the lamp's own resolver is asked;
+never the place, its coordinates, the country code, anything the person said
+or who asked. Only the global unicast addresses of its answer are used
+(`net::public::global`), and each is reached as the same named host over TLS,
+so an address it gives can't stand in for another service.
+
+## Faces kept with nothing asked
+
+A face kept with nothing asked (`LAMP_FACE_NO_ASK=on`, off unless set) is biometric: at the lamp it is kept only with
+the speaker's own "I'm X" proof, the face the eyes saw saying that line ([eyes.md](eyes.md), "A new face with nothing
+asked"); from the app's photo, only a photo of one face, never added to someone already kept ("A face from a photo").
+A face the lamp already knows that gives another name ("Call me Jay.") is no new face: it still goes to the eyes'
+rename and that person's yes.
+
+## The weather's backup service (`LAMP_WEATHER_BACKUP`)
+
+The weather can ask one more service for a forecast: MET Norway's
+Locationforecast 2.0 at `https://api.met.no/weatherapi/locationforecast/2.0/compact`
+(the Norwegian Meteorological Institute; no key, no account), over TLS with
+the lamp's verified roots and the same raced connection as Open-Meteo's
+(`net::public::get_public_json_as`, `net::weather::met`, #7593, #7732). It
+runs only with `LAMP_WEATHER_BACKUP=on` exactly; unset or any other value is
+off, and no product unit sets it, so a product lamp never asks it. Even with
+the switch on, it is asked only for a forecast Open-Meteo couldn't give: no
+connection to it opened, its name wasn't found or a step timed out, or it
+answered only with a server error (HTTP 500 to 599); never after a forecast
+Open-Meteo gave, nor for a 4xx or an answer it couldn't read
+(`met::backs_up`). What goes to it is the place's latitude and longitude, to
+4 decimals (about 11 m), and a `User-Agent` naming the program, as MET's
+terms ask (`lampOS/<version> (+https://github.com/autonomous-ai/lampOS)`,
+`met::USER_AGENT`): never the place's name, which only Open-Meteo's
+geocoding looks up, nor the country code, anything the person said, who
+asked, or anything else about them. The journal says only that the forecast
+came from the backup service and after how long, never the place.

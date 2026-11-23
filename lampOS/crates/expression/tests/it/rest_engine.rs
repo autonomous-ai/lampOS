@@ -1,8 +1,7 @@
 use lamp_expression::{Catalogue, Engine, Input, Output, TICK_US, Trigger};
 use lamp_msgs::{
-    BodyOffsets, ClockStamp, Concentration, ExpressionFace, Face, Faces, JointState, Light,
-    PersonActivity, Room, RoomState, Voice, VoiceEvent, VoicePlayout, VoiceProgress, VoiceSound,
-    VoiceTiming,
+    BodyOffsets, ClockStamp, ExpressionFace, Face, Faces, JointState, Light, PersonActivity, Room,
+    RoomState, Voice, VoiceEvent, VoicePlayout, VoiceProgress, VoiceSound, VoiceTiming,
 };
 
 const CLOCK: &str = "rest-test-boot";
@@ -180,10 +179,10 @@ impl Harness {
 
     fn focus(&mut self, at: u64, concentrating: bool) {
         let stamp = self.stamp(at);
-        self.send(Input::Concentration(Concentration {
+        self.send(Input::HeadDown {
             stamp,
-            concentrating,
-        }));
+            down: concentrating,
+        });
     }
 
     fn has(output: &Output, trigger: Trigger) -> bool {
@@ -537,17 +536,30 @@ fn hold_discards_the_previous_audio_schedule() {
 }
 
 #[test]
-fn concentration_is_false_without_a_publisher_and_true_until_explicitly_cleared() {
+fn concentration_is_false_without_a_reading_true_while_head_down_is_fresh_and_false_when_it_lifts_or_goes_stale()
+ {
     let mut h = Harness::new(Voice::Listening);
     h.activity(0, false);
     let out = h.engine.tick(0);
     assert!(out.state.missing.is_empty(), "{:?}", out.state.missing);
     assert!(!out.body.unwrap().hold);
-    h.focus(10_000, true);
-    let out = h.until(6_000_000);
-    assert!(out.body.unwrap().hold);
-    h.focus(6_000_000, false);
-    assert!(!h.engine.tick(6_000_000).body.unwrap().hold);
+    // `room/activity` says head down once a second: held while it keeps coming.
+    for second in 0..5 {
+        h.focus(10_000 + second * 1_000_000, true);
+        assert!(
+            h.until(10_000 + second * 1_000_000 + 500_000)
+                .body
+                .unwrap()
+                .hold
+        );
+    }
+    // The head lifts: let go at once.
+    h.focus(5_100_000, false);
+    assert!(!h.until(5_200_000).body.unwrap().hold);
+    // Head down again, then the readings stop (the eyes die): not held for ever.
+    h.focus(5_300_000, true);
+    assert!(h.until(5_400_000).body.unwrap().hold);
+    assert!(!h.until(11_000_000).body.unwrap().hold);
 }
 
 #[test]
@@ -771,7 +783,15 @@ fn rest_aborts_for_busy_unknown_or_concentration_and_needs_new_quiet_time() {
             _ => unreachable!(),
         }
         assert!(!Harness::has(&h.step(46_000_000), Trigger::Rest));
-        assert!(!Harness::has(&h.until(96_000_000), Trigger::Rest));
+        // The head stays down: `room/activity` says so each second.
+        let mut at = 46_000_000;
+        while at < 96_000_000 {
+            at += 1_000_000;
+            if reason == "focus" {
+                h.focus(at - 500_000, true);
+            }
+            assert!(!Harness::has(&h.until(at), Trigger::Rest), "{reason}");
+        }
         h.room = Room::Quiet;
         h.focus(96_000_000, false);
         h.step(96_000_000);

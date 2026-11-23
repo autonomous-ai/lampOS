@@ -1,0 +1,45 @@
+kind = "installable"
+version = "1.0.0"
+
+[permissions]
+speak = true
+topics = ["humans/faces/tracked", "voice/state", "room/activity"]
+
+# Once a sitting, after 25 minutes at the desk; again only after they have
+# left. A one-off reminder ("in 25 minutes") is never a skill: the lamp's
+# own reminders set it.
+[trigger]
+topic = "humans/faces/tracked"
+when = "present"
+near = 0.14
+for = "25m"
+gap = "2m"
+rearm = "leaves"
+cooldown = "45m"
+wait = "10m"
+
+# Never on top of the lamp's own words, never mid-conversation, never with
+# the head down: a nudge's guards, as the lamp's sip of water has them.
+[[while]]
+topic = "voice/state"
+field = "state"
+not_equals = "speaking"
+for = "30s"
+
+[[while]]
+topic = "voice/state"
+field = "state"
+equals = "resting"
+for = "5s"
+
+[[while]]
+topic = "room/activity"
+field = "state"
+not_equals = "head_down"
+unknown = "holds"
+
+[ask]
+policy = "nudge"
+
+[[do]]
+say = { text = ["Time for a short break.", "A short break would be good now.", "Stand up and stretch for a minute."] }

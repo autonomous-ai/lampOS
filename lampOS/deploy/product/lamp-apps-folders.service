@@ -1,0 +1,38 @@
+# The Store apps' three folders (#7415, #7920): made empty, once at boot, as root, by the apps' own helper
+# (`lamp-apps-manage folders`: a unit of the part, so a round carries and adds it; a round carries binary-backed units
+# only). The helper's two units name two of the folders in ReadWritePaths= (a path missing there fails the unit's
+# namespace, 226) and `Want` this one; while the folders are absent they are SKIPPED, never failed. The product's
+# tmpfiles cannot make the folders: their switch-time run is inside lamp-update-apply.service, which cannot write them
+# on a lamp that already has it. Nothing here needs the apps' switch: no input, empty folders, no app.
+# Not in the target and not enabled: lamp-apps-start.service (which is), lamp-control.service and the helper's template Want it.
+[Unit]
+Description=lampOS apps' folders
+After=local-fs.target
+# A round that adds the apps' part (#8131's first, by G2's lamp-update) can start this unit before it makes
+# /opt/lampOS/apps-manage/current, so it fails 203/EXEC: it tries again every 2 s, five times in a minute at most,
+# and lamp-control.service, which the round restarts after the links, Wants it as well. Before the link the start is
+# skipped by the condition, not failed, so no start limit builds up on a slower lamp.
+ConditionPathExists=/opt/lampOS/apps-manage/current/lamp-apps-manage
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+Group=root
+Slice=lampos-parts.slice
+ExecStart=/opt/lampOS/apps-manage/current/lamp-apps-manage folders
+SyslogIdentifier=lamp-apps-manage
+TimeoutStartSec=30
+Restart=on-failure
+RestartSec=2s
+UMask=0022
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=CAP_CHOWN CAP_FOWNER

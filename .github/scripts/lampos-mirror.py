@@ -5,7 +5,8 @@
 names the build's own release, verifies it with the trusted public key using
 the updater this run built from its own checkout (never one it downloads),
 then copies the build's files and models to
-`lampos/stable/<sequence>/`, points the signed manifest at those copies,
+`lampos/stable/<sequence>/` (and each model once more to the sequence-free
+`lampos/models/<tag>/<file>`, #7709), points the signed manifest at those copies,
 signs it again with the same key (same sequence, commit and channel) and
 puts it at `lampos/stable/lampos-manifest.json` last. `probe` writes, reads
 back and deletes one small file under `lampos/_probe/`.
@@ -217,6 +218,20 @@ class Store:
         return "uploaded"
 
 
+def planned_copies(sequence, stage, files, sources, moved, models):
+    """`(local file, bucket path, expected info)` for every object a mirror
+    writes: the build's files and models under `lampos/stable/<sequence>/`,
+    and each model again at `lampos/models/<tag>/<file>`, a path no sequence
+    names, which `lamp-update` asks for before the model's GitHub release
+    (#7709). Both are immutable: a model already there with the same bytes is
+    kept, a different one fails the mirror and is never overwritten."""
+    folder = f"{STABLE}/{sequence}"
+    copies = [(stage / name, f"{folder}/files/{name}", info) for name, info in sorted(files.items())]
+    copies += [(sources[url], f"{folder}/{moved[url]}", info) for url, info in sorted(models.items())]
+    copies += [(sources[url], f"{ROOT}/{moved[url]}", info) for url, info in sorted(models.items())]
+    return copies
+
+
 def cdn_url(path):
     return f"{CDN}/{path}"
 
@@ -378,10 +393,8 @@ class Mirror:
 
         self.not_behind(self.head_sequence())
 
-        folder = f"{STABLE}/{self.sequence}"
         uploaded = kept = 0
-        copies = [(stage / name, f"{folder}/files/{name}", info) for name, info in sorted(files.items())]
-        copies += [(sources[url], f"{folder}/{moved[url]}", info) for url, info in sorted(models.items())]
+        copies = planned_copies(self.sequence, stage, files, sources, moved, models)
         for local, path, info in copies:
             outcome = self.store.put_immutable(local, path, self.work)
             uploaded += outcome == "uploaded"

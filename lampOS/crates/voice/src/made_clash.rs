@@ -77,24 +77,46 @@ const CONDITION_KEYS: [&str; 7] = [
     "field", "when", "equals", "above", "below", "present", "changes",
 ];
 
+/// The keys of a trigger that say at what time of day and on which days it
+/// may fire. Not in a clash ([`CONDITION_KEYS`]), but in whether two skills
+/// do the same thing ([`same_thing`], #7938): every skill on the lamp's
+/// clock shares one topic and condition, and only its window says when.
+const WINDOW_KEYS: [&str; 2] = ["during", "days"];
+
+/// The keys of a `[[do]]` step that say when or for which call it is made,
+/// not what it does: left out of what a skill does ([`same_thing`]).
+const STEP_MODIFIERS: [&str; 3] = ["after", "on", "if_choice"];
+
 /// What a skill's `skill.toml` starts on and what it uses, as a clash is
 /// judged: each trigger's topic and condition ([`CONDITION_KEYS`]), and
-/// whether any `[[do]]` step uses the light or the body. Kept with a made
-/// skill in its index (`made_skill`'s `"clash"`), so one made here and on
-/// is judged even when its folder can't be read.
+/// whether any `[[do]]` step uses the light or the body; and, under
+/// `"same"`, what says whether it does the same thing as another
+/// ([`same_thing`]): each trigger with its window too ([`WINDOW_KEYS`]),
+/// and the kinds of its steps. Kept with a made skill in its index
+/// (`made_skill`'s `"clash"`), so one made here and on is judged even when
+/// its folder can't be read.
 pub fn signature(toml: &str) -> Value {
     let Ok(table) = toml::from_str::<toml::Table>(toml) else {
         return json!({"triggers": [], "light": false, "body": false});
     };
-    let triggers: Vec<Value> = match table.get("trigger") {
-        Some(toml::Value::Table(trigger)) => vec![trigger_key(trigger)],
-        Some(toml::Value::Array(list)) => list
-            .iter()
-            .filter_map(toml::Value::as_table)
-            .map(trigger_key)
-            .collect(),
-        _ => Vec::new(),
-    };
+    let mut timed: Vec<Value> = trigger_tables(&table)
+        .into_iter()
+        .map(|trigger| {
+            let mut key = trigger_key(trigger);
+            for name in WINDOW_KEYS {
+                if let Some(value) = trigger.get(name) {
+                    key[name] = serde_json::to_value(value).unwrap_or(Value::Null);
+                }
+            }
+            key
+        })
+        .collect();
+    timed.sort_by_key(Value::to_string);
+    timed.dedup();
+    let triggers: Vec<Value> = trigger_tables(&table)
+        .into_iter()
+        .map(trigger_key)
+        .collect();
     let steps: Vec<&toml::Table> = table
         .get("do")
         .and_then(toml::Value::as_array)
@@ -102,11 +124,49 @@ pub fn signature(toml: &str) -> Value {
         .flatten()
         .filter_map(toml::Value::as_table)
         .collect();
+    let does: std::collections::BTreeSet<&str> = steps
+        .iter()
+        .flat_map(|step| step.keys())
+        .map(String::as_str)
+        .filter(|key| !STEP_MODIFIERS.contains(key))
+        .collect();
     json!({
         "triggers": triggers,
         "light": steps.iter().any(|step| step.contains_key("light")),
         "body": steps.iter().any(|step| step.contains_key("body")),
+        "same": { "triggers": timed, "does": does },
     })
+}
+
+/// A `skill.toml`'s triggers: its one `[trigger]`, or each `[[trigger]]`.
+fn trigger_tables(table: &toml::Table) -> Vec<&toml::Table> {
+    match table.get("trigger") {
+        Some(toml::Value::Table(trigger)) => vec![trigger],
+        Some(toml::Value::Array(list)) => list.iter().filter_map(toml::Value::as_table).collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// Whether two skills that clash ([`shared`]) do the same thing, by their
+/// [`signature`]s, so a make may replace the other with no question
+/// (`LAMP_MAKE_NO_ASKS`, #7938): the very same triggers, each with its
+/// condition and its window (the time of day and the days it may fire),
+/// and the same kinds of steps. A shared topic, condition, time source or
+/// output alone never makes two skills the same: on lamp-9adf a daily brief
+/// at 08:00 replaced a good morning, a good morning 3 and a water reminder,
+/// each on the lamp's clock at its own time and lighting. A structural
+/// check, no words matched; a signature kept before its `"same"` is never
+/// the same, so nothing is replaced by it.
+pub fn same_thing(one: &Value, other: &Value) -> bool {
+    let same = |signature: &Value| -> Option<(Vec<Value>, Vec<Value>)> {
+        let same = &signature["same"];
+        let triggers = same["triggers"].as_array()?.clone();
+        let does = same["does"].as_array()?.clone();
+        (!triggers.is_empty() && triggers.iter().all(|trigger| trigger["topic"].is_string()))
+            .then_some((triggers, does))
+    };
+    shared(one, other).is_some()
+        && matches!((same(one), same(other)), (Some(one), Some(other)) if one == other)
 }
 
 fn trigger_key(trigger: &toml::Table) -> Value {
@@ -159,6 +219,25 @@ pub struct Clash {
 /// signature kept with them. Empty when nothing clashes, or the made one's
 /// signature isn't kept.
 pub fn found(keeping: &Keeping, made: &Made) -> Vec<Clash> {
+    found_where(keeping, made, shared)
+}
+
+/// Of [`found`], those that do the same thing as `made` ([`same_thing`]):
+/// the only ones a make replaces with no question (`LAMP_MAKE_NO_ASKS`,
+/// #7938). The others clash and are left on beside it.
+pub fn same_found(keeping: &Keeping, made: &Made) -> Vec<Clash> {
+    found_where(keeping, made, |mine, theirs| {
+        shared(mine, theirs).filter(|_| same_thing(mine, theirs))
+    })
+}
+
+/// [`found`] by `judge`, what the made one's signature shares with
+/// another's, or none.
+fn found_where(
+    keeping: &Keeping,
+    made: &Made,
+    judge: impl Fn(&Value, &Value) -> Option<&'static str>,
+) -> Vec<Clash> {
     let entries = made_skill::entries(&keeping.directory);
     let Some(mine) = entries
         .iter()
@@ -197,7 +276,7 @@ pub fn found(keeping: &Keeping, made: &Made) -> Vec<Clash> {
             let Ok(toml) = std::fs::read_to_string(path.join("skill.toml")) else {
                 continue;
             };
-            if let Some(shares) = shared(&mine, &signature(&toml)) {
+            if let Some(shares) = judge(&mine, &signature(&toml)) {
                 clashes.push(Clash {
                     name: name.to_owned(),
                     shares,
@@ -218,7 +297,7 @@ pub fn found(keeping: &Keeping, made: &Made) -> Vec<Clash> {
         {
             continue;
         }
-        if let Some(shares) = shared(&mine, &entry["clash"]) {
+        if let Some(shares) = judge(&mine, &entry["clash"]) {
             clashes.push(Clash {
                 name: name.to_owned(),
                 shares,
@@ -305,6 +384,14 @@ struct Waiting {
     /// The lamp's words in each request from the make's on, and whether
     /// that answer was cut.
     said: VecDeque<(u64, String, bool)>,
+    /// The first later line that was more than the lamp's name, its request
+    /// and words, in memory only ([`line_heard`]): the only line that may
+    /// choose a replace, and only as a plain one ([`not_a_plain_replace`]).
+    /// The question asked again clears it.
+    answer_line: Option<(u64, String)>,
+    /// Later requests whose rounds called anything but the clash's answer
+    /// ([`round_called`]), at most [`SAID_KEPT`]: no replace in one.
+    other_calls: Vec<u64>,
 }
 
 #[cfg(not(test))]
@@ -317,6 +404,12 @@ mod kept {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner()))
     }
+    static ENDED: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+    pub fn ended<R>(f: impl FnOnce(&mut Option<std::time::Instant>) -> R) -> R {
+        f(&mut ENDED
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()))
+    }
 }
 
 /// Tests: each test thread has its own.
@@ -326,10 +419,54 @@ mod kept {
     use std::cell::RefCell;
     thread_local! {
         static WAITING: RefCell<Option<Waiting>> = const { RefCell::new(None) };
+        static ENDED: RefCell<Option<std::time::Instant>> = const { RefCell::new(None) };
     }
     pub fn waiting<R>(f: impl FnOnce(&mut Option<Waiting>) -> R) -> R {
         WAITING.with(|cell| f(&mut cell.borrow_mut()))
     }
+    pub fn ended<R>(f: impl FnOnce(&mut Option<std::time::Instant>) -> R) -> R {
+        ENDED.with(|cell| f(&mut cell.borrow_mut()))
+    }
+}
+
+/// How long after a clash ended (chosen, cancelled, let go) a reply that
+/// asks a clash's choice with no `make_skill` call is held and judged
+/// ([`lately_ended`]): the history still carries its question then, and
+/// the model may copy it (lamp-9adf, 18 Nov, #7554's ROW at 2e864a0:
+/// request 94, 56 s after a cancel, asked one for a skill never made).
+/// Past it, no reply waits for it (App Only's P2 on #7554: held on every
+/// later turn, each reply's first audio waited two sentences).
+pub const COPIED_WITHIN: Duration = Duration::from_secs(120);
+
+/// A clash ended at `now`: chosen, cancelled or let go.
+fn ended_at(now: Instant) {
+    kept::ended(|ended| *ended = Some(now));
+}
+
+/// Whether a clash waits for the person's choice at `now`, read only: one
+/// past [`CLASH_WITHIN`] does not ([`awaited`] lets it go).
+pub fn waits(now: Instant) -> bool {
+    kept::waiting(|waiting| {
+        waiting
+            .as_ref()
+            .is_some_and(|waiting| now.saturating_duration_since(waiting.at) <= CLASH_WITHIN)
+    })
+}
+
+/// Whether no clash waits at `now` and one ended within [`COPIED_WITHIN`]
+/// before it: a reply asking a clash's choice then, with no `make_skill`
+/// call, copied it (`make_skill_agent::clash_claimed`).
+pub fn lately_ended(now: Instant) -> bool {
+    !waits(now)
+        && kept::ended(|ended| {
+            ended.is_some_and(|at| now.saturating_duration_since(at) <= COPIED_WITHIN)
+        })
+}
+
+/// Tests: a clash ended at `at`, or none.
+#[cfg(test)]
+pub fn set_ended(at: Option<Instant>) {
+    kept::ended(|ended| *ended = at);
 }
 
 static IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
@@ -423,25 +560,63 @@ pub fn asked(
             at: now,
             echoes: Vec::new(),
             said: VecDeque::new(),
+            answer_line: None,
+            other_calls: Vec::new(),
         })
     });
-    if let Some(before) = before.filter(|before| before.sha256 != made.sha256) {
-        let_go(&before, "a newer clash was asked");
-    }
+    // One clash waits at a time: an older one let go is told, never dropped
+    // silently (lamp-9adf, 18 Nov, #7554's ROW at 2e864a0: 12 s after
+    // `dim-light-at-night`'s clash was asked, a newer clash dropped it and
+    // nothing was said).
+    let dropped = before
+        .filter(|before| before.sha256 != made.sha256)
+        .map(|before| {
+            let_go(&before, "a newer clash was asked");
+            made_skill::spoken_name(&before.name)
+        });
     eprintln!(
         "lamp-voice: request {request}: a made skill {} clashes with {} ({}): not put on, the person is asked",
         made.name,
         others.join(", "),
         shares
     );
-    json!({
+    let mut told = json!({
         "made": made.name,
         "on": false,
         "clashes_with": spoken,
         "shares": shares,
         CLASH_ID: id,
         "next": format!("{} {}", say_whole(&question), then_choose(&id)),
-    })
+    });
+    if let Some(dropped) = dropped {
+        told["next"] = json!(format!(
+            "{} {}",
+            dropped_first(&dropped),
+            told["next"].as_str().unwrap_or_default()
+        ));
+        told["dropped"] = json!(dropped);
+    }
+    told
+}
+
+/// The line said first, through the say service, of an older clash let go
+/// for a newer one asked in a turn that was cut ([`cut_line`] follows it):
+/// never dropped silently there either (App Only's P2 on #7554).
+pub fn dropped_line(dropped: &str) -> String {
+    format!(
+        "I didn't put on {dropped}, which I made earlier: it's dropped now, as only one \
+         clash can wait at a time."
+    )
+}
+
+/// What the model is told first of an older clash let go for a newer one
+/// ([`asked`]): the person hears that skill was not put on.
+fn dropped_first(dropped: &str) -> String {
+    format!(
+        "First tell them, in a few words, that {dropped}, made earlier, also clashed and \
+         waited for their choice; it was not put on and is dropped now, as only one clash \
+         waits at a time. Then:"
+    )
 }
 
 /// The note a later heard line `request` is told at `now` of the clash
@@ -482,6 +657,7 @@ fn let_go(waiting: &Waiting, why: &str) {
         waiting.name
     );
     made_skill::forget_unput(&waiting.keeping.directory, &waiting.sha256);
+    ended_at(Instant::now());
 }
 
 /// Whether a clash waits for the person's choice at `now`: the echo hold
@@ -515,6 +691,93 @@ pub fn echo_held(request: u64) {
             waiting.echoes.push(request);
         }
     });
+}
+
+/// The second route asks the model the person's line `line` of `request`
+/// (`name_only`: only the lamp's name, or no words). While a clash waits,
+/// its first later line that is more than the name is kept, in memory only
+/// and never journalled: the only line that may choose a replace
+/// ([`not_a_plain_replace`]). Later lines change nothing here; a keep or
+/// a cancel may still come.
+pub fn line_heard(request: u64, name_only: bool, line: &str) {
+    if name_only {
+        return;
+    }
+    kept::waiting(|waiting| {
+        if let Some(waiting) = waiting
+            .as_mut()
+            .filter(|waiting| request > waiting.request && waiting.answer_line.is_none())
+        {
+            waiting.answer_line = Some((request, line.to_owned()));
+        }
+    });
+}
+
+/// A round of `request` calls `calls`, before any runs
+/// (`skill_write_yes::round_called`): while a clash waits, one that calls
+/// anything but its answer (`make_skill` with a [`CLASH_ID`]) marks the
+/// request, so no replace is chosen in it: the line carried another ask.
+pub fn round_called<'a>(request: u64, calls: impl IntoIterator<Item = (&'a str, &'a Value)>) {
+    let other = calls
+        .into_iter()
+        .any(|(name, args)| name != made_skill::MAKE || !args[CLASH_ID].is_string());
+    if !other {
+        return;
+    }
+    kept::waiting(|waiting| {
+        let Some(waiting) = waiting.as_mut().filter(|waiting| request > waiting.request) else {
+            return;
+        };
+        if !waiting.other_calls.contains(&request) {
+            if waiting.other_calls.len() == SAID_KEPT {
+                waiting.other_calls.remove(0);
+            }
+            waiting.other_calls.push(request);
+        }
+    });
+}
+
+/// What may be said for a replace: the only answers that choose it, each
+/// as its words, read in code by `skill_write_yes::plain_answer` under the
+/// same ruling as a remove's yes (#7683, 18 Nov: a fixed set, since a
+/// replace takes skills off the lamp). A bare "yes" is none: the question
+/// offers three choices.
+const REPLACE_SAID: &[&[&str]] = &[
+    &["replace"],
+    &["replace", "it"],
+    &["replace", "them"],
+    &["replace", "them", "all"],
+    &["replace", "all"],
+    &["replace", "both"],
+    &["thay", "thế"],
+    &["thay", "đi"],
+];
+
+/// What may come with a replace: a plain yes before it ("Yes, replace
+/// it").
+const REPLACE_ALSO: &[&[&str]] = crate::skill_write_yes::YES_SAID;
+
+/// Why a replace in `request` is no plain choice of it, in code: not the
+/// first line after the question ([`line_heard`]), a line that is not only
+/// a plain replace (a question, or anything else asked), or a request
+/// whose rounds called anything else ([`round_called`]). None when it is
+/// one. The model's own `choice` is read first; this only ever leaves the
+/// other skills on.
+fn not_a_plain_replace(waiting: &Waiting, request: u64) -> Option<&'static str> {
+    match &waiting.answer_line {
+        Some((answer, line)) if *answer == request => {
+            let mut names = waiting.others.clone();
+            names.push(waiting.name.clone());
+            if !crate::skill_write_yes::plain_answer(line, REPLACE_SAID, REPLACE_ALSO, &names) {
+                Some("its line is not only a plain replace")
+            } else if waiting.other_calls.contains(&request) {
+                Some("its turn called something else")
+            } else {
+                None
+            }
+        }
+        _ => Some("not the line right after the question"),
+    }
 }
 
 /// The lamp said `words` in `request` (`thread::Thread::lamp_for`, as
@@ -747,10 +1010,11 @@ pub fn chosen(
         Nothing,
         Late(Box<Waiting>),
         Refused(Value),
+        NotPlain(Box<Waiting>, &'static str),
         Taken(Box<Waiting>, &'static str),
     }
     let took = kept::waiting(|kept| {
-        let Some(waiting) = kept.as_ref().filter(|waiting| waiting.id == id) else {
+        let Some(waiting) = kept.as_mut().filter(|waiting| waiting.id == id) else {
             return Took::Nothing;
         };
         if now.saturating_duration_since(waiting.at) > CLASH_WITHIN {
@@ -796,14 +1060,24 @@ pub fn chosen(
             eprintln!(
                 "lamp-voice: request {request}: a made skill's clash wasn't answered: its question was not heard whole"
             );
+            // Asked again: the line after it is the one that may choose.
+            waiting.answer_line = None;
             return Took::Refused(json!({
                 "error": "not chosen yet: the question was not said in full, or it was cut",
                 "next": format!("{} {}", say_whole(&waiting.question), then_choose(&waiting.id)),
             }));
         }
-        kept.take().map_or(Took::Nothing, |waiting| {
-            Took::Taken(Box::new(waiting), choice)
-        })
+        // A replace takes skills off the lamp: only a plain replace on the
+        // line right after the question, in code (#7683), else nothing is
+        // replaced and the clash ends, as a remove's yes is held.
+        let not_plain = (choice == "replace")
+            .then(|| not_a_plain_replace(waiting, request))
+            .flatten();
+        kept.take()
+            .map_or(Took::Nothing, |waiting| match not_plain {
+                Some(why) => Took::NotPlain(Box::new(waiting), why),
+                None => Took::Taken(Box::new(waiting), choice),
+            })
     });
     let (waiting, choice) = match took {
         Took::Nothing => {
@@ -821,8 +1095,29 @@ pub fn chosen(
             });
         }
         Took::Refused(told) => return told,
+        Took::NotPlain(waiting, why) => {
+            eprintln!(
+                "lamp-voice: request {request}: a made skill's clash: a replace not taken: {why}: nothing replaced, the clash dropped (#7683)"
+            );
+            let_go(&waiting, "a replace not plainly chosen");
+            let new = made_skill::spoken_name(&waiting.name);
+            let others = spoken_list(&waiting.others);
+            return json!({
+                "made": waiting.name,
+                "on": false,
+                "left": waiting.others,
+                "next": format!(
+                    "Nothing was replaced: only a plain choice to replace, right after the \
+                     lamp's question, takes a skill off. Say first, in a few words, in the \
+                     conversation's language, that you left {others} as it was and didn't put \
+                     {new} on; then do anything else they asked in that line, as for any line."
+                )
+            });
+        }
         Took::Taken(waiting, choice) => (waiting, choice),
     };
+    // Chosen: its question may still be copied for a while.
+    ended_at(now);
     let new = made_skill::spoken_name(&waiting.name);
     let others = spoken_list(&waiting.others);
     let many = waiting.others.len() > 1;
@@ -946,14 +1241,14 @@ pub fn chosen(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::make_skill_local::tests::{chat_at, good, keeping, manage_helper, service};
     use std::sync::Mutex;
 
     const NOW: u64 = 1_800_000_000_000;
 
-    fn forget_waiting() {
+    pub(crate) fn forget_waiting() {
         kept::waiting(Option::take);
     }
 
@@ -1091,6 +1386,53 @@ mod tests {
         assert_eq!(shared(&light, &paced), Some("the light"));
     }
 
+    /// #7938: two skills do the same thing only with the very same
+    /// triggers, windows too, and the same kinds of steps; a shared clock,
+    /// condition or light alone never makes them the same.
+    #[test]
+    fn the_same_thing_is_the_same_triggers_windows_and_steps() {
+        let daily = |at: &str, to: &str, steps: &str| {
+            signature(&format!(
+                "[trigger]\ntopic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \
+                 \"ends\"\nduring = {{ from = \"{at}\", to = \"{to}\" }}\n{steps}"
+            ))
+        };
+        let says = "[[do]]\nsay = { text = \"Hello.\" }\n[[do]]\nlight = { dim = 1 }\n";
+        let brief = daily("08:00", "08:01", says);
+        // Another time on the lamp's clock: a clash, never the same.
+        let morning = daily("07:00", "07:01", says);
+        assert_eq!(shared(&brief, &morning), Some("the light"));
+        assert!(!same_thing(&brief, &morning));
+        // Its very minute, other steps: not the same.
+        let nods = daily(
+            "08:00",
+            "08:01",
+            "[[do]]\nbody = { gesture = \"nod\" }\n[[do]]\nlight = { dim = 1 }\n",
+        );
+        assert!(!same_thing(&brief, &nods));
+        // Its very minute and steps, other words and pace: the same.
+        let again = daily(
+            "08:00",
+            "08:01",
+            "cooldown = \"12h\"\n[[do]]\nlight = { colour = \"blue\" }\nsay = { text = \"Brief.\" }\nafter = \"say\"\n",
+        );
+        assert!(same_thing(&brief, &again));
+        assert!(same_thing(&again, &brief));
+        // Another day: not the same.
+        let weekdays = signature(&format!(
+            "[trigger]\ntopic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \
+             \"ends\"\nduring = {{ from = \"08:00\", to = \"08:01\" }}\ndays = \"weekdays\"\n{says}"
+        ));
+        assert!(!same_thing(&brief, &weekdays));
+        // A signature kept before `"same"`: never the same.
+        let mut old = brief.clone();
+        old.as_object_mut().unwrap().remove("same");
+        assert!(!same_thing(&brief, &old));
+        // No shared output: no clash, so never the same.
+        let quiet = daily("08:00", "08:01", "[[do]]\nsay = { text = \"Hello.\" }\n");
+        assert!(!same_thing(&quiet, &quiet));
+    }
+
     /// The question the lamp asked, said whole and uncut in `request`, as
     /// the thread tells it ([`lamp_said`]).
     fn said_whole(told: &Value, request: u64) {
@@ -1100,8 +1442,12 @@ mod tests {
     }
 
     /// A choice in a heard line `request`, on the route with the echo judge
-    /// or not (`here`).
+    /// or not (`here`). A replace's line, the first after the question, is
+    /// heard as a plain "Replace it." ([`line_heard`]).
     fn pick<'a>(id: &'a str, choice: &'a str, request: u64, here: bool) -> Answer<'a> {
+        if choice == "replace" {
+            line_heard(request, false, "Replace it.");
+        }
         Answer {
             id,
             choice: Some(choice),
@@ -1265,7 +1611,16 @@ mod tests {
         // held as the lamp's echo: that line's replace is refused.
         said_whole(&told, 4);
         echo_held(5);
-        let echoed = chosen(pick(&id, "replace", 5, true), || true, now, &hands);
+        // A line held as the echo is never asked of the model, so it is no
+        // answer line ([`line_heard`]).
+        let echo = Answer {
+            id: &id,
+            choice: Some("replace"),
+            request: 5,
+            heard: true,
+            here: true,
+        };
+        let echoed = chosen(echo, || true, now, &hands);
         assert!(
             echoed["error"].as_str().unwrap().contains("own words"),
             "{echoed}"
@@ -1283,6 +1638,108 @@ mod tests {
         assert_eq!(replaced["on"], true, "{replaced}");
         assert_eq!(*done.lock().unwrap(), ["on", "remove glow-blue-on-return"]);
         assert!(!awaited(now));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Twelve's P2 on #7683, by the first builder's ruling: a replace
+    /// takes skills off the lamp, so it is taken only as a plain choice of
+    /// it, read in code, on the line right after the question, with nothing
+    /// else asked. The clash question, then "Also make one that chimes
+    /// when I'm back" (the model's choice `replace` all the same): nothing
+    /// is replaced or put on, and the person is told so. A question, a
+    /// bare yes, a later line, or a round calling more replace nothing; a
+    /// plain "Yes, replace it." does.
+    #[test]
+    fn only_a_plain_replace_on_the_next_line_takes_a_skill_off() {
+        let (root, keeping) = keeping("clash-plain");
+        let done: Mutex<Vec<String>> = Mutex::new(Vec::new());
+        let remove = |_: &Keeping, name: &str| {
+            done.lock().unwrap().push(format!("remove {name}"));
+            Ok(())
+        };
+        let put_on = |_: &Keeping, _: &str| {
+            done.lock().unwrap().push("on".to_owned());
+            Ok("glow-green".to_owned())
+        };
+        let hands = Hands {
+            remove: &remove,
+            put_on: &put_on,
+            clock: &Instant::now,
+        };
+        let clash = Clash {
+            name: "glow-blue-on-return".to_owned(),
+            shares: "the light",
+        };
+        let now = Instant::now();
+        let ask = || {
+            let told = asked(
+                &keeping,
+                &made("glow-green"),
+                std::slice::from_ref(&clash),
+                3,
+                now,
+            );
+            said_whole(&told, 3);
+            told[CLASH_ID].as_str().unwrap().to_owned()
+        };
+        let answer = |id: &str, request| {
+            chosen(
+                Answer {
+                    id,
+                    choice: Some("replace"),
+                    request,
+                    heard: true,
+                    here: true,
+                },
+                || true,
+                now,
+                &hands,
+            )
+        };
+        for line in [
+            "Also make one that chimes when I'm back",
+            "Is that the blue one?",
+            "Yes.",
+            "Replace it, and what's the weather?",
+        ] {
+            let id = ask();
+            line_heard(4, false, line);
+            let told = answer(&id, 4);
+            assert_eq!(told["on"], false, "{line}: {told}");
+            assert_eq!(
+                told["left"],
+                json!(["glow-blue-on-return"]),
+                "{line}: {told}"
+            );
+            let next = told["next"].as_str().unwrap();
+            assert!(
+                next.contains("left glow blue on return as it was"),
+                "{next}"
+            );
+            assert!(next.contains("do anything else they asked"), "{next}");
+            assert!(!awaited(now), "{line}");
+            assert!(done.lock().unwrap().is_empty(), "{line}");
+        }
+        // Not the line right after the question.
+        let id = ask();
+        line_heard(4, false, "What does it do?");
+        line_heard(5, false, "Replace it.");
+        assert_eq!(answer(&id, 5)["on"], false);
+        // A round that calls more beside the answer.
+        let id = ask();
+        line_heard(4, false, "Replace it.");
+        let choice = json!({ CLASH_ID: id, CHOICE: "replace" });
+        let play = json!({"query": "music"});
+        round_called(4, [(made_skill::MAKE, &choice), ("play_music", &play)]);
+        assert_eq!(answer(&id, 4)["on"], false);
+        assert!(done.lock().unwrap().is_empty());
+        // A plain choice of it on the next line: replaced.
+        let id = ask();
+        line_heard(4, false, "Hey Lamp, yes, replace it please.");
+        round_called(4, [(made_skill::MAKE, &choice)]);
+        let replaced = answer(&id, 4);
+        assert_eq!(replaced["on"], true, "{replaced}");
+        assert_eq!(*done.lock().unwrap(), ["on", "remove glow-blue-on-return"]);
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -1947,6 +2404,151 @@ mod tests {
         assert!(!awaited(now + CLASH_WITHIN + Duration::from_secs(1)));
         assert_eq!(names(), ["rest-glow"]);
         assert!(!package.exists());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// lamp-9adf, 18 Nov (#7554's ROW at 2e864a0, 17:39:32 and 17:39:44):
+    /// `dim-light-at-night`'s clash waited, and 12 s later the clash of
+    /// `joke-on-pat-2` let it go with nothing said. The newer clash's answer
+    /// now tells the model to say first that the older one was dropped.
+    #[test]
+    fn a_clash_let_go_for_a_newer_one_is_told() {
+        let (root, keeping) = keeping("clash-newer-told");
+        let now = Instant::now();
+        let first = asked(
+            &keeping,
+            &made("dim-light-at-night"),
+            &clashes_of(&["water-reminder"]),
+            86,
+            now,
+        );
+        assert!(first.get("dropped").is_none(), "{first}");
+        let newer = Made {
+            sha256: "cd".repeat(32),
+            ..made("joke-on-pat-2")
+        };
+        let told = asked(
+            &keeping,
+            &newer,
+            &clashes_of(&["cat-joke-on-pat", "joke-on-pat"]),
+            92,
+            now,
+        );
+        assert_eq!(told["dropped"], "dim light at night", "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(
+            next.starts_with("First tell them, in a few words, that dim light at night"),
+            "{next}"
+        );
+        assert!(next.contains("Say this word for word"), "{next}");
+        // The same skill asked again is no other clash: nothing dropped.
+        let again = asked(
+            &keeping,
+            &newer,
+            &clashes_of(&["cat-joke-on-pat", "joke-on-pat"]),
+            93,
+            now,
+        );
+        assert!(again.get("dropped").is_none(), "{again}");
+        forget_waiting();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// App Only's P1 on #7554: with `dim-light-at-night` made, not on, and
+    /// its clash waiting, the lamp asks its choice again ("what?"): its own
+    /// sentence and the model's words are no claim, read from the clash's
+    /// own state, and no reply is held for it while it waits. Once it ended
+    /// (here let go past its time), a choice asked with no call within
+    /// [`COPIED_WITHIN`] is a claim; past that, no reply is held.
+    #[test]
+    fn a_clash_asked_again_while_it_waits_is_no_claim() {
+        use crate::make_skill_agent::clash_claimed;
+        let (root, keeping) = keeping("clash-asked-again");
+        let now = Instant::now();
+        set_ended(None);
+        let told = asked(
+            &keeping,
+            &made("dim-light-at-night"),
+            &clashes_of(&["rest-glow"]),
+            3,
+            now,
+        );
+        let question = told["next"].as_str().unwrap().split('"').nth(1).unwrap();
+        assert!(waits(now));
+        assert!(!lately_ended(now), "no reply is held while it waits");
+        for again in [
+            "Shall I replace rest glow, keep both (they may take turns), or cancel?",
+            "Do you want me to replace rest glow, keep both, or cancel?",
+            question,
+        ] {
+            assert_eq!(
+                clash_claimed(again, true, || waits(now)),
+                Some(false),
+                "{again}"
+            );
+        }
+        // Past its time: let go, and so ended.
+        let late = now + CLASH_WITHIN + Duration::from_secs(1);
+        assert!(!awaited(late));
+        assert!(!waits(late));
+        assert!(lately_ended(Instant::now()));
+        assert_eq!(
+            clash_claimed(question, true, || waits(Instant::now())),
+            Some(true)
+        );
+        assert!(!lately_ended(
+            Instant::now() + COPIED_WITHIN + Duration::from_secs(1)
+        ));
+        set_ended(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// App Only's P2 on #7554: a newer clash made in a cut turn lets the
+    /// older one go, and its line, said through the say service, tells that
+    /// first: never dropped silently.
+    #[test]
+    fn a_newer_clash_in_a_cut_turn_tells_the_older_one_dropped() {
+        let (root, keeping) = keeping("clash-cut-dropped");
+        installed(
+            &keeping,
+            "rest-glow",
+            RESTING,
+            "light = { colour = \"blue\" }",
+        );
+        let older = Made {
+            sha256: "cd".repeat(32),
+            ..made("dim-light-at-night")
+        };
+        asked(
+            &keeping,
+            &older,
+            &clashes_of(&["water-reminder"]),
+            2,
+            Instant::now(),
+        );
+        let (url, served) = service(vec![(200, good())]);
+        let told = crate::make_skill_local::make_with(
+            3,
+            Some("make me a skill that dims the light at 10 pm"),
+            "dim the light at 10 pm",
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(told["dropped"], "dim light at night", "{told}");
+        let line = crate::make_skill_local::take_said_line().unwrap();
+        assert!(
+            line.starts_with(&dropped_line("dim light at night")),
+            "{line}"
+        );
+        assert!(
+            line.contains("didn't put it on: rest glow starts at the same moment"),
+            "{line}"
+        );
+        forget_waiting();
+        set_ended(None);
         let _ = std::fs::remove_dir_all(&root);
     }
 }

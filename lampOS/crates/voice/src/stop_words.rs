@@ -541,6 +541,15 @@ pub fn stop_word(word: &str) -> bool {
             .any(|(first, second)| word == *first || word == *second)
 }
 
+/// Whether `heard` tells the lamp to stop or wait ([`stop_phrase`]) and asks
+/// something more beside it: "Hold on, hey Lamp, make the light a little
+/// warmer." (#7285), not "Hold on." nor "Hold on a second, Lamp.". A bare
+/// stop is decided in one place, [`crate::wait_words::only_a_stop`], so the
+/// cut-in's note and the answer wait never read a line two ways.
+pub fn a_stop_and_more(heard: &str) -> bool {
+    stop_phrase(heard) && !crate::wait_words::only_a_stop(heard)
+}
+
 /// Whether what was heard tells the lamp to stop, when the lamp itself has
 /// just said `lamp`: a stop word, or pair, that is not among the lamp's own
 /// words, nor right after one that turns it round. "The fox had to wait"

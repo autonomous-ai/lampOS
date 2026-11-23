@@ -42,6 +42,9 @@ fn main() {
     // closed: after `run`, or while a panic unwinds out of it.
     let stalls_end = lamp_voice::stalls::Finishing(std::time::Duration::from_millis(300));
     let result = run();
+    // A clean stop: forgets handed off the voice's way are written first,
+    // within a bound (`LAMP_HISTORY_FORGET`, #7771; Twelve on #8086).
+    lamp_voice::history_forget::drain();
     if let Err(error) = &result {
         eprintln!("lamp-voice: {error}");
     }
@@ -49,7 +52,9 @@ fn main() {
     if relayed {
         lamp_voice::log_relay::finish(std::time::Duration::from_millis(500));
     }
-    if result.is_err() {
+    // A stop (SIGTERM) met at any of the run's checks is the service being
+    // stopped, not a fault: exit 0, as the main loop's own stop does.
+    if !lamp_voice::exits_clean(&result) {
         std::process::exit(1);
     }
 }
@@ -788,9 +793,58 @@ fn run() -> Result<()> {
                 lamp_voice::second_provider::probe::cut_in::run(Path::new(provider_config), Path::new(second_config), runs),
             )?;
         }
-        // probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--recall | --when | --nightly | --keep [--keep-said]]
+        // probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--recall | --when | --nightly | --keep [--keep-said] | --face]
+        // probe-tools PROVIDER_CONFIG SECOND_CONFIG --doubt [--wording new|old|off] [--times N]
         [command, provider_config, second_config, rest @ ..] if command == "probe-tools" => {
-            let usage = || io::Error::other("usage: probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS of 1 to 20] [--recall | --when | --nightly | --keep [--keep-said]]");
+            let usage = || io::Error::other("usage: probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS of 1 to 20] [--recall | --when | --nightly | --keep [--keep-said] | --face], or --doubt [--wording new|old|off] [--times 1 to 20], or --held-yes [--wording new|old] [--times 1 to 20]");
+            // probe-tools PROVIDER_CONFIG SECOND_CONFIG --held-yes [--wording new|old] [--times N]
+            if rest.first().is_some_and(|first| first == "--held-yes") {
+                use lamp_voice::second_provider::probe::held_yes::Wording;
+                let (mut runs, mut wordings) = (10, Wording::ALL.to_vec());
+                let mut options = rest[1..].iter();
+                while let Some(option) = options.next() {
+                    let value = options.next().ok_or_else(usage)?;
+                    match option.as_str() {
+                        "--times" => runs = value.parse().ok().filter(|runs| (1..=20).contains(runs)).ok_or_else(usage)?,
+                        "--wording" => wordings = vec![Wording::parse(value).ok_or_else(usage)?],
+                        _ => return Err(usage().into()),
+                    }
+                }
+                tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(
+                    lamp_voice::second_provider::probe::held_yes::run(Path::new(provider_config), Path::new(second_config), runs, &wordings),
+                )?;
+                return Ok(());
+            }
+            if rest.first().is_some_and(|first| first == "--doubt") {
+                use lamp_voice::second_provider::probe::doubt::Wording;
+                let (mut runs, mut wordings) = (3, Wording::ALL.to_vec());
+                let mut options = rest[1..].iter();
+                while let Some(option) = options.next() {
+                    let value = options.next().ok_or_else(usage)?;
+                    match option.as_str() {
+                        "--times" => runs = value.parse().ok().filter(|runs| (1..=20).contains(runs)).ok_or_else(usage)?,
+                        "--wording" => wordings = vec![Wording::parse(value).ok_or_else(usage)?],
+                        _ => return Err(usage().into()),
+                    }
+                }
+                tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(
+                    lamp_voice::second_provider::probe::doubt::run(Path::new(provider_config), Path::new(second_config), runs, &wordings),
+                )?;
+                return Ok(());
+            }
+            if let [first @ .., last] = rest
+                && last == "--face"
+            {
+                let runs = match first {
+                    [] => 1,
+                    [runs] => runs.parse().ok().filter(|runs| (1..=20).contains(runs)).ok_or_else(usage)?,
+                    _ => return Err(usage().into()),
+                };
+                tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(
+                    lamp_voice::second_provider::probe::face_question::run(Path::new(provider_config), Path::new(second_config), runs),
+                )?;
+                return Ok(());
+            }
             let (rest, keep_said) = match rest {
                 [first @ .., last] if last == "--keep-said" => (first, true),
                 _ => (rest, false),

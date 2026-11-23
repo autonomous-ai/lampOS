@@ -1,0 +1,1222 @@
+//! `LAMP_MAKE_NO_ASKS` (the first builder, 18:41 and 18:45): each written
+//! first and seen failing with the switch-on branch disabled.
+use super::*;
+use crate::make_skill_local::tests::{
+    CODE_REQUEST, CODE_TOML, FOURTEEN, FOURTEEN_ASK, MOON_TIME, chat_at, code_answer_of, good,
+    keeping, service, service_sent, task_asks,
+};
+use crate::make_skill_local::{make_with, set_owner_here, set_tasks_here, take_said_line};
+use std::io::{BufRead, Write};
+use std::path::Path;
+
+const DIM: &str = "make me a skill that dims the light at 10 pm";
+const NOW: u64 = 1_800_000_000_000;
+
+/// The made test skill's trigger (`good()`'s): the voice resting.
+const RESTING: &str = "topic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n";
+
+/// A manage helper at `socket` that answers done to each of `lines` asks,
+/// one a connection: the lines it was asked, in order.
+fn helper(socket: &Path, lines: usize) -> std::thread::JoinHandle<Vec<Value>> {
+    let _ = fs::remove_file(socket);
+    let listener = std::os::unix::net::UnixListener::bind(socket).unwrap();
+    std::thread::spawn(move || {
+        (0..lines)
+            .map(|_| {
+                let stream = crate::make_skill_local::tests::accept_within(&listener);
+                let mut line = String::new();
+                std::io::BufReader::new(&stream)
+                    .read_line(&mut line)
+                    .unwrap();
+                writeln!(&stream, r#"{{"done": "ok"}}"#).unwrap();
+                serde_json::from_str(&line).unwrap()
+            })
+            .collect()
+    })
+}
+
+/// A skill on the lamp named `name` doing what the made test skill does
+/// (`made_clash::same_thing`, #7938): on the resting trigger in its very
+/// window, lighting (its pace and its light's colour its own).
+fn installed(keeping: &Keeping, name: &str) {
+    let folder = keeping.installed.join(name);
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(
+        folder.join("skill.toml"),
+        format!(
+            "kind = \"installable\"\nversion = \"1.0.0\"\n\n[trigger]\n{RESTING}cooldown = \
+             \"1h\"\nduring = {{ from = \"22:00\", to = \"22:30\" }}\n\n[[do]]\nlight = {{ \
+             colour = \"blue\" }}\n"
+        ),
+    )
+    .unwrap();
+}
+
+/// The folder `name` on the lamp went on as `sha256`, as the manage
+/// helper's install writes it.
+fn went_on_as(keeping: &Keeping, name: &str, sha256: &str) {
+    let folder = keeping.installed.join(name);
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(
+        folder.join(".package.json"),
+        json!({ "sha256": sha256 }).to_string(),
+    )
+    .unwrap();
+}
+
+fn names(keeping: &Keeping) -> Vec<String> {
+    made_skill::entries(&keeping.directory)
+        .iter()
+        .filter_map(|entry| entry["name"].as_str().map(str::to_owned))
+        .collect()
+}
+
+/// A remove asked by voice of `name`, as `make_skill`'s `remove` asks
+/// it: the owner's by `owners`, taken off by `remove`.
+fn removing(
+    name: &str,
+    keeping: &Keeping,
+    owners: impl FnOnce() -> bool,
+    remove: impl FnOnce(&str) -> Result<(), String>,
+) -> Value {
+    crate::made_remove::asked_or_removed(
+        crate::made_remove::Ask {
+            name,
+            request: 5,
+            heard: true,
+            sends_here: true,
+        },
+        keeping,
+        || true,
+        owners,
+        remove,
+    )
+}
+
+/// The quoted line a `next` tells the model to say.
+fn quoted(next: &str) -> &str {
+    next.rsplit_once(": \"")
+        .map(|(_, line)| line.trim_end_matches('"'))
+        .unwrap_or_default()
+}
+
+/// A plain make goes on at once and is said in one line with its undo,
+/// through the model, in the conversation's language, with no question.
+#[test]
+fn a_plain_make_is_on_at_once_with_the_one_line() {
+    set_here(Some(true));
+    let (root, keeping) = keeping("no-asks-plain");
+    let (url, served) = service(vec![(200, good())]);
+    let asked = helper(&keeping.manage, 1);
+    let told = make_with(7, Some(DIM), DIM, &keeping, chat_at(url), NOW, || None);
+    assert_eq!(served.join().unwrap(), 1);
+    assert_eq!(told["on"], true, "{told}");
+    let next = told["next"].as_str().unwrap();
+    assert!(next.starts_with(made_skill::ALREADY_DONE), "{next}");
+    assert!(
+        next.contains("in the language of the conversation"),
+        "{next}"
+    );
+    assert!(next.contains("Ask nothing and add no question"), "{next}");
+    assert!(
+        next.contains("one short clause of what it will do"),
+        "{next}"
+    );
+    assert_eq!(quoted(next), "Made evening dim. Say 'remove it' to undo.");
+    assert!(!quoted(next).contains('?'), "{next}");
+    assert!(told.get(crate::skill_write_yes::APPROVE_ID).is_none());
+    assert_eq!(
+        take_said_line().as_deref(),
+        Some("Made evening dim. Say 'remove it' to undo.")
+    );
+    assert_eq!(
+        asked.join().unwrap()[0]["install_made"],
+        made_skill::entries(&keeping.directory)[0]["sha256"]
+    );
+    // Its undo, within ten minutes: "remove it" removes it.
+    let remover = helper(&keeping.manage, 1);
+    let sha256 = made_skill::entries(&keeping.directory)[0]["sha256"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    went_on_as(&keeping, "evening-dim", &sha256);
+    let undone = undo(&keeping, LAST, now_unix_ms());
+    assert_eq!(
+        quoted(undone["next"].as_str().unwrap()),
+        "Removed evening dim. Say 'put it back' to undo.",
+        "{undone}"
+    );
+    assert_eq!(undone["removed"], "evening-dim", "{undone}");
+    assert_eq!(remover.join().unwrap()[0]["remove"], "evening-dim");
+    assert!(names(&keeping).is_empty());
+    set_here(None);
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// A code make goes on at once with no yes, even one granted the camera,
+/// only on the owner's ask; with `LAMP_MADE_SCRIPTS` off it never goes on,
+/// and neither does it for anyone but the owner: each said plainly.
+#[test]
+fn a_code_make_is_on_at_once_with_no_yes_and_scripts_on_still_holds() {
+    set_here(Some(true));
+    made_skill::set_scripts_here(Some(true));
+    crate::skill_task_yes::set_on_here(Some(true));
+    set_owner_here(Some(true));
+    let folder = "cd".repeat(32);
+    set_tasks_here(Some(task_asks("photo-booth", &folder, "", &["camera"])));
+    let (root, keeping) = keeping("no-asks-code");
+    let (url, served) = service(vec![(200, code_answer_of(CODE_TOML))]);
+    let asked = helper(&keeping.manage, 1);
+    let told = make_with(
+        7,
+        Some(CODE_REQUEST),
+        CODE_REQUEST,
+        &keeping,
+        chat_at(url),
+        NOW,
+        || None,
+    );
+    assert_eq!(served.join().unwrap(), 1);
+    assert_eq!(told["on"], true, "{told}");
+    assert_eq!(told["task"], true, "{told}");
+    for none in [
+        crate::skill_write_yes::APPROVE_ID,
+        "code_waits_for_yes",
+        "not_on",
+    ] {
+        assert!(told.get(none).is_none(), "{none}: {told}");
+    }
+    assert!(!crate::skill_write_yes::awaited(std::time::Instant::now()));
+    assert_eq!(
+        quoted(told["next"].as_str().unwrap()),
+        "Made photo booth. Say 'remove it' to undo."
+    );
+    assert!(asked.join().unwrap()[0]["install_made"].is_string());
+    assert_eq!(made_skill::entries(&keeping.directory)[0]["on"], true);
+    let _ = take_said_line();
+    set_tasks_here(None);
+
+    // The same skill, kept and not on: never on with scripts off, nor on
+    // anyone's ask but the owner's.
+    let mut made = made_skill::made_of(
+        &keeping.directory,
+        &made_skill::entries(&keeping.directory)[0],
+    )
+    .unwrap();
+    made.uses.code = true;
+    made_skill::set_scripts_here(Some(false));
+    let (on, line) = put_on(&keeping, &made, || true).unwrap();
+    assert_eq!(on, Err(CODE_OFF.to_owned()));
+    assert_eq!(line, made_skill::not_on_line(CODE_OFF));
+    made_skill::set_scripts_here(Some(true));
+    let (on, line) = put_on(&keeping, &made, || false).unwrap();
+    assert_eq!(on, Err(NOT_OWNERS_CODE.to_owned()));
+    assert!(
+        line.starts_with("I made it but couldn't put it on: "),
+        "{line}"
+    );
+    let told = made_told(&made, &on, &line, None);
+    assert_eq!(told["on"], false);
+    assert!(
+        told["next"]
+            .as_str()
+            .unwrap()
+            .contains("Never say it is on")
+    );
+    set_owner_here(None);
+    crate::skill_task_yes::set_on_here(None);
+    made_skill::set_scripts_here(None);
+    set_here(None);
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// A clash replaces: the new one on, the old one turned off (never
+/// deleted), one line with its undo; "keep the old one" puts the old one
+/// back on and removes the new one.
+#[test]
+fn a_clash_replaces_and_its_undo_restores() {
+    set_here(Some(true));
+    set_owner_here(Some(true));
+    let (root, keeping) = keeping("no-asks-clash");
+    set_state_here(Some(root.join("state")));
+    installed(&keeping, "rest-glow");
+    let (url, served) = service(vec![(200, good())]);
+    let asked = helper(&keeping.manage, 2);
+    let told = make_with(3, Some(DIM), DIM, &keeping, chat_at(url), NOW, || None);
+    assert_eq!(served.join().unwrap(), 1);
+    assert_eq!(told["on"], true, "{told}");
+    assert!(told.get(crate::made_clash::CLASH_ID).is_none(), "{told}");
+    assert_eq!(told["replaced"], json!(["rest-glow"]), "{told}");
+    let line = "Made evening dim and replaced your old rest glow. Say 'keep the old one' to undo.";
+    assert_eq!(quoted(told["next"].as_str().unwrap()), line);
+    assert_eq!(take_said_line().as_deref(), Some(line));
+    let asked = asked.join().unwrap();
+    assert!(asked[0]["install_made"].is_string(), "{asked:?}");
+    assert_eq!(asked[1], json!({ "off": "rest-glow" }));
+    assert!(
+        keeping.installed.join("rest-glow").is_dir(),
+        "never deleted"
+    );
+    assert!(!crate::made_clash::awaited(std::time::Instant::now()));
+    // "Keep the old one": the model's undo.
+    let sha256 = made_skill::entries(&keeping.directory)[0]["sha256"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    went_on_as(&keeping, "evening-dim", &sha256);
+    let undoing = helper(&keeping.manage, 2);
+    let undone = undo(&keeping, "rest glow", now_unix_ms());
+    assert_eq!(
+        quoted(undone["next"].as_str().unwrap()),
+        "Your old rest glow is back on, and I removed evening dim. Say 'put it back' to undo.",
+        "{undone}"
+    );
+    // The fields `make_skill`'s other answers have (#7730's status).
+    assert_eq!(
+        (&undone["made"], &undone["on"], &undone["removed"]),
+        (&json!("rest-glow"), &json!(true), &json!("evening-dim")),
+        "{undone}"
+    );
+    let undoing = undoing.join().unwrap();
+    assert_eq!(undoing[0], json!({ "on": "rest-glow" }));
+    assert_eq!(undoing[1], json!({ "remove": "evening-dim" }));
+    assert!(names(&keeping).is_empty());
+    // The new one kept aside, as a make's undo keeps it: "put it back".
+    assert!(
+        keeping
+            .directory
+            .join(KEPT_FOLDER)
+            .join(format!("{sha256}.tar"))
+            .is_file()
+    );
+    set_state_here(None);
+    set_owner_here(None);
+    set_here(None);
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// An unsure line makes nothing and asks nothing: no "could you say it
+/// again?", nothing kept, no line left for a cut turn.
+#[test]
+fn an_unsure_line_makes_nothing_and_asks_nothing() {
+    set_here(Some(true));
+    made_skill::set_unrelated_here(Some(true));
+    made_skill::set_english_here(Some(true));
+    made_skill::set_asks_here(Some(true));
+    let (root, keeping) = keeping("no-asks-unsure");
+    let (url, served) = service_sent(vec![(200, MOON_TIME.to_owned()), (200, "No.".to_owned())]);
+    let told = make_with(
+        7,
+        Some(FOURTEEN),
+        FOURTEEN_ASK,
+        &keeping,
+        chat_at(url),
+        NOW,
+        || None,
+    );
+    assert_eq!(served.join().unwrap().len(), 2);
+    assert_eq!(told["error"], NOT_ACTED, "{told}");
+    assert_eq!(told["next"], NOT_ACTED_NEXT);
+    assert!(!told.to_string().contains('?'), "{told}");
+    assert!(!told.to_string().contains(made_skill::UNRELATED), "{told}");
+    assert_eq!(take_said_line(), None);
+    assert!(made_skill::entries(&keeping.directory).is_empty());
+    made_skill::set_asks_here(None);
+    made_skill::set_english_here(None);
+    made_skill::set_unrelated_here(None);
+    set_here(None);
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// A remove happens at once on the owner's ask, with no yes, said in one
+/// line; "put it back" restores it from its keep and puts it on. Anyone
+/// else's ask removes nothing, and several alike ask nothing.
+#[test]
+fn a_remove_happens_with_no_yes_and_put_it_back_restores() {
+    set_here(Some(true));
+    crate::skill_write_yes::clear_for_test();
+    let (root, keeping) = keeping("no-asks-remove");
+    crate::made_remove::tests::made_here(&keeping, &[("moon-fact", true), ("joke-time", true)]);
+    // Not the owner's: nothing removed, no skill named.
+    let told = removing("moon fact", &keeping, || false, |_| panic!("never removed"));
+    assert_eq!(told["error"], NOT_OWNER, "{told}");
+    assert_eq!(names(&keeping).len(), 2);
+    // The owner's: removed at once, kept aside.
+    let mut removed = Vec::new();
+    let told = removing(
+        "moon fact",
+        &keeping,
+        || true,
+        |name| {
+            removed.push(name.to_owned());
+            Ok(())
+        },
+    );
+    assert_eq!(removed, ["moon-fact"]);
+    assert_eq!(told["removed"], "moon-fact", "{told}");
+    assert!(
+        told.get(crate::skill_write_yes::APPROVE_ID).is_none(),
+        "{told}"
+    );
+    assert!(!crate::skill_write_yes::awaited(std::time::Instant::now()));
+    assert_eq!(
+        quoted(told["next"].as_str().unwrap()),
+        "Removed moon fact. Say 'put it back' to undo."
+    );
+    assert_eq!(names(&keeping), ["joke-time"]);
+    assert!(!keeping.directory.join("moon-fact-1.0.0.tar").exists());
+    // "Put it back", by its name: back in the index and on.
+    let _ = fs::remove_dir_all(keeping.installed.join("moon-fact"));
+    let asked = helper(&keeping.manage, 1);
+    let back = undo(&keeping, "moon fact", now_unix_ms());
+    assert_eq!(
+        (&back["made"], &back["on"]),
+        (&json!("moon-fact"), &json!(true)),
+        "{back}"
+    );
+    assert_eq!(
+        quoted(back["next"].as_str().unwrap()),
+        "moon fact is back on."
+    );
+    assert!(asked.join().unwrap()[0]["install_made"].is_string());
+    assert!(keeping.directory.join("moon-fact-1.0.0.tar").is_file());
+    let entry = made_skill::entries(&keeping.directory)
+        .into_iter()
+        .find(|entry| entry["name"] == "moon-fact")
+        .unwrap();
+    assert_eq!(entry["on"], true, "{entry}");
+    // Two alike: nothing removed, nothing asked.
+    crate::made_remove::tests::made_here(&keeping, &[("moon", true), ("moon-fact", true)]);
+    let told = removing("moon fax", &keeping, || true, |_| panic!("never removed"));
+    let next = told["next"].as_str().unwrap();
+    assert!(next.contains("nothing was removed"), "{next}");
+    assert!(next.contains("Ask nothing"), "{next}");
+    set_here(None);
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// A failed put-on is told in one plain line with why, never as on, and
+/// leaves nothing to undo.
+#[test]
+fn a_failed_put_on_is_told_plainly() {
+    set_here(Some(true));
+    let (root, keeping) = keeping("no-asks-failed");
+    let (url, served) = service(vec![(200, good())]);
+    // No manage helper listening.
+    let told = make_with(7, Some(DIM), DIM, &keeping, chat_at(url), NOW, || None);
+    assert_eq!(served.join().unwrap(), 1);
+    assert_eq!(told["on"], false, "{told}");
+    let next = told["next"].as_str().unwrap();
+    assert!(next.contains("Never say it is on"), "{next}");
+    let line = quoted(next);
+    assert!(
+        line.starts_with("I made it but couldn't put it on: "),
+        "{line}"
+    );
+    assert!(!line.contains("remove it"), "{line}");
+    assert!(told["not_on"].is_string(), "{told}");
+    assert_eq!(take_said_line().as_deref(), Some(line));
+    assert_eq!(
+        undo(&keeping, LAST, now_unix_ms())["error"],
+        NOTHING_TO_UNDO
+    );
+    set_here(None);
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// The switch off: a clash still asks, a remove still asks its one
+/// question and waits for the yes, and `make_skill` has no undo.
+#[test]
+fn with_the_switch_off_nothing_changes() {
+    set_here(Some(false));
+    crate::skill_write_yes::clear_for_test();
+    let parameters = crate::make_skill_local::tool().parameters.unwrap();
+    assert!(parameters["properties"].get(UNDO).is_none());
+    let (root, keeping) = keeping("no-asks-off");
+    installed(&keeping, "rest-glow");
+    let (url, served) = service(vec![(200, good())]);
+    let told = make_with(3, Some(DIM), DIM, &keeping, chat_at(url), NOW, || None);
+    assert_eq!(served.join().unwrap(), 1);
+    assert_eq!(told["on"], false, "{told}");
+    assert!(told[crate::made_clash::CLASH_ID].is_string(), "{told}");
+    let _ = take_said_line();
+    crate::made_remove::tests::made_here(&keeping, &[("moon-fact", true)]);
+    let told = removing("moon fact", &keeping, || true, |_| panic!("never removed"));
+    assert!(
+        told[crate::skill_write_yes::APPROVE_ID].is_string(),
+        "{told}"
+    );
+    assert!(told["next"].as_str().unwrap().contains("Remove moon fact?"));
+    assert_eq!(names(&keeping), ["moon-fact"]);
+    crate::skill_write_yes::clear_for_test();
+    set_here(None);
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// The switch on: `make_skill` takes the undo, and its description keeps
+/// within the link's 1,024 bytes with every switch on.
+#[test]
+fn with_the_switch_on_the_tool_takes_the_undo() {
+    set_here(Some(true));
+    made_skill::set_scripts_here(Some(true));
+    let tool = crate::make_skill_local::tool();
+    assert!(tool.parameters.unwrap()["properties"][UNDO].is_object());
+    assert!(!tool.description.contains("once the person agrees"));
+    assert!(
+        tool.description.len() <= 1_024,
+        "{}",
+        tool.description.len()
+    );
+    made_skill::set_scripts_here(None);
+    set_here(None);
+}
+
+/// A records file in `keeping`'s folder holding `records`.
+fn records_are(keeping: &Keeping, records: &[Value]) {
+    fs::create_dir_all(&keeping.directory).unwrap();
+    fs::write(
+        keeping.directory.join(RECORDS),
+        serde_json::to_vec(records).unwrap(),
+    )
+    .unwrap();
+}
+
+/// A removed skill `name` kept aside at `at`, its package in the keep.
+fn removed_at(keeping: &Keeping, name: &str, sha: char, at: u64) -> Value {
+    let sha256 = sha.to_string().repeat(64);
+    let kept = keeping.directory.join(KEPT_FOLDER);
+    fs::create_dir_all(&kept).unwrap();
+    fs::write(kept.join(format!("{sha256}.tar")), "tar").unwrap();
+    json!({
+        "kind": "removed",
+        "name": name,
+        "at_unix_ms": at,
+        "entry": {
+            "name": name,
+            "sha256": sha256,
+            "package": format!("{name}-1.0.0.tar"),
+            "version": "1.0.0",
+            "description": "",
+            "uses": {},
+            "on": true,
+        },
+    })
+}
+
+const MINUTE: u64 = 60_000;
+const DAY: u64 = 86_400_000;
+
+/// Twelve's P1 on #7783: a guest's make that clashes goes on beside the
+/// owner's skill, which stays on, and nothing is asked; a clash with a
+/// skill already off turns nothing off and restores nothing later.
+#[test]
+fn a_guests_clash_and_a_clash_with_an_off_skill_turn_nothing_off() {
+    set_here(Some(true));
+    let (root, keeping) = keeping("no-asks-guest");
+    set_state_here(Some(root.join("state")));
+    installed(&keeping, "rest-glow");
+    set_owner_here(Some(false));
+    let (url, served) = service(vec![(200, good())]);
+    let asked = helper(&keeping.manage, 1);
+    let told = make_with(3, Some(DIM), DIM, &keeping, chat_at(url), NOW, || None);
+    assert_eq!(served.join().unwrap(), 1);
+    assert_eq!(told["on"], true, "{told}");
+    assert!(told.get("replaced").is_none(), "{told}");
+    assert_eq!(
+        quoted(told["next"].as_str().unwrap()),
+        "Made evening dim. Your other rest glow is still on. Say 'remove it' to undo."
+    );
+    assert!(!told.to_string().contains("keep the old one"), "{told}");
+    // Only the put-on was asked of the helper: rest glow never off.
+    assert_eq!(asked.join().unwrap().len(), 1);
+    let _ = take_said_line();
+    let _ = fs::remove_dir_all(&root);
+
+    // The owner's make, the other skill off already: nothing turned off,
+    // and nothing to turn back on.
+    let (root, keeping) = crate::make_skill_local::tests::keeping("no-asks-off-clash");
+    set_state_here(Some(root.join("state")));
+    fs::create_dir_all(root.join("state")).unwrap();
+    fs::write(root.join("state").join("off"), "rest-glow\n").unwrap();
+    installed(&keeping, "rest-glow");
+    set_owner_here(Some(true));
+    let (url, served) = service(vec![(200, good())]);
+    let asked = helper(&keeping.manage, 1);
+    let told = make_with(3, Some(DIM), DIM, &keeping, chat_at(url), NOW, || None);
+    assert_eq!(served.join().unwrap(), 1);
+    assert_eq!(
+        quoted(told["next"].as_str().unwrap()),
+        "Made evening dim. Say 'remove it' to undo."
+    );
+    assert_eq!(asked.join().unwrap().len(), 1);
+    let records = records(&keeping.directory, now_unix_ms());
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0]["kind"], "made", "{records:?}");
+    let _ = take_said_line();
+    set_state_here(None);
+    set_owner_here(None);
+    set_here(None);
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// Twelve's P2 on #7783: "last" is the latest action, undone only within
+/// its own window. A remove on Monday, a make 15 minutes ago: "remove it"
+/// is past the make's 10 minutes and never puts Monday's remove back; the
+/// remove alone, latest, still is put back within its 7 days.
+#[test]
+fn an_undo_is_bound_to_the_latest_action_and_its_own_window() {
+    let (root, keeping) = keeping("no-asks-last");
+    let now = NOW;
+    let monday = removed_at(&keeping, "moon-fact", 'a', now - 3 * DAY);
+    records_are(
+        &keeping,
+        &[
+            monday.clone(),
+            json!({ "kind": "made", "name": "joke-time", "sha256": "b".repeat(64), "at_unix_ms": now - 15 * MINUTE }),
+        ],
+    );
+    assert_eq!(undo(&keeping, LAST, now)["error"], NOTHING_TO_UNDO);
+    assert_eq!(undo(&keeping, "joke time", now)["error"], NOTHING_TO_UNDO);
+    assert!(
+        made_skill::entries(&keeping.directory).is_empty(),
+        "nothing put back"
+    );
+    // Named, the remove is its own latest action: put back.
+    let asked = helper(&keeping.manage, 1);
+    let back = undo(&keeping, "moon fact", now);
+    assert_eq!(
+        (&back["made"], &back["on"]),
+        (&json!("moon-fact"), &json!(true)),
+        "{back}"
+    );
+    asked.join().unwrap();
+    // A replace's record outlives the remove of its new skill.
+    let (root2, keeping2) = crate::make_skill_local::tests::keeping("no-asks-last-replaced");
+    records_are(
+        &keeping2,
+        &[
+            json!({ "kind": "replaced", "name": "evening-dim", "sha256": "c".repeat(64), "others": ["rest-glow"], "at_unix_ms": now_unix_ms() - MINUTE }),
+        ],
+    );
+    noted(
+        &keeping2.directory,
+        removed_at(&keeping2, "evening-dim", 'c', 0),
+    );
+    let kinds: Vec<Value> = records(&keeping2.directory, now_unix_ms())
+        .iter()
+        .map(|record| record["kind"].clone())
+        .collect();
+    assert_eq!(kinds, [json!("replaced"), json!("removed")]);
+    let _ = fs::remove_dir_all(&root);
+    let _ = fs::remove_dir_all(&root2);
+}
+
+/// The 7-day keep: past it, a record and its package go at the purge (at
+/// the voice's start and hourly), and a package no record names; at most
+/// `MOST_KEPT` removes are kept, the oldest out first; the owner's
+/// "forget everything" clears it all.
+#[test]
+fn the_keep_is_purged_bounded_and_forgotten_with_everything() {
+    let (root, keeping) = keeping("no-asks-purge");
+    let now = NOW;
+    let old = removed_at(&keeping, "old-one", 'a', now - 8 * DAY);
+    let fresh = removed_at(&keeping, "fresh-one", 'b', now - DAY);
+    records_are(&keeping, &[old, fresh]);
+    let stray = keeping.directory.join(KEPT_FOLDER).join("stray.tar");
+    fs::write(&stray, "tar").unwrap();
+    purge(&keeping.directory, now);
+    let kept = records(&keeping.directory, now);
+    assert_eq!(kept.len(), 1);
+    assert_eq!(kept[0]["name"], "fresh-one");
+    let folder = keeping.directory.join(KEPT_FOLDER);
+    assert!(!folder.join(format!("{}.tar", "a".repeat(64))).exists());
+    assert!(folder.join(format!("{}.tar", "b".repeat(64))).exists());
+    assert!(!stray.exists());
+    // Bounded: the oldest removes out first, their packages with them.
+    let many: Vec<Value> = (0..MOST_KEPT + 3)
+        .map(|at| {
+            let mut record =
+                removed_at(&keeping, &format!("skill-{at}"), 'c', now - DAY + at as u64);
+            record["entry"]["sha256"] = json!(format!("{at:064x}"));
+            fs::write(folder.join(format!("{at:064x}.tar")), "tar").unwrap();
+            record
+        })
+        .collect();
+    records_are(&keeping, &many);
+    purge(&keeping.directory, now);
+    let kept = records(&keeping.directory, now);
+    assert_eq!(kept.len(), MOST_KEPT);
+    assert_eq!(kept[0]["name"], "skill-3");
+    assert!(!folder.join(format!("{:064x}.tar", 0)).exists());
+    assert!(folder.join(format!("{:064x}.tar", 3)).exists());
+    // Another person's forget, or one not emptied, leaves it.
+    let owners = ["owner".to_owned()];
+    let told = (json!({ "forgotten": true }), true);
+    let (left, _) = forget_if(&keeping.directory, told.clone(), Some("guest"), &owners);
+    assert!(left.get("removed_skills_kept").is_none());
+    assert!(keeping.directory.join(RECORDS).exists());
+    let (left, _) = forget_if(
+        &keeping.directory,
+        (json!({}), true),
+        Some("owner"),
+        &owners,
+    );
+    assert!(left.get("removed_skills_kept").is_none());
+    // The owner's "forget everything": the records and the packages go.
+    let (cleared, _) = forget_if(&keeping.directory, told, Some("owner"), &owners);
+    assert_eq!(cleared["removed_skills_kept"], "forgotten too");
+    assert!(!keeping.directory.join(RECORDS).exists());
+    assert!(!folder.exists());
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// A skill that sends keeps its read-back and yes: nothing here puts it on.
+#[test]
+fn a_sending_skill_keeps_its_yes() {
+    set_here(Some(true));
+    let (root, keeping) = keeping("no-asks-sends");
+    let mut made = Made {
+        name: "leaving-mail".to_owned(),
+        version: "1.0.0".to_owned(),
+        sha256: "d".repeat(64),
+        description: String::new(),
+        uses: Default::default(),
+        package: root.join("none"),
+    };
+    made.uses.writes = vec!["gmail".to_owned()];
+    assert!(!keeps_no_yes(&made));
+    assert!(put_on(&keeping, &made, || true).is_none());
+    made.uses.writes.clear();
+    made.uses.code = true;
+    made.uses.messages = true;
+    assert!(!keeps_no_yes(&made));
+    assert!(put_on(&keeping, &made, || true).is_none());
+    assert!(!keeping.directory.join(RECORDS).exists());
+    set_here(None);
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// A put-back of a skill with code of its own, `LAMP_MADE_SCRIPTS` off:
+/// back in the index, kept off, and why said; never on.
+#[test]
+fn a_code_skill_put_back_with_scripts_off_stays_off() {
+    made_skill::set_scripts_here(Some(false));
+    let (root, keeping) = keeping("no-asks-put-back-code");
+    let mut record = removed_at(&keeping, "photo-booth", 'e', NOW);
+    record["entry"]["uses"] = json!({ "code": true });
+    records_are(&keeping, &[record]);
+    let back = undo(&keeping, LAST, NOW);
+    assert_eq!(
+        (&back["made"], &back["on"]),
+        (&json!("photo-booth"), &json!(false)),
+        "{back}"
+    );
+    assert_eq!(back["not_on"], CODE_OFF);
+    assert_eq!(
+        quoted(back["next"].as_str().unwrap()),
+        format!("I put photo booth back, but it stays off: {CODE_OFF}.")
+    );
+    let entries = made_skill::entries(&keeping.directory);
+    assert_eq!(entries.len(), 1);
+    assert_ne!(entries[0]["on"], true);
+    made_skill::set_scripts_here(None);
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// Fix 1 of #7828's DEFAULT-ON (lamp-9adf, 19 Nov, on the second route:
+/// "Do you want me to make it again?", "Did you mean the flip-a-coin
+/// skill? Say the word and I'll remove it.", "Which one…?" to "remove
+/// it"): with the switch on, `make_skill` tells the model to make and to
+/// remove at once with the undo in its line, never asking first, and
+/// asking which only when two skills they made fit alike, never of "it";
+/// within the link's bounds with every switch the lamp's unit sets on.
+/// Off, the description and the remove are as before.
+#[test]
+fn make_and_remove_are_told_at_once_and_never_asked_first() {
+    made_skill::set_scripts_here(Some(true));
+    made_skill::set_writes_here(Some(true));
+    made_skill::set_off_said_here(Some(true));
+    crate::skill_task_yes::set_on_here(Some(true));
+    let remove_of = |tool: &lamp_gemini::Tool| {
+        tool.parameters.as_ref().unwrap()["properties"][crate::made_remove::REMOVE]["description"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    set_here(Some(false));
+    let off = crate::make_skill_local::tool();
+    assert!(
+        !off.description.contains(AT_ONCE_TOLD),
+        "{}",
+        off.description
+    );
+    assert!(!remove_of(&off).contains(REMOVE_AT_ONCE_TOLD));
+    set_here(Some(true));
+    let on = crate::make_skill_local::tool();
+    assert!(on.description.ends_with(AT_ONCE_TOLD), "{}", on.description);
+    for part in ["at once", "never ask", "undo"] {
+        assert!(on.description.contains(part), "{part}: {}", on.description);
+    }
+    let remove = remove_of(&on);
+    assert!(remove.ends_with(REMOVE_AT_ONCE_TOLD), "{remove}");
+    for part in [
+        "at once",
+        "never asking first",
+        "two skills they made",
+        "\"it\"",
+    ] {
+        assert!(remove.contains(part), "{part}: {remove}");
+    }
+    // "Put it back" by a removed skill's name is the undo, never a make.
+    let undo = on.parameters.as_ref().unwrap()["properties"][UNDO]["description"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(undo.contains(UNDO_RESTORE_TOLD), "{undo}");
+    for part in [
+        "put back or restore a skill they removed",
+        "call it with that skill",
+        "never make it again",
+    ] {
+        assert!(UNDO_RESTORE_TOLD.contains(part), "{part}");
+    }
+    assert!(on.description.len() <= 1_024, "{}", on.description.len());
+    let parameters = on.parameters.as_ref().unwrap().to_string().len();
+    assert!(
+        parameters <= lamp_gemini::MAX_TOOL_JSON_BYTES,
+        "{parameters}"
+    );
+    assert!(on.validate().is_ok());
+    crate::skill_task_yes::set_on_here(None);
+    made_skill::set_off_said_here(None);
+    made_skill::set_writes_here(None);
+    made_skill::set_scripts_here(None);
+    set_here(None);
+}
+
+/// Heron's P2 on #7836: a make never puts back a skill kept aside, however
+/// near its words come to that skill's name; each of these, after the
+/// owner removed the skill beside it, is made anew and puts nothing back.
+/// "Put X back" is `undo`'s, by the model's judgment of the words.
+#[test]
+fn a_make_near_a_skill_kept_aside_is_made_anew() {
+    set_here(Some(true));
+    set_owner_here(Some(true));
+    made_skill::set_off_said_here(Some(true));
+    for (at, (kept, words)) in [
+        ("water-reminder-2", "make a water reminder"),
+        ("alarm-3", "make alarm two at seven"),
+        ("dim", "dim the lamp at nine every night"),
+        ("good-morning", "play a good morning song at seven"),
+        // Thirteen's HOLD on #7836: a kept name inside a new make's
+        // words, and a name a number apart.
+        (
+            "flip-a-coin",
+            "make a skill that glows blue when I say flip a coin",
+        ),
+        ("good-morning-2", "make good morning 3"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        crate::skill_write_yes::clear_for_test();
+        let (root, keeping) = keeping(&format!("no-asks-near-kept-{at}"));
+        crate::made_remove::tests::made_here(&keeping, &[(kept, true)]);
+        let told = removing(&kept.replace('-', " "), &keeping, || true, |_| Ok(()));
+        assert_eq!(told["removed"], kept, "{kept}: {told}");
+        let _ = fs::remove_dir_all(keeping.installed.join(kept));
+        let (url, served) = service(vec![(200, good())]);
+        let asked = helper(&keeping.manage, 1);
+        let told = make_with(
+            20 + at as u64,
+            Some(words),
+            words,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1, "{words}: {told}");
+        assert!(told.get("put_back").is_none(), "{words}: {told}");
+        assert_eq!(told["made"], "evening-dim", "{words}: {told}");
+        asked.join().unwrap();
+        assert_eq!(names(&keeping), ["evening-dim"], "{words}");
+        let _ = take_said_line();
+        let _ = fs::remove_dir_all(&root);
+    }
+    made_skill::set_off_said_here(None);
+    set_owner_here(None);
+    set_here(None);
+}
+
+/// "Put the flip a coin skill back" is `undo` with that name: the skill of
+/// that name kept aside is put back and on, even when another skill was
+/// removed after it, matched as a remove's name is (#7830's numbers: "flip
+/// a coin" is never flip a coin 2, "flip a coin two" is).
+#[test]
+fn an_undo_by_name_puts_that_skill_back() {
+    set_here(Some(true));
+    made_skill::set_off_said_here(Some(true));
+    crate::skill_write_yes::clear_for_test();
+    let (root, keeping) = keeping("no-asks-undo-named");
+    crate::made_remove::tests::made_here(
+        &keeping,
+        &[("flip-a-coin", true), ("flip-a-coin-2", true)],
+    );
+    for name in ["flip a coin", "flip a coin two"] {
+        let told = removing(name, &keeping, || true, |_| Ok(()));
+        assert!(told["removed"].is_string(), "{name}: {told}");
+    }
+    for name in ["flip-a-coin", "flip-a-coin-2"] {
+        let _ = fs::remove_dir_all(keeping.installed.join(name));
+    }
+    for (asked, name, said) in [
+        ("flip a coin", "flip-a-coin", "flip a coin is back on."),
+        (
+            "flip a coin two",
+            "flip-a-coin-2",
+            "flip a coin 2 is back on.",
+        ),
+    ] {
+        let helped = helper(&keeping.manage, 1);
+        let back = undo(&keeping, asked, now_unix_ms());
+        assert_eq!(
+            (&back["made"], &back["on"], &back["put_back"]),
+            (&json!(name), &json!(true), &json!(true)),
+            "{asked}: {back}"
+        );
+        assert_eq!(quoted(back["next"].as_str().unwrap()), said);
+        assert!(helped.join().unwrap()[0]["install_made"].is_string());
+    }
+    assert_eq!(names(&keeping), ["flip-a-coin", "flip-a-coin-2"]);
+    made_skill::set_off_said_here(None);
+    set_here(None);
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// Heron's P3 4 on #7836: with the switch on a remove is done at once, so
+/// a near name is never taken for another: one whose numbers differ is
+/// nothing removed, and the name as it is written is removed.
+#[test]
+fn a_near_name_remove_at_once_takes_only_the_name_asked() {
+    set_here(Some(true));
+    made_skill::set_off_said_here(Some(true));
+    crate::skill_write_yes::clear_for_test();
+    let (root, keeping) = keeping("no-asks-near-remove");
+    crate::made_remove::tests::made_here(&keeping, &[("good-morning-3", true)]);
+    for near in ["good morning", "good morning thirteen"] {
+        let told = removing(near, &keeping, || true, |_| panic!("never removed"));
+        assert!(told.get("removed").is_none(), "{near}: {told}");
+        assert_eq!(names(&keeping), ["good-morning-3"], "{near}");
+    }
+    let mut removed = Vec::new();
+    let told = removing(
+        "good morning three",
+        &keeping,
+        || true,
+        |name| {
+            removed.push(name.to_owned());
+            Ok(())
+        },
+    );
+    assert_eq!(told["removed"], "good-morning-3", "{told}");
+    assert_eq!(removed, ["good-morning-3"]);
+    assert!(names(&keeping).is_empty());
+    made_skill::set_off_said_here(None);
+    set_here(None);
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// A made skill started by the words "flip a coin", named coin flip.
+fn coin_flip() -> String {
+    "```skill.toml\nasks = [\"flip a coin\"]\nkind = \"installable\"\nversion = \"1.0.0\"\n\
+     needs = [\"light\"]\n\n[permissions]\nlight = true\n\n[[do]]\nlight = { colour = \
+     \"blue\" }\n```\n\n```SKILL.md\n---\nname: coin-flip\ndescription: Glows blue when you \
+     say flip a coin.\n---\n\n# Coin flip\n\nIt glows blue.\n```\n"
+        .to_owned()
+}
+
+/// What a make of [`coin_flip`] beside `others` on the lamp answers, made
+/// in `name`'s folder, on the owner's ask or not (`owner`), with the
+/// manage helper answering `helped` asks (none: no helper at all) and
+/// lamp-skills' `off` file readable or not (`readable`): what it was told,
+/// the line kept for its turn, the helper's asks, and the made skills
+/// listed after.
+fn coin_flip_made(
+    name: &str,
+    others: impl FnOnce(&Keeping),
+    owner: bool,
+    helped: usize,
+    readable: bool,
+) -> (Value, Option<String>, Vec<Value>, Vec<String>) {
+    const COIN: &str = "make a skill that glows blue when I say flip a coin";
+    set_owner_here(Some(owner));
+    let (root, keeping) = keeping(name);
+    let state = root.join("state");
+    if !readable {
+        // A file where its folder should be: the `off` file can't be read.
+        fs::write(&state, "").unwrap();
+    }
+    set_state_here(Some(state));
+    others(&keeping);
+    let (url, served) = service(vec![(200, coin_flip())]);
+    let asked = (helped > 0).then(|| helper(&keeping.manage, helped));
+    let told = make_with(7, Some(COIN), COIN, &keeping, chat_at(url), NOW, || None);
+    assert_eq!(served.join().unwrap(), 1, "{told}");
+    let said = take_said_line();
+    // Bounded: a helper never asked as many times as waited for gives
+    // what it was asked by then, never hangs the test.
+    let asked = match asked {
+        Some(asked) => {
+            let (send, got) = std::sync::mpsc::channel();
+            std::thread::spawn(move || send.send(asked.join()));
+            match got.recv_timeout(std::time::Duration::from_secs(5)) {
+                Ok(Ok(asked)) => asked,
+                _ => Vec::new(),
+            }
+        }
+        None => Vec::new(),
+    };
+    let listed = names(&keeping);
+    set_state_here(None);
+    set_owner_here(None);
+    let _ = fs::remove_dir_all(&root);
+    (told, said, asked, listed)
+}
+
+/// Fix 3 of #7828's DEFAULT-ON (lamp-9adf, 19 Nov: "a skill made here
+/// wasn't kept in 35501 ms: the words “flip a coin” would start both coin
+/// flip and another skill, flip a coin, so neither would start; say other
+/// words for coin flip", and the person heard "I couldn't make that one.
+/// Try asking for one thing…"): with the switch on, a make whose words
+/// clash with a skill the owner made replaces it on the owner's ask, the
+/// old one turned off before the new one goes on, with its undo. Anyone
+/// else's, a clash with a skill they didn't make (the lamp's own, one added
+/// from a file), and one whose old skill can't be turned off (the `off`
+/// file unreadable, no helper: Heron's P3 2 on #7836) are refused as
+/// before, the real reason said, never on beside it. Off, all is as before,
+/// "Try asking for one thing" too (Heron's P3 1).
+#[test]
+fn a_words_clash_with_their_own_skill_replaces_it_and_any_other_says_why() {
+    set_here(Some(true));
+    made_skill::set_asks_here(Some(true));
+    let why = "the words “flip a coin” would start both coin flip and another skill, flip a \
+               coin, so neither would start; say other words for coin flip";
+    let refused_line = format!("I couldn't make that: {why}.");
+    // Their own, on the owner's ask: replaced, one line with its undo.
+    let theirs =
+        |keeping: &Keeping| crate::made_remove::tests::made_here(keeping, &[("flip-a-coin", true)]);
+    let (told, said, asked, listed) = coin_flip_made("no-asks-words-own", theirs, true, 2, true);
+    let line = "Made coin flip and replaced your old flip a coin. Say 'keep the old one' to undo.";
+    assert_eq!(told["replaced"], json!(["flip-a-coin"]), "{told}");
+    assert_eq!(told["on"], true, "{told}");
+    assert_eq!(quoted(told["next"].as_str().unwrap()), line);
+    assert_eq!(said.as_deref(), Some(line));
+    assert_eq!(asked[0], json!({ "off": "flip-a-coin" }), "{asked:?}");
+    assert!(asked[1]["install_made"].is_string(), "{asked:?}");
+    assert_eq!(listed, ["flip-a-coin", "coin-flip"]);
+    // Refused, the real reason said, nothing kept, nothing on.
+    let core = |keeping: &Keeping| {
+        let folder = keeping.installed.join("flip-a-coin");
+        fs::create_dir_all(&folder).unwrap();
+        fs::write(
+            folder.join("skill.toml"),
+            "kind = \"installable\"\nversion = \"1.0.0\"\n",
+        )
+        .unwrap();
+    };
+    let added = |keeping: &Keeping| {
+        crate::made_remove::tests::made_here(keeping, &[("flip-a-coin", true)]);
+        let mut entries = made_skill::entries(&keeping.directory);
+        entries[0]["added"] = json!("file");
+        made_skill::write_entries(&keeping.directory, &entries).unwrap();
+    };
+    type Others = Box<dyn FnOnce(&Keeping)>;
+    let cases: [(&str, Others, bool, bool, bool); 6] = [
+        ("guest", Box::new(theirs), false, true, true),
+        ("core", Box::new(core), true, true, true),
+        ("added", Box::new(added), true, true, true),
+        ("unreadable", Box::new(theirs), true, true, false),
+        ("no-helper", Box::new(theirs), true, true, true),
+        ("off", Box::new(theirs), true, false, true),
+    ];
+    for (case, others, owner, on, readable) in cases {
+        set_here(Some(on));
+        let (told, said, asked, listed) =
+            coin_flip_made(&format!("no-asks-words-{case}"), others, owner, 0, readable);
+        let (reason, heard) = if on {
+            (why.to_owned(), refused_line.clone())
+        } else {
+            (
+                made_skill::NOT_MADE_TRY.to_owned(),
+                made_skill::NOT_MADE_TRY.to_owned(),
+            )
+        };
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {reason}"),
+            "{case}: {told}"
+        );
+        assert_eq!(quoted(told["next"].as_str().unwrap()), heard, "{case}");
+        assert_eq!(said.as_deref(), Some(heard.as_str()), "{case}");
+        assert!(asked.is_empty(), "{case}: {asked:?}");
+        assert!(
+            !listed.iter().any(|name| name == "coin-flip"),
+            "{case}: {listed:?}"
+        );
+    }
+    // On, said as it is, never the tip to ask for one thing; off, as before.
+    set_here(Some(true));
+    assert_eq!(made_skill::plain_reason(why), why);
+    assert_eq!(made_skill::not_made_line(why), refused_line);
+    set_here(Some(false));
+    assert_eq!(made_skill::plain_reason(why), made_skill::NOT_MADE_TRY);
+    made_skill::set_asks_here(None);
+    set_here(None);
+}
+
+/// What a voice make of a daily brief came back as on lamp-9adf (#7938):
+/// a greeting at 08:00 that says a line and lights.
+const BRIEF_TOML: &str = r#"kind = "installable"
+version = "1.0.0"
+needs = ["light"]
+
+[permissions]
+topics = ["clock/local"]
+light = true
+speak = true
+
+[trigger]
+topic = "clock/local"
+field = "known"
+equals = true
+rearm = "ends"
+during = { from = "08:00", to = "08:01" }
+
+[ask]
+policy = "nudge"
+
+[[do]]
+say = { text = "Here is your daily brief." }
+
+[[do]]
+light = { dim = 1 }
+"#;
+
+const BRIEF_CARD: &str = "---\nname: daily-brief\ndescription: Says the daily brief at 8 am.\n---\n\n# Daily brief\n\nAt eight it says the brief.\n";
+
+const BRIEF: &str = "make a skill called daily brief: when I say daily brief, tell me today's \
+                     weather in one short sentence";
+
+/// A skill on the lamp named `name`, each day at `at` (`HH:MM`, a
+/// minute's window, as made skills keep a time), its `[[do]]` `steps`.
+fn installed_daily(keeping: &Keeping, name: &str, at: &str, steps: &str) {
+    let folder = keeping.installed.join(name);
+    fs::create_dir_all(&folder).unwrap();
+    let (hour, minute) = at.split_once(':').unwrap();
+    let to = format!("{hour}:{:02}", minute.parse::<u8>().unwrap() + 1);
+    fs::write(
+        folder.join("skill.toml"),
+        format!(
+            "kind = \"installable\"\nversion = \"1.0.0\"\n\n[trigger]\ntopic = \
+             \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\nduring = {{ \
+             from = \"{at}\", to = \"{to}\" }}\n\n{steps}"
+        ),
+    )
+    .unwrap();
+}
+
+const SAYS_AND_LIGHTS: &str =
+    "[[do]]\nsay = { text = \"Good morning.\" }\n\n[[do]]\nlight = { dim = 1 }\n";
+
+const WATER: &str =
+    "[[do]]\nsay = { text = \"Time for some water.\" }\n\n[[do]]\nlight = { dim = 1 }\n";
+
+/// The daily brief made as on lamp-9adf, beside `others` (name, time,
+/// steps), by the owner, with a manage helper answering `helped` asks:
+/// what the model is told, and what the helper was asked.
+fn brief_made_beside(
+    case: &str,
+    others: &[(&str, &str, &str)],
+    helped: usize,
+) -> (Value, Vec<Value>) {
+    set_here(Some(true));
+    set_owner_here(Some(true));
+    let (root, keeping) = keeping(case);
+    set_state_here(Some(root.join("state")));
+    for (name, at, steps) in others {
+        installed_daily(&keeping, name, at, steps);
+    }
+    let answer = format!("```skill.toml\n{BRIEF_TOML}```\n\n```SKILL.md\n{BRIEF_CARD}```\n");
+    let (url, served) = service(vec![(200, answer)]);
+    let asked = helper(&keeping.manage, helped);
+    let told = make_with(3, Some(BRIEF), BRIEF, &keeping, chat_at(url), NOW, || None);
+    assert_eq!(served.join().unwrap(), 1);
+    // Made and on, before the helper is waited on.
+    assert_eq!(told["on"], true, "{told}");
+    // Whatever is "replaced" stays on the lamp: turned off, never deleted.
+    for (name, ..) in others {
+        assert!(keeping.installed.join(name).is_dir(), "{name} deleted");
+    }
+    let _ = take_said_line();
+    set_state_here(None);
+    set_owner_here(None);
+    set_here(None);
+    let _ = fs::remove_dir_all(&root);
+    (told, asked.join().unwrap())
+}
+
+/// #7938, lamp-9adf, 19 Nov: a daily brief made beside the person's good
+/// morning, good morning 3 and water reminder "replaced" all three, since
+/// each is on the lamp's clock and lights: a shared time source and a
+/// shared light were taken as the same skill. Beside skills doing
+/// something else (another time, or its very minute with other steps), a
+/// make replaces none of them and is said as a plain make.
+#[test]
+fn a_make_beside_unrelated_skills_replaces_none_of_them() {
+    let nods = "[[do]]\nbody = { gesture = \"nod\" }\n\n[[do]]\nlight = { dim = 1 }\n";
+    let (told, asked) = brief_made_beside(
+        "no-asks-unrelated",
+        &[
+            ("good-morning", "07:00", SAYS_AND_LIGHTS),
+            ("good-morning-3", "07:30", SAYS_AND_LIGHTS),
+            ("water-reminder", "10:00", WATER),
+            ("stretch-nod", "08:00", nods),
+        ],
+        1,
+    );
+    assert_eq!(told["on"], true, "{told}");
+    assert!(told.get("replaced").is_none(), "{told}");
+    assert_eq!(
+        quoted(told["next"].as_str().unwrap()),
+        "Made daily brief. Say 'remove it' to undo.",
+        "{told}"
+    );
+    // Only the put-on was asked of the helper: none of the others off.
+    assert_eq!(asked.len(), 1, "{asked:?}");
+    assert!(asked[0]["install_made"].is_string(), "{asked:?}");
+}
+
+/// #7938: a make that does what one on the lamp does (the same trigger at
+/// the same time, the same kinds of steps) replaces that one alone, turned
+/// off and never deleted; the unrelated ones beside it stay on.
+#[test]
+fn a_make_that_duplicates_one_replaces_only_that_one() {
+    let (told, asked) = brief_made_beside(
+        "no-asks-duplicate",
+        &[
+            ("good-morning", "07:00", SAYS_AND_LIGHTS),
+            ("morning-brief", "08:00", SAYS_AND_LIGHTS),
+            ("water-reminder", "10:00", WATER),
+        ],
+        2,
+    );
+    assert_eq!(told["on"], true, "{told}");
+    assert_eq!(told["replaced"], json!(["morning-brief"]), "{told}");
+    assert_eq!(
+        quoted(told["next"].as_str().unwrap()),
+        "Made daily brief and replaced your old morning brief. Say 'keep the old one' to undo."
+    );
+    assert!(asked[0]["install_made"].is_string(), "{asked:?}");
+    assert_eq!(asked[1], json!({ "off": "morning-brief" }));
+}

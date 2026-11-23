@@ -79,6 +79,9 @@ export const APP_SOCKET = '/run/lampos-apps/apps.sock';
 const PANEL_TITLE_MAX = 40;
 const PANEL_LINES_MAX = 6;
 const PANEL_LINE_MAX = 80;
+// How long an app's context line lasts unless it says (`context`): a minute. The lamp judges the line and its time
+// (at most 120 characters, 1 ms to 10 minutes), as it judges a fact's words (`remember`, 280 once tidied).
+const CONTEXT_FOR_MS = 60_000;
 
 function agentSocket() {
   const path = process.env.LAMPOS_AGENT_SOCKET || AGENT_SOCKET;
@@ -160,6 +163,18 @@ function hex(colour) {
 // lamp-control holds too (protocol.rs SAY_MAX_BYTES, lamp-voice's
 // MOST_WORDS_BYTES), checked here at the same bytes, never stricter.
 export const SAY_MAX_BYTES = 900;
+
+// A `pose` request's longest JPEG: 204800 characters of base64 (protocol.rs
+// POSE_JPEG_MAX_CHARS), 150 KiB of picture, so the frame stays under 256 KiB.
+export const POSE_JPEG_MAX_CHARS = 204800;
+export const POSE_JPEG_MAX_BYTES = (POSE_JPEG_MAX_CHARS / 4) * 3;
+// The 17 COCO keypoints a pose's `keypoints` come in, in this order.
+export const POSE_KEYPOINTS = Object.freeze([
+  'nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear',
+  'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
+  'left_wrist', 'right_wrist', 'left_hip', 'right_hip',
+  'left_knee', 'right_knee', 'left_ankle', 'right_ankle',
+]);
 
 // The refusal for a name that is no event, with the event the name was meant
 // for when it is a lease's or a look's end (`lease.ended` is `lease`, state
@@ -473,6 +488,7 @@ export class Lamp {
     // The hand this connection's head follows, if any (`followHand`).
     this.following = null;
     this.closeReason = null; // why the lamp closed the connection, when it said
+    this.keepaliveEnded = false; // this client ended it: no answer to its keepalive ping
     this.waiting = new Map();
     this.done = new Map();
     this.handlers = new Map();
@@ -493,6 +509,9 @@ export class Lamp {
     ws.on('pong', () => { answered = true; });
     this.keepalive = setInterval(() => {
       if (!answered) {
+        // Said, not silent: with no pong the connection is ended here, and nothing else would say why (`endedWhy`).
+        this.keepaliveEnded = true;
+        console.error(`lampos: no answer to the keepalive ping for ${Lamp.KEEPALIVE_MS / 1000} s: the connection is ended`);
         ws.terminate();
         return;
       }
@@ -694,6 +713,13 @@ export class Lamp {
     this.ws.close();
   }
 
+  // Why the connection ended, in words, once it has: what the lamp said, else that this client ended it for want of a pong, else that
+  // it dropped with no reason given (a reset, the Wi-Fi). Undefined while it is open.
+  get endedWhy() {
+    if (this.ws.readyState !== WebSocket.CLOSED) return undefined;
+    return this.closeReason ?? (this.keepaliveEnded ? `no answer to the keepalive ping for ${Lamp.KEEPALIVE_MS / 1000} s` : 'the connection dropped, with no reason given');
+  }
+
   closed() { return new Promise((resolve) => (this.ws.readyState === WebSocket.CLOSED ? resolve() : this.ws.once('close', resolve))); }
 
   // Send one request; resolves with its reply, rejects with its typed error.
@@ -794,6 +820,11 @@ export class Lamp {
     }
     const short = shortPhrase(phrases);
     if (short) throw short;
+    if (this.app !== null && phrases?.length && event === 'phrase.heard') {
+      // On an app's socket the phrases are the app's whole list, replaced as one (`phrases.set`): a filter here would
+      // never be sent to the lamp, and the handler would never fire.
+      throw new LampError("on an app's socket the phrases are the app's own list: use `await lamp.listenFor(phrases, handler)`", { code: 'bad_request' });
+    }
     // A handler given `phrases` hears only those; with none it hears every `phrase.heard`. The lamp is asked for
     // all the connection's phrases once, so the filter is here.
     let registered = handler;
@@ -829,7 +860,9 @@ export class Lamp {
       return Promise.resolve();
     }
     this.handlers.delete(event);
-    return schema.events.includes(event) && this.app === null ? this.request('unsubscribe', { events: [event] }) : Promise.resolve();
+    // On an app's socket `phrase.heard` was never subscribed (`listenFor` turns it on): nothing to take back; a door event
+    // `on()` did subscribe is unsubscribed as anywhere.
+    return schema.events.includes(event) && !(this.app !== null && event === 'phrase.heard') ? this.request('unsubscribe', { events: [event] }) : Promise.resolve();
   }
 
   subscribe(events, phrases) {
@@ -853,8 +886,10 @@ export class Lamp {
   async listenFor(phrases, handler) {
     const short = shortPhrase(phrases);
     if (short) throw short;
+    const answer = await this.request('phrases.set', { phrases: [...phrases] });
+    // After the lamp took it, so a refusal (`no_grant`, `bad_request`) leaves no handler behind.
     if (handler) this.handlers.set('phrase.heard', [...(this.handlers.get('phrase.heard') ?? []), handler]);
-    return this.request('phrases.set', { phrases: [...phrases] });
+    return answer;
   }
 
   // Take the turn an `app.trigger` named (its `turn`): the voice keeps quiet. A say, gesture or light within 3 s
@@ -867,14 +902,38 @@ export class Lamp {
 
   // The app's panel in the owner's app: a title (40 characters at most) and up to 6 lines of 80, plain text, no
   // control characters. One a minute: over it, `rate` with `retry_ms`. Resolves to the panel's revision.
-  async panel(title, lines = []) {
+  async panel(title, lines) {
+    lines ??= [];
     const bad = (why) => new LampError(`panel: ${why}`, { code: 'bad_request' });
     if (typeof title !== 'string' || title.length < 1 || [...title].length > PANEL_TITLE_MAX
       || lines.length > PANEL_LINES_MAX || lines.some((line) => [...line].length > PANEL_LINE_MAX)) {
       throw bad(`a title of 1 to ${PANEL_TITLE_MAX} characters and at most ${PANEL_LINES_MAX} lines of ${PANEL_LINE_MAX}`);
     }
     if (/\p{Cc}/u.test(title) || lines.some((line) => /\p{Cc}/u.test(line))) throw bad('text, no control characters');
+    if (lines.some((line) => line === '')) throw bad('a line is text, never empty (leave it out)');
     return (await this.request('app.panel.set', { title, lines: [...lines] })).rev;
+  }
+
+  // Keep one fact for the lamp's known person, marked with this app as its source (the manifest's `remember` grant).
+  // The lamp tidies the words first (links, markup and double quotes left out) and refuses, never cuts, what is left
+  // over 280 characters (`BadRequestError`). True once memory kept it. Refused `off`, `no_grant`, `private`,
+  // `unavailable`, `rate` (three a minute an app; `retryMs`) or `refused` (memory did not keep it).
+  async remember(text) { return Boolean((await this.request('apps.remember', { text })).kept); }
+
+  // Tell the voice a live line beside what the person says, for `forMs` (1 ms to 10 minutes), never kept: renew it
+  // while it holds ('set 2 of 3, 7 squats'). An empty line clears it (`clearContext`). The `remember` grant, as
+  // `remember`'s refusals, and `bad_request` for a line over 120 characters. Needs a lamp build with `apps.context`;
+  // an older one refuses it.
+  async context(line, { forMs = CONTEXT_FOR_MS } = {}) {
+    if (line === '') return this.clearContext();
+    await this.request('apps.context', { line, for_ms: forMs });
+    return undefined;
+  }
+
+  // Take this app's context line back at once (it goes by itself after its `forMs`).
+  async clearContext() {
+    await this.request('apps.context', { line: '' });
+    return undefined;
   }
 
   async get(...states) { return (await this.request('get', { state: states })).state ?? {}; }
@@ -966,6 +1025,8 @@ export class Lamp {
   // The owner's language, from hello: 'en', 'vi', 'ja', 'zh' or 'ko', so a program's own lines can follow it. 'en' from a lamp
   // that says none (one from before this), and from a code this SDK does not know.
   get language() { return ['en', 'vi', 'ja', 'zh', 'ko'].includes(this.info.language) ? this.info.language : 'en'; }
+  // The lamp's build, from hello: the text the owner's app shows (143+ab12cd34ef56), to quote in a bug report. null from a lamp that says none.
+  get build() { return typeof this.info.build === 'string' && this.info.build ? this.info.build : null; }
 
   get ringPixels() { return this.limits.ring?.pixels; }
   // Light the ring pixel by pixel for `forMs` (30 s at most): one colour per pixel, from pixel 0 around the ring,
@@ -1014,6 +1075,30 @@ export class Lamp {
   async cameraSnapshot() {
     const reply = await this.request('camera.snapshot');
     return unb64(reply.jpeg);
+  }
+
+  /** One person's pose in `jpeg`, a JPEG of this computer's own (a Buffer or
+   * Uint8Array; a camera frame it has), from the lamp's NPU: `{ pose, width,
+   * height, model, ms }`. `pose` is `{ score, keypoints }`, the 17 COCO
+   * keypoints in COCO order (`POSE_KEYPOINTS`), each `{ x, y, score }` in the
+   * picture's own pixels, or null with no person. At most 150 KiB of JPEG
+   * (`POSE_JPEG_MAX_BYTES`, so the request stays under the 256 KiB frame): a
+   * 640x480 frame at high quality fits. Needs the camera grant and the
+   * lamp's own network; off unless the lamp's LAMP_NPU is on. `preparing`
+   * (with `retryMs`) while the lamp fetches its model on first use;
+   * `unavailable` with no model or no NPU. */
+  async pose(jpeg) {
+    if (!(jpeg instanceof Uint8Array)) throw new LampError('jpeg: the JPEG as a Buffer or Uint8Array', { code: 'bad_request' });
+    if (jpeg.length === 0) throw new LampError('jpeg: an empty picture, send one JPEG', { code: 'bad_request' });
+    if (jpeg.length > POSE_JPEG_MAX_BYTES) {
+      throw new LampError(
+        `jpeg: ${jpeg.length} bytes, over the ${POSE_JPEG_MAX_BYTES} (150 KiB) a pose takes: `
+          + 'send a smaller or more compressed frame (a 640x480 one at ordinary quality fits)',
+        { code: 'bad_request' },
+      );
+    }
+    const reply = await this.request('pose', { jpeg: Buffer.from(jpeg.buffer, jpeg.byteOffset, jpeg.length).toString('base64') });
+    return { pose: reply.pose ?? null, width: reply.width, height: reply.height, model: reply.model, ms: reply.ms };
   }
 
   /** Pictures as `camera.frame` events (`lamp.on('camera.frame', ...)`, each
@@ -1166,4 +1251,28 @@ export class Lamp {
   async skills() { return (await this.request('skill.list')).skills ?? []; }
 
   removeSkill(name) { return this.request('skill.remove', { name }); }
+
+  // Apps of this computer's own (the `skills` grant too; docs/apps.md): a Store-format package, unsigned, with the
+  // pairing as the owner's yes. `pushApp(path)` sends the format 2 `.tar` at `path` in parts and resolves with the
+  // lamp's `app` once installed (name, title, version, sha256, grants, net, logs, updated, started, from); a re-push of
+  // the name replaces this computer's app of it. A package over 4 MiB, not format 2 kind app, signed, or asking a grant
+  // this pairing lacks (or `remember`) is refused here, before any byte is sent.
+  async pushApp(path) {
+    const { appAsksBeyond, readApp } = await import('./push.js');
+    const pkg = readApp(path);
+    if (!this.grants.includes('skills')) throw new byCode.no_grant('not granted: skills');
+    const beyond = appAsksBeyond(pkg.manifest, this.grants);
+    if (beyond) throw new byCode[beyond[0]](beyond[1]);
+    let reply = {};
+    for (const [part, data] of pkg.parts.entries()) {
+      reply = await this.request('app.push', {
+        name: pkg.name, sha256: pkg.sha256, size: pkg.data.length, part, parts: pkg.parts.length, data,
+      });
+    }
+    return reply.app ?? {};
+  }
+
+  async apps() { return (await this.request('app.list')).apps ?? []; }
+
+  removeApp(name) { return this.request('app.remove', { name }); }
 }

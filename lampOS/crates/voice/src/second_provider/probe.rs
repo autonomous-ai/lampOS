@@ -54,7 +54,10 @@ use super::worker::{ChatRoute, RouteFlags, relay_routable};
 
 pub mod cache;
 pub mod cut_in;
+pub mod doubt;
+pub mod face_question;
 pub mod handover;
+pub mod held_yes;
 pub mod keep_quietly;
 pub mod kept_earlier;
 pub mod nightly;
@@ -137,7 +140,10 @@ pub async fn time_chat(
                     times.clause = Some(ms(from));
                 }
             }
-            ChatEvent::ToolCalls(_) | ChatEvent::Reasoning(_) => {}
+            ChatEvent::ToolCalls(_)
+            | ChatEvent::Calling(_)
+            | ChatEvent::Argued(..)
+            | ChatEvent::Reasoning(_) => {}
             ChatEvent::Searched => {
                 times.searched.get_or_insert(ms(from));
             }

@@ -129,6 +129,9 @@ pub trait Lamp {
     fn devices(&mut self, _now_ms: u64, _connected: bool) -> crate::devices::Polled {
         crate::devices::Polled::default()
     }
+    /// A desk or Hydrate ask the client would not take (its queue was full):
+    /// answered `busy` at once.
+    fn devices_unsent(&mut self, _req_id: &str) {}
     /// One `devices.*` kind from the cloud: whether the bridge took it
     /// (always `false` when off, so the kind is refused as any unknown one).
     fn devices_down(&mut self, _kind: &str, _data: &Value, _now_ms: u64) -> bool {
@@ -276,6 +279,13 @@ pub trait Lamp {
         None
     }
 
+    /// The owner's desk noticing switch in the app (#6543,
+    /// `crate::consent::DESK_KINDS`): there only with `LAMP_SEEN_ACTIVITY=on`
+    /// in `lamp-cloud`'s own unit.
+    fn desk_noticing(&self) -> Option<crate::consent::Place> {
+        None
+    }
+
     /// The person's own services linked from the app (`LAMP_SERVICES=on`,
     /// Queue #4710, `crate::services`): there only with the switch.
     fn services(&self) -> Option<std::sync::Arc<crate::services::Services>> {
@@ -325,6 +335,24 @@ pub trait Lamp {
         _retry: Option<u64>,
     ) -> Result<(), String> {
         Err(not_here("update.check"))
+    }
+
+    /// Whether the owner's Update now is answered (#7517, `LAMP_UPDATE_NOW=on`
+    /// with `LAMP_APP_UPDATE=on`, `crate::update::Checks::ask_now`).
+    fn update_now_page(&self) -> bool {
+        false
+    }
+
+    /// The owner's Update now (#7517): lamp-cloud's mark, then one
+    /// `update/check` with `now`, at `now`.
+    fn ask_update_now(&mut self, _now: std::time::Instant) -> Result<(), String> {
+        Err(not_here("update.now"))
+    }
+
+    /// Whether the setup walk is under way, as the voice's
+    /// `onboarding/pending` says it (#4367): false while unknown.
+    fn walk_under_way(&self) -> bool {
+        false
     }
 
     /// Whether the app may see and install the lamp's agents
@@ -386,6 +414,12 @@ pub trait Lamp {
     fn monitor(&self) -> Option<crate::monitor::Place> {
         None
     }
+
+    /// The owner's installed apps (`LAMP_STORE_APPS=on`, #7415 piece 4,
+    /// `crate::apps`): there only with the switch.
+    fn apps(&self) -> Option<std::sync::Arc<crate::apps::Apps>> {
+        None
+    }
 }
 
 /// Whether a kind is answered on `lamp` now: its switch, read without
@@ -396,7 +430,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 78] = [
+pub const KINDS: [(&str, Switch); 89] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -414,6 +448,10 @@ pub const KINDS: [(&str, Switch); 78] = [
     // reports' choice: both kinds with the switch.
     (crate::consent::KINDS[0], CONSENT),
     (crate::consent::KINDS[1], CONSENT),
+    // The owner's desk noticing switch (#6543), as mute's row: named only
+    // while lamp-seen is switched on (`LAMP_SEEN_ACTIVITY=on`).
+    (crate::consent::DESK_KINDS[0], DESK),
+    (crate::consent::DESK_KINDS[1], DESK),
     ("skills.list", |lamp| lamp.skills().is_some()),
     ("skills.remove", |lamp| lamp.skills().is_some()),
     // Off, on and the camera's yes with the page (#4099), so `can` tells an
@@ -468,6 +506,8 @@ pub const KINDS: [(&str, Switch); 78] = [
     (crate::skill_secrets::KINDS[2], SKILL_SECRETS),
     ("update.status", |lamp| lamp.update_page()),
     ("update.check", |lamp| lamp.update_page()),
+    // The owner's Update now (#7517), with its own switch.
+    ("update.now", |lamp| lamp.update_now_page()),
     // The lamp's agents (#6240): a missing one installed from the app.
     ("engines.install", |lamp| lamp.engines_page()),
     // The lamp's default agent, chosen in the app (#6492).
@@ -499,9 +539,20 @@ pub const KINDS: [(&str, Switch); 78] = [
     (crate::monitor::KINDS[0], MONITOR),
     (crate::monitor::KINDS[1], MONITOR),
     (crate::monitor::KINDS[2], MONITOR),
+    // The apps from the Store (#7415 piece 4): the word `apps`, then each
+    // kind, with the switch.
+    (crate::apps::CAN, APPS),
+    (crate::apps::KINDS[0], APPS),
+    (crate::apps::KINDS[1], APPS),
+    (crate::apps::KINDS[2], APPS),
+    (crate::apps::KINDS[3], APPS),
+    (crate::apps::KINDS[4], APPS),
+    (crate::apps::KINDS[5], APPS),
+    (crate::apps::KINDS[6], APPS),
 ];
 
 const CONSENT: Switch = |lamp| lamp.consent().is_some();
+const DESK: Switch = |lamp| lamp.desk_noticing().is_some();
 const HARNESS_SIGN_IN: Switch = |lamp| lamp.harness_sign_in().is_some();
 
 const WIFI: Switch = |lamp| lamp.changes().is_some_and(|c| c.wifi_on());
@@ -520,6 +571,8 @@ const PLACE: Switch = |lamp| lamp.changes().is_some_and(|c| c.place_on());
 const VOICE: Switch = |lamp| lamp.changes().is_some_and(|c| c.voice_on());
 /// The switch, and lamp-services there to ask.
 const SERVICES: Switch = |lamp| lamp.services().is_some_and(|s| s.here());
+/// The switch (`LAMP_STORE_APPS=on`).
+const APPS: Switch = |lamp| lamp.apps().is_some();
 /// The switch, and root's change helper for `monitor.set`.
 const MONITOR: Switch = |lamp| lamp.monitor().is_some() && lamp.changes().is_some();
 /// The switch, the skills page, and lamp-services there to ask.
@@ -634,6 +687,23 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             // an `energy` and `voice.get` says it, whenever they are taken.
             if on(lamp, "character.set") {
                 info["character_energy_supported"] = json!(true);
+                // `character.energy_alone` (#7566, the first builder's 23:23):
+                // `character.set` takes `{"energy"}` alone and keeps the
+                // words, so the app sends a picked level at once. A field,
+                // not a `can` kind: it's a new way to send a kind `can`
+                // lists. Missing, the app keeps "save the words first".
+                info["character"] = json!({"energy_alone": true});
+            }
+            // `make_skill_most_chars` (#7245, 19 Nov): the most characters
+            // of words `skills.make` takes, 2,000, and
+            // `make_skill_most_bytes` (18 Nov), those in bytes at most,
+            // 8,000, only while `can` names it, so the app holds a lamp
+            // that says neither, an older one, to 480 bytes.
+            if on(lamp, "skills.make") {
+                info[crate::make_skill::MOST_CHARS_FIELD] =
+                    json!(crate::make_skill::MOST_WORDS_CHARS);
+                info[crate::make_skill::MOST_WORDS_FIELD] =
+                    json!(crate::make_skill::MOST_WORDS_BYTES);
             }
             some(info)
         }
@@ -715,6 +785,19 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 crate::consent::set(&place, data).map(Some)
             }
         }
+        // The owner's desk noticing switch (#6543): read where the yes is
+        // kept, and set through root's helper as seen activity's yes, with
+        // `"by":"app"` and the app's `request_id` (a yes not above the mark
+        // is refused); off removes it, as the voice's stop does. The reply
+        // is what the file says after it.
+        kind if crate::consent::DESK_KINDS.contains(&kind) && on(lamp, kind) => {
+            let place = lamp.desk_noticing().ok_or_else(|| not_here(kind))?;
+            if kind == crate::consent::DESK_KINDS[0] {
+                some(crate::consent::desk_now(&place))
+            } else {
+                crate::consent::desk_set(&place, data).map(Some)
+            }
+        }
         // The app's skills page (#1722): every skill on the lamp, its group,
         // whether it can be removed or turned off and what it may use. Read
         // only.
@@ -748,7 +831,7 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         kind if crate::settings::KINDS.contains(&kind) && on(lamp, kind) => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             let line = crate::settings::line(kind, data)?;
-            changes.start(kind, line);
+            changes.start(kind, line, None);
             Ok(None)
         }
         // The owner's approximate place (#4333), with LAMP_OWNER_PLACE=on
@@ -763,7 +846,7 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             let line = crate::settings::place_line(kind, data)?;
-            changes.start(kind, line);
+            changes.start(kind, line, None);
             Ok(None)
         }
         // The owner's chosen voice and character words (#5394), with
@@ -772,7 +855,7 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         kind if crate::settings::VOICE_KINDS.contains(&kind) && on(lamp, kind) => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
             let line = crate::settings::voice_line(kind, data)?;
-            changes.start(kind, line);
+            changes.start(kind, line, None);
             Ok(None)
         }
         // The app's voice preview (#7485), with LAMP_CHOSEN_VOICE=on too:
@@ -975,6 +1058,16 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             lamp.check_update(std::time::Instant::now(), retry)?;
             some(crate::update::started(status))
         }
+        // The owner's Update now (#7517): never during the setup walk; between
+        // rounds a round starts, and a round waiting for its quiet moment is
+        // taken over. lamp-update gives the voice its moment, then switches.
+        "update.now" if on(lamp, kind) => {
+            let status = crate::update::status(lamp.update_status(), lamp.engines_page())?
+                .unwrap_or_default();
+            crate::update::may_update_now(&status, lamp.walk_under_way())?;
+            lamp.ask_update_now(std::time::Instant::now())?;
+            some(crate::update::started(status))
+        }
         // The app's install of a missing agent (#6240): only one lamp-update
         // says is missing or failed, at most once a minute; the install
         // waits for lamp-update's next round and keeps its own rules.
@@ -1030,7 +1123,8 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // app's own key.
         crate::monitor::SET_KIND if on(lamp, kind) => {
             let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
-            changes.start(kind, crate::monitor::line(data)?);
+            let (line, request_id) = crate::monitor::line(data)?;
+            changes.start(kind, line, request_id);
             Ok(None)
         }
         kind if crate::monitor::KINDS.contains(&kind) && on(lamp, kind) => {
@@ -1041,6 +1135,12 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             } else {
                 some(crate::monitor::get(&place))
             }
+        }
+        // An app installed from the Store (#7415 piece 4): its page's kinds,
+        // answered from root's helper and lamp-control, never carried out here.
+        kind if crate::apps::KINDS.contains(&kind) && on(lamp, kind) => {
+            let apps = lamp.apps().ok_or_else(|| not_here(kind))?;
+            apps.answer(kind, data)
         }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
@@ -1103,6 +1203,8 @@ pub mod tests {
         /// `update.check` asks on, and the checks asked (#4153).
         pub update_bus: Option<lamp_bus::Bus>,
         pub update_checks: crate::update::Checks,
+        /// The setup walk under way, as `onboarding/pending` would say (#7517).
+        pub walk: bool,
         pub restart: bool,
         pub shutdown: bool,
         /// What `account` says (`LAMP_SIGNED_OUT`).
@@ -1113,12 +1215,16 @@ pub mod tests {
         pub reset: Option<&'static str>,
         /// The person's own services (Queue #4710), with their switch.
         pub services: Option<std::sync::Arc<crate::services::Services>>,
+        /// The owner's installed apps (#7415 piece 4), with their switch.
+        pub apps: Option<std::sync::Arc<crate::apps::Apps>>,
         /// lamp-services' admin socket for a skill's keys, with their switch.
         pub skill_secrets: Option<std::path::PathBuf>,
         /// lamp-control's admin socket (#5299).
         pub control: Option<crate::control::Door>,
         /// The owner's two yeses from the app (#5500), with their switch.
         pub consent: Option<crate::consent::Place>,
+        /// The owner's desk noticing switch (#6543), with lamp-seen's.
+        pub desk_noticing: Option<crate::consent::Place>,
         /// What `onboarding` says, and the switch's file (#5812).
         pub onboarding: Option<u64>,
         pub onboarding_done: Option<std::path::PathBuf>,
@@ -1250,6 +1356,9 @@ pub mod tests {
         fn services(&self) -> Option<std::sync::Arc<crate::services::Services>> {
             self.services.clone()
         }
+        fn apps(&self) -> Option<std::sync::Arc<crate::apps::Apps>> {
+            self.apps.clone()
+        }
         fn skill_secrets(&self) -> Option<std::path::PathBuf> {
             self.skill_secrets.clone()
         }
@@ -1258,6 +1367,9 @@ pub mod tests {
         }
         fn consent(&self) -> Option<crate::consent::Place> {
             self.consent.clone()
+        }
+        fn desk_noticing(&self) -> Option<crate::consent::Place> {
+            self.desk_noticing.clone()
         }
         fn update_events(&self) -> Option<std::path::PathBuf> {
             self.update_events.clone()
@@ -1280,6 +1392,16 @@ pub mod tests {
             retry: Option<u64>,
         ) -> Result<(), String> {
             self.update_checks.ask(self.update_bus.as_ref(), now, retry)
+        }
+        fn update_now_page(&self) -> bool {
+            self.update_page && self.update_checks.now()
+        }
+        fn ask_update_now(&mut self, now: std::time::Instant) -> Result<(), String> {
+            self.update_checks
+                .ask_now(self.update_bus.as_ref(), now, 1_000)
+        }
+        fn walk_under_way(&self) -> bool {
+            self.walk
         }
         fn engines_page(&self) -> bool {
             self.update_page && self.update_checks.engines()
@@ -1350,7 +1472,11 @@ pub mod tests {
                 let mut line = String::new();
                 let _ = std::io::BufReader::new(&stream).read_line(&mut line);
                 kept.lock().unwrap().push(line.trim().to_owned());
-                let asked: Value = serde_json::from_str(&line).unwrap_or_default();
+                let mut asked: Value = serde_json::from_str(&line).unwrap_or_default();
+                // The desk noticing switch's line is seen activity's yes.
+                if let Some(allow) = asked["desk_noticing"].get("allow").cloned() {
+                    asked = json!({"consent": {"seen_activity": allow}});
+                }
                 let reply = match asked["consent"].as_object().and_then(|c| c.iter().next()) {
                     Some((key, yes)) => {
                         let file = lamp_msgs::consent::file_in(&folder, key).unwrap();
@@ -1468,6 +1594,134 @@ pub mod tests {
         let _ = std::fs::remove_dir_all(&folder);
     }
 
+    /// #6543: the owner's desk noticing switch in the app. Off (no
+    /// `LAMP_SEEN_ACTIVITY=on`): neither kind in `can`, `can` and
+    /// `system.info` byte for byte as before, each "not on this lamp". On:
+    /// a yes kept through the helper as seen activity's with `"by":"app"`,
+    /// the app's `request_id` handed on, read back with who gave it and
+    /// whether posture is on; off removes the file, as the voice's stop
+    /// does; a voice's yes reads as the voice's; no `request_id`, refused
+    /// before the helper.
+    #[test]
+    fn the_owners_desk_noticing_is_set_and_read_from_the_app_with_lamp_seens_switch() {
+        let folder = std::path::PathBuf::from(format!("/tmp/lcd-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let socket = folder.join("change.sock");
+        let lines = consent_helper(&socket, &folder);
+        let kinds = crate::consent::DESK_KINDS;
+        let file = folder.join("seen-activity.json");
+
+        let mut off = lamp();
+        let before = answer(&mut off, "system.info", &json!({}))
+            .unwrap()
+            .unwrap();
+        let before = serde_json::to_vec(&before).unwrap();
+        assert!(kinds.iter().all(|kind| !can(&off).contains(kind)));
+        for kind in kinds {
+            assert_eq!(
+                answer(&mut off, kind, &json!({"allow": true})),
+                Err(format!("not on this lamp: {kind}"))
+            );
+        }
+        assert!(lines.lock().unwrap().is_empty() && !file.exists());
+
+        let mut on = Fake {
+            desk_noticing: Some(crate::consent::desk_in(&folder, &socket)),
+            ..lamp()
+        };
+        // With the switch on, `can` gains exactly the two kinds; the rest of
+        // system.info is unchanged.
+        let with = can(&on);
+        assert!(kinds.iter().all(|kind| with.contains(kind)));
+        let without: Vec<&str> = with
+            .into_iter()
+            .filter(|kind| !kinds.contains(kind))
+            .collect();
+        assert_eq!(without, can(&off));
+        let mut info = answer(&mut on, "system.info", &json!({})).unwrap().unwrap();
+        info["can"] = json!(can(&off));
+        assert_eq!(serde_json::to_vec(&info).unwrap(), before);
+
+        let get = |lamp: &mut Fake| answer(lamp, kinds[0], &json!({})).unwrap().unwrap();
+        let set = |lamp: &mut Fake, data: Value| answer(lamp, kinds[1], &data);
+        let state =
+            |on: bool, by: Value| json!({"desk_noticing": {"on": on, "by": by, "posture": false}});
+        assert_eq!(get(&mut on), state(false, Value::Null));
+        assert_eq!(
+            set(&mut on, json!({"allow": true})),
+            Err(crate::consent::DESK_REQUEST_ID.to_owned())
+        );
+        assert_eq!(
+            set(&mut on, json!({"allow": true, "request_id": 10})),
+            Ok(Some(state(true, json!("app"))))
+        );
+        assert_eq!(get(&mut on), state(true, json!("app")));
+        // The file is the voice's but for `by`.
+        let kept: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+        assert_eq!(
+            kept,
+            json!({"version": 1, "seen_activity": "yes", "at_unix_s": 9, "by": "app"})
+        );
+        assert_eq!(
+            set(&mut on, json!({"allow": false, "request_id": 11})),
+            Ok(Some(state(false, Value::Null)))
+        );
+        assert!(!file.exists());
+        // A spoken yes reads as the voice's, and the app's off takes it back
+        // as the voice's stop does: the file gone.
+        std::fs::write(
+            &file,
+            lamp_msgs::consent::bytes("seen_activity", 5, lamp_msgs::consent::BY_VOICE),
+        )
+        .unwrap();
+        assert_eq!(get(&mut on), state(true, json!("voice")));
+        assert_eq!(
+            set(&mut on, json!({"allow": false, "request_id": 11})),
+            Ok(Some(state(false, Value::Null)))
+        );
+        assert!(!file.exists());
+        for data in [
+            json!({"request_id": 12}),
+            json!({"allow": "yes", "request_id": 12}),
+            json!({"allow": 1, "request_id": 12}),
+            json!(null),
+        ] {
+            assert_eq!(
+                set(&mut on, data.clone()),
+                Err("allow must be true or false".to_owned()),
+                "{data}"
+            );
+        }
+        // Only what passed the check reached the helper, as consent.set's line.
+        assert_eq!(
+            *lines.lock().unwrap(),
+            [
+                r#"{"desk_noticing":{"allow":true,"request_id":10}}"#,
+                r#"{"desk_noticing":{"allow":false,"request_id":11}}"#,
+                r#"{"desk_noticing":{"allow":false,"request_id":11}}"#,
+            ]
+        );
+        // Posture said as its switch is (`LAMP_SEEN_POSTURE`).
+        let mut posture = Fake {
+            desk_noticing: Some(crate::consent::Place {
+                posture: true,
+                ..crate::consent::desk_in(&folder, &socket)
+            }),
+            ..lamp()
+        };
+        assert_eq!(get(&mut posture)["desk_noticing"]["posture"], json!(true));
+        let mut gone = Fake {
+            desk_noticing: Some(crate::consent::desk_in(&folder, &folder.join("none.sock"))),
+            ..lamp()
+        };
+        assert_eq!(
+            set(&mut gone, json!({"allow": true, "request_id": 13})),
+            Err("the lamp's settings are not running".to_owned())
+        );
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+
     fn lamp() -> Fake {
         Fake {
             raw: 60,
@@ -1560,6 +1814,9 @@ pub mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(told["character_energy_supported"], true);
+        // #7566: the level alone is taken, said with the same switches.
+        assert!(info.get("character").is_none(), "{info}");
+        assert_eq!(told["character"], json!({"energy_alone": true}));
         assert!(answer(&mut will, "onboarding.page", &json!({"page": "create"})).is_ok());
         assert!(
             answer(
@@ -1943,6 +2200,32 @@ pub mod tests {
         assert!(can.contains(&"skills.make".to_owned()) && can.contains(&"skills.made".to_owned()));
     }
 
+    /// 18 Nov: `system.info` says how many bytes of words `skills.make`
+    /// takes, 2,000, only while `can` names it; so the app holds a lamp
+    /// that says nothing, an older one, to its old 480.
+    #[test]
+    fn system_info_says_the_words_bound_only_while_make_skill_is_named() {
+        let bound = |lamp: &mut Fake| {
+            let info = answer(lamp, "system.info", &Value::Null).unwrap().unwrap();
+            (
+                info.get("make_skill_most_chars").cloned(),
+                info.get("make_skill_most_bytes").cloned(),
+            )
+        };
+        let mut lamp = lamp();
+        assert_eq!(bound(&mut lamp), (None, None));
+        lamp.make_skill = Some(std::path::PathBuf::from("/nowhere/make.sock"));
+        assert_eq!(
+            bound(&mut lamp),
+            (None, None),
+            "not ready: not named, not said"
+        );
+        lamp.make_skill_ready = true;
+        assert_eq!(bound(&mut lamp), (Some(json!(2_000)), Some(json!(8_000))));
+        assert_eq!(crate::make_skill::MOST_WORDS_FIELD, "make_skill_most_bytes");
+        assert_eq!(crate::make_skill::MOST_CHARS_FIELD, "make_skill_most_chars");
+    }
+
     /// #1685: with only skills' lines carried (`LAMP_SKILL_MESSAGES=on`,
     /// `LAMP_MESSAGES` unset), a text from the app is refused as with both
     /// off, and nothing is put on `chat/in`.
@@ -2269,6 +2552,105 @@ pub mod tests {
         }
     }
 
+    /// #7517: `update.now` is answered only with both switches on, is never
+    /// taken during the setup walk, writes lamp-cloud's mark before its one
+    /// `update/check` with `now`, takes over a round waiting for quiet, and
+    /// answers a second tap while an Update now round runs with
+    /// `a round is running`.
+    #[test]
+    fn the_owners_update_now_is_marked_and_asked_once_and_never_during_the_walk() {
+        let root = tempfile::tempdir().unwrap();
+        let bus = lamp_bus::Bus::new(root.path()).unwrap();
+        let state = tempfile::tempdir().unwrap();
+        let mark = state.path().join("update-now");
+        let mut lamp = Fake {
+            update_bus: Some(lamp_bus::Bus::new(root.path()).unwrap()),
+            update_page: true,
+            ..lamp()
+        };
+        // Its own switch off: not on this lamp, and not in `can`.
+        assert_eq!(
+            answer(&mut lamp, "update.now", &json!({})),
+            Err(not_here("update.now"))
+        );
+        lamp.update_checks = crate::update::Checks::default().with_now(mark.clone());
+        let mut update = bus
+            .subscribe_typed(
+                lamp_msgs::UpdateCheck::TOPIC,
+                "update",
+                lamp_msgs::UpdateCheck::TYPE,
+            )
+            .unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        // During the setup walk: refused, nothing marked or said.
+        lamp.walk = true;
+        assert_eq!(
+            answer(&mut lamp, "update.now", &json!({})),
+            Err(crate::update::WALK.to_owned())
+        );
+        assert!(!mark.exists());
+        assert!(update.recv(std::time::Duration::ZERO).unwrap().is_none());
+        lamp.walk = false;
+        // Between rounds: marked, then one check with `now`.
+        let started = answer(&mut lamp, "update.now", &json!({}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(started["check"], "started");
+        let marked: Value = serde_json::from_slice(&std::fs::read(&mark).unwrap()).unwrap();
+        assert_eq!(marked, json!({"at_unix_ms": 1_000}));
+        let heard = update
+            .recv(std::time::Duration::from_secs(1))
+            .unwrap()
+            .expect("one check on the bus");
+        assert_eq!(
+            heard.parse::<lamp_msgs::UpdateCheck>().unwrap(),
+            lamp_msgs::UpdateCheck {
+                retry: None,
+                now: Some(true)
+            }
+        );
+        // A round waiting for its quiet moment is taken over, not held to
+        // the minute; one already asked now is running.
+        let mut says = bus
+            .publisher_declared(
+                lamp_msgs::UpdateStatus::TOPIC,
+                &lamp_msgs::UpdateStatus::declaration(),
+                "update",
+            )
+            .unwrap();
+        let mut round = lamp_msgs::UpdateRound {
+            started_at_unix_ms: 1,
+            step_started_at_unix_ms: 2,
+            waiting: Some(lamp_msgs::UpdateRound::WAITING_QUIET.into()),
+            ..Default::default()
+        };
+        let switching = |round: &lamp_msgs::UpdateRound| lamp_msgs::UpdateStatus {
+            running: None,
+            now: "switching".into(),
+            last: None,
+            harness: None,
+            round: Some(round.clone()),
+            engines: None,
+            refused: None,
+        };
+        says.publish_json(0, &switching(&round)).unwrap();
+        assert!(answer(&mut lamp, "update.now", &json!({})).is_ok());
+        round.asked = Some(lamp_msgs::UpdateRound::ASKED_NOW.into());
+        says.publish_json(0, &switching(&round)).unwrap();
+        assert_eq!(
+            answer(&mut lamp, "update.now", &json!({})),
+            Err(crate::update::RUNNING.to_owned())
+        );
+        // A round switching (no longer waiting) is running too.
+        round.asked = None;
+        round.waiting = None;
+        says.publish_json(0, &switching(&round)).unwrap();
+        assert_eq!(
+            answer(&mut lamp, "update.now", &json!({})),
+            Err(crate::update::RUNNING.to_owned())
+        );
+    }
+
     /// #4153: `update.check` is answered only with `LAMP_APP_UPDATE=on`,
     /// with `update.status`'s object and `"check": "started"` once a
     /// running lamp-update has the check. Refused, with what the app shows,
@@ -2402,7 +2784,10 @@ pub mod tests {
             .expect("the retry is on the bus");
         assert_eq!(
             heard.parse::<lamp_msgs::UpdateCheck>().unwrap(),
-            lamp_msgs::UpdateCheck { retry: Some(12226) }
+            lamp_msgs::UpdateCheck {
+                retry: Some(12226),
+                now: None
+            }
         );
     }
 
@@ -2639,5 +3024,39 @@ pub mod tests {
             wifi.then(|| (std::path::PathBuf::from("/nowhere/wifi.sock"), wait)),
             keys.then(|| (std::path::PathBuf::from("/nowhere/keys.sock"), wait)),
         ))
+    }
+
+    /// The apps' kinds (#7415 piece 4) are answered, and in `can`, only with
+    /// the switch; without it each is "not on this lamp".
+    #[test]
+    fn the_apps_kinds_and_their_can_word_need_the_switch() {
+        let mut lamp = Fake::default();
+        for kind in crate::apps::KINDS {
+            assert!(!on(&lamp, kind), "{kind}");
+            assert!(
+                answer(&mut lamp, kind, &json!({"id": "x1"})).is_err(),
+                "{kind}"
+            );
+        }
+        assert!(!can(&lamp).contains(&crate::apps::CAN));
+        lamp.apps = Some(std::sync::Arc::new(crate::apps::Apps::new(Box::new(
+            crate::apps::tests::Fake::default(),
+        ))));
+        for kind in crate::apps::KINDS {
+            assert!(on(&lamp, kind), "{kind}");
+        }
+        assert!(can(&lamp).contains(&crate::apps::CAN));
+        assert_eq!(
+            answer(&mut lamp, crate::apps::LIST_KIND, &Value::Null),
+            Ok(Some(json!({"apps": []})))
+        );
+        assert!(
+            answer(
+                &mut lamp,
+                crate::apps::START_KIND,
+                &json!({"id": "nothing"})
+            )
+            .is_err()
+        );
     }
 }

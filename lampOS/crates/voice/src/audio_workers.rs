@@ -118,9 +118,23 @@ const REOPEN_US: u64 = 1_500_000;
 const LAPSE_MOST_US: u64 = REOPEN_US;
 /// A tick that comes this long after the last was held up.
 const HELD_UP: Duration = Duration::from_millis(50);
-/// What a held-up capture worker may read in one tick: snapshots come no
-/// faster than one a capture block, so 1.5 s leaves at most 150.
+/// What a held-up capture or speaker worker may read in one tick: snapshots
+/// come no faster than one a capture block, so 1.5 s leaves at most 150.
 const HELD_UP_CONTROL: usize = 256;
+
+/// How many control messages a worker's tick may read, asked before each
+/// one: a tick held up (#784), since the last tick or within this one (an
+/// install's look at the device), finds the snapshots sent meanwhile queued,
+/// and reads them all. The speaker kept the tight bound (#7804, lamp-0c89 in
+/// an update's restart): a hold-up's queued renewals ended it with "speaker
+/// control tick bound", and lamp-voice with it.
+fn control_bound(tick: Instant, last_tick: Instant) -> usize {
+    if tick.duration_since(last_tick) > HELD_UP || tick.elapsed() > HELD_UP {
+        HELD_UP_CONTROL
+    } else {
+        MAX_CONTROL
+    }
+}
 
 /// A discontinuity a short stall of this worker causes: the authority it
 /// held lapsed while it was held up, or its 40 ms buffer overran. Anything
@@ -618,6 +632,12 @@ fn capture_loop<D: CaptureDevice>(
     // reference's barrier to keep, and a stall in it still ends the worker.
     let mut gap: Option<u64> = None;
     let mut started = false;
+    // With LAMP_VOICE_UNSTARTED_FRAME_DROP=on (#7224), a reopened
+    // microphone sends nothing until the speaker's clock has started again,
+    // as the first start waits for it: the speaker may re-prime on the
+    // same fresh authority.
+    let mut reopen_hold =
+        crate::unstarted_frames::ReopenHold::new(crate::unstarted_frames::from_environment());
     let mut last_tick = Instant::now();
     channels.control.send(WorkerEvent::Ready)?;
     // With LAMP_STALLS=on, a pass or an overrun wait of 50 ms or more is
@@ -637,13 +657,9 @@ fn capture_loop<D: CaptureDevice>(
         cost.begin();
         // A worker held up (#784) finds the snapshots sent meanwhile queued:
         // they are read in this tick, up to what the longest gap can leave.
-        let bound = if tick.duration_since(last_tick) > HELD_UP {
-            HELD_UP_CONTROL
-        } else {
-            MAX_CONTROL
-        };
-        last_tick = tick;
-        for index in 0..=bound {
+        let previous = std::mem::replace(&mut last_tick, tick);
+        let mut bound = control_bound(tick, previous);
+        for index in 0..=HELD_UP_CONTROL {
             let control = match held.pop_front() {
                 Some(control) => control,
                 None => match channels.control.receive_renewed(Control::is_renewal)? {
@@ -651,6 +667,7 @@ fn capture_loop<D: CaptureDevice>(
                     None => break,
                 },
             };
+            bound = control_bound(tick, previous);
             if index == bound {
                 return Err(io::Error::other("capture control tick bound").into());
             }
@@ -727,6 +744,7 @@ fn capture_loop<D: CaptureDevice>(
                                 privacy,
                             ))?;
                             gap = None;
+                            reopen_hold.reopened(monotonic_us());
                         }
                         // The fresh authority lapsed between open and start:
                         // the microphone closed again; the next one reopens it.
@@ -845,6 +863,9 @@ fn capture_loop<D: CaptureDevice>(
                             );
                             // No microphone sequence or retained upstream prefix is reset.
                             primed_at = Some(monotonic_us());
+                            // A re-prime soon after a reopen is held as the
+                            // reopen is (#7224).
+                            reopen_hold.primed(monotonic_us());
                             link.control
                                 .send(ReferenceControl::ReferencePrimed { prepared })?;
                         }
@@ -906,10 +927,39 @@ fn capture_loop<D: CaptureDevice>(
                 cost.stage(Stage::Reference, from);
             }
         }
-        if primed_at.is_some_and(|at| monotonic_us().saturating_sub(at) >= BARRIER_US) {
+        // While a reopen holds its blocks back (#7224), its own two steps
+        // bound the clock's start, not the barrier.
+        if !reopen_hold.waiting()
+            && primed_at.is_some_and(|at| monotonic_us().saturating_sub(at) >= BARRIER_US)
+        {
             return Err(reference
                 .fault(ReferenceFaultKind::BarrierTimeout, monotonic_us())
                 .into());
+        }
+        // A clock a reopen waits for that has not come (#7224): first a
+        // fresh reopen, as after a stall, then the old exit. Never silent
+        // for good.
+        if gap.is_none() {
+            match reopen_hold.due(&reference.timing(), monotonic_us()) {
+                None => {}
+                Some(crate::unstarted_frames::Recovery::Reopen(line)) => {
+                    eprintln!("{line}");
+                    microphone.revoke()?;
+                    let closed_at_us = monotonic_us();
+                    channels.control.send(WorkerEvent::CaptureGap {
+                        epoch: microphone.epoch(),
+                        reason: crate::unstarted_frames::CLOCK_NOT_STARTED.to_owned(),
+                        closed_at_us,
+                    })?;
+                    hold = CaptureHold::new(hold.blocks())
+                        .ok_or_else(|| io::Error::other("capture hold beyond its bound"))?;
+                    gap = Some(closed_at_us);
+                }
+                Some(crate::unstarted_frames::Recovery::Exit(line)) => {
+                    eprintln!("{line}");
+                    return Err(io::Error::other(crate::unstarted_frames::UNSTARTED_ERROR).into());
+                }
+            }
         }
         let read = if microphone.is_running() {
             let from = cost.now();
@@ -927,6 +977,32 @@ fn capture_loop<D: CaptureDevice>(
             None
         };
         let available = read.as_ref().map(|frame| frame.timing.available_frames);
+        // After a reopen, nothing before the clock has started again
+        // (#7224): the block, read under the authority `try_read` checked,
+        // is dropped before the reference sees it, so the strict count
+        // before a start notice is never spent on it, as at the first
+        // start no block is read before the start.
+        if read.is_some() && !reopen_hold.takes(&reference.timing(), monotonic_us()) {
+            if let Some(line) = reopen_hold.line() {
+                eprintln!("{line}");
+            }
+            said(cost.done());
+            stall_pass.done();
+            pace(
+                wait,
+                microphone,
+                channels,
+                link.as_ref(),
+                gap,
+                primed_at,
+                available,
+                tick,
+            );
+            continue;
+        }
+        if let Some(line) = reopen_hold.line() {
+            eprintln!("{line}");
+        }
         if let Some(frame) = read {
             let from = cost.now();
             let step = reference.capture_step(
@@ -1700,15 +1776,17 @@ fn speaker_loop(
     // With LAMP_STALLS=on, a pass or an overrun wait of 50 ms or more is
     // recorded with what held it (#1178).
     let mut stalls = crate::stalls::Stalls::from_environment("speaker");
+    let mut last_tick = Instant::now();
     'tick: loop {
         let tick = Instant::now();
         output.times.begin(tick);
         let stall_pass = stalls.begin();
-        for index in 0..=MAX_CONTROL {
+        let previous = std::mem::replace(&mut last_tick, tick);
+        for index in 0..=HELD_UP_CONTROL {
             let Some(control) = channels.control.receive_renewed(Control::is_renewal)? else {
                 break;
             };
-            if index == MAX_CONTROL {
+            if index == control_bound(tick, previous) {
                 return Err(io::Error::other("speaker control tick bound").into());
             }
             match control {
@@ -2774,15 +2852,19 @@ mod capture_wait_tests {
         let (socket, _peer) = UnixDatagram::pair().unwrap();
         rustix::io::write(&write, &[1]).unwrap();
         let calls = Cell::new(0);
-        let started = Instant::now();
-        let waited = wait_between_passes(&[socket.as_fd()], false, started, device(&read, &calls));
+        let waited = wait_between_passes(
+            &[socket.as_fd()],
+            false,
+            Instant::now(),
+            device(&read, &calls),
+        );
         assert_eq!(waited, Waited::Samples);
         assert_eq!(calls.get(), 1);
-        // The claim: it returned before its own timeout, so it was woken, not
-        // timed out. Not a few-millisecond bound, which a loaded macOS runner
-        // misses (6.8 ms seen in CI); a wait that ran to its bound takes at
-        // least WAIT_AT_MOST.
-        assert!(started.elapsed() < WAIT_AT_MOST, "{:?}", started.elapsed());
+        // The claim is that it was woken, not timed out, and the answer says
+        // so: a poll that ran out reports no readiness, so it would be
+        // `Timeout` or `Ticked`, never `Samples`. No wall-clock bound: a
+        // loaded macOS runner took 6.8 ms, then 43 ms (train 1042), to a
+        // wait that returned at once.
     }
 
     /// The stop comes on the coordinator's control socket: it ends the wait
@@ -2793,15 +2875,19 @@ mod capture_wait_tests {
         let (socket, peer) = UnixDatagram::pair().unwrap();
         peer.send(b"stop").unwrap();
         let calls = Cell::new(0);
-        let started = Instant::now();
-        let waited = wait_between_passes(&[socket.as_fd()], false, started, device(&read, &calls));
+        let waited = wait_between_passes(
+            &[socket.as_fd()],
+            false,
+            Instant::now(),
+            device(&read, &calls),
+        );
         assert_eq!(waited, Waited::Sockets);
         assert_eq!(calls.get(), 1);
-        // The claim: it returned before its own timeout, so it was woken, not
-        // timed out. Not a few-millisecond bound, which a loaded macOS runner
-        // misses (6.8 ms seen in CI); a wait that ran to its bound takes at
-        // least WAIT_AT_MOST.
-        assert!(started.elapsed() < WAIT_AT_MOST, "{:?}", started.elapsed());
+        // The claim is that it was woken, not timed out, and the answer says
+        // so: a poll that ran out reports no readiness, so it would be
+        // `Timeout` or `Ticked`, never `Sockets`. No wall-clock bound: a
+        // loaded macOS runner took 6.8 ms, then 35 ms (train 1042), to a
+        // wait that returned at once.
     }
 
     /// A block the device already holds (read ahead of the wait, as its
@@ -2827,12 +2913,19 @@ mod capture_wait_tests {
         let (read, _write) = pcm();
         let (socket, _peer) = UnixDatagram::pair().unwrap();
         let calls = Cell::new(0);
+        let given = Cell::new(Duration::MAX);
         let started = Instant::now();
-        let waited = wait_between_passes(&[socket.as_fd()], false, started, device(&read, &calls));
+        let waited = wait_between_passes(&[socket.as_fd()], false, started, |others, timeout| {
+            given.set(timeout);
+            device(&read, &calls)(others, timeout)
+        });
         assert_eq!(waited, Waited::Timeout);
         let took = started.elapsed();
         assert!(took >= WAIT_AT_MOST - Duration::from_millis(1), "{took:?}");
-        assert!(took < WAIT_AT_MOST * 3, "{took:?}");
+        // That it ends at its bound, not later, is the timeout it hands the
+        // poll: never more than WAIT_AT_MOST from the pass's start. Not a
+        // wall-clock ceiling, which a loaded macOS runner overshoots.
+        assert!(given.get() <= WAIT_AT_MOST, "{:?}", given.get());
     }
 
     /// A device that cannot be waited on, whose wait failed, or that woke
@@ -3111,6 +3204,9 @@ mod speaker_chunk_tests {
         clock: Arc<AtomicU64>,
         /// One entry per block the queue was given: true if it holds sound.
         blocks: Arc<Mutex<Vec<bool>>>,
+        /// Held by the test, the worker's next read of the queue's clock waits for it: a speaker
+        /// held up mid-tick, as by a busy lamp.
+        hold: Arc<Mutex<()>>,
         worker: Option<std::thread::JoinHandle<std::result::Result<(), String>>>,
         privacy: u64,
         linked: bool,
@@ -3146,15 +3242,19 @@ mod speaker_chunk_tests {
                     .unwrap();
             let clock = Arc::new(AtomicU64::new(5_000_000));
             let blocks = Arc::new(Mutex::new(Vec::new()));
+            let hold = Arc::new(Mutex::new(()));
             let mut controller = Controller::new(parent_boot, at());
             controller
                 .set_microphone_permission(at(), Permission::Allowed)
                 .unwrap();
             let path = directory.path.clone();
-            let (read, seen) = (clock.clone(), blocks.clone());
+            let (read, seen, held) = (clock.clone(), blocks.clone(), hold.clone());
             let worker = std::thread::spawn(move || {
                 let pcm = SoftPcm::with_clock(
-                    move || read.load(Ordering::SeqCst),
+                    move || {
+                        drop(held.lock().unwrap_or_else(|p| p.into_inner()));
+                        read.load(Ordering::SeqCst)
+                    },
                     move |frames| {
                         seen.lock()
                             .unwrap()
@@ -3184,6 +3284,7 @@ mod speaker_chunk_tests {
                 capture,
                 clock,
                 blocks,
+                hold,
                 worker: Some(worker),
                 privacy: 0,
                 linked: false,
@@ -3399,6 +3500,46 @@ mod speaker_chunk_tests {
                 first + 1,
                 "a block of silence between two blocks of speech (pair {batch}): {blocks:?}"
             );
+        }
+        rig.parent.control.send(Control::Stop).unwrap();
+        let ended = rig.worker.take().unwrap().join().unwrap();
+        assert_eq!(ended, Ok(()));
+    }
+
+    /// #7804, lamp-0c89 in an update's restart: the speaker held up past its authority's lease
+    /// while the controller kept renewing it. Its authority lapsed ("silent until a fresh one"),
+    /// and the next tick found the renewals queued meanwhile, more than its tight bound: it ended
+    /// with "speaker control tick bound", and lamp-voice with it, so the update rolled back. Read
+    /// as the capture worker reads a hold-up's backlog (#784), the newest renewal is the fresh
+    /// authority, and the speaker goes on.
+    #[cfg_attr(
+        target_os = "macos",
+        ignore = "the Mac CI runner ends the worker early (reset, os error 54); runs on Linux"
+    )]
+    #[test]
+    fn a_speaker_held_up_past_its_authority_goes_on_with_the_renewals_queued_meanwhile() {
+        let mut rig = Rig::start();
+        rig.until("the clock starts", |rig| rig.started);
+        rig.settle();
+        // Held up past the rig's 1 s lease, a renewal every 20 ms queued behind it: about 60,
+        // far past the tight bound of 8, and within the 1.5 s a hold-up may take.
+        let hold = rig.hold.clone();
+        let guard = hold.lock().unwrap();
+        let held = Instant::now();
+        let mut renewals = 0;
+        while held.elapsed() < Duration::from_millis(1_200) {
+            rig.renew();
+            renewals += 1;
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        drop(guard);
+        assert!(renewals > MAX_CONTROL, "{renewals} renewals queued");
+        // A fresh authority after the hold-up, and the speaker still up for a while after it.
+        rig.settle();
+        let from = Instant::now();
+        while from.elapsed() < Duration::from_millis(200) {
+            rig.service();
+            std::thread::sleep(Duration::from_millis(5));
         }
         rig.parent.control.send(Control::Stop).unwrap();
         let ended = rig.worker.take().unwrap().join().unwrap();

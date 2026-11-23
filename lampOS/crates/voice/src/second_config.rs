@@ -96,7 +96,7 @@ pub const OPENROUTER_SECOND_MODEL: &str = "google/gemini-3.6-flash";
 pub const DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com";
 /// The company relay's host: a route whose `llm_base_url` is on it reaches
 /// DeepSeek through it too, with no `deepseek_base_url` ([`relay_deepseek`]).
-const COMPANY_RELAY_HOST: &str = "campaign-api.autonomous.ai";
+pub(crate) const COMPANY_RELAY_HOST: &str = "campaign-api.autonomous.ai";
 
 /// DeepSeek through the relay `llm_base_url` names, when it is the
 /// company's: `…/api/v1/ai` gives `…/api/v1/ai/v1/deepseek`, as `/v1` is

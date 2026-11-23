@@ -239,11 +239,14 @@ CREATE INDEX IF NOT EXISTS service_records_by ON service_records(person,changed_
 -- after this file, each column the table lacks (`pragma table_info`), the
 -- first ALTER of these tables (SQLite has no ADD COLUMN IF NOT EXISTS):
 --   source_kind TEXT NOT NULL DEFAULT 'voice'
---     CHECK(source_kind IN ('voice','task','agent','reminder'))
+--     CHECK(source_kind IN ('voice','task','agent','reminder','sdk'))
 --   source_ref TEXT NOT NULL DEFAULT '{}'  (at most 512 bytes, checked JSON)
 --   summary TEXT NOT NULL DEFAULT ''       (at most 160 bytes)
 --   deed_unix_ms INTEGER                   (none on an older row)
 -- and the index service_records_kind(person,source_kind,changed_unix_ms).
+-- A table slice 1 made has the CHECK without 'sdk': `service_records::
+-- allow_sdk` rebuilds it once (new table, copy, drop, rename, its indexes
+-- and triggers again, the rows counted before and after).
 -- The table above stays as older builds made it; `user_version` stays 1.
 -- When each known person's everything was last forgotten (forget everything,
 -- forget the person; '' for everyone's): a service record asked before it is
@@ -271,4 +274,35 @@ CREATE TABLE IF NOT EXISTS service_contacts (
     saved_unix_ms INTEGER NOT NULL,
     changed_unix_ms INTEGER NOT NULL,
     PRIMARY KEY(person,name_key)
+);
+-- #7415 (C166, the first builder's yes of 19 Nov 16:45): the kept things a
+-- Store app or a paired computer told (`Days::remember_app_fact`), each
+-- marked with its source (`app:<id>` / `computer:<id>`, set by the door from
+-- the grant) and never found by its words, so a person's own kept line in
+-- the same words is never one. At most `app_fact::MOST_A_DAY` a source a
+-- day and `app_fact::MOST_KEPT` a source in all (the first kept going),
+-- both by `kept_day`/`rid`, memory's own day and order of taking them, never
+-- the fact's `at`; gone `app_fact::KEPT_DAYS` after `kept_day`
+-- (`Days::maintain`) and with its source (`forget_app_facts`); not counted
+-- in the kept list's room, never in `kept`, never read by the nightly pass.
+-- Its row goes with the entry. Older builds pass this table over;
+-- `user_version` stays 1.
+CREATE TABLE IF NOT EXISTS app_facts (
+    rid INTEGER PRIMARY KEY REFERENCES entries(rid) ON DELETE CASCADE,
+    source TEXT NOT NULL,
+    kept_day TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS app_facts_source ON app_facts(source);
+-- #7771 (the first builder's switch-on condition on #8086): what a forget
+-- the voice asked with `history_unsent` removed, kept in the forget's own
+-- transaction until the voice has it on its queue for the account's
+-- history (`history_unsent_done`), read again at the voice's next start
+-- otherwise (`history_unsent`). A turn id each, or `turn` NULL for a known
+-- person's whole history; never a word. Never let go but by the voice's
+-- done. Older builds pass this table over;
+-- `user_version` stays 1.
+CREATE TABLE IF NOT EXISTS history_unsent (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    scope TEXT NOT NULL,
+    turn TEXT
 );

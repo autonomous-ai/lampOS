@@ -18,6 +18,59 @@ struct State {
     at: u64,
     sources: BTreeMap<u64, String>,
 }
+/// One found entry as the voice's recall tells it (`remember.rs`), read at
+/// `now_unix_ms` in `zone`, before its `source_record_id` is added.
+pub fn recall_entry(entry: &Value, now_unix_ms: u64, zone: &LocalTime) -> Result<Value> {
+    // The voice's recall shape (`remember.rs`): an exchange is its
+    // `when`, `heard` and `you_said`, a kept thing its `when` and
+    // `asked_to_remember`; the store's epoch is never shown.
+    let when = crate::when::dated(entry.clone(), now_unix_ms, zone)?["when"].clone();
+    let mut value = match entry["kind"].as_str() {
+        Some("exchange") => {
+            json!({"when":when,"heard":entry["heard"],"you_said":entry["said"]})
+        }
+        Some("kept") => json!({"when":when,"asked_to_remember":entry["text"]}),
+        _ => {
+            let mut other = crate::when::dated(entry.clone(), now_unix_ms, zone)?;
+            if let Some(fields) = other.as_object_mut() {
+                for raw in ["id", "on", "earlier", "strength"] {
+                    fields.remove(raw);
+                }
+            }
+            other
+        }
+    };
+    let fields = value
+        .as_object_mut()
+        .ok_or_else(|| invalid("invalid entry"))?;
+    // A dated thing's own day, as the voice tells it (`remember.rs`):
+    // `event_on`, `event_status` and `today`, read in the zone.
+    let mut past = false;
+    if entry["kind"] != "exchange"
+        && let Some(day) = entry["on"].as_str().and_then(crate::when::day_of)
+    {
+        let today = zone.day(now_unix_ms);
+        let status = match day.cmp(&today) {
+            std::cmp::Ordering::Greater => "upcoming",
+            std::cmp::Ordering::Equal => "today",
+            std::cmp::Ordering::Less => "past",
+        };
+        past = status == "past";
+        fields.insert("event_on".into(), json!(crate::when::day_name(day)));
+        fields.insert("event_status".into(), json!(status));
+        fields.insert("today".into(), json!(crate::when::day_name(today)));
+    }
+    // P2 `strength` reaches the answerer only in the voice's words
+    // (`remember.rs` `strength_told`); any other label is dropped.
+    // P1 `earlier` only orders the entries: the voice never tells it.
+    if let Some(told) = entry["strength"]
+        .as_str()
+        .and_then(|label| crate::when::strength_told(label, past))
+    {
+        fields.insert("strength".into(), json!(told));
+    }
+    Ok(value)
+}
 pub struct Partial {
     owner: String,
     zone: String,
@@ -26,6 +79,34 @@ pub struct Partial {
     sequence: u64,
     recall_calls: u64,
     snapshot_calls: u64,
+    /// `lampos_today_partial_next`: the memory owner's Tiers-ideas switches
+    /// (3 Nov, P1-P3) on, as the voice sends them with each env `on`.
+    next: bool,
+}
+/// The setup that sends the Tiers-ideas switches (P4b).
+pub const NEXT: &str = "lampos_today_partial_next";
+/// The partial arm's `search`. With `next` it also sends `newer_first`
+/// (`LAMP_MEMORY_NEWER_FIRST`) and `strength` (`LAMP_MEMORY_STRENGTH`);
+/// without it, the bytes are today's. A Days without those fields refuses
+/// them (`deny_unknown_fields`), so the setup never runs as today's.
+pub fn search_request(owner: &str, query: &str, max_bytes: usize, next: bool) -> Value {
+    let mut request = json!({"op":"search","person":owner,"query":query,"limit":8,"max_bytes":max_bytes,"history":false,"recall_v2":false});
+    if next {
+        request["newer_first"] = json!(true);
+        request["strength"] = json!(true);
+    }
+    request
+}
+/// The partial arm's `session_open`. With `next` it also sends `strength`
+/// and `profile` (`LAMP_MEMORY_PROFILE`); without it, today's bytes.
+pub fn session_open_request(owner: &str, session: &str, max_bytes: usize, next: bool) -> Value {
+    let mut request =
+        json!({"op":"session_open","person":owner,"session":session,"max_bytes":max_bytes});
+    if next {
+        request["strength"] = json!(true);
+        request["profile"] = json!(true);
+    }
+    request
 }
 impl Partial {
     pub fn open(init: &Init) -> Result<Self> {
@@ -46,6 +127,7 @@ impl Partial {
             sequence: 0,
             recall_calls: 0,
             snapshot_calls: 0,
+            next: init.arm == NEXT,
         };
         drop(arm.store()?);
         Ok(arm)
@@ -152,7 +234,12 @@ impl MemoryArm for Partial {
         }
         self.sequence += 1;
         let session = format!("bench-snapshot-{}", self.sequence);
-        let reply=self.send(json!({"op":"session_open","person":self.owner,"session":session,"max_bytes":q.max_context_bytes.min(1200)}))?;
+        let reply = self.send(session_open_request(
+            &self.owner,
+            &session,
+            q.max_context_bytes.min(1200),
+            self.next,
+        ))?;
         self.send(json!({"op":"session_close","person":self.owner,"session":session}))?;
         let snapshot = &reply["snapshot"];
         let sources = self.sources(&snapshot["source_ids"])?;
@@ -179,10 +266,16 @@ impl MemoryArm for Partial {
         if !self.admitted(q.person, q.person_id.as_deref(), q.presence) {
             return Ok(Recall::default());
         }
-        let reply=self.send(json!({"op":"search","person":self.owner,"query":q.heard,"limit":8,"max_bytes":q.max_context_bytes.saturating_sub(2048).max(1),"history":false,"recall_v2":false}))?;
+        let reply = self.send(search_request(
+            &self.owner,
+            &q.heard,
+            q.max_context_bytes.saturating_sub(2048).max(1),
+            self.next,
+        ))?;
         let entries = reply["entries"]
             .as_array()
             .ok_or_else(|| invalid("search omitted entries"))?;
+        let zone = crate::when::zone(&self.zone)?;
         let mut output = vec![];
         let mut sources = vec![];
         for entry in entries {
@@ -194,11 +287,11 @@ impl MemoryArm for Partial {
                 .sources
                 .get(&id)
                 .ok_or_else(|| invalid("unmapped record"))?;
-            let mut value = entry.clone();
-            value
+            let mut value = recall_entry(entry, q.at_unix_ms, &zone)?;
+            let fields = value
                 .as_object_mut()
-                .ok_or_else(|| invalid("invalid entry"))?
-                .insert("source_record_id".into(), json!(source));
+                .ok_or_else(|| invalid("invalid entry"))?;
+            fields.insert("source_record_id".into(), json!(source));
             sources.push(source.clone());
             output.push(value);
         }
@@ -238,7 +331,7 @@ impl MemoryArm for Partial {
             json!({})
         };
         Ok(
-            json!({"owner_model":[],"retained_record_ids":retained,"diagnostics":{"schema":"tier-usage-v1","tiers":tiers},"stats":{"label":"partial current product","complete_baseline":false,"voice_observations":false,"voice_talk_notes":false,"voice_running_summary":false,"voice_forget_dispatch":false,"stored_bytes":fs::metadata(self.state.path.join(DATABASE))?.len(),"model_calls":0}}),
+            json!({"owner_model":[],"retained_record_ids":retained,"diagnostics":{"schema":"tier-usage-v1","tiers":tiers},"stats":{"label":if self.next {"partial current product, Tiers-ideas switches on"} else {"partial current product"},"complete_baseline":false,"voice_observations":false,"voice_talk_notes":false,"voice_running_summary":false,"voice_forget_dispatch":false,"stored_bytes":fs::metadata(self.state.path.join(DATABASE))?.len(),"model_calls":0}}),
         )
     }
     fn begin_probe(&mut self, id: &str, at: u64) -> Result<()> {

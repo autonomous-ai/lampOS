@@ -225,6 +225,18 @@ impl Http {
         Ok(bytes)
     }
 }
+/// A failure in transit: no reply to score, but nothing wrong with the run.
+fn transport(message: &str) -> crate::Error {
+    crate::Error::Transport(message.into())
+}
+/// An overloaded or failing relay (429, 5xx) is transient; a refused request
+/// (other 4xx) is the bench's own and stops the run.
+fn unaccepted(status: Option<u16>) -> crate::Error {
+    match status {
+        Some(429 | 500..=599) => transport("chat service unavailable"),
+        _ => invalid("chat service refused request"),
+    }
+}
 pub(crate) fn save(path: &Path, bytes: &[u8]) -> Result<()> {
     let mut file = OpenOptions::new()
         .create_new(true)
@@ -274,8 +286,8 @@ impl Provider for Http {
                         .send(),
                 )
                 .await
-                .map_err(|_| invalid("chat headers deadline expired"))?
-                .map_err(|_| invalid("chat connection or headers failed"))?;
+                .map_err(|_| transport("chat headers deadline expired"))?
+                .map_err(|_| transport("chat connection or headers failed"))?;
                 status = Some(response.status().as_u16());
                 let accepted = response.status().is_success();
                 let event_stream = response
@@ -287,11 +299,16 @@ impl Provider for Http {
                             .next()
                             .is_some_and(|s| s.trim().eq_ignore_ascii_case("text/event-stream"))
                     });
-                while let Some(chunk) = response
-                    .chunk()
-                    .await
-                    .map_err(|_| invalid("chat response transport failed"))?
-                {
+                // A refusal whose body is cut short is still a refusal: the
+                // status already arrived, so the failed read must not turn it
+                // into a transient failure the run would score and pass over.
+                while let Some(chunk) = response.chunk().await.map_err(|_| {
+                    if accepted {
+                        transport("chat response transport failed")
+                    } else {
+                        unaccepted(status)
+                    }
+                })? {
                     let remaining = MAX_WIRE - raw.len();
                     raw.extend_from_slice(&chunk[..chunk.len().min(remaining)]);
                     if chunk.len() > remaining {
@@ -302,12 +319,12 @@ impl Provider for Http {
                     }
                 }
                 if !accepted {
-                    return Err(invalid("chat service refused request"));
+                    return Err(unaccepted(status));
                 }
                 if !event_stream {
                     return Err(invalid("chat response is not an event stream"));
                 }
-                Err(invalid("chat stream ended before terminal marker"))
+                Err(transport("chat stream ended before terminal marker"))
             })
             .await
             .map_err(|_| invalid("chat absolute deadline expired"))?
@@ -356,8 +373,11 @@ impl Provider for Http {
 }
 
 // Inspect JSON strings even in rejected SSE frames or non-JSON envelopes.
-// A malformed/truncated quoted string is not safe to archive: retain only the
-// digest and safe accounting metadata. This scan is independent of acceptance.
+// A malformed quoted string is not safe to archive: retain only the digest and
+// safe accounting metadata. This scan is independent of acceptance. A string
+// cut by the end of the bytes (a stream cut in transit) is safe only when it
+// holds no escape, so its raw bytes are its text and were scanned above, and
+// no tail of it could be the start of the secret.
 pub(crate) fn wire_safe_to_save(bytes: &[u8], secret: &str) -> bool {
     if bytes.windows(secret.len()).any(|w| w == secret.as_bytes()) {
         return false;
@@ -371,6 +391,7 @@ pub(crate) fn wire_safe_to_save(bytes: &[u8], secret: &str) -> bool {
         let start = at;
         at += 1;
         let mut escaped = false;
+        let mut closed = false;
         while at < bytes.len() {
             let byte = bytes[at];
             at += 1;
@@ -379,8 +400,14 @@ pub(crate) fn wire_safe_to_save(bytes: &[u8], secret: &str) -> bool {
             } else if byte == b'\\' {
                 escaped = true;
             } else if byte == b'"' {
+                closed = true;
                 break;
             }
+        }
+        if !closed {
+            let cut = &bytes[start + 1..];
+            return !cut.contains(&b'\\')
+                && !(1..secret.len()).any(|n| cut.ends_with(&secret.as_bytes()[..n]));
         }
         let Ok(decoded) = serde_json::from_slice::<String>(&bytes[start..at]) else {
             return false;
@@ -420,6 +447,21 @@ data: {"error":"bench-offline-fixture-\u0063redential"}
             br#"data: {"unfinished":"\u0063"#,
             "fixture-key"
         ));
+    }
+    #[test]
+    fn a_stream_cut_inside_a_plain_string_is_safe_to_save_unless_it_may_begin_the_secret() {
+        let key = "fixture-key";
+        assert!(wire_safe_to_save(
+            br#"data: {"choices":[{"delta":{"content":"the lamp re"#,
+            key
+        ));
+        assert!(!wire_safe_to_save(
+            br#"data: {"choices":[{"delta":{"content":"the lamp fixture-k"#,
+            key
+        ));
+        assert!(!wire_safe_to_save(br#"data: {"content":"f"#, key));
+        assert!(!wire_safe_to_save(br#"data: {"content":"a\n b"#, key));
+        assert!(!wire_safe_to_save(br#"data: {"content":"fixture-key"#, key));
     }
     #[test]
     fn escaped_request_and_nested_response_strings_are_checked_as_values() {

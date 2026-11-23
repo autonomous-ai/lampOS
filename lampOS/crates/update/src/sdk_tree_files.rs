@@ -3,6 +3,7 @@
 // added or removed there fails it until this list is made again).
 pub const FILES: &[(&str, &[u8])] = &[
     ("lampos/__init__.py", include_bytes!("../../../sdk/python/src/lampos/__init__.py")),
+    ("lampos/app.py", include_bytes!("../../../sdk/python/src/lampos/app.py")),
     ("lampos/cli.py", include_bytes!("../../../sdk/python/src/lampos/cli.py")),
     ("lampos/client.py", include_bytes!("../../../sdk/python/src/lampos/client.py")),
     ("lampos/control.schema.json", include_bytes!("../../../sdk/python/src/lampos/control.schema.json")),
@@ -18,6 +19,8 @@ pub const FILES: &[(&str, &[u8])] = &[
     ("lampos/schema.py", include_bytes!("../../../sdk/python/src/lampos/schema.py")),
     ("lampos/skill-format.schema.json", include_bytes!("../../../sdk/python/src/lampos/skill-format.schema.json")),
     ("lampos/skillcheck.py", include_bytes!("../../../sdk/python/src/lampos/skillcheck.py")),
+    ("lampos/store.py", include_bytes!("../../../sdk/python/src/lampos/store.py")),
+    ("lampos/studio.py", include_bytes!("../../../sdk/python/src/lampos/studio.py")),
     ("lampos/testing.py", include_bytes!("../../../sdk/python/src/lampos/testing.py")),
     ("websockets/LICENSE", include_bytes!("../../../deploy/sdk-runtime/websockets/LICENSE")),
     ("websockets/__init__.py", include_bytes!("../../../deploy/sdk-runtime/websockets/__init__.py")),

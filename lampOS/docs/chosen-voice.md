@@ -18,7 +18,7 @@ each answered `starting` at once, then `success` or `failure`, as
 | Kind | Data | `success` data |
 |---|---|---|
 | `voice.set` | V1's `tts.set` shape: `{"provider"?, "voice", "language"?, "speed"?}`. `provider` absent or `"elevenlabs"`. `voice` is a name from Backend2's `lamp-2-tts-catalog`; every name there is in the lamp's own table (`lamp_msgs::chosen_voice::ELEVENLABS_VOICES`), which is what is checked. `""` goes back to the default. `language` and `speed` are taken and left alone: the language stays `language.set`'s, the speed 1.0 | `{"provider": "elevenlabs", "voice", "speed": 1.0}` |
-| `character.set` | `{"text", "energy"?}`: the owner's own words, plain text on one line, at most 200 characters. `""` clears them. `energy` (#6893), a whole number 1 to 5, is how lively the lamp moves; absent or `null`, it is worked out from the words ("Energy" below). 0, 6 or anything else is refused | `{"text", "energy"}`: the level kept, 1 when the words were cleared |
+| `character.set` | `{"text", "energy"?}`: the owner's own words, plain text on one line, at most 200 characters. `""` clears them. `energy` (#6893), a whole number 1 to 5, is how lively the lamp moves; absent or `null`, it is worked out from the words ("Energy" below). **`{"energy"}` alone** (no `text`, or `text: null`, #7566): the kept words stay as they are and the level is kept as chosen, words or none, so the app's picker sets it in one tap. 0, 6 or anything else is refused, and so is neither text nor energy | `{"text", "energy"}`: the level kept, 1 when the words were cleared |
 | `voice.get` | `{}`: answered at once, nothing written; `lamp-cloud` reads the files as it reads the language | `{"provider": "elevenlabs", "voice", "text", "energy"}`: `""` for none kept, and for a kept value that does not fit the rules (as the voice takes it: the default voice, no words); `energy` 1 when none is kept |
 
 A voice the lamp lacks, another provider, or words that break the rules get
@@ -27,7 +27,10 @@ The reason never holds the value sent.
 
 `system.info` says `"character_energy_supported": true` whenever
 `character.set` is taken, so the app shows the energy picker only to a lamp
-that keeps it.
+that keeps it. With it, `"character": {"energy_alone": true}` (#7566) says
+the lamp takes `{"energy"}` alone and keeps the words, so the app sends a
+picked level at once; a lamp without the field keeps the app's "save the
+words first" path.
 
 ## Energy
 
@@ -79,8 +82,11 @@ cleared, wiped by the reset. A change of the energy alone restarts nothing.
 (`lamp_msgs/Energy {level, chosen}`, [msgs.md](msgs.md)) at once when it
 changes and every 5 s otherwise, so a level the app sets is said within
 half a second and the body, reading once a second, has it within about
-1.5 s (#7438); inert data, so no switch of its own: the body reads it only
-with its own switch (#6893's later pieces).
+1.5 s (#7438); inert data, so no switch of its own: the body, Expression,
+lamp-skills and the voice read it under `LAMP_BODY_ENERGY=on`, on in the
+product ([body.md](body.md), "How lively it moves"); at level 5 the body
+plays each cut clip for all of its V1 recording, its swing at most V1's
+(#8153).
 
 ## The character words' rules
 

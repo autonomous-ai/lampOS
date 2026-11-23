@@ -58,6 +58,14 @@ mod shutdown;
 pub use shutdown::*;
 mod ears;
 pub use ears::*;
+mod app_triggers;
+pub use app_triggers::*;
+mod play_allow;
+pub use play_allow::*;
+mod body_sound;
+pub use body_sound::*;
+mod lamp_did;
+pub use lamp_did::*;
 mod sound_classes;
 pub use sound_classes::*;
 mod air;
@@ -96,6 +104,8 @@ mod chat;
 pub use chat::*;
 mod presence;
 pub use presence::*;
+mod heat;
+pub use heat::*;
 mod account;
 pub use account::*;
 mod energy;
@@ -120,6 +130,10 @@ pub use speaker_state::*;
 
 /// The memory's id for a person the eyes know, and the `known` file (#2176).
 pub mod known;
+
+/// What a Store app or a paired computer tells Lamp's memory: a kept fact
+/// marked with its source, and a live context line never kept (#7415).
+pub mod app_fact;
 
 /// The owner's approximate place from the app, rounded, and its file
 /// (#4333, `docs/owner-place.md`).
@@ -569,8 +583,10 @@ impl Faces {
 
     /// A message on `topic` as skills may see it (#7442, the Reviewer-lead's
     /// P2 on #7450): on [`Self::TOPIC`], each face's `pitch` and `looking`
-    /// are taken out unless the face-expressions yes is kept at `yes_file`
-    /// ([`consent::read`]: missing or unreadable is no yes). Where a face
+    /// are taken out unless the face-expressions yes is allowed at
+    /// `yes_file` ([`consent::allowed`]: a kept no or a file that can't be
+    /// read is no yes; a missing file is `by_default`, which callers take
+    /// from [`consent::noticing_by_default`], #7767). Where a face
     /// looks is for the lamp's own parts (the voice's said-to-me rule); a
     /// skill can send what it reads off the lamp. Any other topic, a payload
     /// with neither field, or not JSON, is passed as it came.
@@ -578,6 +594,7 @@ impl Faces {
         topic: &str,
         payload: &'a [u8],
         yes_file: &std::path::Path,
+        by_default: bool,
     ) -> std::borrow::Cow<'a, [u8]> {
         use std::borrow::Cow;
         if topic != Self::TOPIC {
@@ -596,7 +613,7 @@ impl Faces {
         {
             had |= face.remove("pitch").is_some() | face.remove("looking").is_some();
         }
-        if !had || consent::read(yes_file, consent::FACE_EXPRESSIONS).yes {
+        if !had || consent::allowed(yes_file, consent::FACE_EXPRESSIONS, by_default) {
             return Cow::Borrowed(payload);
         }
         Cow::Owned(serde_json::to_vec(&value).unwrap_or_default())
@@ -1188,6 +1205,77 @@ impl VoiceTone {
     pub fn declaration() -> Declaration {
         Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
     }
+}
+
+/// The memory requests whose answer names the exchanges they removed,
+/// `"exchanges":{"<scope>":[turn ids]}` (#7771), each by
+/// [`history_turn_id`], for the voice to delete the same turns from the
+/// account's history. No other answer's `exchanges` is read.
+pub const MEMORY_FORGETS_TELLING_EXCHANGES: [&str; 5] = [
+    "forget",
+    "forget_last",
+    "forget_all",
+    "forget_said",
+    "exchanges_forget",
+];
+
+/// The memory request that pages the rest of the exchanges a forget
+/// removed, when its answer said `"exchanges_more":true`, by the
+/// `"exchanges_token"` that answer gave (`{"op":"forgot_exchanges",
+/// "token":…}`; a token not kept is refused `rest_gone`, #7771).
+pub const MEMORY_FORGOT_EXCHANGES_OP: &str = "forgot_exchanges";
+
+/// The field a voice with `LAMP_HISTORY_FORGET=on` adds, `true`, to each of
+/// [`MEMORY_FORGETS_TELLING_EXCHANGES`]: the memory then keeps what the
+/// forget removed on its disk, in the forget's own transaction, until the
+/// voice says it is on its own queue ([`MEMORY_HISTORY_UNSENT_DONE_OP`]),
+/// and the answer says the rows' range, `"unsent":[from,to]`. Without it,
+/// nothing is kept (the first builder's switch-on condition on #8086).
+pub const MEMORY_HISTORY_UNSENT_FIELD: &str = "history_unsent";
+
+/// The memory request that pages what forgets asked with
+/// [`MEMORY_HISTORY_UNSENT_FIELD`] removed and the voice has not yet said
+/// done, oldest first: `{"op":"history_unsent","after":<seq>}` answered
+/// `{"ok":true,"exchanges":{"<scope>":[turn ids]},"all":["p-…"],
+/// "to":<last seq or null>,"more":…}`.
+pub const MEMORY_HISTORY_UNSENT_OP: &str = "history_unsent";
+
+/// The memory request that lets go of those rows once the voice has them on
+/// its own queue: `{"op":"history_unsent_done","from":<seq>,"to":<seq>}`,
+/// both included.
+pub const MEMORY_HISTORY_UNSENT_DONE_OP: &str = "history_unsent_done";
+
+/// The memory request that answers its store's epoch,
+/// `{"ok":true,"epoch":"<8 hex>"}` (#7771): for [`history_turn_id`].
+pub const MEMORY_HISTORY_EPOCH_OP: &str = "history_epoch";
+
+/// A memory exchange's id on the account's history (#7771):
+/// `<epoch>.<scope>:<id>`. The epoch is the memory store's own, 8 hex
+/// characters minted when the store is made and again when it is wiped
+/// whole, so an exchange id the memory gives again after a wipe (ids
+/// start at 1 in a new store) never names a turn deleted before it. The
+/// scope is a known person's `p-` id or `everyone`. The only maker of the
+/// id: the memory's forget answers, and the voice's save of a turn, call
+/// it.
+pub fn history_turn_id(epoch: &str, scope: &str, id: u64) -> String {
+    format!("{epoch}.{scope}:{id}")
+}
+
+/// A memory store's epoch as [`history_turn_id`] takes it: 8 lowercase
+/// hex characters.
+pub fn is_history_epoch(epoch: &str) -> bool {
+    epoch.len() == 8
+        && epoch
+            .bytes()
+            .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+/// The scope of a [`history_turn_id`], when `turn` is one: a well-formed
+/// epoch, a scope and a number.
+pub fn history_turn_scope(turn: &str) -> Option<&str> {
+    let (epoch, rest) = turn.split_once('.')?;
+    let (scope, id) = rest.rsplit_once(':')?;
+    (is_history_epoch(epoch) && !scope.is_empty() && id.parse::<u64>().is_ok()).then_some(scope)
 }
 
 /// Memory has forgotten everything it kept under a person, asked by the
@@ -1912,12 +2000,43 @@ impl UpdateStatus {
 /// being installed, and in `restoring` still the build that was tried. Times are
 /// the lamp's clock in Unix milliseconds; the step's is never before the
 /// round's.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UpdateRound {
     pub started_at_unix_ms: u64,
     pub step_started_at_unix_ms: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<UpdateBuild>,
+    /// What the round waits for before it switches (#7517), with `now`
+    /// `switching`: [`UpdateRound::WAITING_QUIET`] while it waits for a
+    /// quiet moment with the new build installed beside, and
+    /// [`UpdateRound::WAITING_GIVE_WAY`] while an Update now round gives the
+    /// voice its moment to say so. Absent once it switches, and before.
+    /// An older reader passes over it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub waiting: Option<String>,
+    /// [`UpdateRound::ASKED_NOW`] for a round the owner's Update now asked
+    /// for, or took over while it waited (#7517); absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asked: Option<String>,
+}
+
+impl UpdateRound {
+    /// `waiting` while the round waits for a quiet moment (#7517).
+    pub const WAITING_QUIET: &str = "quiet";
+    /// `waiting` while an Update now round gives way to the voice (#7517).
+    pub const WAITING_GIVE_WAY: &str = "give_way";
+    /// `asked` for a round of the owner's Update now (#7517).
+    pub const ASKED_NOW: &str = "now";
+
+    /// Whether this round is one the owner's Update now asked for.
+    pub fn asked_now(&self) -> bool {
+        self.asked.as_deref() == Some(Self::ASKED_NOW)
+    }
+
+    /// Whether this round is giving way to the voice before its switch.
+    pub fn giving_way(&self) -> bool {
+        self.waiting.as_deref() == Some(Self::WAITING_GIVE_WAY)
+    }
 }
 
 /// Where Harness's install on the lamp is (#5197), as lamp-update's
@@ -2163,7 +2282,21 @@ pub struct UpdateCheck {
     /// does not know it reads a plain check.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry: Option<u64>,
+    /// The owner's Update now (#7517, `update.now`): the round switches
+    /// without waiting for a quiet moment. lamp-update takes it as now only
+    /// with lamp-cloud's own mark beside it ([`UPDATE_NOW_FILE`], at most
+    /// [`UpdateCheck::NOW_WITHIN`] old); any other is a plain check. Absent
+    /// for a plain check; an older lamp-update reads a plain check.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub now: Option<bool>,
 }
+
+/// lamp-cloud's mark of the owner's Update now (#7517): `{"at_unix_ms": <ms>}`,
+/// written in lamp-cloud's own state folder (0700, which no other part may
+/// write) just before it says `update/check` with `now`. lamp-update takes a
+/// `now` check only while this is at most [`UpdateCheck::NOW_WITHIN`] old,
+/// since the bus has no list of who may say a topic.
+pub const UPDATE_NOW_FILE: &str = "/var/lib/lampos-cloud/update-now";
 
 impl UpdateCheck {
     pub const TYPE: &str = "lamp_msgs/UpdateCheck";
@@ -2172,6 +2305,9 @@ impl UpdateCheck {
     /// The least time between two checks that start a round, on either
     /// side: lamp-cloud refuses an ask sooner, and `serve` drops one.
     pub const AGAIN_AFTER: Duration = Duration::from_secs(60);
+    /// How old lamp-cloud's mark ([`UPDATE_NOW_FILE`]) may be for a `now`
+    /// check to count as the owner's Update now (#7517).
+    pub const NOW_WITHIN: Duration = Duration::from_secs(5);
 
     /// A stream with no period: nothing is kept, so a lamp-update that
     /// starts later never takes an old ask for a new one.
@@ -2649,8 +2785,13 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(addon_topics())
         .chain(privacy_topics())
         .chain(sound_class_topics())
+        .chain(body_sound_topics())
+        .chain(lamp_did_topics())
+        .chain(app_trigger_topics())
+        .chain(app_fact::app_fact_topics())
         .chain(chat_topics())
         .chain(presence_topics())
+        .chain(heat_topics())
         .chain(reports_topics())
         .chain(account_topics())
         .chain(energy_topics())
@@ -2673,6 +2814,28 @@ mod tests {
     use super::*;
     use serde::de::DeserializeOwned;
     use serde_json::{Value, json};
+
+    /// #7771: a turn id is `<epoch>.<scope>:<id>`, and only such an id
+    /// gives its scope.
+    #[test]
+    fn a_history_turn_id_carries_the_epoch_scope_and_id() {
+        let turn = history_turn_id("0a1b2c3d", "p-0123456789abcdef", 12);
+        assert_eq!(turn, "0a1b2c3d.p-0123456789abcdef:12");
+        assert_eq!(history_turn_scope(&turn), Some("p-0123456789abcdef"));
+        assert_eq!(
+            history_turn_scope(&history_turn_id("ffffffff", "everyone", 7)),
+            Some("everyone")
+        );
+        for bad in [
+            "everyone:7",
+            "0A1B2C3D.everyone:7",
+            "0a1b2c.everyone:7",
+            "0a1b2c3d.:7",
+            "0a1b2c3d.everyone:x",
+        ] {
+            assert_eq!(history_turn_scope(bad), None, "{bad}");
+        }
+    }
 
     /// `value` is written as exactly `text`, reads back as itself, and
     /// reads the same with a field no version yet knows beside the others.
@@ -2895,7 +3058,7 @@ mod tests {
         let yes = consent::file_in(&folder, consent::FACE_EXPRESSIONS).unwrap();
         let gaze = br#"{"faces":[{"id":"f1","xmin":0.2,"ymin":0.2,"xmax":0.4,"ymax":0.5,"confidence":0.9,"facing":true,"pitch":0.6,"looking":false}]}"#;
         let seen = |payload: &[u8]| {
-            serde_json::from_slice::<Faces>(&Faces::for_skills(Faces::TOPIC, payload, &yes))
+            serde_json::from_slice::<Faces>(&Faces::for_skills(Faces::TOPIC, payload, &yes, false))
                 .unwrap()
                 .faces
                 .remove(0)
@@ -2915,15 +3078,52 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(
-            Faces::for_skills(Faces::TOPIC, gaze, &yes),
+            Faces::for_skills(Faces::TOPIC, gaze, &yes, false),
             std::borrow::Cow::Borrowed(_)
         ));
         let face = seen(gaze);
         assert_eq!((face.pitch, face.looking), (Some(0.6), Some(false)));
         std::fs::remove_file(&yes).unwrap();
         let plain = br#"{"faces":[{"id":"f1","pitch":0.6}]}"#;
-        assert_eq!(&*Faces::for_skills("room/activity", plain, &yes), plain);
-        assert_eq!(&*Faces::for_skills(Faces::TOPIC, b"[1]", &yes), b"[1]");
+        assert_eq!(
+            &*Faces::for_skills("room/activity", plain, &yes, false),
+            plain
+        );
+        assert_eq!(
+            &*Faces::for_skills(Faces::TOPIC, b"[1]", &yes, false),
+            b"[1]"
+        );
+        std::fs::remove_dir_all(&folder).unwrap();
+    }
+
+    /// #7767: with `LAMP_NOTICING_BY_DEFAULT` on, a missing face-expressions
+    /// file lets skills see where a face looks; a kept no or a file that
+    /// can't be read still takes both out. Off, a missing file takes them
+    /// out, as before.
+    #[test]
+    fn skills_see_where_a_face_looks_by_default_only_with_the_switch() {
+        let folder = std::env::temp_dir().join(format!("msgs-gaze-default-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let yes = consent::file_in(&folder, consent::FACE_EXPRESSIONS).unwrap();
+        let gaze = br#"{"faces":[{"id":"f1","pitch":0.6,"looking":false}]}"#;
+        let passes = |by_default| {
+            matches!(
+                Faces::for_skills(Faces::TOPIC, gaze, &yes, by_default),
+                std::borrow::Cow::Borrowed(_)
+            )
+        };
+        assert!(!passes(false), "missing, off");
+        assert!(!passes(true), "missing, on, before the old nos are done");
+        std::fs::write(folder.join(consent::OLD_NOS_DONE), b"{}").unwrap();
+        assert!(!passes(false), "missing, off");
+        assert!(passes(true), "missing, on");
+        let no = consent::no_bytes(consent::FACE_EXPRESSIONS, 1, consent::BY_VOICE);
+        for text in [no.as_slice(), b"not json"] {
+            std::fs::write(&yes, text).unwrap();
+            assert!(!passes(true), "{}", String::from_utf8_lossy(text));
+            assert!(!passes(false), "{}", String::from_utf8_lossy(text));
+        }
         std::fs::remove_dir_all(&folder).unwrap();
     }
 
@@ -4251,7 +4451,13 @@ mod tests {
     #[test]
     fn an_update_check_is_an_empty_stream_and_nothing_is_kept() {
         round_trip(&UpdateCheck::default(), "{}");
-        round_trip(&UpdateCheck { retry: Some(12226) }, "{\"retry\":12226}");
+        round_trip(
+            &UpdateCheck {
+                retry: Some(12226),
+                now: None,
+            },
+            "{\"retry\":12226}",
+        );
         let declared = UpdateCheck::declaration();
         assert_eq!(
             (declared.type_name.as_str(), declared.kind),
@@ -4287,6 +4493,8 @@ mod tests {
                     sequence: 10_580,
                     commit: "e3b6593873".into(),
                 }),
+                waiting: None,
+                asked: None,
             }),
             ..idle.clone()
         };
@@ -4298,6 +4506,8 @@ mod tests {
                 started_at_unix_ms: 1_000,
                 step_started_at_unix_ms: 1_000,
                 target: None,
+                waiting: None,
+                asked: None,
             }),
             ..idle
         };
@@ -4720,6 +4930,8 @@ mod update_status_tests {
                 started_at_unix_ms: 1,
                 step_started_at_unix_ms: 1,
                 target: target.map(build),
+                waiting: None,
+                asked: None,
             }),
         }
     }

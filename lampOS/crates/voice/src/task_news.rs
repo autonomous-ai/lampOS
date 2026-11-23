@@ -1836,6 +1836,9 @@ fn note_failed(
         // answer in time, or Harness is not running yet (#7282). Told so
         // at once, not as a hand-over that could not be started.
         Some("openclaw_gateway_not_ready" | "harness_not_running") => Some(&words.failed_not_ready),
+        // The lamp's kept session got stuck under it and is being restarted
+        // (#7906 sign 5): ended at once, the person asks again later.
+        Some("one_session_stuck") => Some(&words.failed_stuck),
         _ => None,
     };
     if let Some(line) = refused
@@ -1865,6 +1868,11 @@ pub(crate) fn unprompted(words: &str) -> String {
 /// work to is named in its news (a Hermes task was told as Claude Code's);
 /// Claude Code, the default target's, for a task naming no known engine.
 pub(crate) fn who(task: &Value) -> &'static str {
+    // The lamp's own engine is never named to the person (the owner,
+    // #7930): the lamp did it.
+    if on_the_lamp(task) {
+        return crate::agent_tasks::OWN_ENGINE;
+    }
     engine_of(task)
         .as_str()
         .and_then(crate::agent_tasks::name_of)
@@ -1928,8 +1936,9 @@ fn engine_of(task: &Value) -> &Value {
 }
 
 /// What a note of work done on the lamp itself adds (#5978): the person
-/// hears that the lamp did it, here.
-const ON_THE_LAMP: &str = " It was done here on the lamp itself, not on their computer: say so in the same breath (\"I did it here on the lamp\").";
+/// hears that the lamp did it, here, and never which agent ran it (the
+/// owner, #7930, [`crate::agent_tasks::NO_AGENT_NAME`]).
+const ON_THE_LAMP: &str = " It was done here on the lamp itself, not on their computer: say so in the same breath (\"I did it here on the lamp\"). Never tell the person which agent runs their work; say what is being done or what was found.";
 
 /// At most `most` characters of `text` on one line, with no double quotes
 /// to end the note's quotation early.
@@ -2510,6 +2519,23 @@ mod tests {
 
     fn own() -> NewsWords {
         NewsWords::in_dir(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills"))
+    }
+
+    /// #7930 (the owner): news of work the lamp's own engine did never
+    /// names that engine, and carries the one rule; a task about Hermes
+    /// keeps "Hermes" in its own words.
+    #[test]
+    fn the_lamps_own_engine_is_never_named_in_its_news() {
+        let task = json!({"text":"Research Hermes, the Greek god, in three lines",
+            "target":{"engine":"openclaw"},"task":{"target_alias":"lamp"}});
+        assert_eq!(who(&task), crate::agent_tasks::OWN_ENGINE);
+        assert!(ON_THE_LAMP.contains(crate::agent_tasks::NO_AGENT_NAME));
+        assert!(!ON_THE_LAMP.contains("OpenClaw") && !ON_THE_LAMP.contains("Hermes"));
+        let (asked, _) = quoted(asked_text(&task).unwrap(), MOST_TASK_CHARS);
+        assert!(asked.contains("Hermes"), "{asked}");
+        let computer = json!({"text":"Fix the parser","target":{"engine":"claude"},
+            "task":{"target_alias":"coding"}});
+        assert_eq!(who(&computer), "Claude Code");
     }
 
     /// What the voice said before its words were Task news' (#940), kept
@@ -3512,6 +3538,21 @@ mod tests {
                 "{code}"
             );
         }
+    }
+
+    /// #7906 sign 5: a spoken task ended as the lamp's kept session got
+    /// stuck and was restarted under it (`one_session_stuck`) is told the
+    /// owner's line once, never as a plain failure.
+    #[test]
+    fn a_task_ended_by_a_stuck_restart_is_told_to_ask_again_in_a_few_minutes() {
+        let task = task("openclaw", json!([]));
+        let told = note_failed(&own(), &task, false, Some("one_session_stuck")).unwrap();
+        assert!(told.contains(crate::skill_words::STUCK_LINE), "{told}");
+        assert_eq!(
+            crate::skill_words::STUCK_LINE,
+            "I can't handle that right now; please ask me again in a few minutes."
+        );
+        assert_ne!(Some(told), note_failed(&own(), &task, false, None));
     }
 
     /// `LAMP_TASKS_RESUME_CLOSED` (openharness#3606): a named session that was
@@ -5238,14 +5279,15 @@ mod tests {
         };
         assert!(on_the_lamp(&fetched(Value::Null)));
         assert_eq!(their_computer(&fetched(Value::Null)), "the lamp");
-        assert_eq!(who(&fetched(Value::Null)), "Hermes");
+        // The lamp's own engine is never named (the owner, #7930).
+        assert_eq!(who(&fetched(Value::Null)), crate::agent_tasks::OWN_ENGINE);
         let elsewhere = fetched(json!({"alias":"office","machine_id":"m","engine":"codex"}));
         assert!(!on_the_lamp(&elsewhere));
         assert_eq!(their_computer(&elsewhere), "their computer");
         assert_eq!(who(&elsewhere), "Codex");
         let on = |alias: &str, engine: &str| json!({"text":"Write a poem","target":{"engine":engine},"target_alias":alias});
         let lamp = note(&own(), &on("lamp", "hermes"), &done, 0).unwrap();
-        assert!(lamp.contains("Hermes"), "{lamp}");
+        assert!(!lamp.contains("Hermes"), "{lamp}");
         assert!(lamp.ends_with(&format!("{ON_THE_LAMP})")), "{lamp}");
         assert_eq!(their_computer(&on("lamp", "hermes")), "the lamp");
         let office = note(&own(), &on("office", "claude"), &done, 0).unwrap();
@@ -5256,7 +5298,7 @@ mod tests {
     }
 
     /// #6226: work done by OpenClaw on the lamp itself is told as done
-    /// here on the lamp, by OpenClaw, as Hermes's.
+    /// here on the lamp, as Hermes's, never naming either (#7930).
     #[test]
     fn work_done_by_openclaw_on_the_lamp_is_told_as_done_here() {
         let done =
@@ -5264,10 +5306,10 @@ mod tests {
         let on =
             json!({"text":"Write a poem","target":{"engine":"openclaw"},"target_alias":"lamp"});
         assert!(on_the_lamp(&on));
-        assert_eq!(who(&on), "OpenClaw");
+        assert_eq!(who(&on), crate::agent_tasks::OWN_ENGINE);
         assert_eq!(their_computer(&on), "the lamp");
         let lamp = note(&own(), &on, &done, 0).unwrap();
-        assert!(lamp.contains("OpenClaw"), "{lamp}");
+        assert!(!lamp.contains("OpenClaw"), "{lamp}");
         assert!(lamp.ends_with(&format!("{ON_THE_LAMP})")), "{lamp}");
         let office =
             json!({"text":"Write a poem","target":{"engine":"openclaw"},"target_alias":"office"});

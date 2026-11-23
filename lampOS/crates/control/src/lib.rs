@@ -14,9 +14,18 @@
 //! the parts come in the pieces after it, off unless `LAMP_CONTROL=on`.
 
 pub mod agent;
+pub mod app_context;
+pub mod app_facts_forget;
+pub mod app_push;
+pub mod app_remember;
+pub mod app_socket;
+pub mod app_triggers;
+pub mod app_yes;
+pub mod apps_owed;
 pub mod body_info;
 pub mod body_lease;
 pub mod body_state;
+pub mod build;
 pub mod camera;
 pub mod cert;
 pub mod feelings;
@@ -27,8 +36,11 @@ pub mod lease;
 pub mod microphone;
 pub mod motion_done;
 pub mod notes;
+pub mod npu;
+pub mod paired_by;
 pub mod pairing;
 pub mod parts;
+pub mod peer;
 pub mod protocol;
 pub mod push;
 pub mod pushed_moves;

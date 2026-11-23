@@ -62,7 +62,19 @@ use tokio::{
 };
 
 mod after_forget;
+
+/// Tests: the status a turn keeps of a `make_skill` call answered as queued
+/// (`LAMP_MAKE_QUEUE`, #7679), as `after_forget::status` keeps it.
+#[cfg(test)]
+pub(crate) fn queued_make_status_for_test() -> serde_json::Value {
+    after_forget::status(
+        crate::made_skill::MAKE,
+        &crate::make_queue::queued_told(1, "q1", "gold price"),
+    )
+}
+
 mod held_rename;
+pub mod limit_local;
 pub mod link;
 pub mod net;
 mod own_echo;
@@ -80,6 +92,34 @@ pub use services::{
     CHAT_WARM_ENVIRONMENT, Listener, Net, RELAY_ROUTES_ENVIRONMENT, Routable,
     SPEECH_SOCKET_ENVIRONMENT, SPEECH_SOCKET_MODEL_ENVIRONMENT, SPEECH_WARM_ENVIRONMENT, Services,
 };
+
+/// What a refused keep's line said at once needs (#7877), each kept apart
+/// so the journal can name the one that failed.
+#[derive(Clone, Copy, Debug)]
+struct RefusedGate {
+    heard: bool,
+    first_calls: bool,
+    held_forget_ran: bool,
+    worded: bool,
+    only_keeps: bool,
+}
+
+impl RefusedGate {
+    /// The first condition that keeps the line from being said, or none;
+    /// `refused_all`: every call came back refused with nobody known.
+    fn failed(self, refused_all: bool) -> Option<&'static str> {
+        [
+            (!self.heard, "not a spoken line"),
+            (!self.first_calls, "not round 1's first calls"),
+            (self.held_forget_ran, "a held forget ran"),
+            (self.worded, "the model's words came beside the call"),
+            (!self.only_keeps, "the line asks more than a keep"),
+            (!refused_all, "not every call was so refused"),
+        ]
+        .into_iter()
+        .find_map(|(fails, why)| fails.then_some(why))
+    }
+}
 
 #[cfg(test)]
 mod tests;
@@ -103,6 +143,11 @@ pub(crate) const WORDS_AFTER_CAP_NOTE: &str = "(For you to know: this request ma
 /// What the lamp says when that round has no words either: never silence
 /// after the person waited through every round.
 pub(crate) const UNFINISHED_LINE: &str = "Sorry, I couldn't finish that. Could you ask me again?";
+
+/// What a call is answered that can't run once an app the model started in
+/// the same round holds the turn (`start_app`, #7415): another app start, a
+/// skill made by voice, a sleep or a recording would speak over the app.
+pub(crate) const APP_TOOK_THE_TURN: &str = "not run: an app took the turn";
 /// A turn's first chat round that has not begun (no word, no call) this
 /// long after it was asked, which is as soon as speech to text gave the
 /// words, is given up and the turn ends unanswered: an answer said 12 s
@@ -217,6 +262,48 @@ pub const CARRY_WITHIN: Duration = Duration::from_secs(30);
 /// held each line's words back 1 to 2.5 s while Deepgram worked through it
 /// (the first builder on lamp-4ace on 19 Oct at 18:56).
 pub const KEPT_SAMPLES: usize = 16_000 * 3 / 2;
+/// With `LAMP_CARRY_UNANSWERED_SOUND=on`: the most of a line's sound kept for
+/// the next, 6 s at 16 kHz (#7939). A line is carried only when its words
+/// did not come back (the `carries` rule in [`Engine`]'s start), so a line
+/// that was heard keeps and carries nothing more than before. On lamp-9adf,
+/// "Lamp, make a skill called tech news: tell me one short tech headline"
+/// was cut in three pieces none of which came back with words; each went on
+/// with only the last 1.5 s, and "Lamp, make a skill" was lost, so no make
+/// was asked.
+pub const KEPT_SAMPLES_LONG: usize = 16_000 * 6;
+/// Where the second route reads it: `on` exactly; off unless set.
+pub const CARRY_LONG_ENVIRONMENT: &str = "LAMP_CARRY_UNANSWERED_SOUND";
+
+/// The most of a line's sound kept for the next: [`KEPT_SAMPLES`], or with
+/// [`CARRY_LONG_ENVIRONMENT`] [`KEPT_SAMPLES_LONG`]. Read once.
+fn kept_most() -> usize {
+    #[cfg(test)]
+    if let Some(long) = tests::LONG_FOR_TEST.with(std::cell::Cell::get) {
+        return most_kept(long);
+    }
+    static LONG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    most_kept(
+        *LONG
+            .get_or_init(|| std::env::var(CARRY_LONG_ENVIRONMENT).is_ok_and(|value| value == "on")),
+    )
+}
+
+/// [`kept_most`] for `long` (the switch).
+fn most_kept(long: bool) -> usize {
+    if long {
+        KEPT_SAMPLES_LONG
+    } else {
+        KEPT_SAMPLES
+    }
+}
+
+/// `new` after `kept`, the oldest dropped past `most`.
+fn keep_sound(kept: &mut VecDeque<i16>, new: &[i16], most: usize) {
+    kept.extend(new.iter().copied());
+    let over = kept.len().saturating_sub(most);
+    kept.drain(..over);
+}
+
 /// A line beginning this soon after the last one ended, that one not
 /// answered, goes on from it: its sound goes first ([`KeptSound`]).
 pub const CARRY_AFTER_END: Duration = Duration::from_millis(1_500);
@@ -340,6 +427,16 @@ pub const LIMIT_AFTER: Duration = Duration::from_secs(120);
 /// After a run's first [`DOWN_LINE_LIMIT`], how long before a line that
 /// names the lamp hears it again (the first builder's ruling on #7362).
 pub const LIMIT_AGAIN_NAMED: Duration = Duration::from_secs(300);
+/// With `LAMP_LIMIT_LOCAL_ASKS`, how long after the last usage-limit
+/// refusal a line is taken as still at the limit, its chat not asked: after
+/// it, one line asks the chat again to find whether the limit has passed,
+/// as a held refusal tries once a minute (#4265; Heron on #7612).
+pub const LIMIT_TRY_AGAIN: Duration = Duration::from_secs(60);
+/// With `LAMP_LIMIT_LOCAL_ASKS`, a due timer's line at the usage limit, in
+/// place of the chat turn the limit refuses (#7642, V2's ruling A).
+pub const LIMIT_TIMER_DONE: &str = "Your timer is done.";
+/// [`LIMIT_TIMER_DONE`] for a reminder, its words being the chat's to say.
+pub const LIMIT_REMINDER_DUE: &str = "You have a reminder.";
 
 /// The down lines, in the order [`DownLine`] renders them at the start.
 pub(crate) const DOWN_LINES: [&str; 4] = [
@@ -422,8 +519,9 @@ pub(crate) fn without_kept_calls(history: &[Message]) -> Option<(Vec<Message>, u
 /// back by the model itself, no call, three rows of three).
 ///
 /// A skill's call through [`crate::use_skill::NAME`] is kept with its
-/// `skill`, `choice` and `flag` only, [`SKILL_KEPT_FIELDS`] (a skill's
-/// name, a word from its own list, a yes-or-no; never the person's words),
+/// `skill`, `choice`, `flag` and `kind` only, [`SKILL_KEPT_FIELDS`] (a
+/// skill's name, a word from its own list, a yes-or-no, a word from its
+/// kinds; never the person's words),
 /// and only when every field it has is one of those (#7076: on lamp-52e6 on
 /// 14 Nov a second "Lamp, I'm unplugging you now." 8 s after a
 /// prepare-unplug run was answered in words, `calls=none`: the earlier
@@ -472,7 +570,15 @@ pub(crate) fn kept_args(name: &str, args: &serde_json::Value) -> Option<serde_js
 pub(crate) const WRITE_KEPT_FIELDS: [&str; 3] = ["service", "action", "send_id"];
 
 /// The only fields a kept `use_skill` call may have ([`kept_args`]).
-pub(crate) const SKILL_KEPT_FIELDS: [&str; 3] = ["skill", "choice", "flag"];
+pub(crate) const SKILL_KEPT_FIELDS: [&str; 4] = ["skill", "choice", "flag", "kind"];
+
+/// A kept `confirm_agent_task`, as told in a later turn's history
+/// ([`kept_result`]): the task was handed over then, and a later bare "how
+/// far is it?" or "is it done?" is about it. On c0a4 (ROW c0a4-5, L4s en)
+/// a yes taken in code kept nothing, and the next turn's "how far is it?"
+/// got `calls=none` and "How far is what?" (#7930). Read at call time:
+/// `check_agent_task` with no task answers the newest work.
+pub(crate) const TASK_HANDED_OVER: &str = "(done earlier: the task was handed over then and runs on its own. A bare \"how far is it\", \"is it done\" or \"how's it going\" after it is about it: call check_agent_task, which with no task answers the newest work.)";
 
 /// A kept skill's call, as told in a later turn's history ([`kept_result`]):
 /// it ran then, and a new ask for it is a call of its own (#7076).
@@ -483,6 +589,52 @@ pub(crate) const SKILL_RAN_EARLIER: &str = "(done earlier: the skill ran then. T
 pub(crate) const WRITE_PREPARED: &str = "(done earlier: prepared, nothing sent; the read_back the lamp said next came from this call, and waited for a yes. The rest of its result was not kept. A new write needs its own call.)";
 pub(crate) const WRITE_DONE: &str = "(done earlier: done by the service. The rest of its result was not kept. A new write needs its own call.)";
 pub(crate) const WRITE_NOT_DONE: &str = "(done earlier: not done. The rest of its result was not kept. A new write needs its own call.)";
+
+/// A `make_skill` call that removed a skill the person made, asked a
+/// remove's question, or turned one off or on, as kept for a later turn's
+/// history (`LAMP_HISTORY_KEEPS_CALLS`, #7683): its one argument by the
+/// made skill's own name from its answer (`made.json`'s, never the words
+/// heard), and its result as one of these fixed lines. Before, no
+/// `make_skill` with arguments was kept ([`kept_args`]), so each earlier
+/// remove was told as words alone, the lamp's "Remove moon fact?" and
+/// "moon fact is removed.", and on lamp-9adf (18 Nov 14:38) "remove
+/// planet fact" then "Yes." were answered in words with `calls=none`, and
+/// nothing was removed. A make's call is not kept: its arguments are the
+/// person's request.
+pub(crate) fn kept_made(
+    name: &str,
+    told: &serde_json::Value,
+) -> Option<(serde_json::Value, Option<&'static str>)> {
+    if name != crate::made_skill::MAKE || told.get("error").is_some() {
+        return None;
+    }
+    let named = |field: &str| {
+        told[field]
+            .as_str()
+            .filter(|made| !made.is_empty() && made.len() <= crate::thread::KEPT_ARGS_BYTES / 2)
+    };
+    let (field, made, result) = if let Some(made) = named("removed") {
+        (crate::made_remove::REMOVE, made, MADE_REMOVED)
+    } else if let Some(made) = named(crate::made_remove::REMOVE)
+        && told[crate::skill_write_yes::APPROVE_ID].is_string()
+    {
+        (crate::made_remove::REMOVE, made, MADE_REMOVE_ASKED)
+    } else if let Some(made) = named(crate::made_turn::TURN_OFF) {
+        (crate::made_turn::TURN_OFF, made, MADE_TURNED)
+    } else if let Some(made) = named(crate::made_turn::TURN_ON) {
+        (crate::made_turn::TURN_ON, made, MADE_TURNED)
+    } else {
+        return None;
+    };
+    Some((serde_json::json!({ field: made }), Some(result)))
+}
+
+/// A kept remove's yes ([`kept_made`]).
+pub(crate) const MADE_REMOVED: &str = "(done earlier: removed on their yes to the lamp's question; what the lamp said next came from this call. The rest of its result was not kept. A new remove needs its own make_skill call, which asks them first.)";
+/// A kept remove that asked its question ([`kept_made`]).
+pub(crate) const MADE_REMOVE_ASKED: &str = "(done earlier: nothing removed yet; the question the lamp asked next came from this call, and waited for their yes. The rest of its result was not kept. A new remove needs its own make_skill call.)";
+/// A kept turn off or on ([`kept_made`]).
+pub(crate) const MADE_TURNED: &str = "(done earlier: done; what the lamp said next came from this call. The rest of its result was not kept. A new turn off or on needs its own make_skill call.)";
 
 /// What a call answered with an error is kept as, bare, for a later turn's
 /// history (`LAMP_HISTORY_KEEPS_CALLS`): never told as a call, only as the
@@ -516,6 +668,12 @@ pub(crate) fn failed_then_note(names: &[&str]) -> String {
 pub(crate) fn kept_result(name: &str, told: &serde_json::Value) -> Option<&'static str> {
     if name == crate::use_skill::NAME {
         return Some(SKILL_RAN_EARLIER);
+    }
+    // A task handed over, by the model's confirm or by the yes taken in
+    // code, is told as running, for a bare "how far is it?" later (#7930).
+    if name == crate::agent_tasks::CONFIRM {
+        return (told.get("handing_over") == Some(&serde_json::Value::Bool(true)))
+            .then_some(TASK_HANDED_OVER);
     }
     if name != crate::services::WRITE {
         return None;
@@ -858,6 +1016,44 @@ pub const NAME_SECOND_SIGN_ENVIRONMENT: &str = "LAMP_NAME_SECOND_SIGN";
 /// at its start and answered (#3945).
 pub const NAME_SAID_TO_A_PERSON_ENVIRONMENT: &str = "LAMP_NAME_SAID_TO_A_PERSON";
 
+/// Where the worker reads whether, with [`NAME_SECOND_SIGN_ENVIRONMENT`], a
+/// second sign must belong to the hearing it counts for (`on`, and nothing
+/// else): a line `LAMP_NAME_NEAR` ruled not the name counts the hearing by
+/// none, and "the name said close to it" counts only when the voice rose
+/// close while a hearing of `attention::NEAR_SCORE` or more was said. On
+/// lamp-74ff on 20 Nov (build 14967) a one-word line ruled not the name
+/// counted by closeness read 15 s before its hearing, and opened a
+/// conversation in a meeting (#8092).
+pub const NAME_SIGN_TIED_ENVIRONMENT: &str = "LAMP_NAME_SIGN_TIED";
+
+/// Where the worker and the coordinator read whether a hearing of the
+/// lamp's name needs a face or its words (`on`, and nothing else): on the
+/// second route, a hearing only in the room's sound under
+/// `attention::SURE_SCORE` counts only with a face turned to the lamp or
+/// the line's words calling it (`attention::Attention::need_a_face_or_words`);
+/// and a request with no words whose hearing the faint floor turned away
+/// owes no second look (`second_look::SecondLook::holding_a_faint_wordless_call`).
+/// On lamp-74ff on 20 Nov (build 15146) two people talking Vietnamese with
+/// their backs to it were answered on a 0.921 hearing at a line's start,
+/// and a 0.904 hearing the floor turned away made the lamp speak unasked
+/// and open a window (#8114's shapes 5-7, #8136).
+pub const NAME_FACE_OR_WORDS_ENVIRONMENT: &str = "LAMP_NAME_FACE_OR_WORDS";
+
+/// `on` exactly, off unless set (#8114, the first builder's 08:54 and 08:57):
+/// a line whose call word is another person's name ("Hey, Lance.", "Dan,
+/// are you done?") is never the lamp's call, however sure lamp-name is,
+/// unless a face is turned to the lamp; and `LAMP_NAME_NEAR` never puts the
+/// lamp's name in such a word's place ([`crate::attention::called_by_another_name`]).
+pub const NAME_NOT_ANOTHERS_ENVIRONMENT: &str = "LAMP_NAME_NOT_ANOTHERS";
+
+/// [`NAME_NOT_ANOTHERS_ENVIRONMENT`] from this worker's environment, read once.
+pub(crate) fn not_anothers_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| {
+        std::env::var(NAME_NOT_ANOTHERS_ENVIRONMENT).is_ok_and(|value| value == "on")
+    })
+}
+
 /// Where the worker reads whether a hearing of the lamp's name inside one
 /// line's sound stays with that line, never counting for the one begun
 /// after it (`on`, and nothing else;
@@ -891,6 +1087,11 @@ pub const BUSY_NO_FACE_RENEWS_ENVIRONMENT: &str = "LAMP_BUSY_NO_FACE_RENEWS";
 /// (`LAMP_ROOM_HELD_TALK=on`,
 /// [`crate::room_told::RoomTold::count_held_not_spoken_to`], #7332).
 pub const ROOM_HELD_TALK_ENVIRONMENT: &str = "LAMP_ROOM_HELD_TALK";
+
+/// A held rename's one- or two-word yes read by the short-line rule, with
+/// `LAMP_NAME_LEARN_FIX` (`LAMP_RENAME_SHORT_YES=on`, #7419,
+/// [`held_rename::SHORT_YES_ENVIRONMENT`]).
+pub const RENAME_SHORT_YES_ENVIRONMENT: &str = "LAMP_RENAME_SHORT_YES";
 
 /// Where the worker reads whether the lamp's name at a line's start
 /// ([`crate::attention::NAME_AT_THE_START_US`]) is dated from the line's usual
@@ -973,6 +1174,16 @@ pub const TWO_FACES_HELD_ENVIRONMENT: &str = "LAMP_TWO_FACES_HELD";
 /// half the same way (Eighth's long request).
 pub const JOIN_CUT_WORDS_ENVIRONMENT: &str = "LAMP_JOIN_CUT_WORDS";
 
+/// Where the worker reads whether the join of cut words reads the voice
+/// prints made for the linked services (`LAMP_SAME_VOICE_FOR=services`), or,
+/// where none are made (the private room, no services), prints of its own:
+/// `on`, and nothing else (#8003: on lamp-9adf on 19 Nov one person's 21 s
+/// request said in the dark was heard as five lines, and only the last was
+/// asked). Only with [`JOIN_CUT_WORDS_ENVIRONMENT`] or
+/// [`NAME_CARRIES_ENVIRONMENT`], and never with
+/// `same_voice::CONFIRMS_ENVIRONMENT`, where the voice only confirms.
+pub const JOIN_SAME_VOICE_ENVIRONMENT: &str = "LAMP_JOIN_SAME_VOICE";
+
 /// Where the worker reads whether a busy room ends sooner (the first
 /// builder on Queue #1722, 04:00): `on`, and nothing else. A minute after
 /// the last talk when the lamp has not answered since, and a minute after
@@ -1008,6 +1219,14 @@ pub const CONVERSATION_CARRIES_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIES";
 /// ([`Engine::carrying_skill_yes_from_question`], #7148). `on`, and nothing
 /// else; off, as before.
 pub const SKILL_YES_CARRY_ENVIRONMENT: &str = "LAMP_SKILL_YES_CARRY";
+
+/// With [`CONVERSATION_CARRIES_ENVIRONMENT`], a line no face was seen
+/// speaking is carried in the known person's conversation going on when the
+/// only face in view is the same unbroken eyes track as the face last named
+/// as them, alone in view, though the eyes no longer name it (a hand over
+/// their face mid-conversation; C63(b), lamp-06c1, 18 Nov;
+/// [`Engine::carrying_own_track`]). `on`, and nothing else; off, as before.
+pub const CONVERSATION_CARRIES_OWN_TRACK_ENVIRONMENT: &str = "LAMP_CONVERSATION_CARRIES_OWN_TRACK";
 
 /// With [`CONVERSATION_CARRIES_ENVIRONMENT`], a carried line may save into
 /// the conversation's own scope: its `remember` runs as the carried person's
@@ -1570,6 +1789,9 @@ pub type Asked = Arc<dyn Fn(u64) -> bool + Send + Sync>;
 pub type Look = Arc<dyn Fn() -> Result<Vec<u8>, &'static str> + Send + Sync>;
 /// The engine's clock, for the announcement's spell.
 pub type Clock = Arc<dyn Fn() -> Instant + Send + Sync>;
+/// The skills the person made, as `made.json` keeps them, each with
+/// whether it is on now ([`Engine::reading_made_names`], #7683).
+pub type MadeNames = Arc<dyn Fn() -> Vec<crate::action_claim::MadeSkill> + Send + Sync>;
 /// The note a spoken request's words earn when they name one of the staff
 /// (`worker::staff_noting`, `crate::staff_note`): `(request, heard)` to the
 /// note, or nothing.
@@ -1595,6 +1817,9 @@ pub type ReadBackAsked = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
 /// The call a heard line plainly asks for by an installed skill's name, as
 /// its name and arguments, or none (`crate::skill_named::heard`, #6772).
 pub type SkillNamed = Arc<dyn Fn(&str) -> Option<(String, Value)> + Send + Sync>;
+/// Whether words (the lamp's own) name a skill made on the lamp by its
+/// name, as words in a row (`crate::skill_named::Heard::names_made`).
+pub type MadeNamed = Arc<dyn Fn(&str) -> bool + Send + Sync>;
 /// An installed skill's own ask phrases, by its function's name
 /// (`crate::tools::skill_asks`, #5749): what a called skill's recording
 /// may play for besides a line that asks to play.
@@ -1616,6 +1841,15 @@ pub type TaskDeclined = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
 /// linked record), the task started in code and the note it gets, or
 /// nothing. Blocking: it asks the tasks part.
 pub type TaskYes = Arc<dyn Fn(u64, &str, Option<&str>) -> Option<String> + Send + Sync>;
+/// The note for a turn while the work this voice handed over last is still
+/// open (`crate::agent_tasks::open_work_note`, #7930), with its request.
+/// Blocking: it asks the tasks part, asked only while work was handed over
+/// (`crate::agent_tasks::work_handed`).
+pub type OpenWorkNote = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
+/// A heard line that is a whole spoken trigger of a running app (#7415 piece
+/// 6, `crate::app_triggers`): with its request and words, whether the app
+/// took it. Blocking: it waits up to `app_triggers::HOLD` for the app.
+pub type AppLine = Arc<dyn Fn(u64, &str) -> bool + Send + Sync>;
 /// [`TaskNote`] with the request's own words too: a new ask while a task
 /// waits replaces it (#6547 B, `crate::agent_tasks::pending_note`).
 pub type WaitingNote = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
@@ -1800,6 +2034,8 @@ struct Shared {
     say_at_once: bool,
     /// [`Engine::keeping_at_once`] (C59).
     keep_at_once: bool,
+    /// [`Engine::rendering_make_opening`] (#7554).
+    make_opening_ahead: bool,
     /// [`Engine::checking_action_claims`] (#5215).
     action_claims: bool,
     /// [`Engine::checking_worded_claims`] (#5215).
@@ -1808,11 +2044,23 @@ struct Shared {
     made_not_on: bool,
     /// [`Engine::checking_doing_claims`] (#7285).
     doing_claims: bool,
+    /// [`Engine::checking_keep_claims_whole`] (#7878).
+    keep_whole: bool,
+    /// [`Engine::checking_nudge_claims`] (#7878).
+    nudge_claims: bool,
+    /// [`Engine::reading_made_names`] (#7683).
+    made_names: Option<MadeNames>,
+    /// [`Engine::checking_live_facts`] (#7605).
+    live_facts: bool,
     /// With the make's one run path ([`Engine::waiting_on_one_path`],
     /// #7371): how long after its waiting line a make with no answer yet
     /// says [`crate::make_skill_agent::LONG_WAIT_LINE`], once; none is
     /// off, today's line and no second.
     one_path_wait: Option<Duration>,
+    /// [`Engine::running_on_after`] (#6811): how long after its waiting
+    /// line a make with no answer yet is let run on, the turn ending after
+    /// [`crate::long_make::RUN_ON_LINE`]; none is off, as before.
+    run_on_after: Option<Duration>,
     /// [`Engine::asking_again_for_no_words`] (#3704).
     no_words_again: bool,
     /// [`Engine::asking_again_for_answers`] (Queue #4710, item 3).
@@ -1859,6 +2107,9 @@ struct Shared {
     tool_cued: Mutex<Option<u64>>,
     /// [`DOWN_LINE`], when switched on.
     down: Option<Arc<DownLine>>,
+    /// At the usage limit, a plain light or volume ask is done without the
+    /// model (`LAMP_LIMIT_LOCAL_ASKS`, #7346, [`Engine::doing_at_the_limit`]).
+    limit_local: bool,
     /// The owner's language, read at start (`None`: English): every fixed
     /// line this route says itself is said in it ([`Shared::fixed`], #4473).
     language: Option<crate::language::Language>,
@@ -1970,6 +2221,9 @@ struct Shared {
     /// lamp, so the spoken cut-in note is not told beside that note
     /// ([`Engine::telling_the_untied`]).
     untied: Option<Busy>,
+    /// Whether a line let out only as the conversation going on is surely
+    /// someone else's ([`Engine::telling_someone_elses`], #7664).
+    someone_elses: Option<Busy>,
     /// With `LAMP_TASKS_NAMED_ASK=on`: whom a line's words ask by name
     /// ([`Engine::asking_by_name`]).
     named_ask: Option<NamedAsk>,
@@ -1979,6 +2233,9 @@ struct Shared {
     /// The skill a heard line plainly asks for by its name: called in code
     /// as round 1 ([`Engine::calling_skills_named`]).
     skill_named: Option<SkillNamed>,
+    /// Whether words name one of the skills made on the lamp, by its name
+    /// ([`Engine::knowing_made_names`]).
+    made_named: Option<MadeNamed>,
     /// A called skill's own ask phrases: a line that holds one that asks to
     /// play is an ask for its recording ([`Engine::playing_for_skill_asks`]).
     skill_asks: Option<SkillAsks>,
@@ -2016,6 +2273,12 @@ struct Shared {
     /// With the tasks part: a heard whole plain yes starts the task waiting
     /// in code, before the chat round (#7027).
     task_yes: Option<TaskYes>,
+    /// With the tasks part: the note that work handed over is still open
+    /// (#7930).
+    open_work: Option<OpenWorkNote>,
+    /// With `LAMP_APP_TRIGGERS=on`: a line that says an installed app's
+    /// trigger is taken by that app, and the request ends here (#7415).
+    app_line: Option<AppLine>,
     /// With the setup walk: a line that spells the person's name, told how
     /// to say it back ([`Engine::noting_a_spelled_name`]).
     spelled_name: Option<WordsNote>,
@@ -2088,6 +2351,11 @@ struct Shared {
     /// A line that was only the lamp's name waits for the line after it,
     /// which is then said by it ([`Engine::carrying_the_name`]).
     name_carries: bool,
+    /// A line the coordinator ended as only the lamp's name (`Called`) is
+    /// a call only while its heard words are none or only the name
+    /// ([`call_stands`], `LAMP_CALL_WORDS_OVER_WAIT`, #8073,
+    /// [`Engine::judging_call_words`]).
+    call_words_over_wait: bool,
     /// Whether the lamp is asleep for the night and resting through sounds
     /// (`LAMP_REST_THROUGH_SOUNDS=on`, [`Engine::resting_through_sounds`]):
     /// its answer to its name alone is then held back.
@@ -2104,10 +2372,16 @@ struct Shared {
     /// lamp-name's near hearings, for a line's first word
     /// ([`Engine::hearing_the_name_near`]).
     name_near: Option<NameNear>,
+    /// Told the request whose line `name_near` ruled not the name
+    /// ([`Engine::telling_near_not_the_name`], #8092).
+    near_not_the_name: Option<Opened>,
     /// `LAMP_NAME_WORDLESS_BAR=on`: lamp-name's best hearing in a line, for
     /// one marked as only the name whose words came back empty
     /// ([`Engine::holding_a_wordless_call`]).
     wordless_bar: Option<wordless_call::BestHeard>,
+    /// lamp-name's best hearing in a line, for a short sound heard in it
+    /// at its bar ([`Engine::knowing_the_name_in_a_line`], #7891).
+    name_in_line: Option<wordless_call::BestHeard>,
     /// With `name_near`, a first word said as a sentence of its own is the
     /// name by its near hearing alone ([`Engine::taking_the_name_as_a_sentence`]).
     name_as_a_sentence: bool,
@@ -2115,6 +2389,9 @@ struct Shared {
     /// its own words at a line's start or end are taken out
     /// ([`Engine::holding_own_echo`]).
     own_echo: bool,
+    /// `LAMP_CARE_LINE` (#7689): words of self-harm caught on a line, and
+    /// the fixed care line said after its answer ([`Engine::caring`]).
+    care: Option<Arc<crate::care_line::Care>>,
     spare: Mutex<Option<Kept>>,
     spares: AtomicU64,
     /// The last send try's attempt id ([`send_attempt_in_context`], #5853).
@@ -2146,6 +2423,17 @@ struct Shared {
     /// given once to that session's next look turn, after its question, and
     /// let go as any other turn begins.
     look_note: Mutex<Option<(u64, String)>>,
+    /// The route's own look asked in a spoken turn, with the model's
+    /// arguments and the line's words (`LAMP_LOOK_TOLD`,
+    /// `LAMP_LOOK_KEPT_WITH_ASK`, [`crate::look_told`]): taken by that
+    /// session's next look turn, let go as any other turn begins.
+    look_asked: Mutex<Option<crate::look_told::LookAsk>>,
+    /// `LAMP_LOOK_TOLD=on`: the look's arguments and memory's hits for its
+    /// question go beside the picture ([`Engine::telling_looks_what_was_said`]).
+    look_told: bool,
+    /// `LAMP_LOOK_KEPT_WITH_ASK=on`: the look's turn is the asker's, and is
+    /// kept with the question ([`Engine::keeping_looks_with_their_ask`]).
+    look_kept: bool,
     /// The spoken request being answered and its words, until any of its
     /// answer is heard or its turn ends.
     in_flight: Mutex<Option<Carried>>,
@@ -2225,6 +2513,10 @@ struct Shared {
     /// read-back with no save called ([`yes_save`]); the walk's file when
     /// unset.
     setup_open: Option<SetupOpen>,
+    /// A face kept with nothing asked (`LAMP_FACE_NO_ASK`, names checked,
+    /// [`Engine::keeping_faces_unasked`]): a yes at setup runs no save and
+    /// asks no face question ([`yes_save`]).
+    face_no_ask: bool,
     /// Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`): the eyes'
     /// looks and their known file, and a held forget's yes counts only
     /// from the held person's face seen saying it (#2377).
@@ -2252,6 +2544,9 @@ struct Shared {
     /// for their yes to that word (`LAMP_MEMORY_ASK_NEAR_HEARD`, C37,
     /// [`Engine::asking_near_heard_words`]).
     near_heard_asks: bool,
+    /// An unsure line is simply not kept, and nothing is asked
+    /// (`LAMP_MEMORY_UNSURE_NOT_KEPT`, #7739, [`Engine::not_keeping_unsure`]).
+    unsure_not_kept: bool,
     remember_speaker: bool,
     enrollment_sight: Option<Arc<crate::speaking_faces::SpeakingFaces>>,
     /// A line is a known person's only when their own face was seen
@@ -2267,6 +2562,13 @@ struct Shared {
     /// end of its say-back as played and read by the short-line rule
     /// (`LAMP_SKILL_YES_CARRY`, [`Engine::carrying_skill_yes_from_question`]).
     skill_yes_carry: bool,
+    /// With [`Self::carries`], the face last named as the person, the same
+    /// unbroken track alone in view, is theirs for the carry
+    /// (`LAMP_CONVERSATION_CARRIES_OWN_TRACK`, [`Engine::carrying_own_track`]).
+    carries_own_track: bool,
+    /// `LAMP_FACE_STICKY` ([`Engine::holding_sticky`]): the eyes hold the
+    /// name themselves, so the own-track carry is inert.
+    face_sticky: bool,
     /// A carried line may save into the conversation's scope
     /// (`LAMP_CONVERSATION_CARRIED_SAVES`, [`Engine::saving_carried`]).
     carried_saves: bool,
@@ -2459,6 +2761,34 @@ fn no_other_shown(
         Some(another) => eyes.looked_between(begun, finishing) && !another(),
         None => eyes.no_other_face_in_view(face, begun, finishing),
     }
+}
+
+/// [`Engine::carrying_own_track`] (`LAMP_CONVERSATION_CARRIES_OWN_TRACK`,
+/// C63(b)): with the switch on, the face last named as `person`, when it is
+/// the same unbroken track alone in view through the line
+/// ([`crate::speaking_faces::SpeakingFaces::own_track_alone`]) and not
+/// already `own_face`, the face the eyes name as theirs now. None off.
+fn own_track_face(
+    shared: &Shared,
+    eyes: &crate::speaking_faces::SpeakingFaces,
+    person: &str,
+    own_face: Option<&str>,
+    begun: Instant,
+    finishing: Instant,
+) -> Option<String> {
+    // With `LAMP_FACE_STICKY` the eyes' own hold keeps naming the face;
+    // a name they let go of on that box went on a print they couldn't
+    // read as the person's, which may be someone else's: never carried as
+    // the person (Friday's P2 on #7933).
+    if !shared.carries_own_track || shared.face_sticky {
+        return None;
+    }
+    eyes.own_track_alone(
+        |name| crate::known_faces::memory_person(name) == person,
+        begun,
+        finishing,
+    )
+    .filter(|track| own_face != Some(track.as_str()))
 }
 
 /// A known person's line read for the carry (#4339): no face found saying
@@ -2805,7 +3135,7 @@ pub const NAME_NEAR_LEAST: f32 = 0.5;
 /// Words the speech to text wrote for "Lamp" at a line's start on
 /// lamp-4ace in 22 Oct's played rounds that the shape in
 /// [`sounds_like_the_name`] misses (`LAMP_NAME_NEAR`).
-const HEARD_FOR_THE_NAME: [&str; 5] = ["louvre", "month", "life", "light", "length"];
+pub(crate) const HEARD_FOR_THE_NAME: [&str; 5] = ["louvre", "month", "life", "light", "length"];
 
 /// People's names of the name's shape, that a colleague may call at a desk
 /// ("Lynn, pass me that"), English and Vietnamese: never the lamp's
@@ -2877,9 +3207,11 @@ fn spoken_form(word: &str) -> String {
         .map_or(spoken.to_owned(), |stem| format!("{stem}m"))
 }
 
-/// Whether a word sounds like the lamp's name at all ([`like_the_name`]).
-#[cfg(test)]
-fn sounds_like_the_name(word: &str) -> bool {
+/// Whether a word sounds like the lamp's name at all ([`like_the_name`]):
+/// with `LAMP_NAME_SIGN_TIED`, a one-word line whose word doesn't is never
+/// taken as the name with no look (`attention::Attention::weigh_the_name`,
+/// #8092).
+pub(crate) fn sounds_like_the_name(word: &str) -> bool {
     like_the_name(word) != LikeTheName::Not
 }
 
@@ -2926,16 +3258,30 @@ fn named_near(
     window: (u64, u64),
     near: &NameNear,
     as_a_sentence: bool,
-) -> String {
+) -> (String, bool) {
     let Some((start, end)) = first_word_set_off(&text) else {
-        return text;
+        return (text, false);
     };
     let word = &text[start..end];
     if word.eq_ignore_ascii_case(net::key_terms::NAME) || word.eq_ignore_ascii_case("lamb") {
-        return text;
+        return (text, false);
+    }
+    // `LAMP_NAME_NOT_ANOTHERS` (#8114): another person's name stays theirs,
+    // whatever lamp-name heard; a face turned keeps the shape's own rule.
+    let (heard_near, turned_near) = near(window);
+    if not_anothers_on() && !turned_near && crate::attention::called_by_another_name(&text) {
+        if heard_near.is_some_and(|score| score >= NAME_NEAR_LEAST) {
+            eprintln!(
+                "lamp-voice second: request {request}: its first word, set off, is another person's name, and no face is turned to the lamp: not the lamp's name, however near lamp-name heard it (LAMP_NAME_NOT_ANOTHERS, #8114)"
+            );
+        }
+        return (
+            text,
+            heard_near.is_some_and(|score| score >= NAME_NEAR_LEAST),
+        );
     }
     let like = like_the_name(word);
-    let (heard, turned) = near(window);
+    let (heard, turned) = (heard_near, turned_near);
     let near_enough = heard.filter(|score| *score >= NAME_NEAR_LEAST);
     let named = match (like, near_enough) {
         (LikeTheName::AsHeard, Some(score)) => Some(format!(
@@ -2974,14 +3320,19 @@ fn named_near(
         }
         (LikeTheName::Not, None) => None,
     };
+    // Heard near by the line's start and not taken: ruled not the name.
+    let not_the_name = named.is_none() && near_enough.is_some();
     match named {
         Some(signs) => {
             eprintln!(
                 "lamp-voice second: request {request}: {signs}: it is the name (LAMP_NAME_NEAR)"
             );
-            format!("{}{}{}", &text[..start], net::key_terms::NAME, &text[end..])
+            (
+                format!("{}{}{}", &text[..start], net::key_terms::NAME, &text[end..]),
+                false,
+            )
         }
-        None => text,
+        None => (text, not_the_name),
     }
 }
 
@@ -3024,7 +3375,7 @@ fn a_sentence_of_its_own(text: &str, start: usize, end: usize) -> bool {
 
 /// Words a line often opens with, set off, that are said, not a wake heard
 /// as another word ([`wake_heard_as`]): "Yes, please.", "Well, …", "Dạ, …".
-const OPENS_SET_OFF: &[&str] = &[
+pub(crate) const OPENS_SET_OFF: &[&str] = &[
     "yes",
     "yeah",
     "yep",
@@ -3101,6 +3452,49 @@ pub(crate) fn wake_heard_as(text: &str) -> Option<(&str, &str)> {
     // as an address counts, never the noun ("Hello. Gaswa, turn off the
     // lamp.", the Reviewer-lead's P2 on #4078).
     (!rest.is_empty() && !named && !common && !addresses_the_name(rest)).then_some((word, rest))
+}
+
+/// The line's words past the lamp's name, heard as itself ([`name_call_rest`]:
+/// "Hey Lamp. Make me a skill that …", kit-8101's second ROW, lamp-52e6,
+/// 20 Nov 15:54) or, on a line that names the lamp (`named`, as `answer`
+/// knows it), as another word ([`wake_heard_as`]): "Hey, Lynn, make me a
+/// skill that …" is "make me a skill that …". `None` on a line that opens
+/// with no call of the lamp, or calls a person ("Hey, Anna, …" with no name
+/// heard). The one reading the made-skill matcher and
+/// `LAMP_MAKE_SKILL_ASKED`'s force share (#8022), so they can't drift.
+pub(crate) fn past_the_name_heard_as(said: &str, named: bool) -> Option<&str> {
+    name_call_rest(said).or_else(|| {
+        named
+            .then(|| wake_heard_as(said))
+            .flatten()
+            .map(|(_, rest)| rest)
+    })
+}
+
+/// [`past_the_name_heard_as`] for a person's line as the first round's
+/// forces see it, `named` as `answer` kept it by the line's exact words
+/// (`crate::tools::make_skill_asked::heard_named`): a force sees only the
+/// messages.
+pub(crate) fn past_the_name(said: &str) -> Option<&str> {
+    past_the_name_heard_as(said, crate::tools::make_skill_asked::named(said))
+}
+
+/// `force` read on the person's line as said or, when that forces nothing,
+/// on the line past the lamp's name ([`past_the_name`]): "Hey Lamp. Remind
+/// me in ten minutes to stretch.", or "Hey, Lynn, remind me …" on a line
+/// that names the lamp. On lamp-52e6 on 20 Nov (#8022) the gates' timer
+/// and reminder asks said `calls=none`. Every first-round force that reads
+/// its ask at the line's opening goes through this one reading, so none
+/// drifts from another; a line said to a person ("Hey, Anna, …") is read
+/// as said. The line past the name is asked alone: these forces read only
+/// the last message.
+pub(crate) fn forced_past_the_name(force: net::Force) -> net::Force {
+    Arc::new(move |messages: &[Message]| {
+        force(messages).or_else(|| {
+            let last = messages.last().filter(|message| message.role == "user")?;
+            force(&[Message::user(past_the_name(last.words()?)?)])
+        })
+    })
 }
 
 /// Greetings a line may open with, set off by a comma or a stop, before
@@ -3216,7 +3610,7 @@ fn addresses_the_name(text: &str) -> bool {
 /// lamp's (the reviewer-lead's HOLD on `0990f0a27`: "Tomorrow, I see the
 /// dentist at 3" must keep its day): time and day words, verbs a request
 /// opens with, and discourse words, English and Vietnamese, NFC lower case.
-const NOT_A_NAME: &[&str] = &[
+pub(crate) const NOT_A_NAME: &[&str] = &[
     // Time and day.
     "today",
     "tomorrow",
@@ -3676,6 +4070,10 @@ struct DownLine {
     /// begun and no other refusal since, and when this run last said
     /// [`DOWN_LINE_LIMIT`] (#7346).
     refused_since: Mutex<Option<(tokio::time::Instant, Option<tokio::time::Instant>)>>,
+    /// When [`Self::refused`] last took a refusal for the usage limit in
+    /// the service's own word (not 429s that last), with no round begun
+    /// since.
+    limited_at: Mutex<Option<tokio::time::Instant>>,
     rendering: AtomicBool,
     /// When the last was said, and whether it was [`DOWN_LINE_AGAIN`].
     said_at: Mutex<Option<(tokio::time::Instant, bool)>>,
@@ -3779,10 +4177,14 @@ impl DownLine {
         let mut since = self.refused_since.lock().ok()?;
         if status != 429 {
             *since = None;
+            self.set_limited(None);
             return None;
         }
         let now = tokio::time::Instant::now();
         let lasted = now.duration_since(since.get_or_insert((now, None)).0);
+        // Only the service's own word keys the local asks (#7642: no
+        // two-minute guess); the timed run still says the limit line.
+        self.set_limited(word.then_some(now));
         (word || lasted >= LIMIT_AFTER).then_some(lasted)
     }
 
@@ -3791,6 +4193,33 @@ impl DownLine {
         if let Ok(mut since) = self.refused_since.lock() {
             *since = None;
         }
+        self.set_limited(None);
+    }
+
+    fn set_limited(&self, at: Option<tokio::time::Instant>) {
+        if let Ok(mut limited_at) = self.limited_at.lock() {
+            *limited_at = at;
+        }
+    }
+
+    /// Whether the last refusal was the usage limit, less than
+    /// [`LIMIT_TRY_AGAIN`] ago, and no round has begun since
+    /// ([`limit_local_ask`]).
+    fn limited(&self) -> bool {
+        self.limited_at
+            .lock()
+            .ok()
+            .and_then(|at| *at)
+            .is_some_and(|at| at.elapsed() < LIMIT_TRY_AGAIN)
+    }
+
+    /// How long this run of 429s has lasted ([`say_limit`]).
+    fn lasted(&self) -> Duration {
+        self.refused_since
+            .lock()
+            .ok()
+            .and_then(|since| *since)
+            .map_or(Duration::ZERO, |(at, _)| at.elapsed())
     }
 
     /// [`DOWN_LINE_LIMIT`]: `None` when not rendered yet (the slow line
@@ -3934,6 +4363,39 @@ async fn play_fixed(
     kept_words: bool,
 ) -> bool {
     let line = shared.fixed(english);
+    let kept = shared.fixed_clips.kept(english);
+    match play_words(
+        shared,
+        (request, heard_at),
+        (line, kept, DOWN_LINE_MOST_SAMPLES),
+        why,
+        kept_words,
+    )
+    .await
+    {
+        None => false,
+        Some((_, whole)) => {
+            // Kept for the next time only when said whole.
+            if let Some(clip) = whole {
+                shared.fixed_clips.keep(english, clip);
+            }
+            true
+        }
+    }
+}
+
+/// [`play_fixed`]'s words `line`: from `kept`, its clip rendered ahead,
+/// else streamed from the voice, at most `most` samples. None when the
+/// turn is gone; else how many samples played, and the clip when it was
+/// streamed whole (for its keeper to keep). The care line (#7689) is
+/// played this way too.
+async fn play_words(
+    shared: &Shared,
+    (request, heard_at): (u64, Instant),
+    (line, kept, most): (&str, Option<Vec<i16>>, usize),
+    why: &str,
+    kept_words: bool,
+) -> Option<(usize, Option<Vec<i16>>)> {
     if !shared
         .emit(ProviderOutput::Transcript {
             request: Some(request),
@@ -3942,10 +4404,9 @@ async fn play_fixed(
         })
         .await
     {
-        return false;
+        return None;
     }
     shared.said_piece(request, kept_words.then_some(line));
-    let kept = shared.fixed_clips.kept(english);
     let ahead = kept.is_some();
     let mut first = true;
     let mut play = |samples: Vec<i16>| {
@@ -3967,11 +4428,12 @@ async fn play_fixed(
         }
     };
     let mut played = 0;
+    let mut whole = None;
     if let Some(clip) = kept {
         for part in clip.chunks(PACKET_SAMPLES) {
             let audio = play(part.to_vec());
             if !shared.emit(audio).await {
-                return false;
+                return None;
             }
             shared.said_samples(request, part.len());
             played += part.len();
@@ -3991,20 +4453,19 @@ async fn play_fixed(
                 for part in packet.chunks(PACKET_SAMPLES) {
                     let audio = play(part.to_vec());
                     if !shared.emit(audio).await {
-                        return false;
+                        return None;
                     }
                     shared.said_samples(request, part.len());
                     played += part.len();
                 }
                 clip.extend(packet);
-                if clip.len() >= DOWN_LINE_MOST_SAMPLES {
+                if clip.len() >= most {
                     break;
                 }
             }
             if played > 0 {
-                // Kept for the next time only when said whole.
                 if !failed {
-                    shared.fixed_clips.keep(english, clip);
+                    whole = Some(clip);
                 }
                 break;
             }
@@ -4015,7 +4476,7 @@ async fn play_fixed(
             "lamp-voice second: request {request}: its fixed line could not be said: the voice gave no sound for it twice ({why})"
         );
     }
-    true
+    Some((played, whole))
 }
 
 /// The newest answer's pieces as written for the voice, in order
@@ -4473,7 +4934,15 @@ async fn render_line(services: &Arc<dyn Services>, text: &str) -> Vec<i16> {
 /// A voice's packets in one clip, at most `DOWN_LINE_MOST_SAMPLES`; empty
 /// if the voice failed.
 async fn clip_of(
+    speech: futures_util::stream::BoxStream<'static, net::Result<Vec<i16>>>,
+) -> Vec<i16> {
+    clip_up_to(speech, DOWN_LINE_MOST_SAMPLES).await
+}
+
+/// [`clip_of`], at most `most` samples.
+async fn clip_up_to(
     mut speech: futures_util::stream::BoxStream<'static, net::Result<Vec<i16>>>,
+    most: usize,
 ) -> Vec<i16> {
     let mut clip = Vec::new();
     while let Some(packet) = speech.next().await {
@@ -4481,8 +4950,8 @@ async fn clip_of(
             Ok(packet) => clip.extend(packet),
             Err(_) => return Vec::new(),
         }
-        if clip.len() >= DOWN_LINE_MOST_SAMPLES {
-            clip.truncate(DOWN_LINE_MOST_SAMPLES);
+        if clip.len() >= most {
+            clip.truncate(most);
             break;
         }
     }
@@ -4554,6 +5023,22 @@ pub const REST_THROUGH_SOUNDS_ENVIRONMENT: &str = "LAMP_REST_THROUGH_SOUNDS";
 /// What `expression/state` names while the night's sleep rests through
 /// sounds (`lamp_expression::RESTING_THROUGH_SOUNDS`).
 pub const RESTING_THROUGH_SOUNDS: &str = "resting_through_sounds";
+
+/// Why a line is held near the end of the lamp's day ([`day_alone_held`]).
+const DAY_NEAR_HELD: &str = "the lamp's day is nearly used, and the line reached it only as the conversation going on, surely from someone other than the one it was talking with: not sent only to be judged (LAMP_VOICE_DAY_SHED)";
+
+/// Whether a line is held near the end of the lamp's day (#7664): the day
+/// at or past `day_shed::NEAR`, and the line let out only as the
+/// conversation going on, told [`worker::CONVERSATION_ALONE`], and surely
+/// someone else's (`someone_elses`: another voice, or a face not the
+/// caller's seen speaking it). The caller's own follow-up
+/// ([`worker::FOLLOW_UP_NOTE`]), a line with nothing seen or heard to tell
+/// the speakers apart (the owner whose face wasn't seen, the Reviewer-lead's
+/// P2 on #7738) and a line with any other sign it was said to the lamp (no
+/// note) are never held.
+fn day_alone_held(level: crate::day_shed::Level, note: Option<&str>, someone_elses: bool) -> bool {
+    level.sheds() && someone_elses && note == Some(worker::CONVERSATION_ALONE)
+}
 
 /// Why the answer to the lamp's name alone is held back in the night's
 /// sleep ([`Engine::resting_through_sounds`]).
@@ -4680,6 +5165,20 @@ fn name_alone(text: &str) -> bool {
         || crate::attention::only_the_name_as_written(text, crate::language::at_start())
 }
 
+/// Whether a line the coordinator ended as only the lamp's name (`Called`)
+/// is still only a call by its heard words (`LAMP_CALL_WORDS_OVER_WAIT`,
+/// #8073): none came back; they are the name alone ([`name_alone`], "Hey
+/// Lamp"), or the coordinator's reading of it
+/// ([`crate::attention::only_the_name`], "Hello Lamp?"); or one word, the
+/// name misheard ("Life.", asked as [`CALLED_WORDS`]). Words past the name
+/// ("Lamp, yes.", "Lamp. So") are no call: the line is judged by them.
+fn call_stands(text: &str) -> bool {
+    text.trim().is_empty()
+        || name_alone(text)
+        || crate::attention::only_the_name(text)
+        || past_a_greeting(text).len() <= 1
+}
+
 /// The most words a short line may have after the lamp's name and still
 /// wait for the line after it ([`name_first`]).
 const NAME_FIRST_MORE: usize = 3;
@@ -4703,8 +5202,8 @@ fn name_first(text: &str) -> bool {
 /// Whether a line begins with the lamp's name, set off as a call at its
 /// start ([`crate::attention::begins_with_the_name`]: "Lamp, …", "Hey Lamp
 /// …"), however many words follow: such a line is never held as a short
-/// sound (`LAMP_ENDPOINT_PAUSE_JOIN`, #4449: "Lamp, can you tell me", four
-/// words past the name, was). Never the name later in a line ("Turn the
+/// sound (#4449: "Lamp, can you tell me", four words past the name, was;
+/// since #7834 with any switch). Never the name later in a line ("Turn the
 /// lamp off", a television's "…the lamp is…"), nor "Lamp is broken", where
 /// it is not set off. Its own check: [`name_first`] and [`NAME_FIRST_MORE`],
 /// the name's carry (`LAMP_SECOND_NAME_CARRIES`), stay as they are, and the
@@ -4871,11 +5370,17 @@ impl Engine {
                 checking_line: false,
                 say_at_once: false,
                 keep_at_once: false,
+                make_opening_ahead: false,
                 action_claims: false,
                 worded_claims: false,
                 made_not_on: false,
                 doing_claims: false,
+                keep_whole: false,
+                nudge_claims: false,
+                made_names: None,
+                live_facts: false,
                 one_path_wait: None,
+                run_on_after: None,
                 no_words_again: false,
                 answer_again: false,
                 cut_ask_answered: false,
@@ -4896,6 +5401,7 @@ impl Engine {
                 every_tool_cued: false,
                 tool_cued: Mutex::new(None),
                 down: None,
+                limit_local: false,
                 language: crate::language::at_start(),
                 spoken_stop_ends: false,
                 wordless_asks: false,
@@ -4930,9 +5436,11 @@ impl Engine {
                 name_note: None,
                 conversation_alone: None,
                 untied: None,
+                someone_elses: None,
                 named_ask: None,
                 read_back_asked: None,
                 skill_named: None,
+                made_named: None,
                 skill_asks: None,
                 named_agent: None,
                 named_agent_takes_line: false,
@@ -4949,6 +5457,8 @@ impl Engine {
                 task_waiting: None,
                 task_declined: None,
                 task_yes: None,
+                open_work: None,
+                app_line: None,
                 spelled_name: None,
                 air: None,
                 seems: None,
@@ -4972,14 +5482,18 @@ impl Engine {
                 pause_kept: Mutex::new(None),
                 pause_cut: Mutex::new(None),
                 name_carries: false,
+                call_words_over_wait: false,
                 night_rest: None,
                 name_waits: Mutex::new(None),
                 name_refused: Mutex::new(None),
                 one_speaker: None,
                 name_near: None,
+                near_not_the_name: None,
                 wordless_bar: None,
+                name_in_line: None,
                 name_as_a_sentence: false,
                 own_echo: false,
+                care: None,
                 spare: Mutex::new(None),
                 sent_write: Mutex::new(Vec::new()),
                 write_sent_in: Mutex::new(None),
@@ -4990,6 +5504,9 @@ impl Engine {
                 begun: Mutex::new(None),
                 wait_sound_only: Mutex::new(None),
                 look_note: Mutex::new(None),
+                look_asked: Mutex::new(None),
+                look_told: false,
+                look_kept: false,
                 in_flight: Mutex::new(None),
                 send_content_epoch: Arc::new(AtomicU64::new(0)),
                 answered_request: Mutex::new(None),
@@ -5013,17 +5530,21 @@ impl Engine {
                 cut_window: None,
                 said_window: None,
                 setup_open: None,
+                face_no_ask: false,
                 forget_sight: None,
                 forget_through_spelling: false,
                 face_claims: false,
                 doubt_undoes: false,
                 forget_target: None,
                 near_heard_asks: false,
+                unsure_not_kept: false,
                 remember_speaker: false,
                 enrollment_sight: None,
                 scope_seen: false,
                 carries: None,
                 skill_yes_carry: false,
+                carries_own_track: false,
+                face_sticky: false,
                 carried_saves: false,
                 carried_memory: false,
                 held_words_seen: false,
@@ -5083,10 +5604,33 @@ impl Engine {
         self.shared
             .private_now
             .store(!(now.0 && now.2), Ordering::SeqCst);
+        // Lamp private: no app's live line outlasts it (`LAMP_APP_MEMORY`),
+        // and the bus writer sets none while it is.
+        crate::app_context::set_private(!(now.0 && now.2));
+        if !(now.0 && now.2) {
+            crate::app_context::clear_all();
+        }
+        // A look asked and not begun is dropped by a privacy close or a
+        // mute: its asking exchange is kept at once, as it stands (Twelve's
+        // P2 on #8019).
+        if !(now.0 && now.2) {
+            self.let_go_look(u64::MAX, "a privacy close or a mute");
+        }
         if self.privacy.replace(now).is_some_and(|was| was != now) {
             // A write read back and waiting for its send goes too
             // (Thirteen's P2 on #5968).
             crate::services::forget_waiting();
+            // And a keep or forget held for their yes, the one-face forget
+            // question among them: a yes after the switch answers nothing
+            // in code (the person's ruling on #8215).
+            if let Ok(mut hold) = self.shared.held_forget.lock()
+                && let Some(held) = hold.held.take()
+            {
+                eprintln!(
+                    "lamp-voice second: dropped a held forget ({}, held in request {}): the privacy switch changed; it is kept",
+                    held.call.name, held.request
+                );
+            }
             if self.shared.remember_speaker {
                 crate::remember_speaker::forget();
                 if let Some(eyes) = &self.shared.enrollment_sight {
@@ -5191,6 +5735,141 @@ impl Engine {
             .map(|scope| scope.lease())
     }
 
+    /// A request scope for `request` in `scope`, as [`Self::memory_scope`]
+    /// admits one; `None` without a memory.
+    fn scope_of(
+        &self,
+        request: u64,
+        session: u64,
+        scope: crate::memory_scope::ScopeSnapshot,
+    ) -> Option<crate::memory_scope::RequestScope> {
+        self.memory.as_ref().map(|(worker, _)| {
+            crate::memory_scope::RequestScope::new(
+                crate::memory_scope::RequestKey {
+                    worker: *worker,
+                    session,
+                    request,
+                },
+                scope,
+            )
+        })
+    }
+
+    /// A look asked by a request up to `through` and not begun is dropped
+    /// (`why`): its asking exchange no longer waits for the look's words and
+    /// is kept at once, as it stands (Twelve's P2 on #8019).
+    fn let_go_look(&self, through: u64, why: &str) {
+        let Some(ask) = self
+            .shared
+            .look_asked
+            .lock()
+            .ok()
+            .and_then(|mut asked| asked.take_if(|ask| ask.request <= through))
+        else {
+            return;
+        };
+        let waited = crate::thread::THREAD.lock().is_ok_and(|mut thread| {
+            let waited = thread.waits_for_look(ask.request);
+            thread.look_let_go(ask.request);
+            waited
+        });
+        eprintln!(
+            "lamp-voice second: request {}: its look was dropped ({why}): its exchange is kept as it stands",
+            ask.request
+        );
+        if waited {
+            crate::remember::finished(ask.request);
+        }
+    }
+
+    /// The route's own look asked in a spoken turn, taken for `session`'s
+    /// look turn `request` (`look`): what the model wrote with it, and the
+    /// asker's scope as it was asked, carried in the ask itself (the look
+    /// request's authority retires the asking turn first, Twelve's P1 on
+    /// #8019). Who is at the lamp is read again now (the memory owner's
+    /// ruling on #8019, privacy first): the asker's scope holds only while
+    /// they are still the one seen, or no face is in view and their gap
+    /// holds them, with no other face, known or not, in the eyes' looks
+    /// ([`asker_still_alone`]); anyone else in view, a privacy change, or
+    /// the camera not allowed, and the look and its hits are the room's.
+    /// Any other turn lets it go.
+    fn look_turn(&mut self, request: u64, session: u64, look: bool) -> Option<LookTurn> {
+        if !look {
+            return None;
+        }
+        let ask = self
+            .shared
+            .look_asked
+            .lock()
+            .ok()
+            .and_then(|mut asked| asked.take())?;
+        if ask.session != session {
+            if let Ok(mut thread) = crate::thread::THREAD.lock() {
+                thread.look_let_go(ask.request);
+            }
+            return None;
+        }
+        let room = crate::memory_scope::ScopeSnapshot::room;
+        let (scope, hits, held) = match &ask.asker {
+            // No memory scope: the look's own lines read as before.
+            None => (room(), None, false),
+            Some(asker) => {
+                let now = Instant::now();
+                let seen_now = match &self.memory {
+                    Some((_, cache)) if self.memory_camera_allowed => cache.snapshot(now),
+                    _ => room(),
+                };
+                let eyes = self.shared.speaking.as_ref().map(|(eyes, known)| {
+                    let face = eyes.known_with_boot(known).map(|(_, face)| face);
+                    (eyes.clone(), face)
+                });
+                let from = now
+                    .checked_sub(crate::speaking_faces::IN_VIEW_BEFORE)
+                    .unwrap_or(now);
+                let alone = asker_still_alone(
+                    &asker.kept,
+                    &seen_now,
+                    eyes.as_ref()
+                        .map(|(eyes, face)| (eyes.as_ref(), face.as_deref())),
+                    from,
+                    now,
+                );
+                if !alone {
+                    eprintln!(
+                        "lamp-voice second: request {request}: the asker is not the one alone at the lamp as the look begins: the look and its hits are the room's"
+                    );
+                }
+                let scope = if alone { asker.kept.clone() } else { room() };
+                let hits = match &asker.hits {
+                    Some(_) if !alone => Some(room()),
+                    hits => hits.clone(),
+                };
+                (scope, hits, asker.held)
+            }
+        };
+        let kept = self.shared.look_kept.then(|| scope.clone());
+        // Its words go on in the asking exchange only while it is the
+        // asker's (`thread::Thread::look_turn`).
+        let theirs = ask
+            .asker
+            .as_ref()
+            .is_none_or(|asker| asker.kept.person() == scope.person());
+        if let Ok(mut thread) = crate::thread::THREAD.lock() {
+            if kept.is_some() && theirs {
+                thread.look_turn(request, ask.request);
+            } else {
+                thread.look_let_go(ask.request);
+            }
+        }
+        Some(LookTurn {
+            told: self.shared.look_told,
+            ask,
+            kept,
+            hits,
+            held,
+        })
+    }
+
     fn memory_scope(
         &self,
         request: u64,
@@ -5221,6 +5900,14 @@ impl Engine {
                         (false, None) => "the room's",
                     };
                     eprintln!("lamp-voice second: request {request}: memory scope {whose}: {told}");
+                }
+                // Why a heard line is the room's when the eyes' snapshot is
+                // empty, whatever the switches (the sticky plan's T0): a
+                // reason, ms and counts, never a name.
+                if let Some(told) = cache.room_told(now) {
+                    eprintln!(
+                        "lamp-voice second: request {request}: memory scope the room's: {told}"
+                    );
                 }
                 // A line held only by a gap is never journalled, whether or
                 // not its exchange is filed by its scope
@@ -5333,6 +6020,34 @@ impl Engine {
     pub fn carrying_skill_yes_from_question(mut self, on: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.skill_yes_carry = on;
+        self
+    }
+
+    /// With [`Self::carrying_conversations`], a line no face was seen
+    /// speaking is carried when the only face in view through it is the same
+    /// unbroken eyes track as the face last named as its person, though the
+    /// eyes no longer name it (`LAMP_CONVERSATION_CARRIES_OWN_TRACK=on`,
+    /// C63(b)): on lamp-06c1 (18 Nov, request 111) the owner's hand over
+    /// their face mid-conversation let the eyes' name go, the one face at
+    /// the desk read as another face, and "What do you remember about my
+    /// food?" was the room's ([`crate::speaking_faces::SpeakingFaces::own_track_alone`]).
+    /// A second face, another face alone, a gap over 1.5 s, or the eyes
+    /// starting again is the room's, and the rest of the carry stands. The
+    /// carry only: it names no face and moves no known file.
+    pub fn carrying_own_track(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.carries_own_track = on;
+        self
+    }
+
+    /// `LAMP_FACE_STICKY=on`: the eyes hold a known name through weak
+    /// prints on their own box and let go only of a face clearly someone
+    /// else's, so [`Self::carrying_own_track`] is inert: a let-go print on
+    /// the owner's box is never carried as the owner. Its switch is to be
+    /// removed once STICKY is the default (the sticky identity plan).
+    pub fn holding_sticky(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.face_sticky = on;
         self
     }
 
@@ -5575,6 +6290,16 @@ impl Engine {
         self
     }
 
+    /// With `LAMP_FACE_NO_ASK` and names checked, a yes at setup with no
+    /// save called runs none and asks no face question ([`yes_save`]): the
+    /// setup face is kept only on the speaker's own proof
+    /// (`known_faces::run_speaker`). Off, as before.
+    pub fn keeping_faces_unasked(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.face_no_ask = on;
+        self
+    }
+
     /// A held rename whose question a line cut before its name was played
     /// is kept, and the model told to ask it again, once
     /// (`LAMP_NAME_LEARN_FIX`, #7331, [`held_rename::take`]). Off, such a
@@ -5641,6 +6366,24 @@ impl Engine {
     pub fn asking_near_heard_words(mut self, on: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.near_heard_asks = on;
+        self
+    }
+
+    /// An unsure line is simply not kept, and nothing is asked
+    /// (`LAMP_MEMORY_UNSURE_NOT_KEPT`, #7739, the product owner's no-asks
+    /// rule of 18 Nov). A keep its own round doubts is told
+    /// `remember::doubted::NOT_KEPT_NO_ASK`; a keep the round right after
+    /// it doubts is taken back by its id and never held for a yes (with
+    /// [`Self::undoing_doubted_keeps`], which forgets by id, and without
+    /// the eyes, since no yes is waited for); a spoken keep with a near
+    /// spelling of a heard word is not kept and nothing is asked, in place
+    /// of [`Self::asking_near_heard_words`]'s ask (with that off, it is kept
+    /// as before). Each time the person is told, in one line that asks
+    /// nothing, that it wasn't kept. A clear keep is kept as before. Off, as
+    /// before.
+    pub fn not_keeping_unsure(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.unsure_not_kept = on;
         self
     }
 
@@ -5833,9 +6576,9 @@ impl Engine {
     /// [`crate::pause_join::GRACE`] after its speech ended, its chat and
     /// speech going on meanwhile, so a line set off in the grace cuts it
     /// short with none of it heard and is joined to it (with
-    /// [`Self::joining_cut_words`]); and a line begun with the lamp's name
-    /// (set off first, [`name_at_start`]) is never held as a short sound,
-    /// however many words follow it. Before any turn only.
+    /// [`Self::joining_cut_words`]). A line begun with the lamp's name (set
+    /// off first, [`name_at_start`]) is never held as a short sound, with
+    /// the switch or without it (#7834). Before any turn only.
     pub fn joining_pauses(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.pause_join = on;
@@ -5878,6 +6621,21 @@ impl Engine {
         self
     }
 
+    /// A line the coordinator ended as only the lamp's name (`Called`, its
+    /// call's wait run out) stays a call only when its heard words are
+    /// none, or only the name ([`call_stands`]); with words past the name
+    /// it is judged by them, as a line begun with the name and no `Called`
+    /// is (`LAMP_CALL_WORDS_OVER_WAIT=on`, #8073: "Lamp, yes." to a held
+    /// forget, its comma under the call's 200 ms pause, was told the model
+    /// as a call and the yes lost). Every reading of the call on this route
+    /// reads that one verdict. Before any turn only.
+    pub fn judging_call_words(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.call_words_over_wait = on;
+        }
+        self
+    }
+
     /// With [`Self::carrying_the_name`]: `same` says whether one person said
     /// the name and the line after it (`worker::Heeding::one_speaker`, the
     /// join's judgement), and `kept` keeps each of the two for it before
@@ -5902,6 +6660,18 @@ impl Engine {
         self
     }
 
+    /// With [`Self::hearing_the_name_near`]: `told` is given the request
+    /// whose line [`named_near`] ruled not the name, lamp-name's near
+    /// hearing at its start on a first word, set off, that is not the name,
+    /// before its words are judged; the rule then counts no second sign for
+    /// that hearing (`LAMP_NAME_SIGN_TIED`, #8092). Before any turn only.
+    pub fn telling_near_not_the_name(mut self, told: Opened) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.near_not_the_name = Some(told);
+        }
+        self
+    }
+
     /// `LAMP_NAME_WORDLESS_BAR=on` (#5385): a line marked as only the
     /// lamp's name whose words came back empty is asked as the name only
     /// when `best` says lamp-name heard it there at
@@ -5910,6 +6680,18 @@ impl Engine {
     pub fn holding_a_wordless_call(mut self, best: wordless_call::BestHeard) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.wordless_bar = Some(best);
+        }
+        self
+    }
+
+    /// A line ended as a short sound, not heard as a short word, is no
+    /// short sound when `best` says lamp-name heard the name in it at its
+    /// own bar ([`crate::called::LEAST_SCORE`], `lamp-name --least`) or
+    /// more: the rule judges it as any line (#7891). Without it, as before.
+    /// Before any turn only.
+    pub fn knowing_the_name_in_a_line(mut self, best: wordless_call::BestHeard) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.name_in_line = Some(best);
         }
         self
     }
@@ -5932,6 +6714,17 @@ impl Engine {
     /// run at its start or end is taken out of what the model is sent. A
     /// line adding words, or begun after its words and answering its offer
     /// or question, is never held. Before any turn only.
+    /// With `LAMP_CARE_LINE` (#7689): a line whose words say the person
+    /// might harm themselves ([`crate::care_line::said_harm`]) is told so
+    /// beside it, kept out of memory, and its answer is followed by the
+    /// fixed care line for the lamp's region and language.
+    pub fn caring(mut self, care: Option<Arc<crate::care_line::Care>>) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.care = care;
+        }
+        self
+    }
+
     pub fn holding_own_echo(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.own_echo = on;
@@ -5983,6 +6776,33 @@ impl Engine {
     pub fn noting_looks(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.note_looks = on;
+        }
+        self
+    }
+
+    /// `LAMP_LOOK_TOLD=on` ([`crate::look_told::TOLD_ENVIRONMENT`]): the
+    /// route's own look turn is told, beside the picture and before its
+    /// note, what the model wrote with its `take_a_look` call (`question`,
+    /// `told`) and memory's hits for the question (or the asking line) in
+    /// the asker's scope; none for a held asker. With no arguments and no
+    /// hits the note is as before. Before any turn only.
+    pub fn telling_looks_what_was_said(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.look_told = on;
+        }
+        self
+    }
+
+    /// `LAMP_LOOK_KEPT_WITH_ASK=on` ([`crate::look_told::KEPT_ENVIRONMENT`]):
+    /// the route's own look turn goes on from the spoken turn that asked it,
+    /// in that turn's scope (the room's for a held, carried, revoked or
+    /// unknown asker), and its words are kept with the question as one
+    /// exchange (`thread::Thread::look_asked`). Words only, never the
+    /// picture. A look the lamp began on its own is as before. Before any
+    /// turn only.
+    pub fn keeping_looks_with_their_ask(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.look_kept = on;
         }
         self
     }
@@ -6143,6 +6963,18 @@ impl Engine {
         self
     }
 
+    /// With a voice make offered (`LAMP_MAKE_SKILL=on`): the make's opening
+    /// ([`crate::make_skill_agent::MAKE_OPENING`], #7554) rendered ahead in
+    /// the owner's language as the worker starts ([`FixedClips`]), so a
+    /// bare make_skill call's first audio never waits on the voice. Off,
+    /// it is said by the voice as the turn's piece. Before any turn only.
+    pub fn rendering_make_opening(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.make_opening_ahead = on;
+        }
+        self
+    }
+
     /// `LAMP_ACTION_CLAIM_CHECKED=on` ([`crate::action_claim`], #5215): a
     /// reply that is or opens with the acting part's own line for a light,
     /// volume or Schedule action ("Louder.", "Timer set. It rings at 9:39
@@ -6203,6 +7035,70 @@ impl Engine {
         self
     }
 
+    /// `LAMP_KEEP_CLAIM_WHOLE=on` ([`crate::remember::WHOLE_ENVIRONMENT`],
+    /// #7878): on a turn whose spoken line is a statement about the person
+    /// (`remember::about_someone`, never a question), while no `remember`
+    /// of the turn has run, a reply is held to its round's end and judged
+    /// whole for a keep, replace or update said done
+    /// (`remember::claims_a_change`), not only by its opening. With such a
+    /// claim and no `remember`, it is asked again once, then said not kept,
+    /// as an opening's claim is. Every other turn streams as before. Before
+    /// any turn only.
+    pub fn checking_keep_claims_whole(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.keep_whole = on;
+        }
+        self
+    }
+
+    /// `LAMP_NUDGE_CLAIM_CHECKED=on` ([`crate::action_claim::nudge_claim`],
+    /// #7878), beside [`Engine::checking_action_claims`]: a reply that opens
+    /// by saying a wellbeing nudge was stopped, snoozed or turned off ("I've
+    /// turned off the water nudge for today.") is held and judged: it
+    /// stands only beside a `wellbeing_nudges` that ran in the turn; with no
+    /// call, asked again once, then said not done. Nothing without the claim
+    /// check. Before any turn only.
+    pub fn checking_nudge_claims(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.nudge_claims = on;
+        }
+        self
+    }
+
+    /// `LAMP_SKILL_CLAIM_CHECKED=on` ([`crate::action_claim::SKILL_ENVIRONMENT`],
+    /// #7683), with [`Engine::checking_action_claims`] and a voice make
+    /// offered (`LAMP_MAKE_SKILL=on`): the skills the person made, with
+    /// whether each is on, read once as each turn begins (`made`:
+    /// `made.json` and lamp-skills' `off` file, two small local files, 0.2
+    /// to 0.4 ms together on a Mac, `crate::action_claim::made_skills`), so a
+    /// reply that says one removed, turned off or on in the lamp's own
+    /// result words ("Planet fact is removed.") that no `make_skill` of the
+    /// turn did, and that isn't its true state, is held and asked again
+    /// once, then said not done ([`crate::action_claim::skill_claim`],
+    /// [`crate::action_claim::skill_stands`]). A `make_skill` that removed,
+    /// asked a remove's question or turned one is kept for a later turn's
+    /// history then too ([`kept_made`]). None: no such claim is read, and
+    /// the history is as before. Before any turn only.
+    pub fn reading_made_names(mut self, made: Option<MadeNames>) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.made_names = made;
+        }
+        self
+    }
+
+    /// `LAMP_LIVE_FACT_CHECKED=on` ([`crate::live_fact`], #7605): a
+    /// sentence of a reply stating a live figure ("around $4,050 an
+    /// ounce") that no lookup in the turn found is not said, judged by the
+    /// reply's own words; the model is asked again once with the lookup
+    /// required, then the lamp says it couldn't look it up. Before any turn
+    /// only.
+    pub fn checking_live_facts(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.live_facts = on;
+        }
+        self
+    }
+
     /// `LAMP_MAKE_AGENT_ONE_PATH=on` ([`crate::make_skill_agent::ONE_PATH_ENVIRONMENT`],
     /// #7371), with `after` ([`crate::make_skill_agent::LONG_WAIT_AFTER`]):
     /// a voice make's waiting line says how long
@@ -6212,6 +7108,19 @@ impl Engine {
     pub fn waiting_on_one_path(mut self, after: Option<Duration>) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.one_path_wait = after;
+        }
+        self
+    }
+
+    /// `LAMP_MAKE_MAY_RUN_ON=on` ([`crate::long_make::ENVIRONMENT`], #6811),
+    /// with `after` ([`crate::long_make::RUN_ON_AFTER`]): a voice make with
+    /// no answer `after` its waiting line is let run on
+    /// ([`crate::long_make::let_go`]), [`crate::long_make::RUN_ON_LINE`]
+    /// said once in place of the long-wait line, and the turn ends, the
+    /// model told it was said. None: as before. Before any turn only.
+    pub fn running_on_after(mut self, after: Option<Duration>) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.run_on_after = after;
         }
         self
     }
@@ -6740,6 +7649,17 @@ impl Engine {
         self
     }
 
+    /// Whether a line let out only as the conversation going on is surely
+    /// someone else's, by voice or by a face seen speaking it that is not
+    /// the caller's: near the end of the lamp's day only such a line is held
+    /// ([`day_alone_held`], #7664). Before any turn only.
+    pub fn telling_someone_elses(mut self, someone_elses: Busy) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.someone_elses = Some(someone_elses);
+        }
+        self
+    }
+
     /// With `LAMP_TASKS_NAMED_ASK=on` (#1722): a line whose own words ask
     /// one of the staff by name (`named`) has its round 1 call of
     /// `start_agent_task` given to that one, whoever the call named; one
@@ -6785,6 +7705,17 @@ impl Engine {
     pub fn calling_skills_named(mut self, named: SkillNamed) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.skill_named = Some(named);
+        }
+        self
+    }
+
+    /// With [`Self::calling_skills_named`]: whether the lamp's last words
+    /// name a skill made on the lamp (`named`), so the lamp was talking of
+    /// its made skills and a made skill's name said next answers it
+    /// ([`lamp_awaits_answer_for`]). Before any turn only.
+    pub fn knowing_made_names(mut self, named: MadeNamed) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.made_named = Some(named);
         }
         self
     }
@@ -7009,6 +7940,31 @@ impl Engine {
         self
     }
 
+    /// While the work this voice handed over last is still open, a spoken
+    /// request is told so in one line (`note`, with the tasks part, #7930):
+    /// on c0a4 (ROW c0a4-6) "Hey Lamp, how far is it?" right after a
+    /// hand-over got "How far is what?" and no call. Asked off the
+    /// runtime's thread only while work was handed over. Before any turn
+    /// only.
+    pub fn noting_open_work(mut self, note: OpenWorkNote) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.open_work = Some(note);
+        }
+        self
+    }
+
+    /// A heard line that is a whole trigger of a running app is taken by
+    /// that app (`take`, #7415 piece 6): told to it, and when it takes the
+    /// line the request ends here with no chat round, the app speaking for
+    /// itself. A line nothing takes goes on to the model as any other.
+    /// Before any turn only.
+    pub fn taking_app_lines(mut self, take: AppLine) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.app_line = Some(take);
+        }
+        self
+    }
+
     /// A spoken line whose own words spell the person's name at setup is
     /// told `note`'s words beside them, the read-back to say with the name
     /// as a word (#5580 row 2: with the nudge off, the model read "W a l t e
@@ -7158,6 +8114,20 @@ impl Engine {
         self
     }
 
+    /// `LAMP_LIMIT_LOCAL_ASKS=on` (#7346, done-when 4): while the chat is
+    /// refused with the usage limit, a heard line that plainly asks for a
+    /// light or volume change ([`limit_local::matched`]) runs that function
+    /// with no model and says its own short line, rendered ahead
+    /// ([`FixedClips`]), and a due timer or reminder is rung with its own
+    /// line ([`limit_ring`], #7642). Only with the down line, whose run of
+    /// refusals knows the limit. Before any turn only.
+    pub fn doing_at_the_limit(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.limit_local = on;
+        }
+        self
+    }
+
     /// The owner's language in place of the one read at start (`None`:
     /// English), for its fixed lines: a test's, as the environment is read
     /// once per process.
@@ -7224,13 +8194,56 @@ impl Engine {
                 shared.keep_at_once && shared.language.is_some(),
                 crate::keep_at_once::KEPT,
             ),
+            // The one-face forget's "Okay, I'll keep it." (#8185), the same
+            // way: in the owner's language only from its clip.
+            (
+                shared.one_face_reads && shared.language.is_some(),
+                crate::remember::KEPT_IT_LINE,
+            ),
+            // The make's opening for a bare make_skill call (#7554), in
+            // every language, so its first audio never waits on the voice.
+            (
+                shared.make_opening_ahead,
+                crate::make_skill_agent::MAKE_OPENING,
+            ),
         ]
         .into_iter()
         .filter_map(|(on, line)| on.then_some(line))
+        // `LAMP_LIMIT_LOCAL_ASKS`: the light's and volume's own lines,
+        // rendered while the voice still answers (#7346).
+        .chain(
+            crate::action_claim::SAID_LINES
+                .into_iter()
+                .chain([LIMIT_TIMER_DONE, LIMIT_REMINDER_DUE])
+                .filter(|_| shared.limit_local),
+        )
+        // And the pieces the time is said from there (#7642), last.
+        .chain(limit_local::time_pieces().filter(|_| shared.limit_local))
         .collect();
         shared
             .fixed_clips
             .render(&shared.services, shared.language, lines);
+        // The care line (`LAMP_CARE_LINE`), rendered ahead for the lamp's
+        // region and language now, so a voice down later still says it (the
+        // first builder's P2 on #7752). Rendered again the next time if not.
+        if let Some(care) = &shared.care {
+            let line = care.line();
+            if care.clip(&line).is_none() {
+                let (care, services) = (care.clone(), shared.services.clone());
+                tokio::spawn(async move {
+                    let clip =
+                        clip_up_to(services.speak(line.clone()), crate::care_line::MOST_SAMPLES)
+                            .await;
+                    if clip.is_empty() {
+                        eprintln!(
+                            "lamp-voice second: the care line could not be rendered ahead; trying again at the next line"
+                        );
+                    } else {
+                        care.keep_clip(&line, clip);
+                    }
+                });
+            }
+        }
     }
 
     pub fn submit(&mut self, input: ProviderInput) {
@@ -7702,9 +8715,7 @@ impl Engine {
                     if kept.said_from == 0 {
                         kept.said_from = read_completed_at_us;
                     }
-                    kept.samples.extend(samples.iter().copied());
-                    let over = kept.samples.len().saturating_sub(KEPT_SAMPLES);
-                    kept.samples.drain(..over);
+                    keep_sound(&mut kept.samples, &samples, kept_most());
                 }
                 match audio.try_send(LinePart::Sound(samples, true, read_completed_at_us)) {
                     Ok(()) => {}
@@ -7876,7 +8887,18 @@ impl Engine {
                     .and_then(|mut note| note.take())
                     .filter(|(of, _)| look && *of == session)
                     .map(|(_, note)| note);
+                // The route's own look asked in a spoken turn, and its
+                // asker's scope, read before the asker's turn is let go
+                // (`LAMP_LOOK_TOLD`, `LAMP_LOOK_KEPT_WITH_ASK`).
+                let look_turn = self.look_turn(request, session, look);
                 if !self.begin(request, session) {
+                    // Refused (retired): its look never runs, and the asking
+                    // exchange is kept as it stands (Twelve's P3 on #8019).
+                    if let Some(turn) = &look_turn
+                        && let Ok(mut thread) = crate::thread::THREAD.lock()
+                    {
+                        thread.look_let_go(turn.ask.request);
+                    }
                     return;
                 }
                 // A search's own turn: the search a push may end goes on
@@ -7957,13 +8979,69 @@ impl Engine {
                     // Its exchange never reaches the memory's journal either.
                     crate::remember::keep_out(request);
                     None
+                } else if crate::onboarding::learn_later::is_ask(&text) {
+                    // The walk's "What should I call you?" (#7876): its own
+                    // line, said with no chat; no one's memory is read for
+                    // it, and its exchange is kept out of memory.
+                    eprintln!(
+                        "lamp-voice second: request {request} is the walk's ask for a name: nothing read from memory, nothing kept (LAMP_FACE_LEARN_LATER)"
+                    );
+                    crate::remember::keep_out(request);
+                    // The next line is its answer, judged by the model.
+                    crate::onboarding::learn_later::asked_now();
+                    None
+                } else if let Some(scope) = look_turn
+                    .as_ref()
+                    .and_then(|turn| turn.kept.clone())
+                    .and_then(|scope| self.scope_of(request, session, scope))
+                {
+                    // The look goes on from the turn that asked it, in its
+                    // scope (`LAMP_LOOK_KEPT_WITH_ASK`).
+                    let kept_lease = scope.lease();
+                    let whose = if kept_lease
+                        .scope()
+                        .and_then(|scope| scope.person())
+                        .is_some()
+                    {
+                        "the asker's"
+                    } else {
+                        "the room's"
+                    };
+                    eprintln!(
+                        "lamp-voice second: request {request}: the look goes on from request {} in {whose} scope (LAMP_LOOK_KEPT_WITH_ASK)",
+                        look_turn.as_ref().map_or(0, |turn| turn.ask.request)
+                    );
+                    Some(scope)
                 } else {
                     self.memory_scope(request, session, false)
                 };
                 let lease = memory_scope.as_ref().map(|scope| scope.lease());
+                // What was said of the look goes beside the picture, before
+                // its note (`LAMP_LOOK_TOLD`); never without a picture.
+                let told = look_turn
+                    .filter(|turn| turn.told && picture.is_some())
+                    .map(|turn| {
+                        // With a memory scope, hits only in the asker's; a
+                        // voice without one reads them as its lines do.
+                        let hits = match &self.memory {
+                            Some(_) => match turn.hits {
+                                Some(scope) => LookHits::In(self.scope_of(request, session, scope)),
+                                None => LookHits::None,
+                            },
+                            None => LookHits::In(None),
+                        };
+                        let hits = if turn.held { LookHits::None } else { hits };
+                        (turn.ask, hits)
+                    });
                 let shared = self.shared.clone();
                 let begun = Instant::now();
                 let task = tokio::spawn(async move {
+                    let text = match told {
+                        Some((ask, hits)) => {
+                            look_told_text(&shared, request, &ask, hits, text).await
+                        }
+                        None => text,
+                    };
                     answer(
                         &shared,
                         (request, lease),
@@ -8000,8 +9078,13 @@ impl Engine {
                 late_by_ms,
                 also,
                 again,
+                ids,
+                timer,
                 ..
             } => {
+                // A timer alone is rung at the usage limit with its own
+                // line; one said with others, as a reminder (#7642).
+                let timer = timer && also.is_empty();
                 // Deferred unless this route is the lamp's only voice and the
                 // lamp says its reminders: standing by, Gemini says them once
                 // it is back.
@@ -8024,6 +9107,12 @@ impl Engine {
                 if !self.begin(request, session) {
                     return;
                 }
+                // Each one its known creator set rang: their linked record
+                // (`LAMP_SERVICE_RECORDS_REMINDERS`).
+                crate::service_records::reminder_rows::said(
+                    &ids,
+                    crate::service_records::unix_ms(),
+                );
                 // Reminder data is not something to remember because it
                 // was said (as on the Live route).
                 crate::remember::keep_out(request);
@@ -8036,7 +9125,7 @@ impl Engine {
                         &shared,
                         (request, lease),
                         note,
-                        Asker::Reminder,
+                        Asker::Reminder { timer },
                         None,
                         None,
                         Vec::new(),
@@ -8082,6 +9171,14 @@ impl Engine {
         self.begun_last = Some((request, session));
         if let Ok(mut begun) = self.shared.begun.lock() {
             *begun = Some((request, session));
+        }
+        // So is a look asked by the route's own call: any other turn lets
+        // it go, and its asking exchange is kept as it stands.
+        if let Ok(mut asked) = self.shared.look_asked.lock()
+            && let Some(ask) = asked.take()
+            && let Ok(mut thread) = crate::thread::THREAD.lock()
+        {
+            thread.look_let_go(ask.request);
         }
         // A skill's note for its picture is for the look turn alone, which
         // takes it before it begins: any other turn lets it go.
@@ -8155,6 +9252,12 @@ impl Engine {
         }
         self.let_go_cut("a stop came after it");
         self.let_go_holding_line(through);
+        // A look asked is not dropped here: an authority with no owner
+        // also comes as the asking turn ends ("Let me look." said), before
+        // the look's picture comes with the next request (lamp-06c1, ROW on
+        // #8019: 17 of 17 looks dropped). A mute or privacy close drops it
+        // (`privacy`), a spoken stop or a close (`thread::close_now`), and
+        // any other turn begun (`begin`).
         // Nor do its words heard and not yet asked go on in a chain
         // ([`Self::chain_heard`]).
         if let Ok(mut last) = self.shared.heard_last.lock() {
@@ -8630,6 +9733,132 @@ async fn say_limit(
         return Err(Stop::Gone);
     }
     Ok(())
+}
+
+/// The journal line for a line at the usage limit that is no plain ask
+/// ([`limit_local_ask`]): its word count only, never its words.
+fn limit_local_unmatched_line(request: u64, said: &str) -> String {
+    format!(
+        "lamp-voice second: request {request}: limit_local: no plain ask matched ({} words)",
+        said.split_whitespace().count()
+    )
+}
+
+/// `LAMP_LIMIT_LOCAL_ASKS` (#7346, done-when 4): at the usage limit, a
+/// heard line that plainly asks for a light or volume change
+/// ([`limit_local::matched`]) runs the function the model would have called,
+/// through the same runner, and the lamp says that function's own short
+/// line ([`short_done_line`], one of [`crate::action_claim::SAID_LINES`])
+/// from its clip rendered ahead; with none kept, the change alone answers.
+/// Told to the coordinator as the limit line is, so no `turn_lost` or
+/// limit line follows it. False, with nothing said, when the line is no
+/// such ask or its function was refused or failed: the limit's own way
+/// then, as without the switch. A line that plainly asks the time
+/// ([`limit_local::asks_the_time`], #7642) is answered from the lamp's
+/// clock, said from its pieces rendered ahead ([`limit_local::time_said`]);
+/// with the clock unknown or a piece not kept, the limit's own way.
+async fn limit_local_ask(
+    shared: &Shared,
+    request: u64,
+    said: &str,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+) -> Result<bool, Stop> {
+    if limit_local::asks_the_time(said) {
+        let clip: Option<Vec<i16>> = crate::local_time::clock_here().and_then(|(hour, minute)| {
+            limit_local::time_said(hour, minute)
+                .into_iter()
+                .map(|piece| shared.fixed_clips.kept(piece))
+                .collect::<Option<Vec<_>>>()
+                .map(|clips| clips.concat())
+        });
+        let Some(clip) = clip else {
+            eprintln!(
+                "lamp-voice second: request {request}: at the usage limit the time was asked, and the clock or its words are not at hand: the limit's own way (LAMP_LIMIT_LOCAL_ASKS)"
+            );
+            return Ok(false);
+        };
+        cue(shared, request, clip).await?;
+        eprintln!(
+            "lamp-voice second: request {request}: at the usage limit the time was said without the model (LAMP_LIMIT_LOCAL_ASKS)"
+        );
+        if !shared.emit(ProviderOutput::DownLineSaid { request }).await {
+            return Err(Stop::Gone);
+        }
+        return Ok(true);
+    }
+    let Some((name, args)) = limit_local::matched(said) else {
+        eprintln!("{}", limit_local_unmatched_line(request, said));
+        return Ok(false);
+    };
+    let began = Instant::now();
+    let call = net::ToolCall {
+        id: format!("limit-local-{request}"),
+        name: name.to_owned(),
+        args,
+        extra: None,
+    };
+    let told = run_tool(shared, request, true, &call, scope).await;
+    if told.get("error").is_some() {
+        eprintln!(
+            "lamp-voice second: request {request}: at the usage limit {name} was asked without the model and refused: the limit's own way (LAMP_LIMIT_LOCAL_ASKS)"
+        );
+        return Ok(false);
+    }
+    let line = short_done_line(std::slice::from_ref(&told));
+    let clip = line.and_then(|line| {
+        crate::action_claim::SAID_LINES
+            .into_iter()
+            .find(|said| *said == line)
+            .and_then(|line| shared.fixed_clips.kept(line))
+    });
+    let spoke = clip.is_some();
+    if let Some(clip) = clip {
+        cue(shared, request, clip).await?;
+    }
+    eprintln!(
+        "lamp-voice second: request {request}: at the usage limit {name} was done without the model, {} in {} ms (LAMP_LIMIT_LOCAL_ASKS)",
+        if spoke {
+            "its own line said"
+        } else {
+            "no line kept, so nothing said"
+        },
+        began.elapsed().as_millis()
+    );
+    if !shared.emit(ProviderOutput::DownLineSaid { request }).await {
+        return Err(Stop::Gone);
+    }
+    Ok(true)
+}
+
+/// `LAMP_LIMIT_LOCAL_ASKS` (#7642, V2's ruling A): at the usage limit a due
+/// timer is rung with [`LIMIT_TIMER_DONE`] and a reminder with
+/// [`LIMIT_REMINDER_DUE`], from its clip rendered ahead, in place of the
+/// chat turn the limit refuses. The turn then ends answered, so the
+/// coordinator completes the item with that audio, as said: no ring again,
+/// and no attempt lost to the no-audio retries. Told as the lamp's own
+/// words ([`ProviderOutput::OwnWordsSaid`]), so it ends no refusal. False,
+/// with nothing said, when the clip isn't kept: the limit's way then.
+async fn limit_ring(shared: &Shared, request: u64, timer: bool) -> Result<bool, Stop> {
+    let line = if timer {
+        LIMIT_TIMER_DONE
+    } else {
+        LIMIT_REMINDER_DUE
+    };
+    let Some(clip) = shared.fixed_clips.kept(line) else {
+        eprintln!(
+            "lamp-voice second: request {request}: at the usage limit \"{line}\" isn't rendered yet: the reminder's chat is asked (LAMP_LIMIT_LOCAL_ASKS)"
+        );
+        return Ok(false);
+    };
+    cue(shared, request, clip).await?;
+    eprintln!(
+        "lamp-voice second: request {request}: at the usage limit the due {} was rung with \"{line}\", no chat asked (LAMP_LIMIT_LOCAL_ASKS)",
+        if timer { "timer" } else { "reminder" }
+    );
+    if !shared.emit(ProviderOutput::OwnWordsSaid { request }).await {
+        return Err(Stop::Gone);
+    }
+    Ok(true)
 }
 
 /// How often a lost line's wait asks whether the link is back.
@@ -9108,7 +10337,13 @@ async fn spoken(
                 (Err(_), _) => "its speech to text failed".to_owned(),
             }
         );
-        let _ = tell.send(back.map(|words| (words, true)));
+        // The call's verdict by its words (`LAMP_CALL_WORDS_OVER_WAIT`,
+        // #8073), as its own line's would be: words past the name are no
+        // call for the line they go to.
+        let _ = tell.send(back.map(|words| {
+            let called = !shared.call_words_over_wait || call_stands(&words);
+            (words, called)
+        }));
         return;
     }
     let text = match finished {
@@ -9367,12 +10602,18 @@ async fn spoken(
                     .as_ref()
                     .filter(|(name, _)| crate::known_faces::memory_person(name) == person)
                     .map(|(_, face)| face.as_str());
+                // `LAMP_CONVERSATION_CARRIES_OWN_TRACK` (C63(b)).
+                let own_track = shared
+                    .scope_seen
+                    .then(|| own_track_face(&shared, eyes, &person, own_face, begun, finishing))
+                    .flatten();
+                let carry_face = own_track.as_deref().or(own_face);
                 let carried = shared.scope_seen
                     && unseen_carry(
                         &shared,
                         eyes,
                         &speakers,
-                        own_face,
+                        carry_face,
                         (begun, finishing),
                         &person,
                         || {
@@ -9385,12 +10626,17 @@ async fn spoken(
                     .is_some_and(|keep_only| carry_into(&shared, scope, &person, keep_only));
                 if carried {
                     carried_past_silent = shared.past_silent.is_some();
-                    carried_face = own_face.map(str::to_owned);
+                    carried_face = carry_face.map(str::to_owned);
                     eprintln!(
                         "lamp-voice second: request {request}: no face was seen speaking it, in their conversation going on, {}: {} (LAMP_CONVERSATION_CARRIES)",
                         carried_as(&shared),
                         carried_told(scope)
                     );
+                    if own_track.is_some() {
+                        eprintln!(
+                            "lamp-voice second: request {request}: carried on their face as last named, the same unbroken track alone in view, the eyes no longer naming it (LAMP_CONVERSATION_CARRIES_OWN_TRACK)"
+                        );
+                    }
                 }
                 // Their known face the one face through it, none seen
                 // speaking it, no other voice in the conversation, and not
@@ -9607,6 +10853,10 @@ async fn spoken(
             .as_ref()
             .filter(|(name, _)| crate::known_faces::memory_person(name) == person)
             .map(|(_, face)| face.as_str());
+        // `LAMP_CONVERSATION_CARRIES_OWN_TRACK` (C63(b)): their face as last
+        // named, the same unbroken track alone in view, as above.
+        let own_track = own_track_face(&shared, eyes, &person, face, begun, finishing);
+        let face = own_track.as_deref().or(face);
         if speakers.is_empty()
             && no_other_shown(&shared, eyes, face, begun, finishing)
             && eyes.face_seen_between(
@@ -9623,6 +10873,11 @@ async fn spoken(
                 carried_as(&shared),
                 carried_told(lease)
             );
+            if own_track.is_some() {
+                eprintln!(
+                    "lamp-voice second: request {request}: carried on their face as last named, the same unbroken track alone in view, the eyes no longer naming it (LAMP_CONVERSATION_CARRIES_OWN_TRACK)"
+                );
+            }
             if prepared.take().is_some() {
                 eprintln!(
                     "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the room's"
@@ -9776,6 +11031,11 @@ async fn spoken(
             // Each id with the eyes' boot, the known face's too: after the
             // eyes start again a passing id names someone else (#3037).
             let speakers = eyes.speakers_with_boot(begun, finishing);
+            // A held rename's short yes, with `LAMP_NAME_LEARN_FIX` and
+            // `LAMP_RENAME_SHORT_YES` (#7419).
+            let short_yes = shared.name_learn_fix && held_rename::short_yes_from_environment();
+            let rename_speakers =
+                renaming.then(|| held_rename::yes_speakers(eyes, begun, finishing, short_yes));
             let (eyes, known) = (eyes.clone(), known.clone());
             let pair = tokio::task::spawn_blocking(move || eyes.known_with_boot(&known))
                 .await
@@ -9798,8 +11058,8 @@ async fn spoken(
                     crate::speaking_faces::saw_line(seen);
                 }
             }
-            if renaming {
-                held_rename::keep_sight(&shared, (request, speakers.clone(), pair.clone()));
+            if let Some(rename_speakers) = rename_speakers {
+                held_rename::keep_sight(&shared, (request, rename_speakers, pair.clone()));
             }
             if held && let Ok(mut hold) = shared.held_forget.lock() {
                 hold.sight = Some((request, speakers, pair));
@@ -9928,6 +11188,21 @@ async fn spoken(
     // often does: asked as the name the coordinator heard, or it would go
     // unanswered as a sound (#1712).
     let called = marks.called.load(Ordering::Acquire);
+    // With `LAMP_CALL_WORDS_OVER_WAIT=on` (#8073), the coordinator's call
+    // stands only while the heard words are none or only the name
+    // ([`call_stands`]): words past the name are judged as they are, as a
+    // line begun with the name and no `Called` is. Read once here: every
+    // use of `called` below (the name's wait and carry, a night's hold,
+    // `CALLED_NOTE`, the say-back's and clash's name-only line) reads it.
+    let called = if called && shared.call_words_over_wait && !call_stands(&text) {
+        eprintln!(
+            "lamp-voice second: request {request}: the coordinator ended it as only the lamp's name, but its {} words go past the name: judged by its words, not as a call (LAMP_CALL_WORDS_OVER_WAIT)",
+            text.split_whitespace().count()
+        );
+        false
+    } else {
+        called
+    };
     // With `LAMP_NAME_WORDLESS_BAR=on` (#5385), only on a sure hearing: a
     // call heard under the bar with no words is no call, and is left as a
     // sound, as a line with no words and no call is.
@@ -9972,13 +11247,21 @@ async fn spoken(
     // with an earlier piece's words, whose start is not this line's
     // (reviewer-three's P3 on 194accd24).
     let text = match &shared.name_near {
-        Some(near) if !went_on => named_near(
-            request,
-            text,
-            said.lock().map_or((0, 0), |said| *said),
-            near,
-            shared.name_as_a_sentence,
-        ),
+        Some(near) if !went_on => {
+            let (text, not_the_name) = named_near(
+                request,
+                text,
+                said.lock().map_or((0, 0), |said| *said),
+                near,
+                shared.name_as_a_sentence,
+            );
+            // The rule counts no second sign for that hearing
+            // (`LAMP_NAME_SIGN_TIED`, #8092).
+            if not_the_name && let Some(told) = &shared.near_not_the_name {
+                told(request);
+            }
+            text
+        }
         _ => text,
     };
     // Said by the lamp's name just before, whose request this line dropped
@@ -10130,14 +11413,41 @@ async fn spoken(
     }
     // Only the lamp's name, or said by it (`LAMP_SECOND_NAME_CARRIES`): it
     // shows it was said to the lamp, so it is never held as a short sound.
-    // Nor, with `LAMP_ENDPOINT_PAUSE_JOIN`, a line begun with the name set
-    // off at its start, however many words follow it (#4449: "Lamp, can
-    // you tell me" was held so).
+    // Nor a line begun with the name set off at its start, however many
+    // words follow it, with or without `LAMP_ENDPOINT_PAUSE_JOIN` (#4449:
+    // "Lamp, can you tell me" was held so; #7834: on lamp-9adf, where the
+    // switch is off, "Lamp, put it back." was, 2 times in 5).
     let marked = checked.is_some_and(|sound| sound.load(Ordering::Acquire))
         && !crate::not_speech::short_word(&text)
         && !name_waits
         && name_of.is_none()
-        && !(shared.pause_join && name_at_start(&text));
+        && !name_at_start(&text);
+    // Nor one lamp-name heard the name in at its own bar (`--least`), its
+    // words come back as another word: it shows it was said to the lamp,
+    // and the rule judges it as any line, where a line of one or two words,
+    // not a question, with nothing written for the name, is still not
+    // answered on the hearing alone (#7918). On lamp-52e6 on 19 Nov
+    // "Lamp?", heard at 0.917, was held so (#7891). Only one begun clear of
+    // the lamp's voice and its echo tail: in the product lamp-name runs
+    // without `--not-while-speaking`, and on lamp-4ace it heard the lamp's
+    // own reply at 0.990 (the Reviewer-lead's P2 on #7994).
+    let began_clear_of_the_lamp = !marks.over_the_lamps_voice
+        && !own_echo::in_the_tail(
+            said.lock().map_or(0, |said| said.0),
+            shared.said_until_us.load(Ordering::Relaxed),
+        );
+    let heard_at = shared
+        .name_in_line
+        .as_ref()
+        .filter(|_| marked && began_clear_of_the_lamp)
+        .and_then(|best| best(said.lock().map_or((0, 0), |said| *said)))
+        .filter(|score| *score >= crate::called::LEAST_SCORE);
+    if let Some(score) = heard_at {
+        eprintln!(
+            "lamp-voice second: request {request}: a short sound, but lamp-name heard the name in it at {score:.3}: judged as a line (#7891)"
+        );
+    }
+    let marked = marked && heard_at.is_none();
     // A sound with a word in it, right after the lamp's own question in a
     // conversation going on, is the person's answer, as on the Live route
     // (lamp-4ace, 17 October 16:11: "Yes. Please start it." heard as
@@ -10155,7 +11465,16 @@ async fn spoken(
         && !answer_awaited
         && crate::agent_tasks::awaits_yes(Instant::now())
         && (crate::services::plain_yes(&text) || crate::services::plain_no(&text));
-    let answers = asked_by_the_lamp || answer_awaited || task_answer;
+    // And a sound with a word in it while the lamp waits for a yes or no of
+    // its own asking ([`a_yes_held`]: a keep, a forget, a setup save, a
+    // rename, a skill's or a task's yes, a write's send): the person's reply
+    // to the lamp, whatever its length (#7698: on lamp-06c1 on 18 Nov the
+    // reply to the lamp's read-back was held so). The rule judges it.
+    let yes_held = marked
+        && !(asked_by_the_lamp || answer_awaited || task_answer)
+        && text.chars().any(char::is_alphanumeric)
+        && a_yes_held(&shared);
+    let answers = asked_by_the_lamp || answer_awaited || task_answer || yes_held;
     if asked_by_the_lamp {
         eprintln!(
             "lamp-voice second: request {request}: a short sound with a word in it, right after the lamp's own question, in a conversation going on: judged as a line"
@@ -10167,6 +11486,10 @@ async fn spoken(
     } else if task_answer {
         eprintln!(
             "lamp-voice second: request {request}: a short sound that is a plain yes or no to a task read back and waiting: judged as a line (#7027)"
+        );
+    } else if yes_held {
+        eprintln!(
+            "lamp-voice second: request {request}: a short sound with a word in it while the lamp waits for a yes or no of its own asking: judged as a line (#7698)"
         );
     }
     let held = marked && !answers;
@@ -10237,10 +11560,20 @@ async fn spoken(
     // plain yes to a task read back is taken in code (#7027), never one that
     // may be the lamp's own words heard back.
     let began_clear = !marks.over_the_lamps_voice && !in_echo_tail;
+    // `LAMP_CARE_LINE` (#7689): words of self-harm are never held by the
+    // said-to-me rule (the first builder's P2 on #7752): they are answered,
+    // and the care line follows, whoever said them.
+    let care_caught = !empty
+        && !held
+        && !echoed
+        && shared.care.as_ref().is_some_and(|care| {
+            crate::care_line::said_harm(&text) && !care.own_line_heard(&text, Instant::now())
+        });
     // The rule judges this very line (`carried_past_silent_undone`).
-    let heed_ran = shared.heed.is_some() && !echoed && !empty && !held;
+    let heed_ran = shared.heed.is_some() && !echoed && !empty && !held && !care_caught;
     let mut heeded = match &shared.heed {
         _ if echoed => Some(OWN_ECHO_HELD),
+        _ if care_caught => None,
         Some(heed) if !empty && !held => {
             let window = said.lock().map_or((0, 0), |said| *said);
             // Said by the name just before: its window begins with the
@@ -10459,12 +11792,19 @@ async fn spoken(
         // a turn or a tap (the local leader, 4 Nov: else it started a fresh
         // 45 s of conversation).
         // Its own exchange is covered however late the line is written.
+        // A look asked and not begun goes with it (#8019).
+        if let Ok(mut asked) = shared.look_asked.lock() {
+            asked.take();
+        }
         crate::thread::close_now(Some(request));
         // An ask with the lamp's agent is stopped too: its answer is never
         // told, and is cancelled if it already waits (Heron's P2 4 on #7509).
         crate::agent_asks::forget();
         // A reminder's ring this line cut is held, not rung once more.
         let _ = shared.emit(ProviderOutput::StopAnswered { request }).await;
+        // A line of theirs, answered by the lamp's own stop line: they went
+        // on from any make whose turn was cut (`worker::made_running`).
+        crate::make_skill_local::person_went_on(request);
         say_fixed(
             &shared,
             request,
@@ -10487,6 +11827,30 @@ async fn spoken(
         && shared.night_rest.as_ref().is_some_and(|night| night())
     {
         heeded = Some(NIGHT_REST_HELD);
+    }
+    // `LAMP_VOICE_DAY_SHED` (#7664): near the end of the lamp's day, a line
+    // let out only as the conversation going on, by someone other than the
+    // one the lamp was talking with (`worker::CONVERSATION_ALONE`, never the
+    // caller's own follow-up), is held, not sent to the model only to be
+    // judged. A named line, a turn, a tap, a face or the caller's follow-up
+    // still goes: the owner's own talk is never shed.
+    if heeded.is_none()
+        && !echoed
+        && !held
+        && !empty
+        && day_alone_held(
+            crate::day_shed::worker_level(),
+            shared
+                .conversation_alone
+                .as_ref()
+                .and_then(|note| note(request)),
+            shared
+                .someone_elses
+                .as_ref()
+                .is_some_and(|someone_elses| someone_elses(request)),
+        )
+    {
+        heeded = Some(DAY_NEAR_HELD);
     }
     // A held echo's journal line, with its counts, is said above.
     if let Some(why) = heeded.filter(|_| !echoed) {
@@ -11046,6 +12410,75 @@ async fn spoken(
             note.len()
         );
     }
+    // A line that is a whole trigger of a running app (#7415 piece 6): told
+    // to the app, which may take it, before anything is spent on its words
+    // (memory recall below). Never while the lamp waits on an answer: a task
+    // read back, a write or skill say-back, a held forget or rename (a
+    // trigger "yes go ahead" must not take the person's yes), never a line
+    // heard over the lamp's voice, and never one let in only as the
+    // conversation going on (`CONVERSATION_ALONE`: no name, not turned to the
+    // lamp, someone other than the caller): that has had no `not_for_me`
+    // judgement, so another person's or the TV's words could start the
+    // owner's app. The caller's own follow-up (`FOLLOW_UP_NOTE`) is theirs.
+    // Not while another person's cut words are kept for this answer
+    // (`carried`): they would be dropped unanswered. A matched line alone
+    // waits (up to the hold) off the runtime's thread, any other costs
+    // nothing here. Taken: the request ends as a normal end does, nothing of
+    // it carried, with no chat round and no words from the lamp; the app
+    // speaks for itself.
+    // Words of self-harm (#7689 part 2) are never offered to an app's
+    // trigger: taken, the turn would end with no answer at all. With
+    // `LAMP_CARE_LINE` on, as the care turn below judges them, and within
+    // its hold the person asking who to call too; with it off too (App
+    // Only's 10:00 on #8341, Store apps going to users), by
+    // `care_line::said_harm` alone: the line then goes to the model as any
+    // other, nothing held or said.
+    let care_turn = care_caught
+        || (shared.care.is_none()
+            && !empty
+            && !held
+            && !echoed
+            && crate::care_line::said_harm(&text))
+        || shared.care.as_ref().is_some_and(|care| {
+            care.holds(Instant::now()) && crate::care_line::asks_who_to_call(&text)
+        });
+    if let Some(take) = &shared.app_line
+        && !care_turn
+        && began_clear
+        && carried.is_none()
+        && !lamp_awaits_an_answer(&shared, request)
+        && shared
+            .conversation_alone
+            .as_ref()
+            .and_then(|note| note(request))
+            != Some(worker::CONVERSATION_ALONE)
+    {
+        let (take, words) = (take.clone(), text.clone());
+        let taken = tokio::task::spawn_blocking(move || take(request, &words))
+            .await
+            .unwrap_or(false);
+        if taken {
+            eprintln!(
+                "lamp-voice second: request {request}: its words are a trigger of a running app, which took the line: the request ends here, the model not asked ({})",
+                crate::app_triggers::ENVIRONMENT
+            );
+            // Its turn over: nothing of it is carried (words an earlier cut
+            // line joined to it would be answered by the next line).
+            if let Ok(mut in_flight) = shared.in_flight.lock() {
+                in_flight.take_if(|carried| carried.request == request);
+            }
+            sent_given_over(&shared, request);
+            if shared.stages(request, &times).await {
+                shared
+                    .emit(ProviderOutput::TurnComplete {
+                        request,
+                        idle: true,
+                    })
+                    .await;
+            }
+            return;
+        }
+    }
     // What memory holds for these words: the prepared chat's, when it was
     // begun on them (so its round still stands), else asked now, off the
     // runtime's thread (Fourth's P3 on #2229).
@@ -11133,6 +12566,16 @@ async fn spoken(
         if let Some(did) = &shared.did {
             did(Did::Worked(monotonic_us()));
         }
+        // Kept as the model's own confirm is kept, told as handed over, so
+        // a later turn's history shows the task started (#7930).
+        if let Some(keep) = &shared.keeps_calls {
+            keep(
+                request,
+                crate::agent_tasks::CONFIRM,
+                &serde_json::Value::Object(serde_json::Map::new()),
+                Some(TASK_HANDED_OVER),
+            );
+        }
     }
     let waiting = declined
         .or(taken)
@@ -11149,6 +12592,20 @@ async fn spoken(
             let owner = crate::services::owner_of(scope.as_ref());
             crate::services::waiting_note(request, owner.as_deref(), Instant::now())
         });
+    // Work handed over and still open (#7930), last in the chain: read
+    // from the tasks part off the runtime's thread, only while work was
+    // handed over and no other note won, so never on a line code took
+    // above.
+    let waiting = match (waiting, &shared.open_work) {
+        (None, Some(note)) if crate::agent_tasks::work_handed() => {
+            let note = note.clone();
+            tokio::task::spawn_blocking(move || note(request))
+                .await
+                .ok()
+                .flatten()
+        }
+        (waiting, _) => waiting,
+    };
     // At setup, a line that spells their name: the read-back to say, the
     // name as a word, never its letters (#5580 row 2).
     let spelled = shared.spelled_name.as_ref().and_then(|note| note(&text));
@@ -11175,12 +12632,27 @@ async fn spoken(
         );
         Vec::new()
     } else {
+        // Its words choose the note: a stop word with an ask is not told
+        // the stop sentence (#7285).
         cut_in
+            .iter()
+            .map(|_| crate::cut_in_told::note(&text).to_owned())
+            .collect()
     };
     // The coordinator's marks, told as the Live route tells them (#1712).
     if !cut_in.is_empty() {
+        // The note's name at the line's end, so prefix greps still match
+        // and each journal shows which note was sent (#7285).
+        let name = if cut_in
+            .iter()
+            .any(|note| note == crate::cut_in_told::ASKED_MORE)
+        {
+            "ASKED_MORE"
+        } else {
+            "NOTE"
+        };
         eprintln!(
-            "lamp-voice second: request {request}: it began over the lamp's answer, and the model is told so"
+            "lamp-voice second: request {request}: it began over the lamp's answer, and the model is told so ({name})"
         );
     }
     let follows_on = (marks.follows_on && !marks.sound.load(Ordering::Acquire))
@@ -11207,13 +12679,20 @@ async fn spoken(
     // "Lamp ơi"), or as the coordinator reads a line of the name alone
     // (`attention::only_the_name`: "Hello Lamp?"), or this route's own name
     // alone, or no words at all.
-    crate::skill_write_yes::line_heard(
-        request,
-        called
-            || text.trim().is_empty()
-            || name_alone(&text)
-            || crate::attention::only_the_name(&text),
-    );
+    // Its words too: only a plain yes the code reads confirms a made
+    // skill's remove (`skill_write_yes::plain_answer`, #7683), and only a
+    // plain replace a clash's replace (`made_clash::line_heard`).
+    let name_only = called
+        || text.trim().is_empty()
+        || name_alone(&text)
+        || crate::attention::only_the_name(&text);
+    crate::skill_write_yes::line_heard(request, name_only, &text);
+    crate::made_clash::line_heard(request, name_only, &text);
+    // A remove on the line right after one that found nothing is asked
+    // only when this line names the skill (`made_remove::line_heard`).
+    if !name_only {
+        crate::made_remove::line_heard(request, &text);
+    }
     let called = called.then(|| {
         eprintln!(
             "lamp-voice second: request {request}: only the lamp's name was said, and the model is told so"
@@ -11285,6 +12764,9 @@ async fn spoken(
             request,
             Instant::now(),
         ))
+        // A voice make still under way (lamp-9adf, 17 Nov): what is being
+        // made, nothing of it on yet, and the id a no drops it by.
+        .chain(crate::make_skill_local::making_note(request))
         // A made skill with code still not on after its say-back (#7270):
         // the model is told it isn't on.
         .chain(crate::made_not_on::note(
@@ -11296,6 +12778,31 @@ async fn spoken(
         // person's choice (#6593): its clash_id and question, for the same
         // reason (the Reviewer-lead's P1 on #6614).
         .chain(crate::made_clash::waiting_note(request, Instant::now()))
+        // The skill made, or turned off or on, in the owner's conversation
+        // (#7660): what "the skill you just made" and "it" mean.
+        .chain(crate::just_made::note_here(
+            request,
+            scope.as_ref(),
+            Instant::now(),
+        ))
+        // Makes waiting their turn (`LAMP_MAKE_QUEUE`, #7679): their labels
+        // and ids, so "never mind the gold one" can drop one. None waiting
+        // (always, with the switch off), nothing.
+        .chain(crate::make_queue::note())
+        // An app's live context lines (`LAMP_APP_MEMORY`, #7415), each a
+        // quoted note with its source, by #7900's short-lived note: told
+        // for this turn only, never kept; nothing while Lamp is private.
+        // Only on the owner's turn, by the known-person gate above: never a
+        // guest's or the room's (the Reviewer-lead's P3 on #8313).
+        .chain(crate::app_context::notes_for(
+            crate::app_context::now_ms(),
+            shared.private_now.load(Ordering::SeqCst),
+            scope
+                .as_ref()
+                .and_then(crate::memory_scope::ScopeLease::scope)
+                .filter(|_| known_in_view)
+                .and_then(|scope| scope.person()),
+        ))
         .chain(records)
         .chain(read_ids)
         .chain(remembered)
@@ -11371,6 +12878,41 @@ async fn spoken(
             SentWith::Told(Some(note)) => {
                 notes.insert(notes.len() - cut_in_told, note.to_owned());
             }
+        }
+    }
+    // `LAMP_CARE_LINE` (#7689): words of self-harm, or, within the hold
+    // after one, the person asking who they can call. The model is told,
+    // the exchange stays out of memory, and the care line follows the
+    // answer ([`answer`]). Everyone heard, no face asked first.
+    // Kept out of memory, and held from the running summary and its talk
+    // note (the safety read's P1 on #7752).
+    if let Some(care) = &shared.care {
+        let now = Instant::now();
+        let asks = care.holds(now) && crate::care_line::asks_who_to_call(&text);
+        if care_caught || asks {
+            care.mark(now, asks);
+            care.turn(request);
+            crate::remember::keep_out(request);
+            crate::care_line::hold_from_summary(request);
+            // The lamp's line follows only when it is due: said in the last
+            // five minutes, the model is told so, never that it comes.
+            let note = if care.owes(now) {
+                crate::care_line::NOTE
+            } else {
+                crate::care_line::NOTE_SAID
+            };
+            notes.insert(notes.len() - cut_in_told, note.to_owned());
+            eprintln!(
+                "lamp-voice second: request {request} is a care turn: the care line follows its answer, or the next one if this is cut (LAMP_CARE_LINE)"
+            );
+        } else if care.owes(now) {
+            // A line owed by a care turn cut before it: this answer is
+            // followed by it, so the model doesn't say it too (the safety
+            // read's P2 on #7752).
+            notes.insert(
+                notes.len() - cut_in_told,
+                crate::care_line::OWED_NOTE.to_owned(),
+            );
         }
     }
     if let Some(heard) = &shared.words_heard {
@@ -12084,6 +13626,27 @@ enum Got {
 
 /// `request`'s turn over: a send given to it ([`sent_with_words`]) is done
 /// with, its record dropped, and a later turn may write again (#5853).
+/// Whether the lamp waits now on a person's answer that this line may be:
+/// a task read back for its yes, a write's read-back, a skill's say-back, a
+/// held forget or a held rename. Such a line is the lamp's to read as the
+/// answer it is, never an app's trigger (#7736).
+fn lamp_awaits_an_answer(shared: &Shared, request: u64) -> bool {
+    let now = Instant::now();
+    crate::agent_tasks::awaits_yes(now)
+        || crate::services::awaits_an_answer()
+        || crate::skill_write_yes::answer_awaited(request, now)
+        || shared
+            .held_forget
+            .lock()
+            .ok()
+            .is_some_and(|held| held.held.is_some())
+        || shared
+            .held_rename
+            .lock()
+            .ok()
+            .is_some_and(|held| held.is_held())
+}
+
 fn sent_given_over(shared: &Shared, request: u64) {
     let given = shared
         .write_sent_in
@@ -12711,6 +14274,10 @@ pub const OPEN_NAME_ENVIRONMENT: &str = "LAMP_SECOND_OPEN_NAME";
 /// else.
 pub const NAME_CARRIES_ENVIRONMENT: &str = "LAMP_SECOND_NAME_CARRIES";
 
+/// Where the worker reads [`Engine::judging_call_words`]: `on`, and nothing
+/// else.
+pub const CALL_WORDS_OVER_WAIT_ENVIRONMENT: &str = "LAMP_CALL_WORDS_OVER_WAIT";
+
 /// Where the worker reads whether, right after a start, a line's room not
 /// yet known only for want of history is taken as quiet for a join when the
 /// ears show it is ([`worker::Heeding::showing_the_first_seconds_quiet`]):
@@ -13271,6 +14838,14 @@ fn prepared_on(
                 .as_ref()
                 .filter(|_| !held_by_gap(scope))
                 .and_then(|note| note(request, &words, scope));
+            // Whether the early words name the lamp, as known before the
+            // line's notes, for `LAMP_MAKE_SKILL_ASKED`'s force (#8022 case
+            // 2); a line named by a note alone isn't begun early's to stand.
+            crate::tools::make_skill_asked::heard_named(
+                &words,
+                crate::attention::called_by_name_on(&words, true)
+                    || crate::attention::marked_woken_by_name(request).is_some(),
+            );
             // The opening's note as the final words will be told it, so a
             // chat begun here still fits them (`LAMP_OPENS_FURTHER`).
             let opens = opening_note(
@@ -13283,9 +14858,14 @@ fn prepared_on(
             );
             // Its notes as round 1 tells them: the quiet note
             // (`LAMP_KEEP_QUIETLY`) before the cut-in's, the opening last.
+            // The cut-in's note as these words choose it (#7285).
             let notes: Vec<String> = crate::keep_quietly::note_for(scope, request)
                 .into_iter()
-                .chain(notes.iter().cloned())
+                .chain(
+                    notes
+                        .iter()
+                        .map(|_| crate::cut_in_told::note(&words).to_owned()),
+                )
                 .chain(opens)
                 .collect();
             Some(Prepared::begin(shared, scope, words, &notes, remembered))
@@ -13317,8 +14897,9 @@ enum Asker {
         quoted: bool,
     },
     /// A due reminder, said as the Live route says it: a note to say it, and
-    /// no tool runs (`provider_worker::reminder_note`).
-    Reminder,
+    /// no tool runs (`provider_worker::reminder_note`); `timer` for a timer
+    /// alone, rung at the usage limit with its own line ([`limit_ring`]).
+    Reminder { timer: bool },
 }
 
 /// How long a turn's first round may take to begin, when it has no wait's
@@ -13459,6 +15040,58 @@ impl TurnTools {
             yes(self.prepared),
         )
     }
+}
+
+/// Round 1's journal line (#8022 case 2): whether `start_agent_task` and
+/// `make_skill` were offered (`offered`), the function it was forced to
+/// call (`forced`, `none` for none), whether the person's line asks to make
+/// a skill as the force reads it (`crate::tools::make_skill_asked::make_asked`,
+/// past the lamp's name heard as another word on a line that names it) and
+/// how many sentences it has; which sentence alone asks
+/// (`crate::tools::make_skill_asked::ask_sentence`, `none` for none) and how
+/// the line opens: with the lamp's own name set off (`name`,
+/// [`name_call_rest`]), its name heard as another word on a line that names
+/// it (`misheard`, [`wake_heard_as`]) or neither (`none`). `?` where the
+/// services cannot say, or where the last message is no person's line.
+/// Names, `y`/`n` and counts: never a word.
+fn round_one_line(
+    request: u64,
+    messages: &[Message],
+    offered: impl Fn(&str) -> Option<bool>,
+    forced: Option<Option<&str>>,
+) -> String {
+    let yes = |on: bool| if on { "y" } else { "n" };
+    let offered = |name: &str| offered(name).map_or("?", yes);
+    let said = messages
+        .last()
+        .filter(|message| message.role == "user")
+        .and_then(Message::words);
+    let make_ask = said.map(crate::tools::make_skill_asked::make_asked);
+    let sentences = said.map(crate::tools::make_skill_asked::sentence_count);
+    let named = said.is_some_and(crate::tools::make_skill_asked::named);
+    let ask_in = said.map(|said| {
+        crate::tools::make_skill_asked::ask_sentence(said, named)
+            .map_or("none".to_owned(), |at| at.to_string())
+    });
+    let opening = said.map(|said| {
+        if name_call_rest(said).is_some() {
+            "name"
+        } else if named && wake_heard_as(said).is_some() {
+            "misheard"
+        } else {
+            "none"
+        }
+    });
+    format!(
+        "lamp-voice second: request {request}: round 1: task_offered={} make_offered={} forced={} make_ask={} sentences={} ask_in={} opening={}",
+        offered(crate::agent_tasks::START),
+        offered(crate::made_skill::MAKE),
+        forced.map_or("?", |forced| forced.unwrap_or("none")),
+        make_ask.map_or("?", yes),
+        sentences.map_or("?".to_owned(), |count| count.to_string()),
+        ask_in.as_deref().unwrap_or("?"),
+        opening.unwrap_or("?"),
+    )
 }
 
 /// A fault's category as a decision's error code (`voice/decision`,
@@ -13734,6 +15367,183 @@ pub(crate) fn look_turn_note(search: bool, note: Option<String>) -> Option<Strin
     }
 }
 
+/// A look the route's own call asked, as its look turn takes it
+/// ([`Engine::look_turn`]).
+struct LookTurn {
+    /// `LAMP_LOOK_TOLD`: what was said goes beside the picture.
+    told: bool,
+    ask: crate::look_told::LookAsk,
+    /// `LAMP_LOOK_KEPT_WITH_ASK`: the scope the look turn goes on in.
+    kept: Option<crate::memory_scope::ScopeSnapshot>,
+    /// The scope memory's hits for it are read in; none for a held,
+    /// revoked or gone asker.
+    hits: Option<crate::memory_scope::ScopeSnapshot>,
+    /// The asker was held only by a face's gap: told no hits, as a held
+    /// line never is.
+    held: bool,
+}
+
+/// Where memory's hits for a look are read (`LAMP_LOOK_TOLD`).
+enum LookHits {
+    /// In this scope, the asker's; `None` for a voice with no memory scope,
+    /// read as its lines are.
+    In(Option<crate::memory_scope::RequestScope>),
+    /// Not at all: a held, revoked or gone asker.
+    None,
+}
+
+/// The scope a look turn goes on in from its asker's `lease`
+/// (`LAMP_LOOK_KEPT_WITH_ASK`): the asker's while current, not held only by
+/// a face's gap, and not carried as a conversation going on (whose lines
+/// are never journalled as theirs); the room's otherwise.
+pub(crate) fn look_scope(
+    lease: &crate::memory_scope::ScopeLease,
+) -> crate::memory_scope::ScopeSnapshot {
+    match lease.scope() {
+        Some(scope) if !scope.held() && !lease.reads_carried() && lease.carried_for().is_none() => {
+            scope.clone()
+        }
+        _ => crate::memory_scope::ScopeSnapshot::room(),
+    }
+}
+
+/// The scope memory's hits for a look are read in (`LAMP_LOOK_TOLD`): its
+/// asker's, as the asking line's own hits would be; none for a revoked or
+/// held one, as a held line is told none.
+pub(crate) fn look_hits_scope(
+    lease: &crate::memory_scope::ScopeLease,
+) -> Option<crate::memory_scope::ScopeSnapshot> {
+    lease.scope().filter(|scope| !scope.held()).cloned()
+}
+
+/// Whether a look's asker, `asked` (their scope as they asked), is still the
+/// one at the lamp as the look begins (the memory owner's ruling on #8019,
+/// privacy first): the face cache names them now (`now`: seen, or held by
+/// their gap with no face in view), and, with the eyes' view (`eyes`, with
+/// the known face's id), no other face, known or not, was in the eyes' looks
+/// from `from` to `to`: only theirs when seen, none when held. A room's ask
+/// has nobody to keep from: always.
+pub(crate) fn asker_still_alone(
+    asked: &crate::memory_scope::ScopeSnapshot,
+    now: &crate::memory_scope::ScopeSnapshot,
+    eyes: Option<(&crate::speaking_faces::SpeakingFaces, Option<&str>)>,
+    from: Instant,
+    to: Instant,
+) -> bool {
+    let Some(person) = asked.person() else {
+        return true;
+    };
+    if now.person() != Some(person) {
+        return false;
+    }
+    match eyes {
+        None => true,
+        Some((eyes, _)) if now.held() => eyes.no_other_face_in_view(None, from, to),
+        Some((eyes, face)) => face.is_some() && eyes.no_other_face_in_view(face, from, to),
+    }
+}
+
+/// The route's own look, asked by its call in `request`'s spoken turn
+/// (`ask_look` took it): kept for that session's look turn with the
+/// model's `args` and the line's words (`heard`), with `LAMP_LOOK_TOLD` or
+/// `LAMP_LOOK_KEPT_WITH_ASK` on. With the latter, the asking exchange waits
+/// in the thread for the look's words (`thread::Thread::look_asked`), unless
+/// the asker is held or carried: those lines are never journalled as
+/// theirs, and the look's words go to the room's as before.
+fn look_asked_by_call(
+    shared: &Shared,
+    request: u64,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    args: crate::look_told::LookArgs,
+    heard: &str,
+) {
+    if !(shared.look_told || shared.look_kept) {
+        return;
+    }
+    let Some(session) = shared
+        .begun
+        .lock()
+        .ok()
+        .and_then(|begun| *begun)
+        .filter(|(of, _)| *of == request)
+        .map(|(_, session)| session)
+    else {
+        return;
+    };
+    eprintln!(
+        "lamp-voice second: request {request}: the look call wrote a question: {}, what they told: {}",
+        if args.question.is_some() { "yes" } else { "no" },
+        if args.told.is_some() { "yes" } else { "no" },
+    );
+    // The asker's scope now, from the asking turn's own lease: by the look
+    // turn the authority has retired this turn (Twelve's P1 on #8019).
+    let asker = lease.map(|lease| crate::look_told::AskerScope {
+        kept: look_scope(lease),
+        hits: look_hits_scope(lease),
+        held: lease
+            .scope()
+            .is_some_and(crate::memory_scope::ScopeSnapshot::held),
+    });
+    if let Ok(mut asked) = shared.look_asked.lock() {
+        *asked = Some(crate::look_told::LookAsk {
+            session,
+            request,
+            args,
+            heard: heard.to_owned(),
+            asker,
+        });
+    }
+    let theirs = lease.is_none_or(|lease| {
+        lease.scope().is_some_and(|scope| {
+            !scope.held() && !lease.reads_carried() && lease.carried_for().is_none()
+        })
+    });
+    if shared.look_kept
+        && theirs
+        && let Ok(mut thread) = crate::thread::THREAD.lock()
+    {
+        thread.look_asked(request);
+    }
+}
+
+/// The look turn's words with `LAMP_LOOK_TOLD` ([`crate::look_told::turn_text`]):
+/// the model's arguments and memory's hits for the question, or for the
+/// asking line, read in `hits_scope` as a spoken line's are (none for a held
+/// asker), before `note`. Counts only in the journal.
+async fn look_told_text(
+    shared: &Shared,
+    request: u64,
+    ask: &crate::look_told::LookAsk,
+    hits: LookHits,
+    note: String,
+) -> String {
+    let words = ask.args.hits_words(&ask.heard).map(str::to_owned);
+    let hits = match (shared.remembered.clone(), words, hits) {
+        (Some(remembered), Some(words), LookHits::In(scope)) => {
+            let lease = scope.as_ref().map(|scope| scope.lease());
+            let hits =
+                tokio::task::spawn_blocking(move || remembered(request, &words, lease.as_ref()))
+                    .await
+                    .ok()
+                    .flatten();
+            drop(scope);
+            hits
+        }
+        _ => None,
+    };
+    eprintln!(
+        "lamp-voice second: request {request}: the look is told what was asked: question {}, what they told {}, memory's hits {} (LAMP_LOOK_TOLD)",
+        if ask.args.question.is_some() {
+            "yes"
+        } else {
+            "no"
+        },
+        if ask.args.told.is_some() { "yes" } else { "no" },
+        if hits.is_some() { "yes" } else { "none" },
+    );
+    crate::look_told::turn_text(&ask.args, hits.as_deref(), &note)
+}
+
 /// Asks the coordinator for `request`'s full look (`LookAsked`), made by a
 /// call of `name`'s: dropped, and why, in a turn the lamp wrote itself
 /// (unless `heard` says it may look all the same: a skill's search's own
@@ -13851,6 +15661,13 @@ struct HeldForget {
     /// counts as asking about it when it offers that word
     /// ([`settle_held_forget`]). `None` for every other held call.
     near: Option<String>,
+    /// The lamp's answer that asked about it offered only this forget: its
+    /// last question, with no "or" in it
+    /// ([`crate::remember::offers_only_forgetting`], the second read's P2
+    /// on #8215). Only then is a plain yes run in code
+    /// ([`OneFaceAnswer::PlainYes`]); "…, or keep it?" or a question after
+    /// it leaves the yes to the model.
+    offered_alone: bool,
 }
 
 /// The one kept thing of a person's a named forget asks to remove, by its
@@ -14013,13 +15830,20 @@ fn one_face_refuses(name: &str, args: &Value, reminders: bool) -> bool {
 
 /// Whether `call` is refused on this scope by the one-face rule
 /// ([`one_face_refuses`]), by every runner.
+///
+/// A line from a name the eyes hold (`LAMP_FACE_STICKY`,
+/// `ScopeLease::sticky_held`) is refused all of them, the single-item yes
+/// (#5627) included: a held identity never runs a forget, correction or
+/// rule. Only the lamp's own take-back of its own keep still runs.
 fn one_face_refused(scope: Option<&crate::memory_scope::ScopeLease>, call: &net::ToolCall) -> bool {
     scope.is_some_and(|scope| {
-        scope.forgets_need_mouth()
-            // The lamp taking back its own keep of this request on its own
-            // doubt ([`undo_doubted_keep`]): no one's forget.
-            && !(call.name == crate::remember::FORGET
-                && (scope.undoes_own_keep(&call.args) || scope.agreed_forget(&call.args)))
+        let own_undo = call.name == crate::remember::FORGET && scope.undoes_own_keep(&call.args);
+        (scope.sticky_held() && !own_undo)
+            || (scope.forgets_need_mouth()
+                // The lamp taking back its own keep of this request on its own
+                // doubt ([`undo_doubted_keep`]): no one's forget.
+                && !(call.name == crate::remember::FORGET
+                    && (own_undo || scope.agreed_forget(&call.args))))
     }) && one_face_refuses(
         &call.name,
         &call.args,
@@ -14221,6 +16045,10 @@ impl Services for LettingGo {
     fn declares(&self, messages: &[Message], without: &[&str], name: &str) -> Option<bool> {
         self.0.declares(messages, without, name)
     }
+    fn forced(&self, messages: &[Message], without: &[&str]) -> Option<Option<&'static str>> {
+        self.0
+            .forced(&forgotten_notes_let_go(messages.to_vec()), without)
+    }
     fn measured(&self, messages: &[Message], told: ChatTold) -> Option<(usize, usize)> {
         self.0
             .measured(&forgotten_notes_let_go(messages.to_vec()), told)
@@ -14296,9 +16124,11 @@ fn memory_refused(scope: Option<&crate::memory_scope::ScopeLease>, name: &str) -
 /// as a forget is ([`hold_forget`]), so the same rules let it go: only a
 /// plain yes on the next spoken turn, from the same session's person,
 /// within `remember::HELD_FORGET_FOR`, with their face seen saying it and
-/// no other ([`take_held_forget`]); the conversation's end, a forget,
-/// another face or anything else drops it. Only where the eyes read
-/// speaking: without them nothing is held. What the model is told.
+/// no other, or with `LAMP_KEEP_QUIETLY_ONE_FACE` on a line theirs by the
+/// face-in-view rule, no face seen saying it ([`take_held_forget`]); the
+/// conversation's end, a forget, another face or anything else drops it.
+/// Only where the eyes read speaking: without them nothing is held. What
+/// the model is told.
 fn hold_carried_keep(
     shared: &Shared,
     (request, said): (u64, &str),
@@ -14372,6 +16202,18 @@ fn hold_near_heard_keep(
     let near = crate::remember::heard::near_heard(call.args["text"].as_str()?, said);
     if near.is_empty() {
         return None;
+    }
+    // An unsure line is simply not kept, and nothing is asked (#7739): in
+    // place of this switch's ask, with no hold, so no eyes or known person
+    // are needed. With the switch off a near spelling is kept as before
+    // (Twelve's P2 on #7966).
+    if shared.unsure_not_kept {
+        eprintln!(
+            "lamp-voice second: request {request}: a keep with {} near word(s) not heard is not kept, and nothing is asked ({})",
+            near.len(),
+            crate::remember::doubted::UNSURE_ENVIRONMENT
+        );
+        return Some(crate::remember::heard::near_not_kept_told(&near));
     }
     let not = if shared.forget_sight.is_none() {
         Some("the eyes don't read who speaks")
@@ -14470,6 +16312,15 @@ type HeldAsker = (u64, String);
 /// [`not_theirs`]'s reason for a line no one is known on.
 const NO_ONE_KNOWN: &str = "not the same person: no one known on the line";
 
+/// [`not_theirs`]'s reason for the same person in a later session.
+const LATER_SESSION: &str = "not the same person: theirs, in a later session";
+
+/// [`not_theirs`]'s reason for another known person.
+const ANOTHER_PERSON: &str = "not the same person: another person";
+
+/// A held yes's reason for coming past its time.
+const TOO_LATE: &str = "too late";
+
 /// Why a yes is not the held call's person's, as the journal says it, or
 /// none when it is: no known person on the line (none admitted, a gap, a
 /// cold face cache), the same person in a later session, or another
@@ -14480,14 +16331,13 @@ fn not_theirs(line: Option<&HeldAsker>, held: &HeldAsker) -> Option<&'static str
     match line {
         Some(line) if line == held => None,
         None => Some(NO_ONE_KNOWN),
-        Some((_, person)) if *person == held.1 => {
-            Some("not the same person: theirs, in a later session")
-        }
-        Some(_) => Some("not the same person: another person"),
+        Some((_, person)) if *person == held.1 => Some(LATER_SESSION),
+        Some(_) => Some(ANOTHER_PERSON),
     }
 }
 
-/// A one-face yes's lateness, then its person ([`not_theirs`]): a late yes
+/// A one-face yes's (or a held spelling's) lateness, then its person
+/// ([`not_theirs`]): a late yes
 /// reads as late, whoever the line is theirs by by then (Thirteen's row on
 /// #5627, 42 s after the hold, journaled as "not the same person").
 fn late_or_not_theirs(
@@ -14496,7 +16346,7 @@ fn late_or_not_theirs(
     held: &HeldAsker,
 ) -> Option<&'static str> {
     if late {
-        Some("too late")
+        Some(TOO_LATE)
     } else {
         not_theirs(line, held)
     }
@@ -14505,7 +16355,7 @@ fn late_or_not_theirs(
 /// What became of a held forget on a turn ([`take_held_forget`]).
 enum Taken {
     /// Nothing held, or dropped: nothing runs and nothing is told (but see
-    /// [`Taken::Unseen`] and [`Taken::Unknown`]).
+    /// [`Taken::Unseen`], [`Taken::Unknown`] and [`Taken::NotTheirs`]).
     Nothing,
     /// Their yes runs exactly this call, with a carried keep's heard line
     /// ([`HeldForget::line`]), and whether it is a one-face line's named
@@ -14515,15 +16365,115 @@ enum Taken {
     /// person's face say it (`LAMP_EYES_SPEAKING=on`, #2377): dropped, and
     /// the model is told the yes did not count.
     Unseen(String),
-    /// A one-face forget's plain yes in time on a line no one is known on
-    /// (no face, an unknown face, a carried line): dropped, it is kept, and
+    /// A held forget's plain yes on a line no one is known on (no face, an
+    /// unknown face, a carried line; #7454), too late or theirs in a later
+    /// session (#7478): dropped, it is kept, and
     /// the model is told the yes did not count and that they may say it
     /// facing the lamp ([`crate::remember::unknown_yes_told`], #7454).
     Unknown(String),
+    /// A one-face line's named forget the lamp asked about, on a later line
+    /// that may be their yes (theirs, in time, seen saying it or in the
+    /// private room): whether it is a yes is the model's to judge, with no
+    /// yes word list (the owner's 13 Nov rule; the first builder's ruling
+    /// on leg (e) of #7960's ROW, where "Lamp, yes." heard as "Loan. Yes."
+    /// lost the forget). The model's `forget` on this line, naming nothing
+    /// else, runs exactly this call ([`agreed_forget_call`]); no such call
+    /// runs nothing and it is kept.
+    Agrees(net::ToolCall),
+    /// A held forget's yes from another known person, dropped: the model is
+    /// told it was not theirs to give and nothing was forgotten, naming
+    /// nothing of what was held ([`crate::remember::not_theirs_told`],
+    /// #7478).
+    NotTheirs,
+    /// A held one-face forget's line dropped (not seen saying it, from no
+    /// one known, too late, theirs in a later session or another person's),
+    /// or a spelling a face forget was held through dropped (#7478): nothing
+    /// runs, and the note is told only if the model's round on this line
+    /// calls that forget, by [`Taken::Agrees`]'s door (#7971), as the
+    /// call's answer; a line it answers with no such call is told nothing
+    /// (the Reviewer-lead's P2 on #7490: an hour-late "good morning" was
+    /// told to ask about the old forget again).
+    OnForget(net::ToolCall, String),
     /// A held keep's answer that was neither a yes nor a no
     /// (`known_faces::unclear_answer_to_keep`): held on for this turn, which
     /// the model is told to ask once more ([`crate::remember::KEEP_ASKED_AGAIN`]).
     AskAgain,
+    /// A held one-face forget's answer that is only a no
+    /// ([`OneFaceAnswer::OnlyNo`], #8185): dropped, it is kept, and the
+    /// lamp says [`crate::remember::KEPT_IT_LINE`] itself with no model
+    /// round ([`kept_line_clip`]). Where that line is not rendered ahead in
+    /// the owner's language, as [`Taken::OnForget`] with the said-no note,
+    /// told to the model beside the line too.
+    KeptAtOnce(net::ToolCall, String),
+}
+
+/// What a held forget `name` dropped for `why` tells the model (#7478): a
+/// yes too late, from no one known or theirs in a later session is told
+/// that nothing was forgotten and it is still kept
+/// ([`crate::remember::unknown_yes_told`]); another known person's yes, on
+/// `line` (a late one judged by whose it is too), only that it was not
+/// theirs to give, naming nothing of what was held
+/// ([`crate::remember::not_theirs_told`]). Any other drop (no yes, a
+/// turn the lamp wrote) and a held keep's are told nothing.
+fn dropped_yes(name: String, why: &str, line: Option<&HeldAsker>, held: &HeldAsker) -> Taken {
+    if name == crate::remember::REMEMBER {
+        return Taken::Nothing;
+    }
+    if why == ANOTHER_PERSON || (why == TOO_LATE && not_theirs(line, held) == Some(ANOTHER_PERSON))
+    {
+        return Taken::NotTheirs;
+    }
+    match why {
+        TOO_LATE | NO_ONE_KNOWN | LATER_SESSION => Taken::Unknown(name),
+        _ => Taken::Nothing,
+    }
+}
+
+/// [`dropped_yes`] on a held one-face forget's line, or on the spelling
+/// (`spelling`) a face forget was held through: [`Taken::OnForget`] with
+/// its note, told only if the model's round calls that forget. A spelling
+/// is told as one, never as a yes, and a late line from no one known names
+/// neither the kind of thing held nor its call
+/// ([`crate::remember::unknown_late_told`]; the P3s on #7490).
+fn dropped_on_forget(
+    call: net::ToolCall,
+    why: &str,
+    line: Option<&HeldAsker>,
+    held: &HeldAsker,
+    spelling: bool,
+) -> Taken {
+    let said = if spelling {
+        crate::remember::THAT_SPELLING
+    } else {
+        crate::remember::THAT_YES
+    };
+    let note = match dropped_yes(call.name.clone(), why, line, held) {
+        Taken::NotTheirs => crate::remember::not_theirs_told(said),
+        Taken::Unknown(_) if why == TOO_LATE && line.is_none() => {
+            crate::remember::unknown_late_told(said)
+        }
+        Taken::Unknown(name) => crate::remember::unknown_told(&name, said),
+        _ => return Taken::Nothing,
+    };
+    Taken::OnForget(call, note)
+}
+
+impl Taken {
+    /// What the model is told of this, if anything ([`answer`]).
+    fn told(&self) -> Option<String> {
+        match self {
+            Taken::Unseen(name) => Some(crate::remember::unseen_yes_told(name)),
+            Taken::Unknown(name) => Some(crate::remember::unknown_yes_told(name)),
+            Taken::NotTheirs => Some(crate::remember::not_theirs_told(crate::remember::THAT_YES)),
+            Taken::AskAgain => Some(crate::remember::KEEP_ASKED_AGAIN.to_owned()),
+            // Told only on the model's forget call ([`told_on_forget`]).
+            Taken::Nothing
+            | Taken::Runs(..)
+            | Taken::Agrees(_)
+            | Taken::OnForget(..)
+            | Taken::KeptAtOnce(..) => None,
+        }
+    }
 }
 
 /// The held forget request `request` runs, if any. Every turn takes the
@@ -14550,16 +16500,85 @@ enum Taken {
 /// "Sounds good." after "Shall I start it?" is the model's, whatever a
 /// skill's `asks` say.
 fn lamp_awaits_answer(held: bool, messages: &[Message]) -> bool {
-    held || messages
+    held || lamp_last_words(messages).is_some_and(crate::remarks::lamp_asked)
+}
+
+/// The lamp's newest words in `messages` that hold a letter or a digit.
+fn lamp_last_words(messages: &[Message]) -> Option<&str> {
+    lamp_last_at(messages).and_then(|at| messages[at].words())
+}
+
+/// Where in `messages` the lamp's newest words that hold a letter or a
+/// digit are ([`lamp_last_words`]).
+fn lamp_last_at(messages: &[Message]) -> Option<usize> {
+    messages.iter().rposition(|message| {
+        message.role == "assistant"
+            && message
+                .words()
+                .is_some_and(|words| words.chars().any(char::is_alphanumeric))
+    })
+}
+
+/// Whether the lamp's turn that said its newest words ([`lamp_last_at`]),
+/// back to the person's line it answered, ran a `make_skill` call kept in
+/// the history (`LAMP_HISTORY_KEEPS_CALLS`, [`kept_made`]: a remove asked
+/// or done, a turn off or on): that turn was the lamp managing its made
+/// skills, so what it asked is of them.
+fn lamp_turn_made_skills(messages: &[Message]) -> bool {
+    let Some(at) = lamp_last_at(messages) else {
+        return false;
+    };
+    messages[..at]
         .iter()
         .rev()
+        .take_while(|message| message.role != "user")
         .filter(|message| message.role == "assistant")
-        .find_map(|message| {
-            message
-                .words()
-                .filter(|words| words.chars().any(char::is_alphanumeric))
-        })
-        .is_some_and(crate::remarks::lamp_asked)
+        .flat_map(|message| &message.tool_calls)
+        .any(|call| call["function"]["name"] == crate::made_skill::MAKE)
+}
+
+/// [`lamp_awaits_answer`] for a line the heard words matched to a skill
+/// (`named`, its call): a made skill's own words or name, said plainly,
+/// still run it in code after the lamp's last words asked something, when
+/// the lamp was not talking of its made skills. The lead's live test, 19
+/// Nov 09:06: after the lamp's question, four "daily brief" lines were
+/// each left to the model, which called nothing. A held yes still waits.
+///
+/// The line stays the answer, the model's to read with the skill told
+/// ([`crate::skill_named::awaited_note`]), when what the code knows ties
+/// the lamp's question to its made skills (Heron's and Twelve's HOLD on
+/// #7916: "Which one do you want me to delete?" then "daily brief" ran
+/// it): its last words name the skill or the line's own words
+/// ([`crate::skill_named::asked_about`]), or any made skill by a name
+/// that alone would run it (`made_named`,
+/// [`crate::skill_named::names_made`]), or its turn ran a kept
+/// `make_skill` call ([`lamp_turn_made_skills`]). Structural only, by the
+/// skills the lamp has and the calls it ran: no word of the question is
+/// matched for what it asks (the owner: the model judges meaning). So a
+/// question of them that names none and follows no kept call ("Which
+/// skill should I turn off?" alone) is not told apart here.
+fn lamp_awaits_answer_for(
+    held: bool,
+    messages: &[Message],
+    named: Option<&(String, Value)>,
+    heard: &str,
+    made_named: Option<&MadeNamed>,
+) -> bool {
+    if !lamp_awaits_answer(held, messages) {
+        return false;
+    }
+    let made = named.filter(|(name, _)| name == crate::made_skill::MAKE);
+    match (held, made, lamp_last_words(messages)) {
+        (false, Some((name, args)), Some(said)) => {
+            crate::skill_named::asked_about(
+                said,
+                heard,
+                crate::skill_named::function_of(name, args),
+            ) || made_named.is_some_and(|named| named(said))
+                || lamp_turn_made_skills(messages)
+        }
+        _ => true,
+    }
 }
 
 /// Whether a yes of any kind is held for the person's next words: a keep or
@@ -14595,6 +16614,73 @@ fn a_yes_held(shared: &Shared) -> bool {
         || crate::services::write_waits(now)
 }
 
+/// How an answer to the one-face forget question is read (#8165), only
+/// ever toward keeping: the model judges what it means (the owner's rule),
+/// and the words here only stop a forget.
+#[derive(Debug, PartialEq)]
+enum OneFaceAnswer {
+    /// A plain yes and nothing else (`agent_tasks::plain_yes_with`: "Yes.",
+    /// "Yeah, go ahead.", "Okay lamp, please do."; #8185): it runs before
+    /// round 1, as a one-face yes did before the model judged it
+    /// ([`Taken::Runs`]), so it runs though the model calls no forget.
+    PlainYes,
+    /// Any other yes, or anything else: the model's forget call on the
+    /// line, naming nothing else, runs it ([`Taken::Agrees`]).
+    ModelsCall,
+    /// A no with no forget word, or with every forget word negated ("No,
+    /// don't forget it.", `known_faces::refuses`): kept, whatever the model
+    /// calls.
+    Refuses,
+    /// A [`Self::Refuses`] that is only a no ("No.", "Lamp, no.", "No, keep
+    /// it.", "No, don't forget it.", `known_faces::only_refuses`; #8185):
+    /// kept, and answered by the lamp with no model round
+    /// ([`Taken::KeptAtOnce`]).
+    OnlyNo,
+    /// Forget said and taken back in one line: a forget word negated and one
+    /// not ("Forget it… no wait, don't delete it."). Kept, and asked once
+    /// more.
+    Unclear,
+}
+
+/// [`OneFaceAnswer`] of the line `said`, a plain yes only where the lamp's
+/// question offered the forget alone (`offered_alone`,
+/// [`HeldForget::offered_alone`]).
+fn one_face_answer(said: &str, offered_alone: bool) -> OneFaceAnswer {
+    if offered_alone && crate::agent_tasks::plain_yes_with(said, &[], &[]) {
+        OneFaceAnswer::PlainYes
+    } else if crate::known_faces::only_refuses(said) {
+        OneFaceAnswer::OnlyNo
+    } else if crate::known_faces::refuses(said) {
+        OneFaceAnswer::Refuses
+    } else if crate::remember::negates_a_forget(said) && crate::remember::forgets_unnegated(said) {
+        OneFaceAnswer::Unclear
+    } else {
+        OneFaceAnswer::ModelsCall
+    }
+}
+
+/// [`crate::remember::KEPT_IT_LINE`]'s clip, if it can be said now
+/// ([`Taken::KeptAtOnce`]): in English, empty, said by the voice as the
+/// turn's piece; in the owner's language, only its clip rendered ahead
+/// ([`FixedClips`]), as `LAMP_KEEP_ANSWERS_AT_ONCE`'s line is.
+fn kept_line_clip(shared: &Shared) -> Option<Vec<i16>> {
+    match shared.language {
+        None => Some(Vec::new()),
+        Some(_) => shared.fixed_clips.kept(crate::remember::KEPT_IT_LINE),
+    }
+}
+
+/// What a dropped one-face forget's note may name of the thing kept: its
+/// subject in their words, only while no one else is in view, by the
+/// private read-backs' gate (`services::owner_sees_alone`: the private
+/// room, or the one face the eyes see; the person is already theirs here);
+/// otherwise nothing.
+fn kept_subject(held: &net::ToolCall) -> Option<&str> {
+    (crate::person::private_room() || crate::services::owner_alone())
+        .then(|| held.args["about"].as_str())
+        .flatten()
+}
+
 fn take_held_forget(
     shared: &Shared,
     request: u64,
@@ -14612,27 +16698,53 @@ fn take_held_forget(
     let Some(held) = hold.held.take() else {
         return Taken::Nothing;
     };
+    // A hold past its window and a grace (`remember::HELD_FORGET_GRACE`) is
+    // let go silently: nothing runs, the thing stays kept, nothing is told,
+    // and this line goes as a plain line, so a new ask long after is never
+    // a late yes (the first builder on #7490).
+    let window = if held.one_face {
+        crate::remember::ONE_FACE_FORGET_YES_FOR
+    } else {
+        crate::remember::HELD_FORGET_FOR
+    };
+    if now.saturating_duration_since(held.at) > window + crate::remember::HELD_FORGET_GRACE {
+        eprintln!(
+            "lamp-voice second: request {request}: let go a held forget ({}, held in request {}): past its {} s and {} s of grace; this line is a plain line",
+            held.call.name,
+            held.request,
+            window.as_secs(),
+            crate::remember::HELD_FORGET_GRACE.as_secs()
+        );
+        return Taken::Nothing;
+    }
     // A face forget whose turn asked them to spell their name
     // (`LAMP_NAMES_RECORD_TOLD`, #5141 row 7): their next turn, the
     // spelling, carries it once, running nothing; that turn's answer is
     // then judged as the held turn's was ([`settle_held_forget`]).
     if held.spelling {
+        // Too late is judged first, as on a one-face line: any line takes
+        // the hold, and a late one from no one known names nothing held
+        // ([`dropped_on_forget`]).
         let dropped = if !heard {
             Some("a turn the lamp wrote")
         } else if held.request >= request {
             Some("not a later turn")
-        } else if let Some(why) = not_theirs(asker, &held.asker) {
-            Some(why)
-        } else if now.saturating_duration_since(held.at) > crate::remember::HELD_FORGET_FOR {
-            Some("too late")
         } else {
-            None
+            late_or_not_theirs(
+                now.saturating_duration_since(held.at) > crate::remember::HELD_FORGET_FOR,
+                asker,
+                &held.asker,
+            )
         };
         match dropped {
-            Some(why) => eprintln!(
-                "lamp-voice second: request {request}: dropped a held forget ({}, held in request {}): {why}",
-                held.call.name, held.request
-            ),
+            Some(why) => {
+                eprintln!(
+                    "lamp-voice second: request {request}: dropped a held forget ({}, held in request {}): {why}",
+                    held.call.name, held.request
+                );
+                // Told only if this line's round calls that forget (#7490).
+                return dropped_on_forget(held.call, why, asker, &held.asker, true);
+            }
             None => {
                 eprintln!(
                     "lamp-voice second: request {request}: carried a held forget ({}, held in request {}) through their spelling (LAMP_NAMES_RECORD_TOLD)",
@@ -14652,7 +16764,10 @@ fn take_held_forget(
     // a plain yes from the same session's person (`line_person`, whoever
     // the line is theirs by), within `remember::ONE_FACE_FORGET_YES_FOR`,
     // their face seen saying it, or in the private room on a line theirs by
-    // their face alone in view. A no, anything else or too late keeps it.
+    // their face alone in view. Too late or anyone else's keeps it. Whether
+    // it is a yes is the model's ([`Taken::Agrees`]), but a no keeps it
+    // whatever the model calls, and a line that says forget and takes it
+    // back is asked once more ([`one_face_answer`], #8165).
     if held.one_face {
         let seen = shared.forget_sight.is_some()
             && sight.is_some_and(|(seen, speakers, known)| {
@@ -14665,8 +16780,6 @@ fn take_held_forget(
             Some("the lamp did not ask about it")
         } else if held.request >= request {
             Some("not a later turn")
-        } else if !crate::known_faces::plain_agreement_to_forget(said) {
-            Some("not a plain yes")
         } else if let Some(why) = late_or_not_theirs(
             now.saturating_duration_since(held.at) > crate::remember::ONE_FACE_FORGET_YES_FOR,
             line_person,
@@ -14680,7 +16793,9 @@ fn take_held_forget(
                 "lamp-voice second: request {request}: dropped a held one-face forget (held in request {}): their face was not seen saying the yes, outside the private room (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
                 held.request
             );
-            return Taken::Unseen(held.call.name);
+            // Told only if this line's round calls that forget (#7490).
+            let note = crate::remember::unseen_yes_told(&held.call.name);
+            return Taken::OnForget(held.call, note);
         };
         return match dropped {
             Some(why) => {
@@ -14688,28 +16803,94 @@ fn take_held_forget(
                     "lamp-voice second: request {request}: dropped a held one-face forget (held in request {}): {why}; it is kept",
                     held.request
                 );
-                // A yes from no one known is told, as an unseen one is: the
-                // model must not say it is forgotten (#7454).
-                if why == NO_ONE_KNOWN {
-                    Taken::Unknown(held.call.name)
-                } else {
-                    Taken::Nothing
-                }
+                // A line from no one known (#7454), too late or another
+                // person's (#7478) is told, so the model never says it is
+                // forgotten, but only if this line's round calls that
+                // forget (#7490): any other line is told nothing.
+                dropped_on_forget(held.call, why, line_person, &held.asker, false)
             }
             None => {
-                eprintln!(
-                    "lamp-voice second: request {request}: their yes runs the one-face forget held in request {} ({})",
-                    held.request,
-                    if seen {
-                        "seen saying it"
-                    } else {
-                        "the private room"
+                let how = if seen {
+                    "seen saying it"
+                } else {
+                    "the private room"
+                };
+                match one_face_answer(said, held.offered_alone) {
+                    OneFaceAnswer::PlainYes => {
+                        eprintln!(
+                            "lamp-voice second: request {request}: their plain yes runs the one-face forget held in request {} before round 1 ({how}, LAMP_PERSON_SCOPE_ONE_FACE_READS)",
+                            held.request
+                        );
+                        Taken::Runs(held.call, None, true)
                     }
-                );
-                Taken::Runs(held.call, held.line, true)
+                    OneFaceAnswer::OnlyNo => {
+                        eprintln!(
+                            "lamp-voice second: request {request}: dropped a held one-face forget (held in request {}): their line is only a no ({how}); it is kept, and the lamp says so itself (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
+                            held.request
+                        );
+                        let note = crate::remember::said_no_told(kept_subject(&held.call));
+                        Taken::KeptAtOnce(held.call, note)
+                    }
+                    OneFaceAnswer::ModelsCall => {
+                        eprintln!(
+                            "lamp-voice second: request {request}: the one-face forget held in request {} runs on the model's forget call on this line, naming nothing else ({how})",
+                            held.request
+                        );
+                        Taken::Agrees(held.call)
+                    }
+                    OneFaceAnswer::Refuses => {
+                        eprintln!(
+                            "lamp-voice second: request {request}: dropped a held one-face forget (held in request {}): they said no ({how}); it is kept, whatever the model calls (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
+                            held.request
+                        );
+                        let note = crate::remember::said_no_told(kept_subject(&held.call));
+                        Taken::OnForget(held.call, note)
+                    }
+                    OneFaceAnswer::Unclear if held.asked_again => {
+                        eprintln!(
+                            "lamp-voice second: request {request}: dropped a held one-face forget (held in request {}): asked once more, its answer still said forget and took it back ({how}); it is kept (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
+                            held.request
+                        );
+                        let note = crate::remember::still_unclear_told(kept_subject(&held.call));
+                        Taken::OnForget(held.call, note)
+                    }
+                    OneFaceAnswer::Unclear => {
+                        eprintln!(
+                            "lamp-voice second: request {request}: held a one-face forget (held in request {}) on: its answer said forget and took it back ({how}); nothing runs, and the model's forget on this line asks once more (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
+                            held.request
+                        );
+                        // Its answer must ask about it again
+                        // ([`settle_held_forget`]), and the next answer is
+                        // judged as this one was, from now.
+                        let call = held.call.clone();
+                        hold.held = Some(HeldForget {
+                            request,
+                            at: now,
+                            asked: false,
+                            asked_again: true,
+                            ..held
+                        });
+                        Taken::OnForget(call, crate::remember::FORGET_ASKED_AGAIN.to_owned())
+                    }
+                }
             }
         };
     }
+    // A held keep's yes on a line theirs by the face-in-view rule
+    // (`ScopeLease::by_one_face`: their known face the one face in view, or
+    // the line carried and read as theirs, no face seen speaking it, no
+    // other voice heard), with `LAMP_KEEP_QUIETLY_ONE_FACE`: the memory
+    // owner's rule, "mouth detection only blocks the forget and nothing
+    // else". Its person is the line's own (`line_person`), since such a
+    // line holds no forget asker; another face seen speaking the yes is
+    // never theirs. A held forget's yes is unchanged.
+    let keep_by_face = held.call.name == crate::remember::REMEMBER
+        && by_one_face
+        && crate::keep_quietly::one_face_on()
+        && !sight
+            .as_ref()
+            .is_some_and(|(seen, speakers, _)| *seen == request && !speakers.is_empty());
+    let asker = if keep_by_face { line_person } else { asker };
     let dropped = if !heard {
         Some("a turn the lamp wrote")
     } else if !held.asked {
@@ -14746,11 +16927,13 @@ fn take_held_forget(
     } else if let Some(why) = not_theirs(asker, &held.asker) {
         Some(why)
     } else if now.saturating_duration_since(held.at) > crate::remember::HELD_FORGET_FOR {
-        Some("too late")
+        Some(TOO_LATE)
     } else if held.call.name == crate::remember::REMEMBER && shared.forget_sight.is_none() {
         // A carried line's keep is let go only on a yes their face is seen
         // saying ([`hold_carried_keep`]).
         Some("the eyes don't read who speaks")
+    } else if keep_by_face {
+        None
     } else if by_one_face {
         // A line theirs only by their face alone in view
         // (`LAMP_PERSON_SCOPE_ONE_FACE`) is no yes to a forget: nothing saw
@@ -14780,9 +16963,18 @@ fn take_held_forget(
                 "lamp-voice second: request {request}: dropped a held forget ({}, held in request {}): {why}",
                 held.call.name, held.request
             );
-            Taken::Nothing
+            // A yes too late or not theirs is told (#7478).
+            dropped_yes(held.call.name, why, asker, &held.asker)
         }
-        None => Taken::Runs(held.call, held.line, false),
+        None => {
+            if keep_by_face {
+                eprintln!(
+                    "lamp-voice second: request {request}: their yes keeps the keep held in request {}: no face was seen saying it, their face the one face in view or the line carried (LAMP_KEEP_QUIETLY_ONE_FACE)",
+                    held.request
+                );
+            }
+            Taken::Runs(held.call, held.line, false)
+        }
     }
 }
 
@@ -14942,11 +17134,21 @@ fn take_held_save(
     let said = said_window(shared);
     let verdict = crate::known_faces::held_save_verdict(&name, &said);
     let plain_yes = verdict == crate::known_faces::HeldSaveVerdict::Runs;
+    // A yes on a line held only by a face's gap, or carried in their
+    // conversation (its scope held), is theirs with
+    // `LAMP_KEEP_QUIETLY_ONE_FACE` by the face-in-view rule
+    // ([`theirs_by_face`]): the memory owner's rule, "mouth detection only
+    // blocks the forget and nothing else". On lamp-06c1 (18 Nov, request
+    // 73) the owner's yes, their face the one face in view and the line
+    // carried, dropped the save held in request 72 as a gap's line. The
+    // scope's person must be the one the save keeps (Twelve's P3 on #7735):
+    // known person B alone in view can't say the yes to A's held save.
+    let save_by_face = held_by_gap(scope) && theirs_by_face(scope, request, &name);
     // Only a second face drops a plain yes the model should hear about.
     let mut told = false;
     let why = if now.saturating_duration_since(held.at) > HELD_SAVE_FOR {
         "too late"
-    } else if held_by_gap(scope) {
+    } else if held_by_gap(scope) && !save_by_face {
         "a line held only by a face's gap"
     } else if held.session.is_some() && scope.map(|scope| scope.key().session) != held.session {
         "not the same session"
@@ -14966,6 +17168,19 @@ fn take_held_save(
             crate::known_faces::HeldSaveVerdict::Runs
                 if !called || crate::known_faces::face_agreed(&name, &said) =>
             {
+                if save_by_face {
+                    let how = if seen_speaking
+                        .as_ref()
+                        .is_some_and(|line| !line.speakers.is_empty())
+                    {
+                        "their face was seen saying it"
+                    } else {
+                        "no face was seen saying it, their face the one face in view or the line carried"
+                    };
+                    eprintln!(
+                        "lamp-voice second: request {request}: their yes to the face runs the setup face save on a line theirs by the face: {how} (LAMP_KEEP_QUIETLY_ONE_FACE)"
+                    );
+                }
                 if called {
                     eprintln!(
                         "lamp-voice second: request {request}: their yes to the face runs the setup face save held in request {}",
@@ -15012,6 +17227,33 @@ fn take_held_save(
     told.then_some(SetupSave::Dropped(why))
 }
 
+/// Whether request `request`'s line, its scope held (a face's gap, or
+/// carried in their conversation), is its known person's by the
+/// face-in-view rule, with `LAMP_KEEP_QUIETLY_ONE_FACE` on: no face seen
+/// speaking it but theirs, their known face the one face in view through
+/// it or the line carried in their conversation, and no other voice heard
+/// (`keep_quietly::saw`, the quiet keep's own record, #7495), when that
+/// person is the one the held save keeps by `name` (its letters joined, as
+/// [`crate::known_faces::held_save_verdict`] judges it). An unknown
+/// speaker, a keep-only carry (the room's), another face seen speaking it,
+/// another voice, another known person and a written turn never are. Off:
+/// never.
+fn theirs_by_face(
+    scope: Option<&crate::memory_scope::ScopeLease>,
+    request: u64,
+    name: &str,
+) -> bool {
+    let joined = crate::known_faces::letters_as_word(name);
+    let saved = crate::known_faces::memory_person(joined.as_deref().unwrap_or(name));
+    crate::keep_quietly::one_face_on()
+        && scope
+            .and_then(crate::memory_scope::ScopeLease::scope)
+            .and_then(crate::memory_scope::ScopeSnapshot::person)
+            .is_some_and(|person| {
+                person == saved && crate::keep_quietly::seen_saying(request, person)
+            })
+}
+
 /// What becomes of a setup face save on a turn ([`take_held_save`]).
 enum SetupSave {
     /// Their yes to the face runs it, with no model call.
@@ -15056,6 +17298,14 @@ fn yes_save(
     now: Instant,
 ) -> Option<Result<HeldSave, String>> {
     if !heard {
+        return None;
+    }
+    // With `LAMP_FACE_NO_ASK` (the product owner's no-asks rule; the first
+    // builder's ruling on #7810): a yes is no proof that the face in view
+    // said the name, so it runs no save, and no face question is asked;
+    // the face is kept only on the speaker's own proof
+    // (`known_faces::run_speaker`), else the step ends with the name only.
+    if shared.face_no_ask {
         return None;
     }
     let said = said_window(shared);
@@ -15149,7 +17399,9 @@ struct JustKept {
 /// keeps the call with that word in place of the kept one. On a line its
 /// person's by their face alone in view the same person may take back their
 /// own keep this way ([`keep_asker`]); their yes still needs their face
-/// seen saying it.
+/// seen saying it. With an unsure line not kept
+/// (`LAMP_MEMORY_UNSURE_NOT_KEPT`, #7739) it is only forgotten: no yes is
+/// waited for, so nothing is held and the eyes are not needed.
 async fn undo_doubted_keep(
     shared: &Shared,
     request: u64,
@@ -15161,11 +17413,12 @@ async fn undo_doubted_keep(
     if !shared.doubt_undoes {
         return Ok(false);
     }
+    let unsure = shared.unsure_not_kept;
     let asker = keep_asker(scope);
     let now = (shared.clock)();
     let not = if !heard {
         Some("a turn the lamp wrote")
-    } else if shared.forget_sight.is_none() {
+    } else if !unsure && shared.forget_sight.is_none() {
         Some("the eyes don't read who speaks, so no yes could keep it again")
     } else if asker.is_none() || asker != kept.asker {
         Some("not the same known person")
@@ -15184,6 +17437,63 @@ async fn undo_doubted_keep(
     let Some(asker) = asker else {
         return Ok(false);
     };
+    if !unsure && !hold_doubted_keep(shared, (request, round), (kept, offered), asker, now) {
+        return Ok(false);
+    }
+    let forget = net::ToolCall {
+        id: format!("{}-doubted", kept.call.id),
+        name: crate::remember::FORGET.to_owned(),
+        args: serde_json::json!({ "source_id": kept.id }),
+        ..kept.call.clone()
+    };
+    // Its own keep's id alone may be forgotten on a lone face's line.
+    if let Some(scope) = scope {
+        scope.mark_own_keep_undone(&OwnKeepUndone(()), kept.id);
+    }
+    let told = run_tool(shared, request, heard, &forget, scope).await;
+    if scope.is_some_and(|scope| !scope.is_current()) {
+        return Err(Stop::Gone);
+    }
+    if told["forgotten"] != true {
+        if !unsure
+            && let Ok(mut hold) = shared.held_forget.lock()
+            && hold
+                .held
+                .as_ref()
+                .is_some_and(|held| held.request == request)
+        {
+            hold.held = None;
+        }
+        eprintln!(
+            "lamp-voice second: request {request} chat round {round}: its words doubt the keep just before, not taken back: the forget did not run ({})",
+            crate::remember::doubted::UNDOES_ENVIRONMENT
+        );
+        return Ok(false);
+    }
+    if unsure {
+        eprintln!(
+            "lamp-voice second: request {request} chat round {round}: its words doubt the keep just before: taken back, not kept, and nothing is asked ({})",
+            crate::remember::doubted::UNSURE_ENVIRONMENT
+        );
+    } else {
+        eprintln!(
+            "lamp-voice second: request {request} chat round {round}: its words doubt the keep just before: taken back, kept again only on their yes ({})",
+            crate::remember::doubted::UNDOES_ENVIRONMENT
+        );
+    }
+    Ok(true)
+}
+
+/// [`undo_doubted_keep`]'s hold of `kept` for `asker`'s yes, asked already
+/// since the round's answer is the question. Whether it is held; the
+/// journal says why not.
+fn hold_doubted_keep(
+    shared: &Shared,
+    (request, round): (u64, usize),
+    (kept, offered): (&JustKept, Option<(String, String)>),
+    asker: (u64, String),
+    now: Instant,
+) -> bool {
     // Their yes to "is that ranunculus?" keeps "ranunculus".
     let held_call = match (&offered, kept.call.args["text"].as_str()) {
         (Some((was, offered)), Some(text)) => {
@@ -15201,7 +17511,7 @@ async fn undo_doubted_keep(
                 "lamp-voice second: request {request} chat round {round}: its words doubt the keep just before, not taken back: another call is held ({})",
                 crate::remember::doubted::UNDOES_ENVIRONMENT
             );
-            return Ok(false);
+            return false;
         }
     }
     if let Ok(mut hold) = shared.held_forget.lock()
@@ -15214,40 +17524,7 @@ async fn undo_doubted_keep(
         // (`remember::heard::yes_alone`, `LAMP_MEMORY_KEEP_HEARD`).
         held.line = held_call.args["text"].as_str().map(str::to_owned);
     }
-    let forget = net::ToolCall {
-        id: format!("{}-doubted", kept.call.id),
-        name: crate::remember::FORGET.to_owned(),
-        args: serde_json::json!({ "source_id": kept.id }),
-        ..kept.call.clone()
-    };
-    // Its own keep's id alone may be forgotten on a lone face's line.
-    if let Some(scope) = scope {
-        scope.mark_own_keep_undone(&OwnKeepUndone(()), kept.id);
-    }
-    let told = run_tool(shared, request, heard, &forget, scope).await;
-    if scope.is_some_and(|scope| !scope.is_current()) {
-        return Err(Stop::Gone);
-    }
-    if told["forgotten"] != true {
-        if let Ok(mut hold) = shared.held_forget.lock()
-            && hold
-                .held
-                .as_ref()
-                .is_some_and(|held| held.request == request)
-        {
-            hold.held = None;
-        }
-        eprintln!(
-            "lamp-voice second: request {request} chat round {round}: its words doubt the keep just before, not taken back: the forget did not run ({})",
-            crate::remember::doubted::UNDOES_ENVIRONMENT
-        );
-        return Ok(false);
-    }
-    eprintln!(
-        "lamp-voice second: request {request} chat round {round}: its words doubt the keep just before: taken back, kept again only on their yes ({})",
-        crate::remember::doubted::UNDOES_ENVIRONMENT
-    );
-    Ok(true)
+    true
 }
 
 fn hold_forget(
@@ -15300,8 +17577,83 @@ fn hold_forget_as(
         asked_again: false,
         one_face,
         near: None,
+        offered_alone: false,
     });
     Holding::Held
+}
+
+/// Whether the model's `forget` call `args`, on a line saying `said`,
+/// agrees to the one-face forget `held` ([`Taken::Agrees`]): it names
+/// nothing else. A `source_id` other than the held one, or words of its own
+/// that the line names ([`crate::remember::named_subject`]), make it that
+/// other forget.
+fn agreed_forget_call(held: &net::ToolCall, args: &Value, said: &str) -> bool {
+    let other_id = args
+        .get("source_id")
+        .filter(|id| !id.is_null())
+        .is_some_and(|id| *id != held.args["source_id"]);
+    !other_id && crate::remember::named_subject(said).is_none()
+}
+
+/// [`Taken::Agrees`] on this round's `calls`: the first `forget` that
+/// agrees ([`agreed_forget_call`]) becomes the held call, keeping its id,
+/// marked agreed on `scope` so it runs as held
+/// ([`crate::memory_scope::ScopeLease::agreed_forget`]); with none, the held
+/// forget runs nothing and the kept thing stays.
+fn agree_held_forget(
+    request: u64,
+    round: usize,
+    said: &str,
+    held: net::ToolCall,
+    calls: &mut [net::ToolCall],
+    scope: Option<&crate::memory_scope::ScopeLease>,
+) {
+    let agreed = calls.iter_mut().find(|call| {
+        call.name == crate::remember::FORGET && agreed_forget_call(&held, &call.args, said)
+    });
+    match (agreed, scope, held.args["source_id"].as_u64()) {
+        (Some(call), Some(scope), Some(id)) => {
+            scope.mark_forget_agreed(&OneFaceForgetYes(()), id);
+            call.args = held.args;
+            eprintln!(
+                "lamp-voice second: request {request} chat round {round}: the model's forget is their yes: the one-face forget held runs as held (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
+            );
+        }
+        _ => eprintln!(
+            "lamp-voice second: request {request} chat round {round}: dropped a held one-face forget: no forget on this line agrees to it; it is kept"
+        ),
+    }
+}
+
+/// [`Taken::OnForget`] on this round's `calls`: the id of the first call to
+/// the dropped forget `held` that agrees to it ([`agreed_forget_call`], the
+/// door of [`Taken::Agrees`], #7971), answered with the note and never run;
+/// with none, nothing is told (the Reviewer-lead's P2 on #7490).
+fn told_on_forget(
+    request: u64,
+    round: usize,
+    said: &str,
+    held: &net::ToolCall,
+    calls: &[net::ToolCall],
+) -> Option<String> {
+    let call = calls
+        .iter()
+        .find(|call| call.name == held.name && agreed_forget_call(held, &call.args, said));
+    match call {
+        Some(call) => {
+            eprintln!(
+                "lamp-voice second: request {request} chat round {round}: {} not run: the held forget was dropped on this line; the model is told nothing was forgotten",
+                call.name
+            );
+            Some(call.id.clone())
+        }
+        None => {
+            eprintln!(
+                "lamp-voice second: request {request} chat round {round}: the held forget dropped on this line: no forget on it agrees, nothing told"
+            );
+            None
+        }
+    }
 }
 
 /// A named `forget` on a line theirs only by their face alone in view
@@ -15314,7 +17666,12 @@ fn hold_forget_as(
 /// is refused as before, for any other call or line: a bare forget, two
 /// faces in view (the line is then nobody's by one face), a line held by a
 /// gap, or no one kept thing named ([`crate::remember::one_face_forget_target`]).
-fn ask_once_forget(
+/// The kept thing is looked up off the runtime's thread (#8204): its two
+/// listings wait up to `tools::ASK_DEADLINE` each on lamp-memory, and on
+/// that thread the worker's control loop read nothing meanwhile, so the
+/// coordinator's renewals filled its socket and the voice ended. The turn
+/// still waits for it, so the forget's answer goes out in its place.
+async fn ask_once_forget(
     shared: &Shared,
     request: u64,
     heard: bool,
@@ -15323,10 +17680,15 @@ fn ask_once_forget(
     scope: Option<&crate::memory_scope::ScopeLease>,
 ) -> Option<Value> {
     let lease = scope?;
+    // A line from a name the eyes hold (`LAMP_FACE_STICKY`) is asked
+    // nothing: its forget is refused, as a held identity runs none.
     if !heard
         || call.name != crate::remember::FORGET
         || held_by_gap(scope)
         || !lease.forgets_need_mouth()
+        // Their yes to one asked about already ([`agree_held_forget`]).
+        || lease.agreed_forget(&call.args)
+        || lease.sticky_held()
     {
         return None;
     }
@@ -15334,24 +17696,41 @@ fn ask_once_forget(
     if lease.kept_by_one_face().as_deref() != Some(asker.1.as_str()) {
         return None;
     }
-    let target = match &shared.forget_target {
-        Some(target) => target(call, said, &asker.1, lease),
-        None => crate::remember::one_face_forget_target(
-            &lamp_gemini::ToolCall {
-                id: call.id.clone(),
-                name: call.name.clone(),
-                args: call.args.clone(),
-            },
-            said,
-            &asker.1,
-            lease,
-        ),
+    let looking = {
+        let (target, call, said) = (shared.forget_target.clone(), call.clone(), said.to_owned());
+        let (person, lease) = (asker.1.clone(), lease.clone());
+        tokio::task::spawn_blocking(move || match target {
+            Some(target) => target(&call, &said, &person, &lease),
+            None => crate::remember::one_face_forget_target(
+                &lamp_gemini::ToolCall {
+                    id: call.id,
+                    name: call.name,
+                    args: call.args,
+                },
+                &said,
+                &person,
+                &lease,
+            ),
+        })
     };
+    let target = looking
+        .await
+        .unwrap_or(Err(crate::remember::ForgetNotAsked::ListingFailed(
+            "its lookup ended",
+        )));
     let (id, subject) = match target {
         Ok(target) => target,
         Err(why) => {
             eprintln!("{}", one_face_forget_not_asked(request, &why));
-            return None;
+            // Told the real cause when what they name can put it right,
+            // never "I couldn't see who was talking": their face was in
+            // view (#8038). A cause of the lamp's own is refused as before.
+            let told = why.told()?;
+            eprintln!(
+                "lamp-voice second: request {request}: {} not run: {why} (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
+                call.name
+            );
+            return Some(serde_json::json!({ "error": told }));
         }
     };
     let held = net::ToolCall {
@@ -15414,6 +17793,8 @@ fn settle_held_forget(shared: &Shared, request: u64, answer: Option<&str>) {
             } =>
         {
             held.asked = true;
+            held.offered_alone = held.call.name != crate::remember::REMEMBER
+                && crate::remember::offers_only_forgetting(answer, &held.call.name);
             return;
         }
         // With `LAMP_NAMES_RECORD_TOLD` (#5141 row 7, lamp-0c4e, 3 Nov): a
@@ -15658,6 +18039,9 @@ enum Stop {
     /// said. It ends as a silent turn; the Policy, which held it, is told
     /// no other verdict.
     Held,
+    /// `start_app`: an app took the line and speaks for itself. Nothing more
+    /// is said; the line was for the lamp, so it is no decline.
+    Taken,
     Failed(Fault),
     /// The engine is gone.
     Gone,
@@ -15707,6 +18091,7 @@ async fn said_while_made<T>(
     request: u64,
     made: bool,
     answering: impl std::future::Future<Output = T>,
+    let_go: impl FnOnce() -> T,
 ) -> Result<T, Stop> {
     if !made {
         return Ok(answering.await);
@@ -15727,6 +18112,26 @@ async fn said_while_made<T>(
     // On the one run path its generation completes once it is played, so
     // the lamp thinks while the make goes on; else as before.
     queue.push_ending(line.to_owned(), wait.is_some()).await?;
+    // `LAMP_MAKE_MAY_RUN_ON` (#6811): still no answer a minute after its
+    // waiting line, the make runs on in lamp-tasks and this turn ends, its
+    // one line said in place of the long-wait line; the person is free to
+    // talk. A make that settled first is waited for as before.
+    if let Some(after) = queue.shared.run_on_after {
+        tokio::select! {
+            answer = &mut answering => return Ok(answer),
+            () = tokio::time::sleep(after) => {}
+        }
+        if crate::long_make::let_go(request, crate::app_make::now_unix_ms()) {
+            eprintln!(
+                "lamp-voice second: request {request}: the make has no answer {} s after its waiting line: it runs on, its one line is said, and the turn ends",
+                after.as_secs()
+            );
+            let line = queue.shared.fixed(crate::long_make::RUN_ON_LINE);
+            queue.push_ending(line.to_owned(), true).await?;
+            return Ok(let_go());
+        }
+        return Ok(answering.await);
+    }
     // With the one run path (#7371): one more line, once, only if the make
     // runs long; the ring and body show thinking meanwhile.
     let Some(after) = wait else {
@@ -15779,22 +18184,38 @@ fn keep_quietly(
     crate::keep_quietly::Quiet::new(&in_talk, &before, line).for_person(person)
 }
 
+/// The last notes a round is asked with, in order: the lamp's own make
+/// line's ask again ([`crate::make_skill_agent::BEGUN_AGAIN_NOTE`]) when
+/// `begun`, then a held live figure's note (#7605). The live note is last,
+/// so its lookup is forced while it is the last message
+/// ([`crate::live_fact::force`]); before another note, nothing is forced.
+fn last_notes(begun: bool, live: Option<String>) -> Vec<Message> {
+    begun
+        .then(|| Message::system(crate::make_skill_agent::BEGUN_AGAIN_NOTE))
+        .into_iter()
+        .chain(live.map(Message::system))
+        .collect()
+}
+
 /// A sentence of an answer as [`crate::keep_quietly::Quiet`] lets it go
 /// (journalled when it leaves one out), then as `hold` does; one said is
 /// counted as said.
 fn said_quietly(
+    live: &mut crate::live_fact::Hold,
     quiet: &mut crate::keep_quietly::Quiet,
     hold: &mut crate::remember::OfferHold,
     sentence: String,
     remembered: bool,
     request: u64,
 ) -> Option<String> {
-    let sentence = quiet.say(sentence);
+    // A live figure no lookup backs is held first (#7605).
+    let sentence = quiet.say(live.pass(sentence)?);
     if let Some(line) = quiet.take_line(request) {
         eprintln!("{line}");
     }
     let said = hold.say(sentence?, remembered)?;
     quiet.spoken(&said);
+    live.said(&said);
     Some(said)
 }
 
@@ -15911,6 +18332,88 @@ async fn dont_know_first(
     match note {
         Some(note) => DontKnow::Recalled(note),
         None => DontKnow::Pass(held),
+    }
+}
+
+/// What of a reply's held opening (`claim_held`) may be said now, while
+/// it streams: `None` holds on. A keep said back on a line that is only a
+/// yes (`yes`) whose sentences name a found thing
+/// (`remember::said_kept_found_to`, beside a `recall` of this request that
+/// `found` it) lets only those sentences be said; the rest stays held and
+/// is judged on its own, so a later "Your bike is kept too." never
+/// inherits "Yes, Pip is kept."'s found thing (Second's P2 at c60b1a7b21
+/// on #5701). The opening claims ("Kept: …") still hold those sentences.
+/// Otherwise the hold ends at the first opening that claims no keep.
+fn claim_released(
+    claim_held: &mut Option<String>,
+    yes: bool,
+    found: &[Vec<String>],
+    asked: Option<&str>,
+    faces: bool,
+    whole: bool,
+    held_whole: &mut bool,
+) -> Option<String> {
+    let held = claim_held.as_mut()?;
+    if yes && let Some(end) = crate::remember::said_kept_found_to(held, found, asked, false) {
+        return match crate::remember::claims_a_keep_said(&held[..end], false, faces, false) {
+            Some(false) => {
+                let rest = held.split_off(end);
+                Some(std::mem::replace(held, rest))
+            }
+            _ => None,
+        };
+    }
+    match crate::remember::claims_a_keep_said(held, false, faces, yes) {
+        // Sentence by sentence (`LAMP_KEEP_CLAIM_WHOLE`, #7878): an opening
+        // that claims no keep lets go only its complete sentences that claim
+        // none, and the hold goes on, so a keep or replace said in a later
+        // sentence is held to the round's end and judged there.
+        Some(false) if whole => {
+            let end = crate::remember::unclaimed_sentences(held);
+            if end < held.len() {
+                *held_whole = true;
+            }
+            (end > 0).then(|| {
+                let rest = held.split_off(end);
+                std::mem::replace(held, rest)
+            })
+        }
+        Some(false) => claim_held.take(),
+        _ => None,
+    }
+}
+
+/// Whether a reply's opening held by `action_held` while its round streams
+/// is let go now: always without the action claims; with them
+/// (`LAMP_ACTION_CLAIM_CHECKED`, #5215), once it is known to claim nothing,
+/// or a claim that `called` (the turn's calls so far) stands for. `turns`
+/// is the turn's (worded, forget, doing) claims; `made` the person's made
+/// skills and whether the line was asked, for a skill told removed, off or
+/// on (#7683).
+fn claim_lets_go(
+    claims: bool,
+    held: &str,
+    turns: (bool, bool, bool),
+    read_asked: bool,
+    called: &[(String, Value)],
+    statuses: &[Value],
+    (made, made_asked, nudge): (&[crate::action_claim::MadeSkill], bool, bool),
+) -> bool {
+    if !claims {
+        return true;
+    }
+    match crate::action_claim::claim_checked_on(held, false, turns, (made, made_asked), nudge) {
+        Some(None) => true,
+        Some(Some(kind)) => crate::action_claim::stands_made_on(
+            kind,
+            held,
+            read_asked,
+            called.iter().map(|(name, args)| (name.as_str(), args)),
+            statuses,
+            made,
+        ),
+        // Undecided.
+        None => false,
     }
 }
 
@@ -16083,6 +18586,7 @@ async fn answer(
 ) {
     let (request, scope) = context;
     let heard = asked == Asker::Spoken;
+    let reminder = matches!(asked, Asker::Reminder { .. });
     // Whether the line names the lamp, known without the model: the name
     // in its words, its name detector's note, or a wake by name before it
     // (#7346: after the first usage-limit line, only such a line hears it).
@@ -16092,6 +18596,20 @@ async fn answer(
                 [crate::called::NOTE, crate::called::NOTE_HEARD_AS].contains(&note.as_str())
             })
             || crate::attention::marked_woken_by_name(request).is_some());
+    // `LAMP_MAKE_SKILL_ASKED`'s force reads a make past the lamp's name
+    // heard as another word on a line that names the lamp alone
+    // ([`past_the_name_heard_as`], #8022 case 2): it sees only the messages.
+    if heard {
+        crate::tools::make_skill_asked::heard_named(&said, named);
+    }
+    // `LAMP_LIMIT_LOCAL_ASKS` (#7346): only a line said to the lamp is
+    // acted on without the model: one named, or one not let out only as the
+    // conversation going on, which the model alone could judge not for it
+    // (Heron on #7612: "Louder." from the TV).
+    let limit_addressed = named
+        || !notes
+            .iter()
+            .any(|note| note == worker::CONVERSATION_ALONE || note == worker::FOLLOW_UP_NOTE);
     // Each round's prompt journaled for a cut-in (`LAMP_CUT_IN_PROMPT_LOG`).
     let logs_prompt = heard && shared.logs_prompt_of(request);
     let looking = matches!(asked, Asker::Written { looking: true, .. });
@@ -16103,6 +18621,11 @@ async fn answer(
     // next line, which may be someone else's.
     if heard && let Ok(mut thread) = crate::thread::THREAD.lock() {
         thread.line_of(request, &said);
+    }
+    // A line the person said with words, answered: they went on from any
+    // make whose turn was cut before it (`worker::made_running`).
+    if heard && said.chars().any(char::is_alphanumeric) {
+        crate::make_skill_local::person_went_on(request);
     }
     // `LAMP_KEEP_QUIETLY`: an offer to keep said at most once a
     // conversation, never about a thing offered before, never on small
@@ -16155,6 +18678,7 @@ async fn answer(
             request,
             Instant::now(),
         ),
+        choice_held: None,
     };
     let began = Instant::now();
     // The bounds below are on the runtime's clock, which a test can step.
@@ -16194,6 +18718,16 @@ async fn answer(
         (shared.clock)(),
     );
     let forget_may_run = crate::remember::forget_may_run(heard, asks_now);
+    // A one-face forget whose yes is the model's to judge on this line
+    // ([`Taken::Agrees`]): run by its `forget` call, naming nothing else.
+    let mut held_forget_agreed = None;
+    // A one-face or spelling forget dropped on this line, and its note, told
+    // only on the model's call to that forget ([`Taken::OnForget`]).
+    let mut held_forget_dropped = None;
+    // A held one-face forget's answer that is only a no, said by the lamp
+    // with no model round: its clip, empty for English said by the voice
+    // ([`Taken::KeptAtOnce`]).
+    let mut kept_at_once = None;
     let (mut held_forget_runs, unseen_yes) = match take_held_forget(
         shared,
         request,
@@ -16220,9 +18754,34 @@ async fn answer(
             (None, None)
         }
         Taken::Runs(call, line, one_face) => (Some((call, line, one_face)), None),
-        Taken::Unseen(name) => (None, Some(crate::remember::unseen_yes_told(&name))),
-        Taken::Unknown(name) => (None, Some(crate::remember::unknown_yes_told(&name))),
-        Taken::AskAgain => (None, Some(crate::remember::KEEP_ASKED_AGAIN.to_owned())),
+        Taken::Agrees(call) => {
+            held_forget_agreed = Some(call);
+            (None, None)
+        }
+        Taken::OnForget(call, note) => {
+            held_forget_dropped = Some((call, note));
+            (None, None)
+        }
+        // Only a no (#8185): the lamp's own line, with no model round,
+        // when it can be said now; else the model is told they said no,
+        // beside the line and on its forget call.
+        Taken::KeptAtOnce(call, note) => match kept_line_clip(shared) {
+            Some(clip) => {
+                kept_at_once = Some(clip);
+                (None, None)
+            }
+            None => {
+                eprintln!(
+                    "lamp-voice second: request {request}: \"{}\" is not rendered ahead in the owner's language yet; the model answers their no",
+                    crate::remember::KEPT_IT_LINE
+                );
+                held_forget_dropped = Some((call, note.clone()));
+                (None, Some(note))
+            }
+        },
+        told @ (Taken::Unseen(_) | Taken::Unknown(_) | Taken::NotTheirs | Taken::AskAgain) => {
+            (None, told.told())
+        }
     };
     let (mut held_save_runs, held_save_dropped, face_to_ask) =
         match take_held_save(shared, request, heard, scope.as_ref(), (shared.clock)()) {
@@ -16278,9 +18837,19 @@ async fn answer(
                 .skill_named
                 .as_ref()
                 .filter(|_| read_back_named.is_none())
-                .and_then(|named| named(&said))
+                .and_then(|skill| {
+                    // Past the lamp's name heard as another word, as its
+                    // kept line is ([`past_the_name_heard_as`]): "Hey, Lynn. An
+                    // apple file." (#8022's kit-8043 ROW, lamp-52e6, 20 Nov
+                    // 09:14: `calls=none`).
+                    let past = || skill(past_the_name_heard_as(&said, named)?);
+                    skill(&said).or_else(past)
+                })
         })
         .flatten();
+    // The line a skill was matched in, for whether the lamp's last words
+    // asked of that skill ([`lamp_awaits_answer_for`]); none, no copy.
+    let named_said = skill_named.as_ref().map(|_| said.clone());
     // Whom the line's own words ask by name (`LAMP_TASKS_NAMED_ASK`): told
     // once, after round 1 answers.
     let mut named_ask = shared
@@ -16339,6 +18908,9 @@ async fn answer(
         && !held_by_gap(scope.as_ref())
         && crate::dont_know::about_themself(&said))
     .then(|| said.clone());
+    // Whether the line asks for a live fact: only the first-words wait of
+    // `LAMP_LIVE_FACT_CHECKED` reads it (the first builder on #8224).
+    let asks_live = crate::live_fact::asks_live(&said);
     let reminded = said.to_lowercase().contains("remind");
     // Whether the worded claims judge this turn (`LAMP_ACTION_CLAIM_WORDED`,
     // #5215): never a line the person asked as a question, whose reply may
@@ -16348,6 +18920,32 @@ async fn answer(
     // ruling on #5215, [`crate::action_claim::stands`]). The strict lines
     // judge every turn.
     let worded_turn = shared.worded_claims && !crate::action_claim::asked_as_a_question(&said);
+    // The skills the person made, as the turn begins, for a reply that says
+    // one removed, turned off or on with no `make_skill` that did it (#7683,
+    // lamp-9adf, 18 Nov 14:38: "planet fact is removed." with
+    // `calls=none`). A line asked as a question has only its removed forms
+    // judged: "Planet fact is on." may answer "is planet fact on?".
+    let made_names: Vec<crate::action_claim::MadeSkill> = match &shared.made_names {
+        Some(read) if shared.action_claims && !quoted && !reminder => read(),
+        _ => Vec::new(),
+    };
+    let made_asked = crate::action_claim::asked_as_a_question(&said);
+    // A turn whose reply is judged sentence by sentence for a keep claimed
+    // in any of them (`LAMP_KEEP_CLAIM_WHOLE`, #7878): structure only, never
+    // words of the person's line (the first builder's 13:44 ruling on
+    // #7924); held while no `remember` of the turn has run.
+    let keep_whole_turn = shared.keep_whole && !quoted;
+    // With it, whether nobody known speaks (no person in the turn's admitted
+    // scope): then a keep claimed with none made is answered with the
+    // refusal's own true line, never "Tell me again and I'll remember it"
+    // (#7885's `REFUSED_LINE`, V2's must-fix (4) on #7924).
+    let keep_nobody_known = keep_whole_turn
+        && crate::remember::needs_face::on()
+        && scope
+            .as_ref()
+            .and_then(|lease| lease.scope())
+            .and_then(|scope| scope.person())
+            .is_none();
     // Whether a light act told as under way is a claim (#7285,
     // `LAMP_ACTION_CLAIM_DOING`): read from the reply alone.
     let doing_turn = shared.doing_claims;
@@ -16392,6 +18990,14 @@ async fn answer(
     let own = written
         .then(|| crate::onboarding::own_words(&said).map(str::to_owned))
         .flatten()
+        // A made skill's line (#7937): its words as written, no chat asked.
+        // Asked of the model beside the conversation, "Here is your daily
+        // brief." was answered as the chat's next line (lamp-9adf, 19 Nov).
+        .or_else(|| {
+            quoted
+                .then(|| crate::say::made_words(&said).map(str::to_owned))
+                .flatten()
+        })
         // A person who talks to the lamp while the first update after setup
         // holds the walk (#6284) hears that it is updating, and no chat.
         .or_else(|| {
@@ -16405,6 +19011,7 @@ async fn answer(
     let prepared_for = prepared
         .filter(|_| {
             held_forget_runs.is_none()
+                && kept_at_once.is_none()
                 && unseen_yes.is_none()
                 && held_save_runs.is_none()
                 && held_save_dropped.is_none()
@@ -16483,11 +19090,38 @@ async fn answer(
             return Err(Stop::Gone);
         }
         if let Some(words) = own {
+            let whose = if quoted {
+                "a made skill's line"
+            } else {
+                "the onboarding walk's own line"
+            };
             eprintln!(
-                "lamp-voice second: request {request} is the onboarding walk's own line; its words are said, no chat asked"
+                "lamp-voice second: request {request} is {whose}; its words are said, no chat asked"
             );
             shared.emit(ProviderOutput::OwnWordsSaid { request }).await;
             queue.push(words).await?;
+            return Ok(());
+        }
+        // Only a no to the one-face forget question (#8185): kept, and the
+        // lamp says so itself, with no model round.
+        if let Some(clip) = kept_at_once {
+            let line = shared.fixed(crate::remember::KEPT_IT_LINE);
+            eprintln!(
+                "lamp-voice second: request {request}: their no keeps the one-face forget's thing; \"{line}\" said{} with no chat asked (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
+                if clip.is_empty() {
+                    ""
+                } else {
+                    " from its clip rendered ahead"
+                }
+            );
+            // The lamp's own words, as its other own lines are: no model
+            // answered this turn.
+            shared.emit(ProviderOutput::OwnWordsSaid { request }).await;
+            if clip.is_empty() {
+                queue.push(line.to_owned()).await?;
+            } else {
+                queue.push_clip(line, clip).await?;
+            }
             return Ok(());
         }
         // The memory's note asked as the line began, waited for here, never
@@ -16511,6 +19145,11 @@ async fn answer(
         // section for it is cut unless that line only greeted
         // (reviewer-two's P2 on #3059).
         let mut notes = notes;
+        // The line after the walk's "What should I call you?" (#7876): the
+        // model judges whether it is a name or a decline.
+        if heard && crate::onboarding::learn_later::answering() {
+            notes.push(crate::onboarding::learn_later::ANSWER_NOTE.to_owned());
+        }
         if heard && let Some(line) = event_line(shared, request, &event_words, scope.as_ref()).await
         {
             notes.push(line);
@@ -16891,6 +19530,22 @@ async fn answer(
                 );
             }
         }
+        // A made skill's words or name run it past a question that is not
+        // of the made skills ([`lamp_awaits_answer_for`], the lead's live
+        // test, 19 Nov; Heron's and Twelve's HOLD on #7916).
+        let awaits_named = lamp_awaits_answer_for(
+            held,
+            &messages,
+            skill_named.as_ref(),
+            named_said.as_deref().unwrap_or_default(),
+            shared.made_named.as_ref(),
+        );
+        if awaits && !awaits_named {
+            eprintln!(
+                "lamp-voice second: request {request}: the lamp's last words asked something, but not of the made skill the heard words named: called in code"
+            );
+        }
+        let awaits = awaits_named;
         if let Some((name, args)) = skill_named
             .as_ref()
             .filter(|_| !forgot_before_question && awaits)
@@ -16920,6 +19575,10 @@ async fn answer(
             });
         let named_by_words = named_call.is_some();
         let mut skill_ran: Option<((String, Value), Value)> = None;
+        // The skill turned off the lamp turned on for the ask and ran
+        // (`LAMP_MADE_SKILL_OFF_SAID`), and what the model was told of it: a
+        // model's call of it after is given this answer, never run again.
+        let mut on_ran: Option<((String, Value), Value)> = None;
         if let Some(call) = &named_call {
             let function = crate::skill_named::function_of(&call.name, &call.args);
             eprintln!(
@@ -16928,6 +19587,13 @@ async fn answer(
             messages.push(Message::system(crate::skill_named::ran_note(
                 &crate::skill_named::spoken(function),
             )));
+        }
+        // A skill they made or added turned off (`LAMP_MADE_SKILL_OFF_SAID`,
+        // #7562's row on lamp-9adf, 18 Nov 03:2x): turned back on only by
+        // `make_skill`'s `turn_on`, never said on without it. Two small
+        // local files read; nothing when none is off.
+        if let Some(note) = crate::made_turn::off_note_here(request, heard) {
+            messages.push(Message::system(note));
         }
         // The owner's own spoken ask of the skill, kept so its task's first
         // yes may be asked in the lamp's quiet hours (#7180,
@@ -17040,11 +19706,49 @@ async fn answer(
         if made_said {
             turn_called.push((crate::made_skill::MAKE.to_owned(), Value::Null));
         }
+        // A live figure said with no lookup behind it (#7605,
+        // `LAMP_LIVE_FACT_CHECKED`): judged a sentence at a time by the
+        // reply's own words, never the person's (the reviewer-lead's HOLD
+        // on #7719); a lookup carried from a cut answer's finished rounds is
+        // the turn's own when it found something. Never a quoted line or a
+        // reminder's ring.
+        let mut live = crate::live_fact::Hold::new(
+            shared.live_facts && !quoted && !matches!(asked, Asker::Reminder { .. }),
+            request,
+            &rounds,
+        )
+        .asking_live(asks_live);
+        let mut live_note: Option<String> = None;
         // Whether a claim with no call (or a step word alone, with the
         // switch) was asked again once already, and whether the next round
         // is told one went unsaid beside other calls.
         let mut action_claim_asked = false;
         let mut action_claim_note: Option<String> = None;
+        // The lamp's own make lines, in English and the owner's language
+        // ([`crate::make_skill_agent::BEGUN_LINES`]): a reply that says one
+        // with no make_skill call in the turn copied it from the history
+        // (lamp-9adf, 18 Nov). Whether it was asked again once already, and
+        // whether the next round, after other calls, is told so.
+        let begun_lines: Vec<&'static str> = crate::make_skill_agent::BEGUN_LINES
+            .iter()
+            .flat_map(|line| [*line, shared.fixed(line)])
+            .collect();
+        let mut begun_asked = false;
+        let mut begun_note = false;
+        // When the round asked again began, for its journal line's ms.
+        let mut begun_again_at: Option<Instant> = None;
+        // A skill the person made or added turned off and on by voice
+        // (`LAMP_MADE_SKILL_OFF_SAID`, #7562's rows on lamp-9adf, 18 Nov):
+        // whether a `turn_on` turned one on in this turn (its function's
+        // answer that it is off is then [`crate::made_turn::just_on`]); the
+        // note of a turn's candidates still unchosen, and whether the turn
+        // was asked once more for them already.
+        let mut turned_on_now = false;
+        // The made skill the model's own `turn_on` turned on in this turn:
+        // its run now after is said with the undo line (#7562's request 9).
+        let mut model_on: Option<String> = None;
+        let mut turn_unchosen: Option<String> = None;
+        let mut turn_unchosen_asked = false;
         // `LAMP_SECOND_CHAT_SECOND_TRY`: not for a look, nor once a held forget
         // ran or rounds were carried from a cut answer.
         let may_go_twice = second_try::may_go_twice(
@@ -17100,14 +19804,27 @@ async fn answer(
         let done_already = (heard && !held_forget_ran)
             .then(|| crate::remember::heard::done_already(request, scope.as_ref()))
             .flatten();
-        if let Some((note, _)) = &done_already {
+        if let Some((Some(note), _)) = &done_already {
             messages.push(Message::system(note.clone()));
         }
+        // The done write backs the turn whether or not its note was told: a
+        // bare "Okay." gets no note, yet its "Pip is kept." is true
+        // (Thirteen's P2 on #5701).
         let mut kept_now = held_keep_ran
             || carried.kept
-            || done_already
-                .as_ref()
-                .is_some_and(|(_, done)| *done != crate::remember::MemoryDone::Forgotten);
+            || crate::remember::heard::done_backs_a_keep(done_already.as_ref());
+        // What a `recall` of this request found, each thing's words: then
+        // a reply to a line that is only a yes may say back that one of
+        // them is kept ("Yes, Pip is kept."), true of what was found; a
+        // keep said of anything else stays a claim, and the opening claims
+        // stay (the first builder's P3 on #5607, as S13 req 339 answered a
+        // yes with a `recall`; Thirteen's P2 on #5701).
+        let mut recall_found: Vec<Vec<String>> = vec![];
+        // What this yes answers, which a found thing said kept must hold
+        // (Thirteen's P2 on #5701: blue asked, the old red found).
+        let yes_answers = yes_line
+            .then(|| crate::remember::heard::yes_answers(request, scope.as_ref()))
+            .flatten();
         // A forget invalidates earlier memory-keep evidence, while completed
         // non-memory actions may still have their content-free confirmation.
         let mut confirmed_other_call = carried.other;
@@ -17130,9 +19847,25 @@ async fn answer(
         // #3504), and whether a `remember` of this request ran.
         let mut offer_hold = crate::remember::OfferHold::default();
         let mut remember_ran = carried.remembered;
+        // Whether a `remember` of this turn came back refused with nobody
+        // known (`needs_face::refused`): a later claim is then answered with
+        // the refusal's own line at once (Friday's P2-2 on #7924).
+        let mut keep_refused = false;
+        // Whether a `remember` of this turn was held for their yes
+        // (`held_keep_told`): its own ask stands, so no refusal is said
+        // over it (Friday's P2 on #7924).
+        let mut keep_held = false;
         // Whether a don't-know was recalled once already in this turn
         // (`LAMP_MEMORY_DONT_KNOW_RECALLS`).
         let mut dont_know_recalled = false;
+        // `LAMP_LIMIT_LOCAL_ASKS` (#7346): a spoken line is tried as an ask
+        // with no model at the usage limit, at round 1 only.
+        let limit_local = shared.limit_local && heard && !quoted;
+        // And a due timer or reminder is rung with its own line (#7642).
+        let limit_ring_timer = match asked {
+            Asker::Reminder { timer } if shared.limit_local => Some(timer),
+            _ => None,
+        };
         let mut round = 0;
         // The one round asked past MAX_ROUNDS, declaring no function: every
         // round so far ended in calls, so nothing they found was said yet
@@ -17154,6 +19887,14 @@ async fn answer(
             if let Some(note) = action_claim_note.take() {
                 messages.push(Message::system(note));
             }
+            // After other calls ran beside the lamp's own make line: this
+            // round is the one asked again, timed from here.
+            let begun_told = std::mem::take(&mut begun_note);
+            if begun_told {
+                begun_again_at = Some(Instant::now());
+            }
+            messages.extend(last_notes(begun_told, live_note.take()));
+            live.begin_round();
             if words_round {
                 past_cap_from = queue.pieces;
                 eprintln!(
@@ -17196,6 +19937,53 @@ async fn answer(
                     _ => &messages,
                 };
                 shared.log_prompt((request, round), asked, told);
+            }
+            // Already at the usage limit: a plain light or volume ask is
+            // done at once, and any other line ends as the limit does, with
+            // no chat asked (`LAMP_LIMIT_LOCAL_ASKS`; Heron on #7612: the
+            // chat would only be refused again).
+            if round == 1
+                && limit_local
+                && let Some(down) = shared.down.as_ref().filter(|down| down.limited())
+            {
+                if !(limit_addressed
+                    && limit_local_ask(shared, request, &heard_words, scope.as_ref()).await?)
+                {
+                    say_limit(shared, (request, heard, named), down.lasted(), None).await?;
+                }
+                return Err(Stop::Failed(Fault::RateLimited));
+            }
+            // Already at the usage limit: a due timer or reminder is rung
+            // with its own line, with no chat asked (#7642).
+            if round == 1
+                && let Some(timer) = limit_ring_timer
+                && shared.down.as_ref().is_some_and(|down| down.limited())
+                && limit_ring(shared, request, timer).await?
+            {
+                return Ok(());
+            }
+            // What round 1 was offered and forced, on the messages it is
+            // asked as round 1's prompt log reads them, and whether the
+            // line asks to make a skill: never a word (#8022 case 2).
+            if round == 1 && by_words.is_none() && !quoted {
+                let asked = prepared
+                    .as_ref()
+                    .map_or(&messages, |prepared| &prepared.messages);
+                let without = withheld(scope.as_ref());
+                let services = shared.services.as_ref();
+                let line = round_one_line(
+                    request,
+                    asked,
+                    |name| services.declares(asked, without, name),
+                    services.forced(asked, without),
+                );
+                eprintln!("{line}");
+                // Which check refused a reminders line its force (#8181).
+                if crate::tools::reminders_asked::on()
+                    && let Some(line) = crate::tools::reminders_asked::declined_line(request, asked)
+                {
+                    eprintln!("{line}");
+                }
             }
             let mut stream = match prepared.take() {
                 // The skill the heard words named: its call alone, at once.
@@ -17256,6 +20044,14 @@ async fn answer(
             let mut first = true;
             let mut split = Sentences::default();
             let mut text = String::new();
+            // After a turn's candidates, the round's words wait for its end
+            // (`LAMP_MADE_SKILL_OFF_SAID`): never once it was asked again
+            // for them, nor in the last round.
+            queue.choice_held = (turn_unchosen.is_some()
+                && !turn_unchosen_asked
+                && round < MAX_ROUNDS
+                && !words_round)
+                .then(Vec::new);
             let mut calls = Vec::new();
             let mut reasoning = None;
             let mut called_us = 0;
@@ -17269,8 +20065,11 @@ async fn answer(
             // when its calls say whether it was. Not while something of
             // this request was kept already, nor on a turn offered no
             // function (a quoted add-on's or a reminder's).
-            let mut claim_held =
-                (!kept_now && !quoted && asked != Asker::Reminder).then(String::new);
+            let mut claim_held = (!kept_now && !quoted && !reminder).then(String::new);
+            // Whether a sentence of this round's reply claiming a keep or
+            // replace was held (`LAMP_KEEP_CLAIM_WHOLE`, #7878), said in the
+            // journal.
+            let mut held_whole = false;
             // A reply's opening, held until it is known whether it narrates
             // a call as words ("Calling not_for_me.", lamp-06c1, 30 Oct);
             // one that does is never said, nor kept as the lamp's words for
@@ -17287,8 +20086,65 @@ async fn answer(
             // the turn, is held to the round's end, when its calls say
             // whether it stands (`LAMP_ACTION_CLAIM_CHECKED`, #5215). Not on
             // a turn offered no function.
+            // A reply's opening held too while it may say one of the lamp's
+            // own make lines with no make_skill call in the turn: only on a
+            // turn whose messages carry one already (the model copies it
+            // from there), so no other turn waits ([`begun_lines`]).
+            let begun_gate = !quoted
+                && !reminder
+                && !turn_called
+                    .iter()
+                    .any(|(name, _)| name == crate::made_skill::MAKE)
+                && messages.iter().any(|message| {
+                    message.words().is_some_and(|words| {
+                        crate::make_skill_agent::says_begun(words, &begun_lines)
+                    })
+                });
+            // A reply's opening held too while it may begin with the make's
+            // opening ([`crate::make_skill_agent::MAKE_OPENING`], in any of
+            // the lamp's languages) with no make_skill call in the turn
+            // (lamp-9adf, 18 Nov, #7554: after three makes, three new make
+            // asks were answered "I'll make it now. Done — … is on the
+            // lamp" with no call, nothing made). On every turn offered
+            // functions, the opening being kept out of the history; only a
+            // reply whose first words are the opening's waits, and it is
+            // let go as soon as the round names a make_skill call.
+            // The opening in the model's own words too ("I'll make that
+            // now.", #7554's ROW at 2e864a0, request 94:
+            // [`crate::make_skill_agent::opens_with_make_line`]).
+            let opening_gate = !quoted
+                && !reminder
+                && !turn_called
+                    .iter()
+                    .any(|(name, _)| name == crate::made_skill::MAKE);
+            // A reply's opening held too while it may ask the lamp's clash
+            // choice with no make_skill call in the turn (#7554's ROW at
+            // 2e864a0, request 94: a clash told for a skill never made):
+            // only on a turn just after a clash ended, none waiting (the
+            // history still carries its question, and the model copies it),
+            // so no other turn waits: not while one waits, whose question
+            // the lamp may ask again, nor once it is past (App Only's P1 and
+            // P2 on #7554; [`crate::make_skill_agent::clash_claimed`]).
+            let clash_gate = opening_gate && crate::made_clash::lately_ended(Instant::now());
+            // Whether a clash waits, read again as a held reply is judged.
+            let clash_waits = || crate::made_clash::waits(Instant::now());
             let mut action_held =
-                (shared.action_claims && !quoted && asked != Asker::Reminder).then(String::new);
+                ((shared.action_claims || begun_gate || opening_gate || clash_gate)
+                    && !quoted
+                    && !reminder)
+                    .then(String::new);
+            // The round named a make_skill call as it streamed (the reader
+            // El's HOLD on #7554: on lamp-9adf a make asked right after
+            // another called it, yet its opening was held to the round's
+            // end, first audio at 8539 ms against 1.6-2.1 s): the lamp's
+            // own make line stands, so nothing is held for it from then.
+            let mut begun_made = false;
+            // The lamp's own make opening said for a bare make_skill call
+            // in this round ([`crate::make_skill_agent::MAKE_OPENING`]).
+            let mut make_opened = false;
+            // The stream named a make_skill call's first argument in this
+            // round: its decision on the opening stands.
+            let mut make_argued = false;
             // A reply's opening on a line about the person, held until it is
             // known whether it says it doesn't know; one that does is
             // searched for at once, and with the person's kept things found
@@ -17507,11 +20363,42 @@ async fn answer(
                             && round == 1
                             && let Some((status, word)) = refusal
                         {
-                            let limited = shared
-                                .down
-                                .as_ref()
-                                .and_then(|down| down.refused(status, word.is_some()));
+                            let limited = shared.down.as_ref().and_then(|down| {
+                                // A spent day read on the relay's answers
+                                // (`LAMP_VOICE_DAY_SHED`, #7664) is its word
+                                // too: the limit at the first 429.
+                                let spent = crate::day_shed::worker_level()
+                                    == crate::day_shed::Level::Spent;
+                                down.refused(status, word.is_some() || spent)
+                            });
                             if let Some(lasted) = limited {
+                                // `LAMP_LIMIT_LOCAL_ASKS`: a plain light or
+                                // volume ask is done with no model instead,
+                                // only on the service's own usage-limit
+                                // word, not 429s that last (#7642).
+                                if limit_local
+                                    && word.is_some()
+                                    && limit_addressed
+                                    && limit_local_ask(
+                                        shared,
+                                        request,
+                                        &heard_words,
+                                        scope.as_ref(),
+                                    )
+                                    .await?
+                                {
+                                    return Err(Stop::Failed(fault(&error)));
+                                }
+                                // And a due timer or reminder is rung, on the
+                                // same usage-limit word only: plain 429s that
+                                // last fail the turn as before, for the item
+                                // to be offered again (#7642).
+                                if let Some(timer) = limit_ring_timer
+                                    && word.is_some()
+                                    && limit_ring(shared, request, timer).await?
+                                {
+                                    return Ok(());
+                                }
                                 say_limit(shared, (request, heard, named), lasted, word.flatten())
                                     .await?;
                             } else if passing(status) {
@@ -17536,7 +20423,130 @@ async fn answer(
                         began.elapsed().as_millis()
                     );
                 }
+                // A make_skill call named while the round streams: an opening
+                // held for the lamp's own make line is let go at once, before
+                // the round ends or the make answers; with the action claims
+                // it is judged with that call as the turn's.
+                let make_named = match &event {
+                    ChatEvent::Calling(name) => name == crate::made_skill::MAKE,
+                    ChatEvent::ToolCalls(asked) if !words_round => asked
+                        .iter()
+                        .any(|call| call.name == crate::made_skill::MAKE),
+                    _ => false,
+                };
+                if make_named
+                    && (begun_gate || opening_gate)
+                    && !std::mem::replace(&mut begun_made, true)
+                {
+                    let mut called = turn_called.clone();
+                    called.push((crate::made_skill::MAKE.to_owned(), Value::Null));
+                    if let Some(held) = action_held.take_if(|held| {
+                        !held.is_empty()
+                            && claim_lets_go(
+                                shared.action_claims,
+                                held,
+                                (worded_turn, forget_turn, doing_turn),
+                                read_asked,
+                                &called,
+                                &call_statuses,
+                                (&made_names, made_asked, shared.nudge_claims),
+                            )
+                    }) {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: a make_skill call named as it streams: its held opening said, {} ms in",
+                            began.elapsed().as_millis()
+                        );
+                        if held.chars().any(char::is_alphanumeric)
+                            && !crate::not_speech::names_a_function(&text)
+                        {
+                            queue.announce().await?;
+                        }
+                        for sentence in split.push(&held) {
+                            if let Some(sentence) = said_quietly(
+                                &mut live,
+                                &mut quiet,
+                                &mut offer_hold,
+                                sentence,
+                                remember_ran,
+                                request,
+                            ) {
+                                queue.push(sentence).await?;
+                            }
+                        }
+                    }
+                }
+                // Round 1 names a make_skill call for a new skill with no
+                // words before it and nothing said yet (lamp-9adf, 18 Nov,
+                // #7554: a bare call's first audio at 8104 ms, after the
+                // make and round 2): the lamp says the make's own opening
+                // at once, once, from its clip rendered ahead. Words the
+                // model gave are said as they came instead. A new make is
+                // a call whose arguments name its `request`; a remove, a
+                // run, a list or a yes gives its own argument alone and is
+                // said nothing first. Both paths read that one rule, and
+                // neither weighs what else the call carries: the stream
+                // must decide before the rest of the arguments come, so
+                // it reads the first argument's name
+                // ([`ChatEvent::Argued`]); with no stream event for the
+                // round's make_skill calls their whole calls are read, for
+                // a `request` among the arguments (parsed, they keep no
+                // order). Once the stream named a make_skill argument,
+                // its decision stands and the whole calls are not read
+                // again for it, but a `given_name` first (#7911), which
+                // the schema's sorted keys stream first in any call that
+                // carries it: it decides nothing, and the whole calls do.
+                let new_make = match &event {
+                    ChatEvent::Argued(name, first) if name == crate::made_skill::MAKE => {
+                        match crate::make_skill_local::new_make_argument(first) {
+                            Some(new) => {
+                                make_argued = true;
+                                new
+                            }
+                            // `given_name` first decides nothing: the
+                            // whole calls do, by their `request`.
+                            None => false,
+                        }
+                    }
+                    ChatEvent::ToolCalls(asked) if !words_round && !make_argued => {
+                        asked.iter().any(|call| {
+                            call.name == crate::made_skill::MAKE
+                                && crate::make_skill_local::asks_a_new_make(&call.args)
+                        })
+                    }
+                    _ => false,
+                };
+                // The round asked again for a reply that said a make line
+                // with no call is the turn's first words too: the same.
+                // Not while another make is under way or waits
+                // (`LAMP_MAKE_QUEUE`, #7679; never with it off): this one
+                // waits its turn, and its one line is "I'll make it next",
+                // never "I'll make it now" before it. One lock, no I/O.
+                if new_make
+                    && (round == 1 || begun_again_at.is_some())
+                    && !queue.started
+                    && !text.chars().any(char::is_alphanumeric)
+                    && !crate::make_queue::busy()
+                    && !std::mem::replace(&mut make_opened, true)
+                {
+                    let english = crate::make_skill_agent::MAKE_OPENING;
+                    let line = shared.fixed(english);
+                    let clip = shared.fixed_clips.kept(english);
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: a make_skill call named with no words before it: the lamp's opening said, {} ms in{}",
+                        began.elapsed().as_millis(),
+                        if clip.is_some() {
+                            ", from its clip rendered ahead"
+                        } else {
+                            ""
+                        }
+                    );
+                    match clip {
+                        Some(clip) => queue.push_clip(line, clip).await?,
+                        None => queue.push(line.to_owned()).await?,
+                    }
+                }
                 match event {
+                    ChatEvent::Calling(_) | ChatEvent::Argued(..) => {}
                     ChatEvent::Text(piece) => {
                         let piece = match silent_after.as_mut() {
                             Some(silent) => silent.piece(piece),
@@ -17622,15 +20632,18 @@ async fn answer(
                             None => piece,
                             Some(held) => {
                                 held.push_str(&piece);
-                                match crate::remember::claims_a_keep_said(
-                                    held,
-                                    false,
-                                    shared.face_claims,
+                                match claim_released(
+                                    &mut claim_held,
                                     yes_line,
+                                    &recall_found,
+                                    yes_answers.as_deref(),
+                                    shared.face_claims,
+                                    keep_whole_turn && !remember_ran,
+                                    &mut held_whole,
                                 ) {
-                                    Some(false) => claim_held.take().unwrap_or_default(),
+                                    Some(said) => said,
                                     // Undecided, or a claim: held.
-                                    _ => continue,
+                                    None => continue,
                                 }
                             }
                         };
@@ -17638,30 +20651,53 @@ async fn answer(
                             None => piece,
                             Some(held) => {
                                 held.push_str(&piece);
-                                match crate::action_claim::claim_on(
-                                    held,
-                                    false,
-                                    worded_turn,
-                                    forget_turn,
-                                    doing_turn,
-                                ) {
-                                    Some(None) => action_held.take().unwrap_or_default(),
-                                    Some(Some(kind))
-                                        if crate::action_claim::stands_on(
-                                            kind,
-                                            held,
-                                            read_asked,
-                                            turn_called
-                                                .iter()
-                                                .map(|(name, args)| (name.as_str(), args)),
-                                            &call_statuses,
-                                        ) =>
-                                    {
-                                        action_held.take().unwrap_or_default()
-                                    }
-                                    // Undecided, or a claim with no call yet.
-                                    _ => continue,
+                                // The lamp's own make line, or not known yet:
+                                // held until the round shows a make_skill
+                                // call, else to its end.
+                                if begun_gate
+                                    && !begun_made
+                                    && crate::make_skill_agent::opens_begun(
+                                        held,
+                                        false,
+                                        &begun_lines,
+                                    ) != Some(false)
+                                {
+                                    continue;
                                 }
+                                // The make's opening at its start, or not
+                                // known yet: held the same way.
+                                if opening_gate
+                                    && !begun_made
+                                    && crate::make_skill_agent::opens_with_make_line(held, false)
+                                        != Some(false)
+                                {
+                                    continue;
+                                }
+                                // The lamp's clash choice, or not known yet:
+                                // held the same way.
+                                if clash_gate
+                                    && !begun_made
+                                    && crate::make_skill_agent::clash_claimed(
+                                        held,
+                                        false,
+                                        clash_waits,
+                                    ) != Some(false)
+                                {
+                                    continue;
+                                }
+                                // Undecided, or a claim with no call yet: held.
+                                if !claim_lets_go(
+                                    shared.action_claims,
+                                    held,
+                                    (worded_turn, forget_turn, doing_turn),
+                                    read_asked,
+                                    &turn_called,
+                                    &call_statuses,
+                                    (&made_names, made_asked, shared.nudge_claims),
+                                ) {
+                                    continue;
+                                }
+                                action_held.take().unwrap_or_default()
                             }
                         };
                         // The model has chosen to speak: the announcement
@@ -17680,19 +20716,39 @@ async fn answer(
                         // So does a step word in the walk (#5890): its ask
                         // is read whole before it is said or dropped.
                         // Nor while a made skill not on is guarded (#7270):
-                        // its claim is judged whole.
+                        // its claim is judged whole. Nor on a line asking a
+                        // live fact before a lookup found one
+                        // (`LAMP_LIVE_FACT_CHECKED`): its figure is judged
+                        // whole; any other line is cut as with it off.
                         if sentences.is_empty()
                             && !queue.started
                             && queue.made_not_on.is_none()
+                            && !live.holds_back()
                             && !crate::remember::may_offer_a_keep(split.pending())
                             && !crate::onboarding::may_open_a_step(split.pending())
                         {
-                            sentences.extend(split.clause().or_else(|| {
-                                shared.first_words.and_then(|words| split.words(words))
+                            // While live figures are judged, a first piece
+                            // is cut before its first number, never with it
+                            // (the 06c1 S1 leg on #8224).
+                            let number = crate::live_fact::is_number;
+                            let clause = if live.watching() {
+                                split.clause_unless(number)
+                            } else {
+                                split.clause()
+                            };
+                            sentences.extend(clause.or_else(|| {
+                                shared.first_words.and_then(|words| {
+                                    if live.watching() {
+                                        split.words_before(words, number)
+                                    } else {
+                                        split.words(words)
+                                    }
+                                })
                             }));
                         }
                         for sentence in sentences {
                             if let Some(sentence) = said_quietly(
+                                &mut live,
                                 &mut quiet,
                                 &mut offer_hold,
                                 sentence,
@@ -17714,12 +20770,25 @@ async fn answer(
                         calls = asked;
                     }
                     ChatEvent::Reasoning(details) => reasoning = Some(details),
-                    ChatEvent::Searched => eprintln!(
-                        "lamp-voice second: request {request} chat round {round} searched the web in {} ms",
-                        began.elapsed().as_millis()
-                    ),
+                    ChatEvent::Searched => {
+                        live.searched();
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round} searched the web in {} ms",
+                            began.elapsed().as_millis()
+                        )
+                    }
                     ChatEvent::Done => break,
                 }
+            }
+            // Held only for the make's opening, and nothing of it came while
+            // the round streamed (all of it held elsewhere to the round's
+            // end): its end goes as without that hold.
+            if opening_gate
+                && !shared.action_claims
+                && !begun_gate
+                && action_held.as_deref() == Some("")
+            {
+                action_held = None;
             }
             if refused {
                 // What the refused round wrote is not said.
@@ -17738,6 +20807,26 @@ async fn answer(
                     crate::dont_know::NOTE
                 )));
                 continue;
+            }
+            // A reply with no call after a turn offered the person's own
+            // skills to choose from (`LAMP_MADE_SKILL_OFF_SAID`, #7562's row
+            // on lamp-9adf, 18 Nov 10:57: "Bitcoin price is already off"
+            // while it was on): not said, asked once more with them. With a
+            // call, or once asked, its words are said as they came.
+            if let Some(held) = queue.choice_held.take() {
+                if calls.is_empty()
+                    && let Some(note) = turn_unchosen.take()
+                {
+                    turn_unchosen_asked = true;
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: its reply made no call after a turn offered their skills to choose from: not said, asked once more (LAMP_MADE_SKILL_OFF_SAID)"
+                    );
+                    messages.push(Message::system(note));
+                    continue;
+                }
+                for piece in held {
+                    queue.push(piece).await?;
+                }
             }
             // A partial marker has not reached the other opening filters
             // yet. Give it to their normal end-of-round path too.
@@ -17779,6 +20868,7 @@ async fn answer(
                         (None, None, None) => {
                             for sentence in split.push(&held_for_a_claim(&mut action_held, held)) {
                                 if let Some(sentence) = said_quietly(
+                                    &mut live,
                                     &mut quiet,
                                     &mut offer_hold,
                                     sentence,
@@ -17867,6 +20957,7 @@ async fn answer(
                     (None, None) => {
                         for sentence in split.push(&held_for_a_claim(&mut action_held, held)) {
                             if let Some(sentence) = said_quietly(
+                                &mut live,
                                 &mut quiet,
                                 &mut offer_hold,
                                 sentence,
@@ -17975,6 +21066,7 @@ async fn answer(
                         if decline_held.is_none()
                             && let Some(rest) = split.finish()
                             && let Some(rest) = said_quietly(
+                                &mut live,
                                 &mut quiet,
                                 &mut offer_hold,
                                 rest,
@@ -18092,16 +21184,17 @@ async fn answer(
                         None => held,
                         Some(claim) => {
                             claim.push_str(&held);
-                            match crate::remember::claims_a_keep_said(
-                                claim,
-                                false,
-                                shared.face_claims,
+                            // Undecided, or a claim: judged below.
+                            claim_released(
+                                &mut claim_held,
                                 yes_line,
-                            ) {
-                                Some(false) => claim_held.take().unwrap_or_default(),
-                                // Undecided, or a claim: judged below.
-                                _ => String::new(),
-                            }
+                                &recall_found,
+                                yes_answers.as_deref(),
+                                shared.face_claims,
+                                keep_whole_turn && !remember_ran,
+                                &mut held_whole,
+                            )
+                            .unwrap_or_default()
                         }
                     };
                     let piece = held_for_a_claim(&mut action_held, piece);
@@ -18112,6 +21205,7 @@ async fn answer(
                     }
                     for sentence in split.push(&piece) {
                         if let Some(sentence) = said_quietly(
+                            &mut live,
                             &mut quiet,
                             &mut offer_hold,
                             sentence,
@@ -18151,16 +21245,17 @@ async fn answer(
                             None => held,
                             Some(claim) => {
                                 claim.push_str(&held);
-                                match crate::remember::claims_a_keep_said(
-                                    claim,
-                                    false,
-                                    shared.face_claims,
+                                // Undecided, or a claim: judged below.
+                                claim_released(
+                                    &mut claim_held,
                                     yes_line,
-                                ) {
-                                    Some(false) => claim_held.take().unwrap_or_default(),
-                                    // Undecided, or a claim: judged below.
-                                    _ => String::new(),
-                                }
+                                    &recall_found,
+                                    yes_answers.as_deref(),
+                                    shared.face_claims,
+                                    keep_whole_turn && !remember_ran,
+                                    &mut held_whole,
+                                )
+                                .unwrap_or_default()
                             }
                         };
                         let piece = held_for_a_claim(&mut action_held, piece);
@@ -18170,7 +21265,10 @@ async fn answer(
                             queue.announce().await?;
                         }
                         for sentence in split.push(&piece) {
-                            if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                            if let Some(sentence) = live.pass(sentence)
+                                && let Some(sentence) = offer_hold.say(sentence, remember_ran)
+                            {
+                                live.said(&sentence);
                                 queue.push(sentence).await?;
                             }
                         }
@@ -18185,8 +21283,98 @@ async fn answer(
             // lead's P2 on #3628). Alone, the model is told once and asked
             // again; a second such reply, or one in the last round, is said
             // as the plain line that it was not kept.
-            if let Some(held) = claim_held.take().filter(|held| !held.is_empty()) {
-                let claim = crate::remember::keep_claim_said(&held, shared.face_claims, yes_line);
+            if held_whole {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: a sentence of its reply says a keep or replace, held to the round's end (LAMP_KEEP_CLAIM_WHOLE)"
+                );
+            }
+            if let Some(mut held) = claim_held.take().filter(|held| !held.is_empty()) {
+                // Sentences whose said-back keeps name a found thing are
+                // said; what follows them is judged here on its own, never
+                // under their found thing (Second's P2 at c60b1a7b21 on
+                // #5701), as `claim_released` does while the reply streams.
+                if let Some(end) = yes_line
+                    .then(|| {
+                        crate::remember::said_kept_found_to(
+                            &held,
+                            &recall_found,
+                            yes_answers.as_deref(),
+                            true,
+                        )
+                    })
+                    .flatten()
+                    .filter(|end| {
+                        *end < held.len()
+                            && crate::remember::claims_a_keep_said(
+                                &held[..*end],
+                                true,
+                                shared.face_claims,
+                                false,
+                            ) == Some(false)
+                    })
+                {
+                    let rest = held.split_off(end);
+                    for sentence in split.push(&held_for_a_claim(&mut action_held, held)) {
+                        if let Some(sentence) = said_quietly(
+                            &mut live,
+                            &mut quiet,
+                            &mut offer_hold,
+                            sentence,
+                            remember_ran,
+                            request,
+                        ) {
+                            queue.push(sentence).await?;
+                        }
+                    }
+                    held = rest;
+                }
+                // A preference said saved beside a light's, volume's or
+                // rule's call of this round is that call's ("Done, your
+                // light preference is saved."), never a said-back keep
+                // (Thirteen's P3 on #5701).
+                let settings_saved = crate::remember::said_saved_preference(&held)
+                    && calls.iter().any(|call| {
+                        crate::tools::is_light_or_volume(&call.name)
+                            || call.name == crate::rules::KEEP_RULE
+                    });
+                let claim = crate::remember::keep_claim_said(
+                    &held,
+                    shared.face_claims,
+                    yes_line
+                        && !settings_saved
+                        && !crate::remember::said_kept_found(
+                            &held,
+                            &recall_found,
+                            yes_answers.as_deref(),
+                            true,
+                        ),
+                )
+                .or_else(|| {
+                    // Sentence by sentence (`LAMP_KEEP_CLAIM_WHOLE`, #7878):
+                    // a sentence held for a keep or replace said done, as a
+                    // hard claim ("Got it — your car is on Level B1, spot 7
+                    // now. That replaces wherever it was before."). A keep
+                    // in memory's own words ("I'll remember you're
+                    // vegetarian.") counts beside any call; a replace or
+                    // update only with no call at all, since beside a
+                    // light's or a reminder's it is that call's ("Done, I've
+                    // updated your light."; the Reviewer-lead's P2 and V2's
+                    // must-fix (3) on #7924).
+                    (keep_whole_turn
+                        && held_whole
+                        && !remember_ran
+                        && match crate::remember::change_claim(&held) {
+                            Some(crate::remember::Change::Keep) => true,
+                            Some(crate::remember::Change::Replace) => calls.is_empty(),
+                            None => false,
+                        })
+                    .then(|| {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: a held sentence of its reply says something was kept or replaced, with no remember (LAMP_KEEP_CLAIM_WHOLE)"
+                        );
+                        crate::remember::KeepClaim::Hard
+                    })
+                });
                 // A face said saved (`LAMP_MEMORY_KEEP_ASKED`, #5141 row 8:
                 // lamp-0c4e, 3 Nov, "hold still while I take your face in"
                 // with no call) is kept by `remember_my_face`: one in this
@@ -18223,6 +21411,44 @@ async fn answer(
                     None => false,
                 };
                 if claimed && !remembers {
+                    // A found keep's sentences said before this claim
+                    // ("Yes, Pip is kept.") go out now, whatever becomes of
+                    // the claim after them (Second's P2 at c60b1a7b21).
+                    if let Some(rest) = split.finish()
+                        && let Some(rest) = said_quietly(
+                            &mut live,
+                            &mut quiet,
+                            &mut offer_hold,
+                            rest,
+                            remember_ran,
+                            request,
+                        )
+                    {
+                        queue.push(rest).await?;
+                    }
+                    // A `remember` of this turn refused as nobody known: the
+                    // refusal's own line is said now, with no round asked to
+                    // call a `remember` that would be refused again
+                    // (`LAMP_KEEP_CLAIM_WHOLE`, V2's must-fix (4) and
+                    // Friday's P2-2 on #7924). Only on a real refusal: with
+                    // nobody known a room fact is still kept, so that case
+                    // keeps its one retry (Friday's P2 at 3410d5b787).
+                    if !face && keep_whole_turn && keep_refused && !keep_held {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: its reply says it kept something, nobody known: the refusal's line said (LAMP_KEEP_CLAIM_WHOLE)"
+                        );
+                        for sentence in offered(&mut offer_hold, false, request, round) {
+                            queue.push(sentence).await?;
+                        }
+                        queue
+                            .push(
+                                shared
+                                    .fixed(crate::remember::needs_face::REFUSED_LINE)
+                                    .to_owned(),
+                            )
+                            .await?;
+                        return Ok(());
+                    }
                     if !calls.is_empty() {
                         eprintln!(
                             "lamp-voice second: request {request} chat round {round}: its reply says it kept something, with no {keeper} call: not said, its other calls run"
@@ -18246,12 +21472,25 @@ async fn answer(
                         for sentence in offered(&mut offer_hold, false, request, round) {
                             queue.push(sentence).await?;
                         }
-                        queue.push(not_kept.to_owned()).await?;
+                        // The second miss with nobody known: the refusal's
+                        // own line, never "Tell me again and I'll remember
+                        // it." (the first builder's 12:54 ruling).
+                        let line = if !face
+                            && keep_whole_turn
+                            && !keep_held
+                            && (keep_refused || keep_nobody_known)
+                        {
+                            shared.fixed(crate::remember::needs_face::REFUSED_LINE)
+                        } else {
+                            not_kept
+                        };
+                        queue.push(line.to_owned()).await?;
                         return Ok(());
                     }
                 } else {
                     for sentence in split.push(&held_for_a_claim(&mut action_held, held)) {
                         if let Some(sentence) = said_quietly(
+                            &mut live,
                             &mut quiet,
                             &mut offer_hold,
                             sentence,
@@ -18260,6 +21499,85 @@ async fn answer(
                         ) {
                             queue.push(sentence).await?;
                         }
+                    }
+                }
+            }
+            // A reply that said one of the lamp's own make lines with no
+            // make_skill call in the turn (lamp-9adf, 18 Nov: copied from the
+            // history, nothing made): not said, and asked again once with
+            // make_skill offered, never forced: the model judges whether the
+            // person's line asks for a skill (El's guard on #7554). Beside
+            // other calls those run and the next round is so asked. The line
+            // said again, or in the last round, is said as the plain line
+            // that it wasn't done; the round asked again that calls nothing
+            // and says no such line is said as it came.
+            // So does a reply that begins with the make's opening, in any
+            // of the lamp's languages, with no make_skill call in the turn
+            // (#7554: "I'll make it now. Done — … is on the lamp" with none).
+            let begun_said = !calls
+                .iter()
+                .any(|call| call.name == crate::made_skill::MAKE)
+                && action_held.as_deref().is_some_and(|held| {
+                    (begun_gate
+                        && crate::make_skill_agent::opens_begun(held, true, &begun_lines)
+                            == Some(true))
+                        || (opening_gate
+                            && crate::make_skill_agent::opens_with_make_line(held, true)
+                                == Some(true))
+                        || (clash_gate
+                            && crate::make_skill_agent::clash_claimed(held, true, clash_waits)
+                                == Some(true))
+                });
+            // The round asked again, ended: what it cost the reply.
+            if let Some(at) = begun_again_at.take() {
+                let ended = if calls
+                    .iter()
+                    .any(|call| call.name == crate::made_skill::MAKE)
+                {
+                    "it called make_skill"
+                } else if begun_said {
+                    "it said the line again"
+                } else {
+                    "it answered in its own words"
+                };
+                eprintln!(
+                    "lamp-voice second: request {request}: the waiting line with no make call was not said; asked again with make_skill: {} ms, {ended}",
+                    at.elapsed().as_millis()
+                );
+            }
+            if begun_said {
+                action_held = None;
+                text.clear();
+                if round < MAX_ROUNDS && !std::mem::replace(&mut begun_asked, true) {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: its reply said the lamp's own make line with no make_skill call: not said, asked again with make_skill offered, {} other call(s) run first",
+                        calls.len()
+                    );
+                    if calls.is_empty() {
+                        messages.push(Message::system(crate::make_skill_agent::BEGUN_AGAIN_NOTE));
+                        begun_again_at = Some(Instant::now());
+                        continue;
+                    }
+                    begun_note = true;
+                } else {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: its reply said the lamp's own make line again with no make_skill call: said it wasn't done"
+                    );
+                    for sentence in offered(&mut offer_hold, false, request, round) {
+                        queue.push(sentence).await?;
+                    }
+                    return queue
+                        .push(shared.fixed(crate::action_claim::NOT_DONE_LINE).to_owned())
+                        .await;
+                }
+            }
+            // Without the action claims, only the make line held it: said.
+            if !shared.action_claims
+                && let Some(held) = action_held.take().filter(|held| !held.is_empty())
+            {
+                for sentence in split.push(&held) {
+                    if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                        queue.push(sentence).await?;
                     }
                 }
             }
@@ -18279,21 +21597,22 @@ async fn answer(
                         .map(|(name, args)| (name.as_str(), args))
                         .chain(calls.iter().map(|call| (call.name.as_str(), &call.args)))
                 };
-                let unmade = crate::action_claim::claim_on(
+                let unmade = crate::action_claim::claim_checked_on(
                     &held,
                     true,
-                    worded_turn,
-                    forget_turn,
-                    doing_turn,
+                    (worded_turn, forget_turn, doing_turn),
+                    (&made_names, made_asked),
+                    shared.nudge_claims,
                 )
                 .flatten()
                 .filter(|kind| {
-                    !crate::action_claim::stands_on(
+                    !crate::action_claim::stands_made_on(
                         *kind,
                         &held,
                         read_asked,
                         called(),
                         &call_statuses,
+                        &made_names,
                     )
                 });
                 // An unplug's act said (#6457): while the skill's turn-off
@@ -18317,8 +21636,49 @@ async fn answer(
                     && calls.iter().any(|call| {
                         crate::action_claim::unplug_tool(&call.name, &call.args).is_some()
                     });
+                // A wellbeing nudge said stopped in the round that calls
+                // `wellbeing_nudges` (to stop, snooze or turn off, never
+                // `how: "on"`): the words ran ahead of the call, so they are
+                // not said and no note is told; the next round speaks from
+                // its answer, as an unplug's and a forget's (Twelve's P1 on
+                // #7917).
+                let nudge_calling = unmade == Some(crate::action_claim::Claim::NudgeOff)
+                    && calls.iter().any(|call| {
+                        crate::action_claim::nudge_tool(&call.name, &call.args).is_some()
+                            && call.args["how"] != "on"
+                    });
                 // A forget said done is told its own note (C88).
                 let forget_said = unmade == Some(crate::action_claim::Claim::Forgot);
+                // So is a made skill's change said done (#7683).
+                let skill_said = matches!(
+                    unmade,
+                    Some(
+                        crate::action_claim::Claim::SkillRemoved
+                            | crate::action_claim::Claim::SkillOff
+                            | crate::action_claim::Claim::SkillOn
+                    )
+                );
+                // Said in the round of its own `make_skill` (the forced yes
+                // round's "Done, planet fact is removed." beside its
+                // `approve_id`), the words ran ahead of the call: not said,
+                // and no note, so the next round speaks from its answer, as
+                // a forget's (Twelve's and the Reviewer-lead's P2 on #7730).
+                // Only a call that can change a made skill: a yes, a turn or
+                // a clash's choice; a list or a remove that only asks its
+                // question changes nothing, so words beside it get the note
+                // (Twelve's P3 at c881d48f19).
+                let skill_calling = skill_said
+                    && calls.iter().any(|call| {
+                        call.name == crate::made_skill::MAKE
+                            && [
+                                crate::skill_write_yes::APPROVE_ID,
+                                crate::made_turn::TURN_OFF,
+                                crate::made_turn::TURN_ON,
+                                crate::made_clash::CLASH_ID,
+                            ]
+                            .iter()
+                            .any(|field| call.args[*field].is_string())
+                    });
                 // Said in the round that calls a forget, the words ran ahead
                 // of it: not said, and no note, so the next round speaks from
                 // its answer (Thirteen's P2-2 on #5942).
@@ -18331,6 +21691,7 @@ async fn answer(
                 // first builder's ruling on #5215): its note says so, never
                 // that nothing ran.
                 let limited = !forget_said
+                    && !skill_said
                     && unmade.is_some_and(|kind| {
                         kind == crate::action_claim::Claim::LightKept
                             || crate::action_claim::worded_limit(&held).is_some()
@@ -18339,6 +21700,8 @@ async fn answer(
                 // Whether only the worded claims found it: the journal says so.
                 let worded = if limited {
                     ", in other words: LAMP_ACTION_CLAIM_WORDED, a said limit no call carried"
+                } else if skill_said {
+                    ", a made skill's change in the lamp's own result words"
                 } else if doing_turn
                     && !forget_said
                     && crate::action_claim::claim_as(&held, true, worded_turn)
@@ -18357,7 +21720,10 @@ async fn answer(
                 match unmade {
                     None => {
                         for sentence in split.push(&held) {
-                            if let Some(sentence) = offer_hold.say(sentence, remember_ran) {
+                            if let Some(sentence) = live.pass(sentence)
+                                && let Some(sentence) = offer_hold.say(sentence, remember_ran)
+                            {
+                                live.said(&sentence);
                                 queue.push(sentence).await?;
                             }
                         }
@@ -18382,6 +21748,20 @@ async fn answer(
                         );
                         text.clear();
                     }
+                    Some(_) if skill_calling => {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: its reply says a made skill's change before its make_skill ran: not said, its {} call(s) run, no note (LAMP_SKILL_CLAIM_CHECKED)",
+                            calls.len()
+                        );
+                        text.clear();
+                    }
+                    Some(_) if nudge_calling => {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: its reply says a wellbeing nudge stopped before its wellbeing_nudges ran: not said, its {} call(s) run, no note (LAMP_NUDGE_CLAIM_CHECKED)",
+                            calls.len()
+                        );
+                        text.clear();
+                    }
                     Some(_) if forget_calling => {
                         eprintln!(
                             "lamp-voice second: request {request} chat round {round}: its reply says a forget done before its forget ran: not said, its {} call(s) run, no note (LAMP_ACTION_CLAIM_CHECKED)",
@@ -18398,6 +21778,8 @@ async fn answer(
                         action_claim_asked = true;
                         action_claim_note = Some(if forget_said {
                             crate::action_claim::FORGET_NOTE.to_owned()
+                        } else if skill_said {
+                            crate::action_claim::SKILL_NOTE.to_owned()
                         } else if limited {
                             crate::action_claim::LIMIT_NOTE.to_owned()
                         } else {
@@ -18416,6 +21798,8 @@ async fn answer(
                         );
                         messages.push(Message::system(if forget_said {
                             crate::action_claim::FORGET_NOTE
+                        } else if skill_said {
+                            crate::action_claim::SKILL_NOTE
                         } else if limited {
                             crate::action_claim::LIMIT_NOTE
                         } else {
@@ -18483,6 +21867,13 @@ async fn answer(
             if !calls.is_empty() {
                 called.store(true, Ordering::Relaxed);
             }
+            // A round that calls anything but a wait's answer: no made
+            // skill's remove is confirmed in this request (#6960), told
+            // before any of its calls runs.
+            crate::skill_write_yes::round_called(
+                request,
+                calls.iter().map(|call| (call.name.as_str(), &call.args)),
+            );
             // The photo face's answer called: no yes is held for it after.
             if calls
                 .iter()
@@ -18508,6 +21899,7 @@ async fn answer(
             // Or asks whether a kept word was another: "is that
             // ranunculus?" after "renunctinus" was kept (lamp-06c1, 10 Nov),
             // whose yes keeps the word asked.
+            let mut taken_back_unsaid = false;
             if let Some(kept) = just_kept.take().filter(|kept| kept.round + 1 == round)
                 && let offered = crate::remember::doubted::offered_word(
                     &text,
@@ -18523,9 +21915,20 @@ async fn answer(
                     scope.as_ref(),
                 )
                 .await?
-                && !calls.is_empty()
             {
-                doubt_note = Some(crate::remember::doubted::UNDONE_NOTE);
+                if !calls.is_empty() {
+                    doubt_note = Some(if shared.unsure_not_kept {
+                        crate::remember::doubted::UNDONE_NO_ASK_NOTE
+                    } else {
+                        crate::remember::doubted::UNDONE_NOTE
+                    });
+                } else if shared.unsure_not_kept {
+                    // Its keep was said back and no round follows: the lamp
+                    // says itself, plainly and asking nothing, that it is
+                    // not kept after all (Twelve's P1 on #7966), after the
+                    // round's own words.
+                    taken_back_unsaid = true;
+                }
             }
             let first_calls = !called_earlier;
             called_earlier |= !calls.is_empty();
@@ -18588,29 +21991,139 @@ async fn answer(
                     .any(|call| call.name == crate::remember::REMEMBER);
             if shared.look_by_call && calls.iter().any(|call| call.name == LOOK_CALL) {
                 if let Some(rest) = split.finish()
-                    && let Some(rest) =
-                        said_quietly(&mut quiet, &mut offer_hold, rest, remember_ran, request)
+                    && let Some(rest) = said_quietly(
+                        &mut live,
+                        &mut quiet,
+                        &mut offer_hold,
+                        rest,
+                        remember_ran,
+                        request,
+                    )
                 {
                     queue.push(rest).await?;
                 }
                 for sentence in offered(&mut offer_hold, remembers, request, round) {
                     queue.push(sentence).await?;
                 }
-                if ask_look(shared, request, heard, (LOOK_CALL, Value::Null), None).await?
-                    && !queue.started
-                {
+                let asked_look =
+                    ask_look(shared, request, heard, (LOOK_CALL, Value::Null), None).await?;
+                // What the model wrote with its look, and the line's words,
+                // for the look turn (`LAMP_LOOK_TOLD`,
+                // `LAMP_LOOK_KEPT_WITH_ASK`).
+                if asked_look {
+                    let args = calls
+                        .iter()
+                        .find(|call| call.name == LOOK_CALL)
+                        .map(|call| crate::look_told::LookArgs::from_args(&call.args))
+                        .unwrap_or_default();
+                    look_asked_by_call(shared, request, scope.as_ref(), args, &heard_words);
+                }
+                if asked_look && !queue.started {
                     queue.push(shared.fixed(LOOKING).to_owned()).await?;
                 }
                 return Ok(());
             }
             if let Some(rest) = split.finish()
-                && let Some(rest) =
-                    said_quietly(&mut quiet, &mut offer_hold, rest, remember_ran, request)
+                && let Some(rest) = said_quietly(
+                    &mut live,
+                    &mut quiet,
+                    &mut offer_hold,
+                    rest,
+                    remember_ran,
+                    request,
+                )
             {
                 queue.push(rest).await?;
             }
             for sentence in offered(&mut offer_hold, remembers, request, round) {
                 queue.push(sentence).await?;
+            }
+            // A keep said back and taken back for doubt, with no round to
+            // follow (`LAMP_MEMORY_UNSURE_NOT_KEPT`): the take-back is the
+            // reply's last line.
+            if taken_back_unsaid {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: the take-back is said after the round's words ({})",
+                    crate::remember::doubted::UNSURE_ENVIRONMENT
+                );
+                queue
+                    .push(
+                        shared
+                            .fixed(crate::remember::doubted::TAKEN_BACK_LINE)
+                            .to_owned(),
+                    )
+                    .await?;
+            }
+            // A live figure said with no lookup answered in the turn
+            // (#7605: lamp-9adf, 18 Nov, "around $4,050 an ounce" to "what
+            // is the gold price today?" with `calls=none`): its sentence and
+            // the rest of its round were not said, nor are they kept as the
+            // lamp's words (`LAMP_LIVE_FACT_CHECKED`).
+            if let Some((lookup, held)) = live.take() {
+                text.clear();
+                let looking_now = calls
+                    .iter()
+                    .any(|call| crate::live_fact::is_lookup(&call.name));
+                if looking_now {
+                    // Said ahead of its lookup: the next round speaks from
+                    // what it finds.
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {held} sentence(s) gave a live figure before its lookup ran: not said, no note (LAMP_LIVE_FACT_CHECKED)"
+                    );
+                } else {
+                    // The lookup the note names, if declared: the weather's
+                    // for the weather, else the search's.
+                    let declared =
+                        |name: &str| shared.services.declares(&messages, &[], name) != Some(false);
+                    let tool = [lookup, crate::live_fact::Lookup::Search]
+                        .into_iter()
+                        .map(crate::live_fact::Lookup::name)
+                        .find(|name| declared(name));
+                    match tool {
+                        Some(tool) if !calls.is_empty() => {
+                            eprintln!(
+                                "lamp-voice second: request {request} chat round {round}: {held} sentence(s) gave a live figure no lookup backs: not said, its {} other call(s) run, the next round must call {tool} (LAMP_LIVE_FACT_CHECKED)",
+                                calls.len()
+                            );
+                            live.asking_again();
+                            live_note = Some(live.note(tool));
+                        }
+                        Some(tool) if round < MAX_ROUNDS && !live.asked_again => {
+                            eprintln!(
+                                "lamp-voice second: request {request} chat round {round}: {held} sentence(s) gave a live figure no lookup backs ({} call(s) in the turn): not said, asked again with {tool} required (LAMP_LIVE_FACT_CHECKED)",
+                                turn_called.len()
+                            );
+                            live.asking_again();
+                            messages.push(Message::system(live.note(tool)));
+                            continue;
+                        }
+                        _ if calls.is_empty() => {
+                            eprintln!(
+                                "lamp-voice second: request {request} chat round {round}: {held} sentence(s) gave a live figure no lookup backs, {}: said it couldn't look it up (LAMP_LIVE_FACT_CHECKED)",
+                                if tool.is_none() {
+                                    "no lookup declared"
+                                } else {
+                                    "after its ask again"
+                                }
+                            );
+                            live.could_not();
+                            // A piece said before the hold is ended first
+                            // ("Silver's around … let me check. Sorry, …").
+                            queue
+                                .push(live.bridge(
+                                    shared.fixed(crate::live_fact::COULD_NOT_LINE).to_owned(),
+                                ))
+                                .await?;
+                            return Ok(());
+                        }
+                        // No lookup declared, beside other calls: those run,
+                        // and their next round is judged the same way.
+                        _ => eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: {held} sentence(s) gave a live figure no lookup backs, none declared: not said, its {} other call(s) run (LAMP_LIVE_FACT_CHECKED)",
+                            calls.len()
+                        ),
+                    }
+                }
             }
             // The round's words held while a made skill is not on (#7270):
             // unsaid beside its yes's call, whose answer the next round
@@ -18709,7 +22222,7 @@ async fn answer(
             }
             // A reminder is only said: its words are data, never an ask
             // (as the Live route's tool gate holds it).
-            if asked == Asker::Reminder {
+            if reminder {
                 eprintln!(
                     "lamp-voice second: request {request} is a reminder: its calls are not run"
                 );
@@ -18748,6 +22261,24 @@ async fn answer(
                 && !crate::not_speech::names_a_function(&text);
             // What each call was told, while every one may be answered short.
             let mut short_told: Vec<Value> = Vec::new();
+            // A line that only asks to keep, round 1's first calls all
+            // `remember`, no words beside them: one whose every keep was
+            // refused with nobody known speaking is said plainly by the lamp
+            // (#7877), with or without `LAMP_KEEP_ANSWERS_AT_ONCE`. Each
+            // condition kept apart, for the journal when one fails.
+            let only_remember = !calls.is_empty()
+                && calls
+                    .iter()
+                    .all(|call| call.name == crate::remember::REMEMBER);
+            let refused_gate = RefusedGate {
+                heard,
+                first_calls,
+                held_forget_ran,
+                worded: text.chars().any(char::is_alphanumeric),
+                only_keeps: crate::keep_at_once::only_keeps_refused(&heard_words),
+            };
+            // What each `remember` was told, when every call is one.
+            let mut refused_told: Vec<Value> = Vec::new();
             // A plain keep answered at once (`LAMP_KEEP_ANSWERS_AT_ONCE`,
             // C59): a spoken line that only asks to keep, round 1's first
             // calls all `remember`, no words beside them. What each was told.
@@ -18820,6 +22351,36 @@ async fn answer(
                 reasoning.take(),
             ));
             let mut forgot_this_round = false;
+            // Their yes to the one-face forget held, as the model judged
+            // it: its `forget` naming nothing else runs the held call
+            // exactly, by its kept id and words, never the raw call; one
+            // naming another thing is that other forget, and the held one
+            // is kept ([`Taken::Agrees`]).
+            if let Some(held) = held_forget_agreed.take() {
+                agree_held_forget(
+                    request,
+                    round,
+                    &heard_words,
+                    held,
+                    &mut calls,
+                    scope.as_ref(),
+                );
+            }
+            // A held forget dropped on this line (#7478): its note is the
+            // answer to the model's call to that forget, by the same door,
+            // and that call runs nothing; with no such call nothing is told
+            // ([`Taken::OnForget`], the Reviewer-lead's P2 on #7490).
+            let dropped_told = held_forget_dropped.take().and_then(|(held, note)| {
+                told_on_forget(request, round, &heard_words, &held, &calls).map(|id| (id, note))
+            });
+            // A forget the model called, whatever becomes of it below
+            // (held for their yes, asked about once, refused): its
+            // exchange is kept out of the journal and the conversation it
+            // was asked in is observed by no pass, as for one the memory
+            // answers (#8038: decided by the call, never by the words).
+            for call in &calls {
+                crate::remember::forget_called(request, &call.name);
+            }
             // A skill's call answered with `"look": true`, by its name, with
             // its arguments and its note for the picture
             // (`LAMP_SECOND_SKILL_LOOK`).
@@ -18863,9 +22424,43 @@ async fn answer(
             };
             // A held call still ends the turn even if a forget stops the batch.
             let policy_held = policed.contains(&Policed::Held);
+            // An app the model started in this round took the line
+            // (`start_app`, #7415): the round's other calls still run, as
+            // they were asked ("turn the volume down and start the coach",
+            // the Reviewer-lead's must-fix on #8131), and the request ends
+            // as taken once they are answered. `reached` is how many calls
+            // the loop came to, so none is left without a word.
+            let mut app_took = false;
+            let mut reached = 0;
             for (call_index, ((call, held), policed)) in
                 calls.iter().zip(held_by_rule).zip(policed).enumerate()
             {
+                reached = call_index + 1;
+                // A call that can't run once an app holds the turn: another
+                // `start_app` (the line is taken already), a skill made by
+                // voice (its waiting line would speak over the app) and a
+                // sleep (it would end the app's turn). Answered as not run
+                // and journalled, never dropped without a word.
+                if app_took
+                    && (call.name == crate::app_triggers::START_APP
+                        || call.name == crate::made_skill::MAKE
+                        || crate::sleep_asked::is_tool(&call.name))
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: an app took the turn ({})",
+                        call.name,
+                        crate::app_triggers::ENVIRONMENT
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        serde_json::json!({"error": APP_TOOK_THE_TURN}).to_string(),
+                    ));
+                    continue;
+                }
+                if let Some((_, note)) = dropped_told.as_ref().filter(|(id, _)| *id == call.id) {
+                    messages.push(Message::tool(call.id.clone(), note.clone()));
+                    continue;
+                }
                 if held {
                     eprintln!(
                         "lamp-voice second: request {request} asked for {}: held, nothing shows it was said to the lamp",
@@ -18925,6 +22520,7 @@ async fn answer(
                 // lamp-c0a4).
                 if let Some(told) =
                     ask_once_forget(shared, request, heard, &heard_words, call, scope.as_ref())
+                        .await
                 {
                     messages.push(Message::tool(call.id.clone(), told.to_string()));
                     continue;
@@ -18976,7 +22572,18 @@ async fn answer(
                     && heard
                     && !crate::remember::forget_unguarded()
                     && forget_asker(scope.as_ref()).is_some();
+                // Their yes to the one-face forget held, the model's call
+                // already made the held one ([`agree_held_forget`]): it runs.
+                // Not once the held forget ran before round 1 (#8185): the
+                // model's own forget of it then is told it ran, never run
+                // again.
+                let agreed = !held_forget_ran
+                    && call.name == crate::remember::FORGET
+                    && scope
+                        .as_ref()
+                        .is_some_and(|scope| scope.agreed_forget(&call.args));
                 if crate::remember::is_forget(&call.name)
+                    && !agreed
                     && ((!forget_may_run && !asked_just_before) || everything_waits)
                 {
                     let holding = match forget_asker(scope.as_ref()) {
@@ -19092,6 +22699,21 @@ async fn answer(
                     ));
                     continue;
                 }
+                // The skill turned off that the lamp turned on for the ask
+                // and ran (`LAMP_MADE_SKILL_OFF_SAID`): never run twice.
+                if let Some((ran, told)) = &on_ran
+                    && crate::skill_named::same_skill_again(&call.name, &call.args, ran)
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: the lamp turned that skill on for the ask and ran it already",
+                        call.name
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        crate::made_turn::ran_already(told).to_string(),
+                    ));
+                    continue;
+                }
                 // A face save their yes already ran ([`HeldSave`]): never a
                 // second.
                 if let Some(told) = saved_already(shared, request, call) {
@@ -19117,7 +22739,8 @@ async fn answer(
                     continue;
                 }
                 // A keep its own round's words doubt is not run (#3504
-                // finding N5): asked again, kept once they say it.
+                // finding N5): asked again, kept once they say it; with
+                // `LAMP_MEMORY_UNSURE_NOT_KEPT` (#7739) nothing is asked.
                 if doubted_calls[call_index] {
                     eprintln!(
                         "lamp-voice second: request {request} chat round {round}: {}",
@@ -19127,7 +22750,9 @@ async fn answer(
                         call.id.clone(),
                         serde_json::json!({
                             "remembered": false,
-                            "note": crate::remember::doubted::NOT_KEPT
+                            "note": crate::remember::doubted::not_kept_note(
+                                shared.unsure_not_kept
+                            )
                         })
                         .to_string(),
                     ));
@@ -19184,7 +22809,32 @@ async fn answer(
                 // A voice make's waiting line is said in this turn as the
                 // agent begins ([`said_while_made`], #6749).
                 let made_call = call.name == crate::made_skill::MAKE;
+                // `start_app` is refused, nothing sent, for a line let in
+                // only as the conversation going on (another person's or the
+                // TV's words must not start the owner's app, as the fast
+                // path refuses it) and while the lamp waits on an answer (a
+                // yes to a held forget or rename or a task must not start an
+                // app): the same two checks as the fast path's. The model
+                // is told so and answers (Heron on #7996).
+                let app_start_blocked = call.name == crate::app_triggers::START_APP
+                    && (shared
+                        .conversation_alone
+                        .as_ref()
+                        .and_then(|note| note(request))
+                        == Some(worker::CONVERSATION_ALONE)
+                        || lamp_awaits_an_answer(shared, request)
+                        // A care turn (#7689 part 2): no app takes it.
+                        || shared.care.as_ref().is_some_and(|care| care.is_turn(request)));
                 let answering = async {
+                    if app_start_blocked {
+                        eprintln!(
+                            "lamp-voice second: request {request}: start_app refused: the line is not plainly for the lamp, an answer is awaited, or it is a care turn ({})",
+                            crate::app_triggers::ENVIRONMENT
+                        );
+                        return crate::tools::ToolAnswer::plain(serde_json::json!({
+                            "error": "not now: nothing was started"
+                        }));
+                    }
                     match (&shared.requested_audio, spoken) {
                         (Some((worker_boot, runner)), Some(turn)) if turn.captured => {
                             let context = lamp_msgs::RequestedAudioContext {
@@ -19283,9 +22933,195 @@ async fn answer(
                         ),
                     }
                 };
-                let mut answer = said_while_made(&mut queue, request, made_call, answering).await?;
+                let mut answer = said_while_made(&mut queue, request, made_call, answering, || {
+                    crate::tools::ToolAnswer::plain(crate::long_make::let_go_told())
+                })
+                .await?;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
+                }
+                // An app the model started (`start_app`, #7415) took the
+                // line and speaks for itself: the request ends after this
+                // round as the fast path's does, with no further round and
+                // no words; the round's other calls are answered first.
+                if call.name == crate::app_triggers::START_APP && answer.told["started"] == true {
+                    eprintln!(
+                        "lamp-voice second: request {request}: the model started an app, which took the line: the request ends after this round's other calls ({})",
+                        crate::app_triggers::ENVIRONMENT
+                    );
+                    app_took = true;
+                    continue;
+                }
+                // A recording offered once an app holds the turn would play
+                // over the app: not played, and the model told so.
+                if app_took && answer.requested_audio.is_some() {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} offered a recording after an app took the turn; not played ({})",
+                        call.name,
+                        crate::app_triggers::ENVIRONMENT
+                    );
+                    answer = crate::tools::ToolAnswer::plain(serde_json::json!({
+                        "error": APP_TOOK_THE_TURN
+                    }));
+                }
+                // A skill turned off, its function asked for on a heard line
+                // (`LAMP_MADE_SKILL_OFF_SAID`; the first builder, 18:41 on 18
+                // Nov, from the product owner: nothing is asked of the
+                // person, an offer becomes the action and one line with an
+                // undo): the lamp turns it on through `make_skill`'s own
+                // `turn_on`, the owner's alone (a guest's is refused there and
+                // told plainly), and runs it again in this turn. No words of
+                // the line are read: the model's call of the skill is the ask.
+                let mut on_for_ask: Option<String> = None;
+                if crate::made_turn::ran_turned_off(&answer.told)
+                    && !turned_on_now
+                    && heard
+                    && crate::made_skill::off_said_on()
+                {
+                    let (name, args) = crate::made_turn::on_for_ask(&call.name, &call.args);
+                    let on = net::ToolCall {
+                        extra: None,
+                        id: crate::made_turn::ON_FOR_ASK_ID.into(),
+                        name,
+                        args,
+                    };
+                    let on_told = run_tool_in_context(
+                        shared,
+                        request,
+                        heard,
+                        &on,
+                        scope.as_ref(),
+                        context_epoch,
+                    )
+                    .await;
+                    if crate::made_turn::turned(&on.name, &on.args, &on_told)
+                        && on_told["off"] == false
+                    {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: a skill turned off asked for use: turned on for the ask, run again (LAMP_MADE_SKILL_OFF_SAID)"
+                        );
+                        turned_on_now = true;
+                        on_for_ask = Some(crate::made_turn::spoken_of(&call.name, &call.args));
+                    } else {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: a skill turned off asked for use: not turned on, told so (LAMP_MADE_SKILL_OFF_SAID)"
+                        );
+                        answer.told = crate::made_turn::not_turned_on(&on_told);
+                    }
+                }
+                // A skill's function still answered off just after a
+                // `turn_on` turned it on in this turn ("turn on btc price
+                // and run it", or the lamp's own above; lamp-skills reads
+                // its `off` file again within 2 s): run again after a short
+                // wait, at most `RERUNS` times; still off, told it was just
+                // turned on, never that it is off. So for `make_skill`'s run
+                // now of it, refused `made_run::STOPPED` (#7562's request 9).
+                if turned_on_now && crate::made_turn::still_off(&call.name, &answer.told) {
+                    for _ in 0..crate::made_turn::RERUNS {
+                        tokio::time::sleep(crate::made_turn::RERUN_AFTER).await;
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: {} still off just after its turn on: run again (LAMP_MADE_SKILL_OFF_SAID)",
+                            call.name
+                        );
+                        answer.told = run_tool_in_context(
+                            shared,
+                            request,
+                            heard,
+                            call,
+                            scope.as_ref(),
+                            context_epoch,
+                        )
+                        .await;
+                        if !crate::made_turn::still_off(&call.name, &answer.told) {
+                            break;
+                        }
+                    }
+                    if crate::made_turn::still_off(&call.name, &answer.told) {
+                        answer.told = crate::made_turn::just_on();
+                    }
+                }
+                // A run that failed after a turn on in this turn for the ask
+                // (the lamp's own above, or the model's `turn_on` then its
+                // run now; Heron's P2 on #7562): the skill is turned off
+                // again, as the owner had it, through `make_skill`'s own
+                // `turn_off`, and said plainly that it didn't run and is
+                // still off; never run again in this turn.
+                if crate::made_skill::off_said_on()
+                    && let Some(why) = crate::made_turn::failed_after_turn_on(
+                        model_on.as_deref(),
+                        on_for_ask.is_some(),
+                        &call.name,
+                        &answer.told,
+                    )
+                {
+                    let spoken = on_for_ask.take().unwrap_or_else(|| {
+                        crate::made_skill::spoken_name(model_on.as_deref().unwrap_or_default())
+                    });
+                    model_on = None;
+                    let (name, args) = crate::made_turn::off_again(&spoken);
+                    let off = net::ToolCall {
+                        extra: None,
+                        id: crate::made_turn::OFF_AGAIN_ID.into(),
+                        name,
+                        args,
+                    };
+                    let off_told = run_tool_in_context(
+                        shared,
+                        request,
+                        heard,
+                        &off,
+                        scope.as_ref(),
+                        context_epoch,
+                    )
+                    .await;
+                    answer.told = if crate::made_turn::turned(&off.name, &off.args, &off_told)
+                        && off_told["off"] == true
+                    {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: a skill turned on for the ask didn't run: turned off again (LAMP_MADE_SKILL_OFF_SAID)"
+                        );
+                        turned_on_now = false;
+                        crate::made_turn::not_run_still_off(&spoken, &why)
+                    } else {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: a skill turned on for the ask didn't run, and wasn't turned off again (LAMP_MADE_SKILL_OFF_SAID)"
+                        );
+                        crate::made_turn::not_run_left_on(&spoken, &why)
+                    };
+                    on_ran = Some(((call.name.clone(), call.args.clone()), answer.told.clone()));
+                }
+                // The run now of the skill the model's own `turn_on` turned
+                // on in this turn (#7562's row on lamp-9adf, 18 Nov, request
+                // 9: "tell me a space fact with my space facts skill" was a
+                // turn on, then, told so, its run): said with the undo line,
+                // once in the turn (Heron's P3): a run of it again after is
+                // said as any run.
+                if let Some(told) = crate::made_run::ran_after_turn_on(
+                    model_on.as_deref(),
+                    &call.name,
+                    &answer.told,
+                ) {
+                    answer.told = told;
+                    model_on = None;
+                }
+                // Turned on for the ask: said with one line and its undo,
+                // and never run again in this turn.
+                if let Some(spoken) = on_for_ask {
+                    answer.told = crate::made_turn::turned_on_for_ask(&spoken, &answer.told);
+                    on_ran = Some(((call.name.clone(), call.args.clone()), answer.told.clone()));
+                }
+                if let Some(note) =
+                    crate::made_turn::unchosen_note(&call.name, &call.args, &answer.told)
+                {
+                    turn_unchosen = Some(note);
+                } else if crate::made_turn::turned(&call.name, &call.args, &answer.told) {
+                    turn_unchosen = None;
+                    if answer.told["off"] == false {
+                        turned_on_now = true;
+                        model_on = answer.told[crate::made_turn::TURN_ON]
+                            .as_str()
+                            .map(str::to_owned);
+                    }
                 }
                 // The skill the heard words named, run: a model's call of it
                 // after is given this answer, never run again.
@@ -19315,12 +23151,21 @@ async fn answer(
                         scope.as_ref(),
                     );
                 }
-                // A `use_skill` that ran an unplug tool is kept under that
-                // tool's name, for the unplug claim's outcome (#6457).
+                if call.name == crate::remember::REMEMBER {
+                    keep_refused |= crate::remember::needs_face::refused(&answer.told);
+                    keep_held |= answer.told.get("held").is_some();
+                }
+                // A `use_skill` that ran an unplug tool, or the wellbeing
+                // nudges' own function, is kept under that tool's name, for
+                // its claim's outcome (#6457, #7878).
                 call_statuses.push(after_forget::status(
-                    crate::action_claim::unplug_tool(&call.name, &call.args).unwrap_or(&call.name),
+                    crate::action_claim::unplug_tool(&call.name, &call.args)
+                        .or_else(|| crate::action_claim::nudge_tool(&call.name, &call.args))
+                        .unwrap_or(&call.name),
                     &answer.told,
                 ));
+                // A lookup that answered backs the turn's live figures (#7605).
+                live.ran(&call.name, &answer.told);
                 if crate::remember::is_forget(&call.name) {
                     context_epoch = shared.send_content_epoch.load(Ordering::Acquire);
                     messages = after_forget::context(
@@ -19335,6 +23180,7 @@ async fn answer(
                     short_line = None;
                     answered_at_once = false;
                     kept_now = confirmed_other_call;
+                    recall_found.clear();
                     remember_ran = false;
                     keep_claim_asked = false;
                     keep_claim_note = None;
@@ -19406,6 +23252,9 @@ async fn answer(
                 if may_keep_at_once {
                     kept_told.push(answer.told.clone());
                 }
+                if only_remember {
+                    refused_told.push(answer.told.clone());
+                }
                 // Any call of this request that ran and was not refused (a
                 // remember, a reminder set, a skill's add): its confirmation
                 // in a later round, "I've saved that for five", is no false
@@ -19439,6 +23288,9 @@ async fn answer(
                         asker: keep_asker(scope.as_ref()),
                     });
                 }
+                if call.name == crate::remember::RECALL {
+                    recall_found.extend(crate::remember::recall_found_words(&answer.told));
+                }
                 if call.name != crate::remember::RECALL && did {
                     kept_now = true;
                     remember_ran |= call.name == crate::remember::REMEMBER;
@@ -19457,14 +23309,16 @@ async fn answer(
                 if did
                     && call.name != worker::MORE
                     && let Some(keep) = &shared.keeps_calls
-                    && let Some(args) = kept_args(&call.name, &call.args)
+                    && let Some((args, result)) = shared
+                        .made_names
+                        .as_ref()
+                        .and_then(|_| kept_made(&call.name, &answer.told))
+                        .or_else(|| {
+                            kept_args(&call.name, &call.args)
+                                .map(|args| (args, kept_result(&call.name, &answer.told)))
+                        })
                 {
-                    keep(
-                        request,
-                        &call.name,
-                        &args,
-                        kept_result(&call.name, &answer.told),
-                    );
+                    keep(request, &call.name, &args, result);
                 }
                 // A call answered with an error is kept bare as failed
                 // then ([`FAILED_THEN`]), told later only as a note after
@@ -19497,6 +23351,19 @@ async fn answer(
                     }
                     dispatched.store(true, Ordering::Relaxed);
                 }
+            }
+            // An app took the line in this round: every call the loop came
+            // to is answered; any it did not come to (a forget after the
+            // start stops the batch) is journalled, and the request ends.
+            if app_took {
+                for call in &calls[reached..] {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: an app took the turn ({})",
+                        call.name,
+                        crate::app_triggers::ENVIRONMENT
+                    );
+                }
+                return Err(Stop::Taken);
             }
             // Every call answered: the round goes with the words if a line
             // cuts them now (#5026). After a forget, no round before it
@@ -19585,6 +23452,35 @@ async fn answer(
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round}: a keep was not kept plainly; round 2 says what happened (LAMP_KEEP_ANSWERS_AT_ONCE)"
                 );
+            }
+            // Every keep of a line that only asks to keep refused for want
+            // of a known face (`LAMP_MEMORY_PERSONAL_NEEDS_FACE`, #7877):
+            // the lamp says so itself, one true line that asks nothing, and
+            // the turn ends with no second round, so no "Got it" is said
+            // for what was not kept.
+            let refused_all = only_remember
+                && refused_told.len() == calls.len()
+                && refused_told
+                    .iter()
+                    .all(crate::remember::needs_face::refused);
+            if only_remember
+                && refused_told
+                    .iter()
+                    .any(crate::remember::needs_face::refused)
+                && let Some(why) = refused_gate.failed(refused_all)
+            {
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: a keep refused with nobody known goes to round 2: {why} (LAMP_MEMORY_PERSONAL_NEEDS_FACE)"
+                );
+            }
+            if refused_all && refused_gate.failed(true).is_none() {
+                let line = shared.fixed(crate::remember::needs_face::REFUSED_LINE);
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: {} keep(s) refused, nobody known; the refusal said at once, and no round 2 is asked (LAMP_MEMORY_PERSONAL_NEEDS_FACE)",
+                    calls.len()
+                );
+                queue.push(line.to_owned()).await?;
+                return Ok(());
             }
             // A skill asked for a look (#941): as a look by its own call, the
             // coordinator takes the turn's full look once the lamp's words
@@ -19727,8 +23623,12 @@ async fn answer(
             // space, so the lamp's words read "just now. Hmm," (#1014).
             let answering = text != ANNOUNCEMENT;
             // The announcement's time counts in what was heard, its words
-            // don't: they are never kept as the lamp's.
-            shared.said_piece(request, answering.then_some(text.as_str()));
+            // don't: they are never kept as the lamp's. Nor are the make's
+            // opening's (#7554, [`crate::make_skill_agent::is_opening`]).
+            shared.said_piece(
+                request,
+                (answering && !crate::make_skill_agent::is_opening(&text)).then_some(text.as_str()),
+            );
             if answering {
                 shared.took_piece(request);
                 words_out.fetch_add(text.split_whitespace().count(), Ordering::Relaxed);
@@ -19925,6 +23825,53 @@ async fn answer(
         wrote
     };
     let ended = tokio::try_join!(writing, saying);
+    // `LAMP_CARE_LINE` (#7689): the care line owed, after whatever the
+    // model said or failed to say: this care turn's, or one an earlier
+    // turn owed when a cut, a stop or a newer line ended it (the P1s on
+    // #7752). Not when a newer line took this turn: its answer says it.
+    // Never the model's words: the line for the lamp's region and language,
+    // from its clip rendered ahead when there is one.
+    if let Some(care) = &shared.care
+        && !matches!(ended, Err(Stop::Gone))
+        && let Some(line) = care.owed_line(Instant::now())
+        && {
+            // The answer it follows is held from memory and the summary
+            // too: the line says what the talk was about (the safety read's
+            // P2 on #7752).
+            crate::remember::keep_out(request);
+            crate::care_line::hold_from_summary(request);
+            true
+        }
+        && let Some((played, whole)) = play_words(
+            shared,
+            (request, heard_at),
+            (&line, care.clip(&line), crate::care_line::MOST_SAMPLES),
+            "the care line, LAMP_CARE_LINE",
+            true,
+        )
+        .await
+    {
+        if let Some(clip) = whole {
+            care.keep_clip(&line, clip);
+        }
+        if played == 0 {
+            eprintln!(
+                "lamp-voice second: request {request}: the care line could not be said: still owed to the next answer"
+            );
+        } else {
+            care.said(&line, Instant::now());
+            eprintln!("lamp-voice second: request {request}: the care line followed its answer");
+            // Its words are over again, as the answer's were: what reads
+            // the lamp's words line by line ends this one too.
+            let _ = shared
+                .emit(ProviderOutput::Transcript {
+                    request: Some(request),
+                    text: String::new(),
+                    finished: true,
+                })
+                .await;
+        }
+    }
     if shared.note_tools
         && let Ok(noted) = turn_tools.lock()
     {
@@ -20027,7 +23974,7 @@ async fn answer(
                 idle: true,
             }
         }
-        Err(Stop::GaveUp | Stop::Held) => ProviderOutput::TurnComplete {
+        Err(Stop::GaveUp | Stop::Held | Stop::Taken) => ProviderOutput::TurnComplete {
             request,
             idle: true,
         },
@@ -20188,6 +24135,10 @@ struct Queue<'a> {
     /// A made skill with code not on, whose claim to be on is never said
     /// (`LAMP_MADE_NOT_ON_TOLD`, #7270).
     made_not_on: Option<crate::made_not_on::Guard>,
+    /// The round's words, held to its end while a `make_skill` turn's
+    /// candidates wait for the model's choice (`LAMP_MADE_SKILL_OFF_SAID`,
+    /// [`crate::made_turn::unchosen_note`]); `None`, said as they come.
+    choice_held: Option<Vec<String>>,
 }
 impl Drop for Queue<'_> {
     /// The reply's tags in the journal, counts only, once it said something.
@@ -20220,6 +24171,12 @@ impl Queue<'_> {
     /// [`ProviderOutput::MakeWaiting`] go just after its last audio, in
     /// order, from the saying half (#7371).
     async fn push_ending(&mut self, text: String, ends: bool) -> Result<(), Stop> {
+        // `LAMP_MADE_SKILL_OFF_SAID` (#7562): a round after a turn's
+        // candidates waits for its end, when its calls say whether it chose.
+        if let Some(held) = self.choice_held.as_mut() {
+            held.push(text);
+            return Ok(());
+        }
         // `LAMP_MADE_NOT_ON_TOLD` (#7270): a claim that a made skill not on
         // is on, and the rest of its round, wait for the round's end.
         if let Some(guard) = self.made_not_on.as_mut()

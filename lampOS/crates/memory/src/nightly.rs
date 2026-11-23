@@ -943,7 +943,7 @@ impl Days {
         let (lines, changes, adds) = allowance(&tx, person, &day)?;
         let generation = generation(&tx, person)?;
         let rows = tx
-            .prepare("SELECT id,at_unix_ms,kind,heard,said,text FROM entries WHERE person=?1 AND day=?2 AND id>?3 AND active=1 AND ((kind='exchange' AND trim(heard)!='' AND at_unix_ms>coalesce((SELECT f.at_unix_ms+?4 FROM nightly_forgets f WHERE f.person=?1 AND f.day=?2),-1)) OR kind='kept') ORDER BY id")?
+            .prepare("SELECT id,at_unix_ms,kind,heard,said,text FROM entries WHERE person=?1 AND day=?2 AND id>?3 AND active=1 AND ((kind='exchange' AND trim(heard)!='' AND at_unix_ms>coalesce((SELECT f.at_unix_ms+?4 FROM nightly_forgets f WHERE f.person=?1 AND f.day=?2),-1)) OR (kind='kept' AND rid NOT IN (SELECT rid FROM app_facts))) ORDER BY id")?
             .query_map(params![person.as_str(), day, after_id, FORGET_TURN_MS], |r| {
                 Ok(json!({"id":r.get::<_,u64>(0)?,"at_unix_ms":r.get::<_,u64>(1)?,"kind":r.get::<_,String>(2)?,"heard":r.get::<_,String>(3)?,"said":r.get::<_,String>(4)?,"text":r.get::<_,String>(5)?}))
             })?
@@ -1422,15 +1422,21 @@ fn seen_again(tx: &Transaction<'_>, person: &Person, text: &str, now: u64) -> Re
 /// note). In the caller's transaction after the forget's own walk and
 /// before `erase`; never on expiry.
 pub(crate) fn with_doomed(tx: &Transaction<'_>) -> Result<()> {
+    // Past their exchanges' expiry: from what goes, by `origins_by`, never
+    // by joining every item the scope has (`days::origin_sharers`).
+    let past_expiry = format!(
+        "INSERT OR IGNORE INTO doomed {}",
+        crate::days::origin_sharers(
+            "nightly_items t",
+            "NOT EXISTS (SELECT 1 FROM nightly_items nd WHERE nd.rid=d.rid) AND t.rid NOT IN (SELECT rid FROM doomed)",
+        )
+    );
     loop {
         let mut added = tx.execute(
             "INSERT OR IGNORE INTO doomed SELECT DISTINCT s.child FROM sources s JOIN nightly_items n ON n.rid=s.child WHERE s.parent IN (SELECT rid FROM doomed) AND s.child NOT IN (SELECT rid FROM doomed)",
             [],
         )?;
-        added += tx.execute(
-            "INSERT OR IGNORE INTO doomed SELECT DISTINCT t.rid FROM nightly_items t JOIN origins o ON o.rid=t.rid WHERE t.rid NOT IN (SELECT rid FROM doomed) AND EXISTS (SELECT 1 FROM entries d WHERE d.rid IN (SELECT rid FROM doomed) AND d.person=t.person AND coalesce(d.category,'')!='talk' AND NOT EXISTS (SELECT 1 FROM nightly_items nd WHERE nd.rid=d.rid) AND (d.id=o.origin OR EXISTS (SELECT 1 FROM origins od WHERE od.rid=d.rid AND od.origin=o.origin)))",
-            [],
-        )?;
+        added += tx.execute(&past_expiry, [])?;
         added += tx.execute(
             "INSERT OR IGNORE INTO doomed SELECT r.older FROM replacements r JOIN nightly_items n ON n.rid=r.older WHERE r.newer IN (SELECT rid FROM doomed) AND r.older NOT IN (SELECT rid FROM doomed)",
             [],

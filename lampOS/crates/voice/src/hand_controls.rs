@@ -732,6 +732,19 @@ impl HandControls {
         )
     }
 
+    /// As [`Self::with_test_muted`], the mute the restart guard's after a
+    /// fault, not the person's ([`Self::restored_after_fault`], #7224).
+    #[cfg(test)]
+    pub(crate) fn with_test_restored(
+        clock_id: &str,
+        started_us: u64,
+        record: &Path,
+    ) -> io::Result<Self> {
+        let mut controls = Self::with_test_muted(clock_id, started_us, record)?;
+        controls.restored_after_fault = true;
+        Ok(controls)
+    }
+
     /// A hand on the head since `now_us - held_us` (#1362), lifted when it
     /// has been there `lifted_us` (3.2 s or more: kept past the sleep), with
     /// head sleep and its durable mute at `record` (in a private

@@ -79,6 +79,12 @@ impl Sentences {
     /// least [`CLAUSE_WORDS`] words come before it: for an answer's first
     /// words, so speech starts before the first sentence is finished.
     pub fn clause(&mut self) -> Option<String> {
+        self.clause_unless(|_| false)
+    }
+
+    /// [`Self::clause`], none when a word of it is one `stops` names: the
+    /// first words are then cut before that word ([`Self::words_before`]).
+    pub fn clause_unless(&mut self, stops: impl Fn(&str) -> bool) -> Option<String> {
         let mut words = 0;
         for (at, c) in self.text[..self.decided].char_indices() {
             if c.is_whitespace() {
@@ -90,6 +96,9 @@ impl Sentences {
             };
             if matches!(c, ',' | ';' | ':') && next.is_whitespace() && words + 1 >= CLAUSE_WORDS {
                 let clause = self.text[..=at].trim().to_owned();
+                if clause.split_whitespace().any(&stops) {
+                    return None;
+                }
                 self.take(next_at);
                 return Some(clause);
             }
@@ -101,22 +110,44 @@ impl Sentences {
     /// followed by whitespace): for a voice asked one request a piece, so
     /// its first sound waits for neither a sentence nor a clause (#1712).
     pub fn words(&mut self, n: usize) -> Option<String> {
+        self.words_before(n, |_| false)
+    }
+
+    /// [`Self::words`], but cut before the first word `stops` names, when
+    /// one comes within the `n`: "Silver's around 52 to" is cut as
+    /// "Silver's around", and the rest waits for its sentence's end
+    /// (`crate::live_fact::is_number`, the 06c1 S1 leg on #8224). With
+    /// such a word first, nothing is cut.
+    pub fn words_before(&mut self, n: usize, stops: impl Fn(&str) -> bool) -> Option<String> {
         let mut words = 0;
+        let mut word_at = 0;
+        let mut last_end = 0;
         let mut in_word = false;
         for (at, c) in self.text.char_indices() {
             if !c.is_whitespace() {
+                if !in_word {
+                    word_at = at;
+                }
                 in_word = true;
             } else if std::mem::replace(&mut in_word, false) {
                 if at > self.decided {
                     // A `-` still waiting to be known a minus or a bullet.
                     return None;
                 }
-                words += 1;
-                if words == n {
-                    let piece = self.text[..at].trim().to_owned();
-                    self.take(at);
-                    return Some(piece);
-                }
+                let end = if stops(&self.text[word_at..at]) {
+                    // Cut before it, or not at all when it comes first.
+                    (words > 0).then_some(last_end)?
+                } else {
+                    words += 1;
+                    last_end = at;
+                    if words < n {
+                        continue;
+                    }
+                    at
+                };
+                let piece = self.text[..end].trim().to_owned();
+                self.take(end);
+                return Some(piece);
             }
         }
         None

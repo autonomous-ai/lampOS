@@ -806,6 +806,7 @@ fn the_stream_reports_denied_sessions_and_recovers_without_words_or_paths() {
     const WORD: &str = "Ossifrage";
     const PERMISSION: &str = "Can't read the voice's sessions: permission.";
     const STALE: &str = "Last read is stale.";
+    const FIRST_AUDIO_FROM_BUS: &str = "not known from the bus";
     let rig = Rig::new("read-status", Some(TOKEN));
     let metadata = rig.root.join("sessions/private-session-name/metadata");
     fs::create_dir_all(&metadata).unwrap();
@@ -836,12 +837,16 @@ fn the_stream_reports_denied_sessions_and_recovers_without_words_or_paths() {
     };
     let started = Instant::now();
     let mut stream = EventStream::open(&rig);
+    // Both fall back to the bus (#7208): Turns, no bus turn yet, an empty
+    // state; Overview's first audio, not known. Never the permission error.
     let sections = stream.until(|sections| {
-        sections["turns"].contains(PERMISSION) && sections["overview"].contains(PERMISSION)
+        sections["turns"].contains("No turn heard yet.")
+            && sections["overview"].contains(FIRST_AUDIO_FROM_BUS)
     });
     let first = started.elapsed();
     safe(&sections);
-    assert!(!sections["turns"].contains("No turn"));
+    assert!(!sections["turns"].contains(PERMISSION));
+    assert!(!sections["overview"].contains(PERMISSION));
     assert!(!sections["turns"].contains(STALE));
     assert!(!sections["turns"].contains("117 ms"));
 
@@ -891,6 +896,52 @@ fn the_stream_reports_denied_sessions_and_recovers_without_words_or_paths() {
         eprintln!("peek_read_status {boundary}_us={}", elapsed.as_micros());
         assert!(elapsed < Duration::from_secs(2), "{boundary}: {elapsed:?}");
     }
+}
+
+/// #7208: on a product lamp the voice's sessions are `root:root 0700` and
+/// peek runs as `lampos`, so the records are never readable. Turns is then
+/// built from the bus's turns, as cards, never the permission error; with
+/// no bus turn either, an empty state. No word shows outside monitor mode.
+#[test]
+fn with_the_voices_sessions_private_turns_shows_the_bus_turns() {
+    const PERMISSION: &str = "Can't read the voice's sessions: permission.";
+    let rig = Rig::new("turns-bus", Some(TOKEN));
+    let sessions = rig.root.join("sessions");
+    fs::create_dir_all(sessions.join("s1/metadata")).unwrap();
+    let _hold = Unreadable::new(&sessions);
+    assert_eq!(
+        fs::read_dir(&sessions).unwrap_err().kind(),
+        std::io::ErrorKind::PermissionDenied,
+        "the permission fixture must run as an ordinary user"
+    );
+    let mut stream = EventStream::open(&rig);
+    let sections = stream.until(|sections| sections["turns"].contains("No turn heard yet."));
+    let turns = &sections["turns"];
+    assert!(!turns.contains(PERMISSION), "{turns}");
+    assert!(!turns.contains("turn card"), "{turns}");
+
+    let mut heard = rig.publisher(Speech::TOPICS[0], &Speech::declaration(), "voice");
+    let mut said = rig.publisher(Speech::TOPICS[1], &Speech::declaration(), "voice");
+    let speech = |text: &str| Speech {
+        text: text.into(),
+        finished: true,
+        locale: None,
+        request: Some(12),
+    };
+    heard.publish_json(1, &speech("Ossifrage heard")).unwrap();
+    thread::sleep(Duration::from_millis(60));
+    said.publish_json(2, &speech("Ossifrage said")).unwrap();
+    let sections = stream.until(|sections| sections["turns"].contains("request 12"));
+    let turns = &sections["turns"];
+    assert!(turns.contains("class=\"turn card\""), "{turns}");
+    assert!(turns.contains("from the bus"), "{turns}");
+    assert!(!turns.contains(PERMISSION), "{turns}");
+    assert!(!turns.contains("Ossifrage"), "{turns}");
+    // Overview's first audio: the bus carries no timing peek joins to a
+    // turn, so it says so quietly, never the permission error.
+    let overview = &sections["overview"];
+    assert!(overview.contains("not known from the bus"), "{overview}");
+    assert!(!overview.contains(PERMISSION), "{overview}");
 }
 
 /// #2141's second step (the lead on #1711, 20 Oct): the one page's stream
@@ -1450,6 +1501,102 @@ fn monitor_mode_a_code_opens_once_and_its_cookie_dies_with_a_restart() {
     fs::remove_dir_all(root).unwrap();
 }
 
+/// The owner's Off (#6401, P1 privacy): systemd's SIGTERM ends every open
+/// `/events` stream and the binary within 2 s. On 0c89 an open stream kept
+/// flowing 81 s after "asked to stop", until its client gave up.
+#[test]
+fn monitor_mode_a_stop_ends_every_open_stream_and_the_binary_within_2_s() {
+    let root = PathBuf::from(format!("/tmp/lpk-mstop-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("bus")).unwrap();
+    let port = free_port();
+    let mut peek = monitor_binary(&root, port);
+    let code = admin_code(&root);
+    let form = "Content-Type: application/x-www-form-urlencoded\r\n";
+    let (status, text) = ask_port(port, "POST", "/in", form, &format!("code={code}"));
+    assert_eq!(status, 204, "{text}");
+    let session = text
+        .lines()
+        .find_map(|line| line.strip_prefix("set-cookie: "))
+        .and_then(|cookie| cookie.split(';').next())
+        .unwrap_or_else(|| panic!("no cookie: {text}"))
+        .to_owned();
+    // Two streams, kept alive as a browser or curl keeps them.
+    let mut streams: Vec<BufReader<TcpStream>> = (0..2)
+        .map(|_| {
+            let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+            stream.set_read_timeout(Some(WAIT)).unwrap();
+            write!(
+                stream,
+                "GET /events HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nCookie: {session}\r\n\r\n"
+            )
+            .unwrap();
+            let mut reader = BufReader::new(stream);
+            let mut line = String::new();
+            while !line.starts_with("event: ") {
+                line.clear();
+                assert_ne!(reader.read_line(&mut line).unwrap(), 0, "no event came");
+            }
+            reader
+        })
+        .collect();
+    let stopped = Instant::now();
+    let within = Duration::from_secs(2);
+    // As systemd stops the unit.
+    let signalled = Command::new("kill")
+        .args(["-TERM", &peek.id().to_string()])
+        .status()
+        .unwrap();
+    assert!(signalled.success());
+    let mut ended = Vec::new();
+    for reader in &mut streams {
+        let mut line = String::new();
+        let end = loop {
+            let left = within.saturating_sub(stopped.elapsed());
+            if left.is_zero() {
+                break None;
+            }
+            reader.get_ref().set_read_timeout(Some(left)).unwrap();
+            line.clear();
+            match reader.read_line(&mut line) {
+                Ok(0) => break Some(stopped.elapsed()),
+                Ok(_) => {}
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                    ) =>
+                {
+                    break None;
+                }
+                // Reset by a process that ended is ended too.
+                Err(_) => break Some(stopped.elapsed()),
+            }
+        };
+        ended.push(end);
+    }
+    let exited = loop {
+        if let Some(status) = peek.try_wait().unwrap() {
+            break Some((status, stopped.elapsed()));
+        }
+        if stopped.elapsed() >= within {
+            break None;
+        }
+        thread::sleep(Duration::from_millis(10));
+    };
+    if exited.is_none() {
+        peek.kill().unwrap();
+        peek.wait().unwrap();
+    }
+    fs::remove_dir_all(&root).unwrap();
+    assert!(
+        ended.iter().all(Option::is_some),
+        "an open stream outlived the stop by 2 s: {ended:?}"
+    );
+    let (status, _) = exited.expect("lamp-peek did not exit within 2 s of SIGTERM");
+    assert!(status.success(), "{status}");
+}
+
 /// An open stream ends when its session does (the 12 hours), not only new
 /// requests (reviewer-two's HOLD on #5943): the session is opened on a clock
 /// set back to just before its end, so the end comes within the test.
@@ -1653,6 +1800,7 @@ fn card_turn(request: u64, start: u64, total: u64, words: bool) -> timeline::Ent
         ],
         ended_at: Some(start + total),
         agent: None,
+        skill_run: None,
     }
 }
 
@@ -1713,7 +1861,7 @@ fn a_turn_card_carries_its_status_and_latency_classes_at_the_edges() {
             "{html}"
         );
         // The Turns section's cards carry the same ⚡ class.
-        let turns = page::turns(&current(vec![card_record(4, ttft, "played")]));
+        let turns = page::turns(&current(vec![card_record(4, ttft, "played")]), &[], false);
         assert!(turns.contains("class=\"turn card\""), "{turns}");
         assert!(
             turns.contains(&format!(
@@ -1729,6 +1877,7 @@ fn a_turn_card_carries_its_status_and_latency_classes_at_the_edges() {
         steps: vec![(1_000, timeline::Step::Heard(None))],
         ended_at: None,
         agent: None,
+        skill_run: None,
     };
     let html = page::timeline(&[going], &current(Vec::new()), false);
     assert!(
@@ -1754,6 +1903,7 @@ fn a_turn_card_carries_its_status_and_latency_classes_at_the_edges() {
         ],
         ended_at: Some(1_500),
         agent: None,
+        skill_run: None,
     };
     let html = page::timeline(&[skill], &current(Vec::new()), false);
     assert!(
@@ -1772,6 +1922,7 @@ fn a_turn_card_carries_its_status_and_latency_classes_at_the_edges() {
         ],
         ended_at: Some(1_100),
         agent: None,
+        skill_run: None,
     };
     let html = page::timeline(&[held], &current(Vec::new()), false);
     assert!(
@@ -1841,6 +1992,7 @@ fn monitor_mode_hostile_words_stay_escaped_in_a_card() {
         ],
         ended_at: Some(1_900),
         agent: None,
+        skill_run: None,
     }];
     let mut record = card_record(3, 500, "<i>played</i>");
     record.basis = Some("<u>basis</u>".into());
@@ -2212,6 +2364,7 @@ fn handed_card(agent: Option<timeline::Agent>) -> timeline::Entry {
         ],
         ended_at: Some(2_000),
         agent,
+        skill_run: None,
     }
 }
 
@@ -2284,6 +2437,7 @@ fn an_active_card_with_no_event_for_five_minutes_reads_stale() {
         steps: vec![(1_000, timeline::Step::Heard(None))],
         ended_at: None,
         agent: None,
+        skill_run: None,
     };
     let active = "<span class=\"badge badge-amber pulse\">ACTIVE</span>";
     let stale = "<span class=\"badge badge-grey\">STALE</span>";
@@ -2307,4 +2461,69 @@ fn an_active_card_with_no_event_for_five_minutes_reads_stale() {
     handed.agent = None;
     let html = page::timeline_at(&[handed], &records, false, Some(10 * page::STALE_MS));
     assert!(html.contains(stale), "{html}");
+}
+
+/// What `skills/tasks` says of mail-check's run (#7873).
+fn skill_run_news(stage: lamp_msgs::SkillTaskStage) -> lamp_msgs::SkillTask {
+    lamp_msgs::SkillTask {
+        skill: "mail-check".into(),
+        stage,
+        run: Some("task-1795056147468-853891-0".into()),
+        engine: (stage == lamp_msgs::SkillTaskStage::Started).then_some("openclaw".into()),
+        gate: None,
+    }
+}
+
+/// #7873 (b), lamp-52e6 on 19 Nov: the turn that ran a made skill now
+/// (`make_skill`) showed only `LOCAL · make_skill` while its `do.task` ran
+/// on OpenClaw. The run begun within the turn's minute carries the turn's
+/// path: AGENT, the engine, the task as lamp-tasks' journal names it, and
+/// how it is going. A turn that ran no skill, or a run after its minute,
+/// is not joined.
+#[test]
+fn the_turn_that_ran_a_skill_carries_its_tasks_agent_badge() {
+    use lamp_msgs::SkillTaskStage::{Ran, Started};
+    let mut timeline = Timeline::new(false);
+    timeline.add(6, 1_000, timeline::Step::Heard(None));
+    timeline.add(
+        6,
+        1_400,
+        timeline::Step::Decided(lamp_msgs::VoiceDecision::answered(6, ["make_skill"])),
+    );
+    timeline.add(6, 2_000, timeline::Step::Said(None));
+    timeline.skill_task(skill_run_news(Started), 3_000);
+    let html = page::timeline(&timeline.newest(), &current(Vec::new()), false);
+    let started = "<span class=\"badge badge-blue\">AGENT · OpenClaw · task \
+                   1795056147468-853891-0 · started</span>";
+    assert!(html.contains(started), "{html}");
+    assert!(!html.contains("LOCAL · make_skill"), "{html}");
+    timeline.skill_task(skill_run_news(Ran), 40_000);
+    let html = page::timeline(&timeline.newest(), &current(Vec::new()), false);
+    assert!(
+        html.contains("AGENT · OpenClaw · task 1795056147468-853891-0 · ran"),
+        "{html}"
+    );
+    // A turn that called no skill's run keeps its own path.
+    let mut other = Timeline::new(false);
+    other.add(7, 1_000, timeline::Step::Heard(None));
+    other.add(
+        7,
+        1_400,
+        timeline::Step::Decided(lamp_msgs::VoiceDecision::answered(7, ["timer"])),
+    );
+    other.skill_task(skill_run_news(Started), 3_000);
+    let html = page::timeline(&other.newest(), &current(Vec::new()), false);
+    assert!(html.contains("LOCAL · timer"), "{html}");
+    assert!(!html.contains("AGENT"), "{html}");
+    // A run begun after the turn's minute is a trigger's, not the turn's.
+    let mut late = Timeline::new(false);
+    late.add(8, 1_000, timeline::Step::Heard(None));
+    late.add(
+        8,
+        1_400,
+        timeline::Step::Decided(lamp_msgs::VoiceDecision::answered(8, ["make_skill"])),
+    );
+    late.skill_task(skill_run_news(Started), 1_000 + timeline::TURN_LASTS_MS);
+    let html = page::timeline(&late.newest(), &current(Vec::new()), false);
+    assert!(html.contains("LOCAL · make_skill"), "{html}");
 }

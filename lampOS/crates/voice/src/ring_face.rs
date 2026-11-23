@@ -113,6 +113,10 @@ const LEVEL_GLOW: [(f32, f32); LEVELS as usize] = [
     (0.68, 0.08),
     (0.90, 0.10),
 ];
+/// The offline breath's warm amber (#830), also the restart guard's pulse
+/// on the asleep face (#7224, [`crate::ring_asleep::guard_pixels`]).
+pub const OFFLINE_TINT: [f32; 3] = [1.0, 0.55, 0.12];
+
 /// A light that is off still shows an ember, in amber: the ring at rest
 /// is also the sign that the lamp can hear, and that sign is not the
 /// lamp's to switch off because it was asked for darkness.
@@ -170,6 +174,22 @@ impl Lit {
         match index {
             0 => 0.5,
             _ => LEVEL_GLOW[index - 1].0 / LEVEL_GLOW[index].0,
+        }
+    }
+
+    /// How bright, from 1 to [`LEVELS`].
+    pub fn level(&self) -> u8 {
+        self.level
+    }
+
+    /// One level brighter, as a share of this light's glow: the next level
+    /// up's over this one's, or at the top only the breath's own rise
+    /// (#7516's swell).
+    pub fn step_up_share(&self) -> f32 {
+        let index = usize::from(self.level.clamp(1, LEVELS)) - 1;
+        match LEVEL_GLOW.get(index + 1) {
+            Some(up) => up.0 / LEVEL_GLOW[index].0,
+            None => (LEVEL_GLOW[index].0 + LEVEL_GLOW[index].1) / LEVEL_GLOW[index].0,
         }
     }
 }
@@ -1030,7 +1050,7 @@ fn look(
             // never more than a third of listening's least: no red, no
             // flashing, the same all round (#830).
             let breath = wave(seconds, 2.5, 0.0, 0.0);
-            ([1.0, 0.55, 0.12], 0.04 + 0.10 * breath)
+            (OFFLINE_TINT, 0.04 + 0.10 * breath)
         }
         Mood::Thinking => {
             // An amber point circling the ring with a fading tail behind it.

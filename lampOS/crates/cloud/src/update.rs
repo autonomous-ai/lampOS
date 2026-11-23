@@ -37,6 +37,16 @@ pub const TOO_SOON: &str = "asked less than a minute ago";
 /// stopped, older than #4153, or a `serve` that does not act).
 pub const NOT_LISTENING: &str = "lamp-update is not listening for a check";
 
+/// The owner's Update now's switch (#7517), in lamp-cloud's unit: `on`
+/// exactly, and only with [`ENVIRONMENT`] on as well.
+pub const NOW_ENVIRONMENT: &str = "LAMP_UPDATE_NOW";
+/// `update.now`, refused: the setup walk is under way; lamp-update updates
+/// by itself once it is done (the first builder on #7517).
+pub const WALK: &str = "the lamp is being set up; it updates by itself once setup is done";
+/// `update.now`, refused: lamp-cloud's mark for lamp-update could not be
+/// written, so lamp-update would take the ask as a plain check.
+pub const NO_MARK: &str = "the lamp could not mark the ask; try again";
+
 /// The lamp's agents' switch (#6240), in lamp-cloud's unit: `on`
 /// exactly, and only with [`ENVIRONMENT`] on as well.
 pub const ENGINES_ENVIRONMENT: &str = "LAMP_APP_ENGINES";
@@ -59,6 +69,11 @@ pub const INSTALLABLE: [&str; 2] = ["hermes", "openclaw"];
 
 pub fn from_environment() -> bool {
     std::env::var(ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
+/// [`NOW_ENVIRONMENT`] `on` exactly.
+pub fn now_from_environment() -> bool {
+    std::env::var(NOW_ENVIRONMENT).is_ok_and(|value| value == "on")
 }
 
 /// [`ENGINES_ENVIRONMENT`] `on` exactly.
@@ -164,6 +179,50 @@ pub fn idle(status: &Value) -> Result<(), String> {
     }
 }
 
+/// Whether the owner's Update now (#7517) may be asked, as `status` (as
+/// [`status`] answers it) and the setup walk say: never during the walk
+/// ([`WALK`]); between rounds it starts one; a round waiting for its quiet
+/// moment with the new build installed beside is taken over; any other
+/// moment of a round, or a round Update now asked for already (a second
+/// tap), is [`RUNNING`].
+pub fn may_update_now(status: &Value, walk: bool) -> Result<(), String> {
+    if walk {
+        return Err(WALK.to_owned());
+    }
+    if idle(status).is_ok() {
+        return Ok(());
+    }
+    let round = &status["round"];
+    let waits_for_quiet = status["now"] == "switching"
+        && round["waiting"] == lamp_msgs::UpdateRound::WAITING_QUIET
+        && round["asked"] != lamp_msgs::UpdateRound::ASKED_NOW;
+    if waits_for_quiet {
+        Ok(())
+    } else {
+        Err(RUNNING.to_owned())
+    }
+}
+
+/// lamp-cloud's mark of the owner's Update now (#7517) at `file`
+/// (`lamp_msgs::UPDATE_NOW_FILE` on a lamp, in this part's 0700 state
+/// folder): `{"at_unix_ms": at}`, written beside and renamed over, 0600.
+/// lamp-update takes the `now` check only with it, at most
+/// `UpdateCheck::NOW_WITHIN` old.
+pub fn mark(file: &std::path::Path, at_unix_ms: u64) -> std::io::Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let beside = file.with_extension("new");
+    let _ = std::fs::remove_file(&beside);
+    let mut out = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&beside)?;
+    out.write_all(json!({ "at_unix_ms": at_unix_ms }).to_string().as_bytes())?;
+    out.sync_all()?;
+    std::fs::rename(&beside, file)
+}
+
 /// `update.check`'s reply: `status` with `"check": "started"`.
 pub fn started(mut status: Value) -> Value {
     status["check"] = json!("started");
@@ -182,6 +241,9 @@ pub struct Checks {
     /// `update/engine_install`, made at first use.
     install_last: Option<Instant>,
     install_publisher: Option<Publisher>,
+    /// Where the owner's Update now is marked (#7517), with its switch on:
+    /// none, `update.now` is not answered.
+    now_mark: Option<std::path::PathBuf>,
 }
 
 impl Checks {
@@ -191,6 +253,62 @@ impl Checks {
             engines,
             ..Self::default()
         }
+    }
+
+    /// The same checks, with the owner's Update now marked at `mark`
+    /// (#7517, [`NOW_ENVIRONMENT`] on).
+    pub fn with_now(mut self, mark: std::path::PathBuf) -> Self {
+        self.now_mark = Some(mark);
+        self
+    }
+
+    /// Whether the owner's Update now's switch is on.
+    pub fn now(&self) -> bool {
+        self.now_mark.is_some()
+    }
+
+    /// The owner's Update now (#7517): its mark written, then one
+    /// `update/check` with `now` on `bus`. Not held to the minute between
+    /// checks: lamp-update takes each mark once, and a round runs one at a
+    /// time. Refused with [`NO_MARK`] when the mark can't be written and
+    /// [`NOT_LISTENING`] when no running lamp-update reads it.
+    pub fn ask_now(
+        &mut self,
+        bus: Option<&Bus>,
+        now: Instant,
+        at_unix_ms: u64,
+    ) -> Result<(), String> {
+        let mark_file = self.now_mark.clone().ok_or(NOT_LISTENING)?;
+        let bus = bus.ok_or(NOT_LISTENING)?;
+        mark(&mark_file, at_unix_ms).map_err(|_| NO_MARK.to_owned())?;
+        let publisher = self.check_publisher(bus)?;
+        let check = UpdateCheck {
+            retry: None,
+            now: Some(true),
+        };
+        let published = publisher
+            .publish_json(lamp_ipc::monotonic_us(), &check)
+            .map_err(|_| NOT_LISTENING.to_owned())?;
+        if published.delivered == 0 {
+            return Err(NOT_LISTENING.to_owned());
+        }
+        self.last = Some(now);
+        Ok(())
+    }
+
+    /// The publisher on `update/check`, made at first use.
+    fn check_publisher(&mut self, bus: &Bus) -> Result<&mut Publisher, String> {
+        Ok(match &mut self.publisher {
+            Some(publisher) => publisher,
+            empty => empty.insert(
+                bus.publisher_declared(
+                    UpdateCheck::TOPIC,
+                    &UpdateCheck::declaration(),
+                    crate::lamp::SOURCE,
+                )
+                .map_err(|_| NOT_LISTENING.to_owned())?,
+            ),
+        })
     }
 
     /// Whether the lamp's agents' switch is on.
@@ -257,19 +375,9 @@ impl Checks {
             return Err(TOO_SOON.to_owned());
         }
         let bus = bus.ok_or(NOT_LISTENING)?;
-        let publisher = match &mut self.publisher {
-            Some(publisher) => publisher,
-            empty => empty.insert(
-                bus.publisher_declared(
-                    UpdateCheck::TOPIC,
-                    &UpdateCheck::declaration(),
-                    crate::lamp::SOURCE,
-                )
-                .map_err(|_| NOT_LISTENING.to_owned())?,
-            ),
-        };
+        let publisher = self.check_publisher(bus)?;
         let published = publisher
-            .publish_json(lamp_ipc::monotonic_us(), &UpdateCheck { retry })
+            .publish_json(lamp_ipc::monotonic_us(), &UpdateCheck { retry, now: None })
             .map_err(|_| NOT_LISTENING.to_owned())?;
         if published.delivered == 0 {
             return Err(NOT_LISTENING.to_owned());
@@ -283,6 +391,48 @@ impl Checks {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn update_now_starts_a_round_or_takes_over_a_wait_for_quiet_and_nothing_else() {
+        assert_eq!(may_update_now(&json!({"now": "idle"}), false), Ok(()));
+        assert_eq!(may_update_now(&json!({"now": "unknown"}), false), Ok(()));
+        assert_eq!(
+            may_update_now(&json!({"now": "idle"}), true),
+            Err(WALK.to_owned())
+        );
+        let waiting = json!({"now": "switching", "round": {"waiting": "quiet"}});
+        assert_eq!(may_update_now(&waiting, false), Ok(()));
+        for busy in [
+            json!({"now": "switching", "round": {"waiting": "quiet", "asked": "now"}}),
+            json!({"now": "switching", "round": {"waiting": "give_way", "asked": "now"}}),
+            json!({"now": "switching", "round": {}}),
+            json!({"now": "fetching", "round": {}}),
+            json!({"now": "watching"}),
+            json!({"now": "restoring"}),
+        ] {
+            assert_eq!(
+                may_update_now(&busy, false),
+                Err(RUNNING.to_owned()),
+                "{busy}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_update_now_mark_is_written_whole_and_for_its_owner_alone() {
+        use std::os::unix::fs::PermissionsExt;
+        let folder = tempfile::tempdir().unwrap();
+        let file = folder.path().join("update-now");
+        mark(&file, 42).unwrap();
+        mark(&file, 43).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&file).unwrap(),
+            "{\"at_unix_ms\":43}"
+        );
+        let mode = std::fs::metadata(&file).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+        assert!(!file.with_extension("new").exists());
+    }
 
     #[test]
     fn a_check_is_refused_while_a_round_runs_and_taken_between_rounds() {
@@ -481,7 +631,10 @@ mod tests {
         let heard = update.recv(Duration::from_secs(1)).unwrap().unwrap();
         assert_eq!(
             heard.parse::<UpdateCheck>().unwrap(),
-            UpdateCheck { retry: Some(12226) }
+            UpdateCheck {
+                retry: Some(12226),
+                now: None
+            }
         );
     }
 

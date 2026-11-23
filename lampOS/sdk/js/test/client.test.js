@@ -71,6 +71,7 @@ test('every op has a call and every error code a class', () => {
   const named = {
     'sound.upload': 'uploadSound', 'sound.list': 'sounds', 'sound.remove': 'removeSound',
     'skill.push': 'pushSkill', 'skill.list': 'skills', 'skill.remove': 'removeSkill',
+    'app.push': 'pushApp', 'app.list': 'apps', 'app.remove': 'removeApp',
     'turn.start': 'startTurn', 'turn.end': 'endTurn', 'listen.set': 'setListening',
   };
   const call = (op) => named[op] ?? op.replace(/\.(\w)/g, (_, c) => c.toUpperCase());
@@ -95,6 +96,15 @@ test('the lamp\'s language comes from hello and is English when it says none', a
     await withLamp({ language: said }, async (lamp) => {
       assert.equal(lamp.language, shown, String(said));
       assert.equal(lamp.info.language, said ?? undefined, String(said));
+    });
+  }
+});
+
+test('the lamp\'s build comes from hello and is null when it says none', async () => {
+  for (const said of ['143+ab12cd34ef56', null]) {
+    await withLamp({ build: said }, async (lamp) => {
+      assert.equal(lamp.build, said);
+      assert.equal(lamp.info.build, said ?? undefined);
     });
   }
 });
@@ -573,7 +583,7 @@ test('get answers the states asked', async () => {
     fake.state.presence = { count: 2, near: 0.4, facing: true };
     const state = await lamp.get('presence', 'lamp');
     // As lamp-control answers: the states by the names asked, `lamp` included, and nothing else.
-    assert.deepEqual(state, { presence: { count: 2, near: 0.4, facing: true }, lamp: { talking: false, paused: false, private: false, asleep: false } });
+    assert.deepEqual(state, { presence: { count: 2, near: 0.4, facing: true }, lamp: { talking: false, paused: false, private: false, asleep: false, muted_after_fault: false } });
   });
 });
 
@@ -1406,6 +1416,52 @@ test('the fake camera gives the picture a test sets', () => withLamp({ grants: [
   // and a stream's frames carry; the default is the smallest whole JPEG.
   fake.picture = Buffer.from([0xff, 0xd8, 0x6d, 0x69, 0x6e, 0x65, 0xff, 0xd9]);
   assert.deepEqual(await lamp.cameraSnapshot(), fake.picture);
+}));
+
+test('pose sends the JPEG in base64 and answers the 17 keypoints', () => withLamp({ grants: ['camera'] }, async (lamp, fake) => {
+  const { FAKE_JPEG } = await import('../src/testing.js');
+  const { POSE_KEYPOINTS } = await import('../src/index.js');
+  const answer = await lamp.pose(FAKE_JPEG);
+  assert.deepEqual(fake.asked('pose'), [{ jpeg: FAKE_JPEG.toString('base64') }]);
+  assert.deepEqual(Object.keys(answer).sort(), ['height', 'model', 'ms', 'pose', 'width']);
+  assert.deepEqual([answer.width, answer.height, answer.model], [640, 480, 'fake-movenet']);
+  assert.equal(answer.pose.keypoints.length, POSE_KEYPOINTS.length);
+  assert.equal(POSE_KEYPOINTS.length, 17);
+  assert.deepEqual(Object.keys(answer.ms).sort(), ['decode', 'npu', 'post', 'total']);
+  fake.pose = null;
+  assert.equal((await lamp.pose(new Uint8Array(FAKE_JPEG))).pose, null);
+  await assert.rejects(lamp.pose(Buffer.from('GIF89a')), (error) => error instanceof byCode.bad_request && /not a JPEG/.test(error.why));
+}));
+
+test('pose checks the size before sending and keeps the lamp\'s refusals', () => withLamp({ grants: ['camera'] }, async (lamp, fake) => {
+  const { FAKE_JPEG } = await import('../src/testing.js');
+  const { POSE_JPEG_MAX_BYTES } = await import('../src/index.js');
+  assert.equal(POSE_JPEG_MAX_BYTES, 150 * 1024);
+  assert.equal(Buffer.alloc(POSE_JPEG_MAX_BYTES).toString('base64').length, 204800);
+  const tooBig = Buffer.concat([Buffer.from([0xff, 0xd8]), Buffer.alloc(POSE_JPEG_MAX_BYTES)]);
+  await assert.rejects(lamp.pose(tooBig), (error) => error.code === 'bad_request' && /over the 153600/.test(error.why));
+  await assert.rejects(lamp.pose(Buffer.alloc(0)), (error) => error.code === 'bad_request' && /empty/.test(error.why));
+  await assert.rejects(lamp.pose('not bytes'), (error) => error.code === 'bad_request');
+  assert.deepEqual(fake.asked('pose'), []);
+  // The biggest that fits goes.
+  await lamp.pose(Buffer.concat([Buffer.from([0xff, 0xd8]), Buffer.alloc(POSE_JPEG_MAX_BYTES - 2)]));
+  fake.refuseNext('pose', 'preparing', 'fetching the pose model', 2000);
+  await assert.rejects(lamp.pose(FAKE_JPEG), (error) => error instanceof byCode.preparing && error.retryMs === 2000
+    && error.name === 'PreparingError' && error.whatToDo.includes('retry_ms'));
+  fake.refuseNext('pose', 'unavailable', 'this lamp has no NPU');
+  await assert.rejects(lamp.pose(FAKE_JPEG), (error) => error instanceof byCode.unavailable && error.retryMs === undefined);
+  fake.refuseNext('pose', 'off', 'the NPU service is off on this lamp: switch LAMP_NPU');
+  await assert.rejects(lamp.pose(FAKE_JPEG), byCode.off);
+  // A code from a newer lamp is still a LampError with its code.
+  fake.refuseNext('pose', 'warming_up', 'a code this SDK has never heard');
+  await assert.rejects(lamp.pose(FAKE_JPEG), (error) => error instanceof LampError && error.code === 'warming_up' && error.whatToDo === '');
+  fake.setPrivate(true);
+  await assert.rejects(lamp.pose(FAKE_JPEG), byCode.private);
+}));
+
+test('pose needs the camera grant', () => withLamp({ grants: ['light'] }, async (lamp) => {
+  const { FAKE_JPEG } = await import('../src/testing.js');
+  await assert.rejects(lamp.pose(FAKE_JPEG), byCode.no_grant);
 }));
 
 test('the camera stream asks up to 30 a second, and 31 is refused before sending', () => withLamp({ grants: ['light', 'camera'] }, async (lamp) => {

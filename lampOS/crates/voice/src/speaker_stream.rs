@@ -71,6 +71,22 @@ pub fn on() -> bool {
     ON.load(Ordering::Relaxed)
 }
 
+/// The switch for the long-form bound (`on` exactly; off unless set).
+pub const LONG_FORM_ENVIRONMENT: &str = "LAMP_STREAM_SPEECH_LEVEL";
+
+/// Whether [`LONG_FORM_ENVIRONMENT`] was `on` when the service started.
+static LONG_FORM: AtomicBool = AtomicBool::new(false);
+
+/// The service started with the long-form switch `on` or not.
+pub fn set_long_form(on: bool) {
+    LONG_FORM.store(on, Ordering::Relaxed);
+}
+
+/// Whether a stream is held to the long-form bound.
+pub fn long_form_on() -> bool {
+    LONG_FORM.load(Ordering::Relaxed)
+}
+
 /// The speaker's chunk, in samples: 10 ms at 24 kHz, as a lamp's own sound is
 /// handed to the speaker worker.
 pub const CHUNK: usize = 240;
@@ -87,9 +103,16 @@ const MOST_HELD: usize = 7_200;
 /// it reads off the bus in, the voice's speaker handoff takes it out in
 /// [`CHUNK`]s ([`crate::coordinator`]'s sound path). Closed, what is left
 /// plays out and ends with one chunk faded to nothing.
-#[derive(Debug, Default)]
+///
+/// A long exact line's pieces (#7892, [`crate::say::tts_cache::Pieces`])
+/// come through a feed of their own size ([`Feed::for_line`]): its
+/// renderer puts each piece in as it is rendered, at most one ahead of what
+/// plays, and stops once the line is let go ([`Feed::abandon`]).
+#[derive(Debug)]
 pub struct Feed {
     state: Mutex<Held>,
+    /// The most sound held: [`MOST_HELD`] for a stream.
+    most: usize,
 }
 
 #[derive(Debug, Default)]
@@ -101,6 +124,10 @@ struct Held {
     dropped: u64,
     /// Gaps the speaker reported in this stream's sound.
     underruns: u64,
+    /// Nobody plays it any more: its line was cut, refused or let go.
+    abandoned: bool,
+    /// Closed before all its sound came: a piece of a line not rendered.
+    short: bool,
 }
 
 /// A feed is its own: two are equal only if they are the same one.
@@ -114,7 +141,16 @@ impl Eq for Feed {}
 
 impl Feed {
     pub fn new() -> Arc<Self> {
-        Arc::default()
+        Self::for_line(MOST_HELD)
+    }
+
+    /// A feed that holds up to `most` samples: a long exact line's, whose
+    /// renderer keeps it to the piece playing and the next one.
+    pub fn for_line(most: usize) -> Arc<Self> {
+        Arc::new(Self {
+            state: Mutex::default(),
+            most,
+        })
     }
 
     fn held(&self) -> std::sync::MutexGuard<'_, Held> {
@@ -126,7 +162,7 @@ impl Feed {
     /// Sound read off the bus; what does not fit is dropped and counted.
     pub fn push(&self, block: &[i16]) {
         let mut held = self.held();
-        let room = MOST_HELD.saturating_sub(held.samples.len());
+        let room = self.most.saturating_sub(held.samples.len());
         held.samples.extend(&block[..block.len().min(room)]);
         held.dropped += block.len().saturating_sub(room) as u64;
     }
@@ -134,6 +170,34 @@ impl Feed {
     /// No more sound comes: what is held plays out.
     pub fn close(&self) {
         self.held().closed = true;
+    }
+
+    /// No more sound comes, though some was owed: what is held plays out,
+    /// and the line is not said whole ([`Feed::short`]).
+    pub fn close_short(&self) {
+        let mut held = self.held();
+        held.closed = true;
+        held.short = true;
+    }
+
+    /// Whether it was closed before all its sound came.
+    pub fn short(&self) -> bool {
+        self.held().short
+    }
+
+    /// Nobody plays it any more: its renderer stops.
+    pub fn abandon(&self) {
+        self.held().abandoned = true;
+    }
+
+    /// Whether nobody plays it any more.
+    pub fn abandoned(&self) -> bool {
+        self.held().abandoned
+    }
+
+    /// The samples held now, not yet taken.
+    pub fn held_samples(&self) -> usize {
+        self.held().samples.len()
     }
 
     /// Whether a chunk may go to the speaker now: a whole one is held (the
@@ -450,14 +514,38 @@ const MOST_READS: usize = 64;
 /// The most of a line from its computer that is kept waiting for its newline.
 const MOST_LINE: usize = 4096;
 
-/// The loudness a computer's stream is held to, the same bound a skill's
-/// sound has ([`crate::say::SOUND_PEAK_DBFS`], [`crate::say::SOUND_LOUDEST_DBFS`]):
-/// no sample past the first and no 10 ms louder than the second as RMS. A
-/// clip past it is refused; a stream, which cannot be read ahead, is lowered.
+/// The loudness a computer's stream is held to. Without
+/// [`LONG_FORM_ENVIRONMENT`] it is the bound a skill's short sound has
+/// ([`crate::say::SOUND_PEAK_DBFS`], [`crate::say::SOUND_LOUDEST_DBFS`]): no
+/// sample past the first and no 10 ms louder than the second as RMS. A clip
+/// past it is refused; a stream, which cannot be read ahead, is lowered.
+///
+/// With the switch, a stream is *long-form*: a computer's or app's audio on
+/// `speaker.stream`, a story, music or a call, which runs for as long as the
+/// computer sends and is the whole of what a person came to hear. It is held
+/// to [`LONG_FORM_LOUDEST_DBFS`] RMS and [`LONG_FORM_PEAK_DBFS`] instead. A
+/// skill's `sound` op (a clip of at most 3 s, a chime) is not long-form and
+/// keeps the short bound, which this does not touch. The owner's volume and
+/// the night caps act after the voice's samples (the speaker's mixer) and are
+/// not changed by either bound.
 const LIMIT_WINDOW: usize = 240;
+
+/// The long-form RMS bound: the lamp's own speech sits at about -20 dBFS, so
+/// a story plays about as loud as the voice, not 10 dB under it.
+pub const LONG_FORM_LOUDEST_DBFS: f64 = -20.0;
+
+/// The long-form peak bound. Speech and recorded stories have peaks 10 to 14
+/// dB over their RMS; a peak bound only 8 dB over the RMS bound (-12) would
+/// clip every one of them and make a story harsh. -6 dBFS leaves 14 dB over
+/// -20 and still keeps every sample 6 dB under full scale, so a train of
+/// full-scale clicks is still held.
+pub const LONG_FORM_PEAK_DBFS: f64 = -6.0;
 
 /// The RMS the limiter aims at, a part of the cap: 2% (0.18 dB) under it.
 const RMS_MARGIN: f64 = 0.98;
+
+/// The peak the limiter aims at, a part of the bound: 0.1% under it.
+const PEAK_MARGIN: f64 = 0.999;
 
 /// A stream's limiter: per 10 ms window (240 samples, one speaker chunk) the
 /// gain that brings its RMS to the cap, taken at once when it must go down
@@ -467,28 +555,59 @@ const RMS_MARGIN: f64 = 0.98;
 struct Limiter {
     /// The gain the last window ended on.
     gain: f64,
+    /// The RMS bound, dBFS.
+    loudest_dbfs: f64,
+    /// The peak bound, dBFS.
+    peak_dbfs: f64,
 }
 
 impl Default for Limiter {
+    /// The short-sound bound.
     fn default() -> Self {
-        Self { gain: 1.0 }
+        Self {
+            gain: 1.0,
+            loudest_dbfs: crate::say::SOUND_LOUDEST_DBFS,
+            peak_dbfs: crate::say::SOUND_PEAK_DBFS,
+        }
     }
 }
 
 impl Limiter {
-    /// Limits `block` in place; how many of its 10 ms windows were lowered
-    /// or clipped. A window shorter than 240 (the end of a block) is its own.
+    /// The long-form bound.
+    fn long_form() -> Self {
+        Self {
+            gain: 1.0,
+            loudest_dbfs: LONG_FORM_LOUDEST_DBFS,
+            peak_dbfs: LONG_FORM_PEAK_DBFS,
+        }
+    }
+
+    /// Limits `block` in place; how many of its 10 ms windows were lowered. A window shorter than 240 (the end of a block) is its own.
     fn limit(&mut self, block: &mut [i16]) -> u64 {
         let full = 32_767.0;
-        let peak = (full * 10f64.powf(crate::say::SOUND_PEAK_DBFS / 20.0)).floor();
+        let peak = (full * 10f64.powf(self.peak_dbfs / 20.0)).floor();
         // A little under the cap, so the rounding to whole samples never
         // puts a window a hair over it.
-        let loudest = full * 10f64.powf(crate::say::SOUND_LOUDEST_DBFS / 20.0) * RMS_MARGIN;
+        let loudest = full * 10f64.powf(self.loudest_dbfs / 20.0) * RMS_MARGIN;
         let mut limited = 0;
         for window in block.chunks_mut(LIMIT_WINDOW) {
             let power = window.iter().map(|&s| f64::from(s).powi(2)).sum::<f64>();
             let rms = (power / window.len() as f64).sqrt();
-            let target = if rms > loudest { loudest / rms } else { 1.0 };
+            // The loudest sample of the window brings the gain down too, so a
+            // peak past the bound is lowered with the whole window (its shape
+            // kept) and not cut flat. A part under 0.1% leaves the rounding
+            // of whole samples no way to put one over.
+            let top = window
+                .iter()
+                .map(|&s| f64::from(s).abs())
+                .fold(0.0, f64::max);
+            let by_rms = if rms > loudest { loudest / rms } else { 1.0 };
+            let by_peak = if top > peak {
+                peak * PEAK_MARGIN / top
+            } else {
+                1.0
+            };
+            let target = by_rms.min(by_peak);
             let start = if target < self.gain {
                 target
             } else {
@@ -505,6 +624,8 @@ impl Limiter {
                     start + (target - start) * (at as f64 + 1.0) / count
                 };
                 let mut value = f64::from(*sample) * gain;
+                // Only the rounding's own last hair: the gain above already
+                // keeps every sample under the bound.
                 if value.abs() > peak {
                     value = value.signum() * peak;
                     touched = true;
@@ -532,7 +653,11 @@ impl Sound {
         Ok(Self {
             blocks: bus.subscribe_typed(Audio::SPEAKER_TOPIC, NAME, Audio::TYPE)?,
             counts: Counts::default(),
-            limiter: Limiter::default(),
+            limiter: if long_form_on() {
+                Limiter::long_form()
+            } else {
+                Limiter::default()
+            },
         })
     }
 
@@ -554,9 +679,9 @@ impl Sound {
                         .chunks_exact(2)
                         .map(|pair| i16::from_le_bytes([pair[0], pair[1]]))
                         .collect();
-                    // A computer's sound is held to the loudness a skill's
-                    // sound is (a clip past it is refused; a live stream is
-                    // lowered, and counted).
+                    // A computer's sound is held to the stream's bound
+                    // (the skill sound's, or the long-form one with its
+                    // switch); a live stream is lowered, and counted.
                     self.counts.limited += self.limiter.limit(&mut samples);
                     feed.push(&samples);
                 }
@@ -773,6 +898,127 @@ mod tests {
             assert!(limited >= 100, "size {size}: {limited} windows counted");
             assert_eq!(played.len(), loud.len());
         }
+    }
+
+    /// A sine of `rms_dbfs` RMS.
+    fn tone_at(rms_dbfs: f64, count: usize) -> Vec<i16> {
+        sine(
+            32_767.0 * 10f64.powf(rms_dbfs / 20.0) * std::f64::consts::SQRT_2,
+            count,
+        )
+    }
+
+    #[test]
+    fn a_stream_at_speech_level_passes_the_long_form_bound_untouched_and_the_short_one_lowers_it() {
+        // About the lamp's own speech, -20 dBFS RMS; its peak is 3 dB over.
+        let speech = tone_at(-20.5, 24_000);
+        let mut long = Limiter::long_form();
+        let mut played = speech.clone();
+        assert_eq!(long.limit(&mut played), 0);
+        assert_eq!(played, speech);
+        let mut short = Limiter::default();
+        let mut lowered = speech.clone();
+        assert!(short.limit(&mut lowered) > 0);
+        let (rms, _) = loudest(&lowered);
+        assert!(rms < 32_767.0 * 10f64.powf(-29.5 / 20.0), "{rms}");
+    }
+
+    #[test]
+    fn a_peak_past_the_bound_is_lowered_with_its_window_and_never_cut_flat() {
+        // One 30,000 pulse a window on a quiet tone: quiet as RMS (about
+        // -21 dBFS), 5 dB past the -6 dBFS peak bound. A hard clip would cut
+        // the pulse and leave the tone as it was; the limiter scales the
+        // whole window so the pulse fits and the tone keeps its shape.
+        let cap_peak = 32_767.0 * 10f64.powf(LONG_FORM_PEAK_DBFS / 20.0);
+        let mut input = sine(3_000.0, 4_800);
+        for window in input.chunks_mut(240) {
+            window[100] = 30_000;
+        }
+        let mut limiter = Limiter::long_form();
+        let mut played = input.clone();
+        let mut limited = 0;
+        for part in played.chunks_mut(240) {
+            limited += limiter.limit(part);
+        }
+        assert!(limited >= 19, "{limited}");
+        let (_, peak) = loudest(&played);
+        assert!(peak <= cap_peak, "{peak} past {cap_peak}");
+        // Not flat: every window's pulse is the window's top, and the tone
+        // beside it is scaled by the same gain (about 0.55), not untouched.
+        for (before, after) in input.chunks(240).zip(played.chunks(240)).skip(1) {
+            assert!(after[100] > 15_000, "pulse cut to {}", after[100]);
+            let gain = f64::from(after[100]) / f64::from(before[100]);
+            assert!((0.45..0.6).contains(&gain), "{gain}");
+            for at in [20, 60, 140, 200] {
+                if before[at].abs() > 1_500 {
+                    let ratio = f64::from(after[at]) / f64::from(before[at]);
+                    assert!(
+                        (ratio - gain).abs() < 0.02,
+                        "sample {at}: {ratio} vs {gain}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_long_form_stream_louder_than_speech_is_held_to_its_own_bound() {
+        let cap_rms = 32_767.0 * 10f64.powf(LONG_FORM_LOUDEST_DBFS / 20.0);
+        let cap_peak = 32_767.0 * 10f64.powf(LONG_FORM_PEAK_DBFS / 20.0);
+        let mut limiter = Limiter::long_form();
+        let mut played = Vec::new();
+        let mut limited = 0;
+        for part in sine(30_000.0, 24_000).chunks(240) {
+            let mut block = part.to_vec();
+            limited += limiter.limit(&mut block);
+            played.extend(block);
+        }
+        let (rms, peak) = loudest(&played);
+        assert!(rms <= cap_rms, "{rms} past {cap_rms}");
+        assert!(peak <= cap_peak, "{peak} past {cap_peak}");
+        assert!(limited >= 90, "{limited} windows counted");
+        // Not lowered past its own bound: about -20, not -30.
+        assert!(rms > 32_767.0 * 10f64.powf(-21.0 / 20.0), "{rms}");
+    }
+
+    #[test]
+    fn a_short_skill_sound_is_still_held_at_minus_30_and_its_check_never_reads_the_switch() {
+        // The skill sound's check is the sound op's, not the stream's: a clip
+        // at speech level is refused, one under -30 passes. `decode_sound`
+        // never reads the long-form switch, so this test does not touch it
+        // (no test writes that process-wide static: the tests run in
+        // parallel and a write races every test that opens a stream).
+        fn wav(samples: &[i16]) -> Vec<u8> {
+            let mut out = Vec::new();
+            {
+                let spec = hound::WavSpec {
+                    channels: 1,
+                    sample_rate: crate::say::SOUND_RATE,
+                    bits_per_sample: 16,
+                    sample_format: hound::SampleFormat::Int,
+                };
+                let mut writer =
+                    hound::WavWriter::new(std::io::Cursor::new(&mut out), spec).unwrap();
+                for &sample in samples {
+                    writer.write_sample(sample).unwrap();
+                }
+                writer.finalize().unwrap();
+            }
+            out
+        }
+        let loud = crate::say::decode_sound(&wav(&tone_at(-20.5, 4_800)));
+        let quiet = crate::say::decode_sound(&wav(&tone_at(-31.0, 4_800)));
+        assert!(
+            loud.is_err(),
+            "a short sound at speech level must be refused"
+        );
+        assert!(quiet.is_ok());
+    }
+
+    #[test]
+    fn the_long_form_switch_is_one_name_and_off_unless_set() {
+        assert_eq!(LONG_FORM_ENVIRONMENT, "LAMP_STREAM_SPEECH_LEVEL");
+        assert!(!long_form_on());
     }
 
     #[test]

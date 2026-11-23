@@ -36,7 +36,8 @@ shares, the author's own, carrying their public key (`lamp-skills pack
 --key-file KEY --author`; skills.md, "A shared package"). A folder with a `run.py`, or any script,
 is refused: script skills are a later format, except the `scripts/` of a skill whose `[[do]]` has a
 `task = { task, run }` (format 2, with its top-level `grants`; skills.md, "A skill's task"): `lamp
-skill check` holds that as the lamp does, and a push may carry it.
+skill check` holds that as the lamp does, and a push may carry it. `lamp-skills pack` refuses a
+task whose words are empty, longer than 120 characters or not plain (#7874).
 
 **`SKILL.md`** starts with front matter between two `---` lines. Two keys
 are read and both are required:
@@ -111,14 +112,16 @@ outside ASCII can pass the schema and still be too long on the lamp.
 | `[budget]` | `{ group, per_hour 1–6, gap, give_back_unsaid }` | runs an hour shared by every skill of the group; `gap` (1 m to 1 h), the least time between two of them; `give_back_unsaid`, a run that said nothing gives its place back (#5207) |
 | `[rest]` | `{ after_ignored 1–5, within }` | rests until the next morning after runs nobody noticed |
 | `[present]` | `enabled`, `trigger`, `while`, `most_a_day`, `active`, `quiet`, `budget`, `rest`, `ask`, `do` | with `LAMP_NUDGES_PRESENT=on`, each key stands in for the file's own, whole; read, checked and ignored without it (#5207) |
-| `[stop]` | `{ tool, about, when? }` | a function the model calls to snooze it or turn it off; `when`, at most 200 bytes, as `SKILL.md`'s (#6218) |
+| `[stop]` | `{ tool, about, when?, group?, kind? }` | a function the model calls to snooze it or turn it off; `when`, at most 200 bytes, as `SKILL.md`'s (#6218); `group`, in a skill with no `[budget]`, shares the function with the skills under the skills folder naming the same group, with no limit (#7401); `kind`, a lowercase letter then lowercase letters, digits and single hyphens between them, at most 32 bytes: the word a shared stop function's `kind` names this skill by, beside its name (#6543) |
 | `[search]` | `{ looks 1–8, give_up, found, note, walk, looked }` | a search a person asked for, its looks and what the model is told past the last (look-for-things) |
 | `[history]` | `{ topic = "room/presence", within, words }` | the room's presence over the last hours, for the model (who-was-here) |
 | `[watch]` | `{ every, asked_within, if_heard, most, mark, words }` | a watch the skill's tool turns on and off, with a faint `mark` light while on (guard-mode). Needs `light`, `messages` and `known_faces`; no trigger and no steps |
 | `[[do]]` | list | the steps |
 
 A skill needs a trigger or a tool, and at least one step. It says, sounds
-or cues at most once a run.
+or cues at most once a run. Its `[[do]]` steps all start together, never one
+after another: a light's `for` holds that light and does not wait. Colours in
+turn are a light show (`show`), or a `task` step's code.
 
 **The lamp's own tables.** `[unplug]`, `[onboarding]` and `[startle]`
 need a core grant (`prepare_unplug`, `onboarding`, `startle`), so only a
@@ -159,7 +162,9 @@ Keys of a trigger:
 - `each` and `key`, together: one start per value of `key`.
 - Timing: `for` (the test holds this long), `absent_for`, `gap`,
   `cooldown`, `wait` (at most 1 h), `rise = { by, within }`,
-  `rearm` (`"leaves"`, `"ends"`, or `{ above | below, for }`).
+  `rearm` (`"leaves"`, `"ends"`, `{ above | below, for }`, or `{ still }`
+  alone on a trigger with a `rise`, 1m to 1h: again only once the field has
+  not risen for that long, #7668).
 - `lively = true`: its `cooldown` and `rearm` follow the energy level
   (`LAMP_BODY_ENERGY`, [skills.md](skills.md)); level 1 as written.
 - `during` (a window), `days` (with `during`: `["mon", "fri"]`,
@@ -183,8 +188,11 @@ Keys of a trigger:
 A `[[while]]` condition takes `topic`, `field`, `equals`, `not_equals`,
 `above`, `below`, `for`, `present = true` or `faces_at_most` (1 to 8) on
 `humans/faces/tracked`, `unknown = "holds"` or `unknown = "holds_stale"`
-(#6543: also holds on a value that has run out), and `through` with
-`broken_by`.
+(#6543: also holds on a value that has run out), `through` with
+`broken_by`, and `drops_kept = true` (#6543, #7668: only on `voice/privacy`,
+a field's test without `for` or `unknown`; the slide is told by lamp-skills on
+a change, never subscribed, and its closing drops every chance the skill
+keeps for its `wait`, and a `rise` forgets what it read before).
 
 ### Steps: the actions
 
@@ -199,7 +207,7 @@ it) or `if_choice` (the tool's values it runs for).
 | `look` (`at = "face"`) | `body = { look_at = "face" }` | `body`, and `humans/faces/tracked` in `topics` (the protocol asks `body` and `look`) |
 | (none) | `body = { mood = "reading", for, toward }`: the reading pose | `body` |
 | `light` | `light = "NAME"` (`lights/NAME.toml`) or `light = { colour, level 1–5, for ≤ 10m, pattern, … }` | `light` |
-| (none) | `show = "NAME"`: `shows/NAME.toml`, 2 to 30 frames, 60 s at most | `light` |
+| (none) | `show = "NAME"`: `shows/NAME.toml`, 2 to 30 frames, 60 s at most; only in a skill its tool, or its own words (`asks`, `LAMP_MADE_SKILL_ASKS`), alone starts | `light` |
 | `express` | (none yet: a feeling is the `feelings` skill's, #3691) | `body` and `light` |
 | `say` | `say = "a note the model speaks from"`, `say = { note = "…" }`, or `say = { text = "said as it is" }`, each with `priority` (0 to 8) and `expires` (1 s to 1 h); `text` or `note` may be a list of 2 to 16 different lines, one said each run (#3997); a `note` may name one number field every trigger running it tests, `{drank_seen}`, filled as a whole number or dropped; any other brace is said as written, and refused only for a new skill ([skills.md](skills.md), "A number from the reading in a note"); a `note` may add `may_end_unsaid = true` (#6543): the voice lets it go, unsaid, once someone talks or the face leaves before it begins, and the run is given back | `speak` |
 | `sound` | `sound = "NAME"`: `sounds/NAME.wav`; not with a tool | `speak` |
@@ -207,6 +215,7 @@ it) or `if_choice` (the tool's values it runs for).
 | (none) | `look = true`: the full look's picture to the model; tool only | `camera` (format 1's `look` still gives it: "The camera", below) |
 | (none) | `stand = N`: a percent of the lamp's own stand, 1 to 100, kept until the next ask; tool only | `body` |
 | (none) | `rest = { op = "rest"\|"wake"\|"cancel", during, resettle }` | `body` |
+| (none) | `remind = { in = "25m", words = "…" }`, `remind = { at = "22:00", words = "…" }` or `remind = { every = "30m", words = "…" }`: one timer, reminder or repeating reminder (every 15 m to 24 h, until cancelled by voice) set in the lamp's schedule, said when due; its words fixed (at most 120 characters, one or two sentences); at most 3 a day, none stacked; never in a skill with a tool | `actions = ["set_timer"]` for `in`, `["set_reminder"]` for `at`, `["repeat_reminder"]` for `every` |
 | (none) | `read = { service, what, ... }`: a read of one of the owner's linked services, said to them alone behind its gate; the skill's only step, alone, from a trigger, no tool or `each`; only with `LAMP_SKILL_READS=on` ("Reading a linked service", below) | `speak` and `services = { <service> = "read" }` |
 
 Light values are the protocol's: colours `yellow`, `red`, `green`,

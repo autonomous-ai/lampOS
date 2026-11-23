@@ -38,6 +38,11 @@ pub(super) struct FailureNotices {
     /// (#4473 (c)): a line it keeps in that language is said in place of
     /// the release's English file, read when the line is chosen.
     owners: Option<Arc<crate::say::tts_cache::TtsCache>>,
+    /// `LAMP_OUTAGE_LINE_AGAIN=on` (#8235): the outage's line on every
+    /// speech turn of it, and `turn_lost` from the speech cache.
+    line_again: bool,
+    /// The speech cache on an English lamp, with the switch (#8235).
+    english: Option<Arc<crate::say::tts_cache::TtsCache>>,
 }
 
 /// How loud the fallback sigh is, as RMS over its loudest tenth of a
@@ -59,6 +64,9 @@ impl Recording {
     pub(super) fn first_sample(&self) -> i16 {
         self.samples[0]
     }
+    pub(super) fn transcript(&self) -> Option<&str> {
+        self.info.as_ref().map(|info| info.transcript.as_str())
+    }
 }
 impl FailureNotices {
     pub(super) fn load(options: Option<&NoticeOptions>) -> Self {
@@ -69,6 +77,7 @@ impl FailureNotices {
             return Self::none();
         };
         let loaded = Notices::load(options.directory(), approval);
+        let line_again = std::env::var(OUTAGE_LINE_AGAIN_ENVIRONMENT).ok().as_deref() == Some("on");
         let get = |kind| {
             loaded.get(kind, options.language()).map(|notice| {
                 Arc::new(Recording {
@@ -92,6 +101,12 @@ impl FailureNotices {
             language: Some(options.language().to_owned()),
             owners: crate::language::at_start()
                 .and_then(|_| crate::say::tts_cache::from_environment()),
+            line_again,
+            // `turn_lost` from the speech cache on an English lamp, whose
+            // release has no file for it (#8235).
+            english: (line_again && crate::language::at_start().is_none())
+                .then(crate::say::tts_cache::from_environment)
+                .flatten(),
         }
     }
     pub(super) fn none() -> Self {
@@ -106,6 +121,8 @@ impl FailureNotices {
             fallback: None,
             language: None,
             owners: None,
+            line_again: false,
+            english: None,
         }
     }
     /// `kind`'s line in the owner's language, read from the speech cache
@@ -117,25 +134,58 @@ impl FailureNotices {
         &self,
         kind: NoticeKind,
     ) -> Option<std::result::Result<Arc<Recording>, Missing>> {
+        self.owners_words_line(kind, notice_words(kind)?)
+    }
+    /// `english`, a fixed line, in the owner's language from the speech
+    /// cache, recorded under `kind`; none as [`Self::owners_line`].
+    fn owners_words_line(
+        &self,
+        kind: NoticeKind,
+        english: &'static str,
+    ) -> Option<std::result::Result<Arc<Recording>, Missing>> {
         let cache = self.owners.as_ref()?;
-        let (language, words) = cache.owners_words(notice_words(kind)?)?;
-        let samples = cache.kept(words)?;
-        let frames = u32::try_from(samples.len()).ok()?;
-        Some(Ok(Arc::new(Recording {
-            info: Some(NoticeInfo {
-                kind,
-                language: language.code().to_owned(),
-                transcript: words.to_owned(),
-                voice: "speech-cache".into(),
-                voice_revision: "speech-cache".into(),
-                approval: Approval::Production,
-                wav_sha256: format!("speech-cache:{}", cache.key(words)),
-                pcm_sha256: "speech-cache".into(),
-                frames,
-                duration_ms: frames / 24,
-            }),
-            samples: samples.into_boxed_slice(),
-        })))
+        let (language, words) = cache.owners_words(english)?;
+        cached_line(cache, kind, language.code(), words)
+    }
+    /// With `LAMP_OUTAGE_LINE_AGAIN=on` (#8235), on an English lamp: the
+    /// English `words` from the speech cache, rendered at start in the
+    /// lamp's voice, recorded under `kind`. Never rendered here.
+    fn english_line(
+        &self,
+        kind: NoticeKind,
+        words: &'static str,
+    ) -> Option<std::result::Result<Arc<Recording>, Missing>> {
+        if !self.line_again {
+            return None;
+        }
+        let language = self.language.as_deref().unwrap_or("en-US");
+        cached_line(self.english.as_ref()?, kind, language, words)
+    }
+    /// With `LAMP_OUTAGE_LINE_AGAIN=on` (#8235), what a local-only turn of
+    /// an outage of the service alone says: the second route's down line
+    /// ("Sorry, my thoughts are slow just now. Ask me again in a moment."),
+    /// the words a turn the service fails says, in the owner's language
+    /// when kept; none while not kept, and the release's service line then.
+    /// And a lost turn's `turn_lost` from the cache on an English lamp,
+    /// whose release has no file for it.
+    fn switched_line(
+        &self,
+        kind: NoticeKind,
+    ) -> Option<std::result::Result<Arc<Recording>, Missing>> {
+        if !self.line_again {
+            return None;
+        }
+        match kind {
+            NoticeKind::VoiceServiceUnreachable => {
+                let down = crate::second_provider::DOWN_LINE;
+                self.owners_words_line(kind, down)
+                    .or_else(|| self.english_line(kind, down))
+            }
+            NoticeKind::TurnLost if self.selected.is_err() => {
+                self.english_line(kind, crate::language::TURN_LOST)
+            }
+            _ => None,
+        }
     }
     pub(super) fn capability(&self) -> Value {
         let mut capability = match &self.selected {
@@ -181,6 +231,33 @@ impl FailureNotices {
             .with("wifi_lost", loaded(&self.wifi_lost))
             .with("wifi_recovering", loaded(&self.wifi_recovering))
     }
+}
+
+/// `words`, kept in `cache`, as a recording of `kind` in `language`,
+/// named as the cache's (#4473 (c)); none while not kept.
+fn cached_line(
+    cache: &crate::say::tts_cache::TtsCache,
+    kind: NoticeKind,
+    language: &str,
+    words: &'static str,
+) -> Option<std::result::Result<Arc<Recording>, Missing>> {
+    let samples = cache.kept(words)?;
+    let frames = u32::try_from(samples.len()).ok()?;
+    Some(Ok(Arc::new(Recording {
+        info: Some(NoticeInfo {
+            kind,
+            language: language.to_owned(),
+            transcript: words.to_owned(),
+            voice: "speech-cache".into(),
+            voice_revision: "speech-cache".into(),
+            approval: Approval::Production,
+            wav_sha256: format!("speech-cache:{}", cache.key(words)),
+            pcm_sha256: "speech-cache".into(),
+            frames,
+            duration_ms: frames / 24,
+        }),
+        samples: samples.into_boxed_slice(),
+    })))
 }
 
 /// The English words of `kind`'s product recording, the key of its line in
@@ -250,6 +327,11 @@ impl Outage {
             self.said = true;
             self.service = local.service;
         }
+    }
+    /// The line is owed: not said yet this outage, or, with
+    /// `LAMP_OUTAGE_LINE_AGAIN=on`, on every speech turn of it (#8235).
+    fn line_owed(&self, every_turn: bool) -> bool {
+        !self.said || every_turn
     }
 }
 
@@ -383,8 +465,13 @@ impl NoticeDelivery {
     /// A computer's stream: played from `feed` in chunks as the sound comes,
     /// the last one at its close.
     pub(super) fn stream(feed: Arc<crate::speaker_stream::Feed>) -> Self {
+        Self::fed(SpeechOrigin::ComputerStream, feed)
+    }
+    /// Sound of `origin` played from `feed` as it comes: a computer's
+    /// stream, or a long exact line's pieces (#7892).
+    pub(super) fn fed(origin: SpeechOrigin, feed: Arc<crate::speaker_stream::Feed>) -> Self {
         Self::Selected {
-            origin: SpeechOrigin::ComputerStream,
+            origin,
             recording: Arc::new(Recording {
                 info: None,
                 samples: Box::default(),
@@ -395,6 +482,16 @@ impl NoticeDelivery {
             final_acceptance: None,
             gaps: 0,
             feed: Some(feed),
+        }
+    }
+    /// For sound played from a feed: whether all of it came (none of a
+    /// long exact line's pieces went unrendered). None for a recording.
+    pub(super) fn fed_whole(&self) -> Option<bool> {
+        match self {
+            Self::Selected {
+                feed: Some(feed), ..
+            } => Some(!feed.short()),
+            _ => None,
         }
     }
     /// Whether all of it was played: its final sample retired.
@@ -653,8 +750,10 @@ pub(super) fn select_failure_notice_in(
     {
         return Ok(());
     }
-    // A local-only turn says the offline line, once an outage and only for
-    // speech; any other try gets no words, only the ring's offline breath.
+    let owed = outage.line_owed(catalog.line_again);
+    // A local-only turn says the offline line, once an outage (with
+    // `LAMP_OUTAGE_LINE_AGAIN=on`, every time, #8235) and only for speech;
+    // any other try gets no words, only the ring's offline breath.
     let (selected, stands_in, kind) = match current.local_only {
         // The second route's down line already told the person it broke
         // (#4332, lamp-e82d: "thoughts are slow", then `turn_lost` 1.8 s
@@ -670,18 +769,23 @@ pub(super) fn select_failure_notice_in(
         Some(local) if local.signed_out => return Ok(()),
         // "Back online" is never stood in for: nothing failed.
         Some(local) if local.back => (&catalog.back_online, false, NoticeKind::BackOnline),
-        Some(local) if local.speech && !outage.said && local.service => (
+        Some(local) if local.speech && owed && local.service => (
             &catalog.service_down,
             true,
             NoticeKind::VoiceServiceUnreachable,
         ),
-        Some(local) if local.speech && !outage.said => {
+        Some(local) if local.speech && owed => {
             (&catalog.offline, true, NoticeKind::ProviderUnavailable)
         }
         Some(_) => return Ok(()),
     };
-    // In the owner's language when the speech cache keeps it (#4473 (c)).
-    let owners = catalog.owners_line(kind);
+    // With `LAMP_OUTAGE_LINE_AGAIN=on`, the service's outage says the down
+    // line and an English lamp's lost turn its `turn_lost`, both from the
+    // speech cache (#8235); otherwise in the owner's language when the
+    // speech cache keeps it (#4473 (c)).
+    let owners = catalog
+        .switched_line(kind)
+        .or_else(|| catalog.owners_line(kind));
     let selected = owners.as_ref().map_or(selected, |owners| owners);
     let selected_recording = |recording: &Arc<Recording>| NoticeDelivery::Selected {
         origin: SpeechOrigin::FailureNotice,
@@ -738,6 +842,15 @@ impl FailureNotices {
         catalog
     }
 
+    pub(super) fn line_again(mut self, on: bool) -> Self {
+        self.line_again = on;
+        self
+    }
+    pub(super) fn with_english(mut self, cache: crate::say::tts_cache::TtsCache) -> Self {
+        self.english = Some(Arc::new(cache));
+        self
+    }
+
     /// The catalog with the speech cache of an owner's language (#4473 (c)).
     pub(super) fn with_owners(mut self, cache: crate::say::tts_cache::TtsCache) -> Self {
         self.owners = Some(Arc::new(cache));
@@ -782,6 +895,8 @@ impl FailureNotices {
             fallback: None,
             language: Some("en-US".into()),
             owners: None,
+            line_again: false,
+            english: None,
         }
     }
 }

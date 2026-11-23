@@ -782,11 +782,58 @@ reminders are not memories (memory.md's decision record), and a fired
 reminder's turn is kept out of the journal on purpose. The miss was the
 model calling `recall`, or nothing, and saying it did not remember. So
 `list_reminders`' description now ends (`LIST_ASKED`, after the earlier
-text, kept as `LIST_BEFORE`): call this, not recall, for any question about
-their reminders or timers, what is set, when one is due or when they set
-it; never say you do not remember a reminder before calling this; and
-never list reminders unasked (rule 8). Both routes declare the same
-catalog, so the Live route and the second route are told the same.
+text, kept as `LIST_BEFORE`): any question about their reminders or timers
+(what is set, when it is due or when it was set; since #8181, their own, at
+any point, "not recall or lamp_help", below), in any wording or
+language, even one that sounds a word short, is answered only after calling
+this in that turn, not recall; and never list reminders unasked (rule 8).
+The wording and language part is #7987's: on lamp-52e6 (gate 1079) "Hey
+Lamp, what reminders do I have?" heard as 6 of its 7 words was not one of
+`LAMP_REMINDERS_ASKED`'s exact phrases, so no call was forced, and the
+model answered with no call. The forced call then took the exact phrases
+only; since #7987's second fix it also takes a phrase of 4 words or more
+heard one word short (one word lost or misheard, never "reminders" or
+"my", never beside a word that changes the ask), after the gate's Mac
+volume 45 heard the 7-word line whole in about 17 of 60 plays (switches.md,
+`LAMP_REMINDERS_ASKED`). Every other line is the model's choice, which
+this text makes. The description as it was before is
+kept as `LIST_DESCRIBED_BEFORE`, for the probe's old arm. Both routes
+declare the same catalog, so the Live route and the second route are told
+the same.
+
+**Their own reminders are `list_reminders`', how reminders work is
+`lamp_help`'s (#8181).** On lamp-52e6 in gate 1126 (build 15285) the core
+reminders line, asked as the 2nd line of a conversation, forced nothing
+(round 1 `forced=none`, `opening=name`, `sentences=2`), and the model
+called faq's `lamp_help` with `topic` `reminders` (`calls=use_skill:1`)
+instead of `list_reminders`; the three first lines after a restart called
+`list_reminders`. No new phrases: the two descriptions now tell the two
+apart. `LIST_ASKED` now says any question about *their own* reminders or
+timers *at any point* is answered only after calling this, "not recall or
+lamp_help" (to fit a function's 1,024 bytes, its "(what is set, when due
+or set)" is gone: the description is 1,021 bytes). Faq's description and
+its `when` say it is "not for their own reminders or timers", which are
+`list_reminders`' ([skills.md](skills.md), "Core skill: how to use the
+lamp"), and its description names "how do reminders work?" among its
+asks (in kit-8206c, #8206's ROW on 22 Nov, that line got no call in 2 of
+4 while faq named reminders only as not its own). Tests:
+`list_reminders_and_lamp_help_say_which_is_for_their_own_reminders` and
+`faq_says_how_reminders_work_is_its_own`
+(`crates/voice/src/tools/reminders_asked.rs`). Whether the model calls
+`list_reminders` mid-conversation is a played row's. That line was 7 of
+7 words heard and still not forced, and the journal could not say which
+word fell outside the exact phrases. So with `LAMP_REMINDERS_ASKED` on, a
+person's line with a word of "remind" in it that the force refuses, as
+said and past the lamp's name (`second_provider::forced_past_the_name`),
+now says why, right after round 1's line, in counts only: `request N:
+round 1: not forced to list_reminders: read=<as_said|past_name>
+refused=<no_ask|outside|two_asks> words=N asks=N outside=N
+first_outside_at=<N|none>`, `read` the reading reported (`past_name` when
+the line opens with the lamp's name, the one the force tries last),
+`no_ask` for none of
+the phrases, `outside` for a word in no phrase and not among the words
+around them, `two_asks` for two phrases. Never a word. Test:
+`a_refused_reminders_line_says_why_in_counts_only`.
 
 Each listed item now says when it was set: `set_day` (`today`,
 `yesterday`, or its `YYYY-MM-DD`) and `set_clock` (its local `HH:MM`), so
@@ -1105,7 +1152,83 @@ it another operation ("don't", "no", "wait", "cancel", "actually", "or",
 "for a week"; a later start: "starting at noon"; a condition: "when", "if",
 "once") and a
 question that isn't an ask are asked as before, and the round after the call is asked with its
-result, so the lamp says what the schedule did.
+result, so the lamp says what the schedule did. The ask is read past the lamp's
+name too (`second_provider::forced_past_the_name`, #8022: on lamp-52e6 on 20
+Nov the gates' timer asks said `calls=none`): its own name set off by a stop
+("Hey Lamp. Remind me in ten minutes to stretch.") and, on a line that names
+the lamp, its name heard as another word ("Hey, Lynn, remind me …"). A line
+said to a person ("Hey, Anna, remind me …") is read as said.
+
+### A length or time not heard is asked (`LAMP_TIMER_ASKS_HOW_LONG`)
+
+In gate 1126 (lamp-52e6, 21 Nov, #8182) the core timer line asked for one
+minute; speech to text kept its words but lost the number and the unit, the
+model set a ten-minute timer on its own, and the lamp said when it would
+ring. With `LAMP_TIMER_ASKS_HOW_LONG=on` (`lamp_actions::schedule::ASKS_HOW_LONG_SWITCH`,
+off unless set; it must be set in lamp-actions' unit and lamp-voice's, as the
+product's both are):
+
+- **The descriptions say so.** `set_timer` says that when the person's words
+  give no length it sets nothing and asks only "For how long?", then sets it
+  from the answer; `set_reminder` the same with "What time?"
+  (`schedule::asking_how_long`). They fix the label question's words too,
+  when one is asked: "What's the timer for?" and "What should I remind you
+  about?", each naming the schedule, so a reply to it lends the asked line's
+  length or time (below; the Reviewer-lead's second P2 on #8274: a free
+  "What's it for?" lent nothing). Off, the catalog is as it was, byte for
+  byte.
+- **The second route refuses the call.** A `set_timer` or `set_reminder`
+  whose request's own heard line (`thread::heard_in_own_line`), and the
+  person's lines the lamp's questions just before it answered
+  (`thread::asked_before`: the run of exchanges whose lamp line ended in a
+  question, each within `said_to_me::QUESTION_WAITS`, 120 s), have no digit
+  and no word of `reminders::WHEN_WORDS` (the numbers one to twenty and the
+  tens, "hundred", "half", "quarter", the units second, minute and hour with
+  their short forms, "noon", "midnight", "o'clock") is never sent
+  to the schedule (`reminders::when_not_heard`): the model is told `Nothing
+  was set: the person's words gave no length or time for it, … Ask only this,
+  in a few words: "For how long?"` (or `"What time?"`), and the journal says
+  `request N: set_timer refused, its line gave no length or time`. The rule
+  only checks that a length was said; it chooses no tool and reads no length.
+  The person's answer ("One minute.", "Ten.") is a line of its own that gives
+  one, so its call is set as the model makes it. A second call in the same
+  request is refused the same way, so the model's rounds end in the ask; each
+  new line is judged by its own words and the lines its question asked for:
+  "Remind me at seven." → "What should I remind you about?" → "Take my
+  pills." is set (Sixth's HOLD on #8274), and "Remind me tomorrow." → "What
+  about?" → "Take my pills." still asks "What time?". An asked line lends
+  its length only when it was itself a timer or reminder ask
+  (`going_on_asks::names_the_schedule`: timer, reminder, remind, alarm,
+  countdown or the lamp) and the lamp's question it answers, its last
+  sentence (`thread::lamp_question_said`), names one of those words too: a
+  question about the asked one ("What should I remind you about?") lends,
+  so "Remind me to take my pills." and "Charge the lamp." after it are set
+  (the Reviewer-lead's P2 on #8274), while "Anything else?" invites a fresh
+  ask, which carries its own: "Set a timer for ten minutes." → "It rings at
+  4:09. Anything else?" → "Set another timer." (or "Pasta.") asks "For how
+  long?", and "What's five plus five?" → "Ten. Anything else?" lends "five"
+  to nothing (Fifth's HOLD on #8274). A reply that names a timer, reminder,
+  alarm or countdown itself (`going_on_asks::names_a_schedule_item`: any of
+  those words but remind and the lamp) is a fresh ask and borrows nothing
+  either, even when the question named one: "Want another timer?" → "Set
+  another timer." asks "For how long?" (Sixth's P3 on #8321). A typed text, a line whose words are
+  not known, and an owner's language other than English check nothing.
+  Because the refusal is an error, `LAMP_SECOND_SAY_WITH_CALL`'s at-once line
+  never says "Timer set." for it (`second_provider::timer_line` needs a
+  committed answer). `LAMP_SCHEDULE_ASKED` forces a call only on a line with
+  its time, which passes.
+
+Test: `a_timer_whose_length_was_not_heard_asks_and_sets_nothing`
+(lamp-voice `tools.rs`: no length asks and sets nothing, "one minute" sets
+60 s, "ten minutes" 600 s),
+`a_reply_to_the_lamps_question_is_set_from_the_line_that_gave_the_time`
+(lamp-voice `tools.rs`),
+`the_lines_the_lamps_questions_answered_are_the_run_back_within_its_bound`
+(lamp-voice `thread.rs`) and
+`set_timer_and_set_reminder_say_to_ask_only_with_the_switch` (lamp-actions).
+Lamp check owed: 10 timer lines with the length cut from the clip all ask,
+10 whole ones set what was said, and a reply to the lamp's own question
+(its label, or morning or evening) is set, from the journal.
 
 ## First's Voice integration contract
 
@@ -1151,6 +1274,49 @@ exactly-once speech or that anyone heard it. First must test that window with re
 receipts, interruption, process restart, privacy changes, and the chosen
 consumer's persistent deduplication. The implementation below adds Voice and
 Actions only; installation and on-lamp qualification remain First's work.
+
+### Reminder rows in the person's memory (`LAMP_SERVICE_RECORDS_REMINDERS`)
+
+The linked-service memory plan, slice 6, on in the product (the product
+owner's rule of 18 Nov, everything on by default). Off unless
+`LAMP_SERVICE_RECORDS_REMINDERS=on` beside `LAMP_SERVICE_RECORDS=on`, on the
+second route only (`voice/src/service_records/reminder_rows.rs`). The
+Schedule itself is unchanged: the voice writes the rows, through its linked
+outbox ([memory-days.md](memory-days.md)), and no Schedule request is added.
+
+| When | Key and action | Written for |
+|---|---|---|
+| `set_reminder` or `repeat_reminder` answered `committed` | `r-<id>-set`, `reminder_set` | The setter the voice names beside the call (`schedule_whose::caller`), a known person (`p-` id) only; in the private room, where the Schedule is told `everyone`, the line's own person or the one-face keep, else the owner (`schedule_whose::record_caller`) |
+| The second route begins to say it (`ProviderInput::Reminder`'s `ids`) | `r-<id>-fired`, `reminder_fired` | Its creator, as kept at the set |
+| `cancel_reminder` answered `committed` with `cancelled: true` | `r-<id>-dismissed`, `reminder_dismissed` | Its creator, whoever cancelled it |
+
+- **No creator, nothing.** Outside the private room, a reminder set as the
+  room's (nobody sure, an unknown face, the room's line) is never written,
+  nor its ring or cancel. In the private room (`LAMP_PRIVATE_ROOM`, on in
+  the product) the Schedule's item stays everyone's, but its record is kept
+  for the person a keep in the line would go to, else the owner, so it is
+  never dropped while the lamp knows its owner (#7960's ROW on lamp-06c1:
+  every voice reminder there kept no row). A ring or cancel of an id the voice did
+  not see set (another route, before a restart) gives nothing.
+- **Each row:** service `schedule`, status `done`, `source_kind`
+  `reminder`, `source_ref` `{service:"lamp-schedule", id:"<id>"}`, the
+  summary the reminder's own text (one line, at most 160 bytes), and the
+  set's time as its deed time, so a forget after the set wins over a later
+  ring.
+- **Bounds:** at most 32 reminders followed, oldest let go first, in
+  memory only. Timers are not kept. A repeating reminder keeps its first
+  ring's row: the memory keeps a `done` row as it is.
+- **Ids on the due request:** the coordinator adds the offer's Schedule id,
+  then its joined ones', to `ProviderInput::Reminder` only with this switch
+  on, so off the packet is as before.
+- **Forget:** a forget of everything, or about a thing the reminder's text
+  matches, lets it go before its rows are sent, and the memory's forget
+  clears the rows. The Schedule's items are never touched by it.
+
+Tests: `the_creator_is_mapped`, `an_unknown_creator_gives_nothing`,
+`off_nothing_is_kept`, `only_a_committed_reminder_is_kept`,
+`the_summary_is_the_text_in_one_short_line`, `the_followed_are_bounded`
+and `a_forget_lets_them_go` (`service_records/reminder_rows.rs`).
 
 ## Optional Voice consumer
 
@@ -1661,6 +1827,21 @@ drops it from the retry map. Tests:
 (`reminders/tests.rs`) and
 `no_audio_or_provider_failure_stays_pending_and_selects_no_failure_recording`
 (`coordinator/tests/reminders.rs`).
+
+At the relay's usage limit, with `LAMP_LIMIT_LOCAL_ASKS=on` (#7642, V2's
+ruling A), every such chat turn is refused, so a ring would end with no
+audio five times and be held. Instead the second route rings a due timer
+with "Your timer is done." and a reminder with "You have a reminder.", from
+clips rendered at start ([second-voice.md](second-voice.md)), and the turn
+ends answered with that audio: the item is completed as said, rung once,
+neither held nor rung again. The consumer reads the item's `kind` from
+Schedule's `get` into `Offer::timer`, passed on as `ProviderInput::Reminder`'s
+`timer`; both are sent only when true and read as false when absent, so an
+older packet is a reminder's. A timer said with others as late takes the
+reminder's line. Tests: `an_offer_without_timer_is_a_reminders_and_sent_as_before`
+(`reminders/tests.rs`), and the three in `second_provider/tests/limit_local.rs`
+named for a due timer (the third pins that a run of plain 429s rings none:
+only the relay's `usage_limit` 429 does).
 
 Crash-uncertain attempts (no settlement ever sent) stay pending without
 re-speech while the voice that made them runs. Such an oldest entry does

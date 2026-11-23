@@ -1,0 +1,14 @@
+# 15:00, the lamp spoke from 8:40 to 9:40, celebrating seen at 10, the voice resting: one line (no wait after its reply).
+clock = "15:00"
+
+[[expect]]
+at = "10m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "10m"
+within = "1m"
+call = "say"
+args = { note = "You just saw them celebrate at the desk: clapping or cheering. Say one warm line, the way a friend would, at most twenty words: share the moment, and maybe ask what the good news is. Say only what you saw; nothing about their body or looks, and never mention a camera." }

@@ -24,6 +24,8 @@ StateDirectoryMode=0700
 # running as lampos with no ProtectSystem=strict could otherwise write by hand. "-": the folder is
 # made at lamp-control's first start, and a part started before it is not refused.
 InaccessiblePaths=-/var/lib/lampos-control
+# lamp-control's apps socket folder hidden (#7793): no ProtectSystem=strict here, so it could replace apps.sock. "-": made by the tmpfiles.
+InaccessiblePaths=-/run/lampos-apps
 # Looking is never worth a late word.
 Nice=10
 Environment=LAMP_BUS=on
@@ -57,6 +59,17 @@ Environment=LAMP_FACE_KNOWN_HOLD=on
 # with the hold above a new id beside the held one's said on humans/faces/tracked as following it (#4885, #5081):
 # the memory owner's call (C65). The name moves to the new id only by a print read as theirs (who::Held::printed).
 Environment=LAMP_FACE_REFOUND=on
+# The sticky identity plan's eyes part (docs/face-recognition-sticky-identity-plan.md, the owner's call on #7933,
+# 20 Nov 01:55): misses, no face and any print on the held face's own or followed id keep the name; only a new id or
+# nobody near for 30 s clears it; another enrolled person takes it only on two looks; someone matched in the last ten
+# minutes is matched again at 0.30 when nobody scores higher. Its why and rules are its row in docs/switches.md.
+Environment=LAMP_FACE_STICKY=on
+# The plan's T5: a poor print on the held face's own unbroken id keeps the name (#7424). Its row in docs/switches.md.
+Environment=LAMP_FACE_KNOWN_ON_ID=on
+# LAMP_FACE_FOLLOW_NEAR_NEW_ID: its why and rules are its row in docs/switches.md (#7933).
+Environment=LAMP_FACE_FOLLOW_NEAR_NEW_ID=on
+# LAMP_FACE_TAKEOVER_SCORE: its why and rules are its row in docs/switches.md (#7933).
+Environment=LAMP_FACE_TAKEOVER_SCORE=on
 # The fast camera stream (#5894, #5956, #6027): a paired computer with the camera grant gets the camera's own frames
 # (about 21 of 25 a second at 640x480, lamp-75c9 10 Nov) at /run/lampos-eyes/frames.sock instead of the eyes' two a
 # second. The socket takes only lamp-control.service, and a stream's end stops its writer at once. Off for any

@@ -57,7 +57,11 @@
 //!   write's) ends with it in lamp-tasks' answer
 //!   (`lamp_tasks::skill_task::tells_answer`), which is said to the owner
 //!   sentence by sentence as exact words, never a turn for the model,
-//!   behind a read's gate and turn (`crate::service_read::tell`). Nothing
+//!   as soon as the run ended, with no read's gate, held only while the
+//!   lamp is private or paused (`crate::service_read::tell`, #7894), when
+//!   its owner asked it by voice now (`asked_by_owner`); asked by anyone
+//!   else, one short line at once and the read's gate; a run nobody asked
+//!   keeps the read's gate. Nothing
 //!   else of a run is told; the journal says only how many sentences were
 //!   said.
 //! - **Off**, a `do.task` loads and hands nothing over, and the journal
@@ -79,7 +83,7 @@ use std::{
 /// The switch, here, in the manage helper and in the voice. `on` only.
 pub const ENVIRONMENT: &str = lamp_voice::skill_task_yes::ENVIRONMENT;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "share-fixture"))]
 thread_local! {
     /// The switch as a test of this thread sets it.
     static ON_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
@@ -87,15 +91,16 @@ thread_local! {
 
 /// Whether a skill's tasks are on in this process.
 pub fn on() -> bool {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "share-fixture"))]
     if let Some(on) = ON_HERE.with(std::cell::Cell::get) {
         return on;
     }
     std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
-/// The switch for this test's thread alone.
-#[cfg(test)]
+/// The switch for this test's thread alone (another crate's test too,
+/// with the `share-fixture` feature).
+#[cfg(any(test, feature = "share-fixture"))]
 pub fn set_on_here(on: Option<bool>) {
     ON_HERE.with(|here| here.set(on));
 }
@@ -179,6 +184,11 @@ pub struct TaskFile {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TaskStep {
     pub task: String,
+    /// Its words as the folder writes them, untrimmed: what a new skill's
+    /// pack holds to the voice's own rule
+    /// (`lamp_voice::made_skill::task_words_plain`, #7874), measured as the
+    /// voice measures them.
+    pub words: String,
     pub run: String,
     /// The skill's own `[quiet]`, local minutes: what its agent found
     /// ([`told`]) is held to it beside the lamp's quiet hours, as a
@@ -199,6 +209,7 @@ impl TaskFile {
         run_ok(dir, &self.run)?;
         Ok(TaskStep {
             task: task.to_owned(),
+            words: self.task.clone(),
             run: self.run,
             quiet,
         })
@@ -710,6 +721,36 @@ pub fn take_asked_by_voice(skill: &str) -> Option<u64> {
         .remove(skill)
 }
 
+/// The skills whose last run marked as asked by voice ([`asked_by_voice`])
+/// was asked by their owner (#7894, V2's 12:47 on #7902): a run now, which
+/// the voice runs only for the owner's own line (`lamp_voice::made_run`,
+/// `services::owner_hears`: the person scope naming the owner, seen saying
+/// it alone), or any ask in the private room (`LAMP_PRIVATE_ROOM`, where
+/// whoever speaks is the owner). Its told answer is then said at once.
+static ASKED_BY_OWNER: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
+
+/// Whether `skill`'s run just marked asked by voice was its owner's
+/// (`owners`), kept with that mark ([`ASKED_BY_OWNER`]).
+pub fn asked_by_owner(skill: &str, owners: bool) {
+    let mut asked = ASKED_BY_OWNER
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner());
+    if owners {
+        asked.insert(skill.to_owned());
+    } else {
+        asked.remove(skill);
+    }
+}
+
+/// Whether `skill`'s last run asked by voice was its owner's, taken once
+/// with [`take_asked_by_voice`] by that run's hand-over.
+pub fn take_asked_by_owner(skill: &str) -> bool {
+    ASKED_BY_OWNER
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .remove(skill)
+}
+
 /// A skill's task under way: the skill is free for its next when it ends
 /// ([`Drop`]).
 #[derive(Debug)]
@@ -960,7 +1001,13 @@ pub fn hand(
         Ok(sha256) => sha256,
         Err(why) => return format!("do.task: not handed over: its folder can't be read: {why}"),
     };
-    if let Some(why) = yes_refuses(place.control, skill, &sha256, grants) {
+    // A core variant's task is pre-approved (`crate::core_agent::pre_approved`,
+    // the first builder's 08:57): no yes is asked, aloud or of lamp-control.
+    let pre_approved = grants.is_empty() && crate::core_agent::pre_approved(folder);
+    if let Some(why) = (!pre_approved)
+        .then(|| yes_refuses(place.control, skill, &sha256, grants))
+        .flatten()
+    {
         // No yes for the folder as it is (#6071's V2): the lamp asks for
         // it itself, once a folder, never lamp-control's no answer.
         if why == WAITING || why == CHANGED {
@@ -1259,6 +1306,67 @@ fn told_bounded(lines: Vec<String>) -> Vec<String> {
 /// P2 on #7351).
 pub const NOT_READY_SAID: [&str; 2] = ["openclaw_gateway_not_ready", "harness_not_running"];
 
+/// What the person who just asked for a run by voice hears, once, when its
+/// agent's start-up wait passes about 5 s (#7354, the first builder's
+/// words): never the agent's name, and nothing says ready.
+pub const GETTING_READY_LINE: &str = "One moment, I'm getting ready.";
+
+/// How long [`GETTING_READY_LINE`] may wait to begin (the first builder's
+/// yes on #8237, 12:32): a backstop only. It is asked about 5 s into the
+/// start, so it is dropped if it can't begin by about 25 s; the run's
+/// answer read first takes it back sooner.
+pub const GETTING_READY_EXPIRES_MS: u64 = 20_000;
+
+/// The hand-over `line` asking lamp-tasks for its getting-ready notice
+/// (`tell_getting_ready`, #7354): only for a run the person just asked for
+/// by voice (`asked_by_voice`); otherwise, or for a line that isn't a JSON
+/// object, `line` as it is.
+pub fn asking_getting_ready(line: &str, asked_by_voice: bool) -> String {
+    match serde_json::from_str::<serde_json::Value>(line) {
+        Ok(serde_json::Value::Object(mut fields)) if asked_by_voice => {
+            fields.insert("tell_getting_ready".into(), serde_json::Value::Bool(true));
+            serde_json::Value::Object(fields).to_string()
+        }
+        _ => line.to_owned(),
+    }
+}
+
+/// The words an earlier lamp-tasks refuses a hand-over line with when it
+/// can't parse it (`HandOver::parse_with`, `deny_unknown_fields`): what a
+/// lamp-tasks from before #7354 answers a line that asks for its
+/// getting-ready notice.
+pub const NOT_A_TASK_LINE: &str = "not a skill's task line";
+
+/// The hand-over `line` again without its getting-ready ask, when `answer`
+/// is the refusal an earlier lamp-tasks gives a line it can't parse
+/// ([`NOT_A_TASK_LINE`], Twelve's HOLD on #8237): an update round restarts
+/// lamp-skills and lamp-tasks in no fixed order, and a lamp-tasks put back
+/// alone is earlier too. That refusal comes before anything is minted or
+/// run, so the line sent again once can never run the task twice. `None`
+/// for any other answer, or a line that never asked.
+pub fn without_getting_ready_if_refused(line: &str, answer: &str) -> Option<String> {
+    let refused = serde_json::from_str::<serde_json::Value>(answer.trim()).is_ok_and(|said| {
+        said["ok"] == false && said["error"] == "bad_request" && said["message"] == NOT_A_TASK_LINE
+    });
+    if !refused {
+        return None;
+    }
+    let Ok(serde_json::Value::Object(mut fields)) = serde_json::from_str(line) else {
+        return None;
+    };
+    fields
+        .remove("tell_getting_ready")
+        .map(|_| serde_json::Value::Object(fields).to_string())
+}
+
+/// Whether one line from lamp-tasks is its getting-ready notice
+/// (`{"event":"getting_ready"}`), not the run's answer.
+pub fn is_getting_ready(line: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(line.trim()).is_ok_and(|said| {
+        said.get("event").and_then(serde_json::Value::as_str) == Some("getting_ready")
+    })
+}
+
 /// The words the person hears, once, when a run they asked for by voice is
 /// refused as the lamp is still getting ready ([`NOT_READY_SAID`]) in
 /// lamp-tasks' `answer`; none for any other answer or a run not asked by
@@ -1283,6 +1391,71 @@ pub fn not_ready_line(
 
 #[cfg(test)]
 mod tests {
+    /// #7354: only a run asked by voice asks lamp-tasks for the
+    /// getting-ready notice, its line otherwise kept; only the notice's own
+    /// line is taken for it, never an answer.
+    #[test]
+    fn only_a_run_asked_by_voice_asks_to_be_told_getting_ready() {
+        let line = json!({"op": "skill_task", "skill": "melon"}).to_string();
+        let asked: serde_json::Value =
+            serde_json::from_str(&asking_getting_ready(&line, true)).unwrap();
+        assert_eq!(asked["tell_getting_ready"], true);
+        assert_eq!(asked["skill"], "melon");
+        assert_eq!(asking_getting_ready(&line, false), line);
+        assert_eq!(asking_getting_ready("not json", true), "not json");
+        assert!(is_getting_ready("{\"event\":\"getting_ready\"}\n"));
+        assert!(!is_getting_ready(
+            "{\"ok\":true,\"answer\":\"getting_ready\"}"
+        ));
+        assert!(!is_getting_ready("{\"ok\":false,\"error\":\"not_ready\"}"));
+        assert!(!GETTING_READY_LINE.to_lowercase().contains("openclaw"));
+    }
+
+    /// Twelve's HOLD on #8237: an earlier lamp-tasks refuses a line it
+    /// can't parse with [`NOT_A_TASK_LINE`] before anything runs, so only
+    /// that refusal of a line that asked for the notice is sent again, once,
+    /// without the ask; any other answer, or a line that never asked, is
+    /// left as it is.
+    #[test]
+    fn only_an_earlier_lamp_tasks_refusal_of_the_ask_is_sent_again_without_it() {
+        let asked = asking_getting_ready(
+            &json!({"op": "skill_task", "skill": "melon"}).to_string(),
+            true,
+        );
+        let refused =
+            json!({"ok": false, "error": "bad_request", "message": NOT_A_TASK_LINE}).to_string();
+        let again: serde_json::Value =
+            serde_json::from_str(&without_getting_ready_if_refused(&asked, &refused).unwrap())
+                .unwrap();
+        assert_eq!(again, json!({"op": "skill_task", "skill": "melon"}));
+        let plain = json!({"op": "skill_task", "skill": "melon"}).to_string();
+        assert_eq!(without_getting_ready_if_refused(&plain, &refused), None);
+        for answer in [
+            json!({"ok": true, "answer": "done"}).to_string(),
+            json!({"ok": false, "error": "bad_request", "message": "the task's words are empty or too long"}).to_string(),
+            json!({"ok": false, "error": "busy", "message": NOT_A_TASK_LINE}).to_string(),
+            "not json".to_owned(),
+        ] {
+            assert_eq!(without_getting_ready_if_refused(&asked, &answer), None, "{answer}");
+        }
+    }
+
+    /// The words [`NOT_A_TASK_LINE`] are lamp-tasks' own for a line it
+    /// can't parse, as an earlier one does with this field: a field it
+    /// doesn't know is refused with them.
+    #[test]
+    fn the_refusal_looked_for_is_lamp_tasks_own_for_a_field_it_does_not_know() {
+        let line =
+            json!({"op": "skill_task", "skill": "melon", "task": "a poem", "not_known": true})
+                .to_string();
+        let Err(refused) =
+            lamp_tasks::skill_task::HandOver::parse(line.as_bytes(), std::path::Path::new("/"))
+        else {
+            panic!("a field it doesn't know is refused");
+        };
+        assert_eq!(refused, ("bad_request", NOT_A_TASK_LINE.to_owned()));
+    }
+
     use super::*;
     use serde_json::json;
 

@@ -126,6 +126,7 @@ fn a_sentence_during_the_prerequisite(never_quiet: bool) {
                 say: &mut |line| lamp.said.push(line.to_owned()),
                 phase: &mut |phase| lamp.phases.push(phase),
                 target: &mut |_| {},
+                now: None,
             },
         )
     };

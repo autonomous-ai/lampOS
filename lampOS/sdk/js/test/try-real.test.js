@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { Keyring, Lamp } from '../src/index.js';
 import { FakeLamp } from '../src/testing.js';
-import { credentials, parseReal } from '../examples/twin/real.js';
+import { credentials, parseReal, twinArguments } from '../examples/twin/real.js';
 import { run, raw, secretsOf } from './try-real-helper.js';
 
 const tryJs = new URL('../examples/twin/try.js', import.meta.url).pathname;
@@ -22,6 +22,22 @@ test('the code and the pin are refused on the command line, with the way to give
   assert.throws(() => parseReal(['--real', '--host', 'h', '--keyring', 'd']), /give one of them/);
   assert.throws(() => parseReal(['--real', '--host', 'h', '--nope']), /unknown argument --nope/);
   assert.deepEqual([...parseReal(['--real', '--host', 'h', '--camera']).flags].sort(), ['camera', 'real']);
+  assert.deepEqual([...parseReal(['--real', '--keyring', 'd', '--local']).flags].sort(), ['local', 'real']);
+  assert.throws(() => parseReal(['--real', '--keyring', 'd', '--local', '--lan-address', '10.0.0.5']), /--local and --lan-address/);
+});
+
+test('a real run passes --reach-map and --reach-shrink on to the twin, and only when given', () => {
+  const given = parseReal(['--real', '--keyring', 'd', '--reach-map', 'a.json,b.json', '--reach-shrink', '48']);
+  assert.equal(given['reach-map'], 'a.json,b.json');
+  const args = twinArguments(given, '9999');
+  assert.deepEqual(args.slice(args.indexOf('--reach-map'), args.indexOf('--reach-map') + 2), ['--reach-map', 'a.json,b.json']);
+  assert.deepEqual(args.slice(args.indexOf('--reach-shrink'), args.indexOf('--reach-shrink') + 2), ['--reach-shrink', '48']);
+  const plain = twinArguments(parseReal(['--real', '--keyring', 'd']), '9999');
+  assert.ok(!plain.includes('--reach-map') && !plain.includes('--reach-shrink'));
+  assert.throws(() => parseReal(['--real', '--keyring', 'd', '--reach-map']), /unknown argument --reach-map/);
+  // With --local (127.0.0.1 only) the map still goes on, and the twin is not started with --lan.
+  const local = twinArguments(parseReal(['--real', '--keyring', 'd', '--local', '--reach-map', 'a.json']), '9999');
+  assert.ok(!local.includes('--lan') && local.includes('--reach-map'));
 });
 
 test('the code and pin come from the environment first, then a prompt that is asked in order', async () => {
@@ -77,11 +93,24 @@ test('a code run pairs as try-controller into a private folder, serves a real-la
   for (const secret of [...secretsOf(fake), join(home, folders[0]), folders[0]]) assert.equal(real.out.text.includes(secret), false, `printed: ${secret.slice(0, 6)}...`);
 });
 
+test('a real run given --reach-map hands it to the twin: the run starts with the map loaded and ends as usual', async (t) => {
+  const mapPath = new URL('../examples/twin/reach-map-4ace.json', import.meta.url).pathname;
+  const fake = await FakeLamp.start({ name: 'Desk lamp', grants: ['body'] });
+  const home = mkdtempSync(join(tmpdir(), 'try-real-home-'));
+  t.after(async () => { await fake.stop(); rmSync(home, { recursive: true, force: true }); });
+  const env = { LAMP_TRY_CODE: fake.code, LAMP_TRY_PIN: fake.pin };
+  const real = await run(t, { args: ['--host', fake.host, '--port', String(fake.port), '--reach-map', mapPath, '--reach-shrink', '48'], env, fake, home });
+  real.child.kill('SIGTERM');
+  assert.equal(await real.ended, 0);
+});
+
 test('SIGTERM ends a code run the same way, and a wrong code says the lamp\'s words and leaves no folder', async (t) => {
   const fake = await FakeLamp.start({ grants: ['light'] });
   const home = mkdtempSync(join(tmpdir(), 'try-real-home-'));
   t.after(async () => { await fake.stop(); rmSync(home, { recursive: true, force: true }); });
   const real = await run(t, { args: ['--host', fake.host, '--port', String(fake.port), '--camera'], env: { LAMP_TRY_CODE: fake.code, LAMP_TRY_PIN: fake.pin }, fake, home });
+  // The camera line is the banner's second write: on a loaded machine it can come after the URL's chunk.
+  for (let i = 0; i < 100 && !/CAMERA ON/.test(real.out.text); i += 1) await new Promise((resolve) => setTimeout(resolve, 50));
   assert.match(real.out.text, /CAMERA ON: anyone on your network who has this link can see or hear the room/);
   real.child.kill('SIGTERM');
   assert.equal(await real.ended, 0);
@@ -164,4 +193,30 @@ test('the say row speaks its own default on a real lamp, not the virtual lamp\'s
   t.after(() => page.socket.close());
   assert.equal((await page.press('say')).ok, true);
   assert.deepEqual(fake.asked('say'), [{ text: 'Hello from the try-it page.' }]);
+});
+
+test('--local serves the page on 127.0.0.1 only and prints no network address; without it the notes of a pairing with no notes grant are not asked for at the end', async (t) => {
+  const fake = await FakeLamp.start({ grants: ['light', 'body'] });
+  const home = mkdtempSync(join(tmpdir(), 'try-real-home-'));
+  const kept = join(home, 'kept');
+  mkdirSync(kept, { mode: 0o700 });
+  chmodSync(kept, 0o700);
+  await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, name: 'mine', keyring: new Keyring(kept) });
+  t.after(async () => { await fake.stop(); rmSync(home, { recursive: true, force: true }); });
+  const real = await run(t, { args: ['--keyring', kept, '--local'], env: { LAMP_TRY_CODE: '', LAMP_TRY_PIN: '' }, fake, home });
+  assert.match(real.out.text, /Open this in a browser on this computer/);
+  assert.equal(/on your network/.test(real.out.text), false, 'no network address is said');
+  assert.match(real.out.text, /http:\/\/localhost:\d+\/\?t=/);
+  const table = await (await fetch(`${real.base}/try.json?t=${real.token}`)).json();
+  assert.equal(table.mode, 'real');
+  // The same page is not on any other address of this computer.
+  const { networkInterfaces } = await import('node:os');
+  const other = Object.values(networkInterfaces()).flat().find((a) => a && !a.internal && a.family === 'IPv4')?.address;
+  if (other) {
+    const refused = await fetch(`http://${other}:${new URL(real.base).port}/try.json?t=${real.token}`, { signal: AbortSignal.timeout(3000) }).then(() => false, () => true);
+    assert.equal(refused, true, 'the page does not answer on the network address');
+  }
+  real.child.kill('SIGINT');
+  assert.equal(await real.ended, 0);
+  assert.equal(/could not clean up/.test(real.out.text), false, `no false alarm for the notes without a grant: ${real.out.text}`);
 });

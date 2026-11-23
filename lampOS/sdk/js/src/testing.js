@@ -30,6 +30,16 @@ const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 // `express`'s feelings and their moves, as lamp-control's feelings.rs.
 // The fake's camera picture: the smallest whole JPEG (start and end markers).
 export const FAKE_JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+// The fake's pose (`pose`): one person standing in a 640x480 picture, the 17
+// COCO keypoints in COCO order, as lamp-npu answers whatever model it runs.
+export const FAKE_POSE = Object.freeze({
+  score: 0.87,
+  keypoints: [
+    [320, 100], [330, 90], [310, 90], [340, 95], [300, 95],
+    [360, 160], [280, 160], [380, 230], [260, 230], [390, 300], [250, 300],
+    [345, 300], [295, 300], [350, 380], [290, 380], [352, 460], [288, 460],
+  ].map(([x, y]) => ({ x, y, score: 0.9 })),
+});
 
 // The fake's microphone, as the ears share it on mic1/audio: a 20 ms block of
 // 320 samples, mono, 16 kHz, S16LE.
@@ -434,7 +444,7 @@ export class FakeLamp {
   // no `done` follows them.
   // `refuses`: ops refused `refused` with this why, as a lamp that doesn't
   // route them yet does (LAMP_CONTROL_REFUSES); none by default.
-  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', language = 'en', autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null, appReach = false, local = false, app = false, appName = 'fake-app', appGrants = ['speak', 'hear', 'light'], appVersion = '1.0.0', appSettings = {}, panelRateS = 60 } = {}) {
+  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', language = 'en', build = null, autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null, appReach = false, local = false, app = false, appName = 'fake-app', appGrants = ['speak', 'hear', 'light'], appVersion = '1.0.0', appSettings = {}, panelRateS = 60, storeApps = true, appsHelper = true } = {}) {
     // `local`: also serve lamp-control's control socket (a unix socket, `localPath`) for a skill's run, where a
     // one-run token from `mintToken` is what lets a connection in (`Lamp.local`).
     this.local = local;
@@ -458,6 +468,13 @@ export class FakeLamp {
     this.appPanel = null;
     this.panelRev = 0;
     this.panelAt = null;
+    // What the app told Lamp's memory: the facts kept (`apps.remember`, three a minute an app, as app_remember.rs; a
+    // refused ask is not counted) and the live context line (`apps.context`, `{ line, forMs }` or null once cleared).
+    // `refuseNext('apps.remember', code)` makes the next one refused with any code.
+    this.appFacts = [];
+    this.appContext = null;
+    this.rememberedAt = [];
+    this.contextAt = null;
     this.localPath = null;
     this.localWs = new Set();
     this.tokens = new Map();
@@ -471,6 +488,8 @@ export class FakeLamp {
     this.asker = new Map();
     // The owner's language the lamp says in welcome and hello; null leaves it out, as a lamp from before it does.
     this.lamp = { id: lampId, name, v: schema.VERSION, ...(language === null ? {} : { language }) };
+    // The build is in hello's answer only, never the welcome (any connection gets that first).
+    this.build = build;
     this.clients = new Map();
     this.requests = [];
     this.received = [];
@@ -487,8 +506,16 @@ export class FakeLamp {
     // Pushed skills by name, and the one push in flight on the lamp.
     this.pushed = new Map();
     this.pushing = null;
+    // Pushed apps by name (`app.push`, docs/apps.md), and the one app push in flight. `storeApps` false is a lamp
+    // without LAMP_STORE_APPS, `appsHelper` false one without the apps helper: every app op is refused, in the lamp's
+    // words. `storeAppNames` are the Store apps installed here, whose names a push may not take.
+    this.storeApps = storeApps;
+    this.appsHelper = appsHelper;
+    this.pushedApps = new Map();
+    this.appPushing = null;
+    this.storeAppNames = new Set();
     this.subscribed = new Map();
-    this.state = { presence: { count: 0, near: 0, facing: false }, light: null, mood: null, lamp: { talking: false, paused: false, private: false, asleep: false },
+    this.state = { presence: { count: 0, near: 0, facing: false }, light: null, mood: null, lamp: { talking: false, paused: false, private: false, asleep: false, muted_after_fault: false },
       // Made-up readings, as lamp-control answers them; `setAir` changes the
       // air and tells `air.changed`, `{ known: false }` for none.
       air: { ...AIR }, device: { ...DEVICE, temperature_c: { ...DEVICE.temperature_c } }, volume: { level: 50, muted: false },
@@ -510,6 +537,11 @@ export class FakeLamp {
     // The picture `camera.snapshot` and a stream's frames carry: the smallest whole JPEG
     // unless a test sets a real one (`fake.picture = buffer`).
     this.picture = FAKE_JPEG;
+    // What `pose` answers for any JPEG: the person (null for nobody), the
+    // picture's size and the model, unless a test sets its own.
+    this.pose = FAKE_POSE;
+    this.poseSize = [640, 480];
+    this.poseModel = 'fake-movenet';
     // Each connection whose head follows the hand (`look` at `hand`) and its
     // lease, until its stop, another look, or the lease ends; and the last
     // hand said.
@@ -665,6 +697,11 @@ export class FakeLamp {
   emit(event, fields = {}) {
     const frame = JSON.stringify({ ev: event, at: now(), ...fields });
     for (const ws of this.wss.clients) if (this.subscribed.get(ws)?.has(event)) ws.send(frame);
+  }
+
+  // The connection drops with no word, as a reset or a lost Wi-Fi does: each socket is ended at once, no close frame, no reason.
+  drop() {
+    for (const ws of this.wss.clients) ws.terminate();
   }
 
   // The lamp restarts, as on every update: each connection closes (1012,
@@ -1042,6 +1079,70 @@ export class FakeLamp {
     });
   }
 
+  // `app.push`, `app.list` and `app.remove`, as lamp-control and the apps helper take them: only with LAMP_STORE_APPS
+  // and the helper, and only this computer's own apps.
+  appPushedOp(ws, client, id, request) {
+    if (!this.storeApps) return this.refuse(ws, id, 'refused', 'apps are off on this lamp');
+    if (!this.appsHelper) return this.refuse(ws, id, 'refused', 'app push is not on this lamp');
+    if (request.op === 'app.push') return this.pushApp(ws, client, id, request);
+    if (request.op === 'app.list') {
+      return this.ok(ws, id, { apps: [...this.pushedApps.values()].filter((a) => a.client === client).map(({ client: _, ...a }) => a) });
+    }
+    const kept = this.pushedApps.get(request.name);
+    if (!kept || kept.client !== client) return this.refuse(ws, id, 'refused', "not one of this computer's pushed apps");
+    this.pushedApps.delete(request.name);
+    return this.ok(ws, id, { removed: request.name });
+  }
+
+  // A part of an app push, as a skill's (`push`): in order from 0, one push at a time, the whole checked against its
+  // SHA-256, then its manifest (format 2, kind app, unsigned, grants within this pairing's, never `remember`), then
+  // kept as this computer's, replacing its app of that name.
+  pushApp(ws, client, id, request) {
+    let going = this.appPushing;
+    if (request.part === 0) {
+      if (going && going.client !== client) return this.refuse(ws, id, 'busy', "another computer's push is in flight");
+      going = this.appPushing = { client, part: -1, chunks: [] };
+    } else if (!going || going.client !== client || request.part !== going.part + 1) {
+      return this.refuse(ws, id, 'bad_request', 'parts out of order');
+    }
+    going.part = request.part;
+    going.chunks.push(Buffer.from(request.data, 'base64'));
+    if (request.part < request.parts - 1) return this.ok(ws, id, { got: request.part + 1 });
+    this.appPushing = null;
+    const data = Buffer.concat(going.chunks);
+    const sha = createHash('sha256').update(data).digest('hex');
+    if (data.length !== request.size || sha !== request.sha256.toLowerCase()) {
+      return this.refuse(ws, id, 'bad_request', "the package's SHA-256 doesn't match");
+    }
+    const files = new Map();
+    for (let at = 0; at + 512 <= data.length;) {
+      const name = data.subarray(at, at + 100).toString('utf8').replace(/\0.*$/s, '');
+      if (!name) break;
+      const size = parseInt(data.subarray(at + 124, at + 135).toString('ascii'), 8);
+      files.set(name, data.subarray(at + 512, at + 512 + size));
+      at += 512 + Math.ceil(size / 512) * 512;
+    }
+    if (files.has('lamp-skill.sig')) return this.refuse(ws, id, 'refused', 'it carries lamp-skill.sig: a pushed app is unsigned');
+    let manifest;
+    try { manifest = JSON.parse(files.get('lamp-skill.json')?.toString('utf8') ?? ''); } catch { manifest = null; }
+    if (manifest?.format !== 2 || manifest.kind !== 'app' || manifest.name !== request.name) {
+      return this.refuse(ws, id, 'refused', 'not a package of that app');
+    }
+    const grants = this.clients.get(client).grants;
+    for (const grant of manifest.grants ?? []) {
+      if (grant === 'remember' || !grants.includes(grant)) return this.refuse(ws, id, 'no_grant', `not granted: ${grant}`);
+    }
+    if (this.storeAppNames.has(request.name)) return this.refuse(ws, id, 'refused', 'a Store app has that name');
+    const kept = this.pushedApps.get(request.name);
+    if (kept && kept.client !== client) return this.refuse(ws, id, 'refused', "another computer's app has that name");
+    const app = {
+      name: manifest.name, title: manifest.title ?? manifest.name, version: manifest.version ?? '', sha256: sha,
+      grants: [...(manifest.grants ?? [])], net: Boolean(manifest.net), logs: Boolean(manifest.logs),
+    };
+    this.pushedApps.set(request.name, { ...app, stopped: false, client });
+    return this.ok(ws, id, { app: { ...app, updated: kept !== undefined, started: true, from: 'computer' } });
+  }
+
   ok(ws, re, fields = {}) { ws.send(JSON.stringify({ re, ok: true, ...fields })); }
 
   pair(ws, request, nonce) {
@@ -1067,7 +1168,7 @@ export class FakeLamp {
       return null;
     }
     const limits = this.motionDone ? { ...LIMITS, motion_done: true } : LIMITS;
-    this.ok(ws, request.id, { lamp: this.lamp, grants: paired.grants, limits });
+    this.ok(ws, request.id, { lamp: { ...this.lamp, ...(this.build === null ? {} : { build: this.build }) }, grants: paired.grants, limits });
     return request.client;
   }
 
@@ -1127,19 +1228,20 @@ export class FakeLamp {
 
   needs(op, request) {
     if (op === 'phrases.set') return ['hear'];
+    if (op === 'apps.remember' || op === 'apps.context') return ['remember'];
     if (op === 'subscribe') return [...new Set((request.events ?? []).map((e) => FakeLamp.EVENT_GRANT[e]).filter(Boolean))];
     if (op === 'get') return [...new Set((request.state ?? []).map((s) => FakeLamp.STATE_GRANT[s]).filter(Boolean))];
     if (op === 'look') return ['face', 'hand'].includes(request.at) ? ['body', 'look'] : ['body'];
     if (['gesture', 'move', 'play', 'joints'].includes(op)) return ['body'];
     if (op === 'lease.take') return (request.parts ?? []).map((p) => ({ body: 'body', light: 'light', voice: 'speak' })[p]);
     const speak = ['say', 'sound', 'sound.upload', 'sound.list', 'sound.remove', 'turn.end', 'volume'];
-    if (op.startsWith('skill.')) return ['skills'];
+    if (op.startsWith('skill.') || ['app.push', 'app.list', 'app.remove'].includes(op)) return ['skills'];
     if (op.startsWith('notes.')) return ['notes'];
     if (speak.includes(op)) return ['speak'];
     // A turn speaks and hears what is said to the lamp.
     return {
       express: ['body', 'light'], light: ['light'],
-      'camera.snapshot': ['camera'], 'camera.stream': ['camera'],
+      'camera.snapshot': ['camera'], 'camera.stream': ['camera'], pose: ['camera'],
       'microphone.stream': ['microphone'], 'speaker.stream': ['speaker'],
       'turn.start': ['speak', 'hear'], 'listen.set': ['hear'],
     }[op] ?? [];
@@ -1226,6 +1328,7 @@ export class FakeLamp {
     const { op, id } = request;
     const bad = (why) => this.refuse(ws, id, 'bad_request', why);
     const text = (value) => typeof value === 'string' && !/\p{Cc}/u.test(value);
+    if (op === 'apps.remember' || op === 'apps.context') return this.appMemory(ws, request);
     if (op === 'phrases.set') {
       const { phrases } = request;
       if (!Array.isArray(phrases) || phrases.some((p) => typeof p !== 'string' || p.length < 1 || [...p].length > 64 || !text(p))) return bad('phrases: 1 to 64 characters each, no control characters');
@@ -1248,6 +1351,8 @@ export class FakeLamp {
     if (typeof title !== 'string' || [...title].length < 1 || [...title].length > 40 || !Array.isArray(lines) || lines.length > 6
       || lines.some((l) => typeof l !== 'string' || [...l].length > 80)) return bad('a title of 1 to 40 characters and at most 6 lines of 80');
     if (!text(title) || !lines.every(text)) return bad('text, no control characters');
+    // The schema's `lines` item pattern needs one character at least: an empty line is refused, as the Python fake does.
+    if (lines.some((line) => line === '')) return bad('a line is text, never empty');
     const at = this.clock();
     if (this.panelAt !== null && at - this.panelAt < this.panelRateS * 1000) {
       return this.refuse(ws, id, 'rate', 'one panel a minute', Math.round(this.panelRateS * 1000 - (at - this.panelAt)));
@@ -1256,6 +1361,43 @@ export class FakeLamp {
     this.panelRev += 1;
     this.appPanel = { title, lines: [...lines], rev: this.panelRev };
     return this.ok(ws, id, { rev: this.panelRev });
+  }
+
+  // `apps.remember` and `apps.context`, as lamp-control answers them: nothing while the lamp is private, a fact's words
+  // at most 280 characters (the lamp tidies them first; this fake only strips them) and three facts a minute; a
+  // context line at most 120 characters for 1 ms to 10 minutes and one a second, an empty line with no time its clear.
+  appMemory(ws, request) {
+    const { op, id } = request;
+    const fields = Object.keys(request).filter((k) => !['id', 'op'].includes(k));
+    if (op === 'apps.context') {
+      const { line, for_ms: forMs } = request;
+      if (fields.some((k) => !['line', 'for_ms'].includes(k))) return this.refuse(ws, id, 'bad_request', 'line and for_ms only');
+      // A clear (an empty line, no time) is never rated and never refused while private.
+      if (line === '' && forMs === undefined) {
+        this.appContext = null;
+        return this.ok(ws, id);
+      }
+      if (typeof line !== 'string' || !line || [...line].length > 120 || !Number.isInteger(forMs) || forMs < 1 || forMs > 600_000) {
+        return this.refuse(ws, id, 'bad_request', 'a line of 1 to 120 characters for 1 to 600000 ms; a clear has no for_ms');
+      }
+      if (this.state.lamp.private) return this.refuse(ws, id, 'private', 'Lamp is private');
+      // One line a second an app; only a line that was set counts.
+      const at = this.clock();
+      if (this.contextAt !== null && at - this.contextAt < 1000) return this.refuse(ws, id, 'rate', 'one line a second', Math.max(1, Math.round(1000 - (at - this.contextAt))));
+      this.contextAt = at;
+      this.appContext = { line, forMs };
+      return this.ok(ws, id);
+    }
+    if (this.state.lamp.private) return this.refuse(ws, id, 'private', 'Lamp is private');
+    if (fields.some((k) => k !== 'text')) return this.refuse(ws, id, 'bad_request', 'text only');
+    const text = typeof request.text === 'string' ? request.text.split(/\s+/u).filter(Boolean).join(' ') : '';
+    if (!text || [...text].length > 280) return this.refuse(ws, id, 'bad_request', 'text: 1 to 280 characters once tidied');
+    const at = this.clock();
+    this.rememberedAt = this.rememberedAt.filter((t) => at - t < 60_000);
+    if (this.rememberedAt.length >= 3) return this.refuse(ws, id, 'rate', 'three facts a minute', Math.max(1, Math.round(60_000 - (at - this.rememberedAt[0]))));
+    this.rememberedAt.push(at);
+    this.appFacts.push(text);
+    return this.ok(ws, id, { kept: true });
   }
 
   tellApps(event, fields = {}, { phrase } = {}) {
@@ -1381,6 +1523,17 @@ export class FakeLamp {
         this.ok(ws, id, { stream: 'on', fps: request.fps ?? 2, fps_now: null });
         ws.send(JSON.stringify({ ev: 'camera.frame', jpeg: this.picture.toString('base64'), bytes: this.picture.length, age_ms: 0, fps_now: null }));
         return undefined;
+      case 'pose': {
+        // As lamp-control's pose: a JPEG of the computer's own, never while
+        // private; the fake runs no model and answers `this.pose`.
+        // `refuseNext('pose', 'preparing', ..., 2000)` and the like stand for
+        // the lamp's NPU states.
+        if (this.state.lamp.private) return this.refuse(ws, id, 'private', 'the lamp is private');
+        const picture = typeof request.jpeg === 'string' && /^[A-Za-z0-9+/=]+$/.test(request.jpeg) ? Buffer.from(request.jpeg, 'base64') : Buffer.alloc(0);
+        if (picture.length < 2 || picture[0] !== 0xff || picture[1] !== 0xd8) return this.refuse(ws, id, 'bad_request', 'jpeg: not a JPEG');
+        const [width, height] = this.poseSize;
+        return this.ok(ws, id, { pose: this.pose, width, height, model: this.poseModel, ms: { decode: 0, npu: 0, post: 0, total: 0 } });
+      }
       case 'microphone.stream':
         // As lamp-control's microphone.rs: on again replaces it, off ends it
         // with no event, and none while the lamp is private.
@@ -1505,6 +1658,10 @@ export class FakeLamp {
         this.pushed.delete(request.name);
         return this.ok(ws, id);
       }
+      case 'app.push':
+      case 'app.list':
+      case 'app.remove':
+        return this.appPushedOp(ws, client, id, request);
       case 'notes.set':
       case 'notes.get':
       case 'notes.delete':

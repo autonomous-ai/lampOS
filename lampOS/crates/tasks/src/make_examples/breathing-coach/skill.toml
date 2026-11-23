@@ -1,0 +1,7 @@
+asks = ["breathing exercise"]
+kind = "installable"
+version = "1.0.0"
+grants = ["light", "speak"]
+
+[[do]]
+task = { task = "lead three slow breaths with the light and the voice", run = "scripts/main.py" }

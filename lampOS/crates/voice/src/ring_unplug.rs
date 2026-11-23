@@ -53,13 +53,19 @@ pub struct Presentation {
 pub struct RingUnplug {
     bus: Bus,
     out: Publisher,
+    /// Whether the picture just drawn begins a showing, for `lamp/did`.
+    shown: crate::did_ring::Episode,
 }
 impl RingUnplug {
     pub fn on(root: &Path) -> io::Result<Self> {
         let bus = Bus::new(root)?;
         let mut out = bus.publisher(STATE_TOPIC, Kind::Latest, "ring")?;
         out.expires_after(Some(Duration::from_millis(500)));
-        Ok(Self { bus, out })
+        Ok(Self {
+            bus,
+            out,
+            shown: crate::did_ring::Episode::default(),
+        })
     }
 
     pub fn prepare(&self, at_us: u64) -> Option<Presentation> {
@@ -95,6 +101,10 @@ impl RingUnplug {
                     "request": presentation.request, "asleep": true
                 }),
             )?;
+            // The picture is drawn: told once as it begins (#7757).
+            if self.shown.seen(at_us) {
+                crate::did_ring::told(crate::did_ring::Face::Unplug);
+            }
         }
         Ok(())
     }

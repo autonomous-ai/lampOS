@@ -144,6 +144,12 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-seen.service",
         include_str!("../../../deploy/product/lamp-seen.service"),
     ),
+    // The NPU's one owner (#7415, docs/npu.md); LAMP_NPU=on in the unit (with
+    // it unset it idles touching nothing). lamp-control forwards `pose`.
+    (
+        "lamp-npu.service",
+        include_str!("../../../deploy/product/lamp-npu.service"),
+    ),
     // The developers' door (#3504, docs/control.md); off unless the owner's
     // setting writes LAMP_CONTROL=on.
     (
@@ -155,6 +161,12 @@ pub const PRODUCT: &[(&str, &str)] = &[
     (
         "lamp-peek.service",
         include_str!("../../../deploy/product/lamp-peek.service"),
+    ),
+    // The lamp plays a URL (#7415, docs/control.md): exits 0 at once unless
+    // LAMP_PLAY_URL=on, which no product unit sets.
+    (
+        "lamp-play.service",
+        include_str!("../../../deploy/product/lamp-play.service"),
     ),
     (
         "lamp-skills.service",
@@ -267,6 +279,34 @@ pub const PRODUCT: &[(&str, &str)] = &[
     ),
     // Setup's hotspot again when a set-up lamp's saved network is gone
     // (#3020); `LAMP_WIFI_RECOVERY=on` in the unit (#5758).
+    // The Store apps (#7415, docs/apps.md): the manage helper, root's, started by its socket for each
+    // connection (the socket enabled, the template never); the boot's start of the apps the owner has
+    // not stopped; and the two static app templates, started by name, never enabled. All do nothing
+    // while LAMP_STORE_APPS is off in their own environment.
+    (
+        "lamp-apps-manage.socket",
+        include_str!("../../../deploy/product/lamp-apps-manage.socket"),
+    ),
+    (
+        "lamp-apps-manage@.service",
+        include_str!("../../../deploy/product/lamp-apps-manage@.service"),
+    ),
+    (
+        "lamp-apps-folders.service",
+        include_str!("../../../deploy/product/lamp-apps-folders.service"),
+    ),
+    (
+        "lamp-apps-start.service",
+        include_str!("../../../deploy/product/lamp-apps-start.service"),
+    ),
+    (
+        "lamp-app@.service",
+        include_str!("../../../deploy/product/lamp-app@.service"),
+    ),
+    (
+        "lamp-app-net@.service",
+        include_str!("../../../deploy/product/lamp-app-net@.service"),
+    ),
     (
         "lamp-setup-recover.service",
         include_str!("../../../deploy/product/lamp-setup-recover.service"),
@@ -292,6 +332,9 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-addons.service",
     "lamp-air-clock.service",
     "lamp-air.service",
+    "lamp-apps-folders.service",
+    "lamp-apps-manage@.service",
+    "lamp-apps-start.service",
     "lamp-body.service",
     "lamp-cloud.service",
     "lamp-control.service",
@@ -305,7 +348,9 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-memory.service",
     "lamp-mood.service",
     "lamp-name.service",
+    "lamp-npu.service",
     "lamp-peek.service",
+    "lamp-play.service",
     "lamp-policy.service",
     "lamp-records.service",
     "lamp-region.service",
@@ -525,6 +570,29 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "an installable skill from the Skills Store: tomorrow's Google Calendar read once an \
          evening, which needs its owner's calendar linked",
     ),
+    // The seen reactions (#6543): off until the owner's day-long row at
+    // lamp-06c1, at most one wrong remark in a working day, through the lead.
+    (
+        "seen-celebrate",
+        "off until the owner's day-long row at lamp-06c1 (#6543): a warm line when lamp-seen sees \
+         celebrating, with `LAMP_SEEN_MORE_DOINGS=on` and the owner's `seen_more` use",
+    ),
+    (
+        "seen-drink",
+        "off until the owner's day-long row at lamp-06c1 (#6543): a light line when lamp-seen \
+         newly sees a drink, with `LAMP_SEEN_MORE_DOINGS=on` and the owner's `seen_more` use",
+    ),
+    (
+        "seen-eat",
+        "off until the owner's day-long row at lamp-06c1 (#6543): a light line when lamp-seen \
+         newly sees eating, with `LAMP_SEEN_MORE_DOINGS=on` and the owner's `seen_more` use",
+    ),
+    (
+        "seen-tired",
+        "off until the owner's day-long row at lamp-06c1 (#6543): a light line when lamp-seen \
+         newly sees a yawn or stretch, with `LAMP_SEEN_MORE_DOINGS=on` and the owner's \
+         `seen_more` use",
+    ),
     (
         "quiet-focus",
         "an installable skill, not yet tried on a lamp: one warm word when they look up after 45 \
@@ -545,6 +613,24 @@ macro_rules! skill_file {
         (
             concat!("/var/lib/lampOS/skills/", $skill, "/", $file),
             include_str!(concat!("../../../skills/", $skill, "/", $file)),
+        )
+    };
+}
+/// A core pilot's brief (`LAMP_CORE_VIA_AGENT`), written beside its
+/// `agent.toml` from lamp-skills' own copy in its source
+/// (`crates/skills/src/core_agent/briefs`, pinned to
+/// `lamp_skills::core_agent::script` there): no skill folder of the
+/// repository carries a script (the SDK's check, #7862), and the bundle
+/// writes the same ([`crate::product_skills::make`]).
+macro_rules! core_brief {
+    ($skill:literal) => {
+        (
+            concat!("/var/lib/lampOS/skills/", $skill, "/scripts/agent.py"),
+            include_str!(concat!(
+                "../../skills/src/core_agent/briefs/",
+                $skill,
+                ".py"
+            )),
         )
     };
 }
@@ -598,8 +684,12 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("onboarding", "SKILL.md"),
     skill_file!("stretch-break", "skill.toml"),
     skill_file!("stretch-break", "SKILL.md"),
+    skill_file!("stretch-break", "agent.toml"),
+    core_brief!("stretch-break"),
     skill_file!("stuffy-air", "skill.toml"),
     skill_file!("stuffy-air", "SKILL.md"),
+    skill_file!("stuffy-air", "agent.toml"),
+    core_brief!("stuffy-air"),
     skill_file!("dance", "skill.toml"),
     skill_file!("dance", "SKILL.md"),
     skill_file!("bedtime-morning", "skill.toml"),
@@ -622,16 +712,28 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("watch-you-leave", "moves/watch-right.json"),
     skill_file!("sip-of-water", "skill.toml"),
     skill_file!("sip-of-water", "SKILL.md"),
+    skill_file!("sip-of-water", "agent.toml"),
+    core_brief!("sip-of-water"),
     skill_file!("rest-your-eyes", "skill.toml"),
     skill_file!("rest-your-eyes", "SKILL.md"),
+    skill_file!("rest-your-eyes", "agent.toml"),
+    core_brief!("rest-your-eyes"),
     skill_file!("stand-up", "skill.toml"),
     skill_file!("stand-up", "SKILL.md"),
+    skill_file!("stand-up", "agent.toml"),
+    core_brief!("stand-up"),
     skill_file!("wind-down", "skill.toml"),
     skill_file!("wind-down", "SKILL.md"),
+    skill_file!("wind-down", "agent.toml"),
+    core_brief!("wind-down"),
     skill_file!("comfort-break", "skill.toml"),
     skill_file!("comfort-break", "SKILL.md"),
+    skill_file!("comfort-break", "agent.toml"),
+    core_brief!("comfort-break"),
     skill_file!("sit-back", "skill.toml"),
     skill_file!("sit-back", "SKILL.md"),
+    skill_file!("sit-back", "agent.toml"),
+    core_brief!("sit-back"),
     skill_file!("head-pat", "skill.toml"),
     skill_file!("head-pat", "SKILL.md"),
     skill_file!("head-pat", "README.md"),
@@ -689,6 +791,8 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "f36f4b63210494cc8848061509c7b085996bfbf3154f2059c58111e0ad623d3c", // #7415: lamp-npu's state folder, its fetched models
+    "0192f1ca63da3391fcb14e072afef96244691c35edef6388c8cd91abc05a7b55", // #6543: the app's desk noticing mark, seen-activity-mark.json
     "bc7558fcea2999b583f79dce9d28ee981db49471c186fea883baa03e2c4c51c9", // #6774 F8: setup's Wi-Fi join counts
     "73d29d8ffa197507ad12bcf41037e12a2a9e5f25c9444a82243c1a07c6ff8666", // #6893: the energy beside the character words
     "622eb88154730d0ee596b9ef048e2120ce9eb67ee33393b1503a1a4d53cdf199", // #6543: lamp-seen's state folder and its opt-in, seen-activity.json
@@ -791,7 +895,8 @@ pub const MODELS_SETTING: (&str, &str) = (
 );
 
 /// lamp-update's own switch file a build carries (`manifest::UPDATE_ENV`,
-/// from updater 12, #6607): `LAMP_APP_ENGINES` and `LAMP_SKILL_TASKS` on.
+/// from updater 12, #6607): `LAMP_APP_ENGINES`, `LAMP_SKILL_TASKS`,
+/// `LAMP_SKILL_DEFAULT_AGENT`, `LAMP_UPDATE_NOW` and `LAMP_UPDATE_CDN_FEED` on.
 /// Read by lamp-update itself, so a lamp in a home takes them with no change
 /// to its own unit. Install doesn't write it: the product unit it writes
 /// sets both, which wins over the file.
@@ -1013,6 +1118,128 @@ pub fn sysstat_quiet(
     Ok(())
 }
 
+/// Where sysstat keeps what it collected (#7254 part 2).
+pub const SYSSTAT_KEPT: &str = "/var/log/sysstat";
+
+/// Whether `name` is one of sysstat's own daily files: `sa` or `sar` and
+/// digits only (`sa18`, `sar31`), never anything else in its folder.
+pub fn sysstat_kept_name(name: &str) -> bool {
+    let digits = name
+        .strip_prefix("sar")
+        .or_else(|| name.strip_prefix("sa"))
+        .unwrap_or("");
+    !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+/// The files sysstat already kept on the RAM log disk (#7254 part 2, the
+/// lead's yes on #7570): with collection off ([`sysstat_quiet`]) they only
+/// take room the journal needs (`/var/log` is 47 MB; past 75 % the base
+/// cuts the journal to 5 MB). Only plain files named as
+/// [`sysstat_kept_name`] directly in [`SYSSTAT_KEPT`] are removed, each said
+/// by name and size once removed; a removal that fails is said once per
+/// process for each distinct error; a link, a folder or anything else is never
+/// followed or touched. With [`SYSSTAT_ON_PATH`] there (its owner wants
+/// sysstat), nothing is removed. `lamp-region.service` may write only
+/// `/etc`, and no round changes that unit in a home, so the removal is one
+/// transient unit of its own (`systemd-run --wait --collect`), writing only
+/// that folder, naming the exact paths, through `systemd_run`. Run at every
+/// boot by `lamp-update region`, by install, and by every round that
+/// applies (crate::round, #7254), so a lamp that updates with no reboot
+/// gets the room too; once they are gone it finds nothing and runs
+/// nothing. journald is never restarted or signalled. Returns the paths it
+/// asked to remove.
+pub fn sysstat_kept_removed(
+    root: &Path,
+    systemd_run: &mut dyn FnMut(&[&str]) -> Result<(), String>,
+    say: &mut dyn FnMut(&str),
+) -> Result<Vec<String>, String> {
+    if fs::symlink_metadata(on(root, SYSSTAT_ON_PATH)).is_ok() {
+        return Ok(Vec::new());
+    }
+    let folder = on(root, SYSSTAT_KEPT);
+    let entries = match fs::read_dir(&folder) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        // A folder it can't list never fails the region's boot work: said,
+        // and nothing removed (the first builder's P3 on #7720).
+        Err(error) => {
+            say(&format!(
+                "sysstat's kept files are left: {SYSSTAT_KEPT}: {error}"
+            ));
+            return Ok(Vec::new());
+        }
+    };
+    let mut kept: Vec<(String, u64)> = Vec::new();
+    for entry in entries {
+        let Ok(entry) = entry else {
+            continue;
+        };
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !sysstat_kept_name(&name) {
+            continue;
+        }
+        // The entry itself, never what a link names.
+        let Ok(meta) = fs::symlink_metadata(entry.path()) else {
+            continue;
+        };
+        if meta.file_type().is_file() {
+            kept.push((format!("{SYSSTAT_KEPT}/{name}"), meta.len()));
+        }
+    }
+    if kept.is_empty() {
+        return Ok(Vec::new());
+    }
+    kept.sort();
+    let paths: Vec<String> = kept.iter().map(|(path, _)| path.clone()).collect();
+    let mut argv = vec![
+        "systemd-run",
+        "--wait",
+        "--collect",
+        "--quiet",
+        "--property=ProtectSystem=strict",
+        "--property=ReadWritePaths=/var/log/sysstat",
+        "--property=NoNewPrivileges=yes",
+        "/bin/rm",
+        "-f",
+        "--",
+    ];
+    argv.extend(paths.iter().map(String::as_str));
+    let result = systemd_run(&argv);
+    // A failure is said once per process for each distinct error: a round
+    // that fails the same way every `--every-s` stays quiet on the RAM log
+    // disk this frees (the reviewer-lead's P3 on #8314).
+    let mut failed = SYSSTAT_FAILED
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    match result {
+        Ok(()) => {
+            if failed.as_ref().is_some_and(|(at, _)| at == root) {
+                *failed = None;
+            }
+            for (path, bytes) in &kept {
+                say(&format!(
+                    "sysstat's kept file removed: {path} ({bytes} bytes)"
+                ));
+            }
+        }
+        Err(why) => {
+            let line = format!("sysstat's kept files were not removed: {why}");
+            if failed
+                .as_ref()
+                .is_none_or(|(at, said)| at != root || *said != line)
+            {
+                say(&line);
+                *failed = Some((root.to_path_buf(), line));
+            }
+        }
+    }
+    Ok(paths)
+}
+
+/// The last failure [`sysstat_kept_removed`] said, and under which root, so
+/// a repeat is not said.
+static SYSSTAT_FAILED: std::sync::Mutex<Option<(PathBuf, String)>> = std::sync::Mutex::new(None);
+
 /// `/etc/tmpfiles.d/lampos.conf`: the bus root and the locks.
 pub const TMPFILES: &str = include_str!("../../../deploy/product/lampos.conf");
 pub const TMPFILES_PATH: &str = "/etc/tmpfiles.d/lampos.conf";
@@ -1163,8 +1390,8 @@ const TIMED: &[&str] = &[
     "lamp-update-back.service",
 ];
 
-/// Services a round starts, and never enabled.
-const STARTED_BY_A_ROUND: &[&str] = &[crate::apply::UNIT];
+/// Services a round starts, or another unit requires (the apps' folders), and never enabled.
+const STARTED_BY_A_ROUND: &[&str] = &[crate::apply::UNIT, "lamp-apps-folders.service"];
 
 /// The units enabled: the target, and what starts outside it.
 pub(crate) fn enabled() -> Vec<String> {
@@ -1185,6 +1412,7 @@ pub(crate) fn enabled() -> Vec<String> {
             "lampos-setup-done.path",
             "lamp-region.path",
             "lamp-skills-manage.socket",
+            "lamp-apps-manage.socket",
             "lamp-setup-change.socket",
             "lamp-setup-wifi.socket",
             "lamp-eyes-camera.socket",
@@ -1390,17 +1618,45 @@ impl Host for System {
     }
 }
 
-/// The Harness CLI as `user`, with `home` as its `HOME` and the user's
-/// own runtime folder (`/run/user/<uid>`), which its per-user service needs.
+/// `ADAPTER_DATA_DIR=<home>/.harness/cli/data`, Harness's own default
+/// exactly (#7906): given to every Harness run here, so Harness 0.6.72's
+/// move of `~/.harness` into the XDG folders (openharness#4469) is
+/// `skipped-override` (`homeMove/conditions.ts` `OVERRIDE_NAMES`) and the
+/// home lampOS reads stays where it is.
+pub(crate) fn harness_data(home: &str) -> String {
+    use lamp_msgs::harness_hold::{DATA_DIR, HARNESS_DATA};
+    format!("{DATA_DIR}={home}/{HARNESS_DATA}")
+}
+
+/// The Harness CLI as `user`, with `home` as its `HOME`, the user's own
+/// runtime folder (`/run/user/<uid>`), which its per-user service needs,
+/// and Harness's data folder ([`harness_data`]).
 pub(crate) fn harness_argv(user: &str, home: &str, uid: &str, args: &[&str]) -> Vec<String> {
     let mut argv: Vec<String> = ["runuser", "-u", user, "--", "env"]
         .map(str::to_owned)
         .into();
     argv.push(format!("HOME={home}"));
     argv.push(format!("XDG_RUNTIME_DIR=/run/user/{uid}"));
+    argv.push(harness_data(home));
     argv.push(HARNESS.to_owned());
     argv.extend(args.iter().map(|arg| (*arg).to_owned()));
     argv
+}
+
+/// `<home>/.harness` made by `user` (`mkdir -p -m 0700`), before Harness's
+/// installer runs (#7906).
+pub(crate) fn harness_dir(user: &str, home: &str) -> Vec<String> {
+    vec![
+        "runuser".to_owned(),
+        "-u".to_owned(),
+        user.to_owned(),
+        "--".to_owned(),
+        "mkdir".to_owned(),
+        "-p".to_owned(),
+        "-m".to_owned(),
+        "0700".to_owned(),
+        format!("{home}/.harness"),
+    ]
 }
 
 /// `user`'s id, from `id -u`, through `run`.
@@ -1440,8 +1696,8 @@ pub const HERMES_STAGE_WITHIN: Duration =
 /// Every step through it gets [`RESTART_WITHIN`], but Harness's installer,
 /// which fetches, gets [`INSTALLER_WITHIN`], and a stage of Hermes's,
 /// which may be frozen too, [`HERMES_STAGE_WITHIN`]; each of OpenClaw's
-/// long steps (#6226, [`crate::openclaw_install::runs_long_step`]) its
-/// own hard [`crate::openclaw_install::STEP_WITHIN`].
+/// long steps (#6226, [`crate::openclaw_install::runs_long_step`]), which
+/// may be frozen too, [`crate::openclaw_install::LONG_STEP_WITHIN`].
 pub fn output_of(argv: &[String]) -> Result<String, String> {
     output_of_within(argv, bound_of(argv))
 }
@@ -1449,7 +1705,7 @@ pub fn output_of(argv: &[String]) -> Result<String, String> {
 /// How long [`output_of`] waits for `argv`.
 pub fn bound_of(argv: &[String]) -> Duration {
     if crate::openclaw_install::runs_long_step(argv) {
-        crate::openclaw_install::STEP_WITHIN
+        crate::openclaw_install::LONG_STEP_WITHIN
     } else if runs_hermes_stage(argv) {
         HERMES_STAGE_WITHIN
     } else if runs_installer(argv) {
@@ -1648,6 +1904,11 @@ pub fn harness_on_pinned_with(
 ) -> Result<(), String> {
     let uid = uid_of(run, user)?;
     run(&["install", "-d", "-o", user, "-g", user, "-m", "0700", home].map(str::to_owned))?;
+    // `~/.harness` there before the installer runs (#7906): on a fresh lamp
+    // Harness's installer otherwise picks the XDG folders and writes
+    // `.harness-root` there. Made by `user` itself (never followed as root),
+    // 0700 as its home; one already there is left as it is.
+    run(&harness_dir(user, home))?;
     let mut installer: Vec<String> = ["runuser", "-u", user, "--", "env"]
         .map(str::to_owned)
         .into();
@@ -1657,6 +1918,7 @@ pub fn harness_on_pinned_with(
     installer.extend([
         format!("HOME={home}"),
         format!("XDG_RUNTIME_DIR=/run/user/{uid}"),
+        harness_data(home),
         "PATH=/usr/local/bin:/usr/bin:/bin".to_owned(),
         "SHELL=/bin/sh".to_owned(),
     ]);
@@ -2044,6 +2306,9 @@ pub fn install(
     if let Err(why) = sysstat_quiet(&config.root, host, &mut changed, say) {
         say(&format!("sysstat's drop-ins: {why}"));
     }
+    // What sysstat already kept (#7254), as the boot run and a round
+    // remove it; each file is said as it goes, and none left runs nothing.
+    let _ = sysstat_kept_removed(&config.root, &mut |argv| host.refresh(argv), say);
 
     let before = state.clone();
     let build = Build {
@@ -3283,7 +3548,68 @@ pub(crate) fn fetch_model(
     result
 }
 
-/// The file at `url` into `to`, only if it is `bytes` long with `sha256`.
+/// Where a model's own release is on GitHub.
+const MODEL_RELEASES: &str = "https://github.com/autonomous-ai/lampOS/releases/download/";
+/// Where the CDN mirror keeps each model at a path no sequence names
+/// (`.github/scripts/lampos-mirror.py`).
+const MODEL_MIRROR: &str = "https://cdn.autonomous.ai/lampos/models/";
+/// Where the CDN mirror keeps a promoted build's models.
+const STABLE_MIRROR: &str = "https://cdn.autonomous.ai/lampos/stable/";
+/// The most a mirror tried before GitHub may take to connect and to begin
+/// answering, before GitHub is asked (#7709).
+pub const MIRROR_QUICK: Duration = Duration::from_secs(5);
+
+/// The URLs a model at `url` is asked for at, in order, each with whether
+/// it is asked quickly, once within [`MIRROR_QUICK`] (#7709): a model of a
+/// GitHub release from the CDN's sequence-free copy first, quickly, then
+/// from GitHub; one at a promoted build's CDN folder
+/// (`lampos/stable/<sequence>/models/<tag>/<file>`) from there, then from
+/// GitHub; any other only where it is. The URL the manifest or
+/// `models.json` names is always asked as before, with a whole fetch's
+/// waits: for a lamp in China, which can't reach GitHub, the CDN is the only
+/// way. Only the copy put in front of it is quick, so a CDN copy not made
+/// yet costs a lamp that can reach GitHub seconds.
+pub fn model_urls(url: &str) -> Vec<(String, bool)> {
+    fn plain(part: &str) -> bool {
+        !part.is_empty()
+            && part != "."
+            && part != ".."
+            && part
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+    }
+    /// `<tag>/<file>`, each a plain name.
+    fn tag_file(rest: &str) -> Option<(&str, &str)> {
+        let (tag, file) = rest.split_once('/')?;
+        (plain(tag) && plain(file)).then_some((tag, file))
+    }
+    if let Some((tag, file)) = url.strip_prefix(MODEL_RELEASES).and_then(tag_file) {
+        return vec![
+            (format!("{MODEL_MIRROR}{tag}/{file}"), true),
+            (url.to_owned(), false),
+        ];
+    }
+    let mirrored = url.strip_prefix(STABLE_MIRROR).and_then(|rest| {
+        let (sequence, rest) = rest.split_once('/')?;
+        if sequence.is_empty() || !sequence.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+        tag_file(rest.strip_prefix("models/")?)
+    });
+    match mirrored {
+        Some((tag, file)) => vec![
+            (url.to_owned(), false),
+            (format!("{MODEL_RELEASES}{tag}/{file}"), false),
+        ],
+        None => vec![(url.to_owned(), false)],
+    }
+}
+
+/// The file at `url` into `to`, only if it is `bytes` long with `sha256`:
+/// asked at each of [`model_urls`] in turn, as quickly as it says, until
+/// one serves it whole and matching. A file missing,
+/// out of reach or not matching at one is asked at the next; a file that
+/// does not match is never taken. Which one served it is said.
 fn fetch_checked(
     channel: &mut dyn Channel,
     url: &str,
@@ -3291,12 +3617,68 @@ fn fetch_checked(
     sha256: &str,
     to: &Path,
 ) -> Result<(), Fetch> {
+    let urls = model_urls(url);
+    let mut failed = Fetch::Failed(format!("{url} was not asked for"));
+    let mut quick_cut_short = None;
+    for (number, (url, quick)) in urls.iter().enumerate() {
+        let last = number + 1 == urls.len();
+        match fetch_one(channel, url, bytes, sha256, to, *quick) {
+            Ok(()) => {
+                eprintln!("lamp-update: {url} served {}", to.display());
+                return Ok(());
+            }
+            Err(error) => {
+                if *quick && !answered(&error) {
+                    quick_cut_short = Some(url);
+                }
+                if !last {
+                    eprintln!("lamp-update: {url}: {error}; asking the next");
+                }
+                failed = error;
+            }
+        }
+    }
+    // A lamp that can't reach GitHub (in China) whose quick CDN try was cut
+    // short, not answered "not there" or a mismatch: the CDN once more with
+    // a whole fetch's waits, its only way (#7709, Seventh's P2). GitHub's
+    // answer stays the one said if this fails too.
+    if let Some(url) = quick_cut_short {
+        eprintln!("lamp-update: asking {url} again with a whole fetch");
+        if fetch_one(channel, url, bytes, sha256, to, false).is_ok() {
+            eprintln!("lamp-update: {url} served {}", to.display());
+            return Ok(());
+        }
+    }
+    Err(failed)
+}
+
+/// Whether a failed try of [`fetch_one`] was answered: the file is not
+/// there, or it does not match. Anything else (out of reach, a timeout, a
+/// server error) cut the try short.
+fn answered(error: &Fetch) -> bool {
+    matches!(error, Fetch::Failed(why) if why.ends_with(" is not there") || why == "it does not match its SHA-256")
+}
+
+/// One try of [`fetch_checked`], at `url` alone: `quick` within
+/// [`MIRROR_QUICK`].
+fn fetch_one(
+    channel: &mut dyn Channel,
+    url: &str,
+    bytes: u64,
+    sha256: &str,
+    to: &Path,
+    quick: bool,
+) -> Result<(), Fetch> {
     let mut out = fs::File::create(to).map_err(|error| Fetch::Failed(error.to_string()))?;
     let mut hashing = Hashing {
         file: &mut out,
         context: digest::Context::new(&digest::SHA256),
     };
-    let fetched = channel.fetch(url, bytes, &mut hashing);
+    let fetched = if quick {
+        channel.fetch_quick(url, bytes, &mut hashing, MIRROR_QUICK)
+    } else {
+        channel.fetch(url, bytes, &mut hashing)
+    };
     let sha = manifest::hex(hashing.context.finish().as_ref());
     match fetched {
         Ok(size) if size == bytes && sha == sha256 => Ok(()),
@@ -3541,6 +3923,79 @@ mod tests {
         }
     }
 
+    /// #7956 (the first builder, 17:3x): a round carries a product unit only when it starts a lamp program
+    /// (`publish.rs`: `unit::program` or `unit::linked`; a part's template, socket or timer through
+    /// `companion::part`), and adds one only through its part. A unit that is not carried reaches a lamp by
+    /// `lamp-update install` alone, so a unit the product needs is carried or is named here, with why. Found by
+    /// the Store apps' two templates and their slice, which a round never brought.
+    #[test]
+    fn every_product_unit_a_round_needs_is_carried_or_named_not_carried() {
+        // Image-only, each with why: the image or `lamp-update install` puts it there, and no unit a round
+        // adds needs it to be new. A unit that is not here and not carried fails this test.
+        const NOT_CARRIED: &[(&str, &str)] = &[
+            (
+                "lampos.target",
+                "the product's grouping target: on the image from the start",
+            ),
+            ("lampos.slice", "a grouping slice: on the image, no program"),
+            (
+                "lampos-voice.slice",
+                "a grouping slice: on the image, no program",
+            ),
+            (
+                "lampos-parts.slice",
+                "a grouping slice: on the image, no program",
+            ),
+            (
+                "lamp-update-back.service",
+                "starts from its fixed path, which no round switches (#1680)",
+            ),
+            (
+                "lamp-update-back.timer",
+                "the back service's timer: fixed with its service",
+            ),
+            (
+                "lamp-update-apply.service",
+                "the switch's own unit, started by a round, never carried by one",
+            ),
+            (
+                "lampos-setup-done.path",
+                "a path watch on setup's marker: on the image",
+            ),
+            (
+                "lamp-region.path",
+                "a path watch for the region one-shot: on the image",
+            ),
+        ];
+        let texts: std::collections::BTreeMap<&str, &str> = PRODUCT.iter().copied().collect();
+        let mut wrong = Vec::new();
+        for (name, text) in PRODUCT {
+            let carried = match crate::companion::kind(name) {
+                Some(_) => {
+                    crate::companion::part(name, text, |unit| texts.get(unit).copied()).is_some()
+                }
+                // A service is carried only under a name a manifest may carry (`lamp-<x>.service`): `lampapp@`
+                // (no dash) starts a linked program too, and no round ever carried it (#7956, 19:50).
+                None => {
+                    crate::manifest::is_unit_name(name)
+                        && (unit::program(text).is_some() || unit::linked(text).is_some())
+                }
+            };
+            let named = NOT_CARRIED.iter().any(|(unit, _)| unit == name);
+            if carried == named {
+                wrong.push(format!(
+                    "{name}: {}",
+                    if named {
+                        "is carried now: take it off the list"
+                    } else {
+                        "no round can carry it (it starts no lamp program): make it start one, or name it in NOT_CARRIED"
+                    }
+                ));
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
     #[test]
     fn every_product_part_starts_through_its_current_link() {
         let parts = parts();
@@ -3558,12 +4013,13 @@ mod tests {
         // setup's three helpers (the names', the Wi-Fi's and its boot
         // restore) share one binary, and so do the air and its bus clock,
         // the skills and their manage helper, the eyes and their camera
-        // helper (#2892), and lamp-update and its region one-shot (#6256);
+        // helper (#2892), the apps' manage helper with its boot start, its folders and its two app templates, and lamp-update
+        // and its region one-shot (#6256);
         // every other service is a part.
         let services = PRODUCT.iter().filter(|(name, _)| linked(name)).count();
         assert_eq!(
             parts.len(),
-            services - 10,
+            services - 14,
             "every product service is a part"
         );
         for part in &parts {
@@ -3632,6 +4088,45 @@ mod tests {
                 .any(|unit| unit.ends_with("lamp-skills-manage.socket")),
             "{after}"
         );
+    }
+
+    /// #8351: app push in the product. The door passes `--apps-manage-socket`
+    /// at the very socket the apps' helper listens on, is ordered after it,
+    /// and may write the staging folder the helper reads pushed packages from.
+    #[test]
+    fn the_door_passes_the_apps_manage_socket_and_may_stage_a_pushed_app() {
+        let unit = |wanted: &str| {
+            PRODUCT
+                .iter()
+                .find(|(name, _)| *name == wanted)
+                .map(|(_, text)| *text)
+                .unwrap_or_else(|| panic!("{wanted} is not installed"))
+        };
+        let listen = unit("lamp-apps-manage.socket")
+            .lines()
+            .find_map(|line| line.strip_prefix("ListenStream="))
+            .expect("the apps' manage socket's ListenStream");
+        let control = unit("lamp-control.service");
+        let exec = control
+            .lines()
+            .find(|line| line.starts_with("ExecStart="))
+            .expect("lamp-control's ExecStart");
+        let words: Vec<&str> = exec.split_whitespace().collect();
+        let manage = words
+            .windows(2)
+            .find(|pair| pair[0] == "--apps-manage-socket")
+            .map(|pair| pair[1]);
+        assert_eq!(manage, Some(listen), "{exec}");
+        assert!(
+            control
+                .lines()
+                .find(|line| line.starts_with("After="))
+                .is_some_and(|after| after
+                    .split_whitespace()
+                    .any(|unit| unit == "lamp-apps-manage.socket")),
+            "lamp-control is ordered after the apps' manage socket"
+        );
+        assert!(control.contains("\nReadWritePaths=-/var/lib/lampos-apps-staging\n"));
     }
 
     /// #2853: every unit in `deploy/product/` is in the install list, so a
@@ -4046,5 +4541,223 @@ mod tests {
             rowless.is_empty(),
             "docs/skills.md's \"Core and installable skills\" has no row for {rowless:?}"
         );
+    }
+
+    const GITHUB_MODEL: &str =
+        "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-10-16/a.onnx";
+    const CDN_MODEL: &str = "https://cdn.autonomous.ai/lampos/models/models-2026-10-16/a.onnx";
+    const STABLE_MODEL: &str =
+        "https://cdn.autonomous.ai/lampos/stable/14202/models/models-2026-10-16/a.onnx";
+
+    /// `(URL, asked quickly)` pairs as [`model_urls`] gives them.
+    fn asks(pairs: &[(&str, bool)]) -> Vec<(String, bool)> {
+        pairs
+            .iter()
+            .map(|(url, quick)| ((*url).to_owned(), *quick))
+            .collect()
+    }
+
+    /// #7709: a GitHub release's model is asked at the CDN first, quickly;
+    /// one at a promoted build's CDN folder there as before, then at its
+    /// GitHub release; any other URL, or one that is not plainly
+    /// `<tag>/<file>`, only where it is, as before.
+    #[test]
+    fn a_model_is_asked_at_the_cdn_first_and_then_at_github() {
+        assert_eq!(
+            model_urls(GITHUB_MODEL),
+            asks(&[(CDN_MODEL, true), (GITHUB_MODEL, false)])
+        );
+        assert_eq!(
+            model_urls(STABLE_MODEL),
+            asks(&[(STABLE_MODEL, false), (GITHUB_MODEL, false)])
+        );
+        for alone in [
+            "https://models.test/a.onnx",
+            "file:///tmp/a.onnx",
+            CDN_MODEL,
+            "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-10-16/x/a.onnx",
+            "https://github.com/autonomous-ai/lampOS/releases/download/../a.onnx",
+            "https://github.com/autonomous-ai/lampOS/releases/download/t/a.onnx?x=1",
+            "https://github.com/other/lampOS/releases/download/models-2026-10-16/a.onnx",
+            "https://cdn.autonomous.ai/lampos/stable/x/models/models-2026-10-16/a.onnx",
+            "https://cdn.autonomous.ai/lampos/stable//models/models-2026-10-16/a.onnx",
+            "https://cdn.autonomous.ai/lampos/stable/14202/files/lamp-update",
+        ] {
+            assert_eq!(model_urls(alone), asks(&[(alone, false)]), "{alone}");
+        }
+    }
+
+    /// #7709: every model and notice the product pins is asked at the CDN
+    /// first, quickly, then at its GitHub release as before.
+    #[test]
+    fn every_product_model_is_asked_at_the_cdn_first() {
+        let models = models().unwrap();
+        assert!(!models.is_empty());
+        for model in models {
+            let urls = model_urls(&model.url);
+            assert_eq!(urls.len(), 2, "{}", model.url);
+            assert!(urls[0].0.starts_with(MODEL_MIRROR), "{}", urls[0].0);
+            assert!(urls[0].1);
+            assert_eq!(urls[1], (model.url.clone(), false));
+        }
+    }
+
+    /// A channel of the test's own for one model: the bytes each URL has,
+    /// and each URL asked with whether it was asked quickly. A URL in
+    /// `busy_once` answers 503 to a quick fetch, which asks once; a whole
+    /// fetch asks again after it, as `Web` does, and is served.
+    #[derive(Default)]
+    struct Mirrors {
+        files: std::collections::HashMap<String, Vec<u8>>,
+        busy_once: Option<String>,
+        asked: Vec<(String, bool)>,
+    }
+
+    impl Mirrors {
+        fn serve(&self, url: &str, out: &mut dyn std::io::Write) -> Result<u64, Fetch> {
+            let bytes = self.files.get(url).ok_or(Fetch::Missing)?;
+            out.write_all(bytes).unwrap();
+            Ok(bytes.len() as u64)
+        }
+    }
+
+    impl Channel for Mirrors {
+        fn fetch(
+            &mut self,
+            url: &str,
+            _most: u64,
+            out: &mut dyn std::io::Write,
+        ) -> Result<u64, Fetch> {
+            self.asked.push((url.to_owned(), false));
+            self.serve(url, out)
+        }
+
+        fn fetch_quick(
+            &mut self,
+            url: &str,
+            _most: u64,
+            out: &mut dyn std::io::Write,
+            quick: Duration,
+        ) -> Result<u64, Fetch> {
+            assert_eq!(quick, MIRROR_QUICK);
+            self.asked.push((url.to_owned(), true));
+            if self.busy_once.as_deref() == Some(url) {
+                return Err(Fetch::Failed("the channel answered 503".into()));
+            }
+            self.serve(url, out)
+        }
+    }
+
+    fn fetch_genuine(channel: &mut Mirrors, url: &str) -> (Result<(), Fetch>, Vec<u8>) {
+        let folder = tempfile::tempdir().unwrap();
+        let to = folder.path().join("a.onnx");
+        let genuine = b"genuine model";
+        let sha = manifest::hex(digest::digest(&digest::SHA256, genuine).as_ref());
+        let fetched = fetch_checked(channel, url, genuine.len() as u64, &sha, &to);
+        (fetched, fs::read(&to).unwrap_or_default())
+    }
+
+    /// #7709: the CDN is asked first, quickly, and GitHub only when the CDN
+    /// has no file or one that does not match, which is never taken.
+    #[test]
+    fn the_cdn_serves_first_and_github_is_asked_only_when_it_fails() {
+        let genuine = b"genuine model".to_vec();
+        // The CDN has it: GitHub is never asked.
+        let mut channel = Mirrors::default();
+        channel.files.insert(CDN_MODEL.into(), genuine.clone());
+        channel.files.insert(GITHUB_MODEL.into(), genuine.clone());
+        let served = fetch_genuine(&mut channel, GITHUB_MODEL);
+        assert_eq!(served, (Ok(()), genuine.clone()));
+        assert_eq!(channel.asked, asks(&[(CDN_MODEL, true)]));
+        // The CDN has none (404): GitHub, asked as before.
+        let mut channel = Mirrors::default();
+        channel.files.insert(GITHUB_MODEL.into(), genuine.clone());
+        let served = fetch_genuine(&mut channel, GITHUB_MODEL);
+        assert_eq!(served, (Ok(()), genuine.clone()));
+        assert_eq!(
+            channel.asked,
+            asks(&[(CDN_MODEL, true), (GITHUB_MODEL, false)])
+        );
+        // The CDN's copy does not match: GitHub's is taken.
+        let mut channel = Mirrors::default();
+        channel
+            .files
+            .insert(CDN_MODEL.into(), b"tampered model".to_vec());
+        channel.files.insert(GITHUB_MODEL.into(), genuine.clone());
+        let served = fetch_genuine(&mut channel, GITHUB_MODEL);
+        assert_eq!(served, (Ok(()), genuine.clone()));
+        assert_eq!(channel.asked.len(), 2);
+        // Neither matches: refused, and GitHub's answer is the one said.
+        let mut channel = Mirrors::default();
+        channel
+            .files
+            .insert(CDN_MODEL.into(), b"tampered model".to_vec());
+        let (fetched, _) = fetch_genuine(&mut channel, GITHUB_MODEL);
+        assert_eq!(
+            fetched,
+            Err(Fetch::Failed(format!("{GITHUB_MODEL} is not there")))
+        );
+    }
+
+    /// #7709: a manifest's own CDN URL keeps a whole fetch and its waits:
+    /// busy once (503), it is still served from the CDN, and GitHub, which a
+    /// lamp in China can't reach, is never asked.
+    #[test]
+    fn a_manifest_cdn_url_busy_once_is_still_served_from_the_cdn() {
+        let genuine = b"genuine model".to_vec();
+        let mut channel = Mirrors {
+            busy_once: Some(STABLE_MODEL.into()),
+            ..Mirrors::default()
+        };
+        channel.files.insert(STABLE_MODEL.into(), genuine.clone());
+        channel.files.insert(GITHUB_MODEL.into(), genuine.clone());
+        let served = fetch_genuine(&mut channel, STABLE_MODEL);
+        assert_eq!(served, (Ok(()), genuine));
+        assert_eq!(channel.asked, asks(&[(STABLE_MODEL, false)]));
+    }
+
+    /// #7709 (Seventh's P2): a lamp that can't reach GitHub, whose quick
+    /// CDN try is cut short (a 503), asks the CDN once more with a whole
+    /// fetch and is served there; a CDN answering "not there" is not asked
+    /// again.
+    #[test]
+    fn a_quick_cdn_try_cut_short_is_asked_again_whole_when_github_fails() {
+        let genuine = b"genuine model".to_vec();
+        let mut channel = Mirrors {
+            busy_once: Some(CDN_MODEL.into()),
+            ..Mirrors::default()
+        };
+        channel.files.insert(CDN_MODEL.into(), genuine.clone());
+        let served = fetch_genuine(&mut channel, GITHUB_MODEL);
+        assert_eq!(served, (Ok(()), genuine));
+        assert_eq!(
+            channel.asked,
+            asks(&[(CDN_MODEL, true), (GITHUB_MODEL, false), (CDN_MODEL, false)])
+        );
+        let mut channel = Mirrors::default();
+        let (fetched, _) = fetch_genuine(&mut channel, GITHUB_MODEL);
+        assert_eq!(
+            fetched,
+            Err(Fetch::Failed(format!("{GITHUB_MODEL} is not there")))
+        );
+        assert_eq!(
+            channel.asked,
+            asks(&[(CDN_MODEL, true), (GITHUB_MODEL, false)])
+        );
+    }
+
+    /// #7709: what a CDN without the file adds before GitHub is asked,
+    /// measured: well under [`MIRROR_QUICK`].
+    #[test]
+    fn a_cdn_without_the_file_adds_little_before_github() {
+        let genuine = b"genuine model".to_vec();
+        let mut channel = Mirrors::default();
+        channel.files.insert(GITHUB_MODEL.into(), genuine.clone());
+        let started = Instant::now();
+        let served = fetch_genuine(&mut channel, GITHUB_MODEL);
+        let took = started.elapsed();
+        assert_eq!(served, (Ok(()), genuine));
+        assert!(took < MIRROR_QUICK, "{took:?}");
+        assert!(took < Duration::from_secs(1), "{took:?}");
     }
 }

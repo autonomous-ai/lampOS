@@ -382,10 +382,13 @@ pub fn product_files(lamp_os: &Path) -> io::Result<BTreeMap<String, String>> {
 /// it: its name and its text both (Second's P3 on #4666), so a hand drop-in
 /// that happens to hold an installed file's text is not taken for it. A
 /// unit by its name; a setting, the exit note and the tmpfiles conf by the
-/// last part of the path install writes them to.
+/// last part of the path install writes them to. lamp-update's own switch
+/// file (`update.env`) is not written by install but carried by every round
+/// to every lamp, and lamp-update reads it at its start, so it turns a
+/// switch on in the product as a unit does (`LAMP_UPDATE_CDN_FEED`, #7728).
 fn installed(name: &str, text: &str) -> bool {
     use lamp_update::install::{
-        EXIT_NOTE, PRODUCT, SETTINGS, STORE_SETTINGS, TMPFILES, TMPFILES_PATH,
+        EXIT_NOTE, PRODUCT, SETTINGS, STORE_SETTINGS, TMPFILES, TMPFILES_PATH, UPDATE_SETTING,
     };
     let file = |path: &str| path.rsplit('/').next().unwrap_or(path).to_owned();
     PRODUCT
@@ -400,6 +403,7 @@ fn installed(name: &str, text: &str) -> bool {
         .chain([
             ("exit-note.conf".to_owned(), EXIT_NOTE),
             (file(TMPFILES_PATH), TMPFILES),
+            (file(UPDATE_SETTING.0), UPDATE_SETTING.1),
         ])
         .any(|(placed_name, placed)| placed_name == name && placed == text)
 }

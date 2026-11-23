@@ -3,7 +3,9 @@
 # Prints one word:
 #   row            a writer's comment whose first line opens with ROW and this PR's number (bold allowed: "**ROW #7016
 #                  <head> on build N …"), or whose first 300 characters say "lamp row for #N" for this PR, as Fifth's
-#                  rows open ("Fifth, 09:51 GMT+7: lamp row for #6907 on lamp-52e6 …");
+#                  rows open ("Fifth, 09:51 GMT+7: lamp row for #6907 on lamp-52e6 …"), or whose first line puts the
+#                  verdict first (23 Nov): "ROW PASS: #N <head> …", "ROW #<issue> via #N …", or "ROW PASS <head>"
+#                  with no number, its commit one of the heads (verdict_row_re, VERDICT_SHA);
 #   no-row-needed  a writer's READ-OK whose first line is the marker, for a commit one of the heads starts with (or a
 #                  prefix of one), saying "no row needed" (docs, tests, or code behind a switch that's off);
 #   row-incomplete MISSING  a row of this PR (and no "no row needed" that carries it) that lacks lamp, build or journal
@@ -48,7 +50,9 @@ from markers import parse_marker, quoted, names_commit, writers_from_args, is_wr
 # VOIDED and VOIDS too; FAILOVER is no verdict.
 FAILED = re.compile(r"\b(?:FAIL|VOID)(?:ED|S)?\b")
 PASSED = re.compile(r"\bPASS\b")
-NO_ROW = re.compile(r"(?i)\bno row needed\b")
+# 20 Nov (#8066): a "no row needed" inside inline quotes ("…", “…”, '…', `…`) is mentioned, not said, and never
+# counts. The Reviewer-lead's READ-OK said: I'd rather not call it "no row needed", and the bot took it as a reader's.
+NO_ROW = re.compile(r"(?i)(?<![\"“‘'`])\bno row needed\b(?![\"”’'`])")
 LAMP = re.compile(r"(?<![\w-])lamp-(?=[0-9a-f]{0,3}[0-9])[0-9a-f]{4}(?![\w-])")
 BUILD = re.compile(r"\b(?i:build|installed|on)[ \t]+[*`]*\d{5}(?!\w)|\bbuild[ \t]+`?[0-9a-f]{7,40}\b")
 FENCE_OPEN = re.compile(r" {0,3}(`{3,}|~{3,})")
@@ -63,21 +67,89 @@ def row_line_re(pr):
     return re.compile(r"\**ROW\b\**[ \t]+\**#?%s(?![\d])" % re.escape(str(pr)))
 
 
-# The commit a ROW line names right after its PR's number (bold, a backtick or "at" allowed before it).
-NAMED_SHA = re.compile(r"\**[ \t]+(?:at[ \t]+)?[*`]*([0-9a-f]{7,40})(?![0-9A-Za-z])")
+# 23 Nov (first builder): the shapes runners write, the verdict first. On one night the bot read none of these as a
+# row and three passed PRs missed gate A: "ROW PASS: #8306 <sha> (kit-8306b), lamp-52e6, …" (Fifth), "ROW PASS <sha>"
+# with no number (Seventh, #8314) and "ROW #8294 via #8302 (head …) on lamp-52e6 …: PASS" (Sixth, an issue's row
+# carried by this PR). A verdict-first line names this PR by its number, by "via #N", or, with no number, by a commit
+# that is one of its heads. A verdict-first line's own verdict word decides (failed(), SubDarren's P2 on #8333):
+# "ROW FAIL: #N …, legs 1-3 PASS" is no row, whatever PASS the counts after it say. On PR #X's thread "ROW #X via #Y"
+# still counts for #X by row_line_re, the number right after ROW, as it did before.
+VERDICT = r"(?:PASS|FAIL(?:ED|S)?|VOID(?:ED|S)?)"
+# The verdict word of a verdict-first line, caught.
+VERDICT_FIRST = re.compile(r"\**ROW\b\**[ \t]+\**(PASS|FAIL(?:ED|S)?|VOID(?:ED|S)?)\b")
+# The commit a numberless verdict-first line names ("ROW PASS 0d7c0340e8…").
+VERDICT_SHA = re.compile(r"\**ROW\b\**[ \t]+\**%s\**:?[ \t]+[*`]*([0-9a-f]{7,40})(?![0-9A-Za-z])" % VERDICT)
+
+
+def verdict_row_re(pr):
+    """ROW, a verdict word, then this PR's number ("ROW PASS: #8306"), or ROW, another number, then "via" this PR's
+    ("ROW #8294 via #8302")."""
+    n = re.escape(str(pr))
+    return re.compile(r"\**ROW\b\**[ \t]+(?:\**%s\**:?[ \t]+\**#?%s(?!\d)|\**#?\d+\**[ \t]+via[ \t]+\**#?%s(?!\d))"
+                      % (VERDICT, n, n))
+
+
+def opens_row(body, pr, heads=()):
+    """Whether body opens with a row line of pr: "ROW #N", a verdict-first "ROW PASS: #N" or "ROW #X via #N", or a
+    numberless "ROW PASS <sha>" whose sha is one of heads."""
+    if row_line_re(pr).match(body) or verdict_row_re(pr).match(body):
+        return True
+    m = VERDICT_SHA.match(body)
+    return bool(m and heads and names_commit(m.group(1), heads))
+
+
+# The commit a ROW line names right after its PR's number (bold, a backtick, "at", or "(head" as Sixth writes it,
+# allowed before it: the Reviewer-lead's P2 on #8333, so a switch-on's via row at another patch reads as stale).
+NAMED_SHA = re.compile(r"\**[ \t]+\(?(?:head[ \t]+|at[ \t]+)?[*`]*([0-9a-f]{7,40})(?![0-9A-Za-z])")
 
 
 def named_sha(body, pr):
-    """The commit a ROW line names after its PR's number, or None when it names none."""
-    m = row_line_re(pr).match(body)
-    s = NAMED_SHA.match(body, m.end()) if m else None
-    return s.group(1) if s else None
+    """The commit a ROW line names after its PR's number, or None when it names none. A numberless verdict-first
+    line ("ROW PASS <sha>") needs no read here: it counts only when its sha is one of the heads, so it's never
+    stale."""
+    for rx in (row_line_re(pr), verdict_row_re(pr)):
+        m = rx.match(body)
+        if m:
+            s = NAMED_SHA.match(body, m.end())
+            return s.group(1) if s else None
+    return None
 
 
-def failed(body):
-    """A row whose first 300 characters say FAIL or VOID and not PASS."""
+def row_line(body, pr=None, heads=()):
+    """The line of body that makes it a row of pr, as has_row matched it: line 1 when it opens with this PR's ROW
+    line (opens_row, the heads deciding a numberless one), else the first line where "lamp row for #N" is said
+    unquoted. Line 1 when neither, or without pr."""
+    lines = body.split("\n")
+    if pr and not opens_row(body, pr, heads):
+        rx, offset = lamp_row_re(pr), 0
+        for line in lines:
+            m = rx.search(line)
+            if m and not quoted(body, offset + m.start()):
+                return line
+            offset += len(line) + 1
+    return lines[0]
+
+
+def failed(body, pr=None, heads=()):
+    """A row whose first 300 characters say FAIL or VOID, and whose own row line doesn't say PASS.
+
+    22 Nov (#8180, train 1162): the PASS that clears a FAIL is read from the row's own line only, the line has_row
+    matched (row_line), never from the rest of the first 300 characters. "ROW #8180 … build 15510: FAIL" followed by
+    a check's "`VERIFY PASS`" in the next paragraph was counted as a row and cut into a train. A row line that says
+    "PASS, the earlier FAIL was the kit" or "FAILED then PASS on a rerun" still counts. The Reviewer-lead's P2 on
+    #8293: the line is the one has_row matched, so an earlier line naming a kit like "row-8053r DRY PASS" can't
+    clear a mid-post "lamp row for #N: FAIL".
+
+    23 Nov (SubDarren's P2 on #8333): when this PR's row line puts the verdict first, that word decides alone:
+    "ROW FAIL: #8306 …, legs 1-3 PASS, leg 4 timed out" is failed, and "ROW PASS: #8306 …, leg 4 FAIL then PASS on its
+    rerun" is not."""
     head = body[:300]
-    return bool(FAILED.search(head)) and not PASSED.search(head)
+    if not FAILED.search(head):
+        return False
+    verdict = VERDICT_FIRST.match(head) if pr and opens_row(head, pr, heads) else None
+    if verdict:
+        return not verdict.group(1).startswith("PASS")
+    return not PASSED.search(row_line(head, pr, heads))
 
 
 def unquoted(rx, body, end=None):
@@ -110,14 +182,15 @@ def missing(body):
             if not ok]
 
 
-def has_row(c, pr):
-    """None when the comment is no row of this PR (or a failed one), else the parts it lacks ([] for a whole row)."""
+def has_row(c, pr, heads=()):
+    """None when the comment is no row of this PR (or a failed one), else the parts it lacks ([] for a whole row).
+    heads: the PR's heads, which a numberless "ROW PASS <sha>" must name."""
     body = c["body"].lstrip()
     if not pr:
         return None
-    if not ((row_line_re(pr).match(body) and not quoted(body, 0)) or unquoted(lamp_row_re(pr), body, 300)):
+    if not ((opens_row(body, pr, heads) and not quoted(body, 0)) or unquoted(lamp_row_re(pr), body, 300)):
         return None
-    return None if failed(body) else missing(body)
+    return None if failed(body, pr, heads) else missing(body)
 
 
 def says_no_row(c, heads):
@@ -132,12 +205,13 @@ def rows(items, heads, writers, pr=None, switch_on=False):
     """items: dicts {login, body} in posting order. heads: the head sha, or a list of it and earlier heads with the same
     patch. switch_on: the PR turns a switch on, so "no row needed" doesn't carry it. Returns "row", "no-row-needed",
     "row-incomplete <parts>" (the newest incomplete row's) or "none"."""
-    heads = [heads] if isinstance(heads, str) else [h for h in heads if h]
+    # 18 Nov: a "code:<sha>" head (lib.sh's code_patch_of) counts for reads only, never for a row or "no row needed".
+    heads = [heads] if isinstance(heads, str) else [h for h in heads if h and not h.startswith("code:")]
     found, short, stale = "none", None, None
     for c in items:
         if c.get("pr_body") or not is_writer(c, writers):
             continue
-        lacks = has_row(c, pr)
+        lacks = has_row(c, pr, heads)
         # A whole row of a switch-on at another patch is stale; one short of a part says what it lacks first.
         if lacks == [] and switch_on:
             sha = named_sha(c["body"].lstrip(), pr)

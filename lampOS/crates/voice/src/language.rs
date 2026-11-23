@@ -174,6 +174,27 @@ pub const UNPLUG_ASK_OFF: &str =
     "My arm is folded. Shall I turn myself off now? Say yes, and I will.";
 pub const UNPLUG_UPDATING: &str = "I'm in the middle of an update, so I can't turn myself off yet. I'll get back up; ask me again once it's done.";
 
+/// What the lamp says when the owner's Update now (#7517) finds someone
+/// talking with it: once, before the switch restarts it.
+pub const UPDATING_NOW: &str = "I'm updating now. I'll be back in a minute.";
+
+/// [`UPDATING_NOW`] in Vietnamese, Japanese, Chinese and Korean. Kept out of
+/// [`FIXED_LINES`]: it is said through the model's route as written, never
+/// from the speech cache.
+const UPDATING_NOW_WORDS: [&str; 4] = [
+    "Mình cập nhật phần mềm nhé, một phút nữa mình quay lại.",
+    "今からソフトウェアを更新します。1分ほどで戻ります。",
+    "我现在要更新软件，一分钟后回来。",
+    "지금 소프트웨어를 업데이트할게요. 1분 뒤에 돌아올게요.",
+];
+
+/// [`UPDATING_NOW`] in `language`, English for none.
+pub fn updating_now(language: Option<Language>) -> &'static str {
+    language.map_or(UPDATING_NOW, |language| {
+        UPDATING_NOW_WORDS[language.column()]
+    })
+}
+
 /// What a lamp woken by its name says in place of its "hm?"
 /// (`LAMP_SLEEP_HEARS_NAME=on`, migrate-P2, the design owner on #4877): only
 /// from the speech cache ([`crate::say::tts_cache::TtsCache::wake_line`]).
@@ -368,8 +389,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
         ],
     ),
     // Before the rest of an answer a wordless cut ended, picked up again in a
-    // busy room (`LAMP_CUT_IN_WORDLESS_RESUMES`, off in the product until its
-    // lamp check passes, #5430).
+    // busy room (`LAMP_CUT_IN_WORDLESS_RESUMES`, on in the product, #7413).
     (
         crate::cut_in_wordless::BRIDGE,
         ["Dù sao thì,", "それでね、", "总之，", "아무튼,"],
@@ -438,6 +458,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "미안해요, 그건 아직 안 했어요. 다시 한 번 부탁해 줄래요?",
         ],
     ),
+    // What it says when a live figure could not be looked up
+    // (`LAMP_LIVE_FACT_CHECKED`, #7605).
+    (
+        crate::live_fact::COULD_NOT_LINE,
+        [
+            "Xin lỗi, giờ mình chưa tra được thông tin đó.",
+            "ごめんね、今それを調べられなかった。",
+            "抱歉，我现在没能查到这个。",
+            "미안해요, 지금은 그걸 찾아보지 못했어요.",
+        ],
+    ),
     // What it says in place of a reply claiming a made skill not on is on
     // (`LAMP_MADE_NOT_ON_TOLD`, #7270), its yes still taken, then too late.
     (
@@ -469,6 +500,28 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "알겠어요.",
         ],
     ),
+    // What the second route says when a keep it said back is taken back
+    // for doubt (`LAMP_MEMORY_UNSURE_NOT_KEPT`, #7739).
+    (
+        crate::remember::doubted::TAKEN_BACK_LINE,
+        [
+            "Xin lỗi, rốt cuộc mình chưa lưu điều đó.",
+            "ごめんね、やっぱりそれは覚えておかなかったよ。",
+            "抱歉，我最后还是没有记下这个。",
+            "미안해요, 결국 그건 기억해 두지 않았어요.",
+        ],
+    ),
+    // What the second route says for a line that only asks to keep, every
+    // keep refused for want of a known face (#7877).
+    (
+        crate::remember::needs_face::REFUSED_LINE,
+        [
+            "Mình chưa chắc ai đang nói, nên mình chưa lưu được điều đó.",
+            "誰が話しているのかわからないから、それは覚えておけないの。",
+            "我不确定是谁在说话，所以没法记住这个。",
+            "누가 말하는지 확실하지 않아서, 그건 기억해 둘 수 없어요.",
+        ],
+    ),
     // What the second route says at once for a plain keep
     // (`LAMP_KEEP_ANSWERS_AT_ONCE`, C59), from its clip rendered ahead.
     (
@@ -478,6 +531,17 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "わかった、覚えておくね。",
             "好的，我会记住的。",
             "알겠어요, 기억해 둘게요.",
+        ],
+    ),
+    // What the second route says at once for a no that is only a no to the
+    // one-face forget question (#8185), from its clip rendered ahead.
+    (
+        crate::remember::KEPT_IT_LINE,
+        [
+            "Được, mình sẽ giữ lại.",
+            "わかった、残しておくね。",
+            "好的，我会留着。",
+            "알겠어요, 그대로 둘게요.",
         ],
     ),
     // The first stand's ask and its "here I go", sent to the say service as
@@ -671,12 +735,52 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
         ],
     ),
     (
+        crate::long_make::RUN_ON_LINE,
+        [
+            "Cái này hơi lâu một chút. Xong mình sẽ báo bạn nhé.",
+            "これは少し時間がかかりそう。できたら知らせるね。",
+            "这个要花点时间。好了我会告诉你。",
+            "이건 시간이 좀 걸려요. 다 되면 알려 드릴게요.",
+        ],
+    ),
+    (
         "Oh, hello to you too.",
         [
             "Ồ, chào bạn nha.",
             "あ、こんにちは。",
             "哦，你也好呀。",
             "오, 안녕하세요.",
+        ],
+    ),
+    // The make's opening, said by the lamp for a make_skill call with no
+    // words before it (#7554), from its clip rendered ahead.
+    (
+        crate::make_skill_agent::MAKE_OPENING,
+        [
+            "Mình làm ngay đây.",
+            "今から作るね。",
+            "我这就来做。",
+            "지금 바로 만들게요.",
+        ],
+    ),
+    // A make past the two waiting its turn (#7679, `LAMP_MAKE_QUEUE`).
+    (
+        crate::make_queue::QUEUE_FULL_LINE,
+        [
+            "Mình đang có hai kỹ năng chờ làm rồi, nên chưa nhận thêm được. Xong rồi bạn nhờ lại mình nhé.",
+            "もう二つのスキルが作られるのを待っているから、今はもう一つは受けられないよ。終わったらもう一度頼んでね。",
+            "已经有两个技能在等我做了，现在还接不了新的。等做完了再跟我说一次吧。",
+            "벌써 두 개의 스킬이 만들어지길 기다리고 있어서, 지금은 하나 더 받을 수 없어요. 다 끝나면 다시 말해 주세요.",
+        ],
+    ),
+    // A waiting make dropped (#7679): its labels follow the colon.
+    (
+        crate::make_queue::QUEUE_DROPPED_LINE,
+        [
+            "Lúc nãy mình bận nên chưa kịp làm cái bạn nhờ, nên nó chưa được làm. Nếu bạn vẫn muốn thì nhờ lại mình nhé:",
+            "さっきは手が離せなくて、頼まれたものを作れなかったよ。まだ欲しかったら、もう一度頼んでね：",
+            "刚才我在忙，没来得及做你要的那个，所以还没做。如果还想要，再跟我说一次吧：",
+            "아까 바빠서 부탁하신 걸 못 만들었어요. 아직 원하시면 다시 말해 주세요:",
         ],
     ),
 ];

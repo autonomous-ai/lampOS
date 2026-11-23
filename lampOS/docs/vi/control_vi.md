@@ -12,7 +12,9 @@ cập cho nhà phát triển trong ứng dụng.
 Khi `LAMP_CONTROL` không bật mà `LAMP_SKILL_TASKS=on`, `lamp-control` vẫn
 chạy nhưng không có cửa: không lắng nghe TCP, không TLS, không ghép đôi. Nó
 chỉ phục vụ phía chủ đèn (`--admin-socket`: lời đồng ý của voice, việc cấp
-token của lamp-tasks) và socket cho skill run. Cả hai đều tắt thì nó báo vậy
+token của lamp-tasks, và `{"notes_forget_skills": true}` → `{"forgot": N}`:
+xoá ghi chú của mọi kỹ năng tự tạo khi chủ đèn nói "quên hết", #7245) và
+socket cho skill run. Cả hai đều tắt thì nó báo vậy
 và thoát với mã 0.
 
 ## Bốn quyết định
@@ -42,6 +44,10 @@ và thoát với mã 0.
 - **Hành động:** `express`, `gesture`, `look`, `move`, `play`, `joints`,
   `light`, `say`, `sound`, `stop`. `look`, `move`, `play` và `joints` cần một
   lease.
+- **`say`:** lời được đọc đúng như gửi, qua dịch vụ giọng nói của đèn, phải
+  dựng xong trọn câu trong 5 s với câu đến 120 ký tự, thêm 1 s cho mỗi 30 ký
+  tự bắt đầu sau đó, tối đa 20 s; quá thời hạn thì bị từ chối
+  (`tts_cache::render_within`, #7742).
 - **Quyền:** `body`, `light`, `speak`, `look`, `hear`, `sound`.
 - **Không bao giờ qua cửa này:** khung hình camera, âm thanh, bản ghi lời
   nói, dấu khuôn mặt hay tên.
@@ -116,3 +122,32 @@ không có truy cập servo trực tiếp. Tốc độ cho mỗi máy khách: `j
 một giây, `gesture`/`move`/`play`/`look` một lần mỗi 2 giây, `light` 5 lần
 một giây, `say`/`sound` 6 lần một phút và 60 lần một giờ, `express` một lần
 một phút, tối đa 16 cụm từ, mỗi cụm tối đa 64 ký tự.
+
+**Giờ yên lặng cho skill run (#7625, `LAMP_CONTROL_QUIET_RUNS`, bật trừ khi
+đúng `off`):** `say`, `sound` và `turn.start` của một skill run trên run
+socket bị từ chối `quiet_hours` ("quiet hours: 22:00 to 07:00 local, a
+skill's run") trong đúng khung giờ yên lặng mà lamp-skills và đường "told"
+đọc (`lamp_local_time::quiet_hours`, hiện là `QuietWindow::DEFAULT`; chưa có
+cài đặt của chủ), không bao giờ là khung riêng của lamp-control, và cả khi
+chưa biết giờ địa phương của đèn. Một run do trigger hay lịch hẹn không thể
+nói lúc nửa đêm, và `say` của chính run ngay sau một yêu cầu bằng giọng nói
+ban đêm cũng không: cổng của run không có khoảng mở. Câu trả lời ban đêm cho
+một yêu cầu bằng giọng nói chỉ đến qua đường "told" (một run trả câu trả lời
+về, với quyền `-read` qua Harness), nơi giữ giờ yên lặng và mở nó 5 phút sau
+lúc hỏi ([tasks.md](../tasks.md)). Lời `hello` của run nói khung giờ trong
+`limits` (`quiet_hours`: `{"from": "22:00", "to": "07:00"}`). Máy tính đã ghép đôi vẫn theo
+`--quiet-hours` (mặc định tắt). Ghi vào journal lúc khởi động.
+
+## Số lần đổi ghi chú cho bộ nhớ của chủ nhân (C157)
+
+lamp-control đếm mỗi `notes.set` hay `notes.delete` đã giữ của từng máy tính
+(ô 15 phút, 25 giờ gần nhất, chỉ trong bộ nhớ, chỉ con số và thời điểm lần đổi
+cuối, không bao giờ là khóa nào); thu hồi máy tính thì xóa con số. Socket của
+chủ nhân trả lời `{"note_changes": {"since_unix_ms": N}}` cho riêng voice, chỉ
+cho các máy tính mà tệp phụ `<state-dir>/paired-by.json` đánh dấu là ghép đôi
+từ app của chủ nhân: `{"v": 1, "clients": {"c_…": {"by": "app", "paired_at":
+<giây Unix>}}}`, tệp thường (không phải link), tối đa 64 KiB, 0600. Chỉ
+`"by": "app"` được tính, và chỉ khi `paired_at` trùng với của máy tính trong
+`clients.json`; mã `lamp-control code` của người giữ máy là `"keeper"` hoặc
+không có trong tệp. Bản dựng này chỉ đọc tệp; phía ghép đôi ghi nó. Chi tiết ở
+[control.md](../control.md), "Notes", và memory-days.md.

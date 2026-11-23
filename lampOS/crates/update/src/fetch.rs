@@ -48,6 +48,22 @@ pub trait Channel {
     /// The file at `url`, written into `out`: at most `most` bytes, and how
     /// many it was.
     fn fetch(&mut self, url: &str, most: u64, out: &mut dyn Write) -> Result<u64, Fetch>;
+
+    /// The file at `url` as [`Channel::fetch`] reads it, but asked once,
+    /// with at most `quick` to connect and for the answer's first bytes: a
+    /// mirror tried before a file's own home, so one that is down or out of
+    /// reach costs seconds before the home is asked, not a whole fetch's
+    /// waits (#7709). A channel with no network of its own reads it as
+    /// `fetch` does.
+    fn fetch_quick(
+        &mut self,
+        url: &str,
+        most: u64,
+        out: &mut dyn Write,
+        _quick: Duration,
+    ) -> Result<u64, Fetch> {
+        self.fetch(url, most, out)
+    }
 }
 
 /// The redirects followed before giving up: GitHub's release downloads
@@ -64,6 +80,8 @@ pub struct Web {
     tls: Arc<rustls::ClientConfig>,
     /// To connect to one address.
     connect: Duration,
+    /// For the answer's first bytes, the TLS handshake with them.
+    first: Duration,
     /// For one read or write to make progress.
     stall: Duration,
     /// For a whole file.
@@ -96,6 +114,7 @@ impl Web {
         Ok(Self {
             tls: Arc::new(tls),
             connect,
+            first: stall,
             stall,
             whole,
         })
@@ -120,18 +139,52 @@ impl Web {
                 self.connect.min(left).max(Duration::from_millis(1)),
             ) {
                 Ok(socket) => {
-                    socket.set_read_timeout(Some(self.stall)).ok();
+                    socket.set_read_timeout(Some(self.first)).ok();
                     socket.set_write_timeout(Some(self.stall)).ok();
                     let name = ServerName::try_from(url.host.clone())
                         .map_err(|_| Fetch::Failed(format!("{} is not a host name", url.host)))?;
                     let session = rustls::ClientConnection::new(Arc::clone(&self.tls), name)
                         .map_err(|error| Fetch::Failed(format!("TLS: {error}")))?;
-                    return Ok(Box::new(rustls::StreamOwned::new(session, socket)));
+                    return Ok(Box::new(FirstBytes {
+                        tls: rustls::StreamOwned::new(session, socket),
+                        stall: Some(self.stall),
+                    }));
                 }
                 Err(error) => last = format!("{address}: {error}"),
             }
         }
         Err(Fetch::Unreachable(last))
+    }
+}
+
+/// A TLS stream whose reads wait at most `Web`'s `first` until the
+/// answer's first bytes come (the handshake among them), and its `stall`
+/// from then on.
+struct FirstBytes {
+    tls: rustls::StreamOwned<rustls::ClientConnection, TcpStream>,
+    /// Set as the read timeout once the first bytes came.
+    stall: Option<Duration>,
+}
+
+impl Read for FirstBytes {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let read = self.tls.read(buffer)?;
+        if read > 0
+            && let Some(stall) = self.stall.take()
+        {
+            self.tls.sock.set_read_timeout(Some(stall)).ok();
+        }
+        Ok(read)
+    }
+}
+
+impl Write for FirstBytes {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        self.tls.write(buffer)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.tls.flush()
     }
 }
 
@@ -206,6 +259,27 @@ impl Channel for Web {
         again_while_busy(&AGAIN_AFTER, until, out, std::thread::sleep, |out| {
             get(url, most, out, until, |url| this.open(url, until))
         })
+    }
+
+    fn fetch_quick(
+        &mut self,
+        url: &str,
+        most: u64,
+        out: &mut dyn Write,
+        quick: Duration,
+    ) -> Result<u64, Fetch> {
+        if url.starts_with("file://") {
+            return self.fetch(url, most, out);
+        }
+        let until = Instant::now() + self.whole;
+        let quick = Web {
+            tls: Arc::clone(&self.tls),
+            connect: self.connect.min(quick),
+            first: self.first.min(quick),
+            stall: self.stall,
+            whole: self.whole,
+        };
+        get(url, most, out, until, |url| quick.open(url, until))
     }
 }
 
@@ -925,6 +999,28 @@ mod tests {
             web.fetch(&url, 1, &mut Vec::new()),
             Err(Fetch::Unreachable(_))
         ));
+    }
+
+    /// A mirror that takes the connection and never answers (the kernel
+    /// accepts it; nobody reads it) costs a quick fetch its bound, not the
+    /// 30 s stall and the waits a fetch spends (#7709).
+    #[test]
+    fn a_quick_fetch_of_a_silent_server_gives_up_within_its_bound() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let mut web = Web::new().unwrap();
+        let quick = Duration::from_secs(1);
+        let started = Instant::now();
+        let answer = web.fetch_quick(
+            &format!("https://127.0.0.1:{port}/x"),
+            1,
+            &mut Vec::new(),
+            quick,
+        );
+        let took = started.elapsed();
+        assert!(matches!(answer, Err(Fetch::Unreachable(_))), "{answer:?}");
+        assert!(took < quick + Duration::from_secs(2), "{took:?}");
+        drop(listener);
     }
 
     /// The real path a lamp takes: GitHub's release download, its redirect

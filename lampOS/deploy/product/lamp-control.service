@@ -7,7 +7,9 @@
 # Skill push on (--manage-socket, docs/control.md "Skills pushed from a computer"): a paired computer
 # with the `skills` grant pushes, lists and removes its own skills through root's manage helper
 # (lamp-skills-manage.socket), which reads the push from --state-dir's push/ and installs it into
-# /var/lib/lampOS/skills-dev for lamp-skills. The body's
+# /var/lib/lampOS/skills-dev for lamp-skills. App push (--apps-manage-socket, docs/apps.md "An app from your own
+# computer"): with LAMP_STORE_APPS=on, a paired computer with `skills` pushes, lists and removes its own unsigned apps
+# through root's apps helper (lamp-apps-manage.socket), staged in /var/lib/lampos-apps-staging. The body's
 # lease socket is opened by the product lamp-body unit (#4568); until it is there, lamp-control
 # retries it and `look` is refused as the body not reachable.
 [Unit]
@@ -15,9 +17,15 @@ Description=lampOS control (lamp-control)
 PartOf=lampos.target
 # Not before setup has finished (#806). The target's own condition holds back none of its parts.
 ConditionPathExists=/var/lib/lampos-setup/done
-After=local-fs.target network-online.target lamp-voice.service lamp-body.service lamp-actions.service lamp-skills-manage.socket
+After=local-fs.target network-online.target lamp-voice.service lamp-body.service lamp-actions.service lamp-skills-manage.socket lamp-apps-manage.socket
 StartLimitIntervalSec=600
 StartLimitBurst=5
+# The apps' manage helper socket and folders (#7415, #8131): a round that adds the apps' part enables the socket into
+# sockets.target, which no round starts, and may start the folders unit before its `current` link is made. The round
+# restarts lamp-control (changed in the same build) after the links, so its start starts both; a boot starts them
+# anyway. No order on the folders: lamp-control needs neither to start.
+Wants=lamp-apps-manage.socket lamp-apps-folders.service
+After=lamp-apps-manage.socket
 
 [Service]
 Type=simple
@@ -45,14 +53,19 @@ Environment=LAMP_TASK_NET=on
 Environment=LAMP_SKILL_WRITES=on
 # #7233, docs/skills.md; owner, 16 Nov
 Environment=LAMP_MADE_SKILL_ASKS=on
+# LAMP_NPU: #7415, `pose` forwarded to lamp-npu; on in the product by the first builder's DEFAULT-ON of 20 Nov, the
+# same line in lamp-npu.service; its rules are its row in docs/switches.md.
+Environment=LAMP_NPU=on
 # The run socket (/run/lampos-control/control.sock) for lamp-tasks' skill runs as `lampos` (#6071 PR 1,
 # docs/control.md "The control socket, lamp-control's side"). With LAMP_CONTROL off, lamp-control serves only it and
 # admin.sock (no TLS door), once the first builder's (b) of 12 Nov 08:15 lands.
 Environment=LAMP_CONTROL_RUN_SOCKET_USER=lampos
+# LAMP_STORE_APPS: #7415, the Store apps; on in the product by the first builder's DEFAULT-ON of 20 Nov; its rules are its rows in docs/switches.md.
+Environment=LAMP_STORE_APPS=on
 # Its certificate and paired computers in --state-dir, the owner's side on --admin-socket (0600),
 # the body's mood and lease sockets, the voice's say socket, lamp-actions' call socket (`volume`),
 # root's skills manage helper (skill push) and the ring's light requests on the bus.
-ExecStart=/opt/lampOS/control/current/lamp-control serve --state-dir /var/lib/lampos-control --admin-socket /run/lampos-control/admin.sock --mood-socket /run/lampos-body/mood.sock --lease-socket /run/lampos-body/lease.sock --say-socket /run/lampos-say/say.sock --actions-socket /run/lampos-actions/call.sock --manage-socket /run/lampos-skills-manage/manage.sock --bus-root /run/lampos-bus
+ExecStart=/opt/lampOS/control/current/lamp-control serve --state-dir /var/lib/lampos-control --admin-socket /run/lampos-control/admin.sock --mood-socket /run/lampos-body/mood.sock --lease-socket /run/lampos-body/lease.sock --say-socket /run/lampos-say/say.sock --actions-socket /run/lampos-actions/call.sock --manage-socket /run/lampos-skills-manage/manage.sock --apps-manage-socket /run/lampos-apps-manage/manage.sock --bus-root /run/lampos-bus
 Restart=on-failure
 RestartSec=5s
 # The local agent's socket file (docs/control.md, "The local agent") is made by lamp-control while the owner's switch is on,
@@ -71,9 +84,19 @@ StateDirectory=lampos-control
 StateDirectoryMode=0700
 RuntimeDirectory=lampos-control
 RuntimeDirectoryMode=0700
+# #5299: lamp-update's state, handed in for the build hello says (docs/control.md, "The build"); the blank SetCredential= is the fallback when the file is missing, as lamp-skills.service's.
+SetCredential=build:\n
+LoadCredential=build:/var/lib/lampos-update/state.json
 ProtectSystem=strict
 # The bus.
 ReadWritePaths=/run/lampos-bus
+# The apps' socket folder, made by the tmpfiles (lampos.conf); `-` so a lamp without it still starts.
+ReadWritePaths=-/run/lampos-apps
+# A pushed app's package staged for the apps' helper (lampos's, made by lamp-apps-folders.service); `-` as above.
+ReadWritePaths=-/var/lib/lampos-apps-staging
+# `pose` (#7415, docs/npu.md): forwarded to lamp-npu's /run/lampos-npu/npu.sock (lampos's, 0700) only with
+# LAMP_NPU=on in this unit's own environment, set below with the same line in lamp-npu.service. Connecting needs no
+# ReadWritePaths= (as the body's and the voice's sockets).
 ProtectHome=yes
 PrivateTmp=yes
 CapabilityBoundingSet=

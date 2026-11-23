@@ -27,10 +27,11 @@ pub const FORMAT: u32 = 2;
 pub const KIND: &str = "app";
 /// The deepest path in an app package, parts inside its folder.
 pub const MOST_DEPTH: usize = 8;
-/// The door's grants an app may ask (`lamp_control::protocol`'s plain
-/// grants): `net` and `logs` are manifest booleans, never grants, and a
-/// service's grant is never an app's own.
-pub const GRANTS: [&str; 14] = [
+/// The grants an app may ask: the door's plain grants
+/// (`lamp_control::protocol`'s), then [`REMEMBER_GRANT`], an app's own. `net`
+/// and `logs` are manifest booleans, never grants, and a service's grant is
+/// never an app's own.
+pub const GRANTS: [&str; 15] = [
     "body",
     "light",
     "speak",
@@ -45,7 +46,16 @@ pub const GRANTS: [&str; 14] = [
     "speaker",
     "notes",
     "speech",
+    REMEMBER_GRANT,
 ];
+/// An app's own grant, no computer's: `apps.remember` on the app socket, a
+/// fact kept for the lamp's known person marked with the app (#7415, C166;
+/// granted at install with nothing more asked, the owner's 18 Nov rule).
+pub const REMEMBER_GRANT: &str = "remember";
+/// The lamp's NPU ops an app may name in `npu` (#7415): the lamp fetches
+/// each op's model when such an app is installed (`lamp-npu`), not at its
+/// first ask. An op rides an existing grant: `pose` the camera's.
+pub const NPU_OPS: [(&str, &str); 1] = [("pose", "camera")];
 /// The longest a phrase or trigger may be, and the fewest letters it holds.
 pub const PHRASE_BYTES: usize = 64;
 pub const PHRASE_LETTERS: usize = 8;
@@ -74,6 +84,18 @@ pub struct AppManifest {
     pub net: bool,
     #[serde(default)]
     pub logs: bool,
+    /// The lamp's NPU ops it uses ([`NPU_OPS`]), so their models are
+    /// fetched at its install. Optional, and left out when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub npu: Vec<String>,
+    /// The names the app answers on its socket for its views (#7415, `docs/apps.md` "App views"): up to 16. Optional,
+    /// left out when empty; a lamp built before it refuses a manifest that names it, so an app that does sets
+    /// `min_build` to a build that reads it, as `npu` does.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ops: Vec<String>,
+    /// The screens the phone draws from an op's answer: up to 8 ([`super::app_views`]). Optional, as `ops`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub views: Vec<super::app_views::View>,
     #[serde(default)]
     pub phrases: Vec<String>,
     pub triggers: Vec<String>,
@@ -378,6 +400,25 @@ pub fn check_manifest(manifest: &AppManifest) -> Result<(), String> {
             return Err(format!("{MANIFEST}: grant {grant:?} twice"));
         }
     }
+    let mut ops = BTreeSet::new();
+    for op in &manifest.npu {
+        let Some((_, grant)) = NPU_OPS.iter().find(|(known, _)| known == op) else {
+            return Err(format!(
+                "{MANIFEST}: npu op {op:?} is not one of the lamp's: {}",
+                NPU_OPS.map(|(op, _)| op).join(", ")
+            ));
+        };
+        if !ops.insert(op.as_str()) {
+            return Err(format!("{MANIFEST}: npu op {op:?} twice"));
+        }
+        if !grants.contains(grant) {
+            return Err(format!(
+                "{MANIFEST}: npu op {op:?} needs the {grant:?} grant"
+            ));
+        }
+    }
+    super::app_views::check(&manifest.ops, &manifest.views)
+        .map_err(|why| format!("{MANIFEST}: {why}"))?;
     phrases_ok("phrases", &manifest.phrases, MOST_PHRASES)?;
     phrases_ok("triggers", &manifest.triggers, MOST_TRIGGERS)?;
     if (!manifest.phrases.is_empty() || !manifest.triggers.is_empty()) && !grants.contains("hear") {
@@ -427,6 +468,25 @@ pub fn check_manifest(manifest: &AppManifest) -> Result<(), String> {
 /// size and SHA-256 and no file but the listed, the entry's module, the
 /// companion skills and the assets. Nothing is written anywhere.
 pub fn read_app_package_bytes(bytes: &[u8], keys: &[[u8; 32]]) -> Result<AppPackage, String> {
+    read_app_package(bytes, Some(keys))
+}
+
+/// What a pushed app's `signed_by` says: it carries no signature.
+pub const UNSIGNED: &str = "unsigned";
+
+/// What a pushed package that carries a signature is told.
+pub const PUSHED_IS_UNSIGNED: &str = "it carries lamp-skill.sig: an app pushed from a computer is unsigned (a signed one is the Store's)";
+
+/// A package pushed from the owner's own paired computer (docs/apps.md, "An
+/// app from your own computer"): every check [`read_app_package_bytes`]
+/// makes but the signature, and it must carry none, so a Store package is
+/// never taken by this path. Only the apps helper's `install_dev`, which
+/// lamp-control alone may ask, reads with it.
+pub fn read_pushed_app_package_bytes(bytes: &[u8]) -> Result<AppPackage, String> {
+    read_app_package(bytes, None)
+}
+
+fn read_app_package(bytes: &[u8], keys: Option<&[[u8; 32]]>) -> Result<AppPackage, String> {
     if bytes.len() as u64 > MOST_PACKAGE_BYTES {
         return Err(format!(
             "more than {MOST_PACKAGE_BYTES} bytes: too big for an app"
@@ -439,7 +499,11 @@ pub fn read_app_package_bytes(bytes: &[u8], keys: &[[u8; 32]]) -> Result<AppPack
         folder,
     } = read_tar(bytes, MOST_DEPTH)?;
     let manifest_bytes = manifest.ok_or(format!("no {MANIFEST}: not an app's package"))?;
-    let signed_by = check_signature(&manifest_bytes, signature.as_deref(), keys)?;
+    let signed_by = match keys {
+        Some(keys) => check_signature(&manifest_bytes, signature.as_deref(), keys)?,
+        None if signature.is_some() => return Err(PUSHED_IS_UNSIGNED.to_owned()),
+        None => UNSIGNED.to_owned(),
+    };
     let manifest: AppManifest =
         serde_json::from_slice(&manifest_bytes).map_err(|error| format!("{MANIFEST}: {error}"))?;
     check_manifest(&manifest)?;

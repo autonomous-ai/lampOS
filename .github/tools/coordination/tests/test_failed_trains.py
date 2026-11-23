@@ -145,7 +145,9 @@ class Loop(StandIn):
             for sig in (signal.SIGTERM, signal.SIGKILL):
                 try:
                     os.killpg(bot.pid, sig)
-                except ProcessLookupError:
+                # macOS answers EPERM, not ESRCH, for a group whose leader has exited but isn't reaped yet
+                # (the Reviewer-lead's P2 on #7729): nothing is left to signal either way.
+                except (ProcessLookupError, PermissionError):
                     break
                 try:
                     bot.wait(20)

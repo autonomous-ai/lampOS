@@ -1,0 +1,93 @@
+# Seen: celebrating. When lamp-seen newly sees celebrating at the desk
+# (celebrating, clapping or applauding), the lamp turns to the person and
+# says one warm line, as V1's wellbeing skill asked "what are we
+# celebrating?" (#6543). One of four seen
+# reactions (seen-celebrate, seen-drink, seen-eat, seen-tired), each its own
+# skill so its off is its own kind's. Written to lamp-skills' schema
+# (docs/skills.md, "The schema, as lamp-skills reads it").
+#
+# The owner's call on #7401 (19 Nov): each one seen is one reaction, with
+# no day's most, no group's hour or gap and no rest. The switch-on (#7668)
+# keeps the first builder's rulings (#7401, 19:05 and 19:10): the same kind
+# is not said again within 20 minutes of its last line heard (a line never
+# heard costs nothing; a different kind may come sooner); a rise kept
+# through a talk is dropped 3 minutes after it was seen; no quiet
+# hours (the owner, 20 Nov 13:1x on #7668: someone may work late or wake
+# early); and never with the privacy slide closed, which drops a kept rise
+# at once. Never while the lamp talks or listens, and never while it sleeps.
+#
+# Whose: lamp-seen sends frames only with exactly one remembered face at
+# the desk, no stranger, awake and the slide open (docs/seen.md), so a
+# sighting is the one remembered sitter's, never a guest's. Until
+# `humans/familiar` says which face is the owner's (B1), that is the
+# owner's rule here, with no face rule of its own.
+#
+# The count: `celebrate_seen` counts celebrating newly seen this sitting, one move
+# caught by two clips in a row once. A note is fixed words with no slot for
+# a reading, so the line carries no number. No "say nothing" outcome (B2):
+# the guards below are the silence.
+needs = ["eyes", "body", "voice"]
+# Off, and not in the product's install (`install::NOT_PRODUCT_SKILLS`),
+# until the switch-on pull request after the owner's working-day row at
+# lamp-06c1 (#6543, #7668); installable until then, since every core skill
+# is a product skill. It says nothing without the owner's yes even then: it
+# reads only `humans/doing_more`, which lamp-seen says with
+# `LAMP_SEEN_MORE_DOINGS=on` and the owner's `seen_more` use.
+kind = "installable"
+enabled = false
+version = "1.0.0"
+
+# What it may read and use, and nothing more: what lamp-seen saw beyond
+# drinking, eating and breaks (the owner's `seen_more` use), the voice's
+# state and privacy, whether the lamp sleeps, and the faces for a turn
+# toward the face. Nothing else: no service, no write, no history, so
+# nothing it sees leaves the lamp through it.
+[permissions]
+speak = true
+topics = ["humans/doing_more", "voice/state", "voice/privacy", "expression/state", "humans/faces/tracked"]
+body = true
+
+# Celebrating newly seen: `celebrate_seen` went up by one since lamp-seen's last word
+# (said at once when it rises, else every 30 s: `within` one
+# of them and a margin). The count begins
+# again at 0 each sitting, so a new sitting is no celebrating.
+[trigger]
+topic = "humans/doing_more"
+field = "celebrate_seen"
+above = 0
+rise = { by = 1, within = "45s" }
+rearm = "leaves"          # one rise, one reaction
+cooldown = "20m"          # the per-kind rest: not again within 20 minutes of its last line heard
+wait = "3m"               # a rise mid-turn is kept, said once the turn ends, dropped 3 minutes after it was seen
+
+[[while]]                 # never while the lamp talks or listens
+topic = "voice/state"
+field = "state"
+equals = "resting"
+
+[[while]]                 # never while the lamp sleeps
+topic = "expression/state"
+field = "asleep"
+equals = false
+
+[[while]]                 # never with the privacy slide closed: closing it drops a kept rise at once (told by lamp-skills on a change, never subscribed)
+topic = "voice/privacy"
+field = "permitted"
+equals = true
+drops_kept = true
+
+# One function for the four seen reactions, shared by its `group` (no
+# limit with it): it stops the one that came last, or with all, every one.
+# Kept off until asked on again.
+[stop]
+tool = "seen_remarks"
+group = "seen-remarks"
+about = "Stop the lamp's remarks on what it sees them do (a drink, eating, a yawn, celebrating): snooze till morning, off till asked, or on again. All out: the last one; all = true: every one."
+when = "When asked to snooze, turn off or on again the lamp's remarks on what it sees them do."
+
+[ask]
+policy = "nudge"
+
+[[do]]
+body = { look_at = "face" }
+say = "You just saw them celebrate at the desk: clapping or cheering. Say one warm line, the way a friend would, at most twenty words: share the moment, and maybe ask what the good news is. Say only what you saw; nothing about their body or looks, and never mention a camera."

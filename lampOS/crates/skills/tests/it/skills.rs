@@ -545,6 +545,10 @@ fn every_skill_folder_says_its_kind_and_version() {
             "morning-agenda",
             "morning-mail",
             "quiet-focus",
+            "seen-celebrate",
+            "seen-drink",
+            "seen-eat",
+            "seen-tired",
             "tomorrows-plan",
             "who-was-here"
         ]
@@ -566,8 +570,14 @@ fn every_skill_folder_says_its_kind_and_version() {
             .filter(|skill| !skill.enabled)
             .map(|skill| skill.name.as_str())
             .collect::<Vec<_>>(),
-        ["comfort-break"],
-        "every existing scene and skill retains its enabled default; Comfort break is on only by its [present] (#5207); Bedtime and Morning is on since #5753"
+        [
+            "comfort-break",
+            "seen-celebrate",
+            "seen-drink",
+            "seen-eat",
+            "seen-tired"
+        ],
+        "every existing scene and skill retains its enabled default; Comfort break is on only by its [present] (#5207); Bedtime and Morning is on since #5753; the seen reactions are off until the owner's day-long row (#6543)"
     );
 }
 
@@ -769,6 +779,15 @@ fn a_skill_reads_and_does_only_what_its_permissions_declare() {
             "\"voice/state\"]",
             "\"voice/state\", \"voice/decision\"]",
             "[permissions] topics: voice/decision is never a skill's to read",
+        ),
+        // What the lamp did, and why, is told on lamp/did and read by the
+        // voice's keeper alone (#7757): a skill that read it would be
+        // triggered by its own runs.
+        (
+            "welcome-back",
+            "\"voice/state\"]",
+            "\"voice/state\", \"lamp/did\"]",
+            "[permissions] topics: lamp/did is never a skill's to read",
         ),
         (
             "welcome-back",
@@ -2567,7 +2586,7 @@ fn a_skill_sees_where_a_face_looks_only_with_the_expressions_yes() {
     // not news.
     let seen = |yes: &Path| {
         let [first, then] = [toward.as_bytes(), away.as_bytes()]
-            .map(|payload| Faces::for_skills(Faces::TOPIC, payload, yes).into_owned());
+            .map(|payload| Faces::for_skills(Faces::TOPIC, payload, yes, false).into_owned());
         let text = |payload: &[u8]| String::from_utf8(payload.to_vec()).unwrap();
         runs_at(
             &skill,
@@ -8691,7 +8710,7 @@ fn humans_doing_more_reaches_a_skill_only_with_the_owners_seen_more_yes() {
 /// The owner's seen_more yes to `names` kept in a state folder of its own,
 /// as the app's `skills.seen_more` keeps it (#6543), and read by `engine`:
 /// the folder, to be kept while the engine runs.
-fn seen_more_yes(engine: &mut Engine, names: &[&str]) -> tempfile::TempDir {
+pub(crate) fn seen_more_yes(engine: &mut Engine, names: &[&str]) -> tempfile::TempDir {
     let state = tempfile::tempdir().unwrap();
     let names = names.iter().map(|name| (*name).to_owned()).collect();
     lamp_skills::keep_names(&state.path().join(lamp_skills::SEEN_MORE_FILE), &names).unwrap();
@@ -13932,7 +13951,7 @@ fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
             (270, "rest-your-eyes")
         ]
     );
-    // "Not today": the one that came last of the four, by its name.
+    // "Not today": the one that came last of the four.
     let told = |run: lamp_skills::Run| {
         lamp_skills::told(&run.calls)["next"]
             .as_str()
@@ -13947,7 +13966,17 @@ fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
             at,
         )
         .unwrap();
-    assert!(told(snoozed).contains("none of the rest your eyes nudges until tomorrow morning"));
+    // By its kind, never "the rest your eyes nudges", said back on
+    // lamp-06c1 as "the water nudges and the rest" (#7473), and only it.
+    let snoozed = told(snoozed);
+    assert!(
+        snoozed.contains("none of the eyes nudges until tomorrow morning"),
+        "{snoozed}"
+    );
+    assert!(
+        snoozed.contains("Only those: every other nudge is as it was"),
+        "{snoozed}"
+    );
     assert!(engine.stopped("rest-your-eyes", at) && !engine.stopped("sip-of-water", at));
     // All of them, and on again.
     let all = engine
@@ -13957,7 +13986,9 @@ fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
             at,
         )
         .unwrap();
-    assert!(told(all).contains("none of the wellbeing nudges"));
+    let all = told(all);
+    assert!(all.contains("none of the wellbeing nudges"), "{all}");
+    assert!(!all.contains("Only those"), "{all}");
     assert!(
         ["rest-your-eyes", "sip-of-water", "stand-up", "wind-down"]
             .iter()
@@ -13981,6 +14012,237 @@ fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
         )
         .unwrap();
     assert!(!engine.stopped("sip-of-water", at));
+}
+
+/// Faces at the desk every 30 s from `from` up to `to` minutes, nobody
+/// there between `to` and `back`, then at the desk again up to `end`: the
+/// runs that did something, by their minute and skill.
+fn sat_and_nudged(
+    engine: &mut Engine,
+    from: u64,
+    to: u64,
+    back: u64,
+    end: u64,
+) -> Vec<(u64, String)> {
+    let mut nudged = Vec::new();
+    for half in from * 2..=end * 2 {
+        let minute = half / 2;
+        let faces = if minute >= to && minute < back {
+            r#"{"faces":[]}"#.to_owned()
+        } else {
+            let left = if half % 2 == 0 { 0.3 } else { 0.5 };
+            format!(
+                r#"{{"faces":[{{"id":"a1","xmin":{left},"ymin":0.2,"xmax":{},"ymax":0.6,"confidence":0.9}}]}}"#,
+                left + 0.3
+            )
+        };
+        for run in engine.observe(
+            "humans/faces/tracked",
+            half * 30_000_000,
+            faces.as_bytes(),
+            None,
+        ) {
+            if !run.calls.is_empty() {
+                nudged.push((minute, run.skill));
+            }
+        }
+    }
+    nudged
+}
+
+/// c6972988862: "I just had water", for a person whose drinks the eyes
+/// can't see. A sip of water's `[stop.done]` gives the wellbeing group's
+/// one `wellbeing_nudges` a fourth way, `just_drank`, with what it means;
+/// the other wellbeing skills declare none.
+#[test]
+fn wellbeing_nudges_takes_just_drank_for_the_water_nudge_alone() {
+    let names = [
+        "comfort-break",
+        "meal-check",
+        "quiet-focus",
+        "rest-your-eyes",
+        "sip-of-water",
+        "sit-back",
+        "stand-up",
+        "wind-down",
+    ];
+    let skills: Vec<lamp_skills::Skill> = names
+        .iter()
+        .map(|name| load(&skills_root().join(name)).unwrap())
+        .collect();
+    for skill in &skills {
+        let done = skill.stop.as_ref().unwrap().done.as_ref();
+        if skill.name == "sip-of-water" {
+            let done = done.unwrap();
+            assert_eq!(done.how, "just_drank");
+            assert_eq!(done.for_us, 30 * 60_000_000);
+        } else {
+            assert!(done.is_none(), "{}", skill.name);
+        }
+    }
+    let tools = tools_file(&skills);
+    let how = &tools["tools"][0]["parameters"]["properties"]["how"];
+    assert_eq!(tools["tools"][0]["name"], "wellbeing_nudges");
+    assert_eq!(
+        how["enum"],
+        serde_json::json!(["snooze", "off", "on", "just_drank"])
+    );
+    assert!(
+        how["description"]
+            .as_str()
+            .unwrap()
+            .ends_with("; just_drank: they say they already had a drink (water, tea, anything), not a question or plan (\"not yet\", \"later\"): no water nudge for 30 minutes, the others as before"),
+        "{how}"
+    );
+    // With LAMP_USE_SKILL_SUMMARY on the model sees the shared `when`
+    // first, so it names a drink too (the reviewer's P2 on #7753), in every
+    // wellbeing skill alike, whichever is first in folder order.
+    let summary = lamp_skills::tools_file_summary(&skills, false, false, true);
+    let when = summary["when"]["wellbeing_nudges"].as_str().unwrap();
+    assert!(when.contains("or told they just had a drink"), "{when}");
+    for skill in &skills {
+        assert_eq!(
+            skill.stop.as_ref().unwrap().when.as_deref(),
+            Some(when),
+            "{}",
+            skill.name
+        );
+    }
+    // A `[stop.done]` is checked as it loads.
+    for (done, error) in [
+        (
+            "how = \"snooze\"\nfor = \"30m\"\nabout = \"x\"",
+            "[stop.done] how",
+        ),
+        (
+            "how = \"Drank\"\nfor = \"30m\"\nabout = \"x\"",
+            "[stop.done] how",
+        ),
+        (
+            "how = \"9drank\"\nfor = \"30m\"\nabout = \"x\"",
+            "[stop.done] how",
+        ),
+        (
+            "how = \"drank\"\nfor = \"10s\"\nabout = \"x\"",
+            "[stop.done] for is 1m to 6h",
+        ),
+        (
+            "how = \"drank\"\nfor = \"7h\"\nabout = \"x\"",
+            "[stop.done] for is 1m to 6h",
+        ),
+        (
+            "how = \"drank\"\nfor = \"30m\"\nabout = \" \"",
+            "[stop.done] about",
+        ),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = skill_with(
+            dir.path(),
+            "sip",
+            &format!(
+                "[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n\
+                 [stop]\ntool = \"stuffy_nudges\"\nabout = \"When asked.\"\n[stop.done]\n{done}\n\
+                 [[do]]\nlight = {{ colour = \"warm\", for = \"5s\" }}\n"
+            ),
+        );
+        let refused = load(&folder).unwrap_err().to_string();
+        assert!(refused.contains(error), "{done}: {refused}");
+    }
+}
+
+/// c6972988862: after "I just had water", a sip of water starts nothing
+/// itself for 30 minutes, then may: a chance that came meanwhile is kept
+/// and comes when the rest ends (the reviewer's P2 on #7753), not spent
+/// for the sitting. Rest your eyes and the rest are as before, with or
+/// without `all`, and a longer snooze is kept, and spends as a snooze.
+#[test]
+fn just_drank_rests_the_water_nudge_30_minutes_and_no_other() {
+    let skills = |names: &[&str]| -> Vec<lamp_skills::Skill> {
+        names
+            .iter()
+            .map(|name| load(&skills_root().join(name)).unwrap())
+            .collect()
+    };
+    let resting = |engine: &mut Engine| {
+        engine.clock(0, 0, 36_000_000);
+        engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
+    };
+    // A sitting from 10:00, "I just had water" at 10 minutes: no sip at 30,
+    // its chance kept until the rest ends at 40, when it comes; away at 45,
+    // back at 50, and the next sitting's 30 minutes, at 80, are within its
+    // 45-minute cooldown.
+    let mut engine = Engine::new(skills(&["sip-of-water"]), true);
+    resting(&mut engine);
+    let mut nudged = sat_and_nudged(&mut engine, 0, 10, 10, 10);
+    let at = 10 * 60_000_000;
+    let told = engine
+        .tool(
+            "wellbeing_nudges",
+            &serde_json::json!({"how": "just_drank"}),
+            at,
+        )
+        .unwrap();
+    assert!(
+        lamp_skills::told(&told.calls)["next"]
+            .as_str()
+            .unwrap()
+            .contains("no sip of water nudge for the next 30 minutes"),
+        "{told:?}"
+    );
+    assert!(engine.stopped("sip-of-water", at + 30 * 60_000_000 - 1));
+    assert!(!engine.stopped("sip-of-water", at + 30 * 60_000_000));
+    nudged.extend(sat_and_nudged(&mut engine, 10, 45, 50, 120));
+    assert_eq!(nudged, [(40, "sip-of-water".to_owned())]);
+
+    // With the other wellbeing nudges, "I just had water" a minute into
+    // the sitting: only the water nudge rests, with `all` too, and its
+    // chance at 30 minutes comes when the rest ends, at 31, not a sitting
+    // later (before #7753's fix, no sip in the whole 100 minutes). Rest
+    // your eyes, due at 45 with the group's hour spent, comes once it is
+    // free.
+    let mut engine = Engine::new(
+        skills(&["rest-your-eyes", "sip-of-water", "stand-up", "wind-down"]),
+        true,
+    );
+    resting(&mut engine);
+    engine
+        .tool(
+            "wellbeing_nudges",
+            &serde_json::json!({"how": "just_drank", "all": true}),
+            60_000_000,
+        )
+        .unwrap();
+    assert!(engine.stopped("sip-of-water", 60_000_000));
+    for other in ["rest-your-eyes", "stand-up", "wind-down"] {
+        assert!(!engine.stopped(other, 60_000_000), "{other}");
+    }
+    let nudged = sat_and_nudged(&mut engine, 0, 100, 100, 100);
+    assert_eq!(
+        nudged,
+        [
+            (31, "sip-of-water".to_owned()),
+            (91, "rest-your-eyes".to_owned())
+        ]
+    );
+
+    // A snooze until tomorrow morning is not shortened to 30 minutes.
+    let mut engine = Engine::new(skills(&["rest-your-eyes", "sip-of-water"]), true);
+    resting(&mut engine);
+    engine
+        .tool(
+            "wellbeing_nudges",
+            &serde_json::json!({"how": "snooze", "all": true}),
+            0,
+        )
+        .unwrap();
+    engine
+        .tool(
+            "wellbeing_nudges",
+            &serde_json::json!({"how": "just_drank"}),
+            0,
+        )
+        .unwrap();
+    assert!(engine.stopped("sip-of-water", 31 * 60_000_000));
 }
 
 /// #1685: a `[stop]` may be shared only by skills of one `[budget]` group;
@@ -14022,6 +14284,368 @@ fn a_shared_stop_is_one_groups_only() {
         .tool("nudges", &serde_json::json!({"how": "off"}), 0)
         .unwrap();
     assert!(engine.stopped("a", 0) && engine.stopped("b", 0));
+}
+
+/// #6543: three skills of one group sharing `nudges`, `drink` and `eat`
+/// declaring a `[stop] kind`, `tired` named by its name.
+fn kinded_stops(dir: &Path) -> Vec<lamp_skills::Skill> {
+    for (name, kind) in [("drink", "drinks"), ("eat", "meals"), ("tired", "")] {
+        let kind = if kind.is_empty() {
+            String::new()
+        } else {
+            format!("kind = \"{kind}\"\n")
+        };
+        skill_with(
+            dir,
+            name,
+            &format!(
+                "[budget]\ngroup = \"g\"\nper_hour = 1\n[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n[stop]\ntool = \"nudges\"\nabout = \"When.\"\n{kind}[[do]]\nlight = {{ colour = \"warm\" }}\n"
+            ),
+        );
+    }
+    let (loaded, errors) = load_all(dir);
+    assert!(errors.is_empty(), "{errors:?}");
+    loaded
+}
+
+/// #7473 on #7401's `[stop] group`: skills in no `[budget]` sharing a stop
+/// by its `group` take a kind too, and a kind stops only its skills. (The
+/// seen reactions' `seen_remarks` declares no kind, so it offers none.)
+#[test]
+fn a_stop_groups_kind_stops_only_that_kind() {
+    let dir = tempfile::tempdir().unwrap();
+    for (name, kind) in [("drink", "drinks"), ("eat", "meals")] {
+        skill_with(
+            dir.path(),
+            name,
+            &format!(
+                "[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n[stop]\ntool = \"remarks\"\nabout = \"When.\"\ngroup = \"r\"\nkind = \"{kind}\"\n[[do]]\nlight = {{ colour = \"warm\" }}\n"
+            ),
+        );
+    }
+    let (loaded, errors) = load_all(dir.path());
+    assert!(errors.is_empty(), "{errors:?}");
+    let tools = tools_file(&loaded);
+    assert_eq!(
+        tools["tools"][0]["parameters"]["properties"]["kind"]["enum"],
+        serde_json::json!(["drinks", "meals"]),
+        "{tools}"
+    );
+    let mut engine = Engine::new(loaded, true);
+    engine
+        .tool(
+            "remarks",
+            &serde_json::json!({"how": "off", "kind": "drinks"}),
+            0,
+        )
+        .unwrap();
+    assert!(engine.stopped("drink", 0) && !engine.stopped("eat", 0));
+}
+
+/// #6543: a shared stop named with a kind stops only the skills of that
+/// kind (its `[stop] kind`, or its name), and puts only them on again; with
+/// no kind it is as before, every one of them before any ran; a kind none
+/// of them is changes nothing, and the model is told the kinds there are.
+/// The tools file offers the kinds, and without any declared it is as
+/// before.
+#[test]
+fn a_shared_stop_named_with_a_kind_stops_only_that_kind() {
+    let dir = tempfile::tempdir().unwrap();
+    let loaded = kinded_stops(dir.path());
+    let tools = tools_file(&loaded);
+    let kind = &tools["tools"][0]["parameters"]["properties"]["kind"];
+    assert_eq!(
+        kind["enum"],
+        serde_json::json!(["drinks", "meals", "tired"]),
+        "{tools}"
+    );
+    assert_eq!(tools["tools"].as_array().unwrap().len(), 1, "{tools}");
+    // #7473: with a kind offered, the `about` and the kind lead the model to
+    // name it ("stop the water nudge"), and `all` is for "the nudges".
+    assert_eq!(
+        tools["tools"][0]["description"],
+        format!("When. {}", lamp_skills::STOP_KIND_LEAD),
+        "{tools}"
+    );
+    let words = kind["description"].as_str().unwrap();
+    assert!(words.contains("whenever they name a kind"), "{words}");
+    let all = tools["tools"][0]["parameters"]["properties"]["all"]["description"]
+        .as_str()
+        .unwrap();
+    assert!(all.contains("'the nudges', plural"), "{all}");
+    assert!(all.contains("'that one'"), "{all}");
+    let told = |run: lamp_skills::Run| {
+        lamp_skills::told(&run.calls)["next"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    let mut engine = Engine::new(loaded.clone(), true);
+    let off = engine
+        .tool(
+            "nudges",
+            &serde_json::json!({"how": "off", "kind": "drinks"}),
+            0,
+        )
+        .unwrap();
+    let off = told(off);
+    assert!(off.contains("none of the drinks nudges"), "{off}");
+    assert!(off.contains("Only those"), "{off}");
+    assert!(engine.stopped("drink", 0));
+    assert!(!engine.stopped("eat", 0) && !engine.stopped("tired", 0));
+    // By its name, its case and spacing not told apart.
+    engine
+        .tool(
+            "nudges",
+            &serde_json::json!({"how": "snooze", "kind": " Tired "}),
+            0,
+        )
+        .unwrap();
+    assert!(engine.stopped("tired", 0) && !engine.stopped("eat", 0));
+    // A kind none of them is: nothing changes, and the kinds are told.
+    let unknown = engine
+        .tool(
+            "nudges",
+            &serde_json::json!({"how": "off", "kind": "naps"}),
+            0,
+        )
+        .unwrap_err();
+    assert!(unknown.contains("Nothing changed"), "{unknown}");
+    assert!(unknown.contains("drinks, meals, tired"), "{unknown}");
+    assert!(!engine.stopped("eat", 0));
+    // An empty kind: refused, nothing changes (the voice read on #7473).
+    let empty = engine
+        .tool("nudges", &serde_json::json!({"how": "off", "kind": " "}), 0)
+        .unwrap_err();
+    assert!(empty.contains("the kind is empty"), "{empty}");
+    assert!(empty.contains("drinks, meals, tired"), "{empty}");
+    assert!(!engine.stopped("eat", 0));
+    // Not a word: refused as before.
+    assert!(
+        engine
+            .tool("nudges", &serde_json::json!({"how": "off", "kind": 3}), 0)
+            .is_err()
+    );
+    // #7473: a list of kinds (the voice reading "the water and eye
+    // nudges"): each one's skills, named back exactly, the others as they
+    // were.
+    let mut both = Engine::new(loaded.clone(), true);
+    let off = both
+        .tool(
+            "nudges",
+            &serde_json::json!({"how": "off", "kind": ["drinks", "meals"]}),
+            0,
+        )
+        .unwrap();
+    let off = told(off);
+    assert!(off.contains("none of the drinks and meals nudges"), "{off}");
+    assert!(off.contains("Only those"), "{off}");
+    assert!(both.stopped("drink", 0) && both.stopped("eat", 0) && !both.stopped("tired", 0));
+    // A list with a kind none of them is (a stale one): it is left out,
+    // the rest stopped and named; with none of them known, nothing changes.
+    let unknown = both
+        .tool(
+            "nudges",
+            &serde_json::json!({"how": "snooze", "kind": ["naps", "fish"]}),
+            0,
+        )
+        .unwrap_err();
+    assert!(unknown.contains("none of these is \"naps\""), "{unknown}");
+    assert!(!both.stopped("tired", 0));
+    let snoozed = both
+        .tool(
+            "nudges",
+            &serde_json::json!({"how": "snooze", "kind": ["tired", "naps"]}),
+            0,
+        )
+        .unwrap();
+    let snoozed = told(snoozed);
+    assert!(snoozed.contains("none of the tired nudges"), "{snoozed}");
+    assert!(!snoozed.contains("naps"), "{snoozed}");
+    assert!(both.stopped("tired", 0));
+    // An empty list, or one with a word missing or not a word: refused.
+    for kind in [
+        serde_json::json!([]),
+        serde_json::json!(["drinks", " "]),
+        serde_json::json!(["drinks", 3]),
+    ] {
+        assert!(
+            both.tool("nudges", &serde_json::json!({"how": "on", "kind": kind}), 0)
+                .is_err(),
+            "{kind}"
+        );
+    }
+    assert!(both.stopped("drink", 0));
+    // On again by kind: only that one.
+    engine
+        .tool(
+            "nudges",
+            &serde_json::json!({"how": "off", "kind": "meals"}),
+            0,
+        )
+        .unwrap();
+    engine
+        .tool(
+            "nudges",
+            &serde_json::json!({"how": "on", "kind": "drinks"}),
+            0,
+        )
+        .unwrap();
+    assert!(!engine.stopped("drink", 0) && engine.stopped("eat", 0));
+    // No kind, none of them run yet: every one, as before.
+    let mut engine = Engine::new(loaded.clone(), true);
+    engine
+        .tool("nudges", &serde_json::json!({"how": "off"}), 0)
+        .unwrap();
+    assert!(
+        ["drink", "eat", "tired"]
+            .iter()
+            .all(|skill| engine.stopped(skill, 0))
+    );
+    // Alone, a [stop] takes no kind.
+    let mut engine = Engine::new(vec![loaded[0].clone()], true);
+    assert!(
+        engine
+            .tool(
+                "nudges",
+                &serde_json::json!({"how": "off", "kind": "drinks"}),
+                0
+            )
+            .is_err()
+    );
+    // No kind declared: the tools file has none, as before.
+    let other = tempfile::tempdir().unwrap();
+    for name in ["a", "b"] {
+        skill_with(
+            other.path(),
+            name,
+            "[budget]\ngroup = \"g\"\nper_hour = 1\n[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n[stop]\ntool = \"nudges\"\nabout = \"When.\"\n[[do]]\nlight = { colour = \"warm\" }\n",
+        );
+    }
+    let (plain, _) = load_all(other.path());
+    let tools = tools_file(&plain);
+    assert!(
+        tools["tools"][0]["parameters"]["properties"]
+            .get("kind")
+            .is_none(),
+        "{tools}"
+    );
+    // ...and its `about` is the skill's own, byte for byte.
+    assert_eq!(tools["tools"][0]["description"], "When.", "{tools}");
+    // A kind that is not a word of its shape is refused at load.
+    let bad = tempfile::tempdir().unwrap();
+    let skill = skill_with(
+        bad.path(),
+        "bad",
+        "[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n[stop]\ntool = \"nudges\"\nabout = \"When.\"\nkind = \"Drinks!\"\n[[do]]\nlight = { colour = \"warm\" }\n",
+    );
+    assert!(load(&skill).unwrap_err().contains("[stop] kind"));
+    for kind in ["a--b", "drinks-", "-drinks"] {
+        let skill = skill_with(
+            bad.path(),
+            "bad",
+            &format!(
+                "[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n[stop]\ntool = \"nudges\"\nabout = \"When.\"\nkind = \"{kind}\"\n[[do]]\nlight = {{ colour = \"warm\" }}\n"
+            ),
+        );
+        assert!(load(&skill).unwrap_err().contains("[stop] kind"), "{kind}");
+    }
+}
+
+/// The reviewer on #7473: a shared stop none of whose skills declares a
+/// kind refuses a `kind` key, as before #6543 ("Say how"), and changes
+/// nothing.
+#[test]
+fn a_shared_stop_with_no_kind_declared_refuses_a_kind() {
+    let dir = tempfile::tempdir().unwrap();
+    for name in ["a", "b"] {
+        skill_with(
+            dir.path(),
+            name,
+            "[budget]\ngroup = \"g\"\nper_hour = 1\n[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n[stop]\ntool = \"nudges\"\nabout = \"When.\"\n[[do]]\nlight = { colour = \"warm\" }\n",
+        );
+    }
+    let (loaded, errors) = load_all(dir.path());
+    assert!(errors.is_empty(), "{errors:?}");
+    let mut engine = Engine::new(loaded, true);
+    let refused = engine
+        .tool("nudges", &serde_json::json!({"how": "off", "kind": "a"}), 0)
+        .unwrap_err();
+    assert!(refused.contains("Say how"), "{refused}");
+    assert!(!engine.stopped("a", 0) && !engine.stopped("b", 0));
+}
+
+/// The reviewer on #7473: a kind that is one sharing skill's declared kind
+/// and another's name stops only the one of that declared kind; a skill's
+/// name is matched only when no declared kind is it.
+#[test]
+fn a_kind_matches_declared_kinds_before_names() {
+    let dir = tempfile::tempdir().unwrap();
+    for (name, kind) in [("water", "kind = \"drink\"\n"), ("drink", ""), ("eat", "")] {
+        skill_with(
+            dir.path(),
+            name,
+            &format!(
+                "[budget]\ngroup = \"g\"\nper_hour = 1\n[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n[stop]\ntool = \"nudges\"\nabout = \"When.\"\n{kind}[[do]]\nlight = {{ colour = \"warm\" }}\n"
+            ),
+        );
+    }
+    let (loaded, errors) = load_all(dir.path());
+    assert!(errors.is_empty(), "{errors:?}");
+    let mut engine = Engine::new(loaded, true);
+    engine
+        .tool(
+            "nudges",
+            &serde_json::json!({"how": "off", "kind": "drink"}),
+            0,
+        )
+        .unwrap();
+    assert!(engine.stopped("water", 0));
+    assert!(!engine.stopped("drink", 0) && !engine.stopped("eat", 0));
+    // A name no declared kind is: that skill, by its name.
+    engine
+        .tool(
+            "nudges",
+            &serde_json::json!({"how": "off", "kind": "eat"}),
+            0,
+        )
+        .unwrap();
+    assert!(engine.stopped("eat", 0) && !engine.stopped("drink", 0));
+}
+
+/// #6543: a kind turned off is kept in the same off file, one line by the
+/// skill's name, and is off still when the skills are loaded again; the
+/// others are not.
+#[test]
+fn a_kind_turned_off_is_kept_across_a_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = tempfile::tempdir().unwrap();
+    let loaded = kinded_stops(dir.path());
+    let mut engine = Engine::new(loaded.clone(), true);
+    engine.keep_off_in(state.path()).unwrap();
+    engine
+        .tool(
+            "nudges",
+            &serde_json::json!({"how": "off", "kind": "drinks"}),
+            0,
+        )
+        .unwrap();
+    assert_eq!(
+        fs::read_to_string(state.path().join("off")).unwrap(),
+        "drink\n"
+    );
+    drop(engine);
+    let mut started = Engine::new(loaded, true);
+    assert_eq!(started.keep_off_in(state.path()).unwrap(), ["drink"]);
+    assert!(started.stopped("drink", 0) && !started.stopped("eat", 0));
+    started
+        .tool(
+            "nudges",
+            &serde_json::json!({"how": "on", "kind": "drinks"}),
+            0,
+        )
+        .unwrap();
+    assert_eq!(fs::read_to_string(state.path().join("off")).unwrap(), "");
 }
 
 /// Who was here (#1685), with its record of the last hour.

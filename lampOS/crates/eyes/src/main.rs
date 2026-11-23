@@ -19,7 +19,7 @@ file, made new each start (0600, in a folder of the owner's only), as one JSON l
 numbers: the rule's verdict, the cells past the bar and, per cell, its change over its
 noise and its change in greys after its row's median change; no grey, pixel or picture,
 and it stops after 20 minutes or 50 MB. A test flag: no unit lampOS deploys passes it
-(off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once;\n{\"close_receipt\":N} after it asks for N on eyes/camera_closed (LAMP_BUS=on) once the\ncamera is shut, with whether its last stop released the device. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there, and `tellable` beside it holds the names\nof those who said yes to being named in Who was here ({\"visits_yes\":\"NAME\"} on the\nsocket, taken only from the face at the lamp now; {\"visits_no\":\"NAME\"} takes it back). With --visits on, each remembered person\nhas one familiarity number, rising once a day they are seen and halving every 14 days,\nwith no date or time of a visit kept, and with LAMP_BUS=on the level of the one at the\nlamp is said on humans/familiar, with no name (off unless given). With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\nWith --sight-from-look on (with --full-look and --sight-file), the sight file's 320-across\nframe is encoded from the look's own decoded picture instead of the full frame being decoded\nand shrunk again (off unless given).\nWith --mouth-model (the pinned Face Mesh V2), the largest face's mouth is read each look\n(with --mouth-diagnostics on, the journal says how open, each look), and with LAMP_EYES_SPEAKING=on that face's speaking reads it\n(off unless given); with LAMP_EYES_SPEAKING_ALL_FACES=on, up to three faces' mouths, largest first,\nwhile the look's meshing stays within 200 ms (off unless set). With --mouth-on-heard on, the mesh runs only while the voice hears a\nline (voice/heard on the bus, from its first words until 2 s after it ends).\nWith --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),\nthe mesh runs under ONNX Runtime on one thread instead of tract.\nWith --seems (the pinned FER+ expression model), how the near face seems is read at\nmost every 2 s, as positive, negative or unsure with a confidence, and with LAMP_BUS=on\nsaid on humans/seems, with no name and no picture, and only while the lamp's yes (for everyone it sees) is kept\nin /var/lib/lampOS/consent/face-expressions.json ({\"face_expressions\":\"yes\"}; none, no\nread: the eyes still look); the journal says only how many reads\nthere were, how long one took and the longest, once a minute (off unless given; #1671).\nWith --seems-log (with --seems or --seems-blendshapes), each read is also written to that\nfile (0600) as its time, kind, confidence and reader, nothing of whose face, up to 20,000\nlines, for the measure; lamp-seems-measure counts it against a labelled session and\nremoves both (off unless given; #1671).\nWith --seems-blendshapes (the pinned Blendshape V2 model, with --mouth-model), the same is\nread from the mesh's points: the smiles, frowns and sneers of the near face, said and\njournaled the same way and with the same yes, each read naming its reader, so both may run\nside by side (off unless given; #1671). This read then runs on its own thread, from the\npoints of the look's own mesh of that face (or of that thread's mesh of its crop, for another\nface), and no look waits on it. With LAMP_SEEMS_BROW_LOW=on, it also names a face negative with\nthe brows drawn down at or over 0.80 and the smiles under 0.3 (off unless set; #2132).\nWith LAMP_REMEMBER_SPEAKER=on (with --recogniser, LAMP_BUS and LAMP_EYES_SPEAKING),\nlive enrollment requires the internal remember_speaker operation and an existing print\nof the face seen speaking that line; plain live remember is refused (off unless set).\nWith LAMP_FACE_FULL_CROP=on (with --recogniser), faces are remembered and recognised from the\nframe at its own size, and the one known is held through a miss for 4 s after their last\nmatch, unless an unknown face is near; the camera closed lets them go at once (off unless set; #3126).\nWith LAMP_FACE_KNOWN_HOLD=on (with --recogniser), the one known is held the same way without\nthat crop (off unless set; #4493). While held, the known file is kept as it was, its time renewed.\nWith LAMP_FACE_REFOUND=on (with --recogniser and LAMP_EYES_SPEAKING), a near face whose passing id\nhas no print read for it yet is recognised at once, and again at most every 0.5 s while\nits alignment or print fails (off unless set; #4486). With both it and LAMP_FACE_KNOWN_HOLD on, a new\npassing id that follows the held face's (the one lost id beside it) carries the hold once a\nprint of it passes 0.30 (unprinted, it lets go as any new id), and humans/faces/tracked says\nwhich id it follows (#4885).\nWith LAMP_EYES_MOUTH_FULL_LOOK=on (with --full-look and --mouth-model), the mouths are cut\nfrom the frame at its own size and their eye distance counted in its pixels (off unless set; #1711).\nWith LAMP_EYES_YAWN=on (with --mouth-model, --seems-blendshapes and LAMP_ACTIVITY), the largest\nface's yawns are counted into the sitting, as yawns on room/activity: its mouth held wide for\n1.5 s with no smile and the brows not raised, and only while the face-expressions yes is kept; a\ncount only (off unless set; #3709).\nWith LAMP_EYES_PITCH_GAZE=on (with LAMP_BUS=on), each face on humans/faces/tracked also says how far\nits head is tipped (pitch, from the five marks), and the face the Blendshape V2 seems read ran on\nwhether its eyes look toward the lamp (looking), for 2.5 s after its frame; with no face-expressions\nyes that read still runs on the same timing for looking only, every other score dropped at once:\nnothing on humans/seems, in --seems-log or toward a yawn (off unless set; #7442).\nWith --photo-dir (the eyes' own folder, with --recogniser), {\"remember\":\"NAME\",\"photo\":\"FILE\"}\non the who socket takes the one face in that JPEG in the folder and removes the file once\nread (no picture is kept); the face is kept unconfirmed until its person says yes at the\nlamp, and deleted if not (off unless given).\nWith LAMP_TURN_TO_ANSWERED=on (with LAMP_BUS=on and LAMP_EYES_SPEAKING=on), as the voice\nbegins an answer (voice/state on the bus), the one face seen speaking just before is the\none sent to --body-socket until the answer ends; while it is out of view nothing is sent (off unless given; #1810).\nWith --mouth-diagnostics on (off by default), one numeric journal record per look explains\nthe largest detection's speaking decision. Requires LAMP_BUS=on and LAMP_EYES_SPEAKING=on;\nnever enables inference and records no IDs, landmarks, images, sound or words.\nWith --camera-helper (the camera's helper's socket, #2892), after three opens in a row that did\nnot open, while seeing is permitted, the helper is asked, on a thread of its own, to re-authorize\nthe camera's USB device, then at most once a minute while they go on failing, and its answer\nis said in the journal (off unless given).\nWith --frames-socket, one reader at a time (its owner's; a second is refused) that says its size,\n640x480 or 1280x720, gets every frame the camera makes while it is connected, as the camera\nmade it (MJPEG, never decoded for this), each as its length (4 bytes, big-endian) and its JPEG:\nthe camera runs at that size at 25 fps then, with 4 buffers, and at its own size again when\nthe reader goes; each frame goes whole through a writer that holds two at most, a frame\npast that dropped, never the reader, so the eyes never wait (off unless given). With\nLAMP_EYES_FAST_STREAM=on and no --frames-socket, the frames are served at\n/run/lampos-eyes/frames.sock, where lamp-control looks by default (off unless set).\nWith --frame-link (a socket in a directory of this user's with no group or other access)\nand --frame-link-boots (the file lamp-seen frame-link keeps, this user's, 0600 or 0640, in a\nfolder with no other access; its two boots are read there at start, never from the command\nline, and with no file no link is served), the eyes serve the camera's private frame link\n(lamp_camera::frames) to lamp-seen, its perception reader: only a peer the kernel names as\nlamp-seen.service run as this user is taken (SO_PEERCRED and its cgroup), any other is\nrefused and counted; one frame per request, copied only for a reader that asked, each with\nits camera grant; bound only while the camera is permitted and closed, with any frame in\ntransit, when that ends, the journal saying the reader was cut; a reader that leaves a\nframe unread for 0.5 s is dropped, never waited for (off unless given; #6543).\n\nlamp-eyes reauthorize-camera --usb VENDOR:PRODUCT[@TOPOLOGY] is that helper, run as root by its\nsocket for each connection: it checks the device at that port is that camera, or with no port\nfinds the one USB device with those ids on any port (none or two: refused), writes its\nauthorized 0 then 1, as an unplug and a plug would, at most once a minute, answers one line,\nand reads nothing from whoever connected.\n";
+(off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once;\n{\"close_receipt\":N} after it asks for N on eyes/camera_closed (LAMP_BUS=on) once the\ncamera is shut, with whether its last stop released the device. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there, and `tellable` beside it holds the names\nof those who said yes to being named in Who was here ({\"visits_yes\":\"NAME\"} on the\nsocket, taken only from the face at the lamp now; {\"visits_no\":\"NAME\"} takes it back). With --visits on, each remembered person\nhas one familiarity number, rising once a day they are seen and halving every 14 days,\nwith no date or time of a visit kept, and with LAMP_BUS=on the level of the one at the\nlamp is said on humans/familiar, with no name (off unless given). With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\nWith --sight-from-look on (with --full-look and --sight-file), the sight file's 320-across\nframe is encoded from the look's own decoded picture instead of the full frame being decoded\nand shrunk again (off unless given).\nWith --mouth-model (the pinned Face Mesh V2), the largest face's mouth is read each look\n(with --mouth-diagnostics on, the journal says how open, each look), and with LAMP_EYES_SPEAKING=on that face's speaking reads it\n(off unless given); with LAMP_EYES_SPEAKING_ALL_FACES=on, up to three faces' mouths, largest first,\nwhile the look's meshing stays within 200 ms (off unless set). With --mouth-on-heard on, the mesh runs only while the voice hears a\nline (voice/heard on the bus, from its first words until 2 s after it ends).\nWith --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),\nthe mesh runs under ONNX Runtime on one thread instead of tract.\nWith --seems (the pinned FER+ expression model), how the near face seems is read at\nmost every 2 s, as positive, negative or unsure with a confidence, and with LAMP_BUS=on\nsaid on humans/seems, with no name and no picture, and only while the lamp's yes (for everyone it sees) is kept\nin /var/lib/lampOS/consent/face-expressions.json ({\"face_expressions\":\"yes\"}; none, no\nread: the eyes still look); the journal says only how many reads\nthere were, how long one took and the longest, once a minute (off unless given; #1671).\nWith --seems-log (with --seems or --seems-blendshapes), each read is also written to that\nfile (0600) as its time, kind, confidence and reader, nothing of whose face, up to 20,000\nlines, for the measure; lamp-seems-measure counts it against a labelled session and\nremoves both (off unless given; #1671).\nWith --seems-blendshapes (the pinned Blendshape V2 model, with --mouth-model), the same is\nread from the mesh's points: the smiles, frowns and sneers of the near face, said and\njournaled the same way and with the same yes, each read naming its reader, so both may run\nside by side (off unless given; #1671). This read then runs on its own thread, from the\npoints of the look's own mesh of that face (or of that thread's mesh of its crop, for another\nface), and no look waits on it. With LAMP_SEEMS_BROW_LOW=on, it also names a face negative with\nthe brows drawn down at or over 0.80 and the smiles under 0.3 (off unless set; #2132).\nWith LAMP_REMEMBER_SPEAKER=on (with --recogniser, LAMP_BUS and LAMP_EYES_SPEAKING),\nlive enrollment requires the internal remember_speaker operation and an existing print\nof the face seen speaking that line; plain live remember is refused (off unless set).\nWith LAMP_FACE_FULL_CROP=on (with --recogniser), faces are remembered and recognised from the\nframe at its own size, and the one known is held through a miss for 4 s after their last\nmatch, unless an unknown face is near; the camera closed lets them go at once (off unless set; #3126).\nWith LAMP_FACE_KNOWN_HOLD=on (with --recogniser), the one known is held the same way without\nthat crop (off unless set; #4493). While held, the known file is kept as it was, its time renewed.\nWith LAMP_FACE_KNOWN_ON_ID=on (with the hold), a print under 0.30 on the held face's own passing id,\nin every look since their match, holds them too, as no print would (off unless set; #7424).\nWith LAMP_FACE_REFOUND=on (with --recogniser and LAMP_EYES_SPEAKING), a near face whose passing id\nhas no print read for it yet is recognised at once, and again at most every 0.5 s while\nits alignment or print fails (off unless set; #4486). With both it and LAMP_FACE_KNOWN_HOLD on, a new\npassing id that follows the held face's (the one lost id beside it) carries the hold once a\nprint of it passes 0.30 (unprinted, it lets go as any new id), and humans/faces/tracked says\nwhich id it follows (#4885).\nWith LAMP_EYES_MOUTH_FULL_LOOK=on (with --full-look and --mouth-model), the mouths are cut\nfrom the frame at its own size and their eye distance counted in its pixels (off unless set; #1711).\nWith LAMP_EYES_YAWN=on (with --mouth-model, --seems-blendshapes and LAMP_ACTIVITY), the largest\nface's yawns are counted into the sitting, as yawns on room/activity: its mouth held wide for\n1.5 s with no smile and the brows not raised, and only while the face-expressions yes is kept; a\ncount only (off unless set; #3709).\nWith LAMP_EYES_PITCH_GAZE=on (with LAMP_BUS=on), each face on humans/faces/tracked also says how far\nits head is tipped (pitch, from the five marks), and the face the Blendshape V2 seems read ran on\nwhether its eyes look toward the lamp (looking), for 2.5 s after its frame; with no face-expressions\nyes that read still runs on the same timing for looking only, every other score dropped at once:\nnothing on humans/seems, in --seems-log or toward a yawn (off unless set; #7442).\nWith --photo-dir (the eyes' own folder, with --recogniser), {\"remember\":\"NAME\",\"photo\":\"FILE\"}\non the who socket takes the one face in that JPEG in the folder and removes the file once\nread (no picture is kept); the face is kept unconfirmed until its person says yes at the\nlamp, and deleted if not (off unless given).\nWith LAMP_TURN_TO_ANSWERED=on (with LAMP_BUS=on and LAMP_EYES_SPEAKING=on), as the voice\nbegins an answer (voice/state on the bus), the one face seen speaking just before is the\none sent to --body-socket until the answer ends; while it is out of view nothing is sent (off unless given; #1810).\nWith --mouth-diagnostics on (off by default), one numeric journal record per look explains\nthe largest detection's speaking decision. Requires LAMP_BUS=on and LAMP_EYES_SPEAKING=on;\nnever enables inference and records no IDs, landmarks, images, sound or words.\nWith --camera-helper (the camera's helper's socket, #2892), after three opens in a row that did\nnot open, while seeing is permitted, the helper is asked, on a thread of its own, to re-authorize\nthe camera's USB device, then at most once a minute while they go on failing, and its answer\nis said in the journal (off unless given).\nWith --frames-socket, one reader at a time (its owner's; a second is refused) that says its size,\n640x480 or 1280x720, gets every frame the camera makes while it is connected, as the camera\nmade it (MJPEG, never decoded for this), each as its length (4 bytes, big-endian) and its JPEG:\nthe camera runs at that size at 25 fps then, with 4 buffers, and at its own size again when\nthe reader goes; each frame goes whole through a writer that holds two at most, a frame\npast that dropped, never the reader, so the eyes never wait (off unless given). With\nLAMP_EYES_FAST_STREAM=on and no --frames-socket, the frames are served at\n/run/lampos-eyes/frames.sock, where lamp-control looks by default (off unless set).\nWith --frame-link (a socket in a directory of this user's with no group or other access)\nand --frame-link-boots (the file lamp-seen frame-link keeps, this user's, 0600 or 0640, in a\nfolder with no other access; its two boots are read there at start, never from the command\nline, and with no file no link is served), the eyes serve the camera's private frame link\n(lamp_camera::frames) to lamp-seen, its perception reader: only a peer the kernel names as\nlamp-seen.service run as this user is taken (SO_PEERCRED and its cgroup), any other is\nrefused and counted; one frame per request, copied only for a reader that asked, each with\nits camera grant; bound only while the camera is permitted and closed, with any frame in\ntransit, when that ends, the journal saying the reader was cut; a reader that leaves a\nframe unread for 0.5 s is dropped, never waited for (off unless given; #6543).\n\nlamp-eyes reauthorize-camera --usb VENDOR:PRODUCT[@TOPOLOGY] is that helper, run as root by its\nsocket for each connection: it checks the device at that port is that camera, or with no port\nfinds the one USB device with those ids on any port (none or two: refused), writes its\nauthorized 0 then 1, as an unplug and a plug would, at most once a minute, answers one line,\nand reads nothing from whoever connected.\n";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Usb {
@@ -534,6 +534,35 @@ const FAST_STREAM_ENVIRONMENT: &str = "LAMP_EYES_FAST_STREAM";
 /// the path lamp-control reads by default (`lamp-control --frames-socket`).
 const FAST_STREAM_SOCKET: &str = "/run/lampos-eyes/frames.sock";
 
+/// With `LAMP_REMEMBER_SPEAKER` (B3472), the voice and the eyes both set:
+/// a remember asked the other way is refused before any other check. On, a
+/// plain `remember`/`remember_one` is `speaker_required`, so no face is
+/// kept that is not bound to its speaker; off, a speaker-bound one is
+/// `not_understood`. Anything else is `None`.
+#[cfg(any(target_os = "linux", test))]
+fn speaker_refusal(ask: &lamp_eyes::who::Ask, remember_speaker: bool) -> Option<&'static str> {
+    use lamp_eyes::who::Ask;
+    match ask {
+        Ask::RememberSpeaker(_) if !remember_speaker => Some("not_understood"),
+        Ask::Remember(_) | Ask::RememberOne { .. } if remember_speaker => Some("speaker_required"),
+        _ => None,
+    }
+}
+
+/// Whether a frame's near print may be stored as the speaker's anchor
+/// (`LAMP_REMEMBER_SPEAKER`): exactly one face is near, and that face's
+/// passing id (`f3`) is one talking now. A second near face, or a near face
+/// not talking, anchors nothing.
+#[cfg(any(target_os = "linux", test))]
+fn anchors_the_speaker(heights: &[f32], near_id: Option<&str>, talking: &[u32]) -> bool {
+    heights
+        .iter()
+        .filter(|height| **height >= lamp_eyes::who::NEAR_ENOUGH)
+        .count()
+        == 1
+        && near_id.is_some_and(|near| talking.iter().any(|id| near == format!("f{id}")))
+}
+
 /// The frames socket the eyes serve: `--frames-socket` when given, else the
 /// default path with `LAMP_EYES_FAST_STREAM=on`, else none. The eyes' own
 /// cost is nil (9 Nov, lamp-75c9: CPU and look time unchanged with a 640x480
@@ -753,6 +782,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         /// The passing ids a print was read for, the newest
         /// `who::PRINTED_IDS_KEPT` (`LAMP_FACE_REFOUND`, #4486).
         printed_ids: std::collections::VecDeque<String>,
+        /// `LAMP_FACE_STICKY`: a newly seen near face is checked at once
+        /// while a name is held (`who::NewFace`).
+        new_face: lamp_eyes::who::NewFace,
         /// `LAMP_FACE_REFOUND=on`: a new near id is recognised at once.
         refound: bool,
         taking: Option<(Taking, UnixStream)>,
@@ -772,6 +804,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         photo_here: Option<(String, Option<String>, Instant)>,
         /// `LAMP_PHOTO_SPEAKER=on` (#2856): a yes is kept only with that id.
         photo_speaker: bool,
+        /// `LAMP_FACE_NO_ASK=on`: a photo's face kept at once, no yes.
+        photo_no_ask: bool,
         remember_speaker: bool,
         speaker_anchors: lamp_eyes::remember_speaker::Anchors,
         /// With it on, a yes that passed, waiting for the look forced after
@@ -786,11 +820,35 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         /// `LAMP_FACE_FULL_CROP=on`: faces cut from the frame at its own
         /// size, and the known person held through a short miss.
         held: lamp_eyes::who::Held,
+        /// `LAMP_FACE_STICKY=on`: another enrolled person's first look,
+        /// waiting for a second before it takes the name (T4).
+        takeover: lamp_eyes::who::Takeover,
+        /// `LAMP_FACE_STICKY=on`: who was last matched, for a match again
+        /// at the lower bar (T7). In memory only.
+        recent: lamp_eyes::who::Recent,
     }
     /// A held check keeps the known file as it was, its time renewed; with
     /// the hold carried to a followed passing id by its print (`who::Held::carry`,
     /// #4885), the known face beside it is rewritten to that id.
     fn keep_held(path: &std::path::Path, who: &Who, carried: bool, near_id: Option<&str>) {
+        // With `LAMP_FACE_STICKY`, the held mark first, so no reader takes the
+        // held name for a match (`who::known_held_of`).
+        if who.held.is_sticky() {
+            if let Some((name, ..)) = who.known.as_ref().filter(|_| carried) {
+                lamp_eyes::who::keep_known_held(
+                    path,
+                    name,
+                    who.people.id_of(name).as_deref(),
+                    near_id,
+                );
+                return;
+            }
+            if !lamp_eyes::who::known_unsure_of(path).exists() {
+                lamp_eyes::who::mark_held(path);
+                lamp_eyes::who::renew_known(path);
+                return;
+            }
+        }
         // Held unsure, the known file moved aside (`who::hold_unsure`): this
         // print keeps them, so it is written again, on the carried id or the
         // one held (#5738).
@@ -890,6 +948,14 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     "lamp-eyes: did not remember a face: its name is someone's whose face it isn't"
                 );
                 serde_json::json!({"error": "not_like_them"})
+            }
+            // Asked to keep only a face it knows (#7704): the voice asks
+            // the face question.
+            Err(who::Refused::NotKnown) => {
+                eprintln!(
+                    "lamp-eyes: did not remember a face: asked for a known face only, it is known as nobody"
+                );
+                serde_json::json!({"error": "not_known"})
             }
             Err(who::Refused::NotAName) => serde_json::json!({"error": "not_a_name"}),
             Err(who::Refused::Store(error)) => {
@@ -1180,6 +1246,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 known: None,
                 looked_for: None,
                 printed_ids: std::collections::VecDeque::new(),
+                new_face: lamp_eyes::who::NewFace::default(),
                 refound: lamp_eyes::who::refound_on(),
                 taking: None,
                 visits: arguments.visits,
@@ -1203,6 +1270,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 }),
                 photo_here: None,
                 photo_speaker: lamp_eyes::photo::speaker_from_environment(),
+                photo_no_ask: lamp_eyes::photo::no_ask_from_environment(),
                 remember_speaker: lamp_eyes::remember_speaker::from_environment(),
                 speaker_anchors: lamp_eyes::remember_speaker::Anchors::default(),
                 photo_yes: None,
@@ -1213,7 +1281,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     lamp_eyes::who::known_hold_on(),
                 ))
                 .following(lamp_eyes::bus_out::follows_from_environment())
-                .unsure_holds(lamp_eyes::who::known_unsure_on()),
+                .unsure_holds(lamp_eyes::who::known_unsure_on())
+                .holds_on_id(lamp_eyes::who::known_on_id_on())
+                .sticky(lamp_eyes::who::sticky_on())
+                .follows_near(lamp_eyes::who::follow_near_new_id_on()),
+                takeover: lamp_eyes::who::Takeover::default(),
+                recent: lamp_eyes::who::Recent::default(),
             })
         }
         None => None,
@@ -1580,7 +1653,11 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     b'\n',
                     &mut line,
                 );
-                let reply = match ask_of(line.trim_ascii()) {
+                let ask = ask_of(line.trim_ascii());
+                let refused = ask
+                    .as_ref()
+                    .and_then(|ask| speaker_refusal(ask, who.remember_speaker));
+                let reply = match ask {
                     Some(Ask::Who) => match who
                         .known
                         .as_ref()
@@ -1710,6 +1787,25 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                                 "lamp-eyes: did not add a face from a photo: it is known by another name"
                                             );
                                             serde_json::json!({"error": "known_as", "known_as": known})
+                                        }
+                                        // `LAMP_FACE_NO_ASK=on`: kept at once,
+                                        // nothing asked at the lamp.
+                                        None if who.photo_no_ask => {
+                                            let now_unix_s = std::time::SystemTime::now()
+                                                .duration_since(std::time::UNIX_EPOCH)
+                                                .map_or(0, |since| since.as_secs());
+                                            let kept = lamp_eyes::photo::keep_at_once(
+                                                &mut who.people,
+                                                &name,
+                                                print,
+                                                now_unix_s,
+                                            );
+                                            if kept.is_ok() {
+                                                eprintln!(
+                                                    "lamp-eyes: kept a face from a photo at once, nothing asked (LAMP_FACE_NO_ASK)"
+                                                );
+                                            }
+                                            kept_reply(kept, who.visits, who.people.names().len())
                                         }
                                         None => {
                                             let now_unix_s = std::time::SystemTime::now()
@@ -1857,12 +1953,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             }
                         },
                     },
-                    Some(Ask::RememberSpeaker(_)) if !who.remember_speaker => {
-                        serde_json::json!({"error": "not_understood"})
-                    }
-                    Some(Ask::Remember(_) | Ask::RememberOne { .. }) if who.remember_speaker => {
-                        serde_json::json!({"error": "speaker_required"})
-                    }
+                    Some(_) if refused.is_some() => serde_json::json!({"error": refused}),
                     Some(Ask::RememberSpeaker(_)) if who.taking.is_some() => {
                         serde_json::json!({"error": "busy"})
                     }
@@ -1905,6 +1996,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         name,
                         replace,
                         apart,
+                        known_only,
                     }) => match plain_name(&name) {
                         Some(name) => {
                             eprintln!(
@@ -1914,6 +2006,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             let mut taking = Taking::new(name, lamp_ipc::monotonic_us());
                             taking.one_face = Some(replace);
                             taking.apart = apart;
+                            taking.known_only = known_only;
                             who.taking = Some((taking, stream));
                             continue;
                         }
@@ -1989,6 +2082,13 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             .remember(&taking.name, prints, now_unix_s)
                             .map(who::Remembered::plain)
                             .map_err(|error| who::Refused::Store(error.to_string())),
+                        Some(replace) if taking.known_only => who.people.remember_one_known_only(
+                            &taking.name,
+                            prints,
+                            now_unix_s,
+                            replace,
+                            taking.apart,
+                        ),
                         Some(replace) => who.people.remember_one_replacing(
                             &taking.name,
                             prints,
@@ -2838,8 +2938,26 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         let near_id = near.and_then(|(index, _)| {
                             bus_out.as_ref().and_then(|bus| bus.speaking_id(index))
                         });
+                        // A newly seen near face while a name is held
+                        // under LAMP_FACE_STICKY: one print at once, outside
+                        // the 2 s cadence (`who::NewFace`).
+                        if let Some(who) = who.as_mut() {
+                            let holding =
+                                who.held.is_sticky() && who.held.holding() && who.known.is_some();
+                            who.new_face.looked(
+                                near.map(|(_, (face, _))| (near_id.as_deref(), face.x + face.width / 2.0, face.width)),
+                                holding,
+                            );
+                            // The held face's last box, on its own or
+                            // followed id (`who::Held::saw_near`,
+                            // LAMP_FACE_FOLLOW_NEAR_NEW_ID).
+                            if let Some((_, (face, _))) = near {
+                                who.held.saw_near(near_id.as_deref(), face.x + face.width / 2.0, face.width);
+                            }
+                        }
                         if let Some(who) = who.as_mut()
-                            && (lamp_eyes::who::recognise_due_near(
+                            && (who.new_face.due(who.looked_for, Instant::now())
+                                || lamp_eyes::who::recognise_due_near(
                                 who.looked_for,
                                 who.taking.is_some(),
                                 Instant::now(),
@@ -2859,6 +2977,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             // checks (the Reviewer-lead's P2 on #5546).
                             let checked = Instant::now();
                             who.looked_for = Some(checked);
+                            who.new_face.checked();
                             // A new near id that follows the held one's
                             // may carry the hold, once a print of it passes
                             // (both `LAMP_FACE_KNOWN_HOLD` and
@@ -2868,19 +2987,39 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 bus_out.as_ref().and_then(|bus| bus.followed_id(id))
                             });
                             if who.known.is_some() {
-                                who.held.follow(
+                                let near_faces = heights.iter().filter(|h| **h >= NEAR_ENOUGH).count();
+                                let follows = who.held.follow(
                                     checked,
                                     near_id.as_deref(),
                                     followed.as_deref(),
-                                    heights.iter().filter(|h| **h >= NEAR_ENOUGH).count(),
+                                    near_faces,
                                 );
+                                // With LAMP_FACE_FOLLOW_NEAR_NEW_ID: a new id
+                                // in the held face's place, the sitter not
+                                // standing up (`who::Held::follow_near`).
+                                if !follows
+                                    && who.held.follow_near(
+                                        checked,
+                                        near.zip(near_id.as_deref()).map(|((_, (face, _)), id)| {
+                                            (id, face.x + face.width / 2.0, face.width)
+                                        }),
+                                        near_faces,
+                                        bus_out.as_ref().is_some_and(|bus| bus.activity_not_standing_up()),
+                                    )
+                                {
+                                    eprintln!(
+                                        "lamp-eyes: a new id in the held face's place, the sitter not standing up: followed (LAMP_FACE_FOLLOW_NEAR_NEW_ID)"
+                                    );
+                                }
                             }
+                            let print_began = Instant::now();
                             let print = near
                                 .and_then(|(_, (face, _))| match full_frame.as_ref().filter(|_| full_crop) {
                                     Some(full) => lamp_eyes::who::align_full(full, &face.marks),
                                     None => align(&picture, &face.marks),
                                 })
                                 .and_then(|aligned| who.recogniser.print(&aligned).ok());
+                            let print_ms = print.as_ref().map(|_| print_began.elapsed().as_millis());
                             // The ids a print was read for: an id not among
                             // them is due at once (`LAMP_FACE_REFOUND`, #4486).
                             if print.is_some()
@@ -2891,19 +3030,48 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             // Each check with a face in view, at most every
                             // two seconds (with LAMP_FACE_REFOUND also once for
                             // an id not yet printed, retried at most every half
-                            // second): the best likeness and the largest
-                            // face's height, never a name.
+                            // second): the best likeness and its prints'
+                            // age, the largest face's height, width, turn
+                            // and place across, never a name. The largest
+                            // face is the near one the print was read
+                            // from whenever there is a likeness.
                             if who.taking.is_none()
-                                && let Some(tallest) = heights.iter().copied().reduce(f32::max)
+                                && let Some(tallest) =
+                                    faces.iter().max_by(|a, b| a.height.total_cmp(&b.height))
                             {
                                 let best = print
                                     .as_ref()
-                                    .and_then(|print| who.people.best_likeness(print))
-                                    .map_or_else(|| "none".to_owned(), |best| format!("{best:.3}"));
+                                    .and_then(|print| who.people.best_likeness(print));
+                                let now_unix_s = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .map_or(0, |since| since.as_secs());
                                 eprintln!(
-                                    "lamp-eyes: recognition best {best} height {tallest:.3} (near at {NEAR_ENOUGH}, same at {})",
-                                    lamp_eyes::who::SAME_PERSON
+                                    "lamp-eyes: {}",
+                                    lamp_eyes::who::recognition_line(
+                                        best,
+                                        tallest,
+                                        picture.filled,
+                                        now_unix_s,
+                                    )
                                 );
+                                // T0 of the sticky identity plan: the near face's
+                                // eye distance, turn, detector score, the second
+                                // person's likeness and the print's time, beside
+                                // the best likeness. Numbers only.
+                                let near_face = near.map(|(_, (face, _))| face);
+                                let measures = lamp_eyes::who::RecognitionMeasures {
+                                    best: best.map(|(how, _)| how),
+                                    second: print.as_ref().and_then(|print| who.people.second_likeness(print)),
+                                    tallest: tallest.height / tall,
+                                    eyes_px: near_face.map(|face| {
+                                        let ((ax, ay), (bx, by)) = (face.marks[0], face.marks[1]);
+                                        ((ax - bx).powi(2) + (ay - by).powi(2)).sqrt()
+                                    }),
+                                    turned_deg: near_face.and_then(|face| lamp_eyes::facing::yaw_deg(&face.marks)),
+                                    score: near_face.map(|face| face.score),
+                                    print_ms,
+                                };
+                                eprintln!("{}", lamp_eyes::who::recognition_told(&measures));
                             }
                             let near_face = near_id
                                 .as_ref()
@@ -2913,10 +3081,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             // inference or disk write for enrollment evidence.
                             // The passing id alone does not mean it spoke.
                             if who.remember_speaker
-                                && heights.iter().filter(|h| **h >= NEAR_ENOUGH).count() == 1
                                 && let (Some(face), Some(print), Some(bus)) =
                                     (near_face.as_deref(), print.as_deref(), bus_out.as_ref())
-                                && bus.talking().iter().any(|id| near_id.as_deref() == Some(format!("f{id}").as_str()))
+                                && anchors_the_speaker(&heights, near_id.as_deref(), bus.talking())
                             {
                                 who.speaker_anchors.observe(face, print, frame_us,
                                     lamp_ipc::monotonic_us(), frame_hold, permit.held());
@@ -2928,10 +3095,107 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     frame_us, lamp_ipc::monotonic_us(), permit.held());
                             } else if let Some(print) = print {
                                 let now = checked;
-                                let found = who
+                                let mut found = who
                                     .people
                                     .who(&print)
                                     .map(|(name, likeness)| (name, likeness, now));
+                                // A T7 rematch is written held, never as a
+                                // real match (Friday's P1 on #7933).
+                                let mut rematched = false;
+                                // A rematch of another than the one held:
+                                // its likeness, not taken (`who::held_rematch`).
+                                let mut refused: Option<f32> = None;
+                                let held_name: Option<String> = who.known.as_ref().map(|known| known.0.clone());
+                                if who.held.is_sticky() {
+                                    match found.as_ref() {
+                                        Some((name, ..)) => who.recent.matched(name, now),
+                                        // T7: someone matched in the last ten
+                                        // minutes, again at the lower bar when
+                                        // nobody else scores higher; while
+                                        // someone is held, only them. No name
+                                        // in the journal.
+                                        None => {
+                                            let rematch = who.recent.rematch(
+                                                now,
+                                                |name| who.people.likeness_to(name, &print),
+                                                who.people.best_likeness(&print).map(|(how, _)| how),
+                                            );
+                                            match lamp_eyes::who::held_rematch(rematch, held_name.as_deref()) {
+                                                Some(lamp_eyes::who::Rematch::Taken(name, likeness)) => {
+                                                    rematched = true;
+                                                    eprintln!(
+                                                        "lamp-eyes: matched again at {likeness:.3}, someone matched within {} min (bar {})",
+                                                        lamp_eyes::who::REMATCH_WITHIN.as_secs() / 60,
+                                                        lamp_eyes::who::REMATCH_LIKENESS
+                                                    );
+                                                    found = Some((name, likeness, now));
+                                                }
+                                                Some(lamp_eyes::who::Rematch::Refused(likeness)) => {
+                                                    refused = Some(likeness);
+                                                }
+                                                None => {}
+                                            }
+                                        }
+                                    }
+                                }
+                                // T4: another enrolled person on the held
+                                // face takes the name only on a second look
+                                // within `who::TAKEOVER_WITHIN`, each over the
+                                // held person's likeness; the first keeps the
+                                // one held, as a held check does
+                                // (`who::sticky_look`).
+                                let look = lamp_eyes::who::sticky_look(
+                                    &who.held,
+                                    &mut who.takeover,
+                                    now,
+                                    held_name.as_deref(),
+                                    found.as_ref().map(|(name, likeness, _)| (name.as_str(), *likeness)),
+                                    held_name
+                                        .as_deref()
+                                        .and_then(|held_name| who.people.likeness_to(held_name, &print)),
+                                    near_id.as_deref(),
+                                    // A rematch never counts; with
+                                    // LAMP_FACE_TAKEOVER_SCORE, nor a poorly
+                                    // seen face (`who::takeover_uncounted`).
+                                    lamp_eyes::who::takeover_uncounted(
+                                        rematched,
+                                        near.map(|(_, (face, _))| face.score),
+                                        lamp_eyes::who::takeover_score_on(),
+                                    ),
+                                );
+                                let waits_takeover = matches!(
+                                    look,
+                                    lamp_eyes::who::StickyLook::KeepsHeld
+                                        | lamp_eyes::who::StickyLook::NotALook(_)
+                                );
+                                match look {
+                                    lamp_eyes::who::StickyLook::KeepsHeld => eprintln!(
+                                        "lamp-eyes: another known face on one look: the one held stays until a second (within {} s)",
+                                        lamp_eyes::who::TAKEOVER_WITHIN.as_secs()
+                                    ),
+                                    lamp_eyes::who::StickyLook::SecondLook => {
+                                        eprintln!("lamp-eyes: another known face on two looks: the name moves")
+                                    }
+                                    lamp_eyes::who::StickyLook::NotALook(
+                                        lamp_eyes::who::Uncounted::Rematch,
+                                    ) => eprintln!(
+                                        "lamp-eyes: another known face on a rematch at the lower bar: not a look, the one held stays"
+                                    ),
+                                    lamp_eyes::who::StickyLook::NotALook(
+                                        lamp_eyes::who::Uncounted::Score,
+                                    ) => eprintln!(
+                                        "lamp-eyes: another known face on a face scored {} (a look needs {}, LAMP_FACE_TAKEOVER_SCORE): not a look, the one held stays",
+                                        near.map_or_else(
+                                            || "none".to_owned(),
+                                            |(_, (face, _))| format!("{:.2}", face.score)
+                                        ),
+                                        lamp_eyes::who::TAKEOVER_SCORE
+                                    ),
+                                    lamp_eyes::who::StickyLook::AsFound => {}
+                                }
+                                if waits_takeover {
+                                    found = None;
+                                }
                                 // Nobody who asked: a face from a photo, maybe,
                                 // never named, only noted so the voice can ask.
                                 if found.is_none() {
@@ -2943,42 +3207,77 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 // After a gap, only this print reading the
                                 // held face keeps the hold, on their id or a
                                 // new one (`who::Held::printed`, #5546):
-                                // journaled with numbers only, never a name.
-                                if let Some((alike, same)) =
-                                    who.held.printed(&print, near_id.as_deref())
-                                    && who.known.is_some()
-                                {
-                                    let alike = alike
-                                        .map_or_else(|| "none".to_owned(), |alike| format!("{alike:.3}"));
-                                    eprintln!(
-                                        "lamp-eyes: known hold: after a gap the near face is {alike} to the last held print (same face at {}): {}",
-                                        lamp_eyes::who::SAME_PERSON,
-                                        if same { "same face" } else { "let go" }
-                                    );
-                                }
+                                // journaled with numbers only, never a name,
+                                // once the check has decided (`who::gap_told`).
+                                let gap_read = who
+                                    .held
+                                    .printed(&print, near_id.as_deref())
+                                    .filter(|_| who.known.is_some());
                                 // With the hold on (`LAMP_FACE_FULL_CROP` or
                                 // `LAMP_FACE_KNOWN_HOLD`), a miss within
                                 // the hold keeps the one known, as they were,
                                 // only while the face still looks like them
                                 // (`who::Held::keeps_print`): a stranger's
                                 // face lets them go at once (#3285).
-                                let held = found.is_none()
-                                    && matched.is_none()
-                                    && who.known.as_ref().is_some_and(|known| {
-                                        who.held.keeps_print(
-                                            now,
-                                            who.people.likeness_to(&known.0, &print),
-                                            near_id.as_deref(),
-                                        )
-                                    });
-                                if held {
+                                let held = waits_takeover
+                                    || (found.is_none()
+                                        && matched.is_none()
+                                        && who.known.as_ref().is_some_and(|known| {
+                                            who.held.keeps_print(
+                                                now,
+                                                who.people.likeness_to(&known.0, &print),
+                                                near_id.as_deref(),
+                                            )
+                                        }));
+                                // Sticky T3: a new unknown face away from
+                                // the held face's box is nobody near at their
+                                // place (`who::Held::keeps_away`): held, with
+                                // nothing renewed, followed or carried.
+                                let matched_any = found.is_some() || matched.is_some();
+                                let away = !held
+                                    && who.known.is_some()
+                                    && who.held.keeps_away(
+                                        now,
+                                        matched_any,
+                                        near_id
+                                            .as_deref()
+                                            .zip(near.map(|(_, (face, _))| face.x + face.width / 2.0)),
+                                    );
+                                if away
+                                    && let Some((_, (face, _))) = near
+                                {
+                                    eprintln!("{}", who.held.away_told(face.x + face.width / 2.0));
+                                }
+                                let held = held || away;
+                                if let Some(likeness) = refused {
+                                    eprintln!("{}", lamp_eyes::who::rematch_refused_told(likeness, held));
+                                }
+                                let mut carried = false;
+                                if away {
+                                    // As a check with nobody near: the name
+                                    // and the held mark stay, the 30 s from
+                                    // their last sighting runs on.
+                                    if let Some(known) = who.known.as_mut() {
+                                        known.2 = now;
+                                    }
+                                    if let Some(path) = &arguments.known_file {
+                                        keep_held(path, who, false, near_id.as_deref());
+                                    }
+                                } else if held {
                                     if let Some(known) = who.known.as_mut() {
                                         known.2 = now;
                                     }
                                     who.held.printed_theirs();
+                                    // Their face on its id: the sticky hold
+                                    // counts from here (T3); another person's
+                                    // first look renews nothing. A look that
+                                    // does not count is theirs (row 5).
+                                    if look != lamp_eyes::who::StickyLook::KeepsHeld {
+                                        who.held.seen_theirs(now);
+                                    }
                                     // A followed id carried by this print
                                     // (`who::Held::carry`, #4885).
-                                    let carried = who.held.carry(near_id.as_deref());
+                                    carried = who.held.carry(near_id.as_deref());
                                     if let Some(path) = &arguments.known_file {
                                         keep_held(path, who, carried, near_id.as_deref());
                                     }
@@ -2988,7 +3287,17 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     } else {
                                         who.held.let_go();
                                     }
+                                    who.takeover.reset();
                                     who.known = found;
+                                }
+                                if let Some((alike, same)) = gap_read {
+                                    let alike = alike
+                                        .map_or_else(|| "none".to_owned(), |alike| format!("{alike:.3}"));
+                                    eprintln!(
+                                        "lamp-eyes: known hold: after a gap the near face is {alike} to the last held print (same face at {}): {}",
+                                        lamp_eyes::who::SAME_PERSON,
+                                        lamp_eyes::who::gap_told(same, held, carried, matched_any, away)
+                                    );
                                 }
                                 // A print not the photo's: no longer here
                                 // (`photo::print_is_photos`, #2856).
@@ -3009,7 +3318,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     who.photo_seen.push((name.clone(), lamp_ipc::monotonic_us()));
                                     who.photo_here = Some((name, near_face.clone(), Instant::now()));
                                 }
-                                if who.visits && !held {
+                                if who.visits && !held && !rematched {
                                     let level = familiar(&mut who.people, who.known.as_ref());
                                     if let Some(bus) = bus_out.as_mut() {
                                         bus.familiar(level, lamp_ipc::monotonic_us());
@@ -3018,11 +3327,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 if let Some(path) = arguments.known_file.as_ref().filter(|_| !held) {
                                     let name = who.known.as_ref().map(|known| known.0.as_str());
                                     let id = name.and_then(|name| who.people.id_of(name));
-                                    lamp_eyes::who::keep_known(
+                                    lamp_eyes::who::keep_found(
                                         path,
                                         name,
                                         id.as_deref(),
                                         near_id.as_deref(),
+                                        rematched,
                                     );
                                 }
                             } else if let Some(unprinted) = who
@@ -3046,6 +3356,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 if let Some(known) = who.known.as_mut() {
                                     known.2 = checked;
                                 }
+                                // Their face on its id, unprinted (turned,
+                                // covered): the sticky hold counts from here
+                                // (T3). Nobody near renews nothing.
+                                if near.is_some() && unprinted == lamp_eyes::who::Unprinted::Sure {
+                                    who.held.seen_theirs(checked);
+                                }
                                 if let Some(path) = &arguments.known_file {
                                     // Unsure: the known file moved aside, so
                                     // no reader of it sees the name held
@@ -3055,13 +3371,21 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                         lamp_eyes::who::Unprinted::Unsure => {
                                             lamp_eyes::who::hold_unsure(path)
                                         }
-                                        _ => lamp_eyes::who::renew_known(path),
+                                        _ => {
+                                            // Held, not matched: the mark first
+                                            // (`LAMP_FACE_STICKY`).
+                                            if who.held.is_sticky() {
+                                                lamp_eyes::who::mark_held(path);
+                                            }
+                                            lamp_eyes::who::renew_known(path)
+                                        }
                                     }
                                 }
                             } else {
                                 // Nobody near: nobody known at the lamp.
                                 if who.held.on() {
                                     who.held.let_go();
+                                    who.takeover.reset();
                                     who.known = None;
                                 }
                                 if let Some(path) = &arguments.known_file {
@@ -3429,6 +3753,54 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Heron's P3 on #7622: the eyes' own refusal of a remember not bound to
+    /// its speaker, and of a speaker-bound one with the switch off.
+    #[test]
+    fn a_plain_remember_is_speaker_required_with_the_switch_on() {
+        use lamp_eyes::who::{Ask, ask_of};
+        let plain = Ask::Remember("Kesh".into());
+        let one = Ask::RememberOne {
+            name: "Kesh".into(),
+            replace: false,
+            apart: false,
+            known_only: false,
+        };
+        for ask in [&plain, &one] {
+            assert_eq!(speaker_refusal(ask, true), Some("speaker_required"));
+            assert_eq!(speaker_refusal(ask, false), None);
+        }
+        let speaker = ask_of(
+            br#"{"remember_speaker":{"name":"Kesh","face":"b/f1","began_us":1,"ended_us":2,"replace":false,"apart":false}}"#,
+        )
+        .expect("a speaker-bound remember");
+        assert!(matches!(speaker, Ask::RememberSpeaker(_)));
+        assert_eq!(speaker_refusal(&speaker, true), None);
+        assert_eq!(speaker_refusal(&speaker, false), Some("not_understood"));
+        assert_eq!(speaker_refusal(&Ask::List, true), None);
+    }
+
+    /// Heron's P3 on #7622: an anchor is stored only when exactly one face
+    /// is near and it is the one talking.
+    #[test]
+    fn only_the_one_near_face_talking_anchors_the_speaker() {
+        use lamp_eyes::who::NEAR_ENOUGH;
+        let near = NEAR_ENOUGH + 0.05;
+        let far = NEAR_ENOUGH / 2.0;
+        assert!(anchors_the_speaker(&[near], Some("f3"), &[3]));
+        assert!(anchors_the_speaker(&[near, far], Some("f3"), &[3, 4]));
+        // A second near face, even both talking.
+        assert!(!anchors_the_speaker(&[near, near], Some("f3"), &[3]));
+        assert!(!anchors_the_speaker(&[near, near], Some("f3"), &[3, 4]));
+        // The near face is not the one talking.
+        assert!(!anchors_the_speaker(&[near], Some("f3"), &[4]));
+        assert!(!anchors_the_speaker(&[near], Some("f3"), &[]));
+        assert!(!anchors_the_speaker(&[near], None, &[3]));
+        // No near face at all.
+        assert!(!anchors_the_speaker(&[far], Some("f3"), &[3]));
+        // An id that only starts the same is another face.
+        assert!(!anchors_the_speaker(&[near], Some("f31"), &[3]));
+    }
 
     fn args(values: &[&str]) -> Vec<OsString> {
         values.iter().map(OsString::from).collect()

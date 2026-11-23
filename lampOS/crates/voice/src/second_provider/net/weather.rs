@@ -10,8 +10,14 @@
 //! weather every 15 minutes and only one location"; "what's the weather in
 //! Hanoi tomorrow?" had been answered with Ho Chi Minh City's. The first
 //! builder on #1712 (15:18): Open-Meteo, free and with no key. Only the
-//! place's name and its coordinates leave the lamp.
-use super::{Result, get_public_json};
+//! place's name, the lamp's country's two-letter code with it
+//! ([`Weather::with_country`], #7593), and the place's coordinates leave
+//! the lamp, to Open-Meteo; with `LAMP_WEATHER_BACKUP=on` (off unless set,
+//! #7593), when its forecast can't be reached, the coordinates alone, to 4
+//! decimals, go to MET Norway (`api.met.no`) for the same forecast ([`met`]).
+pub mod met;
+
+use super::{Error, Result, get_public_json_within, public::OPEN_WITHIN};
 use futures_util::future::BoxFuture;
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
@@ -30,6 +36,11 @@ pub const NAME: &str = "weather";
 /// it is checking meanwhile, and a right answer a little later is the owner's
 /// choice ("quality first").
 pub const WITHIN: Duration = Duration::from_secs(6);
+/// What a forecast's open bound leaves of [`WITHIN`] for its answer once
+/// its connection is open: the request sent and the answer read over it,
+/// about two round trips of lamp-9adf's 0.33 s (18 Nov) and Open-Meteo's
+/// own work; an estimate, not timed on its own on a lamp.
+pub const FORECAST_ANSWERED_IN: Duration = Duration::from_millis(800);
 /// A place's forecast is answered from what was kept while it is this
 /// fresh, never older.
 pub const KEPT_FOR: Duration = Duration::from_secs(10 * 60);
@@ -47,6 +58,17 @@ const MOST_FOUND: usize = 32;
 const MOST_NAMES: usize = 8;
 /// The longest place name looked up, in characters.
 const MOST_NAME_CHARS: usize = 100;
+/// A place found anywhere goes over the first of its name in the lamp's
+/// own country ([`Weather::with_country`]) only when both say how many
+/// live there and it is a city of at least [`LARGE_CITY`] people and
+/// [`FAR_LARGER`] times as many as that one: "Sapa" asked of a lamp in
+/// Vietnam is Sa Pa, Lao Cai, not Sapa, Romania (lamp-9adf, 18 Nov,
+/// #7593), while "Paris" asked of one in the US is still Paris, France,
+/// not Paris, Texas. A place at home with no count is chosen: unknown is
+/// not small.
+const FAR_LARGER: u64 = 10;
+/// See [`FAR_LARGER`].
+const LARGE_CITY: u64 = 100_000;
 const GEOCODING: &str = "https://geocoding-api.open-meteo.com/v1/search";
 const FORECAST: &str = "https://api.open-meteo.com/v1/forecast";
 
@@ -93,13 +115,27 @@ pub fn declaration() -> lamp_gemini::Tool {
     }
 }
 
-/// How a request's JSON answer is fetched: from Open-Meteo on the lamp
-/// ([`open_meteo`]), and a canned one in a test.
-pub type Fetch = Arc<dyn Fn(String) -> BoxFuture<'static, Result<Value>> + Send + Sync>;
+/// How a request's JSON answer is fetched, its connection open within the
+/// bound given: from Open-Meteo on the lamp ([`open_meteo`]), and a canned
+/// one in a test.
+pub type Fetch = Arc<dyn Fn(String, Duration) -> BoxFuture<'static, Result<Value>> + Send + Sync>;
 
 /// Open-Meteo's answers, fetched over HTTPS with no key.
 pub fn open_meteo() -> Fetch {
-    Arc::new(|url| Box::pin(async move { get_public_json(&url).await }))
+    Arc::new(|url, open_within| {
+        Box::pin(async move { get_public_json_within(&url, open_within).await })
+    })
+}
+
+/// How long a forecast fetched with `left` of the call's [`WITHIN`] still
+/// to come may take to open its connection: all but
+/// [`FORECAST_ANSWERED_IN`] of it, never less than a place's own
+/// [`OPEN_WITHIN`]. lamp-9adf on 18 Nov (#7593): a place looked up in
+/// 1.2 s left its forecast 4.8 s, but the forecast's one address opened
+/// none of its tries in a fixed 2.5 s and the call failed in 3.7 s; with
+/// this it has 4 s. A forecast of a place known before has 5.2 s.
+pub fn forecast_open_within(left: Duration) -> Duration {
+    left.saturating_sub(FORECAST_ANSWERED_IN).max(OPEN_WITHIN)
 }
 
 /// The name a place is looked up by: its first part ("Hanoi" for "Hanoi,
@@ -109,9 +145,10 @@ pub fn place_query(place: &str) -> Option<String> {
     (!name.is_empty()).then(|| name.to_owned())
 }
 
-/// The geocoding request for `name`.
-pub fn geocoding_url(name: &str) -> Option<String> {
-    reqwest::Url::parse_with_params(
+/// The geocoding request for `name`, anywhere, or only in `country` (its
+/// two-letter code, `countryCode`).
+pub fn geocoding_url(name: &str, country: Option<&str>) -> Option<String> {
+    let mut url = reqwest::Url::parse_with_params(
         GEOCODING,
         [
             ("name", name),
@@ -120,8 +157,41 @@ pub fn geocoding_url(name: &str) -> Option<String> {
             ("format", "json"),
         ],
     )
-    .ok()
-    .map(String::from)
+    .ok()?;
+    if let Some(country) = country {
+        url.query_pairs_mut().append_pair("countryCode", country);
+    }
+    Some(url.into())
+}
+
+/// How many people live at the first place found, as the geocoding says;
+/// `None` when it doesn't say (unknown, not none).
+fn population(answer: &Value) -> Option<u64> {
+    answer["results"][0]["population"].as_u64()
+}
+
+/// The place a name finds from its two answers, anywhere and in the
+/// lamp's own country: the one in the lamp's country while there is one,
+/// unless the one found anywhere is known to be a far larger city than
+/// the one at home is known to be ([`FAR_LARGER`]).
+fn chosen(anywhere: &Value, at_home: &Value) -> Option<Place> {
+    let Some(home) = found(at_home) else {
+        return found(anywhere);
+    };
+    if let (Some(far), Some(near)) = (population(anywhere), population(at_home))
+        && far >= LARGE_CITY
+        && far >= near.saturating_mul(FAR_LARGER)
+        && let Some(far) = found(anywhere)
+    {
+        return Some(far);
+    }
+    Some(home)
+}
+
+/// A country code as the geocoding takes it: two capital letters.
+fn country_code(code: &str) -> Option<String> {
+    let code = code.trim();
+    (code.len() == 2 && code.bytes().all(|b| b.is_ascii_uppercase())).then(|| code.to_owned())
 }
 
 /// The first place found: its latitude and longitude.
@@ -378,9 +448,26 @@ fn day_said(daily: &Value, row: usize, after: i64) -> Option<String> {
     let mut said = format!("{name} {low} to {high}°C, {}", sky(code));
     if let Some(rain) = at("precipitation_probability_max").as_i64() {
         said.push_str(&format!(", {rain}% chance of rain"));
+    } else if let Some(rain) = at("precipitation_sum").as_f64() {
+        said.push_str(&rain_said(rain));
     }
     said.push('.');
     Some(said)
+}
+
+/// A day's rain in mm, for a forecast that gives no chance of it (MET
+/// Norway's, [`met`]): "no rain" under 0.05 mm, then to a tenth of a mm
+/// below 10 and to a whole one from there.
+fn rain_said(mm: f64) -> String {
+    if mm < 0.05 {
+        return ", no rain".into();
+    }
+    let amount = if mm < 10.0 {
+        format!("{mm:.1}").trim_end_matches(".0").to_owned()
+    } else {
+        format!("{mm:.0}")
+    };
+    format!(", {amount} mm of rain")
 }
 
 /// The forecast in a few words for `place`, as it came: now, today and
@@ -468,7 +555,13 @@ pub struct Weather {
     /// The owner's place from the app (`LAMP_OWNER_PLACE=on`, #4333), read
     /// at each call that names no place: kept, it goes over `here`.
     owner_place: Option<std::path::PathBuf>,
+    /// The lamp's own country's code ("VN"), whose places a name finds
+    /// first ([`chosen`]).
+    country: Option<String>,
     fetch: Fetch,
+    /// The forecast's backup, MET Norway, and the lamp's zone its days are
+    /// told in ([`Weather::with_backup`]).
+    backup: Option<(Fetch, met::Offset)>,
     clock: Clock,
     kept: Mutex<Vec<Kept>>,
     /// The places names were found as, by name, kept [`PLACE_KEPT_FOR`].
@@ -482,7 +575,9 @@ impl Weather {
         Self {
             here,
             owner_place: None,
+            country: None,
             fetch,
+            backup: None,
             clock,
             kept: Mutex::new(Vec::new()),
             found: Mutex::new(Vec::new()),
@@ -494,6 +589,27 @@ impl Weather {
     /// looked up by name, said by its name (#4333). None kept, `here`.
     pub fn with_owner_place(mut self, file: std::path::PathBuf) -> Self {
         self.owner_place = Some(file);
+        self
+    }
+
+    /// The same, a name looked up both anywhere and in `country` (its
+    /// two-letter code, as the lamp's zone gives it,
+    /// `crate::local_time::country_here`), at once, the place in the
+    /// lamp's country chosen while there is one ([`chosen`]). Anything
+    /// but two capital letters is no country.
+    pub fn with_country(mut self, country: Option<String>) -> Self {
+        self.country = country.as_deref().and_then(country_code);
+        self
+    }
+
+    /// The same, a forecast Open-Meteo can't be reached for, or answers
+    /// only with a server error for ([`met::backs_up`]), fetched with `backup` (MET Norway) in what is
+    /// left of the call's [`WITHIN`], its days the lamp's own by `offset`,
+    /// only while `switch` (`LAMP_WEATHER_BACKUP`) is exactly `on` (#7593).
+    /// While it is on, Open-Meteo's forecast leaves it
+    /// [`met::LEFT_FOR_IT`]; off, Open-Meteo has the whole 6 s as before.
+    pub fn with_backup(mut self, switch: Option<&str>, backup: Fetch, offset: met::Offset) -> Self {
+        self.backup = met::on(switch).then_some((backup, offset));
         self
     }
 
@@ -531,24 +647,32 @@ impl Weather {
             day.said()
         );
         let now = (self.clock)();
-        let (told, how) = match tokio::time::timeout(WITHIN, self.looked_up(place, day, now)).await
-        {
-            Ok(answered) => answered,
-            Err(_) => (
-                json!({"error": UNREACHED}),
-                format!("not reached within {} ms", WITHIN.as_millis()),
-            ),
-        };
+        let until = Instant::now() + WITHIN;
+        let (told, how) =
+            match tokio::time::timeout_at(until, self.looked_up(place, day, now, until)).await {
+                Ok(answered) => answered,
+                Err(_) => (
+                    json!({"error": UNREACHED}),
+                    format!("not reached within {} ms", WITHIN.as_millis()),
+                ),
+            };
         Answered { told, asked, how }
     }
 
-    /// The call's answer, its days told from the place's own day at `now`.
-    async fn looked_up(&self, place: Option<&str>, day: Day, now: i64) -> (Value, String) {
+    /// The call's answer, its days told from the place's own day at `now`,
+    /// the call cut at `until`.
+    async fn looked_up(
+        &self,
+        place: Option<&str>,
+        day: Day,
+        now: i64,
+        until: Instant,
+    ) -> (Value, String) {
         if place.is_none()
             && let Some(owner) = self.owner_here()
         {
             let key = owner.name.to_lowercase();
-            return self.forecast_of(key, owner, true, day, now).await;
+            return self.forecast_of(key, owner, true, (day, now), until).await;
         }
         let Some(name) = place.or(self.here.as_deref()) else {
             return (json!({"error": NO_HERE}), "no place, and none here".into());
@@ -569,11 +693,8 @@ impl Weather {
         let place = match known.clone() {
             Some(place) => place,
             None => {
-                let Some(url) = geocoding_url(&query) else {
-                    return (json!({"error": NOT_FOUND}), "no such place".into());
-                };
-                let place = match (self.fetch)(url).await {
-                    Ok(answer) => found(&answer),
+                let place = match self.place_found(&query).await {
+                    Ok(place) => place,
                     Err(error) => {
                         return (
                             json!({"error": UNREACHED}),
@@ -588,19 +709,49 @@ impl Weather {
                 place
             }
         };
-        self.forecast_of(key, place, known.is_some(), day, now)
+        self.forecast_of(key, place, known.is_some(), (day, now), until)
             .await
     }
 
+    /// Where `query` is: looked up anywhere and, with the lamp's country
+    /// known, in it too, both at once ([`chosen`]). With one of the two
+    /// unreached, the other's; `None` when nothing was found.
+    async fn place_found(&self, query: &str) -> Result<Option<Place>> {
+        let Some(anywhere) = geocoding_url(query, None) else {
+            return Ok(None);
+        };
+        let at_home = self
+            .country
+            .as_deref()
+            .and_then(|country| geocoding_url(query, Some(country)));
+        let Some(at_home) = at_home else {
+            return (self.fetch)(anywhere, OPEN_WITHIN)
+                .await
+                .map(|answer| found(&answer));
+        };
+        let (anywhere, at_home) = tokio::join!(
+            (self.fetch)(anywhere, OPEN_WITHIN),
+            (self.fetch)(at_home, OPEN_WITHIN)
+        );
+        match (anywhere, at_home) {
+            (Ok(anywhere), Ok(at_home)) => Ok(chosen(&anywhere, &at_home)),
+            (Ok(anywhere), Err(_)) => Ok(found(&anywhere)),
+            (Err(error), Ok(at_home)) => found(&at_home).map(Some).ok_or(error),
+            (Err(error), Err(_)) => Err(error),
+        }
+    }
+
     /// The forecast of `place`, found by the name `key`, from what was kept
-    /// or fetched; `known`, its place was known before this call.
+    /// or fetched, its connection open within what is left before `until`
+    /// ([`forecast_open_within`]); `known`, its place was known before this
+    /// call.
     async fn forecast_of(
         &self,
         key: String,
         place: Place,
         known: bool,
-        day: Day,
-        now: i64,
+        (day, now): (Day, i64),
+        until: Instant,
     ) -> (Value, String) {
         if let Some((forecast, today)) = self.kept_by_place(&place, &key, now) {
             return (
@@ -611,14 +762,24 @@ impl Weather {
         let Some(url) = forecast_url(place.latitude, place.longitude) else {
             return (json!({"error": UNREACHED}), "no forecast request".into());
         };
-        let forecast = match (self.fetch)(url).await {
-            Ok(forecast) => Arc::new(forecast),
-            Err(error) => {
-                return (
-                    json!({"error": UNREACHED}),
-                    format!("the weather was not fetched: {error}"),
-                );
-            }
+        let left = until.saturating_duration_since(Instant::now());
+        // With a backup, its share of the 6 s is left to it (#7593).
+        let left = match self.backup {
+            Some(_) => left.saturating_sub(met::LEFT_FOR_IT),
+            None => left,
+        };
+        let (forecast, backed_up) = match (self.fetch)(url, forecast_open_within(left)).await {
+            Ok(forecast) => (Arc::new(forecast), None),
+            Err(error) => match self.backed_up(&place, &error, now, until).await {
+                Some(Ok((forecast, took))) => (Arc::new(forecast), Some(took)),
+                Some(Err(how)) => return (json!({"error": UNREACHED}), how),
+                None => {
+                    return (
+                        json!({"error": UNREACHED}),
+                        format!("the weather was not fetched: {error}"),
+                    );
+                }
+            },
         };
         // The place's today must be one of its rows, with the weather now:
         // a forecast without either is no answer, and is not kept.
@@ -632,12 +793,44 @@ impl Weather {
         };
         let answered = answer_for(&place, &forecast, day, today);
         self.keep(key, place, forecast, (today, now));
-        let how = if known {
-            "fetched, its place known"
-        } else {
-            "fetched"
+        let how = match backed_up {
+            Some(took) => format!("the forecast came from the backup service after {took} ms"),
+            None if known => "fetched, its place known".into(),
+            None => "fetched".into(),
         };
-        (answered, how.into())
+        (answered, how)
+    }
+
+    /// The forecast of `place` from the backup, when there is one and
+    /// Open-Meteo's `error` is that it couldn't be reached or answered
+    /// only with a server error ([`met::backs_up`]): fetched within what is left before `until`
+    /// less its answer's [`FORECAST_ANSWERED_IN`], in Open-Meteo's shape
+    /// ([`met::as_open_meteo`]), with how many ms it took. `None` when it
+    /// isn't asked; the journal's words when it fails too, never the place.
+    async fn backed_up(
+        &self,
+        place: &Place,
+        error: &Error,
+        now: i64,
+        until: Instant,
+    ) -> Option<std::result::Result<(Value, u128), String>> {
+        let (fetch, offset) = self.backup.as_ref().filter(|_| met::backs_up(error))?;
+        let failed = |why: &dyn std::fmt::Display| {
+            format!("the weather was not fetched: {error}; nor from the backup service: {why}")
+        };
+        let Some(url) = met::url(place.latitude, place.longitude) else {
+            return Some(Err(failed(&"no forecast request")));
+        };
+        let began = Instant::now();
+        let open_within = until
+            .saturating_duration_since(began)
+            .saturating_sub(FORECAST_ANSWERED_IN);
+        Some(match fetch(url, open_within).await {
+            Ok(answer) => met::as_open_meteo(&answer, offset(now), now)
+                .map(|forecast| (forecast, began.elapsed().as_millis()))
+                .ok_or_else(|| failed(&"its answer was not read")),
+            Err(why) => Err(failed(&why)),
+        })
     }
 
     /// Where `name` was found before, while under [`PLACE_KEPT_FOR`] old.
@@ -800,13 +993,16 @@ mod tests {
     fn a_place_is_looked_up_by_its_first_part() {
         assert_eq!(place_query("Hanoi, Vietnam").as_deref(), Some("Hanoi"));
         assert_eq!(place_query(" , x"), None);
-        let url = geocoding_url("Ho Chi Minh City").unwrap();
+        let url = geocoding_url("Ho Chi Minh City", None).unwrap();
         assert!(
             url.starts_with(
                 "https://geocoding-api.open-meteo.com/v1/search?name=Ho+Chi+Minh+City&count=1"
             ),
             "{url}"
         );
+        assert!(!url.contains("countryCode"), "{url}");
+        let url = geocoding_url("Sapa", Some("VN")).unwrap();
+        assert!(url.ends_with("&countryCode=VN"), "{url}");
         let found =
             json!({"results": [{"name": "Hanoi", "latitude": 21.0245, "longitude": 105.84117}]});
         assert_eq!(coordinates(&found), Some((21.0245, 105.84117)));
@@ -899,7 +1095,7 @@ mod tests {
             let asked = Arc::new(Mutex::new(Vec::new()));
             let failing = Arc::new(std::sync::atomic::AtomicBool::new(false));
             let (urls, fails) = (asked.clone(), failing.clone());
-            let fetch: Fetch = Arc::new(move |url: String| {
+            let fetch: Fetch = Arc::new(move |url: String, _| {
                 urls.lock().unwrap().push(url.clone());
                 let fails = fails.load(std::sync::atomic::Ordering::Relaxed);
                 Box::pin(async move { canned(&url, fails) })
@@ -1147,7 +1343,7 @@ mod tests {
     /// the weather couldn't be reached.
     #[tokio::test(start_paused = true)]
     async fn the_weather_not_reached_in_time_is_an_error() {
-        let slow: Fetch = Arc::new(|_| Box::pin(std::future::pending()));
+        let slow: Fetch = Arc::new(|_, _| Box::pin(std::future::pending()));
         let waited = Instant::now();
         let answered = Weather::new(None, slow, tuesday_noon())
             .answer(&json!({"place": "Hanoi"}))
@@ -1155,6 +1351,93 @@ mod tests {
         assert_eq!(answered.told, json!({"error": UNREACHED}));
         assert_eq!(answered.how, "not reached within 6000 ms");
         assert_eq!(waited.elapsed(), WITHIN);
+    }
+
+    /// A fetcher whose place is found after `looked_up_in` and whose
+    /// forecast connection never opens: each fails as the race does once
+    /// its open bound has passed. Each bound asked with is kept, the
+    /// place's first.
+    fn never_opening_forecast(looked_up_in: Duration) -> (Arc<Mutex<Vec<Duration>>>, Fetch) {
+        let bounds = Arc::new(Mutex::new(Vec::new()));
+        let kept = bounds.clone();
+        let fetch: Fetch = Arc::new(move |url: String, open_within| {
+            kept.lock().unwrap().push(open_within);
+            Box::pin(async move {
+                if url.contains("geocoding-api") {
+                    tokio::time::sleep(looked_up_in).await;
+                    return canned(&url, false);
+                }
+                tokio::time::sleep(open_within).await;
+                Err(super::super::Error::Timeout("connection"))
+            })
+        });
+        (bounds, fetch)
+    }
+
+    /// lamp-9adf on 18 Nov (#7593): a place looked up in 1.2 s, its
+    /// forecast's connection unopened in a fixed 2.5 s, and the call failed
+    /// in 3.7 s. The place's lookup opens within [`OPEN_WITHIN`] as before;
+    /// the forecast within what is left of the 6 s less
+    /// [`FORECAST_ANSWERED_IN`], 4 s, and a forecast that never opens ends
+    /// there, inside the call's bound. A place known before leaves its
+    /// forecast 5.2 s.
+    #[tokio::test(start_paused = true)]
+    async fn the_forecast_may_open_within_what_is_left_of_the_six_seconds() {
+        let (bounds, fetch) = never_opening_forecast(Duration::from_millis(1200));
+        let weather = Weather::new(None, fetch, tuesday_noon());
+        let waited = Instant::now();
+        let answered = weather.answer(&json!({"place": "Hanoi"})).await;
+        assert_eq!(answered.told, json!({"error": UNREACHED}));
+        assert_eq!(
+            answered.how,
+            "the weather was not fetched: connection timed out"
+        );
+        assert_eq!(waited.elapsed(), Duration::from_millis(5200));
+        assert!(waited.elapsed() < WITHIN);
+        assert_eq!(
+            *bounds.lock().unwrap(),
+            [OPEN_WITHIN, Duration::from_millis(4000)]
+        );
+        let waited = Instant::now();
+        let answered = weather.answer(&json!({"place": "Hanoi"})).await;
+        assert_eq!(
+            answered.how,
+            "the weather was not fetched: connection timed out"
+        );
+        assert_eq!(waited.elapsed(), WITHIN - FORECAST_ANSWERED_IN);
+        assert_eq!(
+            bounds.lock().unwrap()[2],
+            WITHIN - FORECAST_ANSWERED_IN,
+            "where Hanoi is was kept: its forecast alone, 5.2 s to open"
+        );
+    }
+
+    /// A place looked up slowly (4 s) leaves its forecast no less than
+    /// [`OPEN_WITHIN`] to open, and the call is cut at its 6 s all the same.
+    #[tokio::test(start_paused = true)]
+    async fn a_slow_place_leaves_its_forecast_the_usual_bound_and_the_call_ends_at_six_seconds() {
+        let (bounds, fetch) = never_opening_forecast(Duration::from_secs(4));
+        let waited = Instant::now();
+        let answered = Weather::new(None, fetch, tuesday_noon())
+            .answer(&json!({"place": "Hanoi"}))
+            .await;
+        assert_eq!(answered.told, json!({"error": UNREACHED}));
+        assert_eq!(answered.how, "not reached within 6000 ms");
+        assert_eq!(waited.elapsed(), WITHIN);
+        assert_eq!(*bounds.lock().unwrap(), [OPEN_WITHIN, OPEN_WITHIN]);
+    }
+
+    /// The forecast's open bound: all but [`FORECAST_ANSWERED_IN`] of what
+    /// is left, never less than [`OPEN_WITHIN`].
+    #[test]
+    fn the_forecast_opens_within_what_is_left_less_its_answer() {
+        assert_eq!(forecast_open_within(WITHIN), Duration::from_millis(5200));
+        assert_eq!(
+            forecast_open_within(Duration::from_millis(4800)),
+            Duration::from_millis(4000)
+        );
+        assert_eq!(forecast_open_within(Duration::from_secs(2)), OPEN_WITHIN);
+        assert_eq!(forecast_open_within(Duration::ZERO), OPEN_WITHIN);
     }
 
     /// A follow-up within 10 minutes ("and Saturday?") is answered from what
@@ -1292,7 +1575,7 @@ mod tests {
     fn honolulu_fetch() -> (Arc<std::sync::atomic::AtomicUsize>, Fetch) {
         let fetched = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let count = fetched.clone();
-        let fetch: Fetch = Arc::new(move |url: String| {
+        let fetch: Fetch = Arc::new(move |url: String, _| {
             count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             Box::pin(async move {
                 Ok(if url.contains("geocoding-api") {
@@ -1408,5 +1691,176 @@ mod tests {
             3,
             "the second call asks its forecast again, not where it is"
         );
+    }
+
+    /// One place found, as the geocoding gives it, with its country's code
+    /// and how many live there when known.
+    fn geocoded_in(name: &str, country: (&str, &str), people: Option<u64>, at: f64) -> Value {
+        let mut found = json!({"id": 1, "name": name, "latitude": at, "longitude": at,
+                               "country": country.0, "country_code": country.1});
+        if let Some(people) = people {
+            found["population"] = json!(people);
+        }
+        json!({"results": [found]})
+    }
+
+    /// A geocoding as Open-Meteo's answered on 18 Nov: "Sapa" anywhere is
+    /// Sapa, Romania, in Vietnam Sa Pa; "Paris" anywhere is Paris, France,
+    /// in the US Paris, Texas, and in Vietnam nothing. Each URL is kept.
+    fn geocoding_by_country() -> (Arc<Mutex<Vec<String>>>, Fetch) {
+        let asked = Arc::new(Mutex::new(Vec::new()));
+        let urls = asked.clone();
+        let fetch: Fetch = Arc::new(move |url: String, _| {
+            urls.lock().unwrap().push(url.clone());
+            Box::pin(async move {
+                let parsed = reqwest::Url::parse(&url).unwrap();
+                let param = |name: &str| {
+                    parsed
+                        .query_pairs()
+                        .find(|(key, _)| key == name)
+                        .map(|(_, value)| value.into_owned())
+                };
+                if parsed.host_str() != Some("geocoding-api.open-meteo.com") {
+                    return Ok(forecast(25.0));
+                }
+                let name = param("name").unwrap_or_default();
+                Ok(match (name.as_str(), param("countryCode").as_deref()) {
+                    ("Sapa", None) => geocoded_in("Sapa", ("Romania", "RO"), None, 46.0),
+                    ("Sapa", Some("VN")) => geocoded_in("Sapa", ("Vietnam", "VN"), None, 22.3),
+                    ("Paris", None) => {
+                        geocoded_in("Paris", ("France", "FR"), Some(2_138_551), 48.8)
+                    }
+                    ("Paris", Some("US")) => {
+                        geocoded_in("Paris", ("United States", "US"), Some(24_782), 33.6)
+                    }
+                    _ => json!({"generationtime_ms": 0.5}),
+                })
+            })
+        });
+        (asked, fetch)
+    }
+
+    /// lamp-9adf on 18 Nov (#7593): "Sa Pa" asked of a lamp in Vietnam was
+    /// answered for Sapa, Romania. With the lamp's country known the name
+    /// is looked up anywhere and there at once, and the place there is
+    /// chosen; a place with no match there is the one found anywhere, and
+    /// a far larger city anywhere goes over a small one there.
+    #[tokio::test]
+    async fn a_place_in_the_lamps_country_is_chosen_over_a_foreign_one() {
+        let (asked, fetch) = geocoding_by_country();
+        let in_vietnam =
+            Weather::new(None, fetch.clone(), tuesday_noon()).with_country(Some("VN".into()));
+        let answered = in_vietnam.answer(&json!({"place": "Sapa"})).await;
+        assert_eq!(answered.told["place"], "Sapa, Vietnam", "{}", answered.told);
+        {
+            let urls = asked.lock().unwrap();
+            assert_eq!(urls.len(), 3, "{urls:?}");
+            assert_eq!(
+                urls.iter()
+                    .filter(|url| url.contains("countryCode=VN"))
+                    .count(),
+                1,
+                "{urls:?}"
+            );
+        }
+        let answered = in_vietnam.answer(&json!({"place": "Paris"})).await;
+        assert_eq!(answered.told["place"], "Paris, France", "{}", answered.told);
+        let in_the_us =
+            Weather::new(None, fetch.clone(), tuesday_noon()).with_country(Some("US".into()));
+        let answered = in_the_us.answer(&json!({"place": "Paris"})).await;
+        assert_eq!(answered.told["place"], "Paris, France", "{}", answered.told);
+        // With no country known, one lookup, anywhere, as before.
+        asked.lock().unwrap().clear();
+        let nowhere =
+            Weather::new(None, fetch.clone(), tuesday_noon()).with_country(Some("vn".into()));
+        let answered = nowhere.answer(&json!({"place": "Sapa"})).await;
+        assert_eq!(answered.told["place"], "Sapa, Romania", "{}", answered.told);
+        assert_eq!(asked.lock().unwrap().len(), 2);
+    }
+
+    /// The place chosen of two answers: the one in the lamp's country,
+    /// unless none, or the one anywhere is a city of 100,000 people or
+    /// more and ten times as many, both counts known.
+    #[test]
+    fn the_place_in_the_lamps_country_goes_first_unless_far_smaller() {
+        let named =
+            |anywhere: &Value, at_home: &Value| chosen(anywhere, at_home).map(|place| place.name);
+        let sapa_ro = geocoded_in("Sapa", ("Romania", "RO"), None, 46.0);
+        let sapa_vn = geocoded_in("Sa Pa", ("Vietnam", "VN"), Some(10_554), 22.3);
+        let none = json!({"generationtime_ms": 0.5});
+        assert_eq!(named(&sapa_ro, &sapa_vn).as_deref(), Some("Sa Pa, Vietnam"));
+        assert_eq!(named(&sapa_ro, &none).as_deref(), Some("Sapa, Romania"));
+        assert_eq!(named(&none, &none), None);
+        let town = geocoded_in("Sapa", ("Philippines", "PH"), Some(99_999), 13.0);
+        assert_eq!(named(&town, &sapa_vn).as_deref(), Some("Sa Pa, Vietnam"));
+        let city = geocoded_in("Sapa", ("Philippines", "PH"), Some(105_540), 13.0);
+        assert_eq!(named(&city, &sapa_vn).as_deref(), Some("Sapa, Philippines"));
+        let near_city = geocoded_in("Sa Pa", ("Vietnam", "VN"), Some(10_555), 22.3);
+        assert_eq!(named(&city, &near_city).as_deref(), Some("Sa Pa, Vietnam"));
+    }
+
+    /// El on #7700: a place at home the geocoding gives no count for is
+    /// unknown, not empty, and is chosen over a foreign namesake of any
+    /// size, as a home place with a count of 0 is not.
+    #[test]
+    fn a_place_at_home_with_no_count_is_chosen_over_a_foreign_city() {
+        let named =
+            |anywhere: &Value, at_home: &Value| chosen(anywhere, at_home).map(|place| place.name);
+        let home = geocoded_in("Sapa", ("Vietnam", "VN"), None, 22.3);
+        let city = geocoded_in("Sapa", ("Philippines", "PH"), Some(2_000_000), 13.0);
+        assert_eq!(named(&city, &home).as_deref(), Some("Sapa, Vietnam"));
+        let empty = geocoded_in("Sapa", ("Vietnam", "VN"), Some(0), 22.3);
+        assert_eq!(named(&city, &empty).as_deref(), Some("Sapa, Philippines"));
+        let unknown_far = geocoded_in("Sapa", ("Romania", "RO"), None, 46.0);
+        assert_eq!(
+            named(&unknown_far, &empty).as_deref(),
+            Some("Sapa, Vietnam")
+        );
+    }
+
+    /// The whole call on lamp-9adf on 18 Nov (#7593): a place looked up in
+    /// 1.2 s, then a forecast host whose one address never opens. Looked
+    /// up again another way, its forecast comes within the 6 s; with no
+    /// other way the call still ends within them, the weather unreached.
+    #[tokio::test]
+    async fn a_forecast_whose_only_address_never_opens_is_reached_another_way_within_six_seconds() {
+        let fetch_by = |elsewhere: bool| -> Fetch {
+            Arc::new(move |url: String, open_within| {
+                Box::pin(async move {
+                    if url.contains("geocoding-api") {
+                        tokio::time::sleep(Duration::from_millis(1200)).await;
+                        return canned(&url, false);
+                    }
+                    super::super::public::tests::one_address_dead(
+                        forecast(21.0).to_string(),
+                        open_within,
+                        elsewhere,
+                    )
+                    .await
+                })
+            })
+        };
+        let reached = Weather::new(None, fetch_by(true), tuesday_noon());
+        let unreached = Weather::new(None, fetch_by(false), tuesday_noon());
+        let asked = Instant::now();
+        let ((reached, reached_in), (unreached, unreached_in)) = tokio::join!(
+            async {
+                let answered = reached.answer(&json!({"place": "Hanoi"})).await;
+                (answered, asked.elapsed())
+            },
+            async {
+                let answered = unreached.answer(&json!({"place": "Hanoi"})).await;
+                (answered, asked.elapsed())
+            },
+        );
+        assert_eq!(reached.told["place"], "Hanoi, Vietnam", "{}", reached.told);
+        assert_eq!(reached.how, "fetched");
+        assert!(reached_in < WITHIN, "{reached_in:?}");
+        assert_eq!(unreached.told, json!({"error": UNREACHED}));
+        assert_eq!(
+            unreached.how,
+            "the weather was not fetched: connection timed out"
+        );
+        assert!(unreached_in <= WITHIN, "{unreached_in:?}");
     }
 }

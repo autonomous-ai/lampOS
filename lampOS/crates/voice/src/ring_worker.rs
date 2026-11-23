@@ -72,6 +72,9 @@ pub struct Senses {
     /// Expression's night sleep, for the asleep face at rest (#3748): only
     /// with `LAMP_NIGHT_ASLEEP_FACE=on` ([`crate::ring_night`]).
     pub night: Option<crate::ring_night::RingNight>,
+    /// An update's breath and its one look after (#7516): only with
+    /// `LAMP_RING_UPDATE=on` ([`crate::ring_update`]).
+    pub update: Option<crate::ring_update::RingUpdate>,
     /// The primary button held, for the shutdown's warning (#3697): with
     /// `LAMP_SHUTDOWN=on`, held 5 to 15 s ([`lamp_msgs::shutdown_hold`]),
     /// the ring shows [`shutdown_warning`] in place of its face.
@@ -307,6 +310,10 @@ pub fn run_continuous(
         .filter(|_| crate::ring_night::enabled())
         .map(crate::ring_night::RingNight::on)
         .transpose()?;
+    let update = bus_root
+        .filter(|_| crate::ring_update::enabled())
+        .map(crate::ring_update::RingUpdate::on)
+        .transpose()?;
     // Only with the switch on, which the voice hands this worker (#3697).
     let button = bus_root
         .filter(|_| lamp_msgs::shutdown_switched_on())
@@ -330,6 +337,7 @@ pub fn run_continuous(
         caps,
         unplug,
         night,
+        update,
         button,
         reset,
         marks,
@@ -631,6 +639,7 @@ fn service(
         mut mood,
         mut unplug,
         mut night,
+        mut update,
         mut button,
         mut reset,
         mut marks,
@@ -642,6 +651,9 @@ fn service(
     face.eye(eye);
     face.eye_strong(eye_strong);
     let mut rested_at = 0u64;
+    // Whether the last resting frame was painted: an update's look is drawn
+    // only over a ring already showing its rest (#7516).
+    let mut rested = false;
     // From zero, so a late startup black write in GuardedRing::new is said too.
     let mut late_said = LateSaid::default();
     let mut lapse = Lapse::default();
@@ -839,8 +851,32 @@ fn service(
             face.skill_light(light.held());
             face.pixels(light.pixels());
         }
-        if let Some(mood) = mood.as_mut() {
-            face.breath(mood.tick(at));
+        let breath = mood.as_mut().and_then(|mood| mood.tick(at));
+        // An update's look (#7516), over the resting face only: never over
+        // the person's light off, the night's sleep, or a light asked for.
+        let look = update
+            .as_mut()
+            .map_or(crate::ring_update::Look::Plain, |update| {
+                let held = light.as_ref().is_some_and(|light| {
+                    light.held().is_some()
+                        || light.pixels().is_some()
+                        || light.fade().is_some()
+                        || light.pattern().is_some()
+                });
+                let can = if held {
+                    crate::ring_update::Can::Held
+                } else if rested && face.lit().on && !update.asleep() && face.rests_on_its_light(at)
+                {
+                    crate::ring_update::Can::Draw
+                } else {
+                    crate::ring_update::Can::Wait
+                };
+                update.tick(at, can)
+            });
+        let (update_breath, update_share) = crate::ring_update::shaped(look, face.lit());
+        // With neither, the face keeps the plain breath, as before.
+        if update.is_some() || mood.is_some() {
+            face.breath(update_breath.or(breath));
         }
         if let Some(ceiling) = resting
             && pending.is_none()
@@ -860,11 +896,13 @@ fn service(
                 .filter(|_| face.lit().on && warning.is_none())
                 .and_then(|unplug| unplug.prepare(at));
             if let RestWins::Warning(pixels) = rest_wins(warning, presentation.is_some()) {
+                rested = false;
                 ring.show_resting(&pixels, ceiling)
                     .map_err(io::Error::other)?;
             } else if let (Some(unplug), Some(presentation)) =
                 (unplug.as_mut(), presentation.as_ref())
             {
+                rested = false;
                 let marked = marks.as_mut().is_some_and(|marks| marks.shown(at));
                 let pixels = if marked {
                     crate::ring_mark::marked(presentation.pixels)
@@ -885,6 +923,7 @@ fn service(
                 }
             } else {
                 let mut pixels = face.render(Mood::Resting, 0, at, ceiling.get());
+                pixels = crate::ring_update::scaled(&pixels, update_share, ceiling.get());
                 // Asleep at night, the asleep face eases in; the person's
                 // light, on, wins, as at a hand's sleep (#3748).
                 let lit = face.lit().on;
@@ -904,6 +943,7 @@ fn service(
                 }
                 let own_light = face.rests_on_its_light(at);
                 let painted = rest(ring, &pixels, ceiling, own_light, light.as_mut())?;
+                rested = painted;
                 if painted
                     && marked
                     && crate::ring_mark::visible(&pixels, ceiling)

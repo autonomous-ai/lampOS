@@ -24,8 +24,27 @@ pub fn on() -> bool {
 /// What the model is told for a `remember` not kept, in a refused one's
 /// shape (`{"remembered": false, "note": …}`): that it wasn't kept, and how
 /// to have it kept (say who they are or show their face, then say it again),
-/// short and friendly. Nothing is held for later, so it promises no later keep.
-pub const NOT_KEPT: &str = "This wasn't kept: nobody known is speaking. If they want it kept, they can tell you who they are, or let the lamp see their face, and say it again. Say so in a few friendly words, not as a refusal. Never say it was kept or will be kept later.";
+/// short and friendly, asking nothing and never "Got it" (#7877). Nothing
+/// is held for later, so it promises no later keep.
+pub const NOT_KEPT: &str = "This wasn't kept: nobody known is speaking. If they want it kept, they can tell you who they are, or let the lamp see their face, and say it again. Say so in a few friendly words, not as a refusal. Never say it was kept or will be kept later, never \"Got it\" or \"Noted\", and ask nothing.";
+
+/// What the second route says itself for a line that only asks to keep,
+/// every `remember` of it refused with [`NOT_KEPT`] (#7877: on lamp-e82d,
+/// 19 Nov, such keeps were left to the model's words, which may say "Got
+/// it"). One true line, for a face the lamp doesn't know and for a known
+/// person not seen saying it alike: it asks nothing and never says it kept.
+pub const REFUSED_LINE: &str = "I'm not sure who's talking, so I can't keep that.";
+
+/// Whether `told` is a `remember` refused with [`NOT_KEPT`]
+/// ([`withheld_as`]).
+pub fn refused(told: &Value) -> bool {
+    told["remembered"] == false && told["note"] == NOT_KEPT
+}
+
+/// With `LAMP_FACE_NO_ASK` and the face save not speaker-bound
+/// ([`NoAsk::Quiet`], the first builder 21:13): their own name given while
+/// nobody is known keeps nothing, and nothing is asked or said about it.
+pub const NAME_QUIET: &str = "Not kept: this is their own name, and the lamp keeps a name only with the face it sees saying it, which it could not here. Ask them nothing, and say nothing about their name or face being kept; just carry on. Only if they asked in words for their face to be remembered, say plainly in a few words that you couldn't see the face saying it, so you can't keep it now, still asking nothing.";
 
 /// The journal's line for a `remember` not kept: no words of it.
 pub const SKIPPED_REMEMBER: &str =
@@ -44,11 +63,38 @@ pub const TO_FACE_SAVE: &str = "lamp-voice provider: a remember of the speaker's
 /// ([`face_save_note`]) in place of [`NOT_KEPT`]: on lamp-74ff the owner's
 /// "my name is ..." came back NOT_KEPT while the eyes held their face as
 /// nobody's. The face save takes a fresh look and the eyes judge the face.
+#[cfg(test)]
 pub(crate) fn withheld(
     call: &ToolCall,
     person: Option<&str>,
     on: bool,
     to_face: bool,
+) -> Option<Value> {
+    withheld_as(call, person, on, to_face, NoAsk::Off)
+}
+
+/// `LAMP_FACE_NO_ASK` for a name given while nobody is known
+/// ([`face_save_note`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum NoAsk {
+    /// Off: the face question, as before.
+    Off,
+    /// On, the face save speaker-bound (`LAMP_REMEMBER_SPEAKER`, the first
+    /// builder 18:50): the face save is called at once, nothing asked.
+    Save,
+    /// On, the face save not speaker-bound (the first builder 21:13):
+    /// nothing kept, nothing asked.
+    Quiet,
+}
+
+/// [`withheld`], with `no_ask` (`LAMP_FACE_NO_ASK`): nothing asked
+/// ([`face_save_note`]).
+pub(crate) fn withheld_as(
+    call: &ToolCall,
+    person: Option<&str>,
+    on: bool,
+    to_face: bool,
+    no_ask: NoAsk,
 ) -> Option<Value> {
     let text = call.args.get("text").and_then(Value::as_str);
     let personal = call.name == super::REMEMBER && text.is_some_and(super::about_someone);
@@ -61,7 +107,7 @@ pub(crate) fn withheld(
             .filter(|name| !name.is_empty());
         if to_face && (name.is_some() || crate::known_faces::gives_a_name(text)) {
             eprintln!("{TO_FACE_SAVE}");
-            return json!({"remembered": false, "note": face_save_note(name.as_deref())});
+            return json!({"remembered": false, "note": face_save_note(name.as_deref(), no_ask)});
         }
         eprintln!("{SKIPPED_REMEMBER}");
         json!({"remembered": false, "note": NOT_KEPT})
@@ -72,8 +118,27 @@ pub(crate) fn withheld(
 /// ([`withheld`]): to ask them whether to keep their face under it, by the
 /// name when it reads. A name is no yes to keeping a face, so the save runs
 /// only on their yes (`known_faces::ASK_FACE_FIRST`, the first builder on
-/// #7331).
-fn face_save_note(name: Option<&str>) -> String {
+/// #7331). With `no_ask` (`LAMP_FACE_NO_ASK`) nothing is asked: where the
+/// face save is speaker-bound it is called now, and its answer says whether
+/// the face was kept ([`NoAsk::Save`]); elsewhere nothing is kept, and only
+/// their own ask for their face is told the plain reason ([`NoAsk::Quiet`],
+/// as `known_faces::CANT_KEEP_NO_ASK`).
+fn face_save_note(name: Option<&str>, no_ask: NoAsk) -> String {
+    if no_ask == NoAsk::Quiet {
+        return NAME_QUIET.to_owned();
+    }
+    if no_ask == NoAsk::Save {
+        let call = match name {
+            Some(name) => format!("call {} with name \"{name}\"", crate::known_faces::REMEMBER),
+            None => format!(
+                "call {} with the name they gave",
+                crate::known_faces::REMEMBER
+            ),
+        };
+        return format!(
+            "Not kept as a memory: this is their own name, and the lamp keeps a name with their face. Don't say it wasn't kept, and ask them nothing: {call} now, so the lamp looks at them and keeps their face under it, and say only what it answers."
+        );
+    }
     let (ask, call) = match name {
         Some(name) => (
             format!("\"Shall I remember your face as {name}?\""),
@@ -250,6 +315,69 @@ mod tests {
             None
         );
         assert!(!TO_FACE_SAVE.contains("Ada"));
+    }
+
+    /// `LAMP_FACE_NO_ASK` (the first builder 18:50): their own name given
+    /// while nobody is known goes to the face save at once, nothing asked;
+    /// off, the face question as before.
+    #[test]
+    fn with_no_ask_a_name_goes_to_the_face_save_unasked() {
+        let call = remember("my name is Ada");
+        let told = withheld_as(&call, None, true, true, NoAsk::Save).unwrap();
+        let note = told["note"].as_str().unwrap();
+        assert!(note.contains("ask them nothing"), "{note}");
+        assert!(
+            note.contains(&format!(
+                "call {} with name \"Ada\" now",
+                crate::known_faces::REMEMBER
+            )),
+            "{note}"
+        );
+        assert!(!note.contains("Shall I"), "{note}");
+        let off = withheld_as(&call, None, true, true, NoAsk::Off).unwrap();
+        assert!(
+            off["note"]
+                .as_str()
+                .unwrap()
+                .contains("\"Shall I remember your face as Ada?\"")
+        );
+        // Not their own name: not kept, as before.
+        let told = withheld_as(
+            &remember("Her name is Linh."),
+            None,
+            true,
+            true,
+            NoAsk::Save,
+        )
+        .unwrap();
+        assert_eq!(told["note"], NOT_KEPT);
+    }
+
+    /// `LAMP_FACE_NO_ASK` with the face save not speaker-bound
+    /// (`LAMP_REMEMBER_SPEAKER` off, the first builder 21:13): their own
+    /// name given while nobody is known keeps nothing and asks nothing, no
+    /// face question and no call to the face save; someone else's name is
+    /// not kept, as before.
+    #[test]
+    fn with_no_ask_not_speaker_bound_a_name_keeps_nothing_and_asks_nothing() {
+        for text in ["my name is Ada", "I'm Ada"] {
+            let told = withheld_as(&remember(text), None, true, true, NoAsk::Quiet).unwrap();
+            assert_eq!(told["remembered"], false, "{text}: {told}");
+            let note = told["note"].as_str().unwrap();
+            assert_eq!(note, NAME_QUIET, "{text}");
+            assert!(note.contains("Ask them nothing"), "{note}");
+            assert!(!note.contains("Shall I"), "{note}");
+            assert!(!note.contains(crate::known_faces::REMEMBER), "{note}");
+        }
+        let told = withheld_as(
+            &remember("Her name is Linh."),
+            None,
+            true,
+            true,
+            NoAsk::Quiet,
+        )
+        .unwrap();
+        assert_eq!(told["note"], NOT_KEPT);
     }
 
     #[test]

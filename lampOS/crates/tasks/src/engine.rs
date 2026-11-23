@@ -15,10 +15,11 @@ use std::{collections::BTreeMap, fmt, io};
 
 pub const MAX_TASKS: usize = 16;
 pub const MAX_OBSERVATIONS: usize = 4;
-/// A task's text, at most: 2,000 bytes, room for a made skill's brief, the
-/// person's request and the lamp's check of a first try (#2813, the first
-/// builder on #3126, 23 Oct 13:07). A spoken or typed ask never nears it.
-pub const MAX_PROMPT_BYTES: usize = 2000;
+/// A task's text, at most: room for a made skill's brief, the person's
+/// request and the lamp's check of a first try (#2813, the first builder on
+/// #3126, 23 Oct 13:07: 2,000). #7245, 18 Nov: 3,000, the user's call, room
+/// for the make's reading list. A spoken or typed ask never nears it.
+pub const MAX_PROMPT_BYTES: usize = 3000;
 pub const MAX_ANSWER_BYTES: usize = 16_384;
 pub const MAX_ASK_BYTES: usize = 4096;
 pub const MAX_SPEECH_BYTES: usize = 1000;
@@ -1711,6 +1712,23 @@ impl<P: Persistence> Engine<P> {
     pub fn store_id(&self) -> &str {
         &self.state.store_id
     }
+    /// The owner's "forget everything" now (#7930): this store and its
+    /// newest task id, so every task it holds, on the work records yet or
+    /// not, is left off them ([`Engine::works`]); one only prepared now is
+    /// not, so a yes after the forget puts it on them.
+    pub fn forget_mark(&self) -> crate::works::Forgotten {
+        crate::works::Forgotten {
+            store_id: self.state.store_id.clone(),
+            through: self.state.next_task_id.saturating_sub(1),
+            prepared: self
+                .state
+                .tasks
+                .iter()
+                .filter(|task| task.dispatch.state == DispatchState::Prepared)
+                .map(|task| task.id)
+                .collect(),
+        }
+    }
     pub fn session_id(&self) -> &str {
         &self.state.session_id
     }
@@ -1838,9 +1856,13 @@ impl<P: Persistence> Engine<P> {
             ),
             // In alias order, as loaded. The machine and project stay here.
             // A name only where it has one (#1676).
-            // `installed: false` only where its engine wasn't found on that
-            // computer (#5199, `installed` null with `installable` true),
-            // so the voice names only agents some computer has.
+            // `installed: false` only where its engine is said not
+            // installed on that computer (#5199: an explicit `installed:
+            // false`), so the voice names only agents some computer has.
+            // Never for an unknown (#8283): Harness's CLI says `installed`
+            // only as `true` or `null`, "`null` is unknown, never 'not
+            // there'" (openharness `machineEngines.ts`), and a slow login
+            // shell reads `installable: true` too.
             // `"lamp":"installing"` only with `LAMP_HERMES_ON_LAMP` on and
             // no lamp Hermes target yet (#5978): the voice then says the
             // lamp's own helper is still being installed.
@@ -1925,6 +1947,11 @@ impl<P: Persistence> Engine<P> {
                     "progress_off",
                     "Progress is not read; the service runs without --progress.",
                 ));
+            }
+            // The work records are held by the service (#7930,
+            // [`crate::works`]): one that reaches here is not read.
+            Request::Work { .. } | Request::WorkList { .. } => {
+                return Err(err("unsupported", "Work records are held by the service."));
             }
             // A look at a named session is held by the service, on a lane
             // of its own (#6274): one that reaches here is not looked at.
@@ -2836,6 +2863,88 @@ impl<P: Persistence> Engine<P> {
     /// with a settled newest answer kept in this boot. One settled in an
     /// earlier boot cannot be dated and is left out. Reads nothing and
     /// changes nothing.
+    /// Each task handed over, for its work record (#7930,
+    /// [`crate::works`]): one queued or being sent; one Harness has, while
+    /// watched or once settled in this boot; one cancelled or not sent in
+    /// this boot. Its words and answer cut to the record's bounds; its
+    /// state the dispatch's or the newest settled observation's, none
+    /// while the agent has it with nothing settled.
+    /// None of a store task the owner's "forget everything" held
+    /// (`forgotten`, [`crate::works::Forgotten`]).
+    pub fn works(
+        &self,
+        now: &Clock,
+        forgotten: Option<&crate::works::Forgotten>,
+    ) -> Vec<crate::works::TaskWork> {
+        use crate::works::{MOST_ANSWER_CHARS, MOST_WORDS_CHARS, State, cut};
+        let this_boot = |audit: &Audit| audit.boot_id == now.boot_id;
+        let ago = |audit: &Audit| {
+            this_boot(audit).then(|| now.monotonic_ms.saturating_sub(audit.monotonic_ms))
+        };
+        self.state
+            .tasks
+            .iter()
+            .filter(|task| !forgotten.is_some_and(|mark| mark.hides(&self.state.store_id, task.id)))
+            .filter_map(|task| {
+                let newest = task.observations.last();
+                let settled_seen = newest.filter(|seen| settled(&seen.data));
+                let state = match task.dispatch.state {
+                    DispatchState::Prepared | DispatchState::Invalidated => return None,
+                    DispatchState::Queued | DispatchState::Attempting | DispatchState::Pending => {
+                        Some(State::Queued)
+                    }
+                    DispatchState::Cancelled if this_boot(&task.updated) => Some(State::Cancelled),
+                    DispatchState::NotSent | DispatchState::Uncertain
+                        if this_boot(&task.updated) =>
+                    {
+                        Some(State::Failed)
+                    }
+                    DispatchState::Cancelled
+                    | DispatchState::NotSent
+                    | DispatchState::Uncertain => return None,
+                    DispatchState::Accepted => match settled_seen {
+                        Some(seen) if this_boot(&seen.observed) => {
+                            Some(State::of_settled(&seen.data.state))
+                        }
+                        Some(_) => return None,
+                        None if watched_age(task, now).is_some() => None,
+                        None => return None,
+                    },
+                };
+                Some(crate::works::TaskWork {
+                    task_id: task.id,
+                    engine: engine_of(task),
+                    words: cut(&task.launch.prompt, MOST_WORDS_CHARS),
+                    state,
+                    tools: newest.map_or(0, |seen| seen.data.tools),
+                    answer: settled_seen
+                        .map(|seen| seen.data.answer.as_str())
+                        .filter(|answer| !answer.trim().is_empty())
+                        .map(|answer| cut(answer, MOST_ANSWER_CHARS)),
+                    // Once Harness made its agent: the machine it is
+                    // followed on and that agent's id, never a path.
+                    session: task
+                        .dispatch
+                        .agent_id
+                        .as_ref()
+                        .filter(|_| task.dispatch.state == DispatchState::Accepted)
+                        .map(|agent| (machine_of(task).to_owned(), agent.clone())),
+                    // When it was handed over (confirmed, else made), if
+                    // in this boot: a lamp-tasks restart keeps the
+                    // monotonic clock, so its record keeps its start.
+                    started_ago_ms: Some(task.dispatch.confirmed.as_ref().unwrap_or(&task.created))
+                        .filter(|at| at.boot_id == now.boot_id)
+                        .map(|at| now.monotonic_ms.saturating_sub(at.monotonic_ms)),
+                    // When the store first saw it over, if in this boot:
+                    // its settled observation, else its dispatch's end.
+                    ended_ago_ms: state.filter(|state| state.over()).and_then(|_| {
+                        settled_seen.map_or_else(|| ago(&task.updated), |seen| ago(&seen.observed))
+                    }),
+                })
+            })
+            .collect()
+    }
+
     pub fn recent(&self, now: &Clock) -> Vec<Recent> {
         let ago = |audit: &Audit| {
             (audit.boot_id == now.boot_id)
@@ -4182,6 +4291,145 @@ mod tests {
             monotonic_ms: 1,
         };
         assert!(engine.recent(&other).is_empty());
+    }
+
+    /// #7930: a task handed over is on the work records from the store:
+    /// queued, then working while Harness has it, then overwritten by its
+    /// settled observation (done, its tools and its answer); one prepared
+    /// only is not; one settled in an earlier boot is not.
+    #[test]
+    fn a_task_handed_over_is_on_the_work_records_queued_working_then_done() {
+        use crate::works::{Board, State};
+        let none = |_: u64| None;
+        let mut board = Board::new();
+        let (mut engine, _) = opened();
+        let prepared = prepare(&mut engine, 0);
+        assert!(engine.works(&clock(0), None).is_empty(), "prepared only");
+        engine
+            .handle(&confirmation(&engine, prepared), &clock(0), true)
+            .unwrap();
+        let queued = engine.works(&clock(0), None);
+        assert_eq!(queued.len(), 1);
+        assert_eq!(queued[0].state, Some(State::Queued));
+        board.tasks(&queued, none, 1_000);
+        let id = prepared.to_string();
+        let record = board.get(&id, 1_000).unwrap();
+        assert_eq!(record["state"], "queued");
+        assert_eq!(record["who"], "Codex");
+        assert_eq!(
+            record["words"],
+            "Review this project without changing files."
+        );
+        // No agent yet: no session.
+        assert_eq!(record["session"], Value::Null);
+        engine.begin_launch(&clock(1)).unwrap().unwrap();
+        engine
+            .finish_launch(
+                prepared,
+                LaunchOutcome::Created {
+                    agent_id: AGENT.into(),
+                },
+                &clock(1),
+            )
+            .unwrap();
+        let working = engine.works(&clock(2), None);
+        assert_eq!(working[0].state, None);
+        board.tasks(&working, none, 2_000);
+        let record = board.get(&id, 2_000).unwrap();
+        assert_eq!(record["state"], "working");
+        // Its machine and Harness agent, ids only.
+        assert_eq!(
+            record["session"],
+            json!({"machine": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "agent": AGENT})
+        );
+        // The watch's read says idle once: the record says so.
+        board.tasks(&working, |_| Some((Some(State::Idle), Some(1_900))), 3_000);
+        assert_eq!(board.get(&id, 3_000).unwrap()["state"], "idle");
+        observe(&mut engine, prepared, "Reviewed: two typos.", 40);
+        // Read as it settled: its end the store's, at this read.
+        let settled = engine.works(&clock(40), None);
+        assert_eq!(settled[0].state, Some(State::Done));
+        board.tasks(&settled, none, 41_000);
+        let done = board.get(&id, 50_000).unwrap();
+        assert_eq!(done["state"], "done");
+        assert_eq!(done["done"], true);
+        assert_eq!(done["tools"], 2);
+        assert_eq!(done["answer"], "Reviewed: two typos.");
+        assert_eq!(done["elapsed_s"], 40);
+        assert_eq!(board.list(10, 50_000).len(), 1);
+        let other = Clock {
+            boot_id: "next-boot".into(),
+            monotonic_ms: 1,
+        };
+        assert!(engine.works(&other, None).is_empty());
+    }
+
+    /// #7930: a task's work record dates from when it was handed over, by
+    /// the store's own clock, so lamp-tasks opened again in the same boot
+    /// gives its record the same start; another boot cannot date it.
+    #[test]
+    fn a_task_on_the_work_records_is_dated_from_its_hand_over_across_a_restart() {
+        let (mut engine, memory) = opened();
+        let prepared = prepare(&mut engine, 0);
+        engine
+            .handle(&confirmation(&engine, prepared), &clock(10), true)
+            .unwrap();
+        assert_eq!(engine.works(&clock(10), None)[0].started_ago_ms, Some(0));
+        engine.begin_launch(&clock(11)).unwrap().unwrap();
+        engine
+            .finish_launch(
+                prepared,
+                LaunchOutcome::Created {
+                    agent_id: AGENT.into(),
+                },
+                &clock(12),
+            )
+            .unwrap();
+        drop(engine);
+        let recovered = Engine::open(memory, targets(), STORE, RESTART, &clock(90_010)).unwrap();
+        let seen = recovered.works(&clock(90_010), None);
+        assert_eq!(seen[0].task_id, prepared);
+        assert_eq!(seen[0].started_ago_ms, Some(90_000));
+    }
+
+    /// #7930 (Heron's P2 1): the owner's "forget everything" covers every
+    /// task the store holds then, one confirmed a moment before and not
+    /// yet on the records too, and one opened again over the same store
+    /// after a restart; a task handed over after it is on them. Its
+    /// settled end is the store's, so a finished task keeps its own time.
+    #[test]
+    fn forget_everything_leaves_every_store_task_off_the_work_records() {
+        use crate::works::Board;
+        let none = |_: u64| None;
+        let (mut engine, memory) = opened();
+        let prepared = prepare(&mut engine, 0);
+        engine
+            .handle(&confirmation(&engine, prepared), &clock(0), true)
+            .unwrap();
+        // Forgotten before any refresh put it on the records.
+        let mut board = Board::new();
+        let mark = engine.forget_mark();
+        board.forget_all();
+        board.tasks(&engine.works(&clock(1), Some(&mark)), none, 1_000);
+        assert!(board.list(10, 1_000).is_empty());
+        // A fresh lamp-tasks over the same store, the mark read back.
+        drop(engine);
+        let mut engine = Engine::open(memory, targets(), STORE, RESTART, &clock(5)).unwrap();
+        let mut board = Board::new();
+        board.tasks(&engine.works(&clock(5), Some(&mark)), none, 5_000);
+        assert!(board.get(&prepared.to_string(), 5_000).is_none());
+        // Handed over after the forget: on the records.
+        let later = prepare(&mut engine, 6);
+        engine
+            .handle(&confirmation(&engine, later), &clock(6), true)
+            .unwrap();
+        board.tasks(&engine.works(&clock(6), Some(&mark)), none, 6_000);
+        let ids: Vec<Value> = board
+            .list(10, 6_000)
+            .iter()
+            .map(|w| w["id"].clone())
+            .collect();
+        assert_eq!(ids, [json!(later.to_string())]);
     }
 
     /// `serve --route`: a task the router typed into a session the person
@@ -6126,8 +6374,9 @@ mod tests {
                 "bad_text"
             );
         }
-        // At the bound, in bytes, it is taken (2,000 since #2813).
-        assert_eq!(MAX_PROMPT_BYTES, 2000);
+        // At the bound, in bytes, it is taken (2,000 since #2813; #7245,
+        // 18 Nov: 3,000, the user's call, room for the make's reading list).
+        assert_eq!(MAX_PROMPT_BYTES, 3000);
         engine
             .handle(
                 &preparation(&engine, &"é".repeat(MAX_PROMPT_BYTES / 2)),
@@ -6477,7 +6726,7 @@ mod tests {
         let id = accepted(&mut engine, 0);
         let mut state = stored(&memory);
         let task = state.tasks.iter_mut().find(|task| task.id == id).unwrap();
-        task.launch.prompt = "\u{1}".repeat(1_000);
+        task.launch.prompt = "\u{1}".repeat(MAX_PROMPT_BYTES / 3 + 1);
         assert!(!prompt_fits(&task.launch.prompt));
         task.prepared_digest =
             digest(&(&state.store_id, task.id, &task.target_alias, &task.launch));
@@ -6486,7 +6735,10 @@ mod tests {
         let engine = Engine::open(memory, targets(), STORE, RESTART, &clock(1))
             .expect("the store opens with the task");
         assert_eq!(engine.state.tasks.len(), 1);
-        assert_eq!(engine.state.tasks[0].launch.prompt, "\u{1}".repeat(1_000));
+        assert_eq!(
+            engine.state.tasks[0].launch.prompt,
+            "\u{1}".repeat(MAX_PROMPT_BYTES / 3 + 1)
+        );
     }
 
     /// A stored state with a field twice is refused, as before #1512, and

@@ -15,6 +15,7 @@ naming every public call, tool, event and error code they have.
 | connect, say hello | `await Lamp.connect()` (or `Lamp.connect(lamp_id, host=..., keyring=...)`) | `await Lamp.connect()` (or `Lamp.connect(lampId, { host, keyring })`) | `lamp-mcp` connects at start (`--lamp ID`) |
 | the lamp, grants, limits | `lamp.info`, `lamp.grants`, `lamp.limits` | `lamp.info`, `lamp.grants`, `lamp.limits` | in `lamp_state("lamp")` and the tool list |
 | the owner's language (`en`, `vi`, `ja`, `zh`, `ko`), from hello, so a program's own lines follow it | `lamp.language` | `lamp.language` | — |
+| the lamp's build (`143+ab12cd34ef56`, as the app shows it), from hello, to quote in a bug report | `lamp.build` | `lamp.build` | — |
 | close | `await lamp.close()`, or `async with` | `await lamp.close()` | — |
 | wait until it ends | `await lamp.wait_closed()` | `await lamp.closed()` | — |
 | keep running across the lamp's restarts (every update) | `await Lamp.keep_connected(setup)`: connects, runs `setup(lamp)`, connects again after each close; raises on what can't mend (`NotPaired`, `no_grant`, ...) | `await Lamp.keepConnected(setup, { signal })` | — (an agent's tools have no setup to keep: lamp-mcp's README says how it meets a restart) |
@@ -23,6 +24,8 @@ naming every public call, tool, event and error code they have.
 | an installed app's manifest trigger and taking its turn | `lamp.on("app.trigger", handler)`, then `await lamp.took(event["turn"])` | `lamp.on('app.trigger', handler)`, then `await lamp.took(event.turn)` | — | — |
 | an installed app's settings, and the owner changing one | `await lamp.settings()`; `lamp.on("app.settings", handler)` | `await lamp.settings()`; `lamp.on('app.settings', handler)` | — | — |
 | an installed app's panel in the owner's app (title, at most 6 lines, one a minute) | `await lamp.panel("Title", ["line"])` | `await lamp.panel('Title', ['line'])` | — | — |
+| an installed app's fact for Lamp's memory (280 characters once tidied, three a minute) | `await lamp.remember("squats 3x10")` | `await lamp.remember('squats 3x10')` | — | `remember` (the manifest's) |
+| an installed app's live context line for the voice, never kept (120 characters, `for_ms` up to 10 minutes, renewed; needs a lamp with `apps.context`) | `await lamp.context("set 2 of 3, 7 squats", for_ms=30_000)`; `await lamp.clear_context()` | `await lamp.context('set 2 of 3, 7 squats', { forMs: 30_000 })`; `await lamp.clearContext()` | — | `remember` (the manifest's) |
 | find lamps on this network | `await find()` (`lampos.discovery`, the `[find]` extra) | `await find()` | — |
 | any op of the schema | `await lamp.request(op, **fields)` (`on_id=` is told its id before it is sent) | `lamp.request(op, fields)` | — |
 
@@ -57,7 +60,7 @@ pairing keeps it for later connects.
 | `sound.heard` (sound) | `class` (`music`, `laughter`, `door`, `footsteps`), `score` | a class's score rises past 0.5 |
 | `touch` | `kind`: `tap` or `pet` | a tap (shown from 11372) or a pet (not shown on a lamp yet) |
 | `button` | `press`: `long_press` | the button is held |
-| `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` | one of them changes |
+| `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `muted_after_fault` | one of them changes |
 | `volume.changed` (speak) | `level` (0–100 of what the lamp allows), `muted` | the speaker's volume changes, whoever changed it: the person by voice or in the app, or a computer |
 | `lamp.said` (speech) | `text`, `by` (`lamp`, `computer`), `source` (`reply`, `exact`, `cached`), `cut` | a line the lamp said out loud: its fixed phrases, a computer's own say back to it, a reply only when said to the owner; never what a person says; what it sends can't be taken back |
 | `air.changed` (air) | `pm1_0`, `pm2_5`, `pm4_0`, `pm10`, `co2_ppm`, `humidity`, `temperature`, `feel` (`fresh`, `fine`, `stuffy`, `very_stuffy`, `unknown`); a value the sensor doesn't know is left out | the first reading, then a value moves by its step (particles 5, CO2 50 ppm, humidity 3, temperature 0.5 °C) or `feel` changes; at most every 5 s |
@@ -68,7 +71,7 @@ pairing keeps it for later connects.
 **State** with `get`: `presence` (`count`, `near`, `facing`; needs look),
 `light` (the person's own `on`, `colour`, `level`, and `shows`: what the ring
 draws now), `mood` (`energy`, `warmth`, `awake`, `asleep`), `lamp`
-(`talking`, `paused`, `private`, `asleep`), `air` (the newest reading as
+(`talking`, `paused`, `private`, `asleep`, `muted_after_fault`), `air` (the newest reading as
 `air.changed` gives it; needs air), `device` (`cpu_load`, `memory_used`,
 `disk_free`, `uptime_s`, `temperature_c`; needs device), `volume`
 (`level`, `muted`; needs speak), `body` (needs body: `yaw`, `pitch`, `roll`,
@@ -221,13 +224,34 @@ this lamp"; try it on `lamp fake`. To try it:
 From lamp-mcp, with the same grant: `lamp_skill_push(folder)`, `lamp_skills()`
 and `lamp_skill_remove(name)`.
 
+## Apps of your own, on your own lamp
+
+| what | Python | JavaScript | command line |
+|---|---|---|---|
+| put an app on the lamp | `await lamp.push_app(path)` (folder or tar) | `await lamp.pushApp(tar)` | `lamp app push DIR\|TAR` |
+| this computer's pushed apps | `await lamp.apps()` | `await lamp.apps()` | `lamp app list` |
+| take one off | `await lamp.remove_app(name)` | `await lamp.removeApp(name)` | `lamp app remove NAME` |
+
+An app (format 2, `lampOS/docs/apps.md`) can go on the developer's own paired
+lamp with no Store: the pairing, with its `skills` grant, is the owner's yes,
+with no yes at the lamp. It is **unsigned**: a tar carrying `lamp-skill.sig`
+is refused. Python checks it as `lamp app check` does and packs a folder; JS
+takes the tar only (`lamp app pack DIR` makes it). Every grant the manifest's
+`grants` asks must be one the pairing holds (`remember` never is; `net` and
+`logs` are booleans, not grants). 4 MiB at most, in parts of 36 KiB, checked
+before a byte goes; a re-push of the name replaces it. A lamp without
+`LAMP_STORE_APPS` refuses "apps are off on this lamp"; one without the apps
+helper, "app push is not on this lamp". From lamp-mcp: `lamp_app_push(package)`,
+`lamp_apps()` and `lamp_app_remove(name)`.
+
 ## Errors
 
 Every refusal is a `LampError` (Python `lampos.errors.BY_CODE[code]`, JS
-`byCode[code]`) with `code`, `why` and, for `rate`, `retry_ms`. The codes:
+`byCode[code]`) with `code`, `why` and, for `rate` (and `busy`, `preparing`
+or `unavailable` from `pose`), `retry_ms`. The codes:
 `unpaired`, `no_hello`, `no_grant`, `no_lease`, `lease_lost`, `busy`,
 `refused`, `quiet_hours`, `private`, `paused`, `asleep`, `rate`,
-`bad_request`, `off`. What to do about each: [errors.md](errors.md).
+`bad_request`, `off`, `preparing`, `unavailable`. What to do about each: [errors.md](errors.md).
 
 ## The command line
 

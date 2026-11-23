@@ -123,8 +123,12 @@ jobs:
   # Free on this public repository.
   # 45 minutes, not 30 (#7193): with lamp-voice's clippy and tests in it the job takes 22 to 25, and a
   # runner half as slow again ran train 953 into the limit with every finished step green.
+  # 18 Nov (the lead, V2 on #7570 20:09: "a queued or stuck one never holds a train"): it runs after a merge, on
+  # lamp-voice's push, and by hand, never on a pull request, a train's included. The org's macOS runners were full of
+  # PR runs and train 1044 waited 50 min for one. A failure here is reported on the Queue and fixed after.
   sim-macos:
     name: lampOS virtual lamp — lamp-sim builds and tests on macOS arm64
+    if: github.event_name != 'pull_request'
     runs-on: macos-15
     timeout-minutes: 45
     steps:

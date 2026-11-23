@@ -3,7 +3,7 @@
 // `app.trigger`, `app.settings` and `phrase.heard` its events. The fake lamp serves the same.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Lamp } from '../src/index.js';
+import { Lamp, byCode } from '../src/index.js';
 import { FakeLamp } from '../src/testing.js';
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 60));
@@ -125,5 +125,162 @@ test('the owner stopping the app closes with the reason and no event', async () 
     await closed;
     assert.equal(lamp.closeReason, 'the owner stopped the app');
     assert.deepEqual(seen, []);
+  });
+});
+
+test('off unsubscribes a door event on an app\'s socket (Heron\'s P2 on #7672)', async () => {
+  await withApp({ appGrants: ['speak', 'hear', 'look'] }, async (fake, lamp) => {
+    const handler = () => {};
+    await lamp.on('person.arrived', handler);
+    await lamp.off('person.arrived', handler);
+    assert.deepEqual(fake.requests.map((r) => r.op), ['subscribe', 'unsubscribe']);
+    // phrase.heard and the app's own events were never subscribed: nothing to take back.
+    await lamp.on('app.trigger', handler);
+    await lamp.off('app.trigger', handler);
+    assert.deepEqual(fake.requests.map((r) => r.op), ['subscribe', 'unsubscribe']);
+  });
+});
+
+test('on phrase.heard with phrases on an app\'s socket points to listenFor', async () => {
+  await withApp({}, async (fake, lamp) => {
+    assert.throws(() => lamp.on('phrase.heard', () => {}, { phrases: ['lesson time'] }), (error) => error.code === 'bad_request' && /listenFor/.test(error.message));
+  });
+});
+
+test('a refused listenFor leaves no handler behind', async () => {
+  await withApp({ appGrants: ['speak'] }, async (fake, lamp) => {
+    await assert.rejects(lamp.listenFor(['lesson time'], () => {}), (error) => error.code === 'no_grant');
+    assert.equal((lamp.handlers.get('phrase.heard') ?? []).length, 0);
+  });
+});
+
+test('an empty panel line is refused by the SDK and the fake alike, and panel(t, null) is the SDK\'s own', async () => {
+  await withApp({}, async (fake, lamp) => {
+    await assert.rejects(lamp.panel('ok', ['a', '', 'b']), (error) => error.code === 'bad_request');
+    await assert.rejects(lamp.request('app.panel.set', { title: 'ok', lines: ['a', '', 'b'] }), (error) => error.code === 'bad_request');
+    assert.equal(await lamp.panel('ok', null), 1);
+  });
+});
+
+// What an app tells Lamp's memory: `remember` (apps.remember) and `context` (apps.context), with the `remember` grant.
+const MEMORY_GRANTS = ['speak', 'hear', 'remember'];
+const MEMORY_REFUSALS = ['off', 'no_grant', 'bad_request', 'private', 'unavailable', 'rate', 'refused'];
+
+test('remember keeps a fact and says kept', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    assert.equal(await lamp.remember('squats 3x10, the 6th too shallow'), true);
+    assert.deepEqual(fake.asked('apps.remember'), [{ text: 'squats 3x10, the 6th too shallow' }]);
+    assert.deepEqual(fake.appFacts, ['squats 3x10, the 6th too shallow']);
+  });
+});
+
+test('remember and context need the remember grant', async () => {
+  await withApp({}, async (fake, lamp) => {
+    await assert.rejects(lamp.remember('squats'), byCode.no_grant);
+    await assert.rejects(lamp.context('set 1 of 3'), byCode.no_grant);
+  });
+});
+
+test('each memory refusal is its own error', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    for (const [op, call] of [['apps.remember', () => lamp.remember('squats')], ['apps.context', () => lamp.context('set 1 of 3')]]) {
+      for (const code of MEMORY_REFUSALS) {
+        fake.refuseNext(op, code, `the lamp says ${code}`, code === 'rate' ? 1234 : undefined);
+        await assert.rejects(call(), (error) => error instanceof byCode[code] && error.code === code
+          && error.why === `the lamp says ${code}` && error.retryMs === (code === 'rate' ? 1234 : undefined), `${op} ${code}`);
+      }
+    }
+    assert.deepEqual(fake.appFacts, []);
+    assert.equal(fake.appContext, null);
+  });
+});
+
+test('remember is three a minute with retryMs', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    for (let n = 0; n < 3; n++) assert.equal(await lamp.remember(`fact ${n}`), true);
+    await assert.rejects(lamp.remember('fact 3'), (error) => error instanceof byCode.rate && error.retryMs > 0 && error.retryMs <= 60_000);
+    assert.deepEqual(fake.appFacts, ['fact 0', 'fact 1', 'fact 2']);
+  });
+});
+
+test('remember is refused while private and over 280', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    await assert.rejects(lamp.remember('x'.repeat(281)), byCode.bad_request);
+    fake.setPrivate(true);
+    await assert.rejects(lamp.remember('squats'), byCode.private);
+    await assert.rejects(lamp.context('set 1 of 3'), byCode.private);
+    assert.deepEqual(fake.appFacts, []);
+  });
+});
+
+test('context is renewed each rep and cleared at the end', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    let now = 100_000;
+    fake.clock = () => now;
+    await lamp.context('set 2 of 3, 6 squats', { forMs: 30_000 });
+    now += 1000;
+    await lamp.context('set 2 of 3, 7 squats', { forMs: 30_000 });
+    assert.deepEqual(fake.appContext, { line: 'set 2 of 3, 7 squats', forMs: 30_000 });
+    now += 1000;
+    await lamp.context('set 3 of 3, 1 squat');
+    assert.deepEqual(fake.appContext, { line: 'set 3 of 3, 1 squat', forMs: 60_000 });
+    await lamp.clearContext();
+    assert.equal(fake.appContext, null);
+    now += 1000;
+    await lamp.context('again');
+    await lamp.context('');
+    assert.equal(fake.appContext, null);
+    assert.deepEqual(fake.asked('apps.context').at(-1), { line: '' });
+    for (const [line, forMs] of [['x'.repeat(121), 1000], ['ok', 0], ['ok', 600_001]]) {
+      await assert.rejects(lamp.context(line, { forMs }), byCode.bad_request, JSON.stringify([line, forMs]));
+    }
+  });
+});
+
+test('context answers ok alone', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    for (const fields of [{ line: 'set 1 of 3', for_ms: 1000 }, { line: '' }]) {
+      const reply = await lamp.request('apps.context', fields);
+      assert.deepEqual(reply, { re: reply.re, ok: true });
+    }
+  });
+});
+
+test('context is one line a second and only set lines count', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    let now = 100_000;
+    fake.clock = () => now;
+    // Refused lines (too long, private) are not counted: the first set line goes.
+    await assert.rejects(lamp.context('x'.repeat(121)), byCode.bad_request);
+    fake.setPrivate(true);
+    await assert.rejects(lamp.context('rep 1'), byCode.private);
+    fake.setPrivate(false);
+    await lamp.context('rep 1');
+    now += 400;
+    await assert.rejects(lamp.context('rep 2'), (error) => error instanceof byCode.rate && error.why === 'one line a second' && error.retryMs === 600);
+    // The rated line did not count: a second after the set one, the next goes.
+    now += 600;
+    await lamp.context('rep 2');
+    assert.equal(fake.appContext.line, 'rep 2');
+  });
+});
+
+test('a clear is never rated nor refused while private', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    let now = 100_000;
+    fake.clock = () => now;
+    await lamp.context('rep 1');
+    await lamp.clearContext();
+    await lamp.clearContext();
+    assert.equal(fake.appContext, null);
+    fake.setPrivate(true);
+    await lamp.clearContext();
+    await lamp.context('');
+  });
+});
+
+test('a clear with for_ms is a bad request', async () => {
+  await withApp({ appGrants: MEMORY_GRANTS }, async (fake, lamp) => {
+    await assert.rejects(lamp.request('apps.context', { line: '', for_ms: 1000 }), byCode.bad_request);
   });
 });

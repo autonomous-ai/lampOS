@@ -676,6 +676,10 @@ pub(crate) struct Tar {
     pub folder: Option<String>,
 }
 
+/// The longest path a package's tar may name, in bytes: a skill's own are
+/// a few parts of at most 100 each.
+const MOST_PATH_BYTES: usize = 1024;
+
 /// Reads a package's tar, `depth` parts of path at most inside the folder.
 pub(crate) fn read_tar(bytes: &[u8], depth: usize) -> Result<Tar, String> {
     if bytes.len() as u64 > MOST_PACKAGE_BYTES {
@@ -695,6 +699,11 @@ pub(crate) fn read_tar(bytes: &[u8], depth: usize) -> Result<Tar, String> {
         let mut entry = entry.map_err(|error| format!("not a tar: {error}"))?;
         let name = String::from_utf8(entry.path_bytes().into_owned())
             .map_err(|_| "a path that is not UTF-8".to_owned())?;
+        // No refusal below echoes a path longer than this: one a tar header
+        // can make megabytes long never reaches a log line or the owner.
+        if name.len() > MOST_PATH_BYTES {
+            return Err(format!("a path of more than {MOST_PATH_BYTES} bytes"));
+        }
         let kind = entry.header().entry_type();
         let path = name.trim_end_matches('/').to_owned();
         // The skill's folder, and only it, before the first `/`; its path
@@ -727,7 +736,7 @@ pub(crate) fn read_tar(bytes: &[u8], depth: usize) -> Result<Tar, String> {
             ));
         }
         let size = entry.size();
-        total += size;
+        total = total.saturating_add(size);
         if total > MOST_BYTES || files.len() >= MOST_FILES {
             return Err(format!(
                 "more than {MOST_FILES} files or {MOST_BYTES} bytes: too big for a skill"
@@ -3167,10 +3176,13 @@ pub fn peer_asker() -> Option<Asker> {
     None
 }
 
-/// [`asked`]'s `forget_counts`: both files deleted, or why not.
-fn forget_counts(state: &Path, made: &Path) -> Result<String, String> {
-    crate::usage::forget(state).map_err(|error| format!("the runs counted: {error}"))?;
-    lamp_voice::made_counts::forget(made)
+/// [`asked`]'s `forget_counts`: both files deleted, or why not; both locks
+/// waited for within one `lock_wait` in all, so the answer comes while
+/// `lamp-cloud` still waits for it.
+fn forget_counts(state: &Path, made: &Path, lock_wait: Duration) -> Result<String, String> {
+    let until = Instant::now() + lock_wait;
+    crate::usage::forget(state, lock_wait).map_err(|error| format!("the runs counted: {error}"))?;
+    lamp_voice::made_counts::forget(made, until.saturating_duration_since(Instant::now()))
         .map_err(|error| format!("the made skills counted: {error}"))?;
     Ok("the skills' counts are deleted".to_owned())
 }
@@ -3226,11 +3238,17 @@ pub fn task_asks(
     let Some(step) = skill.task_step() else {
         return Ok(none);
     };
-    if let Some(why) = crate::task::origin_refuses(&folder, pushed) {
+    // A core skill's line through the lamp's agent (`LAMP_CORE_VIA_AGENT`):
+    // its brief is the lamp's own, checked byte for byte as it loaded.
+    if !skill.via_agent
+        && let Some(why) = crate::task::origin_refuses(&folder, pushed)
+    {
         return Err(why);
     }
     let sha256 = crate::task::folder_sha256(&folder)?;
-    let from = if pushed {
+    let from = if skill.via_agent {
+        crate::core_agent::FROM.to_owned()
+    } else if pushed {
         // "your computer NAME", or "your computer" when no name came with
         // the push: never "your computer a computer", which no read-back
         // says word for word, so no first yes was taken (#6715).
@@ -3377,7 +3395,7 @@ pub fn asked(
                 }
             }
             // The person's no to reports: the skills' counts deleted.
-            _ if only("forget_counts").is_some() => forget_counts(state, made),
+            _ if only("forget_counts").is_some() => forget_counts(state, made, lock_wait),
             // The owner's yes to the camera's picture, given or taken back.
             _ if only("camera").or(only("camera_off")).is_some() => {
                 match (only("camera"), only("camera_off")) {
@@ -3647,6 +3665,49 @@ mod tests {
         assert!(done, "{answer}");
         assert!(answer.contains("\"done\""), "{answer}");
         assert!(!runs.exists() && !counts.exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// The daily journal, `daily.json` in the same state folder, holds the
+    /// folder's lock for as long as `lamp-skills` runs: the manage helper
+    /// still answers a no at once and deletes the run totals, never left
+    /// waiting until systemd kills it at 60 s.
+    #[test]
+    fn forget_counts_answers_while_the_daily_journal_is_open() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("forget-journal-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let (skills, made, state) = (root.join("skills"), root.join("made"), root.join("state"));
+        for dir in [&skills, &made, &state] {
+            fs::create_dir_all(dir).unwrap();
+        }
+        fs::set_permissions(&state, fs::Permissions::from_mode(0o700)).unwrap();
+        let runs = state.join(crate::usage::RUNS_FILE);
+        fs::write(&runs, r#"{"version":1,"core":4}"#).unwrap();
+        let journal = crate::daily::Journal::open(state.join("daily.json")).unwrap();
+        let (told, heard) = std::sync::mpsc::channel();
+        let (skills_at, made_at, state_at) = (skills.clone(), made.clone(), state.clone());
+        std::thread::spawn(move || {
+            let mut answer = Vec::new();
+            let done = asked(
+                &skills_at,
+                &made_at,
+                &state_at,
+                Duration::from_secs(1),
+                None,
+                None,
+                &b"{\"forget_counts\": {}}\n"[..],
+                &mut answer,
+            );
+            let _ = told.send((done.ok(), String::from_utf8(answer).unwrap()));
+        });
+        let (done, answer) = heard
+            .recv_timeout(Duration::from_secs(6))
+            .expect("the manage helper waits for the journal's folder lock");
+        assert_eq!(done, Some(true), "{answer}");
+        assert!(answer.contains("\"done\""), "{answer}");
+        assert!(!runs.exists());
+        drop(journal);
         let _ = fs::remove_dir_all(&root);
     }
 

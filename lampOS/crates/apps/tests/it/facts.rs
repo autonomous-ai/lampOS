@@ -1,13 +1,13 @@
-use lamp_apps::facts::{DOOR_GRANTS, check, unit_of};
+use lamp_apps::facts::{APP_GRANTS, DOOR_GRANTS, check, unit_of};
 use lamp_apps::testing::StubApp;
 
 #[test]
 fn a_good_app_passes_and_net_picks_the_unit() {
     let mut app = StubApp::good("english-lessons");
     assert_eq!(check(&app, Some(200)), Ok(()));
-    assert_eq!(unit_of(&app), "lampapp@english-lessons.service");
+    assert_eq!(unit_of(&app), "lamp-app@english-lessons.service");
     app.net = true;
-    assert_eq!(unit_of(&app), "lampapp-net@english-lessons.service");
+    assert_eq!(unit_of(&app), "lamp-app-net@english-lessons.service");
 }
 
 #[test]
@@ -32,6 +32,12 @@ fn only_the_doors_plain_grants_and_no_service_grant() {
     }
     app.grants = vec!["body".into(), "body".into()];
     assert!(check(&app, Some(200)).is_err(), "a grant twice");
+    // An app's own grant (`remember`, apps.remember), beside the door's.
+    assert_eq!(APP_GRANTS, ["remember"]);
+    app.grants = vec!["remember".into(), "speak".into()];
+    assert_eq!(check(&app, Some(200)), Ok(()));
+    app.grants = vec!["remember".into(), "remember".into()];
+    assert!(check(&app, Some(200)).is_err(), "remember twice");
 }
 
 #[test]

@@ -15,6 +15,9 @@ serde_json.workspace = true
 lamp-bus = { path = "../bus" }
 # The memory's person id (`known::person_id`), as the voice made it (#2176).
 sha2.workspace = true
+# The desk noticing mark's lock and careful opens (`consent::lock_mark`,
+# #6543): `O_NOFOLLOW | O_NONBLOCK`, as the crates that write beside it.
+rustix = { version = "=1.1.5", features = ["fs"] }
 
 [lints]
 workspace = true

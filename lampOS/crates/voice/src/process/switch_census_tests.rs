@@ -67,6 +67,12 @@ const NOT_PASSED: &[(&str, &str)] = &[
     // `tools::arguments_from_environment`, run by the coordinator: each
     // reaches the Live worker as an argument.
     ("LAMP_TOOLS", "the coordinator's, given as an argument"),
+    // `day_shed::arguments_from_environment`, run by the coordinator: the
+    // worker starts its day reader on the flag (#7664).
+    (
+        "LAMP_VOICE_DAY_SHED",
+        "the coordinator's, given as an argument",
+    ),
     (
         "LAMP_ACTIONS_DIR",
         "the coordinator's, given as an argument",
@@ -118,6 +124,10 @@ const NOT_PASSED: &[(&str, &str)] = &[
         "the coordinator's, given as an argument (--devices, #7470)",
     ),
     (
+        "LAMP_WATCH",
+        "the coordinator's, given as an argument (--watch, #7761)",
+    ),
+    (
         "LAMP_SLEEP_ASKED",
         "the coordinator's, given as an argument (--sleep-asked, #3748)",
     ),
@@ -128,6 +138,14 @@ const NOT_PASSED: &[(&str, &str)] = &[
     (
         "LAMP_SEEN_POSTURE",
         "the coordinator's, given as an argument (--seen-posture, #6543)",
+    ),
+    (
+        "LAMP_SEEN_VOICE_OFFER",
+        "the coordinator's, given as an argument (--seen-voice-offer, #6543)",
+    ),
+    (
+        "LAMP_DESK_TIME",
+        "the coordinator's, given as an argument (--desk-time, #7694)",
     ),
     // `thread::arguments_from_environment`, the same way.
     (
@@ -650,6 +668,10 @@ fn census_leaving_out(left_out: &[&str]) -> Census {
 /// `speaking_faces`.
 const THROUGH_HELPERS: &[(&str, &str)] = &[
     ("LAMP_FACE_GAP_HOLD", "memory_scope::gap_from_environment"),
+    (
+        "LAMP_FACE_NO_FACE_HOLD",
+        "memory_scope::gap_from_environment",
+    ),
     (
         "LAMP_SECOND_SPEAKING_FACE",
         "speaking_faces::from_environment",

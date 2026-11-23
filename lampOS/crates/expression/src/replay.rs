@@ -416,7 +416,7 @@ struct Captured {
 
 fn topic(topic: &str) -> Option<(&'static str, &'static str, Kind, bool)> {
     use lamp_msgs::{
-        Concentration, ControlGesture, Faces, JointState, Light, NameHeard, PersonActivity,
+        ControlGesture, Faces, JointState, Light, NameHeard, PersonActivity, RoomActivity,
         RoomState, ScheduleDue, Speech, SuddenSound, VoicePlayout, VoiceProgress, VoiceSound,
         VoiceState, VoiceTiming,
     };
@@ -426,7 +426,7 @@ fn topic(topic: &str) -> Option<(&'static str, &'static str, Kind, bool)> {
         PersonActivity::TOPIC => ("activity", PersonActivity::TYPE, Kind::Latest, true),
         VoicePlayout::TOPIC => ("playout", VoicePlayout::TYPE, Kind::Event, true),
         VoiceSound::TOPIC => ("sound", VoiceSound::TYPE, Kind::Event, true),
-        Concentration::TOPIC => ("concentration", Concentration::TYPE, Kind::Latest, true),
+        RoomActivity::TOPIC => ("head_down", RoomActivity::TYPE, Kind::Latest, false),
         VoiceState::TOPIC => ("voice_state", VoiceState::TYPE, Kind::Latest, false),
         JointState::TOPIC => ("joints", JointState::TYPE, Kind::Latest, false),
         Faces::TOPIC => ("faces", Faces::TYPE, Kind::Latest, false),

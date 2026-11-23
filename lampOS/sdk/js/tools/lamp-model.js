@@ -28,7 +28,11 @@ import { readFileSync } from 'node:fs';
 // 11 Nov: arms low and compact, head on top, shade clear of the base), and the CAD
 // scan (tools/model-collisions.html) finds no collision at the fold, the stand or between.
 // Both signs were judged from frames and counts, not yet from a measured angle.
-const MEASURED = { shoulder: { sign: 1, zero_deg: 49.5 }, elbow: { sign: -1, zero_deg: 46.1 } };
+// The head's pitch sign is -1, from a measurement: on lamp-52e6 folded, with only the head's pitch moving, the head
+// met the base at 2,010 counts going down and rose free to 1,474 going up (docs/body.md, 14 Oct), so more counts is
+// head down; `body.state` degrees are up-positive for the pitch, and the CAD's pitch axis tips the camera's forward
+// toward down for a positive turn, so the turn is sign -1 times the degrees (the study in #7513, 18 Nov).
+const MEASURED = { shoulder: { sign: 1, zero_deg: 49.5 }, elbow: { sign: -1, zero_deg: 46.1 }, pitch: { sign: -1, zero_deg: 0 } };
 
 const JOINTS = [
   { name: 'yaw', bus: 'base_yaw', servo: 1, bone: 'base_yaw', mesh: '1_base_yaw' },
@@ -141,7 +145,7 @@ function model(path) {
     frame: 'glTF: y up, metres; each joint turns its bone about axis, in the bone\'s own frame after rest_quat',
     measured: {
       origins: 'cad',
-      zero_and_sign: 'shoulder and elbow: zero_deg at lamp-75c9\'s stand angle (stand 2639 / 2570 counts less home 2076 / 2045: 49.5 / 46.1 deg), so the CAD\'s upright pose is the stood lamp and deg 0 the folded one; photos of lamp-75c9 standing agree with the zero. Signs: the elbow\'s -1 closes the arm as the real fold does; the shoulder\'s +1 (it was -1) lays the lower arm low over the base at the fold, as in frames of lamp-75c9 folded by itself on 11 Nov, and the CAD scan (tools/model-collisions.html) finds no collision at the fold, the stand or between; both signs judged from frames and counts, not yet from a measured angle. Another lamp\'s own stand angle differs by a few degrees. The others: cad, zero_deg is the joint\'s deg (body.state, degrees from its home) at the CAD\'s rest pose, sign +1, until measured on a lamp',
+      zero_and_sign: 'shoulder and elbow: zero_deg at lamp-75c9\'s stand angle (stand 2639 / 2570 counts less home 2076 / 2045: 49.5 / 46.1 deg), so the CAD\'s upright pose is the stood lamp and deg 0 the folded one; photos of lamp-75c9 standing agree with the zero. Signs: the elbow\'s -1 closes the arm as the real fold does; the shoulder\'s +1 (it was -1) lays the lower arm low over the base at the fold, as in frames of lamp-75c9 folded by itself on 11 Nov, and the CAD scan (tools/model-collisions.html) finds no collision at the fold, the stand or between; both signs judged from frames and counts, not yet from a measured angle. The head\'s pitch sign -1 is measured: lamp-52e6 folded met its base at 2,010 counts going down (docs/body.md, 14 Oct), and deg is up-positive. Another lamp\'s own stand angle differs by a few degrees. The others (yaw, roll): cad, zero_deg is the joint\'s deg (body.state, degrees from its home) at the CAD\'s rest pose, sign +1, until measured on a lamp',
       reach: 'product: lamp-body --reach around each lamp\'s home; a lamp\'s home is its own (/etc/lampOS/body/lamp.env)',
     },
     chain: order,

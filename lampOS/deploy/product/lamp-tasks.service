@@ -38,6 +38,8 @@ Environment=LAMP_SKILL_TASKS=on
 Environment=LAMP_SKILL_SECRETS=on
 # A skill's task reaches the public web (80/443) with its owner's spoken yes (#7200).
 Environment=LAMP_TASK_NET=on
+# On OpenClaw too (#7742): a net run's own egress socket, relayed in its skill-start fence alone.
+Environment=LAMP_TASK_NET_GATEWAY=on
 # The lamp's agent's connectors (#6648, docs/services.md "The lamp's agent's connectors"): Hermes's config.yaml
 # gets mcp_servers.lamp-services at start, reaching a linked service only by a skill run's one-run token and grants;
 # a write waits for the owner's spoken yes. The same line in lamp-skills, lamp-skills-manage@, lamp-voice and
@@ -56,6 +58,12 @@ Environment=LAMP_SKILL_DEFAULT_AGENT=on
 # OpenClaw, and either falls back to the other when it is not installed. Its Gateway runs always under
 # lamp-update's unit; lamp-tasks only waits for it to answer before a launch.
 Environment=LAMP_OPENCLAW_ON_LAMP=on
+# V1's tool grants for the lamp's OpenClaw (#7245; platform runtimes/openclaw/service_setup.go lines 136, 237-250):
+# lamp-tasks merges tools.profile=full, tools.exec {host gateway, mode full} (V1's security full + ask off), tools.elevated
+# and agents.defaults elevatedDefault=full, sandbox.mode=off into openclaw.json at every start, inside openclaw-ns, and a
+# gateway make gets the guide's lamp-skills pack check. On in the product (owner: "whatever V1 gave, we give"; 18 Nov:
+# the lamp is one user's, OpenClaw unrestricted on it); off restores exec.mode=ask, byte for byte.
+Environment=LAMP_OPENCLAW_V1_TOOLS=on
 # An OpenClaw task's own steps on the bus (#7267, docs/tasks.md "An agent's steps"): each tool call, its result's first
 # 120 bytes, the agent's reply and an error, read from its session in OpenClaw's SQLite every second (read-only),
 # nothing written. Words on the bus, so off in the product until its lamp check; a dev lamp turns it on with
@@ -69,6 +77,8 @@ Environment=LAMP_TASKS_RESUME_CLOSED=on
 Environment=LAMP_TASKS_ONE_SESSION=on
 # The one session as Harness's kept session (openharness#4393, #7507; docs/switches.md).
 Environment=LAMP_TASKS_KEPT_SESSION=on
+# #7245: an agent make's own lamp-skills pack check takes a skill started by its words (docs/switches.md).
+Environment=LAMP_MADE_SKILL_ASKS=on
 RuntimeDirectory=lampos-tasks
 RuntimeDirectoryMode=0700
 StateDirectory=lampos-tasks
@@ -77,6 +87,8 @@ StateDirectoryMode=0700
 # running as lampos with no ProtectSystem=strict could otherwise write by hand. "-": the folder is
 # made at lamp-control's first start, and a part started before it is not refused.
 InaccessiblePaths=-/var/lib/lampos-control
+# lamp-control's apps socket folder hidden (#7793): no ProtectSystem=strict here, so it could replace apps.sock. "-": made by the tmpfiles.
+InaccessiblePaths=-/run/lampos-apps
 # --progress puts how each task goes on the bus (tasks/status), which the voice's news reads (#1156);
 # --push-wait holds Harness's own wait so a result is known within about 10 s of the agent ending (#560).
 # On lamp-75c9 (Ten, 2026-10-16): 8.3 to 10.2 s against 39 to 41 s without, about 1 point more of

@@ -44,6 +44,9 @@ into, a three-second hold puts it to sleep, a tap wakes it (docs/alive.md, #711)
 --offline-face draws listening as not ready while lamp/online says the lamp is offline.\n\
 --startle reads the startle, a glance at a sudden sound, from its skill's file (#2822): serve\n\
 reads /var/lib/lampOS/skills/startle/skill.toml without it, replay none. No other startle.\n\
+LAMP_EXPRESSION_HEAD_DOWN=on stops every expressive move (no nod, look or tilt) while room/activity has said head_down\n\
+for a few seconds, so the lamp does not fidget while you read or write; the breath and the idle light stay, and it moves\n\
+again as the head comes up; off otherwise.\n\
 LAMP_REMARK_GLANCE=on glances once, with the startle's move, when someone in a busy room said\n\
 something about the lamp and the voice said nothing (voice/remarked, #4175); off otherwise.\n\
 No command opens hardware, launches a provider, or changes a device's service settings.";
@@ -404,6 +407,17 @@ fn run(args: Arguments) -> Result<(), Box<dyn std::error::Error>> {
     }
     if remark_glance {
         service = service.with_remark_glance(&bus)?;
+    }
+    if runtime::head_down_on(
+        std::env::var(runtime::HEAD_DOWN_ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    ) {
+        eprintln!(
+            "lamp-expression: {}=on: a head held down stops the expressive moves while it lasts",
+            runtime::HEAD_DOWN_ENVIRONMENT
+        );
+        service = service.with_head_down(&bus)?;
     }
     if args.offline_face {
         service = service.with_offline_face(&bus);

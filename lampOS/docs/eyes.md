@@ -789,13 +789,26 @@ this room" until someone asks to be recognised.
   the face is cut from the frame at its own size instead
   ([below](#held-through-a-miss-lamp_face_full_cropon-3126)).
 - **The score, in the journal.** Each check with a face in view, outside a
-  remembering, says one line, at most every two seconds (with
+  remembering, says two lines, at most every two seconds (with
   `LAMP_FACE_REFOUND=on`, also at a forced check above):
-  `recognition best 0.341 height 0.152 (near at 0.1, same at 0.363)`, the
-  best cosine against anyone's kept prints (`none` with nobody remembered
-  or no face near enough), the largest face's height as a share of the
-  picture's, the near gate and the threshold. No name, no id: only numbers,
-  always on (#3126).
+  `recognition best 0.341 height 0.152 width 0.114 turn -0.18 across 0.712 prints age 86400 s (near at 0.1, same at 0.363)`,
+  the best cosine against anyone's kept prints (`none` with nobody remembered
+  or no face near enough), the largest face's height and width as shares of
+  the picture's (the near face the print was read from, whenever there is a
+  best), its turn (the nose's offset from the eyes' middle over the
+  eyes' span: 0 front-on, about ±0.5 well turned, the sign the side; `none`
+  with the eyes on one point), its box's centre across the picture (0 the
+  left edge, 1 the right), how many seconds ago the closest person's prints were
+  added (their `added_unix_s`: people.json keeps one time per person, not
+  per print; `none` with the best), the near gate and the threshold. No
+  name, no id: only numbers, always on (#3126; width, turn, across and age #7424).
+  Beside it, the sticky plan's T0 line (`who::recognition_told`):
+  `recognition best 0.341 height 0.152 (near at 0.1, same at 0.363) second 0.120 eyes 14.2 px turned -12 deg score 0.91 print 152 ms`,
+  the best likeness and the largest face's height again, then `second` (the
+  best cosine against anyone else's prints), `eyes` (the near face's eye
+  distance in pixels), `turned` (its turn in degrees), `score` (the
+  detector's) and `print` (the print's time in ms), each `none` when not
+  measured. Numbers only as well.
 - **Kept.** `--people FILE` (on lamp-4ace `/var/lib/lampos-eyes/people.json`,
   in a directory of mode 0700 and a file of mode 0600). Per person: the
   name, up to five prints and when they were added; with
@@ -995,6 +1008,23 @@ this room" until someone asks to be recognised.
       anyone who asks when they've been at the desk, by name
       (`known_faces::ASK_TO_NAME`); they can also say so, or take it back,
       in their own words later.
+    - **Nothing asked** (`LAMP_FACE_NO_ASK=on`; the first builder 19:47,
+      18 Nov: `ASK_TO_NAME` is in the no-asks rule). Past setup, a
+      remembering that would carry that question carries none: the voice
+      sends the eyes `visits_yes` for the name just kept, as a yes would
+      (the eyes take it only for that face at the lamp now), and in the
+      question's place the model says once "I'll mention you stopped by.
+      Say 'keep my visits private' to undo." (`known_faces::VISITS_UNDO`,
+      `no_ask_visits`), after the visits line when visits are counted. If
+      the eyes don't take it, nothing is asked and the undo is not said.
+      "Keep my visits private" is the existing no,
+      `dont_tell_others_i_was_here`, whose description names it with the
+      switch on. Faces kept from a photo are never at the lamp as they are
+      kept, so they get no yes this way. The setup walk's visits ask, after
+      its first save (`at_setup`), is the setup walk's own part, worked on
+      apart from this switch: it is asked there as before, with or without
+      it. Off, the question as before
+      (`known_faces::tests::with_no_ask_being_named_is_taken_and_the_undo_said_once`).
     - **A yes only from the named person's own scope** (Third on #1997).
       It's taken only when the request's admitted scope
       (`memory_scope::ScopeLease`) is that person's, and not narrowed to the
@@ -1076,9 +1106,13 @@ analysis on #3126). With the switch on:
   more on the same clock, always lets go (the Reviewer-lead's P2 on
   #5546; stamped after the print it held a third check, past 6 s). A held check does not count a visit, and it
   leaves the known file's words and `known-face` as they were and only
-  sets its modified time to now (`who::renew_known`, #4493): the voice
-  takes the file as fresh for 3 s after it was written, so without the
-  renewal it stopped naming a held face a second before the next check. Someone
+  sets both their modified times to now (`who::renew_known`, #4493; the
+  face too since #7146): the voice takes both as fresh for 4 s after they
+  were written (`lamp_msgs::known::FRESH`, twice the eyes' 2 s check,
+  `lamp_msgs::known::RECOGNISE_EVERY`), so without the renewal it stopped
+  naming a held face before the next check. With only the name renewed,
+  a held person's face went stale under it and their line was taken as
+  another face's (#7146). Someone
   else matched, or a face from a photo, replaces them at once. An unknown
   face ends the hold too: a near face that printed and matched nobody keeps
   the held name only if it is still at least 0.30 alike to that person's
@@ -1133,6 +1167,138 @@ and the next match wrote it back, and the voice journaled its face cache
 cold each time (8 to 23 times a run). On lamp-29e7 (#5522) it was 122
 times in a day and a half, and a line said while the file named nobody,
 with their face still in view, is the room's.
+
+**Held on their own id** (#7424), only with `LAMP_FACE_KNOWN_ON_ID=on`
+and the hold on (off unless set; `who::known_on_id_on`). The shrunk
+picture's print of a seated person is poor: on lamp-74ff on 16 Nov the
+owner's face scored 0.71 then 0.12 within seconds at a steady height
+(#7331), and each print under the 0.30 bar let him go, the known file
+and `known-face` removed, though his face never left the view; a check
+that could not print his face at all would have held him. With the
+switch on, a print under 0.30 keeps the held name as no print does: only
+while it is on the passing id their face had at the match and that id
+has been in every look since (`Held::keeps_print`, the same rule as
+`Held::keeps_unprinted`), and only to the 4 s bound from their last
+match, which a held print never renews. Another id, a followed id (which
+still needs 0.30), a gap whose print is not read as theirs
+(`Held::printed`), a forgotten person or the bound let go as before.
+Off, nothing changes. The lamp check: on lamp-52e6, a seated known
+person for 3 min, quiet and talking, before and after a fresh save, the
+known file naming them in at least 9 of 10 looks; the #5546 swap row
+still sends the one who sat down to the room.
+
+**Sticky** (the sticky identity plan, face-recognition-sticky-identity-plan.md),
+only with `LAMP_FACE_STICKY=on` and the hold on (on in the product unit;
+`who::sticky_on`). A known person was too often treated as nobody: one
+poor print, a hand or a turned head let the name go. The rules are the
+plan's own §3 and T3, T4 and T7, as its owner set them on #7933 (20 Nov,
+01:55). That call overrules the first builder's 19 Nov rulings: 20:00 (a
+print under the match bar dropping the name), 21:14 (no lower bar after a
+recent match) and 22:14 (the first look of another enrolled person
+dropping the name), and with them the 15:45 privacy HOLD's 2 min total and
+near-face-only read. With it on, once someone is matched:
+
+- **Hard to lose (T3).** Missed prints, no face, a turned head and any
+  print, whatever its likeness, on the held face's own passing id or the
+  id that follows it keep the name (`Held::keeps_print`,
+  `Held::keeps_unprinted`, `Held::on_held_face`). After a gap, a print not
+  read as theirs keeps it too while it is on that id (`Held::printed`).
+  Only a new id, or nobody near for `who::STICKY_HOLD` (30 s, the voice's
+  `GONE_AFTER`), clears it. Each check that finds their face on that id,
+  printed or not, renews the 30 s (`Held::seen_theirs`): an owner eating
+  with his hands over his face (lamp-74ff, 19 Nov at lunch, matched in 0 of
+  about 230 looks) keeps his name. `LAMP_FACE_KNOWN_ON_ID` (on) is
+  subsumed. Off, 4 s as before.
+  A new unknown face away from the held place counts as nobody near
+  there (`Held::keeps_away`): a print matching nobody at the real bar, on
+  a new id whose box centre is more than `who::JUMP_SHARE` of the held
+  face's last box width from that box (`Held::saw_near`), keeps the name
+  but renews nothing: no `Held::seen_theirs`, no follow, no carry, so the
+  name still goes 30 s from the last sighting of the held face, the
+  existing bound (the owner's call on #7933, 20 Nov). The journal says "a
+  new unknown face away from the one held (across … px, the one held last
+  at … px): not at their place, the one held stays (sticky T3) until 30 s
+  from their last sighting", with no name. A new id within `JUMP_SHARE`
+  still follows (`Held::follow_near`) or lets go, a far face matching
+  someone goes through T4 as before, and with no held box nothing changes.
+  On lamp-06c1 (#7933 at 443fea27, 20 Nov 15:28) a covered held face left
+  the detector and a second small face far across the frame (about 0.13
+  to 0.17 across, the held box at 0.40 to 0.50) was the only near face, on
+  a new id, so the name let go.
+- **Another enrolled person takes two looks (T4).** A print matching
+  someone else enrolled, on the held face, keeps the one held; a second
+  within `who::TAKEOVER_WITHIN` (4 s), each over `SAME_PERSON` and over the
+  held person's likeness, takes the name (`who::sticky_look`,
+  `who::Takeover`). Another enrolled person on a new id is named as found:
+  the new id has cleared the held name already.
+- **A lower bar after a recent match (T7).** Someone matched over
+  `SAME_PERSON` in the last `who::REMATCH_WITHIN` (10 min) is matched again
+  at `who::REMATCH_LIKENESS` (0.30) when nobody else enrolled scores higher
+  (`who::Recent`); a match at the lower bar never renews the 10 min. A
+  rematch is held, not a full match: it is written with the held mark
+  (`who::keep_found`, `keep_known_held`), so the voice reads and keeps it
+  as theirs but runs no forget, correction or rule on it, never counts it
+  the owner present or alone, and anchors no `adopt`; only a print at
+  `SAME_PERSON` is a real match and clears the mark (Friday's P1 on #7933,
+  20 Nov 03:16).
+  A rematch of another enrolled person on the held face never counts
+  toward T4's two looks: it keeps the one held (`who::takeover_uncounted`;
+  row 5 on lamp-06c1, 20 Nov, where a covered face rematched another
+  enrolled person).
+  While someone is held, the lower bar may only match the one held again
+  (`who::held_rematch`): a rematch whose person is another is not taken,
+  not a match, not a takeover look and no let-go by itself; the hold
+  decides as for a print that matches nobody, and the journal says "matched
+  again at … to another than the one held: not taken (sticky T7)", then
+  whether the one held stays or the hold lets go (`who::rematch_refused_told`).
+  Another person still needs T4's two looks at `SAME_PERSON` (and, with
+  `LAMP_FACE_TAKEOVER_SCORE`, the score bar). With nobody held, T7 as above
+  (the owner's call on #7933, 20 Nov, after leg 1b on lamp-06c1 switched
+  the held name on a rematch at 0.356).
+- **The gap line says what the check did.** After a gap, the known hold's
+  journal line ends "same face", "kept on its id (sticky)", "followed",
+  "a new unknown face away from the one held", "matched" or "let go",
+  decided after the check (`who::gap_told`). Row 5 logged "kept on its id"
+  on checks that let the name go, and a check whose print matched someone
+  (0.726 to the held set, 1795163856.5 on lamp-06c1) logged "let go".
+- **Two switches, on as a pair by the owner's call (row 5).** The detector lost a
+  covered face for 0.2 to 3 s at a time and found it again as a new id,
+  so T3 let the name go: to another enrolled person on one print (leg E),
+  or to nobody for 6 s (leg H).
+  - **`LAMP_FACE_FOLLOW_NEAR_NEW_ID=on`** follows such an id
+    (`Held::follow_near`). The id must be within `who::JUMP_SHARE` of the
+    held face's last box (`Held::saw_near`) and the only near face, with
+    the sitter check (LAMP_ACTIVITY) saying the sitter is not standing up
+    (`activity::Judge::not_standing_up`).
+  - **`LAMP_FACE_TAKEOVER_SCORE=on`** counts a takeover look only on a face
+    the detector scored at least `who::TAKEOVER_SCORE`, which reuses
+    `still::PERSON_SCORE` (0.8). A look under it keeps and renews the one
+    held. Covered prints scored 0.60 to 0.81, and the real swap 0.85 to
+    0.89.
+
+  Both are on in the product unit, by the owner's call on #7933 (20 Nov;
+  switches.md). E needs both on: with the
+  follow alone, the covered face still switched on two looks.
+- **A newly seen face is printed at once.** While a name is held, a newly
+  seen near face (a near face after none, a new passing id, or a box whose
+  centre moved more than a third of its width since the last look) is
+  printed on the next look, outside the 2 s cadence, at most once per such
+  change and at most every 0.5 s (`who::NewFace`); a steady box asks for no
+  extra print. It only speeds recognition, and agrees with T3: that print
+  on a new id lets the name go, on the same id keeps it. The cost: one
+  print (152 ms on a lamp) per new face or jump.
+- **The held mark.** While a name is kept by a hold and not a match, the
+  eyes renew an empty file, the known file's name with `-held`, before the
+  known file (`who::mark_held`, `who::keep_known_held`); a match's write or a
+  let-go removes it. The voice reads and keeps such a name as theirs, with
+  a face in view or none (memory.md, "A name the eyes hold"), but a held
+  name runs no forget, correction or rule and is never the owner present
+  or alone.
+
+The accepted risk is the plan's (§2): until another known face is matched
+or the conversation goes quiet, someone else at the lamp is answered from
+the current person's memory. Off, nothing changes. The lamp check, owed on
+lamp-06c1: the plan's §7 session, judged against §3.
 
 **The followed id** (#4885), only with both `LAMP_FACE_KNOWN_HOLD=on` and
 `LAMP_FACE_REFOUND=on` (off unless set, both on in the product unit,
@@ -1203,7 +1369,7 @@ print.
   due every 0.5 s (`who::recognise_due_unsure`), not every 2 s, so a print
   comes within the voice's wait.
 - **The second voice waits for it.** A line ending while `known-unsure` is
-  fresh (3 s, as the known file) is tied to no one until it goes, at most
+  fresh (4 s, as the known file) is tied to no one until it goes, at most
   1 s past the line's end (`speaking_faces::known_once_printed`): then the
   known file as it stands, theirs only if a print wrote it back; still
   unsure at the bound, the room's ([second-voice.md](second-voice.md)). A
@@ -1515,7 +1681,11 @@ With the switch:
     you, Marie! May I remember your face?" "Yes.") is no read-back, since
     its yes may answer only the face (`known_faces::said_back`). Otherwise
     nothing is sent and the model is told to say the name back and ask if
-    it is right (`SAY_IT_BACK`). The voice keeps that refused save
+    it is right (`SAY_IT_BACK`). With `LAMP_FACE_NO_ASK=on` the setup save
+    needs no read-back's yes and none is held: the face is kept only on the
+    speaker-bound route's proof, the eyes seeing that face say its own
+    name, and without it nothing is kept and nothing asked
+    ([onboarding.md](onboarding.md), "With nothing asked"). The voice keeps that refused save
     (`second_provider::HeldSave`, as a held forget is kept) and runs it
     itself once the person agrees to their face being kept
     (`known_faces::face_agreed`): a plain yes to the face question after
@@ -1538,7 +1708,11 @@ With the switch:
     right?" "Yes, that's my name." made no call and kept no face). A yes
     no face was seen saying, even with no face in view, still runs it
     (the lead, 9 Nov: the owner may not face the lamp; when the eyes then
-    find no face, the model is told it was not kept, and why). A plain
+    find no face, the model is told it was not kept, and why). With
+    `LAMP_KEEP_QUIETLY_ONE_FACE=on`, a line held by a face's gap or carried
+    does not drop it when it is theirs by the face-in-view rule and the
+    scope's known person is the one the save keeps
+    (`second_provider::theirs_by_face`, memory.md). A plain
     yes dropped for the second face is told to the model as a face not
     kept, and why, so it makes up no reason of its own (lamp-52e6, 5 Nov,
     Fifth's run B on #5415: "I need to know who you are first"). With nothing held, while "who you are"
@@ -1658,9 +1832,200 @@ With the switch:
   no or another answer, sends nothing, before the name's own checks, and
   the model is told to ask that question (`ASK_FACE_FIRST`). A name is no
   yes to keeping a face (the first builder on #7331). Setup asks its own
-  face question, and a rename takes its own yes. Off, a new face is kept
+  face question, and a rename takes its own yes. While the eyes' known
+  file names a face at the lamp (`known_faces::known_now`, the file the
+  second voice's rename force reads), the save goes to the eyes as before:
+  a known face's "Call me Jay." is answered "known as" and the rename is
+  held for their yes, and two faces are the eyes' own refusal (#7653,
+  row-7422c on lamp-52e6;
+  `a_known_face_giving_another_name_reaches_the_eyes_and_is_asked_to_rename`).
+  With `LAMP_REMEMBER_SPEAKER` on too and `LAMP_FACE_NO_ASK` off, the
+  speaker-bound save asks the same (`known_faces::run_speaker`, Heron's P1
+  on #7622), read from the speaker's own line, after the name's own checks,
+  and not for a face the eyes know that is the one seen saying it (the
+  first builder's P2 on #7622). On either save, a line keeping the face out
+  (face words with "out", "off" or "forget" and no refusal word: "Keep my
+  face out of this, I'm Kesh.") keeps nothing and asks nothing, never the
+  face question it just refused (`FACE_KEPT_OUT`, at setup
+  `SETUP_NOT_KEPT_NO_ASK`; Heron's HOLD on #7622); "Don't forget my face"
+  is asked first as before. Off, a new face is kept
   on the call as before
   (`known_faces::tests::a_new_face_is_kept_only_on_a_yes_to_keeping_it`).
+- **A known face only, when the known file let the save past the face
+  question** (`LAMP_FACE_SAVE_KNOWN_ONLY=on`, lamp-voice; off unless set,
+  on in the product unit; #7704). The known file stays up to its 3 s after a
+  known face leaves, so a stranger who steps in and gives a name in that
+  gap was saved as a new person with no face question. With the switch,
+  that save alone (the face question skipped only because the known file
+  named a face; never with `LAMP_FACE_NO_ASK`) is sent with
+  `"known_only":true`. The eyes refuse a capture recognised as nobody,
+  under a name nobody is kept under, with `{"error":"not_known"}` before
+  the new-person save (`who::People::remember_one_known_only`,
+  `Refused::NotKnown`; the journal says "asked for a known face only, it is
+  known as nobody"), and the voice tells it as the face question
+  (`ASK_FACE_FIRST`), nothing kept. A known face is still answered "known
+  as" and the rename held (#7653), and their own name on their own face is
+  still kept in place
+  (`a_save_for_a_known_face_only_refuses_a_face_known_as_nobody`,
+  `with_known_only_a_face_the_eyes_do_not_know_is_asked_the_face_question`).
+  `known_only` is sent only when true: eyes from before it refuse a field
+  they don't know, so voice and eyes ship in one build. Off, the line is
+  as before.
+- **A question is no ask, and a known face is told so**
+  (`LAMP_FACE_QUESTION_NOT_ASK=on`, on in the product unit; lamp-74ff,
+  19 Nov: "Did you remember my face then?" and "Do you remember my face?",
+  right after the face was kept, called `remember_my_face`, and the name
+  checks answered that the lamp couldn't take the look). The function's
+  description, names checked or not, says that a question of whether the
+  lamp knows or remembers them ("Do you remember me?", "Did you remember my
+  face?", "Do you know my face?") is no ask: answer it from who you see now,
+  never with this call. With names checked (`LAMP_NAMES=checked`, as in the
+  product), before that line it says every clear ask to
+  remember them is a call in any turn, also when their face was kept
+  earlier in the conversation (the handler answers that it already knows
+  them, below) and before they said their name (with an empty name, told
+  `There was no name in that for me to keep.` before any look) (#8053,
+  row-8053q on lamp-52e6, 21 Nov: such asks called it 17 of 30 after a
+  save, and an ask with no name rarely after a greeting or after the lamp
+  asked a name; `known_faces::ASK_IS_A_CALL`). The line's words are never judged in the handler:
+  whether a line asks or only wonders is the model's call. In the handler
+  (`known_faces::run_switched`), before any name check, a call with no
+  `replace` past setup's first save, whatever the line says:
+  - for the face the eyes' known file names now, under that same name
+    (case, accents and spaces folded, `known_faces::already_known`), only
+    as a fresh real match (the owner, 20 Nov 02:18): the known file within
+    3 s, the eyes marking held names (`LAMP_FACE_STICKY=on` in the voice,
+    #7933's `-held` mark) and no fresh held mark. A held name, or eyes whose
+    held names can't be told (`LAMP_FACE_KNOWN_HOLD` renews the known file
+    with no mark), goes to the eyes, whose fresh look answers `already` or
+    `not_like_them`. Otherwise it
+    answers `{"already_known": <name>}` with a note to say the lamp already
+    knows them (`ALREADY_KNOWN_NOTE`). Nothing is sent to the eyes and
+    nothing saved.
+  - on the speaker-bound route (`LAMP_REMEMBER_SPEAKER`), only when the
+    line's own speaking face (`line.enrollment`) is the known face read
+    with it (`known_faces::said_by_known_face`, as the save's own check):
+    an off-camera voice giving the in-view person's name goes on as before,
+    never told "I already know your face".
+  - any other call, a question or not, goes on as before.
+
+  A face known by another name, a rename and the setup walk's first save
+  go as before; "Remember my face." from an unknown face still saves. The
+  voice's journal names this the check here, not the eyes'
+  (`known_faces::answered_here`). Off, as before
+  (`with_face_question_a_known_face_sends_nothing_and_any_other_call_goes_as_before`).
+
+  The description is scored on the real model by `lamp-voice probe-tools
+  PROVIDER_CONFIG SECOND_CONFIG [RUNS] --face`
+  (`second_provider/probe/face_question.rs`): 32 made-up lines, 16
+  questions whether the lamp knows them and 16 asks to remember them, half
+  English and half Vietnamese, each asked as the next turn after a face was
+  kept, with the description as the switch off (`before`) and on (`now`),
+  names checked. It prints only how many requests called
+  `remember_my_face`, per arm, line, kind and language. Run it on a lamp as
+  `probe-tools` is run (docs/second-voice.md), through the relay:
+
+  ```sh
+  systemd-run --pty --wait \
+    -E LAMP_SECOND_DEEPSEEK_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek \
+    /opt/lampOS/voice/current/lamp-voice probe-tools \
+    /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 1 --face
+  ```
+
+  With the same switch, two more (lamp-74ff, 19 Nov):
+  - **A name confirmed this session is reused** for a later save of the
+    same face, not heard again (requests 27 and 28 were refused as "name
+    not heard" right after the name was confirmed). A save whose name was
+    said back and agreed, or spelled, keeps it in memory with the one near
+    face in view then (`known_faces::note_confirmed`, before any refusal;
+    a forget clears it). A later save of that name stands as heard only
+    when all hold (`known_faces::reused_name`): the same name, folded;
+    exactly one face at least 0.10 of the frame tall in the eyes' newest
+    look within 1.2 s (`speaking_faces::SpeakingFaces::one_near_face`,
+    `NEAR_FACE_HEIGHT`, the eyes' own `NEAR_ENOUGH`); and that face is the
+    same track as at the confirmation, the same passing id or one the eyes
+    said follows it (`SpeakingFaces::same_track`). A held or carried name
+    is never one. The save then goes to the eyes' own checks as any other:
+    a name kept for another face is refused there, told as `NOT_LIKE_THEM`,
+    which never says the name is kept. The faces are the second worker's
+    own reader (`second_provider::worker`, `known_faces::sees_tracks_with`).
+    Only on the save with no speaking proof (`run_switched`), never a rename
+    and never the speaker-bound save (`LAMP_REMEMBER_SPEAKER`), which takes
+    the speaker's own words. **Dark until `LAMP_FACE_NO_ASK` is on** (#8010,
+    deferred; off in the product): without it the no-proof save has no
+    speaking proof, so the name is never reused and the save goes as today.
+    With it on, that save keeps no new face with nobody known, so the reuse
+    reaches only a save while the eyes' known file names someone. The
+    already-known answer comes first on both routes
+    (`known_faces::face_question_first`).
+  - **A face kept again is said to be known already.** The eyes answer a
+    remembering of a name already kept, the face matched as theirs as a
+    whole (`SAME_PERSON`) and no `replace`, with `"already":true` beside
+    `remembered` (`who::Remembered::already`, always; a voice that does not
+    read it ignores it). The voice then tells the model to say it already
+    knows their face ("I already know your face, Ana."), never "I'll know
+    you now", and drops the visits line said at the first save
+    (`ALREADY_KNOWN_NOTE`). Off, as a first save.
+  - **A rename is not told the visits line again.** A `replace` the eyes
+    made (their `replaced` not empty, Ana renamed Ben) is never told known
+    already, but the visits line (`VISITS_LINE`) is taken out of its
+    `also_say`, since the person heard it when the face was first kept;
+    the other lines, `ok` and `remembered` stay
+    (`known_faces::told_already`). A replace that replaced nothing is a
+    first save and keeps the line. Off, as before.
+- **A new face with nothing asked** (`LAMP_FACE_NO_ASK=on`, with names
+  checked; off unless set; the first builder 18:50, 18 Nov, from the
+  product owner). A face is kept unasked **only with speaking-face proof**
+  (Thirteen's and Heron's HOLDs on #7787): past setup, on the speaker-bound
+  route (`LAMP_REMEMBER_SPEAKER`, `known_faces::run_speaker`), where the
+  request's own words must name the speaker (`speaker_named_self`) and
+  the eyes keep only the face seen saying them. Kept (the eyes'
+  `remembered`, and only then), the model is told to say one line, "I'll
+  know you next time. Say 'forget my face' to undo.", and ask nothing
+  (`KEPT_NO_ASK`). A face the eyes could not see alone (`two_faces`,
+  `no_face`, `too_far`, `eyes_shut`) keeps nothing, and unless the person
+  asked for their face in words, the model is told to ask nothing and
+  never to say it will know them (`NOT_SEEN_NO_ASK`). Another person's name
+  ("this is Tom") or a voice with no face seen saying it (a TV, someone off
+  camera) sends nothing, and is not asked to look and say it again
+  (`NOT_SEEN` and `NOT_OWN_NAME` are told as below, `no_ask_speaker`).
+  **Not speaker-bound, nothing is kept and nothing is asked** (the first
+  builder 21:13, 18 Nov): without that route, `one_face` says only that one
+  face is in view, not whose voice it was, so no new face is kept past
+  setup (`no_ask_unkept`, even with `LAMP_NAME_LEARN_FIX` off): "I'm Ada",
+  "I'm Anna" from a TV, "This is my son Tom" then a yes to "Tom, right?",
+  and "Remember my face, this is Tom" send nothing, and the model is told
+  to ask nothing and say nothing about the face (`NOT_KEPT_NO_ASK`), not
+  the face question. Only when they asked in words for their face, under a
+  name they gave as their own ("Remember my face, my name is Ada.") or as a
+  yes to a face question, is the model told the plain reason ("I could not
+  see that the face in view was the one saying it"), still asking nothing
+  (`CANT_KEEP_NO_ASK`), as the eyes' own reason is told on the speaker
+  route. A rename agreed to and "Forget my face" are unchanged. A face
+  the eyes' known file names at the lamp is no new face: on either route
+  its "Call me Jay." still goes to the eyes' "known as" and the rename's
+  own yes, never a no-ask "not kept" (`known_now`, #7800). A
+  `remember` of their own name while nobody is known
+  (`LAMP_MEMORY_PERSONAL_NEEDS_FACE` with `LAMP_NAME_LEARN_FIX`) is told to
+  call `remember_my_face` at once, not to ask, with `LAMP_REMEMBER_SPEAKER`
+  on too; without it, that nothing was kept, to ask nothing and say nothing
+  about it, but the plain reason if they asked for their face in words
+  (`needs_face::NAME_QUIET`). The setup walk's first save (`at_setup`)
+  takes the same proof (#7810, the Reviewer-lead's HOLD and the first
+  builder's ruling): on the speaker-bound route the face seen saying its
+  own name is kept with no face question (`FACE_LEAVE` not asked) and the
+  model says the same line (`SETUP_KEPT_NO_ASK`); a face seen silent while
+  another voice says the name, another person's name, two faces in view,
+  or a save off that route keep nothing and ask nothing, not the read-back
+  nor the face question, and the step ends with the name only
+  (`SETUP_NOT_KEPT_NO_ASK`, `setup_no_ask_speaker`); a plain yes at setup
+  runs no save (`second_provider::yes_save`). Off, as above, the face question included
+  (`known_faces::tests::with_no_ask_and_no_speaker_proof_nothing_is_kept_or_asked`,
+  `known_faces::tests::with_no_ask_the_setup_face_is_kept_only_on_the_speakers_proof`,
+  `remember_speaker::tests::remember_speaker_at_setup_with_no_ask_keeps_only_the_face_seen_saying_the_name`,
+  `remember_speaker::tests::remember_speaker_with_no_ask_keeps_only_the_speakers_own_face`,
+  `needs_face::tests::with_no_ask_a_name_goes_to_the_face_save_unasked`,
+  `needs_face::tests::with_no_ask_not_speaker_bound_a_name_keeps_nothing_and_asks_nothing`).
 - **The word that called the lamp is not their name**
   (`known_faces::only_the_call`, 25 Oct).
   - **What's refused:** a name heard only as the line's opening word, past any greeting and set off by a comma or a
@@ -1767,7 +2132,20 @@ With the switch:
     every other guard stand, and nothing is renamed without the yes to the
     question asked again. On lamp-74ff a line began over the question,
     none of it played, and the rename was dropped in silence
-    (`a_rename_question_cut_before_its_name_keeps_the_hold`). A line carried into the
+    (`a_rename_question_cut_before_its_name_keeps_the_hold`). With
+    `LAMP_RENAME_SHORT_YES` too (off in the product until its ROW with a
+    person), a yes no face was read saying is read again by the
+    short-line rule of `LAMP_VOICE_SHORT_LINE_SPEAKER` (whether or not that
+    switch is on; `held_rename::yes_speakers`,
+    `SpeakingFaces::short_line_speakers_with_boot`): a one- or two-word
+    yes spans under the three looks a line needs, so on lamp-52e6 (13658,
+    17 Nov) the asker's yes was nobody's, the one-face count (also three
+    looks) took no one either, and the rename ran only on the third try
+    (#7419). Their face read still before it and speaking in it now says
+    it; another face's short yes is still "another face was seen saying
+    the yes", and nobody in view is still nobody's
+    (`a_short_yes_from_the_askers_face_runs_the_rename_with_the_fix`).
+    Only the held rename's sight and its asked note read it. A line carried into the
     asker's conversation going on and read as theirs
     (`LAMP_CONVERSATION_CARRIED_MEMORY`, `ScopeLease::read_carried`: their
     own face the one face in view, none seen saying it, no other voice
@@ -1931,6 +2309,10 @@ With the switch:
   (`known_faces::gives_a_name`) has its first round sent with
   `tool_choice` naming `remember_my_face`. The name is still checked, so
   one not in their words is refused, and the model asks them to spell it.
+  The ask is read past the lamp's name too
+  (`second_provider::forced_past_the_name`, #8022): "Hey, Lynn, remember
+  my face, I'm …" on a line that names the lamp, never "Hey, Anna, …" said
+  to a person.
   Not forced, the model's as before:
   - an ask with no name;
   - a name in the line after an ask, since the thread doesn't say the two
@@ -2009,7 +2391,9 @@ service writes a name said once right.
 
 ### Remember only the person who spoke (`LAMP_REMEMBER_SPEAKER=on`)
 
-Off by default in both Voice and Eyes. Eyes needs its recognizer and who
+Off by default in both Voice and Eyes, and off in the product units: it goes
+on together with `LAMP_FACE_NO_ASK` and the coming `LAMP_FACE_LEARN_LATER`
+(the first builder's ruling on #7622, 18 Nov). Eyes needs its recognizer and who
 socket, `LAMP_BUS=on` and `LAMP_EYES_SPEAKING=on`; Voice also needs
 `LAMP_EYES_SPEAKING=on` and the bus. With `LAMP_NAMES=checked`, the second
 voice route binds `remember_my_face` to the current microphone line, its
@@ -2041,8 +2425,15 @@ to it without asking anything ("Yes, my name is Kess."). A refusal word
 anywhere in the line, someone else's face ("remember her face") or a plain
 "I'm Kess." refuses before Eyes is asked, and the model is told to ask the
 face question and wait for a yes that includes the name. The lamp's last
-line is its own words and never supplies a name. Past setup, and with the
-switch off, nothing changes.
+line is its own words and never supplies a name. Past setup, with
+`LAMP_NAME_LEARN_FIX` on (as in the product, #7331), a name alone keeps no
+face either: the same leave is needed, except for a rename or a line
+correcting letters the lamp just spelled back, and the model is told
+`ASK_FACE_FIRST` (Heron's P1 on #7622), unless `LAMP_FACE_NO_ASK` is on:
+then the speaker-bound proof replaces the ask, and a face seen saying
+"I'm X" is kept with nothing asked
+(`remember_speaker_with_no_ask_and_name_learn_fix_keeps_the_speaker_unasked`).
+Past setup with that switch off, and with this switch off, nothing changes.
 With `LAMP_MEMORY_ROOM_SPEAKER` also on, its background attribution keeps
 this same request's enrollment proof through the live scope check. It does
 not replace the proof with visibility or a room speaker. A cancelled,
@@ -2488,6 +2879,27 @@ Tests (`photo.rs`):
 The asks' parsing is in `who.rs`, `--photo-dir` in `main.rs`, and the reset's
 wipe in `crates/setup/tests/it/reset.rs`. Not run on a lamp.
 
+**With nothing asked** (`LAMP_FACE_NO_ASK=on` on lamp-eyes, off unless set;
+the first builder 18:50, 18 Nov, from the product owner: nothing is asked
+of the person). The photo's one face, found and printed as above, is kept
+**at once** in the people's file (`photo::keep_at_once`): the answer is the
+eyes' `{"remembered":NAME,…}`, which lamp-cloud tells the app as
+`{"remembered":NAME}`, and nothing is said at the lamp (it is the app's
+flow). A photo with more than one face, or none, is still refused, and a
+face known by another name is `known_as`. Never put beside someone already
+kept (no `apart`): with nobody at the lamp to judge it, a photo under a name
+already kept that is only near that person (a sibling's photo sent under the
+owner's name) is refused `near_to`, and one not like them `not_like_them`,
+the owner's record unchanged (Heron's P2-2 on #7787). "Forget my face" and
+the app's removal forget it as any other face. **Photos already waiting**,
+added unconfirmed before the switch or by eyes without it, are not kept
+unasked: the voice asks about them at the lamp as before, and their yes or
+no is theirs (Heron's P3 on #7787; the simpler and safer of the two ways).
+Off, all of this section stands as written
+(tests `photo::tests::with_no_ask_a_face_from_a_photo_is_kept_at_once_and_forgets`,
+`photo::tests::with_no_ask_a_near_photo_under_a_kept_name_is_refused`).
+Not run on a lamp.
+
 ### How familiar a remembered person is (`--visits on`, #1670)
 
 Off unless `lamp-eyes --visits on`, which needs the recogniser (`--recogniser`, `--people`, `--who-socket`). Only
@@ -2524,7 +2936,9 @@ it is on in the product.
 - **Told:** when someone asks to be remembered, the eyes' answer carries
   `"visits": true`, and the voice tells the model to say in one short
   sentence that the lamp will notice how often they come by, so it can
-  greet them more warmly (`known_faces.rs`, `VISITS_LINE`).
+  greet them more warmly (`known_faces.rs`, `VISITS_LINE`); with
+  `LAMP_FACE_QUESTION_NOT_ASK`, not again on a save already kept or a
+  rename (above).
 
 Tests (a lamp at UTC+7): counted once in 16 hours with nothing written;
 written only once 03:00 local has passed, once, scored as of that 03:00; `regular` on the

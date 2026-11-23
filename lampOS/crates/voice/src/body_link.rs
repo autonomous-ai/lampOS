@@ -568,7 +568,10 @@ mod tests {
         let started = std::time::Instant::now();
         // Just after a yes: a close does not wait for a repeat to fall due.
         assert!(link.close());
-        assert!(started.elapsed() < std::time::Duration::from_millis(50));
+        // A close that waited for a repeat to fall due would take
+        // PERMIT_REPEAT_US; the bound is that, not 50 ms, which a loaded
+        // macOS runner can miss on a send that never waits.
+        assert!(started.elapsed() < std::time::Duration::from_micros(PERMIT_REPEAT_US));
         assert_eq!(told(&eyes), [r#"{"camera":true}"#, r#"{"camera":false}"#]);
         // No is said once: a second close and a drop after it add nothing.
         assert!(!link.close());
@@ -592,7 +595,9 @@ mod tests {
         let started = std::time::Instant::now();
         assert!(link.close());
         drop(link);
-        assert!(started.elapsed() < std::time::Duration::from_millis(50));
+        // The socket never blocks; the bound only has to catch a close that
+        // waited for a repeat (PERMIT_REPEAT_US), not a loaded runner.
+        assert!(started.elapsed() < std::time::Duration::from_micros(PERMIT_REPEAT_US));
     }
 
     #[test]
@@ -771,8 +776,8 @@ mod tests {
     }
 
     /// Level 1 (and 0, nothing said) fills nothing: the voice as today.
-    /// Level 5 fills about 40% of the answers with none, never within 20 s
-    /// of the last fill and never the same twice in a row; a matched cue is
+    /// Level 5 fills every answer with none (#8153), never within 8 s of
+    /// the last fill and never the same twice in a row; a matched cue is
     /// still sent at every level, and is no fill.
     #[test]
     fn an_answer_with_no_gesture_is_filled_only_above_level_one() {
@@ -780,17 +785,16 @@ mod tests {
             assert!(fills(level, 1_000, 30).is_empty(), "level {level}");
         }
         let spaced = fills(5, 1_000, 30);
-        assert!(
-            (350..=450).contains(&spaced.len()),
-            "{} of 1000",
-            spaced.len()
-        );
+        assert_eq!(spaced.len(), 1_000);
         let close = fills(5, 1_000, 5);
-        assert!(!close.is_empty());
+        // Every other answer 5 s apart: the 8 s gap skips the next.
+        assert_eq!(close.len(), 500);
         for pair in close.windows(2).chain(spaced.windows(2)) {
-            assert!(pair[1].0 - pair[0].0 >= 20_000_000, "{pair:?}");
+            assert!(pair[1].0 - pair[0].0 >= 8_000_000, "{pair:?}");
             assert_ne!(pair[1].1, pair[0].1, "{pair:?}");
         }
+        let half = fills(3, 1_000, 30).len();
+        assert!((450..=550).contains(&half), "{half} of 1000");
         assert!(fills(2, 1_000, 30).len() < fills(3, 1_000, 30).len());
         for level in 1..=5 {
             let mut cue = Cue::seeded(7);

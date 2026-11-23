@@ -92,7 +92,7 @@ honest failure when called. It does not disable unrelated volume/light calls.
 | `set_timer` | `text`, whole `seconds` | Set with an elapsed `After` deadline; for a voice line, the same timer asked for again within 2 min is the one already set (`already_set`), and one with the same words as another still set names it (`same_words_set`; 29e7, [schedule.md](schedule.md)) |
 | `set_reminder` | `text`, exact `time` in `HH:MM`; optional `day`, `zone`, `fold` | Set one civil `At` deadline |
 | `repeat_reminder` | `text`, `time`, `every` (`daily` or `weekly`); `weekday` required only for weekly; optional `zone` | Set a local daily/weekly recurrence |
-| `list_reminders` | Optional boolean `pending_only`, optional nonnegative `after_id` | Read one bounded page of the line's own and the room's reminders and timers; each item says when it was set (`set_day`, `set_clock`), `said_recently` lists the line's own already said (29e7), and questions about reminders are its, not recall's ([schedule.md](schedule.md)) |
+| `list_reminders` | Optional boolean `pending_only`, optional nonnegative `after_id` | Read one bounded page of the line's own and the room's reminders and timers; each item says when it was set (`set_day`, `set_clock`), `said_recently` lists the line's own already said (29e7), and any question about their own reminders or timers, at any point in a conversation, in any wording or language, even one that sounds a word short, is answered only after calling it in that turn, not recall or faq's `lamp_help` ([schedule.md](schedule.md)) |
 | `cancel_reminder` | Positive `id` from the current list | Cancel that timer or whole series, only the line's own or the room's (one set with nobody sure; [schedule.md](schedule.md)) |
 | `snooze_reminder` | Positive `id`, whole `seconds` | Get the exact current pending delivery, then snooze it, only the line's own or the room's; a one-time one said within the last two minutes is set again and snoozed (C68, [schedule.md](schedule.md)), and one said longer ago is `said_too_long_ago` |
 
@@ -113,6 +113,14 @@ duration to its minute-only `HH:MM` argument can make it fire almost a minute
 early. Both descriptions explicitly rule out that conversion. The published
 catalog regression checks this guidance; live model selection still needs
 the [lamp follow-up](schedule.md#relative-time-follow-up-on-the-lamp).
+
+With `LAMP_TIMER_ASKS_HOW_LONG=on` in lamp-actions' unit (#8182, off unless
+set; on in the product unit), `set_timer`'s description also says that when the person's words give
+no length it sets nothing and asks only "For how long?", and `set_reminder`'s
+the same with "What time?" (`schedule::asking_how_long`), and that a question
+about what it is for is asked only as "What's the timer for?" or "What should
+I remind you about?"; the voice's second
+route refuses such a call by the heard line ([schedule.md](schedule.md#a-length-or-time-not-heard-is-asked-lamp_timer_asks_how_long)).
 
 Labels contain 1–300 UTF-8 bytes, nonblank, with no control characters.
 Durations are 1–31,536,000 seconds. Time is exactly `00:00` through `23:59`.

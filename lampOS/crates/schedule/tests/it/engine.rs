@@ -146,6 +146,27 @@ fn even_a_one_millisecond_overdue_restart_is_marked_late() {
     assert!(notice.late);
     assert_eq!(notice.late_by_ms, Some(1));
 }
+/// #7517: the owner's Update now restarts the lamp's parts for about a
+/// minute. A timer due in that minute is kept pending through the restart
+/// and found when the owner opens again, marked late by the restart only,
+/// never dropped (that is only past `TIMER_TOO_LATE_MS`, 10 min), so the
+/// voice says it as soon as it is back.
+#[test]
+fn a_timer_due_while_an_update_restarts_the_lamp_is_kept_and_said_late_after() {
+    let disk = Disk::default();
+    let mut e = open(disk.clone(), &now(0));
+    // A 30 s timer; the update stops the owner at 20 s.
+    set(&mut e, &now(0), 30);
+    drop(e);
+    // Back 70 s later, at 90 s: 60 s past due.
+    let back = now(90_000);
+    let mut e = open(disk, &back);
+    e.tick(&back).unwrap();
+    let notice = due(&e, &back).oldest.expect("still pending");
+    assert!(notice.late);
+    assert_eq!(notice.late_by_ms, Some(60_000));
+    assert!(notice.late_by_ms.unwrap() < lamp_schedule::engine::TIMER_TOO_LATE_MS);
+}
 #[test]
 fn exact_due_time_is_pending_without_lateness() {
     let mut e = open(Disk::default(), &now(0));

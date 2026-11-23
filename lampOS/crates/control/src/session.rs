@@ -10,7 +10,7 @@
 //! fake and the routing to the lamp's sockets comes as its own piece.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use ring::rand::SystemRandom;
 use serde_json::{Value, json};
@@ -202,6 +202,10 @@ pub struct Session {
     /// hold a one-run token (`crate::runs`), and says nothing else of who it
     /// is.
     run_socket: bool,
+    /// Set for a connection that came by the app socket: the installed app
+    /// whose cgroup the socket read (`crate::app_socket`). Its `hello` takes
+    /// any well-formed client and signature; the grants are the manifest's.
+    app: Option<crate::app_socket::AppPeer>,
 }
 
 /// What a computer beyond the lamp's own network is told when it asks for
@@ -209,6 +213,24 @@ pub struct Session {
 pub const LOCAL_ONLY: &str = "local network only: the camera, the microphone and the speaker are never given beyond the lamp's own network";
 
 impl Session {
+    /// The app this connection is, by the app socket.
+    pub fn app_name(&self) -> Option<&str> {
+        self.app.as_ref().map(|app| app.name.as_str())
+    }
+
+    /// The installed app this connection is, as the socket named it.
+    pub fn app_peer(&self) -> Option<&crate::app_socket::AppPeer> {
+        self.app.as_ref()
+    }
+
+    /// Whether this connection is an app that has the `speak` grant: its
+    /// `say` counts as taking a trigger offered it (`Live::took_by_say`).
+    pub fn app_may_speak(&self) -> bool {
+        self.app
+            .as_ref()
+            .is_some_and(|app| app.grants.contains(&crate::protocol::Grant::Speak))
+    }
+
     /// This connection comes from beyond the lamp's own network.
     /// The server's number for this connection.
     pub fn set_connection(&mut self, connection: u64) {
@@ -274,6 +296,10 @@ pub struct Door {
     /// The file the owner's language is read from at each welcome and hello
     /// (`language`); none, as in tests, says English.
     language_file: Option<PathBuf>,
+    /// The lamp's build, said in the hello's `lamp` when known, never in the
+    /// welcome (`crate::build`): the welcome goes to any connection before it
+    /// is known, and the hello's answer only after the signature check.
+    build: Option<String>,
     codes: Codes,
     /// The grants the owner chose with the code out.
     code_grants: BTreeSet<Grant>,
@@ -300,10 +326,22 @@ pub struct Door {
     pin: [u8; 32],
     /// The quiet hours, once wired: the lamp's local time, if known.
     quiet: Option<Quiet>,
+    /// A skill run's say, sound and turn held in the lamp's quiet hours
+    /// (#7625, `LAMP_CONTROL_QUIET_RUNS`, on unless exactly `off`), paired
+    /// computers aside: a run speaks for itself only by day; at night its
+    /// answer goes by the told path, which keeps the quiet hours.
+    quiet_runs: bool,
     /// Where a pushed skill's package is kept for the manage helper: none,
     /// and skill push is off on this lamp.
     push_folder: Option<PathBuf>,
     pushes: Pushes,
+    /// Where a pushed app's package is staged for the apps' helper
+    /// (`--apps-manage-socket`, [`crate::app_push`]): none, and app push is
+    /// off on this lamp.
+    apps_staging: Option<PathBuf>,
+    /// Whether apps are on (`LAMP_STORE_APPS=on`, read once at the start).
+    apps_on: bool,
+    app_pushes: Pushes,
     /// The computers' own clips (`crate::sounds`): none, and `sound` plays
     /// the hum only.
     sounds: Option<crate::sounds::Sounds>,
@@ -327,6 +365,12 @@ pub struct Door {
     /// What the helper must be told of pairings, in order: drained by the
     /// server into one queue, so a later change is never served first.
     helper_changes: Vec<Value>,
+    /// What the apps' helper must be told of pairings, in order, as
+    /// `helper_changes` (Heron's P1 on #8358), with app push on.
+    app_changes: Vec<Value>,
+    /// Where those are kept until answered ([`crate::apps_owed`]): none in a
+    /// door with no state folder.
+    apps_owed: Option<PathBuf>,
     /// One line for every command and its answer ([`crate::journal`]).
     journal: Journal,
 }
@@ -374,13 +418,41 @@ impl Quiet {
     fn refuses(&mut self, client: &str, wall_s: u64) -> Option<String> {
         // Off by this lamp's own setting: never quiet.
         let window = self.window?;
+        let label = format!("{window} local, this lamp's setting");
+        self.refuses_in(client, wall_s, &label, |minute| window.contains(minute))
+    }
+
+    /// Why a skill run's say or sound is refused at `wall_s`, if it is
+    /// (#7625): the lamp's quiet hours exactly as lamp-skills and the told
+    /// path read them (`lamp_local_time::quiet_hours`, today
+    /// [`lamp_local_time::QuietWindow::DEFAULT`]; no owner's setting yet),
+    /// never a window of lamp-control's own, nor the paired computers'
+    /// `--quiet-hours`.
+    fn refuses_run(&mut self, client: &str, wall_s: u64) -> Option<String> {
+        let label = format!(
+            "{} local, a skill's run",
+            lamp_local_time::QuietWindow::DEFAULT
+        );
+        self.refuses_in(client, wall_s, &label, lamp_local_time::quiet_hours)
+    }
+
+    /// Why `client`'s say or sound is refused at `wall_s` by the quiet
+    /// hours `quiet_at` (a local minute of the day: quiet), said as
+    /// `label`; with the lamp's time unknown, quiet.
+    fn refuses_in(
+        &mut self,
+        client: &str,
+        wall_s: u64,
+        label: &str,
+        quiet_at: impl Fn(u16) -> bool,
+    ) -> Option<String> {
         let why = match &self.local_time {
             Some(local) if wall_s >= CLOCK_SET_AFTER_S => {
                 let minute = local.minute_of_day(wall_s.saturating_mul(1_000));
-                if !window.contains(minute) {
+                if !quiet_at(minute) {
                     return None;
                 }
-                format!("quiet hours: {window} local, this lamp's setting")
+                format!("quiet hours: {label}")
             }
             _ => "quiet hours: the lamp's local time isn't known".to_owned(),
         };
@@ -408,6 +480,7 @@ impl Door {
         Self {
             lamp: json!({"id": id, "name": name, "v": VERSION}),
             language_file: None,
+            build: None,
             codes: Codes::new(),
             code_grants: BTreeSet::new(),
             media_dropped: Vec::new(),
@@ -422,8 +495,12 @@ impl Door {
             runs: crate::runs::Runs::default(),
             pin,
             quiet: None,
+            quiet_runs: false,
             push_folder: None,
             pushes: Pushes::default(),
+            apps_staging: None,
+            apps_on: false,
+            app_pushes: Pushes::apps(),
             sounds: None,
             notes: None,
             moves: None,
@@ -432,6 +509,8 @@ impl Door {
             last_rev: 0,
             asking: BTreeSet::new(),
             helper_changes: Vec::new(),
+            app_changes: Vec::new(),
+            apps_owed: None,
             journal: Journal::default(),
         }
     }
@@ -502,8 +581,16 @@ impl Door {
         self
     }
 
-    /// The `lamp` object the welcome and the hello carry: id, name, version
-    /// and the owner's language (always one of [`crate::language::CODES`]).
+    /// The lamp's build for the hello's `lamp` (`build`), never the welcome's;
+    /// none says nothing.
+    pub fn with_build(mut self, build: Option<String>) -> Self {
+        self.build = build;
+        self
+    }
+
+    /// The `lamp` object the welcome carries: id, name, version and the
+    /// owner's language (always one of [`crate::language::CODES`]). Never the
+    /// build: any connection gets it before it is paired or signed.
     fn lamp_info(&self) -> Value {
         let mut lamp = self.lamp.clone();
         let language = self
@@ -511,6 +598,16 @@ impl Door {
             .as_deref()
             .map_or(crate::language::CODES[0], crate::language::read);
         lamp["language"] = json!(language);
+        lamp
+    }
+
+    /// The `lamp` object the hello's answer carries, once the client is
+    /// known: [`Door::lamp_info`] and, when known, the build.
+    fn lamp_info_known(&self) -> Value {
+        let mut lamp = self.lamp_info();
+        if let Some(build) = &self.build {
+            lamp["build"] = json!(build);
+        }
         lamp
     }
 
@@ -528,6 +625,26 @@ impl Door {
         self
     }
 
+    /// A skill run's say, sound and turn held in the lamp's quiet hours
+    /// (#7625): `serve` turns it on unless `LAMP_CONTROL_QUIET_RUNS` is
+    /// exactly `off`; a door without, as in tests, holds runs only to the
+    /// lamp's own window.
+    pub fn with_quiet_runs(mut self, on: bool) -> Self {
+        self.quiet_runs = on;
+        self
+    }
+
+    /// The quiet hours a skill's run is held to, as its hello's `limits`
+    /// says them: the lamp's own (lamp-skills' and the told path's) when
+    /// runs are held, else this lamp's setting for computers.
+    fn run_quiet_window(&self) -> Option<lamp_local_time::QuietWindow> {
+        if self.quiet_runs {
+            Some(lamp_local_time::QuietWindow::DEFAULT)
+        } else {
+            self.quiet.as_ref().and_then(|quiet| quiet.window)
+        }
+    }
+
     /// Skill push on, its packages kept in `folder` for the manage helper.
     pub fn with_push_folder(mut self, folder: PathBuf) -> Self {
         self.moves = Some(crate::pushed_moves::Moves::new(
@@ -535,6 +652,77 @@ impl Door {
         ));
         self.push_folder = Some(folder);
         self
+    }
+
+    /// App push given its apps' helper, its packages staged in `staging`;
+    /// `on` is `LAMP_STORE_APPS` ([`crate::app_push::on`]): off, every app
+    /// op says apps are off.
+    pub fn with_app_push(mut self, staging: PathBuf, on: bool) -> Self {
+        self.apps_staging = Some(staging);
+        self.apps_on = on;
+        self
+    }
+
+    /// The changes the apps' helper is still owed kept in `path`
+    /// (`--state-dir`'s [`crate::apps_owed::OWED`]), so a restart re-tells them.
+    pub fn with_apps_owed(mut self, path: PathBuf) -> Self {
+        self.apps_owed = Some(path);
+        self
+    }
+
+    /// Where the apps' helper's owed changes are kept, if anywhere.
+    pub fn apps_owed(&self) -> Option<&Path> {
+        self.apps_owed.as_deref()
+    }
+
+    /// The apps' helper has answered `client`'s `app.push`, asked under
+    /// pairing generation `rev` (or failed to): another may begin. The server
+    /// removes the staged file. If the pairing changed while the install was
+    /// with the helper, the apps' helper is told again what the computer may
+    /// have now, after the install, as [`Door::push_installed`] does.
+    pub fn app_push_installed(&mut self, client: &str, rev: u64) {
+        self.app_pushes.installed(None);
+        if self.rev_of(client) == rev {
+            return;
+        }
+        match self.clients.get(client).map(|paired| paired.grants.clone()) {
+            Some(grants) => self.tell_apps_grants(client, &grants),
+            None => self.tell_apps_off(client),
+        }
+    }
+
+    /// What the apps' helper must be told of pairings since the last call,
+    /// in order; each kept on disk first when a state folder is given.
+    pub fn take_app_changes(&mut self) -> Vec<Value> {
+        std::mem::take(&mut self.app_changes)
+    }
+
+    /// `client`'s pushed apps stopped (not removed), with app push given.
+    fn tell_apps_off(&mut self, client: &str) {
+        self.owe_apps(json!({ "off_pushed_by": client }));
+    }
+
+    /// `client`'s pushed apps held to `grants`: one asking a grant outside
+    /// them is stopped.
+    fn tell_apps_grants(&mut self, client: &str, grants: &BTreeSet<Grant>) {
+        self.owe_apps(json!({ "grants_pushed_by": { "client": client, "grants": grants } }));
+    }
+
+    fn owe_apps(&mut self, change: Value) {
+        if self.apps_staging.is_none() {
+            return;
+        }
+        if let Some(path) = &self.apps_owed
+            && let Err(why) = crate::apps_owed::keep(path, &change)
+        {
+            eprintln!("lamp-control: {why}: it is told now, but not again after a restart");
+        }
+        self.app_changes.push(change);
+    }
+
+    /// The computers' own notes, if kept.
+    pub fn notes(&self) -> Option<&crate::notes::Notes> {
+        self.notes.as_ref()
     }
 
     /// The computers' own notes kept under `folder` (the state folder's
@@ -613,11 +801,13 @@ impl Door {
         self.revs.insert(client.to_owned(), self.last_rev);
     }
 
-    /// `client`'s pushed skills off (not deleted), with skill push on.
+    /// `client`'s pushed skills off (not deleted), with skill push on, and
+    /// its pushed apps stopped, with app push given.
     fn tell_helper_off(&mut self, client: &str) {
         if self.push_folder.is_some() {
             self.helper_changes.push(json!({ "off_pushed_by": client }));
         }
+        self.tell_apps_off(client);
     }
 
     /// `client`'s pushed skills held to `grants`: one asking a grant
@@ -627,6 +817,7 @@ impl Door {
             self.helper_changes
                 .push(json!({ "grants_pushed_by": { "client": client, "grants": grants } }));
         }
+        self.tell_apps_grants(client, grants);
     }
 
     /// A new connection, and the `welcome` to send it first.
@@ -641,6 +832,7 @@ impl Door {
             connection: None,
             local: None,
             run_socket: false,
+            app: None,
         };
         use base64::Engine as _;
         let welcome = json!({
@@ -665,6 +857,14 @@ impl Door {
     pub fn open_run(&mut self) -> (Session, Value) {
         let (mut session, welcome) = self.open();
         session.run_socket = true;
+        (session, welcome)
+    }
+
+    /// A connection that came by the app socket, whose peer the socket has
+    /// already named by its cgroup.
+    pub fn open_app(&mut self, app: crate::app_socket::AppPeer) -> (Session, Value) {
+        let (mut session, welcome) = self.open();
+        session.app = Some(app);
         (session, welcome)
     }
 
@@ -806,6 +1006,23 @@ impl Door {
         })
     }
 
+    /// A made skill's notes forgotten (#7245): the skill `Some(name)`'s
+    /// (its remove, `task_yes_forget`), or every made skill's (`None`,
+    /// "forget everything"). How many skills' notes went; none with notes
+    /// off.
+    pub fn forget_skill_notes(&self, skill: Option<&str>) -> usize {
+        let Some(notes) = &self.notes else {
+            return 0;
+        };
+        match skill {
+            Some(skill) => {
+                notes.forget(&crate::runs::skill_notes_client(skill));
+                1
+            }
+            None => notes.forget_skills(),
+        }
+    }
+
     /// The owner revokes `client`: its leases end, told. Whether it was
     /// paired. The server closes its connections at once; a frame that
     /// beats it is refused.
@@ -819,6 +1036,7 @@ impl Door {
         if was {
             self.rates.forget(client);
             self.pushes.forget(client);
+            self.app_pushes.forget(client);
             changes = self.leases.client_gone(client, LeaseWhy::Revoked, now_us);
             self.unsaved_revokes.insert(client.to_owned());
             self.new_rev(client);
@@ -849,6 +1067,21 @@ impl Door {
         }
     }
 
+    /// What the door kept for `client` beyond its record (its notes, clips
+    /// and recorded moves), gone: an app that was removed, whose client id is
+    /// its name's ([`crate::app_socket::app_client`]).
+    pub fn forget_data(&mut self, client: &str) {
+        if let Some(sounds) = &mut self.sounds {
+            sounds.forget(client);
+        }
+        if let Some(notes) = &mut self.notes {
+            notes.forget(client);
+        }
+        if let Some(moves) = &self.moves {
+            moves.forget(client);
+        }
+    }
+
     /// Revokes taken but not yet written to the file.
     pub fn unsaved_revokes(&self) -> &BTreeSet<String> {
         &self.unsaved_revokes
@@ -866,6 +1099,10 @@ impl Door {
         });
         if left == Some(0) {
             self.open.remove(client);
+            // An app's record lives while it has a connection.
+            if session.app.is_some() {
+                self.clients.end_run(client);
+            }
             return self.leases.client_gone(client, LeaseWhy::Released, now_us);
         }
         Vec::new()
@@ -971,13 +1208,17 @@ impl Door {
             return outcome;
         }
         match &op {
-            Op::Pair { .. } if session.local.is_some() || session.run_socket => {
+            Op::Pair { .. }
+                if session.local.is_some() || session.run_socket || session.app.is_some() =>
+            {
                 return reply_refused(
                     Some(re),
                     Error::new(
                         ErrorCode::BadRequest,
                         if session.run_socket {
                             "this socket is not for pairing: it is a skill run's"
+                        } else if session.app.is_some() {
+                            "this socket is not for pairing: it is an app's"
                         } else {
                             "this socket is not for pairing: it is the local agent's"
                         },
@@ -1047,17 +1288,22 @@ impl Door {
                 .filter(|_| session.run_socket)
                 .map(|run| {
                     let fixed = run.fixed_write.clone().map(|held| (run.run.clone(), held));
-                    (run.skill.clone(), fixed)
+                    (run.skill.clone(), run.run.clone(), fixed)
                 });
-            let (Some((skill, fixed_write)), Some(services)) = (run, self.services.clone()) else {
+            let (Some((skill, run_id, fixed_write)), Some(services)) = (run, self.services.clone())
+            else {
                 return refuse(ErrorCode::NoGrant, crate::services::RUNS_ONLY.to_owned());
             };
             let write = matches!(op, Op::ServiceWrite { .. });
             let mut line = match &fixed_write {
-                Some((_, held)) if write && held.covers(args) => {
-                    crate::services::Services::line(&skill, write, held.service(), &held.args())
-                }
-                _ => crate::services::Services::line(&skill, write, service, args),
+                Some((_, held)) if write && held.covers(args) => crate::services::Services::line(
+                    &skill,
+                    &run_id,
+                    write,
+                    held.service(),
+                    &held.args(),
+                ),
+                _ => crate::services::Services::line(&skill, &run_id, write, service, args),
             };
             if let Some((run, _)) = fixed_write {
                 line = crate::services::Services::fixed_write(&line, &run);
@@ -1212,6 +1458,102 @@ impl Door {
                     Err(error) => reply_refused(Some(re), error),
                 };
             }
+            Op::AppPush { .. } | Op::AppList {} | Op::AppRemove { .. }
+                if self.apps_staging.is_none() =>
+            {
+                return refuse(ErrorCode::Refused, crate::app_push::NOT_HERE.to_owned());
+            }
+            Op::AppPush { .. } | Op::AppList {} | Op::AppRemove { .. } if !self.apps_on => {
+                return refuse(ErrorCode::Refused, crate::app_push::OFF.to_owned());
+            }
+            Op::AppPush {
+                name,
+                sha256,
+                size,
+                part,
+                parts: count,
+                data,
+            } => {
+                if *part == 0 {
+                    if let Err(retry_ms) = self.rates.check(&client, Class::AppPush, now_us) {
+                        let mut error = Error::new(ErrorCode::Rate, Class::AppPush.says());
+                        error.retry_ms = Some(retry_ms);
+                        return reply_refused(Some(re), error);
+                    }
+                    self.rates.count(&client, Class::AppPush, now_us);
+                }
+                let part = push::Part {
+                    name,
+                    sha256,
+                    size: *size,
+                    part: *part,
+                    parts: *count,
+                    data,
+                };
+                let (sha256, bytes) = match self.app_pushes.gather(&client, &part, now_us) {
+                    Ok(push::Gathered::Got(got)) => return ok(re, json!({"got": got})),
+                    Ok(push::Gathered::Whole { sha256, bytes }) => (sha256, bytes),
+                    Err(error) => return reply_refused(Some(re), error),
+                };
+                // Checked here, before a byte is staged: the package as a
+                // pushed app, and its grants against this pairing's now.
+                let told = match crate::app_push::checked(&bytes, &sha256, name, &grants) {
+                    Ok(told) => told,
+                    Err(error) => {
+                        self.app_pushes.not_installed();
+                        return reply_refused(Some(re), error);
+                    }
+                };
+                let staging = self.apps_staging.clone().expect("app push on");
+                let path = match push::stage_app(&staging, &sha256, &bytes) {
+                    Ok(path) => path,
+                    Err(error) => {
+                        self.app_pushes.not_installed();
+                        eprintln!("lamp-control: app.push: staging the package: {error}");
+                        return refuse(
+                            ErrorCode::Refused,
+                            "the lamp could not keep the package".to_owned(),
+                        );
+                    }
+                };
+                let client_name = self.clients.get(&client).map(|paired| paired.name.clone());
+                return Outcome {
+                    ask: Some(Ask {
+                        rev: self.rev_of(&client),
+                        ..Ask::app_install(re, &client, client_name.as_deref(), &path, told)
+                    }),
+                    ..Outcome::default()
+                };
+            }
+            Op::AppList {} | Op::AppRemove { .. } => {
+                if self.asking.contains(&client) {
+                    return refuse(
+                        ErrorCode::Busy,
+                        "this computer's last request is still with the lamp's helper".to_owned(),
+                    );
+                }
+                if self.asking.len() >= ASKING_MOST {
+                    return refuse(
+                        ErrorCode::Busy,
+                        "the lamp's apps helper is busy: try again".to_owned(),
+                    );
+                }
+                if let Err(retry_ms) = self.rates.check(&client, Class::AppManage, now_us) {
+                    let mut error = Error::new(ErrorCode::Rate, Class::AppManage.says());
+                    error.retry_ms = Some(retry_ms);
+                    return reply_refused(Some(re), error);
+                }
+                self.rates.count(&client, Class::AppManage, now_us);
+                self.asking.insert(client.clone());
+                let ask = match &op {
+                    Op::AppRemove { name } => Ask::app_remove(re, &client, name),
+                    _ => Ask::app_list(re, &client),
+                };
+                return Outcome {
+                    ask: Some(ask),
+                    ..Outcome::default()
+                };
+            }
             Op::NotesSet { .. }
             | Op::NotesGet { .. }
             | Op::NotesDelete { .. }
@@ -1233,20 +1575,33 @@ impl Door {
                     return reply_refused(Some(re), error);
                 }
                 let notes = self.notes.as_ref().expect("notes on");
+                // A made skill's run, with its switch (#7245): its notes are
+                // its skill's, so its next run reads them back. Off, or no
+                // live run, the run's own client as before.
+                // The session's own client still takes the rate and the reply.
+                let kept_as = if crate::runs::skill_notes_on() && session.run_socket {
+                    self.runs
+                        .of_client(&client, now_us)
+                        .map_or(client.clone(), |run| {
+                            crate::runs::skill_notes_client(&run.skill)
+                        })
+                } else {
+                    client.clone()
+                };
                 // A write is kept off the door's lock (two fsyncs took 11 to
                 // 15 ms on lamp-75c9, 10 Nov), its answer coming when it is;
                 // a read is from memory.
                 let answered = match &op {
-                    Op::NotesSet { key, value } => notes.set(&client, key, value),
-                    Op::NotesDelete { key } => notes.delete(&client, key),
-                    Op::NotesGet { key } => notes.get(&client, key).map(|found| {
+                    Op::NotesSet { key, value } => notes.set(&kept_as, key, value),
+                    Op::NotesDelete { key } => notes.delete(&kept_as, key),
+                    Op::NotesGet { key } => notes.get(&kept_as, key).map(|found| {
                         crate::notes::Step::Now(match found {
                             Some(value) => json!({"key": key, "found": true, "value": value}),
                             None => json!({"key": key, "found": false}),
                         })
                     }),
                     Op::NotesList { prefix } => {
-                        notes.list(&client, prefix).map(crate::notes::Step::Now)
+                        notes.list(&kept_as, prefix).map(crate::notes::Step::Now)
                     }
                     _ => unreachable!("a notes op"),
                 };
@@ -1381,13 +1736,20 @@ impl Door {
         // The quiet hours, before the rate, so a refusal isn't counted. A
         // turn meets them with or without a prompt: it opens the lamp to
         // talk.
-        if matches!(op, Op::Say { .. } | Op::Sound { .. } | Op::TurnStart { .. })
-            && let Some(why) = self
-                .quiet
-                .as_mut()
-                .and_then(|quiet| quiet.refuses(&client, wall_s))
-        {
-            return refuse(ErrorCode::QuietHours, why);
+        // A skill's run meets the lamp's quiet hours whatever a paired
+        // computer's setting (#7625): a trigger's or a schedule's run could
+        // otherwise talk at 3 a.m.; with the lamp's time unknown, quiet.
+        if matches!(op, Op::Say { .. } | Op::Sound { .. } | Op::TurnStart { .. }) {
+            let run = session.run_socket && self.quiet_runs;
+            let why = match self.quiet.as_mut() {
+                Some(quiet) if run => quiet.refuses_run(&client, wall_s),
+                Some(quiet) => quiet.refuses(&client, wall_s),
+                None if run => Some("quiet hours: the lamp's local time isn't known".to_owned()),
+                None => None,
+            };
+            if let Some(why) = why {
+                return refuse(ErrorCode::QuietHours, why);
+            }
         }
         let class = Class::of(&op);
         if let Some(class) = class
@@ -1556,6 +1918,44 @@ impl Door {
                 Error::new(ErrorCode::BadRequest, "hello once a connection"),
             );
         }
+        // By the app socket: the app its cgroup named, with its manifest's
+        // grants; the client and signature need only be well-formed, and a
+        // token is no part of it.
+        if let Some(app) = session.app.clone() {
+            if token.is_some() || !crate::runs::plain(client) || sig.len() > 128 {
+                let mut outcome = reply_refused(
+                    Some(re),
+                    Error::new(
+                        ErrorCode::BadRequest,
+                        "on this socket hello is a plain client id and a signature, no token",
+                    ),
+                );
+                outcome.close = true;
+                return outcome;
+            }
+            self.clients.add_run(
+                &app.client,
+                &app.name,
+                app.grants.clone(),
+                now_us / 1_000_000,
+            );
+            *self.open.entry(app.client.clone()).or_default() += 1;
+            session.client = Some(app.client.clone());
+            let limits = limits(
+                self.quiet.as_ref().and_then(|quiet| quiet.window),
+                self.rates.lifted(),
+            );
+            return ok(
+                re,
+                json!({
+                    "lamp": self.lamp_info(),
+                    "grants": app.said_grants(),
+                    "limits": limits,
+                    "app": app.name,
+                    "version": app.version,
+                }),
+            );
+        }
         // By the run socket: a live one-run token and nothing else; the run's
         // own client and the grants the token names. Any other way in, a
         // token is no part of hello.
@@ -1585,10 +1985,7 @@ impl Door {
             };
             *self.open.entry(run.client.clone()).or_default() += 1;
             session.client = Some(run.client.clone());
-            let limits = limits(
-                self.quiet.as_ref().and_then(|quiet| quiet.window),
-                self.rates.lifted(),
-            );
+            let limits = limits(self.run_quiet_window(), self.rates.lifted());
             return ok(
                 re,
                 json!({
@@ -1662,7 +2059,7 @@ impl Door {
         ok(
             re,
             json!({
-                "lamp": self.lamp_info(),
+                "lamp": self.lamp_info_known(),
                 "grants": grants,
                 "limits": limits,
             }),
@@ -2970,6 +3367,107 @@ mod tests {
         assert!(limits.get("take_max_ms").is_none());
     }
 
+    /// #7625 (lamp-9adf, 18 Nov): a skill's run spoke for itself 6 min 19 s
+    /// after a night ask, through its own `say`, with quiet hours off for
+    /// computers. A run's say, sound and turn meet the lamp's quiet hours
+    /// whatever the computers' setting, and while the lamp's time is
+    /// unknown; by day they go; a paired computer is as before; and with
+    /// `LAMP_CONTROL_QUIET_RUNS=off` a run is as before too.
+    #[test]
+    fn a_skill_runs_say_is_held_in_the_lamps_quiet_hours_and_a_computers_is_not() {
+        let utc7 = std::sync::Arc::new(lamp_local_time::LocalTime::Offset(7 * 60));
+        const MIDNIGHT_UTC: u64 = 1_793_145_600;
+        let at = |hour_local: u64| MIDNIGHT_UTC + ((hour_local + 24 - 7) % 24) * 3_600;
+        let say = r#"{"id":3,"op":"say","text":"Here is your plan."}"#;
+        let sound = r#"{"id":4,"op":"sound","name":"chime"}"#;
+        let turn = r#"{"id":6,"op":"turn.start"}"#;
+        // Quiet hours off for computers (the product's default), held for runs.
+        let (door, mut session, mut fake) = run_door(&[Grant::Speak, Grant::Hear], None);
+        let mut door = door
+            .with_quiet_hours(Quiet::new(Some(utc7.clone())))
+            .with_quiet_runs(true);
+        for hour in [22, 23, 0, 3, 6] {
+            for frame in [say, sound, turn] {
+                let refused = door.handle(&mut session, frame, &mut fake, 2 * S, at(hour));
+                assert_eq!(
+                    code_of(&refused),
+                    Some("quiet_hours"),
+                    "{hour}: {refused:?}"
+                );
+                assert_eq!(
+                    reply(&refused)["error"]["why"],
+                    "quiet hours: 22:00 to 07:00 local, a skill's run"
+                );
+            }
+        }
+        assert!(fake.did.is_empty(), "{:?}", fake.did);
+        // By day the run says it.
+        assert_eq!(
+            reply(&door.handle(&mut session, say, &mut fake, 3 * S, at(12)))["ok"],
+            true
+        );
+        // The lamp's time unknown: a run is quiet, as a computer is with a window.
+        let unknown = door.handle(&mut session, say, &mut fake, 4 * S, 1_000);
+        assert_eq!(code_of(&unknown), Some("quiet_hours"));
+        let (door, mut session, mut fake) = run_door(&[Grant::Speak, Grant::Hear], None);
+        let mut door = door.with_quiet_runs(true);
+        let unwired = door.handle(&mut session, say, &mut fake, 2 * S, at(12));
+        assert_eq!(
+            code_of(&unwired),
+            Some("quiet_hours"),
+            "no zone wired: unknown"
+        );
+        // A paired computer at 23:00, quiet hours off for computers: said.
+        let computer = Computer::new(40);
+        let (door, mut session, mut fake) = paired(&computer, &[Grant::Speak, Grant::Hear]);
+        let mut door = door
+            .with_quiet_hours(Quiet::new(Some(utc7.clone())))
+            .with_quiet_runs(true);
+        assert_eq!(
+            reply(&door.handle(&mut session, say, &mut fake, 2 * S, at(23)))["ok"],
+            true
+        );
+        // A run's hello says the window it is held to, never "off".
+        let held =
+            Door::new("lamp-75c9", "Lamp", PIN, Clients::default(), None).with_quiet_runs(true);
+        assert_eq!(
+            held.run_quiet_window(),
+            Some(lamp_local_time::QuietWindow::DEFAULT)
+        );
+        let not = Door::new("lamp-75c9", "Lamp", PIN, Clients::default(), None);
+        assert_eq!(not.run_quiet_window(), None);
+        // One window for the whole lamp (the first builder's condition on
+        // #7625): every minute of the day, a run is held exactly when
+        // lamp-skills and the told path count the lamp's quiet hours
+        // (`lamp_local_time::quiet_hours`), whatever a computer's setting.
+        let (door, mut session, mut fake) = run_door(&[Grant::Speak, Grant::Hear], None);
+        let mut door = door
+            .with_quiet_hours(
+                Quiet::new(Some(utc7.clone()))
+                    .with_window(Some(lamp_local_time::QuietWindow { from: 60, to: 120 })),
+            )
+            .with_quiet_runs(true);
+        let local = lamp_local_time::LocalTime::Offset(7 * 60);
+        for minute in 0..1_440u64 {
+            let wall_s = MIDNIGHT_UTC + ((minute + 1_440 - 7 * 60) % 1_440) * 60;
+            let skills_quiet =
+                lamp_local_time::quiet_hours(local.minute_of_day(wall_s.saturating_mul(1_000)));
+            let held =
+                code_of(&door.handle(&mut session, sound, &mut fake, 10 * S + minute, wall_s))
+                    == Some("quiet_hours");
+            assert_eq!(held, skills_quiet, "minute {minute}");
+        }
+        // The switch off: a run at 23:00 says it, as before #7625.
+        let (door, mut session, mut fake) = run_door(&[Grant::Speak, Grant::Hear], None);
+        let mut door = door
+            .with_quiet_hours(Quiet::new(Some(utc7)))
+            .with_quiet_runs(false);
+        assert_eq!(
+            reply(&door.handle(&mut session, say, &mut fake, 2 * S, at(23)))["ok"],
+            true
+        );
+    }
+
     /// The welcome and the hello both say the owner's language, read at each
     /// connection: English with no file, the file's code with one, and a
     /// change shows on the next connection with no restart.
@@ -3013,6 +3511,47 @@ mod tests {
             "unknown"
         );
         let _ = std::fs::remove_file(&file);
+    }
+
+    /// The build, when the unit handed it in, is said in the hello's `lamp`
+    /// only, after the signature check, and never in the welcome that any
+    /// connection gets first (Heron's P2 on #7528); with none the field is
+    /// not there at all (never null, never a made-up value), and nothing
+    /// else in `lamp` changes.
+    #[test]
+    fn only_the_hello_says_the_build_and_only_when_it_is_known() {
+        let computer = Computer::new(42);
+        let (door, _, mut fake) = paired(&computer, &[Grant::Light]);
+        let mut door = door;
+        fn said(door: &mut Door, computer: &Computer, fake: &mut Fake, at: u64) -> (Value, Value) {
+            let (mut session, welcome) = door.open();
+            let hello = door.handle(&mut session, &computer.hello_frame(&welcome), fake, S, at);
+            (welcome["lamp"].clone(), reply(&hello)["lamp"].clone())
+        }
+        let (welcome, hello) = said(&mut door, &computer, &mut fake, 1);
+        for lamp in [&welcome, &hello] {
+            assert!(lamp.get("build").is_none(), "no build, no field: {lamp}");
+            assert!(lamp["id"].is_string() && lamp["v"] == 1, "{lamp}");
+        }
+        let mut door = door.with_build(Some("143+ab12cd34ef56".to_owned()));
+        let (welcome, hello) = said(&mut door, &computer, &mut fake, 2);
+        assert!(
+            welcome.get("build").is_none(),
+            "never before the signature: {welcome}"
+        );
+        assert_eq!(hello["build"], "143+ab12cd34ef56");
+        // A hello that fails its signature does not say it either.
+        let (mut session, welcome) = door.open();
+        let bad = json!({"id": 9, "op": "hello", "client": pairing::client_id(&computer.key()), "sig": crate::runs::hello_sig()}).to_string();
+        let refused = door.handle(&mut session, &bad, &mut fake, S, 2);
+        assert!(welcome["lamp"].get("build").is_none());
+        assert!(
+            !reply(&refused).to_string().contains("143+ab12cd34ef56"),
+            "{refused:?}"
+        );
+        let mut door = door.with_build(None);
+        let (welcome, hello) = said(&mut door, &computer, &mut fake, 3);
+        assert!(welcome.get("build").is_none() && hello.get("build").is_none());
     }
 
     /// Hello's `hold_max_ms` keeps its meaning, a light's longest `for_ms`
@@ -3976,6 +4515,93 @@ mod tests {
         assert!(fake.did.is_empty());
     }
 
+    // --- An installed app's socket (#7415 3b) ---
+
+    fn app_peer(grants: &[Grant]) -> crate::app_socket::AppPeer {
+        crate::app_socket::AppPeer {
+            name: "demo".to_owned(),
+            title: "Demo".to_owned(),
+            version: "1.2.3".to_owned(),
+            client: crate::app_socket::app_client("demo"),
+            grants: grants.iter().copied().collect(),
+            remember: false,
+        }
+    }
+
+    /// `remember` is an app's own grant: said in hello beside the door's,
+    /// never one the door's ops read.
+    #[test]
+    fn an_apps_hello_says_its_remember_grant() {
+        let mut door = Door::new("lamp-75c9", "Lamp", PIN, Clients::default(), None);
+        let mut fake = Fake::default();
+        let mut peer = app_peer(&[Grant::Speak, Grant::Light]);
+        peer.remember = true;
+        let (mut session, _) = door.open_app(peer);
+        let hello =
+            json!({"id": 1, "op": "hello", "client": "c_0", "sig": crate::runs::hello_sig()})
+                .to_string();
+        let outcome = door.handle(&mut session, &hello, &mut fake, S, 2);
+        assert_eq!(
+            reply(&outcome)["grants"],
+            json!(["light", "speak", "remember"])
+        );
+        assert!(session.app_peer().is_some_and(|app| app.remember));
+    }
+
+    #[test]
+    fn an_app_says_hello_with_its_manifests_grants_and_is_told_its_name_and_version() {
+        let mut door = Door::new("lamp-75c9", "Lamp", PIN, Clients::default(), None);
+        let mut fake = Fake::default();
+        let (mut session, _) = door.open_app(app_peer(&[Grant::Light]));
+        // No pairing here, and no hello yet.
+        let pair =
+            json!({"id": 1, "op": "pair", "name": "x", "key": "k", "proof": "p"}).to_string();
+        assert_eq!(
+            code_of(&door.handle(&mut session, &pair, &mut fake, S, 1)),
+            Some("bad_request")
+        );
+        let early = json!({"id": 2, "op": "gesture", "name": "nod"}).to_string();
+        assert_eq!(
+            code_of(&door.handle(&mut session, &early, &mut fake, S, 1)),
+            Some("no_hello")
+        );
+        // A token is no part of it; a client that is not plain is refused.
+        let token =
+            json!({"id": 3, "op": "hello", "client": "c_1", "sig": crate::runs::hello_sig(), "token": "T"})
+            .to_string();
+        assert_eq!(
+            code_of(&door.handle(&mut session, &token, &mut fake, S, 1)),
+            Some("bad_request")
+        );
+        let hello =
+            json!({"id": 4, "op": "hello", "client": "c_0", "sig": crate::runs::hello_sig()})
+                .to_string();
+        let outcome = door.handle(&mut session, &hello, &mut fake, S, 2);
+        let said = reply(&outcome);
+        assert_eq!(said["ok"], true, "{outcome:?}");
+        assert_eq!(said["app"], "demo");
+        assert_eq!(said["version"], "1.2.3");
+        assert_eq!(said["grants"], json!(["light"]));
+        // A grant the manifest did not have is refused as the door refuses it.
+        let gesture = json!({"id": 5, "op": "gesture", "name": "nod"}).to_string();
+        assert_eq!(
+            code_of(&door.handle(&mut session, &gesture, &mut fake, S, 3)),
+            Some("no_grant")
+        );
+        // The record lives while a connection does.
+        assert!(
+            door.clients()
+                .get(&crate::app_socket::app_client("demo"))
+                .is_some()
+        );
+        door.closed(&session, 4);
+        assert!(
+            door.clients()
+                .get(&crate::app_socket::app_client("demo"))
+                .is_none()
+        );
+    }
+
     // --- A skill run's linked services (#6432) ---
 
     fn service(code: &str, access: protocol::Access) -> Grant {
@@ -4136,7 +4762,7 @@ mod tests {
         let asked: Value = serde_json::from_str(&served.join().unwrap()).unwrap();
         assert_eq!(
             asked,
-            json!({"op": "call", "name": "service_read", "skill": "mail-count",
+            json!({"op": "call", "name": "service_read", "skill": "mail-count", "run": "r1",
                 "args": {"what": "search", "query": "is:unread", "service": "gmail-app"}})
         );
         // Once the run ends, its connection holds nothing.
@@ -4253,7 +4879,7 @@ mod tests {
         );
         assert!(lines[0].get("fixed_write_run").is_none(), "{}", lines[0]);
         let given = json!({"op": "call", "name": "service_write", "skill": "mail-count",
-            "fixed_write_run": "r1",
+            "fixed_write_run": "r1", "run": "r1",
             "args": {"service": "gmail-app", "action": "send_mail", "to": ["boss@work.test"],
                      "subject": "In", "text": "I'm at my desk."}});
         assert_eq!(lines[1], given);

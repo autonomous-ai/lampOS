@@ -542,6 +542,83 @@ as soon as the lamp may speak after the model's answer (below). `room_sounds` an
 ask their questions exactly too (see the step table), each ending "Just say yes
 or no.", and keep their consent clauses.
 
+**With nothing asked (`LAMP_FACE_NO_ASK=on`, off unless set).** The
+product owner's no-asks rule (the first builder 18:50, 18 Nov; the setup
+walk's half, past setup and the photo are [eyes.md](eyes.md)'s). On a lamp
+that keeps faces with `LAMP_NAMES=checked`, "who you are" is asked with the
+walk's own note (`skill::WHO_YOU_ARE_NO_ASK`, in place of the file's
+`first` and `reoffer`, on a redo too): once the name is heard the model
+calls `remember_my_face` at once. There is no "May I remember your face?",
+no read-back's yes before the save, no save held for one, and the walk
+never asks the face question itself (`skill::FACE_ASK`). The name's own
+checks stay (heard, or spelled after the lamp asked).
+
+The face is kept only with the same speaking-face proof as past setup
+(#7810, the Reviewer-lead's HOLD and the first builder's ruling): the
+speaker-bound route (`LAMP_REMEMBER_SPEAKER`, `known_faces::run_speaker`),
+where the eyes saw that face say the name, in the request's own words
+naming the speaker. Then the speaker's leave for the face (`FACE_LEAVE`)
+is not asked, and only when the eyes answer `remembered` is the model told
+to say "I'll know you next time. Say 'forget my face' to undo."
+(`known_faces::SETUP_KEPT_NO_ASK`). Without that proof nothing is kept and
+nothing is asked, not the read-back nor the face question
+(`known_faces::SETUP_NOT_KEPT_NO_ASK`): one face seen silent while another
+voice says the name (a TV, a second person), another person's name ("This
+is my son Tom"), two faces, none, too far or the eye shut, and any save
+off the speaker-bound route (`run_switched`, where one face in view is not
+proof of who spoke). The step then ends with the name only, on its own line,
+"Thanks, it's good to meet you." (`skill::NAME_ONLY_NO_ASK`, in place of
+`NAME_ONLY`'s "once I've seen your face", which nothing would keep), and
+the face is never asked for once more (`face_again` is not kept); it is learned later on the speaker route, when they say "I'm X". A
+plain yes at setup with no save called runs none and asks no face question
+(`second_provider::yes_save`, `Engine::keeping_faces_unasked`). "Forget my
+face" is unchanged. Off, the walk is as described above, the held save
+included.
+
+**A way back for a lamp that knows nobody (`LAMP_FACE_LEARN_LATER=on`, off
+unless set, #7876).** Only with `LAMP_FACE_NO_ASK` and
+`LAMP_REMEMBER_SPEAKER` on too (`learn_later::switched`); the three go on in
+the product together. A lamp set up with no face kept (lamp-e82d, 18 Nov)
+kept nothing in every later conversation. With the walk over and nothing of
+it led, the walk asks once, as its own line, "What should I call you?"
+(`learn_later::ASK`), when all of these hold:
+
+- the eyes know nobody: 0 people in their `{"list":true}` answer, read by a
+  thread of its own every 30 s off every reply's path (`learn_later::start`);
+  not yet answered is no;
+- the conversation's first line (after 60 s of quiet) is a greeting and
+  nothing more ("Hi lamp.", "Hello, how are you?"; a task or a question is
+  not), a face read speaking as it was said (the eyes' `speaking`, within
+  6 s of its end), and no second face in view since it began;
+- the lamp's answer to it ended 1.5 to 10 s ago, no second line heard, one
+  face in view now, English (as the walk's name reading);
+- the bounds in the walk's file (`Progress::learn_later`, kept through a
+  redo of the whole walk, wiped by a reset): at most once in 24 h; an ask
+  left unanswered counts, and after 3 it is never asked again; the model
+  judging the answer a decline, or "forget my face" at any time, stops it
+  for good.
+
+It is getting to know someone, never a consent question. The ask is said
+with no chat, so nothing is read from memory for it, and the second route
+keeps its exchange out of memory (`learn_later::is_ask`, `remember::keep_out`).
+The model judges the answer, never a list of words (the owner's rule, 13
+Nov): on the one line after the ask (30 s at most) the second route tells it
+it just asked (`learn_later::ANSWER_NOTE`) and declares
+`not_telling_their_name` (`learn_later::DECLINED`, with the switch passed to
+the worker). That call, only on the ask's answer, tells the walk by its
+mailbox to stop for good (`{"learn_later":"declined"}`); `remember_my_face`
+on it tells it the ask was answered (`{"learn_later":"answered"}`). "I don't
+mind, call me Sam" is a name. On a name, names checked, the model calls
+`remember_my_face`, and the speaker-bound route (`known_faces::run_speaker`)
+proves the face in view said its own name, unchanged (#7787). Only when the
+eyes answer `remembered` is the model told to say "I'll know you next time.
+Say 'forget my face' to undo." (`KEPT_NO_ASK`); the eyes refusing (two
+faces, none, too far), nothing is kept and nothing said of it. The setup
+name answered again is that person (`known_faces::memory_person`, the same
+id); another name is its own person. The old face question is never asked
+again, and the room's earlier exchanges stay the room's. Off, nothing of
+this runs.
+
 **A skip is said from the record.** The model may only skip `where_you_sit`,
 `how_you_sound`, `touch` and `giving_way`. For those four, the walk itself says
 the step's `skipped` line once the skip is in the record, before the next
@@ -590,7 +667,35 @@ The record, for lamp-ears (`onboarding/storage.rs`, `room_sounds`):
   any progress write or start whose `room_sounds` outcome is not `done`,
   unless it is the owner's yes from the app that still stands (below).
   It is never written back from the progress, so once removed it stays
-  gone until a new yes.
+  gone until a new yes. With `LAMP_NOTICING_BY_DEFAULT=on` (#7767,
+  [switches.md](switches.md)), where a missing file is on, a kept no
+  (`{"room_sounds":"no",...}`, `lamp_msgs::consent::no_bytes`: the voice's
+  stop, the app's off or the walk's own) is left in place by every start
+  and progress write, a redo too, and a "no" (`skipped`) at the lamp keeps
+  one (`"by":"voice"`, at the "no"'s time) where the write would remove
+  the file; only a yes or the factory reset replaces it. A no given
+  before the switch was on removed the file then, so at each lamp-voice
+  start with the switch on, until done, `keep_old_nos` keeps a no
+  (`"by":"voice"`) for each step whose progress holds the "no"
+  (`skipped`), at the "no"'s time (now when it is 0), and for seen
+  activity when the app's mark (`seen-activity-mark.json`, raised by an
+  app's yes or off, the lamp's stop and a forget) stands beside no yes
+  file, at the mark's time. Each is written whole in the yes's mode and
+  group, under the mark's lock (a lock not taken writes nothing), never
+  over a file already there. Then the done mark
+  `noticing-old-nos.done` (`lamp_msgs::consent::OLD_NOS_DONE`) is written
+  in the consent folder, only after every no is kept, so a failed one is
+  tried again at the next start and a later yes is never turned back into
+  a no; one journal line names the keys, no words. **Until the done mark
+  is there, every reader (the ears, the eyes, lamp-seen, skills' face
+  reads) reads a missing file as no** (`consent::read_or`), so a
+  migration that never ran or failed half way leaves the lamp off (the
+  first builder's c7003588081 on #7767). Once it is there, a "no" in the
+  walk and the voice's stop keep a no even with the switch off, and a
+  start off leaves a kept no, so on, off, on still reads it as no; the
+  app's off with the switch off still removes the file (slice 6). Off on a
+  lamp never switched on (no done mark), all of it is as above, byte for
+  byte, and nothing is written.
 - Shape: `{"version":1,"room_sounds":"yes","at_unix_s":<when the yes was kept>,"by":"voice"}`
   (keys in that file sorted, as `lamp_msgs::consent::bytes` writes them;
   files from before `by` have none and are the voice's).
@@ -657,19 +762,39 @@ off until a yes, spoken or in the app.
 The owner's yes to lamp-seen looking now and then at what they do at the
 desk (eating, drinking, slouching), kept beside the two above and in their
 shape, but given at any time, never asked at onboarding. Only with
-`LAMP_SEEN_ACTIVITY=on`, lamp-seen's own switch (off unless set); off, no
-function is declared and the app has no such key.
+`LAMP_SEEN_ACTIVITY=on`, lamp-seen's own switch (off unless set; on in the
+product units, lamp-seen's, the voice's and lamp-cloud's); off, no
+function is declared and the app has no such key. The voice's offer,
+`offer_desk_noticing`, has a switch of its own, `LAMP_SEEN_VOICE_OFFER`
+(`on` only; off unless set, and off in the product, the first builder on
+#7506): without it the offer is not declared and a call of it is nobody's,
+so no spoken yes can be taken (`look_at_my_desk` is refused, its note telling the model the yes is in
+the app, under Desk noticing, and naming no undeclared function) and the
+yes comes from the app; "stop looking"
+(`stop_looking_at_my_desk`) works either way (test
+`with_the_voice_offer_off_no_request_is_offered_the_desk_offer`). With it on, the offer never comes
+during setup's walk: on the second route `offer_desk_noticing` is left out
+of every chat request while the walk is under way
+(`onboarding::under_way_now`), always, not behind
+`LAMP_SECOND_WHILE_THEY_APPLY`, and given again once it ends; with no offer
+`look_at_my_desk` is refused (test
+`the_desk_offer_is_never_made_during_setups_walk`).
+
+**Without the yes** (the first builder, c6948639068): Without your yes, the lamp still keeps, on the lamp only, how long you've sat at the desk; it sends nothing. Once a
+remembered face sits at the desk, lamp-seen says the sitting's local timers on
+`humans/doing` (the clock and the face only, whatever the opt-in); no
+picture is taken or sent and nothing from the cloud is in them.
 
 | | Room sounds | Seen activity |
 |---|---|---|
 | Key, file | `room_sounds`, `room-sounds.json` | `seen_activity`, `seen-activity.json` |
-| Asked | once, at onboarding, on a no-slide lamp | when the person asks the lamp to notice what they do at the desk ("keep an eye on whether I eat"): the model's `offer_desk_noticing` gives it the disclosure to say word for word (`SEEN_DISCLOSURE`, the PM's wording on #6543 with the lead's "you or anyone else" (#1711): "I can notice when you eat, drink or take a break, so my reminders fit better. To do that, while you or anyone else is at the desk I'd send a few pictures from my camera to Autonomous's server to be recognised, and they're deleted once they're checked. My light shows each time I send one, and you can tell me to stop any time. Shall I?"; with `LAMP_SEEN_POSTURE=on`, ", and how you're sitting" after "take a break"), and keeps the offer pending when it was said aloud. The offer counts only when the lamp played the disclosure whole: every word of it, in order, in the lamp's words as played for that turn (`thread`'s `lamp_for`), and the answer not cut, interrupted or barged in (`heard_only`), as a write's read-back is checked (`services::read_back_said`). An offer whose words a newer line cut short, answered in that line's place (a held line's, or one that only declined with `LAMP_CUT_ASK_ANSWERED`), goes with them (`seen_yes::answered_in_place`, as `services::answered_in_place` keeps a read-back): the replay must play the disclosure whole and uncut itself, and the line after it answers the offer (lamp-06c1, 17 Nov: a 0-word line cut the offer before any word of it, the replay played it whole, and the owner's yes found no offer). **Owed before the switch goes on:** "deleted once they're checked" waits on the backend's written retention confirmation (#6912). An ordinary look ("look at my desk, where are my keys?") is never an offer |
+| Asked | once, at onboarding, on a no-slide lamp | when the person asks the lamp to notice what they do at the desk ("keep an eye on whether I eat"): the model's `offer_desk_noticing` gives it the disclosure to say word for word (`SEEN_DISCLOSURE`, the PM's wording on #6543 with the lead's "you or anyone else" (#1711), naming what the yes covers by the first builder's c6957770745: "I can notice when you eat, drink, take a break, look tired or celebrate, and I react to what I notice. To do that, while you or anyone else is at the desk I'd send a few pictures from my camera to Autonomous's server to be labelled, and they're deleted once they're checked. My light shows each time I send one, and you can tell me to stop any time. Shall I?"; with `LAMP_SEEN_POSTURE=on`, ", and how you're sitting" after "celebrate"), and keeps the offer pending when it was said aloud. The offer counts only when the lamp played the disclosure whole: every word of it, in order, in the lamp's words as played for that turn (`thread`'s `lamp_for`), and the answer not cut, interrupted or barged in (`heard_only`), as a write's read-back is checked (`services::read_back_said`). An offer whose words a newer line cut short, answered in that line's place (a held line's, or one that only declined with `LAMP_CUT_ASK_ANSWERED`), goes with them (`seen_yes::answered_in_place`, as `services::answered_in_place` keeps a read-back): the replay must play the disclosure whole and uncut itself, and the line after it answers the offer (lamp-06c1, 17 Nov: a 0-word line cut the offer before any word of it, the replay played it whole, and the owner's yes found no offer). Retention: confirmed by the owner, who runs the perception server, and accepted by the backend on #6912 (c6906610629). An ordinary look ("look at my desk, where are my keys?") is never an offer |
 | Spoken yes taken | the model's `setup_step` `done` after a clear yes | the model's `look_at_my_desk` (`seen_yes.rs`), only in the very next turn after the offer played whole (the offer goes at the next turn either way, and with no offer pending the call is refused), and only for the owner's own spoken line: seen saying it, or in their voice (`services::owners_yes_now`); in the private room (`LAMP_PRIVACY_ROOM`), their voice by the judge (`services::owners_voice_now`), so a television's line is none. A guest's, a typed or a later yes is refused and nothing is written |
 | Written by | the onboarding storage worker | the same writer (`storage::keep_yes`), from the voice's provider worker: whole, temporary file, mode set, group set, synced, renamed; 0640 root:lampos (0600 with no `lampos` group), `{"version":1,"seen_activity":"yes","at_unix_s":N,"by":"voice"}`. A yes already kept is left as it is |
 | Said back | the walk's or the model's words | by lamp-seen alone, on and off (its said-back record); the model is told to add nothing |
 | Taken back by voice | a "no" or a redo | anyone's "stop looking" (`stop_looking_at_my_desk`) removes the file, the safe side; never declined with its request, as reports' stop |
 | Forget | a forget of everything | any forget (`forget` and `forget_everything`, `remember.rs`), whoever asked, before the memory is asked; a journal line names the file only when one was there |
-| App | `consent.set` with `LAMP_APP_CONSENT=on`, only on a no-slide lamp | the same, only where `lamp-cloud` has `LAMP_SEEN_ACTIVITY=on` |
+| App | `consent.set` with `LAMP_APP_CONSENT=on`, only on a no-slide lamp | the same, only where `lamp-cloud` has `LAMP_SEEN_ACTIVITY=on`; and the owner's desk noticing switch, `desk_noticing.set` (`{"allow": bool, "request_id": N}`), with `LAMP_SEEN_ACTIVITY=on` alone: the same file through the same helper, `"by":"app"`, a yes kept only with `request_id` above the mark the voice's stop and a forget raise, off removing it as the voice's stop does, read back as `{"desk_noticing": {"on", "by", "posture"}}` (cloud.md, "Desk noticing from the app") |
 | Reset | the reset plan wipes it | the same |
 | Read by | lamp-ears, at its start | lamp-seen, every 2 s; it never writes the folder |
 
@@ -878,8 +1003,19 @@ redone alone; it goes with `all`. A call that names no step, or a step the
 walk doesn't know, reopens nothing and tells the model to ask which,
 naming the step IDs in the `order` (on
 lamp-06c1 on 28 Oct "redo the touch step" reached a redo with no step and
-reopened every step). Skipping one step is `setup_step … skipped`; skipping
-the rest is that for each step.
+reopened every step). The step may be said as it is spoken, not only as
+its ID (lamp-06c1, 18 Nov ~12:20-12:55: "where", "sitting", "where you
+sit" and "who you are" four times were each refused, and the owner said it
+again and again): the name is lowercased and trimmed, spaces and hyphens
+become `_`, and a leading "the " and a trailing " step" go, so "the who
+you are step" is `who_you_are`. A few clear names are taken too:
+"where", "sit", "sitting", "seat" and "where i sit" are `where_you_sit`;
+"who", "name", "my name" and "who i am" are `who_you_are`; "pet" and
+"head" are `touch`; "voice", "sound" and "how i sound" are
+`how_you_sound`. `all` is still taken only exactly, so a whole redo stays
+explicit, and any other name reopens nothing as above. The IDs are still
+not put in the schema as an enum (#5499, above). Skipping one step is
+`setup_step … skipped`; skipping the rest is that for each step.
 
 ## Where it is kept
 

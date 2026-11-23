@@ -114,6 +114,7 @@ on:
       - 'lampOS/docs/memory.md'
       - 'lampOS/docs/msgs.md'
       - 'lampOS/docs/setup.md'
+      - 'lampOS/docs/skill-format.md'
       - 'lampOS/docs/skills.md'
       - 'lampOS/docs/switches.md'
       - 'lampOS/docs/updates.md'
@@ -664,13 +665,18 @@ jobs:
   # nothing, this job builds the same targets here instead, from the last
   # cache, and saves them under the same key. Nothing waits on it: publish
   # needs only the ARM64 jobs. A push that reuses the train's build (#6556)
-  # built nothing and renews nothing.
+  # built nothing, so it renews here only when lamp-voice has no cache for its
+  # Cargo.lock: trains restore only that hash's, and built cold after every
+  # lock change until a push that reused nothing (#8009).
   cache:
     needs: [route, reuse]
-    if: ${{ !cancelled() && github.event_name == 'push' && needs.route.outputs.studio == 'true' && github.run_attempt == '1' && needs.reuse.outputs.run_id == '' }}
+    if: ${{ !cancelled() && github.event_name == 'push' && github.run_attempt == '1' && (needs.reuse.outputs.run_id != '' || needs.route.outputs.studio == 'true') }}
     name: lampOS — renew the pull requests' ARM64 cache
     runs-on: ubuntu-22.04-arm
     timeout-minutes: 60
+    permissions:
+      actions: read  # a reusing push lists lamp-voice's caches (#8009)
+      contents: read
     steps:
       - name: system packages
         # A fresh runner's unattended-upgrades can hold dpkg's lock as the job
@@ -701,11 +707,27 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y --no-install-recommends \
             ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev procps file
       - uses: actions/checkout@v4
+      # As a train's lookup: lamp-voice's newest cache for this Cargo.lock. Found,
+      # a reusing push builds nothing; none (or an API error), it renews (#8009).
+      - name: lamp-voice's newest cache (a push that reused the train's build)
+        id: lv
+        if: needs.reuse.outputs.run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREFIX: lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
+        run: |
+          key=$(gh api "repos/$GITHUB_REPOSITORY/actions/caches?ref=refs/heads/lamp-voice&key=$PREFIX&sort=created_at&direction=desc&per_page=100" \
+            --jq '[.actions_caches[] | select(.ref == "refs/heads/lamp-voice")][0].key // ""') || key=''
+          [[ "$key" =~ ^lampos-arm64-u2204-[0-9a-f]+-[0-9a-f]{40}$ ]] || key=''
+          echo "lamp-voice's cache: ${key:-none, renewing}"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
       - name: Rust 1.96.0
+        if: steps.lv.outputs.key == ''
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - name: restore the cache
+        if: steps.lv.outputs.key == ''
         id: cache
         uses: actions/cache/restore@v4
         with:
@@ -718,25 +740,30 @@ jobs:
             lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
             lampos-arm64-u2204-
       - name: unchanged source files get the cached build's times back
+        if: steps.lv.outputs.key == ''
         run: python3 -I .github/scripts/lampos-source-times.py
       - uses: taiki-e/install-action@v2
+        if: steps.lv.outputs.key == ''
         with:
           tool: cargo-nextest
       # The ARM64 job's own builds, so a pull request finds every target fresh.
       - name: build (release, the lamps' binaries)
+        if: steps.lv.outputs.key == ''
         working-directory: lampOS
         run: cargo build --locked --release --workspace --bins --examples
       - name: lamp-tasks static, no ELF interpreter (its byte copy is the skill-start launcher, #7133)
+        if: steps.lv.outputs.key == ''
         working-directory: lampOS
         run: bash deploy/build-lamp-tasks-static.sh target/release
       - name: build the test binaries (listed, not run)
+        if: steps.lv.outputs.key == ''
         working-directory: lampOS
         # The two own-harness tests cannot be listed; the ARM64 job leaves them out the same way.
         run: >-
           cargo nextest list --locked --release --workspace --profile pr
           -E 'not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))' > /dev/null
       - name: save the cache
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.lv.outputs.key == '' && steps.cache.outputs.cache-hit != 'true'
         timeout-minutes: 10
         uses: actions/cache/save@v4
         with:

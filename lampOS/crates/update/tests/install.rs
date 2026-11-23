@@ -190,6 +190,14 @@ impl Host for FakeHost {
 
     fn refresh(&mut self, argv: &[&str]) -> Result<(), String> {
         self.calls.push(format!("refresh {}", argv.join(" ")));
+        // The transient unit's `rm -f --`, done under the root (#7254).
+        if argv.first() == Some(&"systemd-run")
+            && let Some(at) = argv.iter().position(|word| *word == "--")
+        {
+            for path in &argv[at + 1..] {
+                let _ = fs::remove_file(self.root.join(path.trim_start_matches('/')));
+            }
+        }
         Ok(())
     }
 
@@ -488,6 +496,17 @@ fn a_blank_lamp_gets_every_part_its_units_and_nothing_started() {
         fs::read_to_string(lamp.on("/etc/tmpfiles.d/lampos.conf"))
             .unwrap()
             .contains("\nd /run/lampos-agent 0755 lampos lampos -\n")
+    );
+    // The apps' socket folder: made here, and named writable by lamp-control's
+    // unit (it never makes the folder itself; Heron's P2 on #7793).
+    assert!(
+        fs::read_to_string(lamp.on("/etc/tmpfiles.d/lampos.conf"))
+            .unwrap()
+            .contains("\nd /run/lampos-apps 0755 lampos lampos -\n")
+    );
+    assert!(
+        include_str!("../../../deploy/product/lamp-control.service")
+            .contains("\nReadWritePaths=-/run/lampos-apps\n")
     );
     assert!(
         calls.contains("tmpfiles /etc/tmpfiles.d/lampos.conf"),
@@ -820,6 +839,9 @@ fn the_exit_note_allowlist_is_exactly_clouds_product_services() {
         .unwrap()
         .map(|entry| entry.unwrap().file_name().into_string().unwrap())
         .filter(|name| name.starts_with("lamp-") && name.ends_with(".service"))
+        // The Store apps' templates are a third party's program, never reported by Cloud (and no app's name is
+        // sent): the same two names are left out in lamp-cloud's own check.
+        .filter(|name| !["lamp-app@.service", "lamp-app-net@.service"].contains(&name.as_str()))
         .collect();
     services.sort();
     assert_eq!(services, names, "no duplicate, omitted or extra unit");
@@ -1524,7 +1546,7 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
             );
         }
     }
-    assert_eq!(gated.len(), 27, "{gated:?}");
+    assert_eq!(gated.len(), 30, "{gated:?}");
     for outside in ["lamp-update.service", "lamp-records.timer"] {
         assert!(!gated.contains(&outside), "{outside}");
     }
@@ -1683,6 +1705,23 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {
     }
 }
 
+/// #7224, fault 4 (the first builder, 23:14): a capture reopen racing the
+/// speaker's re-prime mid-run is dropped as a gap, never the voice's exit,
+/// in the product from landing.
+#[test]
+fn the_product_voice_drops_frames_before_a_restarted_clock() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_VOICE_UNSTARTED_FRAME_DROP=on"),
+        "the voice lacks LAMP_VOICE_UNSTARTED_FRAME_DROP=on"
+    );
+}
+
 /// The tiered store beside Days stays off in the product (`LAMP_MEMORY_TIERS`,
 /// #4746): until its played test over days and two reads, no product file
 /// sets it, so lamp-memory serves Days alone.
@@ -1783,6 +1822,25 @@ fn the_product_keeps_what_was_heard() {
         service.contains(&"Environment=LAMP_MEMORY_KEEP_HEARD=on"),
         "the voice lacks LAMP_MEMORY_KEEP_HEARD"
     );
+}
+
+/// A split-second lapse of the privacy switch's readings is ridden in the
+/// product (#7224 fault 5, the first builder's ruling of 19 Nov 23:59): the
+/// gap ride beside the stall ride, both exactly `on`.
+#[test]
+fn the_product_rides_a_short_privacy_gap() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_PRIVACY_RIDES_STALL=on",
+        "Environment=LAMP_PRIVACY_GAP_RIDE=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
 }
 
 /// CAM++ one way only (`LAMP_SAME_VOICE_CONFIRMS`, the memory owner's
@@ -1895,6 +1953,29 @@ fn the_product_takes_back_a_doubted_keep() {
     assert!(
         service.contains(&"Environment=LAMP_MEMORY_DOUBT_UNDOES=on"),
         "the voice lacks LAMP_MEMORY_DOUBT_UNDOES"
+    );
+}
+
+/// An unsure line is simply not kept, and nothing is asked, in the
+/// product (`LAMP_MEMORY_UNSURE_NOT_KEPT`, #7739): the product owner's
+/// no-asks rule of 18 Nov. The near word's ask stays out of it.
+#[test]
+fn the_product_keeps_no_unsure_line_and_asks_nothing() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    assert!(
+        service.contains(&"Environment=LAMP_MEMORY_UNSURE_NOT_KEPT=on"),
+        "the voice lacks LAMP_MEMORY_UNSURE_NOT_KEPT"
+    );
+    assert!(
+        !service
+            .iter()
+            .any(|line| line.starts_with("Environment=LAMP_MEMORY_ASK_NEAR_HEARD")),
+        "the voice asks about a near word"
     );
 }
 
@@ -2130,6 +2211,33 @@ fn the_product_asks_a_holding_answer_to_go_on_in_the_voice_alone() {
             .count();
         assert_eq!(on, usize::from(*unit == owner), "{unit}");
         assert_eq!(mentioned, on, "{unit}");
+    }
+    assert!(install::PRODUCT.iter().any(|(unit, _)| *unit == owner));
+}
+
+/// A voice make is made, on at once and said in one line with its undo,
+/// never asked (`LAMP_MAKE_NO_ASKS`, #7783; the first builder's ruling on
+/// #7819, under the product owner's 18:41 rule): `on` once in
+/// `lamp-voice.service`, the one unit that reads it (`make_no_asks::on`,
+/// passed to its provider and second workers), and no other product unit
+/// names it.
+#[test]
+fn the_product_makes_and_removes_with_nothing_asked_in_the_voice_alone() {
+    let name = lamp_voice::make_no_asks::ENVIRONMENT;
+    assert_eq!(name, "LAMP_MAKE_NO_ASKS");
+    let owner = "lamp-voice.service";
+    let line = format!("Environment={name}=on");
+    for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service")
+            .iter()
+            .filter(|set| **set == line)
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|set| !set.starts_with('#') && set.contains(name))
+            .count();
+        assert_eq!(on, usize::from(*unit == owner), "{unit}: {line}");
+        assert_eq!(mentioned, on, "{unit}: {name}");
     }
     assert!(install::PRODUCT.iter().any(|(unit, _)| *unit == owner));
 }
@@ -2438,6 +2546,7 @@ fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
         for line in [
             "Environment=LAMP_MAKE_SKILL_AGENT=on",
             "Environment=LAMP_MAKE_AGENT_ONE_PATH=on",
+            "Environment=LAMP_MAKE_AGENT_GUIDE=on",
             "Environment=LAMP_MAKE_SKILL=on",
             "Environment=LAMP_TASKS_DIR=/run/lampos-tasks",
         ] {
@@ -2455,12 +2564,13 @@ fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
 /// reads it and in no other: a made skill started by its own words
 /// (`LAMP_MADE_SKILL_ASKS`, #7233) in lamp-voice, which makes it, and the
 /// four that load it (lamp-skills, its manage helper, lamp-cloud's skills
-/// page and lamp-control's token), so such a skill is never refused at
+/// page and lamp-control's token), and lamp-tasks for an agent make's own
+/// `lamp-skills pack` check (#7245), so such a skill is never refused at
 /// install, not loaded or listed as not loaded; a made skill not on never
 /// said on (`LAMP_MADE_NOT_ON_TOLD`, #7270) in lamp-voice alone; and a
 /// skill's task made sure of (`LAMP_SKILL_TASK_SURE`, #7239) in lamp-skills
 /// alone. A `cannot:` made a task for the lamp's agent
-/// (`LAMP_MAKE_NO_CANNOT`, #7234) stays off until its own row.
+/// (`LAMP_MAKE_NO_CANNOT`, #7234) is on with the make flow's five below.
 #[test]
 fn the_product_turns_the_skill_flows_three_switches_on_where_they_are_read() {
     let switches: [(&str, &[&str]); 3] = [
@@ -2472,6 +2582,8 @@ fn the_product_turns_the_skill_flows_three_switches_on_where_they_are_read() {
                 "lamp-skills-manage@.service",
                 "lamp-cloud.service",
                 "lamp-control.service",
+                // #7245: an agent make's own lamp-skills pack check.
+                "lamp-tasks.service",
             ],
         ),
         (
@@ -2509,6 +2621,87 @@ fn the_product_turns_the_skill_flows_three_switches_on_where_they_are_read() {
             assert!(
                 install::PRODUCT.iter().any(|(unit, _)| unit == owner),
                 "{owner} is not a product unit"
+            );
+        }
+    }
+}
+
+/// The make flow's five switches (the first builder's DEFAULT-ON, 19 Nov
+/// 21:42, on #7814), each `on` once in lamp-voice, whose part reads it, and
+/// in no other unit: a make the lamp can't build itself made a task for its
+/// agent (`LAMP_MAKE_NO_CANNOT`, #7234), made code that only lights, speaks
+/// or moves on at once (`LAMP_MADE_CODE_ON_AT_ONCE`), a skill the lamp has
+/// but is off turned on for a make asking for it (`LAMP_MAKE_CORE_OFFER`),
+/// "make a skill" listened for (`LAMP_SKILL_KEYTERM`) with a thing to do on
+/// a repeat told as a skill, never a reminder
+/// (`LAMP_SKILL_RECURRING_TOLD`). Each beside the companions its row
+/// names, on in the same unit. A skill written in the app
+/// (`LAMP_SKILL_WRITTEN`) follows #7977, the written-note size bound.
+#[test]
+fn the_product_turns_the_make_flows_five_switches_on_where_they_are_read() {
+    let voice: &[&str] = &["lamp-voice.service"];
+    let switches: [(&str, &[&str]); 5] = [
+        (lamp_voice::make_no_cannot::ENVIRONMENT, voice),
+        (lamp_voice::made_skill::CODE_AT_ONCE_ENVIRONMENT, voice),
+        (lamp_voice::make_core_offer::ENVIRONMENT, voice),
+        (
+            lamp_voice::second_provider::net::key_terms::SKILL_ENVIRONMENT,
+            voice,
+        ),
+        (lamp_voice::skill_recurring::ENVIRONMENT, voice),
+    ];
+    assert_eq!(
+        switches.map(|(name, _)| name),
+        [
+            "LAMP_MAKE_NO_CANNOT",
+            "LAMP_MADE_CODE_ON_AT_ONCE",
+            "LAMP_MAKE_CORE_OFFER",
+            "LAMP_SKILL_KEYTERM",
+            "LAMP_SKILL_RECURRING_TOLD",
+        ]
+    );
+    for (name, owners) in switches {
+        let line = format!("Environment={name}=on");
+        for (unit, text) in install::PRODUCT {
+            let on = section(text, "Service")
+                .iter()
+                .filter(|set| **set == line)
+                .count();
+            let mentioned = text
+                .lines()
+                .filter(|set| !set.starts_with('#') && set.contains(name))
+                .count();
+            assert_eq!(on, usize::from(owners.contains(unit)), "{unit}: {line}");
+            assert_eq!(mentioned, on, "{unit}: {name}");
+        }
+        for owner in owners {
+            assert!(
+                install::PRODUCT.iter().any(|(unit, _)| unit == owner),
+                "{owner} is not a product unit"
+            );
+        }
+    }
+    // The companions each row names, on in the unit that reads it.
+    let companions: [(&str, &[&str]); 1] = [(
+        "lamp-voice.service",
+        &[
+            "Environment=LAMP_MAKE_SKILL=on",
+            "Environment=LAMP_MADE_SCRIPTS=on",
+            "Environment=LAMP_SKILL_TASKS=on",
+        ],
+    )];
+    for (owner, lines) in companions {
+        let text = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == owner)
+            .unwrap()
+            .1;
+        let service = section(text, "Service");
+        for line in lines {
+            assert_eq!(
+                service.iter().filter(|set| *set == line).count(),
+                1,
+                "{owner} lacks {line}"
             );
         }
     }
@@ -2641,6 +2834,37 @@ fn the_skills_page_loads_skills_with_lamp_skills_own_switches() {
     }
 }
 
+/// Skills' runs wait late in a busy day so the voice keeps half of it (#7342,
+/// the first builder's DEFAULT-ON on #7814): `LAMP_SKILL_RUNS_VOICE_SHARE=on`
+/// once in the two units whose part reads it, alike, and named by no other
+/// product unit: `lamp-skills` (the bound, `relay_share::share`, where `on`
+/// is half the day) and `lamp-cloud` (its model forwarder keeps the reading).
+#[test]
+fn the_product_keeps_half_the_day_for_the_voice_alike_in_its_two_units() {
+    let name = lamp_skills::relay_share::SWITCH;
+    assert_eq!(name, "LAMP_SKILL_RUNS_VOICE_SHARE");
+    assert_eq!(
+        lamp_skills::relay_share::share_from(Some("on")),
+        Some(0.5),
+        "`on` keeps half the day"
+    );
+    let switch = format!("Environment={name}=on");
+    let readers = ["lamp-skills.service", "lamp-cloud.service"];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service.iter().filter(|line| **line == switch).count();
+        let mentioned = service.iter().filter(|line| line.contains(name)).count();
+        assert_eq!(on, usize::from(readers.contains(unit)), "{unit}");
+        assert_eq!(mentioned, on, "{unit} names {name}");
+    }
+    for reader in readers {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == reader),
+            "{reader} is not a product unit"
+        );
+    }
+}
+
 /// A skill's task reaches the public web on 80 and 443 with its owner's
 /// spoken yes (#7200, the first builder's three checks): `LAMP_TASK_NET=on`
 /// once in the six units whose part reads it, and no other product unit
@@ -2665,7 +2889,10 @@ fn the_product_lets_a_skills_task_reach_the_public_web() {
     for (unit, text) in install::PRODUCT {
         let service = section(text, "Service");
         let on = service.iter().filter(|line| **line == switch).count();
-        let mentioned = text.lines().filter(|line| line.contains(name)).count();
+        let mentioned = text
+            .lines()
+            .filter(|line| line.contains(&format!("{name}=")))
+            .count();
         assert_eq!(on, usize::from(readers.contains(unit)), "{unit}");
         assert_eq!(mentioned, on, "{unit} names {name}");
     }
@@ -2675,6 +2902,125 @@ fn the_product_lets_a_skills_task_reach_the_public_web() {
             "{reader} is not a product unit"
         );
     }
+}
+
+/// A skill the owner asks for by voice at night is told within its run
+/// (#7180; lamp-9adf, 16 Nov 02:28: its answer waited behind quiet hours and
+/// was skipped): `LAMP_TOLD_WHEN_ASKED` on, once, in the two units whose part
+/// reads it (lamp-skills' told answer, lamp-voice's second route and say
+/// service), each beside the skill task switch it rides on, and in no other.
+#[test]
+fn the_product_tells_a_skill_asked_for_by_voice_in_quiet_hours() {
+    let readers = ["lamp-skills.service", "lamp-voice.service"];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let wanted = usize::from(readers.contains(unit));
+        assert_eq!(
+            service
+                .iter()
+                .filter(|line| line.contains("LAMP_TOLD_WHEN_ASKED"))
+                .count(),
+            wanted,
+            "{unit}"
+        );
+        if wanted == 0 {
+            continue;
+        }
+        for line in [
+            "Environment=LAMP_TOLD_WHEN_ASKED=on",
+            "Environment=LAMP_SKILL_TASKS=on",
+        ] {
+            assert_eq!(
+                service.iter().filter(|set| **set == line).count(),
+                1,
+                "{unit} lacks {line}"
+            );
+        }
+    }
+    for unit in readers {
+        assert!(
+            install::PRODUCT.iter().any(|(name, _)| *name == unit),
+            "{unit} is not a product unit"
+        );
+    }
+}
+
+/// A gateway agent's (OpenClaw's) run granted `net` (#7742): its own
+/// egress socket, relayed in its skill-start fence alone, with
+/// `LAMP_TASK_NET_GATEWAY=on` once in the three units whose part reads it,
+/// beside `LAMP_TASK_NET`, and in no other: `lamp-tasks` (the run's way
+/// out, `skill_task::GATEWAY_NET_SWITCH`), `lamp-voice` (a make on
+/// OpenClaw may write its own code granted `net`) and
+/// `lamp-skills-manage@` (that code put on after the owner's yes).
+#[test]
+fn the_product_lets_a_gateway_agents_task_reach_the_public_web() {
+    let name = lamp_voice::skill_task_yes::GATEWAY_NET_ENVIRONMENT;
+    assert_eq!(name, "LAMP_TASK_NET_GATEWAY");
+    let switch = format!("Environment={name}=on");
+    let net = format!(
+        "Environment={}=on",
+        lamp_voice::skill_task_yes::NET_ENVIRONMENT
+    );
+    let readers = [
+        "lamp-tasks.service",
+        "lamp-voice.service",
+        "lamp-skills-manage@.service",
+    ];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service.iter().filter(|line| **line == switch).count();
+        let mentioned = text.lines().filter(|line| line.contains(name)).count();
+        assert_eq!(on, usize::from(readers.contains(unit)), "{unit}");
+        assert_eq!(mentioned, on, "{unit} names {name}");
+        if on == 1 {
+            assert!(service.contains(&net.as_str()), "{unit} lacks {net}");
+        }
+    }
+}
+
+/// A skill's read whose service isn't linked says once where to link it
+/// (#5518; the bundled Morning mail, Morning agenda and Tomorrow's plan
+/// otherwise say nothing, every day): `LAMP_SKILL_LINK_NOTE` on, once, in
+/// lamp-skills alone, the one unit whose part reads it, beside
+/// `LAMP_SKILL_READS` and with the `--state-dir` it keeps its note in.
+#[test]
+fn the_product_tells_once_that_a_skills_read_service_is_not_linked() {
+    let reader = "lamp-skills.service";
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let wanted = usize::from(*unit == reader);
+        assert_eq!(
+            service
+                .iter()
+                .filter(|line| line.contains("LAMP_SKILL_LINK_NOTE"))
+                .count(),
+            wanted,
+            "{unit}"
+        );
+        if wanted == 0 {
+            continue;
+        }
+        for line in [
+            "Environment=LAMP_SKILL_LINK_NOTE=on",
+            "Environment=LAMP_SKILL_READS=on",
+        ] {
+            assert_eq!(
+                service.iter().filter(|set| **set == line).count(),
+                1,
+                "{unit} lacks {line}"
+            );
+        }
+        assert!(
+            service
+                .iter()
+                .any(|line| line.starts_with("ExecStart=") && line.contains(" --state-dir ")),
+            "{unit} runs without --state-dir"
+        );
+    }
+    assert!(
+        install::PRODUCT.iter().any(|(name, _)| *name == reader),
+        "{reader} is not a product unit"
+    );
 }
 
 /// An uploaded skill's keys go in through the app and reach only its run
@@ -2759,13 +3105,11 @@ fn the_product_answers_a_stop_and_asks_after_a_wordless_cut_in() {
         service.contains(&"Environment=LAMP_CUT_IN_WORDLESS_ASKS=on"),
         "the voice lacks LAMP_CUT_IN_WORDLESS_ASKS"
     );
-    // Off for the candidate (the PM, 6 Nov): its lamp check came back FAIL,
-    // partial (#5430), so a busy room's cut is asked, as on stable.
+    // On in the product (#7413): a busy room's wordless cut goes on from the
+    // sentence it cut.
     assert!(
-        !service
-            .iter()
-            .any(|line| line.contains("LAMP_CUT_IN_WORDLESS_RESUMES")),
-        "the voice sets LAMP_CUT_IN_WORDLESS_RESUMES"
+        service.contains(&"Environment=LAMP_CUT_IN_WORDLESS_RESUMES=on"),
+        "the voice lacks LAMP_CUT_IN_WORDLESS_RESUMES"
     );
 }
 
@@ -2826,6 +3170,34 @@ fn the_voice_tells_a_skills_state_and_its_present_spacing() {
     );
 }
 
+/// A skill the person made is turned off and back on by voice, never
+/// removed for it (`LAMP_MADE_SKILL_OFF_SAID`, #7445): on lamp-9adf, 17 Nov
+/// 18:11, with it off in every unit, "turn off the mail count skill" was
+/// asked "Remove mail count?". `on`, once, in lamp-voice, the only part
+/// that reads it.
+#[test]
+fn the_voice_turns_a_made_skill_off_never_removing_it() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    let line = format!(
+        "Environment={}=on",
+        lamp_voice::made_skill::OFF_SAID_ENVIRONMENT
+    );
+    assert_eq!(
+        service.iter().filter(|set| **set == line).count(),
+        1,
+        "the voice sets {line} once"
+    );
+    assert_eq!(
+        lamp_voice::made_skill::OFF_SAID_ENVIRONMENT,
+        "LAMP_MADE_SKILL_OFF_SAID"
+    );
+}
+
 /// Each second-route turn is told the light as `light/state` says it now
 /// (`LAMP_LIGHT_TOLD`): on lamp-52e6 at 9928 (4 Nov), "what colour is the
 /// light?" was answered "White" three times while the light was warm at
@@ -2861,6 +3233,53 @@ fn the_product_never_says_an_action_no_call_made() {
         service.contains(&"Environment=LAMP_ACTION_CLAIM_CHECKED=on"),
         "the voice lacks LAMP_ACTION_CLAIM_CHECKED"
     );
+}
+
+/// A reply saying a made skill was removed, turned off or on, with no call
+/// that did it, is asked again, never said (`LAMP_SKILL_CLAIM_CHECKED`,
+/// #7730): on lamp-9adf a false "Space facts is off." came with no call.
+/// `on` once in `lamp-voice.service`, the one unit that reads it (passed to
+/// its second worker alone), and no other product unit names it.
+#[test]
+fn the_product_never_says_a_made_skill_change_no_call_made() {
+    let owner = "lamp-voice.service";
+    for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service")
+            .iter()
+            .filter(|line| **line == "Environment=LAMP_SKILL_CLAIM_CHECKED=on")
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|line| !line.starts_with('#') && line.contains("LAMP_SKILL_CLAIM_CHECKED"))
+            .count();
+        assert_eq!(on, usize::from(*unit == owner), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+    }
+    assert!(install::PRODUCT.iter().any(|(unit, _)| *unit == owner));
+}
+
+/// A live figure (a price, a rate, a score, the weather) said with no
+/// lookup in its turn is asked again with the lookup required, never said
+/// as it is (`LAMP_LIVE_FACT_CHECKED`, #7605, #7719): on lamp-9adf "what is
+/// the gold price today?" got "around $4,050 an ounce" with no search.
+/// `on` once in `lamp-voice.service`, the one unit that reads it (passed to
+/// its second worker alone), and no other product unit names it.
+#[test]
+fn the_product_never_gives_a_live_figure_it_did_not_look_up() {
+    let owner = "lamp-voice.service";
+    for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service")
+            .iter()
+            .filter(|line| **line == "Environment=LAMP_LIVE_FACT_CHECKED=on")
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|line| !line.starts_with('#') && line.contains("LAMP_LIVE_FACT_CHECKED"))
+            .count();
+        assert_eq!(on, usize::from(*unit == owner), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+    }
+    assert!(install::PRODUCT.iter().any(|(unit, _)| *unit == owner));
 }
 
 /// A line that is only an installed skill's name said plainly ("photo
@@ -3718,6 +4137,60 @@ fn the_product_reads_speaking_on_steady_looks() {
     }
 }
 
+/// The sticky identity plan (docs/face-recognition-sticky-identity-plan.md),
+/// as its owner set it on #7933 (20 Nov, 01:55): the eyes and the voice both
+/// read `LAMP_FACE_STICKY`; the eyes hold a poor print on the held id
+/// (`LAMP_FACE_KNOWN_ON_ID`, T5), follow a new id in the held face's place
+/// (`LAMP_FACE_FOLLOW_NEAR_NEW_ID`) and count no poorly scored takeover look
+/// (`LAMP_FACE_TAKEOVER_SCORE`), the pair on by the owner's call (20 Nov);
+/// the voice holds the conversation's person
+/// with no face (`LAMP_FACE_NO_FACE_HOLD`, T1) and journals carried lines
+/// (`LAMP_CARRIED_JOURNAL`, T9). Each switch is in its own unit only.
+#[test]
+fn the_product_holds_a_known_name_sticky_with_the_plans_switches_on() {
+    for (name, on, off) in [
+        (
+            "lamp-eyes.service",
+            &[
+                "Environment=LAMP_FACE_STICKY=on",
+                "Environment=LAMP_FACE_KNOWN_ON_ID=on",
+                "Environment=LAMP_FACE_FOLLOW_NEAR_NEW_ID=on",
+                "Environment=LAMP_FACE_TAKEOVER_SCORE=on",
+            ][..],
+            &["LAMP_FACE_NO_FACE_HOLD=on", "LAMP_CARRIED_JOURNAL=on"][..],
+        ),
+        (
+            "lamp-voice.service",
+            &[
+                "Environment=LAMP_FACE_STICKY=on",
+                "Environment=LAMP_FACE_NO_FACE_HOLD=on",
+                "Environment=LAMP_CARRIED_JOURNAL=on",
+            ][..],
+            &[
+                "LAMP_FACE_KNOWN_ON_ID=on",
+                "LAMP_FACE_FOLLOW_NEAR_NEW_ID=on",
+                "LAMP_FACE_TAKEOVER_SCORE=on",
+            ][..],
+        ),
+    ] {
+        let text = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap_or_else(|| panic!("no {name}"))
+            .1;
+        let service = section(text, "Service");
+        for line in on {
+            assert!(service.contains(line), "{name} lacks {line}");
+        }
+        for line in off {
+            assert!(
+                !service.iter().any(|kept| kept.contains(line)),
+                "{name} has {line}, not its own switch"
+            );
+        }
+    }
+}
+
 /// #2176 row 3: a rename keeps the person's memory, so the eyes and the
 /// voice both set the stable id. The voice uses an id only when its own
 /// switch and the eyes' agree, so one without the other keys nobody on it
@@ -4180,6 +4653,24 @@ fn a_blank_lamp_runs_every_product_skill_as_the_skill() {
                 ours.splice(0..0, install::OFF_LINE.bytes());
             }
             assert_eq!(fs::read(lamp.on(&path)).unwrap(), ours, "{path}");
+            installed.push(path);
+        }
+        // A core pilot's brief beside its variant, lamp-skills' own words,
+        // which no folder of the repository carries (#7862).
+        if folder.join(lamp_skills::core_agent::OVERLAY).is_file() {
+            let path = format!(
+                "/var/lib/lampOS/skills/{skill}/{}",
+                lamp_skills::core_agent::RUN
+            );
+            assert!(
+                !folder.join(lamp_skills::core_agent::RUN).exists(),
+                "{skill}"
+            );
+            assert_eq!(
+                fs::read_to_string(lamp.on(&path)).unwrap(),
+                lamp_skills::core_agent::script(lamp_skills::core_agent::pilot(skill).unwrap()),
+                "{path}"
+            );
             installed.push(path);
         }
     }
@@ -4752,6 +5243,27 @@ fn the_product_keeps_the_one_session_as_the_kept_session() {
     let on = |line: &str| service.iter().filter(|said| **said == line).count();
     assert_eq!(on("Environment=LAMP_TASKS_KEPT_SESSION=on"), 1);
     assert_eq!(on("Environment=LAMP_TASKS_ONE_SESSION=on"), 1);
+    // #7245: the agent make's own pack check takes a skill its words start.
+    assert_eq!(on("Environment=LAMP_MADE_SKILL_ASKS=on"), 1);
+    // #7245: V1's tool grants for the lamp's OpenClaw, live in the product
+    // (the owner's call: the lamp is one user's, OpenClaw unrestricted).
+    assert_eq!(on("Environment=LAMP_OPENCLAW_V1_TOOLS=on"), 1);
+}
+
+/// #7245: the product's lamp-voice makes a skill on the lamp's agent with
+/// the guide, on the one run path (named on #7737, El's P2).
+#[test]
+fn the_product_makes_with_the_agents_guide_on_the_one_path() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    let on = |line: &str| service.iter().filter(|said| **said == line).count();
+    assert_eq!(on("Environment=LAMP_MAKE_SKILL_AGENT=on"), 1);
+    assert_eq!(on("Environment=LAMP_MAKE_AGENT_ONE_PATH=on"), 1);
+    assert_eq!(on("Environment=LAMP_MAKE_AGENT_GUIDE=on"), 1);
 }
 
 /// #811, from lamp-06c1: without Harness (its own installer's to put on the
@@ -6420,7 +6932,7 @@ fn harness_off_runs_uninstall_stop_status_then_the_linger_then_pgrep() {
     let mut lamp = Lamp::with_harness();
     lamp.install().unwrap();
     lamp.harness_off().unwrap();
-    let harness = "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/999 /usr/local/bin/harness";
+    let harness = "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/999 ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data /usr/local/bin/harness";
     assert_eq!(
         lamp.host.steps,
         [
@@ -7038,8 +7550,9 @@ fn harness_on_installs_with_harnesss_own_installer_then_sets_it_at_boot() {
         [
             "id -u lampos".to_owned(),
             "install -d -o lampos -g lampos -m 0700 /var/lib/lampos-tasks".to_owned(),
+            "runuser -u lampos -- mkdir -p -m 0700 /var/lib/lampos-tasks/.harness".to_owned(),
             format!(
-                "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/999 PATH=/usr/local/bin:/usr/bin:/bin SHELL=/bin/sh sh -c curl -fsSL --proto =https --tlsv1.2 {} | sh",
+                "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/999 ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data PATH=/usr/local/bin:/usr/bin:/bin SHELL=/bin/sh sh -c curl -fsSL --proto =https --tlsv1.2 {} | sh",
                 install::HARNESS_INSTALLER
             ),
             "test -x /var/lib/lampos-tasks/.local/bin/harness".to_owned(),
@@ -7312,7 +7825,7 @@ fn harness_on_stops_at_a_failing_step_and_leaves_no_link() {
 fn harness_at_boot_gives_lamposs_manager_its_home_first() {
     let mut lamp = Lamp::with_harness();
     lamp.install().unwrap();
-    let harness = "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/999 /usr/local/bin/harness";
+    let harness = "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/999 ADAPTER_DATA_DIR=/var/lib/lampos-tasks/.harness/cli/data /usr/local/bin/harness";
     assert_eq!(
         lamp.host.boot_steps,
         [
@@ -8503,10 +9016,22 @@ fn a_servo_port_not_there_never_fails_a_unit_that_hides_it() {
 /// Reviewer-lead's P2 on #6346). A new `lampos` unit is held to it too.
 #[test]
 fn no_other_lampos_unit_can_write_lamp_controls_yes() {
-    const FOLDER: &str = "/var/lib/lampos-control";
+    no_other_lampos_unit_can_write("/var/lib/lampos-control", Some("lampos-control"));
+}
+
+/// The apps' socket folder (`/run/lampos-apps`) is lamp-control's to bind in:
+/// a unit that runs as `lampos` and could write it (no `ProtectSystem=strict`)
+/// could remove `apps.sock` and bind its own, and every app would talk to it
+/// (SubDarren's P2 on #7793). It is hidden from them as the state folder is.
+#[test]
+fn no_other_lampos_unit_can_write_the_apps_socket_folder() {
+    no_other_lampos_unit_can_write("/run/lampos-apps", None);
+}
+
+fn no_other_lampos_unit_can_write(folder: &str, state_directory: Option<&str>) {
     let covers = |path: &str| {
         let path = path.trim_start_matches(['-', '+']).trim_end_matches('/');
-        path.is_empty() || FOLDER == path || FOLDER.starts_with(&format!("{path}/"))
+        path.is_empty() || folder == path || folder.starts_with(&format!("{path}/"))
     };
     let mut held = Vec::new();
     for (name, text) in PRODUCT.iter() {
@@ -8528,15 +9053,15 @@ fn no_other_lampos_unit_can_write_lamp_controls_yes() {
         };
         let hidden = values("InaccessiblePaths=")
             .iter()
-            .any(|path| path.trim_start_matches('-') == FOLDER);
+            .any(|path| path.trim_start_matches('-') == folder);
         let strict = service.contains(&"ProtectSystem=strict")
             && !values("ReadWritePaths=").iter().any(|path| covers(path))
             && !values("StateDirectory=")
                 .iter()
-                .any(|dir| dir == "lampos-control");
+                .any(|dir| Some(dir.as_str()) == state_directory);
         assert!(
             hidden || strict,
-            "{name} runs as lampos and could write {FOLDER}: add InaccessiblePaths=-{FOLDER}"
+            "{name} runs as lampos and could write {folder}: add InaccessiblePaths=-{folder}"
         );
         held.push(*name);
     }
@@ -8948,4 +9473,316 @@ fn the_region_unit_may_write_sysstats_drop_ins() {
             "{path} not in {writes:?}"
         );
     }
+}
+
+/// The `systemd-run` asked for #7254 part 2's removal, as the host records it.
+fn sysstat_removal(lamp: &Lamp) -> Vec<String> {
+    lamp.host
+        .calls
+        .iter()
+        .filter(|call| call.starts_with("refresh systemd-run"))
+        .cloned()
+        .collect()
+}
+
+/// #7254 part 2: only sysstat's own daily files (`sa` or `sar` and digits)
+/// directly in /var/log/sysstat are removed, each said by name and size,
+/// through one transient unit that may write that folder only.
+#[test]
+fn only_sysstats_own_kept_files_are_removed() {
+    let mut lamp = Lamp::new(188, &[]);
+    let folder = lamp.on(install::SYSSTAT_KEPT);
+    fs::create_dir_all(&folder).unwrap();
+    for (name, bytes) in [
+        ("sa18", 146_028),
+        ("sar17", 672_320),
+        ("sa1", 3),
+        ("sa", 1),
+        ("saXY", 1),
+        ("sadc", 1),
+        ("sa18.bak", 1),
+        ("notes", 1),
+    ] {
+        fs::write(folder.join(name), vec![0u8; bytes]).unwrap();
+    }
+    let mut said = Vec::new();
+    let removed = install::sysstat_kept_removed(
+        &lamp.root,
+        &mut |argv: &[&str]| lamp.host.refresh(argv),
+        &mut |line: &str| said.push(line.to_owned()),
+    )
+    .unwrap();
+    assert_eq!(
+        removed,
+        [
+            "/var/log/sysstat/sa1",
+            "/var/log/sysstat/sa18",
+            "/var/log/sysstat/sar17",
+        ]
+    );
+    assert_eq!(
+        sysstat_removal(&lamp),
+        [
+            "refresh systemd-run --wait --collect --quiet --property=ProtectSystem=strict \
+          --property=ReadWritePaths=/var/log/sysstat --property=NoNewPrivileges=yes \
+          /bin/rm -f -- /var/log/sysstat/sa1 /var/log/sysstat/sa18 /var/log/sysstat/sar17"
+        ]
+    );
+    assert_eq!(
+        said,
+        [
+            "sysstat's kept file removed: /var/log/sysstat/sa1 (3 bytes)",
+            "sysstat's kept file removed: /var/log/sysstat/sa18 (146028 bytes)",
+            "sysstat's kept file removed: /var/log/sysstat/sar17 (672320 bytes)",
+        ]
+    );
+    for name in ["sa", "saXY", "sadc", "sa18.bak", "notes"] {
+        assert!(!install::sysstat_kept_name(name), "{name}");
+    }
+}
+
+/// #7254 part 2: a link, a folder, or a file of that name anywhere else is
+/// never followed or touched; with nothing of sysstat's kept, nothing runs.
+#[test]
+fn a_link_a_folder_or_a_file_elsewhere_is_never_removed() {
+    let mut lamp = Lamp::new(188, &[]);
+    let folder = lamp.on(install::SYSSTAT_KEPT);
+    fs::create_dir_all(folder.join("sa02")).unwrap();
+    fs::write(folder.join("sa02").join("sa03"), "inside a folder").unwrap();
+    let elsewhere = lamp.on("/etc/lampOS/sa04");
+    fs::create_dir_all(elsewhere.parent().unwrap()).unwrap();
+    fs::write(&elsewhere, "elsewhere").unwrap();
+    std::os::unix::fs::symlink(&elsewhere, folder.join("sa01")).unwrap();
+    fs::write(lamp.on("/var/log/sa05"), "beside the folder").unwrap();
+    let removed = install::sysstat_kept_removed(
+        &lamp.root,
+        &mut |argv: &[&str]| lamp.host.refresh(argv),
+        &mut |_| {},
+    )
+    .unwrap();
+    assert!(removed.is_empty(), "{removed:?}");
+    assert!(sysstat_removal(&lamp).is_empty());
+    // No folder at all: nothing either.
+    let mut bare = Lamp::new(188, &[]);
+    assert!(
+        install::sysstat_kept_removed(
+            &bare.root,
+            &mut |argv: &[&str]| bare.host.refresh(argv),
+            &mut |_| {}
+        )
+        .unwrap()
+        .is_empty()
+    );
+    assert!(sysstat_removal(&bare).is_empty());
+}
+
+/// #7254 part 2, the first builder's P3: a sysstat folder it can't list is
+/// said and left, and never fails the region's boot run.
+#[test]
+fn a_kept_folder_it_cant_list_is_said_and_never_fails_the_boot_run() {
+    let mut lamp = Lamp::new(188, &[]);
+    let folder = lamp.on(install::SYSSTAT_KEPT);
+    fs::create_dir_all(folder.parent().unwrap()).unwrap();
+    // A plain file where the folder should be: listing it fails.
+    fs::write(&folder, "not a folder").unwrap();
+    let mut said = Vec::new();
+    let removed = install::sysstat_kept_removed(
+        &lamp.root,
+        &mut |argv: &[&str]| lamp.host.refresh(argv),
+        &mut |line: &str| said.push(line.to_owned()),
+    )
+    .unwrap();
+    assert!(removed.is_empty());
+    assert_eq!(said.len(), 1, "{said:?}");
+    assert!(
+        said[0].starts_with("sysstat's kept files are left: /var/log/sysstat: "),
+        "{said:?}"
+    );
+    assert!(sysstat_removal(&lamp).is_empty());
+}
+
+/// #7254 part 2: with /etc/lampOS/sysstat-on (the owner wants sysstat),
+/// nothing is removed, and nothing is said.
+#[test]
+fn with_sysstat_on_nothing_kept_is_removed() {
+    let mut lamp = Lamp::new(188, &[]);
+    let folder = lamp.on(install::SYSSTAT_KEPT);
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("sa18"), "kept").unwrap();
+    let on = lamp.on(install::SYSSTAT_ON_PATH);
+    fs::create_dir_all(on.parent().unwrap()).unwrap();
+    fs::write(&on, "").unwrap();
+    let mut said = Vec::new();
+    let removed = install::sysstat_kept_removed(
+        &lamp.root,
+        &mut |argv: &[&str]| lamp.host.refresh(argv),
+        &mut |line: &str| said.push(line.to_owned()),
+    )
+    .unwrap();
+    assert!(removed.is_empty());
+    assert!(said.is_empty(), "{said:?}");
+    assert!(sysstat_removal(&lamp).is_empty());
+    assert!(folder.join("sa18").exists());
+}
+
+/// The reviewer-lead's P3 on #8314: a `systemd-run` that keeps failing is
+/// said once for each distinct error, never again each round, and no file
+/// is said removed; a removal that works is said, and the next failure is
+/// said again.
+#[test]
+fn a_removal_that_keeps_failing_is_said_once_for_each_error() {
+    let lamp = Lamp::new(188, &[]);
+    let folder = lamp.on(install::SYSSTAT_KEPT);
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("sa18"), "kept").unwrap();
+    let mut said = Vec::new();
+    let remove = |error: Option<&str>, said: &mut Vec<String>| {
+        install::sysstat_kept_removed(
+            &lamp.root,
+            &mut |_: &[&str]| error.map_or(Ok(()), |why| Err(why.to_owned())),
+            &mut |line: &str| said.push(line.to_owned()),
+        )
+        .unwrap()
+    };
+    // The memory is the process's, kept with this lamp's root, so another
+    // test's removal never clears it.
+    let refused = "P3 test: Failed to start transient service unit: Access denied";
+    for _ in 0..3 {
+        assert_eq!(remove(Some(refused), &mut said), ["/var/log/sysstat/sa18"]);
+    }
+    let other = "P3 test: Connection timed out";
+    remove(Some(other), &mut said);
+    remove(Some(other), &mut said);
+    assert_eq!(
+        said,
+        [
+            format!("sysstat's kept files were not removed: {refused}"),
+            format!("sysstat's kept files were not removed: {other}"),
+        ]
+    );
+    said.clear();
+    remove(None, &mut said);
+    remove(Some(other), &mut said);
+    assert_eq!(
+        said,
+        [
+            "sysstat's kept file removed: /var/log/sysstat/sa18 (4 bytes)".to_owned(),
+            format!("sysstat's kept files were not removed: {other}"),
+        ]
+    );
+}
+
+/// #7254: install removes sysstat's kept files as the boot run does, so a
+/// lamp gets the journal's room at the update itself; a second install
+/// finds none, runs nothing and changes nothing.
+#[test]
+fn an_install_removes_sysstats_kept_files_and_a_second_changes_nothing() {
+    let mut lamp = Lamp::new(188, &[]);
+    let folder = lamp.on(install::SYSSTAT_KEPT);
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("sa18"), vec![0u8; 146_028]).unwrap();
+    fs::write(folder.join("sar17"), "kept").unwrap();
+    fs::write(folder.join("notes"), "not sysstat's").unwrap();
+    lamp.install().unwrap();
+    assert!(!folder.join("sa18").exists(), "{:?}", lamp.said);
+    assert!(!folder.join("sar17").exists());
+    assert!(folder.join("notes").exists());
+    assert_eq!(sysstat_removal(&lamp).len(), 1, "{:?}", lamp.host.calls);
+    let said = "sysstat's kept file removed: /var/log/sysstat/sa18 (146028 bytes)";
+    assert!(lamp.said.iter().any(|line| line == said), "{:?}", lamp.said);
+    lamp.said.clear();
+    assert!(lamp.install().unwrap().changed.is_empty());
+    assert_eq!(sysstat_removal(&lamp).len(), 1);
+    assert!(
+        !lamp.said.iter().any(|line| line.contains("sysstat")),
+        "{:?}",
+        lamp.said
+    );
+    assert!(folder.join("notes").exists());
+}
+
+/// Cloud perception is on in the product (#6543's switch-on): lamp-seen
+/// with activity, posture, the held sitting, the stand-up break and the
+/// more doings; the voice's yes and offer, and the app's consent key, read
+/// the same `LAMP_SEEN_ACTIVITY`, and lamp-cloud's `seen_more` grant its own
+/// `LAMP_SEEN_MORE_DOINGS` (#7529); lamp-skills' `sooner`. The journal's
+/// labels stay a diagnostics switch, in no unit, and the voice's own offer
+/// (`LAMP_SEEN_VOICE_OFFER`) is in none either.
+#[test]
+fn the_product_sees_with_cloud_perception() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1
+    };
+    for (name, lines) in [
+        (
+            "lamp-seen.service",
+            &[
+                "Environment=LAMP_SEEN_ACTIVITY=on",
+                "Environment=LAMP_SEEN_POSTURE=on",
+                "Environment=LAMP_SEEN_HOLDS_SITTING=on",
+                "Environment=LAMP_SEEN_BREAK_IS_STANDING=on",
+                "Environment=LAMP_SEEN_MORE_DOINGS=on",
+            ][..],
+        ),
+        (
+            "lamp-voice.service",
+            &[
+                "Environment=LAMP_SEEN_ACTIVITY=on",
+                "Environment=LAMP_SEEN_POSTURE=on",
+            ][..],
+        ),
+        (
+            "lamp-cloud.service",
+            &[
+                "Environment=LAMP_SEEN_ACTIVITY=on",
+                "Environment=LAMP_SEEN_POSTURE=on",
+                "Environment=LAMP_SEEN_MORE_DOINGS=on",
+            ][..],
+        ),
+        (
+            "lamp-skills.service",
+            &["Environment=LAMP_YAWN_SOONER=on"][..],
+        ),
+    ] {
+        let service = section(unit(name), "Service");
+        for line in lines {
+            assert_eq!(
+                service.iter().filter(|set| *set == line).count(),
+                1,
+                "{name} lacks {line}"
+            );
+        }
+    }
+    for (name, _) in install::PRODUCT {
+        assert!(
+            !unit(name).contains("LAMP_SEEN_JOURNAL_LABELS=on"),
+            "{name} sets the journal's labels"
+        );
+        // The voice's own offer stays off: the yes comes from the app
+        // (the first builder on #7506).
+        assert!(
+            !unit(name).contains("LAMP_SEEN_VOICE_OFFER"),
+            "{name} sets the voice's offer"
+        );
+    }
+}
+
+/// A round carries a product unit only if its first `ExecStart=` is a lamp program (#7956's row on lamp-75c9: the
+/// folders unit that ran `/usr/bin/install` was never in the manifest, so no round could add it).
+#[test]
+fn the_apps_folders_unit_is_binary_backed_so_a_round_can_carry_and_add_it() {
+    let (_, text) = PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-apps-folders.service")
+        .expect("in the product's list");
+    assert!(
+        lamp_update::unit::linked(text)
+            .is_some_and(|(folder, binary)| folder == "/opt/lampOS/apps-manage/"
+                && binary == "lamp-apps-manage"),
+        "{text}"
+    );
 }

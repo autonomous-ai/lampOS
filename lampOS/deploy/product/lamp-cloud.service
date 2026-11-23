@@ -25,6 +25,12 @@ StartLimitBurst=5
 [Service]
 Type=simple
 Environment=LAMP_CLOUD=on
+# LAMP_SEEN_ACTIVITY: its why and rules are its row in docs/switches.md (#6543).
+Environment=LAMP_SEEN_ACTIVITY=on
+# LAMP_SEEN_POSTURE: its why and rules are its row in docs/switches.md (#6543, #7551).
+Environment=LAMP_SEEN_POSTURE=on
+# LAMP_SEEN_MORE_DOINGS: its why and rules are its row in docs/switches.md (#6543, #7529).
+Environment=LAMP_SEEN_MORE_DOINGS=on
 # Each connection leaves the broker a will saying the lamp `offline` on its own channel, 30 s
 # after the connection is lost (WILL_DELAY_S; the session is kept 60 s, longer, so the delay
 # holds): the lamp's record shows it gone about 30 s after a stop and within about 2 min of a
@@ -103,7 +109,14 @@ Environment=LAMP_UPLOAD_TO_AGENT=on
 Environment=LAMP_SKILL_SECRETS=on
 # A skill's task reaches the public web (80/443) with its owner's spoken yes (#7200).
 Environment=LAMP_TASK_NET=on
+# The model forwarder keeps the relay's day used and the agent's chat tokens in day-used.json, for lamp-skills' bound
+# on skills' runs (#7342, docs/cloud.md; the first builder's DEFAULT-ON, #7814); it never refuses for it. The same
+# line in lamp-skills, where `on` keeps half the day for the voice.
+Environment=LAMP_SKILL_RUNS_VOICE_SHARE=on
 Environment=LAMP_APP_UPDATE=on
+# The owner's Update now (#7517, docs/cloud.md): `update.now` from the owner's app. On in the product by the
+# owner's word (20 Nov); lamp-update takes the same switch from /etc/lampOS/update.env.
+Environment=LAMP_UPDATE_NOW=on
 # The lamp's agents for the app (#6240): `engines` in update.status and engines.install for a missing Hermes,
 # on in the product by the owner's rule of 11 Nov; `off` here takes it away.
 Environment=LAMP_APP_ENGINES=on
@@ -140,6 +153,8 @@ Environment=LAMP_MEMORY_FORGET_SOCKET=/run/lampos-memory/forget.sock
 # The owner's dev monitor from the app (#5883, #6401; cloud.md "The dev monitor"): monitor.set/get/link in `can`, so the
 # app shows its switch. The monitor itself stays off until the owner turns it on in the app. On for every lamp: the lead's call (16 Nov).
 Environment=LAMP_APP_MONITOR=on
+# LAMP_STORE_APPS: #7415, the Store apps; on in the product by the first builder's DEFAULT-ON of 20 Nov; its rules are its rows in docs/switches.md.
+Environment=LAMP_STORE_APPS=on
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos
@@ -174,8 +189,8 @@ ProtectSystem=strict
 # lamp-voice's app-make socket, for a skill typed in the app with LAMP_APP_MAKE_SKILL=on (#2813);
 # lamp-tasks' app route, for Harness signed in from the app with LAMP_TASKS_SIGN_IN_APP=on (#5198);
 # lamp-control's admin socket, while developer access is on; and lamp-voice's say socket, for
-# the app's onboarding pages said done (#6076).
-ReadWritePaths=/run/lampos-bus /run/lampos-actions -/run/lampos-photos -/run/lampos-skills -/run/lampos-app-make -/run/lampos-services -/run/lampos-tasks -/run/lampos-control -/run/lampos-say
+# the app's onboarding pages said done (#6076); and the apps' staging folder, where an install's package waits for the helper (#7415, #7956).
+ReadWritePaths=/run/lampos-bus /run/lampos-actions -/run/lampos-photos -/run/lampos-skills -/run/lampos-app-make -/run/lampos-services -/run/lampos-tasks -/run/lampos-control -/run/lampos-say -/var/lib/lampos-apps-staging
 ProtectHome=yes
 PrivateTmp=yes
 # No capability is needed (Fourth on #1404): the broker, the ping and the bus. Netlink is for `iw`,

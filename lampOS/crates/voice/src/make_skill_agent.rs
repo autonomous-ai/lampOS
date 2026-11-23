@@ -58,8 +58,9 @@
 //! runner by `default_agent_takes_runs` (#7133's `HarnessRunner` for a
 //! gateway agent). Off, the line and the hand-over are today's, byte for
 //! byte. A `cannot:` answer is passed on verbatim, as before (#7234). It is
-//! the voice's make's alone ([`Agent::for_voice`]): the app's MAKE IT below
-//! hands over to Hermes only, as before.
+//! the voice's make's, and the app's MAKE IT's from the coordinator's own
+//! environment ([`Agent::for_app`]), so a make typed in the app on an
+//! OpenClaw lamp goes to OpenClaw as a spoken one does.
 //!
 //! The app's MAKE IT (`crate::app_make`, the owner's ask, 13 Nov) makes the
 //! same way: its typed words go through the same order and this same
@@ -81,7 +82,7 @@ use std::{
 pub const ENVIRONMENT: &str = "LAMP_MAKE_SKILL_AGENT";
 /// The longest one of the agent's answers is waited for, from the hand-over
 /// to its answer kept: the make run's own deadline, within lamp-tasks'
-/// most (`lamp_tasks::skill_make::MOST_WITHIN`, 120 s). 45 s before #6749:
+/// most (`lamp_tasks::skill_make::MOST_WITHIN`, 10 minutes). 45 s before #6749:
 /// on lamp-9adf (an Orange Pi, build 12958) a make with code ran out at
 /// 45 s 2 of 2, where `hermes chat -q "Say OK."` alone takes about 24.5 s,
 /// about 13 s of it before Hermes's own session; a gmail make with no
@@ -91,14 +92,25 @@ pub const WRITE_WITHIN: Duration = Duration::from_secs(90);
 /// The longest the agent's part of a make goes on, its repairs included: a
 /// repair is begun only while one more answer ([`WRITE_WITHIN`]) still
 /// ends within it.
-pub const MAKE_WITHIN: Duration = Duration::from_secs(120);
+// #7245: 10 minutes, then the make is told failed (the first builder's
+// call on #6811, 18 Nov 17:23), and [`TASKS_MARGIN`] over lamp-tasks' own
+// 10 minutes, so lamp-tasks' failed answer reaches the voice before the
+// voice gives up (Twelve's P2 on #7737).
+pub const MAKE_WITHIN: Duration = Duration::from_secs(10 * 60 + TASKS_MARGIN.as_secs());
+/// How much longer the voice waits for the agent's make than lamp-tasks
+/// runs it ([`GUIDED_WRITE_WITHIN`], the line's `within_ms`): the voice
+/// counts from before the hand-over, lamp-tasks from it.
+pub const TASKS_MARGIN: Duration = Duration::from_secs(30);
 /// The guide's switch: `on`, and nothing else; off unless set.
 pub const GUIDE_ENVIRONMENT: &str = "LAMP_MAKE_AGENT_GUIDE";
 /// With the guide, the longest one of the agent's answers is waited for: a
 /// draft, its check and up to two fixes in one run, within lamp-tasks'
-/// most (`lamp_tasks::skill_make::MOST_WITHIN`, 120 s) and the agent's
+/// most (`lamp_tasks::skill_make::MOST_WITHIN`, 10 minutes) and the agent's
 /// [`MAKE_WITHIN`].
-pub const GUIDED_WRITE_WITHIN: Duration = Duration::from_secs(90);
+// #7245 (the owner, 18 Nov 14:5x): no short cut on the agent's make; it is
+// waited for up to 10 minutes, then told failed (180 s before; the first
+// builder's call on #6811, 18 Nov 17:23).
+pub const GUIDED_WRITE_WITHIN: Duration = Duration::from_secs(10 * 60);
 /// With the guide, the most times an answer the voice's check refused goes
 /// back to the agent with the check's words.
 pub const GUIDED_MOST_REPAIRS: usize = 2;
@@ -108,10 +120,22 @@ pub const MAKE_SOCKET_NAME: &str = "skill-make.sock";
 /// silence: in the make's own voice turn when one waits on it
 /// ([`waiting_due`]), else through the say service.
 pub const WAITING_LINE: &str = "Let me think about that a little longer.";
+/// The opening a voice make asks of the model before its `make_skill`
+/// call ([`crate::make_skill_local::tool`]: "say in a few words that you'll
+/// make it now"), said by the lamp itself when round 1 names the call with
+/// no words before it, so the person isn't left in silence while the make
+/// and the next round run (lamp-9adf, 18 Nov, #7554: a bare call's first
+/// audio at 8104 ms). One of the lamp's fixed lines, in the owner's
+/// language and rendered ahead (`second_provider::FixedClips`). Never one
+/// of [`BEGUN_LINES`]: the model may say it.
+pub const MAKE_OPENING: &str = "I'll make it now.";
 /// With the one run path ([`ONE_PATH_ENVIRONMENT`], #7371): the waiting
-/// line says how long, as an agent's make takes about a minute (lamp-c0a4,
-/// 16 Nov: 63 s from the waiting line to the result).
-pub const ONE_PATH_WAITING_LINE: &str = "This takes about a minute. I'm on it.";
+/// line says how long. An agent's make takes about a minute warm (lamp-c0a4,
+/// 16 Nov: 63 s from the waiting line to the result) and about three cold
+/// (lamp-c0a4, 18 Nov: 184 s after a gateway restart), so it promises a few
+/// minutes and that the lamp says when it is done, never "about a minute".
+pub const ONE_PATH_WAITING_LINE: &str =
+    "This can take a few minutes. I'll tell you when it's ready.";
 /// With the one run path: said once, never again, when the make still has
 /// no answer [`LONG_WAIT_AFTER`] after its waiting line (#7371).
 pub const LONG_WAIT_LINE: &str = "It's taking a bit longer, but I'm still on it.";
@@ -128,6 +152,313 @@ pub fn waiting_line(one_path: bool) -> &'static str {
         WAITING_LINE
     }
 }
+
+/// The lamp's own lines that tell a make as begun on the one run path:
+/// said only by the lamp once `make_skill` runs, never by the model. A
+/// reply of the model's that says one with no `make_skill` call in its turn
+/// copied it from the history (lamp-9adf, 18 Nov 04:23–04:25: after a make
+/// waited for its yes, three new make asks each got "I'll make it now. This
+/// takes about a minute. I'm on it." with `calls=none`, nothing made).
+pub const BEGUN_LINES: [&str; 3] = [
+    ONE_PATH_WAITING_LINE,
+    ONE_PATH_WAITING_LINE_BEFORE,
+    LONG_WAIT_LINE,
+];
+/// The waiting line the one run path said before 19 Nov ("about a minute"),
+/// still one of [`BEGUN_LINES`]: a conversation held over the update may
+/// carry it, and a copy of it from that history is caught as the new one is.
+pub const ONE_PATH_WAITING_LINE_BEFORE: &str = "This takes about a minute. I'm on it.";
+
+/// What the model is told when its reply said one of [`BEGUN_LINES`] with
+/// no `make_skill` call: that reply was not said, and the round is asked
+/// again once with `make_skill` offered, never forced: the model judges
+/// whether the person's last line asks for a skill (the reader El's guard on
+/// #7554). Names `make_skill` so a narrowed request is given it.
+pub const BEGUN_AGAIN_NOTE: &str = "Your reply said the lamp's own line that a skill is \
+     being made, or asked of a clash for a skill not made, but you called no make_skill, so \
+     nothing is being made and your reply was not said. Those lines are the lamp's, said only \
+     once make_skill runs; never say them yourself. If their last line asks you to make a skill, call make_skill now for it, \
+     with its own request. If it doesn't, answer it in your own words.";
+
+/// `text` in plain form for [`says_begun`]: lower case, one kind of
+/// apostrophe, single spaces, no closing stop.
+fn plain(text: &str) -> String {
+    text.replace('\u{2019}', "'")
+        .to_lowercase()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim_end_matches(['.', '!', '?'])
+        .to_owned()
+}
+
+/// Whether `text` says one of `lines` whole (the lamp's own constants,
+/// never a word list): case, apostrophes and spacing aside.
+pub fn says_begun(text: &str, lines: &[&str]) -> bool {
+    let text = plain(text);
+    lines.iter().any(|line| text.contains(&plain(line)))
+}
+
+/// For a reply's opening held while it may say one of `lines`
+/// ([`says_begun`]): `Some(true)` once it does; `Some(false)` once two of
+/// its sentences have ended with neither the first sentence of a line in
+/// it, or when `whole` (the round ended) and it says none; `None` while
+/// undecided. The lamp's lines come at most a sentence in ("I'll make it
+/// now. This takes about a minute. I'm on it."), so at most two sentences
+/// are held.
+pub fn opens_begun(held: &str, whole: bool, lines: &[&str]) -> Option<bool> {
+    if says_begun(held, lines) {
+        return Some(true);
+    }
+    if whole {
+        return Some(false);
+    }
+    let text = plain(held);
+    let heads = lines.iter().any(|line| {
+        let head = line.split(['.', '!', '?']).next().unwrap_or(line);
+        text.contains(&plain(head))
+    });
+    let ended = held
+        .char_indices()
+        .filter(|(at, c)| {
+            matches!(c, '.' | '!' | '?')
+                && held[at + c.len_utf8()..]
+                    .chars()
+                    .next()
+                    .is_some_and(char::is_whitespace)
+        })
+        .count();
+    (ended >= 2 && !heads).then_some(false)
+}
+
+/// [`MAKE_OPENING`] in English and in each language the lamp speaks.
+fn openings() -> impl Iterator<Item = &'static str> {
+    use crate::language::Language;
+    std::iter::once(MAKE_OPENING).chain(
+        [
+            Language::Vietnamese,
+            Language::Japanese,
+            Language::Chinese,
+            Language::Korean,
+        ]
+        .into_iter()
+        .filter_map(|language| language.fixed(MAKE_OPENING)),
+    )
+}
+
+/// Whether `piece`, one said piece of an answer, is the make's opening
+/// whole ([`MAKE_OPENING`], in any of the lamp's languages): the lamp's
+/// line, or the model's same words, kept out of the thread (lamp-9adf,
+/// 18 Nov, #7554: after three makes whose turns opened with it, three new
+/// make asks were answered "I'll make it now. Done — … is on the lamp"
+/// with no call, the model copying it from the history; nothing made).
+pub fn is_opening(piece: &str) -> bool {
+    let piece = plain(piece);
+    !piece.is_empty() && openings().any(|opening| plain(opening) == piece)
+}
+
+/// For a reply's opening held while it may begin with [`MAKE_OPENING`]
+/// (in any of the lamp's languages): `Some(true)` once it does, the line
+/// whole at its start; `Some(false)` once it can't, or when `whole` (the
+/// round ended) and it doesn't; `None` while it is still the line's start.
+/// Only the reply's start is read, so a reply that doesn't open with it is
+/// let go at its first words that differ. The line's sentence must end
+/// where it does ('.', '!' or '…', or the reply's end): "I'll make it now,
+/// then set the light." goes on to something else and is not it (App
+/// Only's P3 on #7554).
+pub fn opens_with_opening(held: &str, whole: bool) -> Option<bool> {
+    let text = plain(held);
+    if text.is_empty() {
+        return whole.then_some(false);
+    }
+    let mut undecided = false;
+    for opening in openings() {
+        let line = plain(opening);
+        if let Some(rest) = text.strip_prefix(&line) {
+            // A line ending in its own mark (Japanese, Chinese) is whole.
+            if !line.ends_with(char::is_alphanumeric) {
+                return Some(true);
+            }
+            match rest.chars().next() {
+                Some('.' | '!' | '…') => return Some(true),
+                // `plain` takes off the reply's last mark: the held words
+                // end here, closed by one, or the round ended.
+                None if held.trim_end().ends_with(['.', '!', '…']) || whole => {
+                    return Some(!held.trim_end().ends_with('?'));
+                }
+                None => undecided = true,
+                Some(_) => {}
+            }
+        } else if line.starts_with(&text) {
+            undecided = true;
+        }
+    }
+    (whole || !undecided).then_some(false)
+}
+
+/// The make's opening in the model's own words (lamp-9adf, 18 Nov, #7554's
+/// ROW at 2e864a0, request 94: "I'll make that now. Cat joke on pat 3
+/// clashes with …" with `calls=none`, let go at "that" by
+/// [`opens_with_opening`]): its own family, never a word list. One of
+/// these heads, one of [`OPENING_OBJECTS`], then one or two of
+/// [`OPENING_TAILS`], and the sentence's end. So "I'll make that now.",
+/// "Making it now!" and "Let me make that one for you." are the opening;
+/// "I'll make it brighter.", "I'll make that now?" and "I'll make it."
+/// (bare, as about anything else) are not.
+const OPENING_HEADS: [&str; 8] = [
+    "i'll make",
+    "i will make",
+    "let me make",
+    "i'm making",
+    "i am making",
+    "i'm going to make",
+    "i'll go ahead and make",
+    "making",
+];
+/// What the opening's make names: the skill asked for, never a thing of
+/// its own ("it brighter", "a cake").
+const OPENING_OBJECTS: [&str; 10] = [
+    "it",
+    "that",
+    "this",
+    "one",
+    "that one",
+    "this one",
+    "a skill",
+    "the skill",
+    "that skill",
+    "this skill",
+];
+/// What may close the opening's sentence after its object.
+const OPENING_TAILS: [&str; 5] = ["now", "right now", "for you", "right away", "straight away"];
+
+/// Every sentence of the opening's family ([`OPENING_HEADS`]), in plain
+/// form, built once.
+fn opening_family() -> &'static [String] {
+    static FAMILY: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    FAMILY.get_or_init(|| {
+        let mut tails = Vec::new();
+        for one in OPENING_TAILS {
+            tails.push(format!(" {one}"));
+            for two in OPENING_TAILS.iter().filter(|two| **two != one) {
+                tails.push(format!(" {one} {two}"));
+            }
+        }
+        OPENING_HEADS
+            .iter()
+            .flat_map(|head| {
+                OPENING_OBJECTS
+                    .iter()
+                    .map(move |object| format!("{head} {object}"))
+            })
+            .flat_map(|said| tails.iter().map(move |tail| format!("{said}{tail}")))
+            .collect()
+    })
+}
+
+/// A sentence's end in `text`: '.', '!', '?' or '…'.
+fn is_sentence_mark(c: char) -> bool {
+    matches!(c, '.' | '!' | '?' | '…')
+}
+
+/// [`opens_with_opening`], with the opening in the model's own words too
+/// ([`OPENING_HEADS`]): `Some(true)` once the reply's first sentence is one
+/// of the family, closed by anything but a '?'; `Some(false)` once it
+/// can't be; `None` while its words so far are still a family sentence's
+/// start. Only the reply's start is read, as for [`opens_with_opening`], so
+/// a reply that opens with other words is let go at its first word that
+/// differs.
+pub fn opens_with_make_line(held: &str, whole: bool) -> Option<bool> {
+    let exact = opens_with_opening(held, whole);
+    if exact == Some(true) {
+        return exact;
+    }
+    let (first, mark) = match held.char_indices().find(|(_, c)| is_sentence_mark(*c)) {
+        Some((at, mark)) => (&held[..at], Some(mark)),
+        None => (held, None),
+    };
+    let first = plain(&first.replace(',', " "));
+    if first.is_empty() {
+        return exact;
+    }
+    let family = opening_family();
+    let said = family.contains(&first);
+    let decided = match mark {
+        Some(mark) => Some(said && mark != '?'),
+        None if whole => Some(said),
+        None if family.iter().any(|line| line.starts_with(&first)) => None,
+        None => Some(false),
+    };
+    // Still the exact opening's start in another language: undecided.
+    match (decided, exact) {
+        (Some(false), None) => None,
+        _ => decided,
+    }
+}
+
+/// Whether `sentence` asks the lamp's clash choice ([`crate::made_clash`]'s
+/// question) in any words: a question whose last words are "or cancel",
+/// with "replace" and then "keep" before them. The lamp's three choices in
+/// its own order, never a word list: "Shall I replace them all, keep them
+/// all (they may take turns), or cancel?" and "Replace them all, keep them
+/// all so they take turns, or cancel?" are; "Shall I cancel it?" is not.
+fn asks_clash_choice(sentence: &str) -> bool {
+    let Some(asked) = sentence.trim_end().strip_suffix('?') else {
+        return false;
+    };
+    let words: Vec<String> = asked
+        .split(|c: char| !(c.is_alphanumeric() || c == '\'' || c == '\u{2019}'))
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    let Some(before) = words
+        .strip_suffix(&["or".to_owned(), "cancel".to_owned()])
+        .filter(|before| !before.is_empty())
+    else {
+        return false;
+    };
+    let replace = before.iter().position(|word| word == "replace");
+    let keep = before.iter().rposition(|word| word == "keep");
+    matches!((replace, keep), (Some(replace), Some(keep)) if replace < keep)
+}
+
+/// The sentences of `text` that have ended, each with its mark: one ends
+/// at a mark followed by a space, or at the text's end.
+fn ended_sentences(text: &str) -> Vec<&str> {
+    let mut ended = Vec::new();
+    let mut from = 0;
+    for (at, c) in text.char_indices() {
+        let next = at + c.len_utf8();
+        if is_sentence_mark(c) && text[next..].chars().next().is_none_or(char::is_whitespace) {
+            ended.push(text[from..next].trim());
+            from = next;
+        }
+    }
+    ended
+}
+
+/// For a reply held while it may ask the lamp's clash choice with no
+/// `make_skill` call in its turn (lamp-9adf, 18 Nov, #7554's ROW, request
+/// 94: "… Cat joke on pat 3 clashes with cat joke on pat, joke on pat and
+/// tell joke on pat… Replace them all, keep them all so they take turns, or
+/// cancel?" with `calls=none`, 56 s after the last clash was cancelled, and
+/// no such skill made): `Some(true)` once one of its sentences asks it
+/// ([`asks_clash_choice`]) and no clash waits for its choice (`waits`, read
+/// from the clash's own state, [`crate::made_clash::waits`]: while one
+/// does, the lamp may ask its question again in any words, App Only's P1 on
+/// #7554); `Some(false)` once two sentences have ended with neither asking
+/// it (the lamp's clash is told in two: what clashes, then the choice), or
+/// when `whole` (the round ended) and none does; `None` while undecided.
+/// Only a turn just after a clash ended is held for it
+/// ([`crate::made_clash::lately_ended`]).
+pub fn clash_claimed(held: &str, whole: bool, waits: impl FnOnce() -> bool) -> Option<bool> {
+    let ended = ended_sentences(held);
+    if ended.iter().any(|sentence| asks_clash_choice(sentence)) {
+        return Some(!waits());
+    }
+    (whole || ended.len() >= 2).then_some(false)
+}
+
 /// What the lamp says when the agent's own answer is `cannot:`: never the
 /// agent's words.
 pub const CANNOT_LINE: &str = "I couldn't make that one.";
@@ -181,6 +512,11 @@ std::thread_local! {
 /// `made_running`): the request whose turn waits on it, 0 for none.
 pub fn set_made_for(request: u64) {
     MADE_FOR.with(|kept| kept.set(request));
+}
+
+/// The voice request whose turn waits on this thread's make, 0 for none.
+pub fn made_for() -> u64 {
+    MADE_FOR.with(std::cell::Cell::get)
 }
 
 /// A voice turn waiting on its make (#6749): while it is held, the make's
@@ -306,6 +642,11 @@ pub struct Agent {
     /// with no turn waiting ([`Agent::for_app`], Heron's P2 on #6788); a
     /// voice make's one answer stands, as before.
     pub repairs_if_untaken: bool,
+    /// A voice make that may run on past a minute (`LAMP_MAKE_MAY_RUN_ON`,
+    /// [`crate::long_make`]): its line carries `"may_run_on":true`, each
+    /// answer given [`crate::long_make::WRITE_WITHIN`] within
+    /// [`crate::long_make::MAKE_WITHIN`]. Off, as before.
+    pub may_run_on: bool,
 }
 
 /// Why the agent gave no answer to take.
@@ -369,14 +710,29 @@ impl Agent {
             return None;
         }
         let tasks = TASKS.get()?.clone();
-        Some(Self {
+        let agent = Self {
             one_path: one_path_on(),
             ..Self::made_with(
                 tasks,
                 Some(PathBuf::from(crate::say::DEFAULT_SOCKET)),
                 guide_on(),
             )
-        })
+        };
+        Some(agent.running_on(crate::long_make::on()))
+    }
+
+    /// This agent, its make marked "may run on" with `on`
+    /// ([`Agent::may_run_on`]); as it is without.
+    pub fn running_on(self, on: bool) -> Self {
+        if !on {
+            return self;
+        }
+        Self {
+            within: crate::long_make::WRITE_WITHIN,
+            make_within: crate::long_make::MAKE_WITHIN,
+            may_run_on: true,
+            ..self
+        }
     }
 
     /// The agent for a make typed in the app's MAKE IT
@@ -390,15 +746,18 @@ impl Agent {
         Self::for_app_with(
             var(ENVIRONMENT).as_deref(),
             var(GUIDE_ENVIRONMENT).as_deref(),
+            var(ONE_PATH_ENVIRONMENT).as_deref(),
             var(agent_tasks::ENVIRONMENT).as_deref(),
         )
     }
 
     /// [`Agent::for_app`] from the switch's value `switch`, the guide's
-    /// `guide` and the tasks part's directory `tasks`, absolute only.
+    /// `guide`, the one run path's `one_path` and the tasks part's
+    /// directory `tasks`, absolute only.
     pub fn for_app_with(
         switch: Option<&str>,
         guide: Option<&str>,
+        one_path: Option<&str>,
         tasks: Option<&str>,
     ) -> Option<Self> {
         if !on_with(switch) {
@@ -412,6 +771,7 @@ impl Agent {
         // the agent doesn't take it.
         Some(Self {
             repairs_if_untaken: true,
+            one_path: on_with(one_path),
             ..Self::made_with(tasks, None, on_with(guide))
         })
     }
@@ -430,10 +790,11 @@ impl Agent {
             },
             make_within: MAKE_WITHIN,
             guide,
-            // The one run path is the voice's (#7245): `for_voice` sets it
+            // The one run path (#7245): `for_voice` and `for_app` set it
             // from its switch.
             one_path: false,
             repairs_if_untaken: false,
+            may_run_on: false,
         }
     }
 
@@ -551,6 +912,11 @@ impl Agent {
         }
         // The one run path asked for only with its switch: off, the line
         // is as above, byte for byte.
+        // Marked to run on only with `LAMP_MAKE_MAY_RUN_ON`: off, the line
+        // is as above, byte for byte.
+        if self.may_run_on {
+            line["may_run_on"] = json!(true);
+        }
         if self.one_path {
             line["one_path"] = json!(true);
             // The lamp's agent as seen here, so lamp-tasks never makes an
@@ -776,10 +1142,11 @@ pub(crate) mod tests {
                 tasks: self.dir.path().to_path_buf(),
                 say: None,
                 within: Duration::from_millis(1_500),
-                make_within: Duration::from_secs(10),
+                make_within: MAKE_WITHIN,
                 guide: false,
                 one_path: false,
                 repairs_if_untaken: false,
+                may_run_on: false,
             }
         }
 
@@ -939,7 +1306,14 @@ pub(crate) mod tests {
         assert_eq!(WRITE_WITHIN, Duration::from_secs(90));
         assert!(WRITE_WITHIN <= lamp_tasks::skill_make::MOST_WITHIN);
         assert!(WRITE_WITHIN <= MAKE_WITHIN);
-        assert!(crate::make_skill_local::MAKE_WITHIN + MAKE_WITHIN <= Duration::from_secs(240));
+        assert!(MAKE_WITHIN >= Duration::from_secs(10 * 60));
+        assert!(GUIDED_WRITE_WITHIN >= Duration::from_secs(10 * 60));
+        assert!(crate::make_skill_local::MAKE_WITHIN + MAKE_WITHIN <= Duration::from_secs(13 * 60));
+        // The voice waits past lamp-tasks' run by its margin, so lamp-tasks'
+        // failed answer comes first.
+        assert_eq!(GUIDED_WRITE_WITHIN, lamp_tasks::skill_make::MOST_WITHIN);
+        assert_eq!(MAKE_WITHIN, GUIDED_WRITE_WITHIN + TASKS_MARGIN);
+        assert!(TASKS_MARGIN >= Duration::from_secs(30));
         let tasks = stub(Some("hermes"), Arc::new(|_: &str| Some("x".to_owned())));
         let agent = Agent {
             within: WRITE_WITHIN,
@@ -1217,7 +1591,7 @@ pub(crate) mod tests {
         );
         assert_eq!(tasks.guided().most_repairs(), GUIDED_MOST_REPAIRS);
         // Within lamp-tasks' most and the agent's part.
-        const { assert!(GUIDED_WRITE_WITHIN.as_secs() <= 120) };
+        const { assert!(GUIDED_WRITE_WITHIN.as_secs() <= lamp_tasks::skill_make::MOST_WITHIN.as_secs()) };
         const { assert!(GUIDED_WRITE_WITHIN.as_secs() <= MAKE_WITHIN.as_secs()) };
     }
 
@@ -1336,7 +1710,9 @@ pub(crate) mod tests {
             "Let me think about that a little longer."
         );
         assert_eq!(waiting_line(true), ONE_PATH_WAITING_LINE);
-        assert!(ONE_PATH_WAITING_LINE.contains("about a minute"));
+        // A cold make takes about three minutes: the line never promises one.
+        assert!(ONE_PATH_WAITING_LINE.contains("a few minutes"));
+        assert!(!ONE_PATH_WAITING_LINE.contains("about a minute"));
         assert_ne!(LONG_WAIT_LINE, ONE_PATH_WAITING_LINE);
         assert_eq!(LONG_WAIT_AFTER, Duration::from_secs(85));
         assert!(LONG_WAIT_AFTER < MAKE_WITHIN);
@@ -1348,14 +1724,15 @@ pub(crate) mod tests {
     #[test]
     fn the_apps_agent_is_had_only_with_its_switch_and_a_tasks_part() {
         let tasks = Some("/run/lampos-tasks");
-        let agent = Agent::for_app_with(Some("on"), None, tasks).unwrap();
+        let agent = Agent::for_app_with(Some("on"), None, None, tasks).unwrap();
         assert_eq!(agent.tasks, PathBuf::from("/run/lampos-tasks"));
         assert_eq!(agent.say, None);
         assert!(!agent.guide);
         assert!(agent.repairs_if_untaken);
+        assert!(!agent.one_path);
         assert_eq!(agent.within, WRITE_WITHIN);
         assert_eq!(agent.make_within, MAKE_WITHIN);
-        let guided = Agent::for_app_with(Some("on"), Some("on"), tasks).unwrap();
+        let guided = Agent::for_app_with(Some("on"), Some("on"), None, tasks).unwrap();
         assert!(guided.guide);
         assert_eq!(guided.within, GUIDED_WRITE_WITHIN);
         assert_eq!(guided.most_repairs(), GUIDED_MOST_REPAIRS);
@@ -1367,10 +1744,77 @@ pub(crate) mod tests {
             (Some("on"), Some("run/lampos-tasks")),
         ] {
             assert!(
-                Agent::for_app_with(switch, Some("on"), folder).is_none(),
+                Agent::for_app_with(switch, Some("on"), Some("on"), folder).is_none(),
                 "{switch:?} {folder:?}"
             );
         }
+    }
+
+    /// The app's MAKE IT takes the one run path as the voice's make does
+    /// (#7245): with `LAMP_MAKE_AGENT_ONE_PATH` on, a make typed in the app
+    /// on an OpenClaw lamp is handed to OpenClaw, its line carrying
+    /// `one_path`; off, Hermes only, as before.
+    #[test]
+    fn the_apps_make_takes_the_one_run_path_with_its_switch() {
+        let tasks = Some("/run/lampos-tasks");
+        let on = Agent::for_app_with(Some("on"), None, Some("on"), tasks).unwrap();
+        assert!(on.one_path);
+        assert_eq!(on.say, None);
+        let stubbed = stub(Some("openclaw"), Arc::new(|_: &str| Some("x".to_owned())));
+        let agent = Agent {
+            tasks: stubbed.agent().tasks,
+            ..on
+        };
+        assert_eq!(agent.hermes(), Some("OpenClaw"));
+        assert_eq!(agent.write("S", "B", false).unwrap(), "x");
+        let sent = stubbed.sent.lock().unwrap().clone();
+        let make = sent.iter().find(|line| line["op"] == "skill_make").unwrap();
+        assert_eq!(make["one_path"], json!(true));
+        for value in [None, Some("off"), Some("ON")] {
+            let off = Agent::for_app_with(Some("on"), None, value, tasks).unwrap();
+            assert!(!off.one_path, "{value:?}");
+        }
+    }
+
+    /// #6811 (`LAMP_MAKE_MAY_RUN_ON`): a voice make that may run on is
+    /// marked so on its line and given past its usual time, within its ten
+    /// minutes, which lamp-tasks takes for that mark (and, since #7245, for
+    /// any make, `MOST_WITHIN`); past them it is refused; without the switch
+    /// the agent and its line are as before.
+    #[test]
+    fn a_make_that_may_run_on_is_marked_and_given_past_two_minutes() {
+        let tasks = stub(Some("hermes"), Arc::new(|_: &str| Some("x".to_owned())));
+        let before = tasks.agent();
+        let same = tasks.agent().running_on(false);
+        assert_eq!(
+            (same.within, same.make_within, same.may_run_on),
+            (before.within, before.make_within, false)
+        );
+        let long = tasks.agent().running_on(true);
+        assert!(long.may_run_on);
+        assert_eq!(long.within, crate::long_make::WRITE_WITHIN);
+        assert_eq!(long.make_within, crate::long_make::MAKE_WITHIN);
+        assert!(long.within > before.within);
+        assert!(long.within <= lamp_tasks::skill_make::RUN_ON_MOST_WITHIN);
+        assert_eq!(same.write("S", "B", false).unwrap(), "x");
+        assert_eq!(long.write("S", "B", false).unwrap(), "x");
+        let sent = tasks.sent.lock().unwrap().clone();
+        let makes: Vec<&Value> = sent
+            .iter()
+            .filter(|line| line["op"] == "skill_make")
+            .collect();
+        assert_eq!(
+            makes[0].as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["op", "rules", "within_ms"]
+        );
+        assert_eq!(makes[1]["may_run_on"], true);
+        assert_eq!(makes[1]["within_ms"], 300_000);
+        // lamp-tasks takes the marked line's time, and refuses one past its
+        // ten minutes.
+        assert!(lamp_tasks::skill_make::MakeLine::parse(makes[1].to_string().as_bytes()).is_ok());
+        let mut past = makes[1].clone();
+        past["within_ms"] = json!(600_001);
+        assert!(lamp_tasks::skill_make::MakeLine::parse(past.to_string().as_bytes()).is_err());
     }
 
     #[test]

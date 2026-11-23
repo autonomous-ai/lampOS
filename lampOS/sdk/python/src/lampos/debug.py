@@ -25,7 +25,9 @@ from typing import Any
 # person's mail, calendar and the like: never logged.
 # An installed app's panel text (`title`, `lines`) and the owner's `settings` values are the app's own and the
 # person's (a learner's name may be one): never logged; the keys that `changed` and a manifest `trigger`'s name are shown.
-SECRET = frozenset({"proof", "sig", "key", "nonce", "pin", "fp", "value", "prefix", "token", "args", "result", "title", "lines", "settings"})
+# An app's context line (`apps.context` `line`) is what the person is doing now: never logged.
+# A `pose` answer's keypoints are where a person's body is in a picture: never logged.
+SECRET = frozenset({"proof", "sig", "key", "nonce", "pin", "fp", "value", "prefix", "token", "args", "result", "title", "lines", "line", "settings", "keypoints"})
 # Fields given only as a summary: a said text or a turn's prompt, a pushed
 # skill part's bytes, a camera picture.
 SUMMARISED = frozenset({"text", "prompt", "data", "jpeg"})
@@ -36,8 +38,10 @@ SUMMARISED = frozenset({"text", "prompt", "data", "jpeg"})
 # an MCP client keeps of stderr: a registered phrase and a `phrase.heard`
 # phrase, events' fields, and a refusal's `why`.
 SHOWN = frozenset({
-    # hello's lamp: the owner's language (en, vi, ja, zh, ko).
+    # hello's lamp: the owner's language (en, vi, ja, zh, ko), and the
+    # lamp's build (`143+ab12cd34ef56`, the text the app shows).
     "language",
+    "build",
     # A skill run's `service.read` / `service.write`: the service's code (its
     # grants, `<code>-read` / `<code>-write`, show in `grants`).
     "service",
@@ -50,6 +54,10 @@ SHOWN = frozenset({
     "pm2_5", "pm4_0", "temperature", "temperature_c", "uptime_s",
     # A camera picture's size, age and a stream's rate (never the picture).
     "age_ms", "bytes", "fast", "fps", "fps_now", "stream",
+    # A `pose` answer's shape: whether a person was found (`pose`, its
+    # `score`), the picture's size, the model and its times; the person's
+    # keypoints are secret above, never shown.
+    "pose", "width", "height", "model", "decode", "npu", "post",
     # A computer's own notes (`notes.*`) and hello's limits for them: whether a
     # key was found or deleted, how many it keeps and the bounds; a key, a
     # value and a prefix are secret above, never shown.
@@ -80,13 +88,15 @@ SHOWN = frozenset({
     "asleep", "at", "clamped", "class", "client", "code", "colour", "confidence", "count", "elbow", "error", "ev", "events",
     "express", "facing", "from", "feeling", "for_ms", "frames", "got", "grants", "hold_max_ms", "how", "lease_max_ms", "say_max_bytes",
     "id", "joints", "kind", "lamp", "lamp_state", "lease", "level", "light", "limits", "manage",
-    "mood", "most", "motion", "motion_done", "mute", "name", "near", "ok", "on", "op", "open", "parts", "pattern", "paused", "phrase",
+    "mood", "most", "motion", "motion_done", "mute", "muted_after_fault", "name", "near", "ok", "on", "op", "open", "parts", "pattern", "paused", "phrase",
     "phrases", "pitch", "presence", "press", "private", "push", "quiet_hours", "re", "refused",
     "retry_ms", "roll", "say", "say_max_chars", "score", "seen", "shoulder", "shows", "side", "size", "skill", "skills",
     "started", "state", "step_ms", "strength", "take_max_ms", "talking", "targets", "to", "turn", "until", "v", "where",
     "why", "within_ms", "x", "y", "yaw",
     # An installed app's `app.settings` event and `app.trigger` (#7415).
-    "changed", "trigger"
+    "changed", "trigger",
+    # A computer's own pushed apps (`app.push`'s last answer, `app.list`); an app's title is secret above.
+    "app", "apps",
 })
 # Fields a lamp sends that the schema leaves open (`limits`, an `express`
 # answer, `mood`, `light`, a pushed skill's parts, Nine's `shows` and `hand`,

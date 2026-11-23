@@ -10,6 +10,16 @@
 //! seen is told, as a coarse kind with a rounded time, never the raw label,
 //! a count or a name, and nothing of it is kept past the note: no history.
 //!
+//! The same rule holds for the person's current sitting at the desk
+//! (`room/activity`'s `sitting_s`, #7694), which is a different thing: what
+//! the eyes measure, not what was seen done. The rule is about volunteering,
+//! so the lamp answers when the person at the desk asks about their own
+//! sitting ([`crate::desk_time`], only for a line heard at the lamp, with
+//! one face in view), and a wellbeing nudge's own line may rest on it
+//! (`lamp_skills::SITTING_SLOT`, its note told to say it only if asked);
+//! it is never raised anywhere else, never about another person, and never
+//! as a raw label.
+//!
 //! As for `humans/seems`, a value counts only fresh (within
 //! `HumanDoing::LASTS`), sure, with exactly one face in view (with two, it
 //! may be the other's), and the note is given only in a room that is not

@@ -264,6 +264,20 @@ pub struct UpdateSwitches {
     /// crate::agent_ns::DEFAULT_AGENT_SWITCH), read as `tasks` is, and
     /// only with `tasks` on.
     pub one_path: bool,
+    /// The owner's Update now (#7517, `LAMP_UPDATE_NOW`,
+    /// crate::update_now::SWITCH), on any lamp, read as `engines` is: the
+    /// carried file turns it on for a lamp already in a home.
+    pub now: bool,
+    /// OpenClaw's gateway only while OpenClaw is the lamp's default agent
+    /// (#8105, `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT`,
+    /// crate::openclaw_install::BY_DEFAULT_SWITCH), on any lamp, read as
+    /// `engines` is.
+    pub gateway_by_default: bool,
+    /// The move to the CDN feed (#7728, `LAMP_UPDATE_CDN_FEED`,
+    /// crate::cdn_feed::SWITCH), on any lamp, read as `engines` is: the
+    /// carried file turns it on for a lamp already in a home, and the round
+    /// that does restarts lamp-update so it moves in that round.
+    pub cdn_feed: bool,
 }
 
 /// lamp-update's switches, each by [`update_switch`], `env` giving
@@ -286,6 +300,21 @@ pub fn update_switches(
         (tasks_env.is_some() || product) && update_switch(root, tasks, tasks_env.as_deref());
     UpdateSwitches {
         engines: update_switch(root, engines, env(engines).as_deref()),
+        now: update_switch(
+            root,
+            crate::update_now::SWITCH,
+            env(crate::update_now::SWITCH).as_deref(),
+        ),
+        gateway_by_default: update_switch(
+            root,
+            crate::openclaw_install::BY_DEFAULT_SWITCH,
+            env(crate::openclaw_install::BY_DEFAULT_SWITCH).as_deref(),
+        ),
+        cdn_feed: update_switch(
+            root,
+            crate::cdn_feed::SWITCH,
+            env(crate::cdn_feed::SWITCH).as_deref(),
+        ),
         tasks,
         one_path: tasks
             && (one_path_env.is_some() || product)
@@ -534,6 +563,39 @@ mod tests {
         assert!(!update_switch(root.path(), engines, None));
     }
 
+    /// #7728: a lamp in a home whose unit doesn't set `LAMP_UPDATE_CDN_FEED`
+    /// starts with no carried file; the round that writes one turning it on
+    /// makes the switches differ, so lamp-update starts itself again and
+    /// moves to the CDN in that round. Its environment set off holds it off.
+    #[test]
+    fn a_round_that_carries_the_cdn_feed_switch_restarts_lamp_update() {
+        let root = tempfile::tempdir().unwrap();
+        let unset = |_: &str| None;
+        let started = update_switches(root.path(), true, unset);
+        assert!(!started.cdn_feed);
+        let at = root
+            .path()
+            .join(crate::manifest::UPDATE_ENV.trim_start_matches('/'));
+        std::fs::create_dir_all(at.parent().unwrap()).unwrap();
+        std::fs::write(&at, b"LAMP_UPDATE_CDN_FEED=on\n").unwrap();
+        let now = update_switches(root.path(), true, unset);
+        assert_eq!(
+            now,
+            UpdateSwitches {
+                cdn_feed: true,
+                ..UpdateSwitches::default()
+            }
+        );
+        assert!(restart_for(started, now));
+        // Started again with the file there: nothing more is asked.
+        assert!(!restart_for(now, update_switches(root.path(), true, unset)));
+        // Off in lamp-update's environment holds it off, the file or not.
+        let off = |name: &str| (name == crate::cdn_feed::SWITCH).then(|| "off".into());
+        let held = update_switches(root.path(), true, off);
+        assert!(!held.cdn_feed);
+        assert!(!restart_for(started, held));
+    }
+
     /// #6607 (P2 of the first read): no file when lamp-update starts, as on a
     /// lamp whose promote round first carries it; the round writes the file;
     /// read again, the switches differ, so lamp-update starts itself again
@@ -561,6 +623,9 @@ mod tests {
                 engines: true,
                 tasks: true,
                 one_path: true,
+                now: true,
+                gateway_by_default: false,
+                cdn_feed: true,
             }
         );
         assert!(restart_for(started, now));

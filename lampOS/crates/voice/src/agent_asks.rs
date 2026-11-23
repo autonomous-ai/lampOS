@@ -110,6 +110,12 @@ pub const NOT_READY: &str = "not_ready";
 /// The field of lamp-tasks' answer that holds it to the owner seen alone
 /// (`lamp_tasks::voice_ask::OWNER_ALONE`).
 pub const OWNER_ALONE: &str = "owner_alone";
+/// The field of lamp-tasks' `busy` refusal that says a make holds the agent
+/// (`lamp_tasks::voice_ask::MAKING_FIELD`, #7245): told [`MAKING_LINE`].
+pub const MAKING_FIELD: &str = "making";
+/// What is said to a live ask while the agent makes a skill: why, and when
+/// to ask again, never the failed line (Twelve's note on #7737).
+pub const MAKING_LINE: &str = "I'm still making your skill. Ask me again in a minute.";
 /// What is said for [`NO_SERVICES`].
 pub const NO_SERVICES_LINE: &str =
     "Your lamp's agent can't read your linked services yet, so I can't get that for you.";
@@ -384,6 +390,8 @@ pub fn hand_at(socket: PathBuf, asked: Asked, told: fn(Told, Since)) -> Value {
                         Told::Line(NO_SERVICES_LINE)
                     } else if why == format!("refused {NOT_READY}") {
                         Told::Line(crate::made_skill::NOT_READY_LINE)
+                    } else if why == format!("refused {MAKING_FIELD}") {
+                        Told::Line(MAKING_LINE)
                     } else {
                         Told::Line(FAILED_LINE)
                     }
@@ -482,6 +490,10 @@ pub fn exchange(socket: &Path, line: &Value, within: Duration) -> Result<Answere
                     owner_alone: answer[OWNER_ALONE] == true,
                 })
                 .ok_or_else(|| "lamp-tasks' answer has no words".into());
+        }
+        // A `busy` that a make holds is told apart (#7245): its own line.
+        if answer[MAKING_FIELD] == true {
+            return Err(format!("refused {MAKING_FIELD}"));
         }
         return Err(format!(
             "refused {}",
@@ -825,6 +837,29 @@ mod tests {
             notes.recv_timeout(Duration::from_secs(5)).unwrap(),
             Told::Line(crate::made_skill::NOT_READY_LINE)
         );
+        wait_free();
+        // A live ask while the agent makes a skill (#7245, Twelve's note on
+        // #7737): lamp-tasks' `busy` with `making` is told why, not the
+        // failed line; a `busy` without it stays the failed line (above).
+        let (_dir, socket, _seen) = tasks(vec![json!({
+            "ok": false,
+            "error": "busy",
+            "message": "the lamp's agent is making a skill; one is taken at a time",
+            MAKING_FIELD: true
+        })]);
+        hand_at(
+            socket,
+            Asked {
+                ask: "what's the weather".into(),
+                ..Asked::default()
+            },
+            told,
+        );
+        assert_eq!(
+            notes.recv_timeout(Duration::from_secs(5)).unwrap(),
+            Told::Line(MAKING_LINE)
+        );
+        assert!(!MAKING_LINE.contains("couldn't"));
         wait_free();
         // No socket at all: the fixed line too.
         let gone = std::env::temp_dir().join("va-none/skill-make.sock");

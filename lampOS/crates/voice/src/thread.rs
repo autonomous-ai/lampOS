@@ -245,6 +245,11 @@ pub struct Thread {
     /// their exchange opened ([`Self::left_on_holding_line`]): each is let
     /// go as it opens.
     let_go: VecDeque<u64>,
+    /// A look asked by the route's own call, kept with its question
+    /// (`LAMP_LOOK_KEPT_WITH_ASK`, [`Self::look_asked`]): the asking request,
+    /// and the look's own request once its turn begins. Its exchange is
+    /// handed on with the look's words, at the look's end.
+    look: Option<(u64, Option<u64>)>,
 }
 
 /// What stands for the lamp's words in a request a connected service's
@@ -294,6 +299,12 @@ struct Kept {
     whose: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     written: Option<String>,
+    /// Never given to the running summary or a talk note
+    /// ([`Thread::held_for`]): kept across a restart (a care turn's, the
+    /// safety read's P1 on #7752). Absent when false, so a file with none
+    /// held is as before.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    held: bool,
 }
 
 /// One exchange as [`Thread::recent`] gives it.
@@ -431,6 +442,7 @@ impl Thread {
             closed_at: None,
             closed_request: None,
             let_go: VecDeque::new(),
+            look: None,
         }
     }
 
@@ -690,6 +702,7 @@ impl Thread {
                 lamp: exchange.lamp.clone(),
                 whose: exchange.whose.clone(),
                 written: exchange.written.clone(),
+                held: exchange.held,
             })
             .collect();
         serde_json::to_string(&kept).ok()
@@ -758,7 +771,7 @@ impl Thread {
                 journalled: true,
                 summarized: false,
                 folded: None,
-                held: false,
+                held: kept.held,
                 let_go: false,
                 whose: kept.whose,
                 written: kept.written.map(|text| {
@@ -1043,7 +1056,18 @@ impl Thread {
             let heard = self.heard_for(request, now);
             crate::owner_voice::lamp_answered(request, heard.as_deref(), words, now);
         }
-        let opening = self.exchanges.back().map(|last| last.request) != Some(request);
+        // A look's words go on in the exchange that asked it, as one, when
+        // it is still the newest, not handed on, and in the same scope
+        // (`LAMP_LOOK_KEPT_WITH_ASK`): what was asked, "Let me look.", and
+        // what the lamp saw.
+        let goes_on_in_ask = self.look.is_some_and(|(asking, look)| {
+            look == Some(request)
+                && self.exchanges.back().is_some_and(|last| {
+                    last.request == asking && !last.journalled && last.whose.as_deref() == scope
+                })
+        });
+        let opening =
+            !goes_on_in_ask && self.exchanges.back().map(|last| last.request) != Some(request);
         if opening && crate::not_speech::names_a_function(text) {
             self.unsaid = Some(request);
             return;
@@ -1054,6 +1078,11 @@ impl Thread {
             return;
         }
         if opening {
+            // Another exchange opens: a look waited for is over, and its
+            // asking exchange is handed on as any other.
+            if self.look.is_some_and(|(asking, _)| asking != request) {
+                self.look = None;
+            }
             let asked = self
                 .heard_at
                 .is_some_and(|at| now.saturating_duration_since(at) <= ASKED_WITHIN);
@@ -1236,6 +1265,43 @@ impl Thread {
             })
     }
 
+    /// `LAMP_LOOK_KEPT_WITH_ASK`: request `asking`'s spoken turn asked for
+    /// a look by the route's own call. Its exchange waits, while it is the
+    /// newest, for the look's words ([`Self::look_turn`]), and is handed on
+    /// with them as one exchange at the look's end ([`Self::finished`]):
+    /// said = the question, answer = "Let me look." and what the lamp saw.
+    /// Any other exchange opening, the look let go, or a forgetting ends the
+    /// wait, and it is handed on as it stands.
+    pub fn look_asked(&mut self, asking: u64) {
+        self.look = Some((asking, None));
+    }
+
+    /// The look `asking` asked for is request `look`'s turn: its words go on
+    /// in `asking`'s exchange ([`Self::look_asked`]). Nothing unless that
+    /// look is waited for.
+    pub fn look_turn(&mut self, look: u64, asking: u64) {
+        if let Some((waiting, turn)) = self.look.as_mut()
+            && *waiting == asking
+        {
+            *turn = Some(look);
+        }
+    }
+
+    /// The look `asking` asked for will not go on in its exchange: dropped,
+    /// another turn began, or its scope is not the asker's. Its exchange is
+    /// handed on as it stands.
+    pub fn look_let_go(&mut self, asking: u64) {
+        if self.look.is_some_and(|(waiting, _)| waiting == asking) {
+            self.look = None;
+        }
+    }
+
+    /// Whether `request`'s exchange waits for its look's words
+    /// ([`Self::look_asked`]): what its calls gave stays for it.
+    pub fn waits_for_look(&self, request: u64) -> bool {
+        self.look.is_some_and(|(asking, _)| asking == request)
+    }
+
     /// The exchanges that are over and were not given out before, for the
     /// lamp's memory ([`crate::remember`]): every one but the newest, and
     /// the newest too when `done` is its request. Each with its request,
@@ -1244,11 +1310,23 @@ impl Thread {
     /// the lamp said.
     pub fn finished(&mut self, done: u64, now: Instant) -> Vec<FinishedExchange> {
         let newest = self.exchanges.back().map(|last| last.request);
+        // A look's end hands on the exchange that asked it, its words in
+        // it; until then that exchange, the newest, waits (`Self::look_asked`).
+        let look = self.look;
+        let looked = look.and_then(|(asking, look)| (look == Some(done)).then_some(asking));
+        let waits = look
+            .filter(|(_, look)| *look != Some(done))
+            .map(|(asking, _)| asking);
+        if looked.is_some() {
+            self.look = None;
+        }
         self.exchanges
             .iter_mut()
             .filter(|exchange| {
                 !exchange.journalled
-                    && (Some(exchange.request) != newest || exchange.request == done)
+                    && (Some(exchange.request) != newest
+                        || (exchange.request == done && waits != Some(done))
+                        || Some(exchange.request) == looked)
             })
             .filter_map(|exchange| {
                 exchange.journalled = true;
@@ -1376,6 +1454,7 @@ impl Thread {
         self.calling.clear();
         self.kept_for.clear();
         self.let_go.clear();
+        self.look = None;
         self.note = None;
         self.heard.clear();
         self.heard_at = None;
@@ -1397,12 +1476,67 @@ impl Thread {
     /// Whether the lamp's newest line before `request` ended in a question:
     /// then a bare answer ("23") is an answer to it (#926).
     pub fn lamp_asked(&self, request: u64) -> bool {
+        self.lamp_question(request).is_some()
+    }
+
+    /// [`Self::lamp_asked`], its exchange begun no more than `within` before
+    /// `now` (the clock [`Self::said_last_ago_but`] reads): a question the
+    /// lamp still waits on. Exchanges drop by count, not age, so
+    /// [`Self::lamp_asked`] alone holds an "Anything else?" for hours
+    /// (`said_to_me`'s bare yes or no out of the window, the Reviewer-lead's
+    /// HOLD on #7705).
+    pub fn lamp_asked_within(&self, request: u64, now: Instant, within: Duration) -> bool {
+        self.lamp_asked_ago(request, now)
+            .is_some_and(|ago| ago <= within)
+    }
+
+    /// How long before `now` the exchange of [`Self::lamp_asked`]'s question
+    /// began, none without one: journaled with `said_to_me`'s verdict so a
+    /// saved journal gives a replay its `asked_s` (#7698, request 99).
+    pub fn lamp_asked_ago(&self, request: u64, now: Instant) -> Option<Duration> {
+        self.lamp_question(request)
+            .map(|exchange| now.saturating_duration_since(exchange.at))
+    }
+
+    /// The words of [`Self::lamp_question`]: what a reply to it answers
+    /// (#8182, the Reviewer-lead's P2 on #8274).
+    pub fn lamp_question_said(&self, request: u64) -> Option<&str> {
+        self.lamp_question(request)
+            .map(|exchange| exchange.lamp.as_str())
+    }
+
+    /// The lamp's newest line before `request`, when it ended in a question.
+    fn lamp_question(&self, request: u64) -> Option<&Exchange> {
         self.exchanges
             .iter()
             .rev()
             .filter(|exchange| exchange.request != request)
             .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))
-            .is_some_and(|exchange| exchange.lamp.trim_end().ends_with('?'))
+            .filter(|exchange| exchange.lamp.trim_end().ends_with('?'))
+    }
+
+    /// The person's lines that the lamp's questions just before `request`
+    /// answered, newest first, one line each, joined: the run of exchanges
+    /// before `request` whose lamp line ended in a question, each begun
+    /// no more than `within` before `now`. An exchange with no words of the
+    /// lamp is passed over; one that asked nothing, or is older, ends the
+    /// run. `None` with no such exchange. For #8182: "Remind me at seven."
+    /// → "What should I remind you about?" → "Take my pills." gave the
+    /// time in the line the reply answers (Sixth's HOLD on #8274).
+    pub fn asked_before(&self, request: u64, now: Instant, within: Duration) -> Option<String> {
+        let mut said = Vec::new();
+        for exchange in self.exchanges.iter().rev() {
+            if exchange.request >= request || !exchange.lamp.chars().any(char::is_alphanumeric) {
+                continue;
+            }
+            if !exchange.lamp.trim_end().ends_with('?')
+                || now.saturating_duration_since(exchange.at) > within
+            {
+                break;
+            }
+            said.push(exchange.person.trim());
+        }
+        (!said.is_empty()).then(|| said.join("\n"))
     }
 
     /// [`Self::lamp_asked`], or with `by_its_end` (`LAMP_REMARKS`)
@@ -1485,6 +1619,9 @@ impl Thread {
         // The events a calendar read kept expire with it
         // (`LAMP_SERVICE_READ_IDS_KEPT`).
         crate::service_read_ids::conversation_ended();
+        // A look's asking exchange waits no longer (`LAMP_LOOK_KEPT_WITH_ASK`,
+        // Twelve's P2 on #8019): the close drops the look.
+        self.look = None;
         self.closed_at = Some(self.closed_at.map_or(now, |closed| closed.max(now)));
     }
 
@@ -2435,11 +2572,17 @@ pub fn close_now(request: Option<u64>) {
     if !test_closes::ON.with(std::cell::Cell::get) {
         return;
     }
-    if let Ok(mut thread) = THREAD.lock() {
+    let waited = THREAD.lock().ok().and_then(|mut thread| {
+        let waited = thread.look.map(|(asking, _)| asking);
         match request {
             Some(request) => thread.close_conversation_with(request, Instant::now()),
             None => thread.close_conversation(Instant::now()),
         }
+        waited
+    });
+    // The exchange that waited for its look is kept at once.
+    if let Some(asking) = waited {
+        crate::remember::finished(asking);
     }
 }
 
@@ -3391,6 +3534,64 @@ mod tests {
         assert_eq!(kept.recent(at(7), within, 6).len(), 1);
     }
 
+    #[test]
+    fn the_lines_the_lamps_questions_answered_are_the_run_back_within_its_bound() {
+        // #8182, Sixth's HOLD on #8274: a reply is read with the lines the
+        // lamp's questions just before it answered.
+        let mut thread = Thread::new();
+        let start = Instant::now();
+        let at = |seconds: u64| start + Duration::from_secs(seconds);
+        let within = Duration::from_secs(120);
+        thread.person("What time is it?", true, at(0));
+        thread.lamp(1, "It's six.", at(1));
+        thread.person("Remind me at seven.", true, at(2));
+        thread.lamp(2, "What should I remind you about?", at(3));
+        thread.person("Take my pills.", true, at(4));
+        thread.lamp(3, "Morning or evening?", at(5));
+        assert_eq!(
+            thread.asked_before(4, at(6), within).as_deref(),
+            Some("Take my pills.\nRemind me at seven."),
+            "the run of questions, and not the line before it"
+        );
+        assert_eq!(
+            thread.asked_before(4, at(124), within).as_deref(),
+            Some("Take my pills."),
+            "an older question ends the run"
+        );
+        assert_eq!(thread.asked_before(4, at(126), within), None, "stale");
+        assert_eq!(thread.asked_before(2, at(6), within), None, "no question");
+    }
+
+    #[test]
+    fn the_lamps_question_waits_only_within_its_bound() {
+        // The Reviewer-lead's HOLD on #7705: `lamp_asked` has no clock;
+        // `lamp_asked_within` holds the question only within its bound.
+        let mut thread = Thread::new();
+        let start = Instant::now();
+        let at = |seconds: u64| start + Duration::from_secs(seconds);
+        let within = Duration::from_secs(120);
+        thread.person("Call me Jay.", true, at(0));
+        thread.lamp(1, "Your name is Jay. Is that right?", at(1));
+        assert!(thread.lamp_asked_within(2, at(30), within), "fresh");
+        // The exchange begins with the lamp's first words, at 1 s.
+        assert!(thread.lamp_asked_within(2, at(121), within), "at the bound");
+        assert!(!thread.lamp_asked_within(2, at(122), within), "stale");
+        assert!(thread.lamp_asked(2), "lamp_asked alone has no clock");
+        // #7698: the journal gives the seconds since the question began.
+        assert_eq!(
+            thread.lamp_asked_ago(2, at(30)),
+            Some(Duration::from_secs(29))
+        );
+        thread.person("Thanks.", true, at(5));
+        thread.lamp(2, "You're welcome.", at(6));
+        assert!(!thread.lamp_asked_within(3, at(7), within), "no question");
+        assert_eq!(
+            thread.lamp_asked_ago(3, at(7)),
+            None,
+            "no question, no seconds"
+        );
+    }
+
     /// `LAMP_SAID_AS_HEARD`: an answer a line cut after its first words is
     /// kept as those words, and what it still sends adds none. Its end is
     /// the heard end, so a question it never played isn't taken as asked. One
@@ -3704,6 +3905,136 @@ mod tests {
         assert_eq!(rest, &flags[2..]);
         assert_eq!(take_file(&flags[2..]).unwrap(), (None, &flags[2..]));
         assert!(take_file(&flags[..1]).is_err());
+    }
+
+    /// `LAMP_LOOK_KEPT_WITH_ASK`: on lamp-06c1 (17 Nov) a look was kept as
+    /// two exchanges, the question with "Let me look." in the person's, and
+    /// what the lamp saw with nothing said in the room's. Now one exchange,
+    /// in the asker's scope: the question, "Let me look." and what it saw,
+    /// handed on at the look's end, words only.
+    #[test]
+    fn a_look_asked_is_kept_with_its_question_as_one_exchange() {
+        let start = Instant::now();
+        let at = |seconds: u64| start + Duration::from_secs(seconds);
+        for whose in [Some("p-a"), None] {
+            let mut thread = Thread::new();
+            thread.person("What movie is this toy from?", true, at(0));
+            thread.look_asked(1);
+            thread.lamp_for(1, "Let me look. ", at(1), whose);
+            assert!(thread.waits_for_look(1));
+            // The asking turn ends: its exchange waits for the look's words.
+            assert!(thread.finished(1, at(2)).is_empty());
+            thread.look_turn(2, 1);
+            thread.lamp_for(2, "A red toy motorcycle, ", at(3), whose);
+            thread.lamp_for(2, "maybe from a film. ", at(3), whose);
+            assert!(!thread.answered_between(1, 3), "no exchange of its own");
+            let done = thread.finished(2, at(4));
+            assert_eq!(
+                done,
+                [FinishedExchange {
+                    request: 1,
+                    age: Duration::from_secs(3),
+                    heard: "What movie is this toy from?".to_owned(),
+                    said: "Let me look. A red toy motorcycle, maybe from a film.".to_owned(),
+                    whose: whose.map(str::to_owned),
+                }]
+            );
+            assert!(!done[0].said.contains("data:"), "words only");
+            assert!(!thread.waits_for_look(1));
+            assert!(thread.finished(2, at(5)).is_empty(), "once");
+        }
+    }
+
+    /// A look let go (a held or carried asker, another turn first), or one
+    /// whose words come in another scope, is kept as before: the asking
+    /// exchange as it stands, the look's words in their own.
+    #[test]
+    fn a_look_let_go_or_in_another_scope_is_kept_apart_as_before() {
+        let start = Instant::now();
+        let mut thread = Thread::new();
+        thread.person("Take a look at it.", true, start);
+        thread.look_asked(1);
+        thread.lamp_for(1, "Let me look. ", start, Some("p-a"));
+        thread.look_let_go(1);
+        assert_eq!(thread.finished(1, start).len(), 1);
+        thread.lamp_for(2, "A red toy motorcycle. ", start, None);
+        let done = thread.finished(2, start);
+        assert_eq!((done[0].request, done[0].heard.as_str()), (2, ""));
+        // Its words in the room's while it was asked in A's: apart.
+        let mut thread = Thread::new();
+        thread.person("Take a look at it.", true, start);
+        thread.look_asked(1);
+        thread.lamp_for(1, "Let me look. ", start, Some("p-a"));
+        assert!(thread.finished(1, start).is_empty());
+        thread.look_turn(2, 1);
+        thread.lamp_for(2, "A red toy motorcycle. ", start, None);
+        let done = thread.finished(2, start);
+        assert_eq!(
+            done.iter()
+                .map(|exchange| (exchange.request, exchange.whose.as_deref()))
+                .collect::<Vec<_>>(),
+            [(1, Some("p-a")), (2, None)]
+        );
+        assert_eq!(done[0].said, "Let me look.");
+        // Someone speaks before the look: their turn opens its own, and the
+        // asking exchange is handed on as it stands.
+        let mut thread = Thread::new();
+        thread.person("Take a look at it.", true, start);
+        thread.look_asked(1);
+        thread.lamp_for(1, "Let me look. ", start, Some("p-a"));
+        assert!(thread.finished(1, start).is_empty());
+        thread.person("Sing.", true, start);
+        thread.lamp_for(3, "La la. ", start, Some("p-a"));
+        let given: Vec<u64> = thread
+            .finished(3, start)
+            .into_iter()
+            .map(|exchange| exchange.request)
+            .collect();
+        assert_eq!(given, [1, 3]);
+        // A close (a turn end, the person's stop) drops the look: the
+        // asking exchange is kept at once, not on the next turn (Twelve's
+        // P2 on #8019).
+        let mut thread = Thread::new();
+        thread.person("Take a look at it.", true, start);
+        thread.look_asked(1);
+        thread.lamp_for(1, "Let me look. ", start, Some("p-a"));
+        assert!(thread.finished(1, start).is_empty());
+        thread.close_conversation(start);
+        assert!(!thread.waits_for_look(1));
+        let done = thread.finished(1, start);
+        assert_eq!(
+            done.iter()
+                .map(|exchange| (exchange.request, exchange.said.as_str()))
+                .collect::<Vec<_>>(),
+            [(1, "Let me look.")]
+        );
+        // A forgetting ends the wait too.
+        thread.look_asked(4);
+        thread.forget();
+        assert!(!thread.waits_for_look(4));
+    }
+
+    /// A look the lamp began on its own (no look asked by the call) is kept
+    /// as it was: its own exchange, nothing said with it.
+    #[test]
+    fn an_unasked_look_is_kept_as_before() {
+        let start = Instant::now();
+        let mut thread = Thread::new();
+        thread.person("Hello.", true, start);
+        thread.lamp_for(1, "Hi! ", start, None);
+        thread.look_turn(2, 1);
+        thread.lamp_for(2, "A mug on the desk. ", start, None);
+        let done = thread.finished(2, start);
+        assert_eq!(
+            done.iter()
+                .map(|exchange| (
+                    exchange.request,
+                    exchange.heard.as_str(),
+                    exchange.said.as_str()
+                ))
+                .collect::<Vec<_>>(),
+            [(1, "Hello.", "Hi!"), (2, "", "A mug on the desk.")]
+        );
     }
 
     #[test]
@@ -4487,6 +4818,31 @@ mod tests {
         assert_eq!(given.len(), EXCHANGES - EXCHANGES / 3, "{given:?}");
     }
 
+    /// A held exchange stays held when a fresh process reads the thread's
+    /// file (the safety read's P1 on #7752: a care turn's words came back
+    /// to the summary after a restart); a file with none held is as before.
+    #[test]
+    fn a_held_exchange_stays_held_across_a_restart() {
+        let start = Instant::now();
+        let wall = SystemTime::now();
+        let mut thread = Thread::new();
+        thread.person("I want to kill myself", true, start);
+        thread.lamp(1, "I'm here with you.", start);
+        thread.held_for(1);
+        thread.person("What's the weather?", true, start);
+        thread.lamp(2, "Sunny.", start);
+        let text = thread.save(start, wall).expect("changed");
+        assert_eq!(text.matches("\"held\":true").count(), 1, "{text}");
+        let mut read = Thread::load(&text, start, wall);
+        let rest = read.summary_rest(None, start + Duration::from_secs(1));
+        assert_eq!(rest.len(), 1, "{rest:?}");
+        assert_eq!(rest[0].2, "Sunny.");
+        let mut plain = Thread::new();
+        plain.person("What's the weather?", true, start);
+        plain.lamp(2, "Sunny.", start);
+        assert!(!plain.save(start, wall).unwrap().contains("held"));
+    }
+
     /// The bike lock (lamp-06c1, 5 Nov): a room's line that corrected A's
     /// kept thing by the one-face rule ([`Thread::kept_for`]) is told in
     /// A's later turn, after A's own older exchanges and marked as the
@@ -4965,6 +5321,32 @@ mod tests {
         assert_eq!(recent[1].person, "What was it again?");
         // A Live session's recall is as before: no note is read to it.
         assert!(!read.recall(now, ROOM).unwrap().contains("Tell them"));
+    }
+
+    /// #7694: a wellbeing nudge's note, with the sitting lamp-skills put
+    /// first in it (`LAMP_DESK_TIME=on`, `lamp_skills::SITTING_SLOT`), is
+    /// kept whole with its answer, so the follow-up "how long have I been
+    /// at my desk?" has the minutes the nudge was about.
+    #[test]
+    fn a_nudges_note_keeps_the_sitting_for_the_follow_up() {
+        let now = Instant::now();
+        let mut thread = Thread::new();
+        let note = "(Measured: at the desk 47 minutes, since 14:12. Tell it only if asked, rounded.) \
+                    They have sat at the desk for about half an hour. Suggest a sip of water in one \
+                    short, warm line, the way a friend would: no lecture, nothing about health.";
+        assert!(note.len() <= PERSON_BYTES);
+        thread.written(1, note);
+        thread.lamp(1, "Jay, how about a sip of water?", now);
+        thread.person("How long have I been at my desk?", true, now);
+        let recent = thread.recent(now, Duration::from_secs(300), 6);
+        assert_eq!(recent[0].written.as_deref(), Some(note));
+        assert!(
+            recent[0]
+                .written
+                .as_deref()
+                .unwrap()
+                .contains("47 minutes, since 14:12")
+        );
     }
 
     /// #1505: a thread file this build cannot read (a later build's field,

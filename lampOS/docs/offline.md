@@ -297,6 +297,13 @@ internet, not the relay, and nothing in #830 depends on the relay.
   my voice service right now", never the internet's words and never "back
   online" after ([failure-notices.md](failure-notices.md), "Service down").
   Off unless set; silent until its recording is given.
+- **A long outage (`LAMP_OUTAGE_LINE_AGAIN=on`, #8235, on in the
+  product):** every speech turn of the outage says the existing line of its
+  cause, not only the first: no internet, "can't reach the internet"; the
+  service alone, the second route's "my thoughts are slow just now", so no
+  turn let through ends in nothing
+  ([failure-notices.md](failure-notices.md), "In a long outage, the line
+  every time").
 - **When the second route is the only voice** (`LAMP_VOICE_ROUTE=second`,
   #1844): it has no relay link of its own to watch, so its worker says its
   link down when a turn fails on the network and none of its services'
@@ -306,11 +313,12 @@ internet, not the relay, and nothing in #830 depends on the relay.
   then follow as above. `LAMP_REACH_PROBE` and `LAMP_SERVICE_DOWN_LINE`
   add nothing there: the worker's own check is already the internet's.
 - **What the product sets** (#830, 17 Oct): `LAMP_START_OFFLINE=on` and
-  `LAMP_OFFLINE_VOICE=on` in the voice, `--online on` in health, and no
-  probe: its voice's only route is the second one (`LAMP_VOICE_ROUTE=second`),
-  whose worker already checks the internet itself (above). Any link loss,
-  the internet's or the relay's, gets the offline line once and the breath;
-  the relay's is said in the internet's words, but never dropped in silence.
+  `LAMP_OFFLINE_VOICE=on` with `LAMP_OUTAGE_LINE_AGAIN=on` (#8235) in the
+  voice, `--online on` in health, and no probe: its voice's only route is
+  the second one (`LAMP_VOICE_ROUTE=second`), whose worker already checks
+  the internet itself (above). Any link loss, the internet's or the relay's,
+  gets the offline line on every speech turn and the breath; the relay's is
+  said in the internet's words, but never dropped in silence.
   lamp-4ace's and lamp-52e6's units set no probe either. `install`'s
   `a_product_lamp_without_a_link_says_so_once_and_never_drops_speech_in_silence`
   holds it: the probe only where `LAMP_VOICE_SECOND_CONFIG` is set.

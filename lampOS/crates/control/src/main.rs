@@ -37,7 +37,7 @@
 //! the microphone, which stay on the lamp's own network (docs/control.md,
 //! "The wire").
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use lamp_control::{cert, pairing::Clients, parts, server, session};
 use lamp_msgs::LightRequest;
@@ -58,6 +58,9 @@ const REMOTE_ENVIRONMENT: &str = "LAMP_CONTROL_REMOTE";
 const MICROPHONE_ENVIRONMENT: &str = "LAMP_CONTROL_MICROPHONE";
 /// The owner's switch for `speaker.stream`, off unless `on`.
 const SPEAKER_ENVIRONMENT: &str = "LAMP_CONTROL_SPEAKER";
+/// A skill run's say, sound and turn held in the lamp's quiet hours
+/// (#7625): on unless exactly `off`.
+const QUIET_RUNS_ENVIRONMENT: &str = "LAMP_CONTROL_QUIET_RUNS";
 /// `on` makes a new computer's pairing glow once on the ring (a soft pulse,
 /// docs/control.md, "Pairing, once per computer"); off unless given.
 const PAIR_CUE_ENVIRONMENT: &str = "LAMP_CONTROL_PAIR_CUE";
@@ -184,15 +187,15 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         )
     );
     // The quiet hours (#3917): the lamp's zone, `--zone`, `system` by
-    // default. With a window set, one that can't be read keeps every
-    // computer's say and sound refused as quiet, never a silent UTC; with
-    // the quiet hours off (the default) the zone is never consulted.
+    // default. One that can't be read keeps say and sound refused as quiet,
+    // never a silent UTC: a computer's with a window set, and a skill run's
+    // whenever runs are held (#7625, the default).
     let zone = option(arguments, "--zone").unwrap_or_else(|| "system".to_owned());
     let local_time = match lamp_local_time::LocalTime::zone(&zone) {
         Ok(local_time) => Some(Arc::new(local_time)),
         Err(error) => {
             eprintln!(
-                "lamp-control: {error}; with quiet hours set, say and sound are refused as quiet"
+                "lamp-control: {error}; a skill run's say and sound (and a computer's, with quiet hours set) are refused as quiet"
             );
             None
         }
@@ -207,6 +210,16 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     match window {
         Some(window) => eprintln!("lamp-control: quiet hours {window} local"),
         None => eprintln!("lamp-control: quiet hours off, this lamp's setting"),
+    }
+    if std::env::var(QUIET_RUNS_ENVIRONMENT).ok().as_deref() == Some("off") {
+        eprintln!(
+            "lamp-control: a skill run's say, sound and turn are not held in quiet hours ({QUIET_RUNS_ENVIRONMENT}=off)"
+        );
+    } else {
+        eprintln!(
+            "lamp-control: a skill run's say, sound and turn are held in the lamp's quiet hours, {} local",
+            lamp_local_time::QuietWindow::DEFAULT
+        );
     }
     // The rates are off unless `--rates default` (or
     // LAMP_CONTROL_RATES=default) turns them back on: every rate lifted but
@@ -223,6 +236,16 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     } else {
         eprintln!("lamp-control: rates on, this lamp's setting");
     }
+    // The build the app shows, from lamp-update's state as the unit hands it in
+    // (a credential): left out of the hello when the lamp has none.
+    let lamp_build = std::env::var_os("CREDENTIALS_DIRECTORY")
+        .and_then(|folder| lamp_control::build::read(Path::new(&folder)));
+    match &lamp_build {
+        Some(build) => eprintln!("lamp-control: the build said in hello: {build}"),
+        None => {
+            eprintln!("lamp-control: no build to say in hello (lamp-update's state not handed in)")
+        }
+    }
     let mut door = session::Door::new(
         &host,
         &host,
@@ -231,10 +254,14 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         Some(clients_path),
     )
     .with_quiet_hours(session::Quiet::new(local_time).with_window(window))
+    // A skill run's say, sound and turn held in the lamp's quiet hours (#7625),
+    // unless `LAMP_CONTROL_QUIET_RUNS` is exactly `off`.
+    .with_quiet_runs(std::env::var(QUIET_RUNS_ENVIRONMENT).ok().as_deref() != Some("off"))
     .with_language_file(std::env::var_os("LAMP_LANGUAGE_FILE").map_or_else(
         || PathBuf::from(lamp_control::language::PATH),
         PathBuf::from,
-    ));
+    ))
+    .with_build(lamp_build);
     if rates_off {
         door = door.with_rates_off();
     }
@@ -243,6 +270,23 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     let manage = option(arguments, "--manage-socket").map(PathBuf::from);
     if manage.is_some() {
         door = door.with_push_folder(state.clone());
+    }
+    // App push (docs/apps.md, "An app from your own computer"): on with the
+    // apps' helper's socket, the packages staged where lamp-cloud stages a
+    // Store one (`--apps-staging`, for a test), and only with LAMP_STORE_APPS=on.
+    let apps_manage = option(arguments, "--apps-manage-socket").map(PathBuf::from);
+    if apps_manage.is_some() {
+        door = door
+            .with_app_push(
+                option(arguments, "--apps-staging").map_or_else(
+                    || PathBuf::from(lamp_control::push::APPS_STAGING),
+                    PathBuf::from,
+                ),
+                lamp_control::app_push::on(),
+            )
+            // A revoke's or a narrowed pairing's change for the apps' helper,
+            // kept until answered, so a restart re-tells it (Heron's P1 on #8358).
+            .with_apps_owed(state.join(lamp_control::apps_owed::OWED));
     }
     let body = option(arguments, "--mood-socket").map(PathBuf::from);
     let say = option(arguments, "--say-socket").map(PathBuf::from);
@@ -266,6 +310,20 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         eprintln!("lamp-control: a skill run's linked services go to {socket}");
         door = door.with_skill_services(PathBuf::from(socket));
     }
+    // `pose` (#7415): only with LAMP_NPU=on, sent on to lamp-npu's socket
+    // (`--npu-socket`); off, it is told so.
+    let npu = lamp_control::npu::on(
+        std::env::var(lamp_control::npu::ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    )
+    .then(|| {
+        let socket = option(arguments, "--npu-socket")
+            .unwrap_or_else(|| lamp_control::npu::SOCKET.to_owned());
+        eprintln!("lamp-control: poses go to {socket}");
+        PathBuf::from(socket)
+    });
+    let poses = npu.is_some();
     let actions = option(arguments, "--actions-socket").map(PathBuf::from);
     let bus = match option(arguments, "--bus-root") {
         Some(root) => Some(lamp_bus::Bus::new(root).map_err(|e| format!("bus: {e}"))?),
@@ -499,6 +557,9 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         if let Some(actions) = actions {
             lamp = lamp.volume_through(actions);
         }
+        if let Some(npu) = npu {
+            lamp = lamp.posing(npu);
+        }
         let on_demand = arguments.iter().any(|a| a == "--camera-opens-on-demand");
         let lamp = match sight {
             Some((sight, mark)) => match frames {
@@ -518,6 +579,11 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     if let Some(manage) = manage {
         shared.set_manage_socket(manage);
     }
+    if let Some(apps_manage) = apps_manage {
+        shared.set_apps_manage_socket(apps_manage);
+        // What the apps' helper was owed when lamp-control last stopped.
+        shared.tell_owed_app_changes();
+    }
     // The owner's yeses to skills' tasks (#6305), in its own state folder,
     // which lamp-skills can't write (`lamp_control::task_yes`).
     shared.set_task_yes_folder(state.clone());
@@ -536,6 +602,7 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     shared.set_remote(remote);
     let pair_cue = std::env::var(PAIR_CUE_ENVIRONMENT).as_deref() == Ok("on");
     shared.set_pair_cue(pair_cue);
+    shared.set_poses(poses);
     eprintln!(
         "lamp-control: {}",
         if pair_cue {
@@ -644,6 +711,52 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
                 }
                 Err(why) => eprintln!("lamp-control: the run socket for {user}: off: {why}"),
             }
+        }
+        // The installed apps' socket, behind LAMP_STORE_APPS: one socket, the
+        // peer known by its cgroup (docs/apps.md, "The app socket").
+        if lamp_control::app_yes::on() {
+            let path = PathBuf::from(
+                option(arguments, "--app-socket")
+                    .or_else(|| std::env::var(lamp_control::app_socket::ENVIRONMENT).ok())
+                    .unwrap_or_else(|| lamp_control::app_socket::SOCKET.to_owned()),
+            );
+            match lamp_control::app_socket::bind(&path) {
+                Ok(listener) => {
+                    eprintln!("lamp-control: installed apps may use {}", path.display());
+                    tokio::spawn(server::serve_app(
+                        listener,
+                        PathBuf::from(lamp_control::app_yes::APPS_DIR),
+                        shared.clone(),
+                    ));
+                }
+                Err(error) => eprintln!("lamp-control: the app socket {}: off: {error}", path.display()),
+            }
+        }
+        // The running apps' spoken triggers to the voice and a turn an app
+        // took back (piece 3b-2b), with the apps on and a bus.
+        // A removed app's facts in memory, forgotten until memory says so
+        // (marks in --state-dir; those a restart left are tried at once).
+        if lamp_control::app_yes::on() {
+            shared.start_facts_forget(state.clone(), lamp_control::app_facts_forget::RETRY_EVERY);
+        }
+        if let (true, Some(bus)) = (lamp_control::app_yes::on(), &bus) {
+            lamp_control::app_triggers::start(bus, shared.clone());
+            // An app's facts for Lamp's memory to the voice and its word
+            // back; `apps.remember` is refused
+            // while the lamp is private, read as the speaker reads it.
+            shared.set_private(lamp_control::speaker::gates(Some(watch.clone())).0);
+            lamp_control::app_remember::start(bus, shared.clone());
+            // An app's live context line (`apps.context`) to the voice, by
+            // the same gates.
+            lamp_control::app_context::start(bus, shared.clone());
+            eprintln!(
+                "lamp-control: apps.remember is {}",
+                if lamp_control::app_remember::on() {
+                    "on (LAMP_APP_REMEMBER)"
+                } else {
+                    "off (LAMP_APP_REMEMBER)"
+                }
+            );
         }
         if let Some(bus) = &bus {
             server::watch_bus(bus, watch, shared.clone())

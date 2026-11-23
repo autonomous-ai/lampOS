@@ -235,6 +235,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lamp-checked-replace"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.4.3",
+ "rustix",
+]
+
+[[package]]
 name = "lamp-local-time"
 version = "0.1.0"
 dependencies = [
@@ -246,6 +254,7 @@ name = "lamp-msgs"
 version = "0.1.0"
 dependencies = [
  "lamp-bus",
+ "rustix",
  "serde",
  "serde_json",
  "sha2",
@@ -258,6 +267,7 @@ dependencies = [
  "base64",
  "httparse",
  "lamp-bus",
+ "lamp-checked-replace",
  "lamp-local-time",
  "lamp-msgs",
  "ring",

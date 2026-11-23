@@ -178,6 +178,69 @@ pub fn only_keeps(said: &str) -> bool {
     true
 }
 
+/// Whether `said` asks only to keep, for a keep refused with nobody known
+/// (#7877, `needs_face::REFUSED_LINE`): [`only_keeps`], or the same with
+/// the keep's own details after it in clauses of their own ("… at level
+/// B2, spot 4T") and a short address before it that isn't the lamp's
+/// usual name ("Lynn, remember that …", the name as heard). Since nothing
+/// of the line is kept, a detail clause loses nothing; a question or a
+/// further ask anywhere still says no.
+pub fn only_keeps_refused(said: &str) -> bool {
+    if only_keeps(said) {
+        return true;
+    }
+    let said = said.replace('\u{2019}', "'").replace(" - ", ", ");
+    if said.contains(['?', '\u{FF1F}']) || asks_a_question(&said) {
+        return false;
+    }
+    let filler = |words: &[String]| words.iter().all(|word| FILLER.contains(&word.as_str()));
+    let mut any = false;
+    for sentence in said.split_inclusive(['.', '!', ';', '\u{3002}', '\u{FF01}', '\u{FF1B}']) {
+        if filler(&crate::known_faces::lower_words(sentence)) {
+            continue;
+        }
+        let mut kept = false;
+        for clause in sentence.split(CLAUSE_ENDS) {
+            let words = crate::known_faces::lower_words(clause);
+            if filler(&words) {
+                continue;
+            }
+            if words.windows(2).any(|pair| {
+                JOINING.contains(&pair[0].as_str())
+                    && (ASKING.contains(&pair[1].as_str())
+                        || NEW_CLAUSE.contains(&pair[1].as_str()))
+            }) {
+                return false;
+            }
+            if !kept {
+                if crate::remember::asked::asks_to_keep(clause) {
+                    kept = true;
+                } else if words.len() > 2 {
+                    // Words before the keep that are no address.
+                    return false;
+                }
+            } else if words.first().is_some_and(|word| {
+                ASKING.contains(&word.as_str())
+                    || NEW_CLAUSE.contains(&word.as_str())
+                    || JOINING.contains(&word.as_str())
+            }) {
+                // A clause after the keep that asks or starts anew.
+                return false;
+            }
+        }
+        // A sentence of an address alone ("Hey, Liz."), before the keep's:
+        // its every clause filler or a short address, or it said no above.
+        if !kept && !any {
+            continue;
+        }
+        if !kept {
+            return false;
+        }
+        any = true;
+    }
+    any
+}
+
 /// The words that start an ask to keep, as `remember::asked` reads them:
 /// the first run of one of these in the heard line is its lead-in, not
 /// what was asked to keep.

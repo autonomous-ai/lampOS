@@ -4,36 +4,53 @@ use super::*;
 mod action_claim;
 mod after_forget;
 mod agent_tasks_named;
+mod app_context_note;
+mod app_triggers_in_code;
+mod care_turn;
 mod chat_second_try;
 mod checking_line;
 mod clash_note;
 mod code_yes_name_only;
 mod cut_to_a_person;
+mod day_shed_held;
 mod decline_silent;
 mod dont_know;
+mod face_sticky;
+mod forces_past_name;
 mod held_consent;
 mod held_forget;
 mod held_rename;
 mod held_save;
 mod history_keeps_calls;
+mod just_made_note;
 mod keep_at_once;
+mod keep_whole;
+mod limit_local;
+mod live_fact;
 mod made_line;
 mod made_not_on;
+mod made_turn_said;
+mod make_begun_line;
 mod music_current;
 mod music_policy;
 mod music_scope;
 mod music_warm_name;
 mod name_carries;
 mod name_near;
+mod needs_face_said;
 mod not_for_me_words;
+mod nudge_claim;
 mod opens_further;
 mod pause_join;
 mod person_scope_seen;
 mod read_back_words;
 mod remember_speaker;
 mod remove_words;
+mod round_one_forced;
 mod sent_write;
 mod short_done;
+mod short_sound_name;
+mod skill_claim;
 mod skill_named_words;
 mod skill_yes_carry;
 mod task_yes_in_code;
@@ -90,6 +107,8 @@ struct Script {
     unsaid: &'static [&'static str],
     /// Speech of this sentence never ends.
     endless: Option<&'static str>,
+    /// Functions the chat declares none of ([`Services::declares`]).
+    undeclared: &'static [&'static str],
     /// Speech of this sentence is this many samples, in whole packets: a
     /// line as long as the lamp's voice says it.
     lasting: Option<(&'static str, usize)>,
@@ -353,7 +372,7 @@ impl Services for Script {
     }
 
     fn declares(&self, _messages: &[Message], without: &[&str], name: &str) -> Option<bool> {
-        Some(!without.contains(&name))
+        Some(!without.contains(&name) && !self.undeclared.contains(&name))
     }
 
     fn measured(&self, messages: &[Message], _told: ChatTold) -> Option<(usize, usize)> {
@@ -538,6 +557,7 @@ async fn turn_within(engine: &mut Engine, wait: Duration) -> Vec<String> {
             ProviderOutput::ServiceCalled { request } => (format!("service:{request}"), false),
             ProviderOutput::StopAnswered { request } => (format!("stop:{request}"), false),
             ProviderOutput::MakeWaiting { request } => (format!("make_waiting:{request}"), false),
+            ProviderOutput::MadeRunNow { skill, .. } => (format!("made_run:{skill}"), false),
             other => panic!("the second route never sends {other:?}"),
         };
         if labels.last() != Some(&label) || !label.starts_with("audio:") {
@@ -957,6 +977,104 @@ async fn a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_mor
             "said:Made.".into()
         ]
     );
+}
+
+/// #6811 (`LAMP_MAKE_MAY_RUN_ON`, the first builder's 17:23): a make with
+/// no answer a minute after its waiting line is let run on: the lamp says
+/// [`crate::long_make::RUN_ON_LINE`] once, in place of the long-wait line,
+/// and the turn ends while the make goes on, the model told it was said.
+/// One that answers first is waited for as before; off, as before.
+#[tokio::test]
+async fn a_make_past_a_minute_says_its_line_once_and_frees_the_turn() {
+    let said = |run_on: Option<Duration>, request: u64, makes_for: Duration| async move {
+        let asked = call("c1", crate::made_skill::MAKE, json!({"request": "x"}));
+        let script = Arc::new(Script {
+            chats: Mutex::new(
+                [
+                    vec![
+                        text("I'll make it now."),
+                        Ok(ChatEvent::ToolCalls(vec![asked])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let directory = std::env::temp_dir().join(format!("run-on-turn-{request}"));
+        let tools: ToolRunner = Arc::new(move |request, _, name, _| {
+            let directory = directory.clone();
+            Box::pin(async move {
+                if name == crate::made_skill::MAKE {
+                    crate::long_make::begin(request, &directory);
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                    assert!(crate::make_skill_agent::waiting_due(request));
+                    tokio::time::sleep(makes_for).await;
+                    if crate::long_make::settle(request).is_some() {
+                        return json!({"settled_after_let_go": true});
+                    }
+                }
+                json!({"ok": true})
+            })
+        });
+        let engine = Engine::with_clock(
+            script,
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        )
+        .waiting_on_one_path(Some(Duration::from_millis(30)))
+        .running_on_after(run_on);
+        let mut engine = engine;
+        engine.submit(written(request, "Make me x."));
+        let began = Instant::now();
+        let said = turn(&mut engine)
+            .await
+            .into_iter()
+            .filter(|label| label.starts_with("said:"))
+            .map(|label| label.replacen("said: ", "said:", 1))
+            .collect::<Vec<_>>();
+        let _ =
+            std::fs::remove_dir_all(std::env::temp_dir().join(format!("run-on-turn-{request}")));
+        (said, began.elapsed())
+    };
+    let waiting = format!("said:{}", crate::make_skill_agent::ONE_PATH_WAITING_LINE);
+    let run_on = format!("said:{}", crate::long_make::RUN_ON_LINE);
+    let long = format!("said:{}", crate::make_skill_agent::LONG_WAIT_LINE);
+    // Past its minute (here 30 ms): its one line, no long-wait line, and
+    // the turn ends long before the make does.
+    let (lines, took) = said(
+        Some(Duration::from_millis(30)),
+        6_811_301,
+        Duration::from_secs(3),
+    )
+    .await;
+    assert_eq!(
+        lines,
+        [
+            "said:I'll make it now.".to_owned(),
+            waiting.clone(),
+            run_on.clone()
+        ]
+    );
+    assert!(
+        took < Duration::from_secs(2),
+        "the turn was freed: {took:?}"
+    );
+    // Its answer within the minute: waited for, as before.
+    let (lines, _) = said(
+        Some(Duration::from_secs(60)),
+        6_811_302,
+        Duration::from_millis(100),
+    )
+    .await;
+    assert!(!lines.contains(&run_on), "{lines:?}");
+    // The switch off: the long-wait line, and the turn waits for the make.
+    let (lines, took) = said(None, 6_811_303, Duration::from_millis(400)).await;
+    assert!(!lines.contains(&run_on), "{lines:?}");
+    assert!(lines.contains(&long), "{lines:?}");
+    assert!(took >= Duration::from_millis(400));
 }
 
 /// lamp-c0a4, 16 Nov (#7371): after the one run path's waiting line the
@@ -5409,6 +5527,8 @@ async fn a_reminder_is_deferred_as_the_fixture_does() {
         late_by_ms: None,
         also: Vec::new(),
         again: false,
+        ids: Vec::new(),
+        timer: false,
     });
     assert_eq!(turn(&mut engine).await, ["deferred:Disabled"]);
 }
@@ -5449,6 +5569,8 @@ fn reminder(request: u64, text: &str) -> ProviderInput {
         late_by_ms: None,
         also: Vec::new(),
         again: false,
+        ids: Vec::new(),
+        timer: false,
     }
 }
 
@@ -5684,6 +5806,25 @@ async fn a_short_sound_not_heard_as_a_short_word_is_held_when_sounds_are_checked
         );
         assert_eq!(asked, 1, "{checked} {marked} {heard}");
     }
+}
+
+/// #7834: on lamp-9adf on 19 Nov "Lamp, put it back." ended as a short
+/// sound and was held 2 times in 5, `LAMP_ENDPOINT_PAUSE_JOIN` being off
+/// there. A line begun with the lamp's name set off is never held as a
+/// short sound, with any switch; one without the name still is.
+#[tokio::test]
+async fn a_short_sound_begun_with_the_lamps_name_is_answered_when_sounds_are_checked() {
+    for named in ["Lamp, put it back.", "Lamp, stop.", "Lamp, lights off."] {
+        let (labels, asked) = sound_turn(true, true, named).await;
+        assert!(
+            labels.iter().any(|label| label.starts_with("audio:")),
+            "{named}: {labels:?}"
+        );
+        assert_eq!(asked, 1, "{named}");
+    }
+    let (held, asked) = sound_turn(true, true, "Put it back.").await;
+    assert_eq!(held, ["started:1", "heard:Put it back.", "complete"]);
+    assert_eq!(asked, 0);
 }
 
 /// #5553: on lamp-9adf on 6 Nov, with nobody in view, "Send." after a
@@ -8758,6 +8899,487 @@ async fn the_routes_own_look_tells_the_model_its_head_did_not_move() {
     assert!(tool.contains("never moves your head"), "{tool}");
 }
 
+/// One look's hits asked: its request, the words and the scope's person.
+type LookHit = (u64, String, Option<String>);
+
+/// `LAMP_LOOK_TOLD` and `LAMP_LOOK_KEPT_WITH_ASK` (lamp-06c1, 17 Nov: the
+/// person's red toy motorcycle, which they had named several times, was
+/// called a red toy camera on three looks, and each look was kept as the
+/// room's with nothing said). With both on, the look turn is told what the
+/// model wrote with its call and memory's hits for the question, beside the
+/// picture and before the note, and goes on in the asker's scope; a look
+/// called with nothing, its hits for the asking line finding nothing, has
+/// the note as before. With both off, all is as before.
+#[tokio::test]
+async fn a_look_is_told_what_was_asked_and_goes_on_in_the_askers_scope() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+    use crate::speaking_faces::known_face_of;
+    const STILL: &str = "\n\n(Your head did not move for this look: say only what is in front of you, and never say you turned or looked to a side.)";
+    let jpeg = [0xFF, 0xD8, 0xFF];
+    for on in [true, false] {
+        let path = std::env::temp_dir().join(format!(
+            "look-told-{on}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::write(&path, "A").unwrap();
+        std::fs::write(known_face_of(&path), "f1\n").unwrap();
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok("Lamp, what movie is this toy from?".to_owned()),
+                    Ok("Lamp, look at this.".to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new(
+                [
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![call(
+                            "c1",
+                            LOOK_CALL,
+                            json!({"question":"what movie is this toy from?","told":"my red toy motorcycle"}),
+                        )])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("A red toy motorcycle."), Ok(ChatEvent::Done)],
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![call("c2", LOOK_CALL, json!({}))])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("A mug."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let cache = Arc::new(FaceCache::default());
+        let runner: ScopedToolRunner =
+            Arc::new(|_, _, _, _, _| Box::pin(async { json!({"ok":true}) }));
+        // Memory's hits, by request, words and scope.
+        let hits: Arc<Mutex<Vec<LookHit>>> = Arc::default();
+        let hit = hits.clone();
+        let mut engine = skill_looking(script.clone(), r#"{"ok":true}"#)
+            .with_memory_scope(
+                lamp_turn_owner::BootId::new([15; 16]).unwrap(),
+                cache.clone(),
+                runner,
+                Some(Arc::new(|lease: &ScopeLease| {
+                    Told::from(format!("for {:?}", lease.scope().unwrap().person()))
+                })),
+            )
+            .remembering(Arc::new(
+                move |request, words: &str, lease: Option<&ScopeLease>| {
+                    hit.lock().unwrap().push((
+                        request,
+                        words.to_owned(),
+                        lease
+                            .and_then(|lease| lease.scope())
+                            .and_then(|scope| scope.person())
+                            .map(str::to_owned),
+                    ));
+                    words.contains("movie").then(|| "HITS".to_owned())
+                },
+            ))
+            .telling_looks_what_was_said(on)
+            .keeping_looks_with_their_ask(on)
+            .announcing(false);
+        engine.memory_camera(true, 1);
+        cache.replace(
+            cache.begin_refresh(),
+            crate::known_faces::FaceObservation::read(&path),
+        );
+        let look = |request| ProviderInput::Written {
+            search: false,
+            request,
+            session: 1,
+            privacy_generation: 1,
+            text: crate::speak_up::LOOK_FULL_NOTE.into(),
+            look: true,
+            quoted: false,
+        };
+        for (spoken, looked) in [(9101, 9102), (9103, 9104)] {
+            engine.submit(start(spoken));
+            engine.submit(audio(spoken, 1));
+            engine.submit(end(spoken));
+            assert_eq!(look_and_words(&mut engine).await.0, Some((spoken, 1, None)));
+            // The lamp's order (`worker.rs`, `Gate::install`), as 06c1's
+            // journal had it: the asking turn ends ("Let me look." said)
+            // and an authority with no owner stops through it; then the
+            // look request's authority retires it, then its input comes
+            // (Twelve's P1 and the ROW on #8019).
+            engine.stop_through(spoken);
+            engine.retire_through(looked - 1);
+            engine.submit(look(looked));
+            look_and_words(&mut engine).await;
+        }
+        let a = crate::remember::person_id("A");
+        let asked = script.asked.lock().unwrap();
+        assert_eq!(asked.len(), 4);
+        let note = format!("{}{STILL}", crate::speak_up::LOOK_FULL_NOTE);
+        let told = if on {
+            format!(
+                "They asked: \"what movie is this toy from?\"\nThey told you it is: \"my red toy motorcycle\"\n{}\n\nHITS\n\n{note}",
+                crate::look_told::TOLD_LINE
+            )
+        } else {
+            note.clone()
+        };
+        assert_eq!(
+            asked[1].last(),
+            Some(&Message::user_seeing(told, &jpeg)),
+            "{on}"
+        );
+        assert_eq!(
+            asked[3].last(),
+            Some(&Message::user_seeing(note, &jpeg)),
+            "no arguments, no hits: the note as before ({on})"
+        );
+        let a_told = Message::system(format!("for {:?}", Some(a.as_str())));
+        let room = Message::system("for None");
+        assert_eq!(asked[0][0], a_told, "A's line is A's");
+        for at in [1, 3] {
+            assert_eq!(
+                asked[at][0],
+                if on { a_told.clone() } else { room.clone() },
+                "the look turn's scope ({on})"
+            );
+        }
+        // The look's hits: for the question, then for the asking line, in
+        // A's scope; none asked with the switch off.
+        let looks: Vec<_> = hits
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(request, ..)| [9102, 9104].contains(request))
+            .cloned()
+            .collect();
+        if on {
+            assert_eq!(
+                looks,
+                [
+                    (
+                        9102,
+                        "what movie is this toy from?".to_owned(),
+                        Some(a.clone())
+                    ),
+                    (9104, "Lamp, look at this.".to_owned(), Some(a.clone())),
+                ]
+            );
+        } else {
+            assert!(looks.is_empty(), "{looks:?}");
+        }
+        // Nothing of the look is left waiting in the lamp's thread.
+        if let Ok(mut thread) = crate::thread::THREAD.lock() {
+            thread.look_let_go(9101);
+            thread.look_let_go(9103);
+        }
+        std::fs::remove_file(known_face_of(&path)).unwrap();
+        std::fs::remove_file(path).unwrap();
+    }
+}
+
+/// Who is at the lamp is read again as the look begins (the memory
+/// owner's ruling on #8019, privacy first): a look A asked that finds B is
+/// the room's, its hits read in the room's; a look asked is kept through
+/// its asking turn's end, and a mute before it began drops it, its asking
+/// exchange kept at once (Twelve's P2 on #8019).
+#[tokio::test]
+async fn a_look_that_finds_someone_else_is_the_rooms_and_a_dropped_one_lets_its_ask_go() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+    use crate::speaking_faces::known_face_of;
+    let tag = format!("{}-{:?}", std::process::id(), std::thread::current().id());
+    let known = |name: &str, face: &str| {
+        let path = std::env::temp_dir().join(format!("look-other-{name}-{tag}"));
+        std::fs::write(&path, name).unwrap();
+        std::fs::write(known_face_of(&path), format!("{face}\n")).unwrap();
+        path
+    };
+    let (path_a, path_b) = (known("A", "f1"), known("B", "f2"));
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Lamp, what movie is this toy from?".to_owned()),
+                Ok("Lamp, take a look at it.".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        LOOK_CALL,
+                        json!({"question":"what movie is this toy from?"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("A red toy motorcycle."), Ok(ChatEvent::Done)],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call("c2", LOOK_CALL, json!({}))])),
+                    Ok(ChatEvent::Done),
+                ],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let cache = Arc::new(FaceCache::default());
+    let runner: ScopedToolRunner = Arc::new(|_, _, _, _, _| Box::pin(async { json!({"ok":true}) }));
+    let hits: Arc<Mutex<Vec<LookHit>>> = Arc::default();
+    let hit = hits.clone();
+    let mut engine = skill_looking(script.clone(), r#"{"ok":true}"#)
+        .with_memory_scope(
+            lamp_turn_owner::BootId::new([17; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            Some(Arc::new(|lease: &ScopeLease| {
+                Told::from(format!("for {:?}", lease.scope().unwrap().person()))
+            })),
+        )
+        .remembering(Arc::new(
+            move |request, words: &str, lease: Option<&ScopeLease>| {
+                hit.lock().unwrap().push((
+                    request,
+                    words.to_owned(),
+                    lease
+                        .and_then(|lease| lease.scope())
+                        .and_then(|scope| scope.person())
+                        .map(str::to_owned),
+                ));
+                None
+            },
+        ))
+        .telling_looks_what_was_said(true)
+        .keeping_looks_with_their_ask(true)
+        .announcing(false);
+    engine.memory_camera(true, 1);
+    let name = |path: &std::path::Path| {
+        cache.replace(
+            cache.begin_refresh(),
+            crate::known_faces::FaceObservation::read(path),
+        );
+    };
+    name(&path_a);
+    engine.submit(start(9201));
+    engine.submit(audio(9201, 1));
+    engine.submit(end(9201));
+    assert_eq!(look_and_words(&mut engine).await.0, Some((9201, 1, None)));
+    // B, not A, is at the lamp as the look begins.
+    name(&path_b);
+    engine.stop_through(9201);
+    engine.retire_through(9201);
+    engine.submit(ProviderInput::Written {
+        search: false,
+        request: 9202,
+        session: 1,
+        privacy_generation: 1,
+        text: crate::speak_up::LOOK_FULL_NOTE.into(),
+        look: true,
+        quoted: false,
+    });
+    look_and_words(&mut engine).await;
+    {
+        let asked = script.asked.lock().unwrap();
+        assert_eq!(
+            asked[0][0],
+            Message::system(format!(
+                "for {:?}",
+                Some(crate::remember::person_id("A").as_str())
+            ))
+        );
+        assert_eq!(asked[1][0], Message::system("for None"), "the room's look");
+    }
+    let looked: Vec<_> = hits
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(request, ..)| *request == 9202)
+        .cloned()
+        .collect();
+    assert_eq!(
+        looked,
+        [(9202, "what movie is this toy from?".to_owned(), None)],
+        "its hits are the room's"
+    );
+    assert!(
+        crate::thread::THREAD
+            .lock()
+            .is_ok_and(|thread| !thread.waits_for_look(9201)),
+        "not kept with A's ask"
+    );
+    // A asks again; the turn ends, which keeps the look asked, and a mute
+    // drops it before it begins.
+    name(&path_a);
+    engine.submit(start(9203));
+    engine.submit(audio(9203, 1));
+    engine.submit(end(9203));
+    assert_eq!(look_and_words(&mut engine).await.0, Some((9203, 1, None)));
+    engine.stop_through(9203);
+    assert!(
+        engine.shared.look_asked.lock().unwrap().is_some(),
+        "the turn over keeps it"
+    );
+    engine.privacy((true, 1, false, 1));
+    assert!(
+        engine.shared.look_asked.lock().unwrap().is_none(),
+        "dropped"
+    );
+    assert!(
+        crate::thread::THREAD
+            .lock()
+            .is_ok_and(|thread| !thread.waits_for_look(9203)),
+        "its exchange waits no longer"
+    );
+    for path in [path_a, path_b] {
+        std::fs::remove_file(known_face_of(&path)).unwrap();
+        std::fs::remove_file(path).unwrap();
+    }
+}
+
+/// Whether a look's asker is still the one alone at the lamp
+/// ([`asker_still_alone`]): the cache must name them now; with the eyes,
+/// no other face, known or not, may be in view (none at all when their gap
+/// holds them).
+#[test]
+fn a_looks_asker_is_alone_only_with_no_one_else_in_view() {
+    use crate::memory_scope::ScopeSnapshot;
+    use crate::speaking_faces::SpeakingFaces;
+    let face = |id: &str| lamp_msgs::Face {
+        pitch: None,
+        looking: None,
+        id: id.to_owned(),
+        xmin: 0.1,
+        ymin: 0.1,
+        xmax: 0.3,
+        ymax: 0.4,
+        confidence: 1.0,
+        yaw: None,
+        facing: None,
+        speaking: None,
+        follows: None,
+    };
+    let (a, b, room) = (
+        ScopeSnapshot::of("A"),
+        ScopeSnapshot::of("B"),
+        ScopeSnapshot::room(),
+    );
+    let from = Instant::now();
+    let to = Instant::now();
+    // No eyes: the cache alone decides.
+    assert!(asker_still_alone(&a, &a, None, from, to));
+    assert!(
+        !asker_still_alone(&a, &b, None, from, to),
+        "someone else known"
+    );
+    assert!(
+        !asker_still_alone(&a, &room, None, from, to),
+        "nobody known"
+    );
+    assert!(asker_still_alone(&room, &b, None, from, to), "a room's ask");
+    // A alone in view.
+    let eyes = SpeakingFaces::default();
+    let from = Instant::now();
+    eyes.look(
+        Instant::now(),
+        Some((
+            ("b", 1),
+            &lamp_msgs::Faces {
+                faces: vec![face("f1")],
+            },
+        )),
+    );
+    let to = Instant::now();
+    assert!(asker_still_alone(
+        &a,
+        &a,
+        Some((&eyes, Some("b/f1"))),
+        from,
+        to
+    ));
+    assert!(
+        !asker_still_alone(&a, &a, Some((&eyes, None)), from, to),
+        "their face not known to the eyes"
+    );
+    // A face the eyes don't know beside A: the room's.
+    eyes.look(
+        Instant::now(),
+        Some((
+            ("b", 2),
+            &lamp_msgs::Faces {
+                faces: vec![face("f1"), face("f9")],
+            },
+        )),
+    );
+    let to = Instant::now();
+    assert!(!asker_still_alone(
+        &a,
+        &a,
+        Some((&eyes, Some("b/f1"))),
+        from,
+        to
+    ));
+    // Held by their gap: no face in view, then an unknown one.
+    let held = ScopeSnapshot::held_of("A");
+    let eyes = SpeakingFaces::default();
+    let from = Instant::now();
+    eyes.look(
+        Instant::now(),
+        Some((("b", 1), &lamp_msgs::Faces { faces: vec![] })),
+    );
+    let to = Instant::now();
+    assert!(asker_still_alone(&a, &held, Some((&eyes, None)), from, to));
+    eyes.look(
+        Instant::now(),
+        Some((
+            ("b", 2),
+            &lamp_msgs::Faces {
+                faces: vec![face("f9")],
+            },
+        )),
+    );
+    let to = Instant::now();
+    assert!(!asker_still_alone(&a, &held, Some((&eyes, None)), from, to));
+}
+
+/// The scope a look goes on in and the one its hits are read in, from the
+/// asker's lease (`LAMP_LOOK_KEPT_WITH_ASK`, `LAMP_LOOK_TOLD`): a known
+/// person's, theirs; the room's, the room's; a held asker's, the room's
+/// and no hits; a revoked one, the room's and no hits.
+#[test]
+fn a_looks_scope_and_hits_follow_the_asker_held_ones_get_none() {
+    use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+    let key = RequestKey {
+        worker: lamp_turn_owner::BootId::new([16; 16]).unwrap(),
+        session: 1,
+        request: 1,
+    };
+    let a = ScopeSnapshot::of("A");
+    let theirs = RequestScope::new(key, a.clone());
+    assert_eq!(look_scope(&theirs.lease()), a);
+    assert_eq!(look_hits_scope(&theirs.lease()), Some(a.clone()));
+    let room = RequestScope::new(key, ScopeSnapshot::room());
+    assert_eq!(look_scope(&room.lease()), ScopeSnapshot::room());
+    assert_eq!(look_hits_scope(&room.lease()), Some(ScopeSnapshot::room()));
+    let held = RequestScope::new(key, ScopeSnapshot::held_of("A"));
+    assert_eq!(look_scope(&held.lease()), ScopeSnapshot::room());
+    assert_eq!(
+        look_hits_scope(&held.lease()),
+        None,
+        "a held asker is told no hits"
+    );
+    let revoked = RequestScope::new(key, a);
+    let lease = revoked.lease();
+    revoked.revoke();
+    assert_eq!(look_scope(&lease), ScopeSnapshot::room());
+    assert_eq!(look_hits_scope(&lease), None);
+    // The look's function takes its arguments only with the switch.
+    assert!(super::worker::look_tool_with(false).parameters.is_none());
+    let told = super::worker::look_tool_with(true).parameters.unwrap();
+    assert!(told["properties"]["question"].is_object());
+    assert!(told["properties"]["told"].is_object());
+}
+
 /// A skill's answer's note for its picture: the words after "When the
 /// picture comes:", bounded and cut at a character's end; none without them.
 #[test]
@@ -9972,6 +10594,9 @@ fn every_function_that_grants_or_keeps_for_someone_is_withheld_from_a_held_line(
                 record: false,
                 rename_yes: false,
                 name_learn_fix: false,
+                face_no_ask: false,
+                face_save_known_only: false,
+                face_question: false,
             },
         ))
         .chain(crate::photo_faces::tools())
@@ -11714,6 +12339,375 @@ async fn a_keep_said_back_to_a_yes_with_no_remember_is_a_claim() {
                 "{labels:?}"
             );
         }
+    }
+}
+
+/// The first builder's P3 on #5607: "Yes, please." was answered with a
+/// `recall` that found the goldfish, then "Yes, Pip is kept." twice, and
+/// the lamp said it didn't keep that. A recall of this request that found
+/// something lifts the said-back rule: its "Pip is kept." is said. A recall
+/// that found nothing does not, and an opening claim ("Kept: ...") stays a
+/// claim after a found recall too. Only a keep that names a found thing,
+/// one that holds what the yes answers, judged on finished sentences, is
+/// lifted (Thirteen's P2s on #5701).
+#[tokio::test]
+async fn a_found_recall_lets_a_yes_say_it_is_kept() {
+    let _one = crate::provider_worker::tests::one_thread();
+    let recall = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "r1",
+                crate::remember::RECALL,
+                json!({"about": "goldfish"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    // A reply's pieces as it streams, split at "|".
+    let reply = |said: &str| {
+        let mut events: Vec<_> = said.split('|').map(text).collect();
+        events.push(Ok(ChatEvent::Done));
+        events
+    };
+    let pip = "My goldfish is called Pip.";
+    let blue = "My bike is blue now.";
+    // What the yes answers, the found, the reply, what is said first, and
+    // whether it is a claim.
+    let cases: Vec<(&str, Value, &str, &str, bool)> = vec![
+        (
+            pip,
+            json!({"found": [{"text": "Their goldfish is called Pip"}]}),
+            "Yes, Pip is kept.",
+            "Yes, Pip is kept.",
+            false,
+        ),
+        (
+            pip,
+            json!({"found": [], "note": "Nothing about that in what I remember."}),
+            "Yes, Pip is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        (
+            pip,
+            json!({"found": [{"text": "Their goldfish is called Pip"}]}),
+            "Kept: your goldfish is Pip.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // Thirteen's P2-a on #5701: what is said kept must be what was
+        // found. "My bike is blue now.", a recall that found the old red
+        // bike, then "that's kept" names nothing found: a claim.
+        (
+            blue,
+            json!({"found": [{"asked_to_remember": "Their bike is red"}]}),
+            "Yes, that's kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // The bike said kept beside a found goldfish: a claim.
+        (
+            pip,
+            json!({"found": [{"text": "Their goldfish is called Pip"}]}),
+            "Yes, your bike is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // The bike's new colour said kept beside the old one: a claim.
+        (
+            blue,
+            json!({"found": [{"asked_to_remember": "Their bike is red"}]}),
+            "Yes, your bike is blue now, kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // Thirteen's restate on #5701: blue asked, the old red found, and
+        // "your bike is kept" names only what was found, yet what the yes
+        // answers (blue) was not found: a claim.
+        (
+            blue,
+            json!({"found": [{"asked_to_remember": "Their bike is red"}]}),
+            "Yes, your bike is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // Thirteen's P2 at f3cccc815d: "not red" asked, the old red found:
+        // the negation is a word no found thing holds, so a claim.
+        (
+            "My bike is not red.",
+            json!({"found": [{"asked_to_remember": "Their bike is red"}]}),
+            "Yes, your bike is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // Thirteen's P2 at aed324db5d: the found thing is negated and the
+        // line answered is not ("not red", "isn't red", "don't like"): the
+        // polarity differs, so a claim.
+        (
+            "My bike is red.",
+            json!({"found": [{"asked_to_remember": "Their bike is not red"}]}),
+            "Yes, your bike is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        (
+            "My bike is red.",
+            json!({"found": [{"asked_to_remember": "Their bike isn't red"}]}),
+            "Yes, your bike is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        (
+            "I like coffee now.",
+            json!({"found": [{"text": "They don't like coffee"}]}),
+            "Yes, coffee is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // Thirteen's P3 at aed324db5d: a lead-in after a negation ("I never
+        // said remember that ...") keeps the line's polarity: a claim.
+        (
+            "I never said remember that my bike is red.",
+            json!({"found": [{"asked_to_remember": "Their bike is red"}]}),
+            "Yes, your bike is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // Thirteen's P3 at f3cccc815d: the line's "keep in mind" is no
+        // word of what was kept: the found Pip is said kept.
+        (
+            "Keep in mind my goldfish is called Pip.",
+            json!({"found": [{"text": "Their goldfish is called Pip"}]}),
+            "Yes, Pip is kept.",
+            "Yes, Pip is kept.",
+            false,
+        ),
+        // Thirteen's new P2 on #5701: the found Pip in a sentence still
+        // streaming ("Yes, Pip is kept") lets nothing out before it ends;
+        // whole, it says the bike is kept too: a claim.
+        (
+            pip,
+            json!({"found": [{"text": "Their goldfish is called Pip"}]}),
+            "Yes, Pip is kept|, and your bike is kept too.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // Second's P2s at c60b1a7b21 on #5701. A changed number is no
+        // found thing: 13 asked and said kept, the old 12 found.
+        (
+            "My daughter is 13.",
+            json!({"found": [{"asked_to_remember": "Their daughter is 12"}]}),
+            "Yes, your daughter is 13, kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // The same number found is said.
+        (
+            "My daughter is 13.",
+            json!({"found": [{"asked_to_remember": "Their daughter is 13"}]}),
+            "Yes, your daughter is 13, kept.",
+            "Yes, your daughter is 13, kept.",
+            false,
+        ),
+        // The keep's own sentence drops the negation the line and the
+        // found thing both hold: a claim.
+        (
+            "My bike is not red.",
+            json!({"found": [{"asked_to_remember": "Their bike is not red"}]}),
+            "Yes, your bike is red, kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // Said with the same negation, it is said.
+        (
+            "My bike is not red.",
+            json!({"found": [{"asked_to_remember": "Their bike is not red"}]}),
+            "Yes, your bike is not red, kept.",
+            "Yes, your bike is not red, kept.",
+            false,
+        ),
+        // A later sentence never inherits the found Pip: "Yes, Pip is
+        // kept." is said, "Your bike is kept too." is held and judged on
+        // its own, a claim, and never said.
+        (
+            pip,
+            json!({"found": [{"text": "Their goldfish is called Pip"}]}),
+            "Yes, Pip is kept.| Your bike is kept too.",
+            "Yes, Pip is kept.",
+            true,
+        ),
+        (
+            pip,
+            json!({"found": [{"text": "Their goldfish is called Pip"}]}),
+            "Yes, Pip is kept. Your bike is kept too.",
+            "Yes, Pip is kept.",
+            true,
+        ),
+        // What follows that is no keep is said.
+        (
+            pip,
+            json!({"found": [{"text": "Their goldfish is called Pip"}]}),
+            "Yes, Pip is kept.| Anything else?",
+            "Yes, Pip is kept.",
+            false,
+        ), // Heron's P2 1 at 8baef46c8f on #5701: an old exchange heard the
+        // goldfish's name and nothing was kept; the recall finds only that
+        // exchange, so "Yes, Pip is kept." is a claim.
+        (
+            pip,
+            json!({"found": [{
+                "heard": "My goldfish is called Pip.",
+                "you_said": "Lovely. Want me to keep that your goldfish is called Pip?"
+            }]}),
+            "Yes, Pip is kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+        // Heron's P2 2: a found "cannot" is the opposite of the "can" said
+        // kept, about an allergy: a claim.
+        (
+            "My daughter can eat peanuts now.",
+            json!({"found": [{"asked_to_remember": "Their daughter cannot eat peanuts"}]}),
+            "Yes, your daughter can eat peanuts, kept.",
+            crate::remember::NOT_KEPT_LINE,
+            true,
+        ),
+    ];
+    for (asked, found, said_back, first_said, claimed) in cases {
+        {
+            let now = Instant::now();
+            let mut thread = crate::thread::Thread::new();
+            thread.person(asked, true, now);
+            thread.lamp(0, "Lovely. Want me to keep that?", now);
+            *crate::thread::THREAD.lock().unwrap() = thread;
+        }
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Yes, please.".into())].into()),
+            chats: Mutex::new(
+                vec![
+                    recall(),
+                    reply(said_back),
+                    reply(said_back),
+                    reply(said_back),
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let told = found.clone();
+        let runner: ToolRunner = Arc::new(move |_, _, _, _| {
+            let told = told.clone();
+            Box::pin(async move { told })
+        });
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            runner,
+            Arc::new(Instant::now),
+        )
+        .announcing(false);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: Vec<&String> = labels
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        // What was said, its pieces joined: a comma may split a sentence.
+        let spoken: String = said
+            .iter()
+            .map(|said| said.trim_start_matches("said:"))
+            .collect();
+        assert!(
+            spoken.starts_with(first_said),
+            "{asked}: {found}: {said_back}: {labels:?}"
+        );
+        let told = script.asked.lock().unwrap().iter().any(|messages| {
+            messages
+                .iter()
+                .any(|message| *message == Message::system(crate::remember::KEEP_CLAIMED_UNKEPT))
+        });
+        assert_eq!(told, claimed, "{asked}: {found}: {said_back}: {labels:?}");
+        // An unbacked keep is never said (Second's P2s at c60b1a7b21).
+        assert!(
+            !claimed || !(spoken.contains("kept too") || spoken.contains(", kept.")),
+            "{asked}: {found}: {said_back}: {labels:?}"
+        );
+    }
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+}
+
+/// Thirteen's P3 on #5701: "preference" is a kept thing on a lone yes
+/// ("Your preference for green tea is saved." is a claim), yet beside a
+/// light's or volume's call of the same round "Done, your light
+/// preference is saved." confirms that call: said, its call run, and the
+/// model never told nothing was kept. Alone it is still a claim.
+#[tokio::test]
+async fn a_preference_said_saved_beside_a_light_call_is_that_calls() {
+    type Chats = Vec<Vec<Result<ChatEvent, net::Error>>>;
+    let line = "Done, your light preference is saved.";
+    let cases: Vec<(Chats, String, bool)> = vec![
+        (
+            vec![
+                vec![
+                    text(line),
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        "light_on",
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![Ok(ChatEvent::Done)],
+            ],
+            format!("said:{line}"),
+            false,
+        ),
+        (
+            vec![
+                vec![
+                    text("Your preference for green tea is saved."),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Okay."), Ok(ChatEvent::Done)],
+            ],
+            "said:Okay.".to_owned(),
+            true,
+        ),
+    ];
+    for (chats, first_said, claimed) in cases {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Yes.".into())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let runner: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) }));
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            runner,
+            Arc::new(Instant::now),
+        )
+        .announcing(false);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: Vec<&String> = labels
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        assert!(
+            said.first().is_some_and(|said| **said == first_said),
+            "{first_said}: {labels:?}"
+        );
+        let told = script.asked.lock().unwrap().iter().any(|messages| {
+            messages
+                .iter()
+                .any(|message| *message == Message::system(crate::remember::KEEP_CLAIMED_UNKEPT))
+        });
+        assert_eq!(told, claimed, "{first_said}: {labels:?}");
     }
 }
 
@@ -14004,6 +14998,93 @@ async fn only_a_wordless_piece_carries_and_only_its_last_moments() {
     );
 }
 
+thread_local! {
+    /// `LAMP_CARRY_UNANSWERED_SOUND` for a test on this thread.
+    pub(super) static LONG_FOR_TEST: std::cell::Cell<Option<bool>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// #7939 (lamp-9adf, 19 Nov): a line cut in three pieces none of which came
+/// back with words loses its opening when each piece goes on with only the
+/// last 1.5 s. With `LAMP_CARRY_UNANSWERED_SOUND` the chain keeps up to 6 s
+/// of it; off, as before. A piece whose words came back carries nothing
+/// either way, so a heard line costs the same.
+#[tokio::test]
+async fn a_chain_of_wordless_pieces_keeps_its_opening_only_with_the_switch() {
+    let frame = lamp_audio::CAPTURE_SAMPLES;
+    // Two wordless pieces of 4 s, then the line that is answered, with the
+    // words of the second back or not.
+    let run = |long: bool, second: &'static str| async move {
+        LONG_FOR_TEST.with(|test| test.set(Some(long)));
+        let pieces = 400u64;
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok(String::new()),
+                    Ok(second.to_owned()),
+                    Ok("what's the weather?".to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new([vec![text("Sunny."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        // The first two pieces are held, so they are never answered.
+        let mut engine = engine.heeding(Arc::new(|request, _, _, _, _| {
+            (request <= 2).then_some("not said to the lamp")
+        }));
+        for request in 1..=2u64 {
+            engine.submit(start(request));
+            for sequence in 1..=pieces {
+                engine.submit(audio_at(request, sequence, 1_000));
+            }
+            engine.submit(end(request));
+            assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        }
+        engine.submit(start(3));
+        engine.submit(audio_at(3, 1, 9_000));
+        engine.submit(end(3));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        let heard = script.samples_heard.load(Ordering::Relaxed);
+        LONG_FOR_TEST.with(|test| test.set(None));
+        // What the third line was sent besides its own frame: all heard,
+        // less the two pieces' own sound, the first's carried into the
+        // second and the second's own frames.
+        let own = 2 * pieces as usize * frame;
+        let first_carried = most_kept(long).min(pieces as usize * frame);
+        heard - own - first_carried - frame
+    };
+    // Both pieces wordless: the second piece carries the first's tail then
+    // its own, to the cap; the third line is sent that.
+    assert_eq!(run(false, "").await, KEPT_SAMPLES, "off: the last 1.5 s");
+    assert_eq!(
+        run(true, "").await,
+        KEPT_SAMPLES_LONG,
+        "on: up to 6 s, the opening kept"
+    );
+    // The second piece's words came back: nothing is carried into the third.
+    assert_eq!(run(true, "Okay yeah sure.").await, 0, "words back: nothing");
+    assert_eq!(KEPT_SAMPLES_LONG, 6 * 16_000);
+    assert!(!matches!(most_kept(false), KEPT_SAMPLES_LONG));
+}
+
+/// The sound kept across pieces is bounded: whatever is added, at most the
+/// cap, the oldest dropped.
+#[test]
+fn the_kept_sound_is_bounded_and_keeps_the_newest() {
+    let mut kept = VecDeque::new();
+    for round in 0..50i16 {
+        keep_sound(&mut kept, &vec![round; 16_000], KEPT_SAMPLES_LONG);
+        assert!(kept.len() <= KEPT_SAMPLES_LONG);
+    }
+    assert_eq!(kept.len(), KEPT_SAMPLES_LONG);
+    assert_eq!(*kept.back().unwrap(), 49);
+    assert_eq!(*kept.front().unwrap(), 44);
+    assert_eq!(most_kept(false), KEPT_SAMPLES);
+    assert_eq!(most_kept(true), KEPT_SAMPLES_LONG);
+}
+
 /// #2002's P1 (the first builder at 01:23): with the next line's socket
 /// kept ready, "Lamp, [600 ms] what time is it?" came back as "Lamp", held
 /// as a short sound, and "what time is it?", held for no name. The name's
@@ -14357,6 +15438,84 @@ async fn an_untied_line_begun_over_the_answer_is_not_told_it_cut_in() {
         assert!(told[0].contains(&cut_in), "{why}: {:?}", told[0]);
         assert!(told[0].contains(&alone), "{why}: {:?}", told[0]);
     }
+}
+
+/// #7285: the core gate's w2, "Hold on, hey Lamp, make the light a little
+/// warmer" said over a story, was told the cut-in note's stop sentence right
+/// before its words and answered "Okay, I'll stop." with no call. Its
+/// request now tells the note without that sentence, still last before the
+/// words; a line that only says "Hold on." keeps it.
+#[tokio::test]
+async fn a_mid_story_hold_on_with_an_ask_is_not_told_to_only_stop() {
+    let w2 = "Hold on, hey Lamp, make the light a little warmer.";
+    let told = asked_with(
+        w2,
+        |engine| engine.telling_cut_ins(true),
+        start_marked(1, true, false, false),
+        false,
+        false,
+    )
+    .await;
+    let asked = &told[0];
+    assert_eq!(
+        asked[asked.len() - 2],
+        Message::system(crate::cut_in_told::ASKED_MORE),
+        "{asked:?}"
+    );
+    assert_eq!(asked.last(), Some(&Message::user(w2)));
+    assert!(
+        !asked.iter().any(|message| message
+            .words()
+            .is_some_and(|words| words.contains("I'll stop"))),
+        "{asked:?}"
+    );
+    let stop = asked_with(
+        "Hold on.",
+        |engine| engine.telling_cut_ins(true),
+        start_marked(1, true, false, false),
+        false,
+        false,
+    )
+    .await;
+    assert_eq!(
+        stop[0][stop[0].len() - 2],
+        Message::system(crate::cut_in_told::NOTE),
+        "{:?}",
+        stop[0]
+    );
+}
+
+/// #7285 w2: the same cut-in ask over a story went with no call about 35
+/// times in 146 core gate tries, the same ask with no cut-in about 3 in 131.
+/// Its request reads like a plain ask: the last note before the words is
+/// [`crate::cut_in_told::ASKED_MORE`], with no "first words" opener or
+/// spoken example, and the request forces no tool (no `tool_choice`).
+#[tokio::test]
+async fn a_cut_in_ask_over_a_story_reads_like_a_plain_ask() {
+    let w2 = "Hold on, hey Lamp, make the light a little warmer.";
+    let told = asked_with(
+        w2,
+        |engine| engine.telling_cut_ins(true),
+        start_marked(1, true, false, false),
+        false,
+        false,
+    )
+    .await;
+    let asked = &told[0];
+    assert_eq!(asked.last(), Some(&Message::user(w2)));
+    assert_eq!(
+        asked[asked.len() - 2],
+        Message::system(crate::cut_in_told::ASKED_MORE),
+        "{asked:?}"
+    );
+    assert!(
+        !asked.iter().any(|message| message
+            .words()
+            .is_some_and(|words| words.contains("your first words") || words.contains("Oh, sure"))),
+        "{asked:?}"
+    );
+    let chat = net::Chat::deepseek("deepseek-chat", "k", Arc::new(Vec::new), false).unwrap();
+    assert_eq!(chat.wire(asked).2.get("tool_choice"), None);
 }
 
 /// #1712, item 4 of the first builder's 20:15 (`LAMP_CUT_IN_TOLD`): a line
@@ -16950,8 +18109,9 @@ async fn a_line_that_cuts_the_story_is_asked_with_the_story_as_heard() {
         "{story:?}"
     );
     assert!(!story.contains("ship"), "{story:?}");
+    // "Wait, who was he?" asks more than a wait: no stop sentence (#7285).
     assert!(
-        asked[1].contains(&Message::system(crate::cut_in_told::NOTE)),
+        asked[1].contains(&Message::system(crate::cut_in_told::ASKED_MORE)),
         "{:?}",
         asked[1]
     );
@@ -17884,13 +19044,124 @@ async fn a_made_skills_words_are_asked_with_no_functions_and_run_no_call() {
         0,
         "a made skill's words run no call"
     );
-    assert_eq!(
-        *script.told_only.lock().unwrap(),
-        [&[] as &[&str]],
-        "told no function"
+    // Said as written with no chat asked (#7937): no function is offered.
+    assert!(script.asked.lock().unwrap().is_empty(), "no chat asked");
+    assert!(
+        script.told_only.lock().unwrap().is_empty(),
+        "no function told"
     );
-    let words = format!("{:?}", script.asked.lock().unwrap()[0].last());
-    assert!(words.contains("untrusted"), "{words}");
+}
+
+/// #7937, lamp-9adf on 19 Nov: `daily-brief`, a made skill, had its line
+/// "Here is your daily brief." asked of the model right after a chat about
+/// a cat, with the conversation around it, and the model answered the chat
+/// ("All right, no cat. What turned you off the idea?"). A made skill's
+/// line is said as written, its words alone: the chat is never asked for
+/// it, so nothing said before can turn it into an answer.
+#[tokio::test(start_paused = true)]
+async fn a_made_skills_line_after_a_chat_is_said_as_written_never_an_answer_to_the_chat() {
+    let script = Arc::new(Script {
+        chats: Mutex::new(VecDeque::from([
+            vec![text("A cat could be lovely company."), Ok(ChatEvent::Done)],
+            vec![
+                text("All right, no cat. What turned you off the idea?"),
+                Ok(ChatEvent::Done),
+            ],
+        ])),
+        ..Script::default()
+    });
+    let (engine, calls, _) = scripted(script.clone());
+    let mut engine = engine.announcing(false);
+    engine.submit(written(1, "Should I get a cat?"));
+    let chat = turn(&mut engine).await;
+    assert!(
+        chat.iter().any(|label| label.contains("lovely company")),
+        "{chat:?}"
+    );
+    engine.submit(ProviderInput::Written {
+        search: false,
+        request: 2,
+        session: 1,
+        privacy_generation: 1,
+        text: crate::say::made_turn("Here is your daily brief."),
+        look: false,
+        quoted: true,
+    });
+    let labels = turn_within(&mut engine, Duration::from_secs(10)).await;
+    let said: Vec<_> = labels
+        .iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(said, ["said:Here is your daily brief."], "{labels:?}");
+    assert!(labels.contains(&"own_words:2".to_owned()), "{labels:?}");
+    assert!(
+        labels.iter().any(|label| label.starts_with("audio:")),
+        "{labels:?}"
+    );
+    assert_eq!(
+        script.asked.lock().unwrap().len(),
+        1,
+        "the chat's turn alone is asked"
+    );
+    assert_eq!(calls.lock().unwrap().len(), 0, "{labels:?}");
+}
+
+/// #7937's second case, the first builder at 16:44 on 19 Nov (lamp-06c1,
+/// stock 14521): a skill's line asked of a reply model that had not begun
+/// within 3 s (a new chat connection took 2.3 s) was dropped as
+/// `no_audio_answer`. A made skill's line is said by the voice directly:
+/// its first audio comes as soon as the speech service's, however slow the
+/// model is to start, or if it never starts.
+#[tokio::test(start_paused = true)]
+async fn a_made_skills_line_is_said_at_once_when_the_model_is_slow_or_never_starts() {
+    for never in [false, true] {
+        let script = Arc::new(Script {
+            chats: Mutex::new(VecDeque::from([vec![
+                text("Something else entirely."),
+                Ok(ChatEvent::Done),
+            ]])),
+            hold_chat: never,
+            first_event_after: Some(Duration::from_secs(if never { 3_600 } else { 5 })),
+            speech_after: Some(Duration::from_millis(300)),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.announcing(false);
+        let asked = tokio::time::Instant::now();
+        engine.submit(ProviderInput::Written {
+            search: false,
+            request: 1,
+            session: 1,
+            privacy_generation: 1,
+            text: crate::say::made_turn("Time for a stretch."),
+            look: false,
+            quoted: true,
+        });
+        let first_audio = tokio::time::timeout(Duration::from_secs(3), async {
+            loop {
+                if let ProviderOutput::Audio { .. } = engine.next().await {
+                    return asked.elapsed();
+                }
+            }
+        })
+        .await
+        .unwrap_or_else(|_| panic!("never: {never}: no audio within 3 s"));
+        assert!(
+            first_audio <= Duration::from_millis(400),
+            "never: {never}: first audio after {first_audio:?}"
+        );
+        let labels = turn_within(&mut engine, Duration::from_secs(10)).await;
+        assert!(
+            labels.iter().all(|label| !label.contains("Something else")),
+            "never: {never}: {labels:?}"
+        );
+        assert_eq!(
+            *script.spoken.lock().unwrap(),
+            ["Time for a stretch."],
+            "never: {never}"
+        );
+        assert!(script.asked.lock().unwrap().is_empty(), "never: {never}");
+    }
 }
 
 /// A bounded local peer for the real second-route tool dispatcher. It is
@@ -18249,8 +19520,11 @@ async fn requested_music_through_the_installed_runner_keeps_its_offer_private() 
 async fn requested_audio_runner_preserves_news_until_engine_takes_out_its_key() {
     for make_skill in [false, true] {
         let directory = crate::process::SessionDirectory::create().unwrap();
-        let peer = music_tool_peer(&directory.path.join("request.sock"), 3, |asked| {
+        // A lamp-tasks before #7930's work records: `work_list` refused as
+        // a line it can't read, then today's three reads.
+        let peer = music_tool_peer(&directory.path.join("request.sock"), 4, |asked| {
             match asked["op"].as_str().unwrap() {
+                "work_list" => json!({"ok":false,"error":"bad_request"}),
                 "list" => {
                     json!({"ok":true,"store_id":"music-news-fixture","items":[{"id":2,"dispatch":{"state":"accepted"}}]})
                 }
@@ -18339,7 +19613,7 @@ async fn requested_audio_runner_preserves_news_until_engine_takes_out_its_key() 
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(seen.len(), 3);
+        assert_eq!(seen.len(), 4);
         assert!(
             seen.iter()
                 .all(|asked| asked.get("requested_audio_context").is_none())
@@ -18520,7 +19794,8 @@ async fn prepared_music_calls_wait_for_final_admission_and_survive_only_matching
             "nothing dispatches before End and final words"
         );
         assert_eq!(
-            script.asked.lock().unwrap()[0].contains(&Message::system(crate::cut_in_told::NOTE)),
+            script.asked.lock().unwrap()[0]
+                .contains(&Message::system(crate::cut_in_told::ASKED_MORE)),
             cut_in,
             "the early chat already has its cut-in note: {mode}"
         );
@@ -18606,7 +19881,7 @@ async fn prepared_music_calls_wait_for_final_admission_and_survive_only_matching
             assert!(
                 asked
                     .iter()
-                    .all(|chat| chat.contains(&Message::system(crate::cut_in_told::NOTE)))
+                    .all(|chat| chat.contains(&Message::system(crate::cut_in_told::ASKED_MORE)))
             );
             assert!(!asked[0].contains(&Message::system(crate::provider_worker::CALLED_NOTE)));
             assert_eq!(

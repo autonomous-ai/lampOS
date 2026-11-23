@@ -38,6 +38,10 @@ const CUT: &str = "cut: ";
 /// unplugging you" (#4595): `app`, `plug`, or `none` with
 /// `prepare_to_unplug` offered.
 const UNPLUG: &str = "unplug: ";
+/// Each declared function's parameters, by name and their bytes as the
+/// link counts them (#8002: with the make flow's switches on, the product's
+/// `make_skill` came to 4,174 bytes and the link left it out).
+const PARAMETER_BYTES: &str = "parameter bytes: ";
 /// `lamp-services`' tools folder in the catalogs' folder: on a lamp it is
 /// `lamp_voice::services::FOLDER`, and the product's `LAMP_SERVICES=on`
 /// tells its three functions (#7433: without it this run counted three
@@ -46,7 +50,15 @@ const SERVICES: &str = "services";
 
 /// The lamp's own functions a product lamp's chat request offers now, on the
 /// product's route (`LAMP_VOICE_ROUTE=second`, bound
-/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 30 (lamp-services'
+/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 34 (the desk
+/// time's `desk_time` since `LAMP_DESK_TIME` is on in the product, #7694,
+/// and before it 33: a made skill's change, `change_skill`, beside `make_skill` since #8008, so
+/// `make_skill`'s parameters stay within
+/// `lamp_voice::make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES`; before
+/// it 32: seen activity's `look_at_my_desk` and `stop_looking_at_my_desk` since
+/// `LAMP_SEEN_ACTIVITY` is on in the product, #6543, its
+/// `offer_desk_noticing` not, `LAMP_SEEN_VOICE_OFFER` being off in the
+/// product, and before them 30: lamp-services'
 /// `services_connected`, `service_read` and `service_write` since
 /// `LAMP_SERVICES` is on in the product, and before them 27, with
 /// onboarding's two and memory's `forget_everything` since 25 Oct,
@@ -67,18 +79,18 @@ const SERVICES: &str = "services";
 /// Pose's `set_pose` and the wellbeing skills' `[stop]`, `wellbeing_nudges`,
 /// were 3 before it; the FAQ's `lamp_help` since #5790, Light show's
 /// `light_show` since #5745, Light scenes' `light_scene` and Point the
-/// light's `point_light` since #5744): 48, and 52 with the route's 4 (the
-/// search, its fetch, the weather and the look), past the bound of 48 it
-/// had until #7433, which left out the fetch, the time elsewhere,
-/// `reports_state` and the weather on every lamp. However many skills
+/// light's `point_light` since #5744): 52, and 56 with the route's 4 (the
+/// search, its fetch, the weather and the look), within the bound of 64;
+/// 52 was past the bound of 48 it had until #7433, which left out the
+/// fetch, the time elsewhere, `reports_state` and the weather on every lamp. However many skills
 /// are installed, the skills' stay 1. The test prints this split. A change
 /// to it is a change to what every session is told: say in its pull
 /// request what is left out past the bound, if anything.
-const PRODUCT_FUNCTIONS: usize = 48;
+const PRODUCT_FUNCTIONS: usize = 52;
 
 /// The lamp's own with `LAMP_HARD_ASKS_TO_AGENT` on (off in the product, a
 /// lamp's drop-in): [`PRODUCT_FUNCTIONS`] and the lamp's agent's
-/// `ask_agent` (Heron's P2 7 on #7509). With the route's 4 that is 53,
+/// `ask_agent` (Heron's P2 7 on #7509). With the route's 4 that is 57,
 /// within the bound of 64 (#7433), so nothing is cut.
 const HARD_ASKS_FUNCTIONS: usize = PRODUCT_FUNCTIONS + 1;
 
@@ -125,7 +137,17 @@ fn the_product_voice_s_functions_in_a_process_of_their_own() {
     if let Some(socket) = &settings.memory {
         lamp_voice::remember::start(socket.clone(), None);
     }
-    let (kept, left_out) = lamp_voice::tools::admitted(lamp_voice::tools::declared(&settings));
+    let declared = lamp_voice::tools::declared(&settings);
+    for tool in &declared {
+        if let Some(parameters) = &tool.parameters {
+            println!(
+                "{PARAMETER_BYTES}{} {}",
+                tool.name,
+                parameters.to_string().len()
+            );
+        }
+    }
+    let (kept, left_out) = lamp_voice::tools::admitted(declared);
     for tool in kept {
         println!("{DECLARED}{}", tool.name);
     }
@@ -196,6 +218,7 @@ struct Product {
     reached: Vec<String>,
     cut: Vec<String>,
     unplug: Vec<String>,
+    parameter_bytes: Vec<String>,
 }
 
 fn product_with(extra: &[(&str, &str)]) -> Product {
@@ -291,7 +314,30 @@ fn product_with(extra: &[(&str, &str)]) -> Product {
         reached: found(REACHED),
         cut: found(CUT),
         unplug: found(UNPLUG),
+        parameter_bytes: found(PARAMETER_BYTES),
     }
+}
+
+/// #8002: with the product voice unit's environment (the make flow's five
+/// switches on), `make_skill`'s parameters stay within
+/// `lamp_voice::make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES`, short of
+/// the link's 4,096 by the room a later parameter needs.
+#[test]
+fn a_product_lamp_s_make_skill_parameters_leave_room_within_the_link() {
+    let Product {
+        parameter_bytes, ..
+    } = product_with(&[]);
+    let named = format!("{} ", lamp_voice::made_skill::MAKE);
+    let bytes: usize = parameter_bytes
+        .iter()
+        .find_map(|line| line.strip_prefix(&named))
+        .unwrap_or_else(|| panic!("no make_skill: {parameter_bytes:?}"))
+        .parse()
+        .unwrap();
+    assert!(
+        bytes <= lamp_voice::make_skill_local::PRODUCT_MOST_PARAMETERS_BYTES,
+        "{bytes}"
+    );
 }
 
 /// Every function the actions part and the product skills offer reaches a

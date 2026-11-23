@@ -211,6 +211,13 @@ const ARRIVED_STEPS: u8 = 15;
 /// reply on the wire, the next three exchanges tripped over it, and the lamp
 /// had no body until someone started it again.
 const WIRE_STEPS: u8 = 25;
+/// Steps in a row of a failing read or write (`WIRE_STEPS`' count) that end
+/// a gesture playing, said as [`GESTURE_BLIND_FATE`]: a tenth of a second,
+/// a frame held long enough to be seen as a stall. Fewer hold the frame and
+/// the gesture goes on: one missed read cut a level 5 waltz from 8.40 s to
+/// 4.78 s on lamp-52e6 (#8266).
+const GESTURE_BLIND_STEPS: u8 = 5;
+const GESTURE_BLIND_FATE: &str = "ended: 5 servo reads in a row were missed";
 
 /// The joints this body commands, in the order of every array of three here.
 /// The glance a look away begins with, in counts of the base's turn: a
@@ -376,7 +383,7 @@ const GESTURE_STEP: [f32; 5] = [24.0, 34.0, 26.0, 21.0, 21.0];
 /// where the look alone already has the base, if farther): a sway alone goes
 /// 250 either way of home, and over a turned look it stops at the reach and
 /// says so in the journal, never past it.
-const GESTURE_REACH: [f32; 5] = [220.0, 220.0, 250.0, 360.0, 360.0];
+pub(crate) const GESTURE_REACH: [f32; 5] = [220.0, 220.0, 250.0, 360.0, 360.0];
 /// The farthest a holder's pose (`Asked::pose`) takes the head's roll from
 /// the pose; the arm goes anywhere inside its window instead (the pose's
 /// own clamp), and pitch and yaw stay with the holder's look.
@@ -414,6 +421,9 @@ const LEAN_SECONDS: f32 = 1.5;
 /// cubic does, never faster than `GESTURE_STEP`, so it neither snaps back
 /// nor stops dead.
 const EASE_OUT: Duration = Duration::from_millis(700);
+/// How long a new energy level waits for a still head before it is taken
+/// under one no faster than its pace (#7749: taken within 5 s of the send).
+const LEVEL_PATIENCE: Duration = Duration::from_secs(2);
 /// A skill's or idle gesture paused as listening began picks up again where
 /// it was if the voice goes back to resting within this, with no answer
 /// (#2602: the line was music, a cough, or not said to the lamp). A longer
@@ -553,7 +563,9 @@ impl StrainGuard {
 /// at a load over [`STAND_EASE_LOAD`] for [`STAND_EASE_STEPS`], has that goal
 /// eased to where it holds plus [`STAND_EASE_MARGIN`] for the rest of the
 /// run. lamp-74ff's elbow held 41 to 47 short at 176 to 200 and heated to
-/// 62 degrees in 40 min; lamp-52e6's held 3 short at 24.
+/// 62 degrees in 40 min; lamp-52e6's held 3 short at 24. An ease still
+/// loaded over [`STAND_EASE_LOAD`] for [`STAND_EASE_STEPS`] is undone, back
+/// to the measured stand, and the joint is not eased again that run.
 /// ponytail: tuned on two lamps; retune from journals of more arms.
 pub const STAND_EASE_SHORT: u16 = 20;
 /// Over this a joint is pushing at its goal, not just carrying the lamp:
@@ -563,6 +575,15 @@ pub const STAND_EASE_LOAD: u16 = 150;
 /// a gesture easing back, long before 74ff's 30 to 40 min to heat.
 /// ponytail: unmeasured; time counts only while it is asked its stand goal.
 pub const STAND_EASE_STEPS: u32 = 3_000;
+/// The count toward [`STAND_EASE_STEPS`] is leaky (#7281): at its stand goal,
+/// every this many steps not short and loaded take one off it, down to 0,
+/// so a minute settled undoes 20 s of strain, and one settle never zeroes it.
+/// lamp-52e6's shoulder (15:06 ROW) spent 20 to 40 s at 38 short and load 164
+/// between landings at its stand (load 20) and heated to 52-53 degrees; a
+/// count that a settle reset never reached 60 s. Five-second spells among 25 s
+/// settled still floor at 0.
+/// ponytail: the rate is tuned on one lamp's day; retune from more journals.
+pub const STAND_EASE_DECAY: u32 = 3;
 /// Left this far toward the goal from where it holds, so it still presses
 /// the lamp up a little. ponytail: unmeasured.
 pub const STAND_EASE_MARGIN: u16 = 5;
@@ -749,6 +770,50 @@ fn held_at(held: Duration, from: [f32; 5], speed: [f32; 5]) -> ([f32; 5], Durati
         EASE_OUT.mul_f32(along),
     )
 }
+/// The least an ease out moves a joint a step, so that one its clip never
+/// moved (a pace of nothing) still comes home: 5 counts a second.
+const EASE_LEAST: f32 = 0.1;
+
+/// An ease out under way: steps since it began, the offsets then, how far
+/// they moved in the step before, and each joint's pace, counts a step.
+type EaseOut = (u32, [f32; 5], [f32; 5], [f32; 5]);
+
+/// One step of an ease out (`easing_out`): from offsets `from`, moving
+/// `speed` a step, back to nothing over `EASE_OUT` or longer, `steps` steps
+/// in. No joint moves more a step than `pace` (#7749: a hand's yield passes
+/// `GESTURE_STEP`; a shift at rest its clip's own pace or the speed it had,
+/// whichever is more, so it only slows and never snaps back). The ease is
+/// stretched so its curve's peak, 1.5 times the offset over the span, keeps
+/// under that; and it ends only once every joint is home. True once over.
+fn ease_out_step(
+    now_at: &mut [f32; 5],
+    steps: u32,
+    from: [f32; 5],
+    speed: [f32; 5],
+    pace: [f32; 5],
+) -> bool {
+    let least = EASE_OUT.as_secs_f32() / TICK.as_secs_f32();
+    let span = (0..5).fold(least, |span, index| {
+        span.max(1.5 * from[index].abs() / pace[index].max(EASE_LEAST))
+    });
+    let t = (steps as f32 / span).min(1.0);
+    // Hermite: from `from` at the speed it had to nothing at rest.
+    let (stays, carries) = (
+        2.0 * t * t * t - 3.0 * t * t + 1.0,
+        t * t * t - 2.0 * t * t + t,
+    );
+    for (index, at) in now_at.iter_mut().enumerate() {
+        let wanted = from[index] * stays + speed[index] * span * carries;
+        let most = pace[index].max(EASE_LEAST);
+        *at += (wanted - *at).clamp(-most, most);
+    }
+    if t >= 1.0 && now_at.iter().all(|at| at.abs() < 0.5) {
+        *now_at = [0.0; 5];
+        return true;
+    }
+    false
+}
+
 /// While a gesture plays, and for half a second after, a joint of the head
 /// may be this far from its goal and read this load before the gesture is
 /// dropped; the shoulder and the elbow may be this far from theirs. A quick
@@ -841,6 +906,11 @@ pub struct Asked {
     /// waiting or asked is dropped as held), and the joint's goal stays
     /// where it is, without the give-way path, torque or a read judged.
     pub held_by_test: bool,
+    /// Reads of the servos to miss from this step, from a test input
+    /// (`lamp-body --miss-from`, off in every product unit, #8266): each
+    /// fails where a read with no reply fails, and nothing else changes.
+    /// 0 asks nothing; an ask while some are still to miss keeps the larger.
+    pub missed_by_test: u8,
     /// Held by `lamp-control`'s lease (`lamp-body --lease-socket`, #3504):
     /// a standing lamp stays up while it lasts, as with someone in front of
     /// it. It never stands a folded lamp up by itself.
@@ -933,6 +1003,7 @@ impl Asked {
         toward: None,
         unplug: false,
         held_by_test: false,
+        missed_by_test: 0,
         held: false,
         aim: None,
         limp: false,
@@ -965,6 +1036,7 @@ impl Asked {
         toward: None,
         unplug: false,
         held_by_test: false,
+        missed_by_test: 0,
         held: false,
         aim: None,
         limp: false,
@@ -1955,6 +2027,10 @@ pub struct BodyReport {
     pub expression_steps: u64,
     /// Times it shifted by itself while standing at rest.
     pub idles: u32,
+    /// Each energy level taken and when (#7749), for the tests: the
+    /// journal says it as `energy level N`.
+    #[serde(skip)]
+    pub energy_levels: Vec<(Duration, u8)>,
     /// Under `Limits::look_at_name`, calls taken.
     pub calls: u32,
     /// Under `--overload release`, each time it let go.
@@ -2084,6 +2160,57 @@ fn checksum(body: &[u8]) -> u8 {
 
 /// The only single-servo writes there are: acceleration (register 41, one
 /// byte) and goal speed (register 46, two bytes).
+/// The servo's own maximum acceleration, kept in its EEPROM (#7946): 254 on
+/// most, 50 on the STS3215s some lamps shipped with.
+const ACCELERATION_CAP_REGISTER: u8 = 85;
+
+/// The lower of the two caps known on shipped lamps (#7946): what a joint
+/// runs at, at most, when its own cap can't be read. Slower is the safe side.
+const ACCELERATION_CAP_KNOWN_LOW: u8 = 50;
+
+/// The acceleration each joint runs at (by `Joint::index`): `asked`, or the
+/// servo's own lower cap (`caps`, read from register 85, in `joints`' order),
+/// so a capped servo's read back of its cap is a pass, never a stop (#7946).
+/// With no caps read, the known low cap. A cap of 0 is no reading. Each
+/// joint run under `asked` is said, once a start, with its cap.
+fn accelerations(
+    asked: u8,
+    joints: &[Joint],
+    caps: Result<Vec<u8>, String>,
+    say: &mut dyn FnMut(String),
+) -> [u8; 5] {
+    let mut each = [asked; 5];
+    match caps {
+        Ok(caps) => {
+            for (joint, cap) in joints.iter().zip(caps) {
+                let cap = if cap == 0 {
+                    ACCELERATION_CAP_KNOWN_LOW
+                } else {
+                    cap
+                };
+                if cap < asked {
+                    each[joint.index()] = cap;
+                    say(format!(
+                        "{joint} holds a maximum acceleration of {cap} (register {ACCELERATION_CAP_REGISTER}), under the {asked} asked: it runs at {cap} (#7946)"
+                    ));
+                }
+            }
+        }
+        Err(detail) => {
+            let low = asked.min(ACCELERATION_CAP_KNOWN_LOW);
+            for joint in joints {
+                each[joint.index()] = low;
+            }
+            if low < asked {
+                say(format!(
+                    "the servos' maximum acceleration could not be read ({detail}): every joint runs at {low}, the lower known cap, under the {asked} asked (#7946)"
+                ));
+            }
+        }
+    }
+    each
+}
+
 fn acceleration_write(joint: Joint, value: u8) -> [u8; 8] {
     let mut packet = [0xff, 0xff, joint.id(), 4, 0x03, 41, value, 0];
     packet[7] = checksum(&packet[2..7]);
@@ -2885,6 +3012,29 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
         Ok(limits)
     }
 
+    /// The maximum acceleration each of `joints` holds in its own EEPROM
+    /// (register 85), in their order (#7946): a write of a higher
+    /// acceleration (register 41) reads back as this.
+    fn acceleration_caps(&mut self, joints: &[Joint]) -> Result<Vec<u8>, String> {
+        let window =
+            ReadWindow::new(ACCELERATION_CAP_REGISTER, 1).map_err(|error| error.to_string())?;
+        let request =
+            ReadOnlyRequest::sync_read(joints, window).map_err(|error| error.to_string())?;
+        let mut caps = vec![0u8; joints.len()];
+        self.read(&request, |reply| {
+            let index = joints
+                .iter()
+                .position(|joint| *joint == reply.joint())
+                .ok_or("a reply from a joint that was not asked")?;
+            let [cap] = reply.parameters() else {
+                return Err("an acceleration cap that is not one byte".into());
+            };
+            caps[index] = *cap;
+            Ok(())
+        })?;
+        Ok(caps)
+    }
+
     /// The force limit each of `joints` holds, in their order.
     fn force_limits(&mut self, joints: &[Joint]) -> Result<Vec<u16>, String> {
         let window = ReadWindow::new(48, 2).map_err(|error| error.to_string())?;
@@ -3681,6 +3831,40 @@ fn fold_joints<P: PortIo, R: Runtime>(
     outcome
 }
 
+/// After a start's recovery stopped and its hold where the joints lie was
+/// refused (an arm joint farther than `ARM_GOAL_STEP` from its last goal):
+/// walk each arm goal from the one last written to where its joint lies,
+/// a step a write, so no servo is left pushing at a goal it cannot reach.
+/// Whether the arm's goals ended where it lies.
+fn stop_pushing<P: PortIo, R: Runtime>(
+    bus: &mut Bus<'_, P, R>,
+    report: &mut BodyReport,
+    hold: [u16; 3],
+    arm: [u16; 2],
+) -> bool {
+    // 4,095 counts at 50 a step.
+    for _ in 0..82 {
+        let from: [u16; 2] =
+            std::array::from_fn(|index| bus.goals[ARM[index].index()].unwrap_or(arm[index]));
+        if from == arm {
+            return true;
+        }
+        let step: [u16; 2] = std::array::from_fn(|index| {
+            if arm[index] >= from[index] {
+                from[index].saturating_add(ARM_GOAL_STEP).min(arm[index])
+            } else {
+                from[index].saturating_sub(ARM_GOAL_STEP).max(arm[index])
+            }
+        });
+        if bus.send_holds_where_they_are(hold, step).is_err() {
+            bus.refused = None;
+            return false;
+        }
+        report.goal_writes += 1;
+    }
+    false
+}
+
 /// The shoulder or the elbow, as the journal and a stop name it.
 fn arm_part(joint: Joint) -> &'static str {
     if joint == Joint::BasePitch {
@@ -3696,6 +3880,11 @@ fn arm_part(joint: Joint) -> &'static str {
 /// turn by [`fold_joint`].
 #[derive(Clone, Debug, PartialEq)]
 struct Fold {
+    /// The wrist roll's and the base yaw's homes, where the start brings
+    /// them before the arm comes down (a factory lamp, 23 Nov: folded with
+    /// its head askew, the elbow met the head 61 counts above folded).
+    /// `None` leaves them where they were found, as `fold_plan` plans.
+    straight: Option<[u16; 2]>,
     head_to: Option<u16>,
     joints: Vec<Joint>,
     order: FoldOrder,
@@ -3742,6 +3931,9 @@ fn fold_said(fold: &Fold) -> String {
         .map(|pitch| format!("its head lifted to {pitch}"))
         .into_iter()
         .collect();
+    if fold.straight.is_some() {
+        moves.push("its head and base turned straight".to_string());
+    }
     match fold.order {
         FoldOrder::Together if fold.joints.len() > 1 => moves.push(format!(
             "its {} together",
@@ -3824,6 +4016,51 @@ fn fold_arm<P: PortIo, R: Runtime>(
         report.lowered = woke;
         now = lifted?;
         moved = true;
+    }
+    // The head's roll and the base's yaw home next, the arm still held
+    // where it was found: the head then lies straight under the arm as it
+    // comes down, and the lamp is seen to face front before it folds.
+    // More than half a turn off is across the seam and is left (the wake
+    // after the fold refuses it).
+    if let Some([roll, yaw]) = fold.straight {
+        let from = COMMANDED.map(|joint| now[joint.index()].position);
+        let near = |at: u16, home: u16| if at.abs_diff(home) <= 2_048 { home } else { at };
+        let to = [from[0], near(from[1], roll), near(from[2], yaw)];
+        if to != from {
+            if bus.runtime.recovery_inhibited() || !matches!(bus.runtime.cancelled(), Ok(false)) {
+                return Err(Stop::Cancelled);
+            }
+            let arm = ARM.map(|joint| now[joint.index()].position);
+            if unready {
+                extend_start(
+                    bus,
+                    FOLD_PAUSE + wake_seconds(from, to, limits.wake_speed()),
+                );
+            }
+            pause(bus, moved);
+            let watch = watching
+                .as_mut()
+                .map(|(watch, glimpse)| (&mut **watch as &mut dyn FnMut(&Glimpse), *glimpse));
+            let turned = wake(
+                bus,
+                report,
+                limits,
+                limits.wake_speed(),
+                (from, to),
+                Some(arm),
+                now,
+                watch,
+            );
+            // Part of the fold: `woke` is the wake's after it, and
+            // `lowered` the arm's (and the head's lift). A turn that
+            // stopped is all the fold did: it is what `lowered` says.
+            let woke = report.woke.take();
+            if turned.is_err() && report.lowered.is_none() {
+                report.lowered = woke;
+            }
+            now = turned?;
+            moved = true;
+        }
     }
     // Together: one move of every joint that folds. In turn: one each.
     let moves: Vec<Vec<Joint>> = match fold.order {
@@ -4211,6 +4448,7 @@ fn fold_plan(
     let worst = lean(&together);
     if worst <= bound {
         return Some(Ok(Fold {
+            straight: None,
             head_to,
             joints,
             order: FoldOrder::Together,
@@ -4230,6 +4468,7 @@ fn fold_plan(
         let worst = lean(&corners);
         if worst <= bound {
             return Some(Ok(Fold {
+                straight: None,
                 head_to,
                 joints: order,
                 order: FoldOrder::InTurn,
@@ -5266,6 +5505,7 @@ pub(crate) fn run_looking(
         toward: None,
         unplug: false,
         held_by_test: false,
+        missed_by_test: 0,
         held: false,
         aim: None,
         limp: false,
@@ -5529,6 +5769,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         gestures_dropped: 0,
         expression_steps: 0,
         idles: 0,
+        energy_levels: Vec::new(),
         calls: 0,
         released: Vec::new(),
         tipping: Tipping::default(),
@@ -6071,7 +6312,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             report.stop = refused(format!("the arm is not folded: {why}"));
             return report;
         }
-        if let Some(Ok(fold)) = plan {
+        if let Some(Ok(mut fold)) = plan {
+            if may_wake {
+                fold.straight = Some([home[1], home[2]]);
+            }
             eprintln!(
                 "lamp-body: found shoulder {} elbow {} head pitch {}: {}, before it wakes",
                 found[Joint::BasePitch.index()].position,
@@ -6113,69 +6357,104 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                             bus.refused = None;
                         }
                     }
-                    // An arm joint stopped short of folded (#2940): with
-                    // `--refused-let-go` a hand can fold it, so the lamp is
-                    // let go and waits for that, the head judged again when
-                    // it starts. Only an arm resting near folded (#5693,
-                    // `ARM_LET_GO_NEAR`): farther up, let go it would fall.
-                    // Anything else ends the run held where it is.
-                    let short = match stop {
-                        Stop::Tracking { joint, .. } => {
-                            ARM.into_iter().find(|arm| arm.id() == joint)
-                        }
-                        _ => None,
-                    };
+                    // An arm joint that met its rest (a factory lamp, 23 Nov):
+                    // the fold stopped on the load of a joint it was
+                    // folding, with the arm down (`ARM_LET_GO_NEAR`). The
+                    // arm is folded: nothing is under it to fall to, and
+                    // it no longer pushes. The lamp wakes and may stand.
                     let near_folded = report.last.is_some_and(|last| {
                         arm_rests(ARM.map(|joint| last[joint.index()].position), up.folded)
                     });
-                    if limits.refused_let_go
-                        && near_folded
-                        && let Some(joint) = short
-                    {
-                        // Only the arm is let go: it rests folded by its
-                        // own weight, and the head, held where it was, is
-                        // judged by the run's bounds while it waits
-                        // (#2938; the Reviewer-lead's P3 on #3168).
+                    let met_rest = match stop {
+                        Stop::Load { joint, .. } => ARM
+                            .into_iter()
+                            .find(|arm| arm.id() == joint)
+                            .filter(|arm| fold.joints.contains(arm)),
+                        _ => None,
+                    };
+                    if let (true, Some(joint), Some(last)) = (near_folded, met_rest, report.last) {
+                        // Not left pushing at a goal under its rest
+                        // (a factory lamp's elbow pressed there at a load of
+                        // 252, heating, its hold refused as 61 counts from
+                        // its last goal): the arm's goals are walked to
+                        // where it lies, a step a write.
+                        let at = |joint: Joint| last[joint.index()].position;
+                        let hold = COMMANDED.map(at);
+                        if stop_pushing(bus, &mut report, hold, ARM.map(at)) {
+                            report.held_at = Some(hold);
+                        }
+                        eprintln!(
+                            "lamp-body: the {} met its rest at {}, {} from folded: the arm is folded there",
+                            arm_part(joint),
+                            last[joint.index()].position,
+                            last[joint.index()]
+                                .position
+                                .abs_diff(up.folded[usize::from(joint == Joint::ElbowPitch)]),
+                        );
+                        found = last;
+                        folded_pose = Some(COMMANDED.map(|joint| found[joint.index()].position));
+                    } else {
+                        // An arm joint stopped short of folded (#2940): with
+                        // `--refused-let-go` a hand can fold it, so the lamp is
+                        // let go and waits for that, the head judged again when
+                        // it starts. Only an arm resting near folded (#5693,
+                        // `ARM_LET_GO_NEAR`): farther up, let go it would fall.
+                        // Anything else ends the run held where it is.
+                        let short = match stop {
+                            Stop::Tracking { joint, .. } => {
+                                ARM.into_iter().find(|arm| arm.id() == joint)
+                            }
+                            _ => None,
+                        };
+                        if limits.refused_let_go
+                            && near_folded
+                            && let Some(joint) = short
+                        {
+                            // Only the arm is let go: it rests folded by its
+                            // own weight, and the head, held where it was, is
+                            // judged by the run's bounds while it waits
+                            // (#2938; the Reviewer-lead's P3 on #3168).
+                            report.pose_wait = Some(PoseWait {
+                                ranges: [(0, 4_095); 3],
+                                joints: ARM.to_vec(),
+                                say: ARM_FOLD,
+                                arm: Some(up.folded),
+                                follow_arm: false,
+                                follow_force: None,
+                            });
+                            bus.after_arm_wait = true;
+                            report.stop = refused(format!(
+                                "the {} stopped short of folded while lowered: {stop:?}",
+                                arm_part(joint)
+                            ));
+                            return report;
+                        }
+                        // An arm that rests ends the run held, as before: the
+                        // restart is bounded by systemd and nothing is raised.
+                        if near_folded {
+                            report.kept_holding = true;
+                            report.stop = stop;
+                            return report;
+                        }
+                        // A raised arm, held where it stopped with torque on all
+                        // five: nothing falls. The run stays up and watches
+                        // (#5693, the Reviewer-lead on #6836: an exit would be
+                        // restarted into the same fold and die holding a raised
+                        // arm): it says so, gives way to a hand and follows it,
+                        // and starts again once the arm is folded and still.
                         report.pose_wait = Some(PoseWait {
                             ranges: [(0, 4_095); 3],
                             joints: ARM.to_vec(),
-                            say: ARM_FOLD,
+                            say: ARM_HELD,
                             arm: Some(up.folded),
-                            follow_arm: false,
-                            follow_force: None,
+                            follow_arm: true,
+                            follow_force: start_force,
                         });
                         bus.after_arm_wait = true;
-                        report.stop = refused(format!(
-                            "the {} stopped short of folded while lowered: {stop:?}",
-                            arm_part(joint)
-                        ));
-                        return report;
-                    }
-                    // An arm that rests ends the run held, as before: the
-                    // restart is bounded by systemd and nothing is raised.
-                    if near_folded {
                         report.kept_holding = true;
-                        report.stop = stop;
+                        report.stop = refused(format!("held where the fold stopped: {stop:?}"));
                         return report;
                     }
-                    // A raised arm, held where it stopped with torque on all
-                    // five: nothing falls. The run stays up and watches
-                    // (#5693, the Reviewer-lead on #6836: an exit would be
-                    // restarted into the same fold and die holding a raised
-                    // arm): it says so, gives way to a hand and follows it,
-                    // and starts again once the arm is folded and still.
-                    report.pose_wait = Some(PoseWait {
-                        ranges: [(0, 4_095); 3],
-                        joints: ARM.to_vec(),
-                        say: ARM_HELD,
-                        arm: Some(up.folded),
-                        follow_arm: true,
-                        follow_force: start_force,
-                    });
-                    bus.after_arm_wait = true;
-                    report.kept_holding = true;
-                    report.stop = refused(format!("held where the fold stopped: {stop:?}"));
-                    return report;
                 }
             }
             arm_profiles = match bus.arm_profiles() {
@@ -6250,10 +6529,22 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 // the joint is found; otherwise where it is. lamp-4ace's
                 // elbow register held 37,639 on 2026-10-17, and taken raw
                 // it was written as 4,095.
+                // Nor one the joint pushes at (over `STALL_LOAD`) from farther
+                // than a goal step (`ARM_GOAL_STEP`): a factory lamp's elbow lay
+                // on its rest 61 counts above the goal it held, at a load
+                // of 256, and that goal, taken as written, was then refused
+                // as a goal on every start (`Stop::Window`). A reading that
+                // far off with nothing pushing keeps the goal (a misread,
+                // #1192).
                 arm_written = std::array::from_fn(|index| {
                     let register = arm_profiles[index].3;
                     let at = found[ARM[index].index()].position;
-                    if register <= 4_095 && register.abs_diff(at) <= Standing::FOUND_SLACK {
+                    let pushes = found[ARM[index].index()].load > STALL_LOAD
+                        && register.abs_diff(at) > ARM_GOAL_STEP;
+                    if register <= 4_095
+                        && register.abs_diff(at) <= Standing::FOUND_SLACK
+                        && !pushes
+                    {
                         register
                     } else {
                         at
@@ -6478,6 +6769,25 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         return report;
     }
 
+    // Each servo's own maximum acceleration (#7946): a joint whose servo
+    // caps lower than asked runs at its cap, so its read back passes.
+    let capped: Vec<Joint> = COMMANDED
+        .iter()
+        .chain(
+            standing
+                .is_some()
+                .then_some(ARM.iter())
+                .into_iter()
+                .flatten(),
+        )
+        .copied()
+        .filter(|joint| !bus.left[joint.index()])
+        .collect();
+    let caps = bus.read_back(|bus| bus.acceleration_caps(&capped));
+    let acceleration_of = accelerations(limits.servo_acceleration, &capped, caps, &mut |line| {
+        eprintln!("lamp-body: {line}");
+    });
+
     // The servo's own speed bound, where it is not already the one wanted
     // (nothing to a joint left as it is).
     for (index, joint) in COMMANDED.iter().enumerate() {
@@ -6490,12 +6800,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             report.profile_writes += 1;
             outcome = bus.write_checked(*joint, &speed_write(*joint, limits.servo_speed));
         }
-        if outcome.is_ok() && acceleration != limits.servo_acceleration {
+        let wanted = acceleration_of[joint.index()];
+        if outcome.is_ok() && acceleration != wanted {
             report.profile_writes += 1;
-            outcome = bus.write_checked(
-                *joint,
-                &acceleration_write(*joint, limits.servo_acceleration),
-            );
+            outcome = bus.write_checked(*joint, &acceleration_write(*joint, wanted));
         }
         if let Err(detail) = outcome {
             report.stop = Stop::Bus {
@@ -6522,12 +6830,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 report.profile_writes += 1;
                 outcome = bus.write_checked(*joint, &speed_write(*joint, arm_speed));
             }
-            if outcome.is_ok() && acceleration != limits.servo_acceleration {
+            let wanted = acceleration_of[joint.index()];
+            if outcome.is_ok() && acceleration != wanted {
                 report.profile_writes += 1;
-                outcome = bus.write_checked(
-                    *joint,
-                    &acceleration_write(*joint, limits.servo_acceleration),
-                );
+                outcome = bus.write_checked(*joint, &acceleration_write(*joint, wanted));
             }
             if let Err(detail) = outcome {
                 report.stop = Stop::Bus {
@@ -6538,8 +6844,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         match bus.read_back(Bus::arm_profiles) {
             Ok(now)
-                if now.iter().all(|profile| {
-                    (profile.0, profile.1, profile.2) == (1, limits.servo_acceleration, arm_speed)
+                if now.iter().zip(ARM).all(|(profile, joint)| {
+                    (profile.0, profile.1, profile.2)
+                        == (1, acceleration_of[joint.index()], arm_speed)
                 }) => {}
             Ok(now) => {
                 report.stop = Stop::Bus {
@@ -6559,7 +6866,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         Ok(now)
             if now.iter().zip(COMMANDED).all(|(profile, joint)| {
                 bus.left[joint.index()]
-                    || *profile == (1, limits.servo_acceleration, limits.servo_speed)
+                    || *profile == (1, acceleration_of[joint.index()], limits.servo_speed)
             }) => {}
         Ok(now) => {
             report.stop = Stop::Bus {
@@ -6759,10 +7066,15 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut strain_since: [Option<Duration>; 2] = [None; 2];
     // #7289: the stand as measured, the steps each arm joint has been held
     // short of its stand goal under load, and whether one too far short to
-    // ease has been said.
+    // ease has been said. Once eased, the steps count only the load; an
+    // ease that leaves it loaded is undone and easing stops for the run.
     let stand_measured = standing.map(|up| [up.pose[3], up.pose[4]]);
     let mut stand_short_steps = [0u32; 2];
+    // #7281: settled steps toward the next one taken off the count.
+    let mut stand_settled_steps = [0u32; 2];
     let mut too_short_said = [false; 2];
+    let mut stand_eased = [false; 2];
+    let mut stand_ease_off = [false; 2];
     let mut seat_retreats: std::collections::VecDeque<Duration> = std::collections::VecDeque::new();
     let mut unlifted_said: Option<&'static str> = None;
     let mut strained_by: Option<(&'static str, u16)> = None;
@@ -6824,7 +7136,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut yielding = false;
     // Such a gesture's ease back: steps since it ended, its offsets then and
     // how far they moved in the step before, counts a step.
-    let mut easing_out: Option<(u32, [f32; 5], [f32; 5])> = None;
+    let mut easing_out: Option<EaseOut> = None;
     let mut gesture_moved = [0.0f32; 5];
     // The gesture waiting stood a folded lamp up; and what to say of a
     // gesture asked from outside, on the next glimpse.
@@ -6868,6 +7180,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut limits = limits;
     let stand_base = standing.map(|up| up.seconds);
     let mut energy = 1u8;
+    // A new level asked and since when (#7749), for `LEVEL_PATIENCE`.
+    let mut level_since: Option<(u8, Duration)> = None;
     let mut said_no_stand = false;
     // Expression's rest offsets of the head (pitch, roll) averaged over a
     // breath, the average a drift last left, and when one last did.
@@ -6995,6 +7309,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut pinned = [false; 3];
     let mut misses = 0u8;
     let mut unsent = 0u8;
+    // Reads still to miss on purpose, asked by a test input
+    // (`Asked::missed_by_test`, `lamp-body --miss-from`).
+    let mut test_misses = 0u8;
     let mut leaving: Option<Duration> = None;
     // What the run ends on once a lamp leaving for it is down: an arm too
     // warm, or unreadable, is folded first and let go folded.
@@ -7088,14 +7405,75 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         // What its eyes saw and a gesture asked of it, since the last step.
         let (mut asked_now, asked_by, asked_source) = asked();
+        test_misses = test_misses.max(asked_now.missed_by_test);
         // A new energy level only once settled, so that a cap never drops
         // under a joint still moving: no gesture playing or waiting, the
         // pose's filter still and the arm up or down.
         let level = crate::energy::taken(asked_now.energy);
+        // #7749: a new level ends a shift at rest it finds playing, eased
+        // to rest as a hand's yield eases a gesture (`easing_out`, over
+        // `EASE_OUT`), so it is taken within seconds of the send. A gesture
+        // asked of it (`playing` not a shift) plays to its end first.
+        // Its ease only slows (the first builder's 02:14 on #7749): no joint
+        // faster than the clip's own pace or than it was moving.
+        if level != energy
+            && let Some((clip, _)) = playing.filter(|(clip, _)| idle::is_move(clip))
+        {
+            playing = None;
+            let pace = clip.pace(TICK);
+            easing_out = Some((
+                0,
+                gesture_now,
+                gesture_moved,
+                std::array::from_fn(|index| pace[index].max(gesture_moved[index].abs())),
+            ));
+            eprintln!(
+                "lamp-body: step {}: energy level {level} asked: the shift at rest eases to rest",
+                report.steps
+            );
+        }
+        // #7749: an unprompted gesture waiting (a shift, Expression's
+        // `lively`, anything asked at idle priority) is dropped on a new
+        // level rather than played first. A call's glance never is: it
+        // keeps the `pending_by` of whatever was asked before it.
+        if level != energy
+            && let Some((old, _)) = pending.filter(|(old, _)| {
+                idle::is_move(old) || (pending_by.0 == Priority::Idle && from_outside(old))
+            })
+        {
+            gesture_fates.push_told(
+                (old.name, "dropped: a new energy level"),
+                Told {
+                    source: pending_by.1,
+                    by: None,
+                },
+            );
+            pending = None;
+        }
+        // The head may be moving (a rest glance, the mood's pose, talk): the
+        // level waits for it to be still, so a joint turning keeps the pace
+        // it began with; but after `LEVEL_PATIENCE` only while a joint is
+        // faster than the new level lets it go, so the cap never drops under
+        // it (#7749: waiting for a head under 1 count a second, nothing
+        // playing or waiting, held levels 19-22 s on lamp-52e6 on
+        // 2026-11-19). The head's roll keeps level 1's pace whatever the
+        // level (`ROLL_SPEED`).
+        level_since = (level != energy).then_some(match level_since {
+            Some((was, since)) if was == level => (level, since),
+            _ => (level, now),
+        });
+        let next_speed = base.at(level).speed;
+        let patient = level_since.is_some_and(|(_, since)| now - since >= LEVEL_PATIENCE);
         if level != energy
             && playing.is_none()
+            && easing_out.is_none()
             && pending.is_none()
-            && velocity.iter().all(|speed| speed.abs() < 1.0)
+            && (velocity.iter().all(|speed| speed.abs() < 1.0)
+                || patient
+                    && velocity
+                        .iter()
+                        .enumerate()
+                        .all(|(index, speed)| index == 1 || speed.abs() <= next_speed))
             && stand_velocity == 0.0
         {
             energy = level;
@@ -7117,11 +7495,14 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 up.seconds = crate::energy::stand_seconds(seconds, level);
             }
             idler.share = crate::energy::of(level).idle_share;
+            report.energy_levels.push((now, level));
             eprintln!(
                 "lamp-body: step {}: energy level {level}: {} counts a second",
                 report.steps, limits.speed
             );
         }
+        // Named here: `level` below is the mood's (the voice's), not this.
+        let level_waits = level != energy;
         // A person or a health check lets a seated lamp stand (#4501).
         if asked_now.unseat
             && let Some((joint, why)) = seated.take()
@@ -7441,7 +7822,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 );
                 playing = None;
                 yielding = true;
-                easing_out = Some((0, gesture_now, gesture_moved));
+                easing_out = Some((0, gesture_now, gesture_moved, GESTURE_STEP));
             }
             // One still waiting goes too, so it never begins after the ease
             // out only to end a step later under the same hand.
@@ -7705,8 +8086,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             relaxed = false;
         }
         // A gesture is for a lamp standing still at its full height.
-        let upright = leaving.is_none()
-            && !blind
+        let stood_still = leaving.is_none()
             && standing.is_some_and(|up| {
                 asked_now
                     .stand_share
@@ -7715,6 +8095,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     && stand >= 1.0
                     && stand_velocity == 0.0
             });
+        let upright = stood_still && !blind;
+        // One playing goes on through a read or write that failed for a
+        // moment: the joints hold the frame they have (nothing new is
+        // asked while blind), its clock goes on. A miss that lasts
+        // `GESTURE_BLIND_STEPS` ends it, said (#8266).
+        let blind_steps = misses.max(unsent);
+        let plays_on = stood_still && blind_steps < GESTURE_BLIND_STEPS;
         // Anything alive that stands with nothing to do shifts a little
         // now and then, not on a clock: after a wait drawn at random, and each
         // time a different small move (`crate::idle`). It stops the moment there is something to do:
@@ -7781,7 +8168,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         } else if playing.is_none() {
             match idle_due {
                 None => idle_due = Some(now + idler.gap()),
-                Some(due) if now >= due && settled && standing.is_some_and(|up| up.idle) => {
+                // #7749: none begins while a new energy level waits.
+                Some(due)
+                    if now >= due
+                        && settled
+                        && !level_waits
+                        && standing.is_some_and(|up| up.idle) =>
+                {
                     // An arm a hand holds is not swayed into the hand.
                     let arm_free = stalls[3..].iter().all(|stall| stall.hold.is_none());
                     let tilts = limits.stand_roll > limits.roll;
@@ -7904,7 +8297,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         }
                         playing = None;
                         yielding = true;
-                        easing_out = Some((0, gesture_now, gesture_moved));
+                        easing_out = Some((0, gesture_now, gesture_moved, GESTURE_STEP));
                     }
                     if let Some((old, _)) = pending.filter(|(old, _)| from_outside(old)) {
                         gesture_fates.push_told(
@@ -7926,6 +8319,15 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                             (1.0 - stand).max(0.0) * up.seconds
                         }
                     });
+                    // #8153: under `LAMP_BODY_ENERGY` a built-in clip is
+                    // played at the level's size and pace, and everything
+                    // below (its window, the reach, the anti-tip check)
+                    // takes it as played.
+                    let clip = if stretch.is_some() && from_outside(clip) {
+                        crate::energy::livelier(clip, energy)
+                    } else {
+                        clip
+                    };
                     let earlier = pending;
                     let begins = (now + Duration::from_secs_f32(rising))
                         .max(earlier.map_or(now, |(_, since)| since));
@@ -8079,13 +8481,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             ) {
                 // Paused (#2602): eased to a hold where it is; its own clock
                 // stands still meanwhile.
-                (Some((at, _, from, speed)), _) if upright => {
+                (Some((at, _, from, speed)), _) if plays_on => {
                     gesture_wanted = held_at(now.saturating_sub(at), from, speed).0;
                 }
                 // Gone on again: from the held pose into the clip, eased in
                 // from still over `EASE_OUT` (a smoothstep), the clip
                 // already taken up from where the hold carried it.
-                (None, Some(offsets)) if upright => {
+                (None, Some(offsets)) if plays_on => {
                     gesture_wanted = offsets;
                     // Under `Limits::presence` (#7301) a shift's arm only
                     // sags toward its fold, by the level's size, and stays
@@ -8116,8 +8518,36 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         }
                     }
                 }
+                // Not one that came to its end as the miss lasted: that one is over.
+                (Some(_), _) | (None, Some(_))
+                    if stood_still && blind_steps >= GESTURE_BLIND_STEPS =>
+                {
+                    playing = None;
+                    report.gestures_dropped += 1;
+                    // One from outside is journaled from its fate; the
+                    // body's own (an idle shift, a call's glance) has none.
+                    if from_outside(clip) {
+                        gesture_fates.push_told(
+                            (clip.name, GESTURE_BLIND_FATE),
+                            Told {
+                                source: playing_by.1,
+                                by: None,
+                            },
+                        );
+                    } else {
+                        eprintln!(
+                            "lamp-body: step {} gesture {} {GESTURE_BLIND_FATE}",
+                            report.steps, clip.name
+                        );
+                    }
+                }
                 _ => playing = None,
             }
+        }
+        // Played on blind, it holds the frame it has: the arm's offsets as
+        // the head's goals (below), nothing new asked until the wire answers.
+        if blind && playing.is_some() {
+            gesture_wanted = gesture_now;
         }
         // A holder's pose (`Asked::pose`): the head's roll and the arm where
         // it asks, laid on the stand as a gesture's offsets are, while held
@@ -8148,21 +8578,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         let before = gesture_now;
         match easing_out.as_mut().filter(|_| playing.is_none()) {
-            Some((steps, from, speed)) => {
+            Some((steps, from, speed, pace)) => {
                 *steps += 1;
-                let span = EASE_OUT.as_secs_f32() / TICK.as_secs_f32();
-                let t = (*steps as f32 / span).min(1.0);
-                // Hermite: from `from` at the speed it had to nothing at rest.
-                let (stays, carries) = (
-                    2.0 * t * t * t - 3.0 * t * t + 1.0,
-                    t * t * t - 2.0 * t * t + t,
-                );
-                for (index, now_at) in gesture_now.iter_mut().enumerate() {
-                    let wanted = from[index] * stays + speed[index] * span * carries;
-                    *now_at += (wanted - *now_at).clamp(-GESTURE_STEP[index], GESTURE_STEP[index]);
-                }
-                if t >= 1.0 {
-                    gesture_now = [0.0; 5];
+                if ease_out_step(&mut gesture_now, *steps, *from, *speed, *pace) {
                     easing_out = None;
                 }
             }
@@ -8888,7 +9306,15 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             }
         }
         let bad_before = (bus.bad_reads, bus.bad_temperatures);
-        let samples = match bus.samples() {
+        // A read missed on purpose (`--miss-from`) fails here, as one with no
+        // reply would, so that what follows is the wire's own miss path.
+        let read = if test_misses > 0 {
+            test_misses -= 1;
+            Err("a read missed on purpose (--miss-from, a test input)".to_string())
+        } else {
+            bus.samples()
+        };
+        let samples = match read {
             Ok(samples) => {
                 misses = 0;
                 samples
@@ -9254,42 +9680,65 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 // another goal, and pauses the count), held short of it
                 // under load: that goal is eased to where it holds. The
                 // strain guard below still judges every step as before.
+                // Eased once, it is kept only if the load comes under
+                // STAND_EASE_LOAD; else back to the measured stand, no more
+                // easing this run (lamp-74ff: each ease only lowered the lamp).
                 let goal = up.pose[3 + index];
-                if stand >= 1.0 && arm_written[index] == goal {
+                if stand >= 1.0 && arm_written[index] == goal && !stand_ease_off[index] {
                     let rising = goal > up.folded[index];
                     let short = if rising {
                         goal.saturating_sub(is.position)
                     } else {
                         is.position.saturating_sub(goal)
                     };
-                    stand_short_steps[index] =
-                        if short > STAND_EASE_SHORT && is.load > STAND_EASE_LOAD {
-                            stand_short_steps[index] + 1
-                        } else {
-                            0
-                        };
+                    // #7281: leaky. A step short and loaded adds one; every
+                    // STAND_EASE_DECAY steps that are not take one off, to 0.
+                    // A joint loaded in spells between landings still counts
+                    // up; one settled now and then does not.
+                    if is.load > STAND_EASE_LOAD && (stand_eased[index] || short > STAND_EASE_SHORT)
+                    {
+                        stand_short_steps[index] += 1;
+                    } else {
+                        stand_settled_steps[index] += 1;
+                        if stand_settled_steps[index] >= STAND_EASE_DECAY {
+                            stand_settled_steps[index] = 0;
+                            stand_short_steps[index] = stand_short_steps[index].saturating_sub(1);
+                        }
+                    }
                     if stand_short_steps[index] >= STAND_EASE_STEPS {
                         stand_short_steps[index] = 0;
                         let measured = stand_measured.map_or(goal, |stood| stood[index]);
-                        let eased = if rising {
-                            is.position + STAND_EASE_MARGIN
-                        } else {
-                            is.position.saturating_sub(STAND_EASE_MARGIN)
-                        };
-                        if eased.abs_diff(measured) <= STAND_EASE_FLOOR {
+                        if stand_eased[index] {
+                            stand_ease_off[index] = true;
                             if let Some(up) = standing.as_mut() {
-                                up.pose[3 + index] = eased;
+                                up.pose[3 + index] = measured;
                             }
                             eprintln!(
-                                "lamp-body: step {}: {joint} held short of its stand: goal {measured} eased to {eased}, held at {}, load {}",
+                                "lamp-body: step {}: {joint} eased stand did not lower its load: goal {goal}, held at {}, load {} (over {STAND_EASE_LOAD}); back to its stand goal {measured}, not eased again this run",
                                 report.steps, is.position, is.load
                             );
-                        } else if !too_short_said[index] {
-                            too_short_said[index] = true;
-                            eprintln!(
-                                "lamp-body: step {}: {joint} held {short} short of its stand goal {goal}, load {}: past {STAND_EASE_FLOOR}, not eased",
-                                report.steps, is.load
-                            );
+                        } else {
+                            let eased = if rising {
+                                is.position + STAND_EASE_MARGIN
+                            } else {
+                                is.position.saturating_sub(STAND_EASE_MARGIN)
+                            };
+                            if eased.abs_diff(measured) <= STAND_EASE_FLOOR {
+                                if let Some(up) = standing.as_mut() {
+                                    up.pose[3 + index] = eased;
+                                }
+                                stand_eased[index] = true;
+                                eprintln!(
+                                    "lamp-body: step {}: {joint} held short of its stand: goal {measured} eased to {eased}, held at {}, load {}",
+                                    report.steps, is.position, is.load
+                                );
+                            } else if !too_short_said[index] {
+                                too_short_said[index] = true;
+                                eprintln!(
+                                    "lamp-body: step {}: {joint} held {short} short of its stand goal {goal}, load {}: past {STAND_EASE_FLOOR}, not eased",
+                                    report.steps, is.load
+                                );
+                            }
                         }
                     }
                 }
@@ -9969,6 +10418,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         };
                         // The shoulder alone: the elbow fell folded.
                         let fold = Fold {
+                            straight: None,
                             head_to: None,
                             joints: vec![Joint::BasePitch],
                             order: FoldOrder::InTurn,

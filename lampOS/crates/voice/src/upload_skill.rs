@@ -123,6 +123,7 @@ pub fn written_with(card: &str, asks: &[String]) -> Result<Files, Refused> {
         card: card.to_owned(),
         left_out: None,
         scripts: Vec::new(),
+        shows: Vec::new(),
     })
 }
 
@@ -332,6 +333,7 @@ pub fn take_telling(
                 card: skill_md.to_owned(),
                 left_out: None,
                 scripts: Vec::new(),
+                shows: Vec::new(),
             },
             Vec::new(),
         ),

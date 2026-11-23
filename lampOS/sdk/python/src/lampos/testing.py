@@ -52,6 +52,20 @@ from .moves import MOVE_FARTHEST, SKILL_FARTHEST, move_refusal, move_why
 # The fake's camera picture: the smallest whole JPEG (start and end markers).
 FAKE_JPEG = bytes([0xFF, 0xD8, 0xFF, 0xD9])
 
+# The fake's pose (`pose`): one person standing in a 640x480 picture, the 17
+# COCO keypoints in COCO order, as lamp-npu answers whatever model it runs.
+FAKE_POSE = {
+    "score": 0.87,
+    "keypoints": [
+        {"x": x, "y": y, "score": 0.9}
+        for x, y in (
+            (320.0, 100.0), (330.0, 90.0), (310.0, 90.0), (340.0, 95.0), (300.0, 95.0),
+            (360.0, 160.0), (280.0, 160.0), (380.0, 230.0), (260.0, 230.0), (390.0, 300.0), (250.0, 300.0),
+            (345.0, 300.0), (295.0, 300.0), (350.0, 380.0), (290.0, 380.0), (352.0, 460.0), (288.0, 460.0),
+        )
+    ],
+}
+
 # The fake's microphone, as the ears share it on mic1/audio: a 20 ms block of
 # 320 samples, mono, 16 kHz, S16LE.
 AUDIO_RATE = 16_000
@@ -551,6 +565,7 @@ class FakeLamp:
         lamp_id: str = "lamp-fake",
         name: str = "Fake lamp",
         language: str | None = "en",
+        build: str | None = None,
         auto_done: bool = True,
         refuses: dict[str, str] | None = None,
         follows_hand: bool = True,
@@ -565,6 +580,8 @@ class FakeLamp:
         app_version: str = "1.0.0",
         app_settings: dict[str, Any] | None = None,
         panel_rate_s: float = 60.0,
+        store_apps: bool = True,
+        apps_helper: bool = True,
     ):
         # `app`: also serve an installed app's socket (a unix socket, `app_path`, what LAMP_APP_SOCKET names on the lamp)
         # for `Lamp.connect_app`: no token and no key, the kernel's word on who connects is the trust, so a connection
@@ -584,6 +601,13 @@ class FakeLamp:
         self.app_panel: dict[str, Any] | None = None
         self._panel_rev = 0
         self._panel_at: float | None = None
+        # What the app told Lamp's memory: the facts kept (`apps.remember`, three a minute an app, as
+        # app_remember.rs; a refused ask is not counted) and the live context line (`apps.context`, `{line, for_ms}`
+        # or None once cleared). `refuse_next("apps.remember", code)` makes the next one refused with any code.
+        self.app_facts: list[str] = []
+        self.app_context: dict[str, Any] | None = None
+        self._remembered_at: list[float] = []
+        self._context_at: float | None = None
         self.app_path: str | None = None
         self._app_server = None
         self._app_dir: tempfile.TemporaryDirectory | None = None
@@ -633,6 +657,10 @@ class FakeLamp:
         # it out, as a lamp from before it does.
         if language is not None:
             self.lamp["language"] = language
+        # The lamp's build (`143+ab12cd34ef56`) in hello's answer only, never
+        # the welcome (any connection gets that first); None leaves it out, as
+        # a lamp that has none to say does.
+        self.build = build
         self.host = "127.0.0.1"
         self.port = 0
         # The certificate's pin (full SHA-256), as the owner's app shows it,
@@ -664,16 +692,29 @@ class FakeLamp:
         # The picture `camera.snapshot` and a stream's frames carry: the
         # smallest whole JPEG unless a test sets a real one (`fake.picture = jpeg`).
         self.picture: bytes = FAKE_JPEG
+        # What `pose` answers for any JPEG: the person (None for nobody), the
+        # picture's size and the model, unless a test sets its own.
+        self.pose: dict | None = FAKE_POSE
+        self.pose_size: tuple[int, int] = (640, 480)
+        self.pose_model = "fake-movenet"
         # Pushed skills by name, and the one push in flight on the lamp.
         self.pushed: dict[str, dict] = {}
         self._pushing: dict | None = None
+        # Pushed apps by name (`app.push`, docs/apps.md), and the one app push in flight. `store_apps` False is a lamp
+        # without LAMP_STORE_APPS, `apps_helper` False one without the apps helper: every app op is refused, in the
+        # lamp's words. `store_app_names` are the Store apps installed here, whose names a push may not take.
+        self.store_apps = store_apps
+        self.apps_helper = apps_helper
+        self.pushed_apps: dict[str, dict] = {}
+        self._app_pushing: dict | None = None
+        self.store_app_names: set[str] = set()
         self.subscribed: dict[str, set[str]] = defaultdict(set)
         self.state: dict[str, Any] = {
             "presence": {"count": 0, "near": 0.0, "facing": False},
             # null until the lamp has heard them, as lamp-control's Watch answers.
             "light": None,
             "mood": None,
-            "lamp": {"talking": False, "paused": False, "private": False, "asleep": False},
+            "lamp": {"talking": False, "paused": False, "private": False, "asleep": False, "muted_after_fault": False},
             # Made-up readings, as lamp-control answers them; `set_air` changes
             # the air and tells `air.changed`, `{"known": False}` for none.
             "air": dict(AIR),
@@ -729,6 +770,10 @@ class FakeLamp:
             if jsonschema
             else None
         )
+
+    def _lamp_known(self) -> dict:
+        """The `lamp` of hello's answer: the welcome's and, when known, the build."""
+        return {**self.lamp, **({} if self.build is None else {"build": self.build})}
 
     async def __aenter__(self) -> "FakeLamp":
         cert, key = _certificate()
@@ -1294,7 +1339,7 @@ class FakeLamp:
             await ws.close()
             return None
         limits = {**LIMITS, "motion_done": True} if self.motion_done else LIMITS
-        await self._ok(ws, request["id"], lamp=self.lamp, grants=paired["grants"], limits=limits)
+        await self._ok(ws, request["id"], lamp=self._lamp_known(), grants=paired["grants"], limits=limits)
         return request["client"]
 
     async def _hello_app(self, ws, request: dict) -> str | None:
@@ -1351,6 +1396,8 @@ class FakeLamp:
     def _needs(self, op: str, request: dict) -> list[str]:
         if op == "phrases.set":
             return ["hear"]
+        if op in ("apps.remember", "apps.context"):
+            return ["remember"]
         if op == "subscribe":
             return sorted({self.EVENT_GRANT[e] for e in request.get("events", []) if e in self.EVENT_GRANT})
         if op == "get":
@@ -1368,6 +1415,7 @@ class FakeLamp:
             "sound": ["speak"],
             "camera.snapshot": ["camera"],
             "camera.stream": ["camera"],
+            "pose": ["camera"],
             "sound.upload": ["speak"],
             "sound.list": ["speak"],
             "sound.remove": ["speak"],
@@ -1378,6 +1426,9 @@ class FakeLamp:
             "skill.push": ["skills"],
             "skill.list": ["skills"],
             "skill.remove": ["skills"],
+            "app.push": ["skills"],
+            "app.list": ["skills"],
+            "app.remove": ["skills"],
             # A turn speaks and hears what is said to the lamp.
             "turn.start": ["speak", "hear"],
             "turn.end": ["speak"],
@@ -1543,10 +1594,98 @@ class FakeLamp:
             moves={"kept": sorted(moves), "left_out": [{"name": n, "why": w} for n, w in left_out]},
         )
 
+    async def _app_pushed_op(self, ws, client: str, id_: int, request: dict) -> None:
+        """`app.push`, `app.list` and `app.remove`, as lamp-control and the apps helper take them: only with
+        LAMP_STORE_APPS and the helper, and only this computer's own apps."""
+        if not self.store_apps:
+            await self._refuse(ws, id_, "refused", "apps are off on this lamp")
+            return
+        if not self.apps_helper:
+            await self._refuse(ws, id_, "refused", "app push is not on this lamp")
+            return
+        op = request["op"]
+        if op == "app.push":
+            await self._push_app(ws, client, id_, request)
+        elif op == "app.list":
+            await self._ok(ws, id_, apps=[{k: v for k, v in a.items() if k != "client"} for a in self.pushed_apps.values() if a["client"] == client])
+        else:
+            kept = self.pushed_apps.get(request["name"])
+            if not kept or kept["client"] != client:
+                await self._refuse(ws, id_, "refused", "not one of this computer's pushed apps")
+                return
+            del self.pushed_apps[request["name"]]
+            await self._ok(ws, id_, removed=request["name"])
+
+    async def _push_app(self, ws, client: str, id_: int, request: dict) -> None:
+        """A part of an app push, as a skill's (`_push`): in order from 0, one push at a time, the whole checked
+        against its SHA-256, then its manifest (format 2, kind app, unsigned, grants within this pairing's, never
+        `remember`), then kept as this computer's, replacing its app of that name."""
+        import tarfile
+
+        going = self._app_pushing
+        if request["part"] == 0:
+            if going and going["client"] != client:
+                await self._refuse(ws, id_, "busy", "another computer's push is in flight")
+                return
+            going = self._app_pushing = {"client": client, "data": b""}
+        elif not going or going["client"] != client or request["part"] != going["part"] + 1:
+            await self._refuse(ws, id_, "bad_request", "parts out of order")
+            return
+        going["part"] = request["part"]
+        going["data"] += base64.b64decode(request["data"])
+        if request["part"] < request["parts"] - 1:
+            await self._ok(ws, id_, got=request["part"] + 1)
+            return
+        self._app_pushing = None
+        data = going["data"]
+        sha = hashlib.sha256(data).hexdigest()
+        if len(data) != request["size"] or sha != request["sha256"].lower():
+            await self._refuse(ws, id_, "bad_request", "the package's SHA-256 doesn't match")
+            return
+        try:
+            with tarfile.open(fileobj=io.BytesIO(data), mode="r:") as tar:
+                names = tar.getnames()
+                manifest = json.loads(tar.extractfile("lamp-skill.json").read())
+        except (tarfile.TarError, KeyError, AttributeError, ValueError):
+            await self._refuse(ws, id_, "refused", "not an app package")
+            return
+        if "lamp-skill.sig" in names:
+            await self._refuse(ws, id_, "refused", "it carries lamp-skill.sig: a pushed app is unsigned")
+            return
+        if not isinstance(manifest, dict) or manifest.get("format") != 2 or manifest.get("kind") != "app" or manifest.get("name") != request["name"]:
+            await self._refuse(ws, id_, "refused", "not a package of that app")
+            return
+        grants = self.clients[client]["grants"]
+        for grant in manifest.get("grants", []):
+            if grant == "remember" or grant not in grants:
+                await self._refuse(ws, id_, "no_grant", f"not granted: {grant}")
+                return
+        if request["name"] in self.store_app_names:
+            await self._refuse(ws, id_, "refused", "a Store app has that name")
+            return
+        kept = self.pushed_apps.get(request["name"])
+        if kept and kept["client"] != client:
+            await self._refuse(ws, id_, "refused", "another computer's app has that name")
+            return
+        app = {
+            "name": manifest["name"],
+            "title": manifest.get("title", manifest["name"]),
+            "version": manifest.get("version", ""),
+            "sha256": sha,
+            "grants": list(manifest.get("grants", [])),
+            "net": bool(manifest.get("net", False)),
+            "logs": bool(manifest.get("logs", False)),
+        }
+        self.pushed_apps[request["name"]] = {**app, "stopped": False, "client": client}
+        await self._ok(ws, id_, app={**app, "updated": kept is not None, "started": True, "from": "computer"})
+
     # An installed app's ops and events (#7415).
 
     async def _app_op(self, ws, request: dict) -> None:
         op, id_ = request["op"], request["id"]
+        if op in ("apps.remember", "apps.context"):
+            await self._app_memory(ws, request)
+            return
         if op == "phrases.set":
             phrases = request["phrases"]
             if any(sum(unicodedata.category(c)[0] in "LMN" for c in phrase) < 8 for phrase in phrases):
@@ -1577,6 +1716,50 @@ class FakeLamp:
             self._panel_rev += 1
             self.app_panel = {"title": request["title"], "lines": list(request["lines"]), "rev": self._panel_rev}
             await self._ok(ws, id_, rev=self._panel_rev)
+
+    async def _app_memory(self, ws, request: dict) -> None:
+        """`apps.remember` and `apps.context`, as lamp-control answers them: nothing while the lamp is private, a
+        fact's words at most 280 characters (the lamp tidies them first; this fake only strips them) and three facts
+        a minute; a context line at most 120 characters for 1 ms to 10 minutes and one a second, an empty line with no
+        time its clear."""
+        op, id_ = request["op"], request["id"]
+        if op == "apps.context":
+            line, for_ms = request.get("line"), request.get("for_ms")
+            # A clear (an empty line, no time) is never rated and never refused while private.
+            if line == "" and for_ms is None:
+                self.app_context = None
+                await self._ok(ws, id_)
+                return
+            if not isinstance(line, str) or not line or len(line) > 120 or not (_whole(for_ms) and 1 <= for_ms <= 600_000):
+                await self._refuse(ws, id_, "bad_request", "a line of 1 to 120 characters for 1 to 600000 ms; a clear has no for_ms")
+                return
+            if self.state["lamp"]["private"]:
+                await self._refuse(ws, id_, "private", "Lamp is private")
+                return
+            # One line a second an app; only a line that was set counts.
+            now = self.clock()
+            if self._context_at is not None and now - self._context_at < 1:
+                await self._refuse(ws, id_, "rate", "one line a second", retry_ms=max(1, round((1 - (now - self._context_at)) * 1000)))
+                return
+            self._context_at = now
+            self.app_context = {"line": line, "for_ms": for_ms}
+            await self._ok(ws, id_)
+            return
+        if self.state["lamp"]["private"]:
+            await self._refuse(ws, id_, "private", "Lamp is private")
+            return
+        text = " ".join(str(request.get("text", "")).split())
+        if not text or len(text) > 280:
+            await self._refuse(ws, id_, "bad_request", "text: 1 to 280 characters once tidied")
+            return
+        now = self.clock()
+        self._remembered_at = [at for at in self._remembered_at if now - at < 60]
+        if len(self._remembered_at) >= 3:
+            await self._refuse(ws, id_, "rate", "three facts a minute", retry_ms=max(1, round((60 - (now - self._remembered_at[0])) * 1000)))
+            return
+        self._remembered_at.append(now)
+        self.app_facts.append(text)
+        await self._ok(ws, id_, kept=True)
 
     async def _tell_apps(self, event: str, only_phrase: str | None = None, **fields: Any) -> None:
         frame = json.dumps({"ev": event, "at": _now(), **fields})
@@ -1844,6 +2027,8 @@ class FakeLamp:
                 return
             del self.pushed[request["name"]]
             await self._ok(ws, id_)
+        elif op in ("app.push", "app.list", "app.remove"):
+            await self._app_pushed_op(ws, client, id_, request)
         elif op.startswith("notes."):
             await self._notes(ws, client, request)
         elif op == "sound.upload":
@@ -1917,6 +2102,27 @@ class FakeLamp:
                     block_ms=int(AUDIO_EVERY_S * 1000), source="mic1",
                 )
                 self.listening[id(ws)] = asyncio.ensure_future(self._listen(ws))
+        elif op == "pose":
+            # As lamp-control's pose: a JPEG of the computer's own, never
+            # while private; the fake runs no model and answers `self.pose`.
+            # `refuse_next("pose", "preparing", ..., 2000)` and the like stand
+            # for the lamp's NPU states.
+            try:
+                picture = base64.b64decode(request.get("jpeg", ""), validate=True)
+            except ValueError:
+                picture = b""
+            if self.state["lamp"]["private"]:
+                self.requests.remove(request)
+                await self._refuse(ws, id_, "private", "the lamp is private")
+            elif not picture.startswith(b"\xff\xd8"):
+                self.requests.remove(request)
+                await self._refuse(ws, id_, "bad_request", "jpeg: not a JPEG")
+            else:
+                width, height = self.pose_size
+                await self._ok(
+                    ws, id_, pose=self.pose, width=width, height=height, model=self.pose_model,
+                    ms={"decode": 0.0, "npu": 0.0, "post": 0.0, "total": 0.0},
+                )
         elif op == "speaker.stream":
             await self._speaker_stream(ws, client, id_, request)
         else:

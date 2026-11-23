@@ -350,6 +350,39 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   plug:device_speaker is busy at start; waiting up to 20 s for it, as the
   microphone waits for its own`, then, once open, `the speaker was busy for
   9.2 s at start; opened on try 185`. Its holder is not looked up.
+- **A worker slow to say ready on a loaded cold boot.** On lamp-c0a4 on
+  2026-11-18 (stable 14008, about 07:17) the voice exited twice within
+  about 67 s of a cold boot with `worker readiness timed out`: a worker
+  missed `WORKER_STARTUP_TIMEOUT`, 3 s from its spawn to its ready, while
+  the board was heavily loaded (1-minute load 7.9 at 31 s; containerd
+  35.7 s and lircd 13 s in `systemd-analyze blame`) (#7224). The timeout
+  names the role and how long it waited (`worker readiness timed out
+  (capture after 3012 ms)`). With `LAMP_VOICE_YOUNG_BOOT_GRACE=on` (off
+  unless set, read by the process that spawns the worker), a worker
+  spawned while the system has been up less than 2 min
+  (`YOUNG_BOOT`, on `CLOCK_BOOTTIME`) has 10 s for its first ready
+  (`YOUNG_BOOT_STARTUP_TIMEOUT`) instead of 3 s; a role already ready
+  once in that process, or started later, has 3 s. Ready still gates the
+  start, so nothing is said to be ready before the worker can take input,
+  and no unit is ordered after slow ones, which would delay every boot. A
+  speaker busy at start gets its 20 s on top of its own bound, so 20 s
+  plus 10 s with the grace. The journal says once per worker given it
+  `lamp-voice: capture was given the young-boot grace (system up 31 s):
+  readiness bound 10 s`. Off, the bound and the journal are as before.
+  Off Linux there is no boot clock read, so no start is young.
+  Whatever the switch, the `second` worker is waited for past its bound
+  while it is still running (#7224 fault 5: lamp-06c1, stable 15203,
+  20 Nov 23:28, a normal reboot: `worker readiness timed out (second after
+  3000 ms)` 9 s after the start, a restart, ready 15 s after the start).
+  It does all its setup before it says ready, so at the deadline, with its
+  process found running, the deadline moves on by 3 s, at most three
+  times and never past `SECOND_READY_BOUND`, 12 s from its spawn (or the
+  grace's 10 s when that is longer, so still 12 s). Each move says
+  `lamp-voice: second worker not ready after <W> ms and still running;
+  waiting up to <N> ms more (retry <n> of 3, bound 12000 ms)`. Ready still
+  gates `listening_ready`; a worker that ends is caught at once; one that
+  never says ready ends at 12 s with the same `worker readiness timed out
+  (second after <W> ms)`. Other roles are not waited for past their bound.
 - **The privacy worker's lease lapsing in the muted wait after boot.** On
   lamp-06c1 on 2026-10-30, a cold boot, run 1: `onboarding skill loaded`
   at 15.82, `schedule-consumer: due reminders available` at 15.89, then
@@ -579,6 +612,36 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   order, from another boot or stamped after now still ends it, as does a
   stale renewal with nothing fresh behind it; the 250 ms lease still ends it
   when the coordinator stops renewing.
+- **A worker's full control socket on an authority renewal (#8204).** On
+  lamp-06c1 (stock 15322, a frozen lamp-memory) a one-face forget's two
+  listings waited up to 1.5 s each (`tools::ASK_DEADLINE`) on the second
+  worker's only runtime thread, so its control loop read nothing. The
+  coordinator's 20 ms renewals filled its socket, the send returned
+  `WouldBlock`, and on the second route alone (a mandatory worker) the voice
+  exited 1 and came back muted by the restart guard. Now both halves hold.
+  The coordinator takes a `WouldBlock` on a worker's authority send as a
+  renewal skipped (`send_authority`, `RenewalStall`): never an error, with one
+  journal line when the run begins (`the second worker's control socket is
+  full: its authority renewal is skipped, sent again on the next tick`) and
+  one when a renewal is taken again (`… takes its authority again: N
+  renewals skipped over M ms`), counts only. The next tick sends a whole new
+  snapshot. A skip never lengthens what a worker may do: its last authority
+  lapses at its own 250 ms lease (`MAX_AUTHORITY_LEASE_US`), and a refused
+  send takes no sequence number, so the next arrives in order. A closed
+  socket or a peer gone still ends the voice as before. And the forget's
+  lookup (`remember::one_face_forget_target`) runs on `spawn_blocking`, so
+  the control loop keeps reading while it waits; the turn waits for it, so
+  the forget's answer goes out in its place. The skips are bounded
+  (`RENEWAL_SKIPS_MOST_US`, 3 s, the first builder's ruling on #8210): past
+  #8204's 2 s and the known real stalls, so a worker deadlocked with its
+  process alive still ends the voice as before (`… stayed full: N renewals
+  skipped over M ms, past 3000 ms: it ends the voice`), and the voice
+  restarts. On the worker's side, a stall of 2 s behind a full socket finds
+  every queued snapshot lapsed; its heartbeat (`STALLED_CONTROL_US`, 1.5 s)
+  is now judged from the newest snapshot read, stale or not, since reading
+  one proves the coordinator there. A lapsed snapshot still grants nothing:
+  the route holds closed on the authority it had (`LAMP_PRIVACY_RIDES_STALL`)
+  until the next fresh renewal, and the conversation goes on.
 - **The first direct capture-ready message while the speaker starts.** On
   build 6963 after setup, lamp-dbda reported `ref.c.speaker` sequence 1
   after 0, aged 143402 us against 100000 us, then restarted muted (#3530).
@@ -782,6 +845,38 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   next pass cut it as `capture_gap`); the margin check is true only
   for a held turn whose lease ends within 40 ms. Not yet tried on a lamp.
 
+- **A reopen raced the speaker's re-prime after a held turn's cut.** On
+  lamp-c0a4 at 22:31:06 on 18 Nov, on stable 14732's code, a turn held
+  about 3 min for a make had its capture frames stop for 63 ms; it was cut
+  40 ms before its lease lapsed, the speaker's authority lapsed and a fresh
+  one came at once, and about 400 ms later the voice exited 1 on `capture
+  frame preceded certified running reference clock`, then came back muted
+  by the restart guard (#7224, fault 4). From the code: the cut revokes
+  both audio workers; capture reopens under the fresh authority with its
+  sequence from 1, and the speaker re-primes on it, clearing the clock's
+  start until `ClockStarted`; a reopen, unlike the first start, did not
+  wait for it. With `LAMP_VOICE_UNSTARTED_FRAME_DROP=on` (on in the
+  product unit) capture holds a reopened microphone's frames back until the
+  clock has started, up to 500 ms and then dropped and counted until it
+  comes; a clock still not started 800 ms after the reopen is recovered
+  by one fresh reopen, and 800 ms more without it ends capture with the
+  old error (exit, systemd restart), never silence for good, the
+  recovery's `ClockNotStarted` gap moving the coordinator's 1.5 s
+  retention heartbeat so both steps come first; and the
+  coordinator ends the voice on that check only at the boot
+  barrier; mid-run the frame is a gap's dropped frame, said once per
+  reopen. Unit tests: in the harness the held turn's cut then a reopen
+  whose first frame has no clock start goes on with the switch, the reply
+  cut once as `capture_gap` and the frame counted in the gap, and ends
+  with the exit off; a boot's first frame before the clock still ends the
+  voice with it on; a clock starting 1.2 s after a reopen goes on with
+  it (off, the heartbeat ends it as before), and one that never starts
+  ends in capture's fault, not the heartbeat; the worker's hold, its 500
+  ms bound, the recovery
+  then the exit for a clock that never starts, and the coordinator's
+  once-per-reopen line each on their own. Not yet tried on a
+  lamp.
+
 - **The voice's processes stalled together on a page read back from the
   card.** On lamp-06c1 at 21:30:02 on 6 Nov, during an SD log flush,
   capture, the ring and the coordinator stalled 120-132 ms together, each
@@ -844,6 +939,40 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   with one journal line (`docs/bus.md`, "Which clock judges a message").
   It likely also ended a running voice with exit 1 in the field; that has
   no journal yet.
+
+- **One late privacy reading ended a make's hold (#7224 fault 5, part
+  1).** On lamp-c0a4 at 23:26 on 19 Nov, during a make's 3-4 min hold, the
+  cycle ended on `privacy_unreadable` ("service privacy freshness lost
+  before next observation"), a fresh privacy worker read the switch open
+  88 ms later, and the make's answer was lost. Controls' health was steady,
+  with 0 reconnects. From the code: with `LAMP_PRIVACY_GAP_RIDE` off, the
+  privacy worker itself ends when a reading is 50 ms late
+  (`SourceGap::missing`), and the loop's 50 ms gate check ends the cycle;
+  the `ENOTCONN` in the trace (`stop_delivery_error`) is the shutdown's Stop
+  to a worker already gone, not the cause. `LAMP_PRIVACY_GAP_RIDE=on` is now
+  in the product unit beside `LAMP_PRIVACY_RIDES_STALL` (the first builder,
+  19 Nov 23:59), so such a lapse is ridden for up to 1 s
+  (`service-privacy.md`): no frame is taken, the turn in flight is cut, and
+  the conversation goes on. A make's answer cut by a ride is fault 5 part 2
+  (its outcome kept past its turn). The install test pins the unit line.
+  Twelve's forced gap on lamp-c0a4 (20 Nov 07:08, ROW FAIL) found the ride
+  covered only a missing reading: Controls kept publishing while the slide's
+  reading lapsed, the fence refused the stale acquisition
+  (`SwitchFence::accept`, "physical privacy acquisition unavailable"), and
+  the worker ended 4 ms into the ride ("privacy worker failed"). With the
+  ride on and capture granted, a stale or level-less acquisition is now
+  `Acquired::Stale` (`SwitchFence::accept_riding`): the fence keeps its
+  envelope so the next state continues the order, the worker closes its
+  gate, says `PrivacyUnavailable` (`SourceGap::stale`), keeps its last fresh
+  reading and goes on reading. Another clock, a reading ahead of now, and
+  session and order errors still end it, and so does a fresh reading that
+  regressed or changed its reader or identity. A stale reading is not
+  checked against the last one, so one that regressed is ridden, closed:
+  the gate is shut, the last fresh reading kept, and the next fresh one is
+  checked against it. The 1 s bound still ends the conversation; a fresh
+  muted reading is still the mute at once.
+  Off, nothing changes. Owed: the same forced-gap leg on lamp-c0a4, then a
+  count of gaps over the hour.
 
 Not found yet: the power cut's first exit (exit 1 at 19.8 s, with no message
 of its own) and the provider's "Connection refused" at 24.7 s; that boot's

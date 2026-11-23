@@ -1,0 +1,62 @@
+# lampOS NPU: the one owner of the lamp's NPU (/dev/vipcore), with `pose` as its first op, asked through
+# lamp-control by a client that holds the camera grant (lampOS/docs/npu.md, #7415). The product unit
+# (lampOS/docs/install.md): installed and enabled on every lamp, under the keeper (in lampos.target,
+# restarted on a crash and by an update), and on: LAMP_NPU=on here and in lamp-control.service (with it
+# unset `serve` idles and touches nothing: no socket, no file, no NPU, no network). The image carries no
+# model: one is fetched from the Store's host on first use or when a pose-using app is installed, and kept
+# only once the Store's signature and its SHA-256 are checked.
+[Unit]
+Description=lampOS NPU (lamp-npu)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+After=local-fs.target network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# LAMP_NPU: #7415, poses on the lamp's NPU; on in the product by the first builder's DEFAULT-ON of 20 Nov; its why
+# and rules are its row in docs/switches.md.
+Environment=LAMP_NPU=on
+# As lampos, the user lamp-control and the eyes run as: its socket's folder below is lampos's with no
+# group or other access, so only the lamp's own parts reach it; an app reaches `pose` only through
+# lamp-control's grant check.
+User=lampos
+Group=lampos
+# /dev/vipcore is the `video` group's (0660, the image's 99-lamp-device.rules, #7972); only that device is
+# allowed below, so the group opens no camera here.
+SupplementaryGroups=video
+Slice=lampos-parts.slice
+# Poses are never worth a late word.
+Nice=10
+# The models' source: the Store's own host (#7415, Backend3's, 20 Nov), pinned; under it each op's folder by the
+# board's NPU, `pose/VIP9000NANODI_PID0X1000003B/{lamp-model.json,lamp-model.sig,<model>}` (docs/npu.md).
+ExecStart=/opt/lampOS/npu/current/lamp-npu serve --socket /run/lampos-npu/npu.sock --state /var/lib/lampos-npu --bus-root /run/lampos-bus --apps /opt/lampOS/apps --models-url https://cdn.autonomous.ai/production/skills-store/npu-models --models-host cdn.autonomous.ai
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-npu
+NoNewPrivileges=yes
+# Its own state, private and writable: the models it fetched and checked. A reset wipes it.
+StateDirectory=lampos-npu
+StateDirectoryMode=0700
+RuntimeDirectory=lampos-npu
+RuntimeDirectoryMode=0700
+ProtectSystem=strict
+# The bus is only read (the privacy lease and the board's heat); nothing outside its own folders is written.
+# What the eyes keep as the same user (frames, faces, the known name, photos) and lamp-control's state are
+# not this part's.
+InaccessiblePaths=-/run/lampos-eyes -%S/lampos-eyes -/run/lampos-eyes-kept -/run/lampos-photos -/var/lib/lampos-control
+ProtectHome=yes
+PrivateTmp=yes
+# The NPU and nothing else of /dev.
+DevicePolicy=closed
+DeviceAllow=/dev/vipcore rw
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=lampos.target

@@ -164,6 +164,11 @@ impl ReceiptHistory {
                     | "speaker_lapsed"
                     | "requested_audio_revoked"
                     | "privacy_gap"
+                    // The owner's Update now (#7517) ends the lamp's own
+                    // answer to say it is updating: the queued audio it drops
+                    // is that cut's. On lamp-e82d on 17 Nov at 20:11 the
+                    // drop ended the voice, and it came back muted.
+                    | "update_give_way"
             ) || LOCAL_CANCELS.contains(&reason),
         });
         entry.terminal = true;
@@ -400,6 +405,7 @@ mod tests {
             ("asker_stopped", true),
             ("requested_audio_revoked", true),
             ("privacy_gap", true),
+            ("update_give_way", true),
             ("reminder_authority_lost", false),
             ("playback_discarded", false),
         ] {

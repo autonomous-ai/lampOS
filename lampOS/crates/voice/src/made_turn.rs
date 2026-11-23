@@ -18,6 +18,15 @@
 //!   skill ([`NOT_OWNER`]). The name is matched to the skills they made as
 //!   a remove's is (`made_remove::found`); one they didn't make, several as
 //!   near, or none, are said so.
+//! - **Made or added alike.** The skills they made are the made skills'
+//!   index (`made.json`), which holds those made by voice, typed in the
+//!   app, and added from a file in the app (`"added": "file"`, an agent
+//!   skill's `SKILL.md` too): each is turned off and on the same way, told
+//!   to the model as one they made or added (#7594: on lamp-9adf, 17 Nov,
+//!   "turn off my btc price skill", one added from a file, was answered
+//!   that it is done in the app, since the function told of one they made
+//!   alone). A skill the lamp ships, or one from the Store or pushed from a
+//!   computer, is none of theirs here, as for a remove.
 //! - **As the app's switch.** One on the lamp, its folder gone on as that
 //!   very package (`made_skill::went_on_as`), is turned off or on by the
 //!   manage helper's own `{"off": NAME}` or `{"on": NAME}`, as the app's
@@ -50,26 +59,138 @@ pub const NOT_ASKED_ALOUD: &str =
     "a skill is turned off or on by voice only when the person asks out loud";
 
 /// What the model is told of a turn asked by anyone but the owner.
-pub const NOT_OWNER: &str = "only the lamp's owner can turn a skill they made off or on by voice";
+pub const NOT_OWNER: &str =
+    "only the lamp's owner can turn a skill they made or added off or on by voice";
 
 /// What the model is told of a skill on the lamp the person didn't make.
-pub const NOT_MADE: &str = "only a skill the person made is turned off or on this way";
+pub const NOT_MADE: &str = "only a skill the person made or added is turned off or on this way";
 
 /// The most of their skills' names said when none is near.
 const NAMED_MOST: usize = 3;
+
+/// The key of a turn-off's answer that tells the model how it is turned
+/// back on later ([`BACK_ON_BY_CALL`]).
+pub const LATER: &str = "later";
+
+/// How a skill turned off is turned back on, told the model (#7562's row on
+/// lamp-9adf, 18 Nov 03:2x: after "turn off my bitcoin price skill", "turn
+/// my bitcoin price skill back on" made no call, and the lamp said
+/// "Bitcoin price is back on" while it stayed off).
+pub const BACK_ON_BY_CALL: &str = "A skill turned off is turned back on by calling make_skill \
+     with turn_on and its name, when their line asks to turn it on, or by the lamp when the owner \
+     asks to use it; never say it is on or back on unless a call's answer says so.";
+
+/// How a turn off is done, told beside a skill's state (`skill_about`'s
+/// answer, [`crate::skill_about::TURNING_OFF`]) with the switch on: #7562's
+/// rows on lamp-9adf, 18 Nov, "Lamp, turn off my space facts skill." was
+/// asked back ("Do you want it off?", "Remove space facts?"), and a skill
+/// started only by its words was said to have "nothing running to switch
+/// off". The product owner's 18:41 rule: a turn off of a named made skill
+/// acts at once, in one line with its undo. Whether a line asks it stays
+/// the model's to judge: no words are read.
+pub const TURN_OFF_AT_ONCE: &str = "A line asking to turn off, pause or stop a skill they made \
+     or added, even one that starts only when they say its words, is make_skill's turn_off with \
+     its name alone, never remove: call it at once and ask nothing first; its answer gives the \
+     one line to say, with how to undo it.";
+
+/// What the model is told when it calls the function of a skill the person
+/// made or added that is turned off (`lamp_skills::TOOL_TURNED_OFF` is
+/// this very text): it ran nothing.
+pub const FUNCTION_OFF: &str = "That skill is turned off, so it did nothing. Say so in a few \
+     words: it is off and didn't run, and they can ask to turn it back on. Never turn it on for \
+     this: it is turned back on only by calling make_skill with turn_on and its name, when their \
+     line asks to turn it on; never say it is on or back on unless that call's answer says so.";
+
+/// What the model is told of a skill's function that answered
+/// [`FUNCTION_OFF`] after a `turn_on` turned that skill on in the same turn.
+pub const JUST_ON: &str = "it was turned on just now and runs from their next ask";
+
+/// How the note of a forced round after a turn's candidates opens.
+pub const UNCHOSEN_OPENS: &str = "(Not said: you answered with no call";
+
+/// The answer's key for the person's own skills offered when none is near
+/// the name asked ([`offered`]).
+pub const CANDIDATES: &str = "candidates";
+
+/// The most of their skills offered when none is near the name asked.
+pub const OFFERED_MOST: usize = 8;
+
+/// The most words of a skill's description said beside its name.
+const DOES_WORDS: usize = 8;
+
+/// The most bytes of a skill's `SKILL.md` read for its description.
+const CARD_MOST: u64 = 16 * 1_024;
 
 /// The longest the manage helper is waited for, as a remove waits.
 const HELPER_WAIT: Duration = Duration::from_secs(8);
 
 /// A turn asked by the model's `make_skill` call: the name as heard, off
 /// or back on (`off`), in the voice's request `request` (`heard`: someone
-/// spoke it).
+/// spoke it); `state`, lamp-skills' state folder, whose `off` file says
+/// which skills are turned off (none: not told).
 #[derive(Clone, Copy, Debug)]
 pub struct Ask<'a> {
     pub name: &'a str,
     pub off: bool,
     pub request: u64,
     pub heard: bool,
+    pub state: Option<&'a Path>,
+}
+
+/// The first [`DOES_WORDS`] words of the description in the `SKILL.md` of
+/// the skill `name` on the lamp, read at most [`CARD_MOST`] bytes.
+fn does(keeping: &Keeping, name: &str) -> Option<String> {
+    use std::io::Read;
+    let mut card = String::new();
+    std::fs::File::open(keeping.installed.join(name).join("SKILL.md"))
+        .ok()?
+        .take(CARD_MOST)
+        .read_to_string(&mut card)
+        .ok()?;
+    let description = made_skill::written_description(&card)?;
+    let words: Vec<&str> = description.split_whitespace().collect();
+    let mut said = words[..words.len().min(DOES_WORDS)].join(" ");
+    if words.len() > DOES_WORDS {
+        said.push_str("...");
+    }
+    Some(said)
+}
+
+/// The person's own skills, made or added and on the lamp, that a turn
+/// `off` (or back on) could mean when none is near the name asked
+/// (#7562's row on lamp-9adf, 18 Nov: "turn my bitcoin price skill back
+/// on" found nothing near "btc price", and the model, told no other,
+/// called it the lamp's own skill). For a turn off those not turned off,
+/// for a turn on those turned off, as lamp-skills' `off` file in `state`
+/// says; all of theirs when it can't be read. Newest first, at most
+/// [`OFFERED_MOST`], each its said name and its description's first words.
+/// Which one, if any, the person means is the model's to judge: no word is
+/// matched here.
+pub fn offered(keeping: &Keeping, off: bool, state: Option<&Path>) -> Vec<Value> {
+    let turned_off = state.and_then(|state| crate::skill_about::turned_off(state).ok());
+    let mut names: Vec<String> = Vec::new();
+    for name in made_skill::kept_on_names(&keeping.directory)
+        .into_iter()
+        .rev()
+    {
+        let fits = turned_off
+            .as_ref()
+            .is_none_or(|turned_off| turned_off.contains(&name) != off);
+        if fits && !names.contains(&name) {
+            names.push(name);
+        }
+    }
+    names
+        .iter()
+        .take(OFFERED_MOST)
+        .map(|name| {
+            let mut offered = json!({ "name": made_skill::spoken_name(name) });
+            if let Some(does) = does(keeping, name) {
+                offered["does"] = json!(does);
+            }
+            offered
+        })
+        .collect()
 }
 
 /// "off" or "on".
@@ -107,6 +228,7 @@ pub fn asked(
         off,
         request,
         heard,
+        state,
     } = ask;
     let way = way(off);
     if !heard {
@@ -120,7 +242,7 @@ pub fn asked(
         return json!({
             "error": NOT_OWNER,
             "next": "Say plainly, in a few words, that only the lamp's owner can turn a skill \
-                     they made off or on by voice. Name no skill. Call nothing."
+                     they made or added off or on by voice. Name no skill. Call nothing."
         });
     }
     let found = made_remove::found(name, keeping);
@@ -142,15 +264,15 @@ pub fn asked(
             return json!({
                 "error": NOT_MADE,
                 "next": format!(
-                    "Say plainly, in a few words, that {} isn't a skill they made, so I can't \
-                     turn it {way} this way. Call nothing.",
+                    "Say plainly, in a few words, that {} isn't a skill they made or added, so \
+                     I can't turn it {way} this way. Call nothing.",
                     made_skill::spoken_name(&other)
                 )
             });
         }
         Found::Alike(names) => {
             return json!({
-                "error": "more than one skill they made has a name like that",
+                "error": "more than one skill they made or added has a name like that",
                 "next": format!(
                     "Ask them once, short, which one they mean: {}. Call nothing now.",
                     made_remove::said_or(&names[..names.len().min(NAMED_MOST)])
@@ -158,9 +280,40 @@ pub fn asked(
             });
         }
         Found::Nothing => {
+            // Theirs it could mean, for the model to choose from in this
+            // turn: one they added named otherwise by the model ("bitcoin
+            // price" for btc price) is never called the lamp's own.
+            let offered = offered(keeping, off, state);
+            if !offered.is_empty() {
+                let call = if off { TURN_OFF } else { TURN_ON };
+                let which = if off {
+                    "not turned off"
+                } else {
+                    "turned off now"
+                };
+                eprintln!(
+                    "lamp-voice: request {request}: a turn {way} found nothing near: {} of theirs offered",
+                    offered.len()
+                );
+                return json!({
+                    "error": made_remove::NO_MADE,
+                    CANDIDATES: offered,
+                    "next": format!(
+                        "No skill they made or added has that name. Their skills {which} are \
+                         in candidates, each with its name and what it does. If one is the \
+                         skill they mean, by its name or what it does, call make_skill again \
+                         now with {call} and that name alone, saying nothing first. If none \
+                         is, say plainly, in a few words, that you found no skill they made or \
+                         added like that, and call nothing. Nothing was turned {way}: never \
+                         say one is {way} or already {way} unless a make_skill call's answer \
+                         says so. Never say it is the lamp's own skill or that it is turned \
+                         {way} in the app."
+                    )
+                });
+            }
             let theirs = made_skill::kept_on_names(&keeping.directory);
             let named = match theirs.len() {
-                0 => "and that none they made is on the lamp".to_owned(),
+                0 => "and that none they made or added is on the lamp".to_owned(),
                 count if count <= NAMED_MOST => format!(
                     "and name theirs on the lamp: {}",
                     theirs
@@ -169,13 +322,14 @@ pub fn asked(
                         .collect::<Vec<_>>()
                         .join(", ")
                 ),
-                count => format!("and that {count} they made are on the lamp"),
+                count => format!("and that {count} they made or added are on the lamp"),
             };
             return json!({
                 "error": made_remove::NO_MADE,
                 "next": format!(
-                    "Say plainly, in a few words, that you found no skill they made by that \
-                     name, {named}. Call nothing."
+                    "Say plainly, in a few words, that you found no skill they made or added \
+                     by that name, {named}. Never say it is the lamp's own skill. Call \
+                     nothing."
                 )
             });
         }
@@ -212,7 +366,9 @@ pub fn asked(
             return not_turned(
                 &spoken,
                 off,
-                &format!("the skill called {spoken} on the lamp now isn't the one they made"),
+                &format!(
+                    "the skill called {spoken} on the lamp now isn't the one they made or added"
+                ),
             );
         }
     }
@@ -231,15 +387,21 @@ pub fn asked(
                 "Say only, in a few words, in the conversation's language, that {spoken} is off, \
                  and that they can say turn it back on whenever they like. Never say it is \
                  removed. Call nothing."
-            )
+            ),
+            LATER: BACK_ON_BY_CALL
         })
     } else {
         json!({
             TURN_ON: made,
             "off": false,
+            // #7562's row on lamp-9adf, 18 Nov, request 9: "tell me a space
+            // fact with my space facts skill" was this turn on alone, and
+            // never ran. Whether the line asked to use it is the model's.
             "next": format!(
-                "Say only, in a few words, in the conversation's language, that {spoken} is on \
-                 again. Call nothing."
+                "If their line asked to use or run it, not only to turn it on, call make_skill \
+                 now with run and its name alone, saying nothing first: its answer says what to \
+                 say. Otherwise say only, in a few words, in the conversation's language, that \
+                 {spoken} is on again, and call nothing."
             )
         })
     }
@@ -269,6 +431,312 @@ pub fn turned_by_helper(socket: &Path, name: &str, off: bool) -> Result<(), Stri
     }
 }
 
+/// What the model is told in a heard turn while any skill the person made
+/// or added is turned off, with the switch on: how many, and
+/// [`BACK_ON_BY_CALL`]. None when none is off, or the `off` file in `state`
+/// can't be read. A structural guard, no words matched: on lamp-9adf, 18
+/// Nov 03:2x, "turn my bitcoin price skill back on" made no call and was
+/// answered "back on" while btc price stayed off; whether a line asks to
+/// turn one back on stays the model's to judge.
+///
+/// With `named` (the private room, where every line is the owner's), each
+/// off one too, by its said name, marked off, at most [`OFFERED_MOST`],
+/// and never said missing (#7562's rows on lamp-9adf, 18 Nov: "Lamp, run
+/// space facts" while it was off was answered "There's no space facts
+/// skill on the lamp" with no call: told how many alone, the model knew
+/// none by name, and a skill started by its words has no function of its
+/// own). Without, how many, never which: a name can carry a person's, and
+/// the line may not be the owner's.
+pub fn off_note(keeping: &Keeping, state: &Path, named: bool) -> Option<String> {
+    let turned_off = crate::skill_about::turned_off(state).ok()?;
+    let mut theirs = made_skill::kept_on_names(&keeping.directory);
+    theirs.sort();
+    theirs.dedup();
+    theirs.retain(|name| turned_off.contains(name));
+    let (count, are) = match theirs.len() {
+        0 => return None,
+        1 => ("One skill".to_owned(), "is"),
+        count => (format!("{count} skills"), "are"),
+    };
+    let which = if named {
+        let lines: Vec<String> = theirs
+            .iter()
+            .take(OFFERED_MOST)
+            .map(|name| format!("{}: off", made_skill::spoken_name(name)))
+            .collect();
+        format!(
+            ": {}. Each is still theirs on the lamp, only turned off: never say there is no \
+             such skill",
+            lines.join("; ")
+        )
+    } else {
+        String::new()
+    };
+    Some(format!(
+        "(For you to know, not to answer: {count} they made or added {are} turned off \
+         now{which}. A line that asks to use or run one: call it as for any skill, by its \
+         function, by use_skill with its name, or by make_skill with run and its name, never \
+         turn_on alone; the lamp turns it on for the owner's ask and runs it, and its answer \
+         says what to say. {BACK_ON_BY_CALL})"
+    ))
+}
+
+/// [`off_note`] on the lamp, in the voice's request `request` (`heard`:
+/// someone spoke it): with the switch on and a heard line only; each off
+/// one named in the private room alone (`person::private_room`, read with
+/// no wait: the owner's voice is never waited for here, before round 1).
+pub fn off_note_here(request: u64, heard: bool) -> Option<String> {
+    if !heard || !made_skill::off_said_on() {
+        return None;
+    }
+    let keeping = Keeping::when(true)?;
+    let named = crate::person::private_room();
+    let note = off_note(&keeping, Path::new(crate::skill_about::STATE_DIR), named)?;
+    eprintln!(
+        "lamp-voice: request {request}: told that a skill they made or added is turned off{}",
+        if named { ", each by its name" } else { "" }
+    );
+    Some(note)
+}
+
+/// Whether a call's answer `told` is a turned-off skill's function that
+/// ran nothing ([`FUNCTION_OFF`]).
+pub fn ran_turned_off(told: &Value) -> bool {
+    told["error"] == FUNCTION_OFF
+}
+
+/// Whether the call `name`'s answer `told` says the skill is still off: its
+/// function's [`FUNCTION_OFF`], or `make_skill`'s run now refused by
+/// lamp-skills as off or snoozed (`made_run::STOPPED`).
+pub fn still_off(name: &str, told: &Value) -> bool {
+    ran_turned_off(told) || name == made_skill::MAKE && crate::made_run::stopped(told)
+}
+
+/// What the model is told of a skill's function that still answered
+/// [`FUNCTION_OFF`] after a `turn_on` turned it on in the same turn
+/// ("turn on btc price and run it": lamp-skills reads its `off` file again
+/// within 2 s): never that it is off.
+pub fn just_on() -> Value {
+    json!({
+        "error": JUST_ON,
+        "next": "Say only, in a few words, in the conversation's language, that the skill is on \
+                 again, and that they can ask to run it now. Never say it is off. Call nothing."
+    })
+}
+
+/// How many times a skill's function is run again when it still answered
+/// [`FUNCTION_OFF`] just after a `turn_on` turned it on in the turn, and how
+/// long before each: lamp-skills reads its `off` file again within 2 s.
+pub const RERUNS: usize = 2;
+pub const RERUN_AFTER: Duration = if cfg!(test) {
+    Duration::from_millis(5)
+} else {
+    Duration::from_millis(1_200)
+};
+
+/// The id of the `turn_on` the lamp calls itself for an ask to use a skill
+/// turned off ([`on_for_ask`]): an id only, in no chat's thread.
+pub const ON_FOR_ASK_ID: &str = "turned_off_on_for_ask";
+
+/// The skill's name as said, of its function's call `name` with `args`
+/// ("btc price" for `btc_price`).
+pub fn spoken_of(name: &str, args: &Value) -> String {
+    crate::skill_named::spoken(crate::skill_named::function_of(name, args))
+}
+
+/// `spoken` with its first letter upper case, as a line opens.
+fn opening(spoken: &str) -> String {
+    let mut said = spoken.chars();
+    said.next()
+        .map(|first| first.to_uppercase().chain(said).collect())
+        .unwrap_or_default()
+}
+
+/// The `make_skill` call the lamp makes itself when a heard line asked to
+/// use a skill turned off, its function's call `name` with `args`
+/// answering [`FUNCTION_OFF`] (the first builder, 18:41 on 18 Nov, from the
+/// product owner: nothing is asked of the person, an offer becomes the
+/// action and one line with an undo). Its `turn_on` goes through
+/// `make_skill` as the model's own would ([`asked`]): heard, the owner's
+/// alone, the name matched to theirs; a guest's is refused there. No words
+/// of the line are read: the model's call of the skill is the ask.
+pub fn on_for_ask(name: &str, args: &Value) -> (String, Value) {
+    (
+        made_skill::MAKE.to_owned(),
+        json!({ TURN_ON: spoken_of(name, args) }),
+    )
+}
+
+/// What the model is told of its call of a skill turned off that the lamp
+/// turned on for the ask and ran again (`ran`, that run's answer, or
+/// [`just_on`] if it still answered off): the one line to say first, in
+/// the conversation's language, with its undo, then what it found.
+pub fn turned_on_for_ask(spoken: &str, ran: &Value) -> Value {
+    json!({
+        "turned_on": spoken,
+        "ran": ran,
+        "next": format!(
+            "It was off, so the lamp turned it on and ran it for their ask. Say first, in the \
+             conversation's language: \"{}\" Then say what ran tells you to say, in a few \
+             words. Call nothing.",
+            undo_line(spoken)
+        )
+    })
+}
+
+/// The one line said of a skill the lamp turned on for an ask to use it,
+/// with its undo ("Btc price was off, so I turned it on. Say 'turn it off'
+/// to undo."): by its function's call ([`turned_on_for_ask`]) or by
+/// `make_skill`'s run now (`made_run::told_turned_on`).
+pub fn undo_line(spoken: &str) -> String {
+    format!(
+        "{} was off, so I turned it on. Say 'turn it off' to undo.",
+        opening(spoken)
+    )
+}
+
+/// What the model is told of a skill turned on for the ask whose run then
+/// failed (`why`), turned off again as the owner had it (Heron's P2 on
+/// #7562): it didn't run, and it is still off. No undo: nothing changed.
+pub fn not_run_still_off(spoken: &str, why: &str) -> Value {
+    json!({
+        "error": why,
+        "next": format!(
+            "Say plainly, in a few words, in the conversation's language, that {spoken} didn't \
+             run now, and why: {why}; it is still off, as it was. Never say it is on or running. \
+             Call nothing."
+        )
+    })
+}
+
+/// What the model is told of a skill turned on for the ask whose run then
+/// failed (`why`), and that could not be turned off again: it didn't run,
+/// and it is on now, said with the undo line.
+pub fn not_run_left_on(spoken: &str, why: &str) -> Value {
+    json!({
+        "error": why,
+        "next": format!(
+            "Say plainly, in a few words, in the conversation's language, that {spoken} didn't \
+             run now, and why: {why}. Then say: \"{}\" Never say it is running. Call nothing.",
+            undo_line(spoken)
+        )
+    })
+}
+
+/// The `make_skill` call the lamp makes itself to turn the skill `spoken`
+/// off again when its run after a turn on for the ask failed
+/// ([`not_run_still_off`]): as the person's own `turn_off` would, so it goes
+/// through the same checks.
+pub fn off_again(spoken: &str) -> (String, Value) {
+    (made_skill::MAKE.to_owned(), json!({ TURN_OFF: spoken }))
+}
+
+/// The id of the lamp's own [`off_again`] call: an id only, in no chat's
+/// thread.
+pub const OFF_AGAIN_ID: &str = "turned_on_for_ask_off_again";
+
+/// Of the call `name` answered `told`, a failed run of a skill turned on in
+/// this turn for the ask: a `make_skill` run now that names the made skill
+/// `on` the model's own `turn_on` turned on (`made_run::NOT_RAN`), or, with
+/// `function` (the lamp's own turn on for a skill's function), any refusal
+/// of that function. Its why; none for a run, for one still answering off
+/// just after (`JUST_ON`), or for any other call.
+pub fn failed_after_turn_on(
+    on: Option<&str>,
+    function: bool,
+    name: &str,
+    told: &Value,
+) -> Option<String> {
+    let why = told["error"].as_str()?;
+    if why == JUST_ON || ran_turned_off(told) {
+        return None;
+    }
+    let ran_on =
+        on.is_some_and(|on| name == made_skill::MAKE && told[crate::made_run::NOT_RAN] == on);
+    (ran_on || function && !crate::made_run::stopped(told)).then(|| why.to_owned())
+}
+
+/// What the model is told of its call of a skill turned off that the lamp
+/// did not turn on for the ask: the `turn_on`'s answer `on` refused it (a
+/// guest's line, [`NOT_OWNER`], or another why) or found no such skill of
+/// theirs. Said plainly, never that it is on.
+pub fn not_turned_on(on: &Value) -> Value {
+    let why = on["error"].as_str().unwrap_or("it couldn't be turned on");
+    json!({
+        "error": "that skill is turned off, so it did nothing",
+        "not_turned_on": why,
+        "next": format!(
+            "Say only, plainly, in a few words, in the conversation's language, that it is \
+             turned off, so it didn't run, and why it wasn't turned on: {why}. Name no skill. \
+             Never say it is on. Call nothing."
+        )
+    })
+}
+
+/// What the model is told of its call of the skill the lamp turned on and
+/// ran for the ask already (`ran`, what it was told of that run): never
+/// run again.
+pub fn ran_already(ran: &Value) -> Value {
+    json!({
+        "error": "Not run again: it was turned on and run for their ask already.",
+        "ran": ran,
+        "next": "Say only what its result above tells you to say. Call nothing."
+    })
+}
+
+/// Whether the answer `told` to the call `name` with `args` turned a skill
+/// off or back on: a `make_skill` turn that found and turned it.
+pub fn turned(name: &str, args: &Value, told: &Value) -> bool {
+    name == made_skill::MAKE
+        && (args[TURN_OFF].is_string() || args[TURN_ON].is_string())
+        && told["off"].is_boolean()
+        && (told[TURN_OFF].is_string() || told[TURN_ON].is_string())
+}
+
+/// The note of a round asked once more when the model answered with no call
+/// after a `make_skill` turn (`name`, `args`) found no skill by the name and
+/// offered theirs ([`CANDIDATES`] in its answer `told`); none for any other
+/// answer. #7562's row on lamp-9adf, 18 Nov 10:57: "turn off my bitcoin
+/// price skill" offered btc price (on), and the model, with no second call,
+/// said "Bitcoin price is already off" while it was on. A skill is said off
+/// (or back on) only after the turn that turned it; which of the offered,
+/// if any, they meant stays the model's to judge, the candidates named
+/// again.
+pub fn unchosen_note(name: &str, args: &Value, told: &Value) -> Option<String> {
+    if name != made_skill::MAKE {
+        return None;
+    }
+    let off = args[TURN_OFF].is_string();
+    if !off && !args[TURN_ON].is_string() {
+        return None;
+    }
+    let offered: Vec<&str> = told
+        .get(CANDIDATES)?
+        .as_array()?
+        .iter()
+        .filter_map(|offered| offered["name"].as_str())
+        .collect();
+    if offered.is_empty() {
+        return None;
+    }
+    let (call, way, still) = if off {
+        (TURN_OFF, "off", "on")
+    } else {
+        (TURN_ON, "on", "off")
+    };
+    let back = if off { "" } else { " or back on" };
+    Some(format!(
+        "{UNCHOSEN_OPENS} after make_skill's {call} found no skill by that name and offered \
+         theirs in candidates. Nothing was turned {way}: each in candidates is {still} now, \
+         whatever was said before, so never say one is {way}{back} or already {way}. If one of \
+         them is the skill they mean, by its name or what it does, call make_skill now with \
+         {call} and that name alone, saying nothing first. Only if none is, say plainly, in a \
+         few words, that you found no skill they made or added like that, and call nothing. \
+         Candidates: {}.)",
+        offered.join(", ")
+    ))
+}
+
 /// [`asked`] on the lamp, by `make_skill`'s call: the made skills' own
 /// folder (`LAMP_MAKE_SKILL`), the owner's hearing as a run's
 /// (`services::owner_hears`), the manage helper's socket.
@@ -290,6 +758,7 @@ pub fn asked_here(
             off,
             request,
             heard,
+            state: Some(Path::new(crate::skill_about::STATE_DIR)),
         },
         &keeping,
         || crate::services::owner_hears(request, heard, lease),
@@ -320,11 +789,37 @@ mod tests {
             off,
             request: 82,
             heard: true,
+            state: None,
         }
     }
 
     fn owner() -> bool {
         true
+    }
+
+    /// #7874 on c0a4: a made skill named `my-day` is turned off and on by
+    /// voice, never "isn't on the lamp"; `desk-check` asked as "my desk
+    /// check skill" still turns.
+    #[test]
+    fn a_made_skill_named_my_something_turns() {
+        yes::clear_for_test();
+        let (root, keeping) = keeping("turn-my-day");
+        made_here(&keeping, &[("my-day", true), ("desk-check", true)]);
+        for (heard, name) in [
+            ("my day", "my-day"),
+            ("my-day", "my-day"),
+            ("my desk check skill", "desk-check"),
+        ] {
+            for off in [true, false] {
+                let mut helper = Vec::new();
+                let told = asked(ask(heard, off), &keeping, owner, |name, off| {
+                    helper.push((name.to_owned(), off));
+                    Ok(())
+                });
+                assert_eq!(helper, [(name.to_owned(), off)], "{heard}: {told}");
+            }
+        }
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     fn names(keeping: &Keeping) -> Vec<String> {
@@ -383,6 +878,10 @@ mod tests {
         assert_eq!(told["off"], false, "{told}");
         let next = told["next"].as_str().unwrap();
         assert!(next.contains("coffee time is on again"), "{next}");
+        // #7562's request 9: whether the line asked to use it is the
+        // model's to judge, told to call the run now, which says the undo.
+        assert!(next.contains("asked to use or run it"), "{next}");
+        assert!(next.contains("call make_skill now with run"), "{next}");
         assert_eq!(names(&keeping), ["coffee-time", "moon-fact"]);
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -405,7 +904,7 @@ mod tests {
             let mut off: Vec<String> = Vec::new();
             let mut asked = Vec::new();
             for _ in 0..2 {
-                let (stream, _) = listener.accept().unwrap();
+                let stream = crate::make_skill_local::tests::accept_within(&listener);
                 let mut line = String::new();
                 std::io::BufReader::new(&stream)
                     .read_line(&mut line)
@@ -501,6 +1000,384 @@ mod tests {
             told["error"].as_str().unwrap().contains("isn't the one"),
             "{told}"
         );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A `SKILL.md` of the kind added in the owner's app on lamp-9adf, 17
+    /// Nov: an agent skill that reads a web API, `grants = ["speak",
+    /// "net"]`.
+    const BTC: &str = "---\nname: btc-price\ndescription: Says the current Bitcoin price when \
+                       asked.\n---\n\nFetch the current BTC price in US dollars from \
+                       https://api.coinbase.com/v2/prices/spot and say it in one short \
+                       sentence.\n";
+
+    /// `BTC` added from the file as the app's upload adds it (the agent
+    /// skill, `grants = ["speak", "net"]`), and put on: its folder on the
+    /// lamp as installed, and lamp-skills' records' places beside it.
+    fn uploaded_btc(test: &str) -> (PathBuf, Keeping, crate::skill_about::Places) {
+        crate::upload_agent::set_on_here(Some(true));
+        crate::skill_task_yes::set_net_here(Some(true));
+        let (root, keeping) = keeping(test);
+        let place = crate::upload_skill::Place {
+            skills: keeping.installed.clone(),
+            pushed: root.join("pushed"),
+        };
+        std::fs::create_dir_all(&place.skills).unwrap();
+        std::fs::create_dir_all(&place.pushed).unwrap();
+        let made =
+            crate::upload_skill::take(&place, &keeping, None, BTC, 1_800_000_000_000).unwrap();
+        assert_eq!(made.name, "btc-price");
+        assert_eq!(made_skill::entries(&keeping.directory)[0]["added"], "file");
+        let (files, _) = crate::upload_agent::files(BTC).unwrap();
+        assert!(
+            files.toml.contains("kind = \"installable\"") && files.toml.contains("\"net\""),
+            "{}",
+            files.toml
+        );
+        let install = crate::make_skill_local::tests::manage_helper(&keeping.manage);
+        made_skill::put_on(&keeping, &made).unwrap();
+        install.join().unwrap();
+        let folder = keeping.installed.join("btc-price");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(folder.join("skill.toml"), &files.toml).unwrap();
+        std::fs::write(folder.join("SKILL.md"), &files.card).unwrap();
+        std::fs::write(
+            folder.join(".package.json"),
+            json!({"sha256": made.sha256}).to_string(),
+        )
+        .unwrap();
+        crate::skill_task_yes::set_net_here(None);
+        crate::upload_agent::set_on_here(None);
+        let places = crate::skill_about::Places {
+            installed: keeping.installed.clone(),
+            pushed: place.pushed.clone(),
+            state: root.join("state"),
+            tools: root.join("tools"),
+        };
+        std::fs::create_dir_all(&places.state).unwrap();
+        (root, keeping, places)
+    }
+
+    /// The manage helper's off and on, kept in lamp-skills' `off` file at
+    /// `off_file`, a name a line.
+    fn kept_in(off_file: &Path) -> impl Fn(&str, bool) -> Result<(), String> + Copy + '_ {
+        move |name, off| {
+            let mut names: String = std::fs::read_to_string(off_file)
+                .unwrap_or_default()
+                .lines()
+                .filter(|kept| *kept != name)
+                .map(|kept| format!("{kept}\n"))
+                .collect();
+            if off {
+                names.push_str(&format!("{name}\n"));
+            }
+            std::fs::write(off_file, names).map_err(|error| error.to_string())
+        }
+    }
+
+    /// #7594, on lamp-9adf, 17 Nov 23:1x: "Lamp, turn off my btc price
+    /// skill", a skill added from a `SKILL.md` in the app, was answered "I
+    /// can't turn skills off myself, that's done in the app", since the
+    /// function and its `turn_off` told only of a skill they made. With
+    /// the switch on they tell of one they made or added; the uploaded
+    /// skill is turned off through the helper's own off, "is it on?" is
+    /// told off from lamp-skills' `off` file, and it is turned back on, as
+    /// a made skill is.
+    #[test]
+    fn an_uploaded_skill_is_turned_off_told_off_and_turned_back_on() {
+        use crate::skill_about::{self, State};
+        made_skill::set_off_said_here(Some(true));
+        yes::clear_for_test();
+        // The function and its turns tell of a skill they added too.
+        let tool = crate::make_skill_local::tool();
+        assert!(
+            tool.description.contains("one they made or added"),
+            "{}",
+            tool.description
+        );
+        let parameters = tool.parameters.unwrap();
+        for key in [TURN_OFF, TURN_ON] {
+            let said = parameters["properties"][key]["description"]
+                .as_str()
+                .unwrap();
+            assert!(said.contains("a skill they made or added"), "{key}: {said}");
+            assert!(said.contains("from a file"), "{key}: {said}");
+        }
+        let (root, keeping, places) = uploaded_btc("turn-uploaded");
+        let folder = keeping.installed.join("btc-price");
+        let off_file = places.state.join(skill_about::OFF_FILE);
+        let helper = kept_in(&off_file);
+        let state = || {
+            skill_about::skills(&places, 0, false)
+                .unwrap()
+                .into_iter()
+                .find(|skill| skill.name == "btc-price")
+                .unwrap()
+                .state
+        };
+        assert_ne!(state(), State::TurnedOff);
+        // "Lamp, turn off my btc price skill."
+        let told = asked(ask("my btc price skill", true), &keeping, owner, helper);
+        assert_eq!(told[TURN_OFF], "btc-price", "{told}");
+        assert_eq!(told["off"], true, "{told}");
+        assert!(
+            told["next"].as_str().unwrap().contains("btc price is off"),
+            "{told}"
+        );
+        // "Is it on?": off, from the lamp's own records.
+        assert_eq!(state(), State::TurnedOff);
+        // Still added from the file, on the lamp, nothing waiting.
+        assert_eq!(names(&keeping), ["btc-price"]);
+        assert!(folder.is_dir());
+        assert!(!yes::awaited(std::time::Instant::now()));
+        // "Turn my btc price skill back on."
+        let told = asked(ask("btc price", false), &keeping, owner, helper);
+        assert_eq!(told[TURN_ON], "btc-price", "{told}");
+        assert_eq!(told["off"], false, "{told}");
+        assert_ne!(state(), State::TurnedOff);
+        made_skill::set_off_said_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7562's row on lamp-9adf, 18 Nov 01:3x: btc price, added from a
+    /// file, was turned off; "turn my bitcoin price skill back on" found
+    /// nothing near, and the model, told of no other, called it the lamp's
+    /// own skill and said to turn it on in the app. Now the answer offers
+    /// theirs that are turned off, btc price with what it does, to call
+    /// again with in the same turn; it is never told with the lamp's skills
+    /// and "offer to turn on nothing"; the second call turns it on. A turn
+    /// off offers those not turned off.
+    #[test]
+    fn a_turn_on_by_another_name_offers_theirs_turned_off_to_call_again() {
+        use crate::skill_about::{self, State};
+        made_skill::set_off_said_here(Some(true));
+        yes::clear_for_test();
+        let (root, keeping, places) = uploaded_btc("turn-offered");
+        let off_file = places.state.join(skill_about::OFF_FILE);
+        let helper = kept_in(&off_file);
+        let mut off = ask("btc price", true);
+        off.state = Some(&places.state);
+        assert_eq!(asked(off, &keeping, owner, helper)["off"], true);
+        // "Lamp, turn my bitcoin price skill back on."
+        let mut bitcoin = ask("my bitcoin price skill", false);
+        bitcoin.state = Some(&places.state);
+        let told = asked(bitcoin, &keeping, owner, |_, _| panic!("turned"));
+        assert_eq!(told["error"], made_remove::NO_MADE, "{told}");
+        let offered = told[CANDIDATES].as_array().unwrap();
+        assert_eq!(offered.len(), 1, "{told}");
+        assert_eq!(offered[0]["name"], "btc price", "{told}");
+        assert!(
+            offered[0]["does"]
+                .as_str()
+                .unwrap()
+                .to_lowercase()
+                .contains("bitcoin"),
+            "{told}"
+        );
+        let next = told["next"].as_str().unwrap();
+        assert!(
+            next.contains("call make_skill again now with turn_on"),
+            "{next}"
+        );
+        assert!(
+            next.contains("Never say it is the lamp's own skill"),
+            "{next}"
+        );
+        let args = json!({ TURN_ON: "my bitcoin price skill" });
+        assert!(!skill_about::tells_their_skills(&args, &told), "{told}");
+        // The second call, with the name offered, turns it on.
+        let mut again = ask("btc price", false);
+        again.state = Some(&places.state);
+        let told = asked(again, &keeping, owner, helper);
+        assert_eq!(told[TURN_ON], "btc-price", "{told}");
+        let state = skill_about::skills(&places, 0, false)
+            .unwrap()
+            .into_iter()
+            .find(|skill| skill.name == "btc-price")
+            .unwrap()
+            .state;
+        assert_ne!(state, State::TurnedOff);
+        // On now: a turn on by another name offers none of theirs, and
+        // never calls it the lamp's own; a turn off offers it.
+        let mut bitcoin = ask("my bitcoin price skill", false);
+        bitcoin.state = Some(&places.state);
+        let told = asked(bitcoin, &keeping, owner, |_, _| panic!("turned"));
+        assert!(told.get(CANDIDATES).is_none(), "{told}");
+        assert!(
+            told["next"]
+                .as_str()
+                .unwrap()
+                .contains("Never say it is the lamp's own skill"),
+            "{told}"
+        );
+        let mut bitcoin = ask("my bitcoin price skill", true);
+        bitcoin.state = Some(&places.state);
+        let told = asked(bitcoin, &keeping, owner, |_, _| panic!("turned"));
+        assert_eq!(told[CANDIDATES][0]["name"], "btc price", "{told}");
+        assert!(told["next"].as_str().unwrap().contains("with turn_off"));
+        made_skill::set_off_said_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7562's rows on lamp-9adf, 18 Nov: "Lamp, run space facts" while it
+    /// was off was answered "There's no space facts skill on the lamp" with
+    /// no call: told only how many were off, the model knew none by name,
+    /// and space facts, started by its words, has no function of its own.
+    /// In the private room, where every line is the owner's, each of theirs
+    /// that is off is told by its name, marked off, and never said missing;
+    /// one that is on is not listed. Outside it, how many alone, as before.
+    #[test]
+    fn an_off_made_skill_is_told_by_name_and_marked_off_in_the_private_room() {
+        let (root, keeping) = keeping("off-note-named");
+        made_remove::tests::made_here(
+            &keeping,
+            &[
+                ("space-facts", true),
+                ("moon-fact", true),
+                ("good-morning-3", true),
+            ],
+        );
+        let state = root.join("state");
+        std::fs::create_dir_all(&state).unwrap();
+        std::fs::write(
+            state.join(crate::skill_about::OFF_FILE),
+            "space-facts\ngood-morning-3\n",
+        )
+        .unwrap();
+        let named = off_note(&keeping, &state, true).unwrap();
+        for told in [
+            "2 skills they made or added are turned off now",
+            "good morning 3: off",
+            "space facts: off",
+            "never say there is no such skill",
+            "make_skill with run and its name",
+        ] {
+            assert!(named.contains(told), "{told}: {named}");
+        }
+        assert!(!named.contains("moon"), "{named}");
+        let counted = off_note(&keeping, &state, false).unwrap();
+        assert!(
+            counted.contains("2 skills they made or added are turned off now"),
+            "{counted}"
+        );
+        assert!(
+            !counted.contains("space") && !counted.contains("morning"),
+            "{counted}"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7562's row on lamp-9adf, 18 Nov 03:2x: btc price turned off by
+    /// voice, then "turn my bitcoin price skill back on" made no call and
+    /// was answered "Bitcoin price is back on" while it stayed off. While
+    /// one they made or added is off, each heard turn tells the model that
+    /// it is turned back on only by `make_skill`'s `turn_on`, never said on
+    /// without it; how many, never which. The turn-off's own answer says
+    /// so too. None off, or the switch off, or unheard: nothing told.
+    #[test]
+    fn while_one_of_theirs_is_off_back_on_is_told_as_a_turn_on_call() {
+        use crate::skill_about;
+        made_skill::set_off_said_here(Some(true));
+        yes::clear_for_test();
+        let (root, keeping, places) = uploaded_btc("turn-off-note");
+        let off_file = places.state.join(skill_about::OFF_FILE);
+        let helper = kept_in(&off_file);
+        assert_eq!(off_note(&keeping, &places.state, false), None);
+        let mut off = ask("btc price", true);
+        off.state = Some(&places.state);
+        let told = asked(off, &keeping, owner, helper);
+        assert_eq!(told[LATER], BACK_ON_BY_CALL, "{told}");
+        let note = off_note(&keeping, &places.state, false).unwrap();
+        assert!(
+            note.contains("One skill they made or added is turned off"),
+            "{note}"
+        );
+        assert!(
+            note.contains("turned back on by calling make_skill with turn_on"),
+            "{note}"
+        );
+        assert!(
+            note.contains("never say it is on or back on unless"),
+            "{note}"
+        );
+        assert!(!note.contains("btc") && !note.contains("bitcoin"), "{note}");
+        // Unheard, or with the switch off, nothing is told.
+        assert_eq!(off_note_here(86, false), None);
+        made_skill::set_off_said_here(Some(false));
+        assert_eq!(off_note_here(86, true), None);
+        made_skill::set_off_said_here(Some(true));
+        // Back on: nothing told.
+        let mut on = ask("btc price", false);
+        on.state = Some(&places.state);
+        assert_eq!(asked(on, &keeping, owner, helper)["off"], false);
+        assert_eq!(off_note(&keeping, &places.state, false), None);
+        made_skill::set_off_said_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The first builder, 18:41 on 18 Nov (no offer): told one of theirs is
+    /// off, a line that asks to use it calls its function as any skill's;
+    /// the lamp turns it on for the owner's ask, by `make_skill`'s own
+    /// `turn_on` of its said name, and the model says one line with its
+    /// undo, in the conversation's language. A guest's turn on is refused
+    /// and told plainly, never said on.
+    #[test]
+    fn a_turned_off_skill_asked_for_use_is_turned_on_with_an_undo_line() {
+        use crate::skill_about;
+        made_skill::set_off_said_here(Some(true));
+        yes::clear_for_test();
+        let (root, keeping, places) = uploaded_btc("turn-off-use");
+        let off_file = places.state.join(skill_about::OFF_FILE);
+        let helper = kept_in(&off_file);
+        let mut off = ask("btc price", true);
+        off.state = Some(&places.state);
+        asked(off, &keeping, owner, helper);
+        let note = off_note(&keeping, &places.state, false).unwrap();
+        assert!(note.contains("by its function"), "{note}");
+        // #7562's row on lamp-9adf, 18 Nov: a made skill has no function,
+        // and the model's `use_skill` for one turned off runs it too.
+        assert!(note.contains("by use_skill with its name"), "{note}");
+        assert!(note.contains("the lamp turns it on"), "{note}");
+        assert!(!note.contains("Never turn it on"), "{note}");
+        let (name, args) = on_for_ask("btc_price", &json!({}));
+        assert_eq!(name, made_skill::MAKE);
+        assert_eq!(args, json!({ TURN_ON: "btc price" }));
+        let told = turned_on_for_ask("btc price", &json!({"price": "90,000 dollars"}));
+        let next = told["next"].as_str().unwrap();
+        assert!(
+            next.contains("\"Btc price was off, so I turned it on. Say 'turn it off' to undo.\""),
+            "{told}"
+        );
+        assert!(next.contains("conversation's language"), "{told}");
+        assert_eq!(told["ran"]["price"], "90,000 dollars", "{told}");
+        // A guest's: the turn on refused by `asked`, told plainly.
+        let mut on = ask("btc price", false);
+        on.state = Some(&places.state);
+        let refused = asked(on, &keeping, || false, helper);
+        let told = not_turned_on(&refused);
+        assert_eq!(told["not_turned_on"], NOT_OWNER, "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("didn't run") && next.contains("Never say it is on"));
+        assert!(
+            skill_about::turned_off(&places.state)
+                .unwrap()
+                .contains("btc-price")
+        );
+        made_skill::set_off_said_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// At most eight of theirs are offered, newest first.
+    #[test]
+    fn at_most_eight_of_theirs_are_offered() {
+        yes::clear_for_test();
+        let (root, keeping) = keeping("turn-offered-most");
+        let made: Vec<String> = (0..12).map(|at| format!("skill-{at}")).collect();
+        let pairs: Vec<(&str, bool)> = made.iter().map(|name| (name.as_str(), true)).collect();
+        made_here(&keeping, &pairs);
+        let offered = offered(&keeping, true, None);
+        assert_eq!(offered.len(), OFFERED_MOST);
+        assert_eq!(offered[0]["name"], "skill 11");
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -637,6 +1514,65 @@ mod tests {
         made_skill::set_off_said_here(None);
     }
 
+    /// #7562's rows on lamp-9adf, 18 Nov ("Lamp, turn off my space facts
+    /// skill." asked back "Do you want it off?", said a skill started by
+    /// its words had "nothing running to switch off", and asked "Remove
+    /// space facts?"): with the switch on, the function's description and
+    /// its `turn_off` tell that a turn off is `turn_off`, never a remove,
+    /// that one started only by their words is turned off too, and that it
+    /// is done at once with nothing asked first; with every switch on,
+    /// still within the link's bounds.
+    #[test]
+    fn a_turn_off_is_told_at_once_even_for_one_started_by_its_words() {
+        made_skill::set_off_said_here(Some(true));
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_scripts_here(Some(true));
+        crate::skill_task_yes::set_on_here(Some(true));
+        let tool = crate::make_skill_local::tool();
+        for told in ["turn_off at once", "never remove"] {
+            assert!(
+                tool.description.contains(told),
+                "{told}: {}",
+                tool.description
+            );
+        }
+        assert!(
+            tool.description.len() <= 1_024,
+            "{}",
+            tool.description.len()
+        );
+        assert!(!tool.description.contains("yes"), "{}", tool.description);
+        let parameters = tool.parameters.unwrap();
+        assert!(
+            parameters.to_string().len() <= 4_096,
+            "{}",
+            parameters.to_string().len()
+        );
+        let off = parameters["properties"][TURN_OFF]["description"]
+            .as_str()
+            .unwrap();
+        for told in [
+            "only when they say its words",
+            "at once",
+            "Ask nothing first",
+        ] {
+            assert!(off.contains(told), "{told}: {off}");
+        }
+        for told in [
+            "turn_off",
+            "never remove",
+            "only when they say its words",
+            "at once",
+            "ask nothing",
+        ] {
+            assert!(TURN_OFF_AT_ONCE.contains(told), "{told}");
+        }
+        crate::skill_task_yes::set_on_here(None);
+        made_skill::set_scripts_here(None);
+        made_skill::set_writes_here(None);
+        made_skill::set_off_said_here(None);
+    }
+
     /// Remove still waits for its yes (#6960) with the switch on: a remove
     /// asks "Remove moon fact?" and removes nothing until the owner's yes,
     /// and a turn-off of the same skill before it removes nothing.
@@ -733,6 +1669,140 @@ mod tests {
             assert_eq!(told["error"], NOT_ASKED_ALOUD, "{key}: {told}");
         }
         made_skill::set_off_said_here(None);
+    }
+
+    /// `make_skill`'s call `args` answered by the real
+    /// `make_skill_local::answer`, with lamp-skills' folder given, in a turn
+    /// nobody spoke: a run now reaches `made_run::asked_here` and is
+    /// refused there as unheard (`made_run::NOT_ASKED_ALOUD`), a turn
+    /// reaches [`asked_here`] (this module's [`NOT_ASKED_ALOUD`]), so which
+    /// path took the call shows and nothing runs or turns.
+    fn answered_unheard_with_skills(args: Value) -> Value {
+        let call = lamp_gemini::ToolCall {
+            id: "1".into(),
+            name: made_skill::MAKE.into(),
+            args,
+        };
+        let skills = std::env::temp_dir().join("lamp-voice-made-turn-no-skills");
+        crate::make_skill_local::answer(&call, 84, false, None, Some(&skills))
+    }
+
+    /// #7562's row on lamp-9adf, 18 Nov, request 9 ("Lamp, tell me a space
+    /// fact with my space facts skill."): one call that carries a `turn_on`
+    /// and a run now of one skill is the run now (`made_run::asked_here`,
+    /// which turns it on itself), with the switch on or off, never a turn.
+    /// Two skills named (Heron's P3): with the switch on, nothing is done and
+    /// each is asked again as its own call; off, the run now as before.
+    #[test]
+    fn a_turn_on_with_a_run_now_is_the_run_now() {
+        for switch in [true, false] {
+            made_skill::set_off_said_here(Some(switch));
+            for run in ["space facts", "my space facts skill", "space_facts"] {
+                let told = answered_unheard_with_skills(json!({
+                    TURN_ON: "space facts",
+                    crate::made_run::RUN: run
+                }));
+                assert_eq!(
+                    told["error"],
+                    crate::made_run::NOT_ASKED_ALOUD,
+                    "{switch}: {told}"
+                );
+                assert_ne!(told["error"], NOT_ASKED_ALOUD, "{switch}: {told}");
+            }
+            let told = answered_unheard_with_skills(json!({
+                TURN_ON: "space facts",
+                crate::made_run::RUN: "unread mail"
+            }));
+            if switch {
+                assert_eq!(
+                    told,
+                    crate::made_run::two_skills("space facts", "unread mail"),
+                    "{told}"
+                );
+            } else {
+                assert_eq!(told["error"], crate::made_run::NOT_ASKED_ALOUD, "{told}");
+            }
+        }
+        made_skill::set_off_said_here(None);
+    }
+
+    /// The real `make_skill_local::answer` dispatch, the switch on: a run
+    /// now alone is `made_run::asked_here`'s; a turn on or off alone is
+    /// [`asked_here`]'s; switch off, a turn is no request of this module's.
+    #[test]
+    fn make_skill_answer_dispatches_a_run_and_a_turn() {
+        made_skill::set_off_said_here(Some(true));
+        let told = answered_unheard_with_skills(json!({ crate::made_run::RUN: "space facts" }));
+        assert_eq!(told["error"], crate::made_run::NOT_ASKED_ALOUD, "{told}");
+        for key in [TURN_OFF, TURN_ON] {
+            let told = answered_unheard_with_skills(json!({ key: "space facts" }));
+            assert_eq!(told["error"], NOT_ASKED_ALOUD, "{key}: {told}");
+        }
+        made_skill::set_off_said_here(Some(false));
+        for key in [TURN_OFF, TURN_ON] {
+            let told = answered_unheard_with_skills(json!({ key: "space facts" }));
+            assert_ne!(told["error"], NOT_ASKED_ALOUD, "{key}: {told}");
+        }
+        made_skill::set_off_said_here(None);
+    }
+
+    /// Heron's P2 on #7562, for the second route: a failed run after a turn
+    /// on in the turn is known (the model's own `turn_on`, by the run's
+    /// `made_run::NOT_RAN`; the lamp's own for a skill's function, any
+    /// refusal but still off), and the skill turned off again by a
+    /// `make_skill` turn off as the person's own; a run, one still off just
+    /// after, or another skill's refusal is none.
+    #[test]
+    fn a_failed_run_after_a_turn_on_is_known() {
+        let why = "it has nothing to do but at its own moment";
+        let refused = json!({"error": why, crate::made_run::NOT_RAN: "space-facts"});
+        let make = made_skill::MAKE;
+        assert_eq!(
+            failed_after_turn_on(Some("space-facts"), false, make, &refused).as_deref(),
+            Some(why)
+        );
+        assert_eq!(
+            failed_after_turn_on(Some("moon-fact"), false, make, &refused),
+            None
+        );
+        assert_eq!(failed_after_turn_on(None, false, make, &refused), None);
+        let ran = json!({crate::made_run::RUN: "space-facts", "ran": true});
+        assert_eq!(
+            failed_after_turn_on(Some("space-facts"), false, make, &ran),
+            None
+        );
+        assert_eq!(
+            failed_after_turn_on(Some("space-facts"), true, make, &just_on()),
+            None
+        );
+        let function = json!({"error": "I'm still doing that."});
+        assert_eq!(
+            failed_after_turn_on(None, true, "btc_price", &function).as_deref(),
+            Some("I'm still doing that.")
+        );
+        assert_eq!(
+            failed_after_turn_on(None, false, "btc_price", &function),
+            None
+        );
+        let off = json!({"error": FUNCTION_OFF});
+        assert_eq!(failed_after_turn_on(None, true, "btc_price", &off), None);
+        assert_eq!(
+            off_again("space facts"),
+            (make.to_owned(), json!({ TURN_OFF: "space facts" }))
+        );
+        let still = not_run_still_off("space facts", why);
+        let next = still["next"].as_str().unwrap();
+        assert!(
+            next.contains("still off") && !next.contains("undo"),
+            "{next}"
+        );
+        let left = not_run_left_on("space facts", why);
+        assert!(
+            left["next"]
+                .as_str()
+                .unwrap()
+                .contains(&undo_line("space facts"))
+        );
     }
 
     /// Switch on: one call that carries both a turn-off and a remove is

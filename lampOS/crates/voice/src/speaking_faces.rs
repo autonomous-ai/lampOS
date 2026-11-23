@@ -238,6 +238,9 @@ struct Look {
     /// The faces whose mouth read still (`no`), turned to the lamp or not
     /// ([`SpeakingFaces::alone_in_view`]).
     still: Vec<String>,
+    /// The passing ids at least [`NEAR_FACE_HEIGHT`] of the frame tall
+    /// ([`SpeakingFaces::one_near_face`]).
+    near: Vec<String>,
     /// Of those, the ones turned to the lamp (`facing`), for a line the lamp
     /// began itself (#2287's follow-up, [`SpeakingFaces::turned_speakers`]).
     turned: Vec<String>,
@@ -247,11 +250,25 @@ struct Look {
     /// The faces turned to the lamp whose mouth was not read (`unknown`, or
     /// not judged at all) in this look.
     turned_unread: Vec<String>,
+    /// Of those, the ones whose mouth was not judged at all (no `speaking`:
+    /// the eyes' speaking read off), for
+    /// [`SpeakingFaces::turned_never_seen_speaking`].
+    turned_unjudged: Vec<String>,
     /// Of the faces turned to the lamp, the one read speaking, when the eyes
     /// gave its head pitch or gaze: its `pitch` (radians, down positive) and
     /// `looking`, both from that face (`LAMP_EYES_PITCH_GAZE`,
     /// [`SpeakingFaces::turned_pose_between`]); none with two such faces.
     turned_pose: (Option<f32>, Option<bool>),
+    /// The speaker's `pitch` and `looking`, turned to the lamp or not: the
+    /// one face read speaking, or, with none read speaking, the only face in
+    /// view when its mouth was not read still (a head down to a phone may
+    /// leave its mouth unread); none with two speaking faces or several in
+    /// view (#7721, [`SpeakingFaces::speaker_pose_between`]).
+    speaker_pose: (Option<f32>, Option<bool>),
+    /// [`Self::speaker_pose`] is the lone face's, none read speaking: its
+    /// voice not shown to be that face's, so read only when no other voice
+    /// is in the conversation (the Reviewer-lead's HOLD on #7726).
+    speaker_lone: bool,
     /// The eyes' word in this look on which lost id each face follows
     /// (`follows`, #4885): (old, new), bare ids.
     follows: Vec<(String, String)>,
@@ -334,9 +351,20 @@ pub struct SpeakingFaces {
     named: Mutex<Option<(String, String, Instant)>>,
 }
 
+/// The near-face bar: a face at least this share of the frame tall is
+/// near the lamp ([`SpeakingFaces::one_near_face`]), as the eyes' own
+/// (`lamp-eyes` who.rs `NEAR_ENOUGH`).
+pub const NEAR_FACE_HEIGHT: f32 = 0.10;
+
 /// How long [`SpeakingFaces::known_lately`] keeps a pair read from the
 /// known file: a conversation's going on (`thread::GOING_ON_FOR`, 45 s).
 pub const NAMED_FOR: Duration = Duration::from_secs(45);
+
+/// The longest the face last named may go unseen and still be the same
+/// track ([`SpeakingFaces::own_track_alone`]): the eyes' own life of a
+/// passing id once its box is lost (`SAME_WITHIN_US`, 1.5 s, `lamp-eyes`
+/// bus_out.rs).
+pub const OWN_TRACK_GAP: Duration = Duration::from_millis(1500);
 
 impl SpeakingFaces {
     /// One read of the eyes' `humans/faces/tracked`: their frame, by its
@@ -406,6 +434,16 @@ impl SpeakingFaces {
                     .collect()
             })
             .unwrap_or_default();
+        let near = frame
+            .map(|(_, faces)| {
+                faces
+                    .faces
+                    .iter()
+                    .filter(|face| face.ymax - face.ymin >= NEAR_FACE_HEIGHT)
+                    .map(|face| face.id.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
         let still = frame
             .map(|(_, faces)| {
                 faces
@@ -444,6 +482,11 @@ impl SpeakingFaces {
             .filter(|face| !matches!(state(face), Some(SpeakingState::Yes | SpeakingState::No)))
             .map(|face| face.id.clone())
             .collect();
+        let turned_unjudged = turned_faces
+            .iter()
+            .filter(|face| state(face).is_none())
+            .map(|face| face.id.clone())
+            .collect();
         // The pose of the one turned face read speaking, pitch and gaze
         // from that face alone: a bystander turned to the lamp says nothing
         // about the speaker (Seventh's P2 on #7457). None with no such face
@@ -457,6 +500,16 @@ impl SpeakingFaces {
             [face] => (face.pitch, face.looking),
             _ => (None, None),
         };
+        let speaker = match speaking_faces.as_slice() {
+            [face] => Some(*face),
+            [] => frame.and_then(|(_, faces)| match faces.faces.as_slice() {
+                [face] if state(&face) != Some(SpeakingState::No) => Some(face),
+                _ => None,
+            }),
+            _ => None,
+        };
+        let speaker_pose = speaker.map_or((None, None), |face| (face.pitch, face.looking));
+        let speaker_lone = speaking_faces.is_empty();
         let boot = frame
             .map(|((boot, _), _)| boot.to_owned())
             .unwrap_or_default();
@@ -494,10 +547,14 @@ impl SpeakingFaces {
             tracked,
             counted,
             still,
+            near,
             turned,
             turned_silent,
             turned_unread,
+            turned_unjudged,
             turned_pose,
+            speaker_pose,
+            speaker_lone,
             follows,
         });
     }
@@ -657,7 +714,7 @@ impl SpeakingFaces {
     /// left view: in some look from `since` to `to`, and not in the
     /// newest look by `to`. The eyes stop writing the known file
     /// once the face is gone and it is fresh only [`crate::known_faces::FRESH`]
-    /// (3 s), so a line said just after it left, or by it before it left,
+    /// (4 s), so a line said just after it left, or by it before it left,
     /// read at the line's end, named no one (lamp-06c1, 5 Nov, S4: requests
     /// 190 and 191, 3 and 8 s after Olivia's face left; neither carried).
     /// A passing id is one face for as long as it is tracked, so the pair
@@ -824,6 +881,83 @@ impl SpeakingFaces {
                         })
                     })
             })
+    }
+
+    /// The one near face in view at `at` (`boot/f3`): the eyes' newest own
+    /// look from [`IN_VIEW_BEFORE`] before `at` to `at`, with exactly one
+    /// face at least [`NEAR_FACE_HEIGHT`] tall. `None` for no look then, no
+    /// near face, or two (`LAMP_FACE_QUESTION_NOT_ASK`'s reused name,
+    /// `known_faces::reused_name`).
+    pub fn one_near_face(&self, at: Instant) -> Option<String> {
+        let from = at.checked_sub(IN_VIEW_BEFORE).unwrap_or(at);
+        let looks = self.looks.lock().ok()?;
+        let look = looks
+            .kept
+            .iter()
+            .rev()
+            .find(|look| look.at >= from && look.at <= at && !look.boot.is_empty())?;
+        match look.near.as_slice() {
+            [id] => Some(format!("{}/{id}", look.boot)),
+            _ => None,
+        }
+    }
+
+    /// Whether the faces `then` and `now` (`boot/f3`) are one track as of
+    /// `at`: the same passing id, or one the eyes said follows the other
+    /// ([`Looks::links_at`]). A link no longer kept is no track.
+    pub fn same_track(&self, then: &str, now: &str, at: Instant) -> bool {
+        self.looks.lock().is_ok_and(|looks| {
+            let links = looks.links_at(at);
+            one_face(then.to_owned(), &links) == one_face(now.to_owned(), &links)
+        })
+    }
+
+    /// `LAMP_CONVERSATION_CARRIES_OWN_TRACK` (C63(b), lamp-06c1, 18 Nov): the
+    /// face [`Self::known_with_boot`] last named, within [`NAMED_FOR`] of
+    /// `to`, as a person `theirs` accepts, when it is the same unbroken track
+    /// from that naming through the line's end: in the eyes' own looks of the
+    /// same boot, never more than [`OWN_TRACK_GAP`] apart, with no look
+    /// counting a face but it (a look with nobody is no other face), and in
+    /// a look of the line (`from` to `to`). Its id as of `to`, a lost id the
+    /// eyes say a new one follows read as that new one ([`Looks::links_at`]).
+    /// A hand over the owner's face lets the eyes' name go (a print under
+    /// their hold's bar) while their box keeps its id: the face is still
+    /// theirs for the carry, and only for it. Never a name: the known file
+    /// and every other rule read the eyes' own word.
+    pub fn own_track_alone(
+        &self,
+        theirs: impl Fn(&str) -> bool,
+        from: Instant,
+        to: Instant,
+    ) -> Option<String> {
+        let (name, face, read) = self.named.lock().ok()?.clone()?;
+        if !theirs(&name) || to.saturating_duration_since(read) > NAMED_FOR {
+            return None;
+        }
+        let looks = self.looks.lock().ok()?;
+        let links = looks.links_at(to);
+        let track = one_face(face, &links);
+        let start = read.min(from);
+        let mut last_seen = start;
+        let mut in_line = false;
+        for look in looks
+            .kept
+            .iter()
+            .filter(|look| look.at >= start && look.at <= to && !look.boot.is_empty())
+        {
+            let own = |id: &String| one_face(format!("{}/{id}", look.boot), &links) == track;
+            if !look.counted.iter().all(own) {
+                return None;
+            }
+            if look.tracked.iter().any(own) {
+                if look.at.saturating_duration_since(last_seen) > OWN_TRACK_GAP {
+                    return None;
+                }
+                last_seen = look.at;
+                in_line |= look.at >= from;
+            }
+        }
+        (in_line && to.saturating_duration_since(last_seen) <= OWN_TRACK_GAP).then_some(track)
     }
 
     /// Whether the eyes made any look of their own from `from` to `to`,
@@ -1009,6 +1143,53 @@ impl SpeakingFaces {
                 .is_empty()
     }
 
+    /// Whether a face was turned to the lamp from `from` to `to` and none
+    /// turned to it was seen speaking: no turned face read `yes` in any look,
+    /// a face the eyes read still or could not read (`unknown`) both count as
+    /// not speaking (`LAMP_TURNED_FACE_SPEAKS`, #7891: on lamp-74ff on 19 Nov
+    /// "Is it after all?" was let out by a turned face read in 8 looks,
+    /// speaking in 0, unread in 8). As [`Self::turned_not_seen_speaking`],
+    /// and more. A turned face whose mouth the eyes never judged through the
+    /// line (no `speaking` at all, `LAMP_EYES_SPEAKING` off) says nothing, so
+    /// never true while one is there.
+    pub fn turned_never_seen_speaking(&self, from: Instant, to: Instant) -> bool {
+        self.looks.lock().is_ok_and(|looks| {
+            let during = || {
+                looks
+                    .kept
+                    .iter()
+                    .filter(|look| look.at >= from && look.at <= to)
+            };
+            let judged = |id: &String| {
+                during().any(|look| {
+                    look.turned_silent.contains(id)
+                        || look.turned_unread.contains(id) && !look.turned_unjudged.contains(id)
+                })
+            };
+            during().any(|look| !look.turned_silent.is_empty() || !look.turned_unread.is_empty())
+                && !during().any(|look| !look.turned.is_empty())
+                && during().flat_map(|look| &look.turned_unjudged).all(judged)
+        })
+    }
+
+    /// How many looks from `from` to `to` read a face turned to the lamp
+    /// speaking while it faced the lamp: the turned face read `yes`, its
+    /// pitch inside `said_to_me::PITCH_DEG` and not looking away when the
+    /// eyes give them (unknown blocks nothing) (`LAMP_SAID_TO_ME`, #7891).
+    pub fn turned_speaking_facing_looks(&self, from: Instant, to: Instant) -> usize {
+        self.looks.lock().map_or(0, |looks| {
+            looks
+                .kept
+                .iter()
+                .filter(|look| look.at >= from && look.at <= to && !look.turned.is_empty())
+                .filter(|look| {
+                    !crate::said_to_me::outside_pitch(look.turned_pose.0)
+                        && look.turned_pose.1 != Some(false)
+                })
+                .count()
+        })
+    }
+
     /// Whether a face was seen speaking from `from` to `to`: read `yes` in
     /// at least one look, a face turned to the lamp with `turned`
     /// (`LAMP_SAID_TO_ME`, #7442). One `yes` is a face seen speaking, as
@@ -1042,19 +1223,59 @@ impl SpeakingFaces {
         })
     }
 
-    /// The head pitch (radians, down positive) and gaze of the turned face
-    /// read speaking, from `from` to `to`, both from the newest look that
-    /// gave either; `None` when none did, which is unknown (`LAMP_SAID_TO_ME`,
-    /// #7442).
-    pub fn turned_pose_between(&self, from: Instant, to: Instant) -> (Option<f32>, Option<bool>) {
-        self.looks.lock().map_or((None, None), |looks| {
-            looks
-                .kept
-                .iter()
-                .rev()
-                .filter(|look| look.at >= from && look.at <= to)
-                .find(|look| look.turned_pose != (None, None))
-                .map_or((None, None), |look| look.turned_pose)
+    /// The pose of the turned face read speaking over the looks from `from`
+    /// to `to` (each look's [`Look::turned_pose`]), read as
+    /// [`Self::speaker_pose_between`] reads the speaker's: the median pitch
+    /// (radians, down positive), `looking` false when more looks read it
+    /// false than true, and the number of looks that gave either; `None`
+    /// when none did, which is unknown (`LAMP_SAID_TO_ME`, #7442). Over the
+    /// line, not its newest look (#7891: three looks head down to a phone
+    /// and a last one level were read as facing). The eyes' lost marks stay
+    /// a pitch here, outside `said_to_me::PITCH_DEG`, as before.
+    pub fn turned_pose_between(
+        &self,
+        from: Instant,
+        to: Instant,
+    ) -> (Option<f32>, Option<bool>, usize) {
+        self.looks.lock().map_or((None, None, 0), |looks| {
+            pose_over(
+                looks
+                    .kept
+                    .iter()
+                    .filter(|look| look.at >= from && look.at <= to)
+                    .map(|look| look.turned_pose),
+                false,
+            )
+        })
+    }
+
+    /// The speaker's pose over the looks from `from` to `to` (each look's
+    /// speaker as [`Look::speaker_pose`] has it): the median pitch (radians,
+    /// down positive) of the looks that gave one, the eyes' lost marks
+    /// ([`crate::said_to_me::LOST_DEG`]) left out, so most looks down is
+    /// down, and `looking` false when more looks read it false than true;
+    /// `None` when no look gave it, which is unknown (`LAMP_SAID_TO_ME` in a
+    /// conversation's window, #7721); with the number of looks that gave
+    /// either, for the journal. Without `lone`, a look whose pose is only
+    /// the lone face's ([`Look::speaker_lone`]) gives none: another voice
+    /// may be saying the line off camera.
+    pub fn speaker_pose_between(
+        &self,
+        from: Instant,
+        to: Instant,
+        lone: bool,
+    ) -> (Option<f32>, Option<bool>, usize) {
+        self.looks.lock().map_or((None, None, 0), |looks| {
+            // The eyes' lost-marks sentinel is no pitch (#7721).
+            pose_over(
+                looks
+                    .kept
+                    .iter()
+                    .filter(|look| look.at >= from && look.at <= to)
+                    .filter(|look| lone || !look.speaker_lone)
+                    .map(|look| look.speaker_pose),
+                true,
+            )
         })
     }
 
@@ -1540,6 +1761,33 @@ pub fn seen_speaking_note(
             ids.join(", ")
         )),
     }
+}
+
+/// A pose over looks (each `(pitch, looking)`): the median pitch, `looking`
+/// false when more looks read it false than true, and how many looks gave
+/// either; with `drop_lost`, the eyes' lost marks
+/// ([`crate::said_to_me::LOST_DEG`]) are no pitch.
+fn pose_over(
+    poses: impl Iterator<Item = (Option<f32>, Option<bool>)>,
+    drop_lost: bool,
+) -> (Option<f32>, Option<bool>, usize) {
+    let (mut pitches, mut gaze, mut used) = (Vec::new(), Vec::new(), 0);
+    for (pitch, looking) in poses {
+        let pitch = pitch.filter(|pitch| !drop_lost || !crate::said_to_me::lost(*pitch));
+        pitches.extend(pitch);
+        gaze.extend(looking);
+        used += usize::from(pitch.is_some() || looking.is_some());
+    }
+    pitches.sort_by(f32::total_cmp);
+    let half = pitches.len() / 2;
+    let pitch = match pitches.len() {
+        0 => None,
+        n if n % 2 == 1 => Some(pitches[half]),
+        _ => Some((pitches[half - 1] + pitches[half]) / 2.0),
+    };
+    let away = gaze.iter().filter(|looking| !**looking).count();
+    let looking = (!gaze.is_empty()).then_some(away * 2 <= gaze.len());
+    (pitch, looking, used)
 }
 
 #[cfg(test)]
@@ -2610,6 +2858,29 @@ mod tests {
         assert!(!not_seen(&[missed; 4]), "f1 never read");
     }
 
+    /// #7891 (lamp-74ff, request 65, "speaking in 0, unread in 8"): for
+    /// `LAMP_TURNED_FACE_SPEAKS` a turned face the eyes judged and never
+    /// read is not seen speaking, alone or beside a still one; one read
+    /// speaking in any look is; a face whose speaking was never judged at
+    /// all (`LAMP_EYES_SPEAKING` off) says nothing; no turned face, nothing.
+    #[test]
+    fn a_turned_face_never_read_speaking_is_not_seen_speaking() {
+        let never = |looks: &[&[TurnedFace]]| {
+            let (eyes, from, to) = turned_seen(looks);
+            eyes.turned_never_seen_speaking(from, to)
+        };
+        let missed: &[TurnedFace] = &[("f1", Some(Unknown), true)];
+        assert!(never(&[missed; 8]), "request 65");
+        let beside: &[TurnedFace] = &[("f1", Some(No), true), ("f2", Some(Unknown), true)];
+        assert!(never(&[beside; 4]), "beside a still face");
+        let spoke: &[TurnedFace] = &[("f1", Some(Yes), true)];
+        assert!(!never(&[missed, missed, spoke, missed]), "seen speaking");
+        let unjudged: &[TurnedFace] = &[("f1", None, true)];
+        assert!(!never(&[unjudged; 4]), "no speaking read");
+        let away: &[TurnedFace] = &[("f1", Some(Unknown), false)];
+        assert!(!never(&[away; 4]), "nobody turned");
+    }
+
     /// `LAMP_TURNED_SPEAKING` (lamp-4ace, 21 Oct 14:00): the faces turned to
     /// the lamp are all silent only when one read still in half the looks,
     /// none turned to it spoke, and none turned to it went unread.
@@ -2769,11 +3040,13 @@ mod tests {
         );
     }
 
-    /// #7442: the speaking turned face's newest pitch and gaze through the
-    /// line, both from the newest look that gave either; a face not turned
-    /// to the lamp, or none given, is unknown.
+    /// #7442, #7891: the speaking turned face's pitch and gaze over the
+    /// line, the median pitch and most looks' gaze, not the newest look's:
+    /// three looks head down to a phone (40 degrees) and a last one level
+    /// (10) is head down; a face not turned to the lamp, or none given, is
+    /// unknown.
     #[test]
-    fn the_turned_faces_pose_is_its_newest_through_the_line() {
+    fn the_turned_faces_pose_is_read_over_the_line() {
         let eyes = SpeakingFaces::default();
         let from = Instant::now();
         let look = |index: u32, facing: bool, pitch: Option<f32>, looking: Option<bool>| {
@@ -2783,12 +3056,30 @@ mod tests {
             seen.faces[0].looking = looking;
             eyes.look(from + EVERY * index, Some((("b", index.into()), &seen)));
         };
-        look(0, true, Some(0.1), Some(true));
-        look(1, true, Some(0.6), None);
+        look(0, true, Some(0.25), Some(true));
+        look(1, true, Some(0.75), None);
         look(2, false, Some(-0.9), Some(false));
         let to = from + EVERY * 3;
-        assert_eq!(eyes.turned_pose_between(from, to), (Some(0.6), None));
-        assert_eq!(eyes.turned_pose_between(to, to), (None, None));
+        assert_eq!(
+            eyes.turned_pose_between(from, to),
+            (Some(0.5), Some(true), 2)
+        );
+        assert_eq!(eyes.turned_pose_between(to, to), (None, None, 0));
+        let phone = SpeakingFaces::default();
+        let down = |index: u32, degrees: f32| {
+            let mut seen = faces(&[("f1", Yes)]);
+            seen.faces[0].facing = Some(true);
+            seen.faces[0].pitch = Some(degrees.to_radians());
+            phone.look(from + EVERY * index, Some((("b", index.into()), &seen)));
+        };
+        for (index, degrees) in [40.0, 40.0, 40.0, 10.0].into_iter().enumerate() {
+            down(index as u32, degrees);
+        }
+        let (pitch, looking, looks) = phone.turned_pose_between(from, from + EVERY * 4);
+        assert_eq!(
+            (pitch.map(f32::to_degrees), looking, looks),
+            (Some(40.0), None, 4)
+        );
     }
 
     /// Seventh's P2 on #7457: a bystander turned to the lamp, still and
@@ -2808,11 +3099,71 @@ mod tests {
         seen.faces[1].looking = Some(true);
         eyes.look(from, Some((("b", 0), &seen)));
         let to = from + EVERY;
-        assert_eq!(eyes.turned_pose_between(from, to), (Some(0.1), Some(true)));
+        assert_eq!(
+            eyes.turned_pose_between(from, to),
+            (Some(0.1), Some(true), 1)
+        );
         let both = SpeakingFaces::default();
         seen.faces[0].speaking.as_mut().unwrap().state = Yes;
         both.look(from, Some((("b", 0), &seen)));
-        assert_eq!(both.turned_pose_between(from, to), (None, None));
+        assert_eq!(both.turned_pose_between(from, to), (None, None, 0));
+    }
+
+    /// #7721: the speaker's pose over the line, turned to the lamp or not:
+    /// most looks down is down (one level look among them changes nothing),
+    /// most looks away is away; the only face in view, its mouth unread,
+    /// is the speaker; a lone face read still, or no pose, is unknown.
+    #[test]
+    fn the_speakers_pose_is_read_over_the_line() {
+        let eyes = SpeakingFaces::default();
+        let from = Instant::now();
+        let look = |eyes: &SpeakingFaces,
+                    index: u32,
+                    state: SpeakingState,
+                    pitch: f32,
+                    looking: Option<bool>| {
+            let mut seen = faces(&[("f1", state)]);
+            seen.faces[0].facing = Some(false);
+            seen.faces[0].pitch = Some(pitch);
+            seen.faces[0].looking = looking;
+            eyes.look(from + EVERY * index, Some((("b", index.into()), &seen)));
+        };
+        look(&eyes, 0, Yes, 0.7, Some(false));
+        look(&eyes, 1, Yes, 0.8, Some(false));
+        look(&eyes, 2, Yes, 0.0, Some(true));
+        let to = from + EVERY * 3;
+        assert_eq!(
+            eyes.speaker_pose_between(from, to, true),
+            (Some(0.7), Some(false), 3)
+        );
+        assert_eq!(
+            eyes.turned_pose_between(from, to),
+            (None, None, 0),
+            "not turned"
+        );
+        let unread = SpeakingFaces::default();
+        look(&unread, 0, Unknown, 0.7, None);
+        assert_eq!(
+            unread.speaker_pose_between(from, to, true),
+            (Some(0.7), None, 1)
+        );
+        // Another voice in the conversation: the lone face's pose is not read.
+        assert_eq!(
+            unread.speaker_pose_between(from, to, false),
+            (None, None, 0)
+        );
+        assert_eq!(
+            eyes.speaker_pose_between(from, to, false),
+            (Some(0.7), Some(false), 3)
+        );
+        let still = SpeakingFaces::default();
+        look(&still, 0, No, 0.7, Some(false));
+        assert_eq!(still.speaker_pose_between(from, to, true), (None, None, 0));
+        // Lost marks (the eyes' 90 degrees) are no pitch: unread.
+        let lost = SpeakingFaces::default();
+        look(&lost, 0, Yes, std::f32::consts::FRAC_PI_2, None);
+        assert_eq!(lost.speaker_pose_between(from, to, true), (None, None, 0));
+        assert_eq!(eyes.speaker_pose_between(to, to, true), (None, None, 0));
     }
 
     /// #7442: one `yes` in one or two looks is a face seen speaking; a mouth
@@ -3088,6 +3439,48 @@ mod tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
 
+    /// #7146, lamp-52e6 on 15 Nov (row-5485y's u4): at the yes's end the
+    /// known file was 1.13 s old and its face 3.01 s old, the face still in
+    /// view, and the line was taken as another face's. The eyes rewrite both
+    /// once a check, every two seconds and later on a slow look, so the face
+    /// stands as long as the name ([`crate::known_faces::FRESH`]); past it,
+    /// it is nobody's.
+    #[test]
+    fn a_known_face_written_3_01_s_ago_with_the_face_in_view_is_the_known_persons() {
+        let dir =
+            std::env::temp_dir().join(format!("speaking-faces-face-age-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let known = dir.join("known");
+        let eyes = SpeakingFaces::default();
+        let now = Instant::now();
+        let at = |seconds: f32| now - Duration::from_secs_f32(seconds);
+        for (seq, ago) in [(0, 6.0), (1, 3.0), (2, 0.1)] {
+            eyes.look(at(ago), Some((("b", seq), &faces(&[("f1", Yes)]))));
+        }
+        std::fs::write(&known, "Lan\n").unwrap();
+        std::fs::write(known_face_of(&known), "f1\n").unwrap();
+        let aged = |path: &Path, age: Duration| {
+            std::fs::File::options()
+                .write(true)
+                .open(path)
+                .unwrap()
+                .set_modified(SystemTime::now() - age)
+                .unwrap();
+        };
+        aged(&known, Duration::from_millis(1_130));
+        aged(&known_face_of(&known), Duration::from_millis(3_010));
+        let lan = Some(("Lan".to_owned(), "b/f1".to_owned()));
+        assert_eq!(eyes.known_with_boot(&known), lan, "3.01 s old: hers");
+        // Just under the bound, with room for the test's own time.
+        let just_under = crate::known_faces::FRESH - Duration::from_millis(300);
+        aged(&known_face_of(&known), just_under);
+        assert_eq!(eyes.known_with_boot(&known), lan, "just under FRESH: hers");
+        aged(&known_face_of(&known), crate::known_faces::FRESH);
+        assert_eq!(eyes.known_with_boot(&known), None, "at the bound: nobody's");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     /// #3037: the known face's id is compared with its boot. The eyes'
     /// `-face` file holds the bare id, so it takes the boot whose first frame
     /// was read before it was written: a file still fresh from before the
@@ -3354,6 +3747,133 @@ mod tests {
         assert_eq!(
             alone.line_counted(edge, to, (true, false), ids),
             alone.line_counted(edge, to, (false, false), ids)
+        );
+    }
+
+    /// `LAMP_CONVERSATION_CARRIES_OWN_TRACK` (C63(b), lamp-06c1, 18 Nov):
+    /// the face last named as theirs, the eyes no longer naming it (a hand
+    /// over it), is still theirs for the carry while the same unbroken track
+    /// is the only face in view: from its naming through the line's end, in
+    /// a look at least every [`OWN_TRACK_GAP`], no look with another face. A
+    /// second face, another face alone, a gap, a naming of someone else or
+    /// one too old, and nobody named are not.
+    #[test]
+    fn own_track_alone_is_the_named_face_unbroken_and_alone() {
+        let face = |id: &str, follows: Option<&str>| Face {
+            pitch: None,
+            looking: None,
+            id: id.to_owned(),
+            xmin: 0.1,
+            ymin: 0.1,
+            xmax: 0.3,
+            ymax: 0.4,
+            confidence: 1.0,
+            yaw: None,
+            facing: None,
+            speaking: Some(Speaking {
+                state: SpeakingState::No,
+                score: 0.9,
+                from: None,
+            }),
+            follows: follows.map(str::to_owned),
+        };
+        let t0 = Instant::now();
+        let at = |ms: u64| t0 + Duration::from_millis(ms);
+        let a = |name: &str| name == "A";
+        // Named A on `b/f1` at 0, then each look by `in_view` every 500 ms
+        // to 6 s; the line from 4 s to 6 s.
+        let seen = |in_view: &dyn Fn(u64) -> Vec<Face>| {
+            let eyes = SpeakingFaces::default();
+            *eyes.named.lock().unwrap() = Some(("A".to_owned(), "b/f1".to_owned(), at(0)));
+            for (seq, ms) in (0..=6000).step_by(500).enumerate() {
+                eyes.look(
+                    at(ms),
+                    Some((("b", seq as u64), &Faces { faces: in_view(ms) })),
+                );
+            }
+            eyes
+        };
+        let line = |eyes: &SpeakingFaces| eyes.own_track_alone(a, at(4000), at(6000));
+
+        let own = seen(&|_| vec![face("f1", None)]);
+        assert_eq!(line(&own), Some("b/f1".to_owned()), "their own track alone");
+        assert_eq!(
+            own.own_track_alone(|name| name == "B", at(4000), at(6000)),
+            None,
+            "named as someone else"
+        );
+        let two = seen(&|ms| {
+            let mut faces = vec![face("f1", None)];
+            if ms == 5000 {
+                faces.push(face("f2", None));
+            }
+            faces
+        });
+        assert_eq!(line(&two), None, "a second face in one look");
+        let before = seen(&|ms| {
+            let mut faces = vec![face("f1", None)];
+            if ms == 2000 {
+                faces.push(face("f2", None));
+            }
+            faces
+        });
+        assert_eq!(line(&before), None, "a second face since the naming");
+        let other = seen(&|ms| {
+            if ms < 3000 {
+                vec![face("f1", None)]
+            } else {
+                vec![face("f2", None)]
+            }
+        });
+        assert_eq!(line(&other), None, "another face alone, no follow");
+        let gap = seen(&|ms| {
+            if (1000..=3000).contains(&ms) {
+                vec![]
+            } else {
+                vec![face("f1", None)]
+            }
+        });
+        assert_eq!(line(&gap), None, "out of view over 1.5 s");
+        let blink = seen(&|ms| {
+            if ms == 3000 {
+                vec![]
+            } else {
+                vec![face("f1", None)]
+            }
+        });
+        assert_eq!(line(&blink), Some("b/f1".to_owned()), "one empty look");
+        // The eyes say a new id follows the lost one: the same track.
+        let followed = seen(&|ms| {
+            if ms < 3000 {
+                vec![face("f1", None)]
+            } else {
+                vec![face("f3", Some("f1"))]
+            }
+        });
+        assert_eq!(line(&followed), Some("b/f3".to_owned()), "followed");
+        let unnamed = seen(&|_| vec![face("f1", None)]);
+        *unnamed.named.lock().unwrap() = None;
+        assert_eq!(line(&unnamed), None, "nobody named");
+        let old = seen(&|_| vec![face("f1", None)]);
+        assert_eq!(
+            old.own_track_alone(a, at(4000), at(0) + NAMED_FOR + Duration::from_secs(1)),
+            None,
+            "named too long ago"
+        );
+        let restarted = seen(&|_| vec![face("f1", None)]);
+        restarted.look(
+            at(6200),
+            Some((
+                ("c", 0),
+                &Faces {
+                    faces: vec![face("f1", None)],
+                },
+            )),
+        );
+        assert_eq!(
+            restarted.own_track_alone(a, at(4000), at(6200)),
+            None,
+            "the eyes started again: their f1 is someone else"
         );
     }
 }

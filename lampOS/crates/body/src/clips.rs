@@ -25,7 +25,37 @@ pub struct Clip {
     pub frames: &'static [[i16; 5]],
 }
 
+/// A clip cut from its V1 recording (`hal/recordings/`), with all of that
+/// recording at the cut's size and frame time (#8153): energy level 5 plays
+/// all of it in place of the clip (`crate::energy::livelier`). The
+/// whole is never played as it is: it begins at the recording's first frame,
+/// ends at nothing and is not held to the generator's speeds, since only
+/// `LAMP_BODY_ENERGY` plays it, with every step stretched under the servo's.
+#[derive(Clone, Copy, Debug)]
+pub struct Whole {
+    pub cut: &'static Clip,
+    pub whole: &'static Clip,
+    /// The whole's frames the cut was taken from, first and last.
+    pub from: usize,
+    pub to: usize,
+}
+
 impl Clip {
+    /// The most each joint moves in `tick`, at the clip's own pace: its
+    /// largest step from one frame to the next, spread over its frame
+    /// time (#7749: an ease out of it is never faster).
+    pub fn pace(&self, tick: std::time::Duration) -> [f32; 5] {
+        let share = tick.as_secs_f32() * 1_000.0 / f32::from(self.step_ms.max(1));
+        let mut pace = [0.0f32; 5];
+        for pair in self.frames.windows(2) {
+            for (index, most) in pace.iter_mut().enumerate() {
+                let moved = f32::from((pair[1][index] - pair[0][index]).unsigned_abs()) * share;
+                *most = most.max(moved);
+            }
+        }
+        pace
+    }
+
     pub fn duration_us(&self) -> u64 {
         (self.frames.len().saturating_sub(1) as u64) * u64::from(self.step_ms) * 1_000
     }
@@ -53,7 +83,7 @@ impl Clip {
     /// The time from frame `frame` to the next, stretched where any joint
     /// would go faster than `ceiling` counts a second, so that none does;
     /// a step under it keeps its time (V1's stretch, #6893).
-    fn step_within_us(&self, frame: usize, ceiling: f32) -> u64 {
+    pub(crate) fn step_within_us(&self, frame: usize, ceiling: f32) -> u64 {
         let (from, to) = (self.frames[frame], self.frames[frame + 1]);
         let farthest = (0..5)
             .map(|joint| (i32::from(to[joint]) - i32::from(from[joint])).unsigned_abs())

@@ -26,13 +26,24 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { Keyring, Lamp, LampError, SPEAKER_EVENTS, model, schema } from 'lampos';
 import { FakeLamp } from 'lampos/testing';
-import { checked, cleanScratch, cleanScratchNotes, cleanScratchSkill, describe, findControl, findStimulus, logIt } from './controls.js';
+import { limitsOf } from './reach.js';
+import { linked } from './link.js';
+import { checked, cleanScratch, cleanScratchNotes, cleanScratchSkill, describe, findControl, findStimulus, logIt, stopRainbow } from './controls.js';
 import { endHandler, watchParent } from './twin-end.js';
 import { chooseLan, hostOk, newToken, originOk, parseUrl, tokenOk } from './guard.js';
+import { loadReachMap, rangesDeg, restrict, restrictAll } from './reach-guard.js';
 
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));
 const options = parse(process.argv.slice(2));
 const port = Number(options.port ?? 8737);
+// `--reach-map PATH`: the page checks every goal for the arm and the head against this reach map (tools/reach, `query.py --export`;
+// examples/twin/reach-map-4ace.json is one) before it sends it. The page only: the lamp's own limits are unchanged. `--reach-shrink N`
+// takes N counts (default 48: the 3D grid overshot the exact march by 40 at the stand) off each end of what the map allows.
+// `--reach-map A.json,B.json` loads several maps (the first is the one in use; the page can switch, each says what masses it was judged with).
+const reachMaps = options['reach-map'] ? options['reach-map'].split(',').map((path) => ({ map: loadReachMap(path), name: path.split('/').pop().replace(/\.json$/, '') })) : null;
+let reachAt = 0;
+const reachMapNow = () => reachMaps?.[reachAt]?.map ?? null;
+const reachShrink = Number(options['reach-shrink'] ?? 48);
 const token = newToken();
 // `--lan`: the page is served on this computer's network address too (not only 127.0.0.1), still only with the
 // token in the URL. `--stim-dir DIR` (with `--lamp-sim PATH`) is the try-it app: a panel that drives the lamp
@@ -61,7 +72,12 @@ if (!existsSync(glbPath) || readFileSync(glbPath).toString('latin1', 0, 4) !== '
 const NAMES = model.joints.map((joint) => joint.name);
 const DEG_A_COUNT = 360 / 4096;
 
-const { lamp, sim, fakeLamp } = options.fake ? await fakeBody() : real ? { lamp: await Lamp.connect(undefined, { keyring: realKeyring }) } : { lamp: await Lamp.connect() };
+// The one word the page server says of the lamp's connection, to its own terminal and to every page once `tell` exists (below).
+let announce = (text) => console.error(`try-it: ${text}`);
+// A real lamp's connection is kept (link.js): it ends with a reason said, is made again, and what the page listens to is listened to again.
+const { lamp, sim, fakeLamp } = options.fake ? await fakeBody() : real
+  ? { lamp: await linked(() => Lamp.connect(undefined, { keyring: realKeyring }), { say: (text) => announce(text), onUp: () => reconnected(), onEnd: () => process.kill(process.pid, 'SIGTERM') }) }
+  : { lamp: await Lamp.connect() };
 const runFlags = real ? { camera: Boolean(options.camera), microphone: Boolean(options.microphone) } : undefined;
 const realHost = real ? realKeyring.pairing()?.host ?? '' : '';
 const pages = new Set();
@@ -70,6 +86,7 @@ const tell = (message) => {
   for (const page of pages) page.send(text);
 };
 let last = null;
+announce = (text) => { console.error(`try-it: ${text}`); tell({ type: 'said', text }); };
 // `--ring-file PATH`: the virtual desktop lamp's ring (lamp-sim's DIR/ring.json: `on`, `colour`, `level`, 32 `#rrggbb` pixels as drawn
 // at that moment, and the `pattern` while one moves), put in the light's `shows` for what the lamp does not say itself: the twin then
 // draws the ring pixel by pixel, moving. It reads a file beside the lamp, not the lamp's door; it goes with the field it stands in
@@ -83,7 +100,10 @@ const ringShows = () => {
     return { pixels: ring.pixels, ...(typeof ring.on === 'boolean' ? { on: ring.on } : {}), ...(typeof ring.colour === 'string' ? { colour: ring.colour } : {}), ...(Number.isInteger(ring.level) ? { level: ring.level } : {}), ...(typeof ring.pattern === 'string' ? { pattern: ring.pattern } : {}) };
   } catch { return null; /* no ring file yet, or half written: the one colour shows */ }
 };
-const withRing = (state) => {
+// With a reach map, every state carries what the map allows each joint now, for the page to draw beside the sliders.
+const withReach = (state) => (reachMaps ? { ...state, reach: { on: true, virtual: options.fake === true, shrink: reachShrink, name: reachMaps[reachAt].name, label: reachMaps[reachAt].map.label ?? '', choices: reachMaps.map((m) => ({ name: m.name, label: m.map.label ?? m.name })), ranges: rangesDeg(reachMapNow(), state.joints, { shrink: reachShrink }) } } : state);
+const withRing = (state) => withReach(withRingShows(state));
+const withRingShows = (state) => {
   if (!ringFile) return state;
   const ring = ringShows();
   if (!ring) return state;
@@ -115,29 +135,119 @@ if (ringFile) {
     tell({ type: 'state', state: last });
   }, 100).unref();
 }
+// What the body will do with each joint (`get body`'s min_deg / max_deg), read at the start and again when it changes (standing or
+// folded moves the head's reach): the page draws the reach and warns past it, and never blocks (reach.js). A lamp that says none: none.
+let limits = null;
+async function readLimits() {
+  if (!bodyGrant) return;
+  try {
+    const next = limitsOf(await lamp.bodyInfo());
+    if (JSON.stringify(next) === JSON.stringify(limits)) return;
+    limits = next;
+    tell({ type: 'limits', joints: next });
+  } catch { /* an older lamp, or the body not heard from yet: no band, as before */ }
+}
+if (bodyGrant) {
+  readLimits();
+  // The limits are read again every 5 s while a page is open (a new page asks at once, below): nobody is looking with none.
+  setInterval(() => { if (pages.size > 0) readLimits(); }, 5_000).unref();
+}
 console.log(bodyGrant ? `body.state subscribed on ${options.fake ? 'a simulated body' : 'the paired lamp'}` : 'no body grant: the twin draws the lamp at rest and its body rows are drawn off');
 
-// One lease at a time, taken at the first drag and given back 3 s after the last.
+// One lease at a time, taken at the first drag and given back HOLD_MS after the last (the lease is taken for 30 s; the lamp's own pose
+// comes back when it is given back, so a pose set with a slider stays this long). A `let_go` message gives it back at once.
+const HOLD_MS = 25_000;
 let lease = null;
 let letGo = null;
-async function drag(joint, deg) {
-  if (!NAMES.includes(joint) || !Number.isFinite(deg)) return;
+// The page's STOP (`stop_all`): from then on no ask goes to the lamp until a page says `resume`.
+let halted = false;
+// The lamp ended a connection and this one is new: the lamp ended the leases of the old one (docs/control.md), so none is held, and the
+// limits are asked again.
+function reconnected() {
+  clearTimeout(letGo);
+  const heldBefore = lease !== null;
+  lease = null;
+  readLimits();
+  // A STOP's hold is the old connection's lease: with it gone the body is the lamp's again (its arm eases back to the stand), said at once.
+  if (halted && heldBefore) announce('the lamp\'s connection was made again while STOPPED: the hold ended with the old connection, the body is the lamp\'s now');
+}
+async function drag(joint, deg, final = false) {
+  if (halted || !NAMES.includes(joint) || !Number.isFinite(deg)) return;
   try {
     if (!lease) {
       lease = lamp.lease('body');
       await lease.take();
       tell({ type: 'said', text: `holding the body (lease ${lease.id})` });
     }
+    if (halted) return; // a STOP came while the lease was being taken: nothing goes out under it
     clearTimeout(letGo);
-    letGo = setTimeout(release, 3_000);
-    const target = Math.max(-180, Math.min(180, deg));
-    await lamp.joints(lease, 300, { [joint]: Number(target.toFixed(1)) });
-    sim?.aim(joint, deg);
+    letGo = setTimeout(release, HOLD_MS);
+    tell({ type: 'holding', ms: HOLD_MS });
+    let target = Math.max(-180, Math.min(180, deg));
+    if (reachMapNow()) {
+      const checked = restrict(reachMapNow(), lastRaw?.joints, joint, target, { shrink: reachShrink });
+      if (checked.note) tell({ type: 'said', text: `reach map: ${checked.note}` });
+      target = checked.deg;
+    }
+    // The virtual lamp's own arm (and roll) is this page's simulation: the lamp's `joints` op takes only yaw and pitch today.
+    if (options.fake && !['yaw', 'pitch'].includes(joint)) { sim?.aim(joint, target); return; }
+    // The lamp's answer to the move, said to the pages (the body's `done`: reached, `clamped`, or `dropped` with its why): the slider
+    // only asks, and the body may cut or refuse what it asks (roll is held to a count either way on a product lamp). Only the page's
+    // last ask of a drag (`final`, the slider let go) waits for it, so a drag leaves no wait behind per step; a lamp that sends no `done`
+    // is not waited on for more than 6 s.
+    if (halted) return;
+    const mine = (asks[joint] = (asks[joint] ?? 0) + 1);
+    const pending = lamp.joints(lease, 300, { [joint]: Number(target.toFixed(1)) }, { wait: final });
+    sim?.aim(joint, target);
+    const done = await (final ? Promise.race([pending, new Promise((resolve) => setTimeout(resolve, 6_000).unref())]) : pending);
+    if (final && done?.how && mine === asks[joint]) {
+      tell({ type: 'joint_done', joint, how: done.how, why: done.why, clamped: done.clamped === true, ...(typeof done[joint] === 'number' ? { [joint]: done[joint] } : {}) });
+    }
   } catch (error) {
     if (!(error instanceof LampError)) throw error;
     tell({ type: 'said', text: `refused: ${error.code}: ${error.message}` });
     if (error.code === 'no_lease') lease = null;
   }
+}
+const asks = {};
+// STOP, from the page's big button: at once no more asks are sent from this page, the rainbow ends and the client's own actions end
+// (`lamp.stop()`: its light, a hand follow, a say), and the arm and head are HELD where they are now: the body lease is kept (the SDK
+// renews it; the body's own cap is 10 minutes) and one last ask names the present pose of the shoulder, the elbow and the pitch, so the
+// body holds them there instead of finishing the move it was on. Letting the lease go is a second, deliberate press (`give_back`): the
+// body then keeps torque on and eases the arm and head back to the stand (lease.rs `Lease::end`, body.rs `GESTURE_STEP` 21 counts a 20 ms
+// step = up to about 1,050 counts a second at the follower; the servo's own bound is 800 to 1,000 counts a second in the product unit,
+// so up to about 70 to 90 degrees a second, from wherever the arm is). STOP NEVER TAKES THE BODY: it holds only what this page held (the
+// lease it had, or one `lamp.stop()` ended with its own follow, taken again once); a page with no lease of its own ends its sends and
+// actions and leaves the body to the lamp, else a stopped web page would stiffen the lamp for the lease's 10 minutes. Each step is bounded and failures are said, never thrown.
+async function stopAll() {
+  halted = true;
+  clearTimeout(letGo);
+  tell({ type: 'stopped', text: 'STOP: this page sends nothing more to the lamp; holding the arm where it is now…' });
+  const bound = (what, work) => Promise.race([
+    work.then(() => null, (error) => `${what}: ${error?.message ?? error}`),
+    new Promise((resolve) => setTimeout(() => resolve(`${what}: no answer in 3 s`), 3_000).unref()),
+  ]);
+  const problems = (await Promise.all([bound('rainbow', stopRainbow()), bound('lamp.stop', lamp.stop())])).filter(Boolean);
+  let held = 'the body lease is kept but the present pose is not known, so the last ask stands';
+  const here = Object.fromEntries(['shoulder', 'elbow', 'pitch'].map((name) => [name, lastRaw?.joints?.[name]?.deg]).filter(([, deg]) => Number.isFinite(deg)));
+  if (lease && Object.keys(here).length) {
+    const asked = Object.fromEntries(Object.entries(here).map(([name, deg]) => [name, Number(deg.toFixed(1))]));
+    let error = await bound('hold', lamp.joints(lease, 300, asked));
+    // `lamp.stop()` may have ended the lease with the follow it ends: take it again once, so the hold is not lost to that.
+    if (error && /no_lease/.test(error)) {
+      try { lease = lamp.lease('body'); await lease.take(); error = await bound('hold', lamp.joints(lease, 300, asked)); } catch (again) { lease = null; error = `body lease: ${again?.message ?? again}`; }
+    }
+    if (error && lease && asked.pitch !== undefined) { error = await bound('hold', lamp.joints(lease, 300, { pitch: asked.pitch })); if (!error) held = 'only the head is held (the lamp refused the arm\'s hold)'; }
+    if (!error && held.startsWith('the body')) held = `held at ${Object.entries(asked).map(([name, deg]) => `${name} ${deg}`).join(', ')}`;
+    if (error) problems.push(error);
+  } else if (!lease) held = 'this page held no body lease, so the body is left to the lamp';
+  tell({ type: 'stopped', done: true, hold: Boolean(lease), text: `STOPPED (${held}).${problems.length ? ` But: ${problems.join('; ')}.` : ''}${lease ? ' Letting go is a second press: the arm then eases back to its stand at the body\'s own pace, up to about 70 to 90 degrees a second.' : ''}` });
+}
+// The second press: the body lease is given back; the body eases the arm and head back to the stand (not held, not limp).
+async function giveBack() {
+  halted = true;
+  await release();
+  tell({ type: 'stopped', done: true, hold: false, text: 'LET GO: the body is given back; the arm and head are easing back to the stand now.' });
 }
 async function release() {
   // A following the panel started (a row that follows the hand) holds the body lease too: let it go, so every row
@@ -148,6 +258,7 @@ async function release() {
   if (!held) return;
   try {
     await held.release();
+    tell({ type: 'holding', ms: 0 });
     tell({ type: 'said', text: 'the body given back' });
   } catch (error) {
     if (!(error instanceof LampError)) throw error;
@@ -180,6 +291,7 @@ async function press(message, page) {
     if (message.type === 'call') {
       const control = findControl(name);
       if (!control) throw refuse(`no button ${name}`);
+      if (halted && control.id !== 'stop') throw refuse('stopped: press Resume on the red bar first');
       // A row the page draws off (not granted, or without --camera/--microphone on a real lamp) is refused here too, on a raw call;
       // and a row that moves the real lamp waits for this page's yes to "this moves the real lamp".
       const off = describe(mode, { grants: lamp.grants, flags: runFlags }).controls.find((c) => c.id === control.id)?.disabled;
@@ -187,7 +299,7 @@ async function press(message, page) {
       if (real && control.moves && !page?.movesOk) throw refuse('this moves the real lamp: say yes to "this moves the real lamp" on the page first');
       // A picture goes to the page that pressed, as one message to it: not through `tell`, never logged, never kept.
       const show = (jpeg) => page?.send(JSON.stringify({ type: 'picture', id, jpeg: Buffer.from(jpeg).toString('base64') }));
-      const call = await control.run({ lamp, release, listenFor, show, mode, audio: audioTo(page, id) }, checked(control.fields, args, mode));
+      const call = await control.run({ lamp, release, listenFor, show, mode, audio: audioTo(page, id), reach: reachMaps && ((targets) => { const r = restrictAll(reachMapNow(), lastRaw?.joints, targets, { shrink: reachShrink }); for (const note of r.notes) tell({ type: 'said', text: `reach map: ${note}` }); return r.targets; }) }, checked(control.fields, args, mode));
       said(id, call, true, 'taken');
     } else {
       const stimulus = real ? undefined : findStimulus(name);
@@ -241,6 +353,7 @@ const files = {
   '/': ['text/html; charset=utf-8', () => readFileSync(here('./index.html'))],
   '/lamp.glb': ['model/gltf-binary', () => readFileSync(glbPath)],
   '/model.json': ['application/json', () => JSON.stringify(model)],
+  '/reach.js': ['text/javascript; charset=utf-8', () => readFileSync(here('./reach.js'))],
   // `lamp` and `mode` name the checklist's key: the lamp's own id and name from hello, and what this page is driving; `grants`
   // are hello's; each row says if it is `disabled` (describe). `camera`/`microphone` say the picture or the sound may show.
   ...(tryPanel ? { '/try.json': ['application/json', () => JSON.stringify({
@@ -353,9 +466,11 @@ server.on('upgrade', (request, socket, head) => {
 });
 wss.on('connection', (page) => {
   pages.add(page);
+  readLimits();
   // A frame over the cap (or a broken one) closes that page's socket; it must not end the twin.
   page.on('error', () => page.terminate());
   if (last) page.send(JSON.stringify({ type: 'state', state: last }));
+  if (limits) page.send(JSON.stringify({ type: 'limits', joints: limits }));
   page.on('message', (data) => {
     let message;
     try {
@@ -365,28 +480,43 @@ wss.on('connection', (page) => {
     }
     // On a real lamp the sliders move the real body only after the page said yes to "this moves the real lamp", and with the grant.
     if (message.type === 'moves_ok' && real) page.movesOk = true;
-    if (message.type === 'drag' && (!real || (page.movesOk && lamp.grants.includes('body')))) drag(message.joint, Number(message.deg));
+    // The page's choice among the loaded reach maps (which masses the limits are judged with): for every page, the next state carries it.
+    if (message.type === 'reach_map' && reachMaps) {
+      const at = reachMaps.findIndex((m) => m.name === message.name);
+      if (at >= 0 && at !== reachAt) {
+        reachAt = at;
+        tell({ type: 'said', text: `reach map: now ${reachMaps[at].map.label || reachMaps[at].name}` });
+        if (lastRaw) { last = withRing(lastRaw); tell({ type: 'state', state: last }); }
+      }
+    }
+    if (message.type === 'drag' && (!real || (page.movesOk && lamp.grants.includes('body')))) drag(message.joint, Number(message.deg), message.final === true);
     if (message.type === 'let_go') release();
+    if (message.type === 'stop_all') stopAll();
+    if (message.type === 'give_back') giveBack();
+    if (message.type === 'resume' && halted) { halted = false; tell({ type: 'resumed', text: 'resumed: the sliders send again' }); }
     if (message.type === 'camera_on') cameraAskedAt = Date.now();
     if (message.type === 'hear') hearing(page, message);
     if (tryPanel && (message.type === 'call' || message.type === 'stim') && typeof message.name === 'string') press(message, page);
   });
-  page.on('close', () => pages.delete(page));
+  // The endless rainbow goes with the last page: nobody is left to switch it off.
+  page.on('close', () => { pages.delete(page); if (pages.size === 0) stopRainbow().catch(() => {}); });
 });
 // The end of a real run: this run's scratch clip and notes come off the lamp (nothing else is touched), then the connection
 // closes. try.js sends SIGTERM; a second signal ends it at once.
 if (real) {
-  // Five steps, each bounded at 3 s, are 15 s at worst; the limit is that plus 5 s, so a lamp that hangs on every step still ends 0.
+  // Six steps, each bounded at 3 s, are 18 s at worst; the limit is that plus 5 s, so a lamp that hangs on every step still ends 0.
   const STEP_MS = 3000;
-  const STEPS = 5;
+  const STEPS = 6;
   const bounded = (work) => Promise.race([work.catch((error) => console.error(`try: could not clean up on the lamp: ${error?.message ?? error}`)), new Promise((resolve) => setTimeout(resolve, STEP_MS))]);
   const end = endHandler({
     mostMs: STEPS * STEP_MS + 5000,
     exit: (code) => process.exit(code),
     cleanup: async () => {
+      await bounded(stopRainbow());
       await bounded(release());
       await bounded(cleanScratch(lamp));
-      await bounded(cleanScratchNotes(lamp));
+      // Notes are listed only on a pairing that has the grant: without it the lamp answers no_grant, and there is nothing of ours to remove.
+      if (lamp.grants.includes('notes')) await bounded(cleanScratchNotes(lamp));
       await bounded(cleanScratchSkill(lamp));
       await bounded(lamp.close());
     },
@@ -450,7 +580,11 @@ async function fakeBody() {
   await Lamp.pair(fakeLamp.code, fakeLamp.host, { pin: fakeLamp.pin, port: fakeLamp.port, keyring });
   const lamp = await Lamp.connect(undefined, { keyring });
   const at = Object.fromEntries(NAMES.map((name) => [name, 0]));
-  const goal = { ...at, shoulder: 35, elbow: -60 };
+  // `--fake-arm SHOULDER,ELBOW` (degrees from the folded arm) starts the simulated arm there: the stand is about 49.5,46.1.
+  const [armShoulder, armElbow] = (options['fake-arm'] ?? '35,-60').split(',').map(Number);
+  if (![armShoulder, armElbow].every(Number.isFinite)) throw new Error('--fake-arm takes SHOULDER,ELBOW in degrees');
+  Object.assign(at, { shoulder: armShoulder, elbow: armElbow });
+  const goal = { ...at };
   const sim = { aim: (joint, deg) => (goal[joint] = deg) };
   const colours = ['warm', 'orange', 'pink', 'purple', 'blue', 'cyan', 'green', 'yellow'];
   let tick = 0;

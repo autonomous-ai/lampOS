@@ -48,6 +48,13 @@ pub struct AppCheck {
     /// The sequences of refused builds the owner asked to retry (#6266),
     /// heard with the checks that started the round and not yet taken.
     retries: Vec<u64>,
+    /// What vouches for the owner's Update now (#7517, `LAMP_UPDATE_NOW=on`):
+    /// none, a `now` is a plain check.
+    marks: Option<crate::update_now::Marks>,
+    /// An Update now heard and vouched for, not yet told to a round.
+    now_heard: bool,
+    /// Why each `now` heard was taken as a plain check, not yet said.
+    now_plain: Vec<String>,
 }
 
 /// Whether the first update is due, saying what it does (#6284).
@@ -77,6 +84,9 @@ impl AppCheck {
             look: LOOK_EVERY,
             engines: None,
             retries: Vec::new(),
+            marks: None,
+            now_heard: false,
+            now_plain: Vec::new(),
         }
     }
 
@@ -85,6 +95,32 @@ impl AppCheck {
     pub fn with_engines(mut self, asks: crate::engines::Asks) -> Self {
         self.engines = Some(asks);
         self
+    }
+
+    /// The same check, hearing the owner's Update now (#7517) as vouched
+    /// for by `marks`.
+    pub fn with_now(mut self, marks: crate::update_now::Marks) -> Self {
+        self.marks = Some(marks);
+        self
+    }
+
+    /// Whether the owner's Update now, vouched for, was heard since it was
+    /// last told: told once. Each `now` taken as a plain check meanwhile is
+    /// said, with why.
+    pub fn take_now(&mut self, say: &mut dyn FnMut(&str)) -> bool {
+        for why in self.now_plain.drain(..) {
+            say(&format!("an Update now is taken as a plain check: {why}"));
+        }
+        std::mem::take(&mut self.now_heard)
+    }
+
+    /// During a round (#7517): every check said since the last look is
+    /// taken, a plain one dropped as between rounds, and whether an Update
+    /// now was among them, or started the round, is told once.
+    pub fn hear_now(&mut self, say: &mut dyn FnMut(&str)) -> bool {
+        self.waiting();
+        self.retries.clear();
+        self.take_now(say)
     }
 
     /// The same check, looking every `look` instead of [`LOOK_EVERY`].
@@ -101,6 +137,11 @@ impl AppCheck {
     pub fn forget(&mut self, say: &mut dyn FnMut(&str)) {
         self.waiting();
         self.retries.clear();
+        // An Update now said after the round's last look: dropped with it,
+        // as a check is; the app sees the round's end and may tap again.
+        if self.take_now(say) {
+            say("an Update now came as the round ended: dropped, as a check is");
+        }
         if let Some(engines) = &mut self.engines {
             engines.take(Instant::now(), say);
         }
@@ -113,6 +154,13 @@ impl AppCheck {
     pub fn asked(&mut self, now: Instant) -> bool {
         if !self.waiting() {
             return false;
+        }
+        // The owner's Update now (#7517), vouched for once per tap by
+        // lamp-cloud's mark, is not held to the minute: a round that ran out
+        // of quiet a moment ago is the one it is for.
+        if self.now_heard {
+            self.last = Some(now);
+            return true;
         }
         if self
             .last
@@ -153,6 +201,17 @@ impl AppCheck {
             if let Ok(check) = message.parse::<UpdateCheck>() {
                 any = true;
                 self.retries.extend(check.retry);
+                if check.now == Some(true) {
+                    match &mut self.marks {
+                        Some(marks) => match marks.vouched(crate::records::unix_ms()) {
+                            Ok(_) => self.now_heard = true,
+                            Err(why) => self.now_plain.push(why),
+                        },
+                        None => self
+                            .now_plain
+                            .push(format!("{} is not on", crate::update_now::SWITCH)),
+                    }
+                }
             }
         }
         any
@@ -497,14 +556,26 @@ mod tests {
         let mut cloud = cloud(&Bus::new(root.path()).unwrap());
         let mut ears = Waits::default();
         cloud
-            .publish_json(0, &UpdateCheck { retry: Some(7) })
+            .publish_json(
+                0,
+                &UpdateCheck {
+                    retry: Some(7),
+                    now: None,
+                },
+            )
             .unwrap();
         assert!(check.wait(&mut ears, Duration::from_secs(2), &mut |_| {}));
         assert_eq!(check.take_retries(), vec![7]);
         assert!(check.take_retries().is_empty(), "taken once");
         // Within the minute: the check is dropped, and the retry with it.
         cloud
-            .publish_json(0, &UpdateCheck { retry: Some(8) })
+            .publish_json(
+                0,
+                &UpdateCheck {
+                    retry: Some(8),
+                    now: None,
+                },
+            )
             .unwrap();
         assert!(!check.asked(Instant::now()));
         assert!(check.take_retries().is_empty());
@@ -534,7 +605,13 @@ mod tests {
         let mut cloud = cloud(&Bus::new(root.path()).unwrap());
         let mut ears = Waits::default();
         cloud
-            .publish_json(0, &UpdateCheck { retry: Some(12587) })
+            .publish_json(
+                0,
+                &UpdateCheck {
+                    retry: Some(12587),
+                    now: None,
+                },
+            )
             .unwrap();
         let mut due = |_: &mut dyn FnMut(&str)| false;
         let woken = check.wait_or(&mut ears, Duration::from_secs(2), &mut |_| {}, &mut due);

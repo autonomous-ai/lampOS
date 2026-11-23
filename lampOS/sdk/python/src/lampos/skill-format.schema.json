@@ -358,6 +358,43 @@
           "minLength": 1,
           "maxLength": 200,
           "description": "When to call the stop function and when not, in short (#6218): the tools file's when with LAMP_USE_SKILL_SUMMARY on."
+        },
+        "group": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{1,64}$",
+          "description": "In a skill with no [budget] (#7401): the skills under the skills folder that name the same group share the stop function, with no limit of their own. Refused beside a [budget]; a pushed skill shares nothing."
+        },
+        "done": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "how",
+            "for",
+            "about"
+          ],
+          "description": "One more how of the stop function, for this skill alone (c6972988862, A sip of water's just_drank): called with it, the skill starts nothing itself for its for.",
+          "properties": {
+            "how": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,31}$",
+              "description": "None of snooze, off or on (the loader refuses them)."
+            },
+            "for": {
+              "type": "string",
+              "description": "A duration, 1m to 6h."
+            },
+            "about": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          }
+        },
+        "kind": {
+          "type": "string",
+          "pattern": "^[a-z](-?[a-z0-9])*$",
+          "maxLength": 32,
+          "description": "The word a call of a shared stop function names this skill by, beside its name (#6543)."
         }
       }
     },
@@ -944,6 +981,10 @@
                 },
                 "for": {
                   "$ref": "#/$defs/duration"
+                },
+                "still": {
+                  "$ref": "#/$defs/duration",
+                  "description": "Alone, on a trigger with a rise (#7668): again only once the rise has not risen for this long, 1m to 1h. One chance a stretch: a meal, a drinking spell."
                 }
               }
             }
@@ -1081,6 +1122,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "drops_kept": {
+          "description": "When a message of its topic does not hold, every chance the skill's triggers keep for their `wait` is dropped at once and a `rise` forgets the readings before it (#6543, the seen reactions' privacy slide); a chance it holds back is never kept. Only on `voice/privacy`, which lamp-skills then tells on a change instead of subscribing (#7668); with a field's test, without `for` or `unknown`.",
+          "type": "boolean"
         }
       }
     },

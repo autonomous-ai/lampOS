@@ -52,6 +52,15 @@ pub fn on() -> bool {
     std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// Whether `LAMP_NAME_FACE_OR_WORDS` is on
+/// ([`SecondLook::holding_a_faint_wordless_call`], #8136).
+pub fn face_or_words_on() -> bool {
+    std::env::var(crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+}
+
 #[derive(Debug, Default)]
 pub struct SecondLook {
     /// The request in hand that was heard, and when it began.
@@ -79,6 +88,15 @@ pub struct SecondLook {
     /// The name was heard in time for the model to have been told of it
     /// inside the request in hand. One asking is enough.
     told: bool,
+    /// `LAMP_NAME_FACE_OR_WORDS=on` (#8136): a hearing the faint floor
+    /// turned away, in a request with no words, owes nothing
+    /// ([`Self::holding_a_faint_wordless_call`]).
+    faint_held: bool,
+    /// When the newest hearings the faint floor turned away began
+    /// ([`Self::turned_away`]).
+    faint: Vec<u64>,
+    /// Words were heard for the request in hand ([`Self::words_heard`]).
+    worded: bool,
 }
 
 impl SecondLook {
@@ -88,6 +106,32 @@ impl SecondLook {
     pub fn with_the_note(mut self, told_while_speaking: bool) -> Self {
         self.told_while_speaking = told_while_speaking;
         self
+    }
+
+    /// `LAMP_NAME_FACE_OR_WORDS=on` (#8136): a request with no words whose
+    /// hearing the faint floor turned away ([`Self::turned_away`]) owes no
+    /// second look: its note would make the lamp speak, unasked, to a line
+    /// nobody said to it, and open a window for the room's next lines.
+    pub fn holding_a_faint_wordless_call(mut self, on: bool) -> Self {
+        self.faint_held = on;
+        self
+    }
+
+    /// The faint floor turned away speech in the hearing begun at
+    /// `began_us` (`crate::faint_named::FaintNamed::turned_away`). Told
+    /// before [`Self::name_heard`] for the same hearing.
+    pub fn turned_away(&mut self, began_us: u64) {
+        // ponytail: the newest few only; a hearing is said about once a
+        // second, and a request's counts within `BEFORE_US` of its start.
+        if self.faint.len() == MOST_RECENT {
+            self.faint.remove(0);
+        }
+        self.faint.push(began_us);
+    }
+
+    /// Words were heard: the request in hand has some.
+    pub fn words_heard(&mut self) {
+        self.worded |= self.began.is_some();
     }
 
     /// The name began to be heard at `began_us`, with this score.
@@ -129,6 +173,7 @@ impl SecondLook {
             .reduce(|best, next| if next.1 > best.1 { next } else { best });
         self.open = true;
         self.ended = None;
+        self.worded = false;
         // Heard as the request began: the note goes at its opening.
         self.told = self.named.is_some_and(|(_, score)| score >= LEAST_SCORE);
     }
@@ -154,8 +199,15 @@ impl SecondLook {
         self.open = false;
         self.ended = None;
         let told = std::mem::take(&mut self.told) && self.told_while_speaking;
-        let (_, score) = self.named.take()?;
+        let worded = std::mem::take(&mut self.worded);
+        let (began, score) = self.named.take()?;
         if !said_nothing || score < LEAST_SCORE || told {
+            return None;
+        }
+        if self.faint_held && !worded && self.faint.contains(&began) {
+            eprintln!(
+                "lamp-voice: request {turn}: its name was heard (score {score:.2}) where the faint floor turned the line away, and no words came: the lamp says nothing and opens no window (LAMP_NAME_FACE_OR_WORDS, #8136)"
+            );
             return None;
         }
         self.due = Some((turn, now_us));
@@ -379,6 +431,54 @@ mod tests {
         // Someone speaks: dropped, with the session it was for.
         look.request_began(3, 27 * SECOND);
         assert!(look.is_for(3));
+    }
+
+    /// #8136, from #8114's shapes 6 and 7 (lamp-74ff, build 15146, 20 Nov,
+    /// two people talking to each other with their backs to the lamp; the
+    /// journal's fixed lines, no words kept). At 17:32:11 lamp-name heard
+    /// the name at 0.904, the faint floor turned the line away, and speech
+    /// to text gave request 172 no words; its second look was owed, the
+    /// lamp spoke unasked, and that opened the window the room's next
+    /// lines were answered in, one of them cut by the lamp's own line
+    /// (shape 7). With the switch on, such a request owes nothing. Still
+    /// owed: the same hearing in a request with words, a hearing the floor
+    /// let by, and each of them with the switch off. Words of the request
+    /// before are not this one's.
+    #[test]
+    fn a_hearing_the_floor_turned_away_with_no_words_owes_no_second_look() {
+        let heard = 10 * SECOND - 200_000;
+        let owed = |on: bool, turned_away: bool, words: bool| {
+            let mut look = SecondLook::default().holding_a_faint_wordless_call(on);
+            if turned_away {
+                look.turned_away(heard);
+            }
+            look.name_heard(heard, 0.904);
+            look.request_began(172, 10 * SECOND);
+            if words {
+                look.words_heard();
+            }
+            look.speech_ended(172, 12 * SECOND);
+            look.finished(172, true, 16 * SECOND)
+        };
+        assert_eq!(owed(true, true, false), None, "shape 6");
+        assert_eq!(owed(true, true, true), Some(0.904), "with words");
+        assert_eq!(owed(true, false, false), Some(0.904), "let by");
+        for (turned_away, words) in [(true, false), (true, true), (false, false)] {
+            assert_eq!(
+                owed(false, turned_away, words),
+                Some(0.904),
+                "off, {turned_away} {words}"
+            );
+        }
+        let mut look = SecondLook::default().holding_a_faint_wordless_call(true);
+        look.request_began(171, 5 * SECOND);
+        look.words_heard();
+        assert_eq!(look.finished(171, false, 7 * SECOND), None);
+        look.turned_away(heard);
+        look.name_heard(heard, 0.904);
+        look.request_began(172, 10 * SECOND);
+        assert_eq!(look.finished(172, true, 16 * SECOND), None);
+        assert_eq!(look.due(16 * SECOND), None);
     }
 
     /// A turn that ends which is not the one in hand changes nothing.

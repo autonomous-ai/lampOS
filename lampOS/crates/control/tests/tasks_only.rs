@@ -30,6 +30,11 @@ fn free_port() -> u16 {
 
 /// `serve` with only the test's own paths, the switches as given.
 fn serve(dir: &Path, port: u16, door: bool, tasks: bool) -> Child {
+    serve_with(dir, port, door, tasks, false)
+}
+
+/// [`serve`], with the apps' socket too when `apps` (`LAMP_STORE_APPS=on`).
+fn serve_with(dir: &Path, port: u16, door: bool, tasks: bool, apps: bool) -> Child {
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-control"));
     command
         .args([
@@ -55,6 +60,9 @@ fn serve(dir: &Path, port: u16, door: bool, tasks: bool) -> Child {
         .env_remove("LAMP_SKILL_TASKS")
         .env_remove("LAMP_CONTROL_RUN_SOCKET_USER")
         .env_remove("LAMP_CONTROL_LOCAL_AGENT")
+        .env_remove("LAMP_STORE_APPS")
+        .arg("--app-socket")
+        .arg(dir.join("admin/apps.sock"))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped());
@@ -63,6 +71,9 @@ fn serve(dir: &Path, port: u16, door: bool, tasks: bool) -> Child {
     }
     if tasks {
         command.env("LAMP_SKILL_TASKS", "on");
+    }
+    if apps {
+        command.env("LAMP_STORE_APPS", "on");
     }
     command.spawn().unwrap()
 }
@@ -153,4 +164,72 @@ fn both_off_says_so_and_exits_0_with_nothing_served() {
     assert!(out.status.success(), "{out:?}");
     assert!(String::from_utf8_lossy(&out.stderr).contains("nothing listens"));
     assert!(!served);
+}
+
+/// Developer access turned Off (#6401): the change helper removes the drop-in
+/// and RESTARTS lamp-control (it used to stop it). The restarted lamp-control
+/// is the same program without `LAMP_CONTROL=on`: no computer can reach the
+/// lamp (the network port refuses, a connection held before is gone with the
+/// old process, no pairing code is made), while the owner's side, the run
+/// socket and the apps' socket keep serving.
+#[test]
+fn restarted_with_developer_access_off_no_computer_reaches_the_lamp_and_the_owners_side_serves() {
+    let dir = folder("restart-off");
+    let port = free_port();
+    let admin = dir.join("admin/admin.sock");
+    // Developer access on: the door listens, a code can be made, and a
+    // computer's connection is open.
+    let on = serve_with(&dir, port, true, true, true);
+    assert!(wait_for(|| UnixStream::connect(&admin).is_ok()));
+    assert!(wait_for(|| TcpStream::connect(("127.0.0.1", port)).is_ok()));
+    let made = ask(&admin, r#"{"code": {"grants": ["light"]}}"#);
+    assert!(made.contains("\"code\""), "{made}");
+    let mut held = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    held.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    // The helper's restart with the drop-in gone: the old process ends, the
+    // new one starts with the door off.
+    stop(on);
+    let mut byte = [0u8; 1];
+    let gone = std::io::Read::read(&mut held, &mut byte);
+    assert!(
+        matches!(gone, Ok(0) | Err(_)),
+        "a connection held to the old door is dropped: {gone:?}"
+    );
+    let _ = std::fs::remove_file(&admin);
+    let off = serve_with(&dir, port, false, true, true);
+    let up = wait_for(|| UnixStream::connect(&admin).is_ok());
+    let refused = TcpStream::connect(("127.0.0.1", port)).is_err();
+    let clients = if up {
+        ask(&admin, r#"{"clients": true}"#)
+    } else {
+        String::new()
+    };
+    let code = if up {
+        ask(&admin, r#"{"code": {"grants": ["light"]}}"#)
+    } else {
+        String::new()
+    };
+    let mint = if up {
+        ask(
+            &admin,
+            r#"{"mint": {"skill": "photo-booth", "run": "task-1"}}"#,
+        )
+    } else {
+        String::new()
+    };
+    let run_socket = wait_for(|| dir.join("admin/run.sock").exists());
+    let apps_socket = wait_for(|| dir.join("admin/apps.sock").exists());
+    stop(off);
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(up, "the owner's side is served after the restart");
+    assert!(refused, "nothing listens on the network after Off");
+    assert!(clients.contains("\"listening\":false"), "{clients}");
+    assert!(
+        code.contains("developer access is off on this lamp") && !code.contains("\"code\":"),
+        "no pairing code is made with the door off: {code}"
+    );
+    // The owner's side still answers (no yes is kept for this skill: refused in words).
+    assert!(mint.contains("\"error\""), "{mint}");
+    assert!(run_socket, "the run socket is served");
+    assert!(apps_socket, "the apps' socket is served");
 }

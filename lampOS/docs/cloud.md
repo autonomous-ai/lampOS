@@ -130,7 +130,7 @@ against lamp-06c1.
   the same folder (`/var/lib/lampos-cloud/region`, 0644, written whole and
   renamed into place) and the journal says `the backend places the lamp in
   region "CN"`. It is kept across boots and read at start, so only a change
-  is written; the voice reads it (`second-voice.md`), and on a change root's `lamp-region.service` gives a lamp in `CN`, and only it, China's name and time servers (`install.md`, #6256). A failing ping is said once, and
+  is written; the voice reads it (`second-voice.md`), and on a change root's `lamp-region.service` gives a lamp in `CN`, and only it, China's name and time servers (`install.md`, #6256). The reply's `seen_clip` (#7401), `{"every_s": N, "until_unix_s": T}` in whole seconds, the burst period the cloud asks of lamp-seen, is kept the same way as `/var/lib/lampos-cloud/seen-clip.json` (0644, written whole on a change, `ping::SeenClipKept`) and removed when a reply leaves it out; anything not exactly those two whole numbers reads as left out, and the rest of the reply is read as before. The cloud moves `until_unix_s` on with each reply, so while it sends one the file is written again on most pings; the journal says only a new `every_s` (`the backend asks a burst every 30 s (seen_clip)`) or its end (`the backend leaves out seen_clip`). lamp-seen (the same `lampos` user) reads it and holds it to its own range and switch (seen.md, "One burst a minute"). A failing ping is said once, and
   once when it answers again. When the lamp's address moves, the HTTP
   client is made afresh, as V1 drops its idle connections.
 
@@ -159,12 +159,14 @@ lamp says so.
 |---|---|
 | `info` | the identity fields above |
 | `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime, zone and the owner's language (`host.language`, #4473: `en`, `vi`, `ja`, `zh` or `ko` from `/etc/lampOS/setup/language`, always said, `en` with no file or one it doesn't know, so the app tells English from a lamp too old to say). None of it asks the voice: it is answered while `lamp-voice` restarts after a new language, and `mic.get` too, from what the bus kept (`available: false` while the voice is down) |
-| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.seen_more` with the page and `LAMP_SEEN_MORE_DOINGS=on` in lamp-cloud's own unit (#6543), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`/`skills.visibility`, `skills.upload`, `skills.secrets`/`skills.secret_set`/`skills.secret_unset` with `LAMP_SKILL_SECRETS=on` while `lamp-services`' admin socket is there, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `engines.install` and `engines.default` with `LAMP_APP_ENGINES=on` too (#6240, #6492), `system.reboot`, `system.shutdown`, `consent.get`/`consent.set` with `LAMP_APP_CONSENT=on`, `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198, `control.code`/`control.clients`/`control.revoke` with `--control-admin-socket` while lamp-control's admin socket is there, `monitor.set`/`monitor.get`/`monitor.link` with `LAMP_APP_MONITOR=on` and `LAMP_SETTINGS_CHANGE=on`, #5883), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
+| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.seen_more` with the page and `LAMP_SEEN_MORE_DOINGS=on` in lamp-cloud's own unit (#6543), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`/`skills.visibility`, `skills.upload`, `skills.secrets`/`skills.secret_set`/`skills.secret_unset` with `LAMP_SKILL_SECRETS=on` while `lamp-services`' admin socket is there, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `engines.install` and `engines.default` with `LAMP_APP_ENGINES=on` too (#6240, #6492), `system.reboot`, `system.shutdown`, `consent.get`/`consent.set` with `LAMP_APP_CONSENT=on`, `desk_noticing.get`/`desk_noticing.set` with `LAMP_SEEN_ACTIVITY=on` (#6543), `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198, `control.code`/`control.clients`/`control.revoke` with `--control-admin-socket` while lamp-control's admin socket is there, `monitor.set`/`monitor.get`/`monitor.link` with `LAMP_APP_MONITOR=on` and `LAMP_SETTINGS_CHANGE=on`, #5883), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
 | `system.info`'s `developer` | `{"camera": bool, "microphone": bool, "speaker": bool}` while lamp-control's admin socket is there (developer access on), else no field: whether a camera, microphone or speaker stream is usable on this lamp (wired, and for the microphone and the speaker the owner's `--microphone on` and `--speaker on`), asked of lamp-control (`{"features": true}`, "The developer door"). `true` means a stream is allowed, not that one starts now (the ears share their sound on demand). The app offers its grants screen only when the field is there and shows the `microphone` tick disabled while it is `false` (and, once it offers the `speaker` tick, that one while `speaker` is `false`); a lamp-control too old to say reads as all `false`, and one from before the speaker reads `speaker` as `false` (App Only's C, 11 Nov 2026) |
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
+| `system.info`'s `character` | `{"energy_alone": true}` whenever `character.set` is taken (with `character_energy_supported`, #7566): the lamp takes the movement level alone, `{"energy": N}` with no `text`, and keeps the kept words ([chosen-voice.md](chosen-voice.md)). Missing on an older build, so the app keeps its "save the words first" path there |
 | `system.info`'s `onboarding_done_at` | when the lamp's setup walk ended, in Unix ms (#5812): the voice's `onboarding/pending` heartbeat's `done_at_unix_ms`, said whenever it is known, so an app that missed `onboarding.done` opens Skills on its page's open if it hasn't for that `at`. No field while unknown: a walk not ended, a lamp set up before it was dated, or the voice not running ("Setup done, told to the app" below) |
 | `system.info`'s `onboarding_done_supported` | `true` while `LAMP_APP_ONBOARDING_DONE=on` (with a state folder): this lamp will send `onboarding.done`, so the app may wait for it (Mobile's ask on #5824). No field otherwise: an older lamp, or the switch off, never sends it, so the app doesn't wait ("Setup done, told to the app" below) |
 | `system.info`'s `onboarding_step_supported` | `true` with the same switch: this lamp sends `onboarding.step` as each walk step ends (#5979). No field otherwise ("Each setup step, told to the app" below) |
+| `system.info`'s `make_skill_most_chars` and `make_skill_most_bytes` | `2000` and `8000` while `can` names `skills.make`: the most characters of words it takes (#7245, 19 Nov; bytes, 2,000, from 18 Nov), and those in bytes at most, four a letter, for an app that still counts bytes (the app holds its box to at most 2,000 bytes whatever a lamp says). No fields otherwise, so the app holds a lamp that says nothing, an older one, to 480 bytes; past the bound the lamp says "what the skill should do is at most 2000 characters" |
 | `system.info`'s `update_events_supported` | `true` while `LAMP_APP_UPDATE_EVENTS=on` (with a state folder): this lamp sends `update.started` and `update.ended` (#6284). No field otherwise ("An update, told to the app" below) |
 | `system.info`'s `onboarding_page_supported` | `true` with the same switch: this lamp takes `onboarding.page` and sends `onboarding.page_done` (#6076). No field otherwise, so the app keeps its Next ("The app's onboarding pages, done on the lamp" below) |
 | `system.info`'s `onboarding_page_version` | `2` with the same switch (#6366): which `onboarding.page` contract the lamp speaks. 2 is per-tap Add (`added: [id]`, one tap a message, the page done with its first installed skill's line) and the `done` page (#6353). No field means 1, #6076's: picks sent once as Add is left, done at once. A version-2 lamp still ends Add on a 1-era leave: an `added` of no ids or several. The app sends per-tap adds and `done` only when it reads `>= 2` |
@@ -180,6 +182,7 @@ lamp says so.
 | `chat.send` (`{"message", "session_id", "speak"}`) | with `LAMP_MESSAGES=on`: acked with `{"run_id", "session_id"}` and put on `chat/in`; the answer goes out after it as `chat.event`s, in V1's shapes ([messages.md](messages.md)). Refused at once when nothing on the lamp takes texts, and for a photo or a file, which aren't read yet. Without the switch, V1's "not on this lamp" |
 | `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued", "by", "held", "at"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`), how many reports wait, and how the newest choice was made: `by` is `voice` (only ever a stop), `app` or `setup` (`null` for a choice kept before these were), `held` is true for a voice's stop from a line whose answer was held, and `at` is when (as `since`), so the app's row can say "Stopped by voice at 3 pm" (#1880). A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
 | `consent.get` (`{}`), `consent.set` (`{"face_expressions": bool}` or `{"room_sounds": bool}`, exactly one) | with `LAMP_APP_CONSENT=on` (#5500, "The two yeses from the app" below): the owner's face expressions yes and, on a lamp with no privacy slide only (`lamp-cloud`'s own `LAMP_PRIVACY_CONTROLS=no-slide`), the room sounds yes, both off until a yes. `consent.get` reads the files and answers at once, `{"face_expressions": bool}` on a slide lamp, `{"face_expressions": bool, "room_sounds": bool}` on one with none, and `seen_activity` beside them only where `lamp-cloud` has `LAMP_SEEN_ACTIVITY=on` (#6543; elsewhere refused: "seen activity is not on this lamp"). `consent.set` is handed to root's helper, which writes or removes the file and answers at once; `success` carries the same shape as `consent.get`, read after it. Refused at once, before the helper: no key, two keys, a key this lamp lacks (room sounds on a slide lamp: "room sounds is not on this lamp: it has a privacy slide"), a value not `true` or `false`. Listed in `can` only with the switch; without it, V1's "not on this lamp" |
+| `desk_noticing.get` (`{}`), `desk_noticing.set` (`{"allow": bool, "request_id": N}`) | with `LAMP_SEEN_ACTIVITY=on` in `lamp-cloud`'s own unit (#6543, "Desk noticing from the app" below), not behind `LAMP_APP_CONSENT`: the owner's switch for lamp-seen's desk noticing, as mute's. Both answer `{"desk_noticing": {"on": bool, "by": "app"|"voice"|null, "posture": bool}}`, read from `seen-activity.json`; `posture` is `LAMP_SEEN_POSTURE=on` in `lamp-cloud`'s unit, so the app shows the disclosure naming posture. `set` needs `request_id`, the app's send time in Unix milliseconds, and hands `{"desk_noticing": {"allow", "request_id"}}` to root's helper (`"by":"app"`; off removes the file, as the voice's stop does, or with `LAMP_NOTICING_BY_DEFAULT=on` keeps a no, #7767), which keeps a yes only with a `request_id` above the mark kept beside it, and answers with the file after it. `allow` that isn't a JSON bool is `allow must be true or false`; no `request_id`, or one that is no positive integer, `request_id must be the app's send time in Unix milliseconds`; a yes at or below the mark, `this request was sent before the lamp's last change: send a new one`; a yes with a `request_id` more than a day past the lamp's clock, `request_id is more than a day ahead of the lamp's clock: send the app's time in Unix milliseconds`. Listed in `can` only with the switch; without it, V1's "not on this lamp" |
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`, and `pushed` for a skill a paired computer pushed), whether it can be removed or turned off, and what it may use in plain words. Without the switch, V1's "not on this lamp" |
 | `skills.install` (`{"url", "sha256", "name", "version"}`, all but `url` optional) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_STORE=on` and the separate Store public key ("Installing from the Skills Store" below): a Skills Store catalogue entry, passed to root's manage helper, which fetches the package over HTTPS and installs it only when it is signed with the Store's key (never a core skill or a core skill's name; `lamp-cloud` writes and fetches nothing); the reply is `skills.list`'s, read after it. Without the Store switch or a valid key, V1's "not on this lamp" |
 | `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder), on a lamp installed before #2429 only after `lamp-update install` once; the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
@@ -191,7 +194,7 @@ lamp says so.
 | `skills.camera` (`{"name", "allow": bool}`) | with `LAMP_SKILLS_PAGE=on` (#3504's piece C, "The owner's yes to a skill's camera" below): the owner's yes to the skill seeing the camera's picture, given (`allow` true) or taken back, past the app's warning, asked of root's manage helper as off and on are and kept in `lamp-skills`' `camera`; the reply is `skills.list`'s, read after it, with `camera: {name, allowed}`, what was kept for that name, on the lamp or not (#4099). A name that is not a skill's is refused, and `allow` that isn't a JSON bool is `allow must be true or false`. Without the switch, V1's "not on this lamp" |
 | `skills.seen_more` (`{"name", "allow": bool}`) | with `LAMP_SKILLS_PAGE=on` and `LAMP_SEEN_MORE_DOINGS=on` in lamp-cloud's own unit (#6543, "The owner's yes to a skill's seen_more" below): the owner's yes to the skill hearing `humans/doing_more` (when they last looked tired, worked at the desk and at what, or celebrated), given (`allow` true) or taken back, asked of root's manage helper as the camera's is and kept in `lamp-skills`' `seen_more`; the reply is `skills.list`'s, read after it, with `seen_more: {name, allowed}`. A name that is not a skill's is refused, and `allow` that isn't a JSON bool is `allow must be true or false`. Without either switch, V1's "not on this lamp", and `can` doesn't name it |
 | `guard.on`, `guard.off` | with `LAMP_GUARD_FROM_APP=on` (#2562, [guard-mode.md](guard-mode.md)): guard mode turned on or off from the owner's app, handed to `lamp-skills`' call socket (`/run/lampos-skills/call.sock`) as `{"op":"guard","turn":"on"\|"off","deadline_us":...}`, which takes it only with the same switch in its own unit and only from `lamp-cloud`'s unit (by `SO_PEERCRED` and cgroup); `lamp-cloud` turns nothing itself. `deadline_us` is the moment `lamp-cloud` sent the op plus the 2 s it waits (`watch::FROM_APP_WAIT`, shared), on the host's shared monotonic clock (`lamp_ipc::monotonic_us`): that socket answers one connection at a time, so an op read at or past it, behind a voice call, is let go ("guard.on let go: it waited N ms behind another call, past the app's 2 s") and nothing is turned, as the app was told; one with no `deadline_us`, from an older `lamp-cloud`, is let go too. `{"guard": "on"}` or `{"guard": "off"}`, or `lamp-skills`' reason (the privacy switch closed, its mark not showable, paused under the person's light, not installed), or "guard mode can't be reached on the lamp now". The faint mark still shows, and nothing is counted until the ring confirms it. Without the switch, V1's "not on this lamp" |
-| `skills.make`, `skills.made` | with `LAMP_APP_MAKE_SKILL=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit (#2813, "A skill typed in the app" below; on in the product, fourteen-P15), and named in `can` only while lamp-voice's maker answers `ready` (asked every 60 s; the lamp's own model makes it, so the voice says yes at once, and the button can show up to 60 s after lamp-voice starts): `skills.make` (`{"words", "request_id"}`, the words at most 480 bytes) hands the words to `lamp-voice`'s app-make socket (`/run/lampos-app-make/make.sock`), which makes the skill as the voice's own; `{"making": true, "request_id"}`, or why not in plain words. `skills.made` (`{"request_id"}`, or `{}` for the newest) tells what became of the app's own ask: `state` (`making`, `on`, `not_kept` with `why`; `left_off` only for an ask from before #5977, when a kept skill waited for a spoken yes), and once kept its `name`, `description`, `version`, `sha256` and `may_use` (the skills page's rows). Nothing from the app puts a skill on: only a spoken yes at the lamp. Without the switches, V1's "not on this lamp" |
+| `skills.make`, `skills.made` | with `LAMP_APP_MAKE_SKILL=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit (#2813, "A skill typed in the app" below; on in the product, fourteen-P15), and named in `can` only while lamp-voice's maker answers `ready` (asked every 60 s; the lamp's own model makes it, so the voice says yes at once, and the button can show up to 60 s after lamp-voice starts): `skills.make` (`{"words", "request_id"}`, the words at most 2,000 characters, said in `system.info` as `make_skill_most_chars` (and, in bytes at most, `make_skill_most_bytes`)) hands the words to `lamp-voice`'s app-make socket (`/run/lampos-app-make/make.sock`), which makes the skill as the voice's own; `{"making": true, "request_id"}`, or why not in plain words. `skills.made` (`{"request_id"}`, or `{}` for the newest) tells what became of the app's own ask: `state` (`making`, `on`, `not_kept` with `why`; `left_off` only for an ask from before #5977, when a kept skill waited for a spoken yes), and once kept its `name`, `description`, `version`, `sha256` and `may_use` (the skills page's rows). Nothing from the app puts a skill on: only a spoken yes at the lamp. Without the switches, V1's "not on this lamp" |
 | `skills.upload.<upload_id>` (`upload_id` the first 16 lowercase hex of the file's SHA-256; no file inline) | with `LAMP_SKILL_UPLOAD=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit ("A skill added from a file" below); `can` names it `skills.upload`: answered `starting` at once, which keeps the file on the backend; the file is taken from the backend's `get-message` for that kind, checked and handed to `lamp-voice`, and a second reply of the same kind follows once it settles: `success` with `{"state": "on", "upload_id", "added": "file", "uploaded": true, "name", "description", "version", "sha256", "may_use"}` once it is on (at once, with no spoken yes, since #5977), with `"asks_left_out": [{"phrase", "why"}]` too when `lamp-voice` left any of its trigger phrases out of its asks (`LAMP_MADE_SKILL_ASKS`; absent with none), or `failure` with why (a check, or not put on at the lamp). Either deletes the file on the backend; with no reply it is gone after a day. Nothing from the app puts it on |
 | `skills.write` | with `LAMP_SKILL_WRITTEN=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit ("A skill written in the app" below; off), named in `can` on the switch alone, with `skills.made`: `{"name", "when", "instructions", "request_id"}`, a skill the person wrote in their own words, held to the voice's bounds and sent to `lamp-voice`'s app-make socket as `{"written": {...}}`, which keeps it as written, with no model; `{"making": true, "request_id"}`, or why not in plain words. `skills.made` tells what became of it, with `"written": true`. Nothing from the app puts it on: only a spoken yes at the lamp. Without the switches, V1's "not on this lamp" |
 | `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
@@ -200,6 +203,7 @@ lamp says so.
 | `schedule.list` (`{"after_id"?: n}`), `schedule.cancel` (`{"id": n}`) | with `LAMP_APP_SCHEDULE=on` (#2195, "The lamp's timers and reminders" below): the list is a page of at most eight, `{"items": [{"id", "kind": "timer"\|"reminder", "text", "state", "local", "due_unix_ms", "repeat", "snoozed", "late"}], "next_after_id", "complete"}`, each as lamp-schedule keeps it; a cancel is `{"cancelled": true, "id": n}`, the timer or the whole reminder series. A refusal is the reminder client's fixed sentence: no longer active, changed meanwhile (list again), or not confirmed (it may have happened). A bad `after_id` or an `id` that isn't a whole number above 0 is refused before lamp-schedule is asked. Without the switch, V1's "not on this lamp" |
 | `update.status` | with `LAMP_APP_UPDATE=on` (#2194, "The lamp's software update" below): `{"running": {"sequence", "commit"} \| null, "now": "idle"\|"checking"\|"fetching"\|"switching"\|"watching"\|"restoring"\|"unknown", "last": {"outcome", "sequence", "at_unix_ms", "reason"?, "started_at_unix_ms"?} \| null, "stale", "round"?: {"started_at_unix_ms", "step_started_at_unix_ms", "target"?: {"sequence", "commit"}}}`, from lamp-update's kept `update/status`; `round` only while a round runs (#5473, "The round under way" below); `unknown` and nulls before lamp-update has said anything; with lamp-update's `LAMP_HARNESS_AT_ONBOARDING=on`, also `"harness"` ("Harness's install" below); with `LAMP_APP_ENGINES=on` here and in lamp-update, also `"engines": {"hermes": {"state", "version"?, "reason"?, "at_unix_ms"?}, "openclaw": {…}, ENGINE: {…}…, "default"?: ENGINE, "default_chosen_in_app"?: BOOL}`, every other engine the lamp's Harness has too ("The lamp's agents" below; `default` from lamp-tasks, left out when it is not reached, "The lamp's default agent" below). Without the switch, V1's "not on this lamp" |
 | `update.check` (`{}`, or `{"retry": SEQUENCE}` for a refused build, #6266) | with `LAMP_APP_UPDATE=on` (#4153, "Check for update" below): asks `lamp-update serve` for its next round now; a `retry` drops that build's refusal before the round, with the first update after setup on or off (#6800: with it on, the retry was heard and its refusal kept). `update.status`'s object with `"check": "started"`, or `failure` with `a round is running` (`now` is not `idle` or `unknown`), `asked less than a minute ago`, or `lamp-update is not listening for a check`. Without the switch, V1's "not on this lamp" |
+| `update.now` (`{}`) | with `LAMP_UPDATE_NOW=on` and `LAMP_APP_UPDATE=on` (#7517, "Update now" below): the owner's Update now. Between rounds it starts one; a round waiting for its quiet moment (`update.status`'s `round.waiting` `quiet`) is taken over. Either way the switch waits for no quiet moment, only the voice's moment to say so (`round.waiting` `give_way`, at most 10 s). `update.status`'s object with `"check": "started"`, or `failure` with `the lamp is being set up; it updates by itself once setup is done` (the walk under way), `a round is running` (any other moment of a round, or a second tap), `the lamp could not mark the ask; try again`, or `lamp-update is not listening for a check`. Without the switches, V1's "not on this lamp" |
 | `engines.install` (`{"engine": "hermes"}` or `"openclaw"`) | with `LAMP_APP_UPDATE=on` and `LAMP_APP_ENGINES=on` (#6240, "The lamp's agents" below): asks `lamp-update serve` to install a missing agent at its next round. `{"install": "started"}`, or `failure` with `no such agent on this lamp` (lamp-update says no such engine), `the agent is not missing or failed` (its `state` is not `not_installed` or `failed`), `asked less than a minute ago`, `not installable from the app on this build` (an agent this build has no installer for: any but Hermes and OpenClaw), or `lamp-update is not listening for a check`. Without the switches, V1's "not on this lamp" |
 | `engines.default` (`{"engine": "<engine>"}`, any engine Harness reports on the lamp) | with `LAMP_APP_UPDATE=on` and `LAMP_APP_ENGINES=on`, as `engines.install` (#6492, "The lamp's default agent" below): the owner's choice of the lamp's default agent, handed to lamp-tasks (`app_engine_default`). `{"default": "<engine>", "chosen_in_app": true}`, or `failure` with lamp-tasks' code and a `message` the app shows: `engine_unknown` (an empty or missing name, refused here before lamp-tasks is asked, or a name lamp-tasks does not know; "That isn't an agent this lamp knows."), `engine_not_installed` ("That engine isn't installed on the lamp."), `engine_default_unsaved` (lamp-tasks could not keep it), or `unreachable` and other codes ("The lamp could not be reached just now. Try again in a moment."). Without the switches, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
@@ -210,13 +214,14 @@ lamp says so.
 | `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters), `language.set` (`{"language": "en" \| "vi" \| "ja" \| "zh" \| "ko"}`, #4473) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}`, `{"name"}` or `{"language"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
 | `control.set` (`{"on": true}` or `{"on": false}`, exactly that one field) | with `LAMP_SETTINGS_CHANGE=on` (the owner's developer setting, [control.md](control.md) "Running the door"): V1's `starting` at once, then `success` or `failure` with why; anything but one boolean `on` fails at once, "on must be true or false, and the only field". **On** on a lamp that has not had the installer's step (a channel update never makes users) first has the root helper make the agent's group `lamp-agents`, its user `lampagent` and the folder `/run/lampos-agent` from fixed constants (`docs/setup.md`), as the owner's tap; the app can show "Setting up the agent's user…" while it waits; a step that fails is refused in words and nothing is written. On: `success` with `{"on": true}` once root's helper has written lamp-control's drop-in, and the door opens within moments after it (or once an update in progress finishes). Off: the door is closed before `success` (`{"on": false, "closed": true}`; `"closed": false` with a `note` if lamp-control would not stop, the door then possibly open until the lamp next restarts), or `failure`, "an update is installing: try again in a few minutes", with nothing changed. Off with developer access already off: `success` with `{"on": false}`. Without the switch, V1's "not on this lamp" |
 | `control.set_agent` (`{"on": true}` or `{"on": false}`, exactly that one field; **no user is ever named**) | with `LAMP_SETTINGS_CHANGE=on` (the owner's local agent switch, [control.md](control.md) "The local agent"): V1's `starting` at once, then `success` with `{"on": bool}` or `failure` with why; anything but one boolean `on` fails at once, "on must be true or false, and the only field". Root's change helper (`{"local_agent": bool}`, [setup.md](setup.md)) writes or removes lamp-control's second drop-in with fixed text and restarts lamp-control; on is refused with the helper's words while developer access is off ("turn developer access on first: the local agent's socket is the developer door's"). Listed in `system.info`'s `can` with the other settings kinds |
-| `monitor.set` (`{"on": bool}`, exactly that one field), `monitor.get` (`{}`), `monitor.link` (`{"seal_to", "request_id"}`) | with `LAMP_APP_MONITOR=on` beside `LAMP_SETTINGS_CHANGE=on` (the owner's dev monitor, #5883, "The dev monitor" below): `monitor.set` as `control.set`, for lamp-peek: `starting`, then `success` with `{"on": true}` once root's helper wrote lamp-peek's drop-in (the page opens within moments, or once an update finishes), or with `{"on": false, "closed": true}` once lamp-peek has stopped (`"closed": false` with a `note` if it would not stop); `monitor.get` answers `{"on": bool}` at once from the drop-in; `monitor.link` answers a one-time link sealed to the app's key, `{"sealed": {"v", "enc", "ct"}, "until_unix_ms"}`, or why not ("the dev monitor is off on this lamp: turn it on first"). Without the switch, V1's "not on this lamp" |
+| `monitor.set` (`{"on": bool, "request_id"?}`, no other field; its result says the `request_id` back in `data.request_id`, #7432), `monitor.get` (`{}`), `monitor.link` (`{"seal_to", "request_id"}`) | with `LAMP_APP_MONITOR=on` beside `LAMP_SETTINGS_CHANGE=on` (the owner's dev monitor, #5883, "The dev monitor" below): `monitor.set` as `control.set`, for lamp-peek: `starting`, then `success` with `{"on": true}` once root's helper wrote lamp-peek's drop-in (the page opens within moments, or once an update finishes), or with `{"on": false, "closed": true}` once lamp-peek has stopped (`"closed": false` with a `note` if it would not stop); `monitor.get` answers `{"on": bool}` at once from the drop-in, with `since_unix_ms` and `off_at_unix_ms` while on, or `went_off_by_itself_unix_ms` once it turned itself off after its day (#7432); `monitor.link` answers a one-time link sealed to the app's key, `{"sealed": {"v", "enc", "ct"}, "until_unix_ms"}`, or why not ("the dev monitor is off on this lamp: turn it on first"). Without the switch, V1's "not on this lamp" |
 | `owner.place` (`{"lat", "lon", "name", "set_at"}`, `set_at` ISO 8601 UTC), `owner.place.clear` (`{}`) | with `LAMP_OWNER_PLACE=on` beside `LAMP_SETTINGS_CHANGE=on` (#4333, [owner-place.md](owner-place.md), "The owner's place" below): rounded here to about a kilometre and handed to root's helper as the names are; `starting` at once, then `success` with what was kept (`{"name", "lat", "lon", "set_at"}`) or `{"cleared": true}` (also when none was kept), or `failure` with why; a request that doesn't fit fails at once. `name` is an area name (sub-locality and locality from the phone's geocoder), never a street address; `lat`/`lon` is where the lamp stands, set by the person at setup or with Update now, never resent as the phone moves, rounded by the app to 2 decimals. Listed in `can` only with the switch. Without it, `owner.place` gets V1's "not on this lamp", and `owner.place.clear` is still taken, unlisted (#4356) |
 | `voice.set` (`{"provider"?, "voice", "language"?, "speed"?}`, V1's `tts.set` shape), `character.set` (`{"text"}`) | with `LAMP_CHOSEN_VOICE=on` beside `LAMP_SETTINGS_CHANGE=on` (#5394, [chosen-voice.md](chosen-voice.md)): checked here and handed to root's helper as the names are; `starting` at once, then `success` with `{"provider": "elevenlabs", "voice", "speed": 1.0}` or `{"text"}`, or `failure` with why. `provider` absent or `elevenlabs`; `voice` one of the lamp's voices (every name in `lamp-2-tts-catalog`), `""` for the default; `language` and `speed` are taken and left alone. `text` plain, one line, at most 200 characters, `""` clears. Listed in `can` only with the switch; without it, V1's "not on this lamp" |
 | `voice.get` (`{}`) | with the same switch (#5394): answered at once with what the lamp keeps, read from `/etc/lampOS/setup/voice` and `character` as `language` is read, writing nothing: `{"provider": "elevenlabs", "voice", "text"}`, `""` for none kept and for a kept value that does not fit the rules (the default voice, no words, as the voice takes them). Listed in `can` only with the switch; without it, V1's "not on this lamp" |
 | `tts.preview` (`{"text", "provider"?, "voice"?, "language"?, "speed"?}`, V1's shape) | with the same switch (#7485, [chosen-voice.md](chosen-voice.md) "The voice preview"): answered `starting`, then `success` once the lamp has said `text` whole in that voice, or `failure` with why (`the lamp is busy; try again in a moment` while someone talks with it past 15 s, or a second preview while one plays). Nothing is kept. Listed in `can` only with the switch; without it, V1's "not on this lamp" |
 | `connector.set.<code>`, `connector.remove.<code>`, `services.list` | with `LAMP_SERVICES=on` (Queue #4710, "A person's linked services" below, [services.md](services.md)): a service of the person's linked or unlinked, by V1's codes (`gmail`, `gmail-app`, `google_calendar`, `google_drive`, `notion`, `figma-api`, `figma`, `github`, `linear`, `asana`, `ahrefs`, `facebook`, `slack`, `mondaydotcom`, `hubspot`, `amplitude`); a set's data fetched from the backend, never carried. `starting` at once, then `success` with `{"connector", "scopes"}` (a remove `{"connector"}`) or `failure` with why; `services.list` is `{"connected": [{"code", "account", "expired"}]}`. `can` says `services` for the `connector.*` kinds. Without the switch, V1's "not on this lamp" |
-| `control.code` (`{"grants": [...], "seal_to", "request_id"}`), `control.clients` (`{}`), `control.revoke` (`{"client": "c_1"}`), `control.code_cancel` (`{}`), `control.take_back` (`{}` or `{"client": "c_1"}`), `control.set_grants` (`{"client": "c_1", "grants": [...]}`) | with `--control-admin-socket` (#5299, "The developer door" below): a pairing code for a developer computer, sealed to the app's one-time key, as `{"sealed": {"v": 1, "enc", "ct"}, "until_unix_ms", "shown", "pin_said"}`, the lamp saying the start of its pin aloud; the code dropped, `{"dropped"}`; the paired computers as `{"clients": [{"id", "name", "grants", "paired_at_unix_ms"}]}`; a computer revoked, `{"revoked", "saved"}` (with `why` when `saved` is false); the lamp taken back from one computer or every one, `{"taken": N}`, the computers still paired. `failure` with a short reason the app shows as is. Listed in `can` only while lamp-control's admin socket is there. **Who may ask:** only the lamp's own account channel, the same guard as `faces.add_photo` and `guard.on` (`online::commanded`), and that channel is plain too until broker TLS ("Limit" below). Without the option, V1's "not on this lamp" |
+| `apps.install`, `apps.list`, `apps.start`, `apps.stop`, `apps.remove`, `apps.settings.get`, `apps.settings.set` | with `LAMP_STORE_APPS=on` (#7415 piece 4): the apps installed from the Store. `apps.list` is `{"apps": [{"id" (the manifest's name), "title", "version", "state" (`installing`, `removing`, `running`, `stopped`, `stopped_after_failures`), "grants", "net", "logs", "phrases", "triggers", "settings" (the schema), "values", "skills", "panel", "connected"}]}`, from the installed manifest (`current/lamp-skill.json`), the helper's marks, systemd (`systemctl show`, at most 2 s a call, killed past that, so a hung systemd leaves an app as stopped and never stalls the loop) and lamp-control's `app_state`; `{"id"}` of the others; `apps.start`, `apps.stop` and `apps.remove` are refused while an install or remove of the app is under way; `apps.settings.get` says so when lamp-control can't be reached or refuses (it never shows "nothing set"); `apps.remove` records the owner's yes in lamp-control (`app_yes_record`, the installed version and package SHA-256, no grants, `net` and `logs` false) and then asks the helper, which waits until the app's processes are gone; `apps.settings.set` `{"id", "values"}` is checked against the schema by lamp-control, all or nothing, and its refusal (the key and why, as lamp-control says it) goes back to the phone as said, lamp-cloud adding no check of its own. The list's `state` is `installing`, `removing` (the page says "Removing…"), `running`, `stopped` or `stopped_after_failures`. A helper that has not answered in 20 s is not a failure: `apps.install` then answers `success` with `"installing": true` (the staged file stays while the helper may read it, and lamp-cloud's watcher deletes any staged `.tar` or `.part` left more than 10 minutes, the owner's yes window) and `apps.remove` `{"id", "removed": false, "removing": true}`; the list tells the truth, and a helper that never answers is covered by lamp-control's yes expiring at 10 minutes: a fresh install that then never lands is not listed (an app is listed once its folder is there), its `installing` mark clears at the next boot's sweep, and the staged file is gone by the watcher's cleanup; the owner installs again. There is no cancel op. `apps.install` `{"id", "url", "sha256", "version"}` (an optional `request_id` said back; nothing else) is taken `starting` at once, one at a time: the Store URL checked as `skills.install`'s, the package fetched here into the staging folder (`/var/lib/lampos-apps-staging/<sha256>.tar`, at most 18 MiB, no redirect), its SHA-256 and its manifest's name and version held to what was asked, the owner's yes recorded in lamp-control for it (the key carries the `net` and `logs` the helper's record holds, like grants: an install what it turns on, an update only the grants, `net` and `logs` it newly asks, so an update turning the internet on is never a yes to "no new grants"), the helper asked to install the staged file by its path, the staged file deleted either way (an install that breaks off unexpectedly still answers `failure` and frees its place); then `success` with `{"id", "version", "updated"}` or `failure` with why. Pushes while it runs: `app.stopped` `{"id", "reason"}` once when an app gives up after its restart limit, and `app.panel` `{"id"}` when its panel moved (at most a minute apart per app); the first look after a start says nothing of what was already so. `can` says `apps` and each kind. **Who may ask:** only the lamp's own account channel (`online::commanded`), the owner's; no kind reads a person from the payload. `failure` carries the reason as the helper or lamp-control gave it, in plain words. Without the switch, V1's "not on this lamp" |
+| `control.code` (`{"grants": [...], "seal_to", "request_id", "say_pin"}`, `say_pin` optional, false when absent), `control.clients` (`{}`), `control.revoke` (`{"client": "c_1"}`), `control.code_cancel` (`{}`), `control.take_back` (`{}` or `{"client": "c_1"}`), `control.set_grants` (`{"client": "c_1", "grants": [...]}`) | with `--control-admin-socket` (#5299, "The developer door" below): a pairing code for a developer computer, sealed to the app's one-time key, as `{"sealed": {"v": 1, "enc", "ct"}, "until_unix_ms", "shown", "pin_said"}`, the lamp saying the start of its pin aloud; the code dropped, `{"dropped"}`; the paired computers as `{"clients": [{"id", "name", "grants", "paired_at_unix_ms"}]}`; a computer revoked, `{"revoked", "saved"}` (with `why` when `saved` is false); the lamp taken back from one computer or every one, `{"taken": N}`, the computers still paired. `failure` with a short reason the app shows as is. Listed in `can` only while lamp-control's admin socket is there. **Who may ask:** only the lamp's own account channel, the same guard as `faces.add_photo` and `guard.on` (`online::commanded`), and that channel is plain too until broker TLS ("Limit" below). Without the option, V1's "not on this lamp" |
 | anything else (`add_channel`, the other `skills.*`, the other `face.*`, `tts.*`, the other `led.*`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
 
 ### News for the phone, unasked (`messages/out`)
@@ -259,8 +264,10 @@ lamp's owner owns the device; the lamp holds no token. `lamp-cloud` takes the
 asks from the voice's `devices/ask` and puts the replies on `devices/answer`
 and the news on `devices/event` ([msgs.md](msgs.md), "The devices contract"):
 only a device the last list gave is asked about, a `stop` goes first and
-cancels commands still waiting, an ask not answered in 8 s is answered
-`timeout`, and none is kept for a reconnect (`crates/cloud/src/devices.rs`).
+cancels commands still waiting (it has its own limit of 60 a minute, apart from
+the 20 of the others), an ask not answered in 8 s is answered `timeout`, one the
+MQTT client would not take (its queue full) is answered `busy` at once, and
+none is kept for a reconnect (`crates/cloud/src/devices.rs`).
 
 ### The light: V1's colours on this lamp's
 
@@ -755,6 +762,67 @@ look starts none, and the app sees it on `update.status` (`now` stays
 `the_software_update_is_answered_from_lamp_updates_status`, and
 `lamp-update`'s `app_check` tests.
 
+### Update now (#7517, `update.now`, `LAMP_UPDATE_NOW`)
+
+With `LAMP_UPDATE_NOW=on` here and in `lamp-update` (and `LAMP_APP_UPDATE=on`;
+all three on in the product, `lamp-update` taking its switch from the carried
+`/etc/lampOS/update.env`),
+the app's Update now takes a build that waits for a quiet moment at once.
+
+- **Who may ask.** Only the lamp's own account channel, as every kind
+  (`online::commanded`: the whole `fa_channel` topic, which only the lamp's
+  signed-in account may publish to). The bus keeps no list of who may say
+  `update/check`, so lamp-cloud first writes its mark,
+  `{"at_unix_ms": <ms>}`, to `/var/lib/lampos-cloud/update-now`
+  (`lamp_msgs::UPDATE_NOW_FILE`, 0600, in its own 0700 state folder, which no
+  other part's unit may write), then says `update/check` with `"now": true`.
+  `lamp-update` takes `now` only with that mark beside it: a plain file in a
+  folder only its owner may write, at most 5 s old
+  (`UpdateCheck::NOW_WITHIN`), each mark once (`update_now::Marks`). Any
+  other `now` is a plain check, said in its journal with why.
+- **When.** Never during the setup walk (`onboarding/pending`'s `walk`):
+  the first update already runs before it (#6284), and the walk would be cut
+  mid-step. Between rounds it starts one, not held to the check's minute; a
+  round waiting for its quiet moment is taken over at its next look (once a
+  second). A second tap, or any other moment of a round, is
+  `a round is running`.
+- **What the round does.** Everything as any round (the lock, the signature
+  and refusals, the room on the disk, the reset and boot holds, the minute's
+  watch and its put-back), but no quiet moment: it gives the voice up to
+  10 s for 3 s of quiet (`round.waiting` `give_way`), then switches, quiet
+  or not. With someone near, the voice ends its own reply and says once, in
+  the owner's language, "I'm updating now. I'll be back in a minute." (vi
+  "Mình cập nhật phần mềm nhé, một phút nữa mình quay lại."); a line heard
+  meanwhile is answered with the same words and no chat. Nobody near, or
+  the lamp asleep or muted: nothing is said, and it switches as soon as the
+  voice is quiet (at once when muted).
+- **What the app reads.** `update.status`'s `round` gains `waiting`
+  (`quiet` while it waits for a quiet moment with the build installed
+  beside, `give_way` during the voice's moment, absent otherwise) and
+  `asked` (`now` for a round Update now asked for or took over). A wait for
+  quiet that ran out (an hour) ends `not-quiet` with `reason` `switching`,
+  its build still installed beside; Update now then starts a round that
+  switches at once. `update.started` and `update.ended` carry
+  `"asked": "now"` for such a round, from when it is seen. A put-back is
+  `update.ended`'s `rolled-back`, `build` the build it went back to.
+- **What survives.** Only the parts the build changes restart. Timers and
+  reminders are lamp-actions' on disk: one due while the parts restart is
+  kept pending and said when the voice is back, marked late, never dropped
+  (that is only 10 min past due, `TIMER_TOO_LATE_MS`; test
+  `a_timer_due_while_an_update_restarts_the_lamp_is_kept_and_said_late_after`).
+
+Tests: lamp-cloud's
+`the_owners_update_now_is_marked_and_asked_once_and_never_during_the_walk`,
+`update_now_starts_a_round_or_takes_over_a_wait_for_quiet_and_nothing_else`,
+`the_update_now_mark_is_written_whole_and_for_its_owner_alone` and
+`an_update_now_round_says_so_in_its_events`; lamp-update's
+`update_now::tests` (`a_now_check_counts_only_within_five_seconds_of_lamp_clouds_mark_and_once`,
+`a_bare_now_from_anywhere_else_is_a_plain_check`) and the round's
+`update_now_takes_over_a_wait_for_quiet_and_switches_within_ten_seconds_while_someone_talks`,
+`update_now_from_the_start_waits_only_for_the_voices_moment` and
+`without_update_now_a_talking_room_is_still_waited_for`; lamp-voice's
+`coordinator::give_way::tests`.
+
 ### The lamp's agents (#6240, `engines`)
 
 With `LAMP_APP_ENGINES=on` (exactly; set in the product units since #6240) in lamp-update's own unit, the
@@ -953,7 +1021,12 @@ said yes to reads `left_off`. `lamp-cloud` passes the state through as the
 voice tells it.
 
 - **`skills.make`** (`{"words", "request_id"}`): the words, trimmed, 1 to
-  480 bytes, and a request id, are sent to `lamp-voice`'s app-make socket
+  2,000 characters (`make_skill::MOST_WORDS_CHARS`, lamp-voice's own
+  `made_skill::MOST_REQUEST_CHARS`; bytes before #7245: 480 from 6 Nov,
+  180 before, 2,000 from 18 Nov, when a Vietnamese request was still cut at
+  160 to 240 letters; characters from 19 Nov, so Vietnamese is as long as
+  English),
+  and a request id, are sent to `lamp-voice`'s app-make socket
   (`/run/lampos-app-make/make.sock`, in `ReadWritePaths` as
   `-/run/lampos-app-make`) as `{"make": {"words", "request_id"}}`. The voice
   answers at once and makes the skill after, on its own thread, from its
@@ -1022,9 +1095,11 @@ first builder (3 Nov, 14:33). No computer and no model: `can` names
   ends and held here exactly as the voice holds it (`make_skill::written`,
   equal to `lamp_voice::made_skill::Written::new` by a test): the name a
   lowercase letter, then lowercase letters, digits and `-`, at most 40
-  bytes; `when` ("when I say study mode") one line of at most 200 bytes;
-  the instructions plain text, new lines and tabs only, at most 2,000
-  bytes; and a request id as for `skills.make`. Anything else is refused in
+  bytes; `when` ("when I say study mode") one line of at most 200
+  characters; the instructions plain text, new lines and tabs only, at
+  most 2,000 characters (both bytes before #7245; lamp-voice alone also
+  holds the two, as its call answer, to 3,700 bytes, and its refusal is
+  passed to the app as it is); and a request id as for `skills.make`. Anything else is refused in
   the voice's plain words before the voice is asked. Then one line to the
   same socket, `{"written": {"name", "when", "instructions",
   "request_id"}}`; the voice answers at once and keeps it after, on its
@@ -2062,8 +2137,18 @@ words or files, nor a made skill's SHA-256.
 - **A no** deletes the days with everything else, and asks the manage
   helper (`{"forget_counts": {}}`, root's, which owns both files) to
   delete `lamp-skills`' `runs.json` and the voice's `counts.json`, each
-  under its writers' lock; asked again every 10 s until it says done
-  (`reports/state.json` keeps that it is owed). Runs counted in a running
+  under its writers' lock. It is asked at once and, while not done,
+  again after 20 s, 40 s, 80 s and so on, doubling up to 10 minutes
+  (`FORGET_MOST`) between asks, until it says done
+  (`reports/state.json` keeps that it is owed; a restart asks at once).
+  `lamp-cloud` asks one at a time and waits at most 5 s for each answer,
+  so it holds at most one of the manage socket's four connections, and
+  none between asks (#7967: asked every 10 s, the socket filled and the
+  voice's skill runs were dropped). Once the helper can answer done (its
+  locks bounded, #7907), the counts are forgotten within 10 minutes.
+  Tests: `reports::tests::a_forget_not_done_is_asked_again_later_each_time`,
+  `reports::tests::the_forget_holds_one_manage_connection_at_most_and_none_between_asks`.
+  Runs counted in a running
   part's memory and not yet written (at most a minute's) begin the next
   file. Nothing is sent without a yes, and a yes again begins the count
   anew from its first reading.
@@ -2372,6 +2457,14 @@ put back from it runs the previous `lamp-cloud`, which has none. A
 - **Factory reset** removes `/etc/lampOS/setup/reports.json` and empties
   `/var/lib/lampos-cloud` (the later choice and the queue); the next setup
   asks again, default off.
+- **On by default, dark (#7767):** with `LAMP_NOTICING_BY_DEFAULT=on`
+  (switches.md; off unless set, in no unit), neither record there (setup's
+  and `lamp-cloud`'s own both not found) reads as a yes nobody gave, with
+  no `by` and no time (`read_consent_or`; setup's status reads its record
+  the same way, `kept_share_reports_or`). A kept `false`, setup's or the
+  lamp's own, stays off, and so does a record this build can't read: the
+  same rule as the consent folder's yeses (`lamp_msgs::consent::allowed`).
+  Off, no record is a no, as above.
 
 ### Its files, one release forward (#2052)
 
@@ -2962,7 +3055,7 @@ until its lamp check. Both yeses stay off by default.
   which has the slide) is a slide lamp: no `room_sounds` in either reply,
   and a set of it refused. Seen activity (#6543, `seen_activity`) the same
   way, only where lamp-seen looks: `lamp-cloud`'s own
-  `LAMP_SEEN_ACTIVITY=on` exactly; lamp-seen reads its yes every 2 s, so
+  `LAMP_SEEN_ACTIVITY=on` exactly, which the product unit sets; lamp-seen reads its yes every 2 s, so
   nothing restarts ([onboarding.md](onboarding.md), "Seen activity").
 - **Reading** (`consent.get`): the files in `/var/lib/lampOS/consent`, which
   `lampos` may read (0750 `root:lampos`, files 0640), with the readers' rule:
@@ -2988,7 +3081,120 @@ until its lamp check. Both yeses stay off by default.
   (`crates/cloud/src/wire.rs`) carries no id or send time, and the helper
   stamps the yes when it arrives (`crates/setup/src/change.rs`), so an
   MQTT QoS 1 resend or a late-delivered app yes counts as a new yes, even
-  after a later "no" at the lamp.
+  after a later "no" at the lamp. `desk_noticing.set` closes this for seen
+  activity with its `request_id` and the mark ("Desk noticing from the app"
+  below); `consent.set`'s three keys, its `seen_activity` too, still owe it.
+
+## Desk noticing from the app (#6543, `desk_noticing.get`, `desk_noticing.set`)
+
+The owner's switch for desk noticing (lamp-seen looks now and then at whether
+they eat, drink or take a break, and with posture on how they sit, and sends
+those pictures to the perception service to be labelled), turned on and off
+in the app like the mute (the owner's call on #6543, c6946201674; the first
+builder's plan, c6946710545: the yes comes from the app button while the
+voice offer stays off). Only with `LAMP_SEEN_ACTIVITY=on` exactly in
+`lamp-cloud`'s own unit, with `LAMP_CLOUD=on`, as lamp-seen's and the voice's
+units have it; off, neither kind is in `can`, both are "not on this lamp", and
+`can` and every other page are byte for byte as before. Off by default: no
+file, no yes.
+
+- **The same yes as the spoken one.** `seen-activity.json` in
+  `/var/lib/lampOS/consent`, `{"version":1,"seen_activity":"yes","at_unix_s":N,"by":"app"}`,
+  byte for byte the voice's file but for `by` (`lamp_msgs::consent::bytes`),
+  written whole by root's helper `lamp-setup change` (0640 `root:lampos`) from
+  the line `{"desk_noticing": {"allow": bool, "request_id": N}}`, waited on
+  at most 2 s. A yes already kept, the voice's too, is left as it is.
+- **No yes after a later "no"** (Heron's P2 on #7551). `request_id` is
+  required: the app's send time in Unix milliseconds, a positive integer,
+  new for each tap (a retry of the same tap may keep it). The helper keeps
+  a mark beside the yes, `seen-activity-mark.json`
+  (`{"version":1,"after_unix_ms":N}`, written whole and renamed into place,
+  in the yes's mode), and keeps a yes only with a `request_id` above it,
+  refusing one at or below it: `this request was sent before the lamp's
+  last change: send a new one`, nothing changed. Each request it takes, yes
+  or off, raises the mark to its `request_id`; the voice's
+  `stop_looking_at_my_desk` and any forget (with a yes or a mark there)
+  raise it to the lamp's own now. So an MQTT QoS 1 resend or a late yes
+  after an off stays off, and a yes the app sent before a "no" at the lamp
+  is refused. An off is never refused, and never lowers the mark. A mark
+  there but unreadable refuses a yes (`the lamp's last change could not be
+  read: turn desk noticing off, then on`) until an off rewrites it. A send
+  time, not a counter, since the lamp's own "no" has to be compared with
+  it: with the phone's clock behind the lamp's, a yes right after a spoken
+  stop is refused until the phone's clock passes it (the safe side); with
+  it ahead, a yes sent less than that difference before the stop still
+  lands.
+- **Within a day of the lamp's clock** (Twelve's P2 on #7551, for
+  Fourteen). A `request_id` more than a day past the lamp's now
+  (`lamp_msgs::consent::REQUEST_AHEAD_MOST_MS`, 86,400,000 ms; an app
+  sending microseconds, or a phone's clock years ahead) is no send time: a
+  yes with one is refused (`request_id is more than a day ahead of the
+  lamp's clock: send the app's time in Unix milliseconds`), nothing
+  changed, and an off with one still turns it off but raises the mark only
+  to the lamp's now. So the mark never runs far ahead of the clock and
+  refuses every later yes.
+- **One writer at a time** (Twelve's P2 on #7551). Every writer of the yes
+  or the mark holds the mark's lock, `seen-activity-mark.lock` beside it
+  (an empty file, `flock`, made `O_NOFOLLOW` in the yes's mode, kept): the
+  helper across its check of a yes against the mark and its writes, the
+  check made again there after the one on the line it was sent, and the
+  voice's stop and any forget across raising the mark and removing the
+  yes. So a yes checked before a spoken stop is refused under the lock
+  rather than kept after it, and two raises never interleave. The mark is
+  read `O_NOFOLLOW | O_NONBLOCK`: a link or a FIFO in its place refuses a
+  yes.
+- **The reset** removes the mark with the yes (`reset-plan-product.json`),
+  so a reset lamp takes the app's next yes whatever came before.
+- **Off is the voice's stop.** `allow: false` removes the file, as
+  `stop_looking_at_my_desk` does, whoever gave the yes. lamp-seen reads it
+  every 2 s: its gate closes, nothing more is sent, and the sitting it held
+  (posture's window, the held sitting) is forgotten, as for a stop by voice.
+  With `LAMP_NOTICING_BY_DEFAULT=on` (#7767, switches.md), where a missing
+  file is on, the off keeps a no instead,
+  `{"version":1,"seen_activity":"no","at_unix_s":N,"by":"app"}`, under the
+  same lock and with the mark raised as above, so a late yes still loses to
+  it, and a later yes turns it back; with no file, a yes is on already and
+  writes nothing. The voice's stop keeps its own no the same way.
+- **The read-back.** `{"desk_noticing": {"on": bool, "by": "app"|"voice"|null, "posture": bool}}`,
+  from both kinds: `on` only while the file holds a yes, `by` `"app"` for the
+  app's and `"voice"` for any other (a file from before `by` is the
+  voice's), null when off; `posture`, whether `lamp-cloud`'s unit has
+  `LAMP_SEEN_POSTURE=on` exactly, set beside lamp-seen's and the voice's,
+  so the app picks the disclosure below.
+- **What the lamp says.** Nothing new: lamp-seen says its own on line once
+  when the yes appears, whoever gave it, and its off line when it goes
+  (`said_back::ON_LINE`, "I'll look now and then to see if you're eating,
+  drinking or slouching. I keep none of the pictures."; with posture,
+  `POSTURE_ON_LINE`; `OFF_LINE`, "Okay, I've stopped looking at the
+  desk."), and no picture goes before the on line has begun.
+- **What the app shows before the switch** (for Fourteen): the voice's
+  disclosure, `SEEN_DISCLOSURE` in `crates/voice/src/seen_yes.rs`, as #7476
+  words it with the lead's "you or anyone else":
+
+  > I can notice when you eat, drink, take a break, look tired or
+  > celebrate, and I react to what I notice. To do that, while you or anyone
+  > else is at the desk I'd send a few pictures from my camera to
+  > Autonomous's server to be labelled, and they're deleted once they're
+  > checked. My light shows each time I send one, and you can tell me to stop
+  > any time. Shall I?
+
+  With `"posture": true` in the reply (`LAMP_SEEN_POSTURE=on`),
+  `SEEN_DISCLOSURE_POSTURE`:
+
+  > I can notice when you eat, drink, take a break, look tired or
+  > celebrate, and how you're sitting, and I react to what I notice. To do
+  > that, while you or anyone else is at the desk I'd send a few pictures from
+  > my camera to Autonomous's server to be labelled, and they're deleted once
+  > they're checked. My light shows each time I send one, and you can tell me
+  > to stop any time. Shall I?
+
+  #7506 turns posture on with activity in the product, so that is the
+  wording the app shows there, and the yes names everything the pictures are
+  labelled for. "Deleted once they're checked" still waits on the backend's
+  written retention confirmation (#6912).
+- **Owed:** neither this yes nor the voice's records which disclosure was
+  shown, so a changed wording does not ask again (a `disclosure` id in the
+  set and the file, Heron's P3 on #7551).
 
 ## A person's linked services (Queue #4710, `connector.*`, `services.list`)
 
@@ -3028,8 +3234,11 @@ gate are in [services.md](services.md).
 pairings.** lamp-cloud, which takes the app's commands from the broker, now
 reaches lamp-control's admin socket, which until now only a person at the lamp
 used (`lamp-control code`, `revoke`). It is gated by the owner's developer
-setting: with developer access off, lamp-control isn't running and the socket
-isn't there, so the five kinds are neither listed nor answered.
+setting: with developer access off, lamp-control's door is shut (it is restarted
+without `LAMP_CONTROL=on`, #6401, and keeps serving the owner's side), so `code`
+is answered `developer access is off on this lamp`, and `control.clients` says
+`listening: false` (the admin socket is there whenever lamp-control runs with a
+skill's tasks on, as on every product lamp; the door's state is `listening`).
 
 Off unless `lamp-cloud` is started with `--control-admin-socket PATH`
 (lamp-control's admin socket, `/run/lampos-control/admin.sock`; docs/control.md,
@@ -3057,7 +3266,9 @@ app that asks anyway is told `developer access is off on this lamp`.
   own: the wall clock now plus the code's 5 minutes. `shown` is the pairing
   screen's words for each grant.
 - **The spoken pin check** (Faye on #5299, 5 Nov 08:18: before customers):
-  with each `control.code` the lamp itself says the first 8 characters of
+  with a `control.code` that carries `"say_pin": true` (absent or anything
+  else is no, the FB's 15:21 ruling of 18 Nov: no spoken check for now) the
+  lamp itself says the first 8 characters of
   its pin aloud, in its own voice and exactly as written, in two groups of
   four ("My pairing check is 3 F 9 A, 0 B 2 C."), once nobody is talking with
   it. `pin_said` (outside the seal) says whether the voice took the line; an
@@ -3150,17 +3361,40 @@ app show its switch: the monitor stays off until the owner turns it on in the
 app. Without it the three kinds are not in `can` and each is "not on this
 lamp".
 
-- **`monitor.set`** (`{"on": bool}`) goes to root's helper as `control.set`
+- **`monitor.set`** (`{"on": bool, "request_id"?}`, the result saying the app's `request_id` back, #7432) goes to root's helper as `control.set`
   does (`{"monitor": bool}`, setup.md, "Changed after setup"). On writes
   `/etc/systemd/system/lamp-peek.service.d/monitor.conf`
   (`Environment=LAMP_PEEK=monitor`) and restarts `lamp-peek.service` once no
   update holds lamp-update's lock. Off stops it before the result, so no
-  page stays open once the app says off; its sessions end with it. The
+  page stays open once the app says off; its sessions end with it, and
+  every open `/events` stream ends at the stop, the unit within 2 s
+  (`TimeoutStopSec=2s`, peek.md, #6401). The
   product installs `lamp-peek.service` on every lamp, outside
   `lampos.target`, and it exits at once without the drop-in. The reset
   wipes the drop-in.
 - **`monitor.get`** (`{}`) reads the drop-in: `{"on": true}` only while it
-  holds exactly what the helper writes.
+  holds exactly what the helper writes, then with `since_unix_ms` (the
+  drop-in's time, when it was turned on) and `off_at_unix_ms` (when it turns
+  itself off). Off, `{"on": false}`, with `went_off_by_itself_unix_ms` once it
+  turned itself off and until it is on again, so the app can tell the owner
+  when it went off.
+- **Said in the lamp's health, and off after a day** (#7432). While it is on,
+  lamp-cloud says so on `diagnostics` every 2 s as the part `dev monitor`
+  (`ok`, so the lamp's level is untouched): "on since 3 h 12 min ago, off by
+  itself in 20 h 48 min" ([health.md](health.md)); once off, it says it
+  stopped on purpose, so the item goes. A day after the drop-in was written
+  (its file time) lamp-cloud asks root's helper `{"monitor": false}`, as the
+  app's off, says "the dev monitor was on for its day: turned off" in its
+  journal, and keeps when in `monitor-off` in its state folder; a helper that
+  refuses is asked again a minute later. Turned on again, it has a new day; on
+  again while still on keeps the day it has. `LAMP_APP_MONITOR_DAY_S` (whole
+  seconds, 60 to 86400; anything else is a day) is a shorter day for a lamp
+  row only. A clock set back counts as just on. While lamp-cloud is stopped
+  the item goes stale and nothing turns it off; it is turned off at the next
+  look after lamp-cloud starts. A lamp-cloud that starts with it off (turned
+  off or reset while lamp-cloud was down) says once that it stopped on
+  purpose, so a stale item left by the one before goes. The app is not pushed a notice: it reads
+  `monitor.get`.
 - **`monitor.link`** (`{"seal_to", "request_id"}`, both as `control.code`'s)
   asks lamp-peek's admin socket (`/run/lampos-peek/admin.sock`, lampos and
   root only, waited on 2 s) for a code, good once for 5 minutes, and answers
@@ -3171,9 +3405,13 @@ lamp".
   The seal is `control.code`'s, under `info` `lampos/v1/monitor.link`, with
   `aad` the lamp's device id and the `request_id` joined by a newline. No
   key, a key that is not one, no `request_id`, or the dev monitor off: refused
-  before any code is made. lamp-peek not running or giving no code: "the dev
-  monitor did not answer on the lamp now". The code and the link are in no
-  journal line, error or clear part of the reply; the code rides only in the
+  before any code is made. A socket not there yet or refusing, as when the
+  app asks the moment `monitor.set` said on and lamp-peek has not bound it
+  yet (#6401: 43 ms early on lamp-0c89), is tried again every 100 ms for up
+  to 3 s. lamp-peek still not there after that, or giving no code: "the dev
+  monitor did not answer on the lamp now", the reason in the journal. The
+  code and the link are in no journal line, error or clear part of the
+  reply; the code rides only in the
   link's fragment, so the browser never sends it in a request line. The app
   shows the link and its QR; the page is on port 80, so the link names none.
 - **Words on the page:** with the switch on, the page shows the words anyone
@@ -3182,8 +3420,11 @@ lamp".
   (the first builder on #5883).
 
 Tests: `monitor::tests` (the switch, the set's line, the get from the
-drop-in, the link sealed, bound to the lamp and the request and refused
-before a code is made, lamp-peek giving none); setup's
+drop-in with since when and when it went off, the day and its row knob, the
+health line, the turn-off through the helper kept and asked again, the link
+sealed, bound to the lamp and the request and refused before a code is made,
+lamp-peek giving none, a socket that appears late waited for and one that
+never does refused once the wait passes); setup's
 `the_dev_monitor_writes_lamp_peeks_drop_in_and_the_reset_forgets_it` and
 `the_dev_monitor_starts_once_unlocked_and_stops_before_the_reply`.
 
@@ -3224,7 +3465,7 @@ adds the key itself (`lamp_cloud::hermes_llm`).
   and attributes them to the lamp exactly as it does the voice's own
   DeepSeek turns; it can't tell the two apart.
 - **The relay's day used** (#7342, off unless `LAMP_SKILL_RUNS_VOICE_SHARE`
-  is set): the forwarder reads each answer's `X-Usage-Day-Used` and each
+  is set; the product's `lamp-cloud.service` sets it `on` since 19 Nov): the forwarder reads each answer's `X-Usage-Day-Used` and each
   chat answer's `usage` and keeps them in `day-used.json` in its state
   folder, for lamp-skills' bound on skills' runs, with one journal line a
   chat answer of its numbers. It still forwards every request as before

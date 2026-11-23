@@ -43,9 +43,9 @@
 //! [`TOKEN_PATH`], which lamp-tasks (also `lampos`) reads. Neither file is
 //! followed through a link, and one that isn't a regular file is refused.
 use std::fs;
-use std::io::{self, Read, Write};
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-use std::path::{Path, PathBuf};
+use std::io::{self, Read};
+use std::os::unix::fs::OpenOptionsExt;
+use std::path::Path;
 
 /// The custom provider's name in `providers:`.
 pub const PROVIDER: &str = "lamp";
@@ -801,30 +801,25 @@ pub(crate) fn read_or_empty(path: &Path) -> io::Result<String> {
 /// `text` in place of `path`, 0600, through a new file beside it renamed
 /// over it, so a reader never sees half a file.
 pub(crate) fn replace(path: &Path, text: &str) -> io::Result<()> {
-    let dir = path.parent().unwrap_or(Path::new("."));
-    let name = path
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let mut random = [0u8; 8];
-    getrandom::fill(&mut random).map_err(|_| io::Error::other("no random bytes"))?;
-    let suffix: String = random.iter().map(|byte| format!("{byte:02x}")).collect();
-    let temporary: PathBuf = dir.join(format!(".{name}.{suffix}.new"));
-    let written = (|| {
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(&temporary)?;
-        file.write_all(text.as_bytes())?;
-        file.sync_all()?;
-        fs::set_permissions(&temporary, fs::Permissions::from_mode(0o600))?;
-        fs::rename(&temporary, path)
-    })();
-    if written.is_err() {
-        let _ = fs::remove_file(&temporary);
-    }
-    written
+    replace_checked(path, text, &mut |_| Ok(()))
+}
+
+/// [`replace`], with `check` run on the new file, whole and synced, before
+/// the rename (#7108: the engine's own check of its config): refused, the
+/// new file is removed and `path` is left as it was. The one checked
+/// replace, shared with lamp-update's and lamp-setup's writers of
+/// OpenClaw's config (`lamp_checked_replace`, #7868).
+pub(crate) fn replace_checked(
+    path: &Path,
+    text: &str,
+    check: &mut dyn FnMut(&Path) -> Result<(), String>,
+) -> io::Result<()> {
+    lamp_checked_replace::replace_checked(
+        path,
+        text.as_bytes(),
+        rustix::fs::Mode::from_raw_mode(0o600),
+        check,
+    )
 }
 
 /// Both files under `hermes_home` merged, on the forwarder's `port`, with
@@ -911,6 +906,20 @@ play sounds on your own.
 - To write a new skill, read two or three existing ones for the format, write \
 it in this work folder, and tell the person where it is. Installing it on the \
 lamp is the person's step, never yours.
+
+## Your last answer
+
+- The lamp's voice reads your last answer and says it aloud to the person, in \
+its own words. Only about the first 1,200 characters of it reach the voice, so \
+put what matters first.
+- Start with what you found or did, in short plain sentences: the names, facts \
+and numbers the person asked for (for \"research ten AI tools\", name each tool \
+and say in a few words what it does). Never answer with only \"done\" or \
+\"saved\".
+- If you also wrote a file, still say what is in it, and where it is, in one \
+short sentence.
+- Keep it under about 800 characters, with no markdown, tables, lists, links or \
+code.
 "
     )
 }
@@ -943,6 +952,7 @@ pub(crate) fn write_guidance_text(folder: &Path, text: &str) -> io::Result<bool>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::fs::PermissionsExt;
 
     const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
@@ -990,6 +1000,26 @@ custom_providers:
     }
 
     const SERVERS: &str = "mcp_servers:\n  lamp-services:\n    command: \"/opt/lampOS/services/current/lamp-services\"\n    args:\n    - \"mcp\"\n    env:\n      LAMP_CONTROL_SOCKET: \"${LAMP_CONTROL_SOCKET}\"\n      LAMP_CONTROL_TOKEN: \"${LAMP_CONTROL_TOKEN}\"\n";
+
+    /// #7930 (the owner's P1): the guidance asks for a last answer that says
+    /// what the agent found, first, within what reaches the voice; Hermes'
+    /// and OpenClaw's alike.
+    #[test]
+    fn the_guidance_asks_for_a_last_answer_that_says_what_was_found() {
+        let want = [
+            "\n## Your last answer\n",
+            "Only about the first 1,200 characters of it reach the voice, so put what matters first.",
+            "Never answer with only \"done\" or \"saved\".",
+            "Keep it under about 800 characters, with no markdown, tables, lists, links or code.",
+        ];
+        for text in [guidance(), crate::openclaw_config::guidance()] {
+            for line in want {
+                assert!(text.contains(line), "{line:?} not in {text}");
+            }
+            let skills = text.find("## The lamp's skills").unwrap();
+            assert!(text.find("## Your last answer").unwrap() > skills);
+        }
+    }
 
     /// LAMP_AGENT_SERVICES: on, the lamp's MCP server is added, once, with
     /// the run's socket and token left to Hermes's interpolation; off, the

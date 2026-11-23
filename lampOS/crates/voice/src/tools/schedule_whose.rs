@@ -86,6 +86,36 @@ fn setter(lease: Option<&ScopeLease>) -> Option<String> {
         .or_else(|| lease.kept_by_one_face())
 }
 
+/// The caller a committed reminder's linked record is kept by
+/// (`LAMP_SERVICE_RECORDS_REMINDERS`, `reminder_rows::after_call`), beside
+/// the `caller` the Schedule was told. Outside the private room it is that
+/// caller. In the private room the Schedule is told `{"everyone":true}`, with
+/// no setter, so the record names its creator here: the person a keep in
+/// the line would be written for ([`setter`]: the line's own person, the
+/// known face the eyes named, or the one-face keep), else the lamp's owner.
+/// Never dropped while the lamp knows its owner (#7960's ROW on lamp-06c1:
+/// every reminder set by voice under `LAMP_PRIVATE_ROOM`, on in the product,
+/// kept no row). The Schedule's own item stays everyone's.
+pub fn record_caller(lease: Option<&ScopeLease>, name: &str, caller: &Value) -> Value {
+    if !crate::person::private_room() {
+        return caller.clone();
+    }
+    private_room_record_caller(lease, name, &crate::person::owner_ids())
+}
+
+/// [`record_caller`] in the private room, with the owner's memory ids given.
+pub(crate) fn private_room_record_caller(
+    lease: Option<&ScopeLease>,
+    name: &str,
+    owners: &[String],
+) -> Value {
+    let setter = SETS
+        .contains(&name)
+        .then(|| setter(lease).or_else(|| owners.first().cloned()))
+        .flatten();
+    json!({"everyone":true,"setter":setter})
+}
+
 /// The caller the executive is told beside `name`'s call, for this line:
 /// `{"asker":{"person","owner"},"setter"}` (`lamp_actions::schedule::Caller`).
 pub fn caller(lease: Option<&ScopeLease>, name: &str) -> Value {
@@ -231,6 +261,48 @@ mod tests {
             nobody
         );
         assert_eq!(caller_among(None, "list_reminders", &owners, false), nobody);
+    }
+
+    /// In the private room a reminder's record names a creator: the line's
+    /// own person, or the one-face keep, else the owner; never none while
+    /// an owner is known (#7960's ROW: "set with no known person as its
+    /// creator" on every private-room reminder). A read names none.
+    #[test]
+    fn a_private_room_reminder_is_kept_by_the_known_face_else_the_owner() {
+        let owners = [id("Ann")];
+        let bo = scope(ScopeSnapshot::of("Bo"), 1);
+        assert_eq!(
+            private_room_record_caller(Some(&bo.lease()), "set_reminder", &owners),
+            json!({"everyone":true,"setter":id("Bo")})
+        );
+        let one_face = scope(ScopeSnapshot::room(), 2);
+        assert!(one_face.lease().keep_for_one_face(&id("Bo")));
+        assert_eq!(
+            private_room_record_caller(Some(&one_face.lease()), "set_timer", &owners),
+            json!({"everyone":true,"setter":id("Bo")})
+        );
+        let room = scope(ScopeSnapshot::room(), 3);
+        assert_eq!(
+            private_room_record_caller(Some(&room.lease()), "repeat_reminder", &owners),
+            json!({"everyone":true,"setter":id("Ann")})
+        );
+        let held = scope(ScopeSnapshot::held_of("Bo"), 4);
+        assert_eq!(
+            private_room_record_caller(Some(&held.lease()), "set_reminder", &owners),
+            json!({"everyone":true,"setter":id("Ann")})
+        );
+        assert_eq!(
+            private_room_record_caller(None, "set_reminder", &owners),
+            json!({"everyone":true,"setter":id("Ann")})
+        );
+        assert_eq!(
+            private_room_record_caller(None, "set_reminder", &[]),
+            json!({"everyone":true,"setter":null})
+        );
+        assert_eq!(
+            private_room_record_caller(Some(&bo.lease()), "list_reminders", &owners),
+            json!({"everyone":true,"setter":null})
+        );
     }
 
     /// The setter is whom a keep would be written for: the line's person,

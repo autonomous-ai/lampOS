@@ -1,0 +1,7 @@
+asks = ["exchange rate"]
+kind = "installable"
+version = "1.0.0"
+grants = ["net", "speak"]
+
+[[do]]
+task = { task = "look up today's euro to dollar rate on the web and say it", run = "scripts/main.py" }

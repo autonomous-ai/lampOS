@@ -43,7 +43,10 @@
 //!   (`{"mint":{"ask":[...]}}`, as the skill [`SKILL`]), held to exactly
 //!   that grant, ended with the run. The run's home has
 //!   `mcp_servers.lamp-services`, and the run is held off the network (the
-//!   runner a held make uses): a mail's words can't send anything anywhere.
+//!   runner a held make uses; with lamp-update's one run path,
+//!   [`crate::skill_make::AskRunner`]: Hermes's task entry in the run's own
+//!   `skill-<run id>` folder, its fresh home named as a make's, no way
+//!   out): a mail's words can't send anything anywhere.
 //!   The voice hands over only a read it would tell in full; it never asks
 //!   for a brief one (someone else may be in view: nothing is handed over).
 //!   OpenClaw can't take one yet: its gateway keeps the network and has no
@@ -73,17 +76,33 @@ pub const SERVICES_SWITCH: &str = "LAMP_SERVICES_TO_AGENT";
 pub const SKILL: &str = "voice-ask";
 /// The line's `op`.
 pub const OP: &str = "voice_ask";
+/// The refusal's code a cancelled news ask's own connection is told, as a
+/// cancelled remake's make (`crate::skill_make`'s, #7789).
+pub const CANCELLED_CODE: &str = "cancelled";
+/// What a cancelled news ask's own connection is told.
+pub const CANCELLED: &str = "the lamp's own ask was cancelled for a person's ask";
+/// How long a person's ask waits for the cancelled news ask to end, as a
+/// make's cancel does (#7789's `CANCEL_WAIT`).
+pub const CANCEL_WAIT: Duration = Duration::from_millis(750);
 /// The most bytes of the person's ask.
 pub const MOST_ASK_BYTES: usize = 2_000;
 /// The most grants: one service's read (writes come with their own gates
 /// in a later cut).
 pub const MOST_GRANTS: usize = 1;
-/// The least and most a run may be given: a make's
-/// (`crate::skill_make::MOST_WITHIN`, 120 s).
+/// The least and most a run may be given: a make's least
+/// (`crate::skill_make::LEAST_WITHIN`) and 120 s, its own: a live ask is
+/// waited on by the person, so it keeps 120 s though a make may now take
+/// 10 minutes (#7245).
 pub const LEAST_WITHIN: Duration = crate::skill_make::LEAST_WITHIN;
-pub const MOST_WITHIN: Duration = crate::skill_make::MOST_WITHIN;
+pub const MOST_WITHIN: Duration = Duration::from_secs(120);
 /// What a second ask is told while one runs.
 pub const BUSY: &str = "the lamp's agent is already on an ask; one is taken at a time";
+/// What an ask for a gateway agent is told while a make runs (#7245): the
+/// make holds the agent's one kept session for up to
+/// `skill_make::MOST_WITHIN`, so the ask would wait behind it past its own
+/// [`MOST_WITHIN`] with nothing said; refused at once, the voice says its
+/// line then.
+pub const MAKING: &str = "the lamp's agent is making a skill; one is taken at a time";
 /// A gateway agent's ask is an answer only (Heron's P2 on #7509): its turn
 /// has the owner's Gateway's tools and messaging channels, and the lamp
 /// asked no yes for an action.
@@ -152,6 +171,11 @@ pub struct AskLine {
     #[serde(default)]
     pub grants: Vec<String>,
     pub within_ms: u64,
+    /// The lamp's own ask for task news's line (`lamp_voice::news_agent`,
+    /// `LAMP_CORE_VIA_AGENT`'s `news`), no grant: a person's ask that comes
+    /// while it runs cancels it ([`answer`]). Never a person's.
+    #[serde(default)]
+    pub news: bool,
 }
 
 /// The line's `op`: `voice_ask` only.
@@ -294,7 +318,8 @@ pub fn prompt(folder: &Path) -> String {
 /// What runs an ask: the lamp's default agent as `agent` picks it; for the
 /// lamp's Hermes, as a make runs (`open`, the network as
 /// `LAMP_MAKE_AGENT_NET` says), the same held off the network for an ask
-/// with a service's grants (`held`); for a gateway agent, `agent`'s one
+/// with a service's grants (`held`, [`crate::skill_make::AskRunner`] on a
+/// lamp, the one run path's when it is on); for a gateway agent, `agent`'s one
 /// turn. lamp-control's tokens, and the one ask at a time.
 pub struct Asks {
     pub switches: Switches,
@@ -312,6 +337,9 @@ pub struct Asks {
     pub default_engine: DefaultEngine,
     pub tokens: Arc<dyn Tokens + Send + Sync>,
     pub asking: AtomicBool,
+    /// The cancel of the lamp's own news ask holding the one place, if one
+    /// does ([`AskLine::news`]).
+    pub news: std::sync::Mutex<Option<Arc<AtomicBool>>>,
 }
 
 /// Frees the one place however the ask ends.
@@ -332,14 +360,13 @@ pub fn answer(line: &[u8], asks: &Asks, work: &Path, started: &mut dyn FnMut()) 
         Ok(ask) => ask,
         Err((code, why)) => return refusal(code, &why),
     };
-    if asks
-        .asking
-        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-        .is_err()
-    {
+    if !take_place(asks, ask.news) {
         return refusal("busy", BUSY);
     }
     let _place = Place(&asks.asking);
+    // The lamp's own news ask may be cancelled by a person's while it runs.
+    let cancel = Arc::new(AtomicBool::new(false));
+    let _news = ask.news.then(|| NewsHeld::hold(asks, cancel.clone()));
     let services = !ask.grants.is_empty();
     match pick(asks) {
         Ok(MakeAgent::Hermes) => {}
@@ -351,7 +378,7 @@ pub fn answer(line: &[u8], asks: &Asks, work: &Path, started: &mut dyn FnMut()) 
             let Some(gateway) = asks.agent.as_deref() else {
                 return refusal("run_failed", "the lamp's default agent can't be reached");
             };
-            return on_gateway(&ask, gateway, work, started);
+            return on_gateway(&ask, gateway, work, &cancel, started);
         }
         Err(refused) => return refused,
     }
@@ -371,6 +398,7 @@ pub fn answer(line: &[u8], asks: &Asks, work: &Path, started: &mut dyn FnMut()) 
     let mut run = crate::skill_make::make_run(&folder.path, ask.within());
     run.skill = SKILL.into();
     run.prompt = prompt(&folder.path);
+    run.cancel = cancel;
     let mut minted = None;
     if services {
         match asks.tokens.mint_ask(&ask.grants, &run.run) {
@@ -402,8 +430,97 @@ pub fn answer(line: &[u8], asks: &Asks, work: &Path, started: &mut dyn FnMut()) 
     let read = crate::skill_make::answer_in(&folder.path);
     drop(folder);
     match ran {
+        _ if run.cancelled() => refusal(CANCELLED_CODE, CANCELLED),
         Err(why) => refusal(not_started(&why), &why),
         Ok(_) => told(read),
+    }
+}
+
+/// The field of a `busy` refusal that says a make holds the agent
+/// ([`answer_beside_make`]): the voice says so in its own line, not the
+/// failed one (`lamp_voice::agent_asks::MAKING_FIELD`). The code stays
+/// `busy`, so a caller that only reads the code asks again as before.
+pub const MAKING_FIELD: &str = "making";
+
+/// [`answer`], beside a make: with one running (`making`), an ask for a
+/// gateway agent is refused `busy` ([`MAKING`], with [`MAKING_FIELD`] true)
+/// at once, never queued behind the make in the agent's one kept session; a
+/// Hermes ask runs on its own runner as before.
+pub fn answer_beside_make(
+    line: &[u8],
+    asks: &Asks,
+    making: bool,
+    work: &Path,
+    started: &mut dyn FnMut(),
+) -> Value {
+    if making && matches!(pick(asks), Ok(MakeAgent::Gateway(_))) {
+        eprintln!("[lamp-tasks] live ask: refused busy, a make holds the agent's session");
+        let mut refused = refusal("busy", MAKING);
+        refused[MAKING_FIELD] = Value::Bool(true);
+        return refused;
+    }
+    answer(line, asks, work, started)
+}
+
+/// The one place for an ask, `news` the lamp's own: free, or held by the
+/// lamp's own news ask and `news` not, which is cancelled at once and waited
+/// for at most [`CANCEL_WAIT`] (the first builder's 09:57: a person's ask
+/// always wins). A news ask never cancels anything.
+fn take_place(asks: &Asks, news: bool) -> bool {
+    let take = || {
+        asks.asking
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+    };
+    if take() {
+        return true;
+    }
+    if news {
+        return false;
+    }
+    let Some(cancel) = asks
+        .news
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .clone()
+    else {
+        return false;
+    };
+    cancel.store(true, Ordering::Release);
+    eprintln!("[lamp-tasks] live ask: the lamp's own news ask is cancelled for a person's");
+    let until = std::time::Instant::now() + CANCEL_WAIT;
+    loop {
+        if take() {
+            return true;
+        }
+        if std::time::Instant::now() >= until {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+/// The lamp's own news ask's cancel, kept in [`Asks::news`] while it holds
+/// the one place, and taken back however it ends.
+struct NewsHeld<'a>(&'a Asks);
+
+impl<'a> NewsHeld<'a> {
+    fn hold(asks: &'a Asks, cancel: Arc<AtomicBool>) -> Self {
+        *asks
+            .news
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner()) = Some(cancel);
+        Self(asks)
+    }
+}
+
+impl Drop for NewsHeld<'_> {
+    fn drop(&mut self) {
+        *self
+            .0
+            .news
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner()) = None;
     }
 }
 
@@ -435,6 +552,7 @@ fn on_gateway(
     ask: &AskLine,
     gateway: &MakeGateway,
     work: &Path,
+    cancel: &Arc<AtomicBool>,
     started: &mut dyn FnMut(),
 ) -> Value {
     if let Err(why) = gateway.ready() {
@@ -453,6 +571,7 @@ fn on_gateway(
     run.skill = SKILL.into();
     run.prompt = prompt(&folder.path);
     run.env = Vec::new();
+    run.cancel = cancel.clone();
     started();
     let ran = gateway.run(&run, &|| {});
     let read = run
@@ -462,6 +581,7 @@ fn on_gateway(
         .or_else(|| crate::skill_make::answer_in(&folder.path));
     drop(folder);
     match ran {
+        _ if run.cancelled() => refusal(CANCELLED_CODE, CANCELLED),
         Err(why) if crate::skill_make::not_ready(&why) => {
             eprintln!("[lamp-tasks] live ask: not ready: {why}");
             refusal(NOT_READY, NOT_READY_LINE)
@@ -512,7 +632,9 @@ fn told(read: Option<String>) -> Value {
 /// The refusal's code for why a run can't start, as a make's.
 fn not_started(why: &str) -> &'static str {
     match why {
-        crate::skill_task::NOT_HELD_OFF => "not_held_off",
+        crate::skill_task::NOT_HELD_OFF | crate::skill_task::NOT_HELD_OFF_ONE_PATH => {
+            "not_held_off"
+        }
         crate::skill_make::NO_NAMESPACE => "no_namespace",
         _ => "run_failed",
     }
@@ -607,6 +729,7 @@ mod tests {
             default_engine: Box::new(|| None),
             tokens,
             asking: AtomicBool::new(false),
+            news: Default::default(),
         }
     }
 
@@ -661,6 +784,7 @@ mod tests {
                 picked.clone()
             }),
             turn,
+            checked: false,
         }));
         asks.default_engine = Box::new(move || default);
         asks
@@ -819,6 +943,106 @@ mod tests {
             .permissions(std::fs::Permissions::from_mode(0o700))
             .tempdir()
             .unwrap()
+    }
+
+    /// Holds any ask whose rules say `HOLD` until it is cancelled or its
+    /// deadline, keeping whether it was cancelled, and answers any other at
+    /// once.
+    #[derive(Default)]
+    struct Holds {
+        cancelled: Mutex<Vec<bool>>,
+    }
+
+    impl Runner for Holds {
+        fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
+            let folder = run.start_in.clone().unwrap();
+            let rules =
+                std::fs::read_to_string(folder.join(crate::skill_make::RULES_FILE)).unwrap();
+            if rules.contains("HOLD") {
+                let began = std::time::Instant::now();
+                while !run.cancelled() && began.elapsed() < run.deadline {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                self.cancelled.lock().unwrap().push(run.cancelled());
+                return Ok(0);
+            }
+            std::fs::write(folder.join(crate::skill_make::ANSWER_FILE), "Here it is.").unwrap();
+            Ok(0)
+        }
+    }
+
+    fn news_line(ask: &str) -> Vec<u8> {
+        json!({"op": OP, "ask": ask, "grants": [], "within_ms": 10_000, "news": true})
+            .to_string()
+            .into_bytes()
+    }
+
+    /// The first builder (19 Nov 09:57): a person's ask always wins. One
+    /// that comes while the lamp's own news ask runs cancels it in
+    /// lamp-tasks at once (its run ended, told `cancelled`, so the voice
+    /// tells its note) and runs, never told busy. A news ask never cancels
+    /// a person's, and a person's ask still waits for another person's.
+    #[test]
+    fn a_persons_ask_cancels_the_lamps_news_ask_and_runs() {
+        let dir = work();
+        let holds = Arc::new(Holds::default());
+        let asks = Asks {
+            switches: on(),
+            open: holds.clone(),
+            held: holds.clone(),
+            agent: None,
+            default_engine: Box::new(|| None),
+            tokens: Arc::new(Minting::default()),
+            asking: AtomicBool::new(false),
+            news: Default::default(),
+        };
+        std::thread::scope(|scope| {
+            let (began, started) = std::sync::mpsc::channel();
+            let (asks, dir) = (&asks, &dir);
+            let news = scope.spawn(move || {
+                answer(
+                    &news_line("HOLD the news note"),
+                    asks,
+                    dir.path(),
+                    &mut || began.send(()).unwrap(),
+                )
+            });
+            started.recv_timeout(Duration::from_secs(5)).unwrap();
+            let asked = std::time::Instant::now();
+            let told = answer(&line("what's on today", &[]), asks, dir.path(), &mut || {});
+            assert_eq!(told, json!({"ok": true, "answer": "Here it is."}));
+            assert!(
+                asked.elapsed() < Duration::from_millis(1_500),
+                "{:?}",
+                asked.elapsed()
+            );
+            let news = news.join().unwrap();
+            assert_eq!(news["error"], CANCELLED_CODE, "{news}");
+        });
+        assert_eq!(*holds.cancelled.lock().unwrap(), vec![true]);
+        // A person's ask held: the lamp's news ask is told busy, and so is
+        // another person's; neither cancels it.
+        std::thread::scope(|scope| {
+            let (began, started) = std::sync::mpsc::channel();
+            let (asks, dir) = (&asks, &dir);
+            let person = scope.spawn(move || {
+                answer(&line("HOLD a long one", &[]), asks, dir.path(), &mut || {
+                    began.send(()).unwrap()
+                })
+            });
+            started.recv_timeout(Duration::from_secs(5)).unwrap();
+            assert_eq!(
+                answer(&news_line("the note"), asks, dir.path(), &mut || {})["error"],
+                "busy"
+            );
+            assert_eq!(
+                answer(&line("and this", &[]), asks, dir.path(), &mut || {})["error"],
+                "busy"
+            );
+            // Ends at its deadline (5 s): never cancelled.
+            let _ = person.join().unwrap();
+        });
+        assert_eq!(*holds.cancelled.lock().unwrap(), vec![true, false]);
     }
 
     #[test]
@@ -1008,6 +1232,224 @@ mod tests {
         assert_eq!(chat(&long, false), None);
         std::fs::write(dir.path().join(crate::skill_make::ANSWER_FILE), "Seven.").unwrap();
         assert_eq!(chat("Six.", false), Some(("Seven.".into(), File)));
+    }
+
+    /// #7245 (Twelve's P2 on #7737): while a make runs, an ask for a
+    /// gateway agent is refused `busy` at once and no turn is typed; a
+    /// Hermes ask still runs; with no make running the gateway ask runs.
+    #[test]
+    fn an_ask_for_a_gateway_agent_while_a_make_runs_is_busy_at_once() {
+        let dir = work();
+        let agent = || Arc::new(Agent::default());
+        let line = br#"{"op":"voice_ask","ask":"plan my trip","within_ms":5000}"#;
+        let picks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let turn = Arc::new(Turn {
+            answer: Some("Planned."),
+            ..Turn::default()
+        });
+        let gateway = picking(
+            asks(agent(), agent(), Arc::new(Minting::default()), on()),
+            Ok(MakeAgent::Gateway(EngineKind::Openclaw)),
+            turn.clone(),
+            Some(EngineKind::Openclaw),
+            picks.clone(),
+        );
+        let told = answer_beside_make(line, &gateway, true, dir.path(), &mut || {});
+        assert_eq!(told["error"], "busy", "{told}");
+        assert_eq!(told["message"], MAKING);
+        // The voice tells a make apart from another ask by this field.
+        assert_eq!(told[MAKING_FIELD], true, "{told}");
+        assert!(turn.seen.lock().unwrap().is_empty());
+        let told = answer_beside_make(line, &gateway, false, dir.path(), &mut || {});
+        assert_eq!(told["ok"], true, "{told}");
+        assert_eq!(turn.seen.lock().unwrap().len(), 1);
+        let open = Arc::new(Agent {
+            answer: Some("Open."),
+            ..Default::default()
+        });
+        let hermes = picking(
+            asks(open, agent(), Arc::new(Minting::default()), on()),
+            Ok(MakeAgent::Hermes),
+            Arc::new(Turn::default()),
+            Some(EngineKind::Hermes),
+            picks,
+        );
+        let told = answer_beside_make(line, &hermes, true, dir.path(), &mut || {});
+        assert_eq!(told["ok"], true, "{told}");
+    }
+
+    /// lamp-9adf, 20 Nov: with lamp-update's one run path, a linked
+    /// service's read was refused `NOT_HELD_OFF_ONE_PATH` within 16 ms, as
+    /// the held make's runner starts Hermes outside a `skill-<run id>`
+    /// folder. By the one run path the ask now runs as a skill's run with no
+    /// Harness: by Hermes's task entry in its own `skill-<run id>` folder
+    /// (which the wrapper holds off the network), its token in its file
+    /// under that id, its fresh home the ask's own `make-<run id>/home`
+    /// named as a make's (`LAMP_NS_HOME`), no egress socket; answered from
+    /// its folder, both folders and the token file gone after. Without the
+    /// one run path it is refused as before; by it, a wrapper or namespace
+    /// with no make-home line is refused before any token is minted.
+    #[test]
+    fn a_held_ask_on_the_one_run_path_runs_in_its_own_skill_folder() {
+        use crate::skill_task::{
+            AGENT_NS_HOME_LINE, AGENT_NS_NET_LINES, AGENT_NS_TASKS_LINE, AGENT_TASK_LINE,
+            HarnessRunner, NOT_HELD_OFF_ONE_PATH, ONE_PATH_MARK, ONE_PATH_RUN_LINE,
+            TASK_ENTRY_LINES, WRAPPER_RUN_LINES,
+        };
+        use std::os::unix::fs::PermissionsExt;
+        let dir = work();
+        let top = std::fs::canonicalize(dir.path()).unwrap();
+        let (bin, runs, project, seen) = (
+            top.join("bin"),
+            top.join("runs"),
+            top.join("project"),
+            top.join("seen"),
+        );
+        std::fs::create_dir_all(&bin).unwrap();
+        let ask_work = top.join("lamp");
+        std::fs::create_dir(&ask_work).unwrap();
+        // The run as the wrapper's task entry starts it: where, its home,
+        // its token file; it answers in its fresh home's folder.
+        let body = format!(
+            "[ \"$1\" = --warm ] && exit 0\n\
+             R=$(basename \"$(pwd -P)\")\n\
+             printf '%s\\n%s\\n%s\\n%s\\n' \"$(pwd -P)\" \"${{LAMP_NS_HOME-}}\" \"${{LAMP_NS_EGRESS-none}}\" \"$(cat {runs}/${{R#skill-}})\" > {seen}\n\
+             printf 'Two meetings, at ten and at three.' > \"${{LAMP_NS_HOME%/home}}/answer.md\"",
+            runs = runs.display(),
+            seen = seen.display(),
+        );
+        let wrapper = |home_line: bool| {
+            format!(
+                "#!/bin/sh\n{ONE_PATH_MARK}E=hermes\n{body}\nexit 0\nagent_env() {{\n{}  :\n}}\n{AGENT_TASK_LINE}  :\n}}{ONE_PATH_RUN_LINE}{}{}{}{}{}{}{}",
+                if home_line {
+                    crate::skill_make::ONE_PATH_HOME_LINE
+                } else {
+                    ""
+                },
+                WRAPPER_RUN_LINES[0],
+                WRAPPER_RUN_LINES[1],
+                AGENT_NS_NET_LINES[0],
+                AGENT_NS_NET_LINES[1],
+                AGENT_NS_NET_LINES[2],
+                TASK_ENTRY_LINES[0],
+                TASK_ENTRY_LINES[1],
+            )
+        };
+        let place = bin.join("hermes");
+        let ns = top.join("agent-ns");
+        let write = |wrapper: &str, script: &str| {
+            std::fs::write(&place, wrapper).unwrap();
+            std::fs::set_permissions(&place, std::fs::Permissions::from_mode(0o755)).unwrap();
+            std::fs::write(&ns, script).unwrap();
+        };
+        let script = format!(
+            "#!/bin/sh\nE=${{LAMP_NS_ENGINE-}} X=${{LAMP_NS_ENGINE_BIN-}}{AGENT_NS_HOME_LINE}W=/w K=/k{AGENT_NS_TASKS_LINE}{}",
+            crate::skill_make::ONE_PATH_NS_MAKE_LINES
+        );
+        write(&wrapper(true), &script);
+        // macOS checks a just-written program at its first exec.
+        assert!(
+            std::process::Command::new(&place)
+                .arg("--warm")
+                .status()
+                .unwrap()
+                .success()
+        );
+        let held = |one_path: bool| {
+            let mut harness = HarnessRunner::lamp(&top, Default::default());
+            harness.project = project.clone();
+            harness.runs = runs.clone();
+            harness.wrappers = Some(bin.clone());
+            harness.agent_ns = Some(ns.clone());
+            harness.default_agent = one_path;
+            let mut make = crate::skill_make::lamp_runner(&top, true);
+            make.hermes.held_by = Some(place.clone());
+            Arc::new(crate::skill_make::AskRunner {
+                make,
+                one_path: Some(Arc::new(harness)),
+                home: top.clone(),
+            })
+        };
+        let ask = || line("what's on my calendar today?", &["google_calendar-read"]);
+        let held_asks = |held: Arc<crate::skill_make::AskRunner>, tokens: Arc<Minting>| Asks {
+            held,
+            ..asks(
+                Arc::new(Agent::default()),
+                Arc::new(Agent::default()),
+                tokens,
+                on(),
+            )
+        };
+        let tokens = Arc::new(Minting::default());
+        let asks = held_asks(held(true), tokens.clone());
+        let told = answer(&ask(), &asks, &ask_work, &mut || {});
+        assert_eq!(told["ok"], true, "{told}");
+        assert_eq!(told["answer"], "Two meetings, at ten and at three.");
+        let run = tokens.asked.lock().unwrap()[0].1.clone();
+        let seen = std::fs::read_to_string(&seen).unwrap();
+        let lines: Vec<&str> = seen.lines().collect();
+        assert_eq!(
+            lines,
+            [
+                project.join(format!("skill-{run}")).to_str().unwrap(),
+                ask_work.join(format!("make-{run}/home")).to_str().unwrap(),
+                "none",
+                "T".repeat(43).as_str(),
+            ],
+            "{seen}"
+        );
+        assert_eq!(*tokens.ended.lock().unwrap(), vec![run.clone()]);
+        assert!(!project.join(format!("skill-{run}")).exists());
+        assert!(!ask_work.join(format!("make-{run}")).exists());
+        assert!(!runs.join(&run).exists());
+        // Without the one run path: the held make's runner, refused as the
+        // one run path holds only a run in its own folder.
+        let tokens = Arc::new(Minting::default());
+        let asks = held_asks(held(false), tokens.clone());
+        let told = answer(&ask(), &asks, &ask_work, &mut || {});
+        assert_eq!(told["error"], "not_held_off", "{told}");
+        assert_eq!(told["message"], NOT_HELD_OFF_ONE_PATH, "{told}");
+        assert!(tokens.asked.lock().unwrap().is_empty());
+        // A hard ask with `LAMP_MAKE_AGENT_NET=held` runs on the held make's
+        // runner (`open`): it has no token, which the one run path's wrapper
+        // needs for a run in its own folder (lamp-control mints an ask only
+        // for a linked service's read), so it still fails closed there, told
+        // `not_held_off` as the voice says it, never `run_failed`.
+        let tokens = Arc::new(Minting::default());
+        let mut held_make = crate::skill_make::lamp_runner(&top, true);
+        held_make.hermes.held_by = Some(place.clone());
+        let hard = Asks {
+            open: Arc::new(held_make),
+            ..super::tests::asks(
+                Arc::new(Agent::default()),
+                Arc::new(Agent::default()),
+                tokens.clone(),
+                on(),
+            )
+        };
+        let told = answer(&line("plan my week", &[]), &hard, &ask_work, &mut || {});
+        assert_eq!(told["error"], "not_held_off", "{told}");
+        assert_eq!(told["message"], NOT_HELD_OFF_ONE_PATH, "{told}");
+        assert!(tokens.asked.lock().unwrap().is_empty());
+        // By the one run path, a wrapper or namespace that gives no fresh
+        // home: refused, no token minted, nothing made or started.
+        for (wrapper, script) in [
+            (wrapper(false), script.clone()),
+            (
+                wrapper(true),
+                script.replace(crate::skill_make::ONE_PATH_NS_MAKE_LINES, ""),
+            ),
+        ] {
+            write(&wrapper, &script);
+            let tokens = Arc::new(Minting::default());
+            let asks = held_asks(held(true), tokens.clone());
+            let told = answer(&ask(), &asks, &ask_work, &mut || {});
+            assert_eq!(told["error"], "no_namespace", "{told}");
+            assert_eq!(told["message"], crate::skill_make::NO_NAMESPACE);
+            assert!(tokens.asked.lock().unwrap().is_empty());
+        }
+        assert_eq!(std::fs::read_dir(&ask_work).unwrap().count(), 0);
+        assert!(std::fs::read_dir(&project).unwrap().next().is_none());
     }
 
     #[test]

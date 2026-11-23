@@ -1027,6 +1027,7 @@ fn as_harness_user(script: &str) -> Vec<String> {
         "--".to_owned(),
         "env".to_owned(),
         format!("HOME={HARNESS_HOME}"),
+        install::harness_data(HARNESS_HOME),
         "PATH=/usr/local/bin:/usr/bin:/bin".to_owned(),
         "sh".to_owned(),
         "-c".to_owned(),

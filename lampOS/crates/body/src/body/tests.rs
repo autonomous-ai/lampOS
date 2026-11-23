@@ -19,6 +19,10 @@ struct Servo {
     keeps_force: bool,
     /// Its own lower and upper position limits (registers 9 and 11).
     range: (u16, u16),
+    /// Its own maximum acceleration (register 85, EEPROM): a write of a
+    /// higher acceleration reads back as this, as the STS3215s capped at 50
+    /// do (#7946). 254 on most.
+    max_acceleration: u8,
 }
 
 /// Something that happens to one servo at a given time.
@@ -54,6 +58,12 @@ struct Lamp {
     register_times: Vec<Duration>,
     /// One servo cannot pass this position and presses on it instead.
     wall: Option<(usize, f32)>,
+    /// One servo cannot go under this position, as an arm that meets its
+    /// rest before its folded count (a factory lamp's elbow, 23 Nov, 61 counts up, its
+    /// head askew under it): it stops there and reads this load while its
+    /// goal is under it, 20 once the goal is where it rests. Servo,
+    /// position, load.
+    floor: Option<(usize, f32, u16)>,
     /// One servo stops this many counts short of any goal, as a real one
     /// does against its own friction.
     short: Option<(usize, f32)>,
@@ -136,9 +146,12 @@ struct Lamp {
     read_times: Vec<Duration>,
     /// Each servo id asked for its position limits (registers 9..=12).
     limit_reads: Vec<u8>,
-    /// This many reads of the force limits (register 48) go unanswered, as
-    /// when a servo just started is slow on the wire (#6591).
-    lost_force_reads: u8,
+    /// Sync reads that go unanswered, as when a servo just started is slow
+    /// on the wire (#6591): the register first read, and how many more reads
+    /// of it are lost.
+    lost_reads: Vec<(u8, u8)>,
+    /// The first register of each sync read asked, in order.
+    sync_reads: Vec<u8>,
 }
 
 struct Clock {
@@ -180,6 +193,7 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
         force: 1_000,
         keeps_force: true,
         range: (0, 4_095),
+        max_acceleration: 254,
     };
     let time = Rc::new(Cell::new(Duration::ZERO));
     (
@@ -201,6 +215,7 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             goal_positions: Vec::new(),
             register_times: Vec::new(),
             wall: None,
+            floor: None,
             short: None,
             heavy: None,
             climb: None,
@@ -231,7 +246,8 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             misreads: Vec::new(),
             read_times: Vec::new(),
             limit_reads: Vec::new(),
-            lost_force_reads: 0,
+            lost_reads: Vec::new(),
+            sync_reads: Vec::new(),
         },
         Clock {
             time,
@@ -400,6 +416,17 @@ impl Lamp {
                 servo.position = at;
                 servo.load = 300;
             }
+            if let Some((rests, at, load)) = self.floor
+                && rests == index
+                && servo.position <= at
+            {
+                servo.position = at;
+                servo.load = if f32::from(servo.goal) < at - 4.0 {
+                    load
+                } else {
+                    20
+                };
+            }
         }
     }
 
@@ -421,6 +448,7 @@ impl Lamp {
                 12 => servo.range.1.to_le_bytes()[1],
                 40 => servo.torque,
                 41 => servo.acceleration,
+                85 => servo.max_acceleration,
                 42 => servo.goal.to_le_bytes()[0],
                 43 => servo.goal.to_le_bytes()[1],
                 46 => servo.speed.to_le_bytes()[0],
@@ -476,8 +504,13 @@ impl Lamp {
                     if address == 9 {
                         self.limit_reads.extend(parameters[2..].iter().copied());
                     }
-                    if address == 48 && self.lost_force_reads > 0 {
-                        self.lost_force_reads -= 1;
+                    self.sync_reads.push(address);
+                    if let Some(lost) = self
+                        .lost_reads
+                        .iter_mut()
+                        .find(|(read, left)| *read == address && *left > 0)
+                    {
+                        lost.1 -= 1;
                         continue;
                     }
                     for asked in parameters[2..].iter().copied() {
@@ -553,7 +586,7 @@ impl Lamp {
                     }
                     let servo = &mut self.servos[usize::from(id) - 1];
                     match (address, data.as_slice()) {
-                        (41, [value]) => servo.acceleration = *value,
+                        (41, [value]) => servo.acceleration = (*value).min(servo.max_acceleration),
                         (46, [low, high]) => servo.speed = u16::from_le_bytes([*low, *high]),
                         // A goal by itself: only ever to the shoulder or the
                         // elbow, or to a joint the body takes hold of.
@@ -682,6 +715,87 @@ fn the_three_writes_are_exactly_these_bytes() {
     assert_eq!(
         hex(&acceleration_write(Joint::BaseYaw, 50)),
         "ffff01040329329c"
+    );
+}
+
+/// #7946: lamp-5ee8's base yaw (and many of the 200-lamp round's) holds a
+/// maximum acceleration of 50 in its EEPROM, so the 50 asked by the folded
+/// limits' own servo cap is no problem, and 60 asked reads back as 50 and
+/// used to stop the start. Now each joint runs at the lower of what is
+/// asked and its own cap: the write asked is the cap, and the start goes on.
+#[test]
+fn a_servo_capped_at_50_runs_at_its_cap_and_the_start_goes_on() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    lamp.servos[0].max_acceleration = 50;
+    let limits = Limits {
+        servo_acceleration: 60,
+        ..Limits::FOLDED
+    };
+    let news = script(&clock.time);
+    let report = run(&mut lamp, &mut clock, limits, None, news, |_| {});
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.moved);
+    // The capped base yaw is asked its cap; the wrist roll its 60.
+    assert!(
+        lamp.registers.contains(&(1, 41, vec![50])),
+        "{:?}",
+        lamp.registers
+    );
+    assert!(
+        lamp.registers.contains(&(4, 41, vec![60])),
+        "{:?}",
+        lamp.registers
+    );
+    assert!(
+        !lamp.registers.contains(&(1, 41, vec![60])),
+        "{:?}",
+        lamp.registers
+    );
+    assert_eq!(lamp.servos[0].acceleration, 50);
+}
+
+/// Without the fix the same lamp stopped before moving, the read back
+/// naming the cap, as lamp-5ee8's did (`profile read back as …`): the test
+/// above is the one that fails on lamp-voice before #7946. Here, a servo with
+/// the usual cap runs at the 60 asked, and nothing is said.
+#[test]
+fn a_servo_with_the_usual_cap_runs_at_what_is_asked() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    let limits = Limits {
+        servo_acceleration: 60,
+        ..Limits::FOLDED
+    };
+    let news = script(&clock.time);
+    let report = run(&mut lamp, &mut clock, limits, None, news, |_| {});
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(
+        lamp.registers.contains(&(1, 41, vec![60])),
+        "{:?}",
+        lamp.registers
+    );
+}
+
+/// The caps' rule by itself: the lower of asked and the cap, the known low
+/// cap when nothing could be read, never higher, and only a lower one said.
+#[test]
+fn each_joint_runs_at_the_lower_of_asked_and_its_cap() {
+    let joints = [Joint::BaseYaw, Joint::WristRoll];
+    let mut said = Vec::new();
+    let mut say = |line: String| said.push(line);
+    let each = accelerations(60, &joints, Ok(vec![50, 254]), &mut say);
+    assert_eq!(each[Joint::BaseYaw.index()], 50);
+    assert_eq!(each[Joint::WristRoll.index()], 60);
+    let each = accelerations(60, &joints, Err("no answer".into()), &mut say);
+    assert_eq!(each[Joint::BaseYaw.index()], 50);
+    assert_eq!(each[Joint::WristRoll.index()], 50);
+    let each = accelerations(40, &joints, Err("no answer".into()), &mut say);
+    assert_eq!(each[Joint::BaseYaw.index()], 40, "never higher than asked");
+    let each = accelerations(60, &joints, Ok(vec![0, 254]), &mut say);
+    assert_eq!(each[Joint::BaseYaw.index()], 50, "a cap of 0 is no reading");
+    assert_eq!(said.len(), 3, "{said:?}");
+    assert!(
+        said[0].contains("base yaw") || said[0].contains("BaseYaw") || said[0].contains("50"),
+        "{said:?}"
     );
 }
 
@@ -1600,7 +1714,7 @@ fn a_force_limit_read_back_that_goes_unanswered_once_is_asked_again() {
         ..Limits::FOLDED
     };
     let (mut lamp, mut clock) = folded(Duration::from_secs(8));
-    lamp.lost_force_reads = 1;
+    lamp.lost_reads = vec![(48, 1)];
     let news = script(&clock.time);
     let report = run(&mut lamp, &mut clock, capped, None, news, |_| {});
     assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
@@ -1609,7 +1723,7 @@ fn a_force_limit_read_back_that_goes_unanswered_once_is_asked_again() {
 
     // A servo that never answers still ends the run before anything moves.
     let (mut lamp, mut clock) = folded(Duration::from_secs(8));
-    lamp.lost_force_reads = u8::MAX;
+    lamp.lost_reads = vec![(48, u8::MAX)];
     let news = script(&clock.time);
     let report = run(&mut lamp, &mut clock, capped, None, news, |_| {});
     assert_eq!(
@@ -1621,6 +1735,49 @@ fn a_force_limit_read_back_that_goes_unanswered_once_is_asked_again() {
     );
     assert!(!report.moved && lamp.goals.is_empty());
     assert_eq!(report.force, None);
+}
+
+/// Each of a start's read-backs is asked `READ_BACK_TRIES` times in all
+/// while no answer comes (#6591, Heron's P2 on #7096): two lost answers are
+/// ridden, a third ends it with the read's own error, and nothing is asked
+/// a fourth time. The same for the arm's profiles, the commanded joints'
+/// profiles and the force limits.
+#[test]
+fn every_start_read_back_is_asked_three_times_in_all_and_no_more() {
+    type Read = fn(&mut Bus<'_, Lamp, Clock>) -> Result<(), String>;
+    let reads: [(&str, u8, Read); 3] = [
+        ("arm profiles", 40, |bus| bus.arm_profiles().map(drop)),
+        ("profiles", 40, |bus| bus.profiles().map(drop)),
+        ("force limits", 48, |bus| {
+            bus.force_limits(&[Joint::BaseYaw]).map(drop)
+        }),
+    ];
+    for (name, address, read) in reads {
+        for lost in 0..=3u8 {
+            let (mut lamp, mut clock) = folded(Duration::from_secs(5));
+            lamp.lost_reads = vec![(address, lost)];
+            let result = {
+                let mut bus = Bus::new(&mut lamp, &mut clock, Some(lamp_4ace_standing()));
+                bus.read_back(read)
+            };
+            let asked = lamp
+                .sync_reads
+                .iter()
+                .filter(|read| **read == address)
+                .count();
+            if lost < 3 {
+                assert_eq!(result, Ok(()), "{name}, {lost} lost");
+                assert_eq!(asked, usize::from(lost) + 1, "{name}, {lost} lost");
+            } else {
+                assert_eq!(
+                    result,
+                    Err("a reply did not come in time".into()),
+                    "{name}, {lost} lost"
+                );
+                assert_eq!(asked, 3, "{name}, {lost} lost");
+            }
+        }
+    }
 }
 
 #[test]
@@ -2041,14 +2198,47 @@ fn an_arm_that_strains_goes_back_down_and_stays_down_for_a_while() {
 /// otherwise as `set` makes it: the arm goals and positions of the last
 /// step it was fully stood up.
 fn elbow_standing(load: u16, set: impl FnOnce(&mut Lamp)) -> ([u16; 2], [u16; 2]) {
-    let (mut lamp, mut clock) = folded(Duration::from_secs(75));
+    elbow_standing_for(
+        Duration::from_secs(75),
+        load,
+        Duration::from_secs(75),
+        &[],
+        set,
+    )
+}
+
+/// As [`elbow_standing`], standing for `ends`, the elbow reading `load`
+/// until `loaded` only, and speaking (so leaning, `LEAN`) in `speaks`
+/// (seconds, from and until).
+fn elbow_standing_for(
+    ends: Duration,
+    load: u16,
+    loaded: Duration,
+    speaks: &'static [(u64, u64)],
+    set: impl FnOnce(&mut Lamp),
+) -> ([u16; 2], [u16; 2]) {
+    let (mut lamp, mut clock) = folded(ends);
     lamp.arm_moves = true;
     lamp.overload_clears = 1;
-    lamp.strains = vec![(Duration::ZERO, Duration::from_secs(75), 2, load)];
+    lamp.strains = vec![(Duration::ZERO, loaded, 2, load)];
     set(&mut lamp);
-    // Listened to throughout: awake, and at energy level 1 no lean moves
+    // Listened to otherwise: awake, and at energy level 1 no lean moves
     // the arm off its stand goal.
-    let news = || Some((Mood::Listening, 100));
+    let time = clock.time.clone();
+    let news = move || {
+        let at = time.get().as_secs();
+        Some(
+            if speaks
+                .iter()
+                .any(|(from, until)| (*from..*until).contains(&at))
+            {
+                (Mood::Speaking, 100)
+            } else {
+                (Mood::Listening, 100)
+            },
+        )
+    };
+    let mut leant = false;
     let mut last = None;
     let report = run_standing(
         &mut lamp,
@@ -2059,12 +2249,16 @@ fn elbow_standing(load: u16, set: impl FnOnce(&mut Lamp)) -> ([u16; 2], [u16; 2]
         news,
         |glimpse| {
             if glimpse.stand == 1.0 {
+                // The shoulder is never eased here: stood, a goal this far
+                // under its stand is a lean.
+                leant |= glimpse.arm_goals[0] <= 2_650 - 40;
                 last = Some((glimpse.arm_goals, glimpse.arm_positions));
             }
         },
     );
     assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
     assert!(report.stood && report.retreats.is_empty(), "{report:?}");
+    assert_eq!(leant, !speaks.is_empty());
     last.unwrap()
 }
 
@@ -2077,6 +2271,174 @@ fn a_standing_elbow_held_45_short_at_load_190_has_its_stand_goal_eased() {
     let (goals, at) = elbow_standing(190, |lamp| lamp.short = Some((2, 45.0)));
     assert_eq!(at[1], 2_555);
     assert_eq!(goals, [2_650, 2_555 + STAND_EASE_MARGIN], "at {at:?}");
+}
+
+/// lamp-74ff on 13508 with #7294 (#7289, 19:57 to 20:05): goal 2,562
+/// eased to 2,527, held at 2,522, load 172; then eased to 2,494, held at
+/// 2,489, load 164; then 40 short at 172, past the floor. Each ease only
+/// lowered the lamp: the elbow drooped ~40 under the new goal at the same
+/// load. Eased once and still loaded, it goes back to its measured stand
+/// and is not eased again this run.
+#[test]
+fn a_standing_elbow_still_loaded_after_its_ease_goes_back_to_its_stand_and_eases_no_more() {
+    let (goals, at) = elbow_standing_for(
+        Duration::from_secs(200),
+        172,
+        Duration::from_secs(200),
+        &[],
+        |lamp| lamp.short = Some((2, 40.0)),
+    );
+    assert_eq!(goals, [2_650, 2_600], "at {at:?}");
+    assert_eq!(at[1], 2_560);
+}
+
+/// An ease after which the load comes under `STAND_EASE_LOAD` is kept.
+#[test]
+fn a_standing_elbow_whose_load_drops_after_its_ease_keeps_it() {
+    let (goals, at) = elbow_standing_for(
+        Duration::from_secs(200),
+        190,
+        Duration::from_secs(80),
+        &[],
+        |lamp| lamp.short = Some((2, 45.0)),
+    );
+    assert_eq!(goals, [2_650, 2_555 + STAND_EASE_MARGIN], "at {at:?}");
+}
+
+/// lamp-52e6 on 14083 (#7281): its shoulder held 52 short at 220 on every
+/// 10 s line but read 176, 144 and 64 right after moves, and leant and
+/// gestured every 10 to 25 s; it was never eased and heated. Here the elbow
+/// holds 50 short at 220 with one 140 read every 30 s and a lean between
+/// each: a dip takes a step off a leaky count, not the count, so it is
+/// eased, and once its load drops (at 100 s) the ease is kept.
+#[test]
+fn a_standing_elbow_whose_load_dips_once_every_30_s_between_leans_is_still_eased() {
+    let ms = Duration::from_millis;
+    let (goals, at) = elbow_standing_for(
+        Duration::from_secs(130),
+        220,
+        Duration::from_secs(100),
+        &[(12, 16), (42, 46), (72, 76)],
+        |lamp| {
+            lamp.short = Some((2, 50.0));
+            // Ahead of the steady load, which `Lamp::strains` finds after.
+            for at in [30_000, 60_000, 90_000] {
+                lamp.strains.insert(0, (ms(at), ms(at + 30), 2, 140));
+            }
+        },
+    );
+    assert!(at[1] <= 2_600 - STAND_EASE_SHORT, "at {at:?}");
+    assert_eq!(goals, [2_650, at[1] + STAND_EASE_MARGIN], "at {at:?}");
+}
+
+/// The elbow's load in spells from `from` until `until` seconds: `a`'s
+/// seconds at its load, then `b`'s, and again.
+fn spells(
+    from: u64,
+    until: u64,
+    a: (u64, u16),
+    b: (u64, u16),
+) -> Vec<(Duration, Duration, usize, u16)> {
+    let mut out = Vec::new();
+    let mut at = from;
+    while at < until {
+        for (secs, load) in [a, b] {
+            out.push((
+                Duration::from_secs(at),
+                Duration::from_secs(at + secs),
+                2,
+                load,
+            ));
+            at += secs;
+        }
+    }
+    out
+}
+
+/// lamp-52e6's 15:06 ROW (#7281): the shoulder spent 30 s at 38 short and
+/// load 164, then landed at its stand (load 20) for 30 s, and again, and
+/// heated to 52-53 degrees; each landing's settle zeroed the count. Here
+/// the elbow, with a lean in each landing: the leaky count gains 20 s of
+/// strain a minute, so it is eased within 3 min, and the ease is kept.
+#[test]
+fn a_standing_elbow_loaded_in_30_s_spells_between_landings_is_eased_within_3_min() {
+    let (goals, at) = elbow_standing_for(
+        Duration::from_secs(185),
+        164,
+        Duration::ZERO,
+        &[(45, 49), (105, 109)],
+        |lamp| {
+            lamp.short = Some((2, 38.0));
+            lamp.strains = spells(0, 185, (35, 164), (30, 20));
+        },
+    );
+    assert_eq!(at[1], 2_600 - 38, "at {at:?}");
+    assert_eq!(goals, [2_650, 2_562 + STAND_EASE_MARGIN], "at {at:?}");
+}
+
+/// Held 50 short at a steady 220: eased once `STAND_EASE_STEPS` (60 s) of
+/// strain are counted from fully stood (about 4.7 s), not before.
+#[test]
+fn a_standing_elbow_held_short_at_a_steady_220_is_eased_at_60_s() {
+    let short = |lamp: &mut Lamp| lamp.short = Some((2, 50.0));
+    let at_62 = elbow_standing_for(
+        Duration::from_secs(62),
+        220,
+        Duration::from_secs(62),
+        &[],
+        short,
+    );
+    assert_eq!(at_62.0, [2_650, 2_600], "{at_62:?}");
+    let at_70 = elbow_standing_for(
+        Duration::from_secs(70),
+        220,
+        Duration::from_secs(70),
+        &[],
+        short,
+    );
+    assert_eq!(at_70.0, [2_650, 2_550 + STAND_EASE_MARGIN], "{at_70:?}");
+}
+
+/// Truly settled, 50 short at a load of 20 for 10 min: never eased.
+#[test]
+fn a_standing_elbow_short_but_settled_for_10_min_is_never_eased() {
+    let (goals, at) = elbow_standing_for(
+        Duration::from_secs(600),
+        20,
+        Duration::from_secs(600),
+        &[],
+        |lamp| lamp.short = Some((2, 50.0)),
+    );
+    assert_eq!(goals, [2_650, 2_600], "at {at:?}");
+}
+
+/// The other bound: 5 s spells at 220 among 25 s settled at 20, for
+/// 10 min. A 25 s settle takes off more than a 5 s spell adds, so the
+/// leaky count stays near 0 and it is never eased.
+#[test]
+fn a_standing_elbow_loaded_in_5_s_spells_among_25_s_settled_is_never_eased() {
+    let (goals, at) =
+        elbow_standing_for(Duration::from_secs(600), 220, Duration::ZERO, &[], |lamp| {
+            lamp.short = Some((2, 50.0));
+            lamp.strains = spells(0, 600, (5, 220), (25, 20));
+        });
+    assert_eq!(goals, [2_650, 2_600], "at {at:?}");
+}
+
+/// #7338's undo counts leakily too: eased at about 65 s, then at 190 in
+/// 30 s spells between 30 s settled at 20 from 75 s, its strain still
+/// reaches `STAND_EASE_STEPS` (at about 245 s) and the ease is undone.
+/// With a load that stays under, it is kept
+/// (`a_standing_elbow_whose_load_drops_after_its_ease_keeps_it`).
+#[test]
+fn a_standing_elbow_loaded_in_spells_after_its_ease_has_the_ease_undone() {
+    let (goals, at) =
+        elbow_standing_for(Duration::from_secs(270), 190, Duration::ZERO, &[], |lamp| {
+            lamp.short = Some((2, 45.0));
+            lamp.strains = vec![(Duration::ZERO, Duration::from_secs(75), 2, 190)];
+            lamp.strains.extend(spells(75, 270, (30, 20), (30, 190)));
+        });
+    assert_eq!(goals, [2_650, 2_600], "at {at:?}");
 }
 
 /// lamp-52e6 on the same build: 3 short at a load of 24. Nothing changes.
@@ -3881,6 +4243,7 @@ fn gesture_run_full(
                 pose: None,
                 unplug: false,
                 held_by_test: false,
+                missed_by_test: 0,
                 held: looking.is_some_and(|(from, _)| time.get() >= from),
                 aim: looking.map(|(_, yaw)| [yaw, 0.0]),
                 limp: false,
@@ -4015,6 +4378,7 @@ fn expression_run_with(
             pose: None,
             unplug: false,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -4190,6 +4554,7 @@ fn speaking_run_with(
             pose: None,
             unplug: false,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -4908,6 +5273,7 @@ fn rest_glances_watched(
             pose: None,
             unplug: false,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -5989,6 +6355,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             pose: None,
             unplug: false,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -6065,6 +6432,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             pose: None,
             unplug: false,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -6159,6 +6527,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 pose: None,
                 unplug: false,
                 held_by_test: false,
+                missed_by_test: 0,
                 held: false,
                 aim: None,
                 limp: false,
@@ -6939,6 +7308,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     pose: None,
                     unplug: false,
                     held_by_test: false,
+                    missed_by_test: 0,
                     held: false,
                     aim: None,
                     limp: false,
@@ -7028,6 +7398,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 pose: None,
                 unplug: false,
                 held_by_test: false,
+                missed_by_test: 0,
                 held: false,
                 aim: None,
                 limp: false,
@@ -7124,6 +7495,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 woken: false,
                 unplug: false,
                 held_by_test: false,
+                missed_by_test: 0,
                 held: false,
                 aim: None,
                 limp: false,
@@ -10128,6 +10500,7 @@ fn called_run(
                 pose: None,
                 unplug: false,
                 held_by_test: false,
+                missed_by_test: 0,
                 held: false,
                 aim: None,
                 limp: false,
@@ -10709,6 +11082,158 @@ fn gesture_limits() -> Limits {
         servo_acceleration: 60,
     })
     .unwrap()
+}
+
+/// A nod asked at 1 s of a folded lamp at rest, with the wire silent over
+/// `silent` (from, until) when given; and when the nod played, first and last.
+fn nod_with_silence(silent: Option<(Duration, Duration)>) -> (Fates, Duration, Duration) {
+    let run = skill_run(
+        14,
+        standing(100, 5),
+        gesture_limits(),
+        |lamp| {
+            if let Some((from, until)) = silent {
+                lamp.silent_from = Some(from);
+                lamp.silent_until = Some(until);
+            }
+        },
+        || Some((Mood::Resting, 0)),
+        once(Duration::from_secs(1), false),
+    );
+    let mut played = run.2.iter().filter(|s| s.2 == Some("nod")).map(|s| s.0);
+    let first = played.next().unwrap();
+    let last = played.next_back().unwrap();
+    (run, first, last)
+}
+
+/// #8266, lamp-52e6 at 04:11 on 22 Nov: a level 5 waltz with one servo read
+/// missed in the middle ended as a plain `over` at 4.78 s of its 8.40 s. One
+/// missed read holds the frame for that step and the gesture plays to its end.
+#[test]
+fn one_missed_read_in_the_middle_of_a_gesture_leaves_it_playing_to_its_end() {
+    let (_, began, ended) = nod_with_silence(None);
+    let middle = began + (ended - began) / 2;
+    let ((report, fates, _), first, last) =
+        nod_with_silence(Some((middle, middle + Duration::from_millis(20))));
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.missed_reads > 0, "the fixture must miss a read");
+    assert!(report.missed_reads < 3, "{report:?}");
+    assert_eq!(first, began);
+    assert!(
+        last + Duration::from_millis(60) >= ended,
+        "cut at {:?} of {:?}",
+        last - first,
+        ended - began
+    );
+    assert_eq!((report.gestures, report.gestures_dropped), (1, 0));
+    assert_eq!(fates, [("nod", "taken: it was folded and stood up for it")]);
+}
+
+/// A miss that lasts (a third of a second, short of the run's own half
+/// second on a silent wire) still ends the gesture, and says why.
+#[test]
+fn a_lasting_miss_ends_a_playing_gesture_and_says_so() {
+    let (_, began, ended) = nod_with_silence(None);
+    let middle = began + (ended - began) / 2;
+    let ((report, fates, _), _, last) =
+        nod_with_silence(Some((middle, middle + Duration::from_millis(300))));
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(last < middle + Duration::from_millis(300), "{last:?}");
+    assert_eq!((report.gestures, report.gestures_dropped), (1, 1));
+    assert_eq!(
+        fates,
+        [
+            ("nod", "taken: it was folded and stood up for it"),
+            ("nod", "ended: 5 servo reads in a row were missed"),
+        ]
+    );
+}
+
+/// A nod asked at 1 s of a folded lamp at rest, with `count` servo reads
+/// missed on purpose (`Asked::missed_by_test`, what `lamp-body --miss-from`
+/// asks) asked once, at `at`; and when the nod played, first and last.
+fn nod_with_test_misses(count: u8, at: Duration) -> (Fates, Duration, Duration) {
+    let mut nod = once(Duration::from_secs(1), false);
+    let mut asked = false;
+    let run = skill_run(
+        14,
+        standing(100, 5),
+        gesture_limits(),
+        |_| {},
+        || Some((Mood::Resting, 0)),
+        move |now| {
+            let due = !asked && now >= at;
+            asked |= due;
+            Asked {
+                missed_by_test: if due { count } else { 0 },
+                ..nod(now)
+            }
+        },
+    );
+    let mut played = run.2.iter().filter(|s| s.2 == Some("nod")).map(|s| s.0);
+    let first = played.next().unwrap();
+    let last = played.next_back().unwrap();
+    (run, first, last)
+}
+
+/// #8266: one or three reads missed on purpose in the middle of a gesture
+/// (`--miss-from`, so that a lamp's row need not wait for the wire) run the
+/// wire's own miss path, and the gesture plays to its length and is over
+/// with no fate but its taking.
+#[test]
+fn one_or_three_reads_missed_on_purpose_leave_a_gesture_playing_to_its_end() {
+    let (_, began, ended) = nod_with_silence(None);
+    let middle = began + (ended - began) / 2;
+    for count in [1, 3] {
+        let ((report, fates, _), first, last) = nod_with_test_misses(count, middle);
+        assert_eq!(report.stop, Stop::Cancelled, "{count}: {report:?}");
+        assert_eq!(report.missed_reads, u64::from(count), "{report:?}");
+        assert_eq!(first, began, "{count}");
+        assert!(
+            last + Duration::from_millis(60) >= ended,
+            "{count}: cut at {:?} of {:?}",
+            last - first,
+            ended - began
+        );
+        assert_eq!(
+            (report.gestures, report.gestures_dropped),
+            (1, 0),
+            "{count}"
+        );
+        assert_eq!(fates, [("nod", "taken: it was folded and stood up for it")]);
+    }
+}
+
+/// #8266: five reads missed on purpose in a row end the gesture playing,
+/// and say so, as five missed on the wire do.
+#[test]
+fn five_reads_missed_on_purpose_end_a_playing_gesture_and_say_so() {
+    let (_, began, ended) = nod_with_silence(None);
+    let middle = began + (ended - began) / 2;
+    let ((report, fates, _), _, last) = nod_with_test_misses(5, middle);
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.missed_reads, 5, "{report:?}");
+    assert!(last < ended, "{last:?} of {ended:?}");
+    assert_eq!((report.gestures, report.gestures_dropped), (1, 1));
+    assert_eq!(
+        fates,
+        [
+            ("nod", "taken: it was folded and stood up for it"),
+            ("nod", GESTURE_BLIND_FATE),
+        ]
+    );
+}
+
+/// Asked nothing (every product unit: no `--miss-from`), a run is the same
+/// step for step as one whose test input never asks a miss.
+#[test]
+fn no_reads_missed_on_purpose_unless_asked() {
+    let (baseline, began, ended) = nod_with_silence(None);
+    let (asked_none, first, last) = nod_with_test_misses(0, began);
+    assert_eq!((first, last), (began, ended));
+    assert_eq!(asked_none.0.missed_reads, 0);
+    assert_eq!(asked_none.1, baseline.1);
+    assert_eq!(asked_none.2, baseline.2);
 }
 
 /// A skill's gesture asked of a folded lamp at rest (lamp-4ace, 15:16 on
@@ -15196,6 +15721,7 @@ fn held_from_test_input_run(
             let asked = Asked {
                 gesture: due.then_some(&crate::clips::STRETCHING),
                 held_by_test: held,
+                missed_by_test: 0,
                 held: false,
                 aim: None,
                 limp: false,
@@ -16142,6 +16668,7 @@ fn unplug_never_attests_an_arm_stuck_away_from_its_fold() {
         || Asked {
             unplug: true,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -16175,6 +16702,7 @@ fn unplug_attests_a_fold_whose_elbow_rests_a_few_counts_off() {
         || Asked {
             unplug: true,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -16216,6 +16744,7 @@ fn unplug_brings_a_base_looking_aside_home_before_it_attests() {
                 Asked {
                     unplug: true,
                     held_by_test: false,
+                    missed_by_test: 0,
                     held: false,
                     aim: None,
                     limp: false,
@@ -16279,6 +16808,7 @@ fn unplug_ready_stays_ready_through_a_second_turn() {
             Asked {
                 unplug: true,
                 held_by_test: false,
+                missed_by_test: 0,
                 held: false,
                 aim: None,
                 limp: false,
@@ -16336,6 +16866,7 @@ fn unplug_ready_survives_a_bad_read() {
         || Asked {
             unplug: true,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -16477,6 +17008,7 @@ fn unplug_never_attests_a_shifted_runtime_home_as_the_configured_fold() {
         || Asked {
             unplug: true,
             held_by_test: false,
+            missed_by_test: 0,
             held: false,
             aim: None,
             limp: false,
@@ -16536,6 +17068,7 @@ fn unplug_released_stands_through_the_ordinary_rise_unless_paused() {
                 Asked {
                     unplug: latched,
                     held_by_test: false,
+                    missed_by_test: 0,
                     held: false,
                     aim: None,
                     limp: false,
@@ -19272,6 +19805,17 @@ fn powered_up_on(
     prepare: impl FnOnce(&mut Lamp),
     run_for: Duration,
 ) -> PoweredUp {
+    powered_up_tuned(flags, found, prepare, run_for, |_| {})
+}
+
+/// [`powered_up_on`] with the unit's limits `tune`d (its `--recover-load`).
+fn powered_up_tuned(
+    flags: &Flags,
+    found: [u16; 5],
+    prepare: impl FnOnce(&mut Lamp),
+    run_for: Duration,
+    tune: impl FnOnce(&mut Limits),
+) -> PoweredUp {
     let (mut lamp, mut clock) = folded(run_for);
     lamp.may_take_hold = true;
     lamp.arm_moves = true;
@@ -19280,7 +19824,7 @@ fn powered_up_on(
         (servo.position, servo.goal, servo.torque, servo.status) = (f32::from(at), 0, 0, 0);
     }
     prepare(&mut lamp);
-    let limits = Limits {
+    let mut limits = Limits {
         force: Some(600),
         torque_on: true,
         wake: true,
@@ -19297,6 +19841,7 @@ fn powered_up_on(
         })
         .unwrap()
     };
+    tune(&mut limits);
     let up = Standing::new(flags.folded, flags.stand, 100, 6, 90, flags.load)
         .unwrap()
         .idling(true);
@@ -20467,6 +21012,130 @@ fn a_found_folded_lamp_whose_wake_stops_ends_held_and_does_not_loop() {
     assert!(powered.lamp.servos.iter().all(|servo| servo.torque == 1));
 }
 
+/// A factory lamp on build 15146, 23 Nov: set up with its arm raised (shoulder
+/// 3162, elbow 3653), it folded for 27 s and its elbow met its rest 61
+/// counts above folded, its head askew under it, pressing there at a load
+/// of 252 against the unit's `--recover-load 250`. The fold ended on that
+/// load, the hold where it lay was refused (61 from its last goal, over
+/// `ARM_GOAL_STEP`), so the elbow went on pressing at 252 (52 C and
+/// rising), and lamp-body exited; systemd's three restarts each ended on
+/// `Window` and the unit failed for good. An arm that meets its rest within
+/// `ARM_LET_GO_NEAR` of folded is folded: it stops pushing, and the lamp
+/// wakes and stands.
+#[test]
+fn a_fold_that_meets_its_rest_short_of_folded_stops_pushing_and_stands() {
+    let rest = f32::from(LAMP_52E6.folded[1]) + 61.0;
+    let powered = powered_up_tuned(
+        &LAMP_52E6,
+        [2_035, 2_657, 2_900, 2_035, 1_771],
+        |lamp| lamp.floor = Some((2, rest, 252)),
+        Duration::from_secs(160),
+        |limits| limits.recover_load = Some(250),
+    );
+    let report = &powered.report;
+    assert!(report.stood && powered.stood_at_pose, "{report:?}");
+    assert_ended_as_asked(report);
+    // Its elbow is never left pressing on its rest: no goal under it stays
+    // written for more than a few seconds while it lies there.
+    let pressing = pressed_on_its_rest(&powered.lamp, rest);
+    assert!(pressing <= Duration::from_secs(5), "pressed {pressing:?}");
+}
+
+/// The hardware lead at the bench, 23 Nov: found with its arm raised and
+/// its base and head turned away, the lamp turns its head and base
+/// straight first, the arm held where it is, and only then folds; so the
+/// head lies straight under the arm as it comes down.
+#[test]
+fn a_raised_lamp_turned_away_faces_front_before_its_arm_comes_down() {
+    let found = [1_700, 2_657, 2_900, 1_800, 1_771];
+    let powered = powered_up(found, |_| {});
+    let report = &powered.report;
+    assert!(report.stood && powered.stood_at_pose, "{report:?}");
+    let lamp = &powered.lamp;
+    // The first write that asks the shoulder or the elbow down.
+    let first_down = lamp
+        .goals
+        .iter()
+        .position(|goals| {
+            goals
+                .iter()
+                .any(|(id, goal)| (*id == 2 && *goal < 2_637) || (*id == 3 && *goal < 2_880))
+        })
+        .expect("the arm folds");
+    let at = lamp.goal_positions[first_down];
+    let home = LAMP_52E6.home;
+    assert!(at[YAW].abs_diff(home[2]) <= 15, "yaw at {}", at[YAW]);
+    assert!(at[ROLL].abs_diff(home[1]) <= 15, "roll at {}", at[ROLL]);
+    // And the arm had not moved while they turned.
+    assert!(
+        at[1].abs_diff(2_657) <= 30 && at[2].abs_diff(2_900) <= 30,
+        "{at:?}"
+    );
+}
+
+/// The run went on until it was asked to stop, 160 s in, standing. Folding
+/// down for the exit, an elbow that rests more than `ARM_GOAL_STEP` short
+/// of folded is let go rather than held there (the exit's own rule, #1722,
+/// unchanged here), which the report says as `Stop::Window`.
+fn assert_ended_as_asked(report: &BodyReport) {
+    assert!(
+        matches!(report.stop, Stop::Cancelled | Stop::Window { joint: 3, .. }),
+        "{report:?}"
+    );
+    assert!(report.steps > 6_000, "it ran to the end: {}", report.steps);
+}
+
+/// The longest the elbow lay on `rest` with a goal more than 4 under it.
+fn pressed_on_its_rest(lamp: &Lamp, rest: f32) -> Duration {
+    let (mut longest, mut since) = (Duration::ZERO, None::<Duration>);
+    for ((goals, at), positions) in lamp
+        .goals
+        .iter()
+        .zip(&lamp.goal_times)
+        .zip(&lamp.goal_positions)
+    {
+        let Some((_, goal)) = goals.iter().find(|(id, _)| *id == 3) else {
+            continue;
+        };
+        let presses = f32::from(*goal) < rest - 4.0 && f32::from(positions[2]) <= rest + 1.0;
+        match (presses, since) {
+            (true, None) => since = Some(*at),
+            (true, Some(from)) => longest = longest.max(at.saturating_sub(from)),
+            (false, _) => since = None,
+        }
+    }
+    longest
+}
+
+/// The same factory lamp's restarts: found folded with torque on, its elbow 61 counts
+/// above its folded goal and pressing on its rest (goal register 2000,
+/// position 2061, load 256). The goal the servo held was taken as written
+/// (within `FOUND_SLACK`, 80) and then refused as a goal (over
+/// `ARM_GOAL_STEP`, 50, from where it read): `Stop::Window` at once, three
+/// times, and the unit failed. Such an elbow is held where it lies, and
+/// the lamp stands when spoken to.
+#[test]
+fn found_folded_pressing_on_its_rest_short_of_folded_it_stops_pushing_and_stands() {
+    let rest = f32::from(LAMP_52E6.folded[1]) + 61.0;
+    let found = [2_035, LAMP_52E6.folded[0] + 12, rest as u16, 2_035, 1_771];
+    let powered = powered_up(found, |lamp| {
+        lamp.floor = Some((2, rest, 256));
+        for (index, servo) in lamp.servos.iter_mut().enumerate() {
+            servo.torque = 1;
+            servo.goal = match index {
+                1 => LAMP_52E6.folded[0],
+                2 => LAMP_52E6.folded[1],
+                _ => servo.position as u16,
+            };
+        }
+    });
+    let report = &powered.report;
+    assert!(report.stood && powered.stood_at_pose, "{report:?}");
+    assert_ended_as_asked(report);
+    let pressing = pressed_on_its_rest(&powered.lamp, rest);
+    assert!(pressing <= Duration::from_secs(5), "pressed {pressing:?}");
+}
+
 /// While a raised, wrapped arm is held for a hand, a push on the head (its
 /// load over the bound) does not end the run: the head stops pushing, held
 /// where it is, and the wait goes on; a hot head joint is let go, the arm
@@ -20677,6 +21346,65 @@ fn an_energy_level_turns_faster_and_waits_for_the_lamp_to_settle() {
     let said_late = yaw_turned(0, 5);
     assert_eq!(landed(&said_late), landed(&today));
     assert!(fastest(&said_late) <= 6);
+}
+
+/// #7749: `LEVEL_PATIENCE` is 2 s. A held look 480 counts round from 1 s
+/// at 100 counts a second (above 1, under level 2's 425), level 2 sent at
+/// 1.2 s: the old level is kept until 2 s after the send, while the head
+/// still turns, and level 2 is taken by one step after.
+#[test]
+fn a_new_energy_level_waits_level_patience_for_a_head_turning_under_its_pace() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    let time = clock.time.clone();
+    let seen = clock.time.clone();
+    let mut yaw = Vec::new();
+    let limits = Limits {
+        yaw: 500.0,
+        ..Limits::folded_with(Tuning {
+            reach: [150, 15, 1, 250],
+            speed: 100,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let send = Duration::from_millis(1_200);
+    let patience = Duration::from_secs(2);
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        None,
+        None,
+        || Some((Mood::Resting, 0)),
+        move || {
+            let now = time.get();
+            Asked {
+                held: true,
+                aim: (now >= Duration::from_secs(1)).then_some([-480.0, 0.0]),
+                energy: if now >= send { 2 } else { 1 },
+                ..Asked::default()
+            }
+        },
+        |glimpse| yaw.push((seen.get(), glimpse.goals[2])),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let taken = report
+        .energy_levels
+        .iter()
+        .find(|(_, level)| *level == 2)
+        .map(|(at, _)| *at - send);
+    assert!(
+        taken.is_some_and(|after| (patience..=patience + TICK).contains(&after)),
+        "taken {taken:?} after the send"
+    );
+    // Still turning when it was taken: the head was never still for it.
+    assert!(
+        Duration::from_secs(1) + landed(&yaw) > send + taken.unwrap(),
+        "landed {:?}",
+        landed(&yaw)
+    );
 }
 
 /// `LAMP_BODY_ENERGY` (#6893): off, a step of the follower is the one it
@@ -21389,6 +22117,74 @@ fn a_gestures_roll_at_level_five_plays_under_the_servos_speed() {
     assert!(fastest <= 21, "{fastest}");
 }
 
+/// The built-in nod asked at 8 s while it speaks, at `level` with
+/// `LAMP_BODY_ENERGY=on` (#8153): the report and the elbow's goal each step
+/// from then on.
+fn nodded_at(level: u8) -> (BodyReport, Vec<u16>) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(14));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits {
+        energy: true,
+        ..Limits::folded_with(Tuning {
+            reach: [150, 15, 1, 250],
+            speed: 120,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let time = clock.time.clone();
+    let seen = clock.time.clone();
+    let mut asked = false;
+    let mut elbows = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        || Some((Mood::Speaking, 60)),
+        move || {
+            let due = !asked && time.get() >= Duration::from_secs(8);
+            asked |= due;
+            Asked {
+                gesture: due.then_some(&crate::clips::NOD),
+                energy: level,
+                ..Asked::default()
+            }
+        },
+        |glimpse| {
+            if seen.get() >= Duration::from_secs(8) {
+                elbows.push(glimpse.arm_goals[1]);
+            }
+        },
+    );
+    (report, elbows)
+}
+
+/// #8153: a built-in clip at level 5 is played 1.6 times its size (the
+/// nod's elbow, 212 counts peak to peak as recorded), passed through the
+/// anti-tip check as played; at level 1 as recorded.
+#[test]
+fn a_built_in_clip_at_level_five_plays_larger_than_at_level_one() {
+    // Over the 4 s from the ask, before the lamp sits down.
+    let span = |goals: &[u16]| {
+        let goals = &goals[..200];
+        goals.iter().max().unwrap() - goals.iter().min().unwrap()
+    };
+    let (report, today) = nodded_at(1);
+    assert_eq!(report.gestures, 1, "{report:?}");
+    assert_eq!(report.tipping.refused, 0, "{report:?}");
+    let (report, lively) = nodded_at(5);
+    assert_eq!(report.gestures, 1, "{report:?}");
+    assert_eq!(report.tipping.refused, 0, "{report:?}");
+    let (today, lively) = (span(&today), span(&lively));
+    assert!((200..=225).contains(&today), "{today}");
+    assert!(lively >= today * 3 / 2, "{today} {lively}");
+}
+
 /// A gesture only an energy level above 1 starts of itself (`lively`, the
 /// voice's fill, a lively skill's run, #6893) is dropped while lamp-control
 /// holds the body; the same nod not marked plays under the lease, as today.
@@ -21648,4 +22444,186 @@ fn a_lamp_folded_hot_stays_down_until_cool_and_then_a_new_line() {
         stood_within(&seen, 340, 355),
         "on: cool, a new line stands it"
     );
+}
+
+/// #7749: the level asked at `at`, alternating 5 and 2 every 7 s.
+fn level_every_seven(at: Duration) -> u8 {
+    if (at.as_secs() / 7).is_multiple_of(2) {
+        5
+    } else {
+        2
+    }
+}
+
+/// #7749: someone there, a new level sent every 7 s for 8 min, shifts at
+/// rest playing: each send is taken within 5 s, a shift found playing
+/// eased to rest for it; and no shift begins while a level waits.
+#[test]
+fn a_new_energy_level_ends_a_shift_at_rest_and_is_taken_within_five_seconds() {
+    let (report, shifts, folding, _, _) = at_rest_with(
+        true,
+        true,
+        8,
+        |at| Asked {
+            present: true,
+            energy: level_every_seven(at),
+            ..Asked::default()
+        },
+        None,
+        None,
+    );
+    assert_eq!(folding, None);
+    let sends: Vec<Duration> = (2..68).map(|k| Duration::from_secs(7 * k)).collect();
+    // Some sends found a shift playing, so the shift's end is what is tried.
+    assert!(
+        sends
+            .iter()
+            .any(|send| shifts.iter().any(|(from, to, _)| from < send && send < to)),
+        "{shifts:?}"
+    );
+    for send in sends {
+        let wanted = level_every_seven(send);
+        let taken = report
+            .energy_levels
+            .iter()
+            .find(|(at, level)| *at >= send && *level == wanted)
+            .map(|(at, _)| *at);
+        assert!(
+            taken.is_some_and(|at| at - send <= Duration::from_secs(5)),
+            "sent {send:?}: taken {taken:?}, {shifts:?}"
+        );
+        let taken = taken.unwrap();
+        assert!(
+            !shifts
+                .iter()
+                .any(|(from, _, _)| send <= *from && *from < taken),
+            "sent {send:?}, taken {taken:?}: a shift began while it waited, {shifts:?}"
+        );
+    }
+}
+
+/// #7749: a nod asked at 1 s and a new level sent at 1.3 s: the nod plays
+/// to its end step for step as with no level sent, and the level is taken
+/// only after it.
+#[test]
+fn a_new_energy_level_never_cuts_a_gesture_asked_of_it() {
+    let nod = |later: u8| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(14));
+        // An arm that moves, or it never stands to nod (as `skill_run`).
+        lamp.arm_moves = true;
+        lamp.overload_clears = 1;
+        let time = clock.time.clone();
+        let seen = clock.time.clone();
+        let asked_once = std::cell::Cell::new(false);
+        let mut gestures = Vec::new();
+        let report = run_alive(
+            &mut lamp,
+            &mut clock,
+            gesture_limits(),
+            Some(HOME),
+            Some(standing(100, 60)),
+            None,
+            || Some((Mood::Speaking, 60)),
+            move || {
+                let now = time.get();
+                let ask = now >= Duration::from_secs(1) && !asked_once.replace(true);
+                Asked {
+                    gesture: ask.then_some(&crate::clips::NOD),
+                    energy: if now >= Duration::from_millis(1_300) {
+                        later
+                    } else {
+                        1
+                    },
+                    ..Asked::default()
+                }
+            },
+            |glimpse| gestures.push((seen.get(), glimpse.gesture)),
+        );
+        let nodding: Vec<Duration> = gestures
+            .iter()
+            .filter(|(_, name)| *name == Some("nod"))
+            .map(|(at, _)| *at)
+            .collect();
+        (report, nodding)
+    };
+    let (_, alone) = nod(1);
+    let (report, sent) = nod(3);
+    assert!(!alone.is_empty());
+    assert_eq!(sent, alone);
+    let taken = report
+        .energy_levels
+        .iter()
+        .find(|(_, level)| *level == 3)
+        .map(|(at, _)| *at);
+    assert!(
+        taken.is_some_and(|at| at > *sent.last().unwrap()),
+        "{taken:?} {sent:?}"
+    );
+}
+
+/// #7749 (the first builder's 02:14): a shift at rest eased out for a new
+/// level only slows. From a hold and mid-motion, `settle` (its arm at the
+/// 1.2 sag of `LAMP_BODY_PRESENCE`) and `look_up`: no joint moves more a
+/// step than the clip's own pace or the speed it had, and it is home
+/// within 4 s, so with energy_in's 1 s read a level lands within 5 s.
+#[test]
+fn a_shift_eased_out_for_a_new_level_never_speeds_up() {
+    let step_us = TICK.as_micros() as u64;
+    for clip in [&crate::clips::SETTLE, &crate::clips::LOOK_UP] {
+        let scale = |offsets: [f32; 5]| -> [f32; 5] {
+            std::array::from_fn(|index| {
+                if clip.name == "settle" && index >= 3 {
+                    offsets[index] * 1.2
+                } else {
+                    offsets[index]
+                }
+            })
+        };
+        let pace = clip.pace(TICK);
+        let ticks = clip.duration_us() / step_us;
+        let peak = (0..ticks)
+            .max_by_key(|&k| {
+                let at = clip.at(k * step_us).unwrap();
+                at.iter().map(|value| value.abs() as u32).sum::<u32>()
+            })
+            .unwrap();
+        // Held at its peak (still), and a sixth of the way through (moving).
+        for k in [peak, ticks / 6] {
+            let from = scale(clip.at(k * step_us).unwrap());
+            let speed: [f32; 5] = if k == peak {
+                [0.0; 5]
+            } else {
+                let next = scale(clip.at((k + 1) * step_us).unwrap());
+                std::array::from_fn(|index| next[index] - from[index])
+            };
+            assert!(
+                k == peak || speed.iter().any(|v| *v != 0.0),
+                "{}",
+                clip.name
+            );
+            let cap: [f32; 5] = std::array::from_fn(|index| pace[index].max(speed[index].abs()));
+            let mut at = from;
+            let mut steps = 0u32;
+            loop {
+                steps += 1;
+                let before = at;
+                let done = ease_out_step(&mut at, steps, from, speed, cap);
+                for index in 0..5 {
+                    let moved = (at[index] - before[index]).abs();
+                    assert!(
+                        moved <= cap[index].max(EASE_LEAST) + 1e-3
+                            || (done && before[index].abs() < 0.5),
+                        "{} from step {k}: joint {index} moved {moved} at step {steps}, cap {}",
+                        clip.name,
+                        cap[index]
+                    );
+                }
+                if done {
+                    break;
+                }
+                assert!(steps < 200, "{} from step {k}: not home in 4 s", clip.name);
+            }
+            assert_eq!(at, [0.0; 5]);
+        }
+    }
 }

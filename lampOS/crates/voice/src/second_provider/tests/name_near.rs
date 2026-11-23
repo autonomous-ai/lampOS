@@ -401,3 +401,72 @@ fn a_first_word_is_a_sentence_of_its_own_only_before_a_stop_and_more_words() {
         assert!(!own(no), "{no}");
     }
 }
+
+/// One line heard as `heard`, lamp-name's near hearing `near` by its
+/// start and a face `turned` or not, `LAMP_NAME_AS_A_SENTENCE` on as in the
+/// product: the requests the rule was told `LAMP_NAME_NEAR` ruled not the
+/// name ([`Engine::telling_near_not_the_name`]).
+async fn told_not_the_name(heard: &str, near: Option<f32>, turned: bool) -> Vec<u64> {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(heard.to_owned())].into()),
+        chats: Mutex::new([vec![text("Sure."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let told: Arc<Mutex<Vec<u64>>> = Arc::default();
+    let tell = told.clone();
+    let mut engine = engine
+        .heeding(Arc::new(|_, _, words, _, _| {
+            (!crate::attention::begins_with_the_name(words))
+                .then_some(crate::attention::NOT_SPOKEN_TO)
+        }))
+        .hearing_the_name_near(Arc::new(move |_: (u64, u64)| (near, turned)))
+        .taking_the_name_as_a_sentence(true)
+        .telling_near_not_the_name(Arc::new(move |request| {
+            tell.lock().unwrap().push(request);
+        }));
+    engine.submit(start(1));
+    engine.submit(ProviderInput::Audio {
+        request: 1,
+        privacy_generation: 1,
+        sequence: 1,
+        read_completed_at_us: READ_US,
+        samples: vec![0; lamp_audio::CAPTURE_SAMPLES],
+    });
+    engine.submit(end(1));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    told.lock().unwrap().clone()
+}
+
+/// #8092 (lamp-74ff, build 14967, 20 Nov): request 4's and request 5's
+/// lines, lamp-name near at 0.86 and 1.00 by the line's start, their first
+/// word, set off, not the name: `LAMP_NAME_NEAR` ruled each not the name,
+/// and the rule is told so before it judges the line, so the hearing
+/// counts by no second sign there (`LAMP_NAME_SIGN_TIED`). A word of the
+/// name's shape with no face turned is ruled so too. Not told: a first
+/// word taken as the name, the name itself, and a line with no near
+/// hearing.
+#[tokio::test]
+async fn a_line_name_near_rules_not_the_name_is_told_to_the_rule() {
+    assert_eq!(told_not_the_name("Really?", Some(0.86), false).await, [1]);
+    assert_eq!(
+        told_not_the_name("Yes, it is.", Some(1.0), false).await,
+        [1]
+    );
+    assert_eq!(
+        told_not_the_name("Leon, pass me that", Some(0.6), false).await,
+        [1]
+    );
+    for (heard, near, turned) in [
+        ("Louvre, I want to start reading more.", Some(0.62), false),
+        ("Leon, pass me that", Some(0.6), true),
+        ("Lamp, what time is it?", Some(1.0), false),
+        ("Right, what time is it?", None, false),
+        ("Lamp. I'm going out later.", Some(0.67), false),
+    ] {
+        assert!(
+            told_not_the_name(heard, near, turned).await.is_empty(),
+            "{heard}"
+        );
+    }
+}

@@ -27,8 +27,10 @@ use std::time::{Duration, Instant};
 /// after the sound it is of.
 pub const TAIL: Duration = Duration::from_millis(800);
 /// The longest a gesture is taken to play without its end heard: the
-/// longest clip (`dance_waltz`, 9.6 s) and more.
-pub const LONGEST: Duration = Duration::from_secs(15);
+/// longest clip at any energy level (`lamp_body::energy::longest_us`,
+/// `dance_hype` at about 16 s, all of its recording at its own step, #8153)
+/// and more.
+pub const LONGEST: Duration = Duration::from_secs(17);
 /// `LAMP_NAME_MOVING_LEAST=on`'s bar.
 pub const DEFAULT_MOVING_LEAST: f32 = 0.99;
 /// What lamp-body plays of its own at rest, and says on `body/gesture` as it
@@ -210,6 +212,13 @@ mod tests {
         moving.began(start);
         let now = start + LONGEST + Duration::from_secs(1);
         assert!(moving.lets_through(0.95, LEAST, Duration::from_millis(80), now));
+        // Longer than any clip plays at any energy level (#8153).
+        let longest = lamp_body::clips::ALL
+            .into_iter()
+            .map(lamp_body::energy::longest_us)
+            .max()
+            .unwrap();
+        assert!(Duration::from_micros(longest) < LONGEST, "{longest}");
     }
 
     #[test]

@@ -45,6 +45,12 @@ pub(crate) const PREFERENCES_DONE: &str = "(Say only this, nothing before or aft
 /// face saved no owner is set and the record says `"name_kept": false`, so
 /// "Got your name" was a claim not done (#5669, the PM's 11:28 ruling).
 pub(crate) const NAME_ONLY: &str = "(Say only this, nothing before or after it: \"Thanks. I'll remember your name, and things for you, once I've seen your face.\")";
+/// [`NAME_ONLY`]'s place with nothing asked (`LAMP_FACE_NO_ASK`): the face
+/// is never asked for once more and nothing keeps it on sight, so the line
+/// promises nothing about their face or their name (the first builder's
+/// HOLD on #7810). In code, not the file, as [`NAME_ONLY`].
+pub(crate) const NAME_ONLY_NO_ASK: &str =
+    "(Say only this, nothing before or after it: \"Thanks, it's good to meet you.\")";
 
 /// The face question, said by the walk when the model has not asked it
 /// once the name's yes is in (#5931: on lamp-52e6 on 10 Nov two walks
@@ -52,6 +58,14 @@ pub(crate) const NAME_ONLY: &str = "(Say only this, nothing before or after it: 
 /// the model says, never an own line, so it is in the chat history and the
 /// worker's yes to it runs the save with no call (`yes_save`, #5684).
 pub(crate) const FACE_ASK: &str = "(Say only this, nothing before or after it: \"May I remember your face, so I know you next time?\")";
+
+/// "Who you are"'s note with nothing asked (`LAMP_FACE_NO_ASK`, the product
+/// owner's no-asks rule, 18 Nov), in place of the file's first and reoffer:
+/// the face is kept once the name is heard, with no face question and no
+/// read-back's yes first, and the lamp says it knows them only when the
+/// save's answer says so (`known_faces::SETUP_KEPT_NO_ASK`). In code, not
+/// the file: an older lamp-skills refuses a new key.
+pub(crate) const WHO_YOU_ARE_NO_ASK: &str = "(Nobody has spoken. Ask exactly this: \"What should I call you?\" When they have told you their name, call remember_my_face with their name at once, before you say anything else: never ask whether you got their name right, and never ask about their face. Ask to spell it only if the answer says you did not hear it, once; then call remember_my_face with the name it spells. Never use remember for this. Say only what the answer tells you to say about their face, and never say you'll know them unless it tells you to. Then call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done. If it was skipped or failed, say only: \"That's fine. You can tell me your name any time.\")";
 
 /// The face asked for once more, after the walk, when "who you are" ended
 /// with the name only (#5139). The name is known by then; a yes and the

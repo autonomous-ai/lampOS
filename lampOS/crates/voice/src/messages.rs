@@ -287,7 +287,11 @@ impl Model for Chat {
                     // Texts are asked of the configured chat, which neither
                     // reasons aloud nor searches on its own (#1712's
                     // OpenRouter and Gemini clients do, for spoken turns).
-                    ChatEvent::Reasoning(_) | ChatEvent::Searched => {}
+                    // A call named as it streams comes whole above.
+                    ChatEvent::Reasoning(_)
+                    | ChatEvent::Searched
+                    | ChatEvent::Calling(_)
+                    | ChatEvent::Argued(..) => {}
                     ChatEvent::Done => break,
                 }
             }

@@ -218,6 +218,33 @@ fn an_unsigned_or_wrongly_signed_package_is_refused_before_the_manifest_is_read(
 }
 
 #[test]
+fn a_pushed_package_is_unsigned_and_otherwise_held_to_every_check() {
+    let files = good_files();
+    let manifest = good_manifest(&files);
+    let unsigned = tar("english-lessons", &manifest, &files, None);
+    let package = app_package::read_pushed_app_package_bytes(&unsigned).unwrap();
+    assert_eq!(package.signed_by, app_package::UNSIGNED);
+    assert_eq!(package.sha256, sha256_hex(&unsigned));
+    // A signed one, even the Store's, is never taken by the pushed path.
+    refused(
+        app_package::read_pushed_app_package_bytes(&good()),
+        "an app pushed from a computer is unsigned",
+    );
+    // Every other rule still holds: a file changed after its listing.
+    let mut changed_files = files.clone();
+    changed_files[1].1 = b"print('changed')\n".to_vec();
+    refused(
+        app_package::read_pushed_app_package_bytes(&tar(
+            "english-lessons",
+            &manifest,
+            &changed_files,
+            None,
+        )),
+        "its size or sha256",
+    );
+}
+
+#[test]
 fn a_format_one_lamp_says_what_it_always_said_of_a_format_two_package() {
     let why = package::read_package_bytes(&good(), None).unwrap_err();
     assert!(
@@ -318,6 +345,13 @@ fn grants_are_the_doors_fourteen_and_nothing_else() {
             "{grant}"
         );
     }
+    // A manifest may ask `remember`; one without it reads as before.
+    assert!(changed(|m, _| m["grants"] = json!(["remember", "hear"])).is_ok());
+    assert!(changed(|m, _| m["grants"] = json!(["hear"])).is_ok());
+    refused(
+        changed(|m, _| m["grants"] = json!(["remember", "remember", "hear"])),
+        "twice",
+    );
 }
 
 #[test]
@@ -629,5 +663,325 @@ fn the_name_rules_are_the_texts_and_a_clip_may_be_quiet() {
     assert!(!app_package::app_name_ok(&"a".repeat(25)));
     assert!(!app_package::app_name_ok("-a"));
     assert!(!app_package::app_name_ok("a_b"));
-    assert_eq!(app_package::GRANTS.len(), 14);
+    assert_eq!(app_package::GRANTS.len(), 15);
+    // `remember` is an app's own grant (apps.remember), never the door's plain
+    // one a computer is paired with: the last in the list.
+    assert_eq!(app_package::GRANTS[14], app_package::REMEMBER_GRANT);
+}
+
+#[test]
+fn a_path_longer_than_the_most_is_refused_without_echoing_it() {
+    let mut files = good_files();
+    files.push((
+        format!("src/{}.py", "x".repeat(2000)),
+        b"print(2)\n".to_vec(),
+    ));
+    let bytes = tar(
+        "english-lessons",
+        &good_manifest(&files),
+        &files,
+        Some(&key(1)),
+    );
+    let why = read(&bytes).expect_err("refused");
+    assert!(why.contains("1024"), "{why}");
+    assert!(why.len() < 200, "{}", why.len());
+}
+
+/// `npu` names the lamp's NPU ops an app uses (#7415), each riding its
+/// grant (`pose`, the camera's), so the lamp fetches the model at install.
+#[test]
+fn an_apps_npu_ops_are_the_lamps_and_ride_their_grant() {
+    let package = changed(|manifest, _| {
+        manifest["grants"] = json!([
+            "speak", "hear", "light", "body", "sound", "skills", "camera"
+        ]);
+        manifest["npu"] = json!(["pose"]);
+    })
+    .unwrap();
+    assert_eq!(package.manifest.npu, ["pose"]);
+    // Left out, none; and an empty list is not written back.
+    assert!(read(&good()).unwrap().manifest.npu.is_empty());
+    refused(
+        changed(|manifest, _| manifest["npu"] = json!(["pose"])),
+        "needs the \"camera\" grant",
+    );
+    refused(
+        changed(|manifest, _| {
+            manifest["grants"] = json!(["speak", "hear", "camera"]);
+            manifest["npu"] = json!(["faces"]);
+        }),
+        "is not one of the lamp's",
+    );
+    refused(
+        changed(|manifest, _| {
+            manifest["grants"] = json!(["speak", "hear", "camera"]);
+            manifest["npu"] = json!(["pose", "pose"]);
+        }),
+        "twice",
+    );
+}
+
+fn gym_coach_views() -> Value {
+    json!({
+        "ops": ["week", "sessions", "plan"],
+        "views": [
+            {"id": "this_week", "kind": "chart", "title": "This week", "op": "week",
+             "style": "bar", "unit": "min", "goal_label": "Daily goal"},
+            {"id": "sessions", "kind": "list", "title": "Sessions", "op": "sessions",
+             "empty": "No sessions yet. Say \"start my workout\"."},
+            {"id": "my_plan", "kind": "form", "title": "My plan", "op": "plan", "submit": "Save plan",
+             "fields": [
+                {"key": "days", "type": "number", "label": "Days a week", "min": 1, "max": 7, "step": 1},
+                {"key": "routine", "type": "rows", "label": "Routine", "max_rows": 20,
+                 "columns": [
+                    {"key": "exercise", "type": "text", "label": "Exercise", "max": 40},
+                    {"key": "sets", "type": "number", "label": "Sets", "min": 1, "max": 10, "step": 1},
+                    {"key": "reps", "type": "number", "label": "Reps", "min": 1, "max": 50, "step": 1}
+                 ]}
+             ]}
+        ]
+    })
+}
+
+/// A package whose manifest carries `ops` and `views` set from `views`.
+fn with_views(views: Value) -> Result<app_package::AppPackage, String> {
+    changed(|manifest, _| {
+        for (key, value) in views.as_object().unwrap() {
+            manifest[key] = value.clone();
+        }
+    })
+}
+
+/// The design's worked example (docs/apps.md, gym-coach) reads, a manifest without `ops` and `views` has neither
+/// (and writes back neither, so it is byte for byte what it was), and the fields read back as written.
+#[test]
+fn an_apps_ops_and_views_read_and_a_manifest_without_them_is_unchanged() {
+    let package = with_views(gym_coach_views()).unwrap();
+    assert_eq!(package.manifest.ops, ["week", "sessions", "plan"]);
+    assert_eq!(package.manifest.views.len(), 3);
+    // The views read back as the design wrote them (a whole number may be written back as `7.0`: the installed copy is
+    // the manifest's own bytes, never this value, so the comparison is of the read types).
+    let written = serde_json::to_value(&package.manifest).unwrap();
+    let designed: Vec<lamp_skills::app_views::View> =
+        serde_json::from_value(gym_coach_views()["views"].clone()).unwrap();
+    assert_eq!(package.manifest.views, designed);
+    assert_eq!(written["ops"], gym_coach_views()["ops"]);
+    let plain = read(&good()).unwrap();
+    assert!(plain.manifest.ops.is_empty() && plain.manifest.views.is_empty());
+    let written = serde_json::to_value(&plain.manifest).unwrap();
+    assert!(
+        written.get("ops").is_none() && written.get("views").is_none(),
+        "{written}"
+    );
+    // And one with ops only (no view yet) is fine.
+    let package = with_views(json!({"ops": ["week"]})).unwrap();
+    assert!(package.manifest.views.is_empty());
+}
+
+/// One refusal per rule of the op rule and of a view's shape (docs/apps.md "In the manifest").
+#[test]
+fn each_rule_of_ops_and_views_refuses_with_its_own_words() {
+    let with = |change: &dyn Fn(&mut Value)| {
+        let mut value = gym_coach_views();
+        change(&mut value);
+        with_views(value)
+    };
+    refused(with(&|v| v["ops"] = json!(vec!["a"; 17])), "at most 16");
+    refused(
+        with(&|v| v["ops"] = json!(["Week", "plan", "sessions"])),
+        "is not ^[a-z]",
+    );
+    refused(
+        with(&|v| v["ops"] = json!(["week", "week", "plan", "sessions"])),
+        "twice",
+    );
+    refused(with(&|v| v["ops"] = json!([])), "need ops");
+    refused(
+        with(&|v| v["views"][0]["op"] = json!("nope")),
+        "not one of the app's ops",
+    );
+    refused(with(&|v| v["views"][0]["id"] = json!("Bad-Id")), "an id is");
+    refused(
+        with(&|v| v["views"][1]["id"] = json!("this_week")),
+        "an id twice",
+    );
+    refused(
+        with(&|v| v["views"][0]["title"] = json!("")),
+        "a title is 1 to 40",
+    );
+    refused(
+        with(&|v| v["views"][0]["title"] = json!("x".repeat(41))),
+        "a title is 1 to 40",
+    );
+    refused(
+        with(&|v| v["views"][0]["title"] = json!("a\u{202e}b")),
+        "a title is 1 to 40",
+    );
+    // Every bidi mark the Store refuses in drawn text, the Arabic letter mark (U+061C) too (Backend3's read of #8357).
+    for mark in ['\u{061c}', '\u{200e}', '\u{200f}', '\u{2066}', '\u{2069}'] {
+        refused(
+            with(&|v| v["views"][0]["title"] = json!(format!("a{mark}b"))),
+            "a title is 1 to 40",
+        );
+    }
+    refused(
+        with(&|v| v["views"][0]["kind"] = json!("map")),
+        "unknown variant",
+    );
+    refused(
+        with(&|v| v["views"] = json!(vec![gym_coach_views()["views"][1].clone(); 9])),
+        "at most 8",
+    );
+    // A field of another kind.
+    refused(
+        with(&|v| v["views"][1]["style"] = json!("line")),
+        "a list has only",
+    );
+    refused(
+        with(&|v| v["views"][0]["empty"] = json!("none")),
+        "a chart has only",
+    );
+    refused(
+        with(&|v| v["views"][2]["unit"] = json!("kg")),
+        "a form has only",
+    );
+    refused(
+        with(&|v| v["views"][0]["fields"] = json!([])),
+        "a chart has only",
+    );
+    // A chart's own.
+    refused(
+        with(&|v| {
+            v["views"][0].as_object_mut().unwrap().remove("style");
+        }),
+        "a chart needs `style`",
+    );
+    refused(
+        with(&|v| v["views"][0]["style"] = json!("pie")),
+        "unknown variant",
+    );
+    refused(
+        with(&|v| v["views"][0]["unit"] = json!("u".repeat(17))),
+        "`unit` is 1 to 16",
+    );
+    refused(
+        with(&|v| v["views"][0]["goal_label"] = json!("g".repeat(25))),
+        "`goal_label` is 1 to 24",
+    );
+    // A list's.
+    refused(
+        with(&|v| v["views"][1]["empty"] = json!("e".repeat(81))),
+        "`empty` is 1 to 80",
+    );
+    // A form's.
+    refused(
+        with(&|v| {
+            v["views"][2].as_object_mut().unwrap().remove("submit");
+        }),
+        "needs `submit`",
+    );
+    refused(
+        with(&|v| v["views"][2]["submit"] = json!("s".repeat(25))),
+        "needs `submit`",
+    );
+    refused(
+        with(&|v| v["views"][2]["fields"] = json!([])),
+        "1 to 16 fields",
+    );
+    refused(
+        with(&|v| {
+            v["views"][2].as_object_mut().unwrap().remove("fields");
+        }),
+        "needs `fields`",
+    );
+    refused(
+        with(&|v| {
+            v["views"][2]["fields"] =
+                json!(vec![json!({"key": "k", "type": "toggle", "label": "K"}); 2])
+        }),
+        "twice",
+    );
+    refused(
+        with(&|v| v["views"][2]["fields"][0]["key"] = json!("Days")),
+        "a key is 1 to 32",
+    );
+    refused(
+        with(&|v| v["views"][2]["fields"][0]["label"] = json!("")),
+        "a label is 1 to 40",
+    );
+    refused(
+        with(&|v| v["views"][2]["fields"][0]["hint"] = json!("h".repeat(121))),
+        "a hint is 1 to 120",
+    );
+    // Each field type's own, and none of another's.
+    refused(
+        with(&|v| v["views"][2]["fields"][0]["min"] = json!(9)),
+        "`min` is below `max`",
+    );
+    refused(
+        with(&|v| v["views"][2]["fields"][0]["step"] = json!(0)),
+        "`step` is above 0",
+    );
+    refused(
+        with(&|v| v["views"][2]["fields"][0]["options"] = json!([])),
+        "min, max, unit and step only",
+    );
+    refused(
+        with(&|v| v["views"][2]["fields"][1]["columns"][0]["max"] = json!(201)),
+        "a text field's `max`",
+    );
+    refused(
+        with(&|v| v["views"][2]["fields"][1]["columns"][0]["min"] = json!(1)),
+        "a text field has only",
+    );
+    refused(
+        with(&|v| v["views"][2]["fields"][1]["max_rows"] = json!(51)),
+        "`max_rows` is 1 to 50",
+    );
+    refused(
+        with(&|v| v["views"][2]["fields"][1]["columns"] = json!([])),
+        "1 to 4 columns",
+    );
+    refused(
+        with(&|v| v["views"][2]["fields"][1]["columns"][0]["type"] = json!("toggle")),
+        "a column is text, number or choice",
+    );
+    refused(
+        with(
+            &|v| v["views"][2]["fields"][1]["columns"][0] = json!({"key": "r", "type": "rows", "label": "R", "max_rows": 2, "columns": [{"key": "c", "type": "text", "label": "C", "max": 5}]}),
+        ),
+        "never rows",
+    );
+    refused(
+        with(&|v| v["views"][2]["fields"][1]["columns"][1]["key"] = json!("exercise")),
+        "twice",
+    );
+    refused(
+        with(
+            &|v| v["views"][2]["fields"][0] = json!({"key": "c", "type": "choice", "label": "C", "options": [{"value": "a", "label": "A"}]}),
+        ),
+        "2 to 16 options",
+    );
+    refused(
+        with(
+            &|v| v["views"][2]["fields"][0] = json!({"key": "c", "type": "choice", "label": "C", "options": [{"value": "a", "label": "A"}, {"value": "a", "label": "B"}]}),
+        ),
+        "value twice",
+    );
+    refused(
+        with(&|v| {
+            v["views"][2]["fields"][0] =
+                json!({"key": "t", "type": "toggle", "label": "T", "max": 1})
+        }),
+        "a toggle has only",
+    );
+    // An unknown field anywhere is refused, as at every level.
+    refused(
+        with(&|v| v["views"][0]["colour"] = json!("red")),
+        "unknown field",
+    );
+    refused(
+        with(&|v| v["views"][2]["fields"][0]["colour"] = json!("red")),
+        "unknown field",
+    );
 }

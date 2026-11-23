@@ -333,12 +333,27 @@ and none of the skills' own (`crate::use_skill`):
       skills are …");
     - a word not in its choice ("dance's choice is one of calm, upbeat,
       jazz.");
-    - any other key ("use_skill takes skill, choice and flag, not mood: …");
+    - any other key ("use_skill takes skill, choice and flag, not mood: …";
+      "skill, choice, flag and kind" for a shared stop that takes a kind,
+      #6543);
     - a choice or a yes for a skill that takes none ("check_my_work takes no
       choice."). An empty choice or a "no" there is nothing.
   - **As a skill's call in every other way:** it waits for the Policy's hold,
     it never runs on a reply, its answer may ask for a look, and the request
     counts as one in which the lamp acted.
+  - **A shared stop's scope, from the person's words** (#7473, the owner's
+    call): a shared stop offering kinds (`wellbeing_nudges`) called with
+    `snooze`, `off` or `on` for a line a person said, through `use_skill` or
+    by its own name, goes to the skills' socket with the `kind` or `all` that
+    turn's own words set (`stop_scope`, its word map in `KIND_WORDS`), over
+    the model's, only when they give a clear scope (a kind's word right after
+    "about", "about my" or "for my", the nudges in general, or a kind's
+    word right before "nudge", "reminder" or "one"); anything
+    else, "it" and "that one" among it, leaves the model's. English only
+    for now. Read only for
+    such a call, from the skills' tools file, with no model call; the
+    journal says "the heard words set kind=… all=… (the model sent …)".
+    The rules and the word map are in [skills.md](skills.md), row `[stop]`.
 - **A plain ask that must call its skill** (`LAMP_SKILL_ASKED=on`, the
   second route, on in the product unit; #5744, #5745): a line that is only
   "movie light", "reading light", "night light", "light show", "party
@@ -351,7 +366,10 @@ and none of the skills' own (`crate::use_skill`):
   a question ("I like movie light", "do you like movie light?") is the
   model's: "I", "like", "do" and "you" alone are no request. Any other word,
   two asks, a skill not offered and a round after a call are asked as
-  before. On lamp-52e6 on 9 Nov (build 10883) both skills were offered with
+  before. The line is read past the lamp's name too
+  (`second_provider::forced_past_the_name`, #8022): "Hey, Lynn, movie
+  light." on a line that names the lamp, never "Hey, Anna, …" said to a
+  person. On lamp-52e6 on 9 Nov (build 10883) both skills were offered with
   lines naming those asks, and "Lamp, movie light." (2 of 2) and "Lamp,
   show me a light show." (3 of 3) were answered in words with no call;
   "reading light" and "light my book" did call. A line that is only a
@@ -397,6 +415,10 @@ and none of the skills' own (`crate::use_skill`):
   calls it"). Host tests: `a_plain_ask_to_make_a_skill_is_told_apart`,
   `the_force_names_make_skill_for_an_ask_and_nothing_else`,
   `the_played_make_sends_a_tool_choice_for_make_skill_when_declared`.
+  Round 1 says in the journal what it was offered and forced, and whether
+  the line asked to make a skill (`request N: round 1: task_offered=…
+  make_offered=… forced=… make_ask=… sentences=… ask_in=… opening=…`,
+  #8022 case 2).
 - **A skill installed or removed** changes no function's name, so each skill
   `use_skill` reaches is counted as `use_skill:<skill>` against what the
   session was given, and the session is renewed for it as for any change.
@@ -437,17 +459,27 @@ A plain question about the person's reminders must read them
 line that is only "what reminders do I have", "do I have any reminders",
 "what are my reminders", "list my reminders" and the like, beside a
 greeting, the lamp's name, "please", "can you", "tell me" or a day
-(`tools::reminders_asked::asks_for_reminders`), has its first chat round
+(`tools::reminders_asked::asks_for_reminders`), or such a question of 4
+words or more heard one word short (one word lost or heard as another,
+never "reminders" or "my", once a line, and never beside a word that
+changes the ask: "set", "cancel", "timer", "need", "should", "not",
+"and"; #7987: on lamp-52e6 at the gate's Mac volume 45 "Hey Lamp, what
+reminders do I have?" was heard whole in about 17 of 60 plays), has its first chat round
 sent with `tool_choice` naming `list_reminders`, when it is declared. Any
 other word (a set, a cancel, a delete, a move, a timer, "do you like
 reminders?"), `list_reminders` not declared and a round after a call are
-asked as before. On lamp-52e6 on 9 Nov (build 10972) "Lamp, what reminders
+asked as before. The line is read past the lamp's name too
+(`second_provider::forced_past_the_name`, #8022): "Hey, Lynn, what reminders
+do I have?" on a line that names the lamp, never "Hey, Anna, …" said to a
+person. On lamp-52e6 on 9 Nov (build 10972) "Lamp, what reminders
 do I have?" was answered in words with no call in 2 of 8 asks, memory
 telling nothing; the journal tagged those lines with
 `attention::about_its_work`, which takes any line with "reminder" in it and
 so is too wide to force a call on. Host tests:
 `a_plain_question_about_reminders_is_told_apart`,
-`a_plain_question_forces_list_reminders_only_when_offered`.
+`a_plain_question_forces_list_reminders_only_when_offered`,
+`a_plain_question_one_word_short_is_still_forced`,
+`one_word_short_never_forces_another_ask`.
 
 Actions validates arguments before IPC, owns Schedule's CAS guards, and calls
 the socket selected by `LAMP_SCHEDULE_SOCKET` (enabled default
@@ -586,6 +618,113 @@ yours."; no answer, "I couldn't reach the desk." or "I'm not online right
 now, so I can't reach your devices." The Hydrate never speaks unasked: these
 functions answer a question and the sips (`devices/event`) are not told.
 
+
+### `desk_stop`, the stop (#7470 S3a)
+
+Beside the two reads, with `LAMP_DEVICES=on`: `desk_stop`, no argument, which
+sends `Stop` to the desk at once. It needs no yes, no presence and no
+person's own words: stopping a desk grants nothing. The desk is the one in
+flight, else the first desk of the kept list (so a stop is one round trip, the
+list read only when none is kept); it is told within 3 s: "Okay, I've told the
+desk to stop.", or "I can't stop that desk.", or, when the cloud did not say,
+"I couldn't reach the desk, so I'm not sure it stopped." (`ok` is that the
+stop was handed to the desk). It is the model's way to stop; the fast ways,
+in code, are below.
+
+**The touch guard.** A move in flight arms a guard (`arm_guard`, S3b calls it
+when a move's command goes; nothing in S3a does): it listens to `controls/touch`
+BEFORE the move goes, and any contact with the lamp (its head, its button),
+from Controls, enabled, valid and later than the arming, sends `Stop` on
+`devices/ask` straight away, once, and ends the guard; it also ends at its
+time (60 s) or when a stop was *taken* by the desk (`ok`): a stop that ended "not sure", refused or away leaves the guard armed, the last fallback. The guard is the voice process's own (`MOVING` is per process): it stops only a move that process began, never a desk moved from the app. With nobody listening for asks on the bus (lamp-cloud down) a stop is answered "away" at once, not after its whole wait. Timed in a test on a real bus from
+the touch on the bus to the `Stop` on the bus: under 100 ms (the guard looks
+every 20 ms); lamp-cloud then sends it up (`stop` goes first, past every cap,
+tested under 100 ms to the send); the cloud's and the desk's own legs are
+measured only on a real desk (the row on lamp-0c89).
+
+## `watch` and `stop_watching`: tell me when (#7761, slice 1)
+
+With `LAMP_WATCH=on` (the provider worker's `--watch`), the model is told of
+two functions, so a person can say "tell me when the air gets stuffy":
+
+- `watch` takes one **fixed fact** and watches it for a while: `arrives`
+  (someone comes into view), `leaves` (nobody is in view any more),
+  `turns_to_lamp` (someone turns to face it), `co2_above` (`ppm`, 400 to
+  5,000; left out it is the sensor's "stuffy", 1,200), `sitting_over`
+  (`minutes`, 1 to 720, against `room/activity`'s `sitting_s`) and `at_time`
+  (`HH:MM`, the next time the lamp's own clock says it; a time farther away
+  than the watch lasts, or this very minute, is refused, and one the lamp could
+  not speak at is dropped unsaid once it is five minutes past, never said as
+  "now" hours late). `for_hours` (1 to 24) is how long to keep watching;
+  never longer than a day. A bad call is
+  refused in words for the model, and nothing is asked of the person.
+- `stop_watching` ends every watch.
+
+**Bounds:** at most 5 watches at once (the sixth is refused: "I'm already
+watching five things"); each at most 24 hours; kept on `/run`, so a
+reboot or a "forget everything" ends them all, and a mute, a hand's sleep or a
+restart of the voice does not (below). The watcher reads the default bus
+(`/run/lampos-bus`), as the worker's air read does, so a sim with its own
+`LAMP_BUS_ROOT` cannot run it.
+
+**Kept across cycles.** The provider worker lives for one cycle: a mute or a
+hand's sleep ends it and the next cycle starts a new one (Heron's P2 on
+#7782). So the list is kept in `/run/lampos-voice/watches.json` (tmpfs,
+mode 0600, the voice's own runtime folder), facts only: kind, level or time,
+and when it ends; no names, no words said, no face ids. It is written whole
+beside itself and moved over, on every take, stop and fire, and read by each
+new worker at its start (`watches::resume`), which also starts the watcher,
+so "tell me at 7:00" set before the lamp slept is told when it wakes (an
+`at_time` more than 5 minutes late is dropped, as before). A file that
+cannot be read is no watches and one journal line, never a crash. The
+voice's `forget_everything`, once it is done (their memory answered, after the
+yes), ends every watch and removes the file; a forget that is held or refused
+ends none, and the app's forget does not reach the watches (on the Live route
+it is drained only by the second route's worker, which has none; a watch holds
+nothing personal: a kind, a level, an end). When a worker starts, the first
+look at the faces is only the baseline: a watch for someone arriving or
+turning to the lamp does not fire on who was in the room already. The folder is the voice unit's own
+`RuntimeDirectory=lampos-voice` with `RuntimeDirectoryPreserve=yes`, so the
+file outlives a restart of the voice (the new voice's first worker takes the
+watches up, as after a mute); a reboot clears `/run` and a factory reset
+empties the folder, so both end them.
+
+The second route's worker strips `--watch`, and the product unit runs
+`LAMP_VOICE_ROUTE=second`, so on a product lamp the tools are not declared
+until the lamp runs the Live route. A note handed to the say thread is lost
+if the worker is killed before it connects (the watch is already over and
+saved): a kill is a lost line, not a repeat.
+
+**Told once.** The tool runs in the provider worker, so the watches AND the
+watcher thread live there too (started at the worker's start, or by the
+first `watch`): one process, no hand-over to the coordinator (Heron's P1 on
+#7782). The second route's
+worker does not get `--watch`, so there is one list; one list for both
+routes is the coordinator's, later. The thread
+(`watches.rs`, as `body_ask.rs` reads the body) reads `humans/faces/tracked` (counts and "facing" only, never who: a
+name is never read here), `air/state` and `room/activity`, and the lamp's
+clock. When a fact holds, that watch is removed and the lamp's own say
+service is asked, on its socket (as `agent_asks` does), for an instruction
+for the MODEL to word (a `note`, the fact in it: "the air's carbon dioxide is
+now 1,250 ppm"), so no fixed spoken line exists. The tool's take never waits
+on a bus call or the socket: `may_speak` is asked before the watches' lock
+is taken, and the say ask is made on a thread of its own. It is handed over at once (within a second of the reading that
+made it true: air comes every 5 s from the sensor, so for air that is within a
+second of the reading) and goes through the say service's gates (paused, nobody
+there, a turn owed, the speaker busy, a second of quiet since the last turn)
+at priority 8, as a reminder does, and is dropped if not begun in a minute: a
+late "the air is stuffy" is never said later. Arrive and leave are the door's
+edges (a face seen after 3 s of none; none for 5 s).
+
+**When the lamp may not speak** (the private room, `LAMP_PRIVATE_ROOM=on`, or
+Expression saying it is asleep: the Policy's gates are not asked by the say
+service, so the watcher asks): a level fact (air, sitting, a time) keeps
+watching and is told when the lamp may speak; an edge fact (arrives, leaves,
+turns) is over and unsaid, since telling it later would be wrong.
+
+**Rule 8:** one line, then the watch is over and the lamp is silent about it;
+no scan, no move.
+
 ## `reports_stop`, a system function
 
 With `LAMP_REPORTS=on` in the voice unit (the worker's `--reports-stop`,
@@ -597,11 +736,17 @@ a skill cut for it is named on the setup line (#1706).
 
 The switch declares two functions, `reports_stop` and `reports_state`
 (below), so a session is told two more than without it. The product's
-unit sets it: a product lamp's chat request offers 45 of the lamp's own
+unit sets it: a product lamp's chat request offers 52 of the lamp's own
 functions (`PRODUCT_FUNCTIONS`, `crates/update/tests/functions.rs`), the
-voice's own 27 with these two among them (and `set_role` and `end_role`
+voice's own 34 with these two among them (and `desk_time` since
+`LAMP_DESK_TIME` is on in the product, #7694, and `change_skill` beside
+`make_skill` since #8008, and lamp-services' three since
+`LAMP_SERVICES` is on in the product, `set_role` and `end_role`
 since `LAMP_MEMORY_ROLE` is on in the product, 9 Nov, and `go_to_sleep`
-since `LAMP_SLEEP_ASKED` is on in the product, #6853), the actions part's
+since `LAMP_SLEEP_ASKED` is on in the product, #6853, and seen activity's
+`look_at_my_desk` and `stop_looking_at_my_desk` since `LAMP_SEEN_ACTIVITY` is
+on in the product, #6543; its `offer_desk_noticing` only with
+`LAMP_SEEN_VOICE_OFFER=on`, off in the product), the actions part's
 17 and `use_skill`, which reaches Dance's `dance` and Pose's `set_pose`
 (#4135, #2826), Light show's `light_show` (#5745), and Light scenes'
 `light_scene` and Point the light's `point_light` (#5744). At the bound a core skill's function is never the one cut (the
@@ -613,8 +758,9 @@ skills' functions that are not a core skill's, the last first (the skills'
 tools file lists them by name, `lamp_skills::tools_file`), then the
 weather, then the search (`chat_cut`). A Live session's bound is 32
 (`lamp_gemini::MAX_TOOLS`); the second route's chat requests have their
-own, 48 (`second_provider::MAX_TOOLS`, 22 Oct: Live's bound had left out
-the time, the light scenes and the search on lamp-4ace). On the product's
+own, 64 (`second_provider::MAX_TOOLS`, 48 from 22 Oct, when Live's bound
+had left out the time, the light scenes and the search on lamp-4ace, until
+#7433, when a product lamp's 52 were past it). On the product's
 chat route nothing is left out: its skills are one function, `use_skill`
 (`LAMP_USE_SKILL=on` since #2826), however many are installed. With the
 switch off and installable skills added it was past 48 (lamp-9adf, 6 Nov:
@@ -624,7 +770,7 @@ left, so its last are left out, and the cut then takes `reports_state`;
 `reports_stop` and `dance` stay in both. With `LAMP_USE_SKILL=on`, `use_skill` carries every
 core skill, so it is a core name and never the one cut. Whatever is cut is
 said once, at start, on a plain journal line naming the bound (`past the
-bound of 32, left out: …` on Live, 48 on the chat route); only the lamp's own
+bound of 32, left out: …` on Live, 64 on the chat route); only the lamp's own
 and core skills' functions alone past it are an error line (`alone are past
 the bound of 32; left out: …`). Tests:
 `with_reports_on_dance_stays_at_the_bound`

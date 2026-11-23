@@ -181,8 +181,15 @@ impl Worker {
             let channels = WorkerChannels::bind(&path, role, parent, boot, false)?;
             // The same command every worker starts with, so the ring gets
             // its role's switches (`LAMP_UNPLUG`, the reviewer on #1699).
-            let child =
-                worker_command(executable, &path, role, (parent, boot), extra, &var).spawn()?;
+            let child = super::spawn_named(&mut worker_command(
+                executable,
+                &path,
+                role,
+                (parent, boot),
+                extra,
+                &var,
+            ))?;
+            let (bound, grace_on) = super::startup_bound(role, &var);
             worker = Some(Box::new(Self {
                 channels,
                 child,
@@ -190,6 +197,7 @@ impl Worker {
                 role: "ring".into(),
                 diagnostic_start: None,
                 ring_resources: Some(resources),
+                renewal_stall: RenewalStall::default(),
                 #[cfg(test)]
                 on_stop: None,
                 #[cfg(test)]
@@ -198,13 +206,14 @@ impl Worker {
             worker
                 .as_mut()
                 .unwrap()
-                .wait_until_ready(&path, || match on_wait() {
+                .wait_until_ready(&path, bound, || match on_wait() {
                     Ok(()) => Ok(()),
                     Err(error) => {
                         mandatory_error = Some(error);
                         Err(io::Error::other("mandatory startup supervision failed"))
                     }
                 })
+                .map(|()| super::ready_noted(role, grace_on))
         })();
         if let Some(error) = mandatory_error {
             // Existing mandatory startup behavior: owned child teardown, then

@@ -118,7 +118,10 @@ to hold the head. The voice declines that hold and plays no sigh, and
 Expression follows the voice's word. The ring's countdown doesn't know about
 onboarding: it dims under the hand and brightens at the letting go. A hand
 kept a second also clears the restart guard's mute (#960), as a tap did,
-since that mute wakes as sleep does. A pad that drifts high on a level read
+since that mute wakes as sleep does. With `LAMP_GUARD_SIGN=on` (#7224, off unless on), the
+asleep face of a lamp the guard muted pulses amber once a minute until that
+tap, so it doesn't look like a mute the person chose (ring-choreography.md,
+"The asleep face"); nothing is said aloud. A pad that drifts high on a level read
 (#1764), or something resting on the head, now wakes a sleeping lamp after a
 second. Before, a drift held 3 s would have put an awake one to sleep.
 
@@ -2104,3 +2107,13 @@ could not operate a hand control until First supplied the real reader and the
 owners' integration. First has since added the board reader above, and Fourth's
 task 21 adds the optional Voice consumer. Those additions do not establish a
 physical press, touch, acoustic Stop or Body integration result.
+
+## A touch stops the desk (#7470 S3a)
+
+With `LAMP_DEVICES=on`, a desk move in flight arms a guard in the voice
+([tools.md](tools.md), "`desk_stop`"): any contact with the lamp, its head or
+its button, read from `controls/touch` (enabled, valid, from Controls, later
+than the arming), sends `Stop` to the desk at once, once. A touch means a
+person is at the lamp and wants it still; it grants nothing else, and the
+touch keeps meaning what it meant to Controls too (a tap that stops the
+lamp's speech still does).

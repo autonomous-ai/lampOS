@@ -199,8 +199,13 @@ impl RingNight {
             .fade
             .asleep_since
             .map_or(0, |since| now_us.saturating_sub(since));
+        let was_shown = self.said.shown;
         if let Some(line) = self.said.step(said, allowed, share, asleep_for_us) {
             eprintln!("lamp-voice ring: {line}");
+        }
+        // The face begins: told once, off the ring's loop (#7757).
+        if !was_shown && self.said.shown {
+            crate::did_ring::told(crate::did_ring::Face::NightSleep);
         }
         share
     }

@@ -24,12 +24,12 @@ use std::{
 
 /// Only the exact value `on`: a known face lost for a few seconds keeps its
 /// memory scope through the gap ([`GAP`]), while the eyes see no face at all
-/// (#2176 row 5b). Off, the scope is the room's as soon as the face's 3 s
+/// (#2176 row 5b). Off, the scope is the room's as soon as the face's 4 s
 /// freshness ends, as before.
 pub const GAP_ENVIRONMENT: &str = "LAMP_FACE_GAP_HOLD";
 
-/// How long past its last fresh sighting (the known file's 3 s freshness, so
-/// about 15 s after the eyes last saw it), and past the end of the lamp's
+/// How long past its last fresh sighting (the known file's 4 s freshness, so
+/// about 16 s after the eyes last saw it), and past the end of the lamp's
 /// last answer to them, a known face's scope is held while the eyes see no
 /// face at all: a hand across, a step out of the picture. A head turned away
 /// is usually still a face in the eyes' look, so it holds nothing. On
@@ -37,13 +37,80 @@ pub const GAP_ENVIRONMENT: &str = "LAMP_FACE_GAP_HOLD";
 /// back to the room's scope mid-conversation. 12 s, not 8: on lamp-c0a4 a
 /// person who turned away and asked again took 8 to 9 s from the end of the
 /// lamp's answer (the first builder on #1722, 21 Oct). One window for both
-/// bounds: a face last seen as the answer ends is fresh 3 s more, so the
+/// bounds: a face last seen as the answer ends is fresh 4 s more, so the
 /// answer's 12 s end first.
 pub const GAP: Duration = Duration::from_secs(12);
 
-/// [`GAP`] when [`GAP_ENVIRONMENT`] is `on`.
-pub fn gap_from_environment() -> Option<Duration> {
-    (std::env::var(GAP_ENVIRONMENT).ok().as_deref() == Some("on")).then_some(GAP)
+/// Only the exact value `on`: the sticky identity plan's T1
+/// (`docs/face-recognition-sticky-identity-plan.md`). [`GAP_ENVIRONMENT`]'s
+/// hold, widened to the conversation's own bounds: a known face lost with no
+/// face in view keeps the conversation's person for up to [`NO_FACE_SEEN`]
+/// past its last fresh sighting and [`NO_FACE_QUIET`] past the lamp's last
+/// answer to them, whichever ends first ([`Gap`]). Under the plan's
+/// single-user decision (its accepted risk, the owner's call on #7933,
+/// 20 Nov 01:55, overruling #7814's held-only condition), the held line is
+/// read, kept and journalled as theirs ([`ScopeSnapshot::sticky`]), but runs
+/// no forget, correction, rule or yes, and is never the owner present or
+/// alone. Only another known face matched, or a face in view, ends it
+/// sooner. Off: [`GAP_ENVIRONMENT`] alone, as before.
+pub const NO_FACE_HOLD_ENVIRONMENT: &str = "LAMP_FACE_NO_FACE_HOLD";
+
+/// With [`NO_FACE_HOLD_ENVIRONMENT`], how long past a known face's last
+/// fresh sighting it is held with no face in view: the voice's
+/// `known_faces::GONE_AFTER`.
+pub const NO_FACE_SEEN: Duration = crate::known_faces::GONE_AFTER;
+
+/// With [`NO_FACE_HOLD_ENVIRONMENT`], how long past the lamp's last answer
+/// to them it is held: the thread's two minutes of quiet before a new
+/// conversation (`thread::QUIET_BEFORE_ROOM`).
+pub const NO_FACE_QUIET: Duration = Duration::from_secs(120);
+
+/// A held gap's two bounds: past the face's last fresh sighting, and past
+/// the lamp's last answer to them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Gap {
+    pub seen: Duration,
+    pub answered: Duration,
+}
+
+impl Gap {
+    /// One window for both bounds, as [`GAP_ENVIRONMENT`] has it.
+    pub fn both(gap: Duration) -> Self {
+        Self {
+            seen: gap,
+            answered: gap,
+        }
+    }
+
+    /// [`NO_FACE_HOLD_ENVIRONMENT`]'s bounds.
+    pub fn no_face() -> Self {
+        Self {
+            seen: NO_FACE_SEEN,
+            answered: NO_FACE_QUIET,
+        }
+    }
+}
+
+/// [`Gap::no_face`] when [`NO_FACE_HOLD_ENVIRONMENT`] is `on`; else [`GAP`]
+/// when [`GAP_ENVIRONMENT`] is.
+pub fn gap_from_environment() -> Option<Gap> {
+    let on = |name: &str| std::env::var(name).as_deref() == Ok("on");
+    gap_of(on(NO_FACE_HOLD_ENVIRONMENT), on(GAP_ENVIRONMENT))
+}
+
+/// The hold for the two switches, each on or not: the no-face hold wins.
+fn gap_of(no_face: bool, gap: bool) -> Option<Gap> {
+    if no_face {
+        Some(Gap::no_face())
+    } else {
+        gap.then_some(Gap::both(GAP))
+    }
+}
+
+/// [`gap_from_environment`] as `var` gives the switches.
+pub fn gap_from(var: impl Fn(&str) -> Option<String>) -> Option<Gap> {
+    let on = |name: &str| var(name).as_deref() == Some("on");
+    gap_of(on(NO_FACE_HOLD_ENVIRONMENT), on(GAP_ENVIRONMENT))
 }
 
 /// Room is an explicit valid scope, distinct from a revoked request.
@@ -55,6 +122,11 @@ pub struct ScopeSnapshot {
     /// it stood, never from memory's reads, and runs no held forget (the
     /// first builder's 22:10 and 01:43 on #2265).
     held: bool,
+    /// A known face's scope from a name the eyes hold, not match, with a
+    /// face in view (`LAMP_FACE_STICKY`, the eyes' held mark): read and kept
+    /// as theirs, but no forget, correction, rule or yes runs on it
+    /// ([`ScopeLease::sticky_held`]).
+    sticky: bool,
 }
 impl ScopeSnapshot {
     pub fn room() -> Self {
@@ -67,12 +139,27 @@ impl ScopeSnapshot {
     pub fn held(&self) -> bool {
         self.held
     }
+    /// Whether this scope is a known face's from a name the eyes hold, not
+    /// match ([`Self::sticky`]'s field).
+    pub fn sticky(&self) -> bool {
+        self.sticky
+    }
+    /// A known person's scope from a name the eyes hold, for other parts'
+    /// tests.
+    #[cfg(test)]
+    pub fn sticky_of(name: &str) -> Self {
+        Self {
+            sticky: true,
+            ..Self::of(name)
+        }
+    }
     /// A known person's scope, for other parts' tests.
     #[cfg(test)]
     pub fn of(name: &str) -> Self {
         Self {
             person: Some(Arc::from(crate::remember::person_id(name))),
             held: false,
+            sticky: false,
         }
     }
     /// A known person's scope kept only by its held gap, for other parts'
@@ -117,7 +204,7 @@ pub struct RefreshToken {
 /// cold looks later for its keeper (#2807). On lamp-c0a4 on 23 October a face
 /// remembered through the eyes' own socket about 1 s after a voice restart
 /// said its first line 1 to 2 s later, and the known file names a face for
-/// 3 s after the eyes write it ([`crate::known_faces::FRESH`]): 5 s covers
+/// 4 s after the eyes write it ([`crate::known_faces::FRESH`]): 5 s covers
 /// both with room to spare. Past it, a cache that names nobody means nobody
 /// known is in view, so a room's line has no late look (El's P2 on #3108).
 /// The whole window serves only with the eyes' view, where the keeper must
@@ -125,6 +212,90 @@ pub struct RefreshToken {
 /// keeps only for a face named within [`REFRESH_EVERY`] of its start
 /// ([`ScopeLease::face_at_end_seen`]).
 pub const COLD_FOR: Duration = Duration::from_secs(5);
+// The cold window must outlast the known file's freshness (#7146).
+const _: () = assert!(COLD_FOR.as_millis() > crate::known_faces::FRESH.as_millis());
+
+/// Why a heard line is admitted as the room's while the camera is allowed
+/// (the sticky plan's T0, [`FaceCache::room_told`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RoomReason {
+    /// A known face was seen lately, and the eyes' known file is there but
+    /// not fresh, or held unsure.
+    KnownStale,
+    /// A known face was seen lately, and the eyes' known file is gone.
+    NoKnown,
+    /// No known face seen in this conversation's time.
+    NeverKnown,
+}
+
+impl RoomReason {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::KnownStale => "known stale",
+            Self::NoKnown => "no known",
+            Self::NeverKnown => "never known this conversation",
+        }
+    }
+}
+
+/// How many lines were the room's for each [`RoomReason`] in this process,
+/// for a day's count from the journal.
+pub struct RoomReasons {
+    stale: AtomicU64,
+    none: AtomicU64,
+    never: AtomicU64,
+}
+
+impl RoomReasons {
+    pub const fn new() -> Self {
+        Self {
+            stale: AtomicU64::new(0),
+            none: AtomicU64::new(0),
+            never: AtomicU64::new(0),
+        }
+    }
+
+    /// Counts one line for `reason`; the counts so far, stale, none, never.
+    pub fn count(&self, reason: RoomReason) -> (u64, u64, u64) {
+        match reason {
+            RoomReason::KnownStale => &self.stale,
+            RoomReason::NoKnown => &self.none,
+            RoomReason::NeverKnown => &self.never,
+        }
+        .fetch_add(1, Ordering::AcqRel);
+        (
+            self.stale.load(Ordering::Acquire),
+            self.none.load(Ordering::Acquire),
+            self.never.load(Ordering::Acquire),
+        )
+    }
+}
+
+impl Default for RoomReasons {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// This process's [`RoomReasons`].
+pub static ROOM_REASONS: RoomReasons = RoomReasons::new();
+
+/// The journal's words for a line admitted as the room's
+/// ([`FaceCache::room_told`]): the reason, how long ago a known face was
+/// last fresh, and the counts so far. Never a name.
+pub fn room_line(
+    reason: RoomReason,
+    ago: Option<Duration>,
+    (stale, none, never): (u64, u64, u64),
+) -> String {
+    let ago = ago.map_or(String::new(), |ago| {
+        format!(", a known face last fresh {} ms ago", ago.as_millis())
+    });
+    format!(
+        "snapshot empty: {}{ago} (lines the room's so far: known stale {stale}, no known {none}, never known {never})",
+        reason.as_str()
+    )
+}
 
 /// The caller refreshes this slot off the audio path and owns that refresh's
 /// lifetime. Snapshot and invalidation never wait on the refresh mutex.
@@ -132,8 +303,15 @@ pub const COLD_FOR: Duration = Duration::from_secs(5);
 pub struct FaceCache {
     generation: AtomicU64,
     face: Mutex<Option<CachedFace>>,
-    /// [`GAP`], when held ([`GAP_ENVIRONMENT`]).
-    gap: Option<Duration>,
+    /// [`GAP`], when held ([`GAP_ENVIRONMENT`]), or [`Gap::no_face`]
+    /// ([`NO_FACE_HOLD_ENVIRONMENT`]).
+    gap: Option<Gap>,
+    /// The end of the newest fresh sighting of a known face, for why a line
+    /// is the room's ([`Self::room_told`]).
+    last_seen_until: Mutex<Option<Instant>>,
+    /// Whether the eyes' known file was there at the last refresh, named or
+    /// not ([`Self::known_file_there`]), for [`Self::room_told`].
+    known_there: AtomicBool,
     /// Whom the lamp last answered, and when ([`Self::answered`]).
     answered: Mutex<Option<(ScopeSnapshot, Instant)>>,
     /// The faces the eyes saw at the last refresh, plus one; 0 when not
@@ -173,10 +351,52 @@ impl FaceCache {
     /// A cache that holds a known face's scope through a gap of up to `gap`
     /// with no face in view ([`Self::replace_seen`]); `None` holds nothing.
     pub fn holding_gaps(gap: Option<Duration>) -> Self {
+        Self::holding(gap.map(Gap::both))
+    }
+
+    /// [`Self::holding_gaps`] with a gap's two bounds ([`Gap`]).
+    pub fn holding(gap: Option<Gap>) -> Self {
         Self {
             gap,
             ..Self::default()
         }
+    }
+
+    /// The refresh found the eyes' known file there (`true`) or not, before
+    /// its [`Self::replace_seen`]: only for why a line is the room's
+    /// ([`Self::room_told`]).
+    pub fn known_file_there(&self, there: bool) {
+        self.known_there.store(there, Ordering::Release);
+    }
+
+    /// Why a line admitted now is the room's, in words and ms, never a name
+    /// (the sticky plan's T0): `None` when the cache names someone. A known
+    /// face seen within [`NO_FACE_QUIET`] makes it "known stale" (the known
+    /// file is there but not fresh, or held unsure) or "no known" (the eyes
+    /// removed it); none, "never known this conversation". Counted for the
+    /// process ([`ROOM_REASONS`]).
+    pub fn room_told(&self, now: Instant) -> Option<String> {
+        if self.snapshot(now).person().is_some() {
+            return None;
+        }
+        let seen = self.last_seen_until.try_lock().ok().and_then(|seen| *seen);
+        let ago = seen.map(|until| now.saturating_duration_since(until));
+        let reason = match ago {
+            Some(ago) if ago < NO_FACE_QUIET => {
+                if self.known_there.load(Ordering::Acquire) {
+                    RoomReason::KnownStale
+                } else {
+                    RoomReason::NoKnown
+                }
+            }
+            _ => RoomReason::NeverKnown,
+        };
+        let counts = ROOM_REASONS.count(reason);
+        Some(room_line(
+            reason,
+            ago.filter(|_| reason != RoomReason::NeverKnown),
+            counts,
+        ))
     }
 
     /// Acquire before starting the source read, never after it completes.
@@ -197,6 +417,9 @@ impl FaceCache {
             });
         // Nothing known in the new generation until the next refresh.
         self.went_cold(Instant::now());
+        if let Ok(mut seen) = self.last_seen_until.lock() {
+            *seen = None;
+        }
     }
 
     /// A face was just remembered by the voice's own tool: the eyes' known
@@ -290,6 +513,25 @@ impl FaceCache {
         observation: Option<FaceObservation>,
         faces_in_view: Option<usize>,
     ) -> bool {
+        self.replace_marked(token, observation, faces_in_view, false)
+    }
+
+    /// [`Self::replace_seen`], told whether the eyes hold the observed name
+    /// rather than match it (`held_name`: `LAMP_FACE_STICKY`, the eyes' held
+    /// mark, `known_faces::held_mark`). A held name is theirs, sticky
+    /// ([`ScopeSnapshot::sticky`]): read, kept and journalled as theirs,
+    /// with a face in view or none (the plan's accepted risk, the owner's
+    /// call on #7933, 20 Nov 01:55, overruling the near-face condition of
+    /// the privacy P3 and #7814's held-only rule), but no forget,
+    /// correction, rule or yes runs on it, and it is never the owner present
+    /// or alone.
+    pub fn replace_marked(
+        &self,
+        token: RefreshToken,
+        observation: Option<FaceObservation>,
+        faces_in_view: Option<usize>,
+        held_name: bool,
+    ) -> bool {
         let current = || {
             token.generation != u64::MAX
                 && token.generation == self.generation.load(Ordering::Acquire)
@@ -313,6 +555,7 @@ impl FaceCache {
                 .filter(|was| {
                     was.generation == token.generation
                         && !was.scope.held
+                        && !was.scope.sticky
                         && was.scope.person.as_deref() == Some(&*person)
                 })
                 .map_or(named_at, |was| was.named_at);
@@ -321,6 +564,7 @@ impl FaceCache {
                 scope: ScopeSnapshot {
                     person: Some(person),
                     held: false,
+                    sticky: held_name,
                 },
                 valid_until: observation.valid_until(),
                 seen_until: observation.valid_until(),
@@ -341,15 +585,31 @@ impl FaceCache {
             let (whom, at) = answered.filter(|(whom, _)| whom.person == was.scope.person)?;
             // Only a face cached in this generation: one from before a
             // privacy change is never carried into the new one.
+            // The plan's T1 (`LAMP_FACE_NO_FACE_HOLD`, [`Gap::no_face`]): the
+            // conversation's person held, read, kept and journalled as
+            // theirs, but sticky: no forget, correction, rule or yes, never
+            // the owner present or alone. `LAMP_FACE_GAP_HOLD`'s 12 s: held,
+            // told only, as before.
+            let reads = gap == Gap::no_face();
             (faces_in_view == Some(0) && was.generation == token.generation).then(|| CachedFace {
                 generation: was.generation,
-                scope: ScopeSnapshot { held: true, ..whom },
-                valid_until: (was.seen_until + gap).min(at + gap),
+                scope: ScopeSnapshot {
+                    held: !reads,
+                    sticky: reads,
+                    ..whom
+                },
+                valid_until: (was.seen_until + gap.seen).min(at + gap.answered),
                 seen_until: was.seen_until,
                 named_at: was.named_at,
             })
         };
         let named = next.is_some();
+        // The newest fresh sighting, for why a later line is the room's.
+        if let Some(face) = next.as_ref()
+            && let Ok(mut seen) = self.last_seen_until.lock()
+        {
+            *seen = Some(seen.map_or(face.seen_until, |was| was.max(face.seen_until)));
+        }
         let next = next.or_else(held);
         *face = next;
         self.in_view.store(
@@ -699,6 +959,15 @@ pub fn one_face_record(request: u64) -> Option<String> {
         .map(|(_, person, _)| person.clone())
 }
 
+/// A line admitted from a name the eyes hold ([`ScopeSnapshot::sticky`]) is
+/// taken as its person's by the one-face rule with reads from the start:
+/// read and kept as theirs, and, as nothing matched their face, no forget,
+/// correction, rule or yes runs on it ([`ScopeLease::forgets_need_mouth`],
+/// [`ScopeLease::by_one_face`]). Any narrow after makes it the room's.
+fn sticky_one_face(scope: &ScopeSnapshot) -> Option<Arc<str>> {
+    scope.person.clone().filter(|_| scope.sticky)
+}
+
 /// Only this non-cloneable owner keeps the request authorized. Task leases
 /// hold immutable data but cannot keep authorization alive after owner drop.
 pub struct RequestScope {
@@ -706,6 +975,7 @@ pub struct RequestScope {
 }
 impl RequestScope {
     pub fn new(key: RequestKey, scope: ScopeSnapshot) -> Self {
+        let (one_face, one_face_reads) = (sticky_one_face(&scope), scope.sticky);
         Self {
             context: Arc::new(RequestContext {
                 key,
@@ -715,8 +985,8 @@ impl RequestScope {
                 keep_for: OnceLock::new(),
                 carried_saves: AtomicBool::new(false),
                 released_keep: OnceLock::new(),
-                one_face: Mutex::new(None),
-                one_face_reads: AtomicBool::new(false),
+                one_face: Mutex::new(one_face),
+                one_face_reads: AtomicBool::new(one_face_reads),
                 carried_reads: OnceLock::new(),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
@@ -746,6 +1016,7 @@ impl RequestScope {
     /// held scope takes no late look, nor does anything once `cache`'s
     /// generation moves on (a privacy change).
     pub fn looking_later(key: RequestKey, scope: ScopeSnapshot, cache: Arc<FaceCache>) -> Self {
+        let (one_face, one_face_reads) = (sticky_one_face(&scope), scope.sticky);
         let late = (scope.person.is_none() && !scope.held).then(|| {
             let cache = cache.clone();
             let generation = cache.generation();
@@ -772,8 +1043,8 @@ impl RequestScope {
                 keep_for: OnceLock::new(),
                 carried_saves: AtomicBool::new(false),
                 released_keep: OnceLock::new(),
-                one_face: Mutex::new(None),
-                one_face_reads: AtomicBool::new(false),
+                one_face: Mutex::new(one_face),
+                one_face_reads: AtomicBool::new(one_face_reads),
                 carried_reads: OnceLock::new(),
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
@@ -926,6 +1197,7 @@ impl ScopeLease {
         let held = ScopeSnapshot {
             person: Some(Arc::from(person)),
             held: true,
+            sticky: false,
         };
         let carried = self.context.carried.get_or_init(|| held);
         carried.person() == Some(person)
@@ -957,6 +1229,7 @@ impl ScopeLease {
         let held = ScopeSnapshot {
             person: None,
             held: true,
+            sticky: false,
         };
         let carried = self.context.carried.get_or_init(|| held);
         carried.person().is_none()
@@ -987,6 +1260,7 @@ impl ScopeLease {
         if !self.is_current()
             || self.context.narrowed.load(Ordering::Acquire)
             || self.context.scope.held
+            || self.context.scope.sticky
             || self.context.keep_for.get().is_some()
             || self.context.carried.get().and_then(ScopeSnapshot::person) != Some(person)
         {
@@ -995,6 +1269,7 @@ impl ScopeLease {
         let seen = self.context.seen_words.get_or_init(|| ScopeSnapshot {
             person: Some(Arc::from(person)),
             held: false,
+            sticky: false,
         });
         if seen.person() != Some(person) {
             return false;
@@ -1071,6 +1346,7 @@ impl ScopeLease {
         let reads = self.context.carried_reads.get_or_init(|| ScopeSnapshot {
             person: Some(person.clone()),
             held: false,
+            sticky: false,
         });
         if reads.person() != Some(&*person) {
             return false;
@@ -1082,8 +1358,9 @@ impl ScopeLease {
 
     /// Whether this line is read as its carried person's
     /// ([`Self::read_carried`]), while current and no narrow came after: its
-    /// exchange is still kept out of the journal and every summary, as any
-    /// carried line's is.
+    /// exchange is still kept out of every summary, and out of the journal
+    /// unless `LAMP_FACE_STICKY` is on, which journals it in their record
+    /// (the sticky plan's T9, `worker::keep_out_scoped`).
     pub fn reads_carried(&self) -> bool {
         self.is_current()
             && !self.context.narrowed.load(Ordering::Acquire)
@@ -1298,13 +1575,26 @@ impl ScopeLease {
         one_face.is_some() && self.context.one_face_reads.load(Ordering::Acquire)
     }
 
+    /// Whether this line was admitted from a name the eyes hold, not match
+    /// ([`ScopeSnapshot::sticky`]), while current and no narrow came after:
+    /// no forget of any kind, no correction, rule or yes runs on it, the
+    /// single-item yes (#5627) included; only the lamp's own take-back of
+    /// its own keep does (`second_provider::one_face_refused`).
+    pub fn sticky_held(&self) -> bool {
+        self.is_current()
+            && !self.context.narrowed.load(Ordering::Acquire)
+            && self.context.scope.sticky
+    }
+
     /// Whose scope this line's `remember` goes to by the one-face rule
     /// ([`Self::take_by_one_face`], [`Self::keep_for_one_face`]), while the
     /// lease is current and no narrow came after. Never a read, a forget or
-    /// a yes: only a keep reads it. The one named exception is the held face
-    /// rename behind `LAMP_NAMES_RENAME_YES`, whose yes it may take, as a
-    /// written risk accepted (`second_provider::held_rename`, docs/eyes.md),
-    /// on a carried line read as theirs too ([`Self::read_carried`], #6859).
+    /// a yes: only a keep reads it, and the done-already note of a yes after
+    /// that keep (`remember::done_for_yes_in`, a note only). The one named
+    /// exception is the held face rename behind `LAMP_NAMES_RENAME_YES`,
+    /// whose yes it may take, as a written risk accepted
+    /// (`second_provider::held_rename`, docs/eyes.md), on a carried line read
+    /// as theirs too ([`Self::read_carried`], #6859).
     pub fn kept_by_one_face(&self) -> Option<String> {
         if !self.is_current() {
             return None;
@@ -1326,8 +1616,12 @@ impl ScopeLease {
     /// person's scope and then the room's on a real no-match there
     /// (`remember::run_one_face_forget`), each re-checked right before its
     /// run.
-    /// Every read (`recall`, hits, notes, context) stays the room's, and
-    /// `forget_everything` and a held forget's yes are never theirs by it.
+    /// Every read (`recall`, hits, notes, context) stays the room's, except
+    /// a yes's done-already lookup (`remember::done_for_yes_in`), which asks
+    /// it for `remember` and finds only that person's done keep or change
+    /// from the last turn, never their forget: a note only, nothing read,
+    /// forgotten or retired. `forget_everything` and a held forget's yes are
+    /// never theirs by it.
     /// `None` for any other call, and whenever [`Self::kept_by_one_face`]
     /// is: a revoked line, one narrowed after, or none taken (a second
     /// face, no known face, another voice).
@@ -2018,6 +2312,7 @@ mod tests {
             scope: ScopeSnapshot {
                 person: Some(Arc::from(crate::remember::person_id(name))),
                 held: false,
+                sticky: false,
             },
             valid_until: until,
             seen_until: until,
@@ -2140,6 +2435,7 @@ mod tests {
         let person = ScopeSnapshot {
             person: Some(Arc::from("p-0123456789abcdef")),
             held: false,
+            sticky: false,
         };
         let owner = RequestScope::new(key(1), person.clone());
         let handed = owner.lease();
@@ -2162,6 +2458,7 @@ mod tests {
         let person = ScopeSnapshot {
             person: Some(Arc::from("p-0123456789abcdef")),
             held: false,
+            sticky: false,
         };
         let owner = RequestScope::new(key(1), person.clone());
         let lease = owner.lease();
@@ -2189,6 +2486,7 @@ mod tests {
         let person = ScopeSnapshot {
             person: Some(Arc::from("p-0123456789abcdef")),
             held: false,
+            sticky: false,
         };
         let owner = RequestScope::new(key(1), person.clone());
         let lease = owner.lease();
@@ -2285,6 +2583,7 @@ mod tests {
         let scope = ScopeSnapshot {
             person: Some(Arc::from(crate::remember::person_id(name))),
             held: false,
+            sticky: false,
         };
         cache.answered(&scope, at);
     }
@@ -2312,7 +2611,7 @@ mod tests {
 
     /// The first builder on #1722 (21 Oct 14:1x): lamp-c0a4's timeline,
     /// replayed. The known person is answered and looks away as the answer
-    /// ends; the eyes' known file, last renewed then, stays fresh up to 3 s
+    /// ends; the eyes' known file, last renewed then, stays fresh up to 4 s
     /// and then goes, with no face in view; the next line, from out of the
     /// picture, is decided 4 to 6 s after the answer. It is held, so it is
     /// told only ([`ScopeSnapshot::held`]); off, it is the room's.
@@ -2341,10 +2640,9 @@ mod tests {
             match gap {
                 Some(_) => {
                     let told = told.unwrap();
-                    assert!(
-                        told.starts_with("known face held, its sighting ends 2"),
-                        "{told}"
-                    );
+                    let ended = Duration::from_secs(5) - crate::known_faces::FRESH;
+                    let held = format!("known face held, its sighting ends {}", ended.as_millis());
+                    assert!(told.starts_with(&held), "{told}");
                     assert!(told.ends_with("ms ago, faces in view 0"), "{told}");
                     assert!(
                         told.contains("last answer to someone known 5000 ms ago"),
@@ -2572,6 +2870,7 @@ mod tests {
             ScopeSnapshot {
                 person: Some(Arc::from("p-0123456789abcdef")),
                 held: true,
+                sticky: false,
             },
             cache.clone(),
         );
@@ -2611,6 +2910,7 @@ mod tests {
             scope: ScopeSnapshot {
                 person: Some(Arc::from("p-0123456789abcdef")),
                 held: true,
+                sticky: false,
             },
             valid_until: Instant::now() + Duration::from_secs(3),
             seen_until: Instant::now(),
@@ -3103,5 +3403,227 @@ mod tests {
         assert!(refresh_from(&cache, &known), "the write back");
         assert!(cache.snapshot(Instant::now()).person().is_some());
         std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    /// [`seen`], the name read with the eyes' held mark (`LAMP_FACE_STICKY`).
+    fn seen_held(cache: &FaceCache, name: &str, faces_in_view: Option<usize>) -> Instant {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "memory-scope-held-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::write(&path, name).unwrap();
+        let observation = FaceObservation::read(&path).unwrap();
+        let until = observation.valid_until();
+        assert!(cache.replace_marked(
+            cache.begin_refresh(),
+            Some(observation),
+            faces_in_view,
+            true
+        ));
+        std::fs::remove_file(path).unwrap();
+        until
+    }
+
+    /// The sticky plan's T1 under `LAMP_FACE_NO_FACE_HOLD` ((a)-(e), the
+    /// owner's call on #7933, 20 Nov 01:55, overruling #7814's held-only
+    /// condition): the person is matched and answered, then the eyes have
+    /// nobody for 25 s mid-conversation: the line stays theirs, read, kept
+    /// and journalled as theirs, but sticky, so no forget, correction, rule
+    /// or yes runs on it (d); past 30 s with no face, or 2 min with nothing
+    /// said, the room's (b); another known face, theirs at once (c).
+    #[test]
+    fn with_the_no_face_hold_a_known_person_out_of_view_keeps_their_conversation() {
+        let cache = FaceCache::holding(Some(Gap::no_face()));
+        let a = crate::remember::person_id("Ann");
+        let until = seen(&cache, "Ann", Some(1));
+        talked_with(&cache, "Ann", until);
+        lost(&cache, Some(0));
+        let held = cache.snapshot(until + Duration::from_secs(25));
+        assert_eq!(held.person(), Some(a.as_str()));
+        assert!(!held.held() && held.sticky(), "theirs, read and kept");
+        let request = RequestScope::new(key(40), held);
+        let lease = request.lease();
+        // (a) Recall and keep are theirs; (d) no forget, correction or yes.
+        assert!(lease.read_by_one_face(), "read as theirs");
+        assert_eq!(lease.kept_by_one_face(), Some(a.clone()), "kept as theirs");
+        assert!(
+            lease.sticky_held() && lease.forgets_need_mouth(),
+            "no forget"
+        );
+        // Journalled as theirs: not kept out as a held line.
+        assert!(!lease.scope().unwrap().held());
+        // 30 s with no face: the room's.
+        lost(&cache, Some(0));
+        assert_eq!(whose(&cache, until + NO_FACE_SEEN), None);
+        // 2 min with nothing said ends it first when it is shorter: answered
+        // long ago, held to that bound only.
+        let quiet = FaceCache::holding(Some(Gap::no_face()));
+        let until = seen(&quiet, "Ann", Some(1));
+        talked_with(
+            &quiet,
+            "Ann",
+            until - NO_FACE_QUIET + Duration::from_secs(5),
+        );
+        lost(&quiet, Some(0));
+        assert_eq!(
+            whose(&quiet, until + Duration::from_secs(4)),
+            Some(a.clone())
+        );
+        assert_eq!(whose(&quiet, until + Duration::from_secs(6)), None);
+        // A face in view (someone else, unknown): nothing held.
+        let other = FaceCache::holding(Some(Gap::no_face()));
+        let until = seen(&other, "Ann", Some(1));
+        talked_with(&other, "Ann", until);
+        lost(&other, Some(1));
+        assert_eq!(whose(&other, until + Duration::from_secs(1)), None);
+        // (c) Another known face: theirs at once.
+        let b = crate::remember::person_id("Bea");
+        let switched = FaceCache::holding(Some(Gap::no_face()));
+        let until = seen(&switched, "Ann", Some(1));
+        talked_with(&switched, "Ann", until);
+        lost(&switched, Some(0));
+        let until = seen(&switched, "Bea", Some(1));
+        assert_eq!(whose(&switched, until - Duration::from_millis(1)), Some(b));
+    }
+
+    /// (k) and (f): the switches as read, and nobody ever known unchanged.
+    #[test]
+    fn the_no_face_hold_is_on_only_for_exactly_on_and_nobody_known_holds_nothing() {
+        let with = |pairs: &'static [(&'static str, &'static str)]| {
+            gap_from(move |name| {
+                pairs
+                    .iter()
+                    .find(|(n, _)| *n == name)
+                    .map(|(_, v)| (*v).to_owned())
+            })
+        };
+        assert_eq!(with(&[]), None);
+        assert_eq!(with(&[(GAP_ENVIRONMENT, "on")]), Some(Gap::both(GAP)));
+        assert_eq!(
+            with(&[(NO_FACE_HOLD_ENVIRONMENT, "on")]),
+            Some(Gap::no_face())
+        );
+        assert_eq!(
+            with(&[(NO_FACE_HOLD_ENVIRONMENT, "On"), (GAP_ENVIRONMENT, "on")]),
+            Some(Gap::both(GAP))
+        );
+        assert_eq!(with(&[(NO_FACE_HOLD_ENVIRONMENT, "1")]), None);
+        // Nobody ever known: the room's, and its reason said so.
+        let cache = FaceCache::holding(Some(Gap::no_face()));
+        lost(&cache, Some(0));
+        let now = Instant::now();
+        assert_eq!(cache.snapshot(now), ScopeSnapshot::room());
+        let told = cache.room_told(now).unwrap();
+        assert!(
+            told.starts_with("snapshot empty: never known this conversation (lines"),
+            "{told}"
+        );
+    }
+
+    /// The sticky plan's T3 on the voice: a name the eyes hold, not match,
+    /// with a face in view, is read and kept as theirs, but no forget,
+    /// correction, rule or yes runs on it (d); any narrow makes it the
+    /// room's. With no face in view, the same (the owner's call on #7933,
+    /// 20 Nov 01:55). Without the mark (the switch off), a fresh face as
+    /// before (k).
+    #[test]
+    fn a_name_the_eyes_hold_reads_and_keeps_with_a_face_in_view_and_runs_no_forget() {
+        let a = crate::remember::person_id("Ann");
+        let cache = FaceCache::holding_gaps(None);
+        let until = seen_held(&cache, "Ann", Some(1));
+        let scope = cache.snapshot(until - Duration::from_millis(1));
+        assert_eq!(scope, ScopeSnapshot::sticky_of("Ann"));
+        let request = RequestScope::new(key(41), scope);
+        let lease = request.lease();
+        assert_eq!(
+            lease.scope().and_then(ScopeSnapshot::person),
+            Some(a.as_str())
+        );
+        assert!(!lease.scope().unwrap().held(), "read as theirs");
+        assert!(lease.sticky_held());
+        assert!(lease.forgets_need_mouth(), "no forget or yes");
+        assert!(
+            lease.by_one_face(),
+            "a held forget's yes is never one on it"
+        );
+        assert_eq!(lease.kept_by_one_face(), Some(a.clone()), "kept as theirs");
+        // No carried line's seen words lift it.
+        assert!(lease.carry_conversation(&a));
+        assert!(!lease.answer_words_seen(&a));
+        lease.narrow_to_room();
+        assert!(!lease.sticky_held() && !lease.forgets_need_mouth());
+        assert_eq!(lease.scope(), Some(&ScopeSnapshot::room()));
+        // No face in view, or no view: read and kept as theirs too (the
+        // plan's accepted risk), still no forget.
+        for faces in [Some(0), None] {
+            let none = FaceCache::holding_gaps(None);
+            let until = seen_held(&none, "Ann", faces);
+            let scope = none.snapshot(until - Duration::from_millis(1));
+            assert!(!scope.held() && scope.sticky(), "{faces:?}");
+            let request = RequestScope::new(key(42), scope);
+            let lease = request.lease();
+            assert!(lease.read_by_one_face() && lease.sticky_held(), "{faces:?}");
+        }
+        // Off: no mark read, a fresh face.
+        let off = FaceCache::holding_gaps(None);
+        let until = seen(&off, "Ann", Some(1));
+        let scope = off.snapshot(until - Duration::from_millis(1));
+        assert_eq!(scope, ScopeSnapshot::of("Ann"));
+        let lease = RequestScope::new(key(43), scope).lease();
+        assert!(!lease.sticky_held() && !lease.forgets_need_mouth());
+    }
+
+    /// Condition A on #7814, the voice's side: the eyes let go of a print
+    /// clearly someone else's on the owner's own followed box, so the known
+    /// file goes with a face still in view: the next line reads nothing of
+    /// the owner's, no-face hold or not.
+    #[test]
+    fn after_the_eyes_let_go_of_someone_else_the_next_line_is_the_rooms() {
+        for gap in [None, Some(Gap::no_face())] {
+            let cache = FaceCache::holding(gap);
+            let until = seen(&cache, "Ann", Some(1));
+            talked_with(&cache, "Ann", until);
+            lost(&cache, Some(1));
+            assert_eq!(whose(&cache, until), None, "{gap:?}");
+            let told = cache.room_told(until).unwrap();
+            assert!(
+                told.contains("no known") || told.contains("known stale"),
+                "{told}"
+            );
+        }
+    }
+
+    /// (h) T0: the room's line says its reason, ms and counts, never a name.
+    #[test]
+    fn the_rooms_line_has_a_reason_and_counts_only() {
+        let reasons = RoomReasons::new();
+        assert_eq!(reasons.count(RoomReason::NoKnown), (0, 1, 0));
+        assert_eq!(reasons.count(RoomReason::KnownStale), (1, 1, 0));
+        let line = room_line(
+            RoomReason::KnownStale,
+            Some(Duration::from_millis(4200)),
+            (1, 1, 0),
+        );
+        assert_eq!(
+            line,
+            "snapshot empty: known stale, a known face last fresh 4200 ms ago (lines the room's so far: known stale 1, no known 1, never known 0)"
+        );
+        assert_eq!(
+            room_line(RoomReason::NeverKnown, None, (0, 0, 3)),
+            "snapshot empty: never known this conversation (lines the room's so far: known stale 0, no known 0, never known 3)"
+        );
+        // A known face's name never reaches it: the cache's line for a
+        // named person's loss has no name in it.
+        let cache = FaceCache::holding_gaps(None);
+        let until = seen(&cache, "Zebediah Name", Some(1));
+        lost(&cache, Some(1));
+        let told = cache.room_told(until).unwrap();
+        assert!(
+            !told.contains("Zebediah")
+                && !told.contains(&crate::remember::person_id("Zebediah Name")),
+            "{told}"
+        );
     }
 }

@@ -899,11 +899,25 @@ pub fn takes_own_keys_at_start(save: &impl Save, recovering: bool) -> bool {
 /// setup knows (`asked` at most [`REPORTS_ASKED`]) and no field but
 /// `share`, `asked` and `at`; missing, unreadable, a later wording or a newer
 /// build's field is a no. A later change in the app is lamp-cloud's own
-/// record, not this one (reviewer-two's P3 on #3024).
+/// record, not this one (reviewer-two's P3 on #3024). With
+/// `LAMP_NOTICING_BY_DEFAULT=on` (#7767, `lamp_msgs::consent`'s one place
+/// for it) no record is [`kept_share_reports_or`]'s default.
 pub fn kept_share_reports(path: &Path) -> bool {
-    std::fs::read(path)
+    kept_share_reports_or(path, lamp_msgs::consent::noticing_by_default())
+}
+
+/// [`kept_share_reports`] with the default given (#7767), as lamp-cloud
+/// reads it: no record (not found) is `by_default`; a kept `false`, a
+/// record that can't be read, a later wording or a newer build's field is
+/// still no.
+pub fn kept_share_reports_or(path: &Path, by_default: bool) -> bool {
+    let bytes = match std::fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return by_default,
+        Err(_) => return false,
+    };
+    serde_json::from_slice::<Value>(&bytes)
         .ok()
-        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
         .is_some_and(|kept| {
             kept.as_object().is_some_and(|fields| {
                 fields

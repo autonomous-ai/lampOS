@@ -33,7 +33,9 @@
 //!   written and answered, then, once no update is at work (no quiet: its
 //!   restart makes no sound), `systemctl daemon-reload` and a restart of
 //!   [`CONTROL_UNIT`] ([`restart_control_when_unlocked`]). Off: the door is
-//!   closed before the answer ([`close_before_answer`]);
+//!   closed before the answer ([`close_before_answer`]): the drop-in goes and
+//!   lamp-control is restarted, not stopped, so it comes back with the door
+//!   shut and still serves the voice's yes records, skill runs and apps;
 //! - the owner's dev monitor (`monitor.set`, #5883, `docs/peek.md`):
 //!   lamp-peek's drop-in ([`MONITOR_DROPIN`], `LAMP_PEEK=monitor`), as
 //!   developer access: on is written, answered, then [`PEEK_UNIT`] is
@@ -58,7 +60,24 @@
 //!   followed within 2 s as it is. `lamp-cloud` sends them only with
 //!   `LAMP_APP_CONSENT=on`, room sounds only on a lamp with no slide. The
 //!   reset's plan, a forget of everything and a redo of setup remove both,
-//!   whoever gave them.
+//!   whoever gave them;
+//! - the owner's desk noticing switch from the app (`desk_noticing`, #6543,
+//!   `docs/cloud.md`, "Desk noticing from the app"): seen activity's yes as
+//!   `consent`'s, with the app's `request_id` (its send time in Unix ms).
+//!   A yes is kept only with an id above the mark beside it
+//!   ([`lamp_msgs::consent::SEEN_ACTIVITY_MARK`]), so a resent or late yes
+//!   never lands after a later "no"; each request taken raises the mark to
+//!   its id, and the voice's stop and any forget raise it to the lamp's now.
+//!   An off is never refused. The check and the write are made under the
+//!   mark's lock ([`lamp_msgs::consent::lock_mark`]), as the voice's stop
+//!   raises and removes under it, so no yes checked before a stop lands
+//!   after it. A `request_id` more than a day past the lamp's now
+//!   ([`lamp_msgs::consent::REQUEST_AHEAD_MOST_MS`]) is no send time: a yes
+//!   is refused, an off raises the mark only to the lamp's now. `lamp-cloud`
+//!   sends it only with `LAMP_SEEN_ACTIVITY=on`. With
+//!   `LAMP_NOTICING_BY_DEFAULT=on` (#7767, `lamp_msgs::consent`), where a
+//!   missing file is on, an off keeps a no (`"by":"app"`) in place of the
+//!   removal, under the same lock and mark ([`apply_or`]).
 use crate::serve::{Config, Files, Save, write_private};
 use lamp_update::quiet::{Heard, QUIET, Quiet};
 use serde_json::{Value, json};
@@ -124,9 +143,54 @@ pub enum Change {
     /// energy with them. With them, the energy the owner chose, if any
     /// (#6893): otherwise worked out from the words when kept.
     Character(Option<String>, Option<u8>),
+    /// The owner's movement level alone (#7566, `{"character": {"energy":
+    /// N}}` with no `text`): kept as chosen, the kept words left as they
+    /// are, so the app's picker sets a level in one tap, with or without
+    /// words.
+    Energy(u8),
     /// One of the owner's yeses from the app (a key of
     /// [`lamp_msgs::consent::FILES`]): kept, or removed.
     Consent(&'static str, bool),
+    /// The owner's desk noticing switch from the app (#6543): seen
+    /// activity's yes kept or removed, with the app's `request_id`, checked
+    /// against the mark when a yes.
+    DeskNoticing(bool, u64),
+}
+
+/// A desk noticing yes whose `request_id` is not above the mark: sent
+/// before the lamp's last change, or resent.
+pub const DESK_OLDER: &str = "this request was sent before the lamp's last change: send a new one";
+/// The mark is there but cannot be read: no yes until an off rewrites it.
+pub const DESK_MARK_UNREAD: &str =
+    "the lamp's last change could not be read: turn desk noticing off, then on";
+/// A desk noticing yes whose `request_id` is more than
+/// [`lamp_msgs::consent::REQUEST_AHEAD_MOST_MS`] past the lamp's now.
+pub const DESK_AHEAD: &str = "request_id is more than a day ahead of the lamp's clock: send the app's time in Unix milliseconds";
+
+/// A change refused under its lock, after `parse` let it through: said back
+/// as `{"refused": why}`, as `parse`'s refusals are.
+#[derive(Debug)]
+struct Refused(&'static str);
+
+impl std::fmt::Display for Refused {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.0)
+    }
+}
+
+impl std::error::Error for Refused {}
+
+/// Why a desk noticing yes with `id` is refused against `mark` (as
+/// [`lamp_msgs::consent::read_mark`] read it), or none.
+fn desk_refused(id: u64, mark: Option<u64>) -> Option<&'static str> {
+    if lamp_msgs::consent::too_far_ahead(id) {
+        return Some(DESK_AHEAD);
+    }
+    match mark {
+        None => Some(DESK_MARK_UNREAD),
+        Some(mark) if id <= mark => Some(DESK_OLDER),
+        Some(_) => None,
+    }
 }
 
 /// Where the chosen voice and the character words are kept: beside the
@@ -157,9 +221,12 @@ pub fn fit_name(name: &str) -> Result<String, &'static str> {
 /// The one line `lamp-cloud` sends, checked against `config`: exactly
 /// `{"person_name": s}`, `{"display_name": s}`, `{"timezone": s}`,
 /// `{"language": s}`, `{"voice": s}`, `{"character": s}` (`""` clears
-/// either; or `{"character": {"text": s, "energy"?: 1..5}}`, #6893), or `{"owner_place": {"name", "lat", "lon", "set_at"}}`
+/// either; or `{"character": {"text": s, "energy"?: 1..5}}`, #6893, or
+/// `{"character": {"energy": 1..5}}` alone, the words kept, #7566), or `{"owner_place": {"name", "lat", "lon", "set_at"}}`
 /// (`null` clears it), or `{"control": bool}`, `{"local_agent": bool}`, `{"monitor": bool}`, or `{"consent": {KEY: bool}}`
-/// with exactly one key of [`lamp_msgs::consent::FILES`].
+/// with exactly one key of [`lamp_msgs::consent::FILES`], or
+/// `{"desk_noticing": {"allow": bool, "request_id": N}}` (N a positive
+/// integer, the app's send time in Unix ms).
 pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
     if line.len() > LINE_MOST {
         return Err("the request is too long".into());
@@ -204,6 +271,13 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
         // `{"text", "energy"?}` (#6893), or the words alone as an older
         // lamp-cloud sends them.
         "character" => {
+            // The level alone, no `text` (#7566): the words are kept.
+            if let Some(asked) = given.as_object()
+                && matches!(asked.get("text"), None | Some(Value::Null))
+                && let Some(energy) = lamp_msgs::chosen_voice::energy_in(given)?
+            {
+                return Ok(Change::Energy(energy));
+            }
             let (words, energy) = match given.as_object() {
                 Some(asked) => (
                     asked.get("text").and_then(Value::as_str),
@@ -255,6 +329,31 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
                 .ok_or(why)?;
             Ok(Change::Consent(key, yes.as_bool().ok_or(why)?))
         }
+        // Checked again here, whatever lamp-cloud sent (#6543): a yes only
+        // with an id above the mark and within a day of the lamp's now; an
+        // off whatever its id. `apply` checks a yes again under the lock.
+        "desk_noticing" => {
+            let why =
+                "desk_noticing holds allow, true or false, and request_id, a positive integer";
+            let asked = given
+                .as_object()
+                .filter(|asked| asked.len() == 2)
+                .ok_or(why)?;
+            let allow = asked.get("allow").and_then(Value::as_bool).ok_or(why)?;
+            let id = asked
+                .get("request_id")
+                .and_then(Value::as_u64)
+                .filter(|id| *id > 0)
+                .ok_or(why)?;
+            if allow {
+                let mark =
+                    lamp_msgs::consent::read_mark(&lamp_msgs::consent::mark_in(&config.consent));
+                if let Some(why) = desk_refused(id, mark) {
+                    return Err(why.into());
+                }
+            }
+            Ok(Change::DeskNoticing(allow, id))
+        }
         _ => Err("the request names no change this lamp makes".into()),
     }
 }
@@ -293,6 +392,12 @@ fn remove(path: &Path) -> io::Result<()> {
 
 /// Make `change` with setup's writers on the files `config` names.
 pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
+    apply_or(change, config, lamp_msgs::consent::noticing_by_default())
+}
+
+/// [`apply`] with `LAMP_NOTICING_BY_DEFAULT` given (#7767): `by_default`
+/// changes only the desk noticing switch, whose off then keeps a no.
+pub fn apply_or(change: &Change, config: &Config, by_default: bool) -> io::Result<Done> {
     let mut files = Files(config);
     match change {
         Change::PersonName(Some(name)) => {
@@ -511,6 +616,31 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 },
             })
         }
+        // The level alone (#7566): kept as the owner's choice beside the
+        // words, which stay as they are; like any energy, it never restarts
+        // the voice.
+        Change::Energy(level) => {
+            let words = fs::read_to_string(beside_language(config, "character"))
+                .ok()
+                .map(|words| words.trim().to_owned())
+                .filter(|words| !words.is_empty());
+            keep_line(
+                &beside_language(config, "energy"),
+                Some(lamp_msgs::chosen_voice::energy_line(*level, true).as_str()),
+            )?;
+            Ok(Done {
+                data: json!({
+                    "text": words.as_deref().unwrap_or(""),
+                    "energy": level,
+                }),
+                restart_schedule: false,
+                restart_voice: false,
+                restart_control: false,
+                restart_ears: false,
+                restart_peek: false,
+                said: format!("the character's movement level was set to {level}"),
+            })
+        }
         Change::Consent(key, yes) => {
             let path = lamp_msgs::consent::file_in(&config.consent, key)
                 .ok_or_else(|| io::Error::other("no such yes"))?;
@@ -534,6 +664,53 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
                 restart_peek: false,
                 said: format!(
                     "the {words} yes is {} from the app{}",
+                    if *yes { "on" } else { "off" },
+                    if *yes == before { " already" } else { "" }
+                ),
+            })
+        }
+        // All under the mark's lock (Twelve's P2 on #7551): a yes checked
+        // again against the mark there, so a stop by voice between `parse`
+        // and here refuses it. The mark raised before a yes is kept, and
+        // after an off is made, so a failed write never leaves a yes without
+        // its mark; an off's id past a day ahead raises it only to now.
+        Change::DeskNoticing(yes, id) => {
+            let key = lamp_msgs::consent::SEEN_ACTIVITY;
+            let path = lamp_msgs::consent::file_in(&config.consent, key)
+                .ok_or_else(|| io::Error::other("no such yes"))?;
+            let lock = lamp_msgs::consent::lock_mark(&config.consent)?;
+            let before = lamp_msgs::consent::read_or(&path, key, by_default).yes;
+            if *yes {
+                if let Some(why) = desk_refused(*id, lock.read()) {
+                    return Err(io::Error::other(Refused(why)));
+                }
+                lock.raise(*id)?;
+                if !before {
+                    keep_yes(&path, key)?;
+                }
+            } else {
+                if by_default {
+                    keep_no(&path, key)?;
+                } else {
+                    remove(&path)?;
+                }
+                let id = if lamp_msgs::consent::too_far_ahead(*id) {
+                    lamp_msgs::consent::now_unix_ms()
+                } else {
+                    *id
+                };
+                lock.raise(id)?;
+            }
+            drop(lock);
+            Ok(Done {
+                data: json!({ key: *yes }),
+                restart_schedule: false,
+                restart_voice: false,
+                restart_control: false,
+                restart_ears: false,
+                restart_peek: false,
+                said: format!(
+                    "the seen activity yes is {} from the app's desk noticing{}",
                     if *yes { "on" } else { "off" },
                     if *yes == before { " already" } else { "" }
                 ),
@@ -599,6 +776,23 @@ fn keep_line(path: &Path, line: Option<&str>) -> io::Result<bool> {
 /// folder's group (`lampos` on a lamp, which the eyes and the ears are in),
 /// or 0600 where the folder's group is root's, as the voice keeps its own.
 fn keep_yes(path: &Path, key: &str) -> io::Result<()> {
+    keep_answer(path, |at| {
+        lamp_msgs::consent::bytes(key, at, lamp_msgs::consent::BY_APP)
+    })
+}
+
+/// A no from the app kept at `path` as [`keep_yes`] keeps a yes (#7767):
+/// `{"version":1,KEY:"no","at_unix_s":N,"by":"app"}`, so that with
+/// `LAMP_NOTICING_BY_DEFAULT` on the off is never read as the default.
+fn keep_no(path: &Path, key: &str) -> io::Result<()> {
+    keep_answer(path, |at| {
+        lamp_msgs::consent::no_bytes(key, at, lamp_msgs::consent::BY_APP)
+    })
+}
+
+/// `bytes(now)` kept at `path`, whole: written beside it and renamed into
+/// place, in the mode and group [`keep_yes`] names.
+fn keep_answer(path: &Path, bytes: impl FnOnce(u64) -> Vec<u8>) -> io::Result<()> {
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
     let folder = path
         .parent()
@@ -607,7 +801,7 @@ fn keep_yes(path: &Path, key: &str) -> io::Result<()> {
     let at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_secs());
-    let bytes = lamp_msgs::consent::bytes(key, at, lamp_msgs::consent::BY_APP);
+    let bytes = bytes(at);
     let next = path.with_extension("change-next");
     let _ = fs::remove_file(&next);
     let result = (|| {
@@ -646,10 +840,16 @@ pub fn answer(line: &str, config: &Config, enabled: bool) -> (Value, Option<Done
     };
     match apply(&change, config) {
         Ok(done) => (json!({"done": done.data}), Some(done)),
-        Err(error) => (
-            json!({"refused": format!("the change could not be saved: {}", error.kind())}),
-            None,
-        ),
+        Err(error) => match error
+            .get_ref()
+            .and_then(|inner| inner.downcast_ref::<Refused>())
+        {
+            Some(Refused(why)) => (json!({ "refused": why }), None),
+            None => (
+                json!({"refused": format!("the change could not be saved: {}", error.kind())}),
+                None,
+            ),
+        },
     }
 }
 
@@ -1064,10 +1264,12 @@ impl Ears for Clock {
 /// before the app is told. lamp-update's lock first, at most
 /// [`CLOSE_LOCK_MOST`], else refused with nothing changed; then, holding it,
 /// the drop-in removed (developer off also the agent's), `daemon-reload` and
-/// `stop` of its unit (a `restart` for the agent off beside developer access
-/// still on, so the agent's socket goes and the developer door stays), and
-/// only then the reply, which this returns for the caller to write. A stop
-/// that failed is said, never claimed closed. `None` when `line` is not such
+/// `restart` of its unit (lamp-control: with the drop-in gone it starts with
+/// the door shut and serves only the owner's side, so no computer can reach
+/// the lamp and the voice's yes records, skill runs and apps keep working;
+/// lamp-peek, for the dev monitor, is stopped), and only then the reply,
+/// which this returns for the caller to write. A restart or stop that failed
+/// is said, never claimed closed. `None` when `line` is not such
 /// a request: it is answered by [`answer`] as any other.
 pub fn close_before_answer(
     line: &str,
@@ -1103,7 +1305,12 @@ pub fn close_before_answer(
                     CONTROL_UNIT,
                     "lamp-control",
                     CLOSE_MAY_STAY_OPEN,
-                    false,
+                    // A restart, never a stop: with the drop-in gone the unit
+                    // starts again with the door shut (no `LAMP_CONTROL=on`:
+                    // nothing listens on the network), and goes on serving
+                    // what the product needs of it (the voice's yes records,
+                    // lamp-tasks' mints, the run socket, the apps' socket).
+                    true,
                 )
             }
             Ok(Change::LocalAgent(false)) if there(&config.agent_dropin) => (
@@ -1112,7 +1319,9 @@ pub fn close_before_answer(
                 CONTROL_UNIT,
                 "lamp-control",
                 CLOSE_MAY_STAY_OPEN,
-                there(&config.control_dropin),
+                // Always restarted, as developer access off is: what the
+                // product needs of lamp-control goes on without the door.
+                true,
             ),
             Ok(Change::Monitor(false)) if there(&config.monitor_dropin) => (
                 vec![config.monitor_dropin.as_path()],
@@ -1139,7 +1348,11 @@ pub fn close_before_answer(
             failed.get_or_insert(error.kind());
         }
     }
-    let (verb, did) = if restart {
+    // A restart only when every removal worked: a drop-in left in place
+    // would start lamp-control with the door open again at once (Heron on
+    // #7998), so then it is stopped, as before, and stays down until its
+    // next start.
+    let (verb, did) = if restart && failed.is_none() {
         ("restart", "restarted")
     } else {
         ("stop", "stopped")

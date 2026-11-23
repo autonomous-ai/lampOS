@@ -1,0 +1,14 @@
+# 10:00, a drink seen at 10 minutes: it turns to them and says one line.
+clock = "10:00"
+
+[[expect]]
+at = "10m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "10m"
+within = "1m"
+call = "say"
+args = { note = "You just saw them take a drink at the desk. Say one short, light, casual line about it, the way a friend would, at most twenty words. Not advice and no count. Say only what you saw; nothing about their health, body or looks, and never mention a camera." }

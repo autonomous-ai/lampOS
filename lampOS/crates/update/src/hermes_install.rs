@@ -322,8 +322,9 @@ pub const PRIVATE: [&str; 3] = ["/tmp", "/var/tmp", "/dev/shm"];
 /// under `--map-root-user` the groups cannot be dropped, so [`NS`] binds
 /// `/dev/null` over each character device these match: cameras, the
 /// microphone and speaker, the servo and other serial ports, I2C, SPI,
-/// GPIO, HID and the display.
-pub const DEVICES: [&str; 14] = [
+/// GPIO, HID, the display and the NPU (`/dev/vipcore`, `video`'s by
+/// `99-lamp-device.rules`; lamp-npu is the only process that opens it).
+pub const DEVICES: [&str; 15] = [
     "/dev/video*",
     "/dev/media*",
     "/dev/v4l-subdev*",
@@ -338,6 +339,7 @@ pub const DEVICES: [&str; 14] = [
     "/dev/hidraw*",
     "/dev/fb*",
     "/dev/dri/*",
+    "/dev/vipcore",
 ];
 /// Free space `/var/lib` must hold before an install: Hermes v0.22.2 took
 /// 3.0 GB there on lamp-c0a4, with room to spare.
@@ -722,7 +724,7 @@ rm -f "$S/r" && rmdir "$S/h" "$S/w" "$S/k" "$S" || fail "staging left"
 mount -o remount,bind,ro,nosuid,nodev,noexec /run || fail "/run not read-only"
 mount -o remount,bind,ro,nosuid,nodev,noexec /var/lib || fail "/var/lib not read-only"
 if [ -d /etc/lampOS ]; then mount -o remount,bind,ro,nosuid,nodev,noexec /etc/lampOS || fail "/etc/lampOS not read-only"; fi
-for d in /dev/video* /dev/media* /dev/v4l-subdev* /dev/snd/* /dev/ttyACM* /dev/ttyUSB* /dev/ttyS* /dev/ttyAMA* /dev/i2c-* /dev/spidev* /dev/gpiochip* /dev/hidraw* /dev/fb* /dev/dri/*; do
+for d in /dev/video* /dev/media* /dev/v4l-subdev* /dev/snd/* /dev/ttyACM* /dev/ttyUSB* /dev/ttyS* /dev/ttyAMA* /dev/i2c-* /dev/spidev* /dev/gpiochip* /dev/hidraw* /dev/fb* /dev/dri/* /dev/vipcore; do
   [ -c "$d" ] || continue
   mount --bind /dev/null "$d" || fail "$d not hidden"
 done
@@ -1404,6 +1406,35 @@ pub fn carry_out_for(
                 say(&format!(
                     "{name}'s install goes on: the voice is quiet again"
                 ));
+                return Carried::Done;
+            }
+            Err(refused) => ("interrupted", format!("{unit} not thawed: {refused}")),
+        },
+        // #7879: the same cgroup freeze (writing 1 again is nothing), with
+        // the heat's own lines.
+        Act::Pause => match systemd.freeze_harness_unit() {
+            Ok(()) => {
+                say(&format!(
+                    "{name}'s install pauses while the board is hot (board/heat)"
+                ));
+                return Carried::Done;
+            }
+            Err(refused) => ("interrupted", format!("{unit} not frozen: {refused}")),
+        },
+        Act::Resume => match systemd.thaw_harness_unit() {
+            Ok(()) => {
+                // Heat pauses only OpenClaw's turn: a pause that ends as the
+                // turn passes to Hermes says so, never "no longer hot"
+                // (Heron's P3 on #7942).
+                if name == crate::openclaw_install::TURN.name {
+                    say(&format!(
+                        "{name}'s install goes on: the board is no longer hot and the voice is quiet"
+                    ));
+                } else {
+                    say(&format!(
+                        "the pause for a hot board ends: the turn passed to {name}'s install, which heat does not pause"
+                    ));
+                }
                 return Carried::Done;
             }
             Err(refused) => ("interrupted", format!("{unit} not thawed: {refused}")),

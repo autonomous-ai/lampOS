@@ -36,6 +36,14 @@ class Row(unittest.TestCase):
         for body in ("ROW 7017", "ROW 70160", "ROW #701", "ROW %s" % HEAD[:10], "ROW"):
             self.assertEqual(rows([c("writer-a", body + WHOLE)], HEAD, W, "7016"), "none", body)
 
+    def test_a_code_head_never_carries_a_row_or_no_row_needed(self):
+        # 18 Nov: "code:<sha>" heads (lib.sh's code_patch_of) are for reads only.
+        row = c("writer-a", "ROW 7016 %s on lamp-52e6 build 12701: PASS" % EARLIER[:10] + J)
+        none = c("writer-a", "READ-OK %s\nno row needed: tests only" % EARLIER)
+        self.assertEqual(rows([none], [HEAD, "code:" + EARLIER], W, "7016"), "none")
+        self.assertEqual(rows([none], [HEAD, EARLIER], W, "7016"), "no-row-needed")
+        self.assertEqual(rows([row], [HEAD, "code:" + EARLIER], W, "7016", switch_on=True), "row-stale " + EARLIER[:10])
+
     def test_without_pr_a_row_never_counts(self):
         self.assertEqual(rows([c("writer-a", "ROW 7016" + WHOLE)], HEAD, W, None), "none")
 
@@ -48,6 +56,90 @@ class Row(unittest.TestCase):
                      "ROW 7016 on lamp-52e6 build 12701: no failure, fail-first test kept" + J,
                      "ROW 7016 on lamp-52e6 build 12701 " + "x" * 300 + " FAIL" + J):
             self.assertEqual(rows([c("writer-a", body)], HEAD, W, "7016"), "row", body)
+
+    def test_a_fail_row_line_is_no_row_whatever_the_lines_below_say(self):
+        # 22 Nov (#8180, train 1162): the row line said FAIL, and a check's "`VERIFY PASS`" in the next paragraph was
+        # read as its verdict, so the PR was cut into a train.
+        body = ("ROW #8180 %s on lamp-e82d build 15510: FAIL\n\nMigrate, 14:38 GMT+7, to **Twelve**: the re-run. "
+                "`VERIFY PASS` (all five), `READY`, `MUTE OFF OK`. E, N and F pass." % HEAD) + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8180"), "none")
+        # The same row line saying PASS still counts, whatever FAILs the lines below name.
+        body = ("ROW #8180 %s on lamp-e82d build 15510: PASS\n\nLeg A was a FAIL on the kit; its rerun passed." % HEAD) + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8180"), "row")
+
+    def test_a_mid_post_lamp_row_is_read_from_its_own_line(self):
+        # The Reviewer-lead's P2 on #8293: an earlier line naming a kit ("row-8053r") or saying PASS can't clear a
+        # mid-post "lamp row for #N: FAIL", and an earlier FAIL can't sink a mid-post PASS.
+        body = ("Sixth, 08:0x: kit row-8053r DRY PASS, then the real run.\n\n"
+                "lamp row for #8218 on lamp-52e6 build 12701: FAIL on leg 2") + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8218"), "none")
+        body = ("Sixth, 08:0x: the DRY run was a FAIL on the kit.\n\n"
+                "lamp row for #8218 on lamp-52e6 build 12701: PASS") + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8218"), "row")
+
+    def test_a_quoted_earlier_lamp_row_does_not_clear_a_real_fail(self):
+        # SubDarren's P3 on #8293: a blockquoted old "lamp row … PASS" above a real "lamp row …: FAIL" is no row. This
+        # pins row_line's quoted() check: with it dropped, the quoted PASS line is taken as the row line.
+        body = ("Re-run notes.\n> lamp row for #8218 on lamp-52e6 build 12701: PASS (yesterday)\n\n"
+                "lamp row for #8218 on lamp-52e6 build 12701: FAIL on leg 2") + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8218"), "none")
+
+    def test_verdict_first_row_lines_count(self):
+        # 23 Nov: three passed PRs (#8306, #8314, #8302) missed gate A because the bot read none of these as a row.
+        for body in ("ROW PASS: #8306 %s (kit-8306b), lamp-52e6, build 15543 e1f55d813a, 03:21-03:26." % HEAD,
+                     "ROW PASS #8306 %s on lamp-52e6 build 15543" % HEAD[:10],
+                     "**ROW PASS**: #8306 on lamp-52e6 build 15543",
+                     "ROW #8294 via #8306 (head %s) on lamp-52e6 build 15543 (e1f55d813a): PASS" % HEAD[:10],
+                     "ROW PASS %s\nSeventh, 01:06 GMT+7 (lamp-52e6 on 15543 e1f55d813a)" % HEAD,
+                     "ROW PASS %s\nSeventh (lamp-52e6 on 15543)" % EARLIER):
+            self.assertEqual(rows([c("writer-a", body + J)], [HEAD, EARLIER], W, "8306"), "row", body)
+
+    def test_a_verdict_first_row_line_still_names_this_pr(self):
+        for body in ("ROW PASS: #8307 %s on lamp-52e6 build 15543" % HEAD,
+                     "ROW #8294 via #8307 on lamp-52e6 build 15543: PASS",
+                     "ROW PASS %s on lamp-52e6 build 15543" % OTHER,
+                     "ROW PASS on lamp-52e6 build 15543",
+                     "ROW %s on lamp-52e6 build 15543: PASS" % HEAD[:10]):
+            self.assertEqual(rows([c("writer-a", body + J)], HEAD, W, "8306"), "none", body)
+
+    def test_a_verdict_first_fail_or_void_is_no_row(self):
+        for body in ("ROW FAIL %s on lamp-52e6 build 15543" % HEAD,
+                     "ROW FAIL: #8306 %s on lamp-52e6 build 15543 (leg B)" % HEAD,
+                     "ROW VOID: #8306 on lamp-52e6 build 15543, nothing judged",
+                     "ROW FAILED #8306 on lamp-52e6 build 15543"):
+            self.assertEqual(rows([c("writer-a", body + J)], HEAD, W, "8306"), "none", body)
+
+    def test_a_verdict_first_line_s_own_word_decides_whatever_counts_follow(self):
+        # SubDarren's P2 on #8333: runners add per-leg counts after the verdict, so a PASS among them must not clear
+        # the FAIL or VOID the line opens with, and a FAIL among them must not sink the PASS it opens with.
+        for body in ("ROW FAIL: #8306 %s on lamp-52e6 build 15543, legs 1-3 PASS, leg 4 timed out" % HEAD,
+                     "ROW VOID: #8306 on lamp-52e6 build 15543 (leg A PASS, B not judged)",
+                     "ROW FAIL %s on lamp-52e6 build 15543, 2/3 PASS" % HEAD,
+                     "**ROW FAIL**: #8306 on lamp-52e6 build 15543, leg 1 PASS"):
+            self.assertEqual(rows([c("writer-a", body + J)], HEAD, W, "8306"), "none", body)
+        body = "ROW PASS: #8306 %s on lamp-52e6 build 15543, leg 4 FAIL then PASS on its rerun" % HEAD + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8306"), "row")
+
+    def test_a_verdict_first_number_is_this_pr_s_whole_number(self):
+        # SubDarren's P3 on #8333: pins the (?!\d) guards, after the verdict and after "via".
+        for body in ("ROW PASS: #83061 %s on lamp-52e6 build 15543" % HEAD,
+                     "ROW #8294 via #83061 (head %s) on lamp-52e6 build 15543: PASS" % HEAD[:10]):
+            self.assertEqual(rows([c("writer-a", body + J)], HEAD, W, "8306"), "none", body)
+
+    def test_another_pr_s_numberless_row_can_t_clear_a_mid_post_fail(self):
+        # The Reviewer-lead's P3 on #8333: line 1 is this PR's row line only when opens_row holds, heads and all, so
+        # "ROW PASS <another PR's sha>" above an unquoted "lamp row for #N …: FAIL" is no row.
+        body = ("ROW PASS %s, the earlier PR's run.\n\nlamp row for #8306 on lamp-52e6 build 15543: FAIL on leg 2" % OTHER) + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8306"), "none")
+
+    def test_a_verdict_first_switch_on_row_at_another_patch_is_stale(self):
+        body = "ROW PASS: #8306 %s on lamp-52e6 build 15543" % EARLIER + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8306", switch_on=True), "row-stale " + EARLIER[:10])
+        self.assertEqual(rows([c("writer-a", body)], [HEAD, EARLIER], W, "8306", switch_on=True), "row")
+        # The Reviewer-lead's P2 on #8333: Sixth's via shape names its head in brackets, "(head <sha>".
+        body = "ROW #8294 via #8306 (head %s, staged lamp-update) on lamp-52e6 build 15543: PASS" % EARLIER[:10] + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8306", switch_on=True), "row-stale " + EARLIER[:10])
+        self.assertEqual(rows([c("writer-a", body)], [HEAD, EARLIER], W, "8306", switch_on=True), "row")
 
     def test_failed_voided_and_fails_are_no_row(self):
         # 14 Nov (the second reader's P2 on #7041).
@@ -154,6 +246,14 @@ class Parts(unittest.TestCase):
 
 
 class NoRowNeeded(unittest.TestCase):
+    def test_a_quoted_no_row_needed_is_mentioned_not_said(self):
+        # 20 Nov (#8066): the Reviewer-lead's READ-OK said it would rather not call it "no row needed".
+        for q in ('"no row needed"', "“no row needed”", "'no row needed'", "`no row needed`"):
+            body = "READ-OK %s\n\nI'd rather not call it %s. The probe counts are its row." % (HEAD, q)
+            self.assertEqual(rows([c("writer-a", body)], HEAD, W, "7016"), "none", q)
+        bold = "READ-OK %s\n\nSixth, 10:02: docs only, **no row needed**." % HEAD
+        self.assertEqual(rows([c("writer-a", bold)], HEAD, W, "7016"), "no-row-needed")
+
     def test_in_a_read_ok_on_the_head(self):
         body = "READ-OK %s\n\nSixth, 10:02: docs only, no row needed." % HEAD
         self.assertEqual(rows([c("writer-a", body)], HEAD, W, "7016"), "no-row-needed")

@@ -142,6 +142,8 @@ struct State {
     authority: BoundaryGuard,
     started_at: u64,
     previous_at: u64,
+    /// Whether the red breath just written begins a showing, for `lamp/did`.
+    shown: crate::did_ring::Episode,
 }
 
 enum Drained {
@@ -156,6 +158,7 @@ impl State {
             authority: BoundaryGuard::new(controller_boot, MonoTime::from_micros(at_us)),
             started_at: at_us,
             previous_at: at_us,
+            shown: crate::did_ring::Episode::default(),
         }
     }
 
@@ -281,8 +284,14 @@ impl State {
         }
         let observed = observed?;
         self.heartbeat(monotonic_us())?;
-        ring.show_privacy_muted(observed)
+        let written = ring
+            .show_privacy_muted(observed)
             .map_err(io::Error::other)?;
+        // A frame written: told once as the showing begins, that the lamp was
+        // private and nothing from while it was (#7757).
+        if written.is_some() && self.shown.seen(monotonic_us()) {
+            crate::did_ring::told(crate::did_ring::Face::PrivacyMuted);
+        }
         Ok(false)
     }
 }

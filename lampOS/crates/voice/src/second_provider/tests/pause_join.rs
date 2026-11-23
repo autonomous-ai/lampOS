@@ -6,7 +6,7 @@
 //! any call of its chat, wait for the rest of the grace, so a piece begun
 //! in it finds the first piece's words unheard and the route's own join
 //! (`LAMP_JOIN_CUT_WORDS`) asks the two as one line. A line begun with the
-//! lamp's name is never held as a short sound with it.
+//! lamp's name is never held as a short sound, with it or without it (#7834).
 use super::*;
 
 const FIRST: &str = "I need a gift for my sister.";
@@ -367,9 +367,9 @@ fn letting_all_out() -> Heed {
 }
 
 /// (b), Reviewer-two's 3 on #4449: "Lamp, can you tell me", four words
-/// past the name, ended as a short sound, is answered with the switch and
-/// held without it. The name later in a line (a television's "the lamp
-/// is…") or not set off ("Lamp is broken") is still held, and so is a
+/// past the name, ended as a short sound, is answered, with the switch and
+/// since #7834 without it. The name later in a line (a television's "the
+/// lamp is…") or not set off ("Lamp is broken") is still held, and so is a
 /// sound with no name; the name's carry ([`NAME_FIRST_MORE`]) is
 /// unchanged.
 #[tokio::test(start_paused = true)]
@@ -380,7 +380,7 @@ async fn a_line_begun_with_the_name_is_never_held_as_a_short_sound() {
             "{named}"
         );
         assert!(
-            !sound_answered(false, named, letting_all_out()).await,
+            sound_answered(false, named, letting_all_out()).await,
             "off: {named}"
         );
     }
@@ -395,6 +395,24 @@ async fn a_line_begun_with_the_name_is_never_held_as_a_short_sound() {
         );
     }
     assert_eq!(NAME_FIRST_MORE, 3, "the name's carry is unchanged");
+}
+
+/// #7698 (lamp-06c1, 18 Nov): a short sound with a word in it, not heard as
+/// a short word, said while the lamp waits for a yes or no of its own
+/// asking (`a_yes_held`; here a task read back), is the person's reply and
+/// is judged as a line, whatever its words. With nothing waiting it is
+/// held as before.
+#[tokio::test(start_paused = true)]
+async fn a_short_sound_while_the_lamp_waits_for_a_yes_is_judged_as_a_line() {
+    let reply = "Yes, and Ada too";
+    crate::agent_tasks::awaits_yes_here(Some(std::time::Instant::now()));
+    let waiting = sound_answered(false, reply, letting_all_out()).await;
+    crate::agent_tasks::awaits_yes_here(None);
+    assert!(waiting, "a yes waits");
+    assert!(
+        !sound_answered(false, reply, letting_all_out()).await,
+        "nothing waits"
+    );
 }
 
 /// #4701's `LAMP_NAME_REPEAT_NOT_A_CALL` with (b): a line that opens with

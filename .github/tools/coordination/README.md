@@ -28,7 +28,7 @@ Each script keeps its dated comments. They are the history of each rule.
 | `tests/test_failed_trains.py` | Tests for #7181: a train whose only red is a cancelled job is cut again once and the second stops the bot, and a set that fails to compile or lint twice the same way goes alone, one PR a train, with the PR that fails alone left out and named on the Queue; and, from the first read of #7186, a PR that fails alone while lamp-voice's own head is red is not left out and the bot stops. The bot's own loop runs for real (not `DRY=1`) on the temporary repository, with a stand-in `gh` that opens, merges, closes and comments on PRs there only. Run with the others. |
 | `tests/test_lane_pids.py` | Tests for #7188: with two lanes, a lane is busy until its train is done with while the other lane still gets its train, the wait between rounds lasts while a train runs and ends when one ends, a stop ends each waiting lane with its `merge-when-green.sh` and lets a lane past its wait finish, a train PR left open is said at the next start, and no process but the bot's own job reads as a lane or is signalled by a stop. The bot's own loop runs for real, as in `tests/test_failed_trains.py`, with a stand-in `sleep` for the bot's own waits. Run with the others. |
 | `tests/test_behind_unrelated.py`, `tests/test_lanes.py` | Tests for `behind-unrelated.sh`, `merge-when-green.sh`, the lanes and the bot's dry round, on a temporary repository with a stand-in `gh`. Run all: `python3 -I -m pytest -q .github/tools/coordination/tests` from the repo root. |
-| `asks-for-me.sh [HH:MM]` | Prints, in full, every comment on the Queue (#3997, #4710, #5385, #6059, #6809, #6811) and the lead's channel (#1711) that names the first builder. With no time it starts 5 min before its own last run. |
+| `asks-for-me.sh [HH:MM]` | Prints, in full, every comment on the Queue (#3997, #4710, #5385, #6059, #6809, #6811, #7814) and the lead's channel (#1711) that names the first builder. With no time it starts 5 min before its own last run. |
 | `build-rows-pr.sh` | Regenerates `lampOS/docs/build-rows.md` from the review page. If it changed, it pushes a branch `first/build-rows-MMDD-HHMM` and opens a docs-only PR. |
 | `gen-build-rows.py BUILD_PY OUT_MD LABELS_JSON PRIVATE_NAMES` | The generator `build-rows-pr.sh` calls. |
 
@@ -237,7 +237,7 @@ in time order with the comments (its submit time), so a later HOLD beats an earl
 A review's state (APPROVED, CHANGES_REQUESTED, ...) is never a read. A review with an empty body, not yet submitted, or dismissed counts for nothing.
 
 **Fetches fail closed.** If a PR's head, comments, reviews or body can't be fetched, that PR is not eligible.
-If any Queue issue (#4710, #5385, #6059, #6809 or #6811) can't be fetched, no PR is eligible that round.
+If any Queue issue (#4710, #5385, #6059, #6809, #6811 or #7814) can't be fetched, no PR is eligible that round.
 `still-eligible.sh` rechecks the markers, the Queue HOLDs, TWO READS and the lamp row just before a train merges.
 
 **Two readers for every PR (13 Nov, the lead).** The train bot and `still-eligible.sh` call `reads2.py --always`, so every PR needs READ-OKs from two different signed readers on its head, asked or not. A reader who restates is still one reader, and two names on one shared login are two readers. A ONE READ line no longer lowers it.
@@ -259,7 +259,7 @@ None of them counts on a quoted line or inside a fenced code block. Without one,
   A HOLD with no sha still holds. A READ-OK with no sha makes the PR not eligible.
 - A marker later in the first 400 characters counts only with a commit of 9 or more characters right after it.
   It does not count when it is quoted (backticks or quotation marks), in brackets, after a possessive ("the Reviewer-lead's READ-OK …"),
-  or named as a noun ("your HOLD …", "the/that/this/their/for …").
+  or named as a noun ("your HOLD …", "the/that/this/their/for …"), or when a sentence says it is lifted or limited ("lift only HOLD …", "this lifts/clears/replaces HOLD …").
 - A marker on a Markdown quote line (`> READ-OK …`, on any line, the first too) or inside a fenced code block (```` ``` ```` or `~~~`) never counts.
 - The signature is the reader's name: "Sixth, 09:16" (an optional "The"), the name right after the marker's commit,
   the name that opens the next line ("Sixth: …"; a capitalised word or "<word> builder", never a label such as "Tests:", "Why:" or "Fail-first:"),
@@ -269,6 +269,7 @@ None of them counts on a quoted line or inside a fenced code block. Without one,
 
 - The PR is eligible on its newest READ-OK when no HOLD stands.
   A READ-OK counts for the PR's head, or for a head with the same patch-id (a plain rebase). The patch-id is taken with no context lines. This holds for TWO READS too.
+  For TWO READS, a READ-OK also counts on a head whose code is the head's but whose docs differ (Markdown files under a `docs/` folder; a rebase that merged the PR's own docs rows), provided at least one reader has read the head's own patch. Every other file counts as code: a skill's SKILL.md or README.md, a guide or prompt the product loads, and the model, schemas and fixtures that also live in `docs/`. A PR of docs alone never carries a read this way. One reader's restate then covers the docs, and the other's earlier read still covers the code. Such a head never carries a row or "no row needed".
 - A signed HOLD is keyed on the login plus the signed name. It stands until the same login and name post a later READ-OK.
   Words alone ("this clears my HOLD" in a comment that is not a READ-OK) never lift it.
 - An unsigned HOLD stands until that login posts a later READ-OK whose first 400 characters say the HOLD is lifted or cleared

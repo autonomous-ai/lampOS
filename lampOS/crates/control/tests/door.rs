@@ -58,6 +58,8 @@ async fn lamp_made(
     );
     let door = build(door, &dir);
     let shared = server::Shared::new_with(door, identity.pin.clone(), parts);
+    // These lamps have a door: it listens below.
+    shared.set_listening(true);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let admin = dir.join("admin.sock");
@@ -281,11 +283,88 @@ async fn a_computer_pairs_says_hello_and_is_answered_over_tls() {
 #[tokio::test]
 async fn another_path_or_an_oversized_frame_is_refused() {
     let lamp = lamp("refuse").await;
+    // Poses on: the door reads a pose's frame, and tells the rest.
+    lamp.shared.set_poses(true);
     assert!(connect(&lamp, "/v2").await.is_err());
     let mut socket = connect(&lamp, "/v1").await.unwrap();
     let _welcome = next(&mut socket).await;
     let huge = "x".repeat(server::FRAME_MAX + 1);
     let _ = socket.send(Message::text(huge)).await;
+    assert_closed_too_big(&mut socket).await;
+    // Past even a pose's frame: closed by the WebSocket itself.
+    let mut socket = connect(&lamp, "/v1").await.unwrap();
+    let _welcome = next(&mut socket).await;
+    let _ = socket
+        .send(Message::text("x".repeat(server::POSE_FRAME_MAX + 1)))
+        .await;
+    let closed = tokio::time::timeout(Duration::from_secs(5), socket.next())
+        .await
+        .expect("closed in time");
+    assert!(!matches!(closed, Some(Ok(Message::Text(_)))), "{closed:?}");
+}
+
+/// A frame over 64 KiB that is not a taken pose: told `bad_request`, then
+/// closed.
+async fn assert_closed_too_big(socket: &mut Socket) {
+    match tokio::time::timeout(Duration::from_secs(5), socket.next())
+        .await
+        .expect("answered in time")
+    {
+        Some(Ok(Message::Text(text))) => {
+            let told: Value = serde_json::from_str(&text).unwrap();
+            assert_eq!(told["error"]["code"], "bad_request", "{told}");
+            assert_eq!(told["error"]["why"], server::FRAME_TOO_BIG);
+        }
+        other => panic!("{other:?}"),
+    }
+    let closed = tokio::time::timeout(Duration::from_secs(5), socket.next())
+        .await
+        .expect("closed in time");
+    assert!(!matches!(closed, Some(Ok(Message::Text(_)))), "{closed:?}");
+}
+
+/// Only a `pose` from a computer that said hello may pass 64 KiB on the
+/// lamp's own network (Heron's P2 on #7972): a large pose is answered (in
+/// the door's words), a large other op closes the connection, and so does a
+/// large pose before hello.
+#[tokio::test]
+async fn only_a_pose_after_hello_may_be_larger_than_64_kib() {
+    let lamp = lamp("pose-frame").await;
+    lamp.shared.set_poses(true);
+    let jpeg = "A".repeat(150 * 1024);
+    let pose = json!({"id": 9, "op": "pose", "jpeg": jpeg}).to_string();
+    assert!(pose.len() > server::FRAME_MAX && pose.len() < server::POSE_FRAME_MAX);
+    // Before hello: closed.
+    let mut stranger = connect(&lamp, "/v1").await.unwrap();
+    let _welcome = next(&mut stranger).await;
+    stranger.send(Message::text(pose.clone())).await.unwrap();
+    assert_closed_too_big(&mut stranger).await;
+    // After hello: answered (here unrouted), and the connection stays.
+    let mut socket = paired(&lamp, json!(["camera"]), 41).await;
+    socket.send(Message::text(pose)).await.unwrap();
+    let answer = next(&mut socket).await;
+    assert_eq!(answer["re"], 9, "{answer}");
+    let still = send(
+        &mut socket,
+        json!({"id": 10, "op": "get", "state": ["lamp"]}),
+    )
+    .await;
+    assert_eq!(still["re"], 10, "{still}");
+    // Another op as large: told and closed.
+    let notes = json!({"id": 11, "op": "notes.set", "key": "k", "value": "x".repeat(80 * 1024)});
+    socket.send(Message::text(notes.to_string())).await.unwrap();
+    assert_closed_too_big(&mut socket).await;
+}
+
+/// With poses off (`LAMP_NPU` not on) no door reads past 64 KiB, a
+/// `pose` after hello neither (Fourteen's P3 on #7972): the WebSocket's
+/// own cap closes the connection, with no answer.
+#[tokio::test]
+async fn with_poses_off_a_large_pose_is_closed_as_any_frame() {
+    let lamp = lamp("pose-off-frame").await;
+    let pose = json!({"id": 9, "op": "pose", "jpeg": "A".repeat(150 * 1024)}).to_string();
+    let mut socket = paired(&lamp, json!(["camera"]), 42).await;
+    let _ = socket.send(Message::text(pose)).await;
     let closed = tokio::time::timeout(Duration::from_secs(5), socket.next())
         .await
         .expect("closed in time");
@@ -567,6 +646,8 @@ async fn the_admin_socket_says_which_streams_are_usable() {
 #[tokio::test]
 async fn the_clients_answer_says_whether_the_door_listens() {
     let lamp = lamp("listening").await;
+    // The test lamps' door listens; this one says what it says before it is bound.
+    lamp.shared.set_listening(false);
     assert_eq!(
         admin(&lamp, json!({"clients": true})).await["listening"],
         json!(false)
@@ -3601,5 +3682,867 @@ async fn a_speaker_stream_off_through_the_door_tells_the_voice_to_cut_the_sound(
     panic!(
         "the voice was not told to cut the sound: {client} not in {:?}",
         CUT.lock().unwrap()
+    );
+}
+
+// --- An installed app's socket (#7415 piece 3b) ---
+
+fn install_app(apps: &std::path::Path, name: &str, grants: Value) {
+    let dir = apps.join(name).join("current");
+    std::fs::create_dir_all(&dir).unwrap();
+    let manifest = json!({
+        "format": 2, "kind": "app", "name": name, "title": "T", "version": "2.0.1",
+        "min_build": 1, "runtime": {"name": "python", "entry": "src/main.py"},
+        "grants": grants, "triggers": [],
+        "settings": [{"key": "loud", "type": "number", "label": "L", "default": 3, "min": 1, "max": 10}],
+        "files": []
+    });
+    std::fs::write(dir.join("lamp-skill.json"), manifest.to_string()).unwrap();
+}
+
+fn is_demo(_: Option<i32>, _: u32) -> Option<(String, bool)> {
+    Some(("demo".to_owned(), false))
+}
+
+fn is_ghost(_: Option<i32>, _: u32) -> Option<(String, bool)> {
+    Some(("ghost".to_owned(), false))
+}
+
+fn is_nobody(_: Option<i32>, _: u32) -> Option<(String, bool)> {
+    None
+}
+
+fn apps_on() -> bool {
+    true
+}
+
+fn apps_off() -> bool {
+    false
+}
+
+async fn app_socket(
+    lamp: &Lamp,
+    file: &str,
+    who: fn(Option<i32>, u32) -> Option<(String, bool)>,
+    on: fn() -> bool,
+) -> std::path::PathBuf {
+    let path = lamp.dir.join(file);
+    let apps = lamp.dir.join("apps");
+    install_app(&apps, "demo", json!(["speak", "light", "hear"]));
+    lamp.shared.set_task_yes_folder(lamp.dir.clone());
+    let listener = tokio::net::UnixListener::bind(&path).unwrap();
+    tokio::spawn(server::serve_app_as(
+        listener,
+        apps,
+        lamp.shared.clone(),
+        who,
+        on,
+    ));
+    path
+}
+
+async fn app_ask(socket: &mut AgentSocket, frame: Value) -> Value {
+    socket.send(Message::text(frame.to_string())).await.unwrap();
+    agent_next(socket).await.expect("an answer")
+}
+
+#[tokio::test]
+async fn an_app_hellos_with_its_manifests_grants_and_uses_the_ops_only_it_has() {
+    let lamp = lamp("app-sock").await;
+    let path = app_socket(&lamp, "apps.sock", is_demo, apps_on).await;
+    // The owner's value, kept where lamp-cloud's op keeps it.
+    std::fs::write(lamp.dir.join("app-settings.json"), r#"{"demo":{"loud":7}}"#).unwrap();
+    let mut socket = agent_connect(&path).await.unwrap();
+    // The app ops come after hello.
+    let welcome = agent_next(&mut socket).await.unwrap();
+    assert_eq!(welcome["ev"], "welcome");
+    let early = app_ask(&mut socket, json!({"id": 9, "op": "app.settings.get"})).await;
+    assert_eq!(early["error"]["code"], "no_hello", "{early}");
+    let hello = json!({"id": 1, "op": "hello", "client": "c_0", "sig": STANDARD.encode([0u8; 64])});
+    let hello = app_ask(&mut socket, hello).await;
+    assert_eq!(hello["ok"], true, "{hello}");
+    assert_eq!(hello["app"], "demo", "{hello}");
+    assert_eq!(hello["version"], "2.0.1", "{hello}");
+    let mut grants: Vec<String> = serde_json::from_value(hello["grants"].clone()).unwrap();
+    grants.sort();
+    assert_eq!(grants, ["hear", "light", "speak"], "{hello}");
+    let settings = app_ask(&mut socket, json!({"id": 2, "op": "app.settings.get"})).await;
+    assert_eq!(settings["settings"], json!({"loud": 7}), "{settings}");
+    let panel = json!({"id": 3, "op": "app.panel.set", "title": "Lesson", "lines": ["one"]});
+    assert_eq!(app_ask(&mut socket, panel.clone()).await["rev"], 1);
+    let again = app_ask(
+        &mut socket,
+        json!({"id": 4, "op": "app.panel.set", "title": "T", "lines": []}),
+    )
+    .await;
+    assert_eq!(again["error"]["code"], "rate", "{again}");
+    assert_eq!(
+        app_ask(
+            &mut socket,
+            json!({"id": 5, "op": "app.took", "turn": "t1"})
+        )
+        .await["ok"],
+        true
+    );
+    // A grant its manifest lacks is refused as the door refuses it.
+    let camera = app_ask(&mut socket, json!({"id": 6, "op": "camera.snapshot"})).await;
+    assert_eq!(camera["error"]["code"], "no_grant", "{camera}");
+    // It is no paired computer.
+    let listed = admin(&lamp, json!({"clients": true})).await;
+    assert!(listed["clients"].as_array().unwrap().is_empty(), "{listed}");
+    // Phrases it listens for, replace-whole, are the door's own: heard on the
+    // bus, told as the phrase and never the words.
+    let set = json!({"id": 7, "op": "phrases.set", "phrases": ["start the lesson"]});
+    let set = app_ask(&mut socket, set).await;
+    assert_eq!(set["ok"], true, "{set}");
+    assert_eq!(set["phrases"], 1, "{set}");
+    assert!(set.get("events").is_none(), "{set}");
+    lamp.shared.deliver(vec![lamp_control::watch::Out::Heard(
+        "ok start the lesson now please".into(),
+    )]);
+    let heard = agent_next(&mut socket).await.unwrap();
+    assert_eq!(heard["ev"], "phrase.heard", "{heard}");
+    assert_eq!(heard["phrase"], "start the lesson", "{heard}");
+    // Too short is the door's refusal; none unsubscribes.
+    let short = app_ask(
+        &mut socket,
+        json!({"id": 8, "op": "phrases.set", "phrases": ["hi"]}),
+    )
+    .await;
+    assert_eq!(short["error"]["code"], "bad_request", "{short}");
+    // A repeat and an unknown field are refused in the app socket's own words.
+    let twice = json!({"id": 10, "op": "phrases.set", "phrases": ["lesson time", "lesson time"]});
+    let twice = app_ask(&mut socket, twice).await;
+    assert_eq!(twice["error"]["why"], "phrases: no phrase twice", "{twice}");
+    let extra = json!({"id": 11, "op": "phrases.set", "phrases": ["lesson time"], "x": 1});
+    let extra = app_ask(&mut socket, extra).await;
+    assert_eq!(
+        extra["error"]["why"], "phrases.set takes only phrases",
+        "{extra}"
+    );
+    let none = app_ask(
+        &mut socket,
+        json!({"id": 9, "op": "phrases.set", "phrases": []}),
+    )
+    .await;
+    assert_eq!(none["phrases"], 0, "{none}");
+    lamp.shared.deliver(vec![lamp_control::watch::Out::Heard(
+        "start the lesson".into(),
+    )]);
+    assert!(agent_next(&mut socket).await.is_none());
+    // A second connection of the app: its panel stays until the last one goes.
+    drop(socket);
+}
+
+/// #7979: an app's `say` within 3 s of a trigger offered it takes that line,
+/// but only once the door has accepted the `say`; a refused one takes nothing
+/// and the voice is not told (Heron's P2).
+#[tokio::test]
+async fn an_apps_say_takes_a_trigger_only_when_the_door_accepts_it() {
+    let says = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let lamp = lamp_with("app-say-took", Box::new(Says(says.clone()))).await;
+    let path = app_socket(&lamp, "apps.sock", is_demo, apps_on).await;
+    // The manifest with a trigger: `install_app` has none.
+    let manifest_path = lamp
+        .dir
+        .join("apps")
+        .join("demo")
+        .join("current")
+        .join("lamp-skill.json");
+    let mut manifest: Value =
+        serde_json::from_slice(&std::fs::read(&manifest_path).unwrap()).unwrap();
+    manifest["triggers"] = json!(["start english practice"]);
+    std::fs::write(&manifest_path, manifest.to_string()).unwrap();
+    let told = std::sync::Arc::new(std::sync::Mutex::new(Vec::<(String, u64)>::new()));
+    let sink = told.clone();
+    lamp.shared
+        .set_took_sink(std::sync::Arc::new(move |app, turn| {
+            sink.lock().unwrap().push((app.to_owned(), turn));
+        }));
+    let mut socket = agent_connect(&path).await.unwrap();
+    let welcome = agent_next(&mut socket).await.unwrap();
+    assert_eq!(welcome["ev"], "welcome");
+    let hello = json!({"id": 1, "op": "hello", "client": "c_0", "sig": STANDARD.encode([0u8; 64])});
+    assert_eq!(app_ask(&mut socket, hello).await["ok"], true);
+    let said = |turn: u64| lamp_msgs::AppTrigger {
+        turn,
+        app: "demo".into(),
+        trigger: "start english practice".into(),
+        phrase: "start english practice".into(),
+        at_ms: 1,
+    };
+    // A refused say (no text) within the hold takes nothing.
+    assert!(lamp.shared.offer_trigger(&said(5)));
+    let offered = agent_next(&mut socket).await.unwrap();
+    assert_eq!(offered["ev"], "app.trigger", "{offered}");
+    assert_eq!(offered["turn"], "5", "{offered}");
+    let refused = app_ask(&mut socket, json!({"id": 20, "op": "say", "text": ""})).await;
+    assert_eq!(refused["ok"], false, "{refused}");
+    assert!(
+        told.lock().unwrap().is_empty(),
+        "a refused say took the line"
+    );
+    // An accepted say takes the newest turn offered, once.
+    assert!(lamp.shared.offer_trigger(&said(6)));
+    let offered = agent_next(&mut socket).await.unwrap();
+    assert_eq!(offered["turn"], "6", "{offered}");
+    let accepted = app_ask(
+        &mut socket,
+        json!({"id": 21, "op": "say", "text": "Hello."}),
+    )
+    .await;
+    assert_eq!(accepted["ok"], true, "{accepted}");
+    assert_eq!(*told.lock().unwrap(), vec![("demo".to_owned(), 6)]);
+}
+
+fn remember_on() -> bool {
+    true
+}
+
+/// `apps.remember` over the app socket (#7415, C166): refused without the
+/// grant, while private, for bad words and over three a minute; with the
+/// grant the checked words go to the voice and its word is the answer.
+#[tokio::test]
+async fn an_apps_fact_over_its_socket_needs_the_grant_and_is_answered_by_the_voice() {
+    use lamp_msgs::app_fact::AppRemember;
+    let lamp = lamp("app-remember").await;
+    let path = app_socket(&lamp, "apps.sock", is_demo, apps_on).await;
+    lamp.shared.set_remember_on(remember_on);
+    let private = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let reads = private.clone();
+    lamp.shared.set_private(Arc::new(move || {
+        reads.load(std::sync::atomic::Ordering::SeqCst)
+    }));
+    let told = Arc::new(std::sync::Mutex::new(Vec::<AppRemember>::new()));
+    let into = told.clone();
+    lamp.shared
+        .set_remember_sink(Arc::new(move |fact: &AppRemember| {
+            into.lock().unwrap().push(fact.clone());
+            true
+        }));
+    let hello =
+        || json!({"id": 1, "op": "hello", "client": "c_0", "sig": STANDARD.encode([0u8; 64])});
+    // Without the grant: refused, nothing told.
+    let mut socket = agent_connect(&path).await.unwrap();
+    agent_next(&mut socket).await.unwrap();
+    assert_eq!(app_ask(&mut socket, hello()).await["ok"], true);
+    let fact = json!({"id": 2, "op": "apps.remember", "text": "squats 3x10"});
+    let none = app_ask(&mut socket, fact.clone()).await;
+    assert_eq!(none["error"]["code"], "no_grant", "{none}");
+    assert_eq!(
+        none["error"]["why"],
+        lamp_control::app_remember::NO_GRANT,
+        "{none}"
+    );
+    drop(socket);
+    // With it (the manifest read at each connection).
+    install_app(
+        &lamp.dir.join("apps"),
+        "demo",
+        json!(["speak", "light", "hear", "remember"]),
+    );
+    let mut socket = agent_connect(&path).await.unwrap();
+    agent_next(&mut socket).await.unwrap();
+    let said = app_ask(&mut socket, hello()).await;
+    let grants: Vec<String> = serde_json::from_value(said["grants"].clone()).unwrap();
+    assert!(grants.contains(&"remember".to_owned()), "{said}");
+    let early = app_ask(
+        &mut socket,
+        json!({"id": 3, "op": "apps.remember", "text": "x".repeat(281)}),
+    )
+    .await;
+    assert_eq!(early["error"]["code"], "bad_request", "{early}");
+    private.store(true, std::sync::atomic::Ordering::SeqCst);
+    let hidden = app_ask(&mut socket, fact.clone()).await;
+    assert_eq!(hidden["error"]["code"], "private", "{hidden}");
+    private.store(false, std::sync::atomic::Ordering::SeqCst);
+    assert!(told.lock().unwrap().is_empty(), "nothing refused was told");
+    let text = "20 Nov 16:47: squats 3×10, 6 too shallow";
+    socket
+        .send(Message::text(
+            json!({"id": 4, "op": "apps.remember", "text": text}).to_string(),
+        ))
+        .await
+        .unwrap();
+    let start = std::time::Instant::now();
+    let fact_told = loop {
+        if let Some(fact) = told.lock().unwrap().pop() {
+            break fact;
+        }
+        assert!(start.elapsed() < Duration::from_secs(5), "not told");
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    };
+    assert_eq!(
+        (fact_told.app.as_str(), fact_told.name.as_str()),
+        ("demo", "T")
+    );
+    assert_eq!(fact_told.text, text);
+    lamp.shared.remembered(&lamp_msgs::app_fact::AppRemembered {
+        ask: fact_told.ask,
+        app: "demo".into(),
+        outcome: lamp_msgs::app_fact::KEPT.into(),
+    });
+    let kept = agent_next(&mut socket).await.expect("the voice's word");
+    assert_eq!(kept, json!({"re": 4, "ok": true, "kept": true}));
+    // Three a minute: two more go, the fourth is the rate.
+    for id in [5, 6] {
+        socket
+            .send(Message::text(
+                json!({"id": id, "op": "apps.remember", "text": "squats"}).to_string(),
+            ))
+            .await
+            .unwrap();
+    }
+    let over = app_ask(
+        &mut socket,
+        json!({"id": 7, "op": "apps.remember", "text": "squats"}),
+    )
+    .await;
+    assert_eq!(over["re"], 7, "{over}");
+    assert_eq!(over["error"]["code"], "rate", "{over}");
+}
+
+#[tokio::test]
+async fn the_ops_only_an_app_has_are_not_the_doors_on_any_other_socket() {
+    let lamp = lamp("app-sock-door").await;
+    let path = run_socket(&lamp, my_uid(&lamp)).await;
+    let minted = mint(&lamp, "booth", "r1").await;
+    let token = minted["token"].as_str().unwrap().to_owned();
+    let mut socket = agent_connect(&path).await.unwrap();
+    assert_eq!(run_hello(&mut socket, Some(&token)).await["ok"], true);
+    let got = app_ask(&mut socket, json!({"id": 2, "op": "app.settings.get"})).await;
+    assert_eq!(got["error"]["code"], "bad_request", "{got}");
+}
+
+#[tokio::test]
+async fn a_peer_in_no_apps_unit_or_for_an_app_not_installed_or_with_apps_off_is_closed() {
+    let lamp = lamp("app-sock-refused").await;
+    for (file, who, on) in [
+        (
+            "nobody.sock",
+            is_nobody as fn(Option<i32>, u32) -> Option<(String, bool)>,
+            apps_on as fn() -> bool,
+        ),
+        ("ghost.sock", is_ghost, apps_on),
+        ("off.sock", is_demo, apps_off),
+    ] {
+        let path = app_socket(&lamp, file, who, on).await;
+        match agent_connect(&path).await {
+            Err(_) => {}
+            Ok(mut socket) => assert!(agent_next(&mut socket).await.is_none(), "{file}"),
+        }
+    }
+}
+
+/// An unsigned app package (format 2) named `name`, asking `grants`, with
+/// `tag` in its code so two pushes differ; `signed` adds a signature member.
+fn app_package(name: &str, grants: &[&str], tag: &str, signed: bool) -> Vec<u8> {
+    app_package_net(name, grants, tag, signed, false)
+}
+
+/// As [`app_package`], its manifest's `net` as given.
+fn app_package_net(name: &str, grants: &[&str], tag: &str, signed: bool, net: bool) -> Vec<u8> {
+    use sha2::Digest as _;
+    let code = format!("print('{tag}')\n").into_bytes();
+    let sha: String = sha2::Sha256::digest(&code)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let manifest = json!({
+        "format": 2, "kind": "app", "name": name, "title": "Gym Coach", "version": "0.1.0",
+        "min_build": 1, "runtime": {"name": "python3", "entry": "coach.app"},
+        "grants": grants, "net": net, "logs": false, "phrases": [], "triggers": [],
+        "settings": [], "skills": [], "assets": [],
+        "files": [{"path": "src/coach/app.py", "size": code.len(), "sha256": sha}],
+    })
+    .to_string()
+    .into_bytes();
+    let mut builder = tar::Builder::new(Vec::new());
+    let mut put = |path: &str, data: &[u8]| {
+        let mut header = tar::Header::new_ustar();
+        header.set_size(data.len() as u64);
+        header.set_mode(0o644);
+        header.set_entry_type(tar::EntryType::Regular);
+        header.set_cksum();
+        builder.append_data(&mut header, path, data).unwrap();
+    };
+    put("lamp-skill.json", &manifest);
+    if signed {
+        put(
+            "lamp-skill.sig",
+            br#"{"key":"0000000000000000","signature":""}"#,
+        );
+    }
+    put(&format!("{name}/src/coach/app.py"), &code);
+    builder.into_inner().unwrap()
+}
+
+/// `package`'s `app.push` frames from id `first`.
+fn app_frames(name: &str, package: &[u8], first: usize) -> Vec<Value> {
+    use sha2::Digest as _;
+    let sha256: String = sha2::Sha256::digest(package)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let chunks: Vec<&[u8]> = package.chunks(36 * 1024).collect();
+    chunks
+        .iter()
+        .enumerate()
+        .map(|(n, chunk)| {
+            json!({"id": first + n, "op": "app.push", "name": name, "sha256": sha256,
+                "size": package.len(), "part": n, "parts": chunks.len(), "data": STANDARD.encode(chunk)})
+        })
+        .collect()
+}
+
+/// What a fake apps' helper was asked, and the staged bytes it read.
+#[derive(Default)]
+struct AppsHelper {
+    asked: Vec<Value>,
+    read: Vec<Vec<u8>>,
+    /// The installed pushed apps: name, client, sha256.
+    installed: Vec<(String, String, String)>,
+}
+
+/// A fake `lamp-apps-manage`'s door verbs at `socket`: it reads the staged
+/// file once and answers as the real one does.
+fn apps_helper(socket: &std::path::Path) -> Arc<std::sync::Mutex<AppsHelper>> {
+    use std::io::{BufRead as _, Write as _};
+    let seen = Arc::new(std::sync::Mutex::new(AppsHelper::default()));
+    let listener = std::os::unix::net::UnixListener::bind(socket).unwrap();
+    let keep = seen.clone();
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { break };
+            let mut line = String::new();
+            std::io::BufReader::new(&stream)
+                .read_line(&mut line)
+                .unwrap();
+            let request: Value = serde_json::from_str(&line).unwrap();
+            let mut helper = keep.lock().unwrap();
+            helper.asked.push(request.clone());
+            let answer = if let Some(install) = request.get("install_pushed") {
+                let bytes = std::fs::read(install["path"].as_str().unwrap()).unwrap();
+                let sha: String = {
+                    use sha2::Digest as _;
+                    sha2::Sha256::digest(&bytes)
+                        .iter()
+                        .map(|b| format!("{b:02x}"))
+                        .collect()
+                };
+                helper.read.push(bytes);
+                let client = install["client"].as_str().unwrap().to_owned();
+                let by = json!({"computer": install["client_name"], "client": client});
+                let had = helper
+                    .installed
+                    .iter()
+                    .position(|(name, _, _)| name == "gym-coach");
+                match had {
+                    Some(at) if helper.installed[at].1 != client => {
+                        json!({"refused": "another computer's app has that name"})
+                    }
+                    Some(at) => {
+                        helper.installed[at].2 = sha;
+                        json!({"ok": {"name": "gym-coach", "version": "0.1.0", "updated": true, "started": true, "pushed_by": by}})
+                    }
+                    None => {
+                        helper.installed.push(("gym-coach".into(), client, sha));
+                        json!({"ok": {"name": "gym-coach", "version": "0.1.0", "updated": false, "started": true, "pushed_by": by}})
+                    }
+                }
+            } else if let Some(client) = request.get("list_pushed_by").and_then(Value::as_str) {
+                let apps: Vec<Value> = helper
+                    .installed
+                    .iter()
+                    .filter(|(_, by, _)| by == client)
+                    .map(|(name, by, sha)| json!({"name": name, "title": "Gym Coach", "version": "0.1.0",
+                        "sha256": sha, "grants": ["speak"], "net": false, "logs": false, "stopped": false,
+                        "pushed_by": {"computer": "test", "client": by}}))
+                    .collect();
+                json!({"ok": {"apps": apps}})
+            } else if let Some(client) = request.get("off_pushed_by").and_then(Value::as_str) {
+                let stopped: Vec<&String> = helper
+                    .installed
+                    .iter()
+                    .filter(|(_, by, _)| by == client)
+                    .map(|(name, _, _)| name)
+                    .collect();
+                json!({"ok": {"stopped": stopped, "not_stopped": []}})
+            } else if request.get("grants_pushed_by").is_some() {
+                json!({"ok": {"stopped": [], "not_stopped": []}})
+            } else if let Some(remove) = request.get("remove_pushed") {
+                let at = helper.installed.iter().position(|(name, by, _)| {
+                    remove["name"] == json!(name) && remove["client"] == json!(by)
+                });
+                match at {
+                    Some(at) => {
+                        helper.installed.remove(at);
+                        json!({"ok": "removed"})
+                    }
+                    None => json!({"refused": "this computer did not push an app of that name"}),
+                }
+            } else {
+                json!({"refused": "not a door verb"})
+            };
+            drop(helper);
+            let _ = writeln!(stream, "{answer}");
+        }
+    });
+    seen
+}
+
+async fn app_lamp(name: &str, on: bool) -> (Lamp, Arc<std::sync::Mutex<AppsHelper>>) {
+    let lamp = lamp_built(name, Box::new(session::Unrouted), move |door, dir| {
+        door.with_rates_off().with_app_push(dir.join("staging"), on)
+    })
+    .await;
+    std::fs::create_dir_all(lamp.dir.join("staging")).unwrap();
+    let helper = apps_helper(&lamp.dir.join("apps-manage.sock"));
+    lamp.shared
+        .set_apps_manage_socket(lamp.dir.join("apps-manage.sock"));
+    (lamp, helper)
+}
+
+/// The lines the lamp said, by client.
+type Said = Arc<std::sync::Mutex<Vec<(String, String)>>>;
+
+/// As [`app_lamp`], with app push on, the lines it says kept, and the apps'
+/// helper's owed changes kept at `owed`.
+async fn app_lamp_owing(
+    name: &str,
+    owed: std::path::PathBuf,
+) -> (Lamp, Arc<std::sync::Mutex<AppsHelper>>, Said) {
+    let said: Said = Arc::default();
+    let lamp = lamp_built(name, Box::new(Says(said.clone())), move |door, dir| {
+        door.with_rates_off()
+            .with_app_push(dir.join("staging"), true)
+            .with_apps_owed(owed)
+    })
+    .await;
+    std::fs::create_dir_all(lamp.dir.join("staging")).unwrap();
+    let helper = apps_helper(&lamp.dir.join("apps-manage.sock"));
+    lamp.shared
+        .set_apps_manage_socket(lamp.dir.join("apps-manage.sock"));
+    (lamp, helper, said)
+}
+
+/// The last frame's answer of a push of `frames`, each before it `got`.
+async fn pushed(socket: &mut Socket, frames: &[Value]) -> Value {
+    let mut answer = Value::Null;
+    for frame in frames {
+        answer = send(socket, frame.clone()).await;
+    }
+    answer
+}
+
+/// #8351: a paired computer with `skills` pushes its own unsigned app with no
+/// yes asked; it is staged for the apps' helper with the computer named,
+/// installed and started; the staged file goes; a re-push replaces it; the
+/// list is the computer's own; a remove removes it.
+#[tokio::test]
+async fn a_paired_computer_pushes_its_own_app_which_installs_runs_is_replaced_and_removed() {
+    let (lamp, helper) = app_lamp("app-push", true).await;
+    let mut socket = paired(&lamp, json!(["speak", "skills"]), 61).await;
+    let package = app_package("gym-coach", &["speak"], "one", false);
+    let frames = app_frames("gym-coach", &package, 10);
+    let installed = pushed(&mut socket, &frames).await;
+    assert_eq!(installed["ok"], true, "{installed}");
+    let app = &installed["app"];
+    assert_eq!(app["name"], "gym-coach", "{installed}");
+    assert_eq!(app["title"], "Gym Coach");
+    assert_eq!(app["grants"], json!(["speak"]));
+    assert_eq!(app["from"], "computer");
+    assert_eq!(app["started"], true, "the app runs once installed");
+    assert_eq!(app["updated"], false);
+    assert_eq!(app["pushed_by"]["computer"], "test", "{installed}");
+    assert!(
+        app["pushed_by"]["client"]
+            .as_str()
+            .unwrap()
+            .starts_with("c_")
+    );
+    {
+        let seen = helper.lock().unwrap();
+        assert_eq!(
+            seen.read,
+            vec![package.clone()],
+            "the helper read the bytes pushed"
+        );
+        let asked = &seen.asked[0]["install_pushed"];
+        assert!(
+            asked["client"].as_str().unwrap().starts_with("c_"),
+            "{asked}"
+        );
+        assert_eq!(asked["client_name"], "test");
+        assert!(asked["path"].as_str().unwrap().ends_with(".tar"));
+    }
+    // The staged file is removed once the helper answered.
+    let staged: Vec<_> = std::fs::read_dir(lamp.dir.join("staging"))
+        .unwrap()
+        .collect();
+    assert!(staged.is_empty(), "{staged:?}");
+    // A re-push of other bytes replaces it.
+    let again = app_package("gym-coach", &["speak"], "two", false);
+    let replaced = pushed(&mut socket, &app_frames("gym-coach", &again, 20)).await;
+    assert_eq!(replaced["app"]["updated"], true, "{replaced}");
+    assert_eq!(helper.lock().unwrap().read.last(), Some(&again));
+    let listed = send(&mut socket, json!({"id": 30, "op": "app.list"})).await;
+    assert_eq!(listed["apps"][0]["name"], "gym-coach", "{listed}");
+    assert_eq!(listed["apps"].as_array().unwrap().len(), 1);
+    assert_eq!(listed["apps"][0]["pushed_by"], app["pushed_by"], "{listed}");
+    let removed = send(
+        &mut socket,
+        json!({"id": 31, "op": "app.remove", "name": "gym-coach"}),
+    )
+    .await;
+    assert_eq!(
+        removed,
+        json!({"re": 31, "ok": true, "removed": "gym-coach"})
+    );
+    let listed = send(&mut socket, json!({"id": 32, "op": "app.list"})).await;
+    assert_eq!(listed["apps"], json!([]), "{listed}");
+    let gone = send(
+        &mut socket,
+        json!({"id": 33, "op": "app.remove", "name": "gym-coach"}),
+    )
+    .await;
+    assert_eq!(gone["error"]["code"], "refused", "{gone}");
+}
+
+/// Waits until the fake apps' helper has been asked `request`, within 3 s.
+async fn until_apps_asked(helper: &std::sync::Mutex<AppsHelper>, request: &Value) {
+    for _ in 0..150 {
+        if helper.lock().unwrap().asked.contains(request) {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("never asked {request}: {:?}", helper.lock().unwrap().asked);
+}
+
+/// Waits until nothing is owed the apps' helper at `owed`, within 3 s.
+async fn until_owed_none(owed: &std::path::Path) {
+    for _ in 0..150 {
+        if lamp_control::apps_owed::owed(owed).is_empty() {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("still owed: {:?}", lamp_control::apps_owed::owed(owed));
+}
+
+/// An owed-changes file of its own for `name`, outside any lamp's folder, so
+/// a lamp made again (a restart) reads the same one.
+fn owed_file(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("lamp-control-owed-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir.join(lamp_control::apps_owed::OWED)
+}
+
+async fn first_client(lamp: &Lamp) -> String {
+    let clients = admin(lamp, json!({"clients": true})).await;
+    clients["clients"][0]["id"].as_str().unwrap().to_owned()
+}
+
+/// Heron's P1 on #8358, test 1 (lamp-control's half; the helper's stop and
+/// start-all are `lamp-apps`' `pushed` tests), and P2's last part: a pushed
+/// app with `net` is said on with the internet named; its computer revoked,
+/// the apps' helper is asked `off_pushed_by` for it alone, and once it
+/// answered nothing is owed.
+#[tokio::test]
+async fn a_revoked_computers_pushed_apps_are_stopped_by_the_apps_helper() {
+    let owed = owed_file("revoke");
+    let (lamp, helper, said) = app_lamp_owing("app-push-revoke", owed.clone()).await;
+    let mut socket = paired(&lamp, json!(["speak", "skills"]), 62).await;
+    let package = app_package_net("gym-coach", &["speak"], "one", false, true);
+    let installed = pushed(&mut socket, &app_frames("gym-coach", &package, 10)).await;
+    assert_eq!(installed["ok"], true, "{installed}");
+    assert_eq!(installed["app"]["net"], true, "{installed}");
+    let line = said.lock().unwrap().last().cloned().unwrap();
+    assert_eq!(
+        line.1,
+        "Gym Coach is on, from your computer, and can use the internet. To undo, remove it in the app."
+    );
+    let client = first_client(&lamp).await;
+    assert_eq!(
+        admin(&lamp, json!({"revoke": client})).await["revoked"],
+        true
+    );
+    let off = json!({"off_pushed_by": client});
+    until_apps_asked(&helper, &off).await;
+    until_owed_none(&owed).await;
+    let asked = helper.lock().unwrap().asked.clone();
+    assert_eq!(
+        asked
+            .iter()
+            .filter(|line| line.get("off_pushed_by").is_some())
+            .count(),
+        1,
+        "{asked:?}"
+    );
+    assert!(
+        asked
+            .iter()
+            .all(|line| line.get("grants_pushed_by").is_none()),
+        "no other computer's apps are touched: {asked:?}"
+    );
+}
+
+/// Heron's P1 on #8358, test 2: a revoke the apps' helper never answered
+/// (it was down, then lamp-control stopped) is kept, and told at the next
+/// start; then nothing is owed.
+#[tokio::test]
+async fn a_revoke_the_apps_helper_never_heard_is_told_after_a_restart() {
+    let owed = owed_file("restart");
+    let before = lamp_built("app-push-down", Box::new(session::Unrouted), {
+        let owed = owed.clone();
+        move |door, dir| {
+            door.with_rates_off()
+                .with_app_push(dir.join("staging"), true)
+                .with_apps_owed(owed)
+        }
+    })
+    .await;
+    // The helper is down: its socket is not there.
+    before
+        .shared
+        .set_apps_manage_socket(before.dir.join("gone.sock"));
+    let _socket = paired(&before, json!(["speak", "skills"]), 63).await;
+    let client = first_client(&before).await;
+    assert_eq!(
+        admin(&before, json!({"revoke": client})).await["revoked"],
+        true
+    );
+    let off = json!({"off_pushed_by": client});
+    assert_eq!(
+        lamp_control::apps_owed::owed(&owed),
+        std::slice::from_ref(&off)
+    );
+    // lamp-control again, the same state folder, the helper up.
+    let (after, helper, _) = app_lamp_owing("app-push-restarted", owed.clone()).await;
+    after.shared.tell_owed_app_changes();
+    until_apps_asked(&helper, &off).await;
+    until_owed_none(&owed).await;
+}
+
+/// Heron's P1 on #8358, test 3 (lamp-control's half; which app stops is
+/// `lamp-apps`' `pushed` test): the owner drops `camera` from a pairing, and
+/// the apps' helper is asked to hold its pushed apps to the grants left.
+#[tokio::test]
+async fn a_narrowed_pairing_holds_its_pushed_apps_to_the_grants_left() {
+    let owed = owed_file("narrowed");
+    let (lamp, helper, _) = app_lamp_owing("app-push-narrowed", owed.clone()).await;
+    let _socket = paired(&lamp, json!(["speak", "camera", "skills"]), 64).await;
+    let client = first_client(&lamp).await;
+    let set = admin(
+        &lamp,
+        json!({"set_grants": {"client": client, "grants": ["speak", "skills"]}}),
+    )
+    .await;
+    assert_eq!(set["removed"], json!(["camera"]), "{set}");
+    let held = json!({"grants_pushed_by": {"client": client, "grants": ["speak", "skills"]}});
+    until_apps_asked(&helper, &held).await;
+    until_owed_none(&owed).await;
+}
+
+/// #8351: only a computer this lamp's owner paired pushes: one never paired
+/// here (another owner's) is refused at hello, and before hello nothing is
+/// taken. A paired one without `skills`, or whose app asks a grant its
+/// pairing lacks, or `remember`, or that pushes a signed package, is refused
+/// before the helper is asked; another computer can't remove or replace it.
+#[tokio::test]
+async fn an_unpaired_or_other_owners_computer_and_a_push_beyond_the_pairing_are_refused() {
+    let (lamp, helper) = app_lamp("app-push-refused", true).await;
+    let package = app_package("gym-coach", &["speak"], "one", false);
+    let frames = app_frames("gym-coach", &package, 3);
+    // Before hello.
+    let mut bare = connect(&lamp, "/v1").await.unwrap();
+    let _welcome = next(&mut bare).await;
+    let refused = send(&mut bare, frames[0].clone()).await;
+    assert_eq!(refused["error"]["code"], "no_hello", "{refused}");
+    // A key paired with another lamp: unknown here.
+    let mut other = connect(&lamp, "/v1").await.unwrap();
+    let welcome = next(&mut other).await;
+    let nonce: [u8; 32] = pairing::bytes_of(welcome["nonce"].as_str().unwrap()).unwrap();
+    let keys = Ed25519KeyPair::from_seed_unchecked(&[99; 32]).unwrap();
+    let sig = keys.sign(&[pairing::HELLO_CONTEXT, &nonce].concat());
+    let hello = send(
+        &mut other,
+        json!({"id": 1, "op": "hello", "client": "c_1", "sig": STANDARD.encode(sig)}),
+    )
+    .await;
+    assert_eq!(hello["error"]["code"], "unpaired", "{hello}");
+    // Paired without `skills`.
+    let mut no_skills = paired(&lamp, json!(["speak"]), 62).await;
+    let refused = send(&mut no_skills, frames[0].clone()).await;
+    assert_eq!(refused["error"]["code"], "no_grant", "{refused}");
+    drop(no_skills);
+    tokio::time::sleep(Duration::from_millis(1_100)).await;
+    let mut socket = paired(&lamp, json!(["speak", "skills"]), 63).await;
+    for (asks, why) in [
+        (vec!["speak", "camera"], "not granted: camera"),
+        (vec!["speak", "remember"], "not granted: remember"),
+    ] {
+        let beyond = app_package("gym-coach", &asks, "x", false);
+        let refused = pushed(&mut socket, &app_frames("gym-coach", &beyond, 40)).await;
+        assert_eq!(
+            refused["error"],
+            json!({"code": "no_grant", "why": why}),
+            "{refused}"
+        );
+    }
+    let signed = app_package("gym-coach", &["speak"], "x", true);
+    let refused = pushed(&mut socket, &app_frames("gym-coach", &signed, 50)).await;
+    assert_eq!(refused["error"]["code"], "refused", "{refused}");
+    assert!(
+        refused["error"]["why"]
+            .as_str()
+            .unwrap()
+            .contains("unsigned"),
+        "{refused}"
+    );
+    // A push named other than its manifest.
+    let refused = pushed(&mut socket, &app_frames("other-app", &package, 60)).await;
+    assert_eq!(refused["error"]["code"], "bad_request", "{refused}");
+    assert!(
+        helper.lock().unwrap().asked.is_empty(),
+        "the helper was never asked"
+    );
+    // Pushed by this computer; another paired computer can't take it over.
+    assert_eq!(pushed(&mut socket, &frames).await["ok"], true);
+    tokio::time::sleep(Duration::from_millis(1_100)).await;
+    let mut second = paired(&lamp, json!(["speak", "skills"]), 64).await;
+    let taken = pushed(&mut second, &app_frames("gym-coach", &package, 70)).await;
+    assert_eq!(
+        taken["error"]["why"], "another computer's app has that name",
+        "{taken}"
+    );
+    let removed = send(
+        &mut second,
+        json!({"id": 80, "op": "app.remove", "name": "gym-coach"}),
+    )
+    .await;
+    assert_eq!(removed["error"]["code"], "refused", "{removed}");
+}
+
+/// Without `LAMP_STORE_APPS` app push says apps are off, and without the
+/// apps' helper it says app push is not on this lamp; nothing is asked.
+#[tokio::test]
+async fn app_push_is_off_without_the_switch_or_the_helper() {
+    let (off, helper) = app_lamp("app-push-off", false).await;
+    let mut socket = paired(&off, json!(["skills"]), 65).await;
+    let refused = send(&mut socket, json!({"id": 3, "op": "app.list"})).await;
+    assert_eq!(
+        refused["error"],
+        json!({"code": "refused", "why": lamp_control::app_push::OFF})
+    );
+    assert!(helper.lock().unwrap().asked.is_empty());
+    let bare = lamp("app-push-none").await;
+    let mut socket = paired(&bare, json!(["skills"]), 66).await;
+    let refused = send(&mut socket, json!({"id": 3, "op": "app.list"})).await;
+    assert_eq!(
+        refused["error"],
+        json!({"code": "refused", "why": lamp_control::app_push::NOT_HERE})
     );
 }

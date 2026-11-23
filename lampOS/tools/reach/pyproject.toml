@@ -1,0 +1,6 @@
+[project]
+name = "lampos-reach"
+version = "0.1.0"
+description = "Where each joint may go at each pose: the lamp's anti-tip rule and its CAD (offline; see README.md)"
+requires-python = ">=3.11"
+dependencies = ["numpy>=2.0", "pillow>=10", "scipy>=1.13"]

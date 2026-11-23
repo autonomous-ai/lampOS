@@ -49,6 +49,7 @@ fn round_muted(lamp: &mut Lamp, mute: Option<VoiceMute>) -> Outcome {
             say: &mut |line| lamp.said.push(line.to_owned()),
             phase: &mut |phase| lamp.phases.push(phase),
             target: &mut |_| {},
+            now: None,
         },
     )
 }

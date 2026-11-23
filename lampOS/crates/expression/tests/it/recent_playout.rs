@@ -1,7 +1,7 @@
 use lamp_expression::{Catalogue, Engine, Error, Input, MAX_PLAYOUT_FRAMES, Output, Trigger};
 use lamp_msgs::{
-    BodyOffsets, ClockStamp, Concentration, ExpressionFace, JointState, Light, Room, RoomState,
-    Voice, VoiceEvent, VoicePlayout, VoiceProgress, VoiceSound, VoiceTiming,
+    BodyOffsets, ClockStamp, ExpressionFace, JointState, Light, Room, RoomState, Voice, VoiceEvent,
+    VoicePlayout, VoiceProgress, VoiceSound, VoiceTiming,
 };
 
 const WINDOW: u64 = 100_000;
@@ -541,13 +541,7 @@ fn concentration_and_busy_room_still_suppress_recent_modulation() {
         if concentrating {
             let stamp = h.stamp(130_000);
             h.engine
-                .ingest(
-                    130_000,
-                    Input::Concentration(Concentration {
-                        stamp,
-                        concentrating: true,
-                    }),
-                )
+                .ingest(130_000, Input::HeadDown { stamp, down: true })
                 .unwrap();
         } else {
             h.context(130_000, Room::Busy);

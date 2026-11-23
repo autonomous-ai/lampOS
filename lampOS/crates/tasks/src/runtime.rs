@@ -774,6 +774,11 @@ fn pane_turn(
     let next_is_spoken = queued
         .first()
         .is_some_and(|launch| crate::one_session::for_the_pane(one, launch).is_some());
+    // One that found the pane not up past its bound (#7895) does not wait
+    // for the pane: handed over next, to end `one_session_not_started`.
+    let spent = queued
+        .first()
+        .is_some_and(|launch| one.not_up_spent(&launch.name));
     one.set_spoken_queue(
         launching
             .map(str::to_owned)
@@ -786,7 +791,10 @@ fn pane_turn(
             )
             .collect(),
     );
-    next_is_spoken && (launching.is_some() || backing_off || !one.free() || !one.has_fresh_pane())
+    next_is_spoken
+        && (launching.is_some()
+            || backing_off
+            || (!spent && (!one.free() || !one.has_fresh_pane())))
 }
 
 /// [`place_wait`]'s answer for the next launch.
@@ -798,6 +806,67 @@ enum PlaceWait {
     Hold,
     /// Held for `cap` already: fails `busy`, with no `harness new`.
     GiveUp,
+}
+
+/// Whether the next launch waits for OpenClaw's Gateway (#8105, the first
+/// builder's (b)): with `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` on (lamp-update
+/// asking, [`crate::gateway::update_asking`]) a launch on OpenClaw while
+/// its Gateway doesn't answer is held in the queue, marking it wanted so
+/// lamp-update starts it, at most `cap`, then given up; the store's loop
+/// and the Harness thread go on meanwhile. Off, or another engine: on as
+/// usual, the launch's own 60 s wait as before. `answers` is the port's
+/// last look; `held` the task held and since when.
+fn gateway_wait(
+    next: Option<&Launch>,
+    asking: crate::gateway::Asking,
+    answers: impl FnOnce() -> bool,
+    held: &mut Option<(String, Instant)>,
+    now: Instant,
+    cap: Duration,
+) -> PlaceWait {
+    use crate::gateway::Asking;
+    let Some(next) =
+        next.filter(|next| asking != Asking::No && next.target.engine == EngineKind::Openclaw)
+    else {
+        if let Some((name, _)) = held.take() {
+            eprintln!("tasks: {name}: held for OpenClaw's gateway no longer");
+        }
+        return PlaceWait::Go;
+    };
+    crate::gateway::mark_wanted();
+    if answers() {
+        match held.take() {
+            Some((name, since)) if name == next.name => eprintln!(
+                "tasks: {name}: OpenClaw's gateway serves after {} s; sent",
+                now.saturating_duration_since(since).as_secs()
+            ),
+            Some((name, _)) => eprintln!("tasks: {name}: held for OpenClaw's gateway no longer"),
+            None => {}
+        }
+        return PlaceWait::Go;
+    }
+    match held {
+        Some((name, since)) if *name == next.name => {
+            if now.saturating_duration_since(*since) < cap {
+                return PlaceWait::Hold;
+            }
+            // `held` is cleared by the caller once the give-up is written,
+            // so a tick with a launch in flight gives up on the next one.
+            PlaceWait::GiveUp
+        }
+        _ => {
+            if let Some((name, _)) = held.take() {
+                eprintln!("tasks: {name}: held for OpenClaw's gateway no longer");
+            }
+            eprintln!(
+                "tasks: {}: held until OpenClaw's gateway answers (at most {} s)",
+                next.name,
+                cap.as_secs()
+            );
+            *held = Some((next.name.clone(), now));
+            PlaceWait::Hold
+        }
+    }
 }
 
 /// Whether the next launch waits for the lamp's place (H5 on #7258):
@@ -1605,6 +1674,26 @@ pub fn app_caller_may(caller: Option<&Caller>, own_uid: u32) -> bool {
     })
 }
 
+/// The one unit that may read the lamp's default engine on the app's
+/// socket besides lamp-cloud (#8105): lamp-update, which keeps OpenClaw's
+/// gateway to the lamp's agent.
+pub const UPDATE_CALLER_UNIT: &str = "lamp-update.service";
+
+/// Whether a caller the kernel named is lamp-update (#8105): root, and
+/// [`UPDATE_CALLER_UNIT`]. Such a caller gets only the read of the lamp's
+/// default engine (`app_engine_default_state`), never the app's sign-in or
+/// its choice; any other caller stays refused.
+pub fn update_caller_may(caller: Option<&Caller>) -> bool {
+    caller
+        .is_some_and(|caller| caller.uid == 0 && caller.unit.as_deref() == Some(UPDATE_CALLER_UNIT))
+}
+
+/// What a request on the read-only route may be (#8105): the lamp's
+/// default engine read, nothing else.
+pub fn update_read_may(request: &Request) -> bool {
+    matches!(request, Request::AppEngineDefaultState {})
+}
+
 /// [`app_caller_may`] with this process's own uid: the part's check on a
 /// lamp ([`Config::app_caller`]).
 pub fn app_caller_is_lamp_cloud(caller: Option<&Caller>) -> bool {
@@ -1633,6 +1722,9 @@ enum Route {
     Public,
     Voice,
     App,
+    /// lamp-update's read of the lamp's default engine on the app's socket
+    /// (#8105, [`update_caller_may`]): `app_engine_default_state` alone.
+    UpdateRead,
 }
 
 struct Work {
@@ -2022,6 +2114,10 @@ fn owner<C: Clock>(
     ): Switches,
 ) -> io::Result<()> {
     let mut looks = Looks::new(session_lane);
+    // The owner's last "forget everything" (#7930), kept beside the store:
+    // the tasks it held are never on the work records again.
+    let forgotten_file = session_index.with_file_name(crate::works::FORGOTTEN_FILE);
+    let mut forgotten = crate::works::Forgotten::load(&forgotten_file);
     // The app's choice of the lamp's default engine (#6492), as kept.
     let lamp = set_up_later.as_ref().and_then(|later| later.lamp.clone());
     if let Some(side) = lamp.as_ref()
@@ -2057,6 +2153,7 @@ fn owner<C: Clock>(
     // The hand-over held for the lamp's place (H5 on #7258): its name and
     // since when, bounded by the queue's wait.
     let mut place_held: Option<(String, Instant)> = None;
+    let mut gateway_held: Option<(String, Instant)> = None;
     // Declared before `waits`, so dropped after it, but still before the
     // engine: every `watch` child is killed and reaped when the owner ends,
     // however it ends.
@@ -2070,6 +2167,9 @@ fn owner<C: Clock>(
     // last step outlives the tracker's line, which goes when the watch
     // lets the task go.
     let mut tasks_now = progress.then(TasksNow::new);
+    // The work records (#7930, [`crate::works`]): the store's tasks on
+    // them brought up to date at most this often, and before each read.
+    let mut works_due = Instant::now();
     let mut status: Option<(u64, Arc<TaskStatus>)> = None;
     let mut status_began = Instant::now();
     // A store kept aside is looked for again once a minute (#1505).
@@ -2349,6 +2449,11 @@ fn owner<C: Clock>(
                         && let Some(wanted) = later.from_machines
                     {
                         machines_answered = true;
+                        // Settled by this answer, looked at at once, not at
+                        // the next look a minute later (#7988).
+                        if starting_since.is_some() {
+                            targets_due = Instant::now();
+                        }
                         let said = match read {
                             Ok(listed) => {
                                 let chosen = if engines_on {
@@ -2574,6 +2679,12 @@ fn owner<C: Clock>(
                                     not_among_said = false;
                                 }
                                 found.sign_in_read(sign_in);
+                                // Settled by this answer (signed out, or no
+                                // machines to wait for), looked at at once,
+                                // not a minute later (#7988).
+                                if starting_since.is_some() {
+                                    targets_due = Instant::now();
+                                }
                             }
                             // Kept as it was: one failed read says nothing
                             // about the account; failing for
@@ -2618,6 +2729,12 @@ fn owner<C: Clock>(
                         code: "timeout",
                         message: "The queued request expired before it started.",
                     }));
+                } else if work.route == Route::UpdateRead && !update_read_may(&work.request) {
+                    // lamp-update reads the lamp's default engine alone (#8105).
+                    let _ = work.response.try_send(Err(EngineError {
+                        code: "not_on_this_route",
+                        message: "lamp-update's route reads only the lamp's default engine.",
+                    }));
                 } else if work.route == Route::App && !work.request.app() {
                     // The app's route takes the app's sign-in alone: never a
                     // hand-over's confirm, nor the voice's sign-in.
@@ -2625,7 +2742,10 @@ fn owner<C: Clock>(
                         code: "not_on_this_route",
                         message: "The app's route takes only the app's sign-in operations.",
                     }));
-                } else if work.request.app() && work.route != Route::App {
+                } else if work.request.app()
+                    && work.route != Route::App
+                    && work.route != Route::UpdateRead
+                {
                     let _ = work.response.try_send(Err(EngineError {
                         code: "untrusted",
                         message: "This operation requires the app's route.",
@@ -2636,10 +2756,18 @@ fn owner<C: Clock>(
                 ) {
                     // The app's choice of the lamp's default engine (#6492):
                     // used at once, and the lamp's target written again.
+                    let update_read = work.route == Route::UpdateRead;
                     let answer =
                         app_engine_default_operation(&work.request, lamp.as_ref(), &engine_default)
                             .map(|mut body| {
                                 body["ok"] = true.into();
+                                // lamp-update's read also hears whether OpenClaw is in
+                                // use whatever the default (#8105, the first builder's
+                                // 15:29 on #8116): a launch or run waited for its
+                                // Gateway within the hold.
+                                if update_read {
+                                    body = update_read_body(body);
+                                }
                                 body
                             });
                     if answer.is_ok() && matches!(work.request, Request::AppEngineDefault { .. }) {
@@ -2733,6 +2861,42 @@ fn owner<C: Clock>(
                     let answer = engine.identified(record.body(unix_ms()));
                     requests = requests.saturating_add(1);
                     let _ = work.response.try_send(answer);
+                } else if let Request::Work { id } = &work.request {
+                    works_refresh(
+                        &engine,
+                        &clock.sample()?,
+                        tracker.as_ref(),
+                        forgotten.as_ref(),
+                    );
+                    let found = crate::works::with(|board| board.get(id, unix_ms()));
+                    let answer = match found {
+                        Some(record) => engine.identified(json!({"work":record})),
+                        None => Err(EngineError {
+                            code: "no_such_work",
+                            message: "No work with that id is on the lamp's records.",
+                        }),
+                    };
+                    requests = requests.saturating_add(1);
+                    let _ = work.response.try_send(answer);
+                } else if let Request::WorkList { limit } = &work.request {
+                    let answer = if (1..=crate::works::LIST_MOST).contains(limit) {
+                        works_refresh(
+                            &engine,
+                            &clock.sample()?,
+                            tracker.as_ref(),
+                            forgotten.as_ref(),
+                        );
+                        let works =
+                            crate::works::with(|board| board.list(usize::from(*limit), unix_ms()));
+                        engine.identified(json!({"works":works}))
+                    } else {
+                        Err(EngineError {
+                            code: "bad_request",
+                            message: "The limit must be between 1 and 10.",
+                        })
+                    };
+                    requests = requests.saturating_add(1);
+                    let _ = work.response.try_send(answer);
                 } else if let Request::ForgetSessions {} = &work.request {
                     // On the voice's route only: the owner's "forget
                     // everything" (#6274).
@@ -2740,14 +2904,23 @@ fn owner<C: Clock>(
                         // The kept session too: closed, its conversation
                         // deleted, and a new one opened (openharness#4393).
                         crate::one_session::forgotten();
-                        match crate::session_index::forget(&session_index) {
-                            Ok(forgotten) => {
-                                if forgotten {
+                        // The work records too, with the person's words
+                        // and the agents' answers in them (#7930): every
+                        // task the store holds now, on the records yet or
+                        // not, kept off them after a restart too.
+                        let mark = engine.forget_mark();
+                        let kept = mark.save(&forgotten_file);
+                        forgotten = Some(mark);
+                        crate::works::forget_all();
+                        let index = crate::session_index::forget(&session_index);
+                        match kept.and(index) {
+                            Ok(any) => {
+                                if any {
                                     eprintln!(
                                         "tasks: the sessions the lamp started were forgotten"
                                     );
                                 }
-                                engine.identified(json!({"forgotten":forgotten}))
+                                engine.identified(json!({"forgotten":any}))
                             }
                             Err(error) => {
                                 eprintln!(
@@ -2838,6 +3011,16 @@ fn owner<C: Clock>(
         if let (Some(record), Some(tracker)) = (tasks_now.as_mut(), tracker.as_ref()) {
             record.refresh(&engine.recent(&clock.sample()?), tracker, unix_ms());
         }
+        // The work records too, before the watch lets a task's line go.
+        if works_due <= Instant::now() {
+            works_due = Instant::now() + WORKS_EVERY;
+            works_refresh(
+                &engine,
+                &clock.sample()?,
+                tracker.as_ref(),
+                forgotten.as_ref(),
+            );
+        }
         if !busy && !stop.load(Ordering::Acquire) {
             let now = clock.sample()?;
             // Harness's daemon first, once, after a sign-in by code
@@ -2887,6 +3070,40 @@ fn owner<C: Clock>(
                     crate::one_session::QUEUE_WAIT,
                 )
             });
+            // A launch on OpenClaw waits for its Gateway in the queue (#8105).
+            let gateway_hold = if place_wait == PlaceWait::Go {
+                gateway_wait(
+                    engine.queued_launches().first().copied(),
+                    crate::gateway::update_asking(),
+                    crate::gateway::cold_answers,
+                    &mut gateway_held,
+                    Instant::now(),
+                    crate::gateway::COLD_WITHIN,
+                )
+            } else {
+                PlaceWait::Go
+            };
+            if daemon.is_none()
+                && start_daemon_due.is_none()
+                && gateway_hold == PlaceWait::GiveUp
+                && let Some(job) = engine.begin_launch(&now).map_err(io::Error::other)?
+            {
+                if let Some((name, _)) = gateway_held.take() {
+                    eprintln!(
+                        "tasks: {name}: OpenClaw's gateway didn't serve in {} s; not sent",
+                        crate::gateway::COLD_WITHIN.as_secs()
+                    );
+                }
+                engine
+                    .finish_launch(
+                        job.task_id,
+                        LaunchOutcome::NotSent {
+                            code: crate::gateway::NOT_READY.into(),
+                        },
+                        &now,
+                    )
+                    .map_err(io::Error::other)?;
+            }
             if daemon.is_none()
                 && start_daemon_due.is_none()
                 && place_wait == PlaceWait::GiveUp
@@ -2905,7 +3122,7 @@ fn owner<C: Clock>(
             let launch = match daemon {
                 Some(job) => Some(job),
                 None if start_daemon_due.is_some() => None,
-                None if place_wait != PlaceWait::Go => None,
+                None if place_wait != PlaceWait::Go || gateway_hold != PlaceWait::Go => None,
                 // `LAMP_TASKS_ONE_SESSION` on (#7246): a spoken task for
                 // the lamp's pane waits queued while the pane is held, and
                 // the spoken task holding it lets go once its answer is read.
@@ -3040,6 +3257,8 @@ fn owner<C: Clock>(
             status: status.clone(),
             reads: tracker.as_ref().map(Tracker::reads),
             set_up,
+            // For the steps' reader, with `LAMP_TASKS_STEPS` on only, as
+            // before #7930: off, nothing is read.
             watched: if crate::steps::on() {
                 engine.watched(&clock.sample()?)
             } else {
@@ -3514,19 +3733,24 @@ fn lamp_folder(home: &Path) -> PathBuf {
 /// `LAMP_OPENCLAW_ON_LAMP` (#6226): OpenClaw's settings written at the
 /// part's start ([`crate::openclaw_config::write`]) under `state_dir`, for
 /// lamp-cloud's forwarder, with the lamp's work folder under `home` its
-/// workspace and the lamp's skills when `skills`. Run as `lampos`,
-/// OpenClaw's own user. One journal line; no token is in the file.
-pub fn set_up_openclaw(state_dir: &Path, home: &Path, skills: bool) -> String {
+/// workspace, the lamp's skills when `skills` and V1's tool grants when
+/// `v1` (`LAMP_OPENCLAW_V1_TOOLS`, #7245). Run as `lampos`, OpenClaw's own
+/// user, at every start (on a thread of its own: it waits for OpenClaw's
+/// gateway to check the text, minutes at most, #7268), so an existing
+/// lamp's file is brought up to date on its next start or update. One
+/// journal line, and one per wait; no token is in the file.
+pub fn set_up_openclaw(state_dir: &Path, home: &Path, skills: bool, v1: bool) -> String {
     let workspace = lamp_folder(home);
-    match crate::openclaw_config::write(state_dir, HERMES_FORWARDER_PORT, &workspace, skills) {
+    match crate::openclaw_config::write(state_dir, HERMES_FORWARDER_PORT, &workspace, skills, v1) {
         Ok(changed) => format!(
-            "tasks: OpenClaw's settings for the lamp's DeepSeek: config {}{}",
+            "tasks: OpenClaw's settings for the lamp's DeepSeek: config {}{}{}",
             if changed { "written" } else { "unchanged" },
             if skills {
                 ""
             } else {
                 ", the lamp's skills off"
-            }
+            },
+            if v1 { "" } else { ", V1's tools off" }
         ),
         Err(error) => format!("tasks: OpenClaw's settings not written: {error}"),
     }
@@ -4386,6 +4610,34 @@ impl Drop for Waits {
     }
 }
 
+/// How often the owner brings the store's tasks on the work records up to
+/// date (#7930): well within the watch's half minute, and far less often
+/// than the owner's tick.
+const WORKS_EVERY: Duration = Duration::from_millis(500);
+
+/// The store's tasks on the work records brought up to date from the store
+/// and the watch's read ([`crate::works::Board::tasks`]): in memory only,
+/// the records' lock held for that alone.
+fn works_refresh(
+    engine: &Engine<Store>,
+    now: &ClockSample,
+    tracker: Option<&Tracker>,
+    forgotten: Option<&crate::works::Forgotten>,
+) {
+    let seen = engine.works(now, forgotten);
+    let at = unix_ms();
+    crate::works::with(|board| {
+        board.tasks(&seen, |task| crate::works::line_of(tracker, task), at);
+    });
+}
+
+/// The steps' reader for [`crate::steps::SWITCH`]'s value and
+/// [`crate::steps::STATE_SETTING`]'s: one only with the switch `on`, as
+/// before #7930; off, nothing is read, for the records neither.
+fn steps_reader(switch: Option<&str>, state: Option<&str>) -> Option<crate::steps::Steps> {
+    crate::steps::switched(switch, crate::steps::roots(state))
+}
+
 fn unix_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -4668,6 +4920,16 @@ fn lamp_target_of(config: &Config) -> Box<dyn Fn() -> Option<Target> + Send + Sy
     }
 }
 
+/// lamp-update's read of the default (`Route::UpdateRead`, #8105): the
+/// answer also says whether OpenClaw is in use, true, false, or null before
+/// the lamp's panes were first read; and the ask is noted, so the panes are
+/// read while lamp-update asks.
+pub(crate) fn update_read_body(mut body: Value) -> Value {
+    crate::gateway::update_asked();
+    body["openclaw_in_use"] = crate::gateway::in_use_said().map_or(Value::Null, Value::from);
+    body
+}
+
 /// The lamp's default agent now, read at each call: [`lamp_default`], else
 /// the build's first switched on ([`lamp_order`]), else the lamp target's
 /// own engine. A skill's run with no Harness and a live ask read the same.
@@ -4940,10 +5202,20 @@ pub fn serve<C: Clock>(
                 .ok()
                 .as_deref(),
         );
-        eprintln!(
-            "{}",
-            set_up_openclaw(Path::new(OPENCLAW_STATE_DIR), &side.home, skills)
+        let v1 = crate::openclaw_config::v1_tools_on(
+            std::env::var(crate::openclaw_config::V1_TOOLS_SWITCH)
+                .ok()
+                .as_deref(),
         );
+        // Beside the start: the write waits for OpenClaw's gateway to check
+        // it, minutes at most (`openclaw_config::GATEWAY_WAITS`, #7268).
+        let home = side.home.clone();
+        std::thread::spawn(move || {
+            eprintln!(
+                "{}",
+                set_up_openclaw(Path::new(OPENCLAW_STATE_DIR), &home, skills, v1)
+            )
+        });
     }
     let served = serve_with_adapter(config, clock, stop, move |session| {
         // The update hold (#5229), off unless set: held, or lifted on a
@@ -4958,6 +5230,13 @@ pub fn serve<C: Clock>(
         // it taken out on the canary; a missing launcher is only said.
         if let Some(line) =
             crate::hold::pin_at_start(hold, std::env::var_os("HOME").as_deref().map(Path::new))
+        {
+            eprintln!("{line}");
+        }
+        // Harness's home moved to the XDG folders after all (#7906): said
+        // once at the start, in one fixed line; nothing is moved back.
+        if let Some(line) = std::env::var_os("HOME")
+            .and_then(|home| lamp_msgs::harness_hold::home_moved_line(Path::new(&home)))
         {
             eprintln!("{line}");
         }
@@ -5143,6 +5422,8 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     }
     let began = Instant::now();
     let sample = clock.sample()?;
+    // The lamp's own panes, read between jobs (#8105): which run OpenClaw.
+    let lamp_panes = lamp_target_of(&config);
     let mut engine = Engine::open(
         Store::open(&config.dir)?,
         config.targets,
@@ -5246,6 +5527,13 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         bus.publisher_declared(Diagnostic::TOPIC, &Diagnostic::declaration(), "tasks")?;
     // Without `--progress` the topic is not touched at all.
     let mut status_out = if config.progress {
+        // A skill's runs beside it (#7873): `tasks/status` lists only the
+        // tasks in the store, which a skill's run never enters.
+        crate::skill_task::tell_runs_on(bus.publisher_declared(
+            lamp_msgs::SkillTask::TOPIC,
+            &lamp_msgs::SkillTask::declaration(),
+            "tasks",
+        )?);
         Some(bus.publisher_declared(TaskStatus::TOPIC, &TaskStatus::declaration(), "tasks")?)
     } else {
         None
@@ -5253,10 +5541,12 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     let mut status_published = 0u64;
     // An OpenClaw task's own steps (#7267): with `LAMP_TASKS_STEPS=on` only,
     // on a thread of their own, never on this accept loop; off, no reader
-    // and the topic is not touched.
-    let _steps = match crate::steps::switched(
+    // and the topic is not touched, and a work record's step stays empty,
+    // its tools from `harness show` alone. With it on, each tool call's
+    // number and name also go to its task's work record (#7930).
+    let _steps = match steps_reader(
         std::env::var(crate::steps::SWITCH).ok().as_deref(),
-        crate::steps::roots(std::env::var(crate::steps::STATE_SETTING).ok().as_deref()),
+        std::env::var(crate::steps::STATE_SETTING).ok().as_deref(),
     ) {
         Some(reader) => {
             let mut out =
@@ -5271,7 +5561,15 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                         .map(|report| report.watched.clone())
                         .unwrap_or_default()
                 },
-                move |step| publish(&mut out, step, &mut errors),
+                move |step| {
+                    let mut record = |task: u64, n: u64, tool: &str| {
+                        let at = unix_ms();
+                        crate::works::with(|board| board.step(task, n, tool, at));
+                    };
+                    crate::steps::deliver(step, &mut record, &mut |step: &TaskStep| {
+                        publish(&mut out, step, &mut errors);
+                    });
+                },
                 stop.clone(),
             )?)
         }
@@ -5285,7 +5583,16 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         .name("tasks-harness".into())
         .spawn(move || {
             let mut gateway = adapter.openclaw_gateway();
+            // Only while lamp-update asks, that is with its switch on
+            // (Twelve's P1 on #8223): with it off, no `ps` is ever run.
+            let mut panes_last: Option<Instant> = None;
             while !cli_stop.load(Ordering::Acquire) {
+                if crate::gateway::panes_due(panes_last) {
+                    panes_last = Some(Instant::now());
+                    if let Some(lamp) = lamp_panes() {
+                        crate::gateway::panes_read(&adapter.status(&lamp.machine_id));
+                    }
+                }
                 match jobs_rx.recv_timeout(TICK) {
                     Ok(job) => {
                         let result = match job {
@@ -5408,9 +5715,14 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                     Ok((stream, _)) => {
                         // The app's route is lamp-cloud's only (#5379): any
                         // other caller is closed with no answer.
+                        // lamp-update may read the lamp's default engine
+                        // there, and nothing else (#8105).
+                        let mut route = route;
                         if route == Route::App {
                             let caller = lamp_ipc::caller::of_stream(&stream);
-                            if !(config.app_caller)(caller.as_ref()) {
+                            if update_caller_may(caller.as_ref()) {
+                                route = Route::UpdateRead;
+                            } else if !(config.app_caller)(caller.as_ref()) {
                                 eprintln!(
                                     "tasks: the app's route refused {}",
                                     refused_caller(caller.as_ref())
@@ -5646,6 +5958,17 @@ fn with_sign_in(
 mod tests {
     use super::code_handed;
 
+    /// #7930: the steps' reader is made only with `LAMP_TASKS_STEPS` exactly
+    /// `on`, as before: off, unset or anything else, nothing is read, for
+    /// the work records neither.
+    #[test]
+    fn no_steps_reader_with_the_switch_off() {
+        for off in [None, Some("off"), Some(""), Some("1"), Some("ON")] {
+            assert!(super::steps_reader(off, None).is_none(), "{off:?}");
+        }
+        assert!(super::steps_reader(Some("on"), None).is_some());
+    }
+
     /// #5488: `status` says Harness's sign-in once it was read, and nothing
     /// else changes.
     #[test]
@@ -5752,6 +6075,47 @@ mod tests {
 
     use super::*;
     use std::os::unix::fs::symlink;
+
+    /// #8105: lamp-update, root in its own unit, may read the lamp's
+    /// default engine on the app's socket and nothing else; lamp-cloud is
+    /// not taken for it, nor root in another unit, nor lamp-update as
+    /// another user.
+    #[test]
+    fn lamp_update_may_read_the_lamps_default_engine_and_nothing_else() {
+        let caller = |unit: Option<&str>, uid| Caller {
+            pid: 7,
+            uid,
+            unit: unit.map(str::to_owned),
+        };
+        assert!(update_caller_may(Some(&caller(
+            Some("lamp-update.service"),
+            0
+        ))));
+        assert!(!update_caller_may(Some(&caller(
+            Some("lamp-update.service"),
+            990
+        ))));
+        assert!(!update_caller_may(Some(&caller(
+            Some("lamp-cloud.service"),
+            0
+        ))));
+        assert!(!update_caller_may(Some(&caller(Some("ssh.service"), 0))));
+        assert!(!update_caller_may(Some(&caller(None, 0))), "no unit read");
+        assert!(!update_caller_may(None));
+        assert!(
+            !app_caller_may(Some(&caller(Some("lamp-update.service"), 0)), 990),
+            "lamp-update never gets the app's route itself"
+        );
+        assert!(update_read_may(
+            &Request::parse(br#"{"op":"app_engine_default_state"}"#).unwrap()
+        ));
+        for refused in [
+            &br#"{"op":"app_engine_default","engine":"openclaw"}"#[..],
+            br#"{"op":"app_sign_in_state"}"#,
+        ] {
+            assert!(!update_read_may(&Request::parse(refused).unwrap()));
+        }
+    }
 
     /// #5379: only lamp-cloud's unit, run as the part's own user, may use
     /// the app's route; another unit, another user, a caller whose unit
@@ -6032,6 +6396,7 @@ mod tests {
                 Ok(vec![Ended {
                     agent_id: agent.into(),
                     state: "idle".into(),
+                    failure: None,
                 }])
             };
             if agents.iter().any(|agent| agent == "a") {
@@ -7046,7 +7411,7 @@ mod tests {
         .unwrap();
         let home = dir.path().join("home");
         assert_eq!(
-            set_up_openclaw(&state, &home, true),
+            set_up_openclaw(&state, &home, true, true),
             "tasks: OpenClaw's settings for the lamp's DeepSeek: config written"
         );
         let config: Value =
@@ -7065,13 +7430,23 @@ mod tests {
             config["skills"]["load"]["extraDirs"],
             json!(["/var/lib/lampOS/skills"])
         );
+        // #7245: V1's tool grants, on by default.
+        // V1's `security: full, ask: off` as its exact `mode` (#7737's P1).
+        assert_eq!(config["tools"]["exec"]["mode"], "full");
+        assert_eq!(config["tools"]["exec"].get("security"), None);
+        assert_eq!(config["tools"]["exec"].get("ask"), None);
+        // #7906: no tool that waits for a person in the pane.
         assert_eq!(
-            set_up_openclaw(&state, &home, true),
+            config["tools"]["deny"],
+            json!(crate::openclaw_config::NO_ASK_TOOLS)
+        );
+        assert_eq!(
+            set_up_openclaw(&state, &home, true, true),
             "tasks: OpenClaw's settings for the lamp's DeepSeek: config unchanged"
         );
         fs::write(state.join("openclaw.json"), "{\"models\": []}").unwrap();
         assert!(
-            set_up_openclaw(&state, &home, true)
+            set_up_openclaw(&state, &home, true, true)
                 .starts_with("tasks: OpenClaw's settings not written:")
         );
     }
@@ -7300,6 +7675,7 @@ mod tests {
                     tools: 0,
                 },
                 taken: !self.untaken.load(Ordering::Acquire),
+                shell: false,
             })
         }
         fn close_now(&self, _: &str, _: &str) -> Result<Closed, String> {
@@ -7468,6 +7844,11 @@ mod tests {
             code: "not_ready".into(),
         };
         assert!(!put_back(&not_ready, second));
+        // Its resumes spent (#7895): finished once, never put back.
+        let not_started = LaunchOutcome::NotSent {
+            code: crate::one_session::NOT_STARTED.into(),
+        };
+        assert!(!put_back(&not_started, second));
     }
 
     const PANE_MACHINE: &str = "0123456789abcdef0123456789abcdef";
@@ -7664,25 +8045,49 @@ mod tests {
     /// The Reviewer-lead's #3 on #7258 (#7246): a spoken task never closes
     /// or opens a pane on the worker. OpenClaw's one pane is never rotated
     /// by count (openharness#4393: its gateway compacts the session), so
-    /// past the rotation's token bound the spoken task is still typed into
-    /// the same pane, with no close and no new.
+    /// below its context's limit the spoken task is still typed into the
+    /// same pane, with no close and no new. Near the limit (#7906,
+    /// `near_context_limit`, here by the pane's own count) the spoken task
+    /// is put back `busy`, still with no close or new on the worker, and the
+    /// one-session thread opens the fresh one.
     #[test]
     fn past_the_token_bound_the_spoken_path_neither_closes_nor_opens() {
         let one = lamp_one();
         let pane = Pane::default();
         one.open_if_due(&pane, &pane_place());
         assert_eq!(pane.opens.load(Ordering::Acquire), 1);
-        // Past the rotation's token bound.
-        one.count_answer(&"x".repeat(4 * crate::one_session::ROTATE_TOKENS as usize));
+        // Below the context's limit.
+        one.count_answer(&"x".repeat(4 * (crate::one_session::TASK_FRESH_TOKENS as usize - 1_000)));
         let spoken = spoken_to_the_lamp("task-1");
         assert!(!pane_turn(&one, &[&spoken], None, false), "not held");
         assert!(matches!(
             crate::one_session::spoken_launch(&one, &pane, &spoken),
             Some(LaunchOutcome::Joined { .. })
         ));
+        one.release("task-1");
         one.open_if_due(&pane, &pane_place());
         assert_eq!(pane.opens.load(Ordering::Acquire), 1, "no new");
         assert_eq!(pane.closes.load(Ordering::Acquire), 0, "no close");
+        // Near it: put back, nothing closed or opened on the worker.
+        one.count_answer(&"x".repeat(4 * 2_000));
+        let spoken = spoken_to_the_lamp("task-2");
+        let outcome = crate::one_session::spoken_launch(&one, &pane, &spoken);
+        assert_eq!(
+            outcome,
+            Some(LaunchOutcome::NotSent {
+                code: "busy".into()
+            })
+        );
+        assert_eq!(
+            pane.opens.load(Ordering::Acquire),
+            1,
+            "no new on the worker"
+        );
+        assert_eq!(
+            pane.closes.load(Ordering::Acquire),
+            0,
+            "no close on the worker"
+        );
     }
 
     /// Heron's H4 on #7258 (#7246): a spoken task whose words are never
@@ -7872,6 +8277,123 @@ mod tests {
             Some(LaunchOutcome::Joined { .. })
         ));
         assert_eq!(pane.opens.load(Ordering::Acquire), 1);
+    }
+
+    /// #8105 (the first builder's (b)): with lamp-update asking, a launch
+    /// on OpenClaw is held while its Gateway doesn't answer, at most the
+    /// cap, then given up; it goes at once when it answers; another engine,
+    /// or lamp-update not asking (the switch off), goes as before.
+    #[test]
+    fn a_launch_on_openclaw_waits_for_a_cold_gateway_in_the_queue() {
+        let launch = |engine: EngineKind| Launch {
+            name: "lamp-cold".into(),
+            prompt: "p".into(),
+            target: Target {
+                machine_id: "a".repeat(32),
+                project: "~/harnesses/lamp-tasks/lamp".into(),
+                engine,
+            },
+            session: None,
+        };
+        let openclaw = launch(EngineKind::Openclaw);
+        let hermes = launch(EngineKind::Hermes);
+        let cap = crate::gateway::COLD_WITHIN;
+        let start = Instant::now();
+        let mut held = None;
+        // The switch off, or another engine: on as before, never held.
+        assert_eq!(
+            gateway_wait(
+                Some(&openclaw),
+                crate::gateway::Asking::No,
+                || false,
+                &mut held,
+                start,
+                cap
+            ),
+            PlaceWait::Go
+        );
+        assert_eq!(
+            gateway_wait(
+                Some(&hermes),
+                crate::gateway::Asking::Yes,
+                || false,
+                &mut held,
+                start,
+                cap
+            ),
+            PlaceWait::Go
+        );
+        assert!(held.is_none());
+        // Cold: held, and still held within the cap.
+        assert_eq!(
+            gateway_wait(
+                Some(&openclaw),
+                crate::gateway::Asking::Yes,
+                || false,
+                &mut held,
+                start,
+                cap
+            ),
+            PlaceWait::Hold
+        );
+        assert_eq!(
+            gateway_wait(
+                Some(&openclaw),
+                crate::gateway::Asking::Yes,
+                || false,
+                &mut held,
+                start + cap / 2,
+                cap
+            ),
+            PlaceWait::Hold
+        );
+        // It answers: sent at once.
+        assert_eq!(
+            gateway_wait(
+                Some(&openclaw),
+                crate::gateway::Asking::Yes,
+                || true,
+                &mut held,
+                start + cap / 2,
+                cap
+            ),
+            PlaceWait::Go
+        );
+        assert!(held.is_none());
+        // Past the cap: given up, and given up again on the next tick until
+        // the caller clears `held` (a launch in flight that tick).
+        let mut late = None;
+        gateway_wait(
+            Some(&openclaw),
+            crate::gateway::Asking::Yes,
+            || false,
+            &mut late,
+            start,
+            cap,
+        );
+        assert_eq!(
+            gateway_wait(
+                Some(&openclaw),
+                crate::gateway::Asking::Yes,
+                || false,
+                &mut late,
+                start + cap,
+                cap
+            ),
+            PlaceWait::GiveUp
+        );
+        assert_eq!(
+            gateway_wait(
+                Some(&openclaw),
+                crate::gateway::Asking::Yes,
+                || false,
+                &mut late,
+                start + cap,
+                cap
+            ),
+            PlaceWait::GiveUp
+        );
+        assert_eq!(cap, Duration::from_secs(480));
     }
 
     /// #7275: the owner's mark on the daemon gate follows its start due or

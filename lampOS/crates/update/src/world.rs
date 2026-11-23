@@ -90,6 +90,19 @@ pub trait Systemd {
     fn thaw_harness_unit(&mut self) -> Result<(), String> {
         Err("this systemd cannot thaw the Harness unit".to_owned())
     }
+    /// `systemctl show` of [`crate::openclaw_install::LOADED`] for
+    /// OpenClaw's gateway, [`crate::openclaw_install::UNIT`], and only it
+    /// (#7879). A systemd that cannot say refuses: the loaded unit is then
+    /// not checked.
+    fn gateway_unit_properties(&mut self) -> Result<String, String> {
+        Err("this systemd cannot show OpenClaw's gateway unit".to_owned())
+    }
+    /// `systemctl try-restart` of [`crate::openclaw_install::UNIT`], and
+    /// only it (#7879): restarted only if it runs. A systemd that cannot
+    /// refuses.
+    fn try_restart_gateway(&mut self) -> Result<(), String> {
+        Err("this systemd cannot restart OpenClaw's gateway".to_owned())
+    }
     /// When [`crate::writer_swap::BACK_UNIT`]'s program last began, in Unix
     /// milliseconds to the second below (`ExecMainStartTimestamp`): none
     /// when it never began, or when systemd cannot say. A `failed` from a
@@ -97,6 +110,13 @@ pub trait Systemd {
     /// writer's (El's P3 on #4178).
     fn back_began_unix_ms(&mut self) -> Option<u64> {
         None
+    }
+    /// `argv`, a `systemd-run --wait` of one transient unit and only that,
+    /// run to its end: sysstat's kept files removed outside this program's
+    /// sandbox (crate::install::sysstat_kept_removed, #7254). Refused
+    /// unless a world can.
+    fn systemd_run(&mut self, argv: &[&str]) -> Result<(), String> {
+        Err(format!("{} cannot be run here", argv.join(" ")))
     }
     /// The last line the unit's own program wrote to the journal since this
     /// program last restarted it, cleaned ([`clean_line`]); none before a
@@ -246,6 +266,27 @@ impl Systemd for Systemctl {
         )
     }
 
+    fn gateway_unit_properties(&mut self) -> Result<String, String> {
+        use crate::openclaw_install::{LOADED, UNIT};
+        show_within(
+            Command::new("systemctl").args([
+                "show",
+                "--no-pager",
+                &format!("--property={LOADED}"),
+                "--",
+                UNIT,
+            ]),
+            JOURNAL_WITHIN,
+        )
+    }
+
+    fn try_restart_gateway(&mut self) -> Result<(), String> {
+        run(
+            &["try-restart", "--", crate::openclaw_install::UNIT],
+            self.restart_within,
+        )
+    }
+
     fn freeze_harness_unit(&mut self) -> Result<(), String> {
         harness_cgroup_freeze(true)
     }
@@ -285,6 +326,13 @@ impl Systemd for Systemctl {
 
     fn start_added(&mut self, unit: &str) -> Result<(), String> {
         run(&["start", "--no-block", "--", unit], JOURNAL_WITHIN)
+    }
+
+    fn systemd_run(&mut self, argv: &[&str]) -> Result<(), String> {
+        match argv.split_first() {
+            Some((&"systemd-run", words)) => run_program("systemd-run", words, self.restart_within),
+            _ => Err(format!("{} is not a systemd-run", argv.join(" "))),
+        }
     }
 
     fn stop(&mut self, unit: &str) -> Result<(), String> {
@@ -555,13 +603,17 @@ fn cgroup_freeze_file(group: &str) -> Option<PathBuf> {
 }
 
 fn run(words: &[&str], within: Duration) -> Result<(), String> {
-    let mut child = Command::new("systemctl")
+    run_program("systemctl", words, within)
+}
+
+fn run_program(program: &str, words: &[&str], within: Duration) -> Result<(), String> {
+    let mut child = Command::new(program)
         .args(words)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|error| format!("systemctl: {error}"))?;
+        .map_err(|error| format!("{program}: {error}"))?;
     let until = Instant::now() + within;
     loop {
         match child.try_wait() {
@@ -572,7 +624,7 @@ fn run(words: &[&str], within: Duration) -> Result<(), String> {
                     let _ = io::Read::read_to_string(&mut stderr, &mut why);
                 }
                 return Err(format!(
-                    "systemctl {}: {status}: {}",
+                    "{program} {}: {status}: {}",
                     words.join(" "),
                     why.trim()
                 ));
@@ -583,12 +635,12 @@ fn run(words: &[&str], within: Duration) -> Result<(), String> {
                 let _ = child.kill();
                 let _ = child.wait();
                 return Err(format!(
-                    "systemctl {} did not finish within {} s",
+                    "{program} {} did not finish within {} s",
                     words.join(" "),
                     within.as_secs()
                 ));
             }
-            Err(error) => return Err(format!("systemctl: {error}")),
+            Err(error) => return Err(format!("{program}: {error}")),
         }
     }
 }

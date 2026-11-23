@@ -393,7 +393,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         "presence": "who is there (a count and how near, never who)",
         "light": "its light",
         "mood": "its mood",
-        "lamp": "whether it is talking, paused, private or asleep",
+        "lamp": "whether it is talking, paused, private, asleep or muted after a fault",
         "air": "the air at its sensor (particles, carbon dioxide, humidity, temperature, and how it feels)",
         "device": "its own computer (processor load, memory, disk free, temperatures)",
         "volume": "its speaker's volume (0 to 100, and whether muted)",
@@ -870,6 +870,29 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         async def lamp_skill_remove(name: str) -> str:
             """Take one of this computer's own skills off the lamp, by its name."""
             await act("skill.remove", name=name)
+            return f"{name} removed"
+
+        @server.tool()
+        async def lamp_app_push(package: str) -> dict:
+            """Put an app of this computer's own (its folder, with app.json, or its packed format 2 `.tar`,
+            unsigned) on the lamp, where it runs as an app, replacing this computer's app of that name. The
+            pairing is the owner's yes. It is checked first, as `lamp app check` does (4 MiB at most, no
+            signature, no grant this computer lacks), and nothing is sent if it fails. Says the app installed and whether it started."""
+            limits.take("app.push")
+            try:
+                return await lamp.push_app(package)
+            except LampError as error:
+                raise refused(error) from error
+
+        @server.tool()
+        async def lamp_apps() -> list[dict]:
+            """The apps this computer has put on the lamp, and whether each is stopped."""
+            return (await act("app.list")).get("apps", [])
+
+        @server.tool()
+        async def lamp_app_remove(name: str) -> str:
+            """Take one of this computer's own apps off the lamp, by its name."""
+            await act("app.remove", name=name)
             return f"{name} removed"
 
     # Turns and listening (docs/control.md): the person wins over each, and

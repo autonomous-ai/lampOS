@@ -181,12 +181,7 @@ pub fn asks_to_make(said: &str) -> bool {
     if crate::remember::asked::withdrawn(said) {
         return false;
     }
-    let said = said.replace('\u{2019}', "'");
-    let sentences: Vec<Vec<String>> = said
-        .split_inclusive(['.', '!', '?', ';'])
-        .map(lower_words)
-        .filter(|words| !words.is_empty())
-        .collect();
+    let sentences = sentences(said);
     let [words] = sentences.as_slice() else {
         return false;
     };
@@ -196,14 +191,102 @@ pub fn asks_to_make(said: &str) -> bool {
     ask_ends(words).is_some_and(|end| words.len() > end)
 }
 
+/// The sentences of `said`, each as its words: a `.`, `!`, `?` or `;` ends
+/// one (a `:` does not), and one with no words is none.
+fn sentences(said: &str) -> Vec<Vec<String>> {
+    said.replace('\u{2019}', "'")
+        .split_inclusive(['.', '!', '?', ';'])
+        .map(lower_words)
+        .filter(|words| !words.is_empty())
+        .collect()
+}
+
+/// How many sentences `said` has, as [`asks_to_make`] counts them, for
+/// round 1's journal line (#8022): a count, never a word.
+pub fn sentence_count(said: &str) -> usize {
+    sentences(said).len()
+}
+
+/// Which sentence of `said` (1-based, split as [`asks_to_make`] splits
+/// it) alone opens with the ask and says what the skill does, the first
+/// read past the lamp's name as [`make_asked`] reads it
+/// (`second_provider::past_the_name_heard_as`, `named` as [`heard_named`]
+/// keeps it); `None` when none does, or the line takes the make back or
+/// doubts it, as [`asks_to_make`] reads the whole line. For round 1's
+/// journal line (#8022 case 2): a count, never a word.
+pub fn ask_sentence(said: &str, named: bool) -> Option<usize> {
+    if crate::remember::asked::withdrawn(said)
+        || sentences(said)
+            .iter()
+            .flatten()
+            .any(|word| DOUBT.contains(&word.as_str()))
+    {
+        return None;
+    }
+    let asks = |words: &[String]| ask_ends(words).is_some_and(|end| words.len() > end);
+    let said = said.replace('\u{2019}', "'");
+    said.split_inclusive(['.', '!', '?', ';'])
+        .filter(|sentence| !lower_words(sentence).is_empty())
+        .enumerate()
+        .find(|&(at, sentence)| {
+            let past = crate::second_provider::past_the_name_heard_as(sentence, named);
+            let past = past.filter(|_| at == 0).map(lower_words);
+            asks(&lower_words(sentence)) || past.is_some_and(|words| asks(&words))
+        })
+        .map(|(at, _)| at + 1)
+}
+
+/// The person's lines that name the lamp (`named`, as
+/// `second_provider::answer` knows it), newest last, at most
+/// [`NAMED_KEPT`], by their words: [`force`] sees only the messages
+/// (#8022 case 2).
+static NAMED: std::sync::Mutex<std::collections::VecDeque<String>> =
+    std::sync::Mutex::new(std::collections::VecDeque::new());
+const NAMED_KEPT: usize = 16;
+
+/// Keeps whether `said`, a person's line, names the lamp (`named`), for
+/// [`force`]: a line heard again without the name is no longer read so.
+pub fn heard_named(said: &str, named: bool) {
+    let Ok(mut lines) = NAMED.lock() else {
+        return;
+    };
+    lines.retain(|line| line != said);
+    if named {
+        lines.push_back(said.to_owned());
+        if lines.len() > NAMED_KEPT {
+            lines.pop_front();
+        }
+    }
+}
+
+/// Whether `said` was kept as a line that names the lamp ([`heard_named`]).
+pub fn named(said: &str) -> bool {
+    NAMED
+        .lock()
+        .is_ok_and(|lines| lines.iter().any(|line| line == said))
+}
+
+/// What [`force`] reads of a person's line, and round 1's `make_ask=`:
+/// whether it asks to make a skill ([`asks_to_make`]) as said or, on a
+/// line that names the lamp ([`heard_named`]), past the lamp's name heard
+/// as another word (`second_provider::past_the_name_heard_as`, which the made-skill
+/// matcher reads too): "Hey, Lynn, make me a skill that …" (kit-8101's
+/// ROW, lamp-52e6, 20 Nov 14:38). Said to a person ("Hey, Anna, make me a
+/// skill that …"), the line names nothing, and is read as said.
+pub fn make_asked(said: &str) -> bool {
+    let past = crate::second_provider::past_the_name(said);
+    asks_to_make(said) || past.is_some_and(asks_to_make)
+}
+
 /// The force the second route's chat is given with the switch on
 /// (`second_provider::net::Chat::forcing`): a request whose last message is
-/// a person's line that plainly asks to make a skill must call
-/// `make_skill`. The chat forces it only when `make_skill` is declared.
+/// a person's line that plainly asks to make a skill ([`make_asked`]) must
+/// call `make_skill`. The chat forces it only when `make_skill` is
+/// declared.
 pub fn force() -> Force {
     std::sync::Arc::new(|messages: &[Message]| {
         let last = messages.last().filter(|message| message.role == "user")?;
-        asks_to_make(last.words()?).then_some(Forced {
+        make_asked(last.words()?).then_some(Forced {
             name: crate::made_skill::MAKE,
             only: None,
             fields: None,
@@ -266,6 +349,30 @@ mod tests {
             "Lamp, make a skill. It checks the processor temperature and sets the light.",
             // A skill whose own words carry a doubt word is the model's.
             "Lamp, make a skill that turns the light off when I don't come back.",
+        ] {
+            assert!(!asks_to_make(said), "{said}");
+        }
+    }
+
+    /// #7939: "make a skill called tech news: tell me one short tech
+    /// headline" (lamp-9adf, 19 Nov) and its rephrasings are asks to make; a
+    /// plain headline ask is not. This gate reads them as asks, so a miss
+    /// on that lamp was not this gate's wording (the cause is found first).
+    #[test]
+    fn a_named_make_is_an_ask_and_a_plain_headline_ask_is_not() {
+        for said in [
+            "Lamp, make a skill called tech news: tell me one short tech headline.",
+            "Make a skill called tech news: tell me one short tech headline",
+            "Can you make a skill that tells me one short tech headline?",
+            "I want a skill called tech news that tells me a tech headline.",
+            "Lamp, make me a new skill called tech news: read one tech headline.",
+        ] {
+            assert!(asks_to_make(said), "{said}");
+        }
+        for said in [
+            "Tell me a tech headline.",
+            "Lamp, tell me one short tech headline.",
+            "What is the tech news?",
         ] {
             assert!(!asks_to_make(said), "{said}");
         }

@@ -284,7 +284,8 @@ fn launch_uses_exact_argv_auto_mode_null_stdin_and_stable_generic_identity() {
     );
     for call in calls {
         let environment = call["environment"].as_object().unwrap();
-        assert_eq!(environment.len(), 5);
+        // HOME, PATH, ADAPTER_DATA_DIR (#7906) and the two marks.
+        assert_eq!(environment.len(), 6);
         assert_eq!(environment["AI_AGENT"], "lampos");
         assert_eq!(environment["HARNESS_AGENT_SESSION"], "stable-session_123");
         for forbidden in [
@@ -315,7 +316,7 @@ fn as_the_person_the_call_carries_no_agent_mark_and_is_otherwise_the_same() {
     assert_eq!(calls[1]["args"][0], "new");
     for call in calls {
         let environment = call["environment"].as_object().unwrap();
-        assert_eq!(environment.len(), 3, "{environment:?}");
+        assert_eq!(environment.len(), 4, "{environment:?}");
         assert!(!environment.contains_key("AI_AGENT"));
         assert!(!environment.contains_key("HARNESS_AGENT_SESSION"));
     }
@@ -515,6 +516,61 @@ fn openclaw_user_row(agent: &str) -> String {
          INSERT INTO session_windows VALUES ('w1', 'agent:main:harness-{agent}');\n\
          INSERT INTO transcript_events VALUES ('w1', 0, NULL), ('w1', 1, 'user');"
     )
+}
+
+/// #7906 sign 3, on the Gateway's own record (a fixture database with
+/// OpenClaw 2026.11.2's tables): a session it holds is held, one deleted
+/// (no rows) is not, and a record that isn't there can't be read. One
+/// look is a read-only SQLite read, well under 50 ms.
+#[test]
+fn the_kept_sessions_gateway_record_says_held_or_gone() {
+    // Read by the kept session's own key, exactly (#7906).
+    let key = format!("agent:main:harness-{AGENT}");
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), Some(&openclaw_user_row(AGENT)));
+    let began = std::time::Instant::now();
+    assert_eq!(rig.cli().openclaw_holds(&key), Some(true));
+    let took = began.elapsed();
+    assert!(took < Duration::from_millis(50), "{took:?}");
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), Some(""));
+    assert_eq!(rig.cli().openclaw_holds(&key), Some(false));
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), None);
+    assert_eq!(rig.cli().openclaw_holds(&key), None);
+}
+
+/// #7906 sign 4: where the record is in the session's turn: its current
+/// id, highest `seq` (which moves with each event), status and the last
+/// row's role; none for no node. Matched by the session key exactly.
+#[test]
+fn the_kept_sessions_gateway_record_says_where_its_turn_is() {
+    use lamp_tasks::harness::TurnRecord;
+    let key = format!("agent:main:harness-{AGENT}");
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), Some(&openclaw_user_row(AGENT)));
+    assert_eq!(
+        rig.cli().openclaw_turn(&key),
+        Some(TurnRecord {
+            session: "w1".into(),
+            seq: 1,
+            status: None,
+            last_role: Some("user".into()),
+        })
+    );
+    let rows = format!(
+        "{}\nUPDATE session_nodes SET status = 'running';\n\
+         INSERT INTO transcript_events VALUES ('w1', 2, 'assistant'), ('w1', 3, NULL), ('w0', 9, 'user');",
+        openclaw_user_row(AGENT)
+    );
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), Some(&rows));
+    assert_eq!(
+        rig.cli().openclaw_turn(&key),
+        Some(TurnRecord {
+            session: "w1".into(),
+            seq: 3,
+            status: Some("running".into()),
+            last_role: Some("assistant".into()),
+        })
+    );
+    let (rig, _) = openclaw_rig(Duration::from_secs(10), Some(""));
+    assert_eq!(rig.cli().openclaw_turn(&key), None);
 }
 
 /// #7277 (a): idle with no ask after `new` is no proof; a tool used within
@@ -2467,11 +2523,13 @@ fn a_devin_cloud_answer_is_read_as_idle_and_it_is_never_asked_to_close() {
         [
             Ended {
                 agent_id: CLOUD.into(),
-                state: "idle".into()
+                state: "idle".into(),
+                failure: None,
             },
             Ended {
                 agent_id: AGENT.into(),
-                state: "needs-input".into()
+                state: "needs-input".into(),
+                failure: None,
             }
         ]
     );
@@ -4266,12 +4324,15 @@ fn a_listing_is_read_for_state_last_activity_and_the_line_and_nothing_else() {
                 about: Some(
                     "Read the brief / Wrote three names to names.md / All 3 tests pass".into()
                 ),
+                agent: None,
             },
             Listed {
                 agent_id: "33333333-3333-4333-8333-333333333333".into(),
                 state: "idle".into(),
                 last_active_unix_ms: None,
                 about: None,
+                // Harness's own `agent` is kept too (#8105).
+                agent: Some("codex".into()),
             },
         ]
     );
@@ -5082,6 +5143,7 @@ fn wait_holds_harness_own_wait_on_named_agents_beside_the_operation_lane() {
         vec![Ended {
             agent_id: AGENT.into(),
             state: "idle".into(),
+            failure: None,
         }]
     );
     let call = rig
@@ -5205,6 +5267,7 @@ fn the_wait_listing_is_read_only_for_the_agents_waited_on() {
         vec![Ended {
             agent_id: AGENT.into(),
             state: "idle".into(),
+            failure: None,
         }]
     );
     let odd = json!({"harnesses":[{"id":AGENT,"state":"has space"}]}).to_string();
@@ -5214,6 +5277,97 @@ fn the_wait_listing_is_read_only_for_the_agents_waited_on() {
     );
     assert_eq!(parse_wait(None, b"", &agents), Err("wait_failed"));
     assert_eq!(parse_wait(Some(124), b"", &agents), Ok(vec![]));
+}
+
+/// Harness 0.6.74 (openharness#4499, `cli/src/agentClient/commands.ts`
+/// v0.6.74_cli): `wait` exits 1 when a launch on this machine failed, its
+/// row `failed` with `failure: {error, detail}`. Read as that `failed`
+/// row with its `failure.error` kept (before #8062: `wait_failed`); exit 1
+/// with no row of ours `failed`, or not JSON, is still `wait_failed`.
+#[test]
+fn a_wait_exit_1_with_a_failed_launch_reads_failed_with_its_reason() {
+    let agents = [AGENT.to_owned()];
+    let failed = json!({"harnesses":[{
+        "name":"lamp-one-openclaw","id":AGENT,"state":"failed",
+        "failure":{"error":"OPENCLAW_NO_TOKEN","detail":"OpenClaw has no gateway token"},
+        "next":[]
+    }]})
+    .to_string();
+    assert_eq!(
+        parse_wait(Some(1), failed.as_bytes(), &agents),
+        Ok(vec![Ended {
+            agent_id: AGENT.into(),
+            state: "failed".into(),
+            failure: Some("OPENCLAW_NO_TOKEN".into()),
+        }])
+    );
+    // No `failure` given: still `failed`, with no reason.
+    let bare = json!({"harnesses":[{"id":AGENT,"state":"failed"}]}).to_string();
+    assert_eq!(
+        parse_wait(Some(1), bare.as_bytes(), &agents).unwrap()[0].failure,
+        None
+    );
+    // A `failed` row at exit 4 (a harness its machine refused) as before.
+    assert_eq!(
+        parse_wait(Some(4), failed.as_bytes(), &agents).unwrap()[0].state,
+        "failed"
+    );
+    // Not loosened: exit 1 with only an idle row, another agent's failed
+    // row, or an error object, is not read.
+    let idle = json!({"harnesses":[{"id":AGENT,"state":"idle"}]}).to_string();
+    assert_eq!(
+        parse_wait(Some(1), idle.as_bytes(), &agents),
+        Err("wait_failed")
+    );
+    let other = json!({"harnesses":[{"id":OTHER,"state":"failed"}]}).to_string();
+    assert_eq!(
+        parse_wait(Some(1), other.as_bytes(), &agents),
+        Err("wait_invalid_reply")
+    );
+    assert_eq!(
+        parse_wait(Some(1), br#"{"error":"USAGE"}"#, &agents),
+        Err("wait_invalid_reply")
+    );
+    assert_eq!(
+        parse_wait(Some(2), failed.as_bytes(), &agents),
+        Err("wait_failed")
+    );
+}
+
+/// Harness 0.6.74: `wait --after` on the one pane exits 1 with a `failed`
+/// row when its launch failed (`FIRST_TASK_NOT_TAKEN`): `failed`, so the
+/// turn takes the ladder at once (before #8062: `wait_failed`, waited on
+/// again). Exit 1 with anything else stays `wait_failed`.
+#[test]
+fn a_wait_after_exit_1_with_a_failed_launch_reads_failed() {
+    let mut rig = Rig::new();
+    rig.config.as_person = true;
+    let failed = json!({"harnesses":[{
+        "name":"lamp-one-openclaw","id":AGENT,"state":"failed",
+        "failure":{"error":"FIRST_TASK_NOT_TAKEN","detail":"OpenClaw did not take the first task. Close it and start it again."},
+        "next":[]
+    }]});
+    rig.plan(json!({
+        "wait":{"each":[
+            {"stdout":format!("{failed}\n"),"exit":1},
+            {"stdout":"{\"harnesses\":[{\"id\":\"x\",\"state\":\"idle\"}]}\n","exit":1},
+            {"stdout":"{\"error\":\"BAD\"}\n","exit":1}
+        ]},
+    }));
+    let cli = rig.cli();
+    let cancel = AtomicBool::new(false);
+    assert_eq!(
+        cli.wait_after(MACHINE, AGENT, "program:in-1", &cancel),
+        Ok(Some("failed".into()))
+    );
+    assert!(
+        cli.wait_after(MACHINE, AGENT, "program:in-1", &cancel)
+            .is_err()
+    );
+    assert!(
+        cli.wait_after(MACHINE, AGENT, "program:in-1", &cancel)
+            .is_err()
+    );
 }
 
 /// #1390: `harness close` on the machine the agent was started on, by the
@@ -6097,6 +6251,30 @@ fn a_runtime_folder_made_after_the_start_reaches_the_next_harness_call() {
     address.push(folder.join("bus").as_os_str());
     assert_eq!(after["DBUS_SESSION_BUS_ADDRESS"], address);
     assert_eq!(after["HOME"], before["HOME"]);
+}
+
+/// #7906: every Harness call lamp-tasks makes, and so any daemon it
+/// starts, is given `ADAPTER_DATA_DIR` at Harness's own default under its
+/// `HOME`, exactly, so Harness 0.6.72's XDG move is `skipped-override` and
+/// Harness's home stays `~/.harness`; one already set is replaced by it.
+#[test]
+fn every_harness_call_keeps_harnesss_home_in_dot_harness() {
+    let rig = Rig::new();
+    let cli = Cli::new(rig.config.clone(), "stable".into()).unwrap();
+    let given = cli.child_environment();
+    assert_eq!(
+        given["ADAPTER_DATA_DIR"],
+        OsString::from(format!("{}/.harness/cli/data", rig.root.path().display()))
+    );
+    let mut config = rig.config.clone();
+    config
+        .environment
+        .insert("ADAPTER_DATA_DIR".into(), "/set/elsewhere".into());
+    let cli = Cli::new(config, "stable".into()).unwrap();
+    assert_eq!(
+        cli.child_environment()["ADAPTER_DATA_DIR"],
+        given["ADAPTER_DATA_DIR"]
+    );
 }
 
 /// One `harness watch --json` line as openharness prints it.
@@ -7453,6 +7631,7 @@ fn skill_runner_with(
         ),
         makes: false,
         egress: None,
+        gateway_net: None,
     }
 }
 
@@ -7479,6 +7658,7 @@ fn skill_run(deadline: Duration) -> SkillRun {
         answer: Default::default(),
         net: false,
         tells: false,
+        cancel: Default::default(),
     }
 }
 
@@ -8854,6 +9034,127 @@ fn a_net_run_by_the_one_run_path_gets_its_egress_socket_before_harness_new() {
     refused(runner, &rig, "LAMP_TASK_NET is off in lamp-tasks");
 }
 
+/// #7742: with `LAMP_TASK_NET_GATEWAY` on (the runner's `gateway_net`, the
+/// installed skill-start launcher) and OpenClaw the lamp's default, a run
+/// granted `net` is not refused: its egress socket `skill-<run id>.sock`
+/// is made before `harness new`, there while the launcher claims the run,
+/// named in the run's grant (which its fence gets as a descriptor), and
+/// gone after the run. A launcher whose fence has no relay line is refused
+/// in words, nothing asked of Harness and no socket; with the switch off,
+/// the refusal is the one before #7742.
+#[test]
+fn a_gateway_net_run_gets_its_egress_socket_named_in_its_fence_grant() {
+    let egress_of = |rig: &Rig| lamp_tasks::egress::Grant {
+        dir: rig.root.path().join("egress"),
+        ..lamp_tasks::egress::Grant::lamp()
+    };
+    let net_run = || {
+        let mut run = skill_run(Duration::from_secs(20));
+        run.net = true;
+        run
+    };
+    let gateway_runner = |rig: &Rig, launcher: Option<&str>| {
+        let gateway_ns = rig.root.path().join("openclaw-ns");
+        fs::write(
+            &gateway_ns,
+            format!("#!/bin/sh\n{}", skill_task::AGENT_NS_TASKS_LINE),
+        )
+        .unwrap();
+        let mut runner = one_path_runner(
+            rig,
+            EngineKind::Openclaw,
+            &[("openclaw", &openclaw_gateway_wrapper(&gateway_ns))],
+            Some("#!/bin/sh\n"),
+        );
+        runner.egress = Some(egress_of(rig));
+        runner.gateway_net = launcher.map(|text| {
+            let path = rig.root.path().join("skill-start");
+            fs::write(&path, text).unwrap();
+            path
+        });
+        runner
+    };
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let runner = gateway_runner(
+        &rig,
+        Some(&format!("ELF...{}...", lamp_tasks::gateway::FENCE_NET_LINE)),
+    );
+    let socket = rig.root.path().join("egress/skill-task-1.sock");
+    // The launcher's claim, taken straight from the run's live starts: its
+    // grant, and whether the socket was there then.
+    let starts = runner.starts.clone();
+    let claimed = thread::spawn({
+        let socket = socket.clone();
+        move || {
+            use std::os::unix::fs::FileTypeExt;
+            let until = Instant::now() + Duration::from_secs(20);
+            while Instant::now() < until {
+                if starts.is_live("task-1") {
+                    let there = fs::symlink_metadata(&socket)
+                        .is_ok_and(|meta| meta.file_type().is_socket());
+                    return Some((starts.claim("task-1").unwrap(), there));
+                }
+                thread::sleep(Duration::from_millis(1));
+            }
+            None
+        }
+    });
+    // No fence here says it started: the run ends as one whose fence failed.
+    let ran = runner.run(&net_run(), &|| {});
+    assert_eq!(ran, Err(lamp_tasks::gateway::FENCE_FAILED.to_owned()));
+    let (grant, there) = claimed.join().unwrap().expect("live");
+    assert!(there, "the egress socket was there at the claim");
+    assert_eq!(grant.egress.as_deref(), Some(socket.as_path()));
+    assert!(
+        rig.calls().iter().any(|call| call["args"][0] == "new"),
+        "harness new was asked"
+    );
+    assert!(!socket.exists(), "gone after the run");
+    assert!(!rig.root.path().join("egress/skill-task-1.folder").exists());
+
+    let refused = |runner: HarnessRunner, rig: &Rig, why: &str| {
+        let said = runner.run(&net_run(), &|| {}).unwrap_err();
+        assert!(said.starts_with(skill_task::NET_REFUSED), "{said}");
+        assert!(said.contains(why), "{why}: {said}");
+        assert!(rig.calls().iter().all(|call| call["args"][0] != "new"));
+        assert!(!rig.root.path().join("egress").exists(), "no socket");
+        assert!(!rig.root.path().join("runs").exists(), "no token file");
+    };
+    // An older launcher: its fence has no relay line.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    refused(
+        gateway_runner(&rig, Some("ELF...an older fence...")),
+        &rig,
+        "a skill-start launcher whose fence gives no run its way out",
+    );
+    // No launcher at all.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut runner = gateway_runner(&rig, None);
+    runner.gateway_net = Some(rig.root.path().join("no-launcher"));
+    refused(
+        runner,
+        &rig,
+        "a skill-start launcher whose fence gives no run its way out",
+    );
+    // The switch off: refused as before #7742.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    refused(
+        gateway_runner(&rig, None),
+        &rig,
+        "the lamp's default agent (openclaw) runs its turns in its gateway's namespaces, which no one run can be held in",
+    );
+    // No egress in lamp-tasks (LAMP_TASK_NET off there), the switch on.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut runner = gateway_runner(&rig, Some(lamp_tasks::gateway::FENCE_NET_LINE));
+    runner.egress = None;
+    refused(runner, &rig, "LAMP_TASK_NET is off in lamp-tasks");
+}
+
 /// LAMP_SKILL_SECRETS with a run granted `net`: through
 /// [`lamp_tasks::skill_make::NetRunner`] by the one run path, a run given its
 /// keys goes through Harness as every run, its keys file left in its own
@@ -9062,6 +9363,36 @@ fn a_keyed_net_run_by_the_one_run_path_gives_its_keys_through_the_wrapper_alone(
         &run,
         "the lamp's Hermes isn't on lamp-update's one run path yet",
     );
+}
+
+/// A run with a fresh home of its own and no way out (a live ask held off
+/// the network, `skill_make::AskRunner`) finds that home only by its
+/// agent's task entry, named in the wrapper's `LAMP_NS_HOME`: Harness
+/// passes the wrapper none of lamp-tasks' variables, so through Harness it
+/// would see the agent's lasting home. Refused before Harness is asked, no
+/// token file written.
+#[test]
+fn a_fresh_home_run_with_no_way_out_never_goes_through_harness() {
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let harness = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some(&ns_with_net_runs()),
+    );
+    let folder = rig.root.path().join("work/make-task-1");
+    fs::create_dir_all(folder.join("home")).unwrap();
+    let mut run = skill_run(Duration::from_secs(20));
+    run.start_in = Some(folder);
+    let said = harness.run(&run, &|| {}).unwrap_err();
+    assert!(said.contains("never through Harness"), "{said}");
+    assert!(rig.calls().iter().all(|call| call["args"][0] != "new"));
+    assert!(
+        !rig.root.path().join("runs/task-1").exists(),
+        "no token file"
+    );
+    nothing_left(&rig);
 }
 
 /// A Gateway probe for a skill's run: ready from look `ready_from` (never
@@ -10252,6 +10583,41 @@ fn calls_of_verb(rig: &Rig, verb: &str) -> Vec<Value> {
         .collect()
 }
 
+/// #7245: with V1's tools switched off (`LAMP_OPENCLAW_V1_TOOLS=off`), a
+/// gateway make's words name no check, as before V1's tools.
+#[test]
+fn a_gateway_make_without_v1s_tools_is_given_no_check() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true,"write_answer":"ANSWER"},
+        "wait":{"stdout":waited("stopped", AGENT)},
+        "show":{"default":true},
+        "close":{"exit":0},
+    }));
+    let work = make_work(&rig);
+    let mut gateway = make_gateway(&rig, EngineKind::Openclaw, true);
+    assert!(gateway.checked, "on unless off");
+    gateway.checked = false;
+    let hermes = MakeHermesStandIn::default();
+    let answered = lamp_tasks::skill_make::answer_with(
+        &make_line(Some(true), 20_000),
+        true,
+        &work,
+        &hermes,
+        Some(&gateway),
+        &mut || {},
+    );
+    assert_eq!(answered, json!({"ok": true, "answer": "ANSWER"}));
+    let news = calls_of_verb(&rig, "new");
+    let task = news[0]["args"][9].as_str().unwrap();
+    assert!(task.contains("rules.md"), "{task}");
+    assert!(
+        !task.contains("lamp-skills"),
+        "no check without V1's tools: {task}"
+    );
+}
+
 /// #7245 (lamp-c0a4, 16 Nov 17:53: Harness's hand-over took 40 of 90 s): a
 /// gateway make's turn gets its whole deadline from the hand-over, so a slow
 /// `harness new` still leaves the agent its time to answer.
@@ -10332,9 +10698,14 @@ fn a_one_path_make_on_a_gateway_default_is_one_harness_new_then_closed_and_gone(
         task.contains("rules.md") && task.contains("answer.md"),
         "{task}"
     );
+    // V1's tools on (LAMP_OPENCLAW_V1_TOOLS unset, the product's): the
+    // guide's check, run from the make's folder.
     assert!(
-        !task.contains("lamp-skills"),
-        "no check on a gateway: {task}"
+        task.contains(&format!(
+            "cd {} && /opt/lampOS/skills/current/lamp-skills pack --out /tmp/lamp-check draft/NAME",
+            folder.display()
+        )),
+        "the check on a gateway with V1's tools: {task}"
     );
     let closes = calls_of_verb(&rig, "close");
     assert_eq!(closes.len(), 1, "closed once");
@@ -10739,7 +11110,9 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
             agent_id: AGENT.into(),
             state: "idle".into(),
             why: None,
-            engine_session: Some("s".into())
+            engine_session: Some("s".into()),
+            confirmed: None,
+            why_code: None,
         })
     );
     assert_eq!(
@@ -10750,12 +11123,23 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
         cli.reply_kept("lamp-one-openclaw", &token, "x"),
         Took::NotIdle
     );
+    // #8001: a hand-over's first try held short (10 s), then the rest of the 60 s.
     assert_eq!(
-        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        cli.reply_kept_held(
+            "lamp-one-openclaw",
+            &token,
+            "x",
+            lamp_tasks::harness::REPLY_KEPT_FIRST_HELD
+        ),
         Took::EngineNotReady
     );
     assert_eq!(
-        cli.reply_kept("lamp-one-openclaw", &token, "x"),
+        cli.reply_kept_held(
+            "lamp-one-openclaw",
+            &token,
+            "x",
+            lamp_tasks::harness::REPLY_KEPT_HELD - lamp_tasks::harness::REPLY_KEPT_FIRST_HELD
+        ),
         Took::Timeout
     );
     // Typed though timed out: that input, never typed again.
@@ -10785,7 +11169,9 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
         ),
         Ok(Some("needs-input".into()))
     );
-    assert_eq!(cli.close_kept("lamp-one-openclaw", &token), Ok(()));
+    assert_eq!(cli.close_kept("lamp-one-openclaw", &token, false), Ok(()));
+    // #7245: a turn cancelled or at its deadline closes it `--now`.
+    assert_eq!(cli.close_kept("lamp-one-openclaw", &token, true), Ok(()));
     let calls = rig.calls();
     let path = token.to_str().unwrap();
     for call in &calls {
@@ -10814,9 +11200,38 @@ fn the_kept_session_verbs_pass_the_token_path_never_its_text() {
     let held = last_reply["args"].as_array().unwrap();
     let at = held.iter().position(|arg| arg == "--timeout").unwrap();
     assert_eq!(held[at + 1], "60s");
-    let close = calls.last().unwrap()["args"].as_array().unwrap().clone();
-    assert_eq!(close[0], "close");
-    assert!(!close.contains(&json!("--forget")), "not built yet");
+    let holds: Vec<String> = calls
+        .iter()
+        .filter(|call| call["args"][0] == "reply")
+        .map(|call| {
+            let args = call["args"].as_array().unwrap();
+            let at = args.iter().position(|arg| arg == "--timeout").unwrap();
+            args[at + 1].as_str().unwrap().to_owned()
+        })
+        .collect();
+    let first = lamp_tasks::harness::REPLY_KEPT_FIRST_HELD;
+    let rest = lamp_tasks::harness::REPLY_KEPT_HELD - first;
+    let (first, rest) = (
+        format!("{}s", first.as_secs()),
+        format!("{}s", rest.as_secs()),
+    );
+    assert_eq!(
+        holds,
+        ["60s", "60s", &first, &rest, "60s", "60s", "60s", "60s"],
+        "#8001: the short hold, then the rest"
+    );
+    assert_eq!((first.as_str(), rest.as_str()), ("10s", "50s"));
+    let closes: Vec<Vec<Value>> = calls
+        .iter()
+        .filter(|call| call["args"][0] == "close")
+        .map(|call| call["args"].as_array().unwrap().clone())
+        .collect();
+    assert_eq!(closes.len(), 2, "{closes:?}");
+    assert!(!closes[0].contains(&json!("--now")), "{:?}", closes[0]);
+    assert!(closes[1].contains(&json!("--now")), "{:?}", closes[1]);
+    for close in &closes {
+        assert!(!close.contains(&json!("--forget")), "not built yet");
+    }
     // No `capabilities` verb: `ensure --help` naming the token flag says yes.
     rig.plan(json!({
         "capabilities":{"stdout":"","stderr":"unknown command\n","exit":1},
@@ -10912,6 +11327,7 @@ fn voice_asks(
         default_engine: Box::new(move || default),
         tokens: tokens.clone(),
         asking: AtomicBool::new(false),
+        news: Default::default(),
     }
 }
 

@@ -1,24 +1,35 @@
 //! The pure parts of the apps' manage helper (#7415, piece 2).
 //!
 //! An app is a Store package (FORMAT 2) the lamp installs as a static
-//! systemd instance, `lampapp@<name>.service` or, with the manifest's
-//! top-level `net`, `lampapp-net@<name>.service`. The helper writes no unit
+//! systemd instance, `lamp-app@<name>.service` or, with the manifest's
+//! top-level `net`, `lamp-app-net@<name>.service`. The helper writes no unit
 //! and makes no user: systemd makes the user (`DynamicUser=yes`) and the data
 //! folder (`StateDirectory=`). What this crate holds is what can be tested
 //! with no root and no systemd: the names, the one manifest-derived line
 //! (`entry.env`), the order a remove runs in, the sweep after an interrupted
 //! install or remove, the rule for a staged package, and the launcher.
 //!
-//! Nothing here stores or compares a uid: a dynamic user's is not stable.
+//! Nothing here stores a uid: a dynamic user's is not stable. (The caller and
+//! the staged file's owner are checked by uid, root's or lampos's, and never
+//! kept.)
+pub mod ask;
+pub mod client;
 pub mod effects;
 pub mod entry;
 pub mod facts;
+pub mod folders;
 pub mod install;
+pub mod launcher;
 pub mod layout;
 pub mod lock;
+pub mod manage;
 pub mod name;
 pub mod package;
+pub mod peer;
+pub mod real;
 pub mod remove;
+pub mod run;
+pub mod skills_reader;
 pub mod staging;
 pub mod state;
 pub mod sweep;
@@ -30,3 +41,5 @@ pub mod yes;
 /// package): `python3 -I` drops the app's `src/` from `sys.path`, so this
 /// puts it back and runs the entry named in `entry.env`.
 pub const LAUNCHER: &str = include_str!("../launcher/run.py");
+/// The resolver a net app sees (`/etc/resolv.conf` in its unit): public addresses only.
+pub const RESOLV: &str = include_str!("../launcher/resolv.conf");

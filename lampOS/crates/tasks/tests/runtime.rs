@@ -70,6 +70,12 @@ fn output_of(command: &mut Command) -> Output {
     .unwrap()
 }
 
+/// The stand-in agent's last activity. The runtime reads the real wall
+/// clock, and a row last active before its task was handed over is an
+/// earlier task's and is dropped (#7930), so this sits after any test's
+/// hand-over (1 Jan 2100).
+const LAST_ACTIVE_UNIX_MS: u64 = 4_102_444_800_000;
+
 #[derive(Clone)]
 struct Injected(Arc<Mutex<Sample>>);
 impl Clock for Injected {
@@ -469,15 +475,17 @@ impl Adapter for Script {
         let mut listed = vec![Listed {
             agent_id: AGENT.into(),
             state: "working".into(),
-            last_active_unix_ms: Some(1_792_022_712_345),
+            last_active_unix_ms: Some(LAST_ACTIVE_UNIX_MS),
             about: self.counts.about.lock().unwrap().clone(),
+            agent: None,
         }];
         if self.counts.theirs.load(Ordering::SeqCst) {
             listed.push(Listed {
                 agent_id: THEIRS.into(),
                 state: "idle".into(),
-                last_active_unix_ms: Some(1_792_022_712_345),
+                last_active_unix_ms: Some(LAST_ACTIVE_UNIX_MS),
                 about: None,
+                agent: None,
             });
         }
         Ok(listed)
@@ -1197,7 +1205,7 @@ fn with_progress_a_value_from_the_start_each_task_read_at_once_then_on_schedule_
         )
     );
     assert_eq!(task.working_s, Some(0));
-    assert_eq!(task.last_active_unix_ms, Some(1_792_022_712_345));
+    assert_eq!(task.last_active_unix_ms, Some(LAST_ACTIVE_UNIX_MS));
     // The line changes; the next read is half a minute later.
     *s.counts.about.lock().unwrap() = Some("Fixed it; all tests pass".into());
     s.clock.0.lock().unwrap().monotonic_ms = 29_999;
@@ -1659,6 +1667,7 @@ fn a_held_wait_that_comes_back_reads_the_agent_at_once_and_keeps_its_idle_answer
     *s.counts.wait_ends.lock().unwrap() = Some(vec![Ended {
         agent_id: AGENT.into(),
         state: "idle".into(),
+        failure: None,
     }]);
     let kept = s.wait(&prepared["id"], |v| v["task"]["observations"] == json!(1));
     assert_eq!(s.counts.reads.load(Ordering::SeqCst), 1, "{kept}");
@@ -2171,6 +2180,75 @@ fn targets_from_machines_are_written_and_used_while_signed_in() {
         s.ask(json!({"op":"targets"}))["targets"][1]["alias"],
         "office"
     );
+}
+
+/// #7988: a restart of a lamp signed in, its targets file as the machines
+/// last wrote it. The targets are known from the first look, and the lamp
+/// stops being "starting" once the machines have answered, not at the next
+/// look a minute later (lamp-52e6 on 19 Nov: settled after 60 s, its
+/// machines unchanged). A hand-over in between is not refused.
+#[test]
+fn a_restart_with_its_targets_settles_when_the_machines_answer_not_at_the_next_look() {
+    let mut s = Running::unstarted(false, false, false, false);
+    let path = s.root.path().join("targets.json");
+    s.config.targets = BTreeMap::new();
+    // A look a minute, as on a lamp: the next look is never within the test.
+    s.config.set_up_later = Some(SetUpLater {
+        targets: path.clone(),
+        every: Duration::from_secs(60),
+        from_machines: Some(EngineKind::Claude),
+        engines: false,
+        lamp: None,
+    });
+    let machines = vec![
+        AccountMachine {
+            machine_id: "a".repeat(32),
+            label: "lamp".into(),
+            current: true,
+            status: None,
+        },
+        AccountMachine {
+            machine_id: "b".repeat(32),
+            label: "Office iMac".into(),
+            current: false,
+            status: None,
+        },
+    ];
+    // As the last run wrote it: the machines' answer changes nothing.
+    lamp_tasks::runtime::write_targets_from_machines(
+        &path,
+        &machines,
+        EngineKind::Claude,
+        &BTreeMap::new(),
+    )
+    .unwrap();
+    *s.counts.machines.lock().unwrap() = machines;
+    s.start();
+    assert_eq!(told_targets(&s), 1);
+    let prepared = s.ask(
+        json!({"op":"prepare","guard":s.guard(),"text":"Private scripted task","target":"office"}),
+    );
+    assert_eq!(prepared["ok"], true, "{prepared}");
+    let start = Instant::now();
+    while s.counts.machine_reads.load(Ordering::SeqCst) == 0 {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "machines not read"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+    let answered = Instant::now();
+    loop {
+        let told = s.ask(json!({"op":"targets"}));
+        if told["ok"] == true && told.get("lamp").is_none() {
+            break;
+        }
+        assert!(
+            answered.elapsed() < Duration::from_secs(10),
+            "still starting 10 s after the machines answered: {told}"
+        );
+        thread::sleep(Duration::from_millis(20));
+    }
 }
 
 /// How long a test waits for the engine reads to come round again: a
@@ -2961,9 +3039,9 @@ fn with_hermes_on_lamp_off_work_naming_no_machine_goes_to_the_computer() {
     assert!(lamp_side(Some("on"), None, None, None).is_none());
 }
 
-/// #5199: an engine not found on that computer (`installed` null with
-/// `installable` true) is refused early, and the targets say so; unknown
-/// proceeds.
+/// #5199, as #8283 left it: an engine said not installed on that computer
+/// (an explicit `installed: false`, from an older Harness or the raw probe)
+/// is refused early, and the targets say so; unknown proceeds.
 #[test]
 fn an_engine_known_not_there_is_refused_and_told_and_unknown_proceeds() {
     let (mut s, path) = engines_running(true);
@@ -2982,10 +3060,10 @@ fn an_engine_known_not_there_is_refused_and_told_and_unknown_proceeds() {
         &s,
         Ok(vec![
             row("claude", Some(true), Some(true)),
-            // Harness's row for an engine not on the computer.
+            // Said not installed there, in so many words.
             EngineRow {
                 installable: Some(true),
-                ..row("codex", None, None)
+                ..row("codex", Some(false), None)
             },
         ]),
     );
@@ -2999,6 +3077,68 @@ fn an_engine_known_not_there_is_refused_and_told_and_unknown_proceeds() {
     // The computer can't say any more: unknown, so it goes as before.
     office_engines(&s, Ok(vec![row("codex", None, None)]));
     prepared_until(&s, None);
+}
+
+/// #8283: the office computer as the real Harness CLI read it on lamp-06c1
+/// (#8240, 22 Nov 12:14): a login shell slower than the probe's 5 s, so
+/// every engine there, Claude Code among them, came out `installed: null`
+/// with `installable: true` (openharness `machineEngines.ts`: "`null` is
+/// unknown, never 'not there'"; the computer's `installable` is
+/// `!installed && command && recipe`). Unknown: the office target is told
+/// without `installed: false`, so the voice keeps it in its staff, and a
+/// hand-over to it is prepared, never refused `engine_missing`.
+#[test]
+fn an_engine_harness_does_not_say_is_installed_is_unknown_never_missing() {
+    let (mut s, path) = engines_running(true);
+    let machine = "b".repeat(32);
+    let cli: String = ["claude", "codex", "opencode", "pi", "hermes", "openclaw"]
+        .iter()
+        .map(|engine| {
+            format!(
+                "{}\n",
+                json!({"machineId":machine,"engine":engine,"installed":null,"signedIn":null,"installable":true,"firstPrompt":null})
+            )
+        })
+        .collect();
+    let rows = lamp_tasks::harness::parse_engines(cli.as_bytes(), &machine).unwrap();
+    assert!(
+        rows.iter()
+            .all(|row| row.installed.is_none() && row.installable == Some(true)),
+        "{rows:?}"
+    );
+    office_engines(&s, Ok(rows));
+    s.start();
+    let office = json!([{"alias":"office","engine":"claude","name":"Office iMac"}]);
+    targets_until(&s, office.clone());
+    // The engines file as Friday's capture had it: `claude:
+    // {installable: true}`, no `installed`.
+    let start = Instant::now();
+    let known = loop {
+        if let Ok(known) = read_engines(&engines_path(&path))
+            && known.get("office").is_some_and(|c| c.engines.len() == 6)
+        {
+            break known;
+        }
+        assert!(start.elapsed() < Duration::from_secs(5), "no engines file");
+        thread::sleep(Duration::from_millis(10));
+    };
+    for (name, engine) in &known["office"].engines {
+        assert_eq!(engine.installed, None, "{name}");
+        assert!(engine.installable.as_ref().unwrap().value, "{name}");
+    }
+    // Read again, and again: still told as unknown, never `installed: false`.
+    let looks = s.counts.engine_looks.load(Ordering::SeqCst);
+    while s.counts.engine_looks.load(Ordering::SeqCst) < looks + 3 {
+        assert!(start.elapsed() < LOOKED_AGAIN_WITHIN, "not looked again");
+        thread::sleep(Duration::from_millis(10));
+    }
+    let told = s.ask(json!({"op":"targets"}));
+    assert_eq!(told["targets"], office, "{told}");
+    assert_eq!(told["targets"][0].get("installed"), None, "{told}");
+    // Handed over: prepared, not refused `engine_missing`.
+    let prepared = prepare_office(&s);
+    assert_eq!(prepared["ok"], true, "{prepared}");
+    assert_ne!(prepared["error"], "engine_missing", "{prepared}");
 }
 
 /// #5199: without `--engines-from-machines` nothing is asked or refused:
@@ -4292,12 +4432,122 @@ fn a_look_at_a_named_session_answers_at_once_and_is_asked_again_for_what_it_foun
     assert_eq!(s.counts.launches.load(Ordering::SeqCst), 0);
 }
 
+/// The work records are one board a process (`lamp_tasks::works`): the
+/// tests that forget them, or read them, run one at a time, so one's
+/// forget never clears another's record mid-test (Heron's P3 on #8052).
+static WORKS: Mutex<()> = Mutex::new(());
+
+fn works_alone() -> std::sync::MutexGuard<'static, ()> {
+    WORKS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// A task with `text` confirmed and held in its launch, so the store keeps
+/// it queued and the work records list it.
+fn held_task(s: &Running, text: &str) -> Value {
+    s.counts.hold_launch.store(true, Ordering::SeqCst);
+    let prepared = s.ask(json!({"op":"prepare","guard":s.guard(),"text":text,"target":"coding"}));
+    assert_eq!(prepared["ok"], true, "{prepared}");
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    prepared["id"].clone()
+}
+
+/// Whether any work record, by `id` or in the list, holds `words`, within
+/// `for_ms` (the records are brought up to date every 500 ms).
+fn records_hold(s: &Running, id: &Value, words: &str, for_ms: u64) -> bool {
+    let start = Instant::now();
+    loop {
+        let by_id = s.ask(json!({"op":"work","id":id.to_string()}));
+        let list = s.ask(json!({"op":"work_list","limit":10}));
+        if by_id.to_string().contains(words) || list.to_string().contains(words) {
+            return true;
+        }
+        if start.elapsed() > Duration::from_millis(for_ms) {
+            return false;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
+}
+
+/// #7930: the owner's "forget everything" clears the work records too: a
+/// store task's words and answer are gone after it, by id and in the
+/// list, and the next refreshes don't open it again.
+#[test]
+fn forget_sessions_clears_the_work_records() {
+    let _alone = works_alone();
+    let s = Running::new(false);
+    let id = held_task(&s, "Find the cheapest flight to Hanoi");
+    assert!(
+        records_hold(&s, &id, "Hanoi", 3_000),
+        "on the records first"
+    );
+    assert_eq!(s.trusted(json!({"op":"forget_sessions"}))["ok"], true);
+    assert!(!records_hold(&s, &id, "Hanoi", 1_200));
+    s.counts.hold_launch.store(false, Ordering::SeqCst);
+}
+
+/// #7930 (Heron's P2 1): forget everything right after a confirm, before
+/// the records were brought up to date, leaves that task off them too.
+#[test]
+fn forget_sessions_covers_a_store_task_not_yet_on_the_records() {
+    let _alone = works_alone();
+    let s = Running::new(false);
+    let id = held_task(&s, "Book a table near Hoan Kiem lake");
+    assert_eq!(s.trusted(json!({"op":"forget_sessions"}))["ok"], true);
+    assert!(!records_hold(&s, &id, "Hoan Kiem", 1_200));
+    s.counts.hold_launch.store(false, Ordering::SeqCst);
+}
+
+/// #7930 (Twelve's P3): a task prepared before forget everything and
+/// confirmed after it is a new yes: it is on the records.
+#[test]
+fn forget_sessions_spares_a_task_prepared_before_and_confirmed_after() {
+    let _alone = works_alone();
+    let s = Running::new(false);
+    s.counts.hold_launch.store(true, Ordering::SeqCst);
+    let prepared = s.ask(json!({"op":"prepare","guard":s.guard(),
+        "text":"Find a bakery near West Lake","target":"coding"}));
+    assert_eq!(prepared["ok"], true, "{prepared}");
+    assert_eq!(s.trusted(json!({"op":"forget_sessions"}))["ok"], true);
+    let confirmed = s.trusted(s.confirmation(&prepared));
+    assert_eq!(confirmed["ok"], true, "{confirmed}");
+    assert!(records_hold(
+        &s,
+        &prepared["id"],
+        "bakery near West Lake",
+        3_000
+    ));
+    s.counts.hold_launch.store(false, Ordering::SeqCst);
+}
+
+/// #7930 (Heron's P2 1): after forget everything, a fresh lamp-tasks over
+/// the same store doesn't open the forgotten tasks again; one handed over
+/// after it is on the records.
+#[test]
+fn forget_sessions_holds_across_a_restart_of_lamp_tasks() {
+    let _alone = works_alone();
+    let mut s = Running::new(false);
+    let id = held_task(&s, "Compare rice cookers under two million dong");
+    assert!(records_hold(&s, &id, "rice cookers", 3_000));
+    let forgot = s.trusted(json!({"op":"forget_sessions"}));
+    assert_eq!(forgot["ok"], true, "{forgot}");
+    s.counts.hold_launch.store(false, Ordering::SeqCst);
+    s.stop();
+    s.start();
+    assert!(!records_hold(&s, &id, "rice cookers", 1_200));
+    let later = held_task(&s, "Find a quiet cafe in Ba Dinh");
+    assert!(records_hold(&s, &later, "quiet cafe", 3_000));
+    s.counts.hold_launch.store(false, Ordering::SeqCst);
+}
+
 /// #6274: the owner's "forget everything" (the voice's `forget_sessions`,
 /// on its route only) removes the index of the sessions the lamp started,
 /// whole, and says whether there was one; asked on the public route it is
 /// refused and the index stays.
 #[test]
 fn forget_sessions_removes_the_index_of_the_sessions_the_lamp_started() {
+    let _alone = works_alone();
     let s = Running::new(false);
     let file = s.config.dir.join(lamp_tasks::runtime::SESSION_INDEX_FILE);
     lamp_tasks::session_index::record(
@@ -4323,5 +4573,76 @@ fn forget_sessions_removes_the_index_of_the_sessions_the_lamp_started() {
         (answer["ok"].clone(), answer["forgotten"].clone()),
         (json!(true), json!(false)),
         "{answer}"
+    );
+}
+
+/// #8105 (Twelve on #8234): through the store's loop, with lamp-update
+/// asking, a task on OpenClaw is held while its Gateway doesn't serve, and
+/// the task queued behind it with it; neither is launched until the look
+/// says it serves, then both go. A port alone is not enough: the look is
+/// the serving read.
+#[test]
+fn a_task_on_openclaw_is_held_in_the_queue_until_its_gateway_serves() {
+    let serving = Arc::new(AtomicBool::new(false));
+    let looked = Arc::new(std::sync::atomic::AtomicU64::new(0));
+    {
+        let serving = serving.clone();
+        let looked = looked.clone();
+        lamp_tasks::gateway::look_cold_with(Box::new(move || {
+            looked.fetch_add(1, Ordering::SeqCst);
+            serving.load(Ordering::SeqCst)
+        }));
+    }
+    // Asked, with no fresh ask: no pane read starts in the other tests
+    // sharing this process.
+    lamp_tasks::gateway::asked_for_tests(true);
+    let mut s = Running::unstarted(false, false, false, false);
+    s.config.targets.insert(
+        "claw".into(),
+        Target {
+            machine_id: "0123456789abcdef0123456789abcdef".into(),
+            project: "project".into(),
+            engine: EngineKind::Openclaw,
+        },
+    );
+    s.start();
+    let ask = |target: &str| {
+        let prepared = s.ask(json!({"op":"prepare","guard":s.guard(),"text":"Private scripted task","target":target}));
+        assert_eq!(prepared["ok"], true, "{prepared}");
+        assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+        prepared
+    };
+    let claw = ask("claw");
+    let coding = ask("coding");
+    // Held: the look runs, nothing is launched, the Codex task waits behind.
+    let start = Instant::now();
+    while looked.load(Ordering::SeqCst) < 2 {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "the gateway was never looked at"
+        );
+        thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(s.counts.launches.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        s.ask(json!({"op":"get_task","id":claw["id"]}))["task"]["dispatch"]["state"],
+        "queued"
+    );
+    // It serves: the held task goes, then the one behind it.
+    serving.store(true, Ordering::SeqCst);
+    s.wait(&claw["id"], |v| {
+        v["task"]["dispatch"]["state"] == "accepted"
+    });
+    // The scripted Harness gives every launch the same agent, so the second
+    // ends `reused_remote_id`: what counts is that it was sent.
+    s.wait(&coding["id"], |v| {
+        v["task"]["dispatch"]["state"] != "queued"
+    });
+    lamp_tasks::gateway::asked_for_tests(false);
+    assert_eq!(s.counts.launches.load(Ordering::SeqCst), 2);
+    assert_eq!(
+        s.counts.launched_on.lock().unwrap()[0].1,
+        EngineKind::Openclaw,
+        "the held task went first"
     );
 }

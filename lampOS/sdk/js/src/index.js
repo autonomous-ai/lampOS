@@ -1,5 +1,5 @@
 // lampos: program a lampOS lamp from your own computer (docs/control.md).
-export { Following, Lamp, Lease, SPEAKER_EVENTS, SpeakerStream } from './client.js';
+export { Following, Lamp, Lease, POSE_JPEG_MAX_BYTES, POSE_KEYPOINTS, SPEAKER_EVENTS, SpeakerStream } from './client.js';
 export { LampError, NotPaired, WrongLamp, WHAT_TO_DO, byCode, fromReply } from './errors.js';
 export { Keyring } from './keys.js';
 export { find } from './discovery.js';
@@ -7,3 +7,4 @@ export { posesToFrames } from './moves.js';
 export { fake } from './fake.js';
 export * as schema from './schema.js';
 export { hardware, model } from './model.js';
+export { PRODUCTION, STAGING, StoreError, endpoints, forgetToken, keptToken, requestPublic, saveToken, sendLoginCode, signIn, submissions, submitApp } from './store.js';

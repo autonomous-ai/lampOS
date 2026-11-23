@@ -27,7 +27,7 @@
       "format": "date-time"
     },
     "grant": {
-      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream), never while the lamp is private; microphone: the microphone's sound (microphone.stream), never while the lamp is private; speaker: sound played through the lamp's speaker, any sound and not only the lamp's own voice (speaker.stream), never while the lamp is private; notes: its own small key/value notes kept on the lamp (notes.set, notes.get, notes.delete, notes.list), gone with its revoke; speech: every line the lamp says out loud (lamp.said), which can be personal, never what a person says to it.",
+      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream) and a person's pose in a picture of the computer's own (pose), never while the lamp is private; microphone: the microphone's sound (microphone.stream), never while the lamp is private; speaker: sound played through the lamp's speaker, any sound and not only the lamp's own voice (speaker.stream), never while the lamp is private; notes: its own small key/value notes kept on the lamp (notes.set, notes.get, notes.delete, notes.list), gone with its revoke; speech: every line the lamp says out loud (lamp.said), which can be personal, never what a person says to it.",
       "enum": [
         "body",
         "light",
@@ -238,6 +238,9 @@
           "$ref": "#/$defs/camera.stream"
         },
         {
+          "$ref": "#/$defs/pose"
+        },
+        {
           "$ref": "#/$defs/skill.push"
         },
         {
@@ -245,6 +248,15 @@
         },
         {
           "$ref": "#/$defs/skill.remove"
+        },
+        {
+          "$ref": "#/$defs/app.push"
+        },
+        {
+          "$ref": "#/$defs/app.list"
+        },
+        {
+          "$ref": "#/$defs/app.remove"
         },
         {
           "$ref": "#/$defs/turn.start"
@@ -1298,10 +1310,105 @@
       ],
       "additionalProperties": false
     },
+    "app.push": {
+      "description": "One part of an app package of this computer's own (format 2, kind app, unsigned: no lamp-skill.sig; docs/apps.md), sent in order from 0, the whole push within 60 s, a broken push resent from 0; the last part's answer comes once the lamp has checked and installed it, replacing this computer's app of that name. The pairing is the owner's yes: no yes at the lamp. Needs the skills grant and every grant the manifest asks (never remember); refused without LAMP_STORE_APPS or the lamp's apps helper.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "app.push"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,23}$",
+          "description": "The manifest's app name: a-z, then up to 23 of a-z, 0-9 and -."
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "description": "The whole package's SHA-256."
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4194304,
+          "description": "The whole package's bytes (4 MiB at most)."
+        },
+        "part": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 127
+        },
+        "parts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128
+        },
+        "data": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 49152,
+          "description": "This part's bytes, base64 (36 KiB of the package at most)."
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "name",
+        "sha256",
+        "size",
+        "part",
+        "parts",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "app.list": {
+      "description": "This client's own pushed apps. Needs the skills grant.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "app.list"
+        }
+      },
+      "required": [
+        "id",
+        "op"
+      ],
+      "additionalProperties": false
+    },
+    "app.remove": {
+      "description": "One of this client's own pushed apps, taken off. Needs the skills grant.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "app.remove"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,23}$",
+          "description": "An app's name: a-z, then up to 23 of a-z, 0-9 and -."
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "name"
+      ],
+      "additionalProperties": false
+    },
     "reply": {
       "oneOf": [
         {
-          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill (and moves) for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now; sound.upload carries got for each part but the last, and sound for the last; sound.list carries sounds; sound.remove carries removed; notes.set carries key and bytes; notes.get carries key, found and, when found, value; notes.delete carries key and deleted; notes.list carries keys, count, total, bytes, keys_max and bytes_max; turn.end carries turn and started; listen.set carries mute; microphone.stream carries stream and, on, sample_rate, channels, format, block_ms and source.",
+          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill (and moves) for the last; skill.list carries skills; app.push carries got for each part but the last, and app for the last; app.list carries apps; app.remove carries removed; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now; pose carries pose, width, height, model and ms; sound.upload carries got for each part but the last, and sound for the last; sound.list carries sounds; sound.remove carries removed; notes.set carries key and bytes; notes.get carries key, found and, when found, value; notes.delete carries key and deleted; notes.list carries keys, count, total, bytes, keys_max and bytes_max; turn.end carries turn and started; listen.set carries mute; microphone.stream carries stream and, on, sample_rate, channels, format, block_ms and source.",
           "type": "object",
           "properties": {
             "re": {
@@ -1350,6 +1457,11 @@
                 "language": {
                   "description": "The owner's language (en, vi, ja, zh or ko), from the lamp's setup, so a program's own lines can follow it; en when the owner has not chosen one. Lamps from before this say none: read it as en.",
                   "enum": ["en", "vi", "ja", "zh", "ko"]
+                },
+                "build": {
+                  "description": "The lamp's build, the same text the owner's app shows: its update sequence, a plus sign and the first twelve of its commit (143+ab12cd34ef56), so a bug report can quote it. Only in hello's answer, after the signature check: never in the welcome, which any connection gets before it is known. Not there on a lamp that has none to say (one from before this, or one without its update state): read it as unknown, never as a value.",
+                  "type": "string",
+                  "pattern": "^[0-9]+\\+[0-9a-fA-F]+$"
                 }
               },
               "required": [
@@ -1610,6 +1722,17 @@
                 "type": "object"
               }
             },
+            "app": {
+              "description": "With the last app.push part: the app installed, name, title, version, sha256, grants, net, logs, updated (it replaced this computer's app of that name), started and from (computer).",
+              "type": "object"
+            },
+            "apps": {
+              "description": "app.list: this computer's own pushed apps, each name, title, version, sha256, grants, net, logs and stopped.",
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
             "jpeg": {
               "description": "A JPEG picture, base64.",
               "type": "string"
@@ -1646,6 +1769,90 @@
             "fast": {
               "description": "camera.stream: true when its frames come binary, every frame the camera makes.",
               "type": "boolean"
+            },
+            "pose": {
+              "description": "pose: the person found in the picture, their score (0 to 1) and the 17 COCO keypoints in COCO order (nose, left_eye, right_eye, left_ear, right_ear, left_shoulder, right_shoulder, left_elbow, right_elbow, left_wrist, right_wrist, left_hip, right_hip, left_knee, right_knee, left_ankle, right_ankle), each x and y in the sent picture's own pixels and its score (0 to 1); null when no person scored 0.2 or more. The same shape whatever model the lamp runs.",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "score": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "keypoints": {
+                      "type": "array",
+                      "minItems": 17,
+                      "maxItems": 17,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "x": {
+                            "type": "number"
+                          },
+                          "y": {
+                            "type": "number"
+                          },
+                          "score": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          }
+                        },
+                        "required": [
+                          "x",
+                          "y",
+                          "score"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "score",
+                    "keypoints"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "width": {
+              "description": "pose: the sent picture's width in pixels.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "height": {
+              "description": "pose: the sent picture's height in pixels.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "model": {
+              "description": "pose: the id of the model the lamp ran.",
+              "type": "string"
+            },
+            "ms": {
+              "description": "pose: how long each step took on the lamp, in ms: decode (the JPEG), npu (the model), post (the keypoints) and total.",
+              "type": "object",
+              "properties": {
+                "decode": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "npu": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "post": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "total": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
             },
             "sound": {
               "$ref": "#/$defs/clip"
@@ -1819,14 +2026,16 @@
             "asleep",
             "rate",
             "bad_request",
-            "off"
+            "off",
+            "preparing",
+            "unavailable"
           ]
         },
         "why": {
           "type": "string"
         },
         "retry_ms": {
-          "description": "With rate: when the oldest counted action leaves its window.",
+          "description": "With rate: when the oldest counted action leaves its window. With busy, preparing or unavailable (pose): when to ask again.",
           "type": "integer",
           "minimum": 0
         }
@@ -2217,6 +2426,9 @@
           "type": "boolean"
         },
         "asleep": {
+          "type": "boolean"
+        },
+        "muted_after_fault": {
           "type": "boolean"
         }
       }
@@ -3381,6 +3593,31 @@
       ],
       "additionalProperties": false
     },
+    "pose": {
+      "description": "One person's pose in a JPEG of the computer's own (a camera frame it has), from the lamp's NPU: the reply's pose (score and the 17 COCO keypoints in the picture's own pixels, or null with no person), width, height, model and ms. jpeg is standard base64, 1 to 204800 characters (a JPEG of at most 150 KiB, so the frame stays under the 256 KiB WebSocket cap): a 640x480 frame at high quality fits; send a smaller or more compressed one otherwise. Needs the camera grant; local network only (refused on a remote connection, as the camera's ops); refused while the lamp is private (private). Off unless the lamp's LAMP_NPU switch is on (off). On first use the lamp fetches its pose model from the Store (preparing, with retry_ms, about 2000); unavailable when no model could be fetched or checked or the lamp has no NPU (with retry_ms when it will try again). One computer asks at most 15 a second, 5 while the board is warm and 1 while hot (rate, with retry_ms); busy (with retry_ms) when the NPU's share for all computers is used; bad_request when jpeg is not a JPEG.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "pose"
+        },
+        "jpeg": {
+          "description": "One JPEG, standard base64.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 204800,
+          "pattern": "^[A-Za-z0-9+/=]+$"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "jpeg"
+      ],
+      "additionalProperties": false
+    },
     "body_joint": {
       "description": "One joint in a body.state: where it is, from the body's own read.",
       "type": "object",
@@ -3587,7 +3824,7 @@
       "additionalProperties": false
     },
     "app.took": {
-      "description": "The app takes the turn an app.trigger named: the voice keeps quiet. A say, gesture or light from the app within 3 s of the trigger counts as well; with neither, the voice answers itself.",
+      "description": "The app takes the turn an app.trigger named: the voice keeps quiet. A say from the app (with the speak grant) within 3 s of the trigger counts as well, not a gesture, light or sound; with neither, the voice answers itself. The reply carries taken: false when the turn was not counted (late, never offered, taken already), and the app then must not speak for that line.",
       "type": "object",
       "properties": {
         "id": {
@@ -3661,6 +3898,55 @@
       ],
       "additionalProperties": false
     },
+    "apps.remember": {
+      "description": "An app's fact for the lamp's known person, kept with the app as its source (the remember grant, an app's own). The lamp tidies the words first (links, markup and double quotes left out, runs of space made one) and refuses, never cuts, what is left over 280 characters. Answered kept: true; refused off, no_grant, bad_request, private, unavailable, rate (retry_ms; three a minute an app) or refused (memory did not keep it).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "apps.remember"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "apps.context": {
+      "description": "An app's live context line, told to the voice beside the person's line for for_ms and never kept (the remember grant). An empty line with no for_ms clears it; a clear is never rated nor refused while private. Built: told to the voice on the owner's turn, or on any turn in the private room; a lamp built before it refuses the op. Refused as apps.remember is, rate past one set line a second an app (retry_ms), and bad_request for a line over 120 characters, for_ms outside 1 to 600000, or a clear with for_ms.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "apps.context"
+        },
+        "line": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "for_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600000
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "line"
+      ],
+      "additionalProperties": false
+    },
     "app_request": {
       "description": "The ops only an installed app's socket (LAMP_APP_SOCKET) takes, besides the door's own that its manifest's grants allow. Apart from `request` until lamp-control's app socket takes them as ops (#7415).",
       "oneOf": [
@@ -3675,6 +3961,12 @@
         },
         {
           "$ref": "#/$defs/app.panel.set"
+        },
+        {
+          "$ref": "#/$defs/apps.remember"
+        },
+        {
+          "$ref": "#/$defs/apps.context"
         }
       ]
     },

@@ -39,6 +39,8 @@
 //! - Once an hour in which this process counted something, the journal
 //!   has today's totals in one line ([`told`]).
 
+pub mod replay;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{

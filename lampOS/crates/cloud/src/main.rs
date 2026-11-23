@@ -319,9 +319,18 @@ fn main() -> ExitCode {
         update_page: lamp_cloud::update::from_environment(),
         // The lamp's agents, a missing one installed from the app (#6240): only with
         // LAMP_APP_ENGINES=on as well.
-        update_checks: lamp_cloud::update::Checks::with_engines(
-            lamp_cloud::update::engines_from_environment(),
-        ),
+        // The owner's Update now (#7517): only with LAMP_UPDATE_NOW=on as well,
+        // marked in this part's own state folder for lamp-update.
+        update_checks: {
+            let checks = lamp_cloud::update::Checks::with_engines(
+                lamp_cloud::update::engines_from_environment(),
+            );
+            if lamp_cloud::update::now_from_environment() {
+                checks.with_now(lamp_msgs::UPDATE_NOW_FILE.into())
+            } else {
+                checks
+            }
+        },
         // A restart from the app, asked of setup's change helper (#2193): only with LAMP_APP_RESTART=on.
         restart: (std::env::var(lamp_cloud::lamp::RESTART_ENVIRONMENT)
             .ok()
@@ -355,15 +364,28 @@ fn main() -> ExitCode {
         // The owner's face expressions and room sounds yeses (#5500): only
         // with LAMP_APP_CONSENT=on; room sounds only with LAMP_PRIVACY_CONTROLS=no-slide.
         consent: lamp_cloud::consent::Place::from_environment(),
+        // The owner's desk noticing switch (#6543): only with
+        // LAMP_SEEN_ACTIVITY=on, the yes kept as the spoken one.
+        desk_noticing: lamp_cloud::consent::desk_from_environment(),
         // The owner's dev monitor (#5883): only with LAMP_APP_MONITOR=on and
         // LAMP_SETTINGS_CHANGE=on, each link sealed to this lamp's device id.
         monitor: lamp_cloud::monitor::Place::from_environment(&account.device_id),
         // The owner's desk and Hydrate bottles (#7470): only with LAMP_DEVICES=on.
         devices: lamp_cloud::devices::on_from_environment().then(Default::default),
+        apps: lamp_cloud::apps::Apps::from_environment().map(std::sync::Arc::new),
     };
     // `can` names skills.make only while lamp-voice's maker has a computer (fourteen-P15).
     if let Some(socket) = &lamp.make_skill {
         lamp_cloud::make_skill::watch(socket.clone());
+    }
+    // The dev monitor said in the lamp's health while on, and off by itself
+    // after its day (#7432).
+    if let Some(place) = &lamp.monitor {
+        lamp_cloud::monitor::keep(
+            place.clone(),
+            lamp.bus.clone(),
+            lamp_cloud::settings::SOCKET.into(),
+        );
     }
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -413,8 +435,10 @@ fn main() -> ExitCode {
         services: None,
         control: None,
         consent: None,
+        desk_noticing: None,
         monitor: None,
         devices: None,
+        apps: None,
         upload: None,
         shutdown: None,
     };
@@ -442,6 +466,10 @@ fn main() -> ExitCode {
         // login for the voice to read; said once each time it changes.
         let mut region_kept = std::env::var_os("STATE_DIRECTORY")
             .map(|dir| ping::Region::at(PathBuf::from(dir).join("region")));
+        // The burst period the cloud asks of lamp-seen (#7401), kept the same
+        // way for it to read; said once each time it is kept or let go.
+        let mut seen_clip_kept = std::env::var_os("STATE_DIRECTORY")
+            .map(|dir| ping::SeenClipKept::at(PathBuf::from(dir).join(ping::SEEN_CLIP_FILE)));
         // The broker's WSS address (#6256 F9), for when its TCP port keeps
         // failing; a new one alone never moves a working connection.
         let (ws_url_tx, ws_url) = watch::channel(String::new());
@@ -458,6 +486,22 @@ fn main() -> ExitCode {
                     Err(_) => say(&format!(
                         "the backend places the lamp in region {region:?}, which could not be kept"
                     )),
+                }
+            }
+            if let Some(kept) = seen_clip_kept.as_mut() {
+                let every_before = kept.kept().map(|clip| clip.every_s);
+                let every_now = reply.seen_clip.map(|clip| clip.every_s);
+                if let Some(result) = kept.take(reply.seen_clip)
+                    && every_now != every_before
+                {
+                    let what = every_now.map_or_else(
+                        || "the backend leaves out seen_clip".to_owned(),
+                        |every_s| format!("the backend asks a burst every {every_s} s (seen_clip)"),
+                    );
+                    match result {
+                        Ok(()) => say(&what),
+                        Err(_) => say(&format!("{what}, which could not be kept")),
+                    }
                 }
             }
         };

@@ -1,14 +1,19 @@
 //! The lamp's OpenClaw Gateway, waited for before an OpenClaw launch
 //! (#6226). OpenClaw's TUI panes talk to one running Gateway (loopback
 //! [`PORT`]), which Harness never starts. lamp-update's Gateway unit
-//! runs it always while
-//! `LAMP_OPENCLAW_ON_LAMP` is on (the owner's decision: every lamp has
-//! 6 GB); lamp-tasks never starts or stops it. A TUI started while the
+//! runs it while `LAMP_OPENCLAW_ON_LAMP` is on: always, or with
+//! `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` on only while OpenClaw is the lamp's
+//! default or in use (#8105, [`in_use_said`]: a wait here or a Harness pane
+//! on it). lamp-tasks never starts or stops it itself; a wait marks it
+//! wanted, and lamp-update starts it within its 10 s look. A TUI started while the
 //! Gateway is still coming up loses its first prompt, and Harness neither
 //! retries nor says so (lamp-c0a4), so before `harness new openclaw`
 //! lamp-tasks waits until the Gateway takes a connection and answers, at
 //! most [`READY_WITHIN`]; else the hand-over is not sent, with
-//! [`NOT_READY`], and the person is told it failed.
+//! [`NOT_READY`], and the person is told it failed. With
+//! `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` on, a launch is first held in the
+//! queue until the Gateway serves ([`cold_answers`]), at most
+//! [`COLD_WITHIN`].
 use std::io::{Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
@@ -24,8 +29,10 @@ use crate::skill_task::{PYTHONPATH_ENV, SOCKET_ENV, SkillRun};
 /// Where the Gateway listens, on loopback.
 pub const PORT: u16 = 18789;
 /// How long a launch waits for a Gateway not answering yet before it is
-/// given up: the Gateway runs always, so this covers only its own start
-/// (27-50 s on lamp-c0a4 with two plugins) after a boot or a restart.
+/// given up: its own start after a boot or a restart (27-50 s on lamp-c0a4
+/// with two plugins). A Gateway stopped by `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT`
+/// starts colder (port 107-112 s, RPCs 220-241 s on lamp-e82d, #8105): the
+/// launch is held in the queue for that ([`COLD_WITHIN`]) before this wait.
 pub const READY_WITHIN: Duration = Duration::from_secs(60);
 /// Between two looks at the port while it is waited for.
 const READY_EVERY: Duration = Duration::from_millis(250);
@@ -35,6 +42,339 @@ const CONNECT_WITHIN: Duration = Duration::from_millis(500);
 const ANSWER_WITHIN: Duration = Duration::from_secs(2);
 /// The code a hand-over is not sent with when the Gateway did not answer.
 pub const NOT_READY: &str = "openclaw_gateway_not_ready";
+
+/// When lamp-tasks last needed OpenClaw's Gateway (#8105): a launch or a
+/// run on OpenClaw waiting for it, in ms on [`mono_ms`]'s clock plus one,
+/// 0 for never in this start. Marked at each look of
+/// [`Gateway::before_launch_until`], whatever the lamp's default engine, so
+/// lamp-update keeps the Gateway up while OpenClaw is in use and starts it
+/// when a run asks for it. Monotonic: a clock step after boot never ends a
+/// fresh mark (Twelve on #8223).
+static WANTED_AT_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// How long a need of OpenClaw keeps it "in use" for lamp-update (#8105):
+/// 4 h, the first builder's 15:33 rule for a cold start over 2 min (three
+/// on lamp-e82d served RPCs at 220-241 s), so a person using OpenClaw
+/// through a day waits for its start at most once or twice.
+pub const IN_USE_HOLD: Duration = Duration::from_secs(4 * 60 * 60);
+
+/// Milliseconds since this process first asked, on the monotonic clock.
+fn mono_ms() -> u64 {
+    static BASE: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+    u64::try_from(BASE.get_or_init(Instant::now).elapsed().as_millis()).unwrap_or(u64::MAX)
+}
+
+/// Marks OpenClaw's Gateway as needed now (#8105).
+pub fn mark_wanted() {
+    WANTED_AT_MS.store(mono_ms() + 1, std::sync::atomic::Ordering::Release);
+}
+
+/// Whether OpenClaw's Gateway was needed within `hold` of `now_ms` (on
+/// [`mono_ms`]'s clock, #8105): never marked is not in use.
+pub fn wanted_within(hold: Duration, now_ms: u64) -> bool {
+    let at = WANTED_AT_MS.load(std::sync::atomic::Ordering::Acquire);
+    at != 0 && (now_ms + 1).saturating_sub(at) <= hold.as_millis() as u64
+}
+
+/// The lamp's Harness panes at the last good read (#8105, the first
+/// builder's 15:33): 0 none read yet, 1 one is on OpenClaw, 2 none is. A
+/// failed read leaves it as it was.
+static PANES_ON_OPENCLAW: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+/// When the panes were last read well, as [`WANTED_AT_MS`]: a reading older
+/// than two [`PANES_EVERY`] is unknown again (Twelve on #8223: a round that
+/// holds lamp-update's lock pauses its asks, and so the reads).
+static PANES_READ_AT_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// When lamp-update last asked whether OpenClaw is in use, as
+/// [`WANTED_AT_MS`]: it asks only with `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT`
+/// on, so the panes are read only then (Twelve's P1 on #8223).
+static UPDATE_ASKED_AT_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// How often the lamp's own panes are read for [`panes_read`].
+pub const PANES_EVERY: Duration = Duration::from_secs(60);
+
+/// A pane's states that run nothing: a dead pane never keeps the Gateway
+/// up (Twelve on #8223).
+const PANE_ENDED: [&str; 6] = ["stopped", "failed", "offline", "exited", "done", "closed"];
+
+/// Whether a pane in `listed` runs OpenClaw, by Harness's own `agent`
+/// field: a pane whose agent can't be read counts as OpenClaw, and an
+/// ended pane ([`PANE_ENDED`]) runs nothing.
+pub fn panes_on_openclaw(listed: &[crate::harness::Listed]) -> bool {
+    listed.iter().any(|pane| {
+        !PANE_ENDED.contains(&pane.state.as_str())
+            && pane
+                .agent
+                .as_deref()
+                .is_none_or(|agent| agent == "openclaw")
+    })
+}
+
+/// Takes a read of the lamp's own panes: one on OpenClaw marks it wanted
+/// and keeps it in use while it's listed; a failed read keeps the last.
+pub fn panes_read(read: &Result<Vec<crate::harness::Listed>, String>) {
+    let Ok(listed) = read else {
+        return;
+    };
+    let on = panes_on_openclaw(listed);
+    if on {
+        mark_wanted();
+    }
+    PANES_ON_OPENCLAW.store(if on { 1 } else { 2 }, std::sync::atomic::Ordering::Release);
+    PANES_READ_AT_MS.store(mono_ms() + 1, std::sync::atomic::Ordering::Release);
+}
+
+/// Whether a reading made at `read_at` (as [`PANES_READ_AT_MS`]) is still
+/// fresh at `now_ms`.
+fn panes_fresh(read_at: u64, now_ms: u64) -> bool {
+    read_at != 0 && (now_ms + 1).saturating_sub(read_at) <= 2 * PANES_EVERY.as_millis() as u64
+}
+
+/// The most a launch on OpenClaw is held in the queue for a Gateway that
+/// isn't answering, while lamp-update may have stopped it (#8105): about
+/// twice the slowest of three cold starts on lamp-e82d (RPCs at 220-241 s,
+/// the first builder's 14:49).
+pub const COLD_WITHIN: Duration = Duration::from_secs(480);
+
+/// Between two looks at the port while a launch is held for it.
+const COLD_EVERY: Duration = Duration::from_secs(1);
+
+/// Whether lamp-update has asked since this process started: it asks only
+/// with `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` on, every 10 s, so a launch is held
+/// for a cold Gateway only then, and off is as before. Kept for the
+/// process's life once set (Twelve on #8234: a round that pauses the asks
+/// is just when the Gateway may be cold).
+static UPDATE_EVER_ASKED: AtomicBool = AtomicBool::new(false);
+
+/// lamp-update's switch file every build carries, and the switch in it
+/// (`lamp_update::switches::update_switch`): read here too, so a launch is
+/// held for a cold Gateway from a lamp-tasks start on, not only once
+/// lamp-update has asked (Twelve on #8234).
+pub const UPDATE_ENV: &str = "/etc/lampOS/update.env";
+pub const BY_DEFAULT_SWITCH: &str = "LAMP_OPENCLAW_GATEWAY_BY_DEFAULT";
+/// The most of the switch file read, as lamp-update reads it.
+const MOST_SWITCH_BYTES: usize = 4096;
+/// Between two reads of the switch file.
+const SWITCH_EVERY: Duration = Duration::from_secs(30);
+
+/// Whether `bytes`, a switch file, says `switch` is `on`, by lamp-update's
+/// rule (`lamp_update::models::file_says_on`): comments and blank lines
+/// skipped, the last value wins, any line that isn't `NAME=value` makes the
+/// whole file off, and so does a file over 4 KiB or not UTF-8.
+pub fn switch_file_says_on(bytes: &[u8], switch: &str) -> bool {
+    if bytes.len() > MOST_SWITCH_BYTES {
+        return false;
+    }
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return false;
+    };
+    let mut value = None;
+    for line in text.lines().map(str::trim) {
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((name, rest)) = line.split_once('=') else {
+            return false;
+        };
+        if name.is_empty()
+            || !name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        {
+            return false;
+        }
+        if name == switch {
+            value = Some(rest);
+        }
+    }
+    value == Some("on")
+}
+
+/// [`BY_DEFAULT_SWITCH`] as [`UPDATE_ENV`] says it, read at most every
+/// [`SWITCH_EVERY`]: missing, not a regular file or unreadable is off.
+fn switch_on() -> bool {
+    use std::io::Read;
+    static READ: std::sync::Mutex<Option<(Instant, bool)>> = std::sync::Mutex::new(None);
+    let mut read = READ
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some((at, on)) = *read
+        && at.elapsed() < SWITCH_EVERY
+    {
+        return on;
+    }
+    let path = Path::new(UPDATE_ENV);
+    let mut bytes = Vec::new();
+    let on = std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_file())
+        && std::fs::File::open(path)
+            .and_then(|file| {
+                file.take(MOST_SWITCH_BYTES as u64 + 1)
+                    .read_to_end(&mut bytes)
+            })
+            .is_ok()
+        && switch_file_says_on(&bytes, BY_DEFAULT_SWITCH);
+    *read = Some((Instant::now(), on));
+    on
+}
+
+/// Whether a launch on OpenClaw may be held for a cold Gateway (#8105).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Asking {
+    /// The switch is on: its file says so, or lamp-update has asked.
+    Yes,
+    /// Neither: off, as before.
+    No,
+}
+
+/// Sets whether lamp-update has asked, alone (no fresh ask, so no pane
+/// read): for tests only, which share this process.
+#[doc(hidden)]
+pub fn asked_for_tests(asked: bool) {
+    UPDATE_EVER_ASKED.store(asked, std::sync::atomic::Ordering::Release);
+}
+
+/// [`Asking`] now.
+pub fn update_asking() -> Asking {
+    asking_of(
+        UPDATE_EVER_ASKED.load(std::sync::atomic::Ordering::Acquire),
+        switch_on,
+    )
+}
+
+/// [`Asking`] with lamp-update having asked or not, else the switch file.
+fn asking_of(ever_asked: bool, file_on: impl FnOnce() -> bool) -> Asking {
+    if ever_asked || file_on() {
+        Asking::Yes
+    } else {
+        Asking::No
+    }
+}
+
+/// How a held launch's Gateway is looked at: [`Serving::lamp`]'s read,
+/// port then the approvals RPC once per Gateway start, so a launch is sent
+/// only once the Gateway serves (#7170's 17:43, Twelve on #8234). Run on a
+/// thread of its own; replaced in tests ([`look_cold_with`]).
+type ColdLook = Box<dyn FnMut() -> bool + Send>;
+static COLD_LOOK: std::sync::OnceLock<std::sync::Mutex<ColdLook>> = std::sync::OnceLock::new();
+
+fn cold_look() -> &'static std::sync::Mutex<ColdLook> {
+    COLD_LOOK.get_or_init(|| std::sync::Mutex::new(serving_look(Serving::lamp())))
+}
+
+/// A held launch's look through `serving`: true only once it serves, its
+/// port then its approvals read, never at the port alone.
+fn serving_look(mut serving: Serving) -> ColdLook {
+    Box::new(move || serving.ready_until(Instant::now() + SERVING_LOOK_WITHIN, &|| false))
+}
+
+/// The last look's answer for a held launch, looked at most every
+/// [`COLD_EVERY`] by a thread of its own, so the store's loop never waits on
+/// a look: `true` once the Gateway served.
+static COLD_ANSWERS: AtomicBool = AtomicBool::new(false);
+/// Until when (as [`WANTED_AT_MS`]) the Gateway is looked at for a held
+/// launch.
+static COLD_LOOK_UNTIL_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// One look's bound: the port, then a read of at most [`READ_WITHIN`].
+const SERVING_LOOK_WITHIN: Duration = Duration::from_secs(25);
+
+/// Puts `look` in place of [`Serving::lamp`]'s read for held launches: for
+/// tests only.
+#[doc(hidden)]
+pub fn look_cold_with(look: ColdLook) {
+    *cold_look()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = look;
+}
+
+/// Whether the Gateway served at the last look for a held launch; looks
+/// go on while held launches ask, and stop 5 s after the last ask. A
+/// Gateway that served this start (the kept listener's inode, as skill
+/// runs keep it) is taken as serving at once, so a warm launch is never
+/// held a tick (Twelve on #8234).
+pub fn cold_answers() -> bool {
+    static LOOKER: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    COLD_LOOK_UNTIL_MS.store(
+        mono_ms() + 1 + 5 * COLD_EVERY.as_millis() as u64,
+        std::sync::atomic::Ordering::Release,
+    );
+    LOOKER.get_or_init(|| {
+        let _ = thread::Builder::new()
+            .name("tasks-gateway-look".into())
+            .spawn(|| {
+                loop {
+                    let until = COLD_LOOK_UNTIL_MS.load(std::sync::atomic::Ordering::Acquire);
+                    let served = mono_ms() < until
+                        && (cold_look()
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner))(
+                        );
+                    COLD_ANSWERS.store(served, std::sync::atomic::Ordering::Release);
+                    thread::sleep(COLD_EVERY);
+                }
+            });
+    });
+    COLD_ANSWERS.load(std::sync::atomic::Ordering::Acquire) || served_this_start()
+}
+
+/// Whether the Gateway listening now is the one whose approvals read last
+/// succeeded ([`SERVED`]): served this start, so warm.
+fn served_this_start() -> bool {
+    SERVED
+        .get()
+        .and_then(|served| {
+            *served
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+        })
+        .is_some_and(|inode| listener_here() == Some(inode))
+}
+
+/// lamp-update asked whether OpenClaw is in use (`Route::UpdateRead`).
+pub fn update_asked() {
+    UPDATE_ASKED_AT_MS.store(mono_ms() + 1, std::sync::atomic::Ordering::Release);
+    UPDATE_EVER_ASKED.store(true, std::sync::atomic::Ordering::Release);
+}
+
+/// Whether the lamp's panes are to be read now, the last read at `last`:
+/// only while lamp-update asks (within two of its looks' worth of
+/// [`PANES_EVERY`]), at once on its first ask, then every [`PANES_EVERY`].
+pub fn panes_due(last: Option<Instant>) -> bool {
+    let asked = UPDATE_ASKED_AT_MS.load(std::sync::atomic::Ordering::Acquire);
+    asked != 0
+        && (mono_ms() + 1).saturating_sub(asked) <= 2 * PANES_EVERY.as_millis() as u64
+        && last.is_none_or(|last| last.elapsed() >= PANES_EVERY)
+}
+
+/// Whether OpenClaw is in use, as lamp-update hears it: yes within the
+/// [`IN_USE_HOLD`] of a need or with a pane on OpenClaw at the last good
+/// read; no with neither once the panes were read; unknown (`None`) before
+/// the first read or once the last is over two [`PANES_EVERY`] old, so a
+/// lamp-tasks just started, or a pause in the reads, never stops the
+/// Gateway under an open pane (Twelve on #8223). A pane on OpenClaw at the
+/// last read stays yes however old: it errs toward keeping it up.
+pub fn in_use_said() -> Option<bool> {
+    if wanted_within(IN_USE_HOLD, mono_ms()) {
+        return Some(true);
+    }
+    match PANES_ON_OPENCLAW.load(std::sync::atomic::Ordering::Acquire) {
+        1 => Some(true),
+        2 if panes_fresh(
+            PANES_READ_AT_MS.load(std::sync::atomic::Ordering::Acquire),
+            mono_ms(),
+        ) =>
+        {
+            Some(false)
+        }
+        _ => None,
+    }
+}
+
+/// [`in_use_said`], unknown read as in use.
+pub fn in_use() -> bool {
+    in_use_said() != Some(false)
+}
 
 /// What the part's targets read of OpenClaw: whether the Harness on the
 /// lamp is too old for it (`refused`, before 0.6.11), so OpenClaw is not
@@ -136,9 +476,18 @@ const READ_WITHIN: Duration = Duration::from_secs(20);
 const ADD_WITHIN: Duration = Duration::from_secs(60);
 /// What the read asks the Gateway to answer within (`{ms}`).
 const READ_RPC_MS: u64 = 10_000;
-/// Between two approvals reads, at least: each starts a Node process, so
-/// they are far sparser than the port's looks.
+/// After a failed approvals read, the next waits at least this: each
+/// starts a Node process, so they are far sparser than the port's looks.
 const READ_EVERY: Duration = Duration::from_secs(3);
+/// The longest wait after a failed read: the wait doubles from
+/// [`READ_EVERY`] after each one (3, 6, 12, then 15 s), so a gateway still
+/// starting is not slowed by a Node CLI started every few seconds beside
+/// it on the lamp (#7174). A read that succeeds sets it back to
+/// none.
+const READ_MOST: Duration = Duration::from_secs(15);
+/// How often a run that shares another's read in flight looks at its own
+/// stop and deadline while it waits for that read.
+const SHARED_LOOK: Duration = Duration::from_millis(100);
 
 /// A Gateway that serves its RPCs (#7170): its port answers ([`answers`]),
 /// and then its approvals read ([`ApprovalsRead`]) succeeds. A Gateway
@@ -165,6 +514,10 @@ pub struct Serving {
     /// every run's wait, each made new.
     served: std::sync::Arc<std::sync::Mutex<Option<u64>>>,
 }
+
+/// The lamp's [`ReadTurns`], for all of lamp-tasks: one approvals read at
+/// a time, whichever run waits (#7174).
+static READS: std::sync::OnceLock<std::sync::Arc<ReadTurns>> = std::sync::OnceLock::new();
 
 /// The lamp's [`Serving::served`], for all of lamp-tasks.
 static SERVED: std::sync::OnceLock<std::sync::Arc<std::sync::Mutex<Option<u64>>>> =
@@ -200,11 +553,14 @@ impl Serving {
     pub fn lamp() -> Self {
         Self::new(
             Box::new(Loopback),
-            Box::new(ApprovalsRead::new(
-                APPROVALS_READ.map(str::to_owned).to_vec(),
-                READ_WITHIN,
-                READ_EVERY,
-            )),
+            Box::new(
+                ApprovalsRead::new(
+                    APPROVALS_READ.map(str::to_owned).to_vec(),
+                    READ_WITHIN,
+                    READ_EVERY,
+                )
+                .sharing(READS.get_or_init(Default::default).clone()),
+            ),
         )
         .with_listener(
             Box::new(listener_here),
@@ -329,15 +685,85 @@ impl Probe for Serving {
     }
 }
 
+/// The approvals reads of every run that waits (#7174): at most one in
+/// flight, whose outcome every run waiting meanwhile shares, and after a
+/// failed one a wait that doubles up to [`READ_MOST`].
+#[derive(Default)]
+pub struct ReadTurns {
+    turn: std::sync::Mutex<Turn>,
+    done: std::sync::Condvar,
+}
+
+#[derive(Default)]
+struct Turn {
+    /// A read is in flight.
+    reading: bool,
+    /// Reads finished, counted: a run sharing one knows when it is done.
+    finished: u64,
+    /// Whether the last finished read was served.
+    served: bool,
+    /// No new read before this, after a failed one.
+    next: Option<Instant>,
+    /// The wait after the next failed read; `None`: the first spacing.
+    gap: Option<Duration>,
+}
+
+impl ReadTurns {
+    fn turn(&self) -> std::sync::MutexGuard<'_, Turn> {
+        self.turn
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+}
+
+/// Ends a turn's read however the read ends, a panic too, so the runs
+/// sharing it are never left waiting on a read that is gone.
+struct Reading<'a> {
+    turns: &'a ReadTurns,
+    every: Duration,
+    most: Duration,
+    /// What the read found: served, failed, or cut short by its run's
+    /// stop or deadline (`None`), which says nothing of the gateway.
+    outcome: Option<bool>,
+}
+
+impl Drop for Reading<'_> {
+    fn drop(&mut self) {
+        let mut turn = self.turns.turn();
+        turn.reading = false;
+        turn.finished = turn.finished.wrapping_add(1);
+        turn.served = self.outcome == Some(true);
+        match self.outcome {
+            Some(true) => {
+                turn.next = None;
+                turn.gap = None;
+            }
+            Some(false) => {
+                let gap = turn.gap.unwrap_or(self.every);
+                turn.next = Some(Instant::now() + gap);
+                turn.gap = Some(gap.saturating_mul(2).min(self.most.max(self.every)));
+            }
+            None => {}
+        }
+        drop(turn);
+        self.turns.done.notify_all();
+    }
+}
+
 /// The Gateway's approvals read ([`APPROVALS_READ`]) run as lamp-tasks'
-/// own user, each bounded by `within`, at most once every `every`: ready
-/// when one exits 0. Only a read: nothing is set. The same runner carries
-/// [`ALLOWLIST_ADD`], OpenClaw's own add of one entry (#7280).
+/// own user, each bounded by `within`: ready when one exits 0. One at a
+/// time across every [`ApprovalsRead`] sharing its [`ReadTurns`]: a run
+/// that finds one in flight waits for it and takes its outcome. After a
+/// failed one, none for `every`, doubled at each failure up to `most`
+/// (#7174). Only a read: nothing is set. The same runner carries
+/// [`ALLOWLIST_ADD`], OpenClaw's own add of one entry (#7280), with turns
+/// of its own.
 pub struct ApprovalsRead {
     argv: Vec<String>,
     within: Duration,
     every: Duration,
-    last: Option<Instant>,
+    most: Duration,
+    turns: std::sync::Arc<ReadTurns>,
     /// How the last run ended, in words: its exit, or why it was stopped.
     outcome: String,
 }
@@ -348,24 +774,39 @@ impl ApprovalsRead {
             argv,
             within,
             every,
-            last: None,
+            most: READ_MOST,
+            turns: Default::default(),
             outcome: "not run".into(),
         }
     }
 
-    /// One read, killed with its process group past `within`.
-    fn read(&mut self, until: Instant, cancelled: &dyn Fn() -> bool) -> bool {
+    /// Taking turns with every read made with the same `turns`.
+    pub fn sharing(mut self, turns: std::sync::Arc<ReadTurns>) -> Self {
+        self.turns = turns;
+        self
+    }
+
+    /// With the longest wait after a failed read `most` (tests).
+    pub fn at_most(mut self, most: Duration) -> Self {
+        self.most = most;
+        self
+    }
+
+    /// One read, killed with its process group past `within`: served
+    /// (`Some(true)`), not served (`Some(false)`: it failed, or ran past
+    /// `within`), or cut short by the run's stop or deadline (`None`).
+    fn read(&mut self, until: Instant, cancelled: &dyn Fn() -> bool) -> Option<bool> {
         use rustix::process::{Pid, Signal, WaitId, WaitIdOptions, kill_process_group, waitid};
         use std::os::unix::process::CommandExt;
         use std::process::{Command, Stdio};
         if cancelled() || Instant::now() >= until {
             self.outcome = "past the run's bound".into();
-            return false;
+            return None;
         }
         let ms = READ_RPC_MS.to_string();
         let mut words = self.argv.iter().map(|word| word.replace("{ms}", &ms));
         let Some(program) = words.next() else {
-            return false;
+            return Some(false);
         };
         let Ok(mut child) = Command::new(program)
             .args(words)
@@ -378,7 +819,7 @@ impl ApprovalsRead {
             .spawn()
         else {
             self.outcome = "not started".into();
-            return false;
+            return Some(false);
         };
         let pid = Pid::from_child(&child);
         let began = Instant::now();
@@ -389,12 +830,15 @@ impl ApprovalsRead {
                 WaitId::Pid(pid),
                 WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
             ) {
-                Ok(Some(status)) => break status.exit_status(),
+                Ok(Some(status)) => break Some(status.exit_status()),
                 Ok(None) => {}
                 Err(error) if error == rustix::io::Errno::INTR => {}
-                Err(_) => break None,
+                Err(_) => break Some(None),
             }
-            if cancelled() || Instant::now() >= until || began.elapsed() >= self.within {
+            if began.elapsed() >= self.within {
+                break Some(None);
+            }
+            if cancelled() || Instant::now() >= until {
                 break None;
             }
             thread::sleep(Duration::from_millis(20));
@@ -403,13 +847,20 @@ impl ApprovalsRead {
         let _ = child.kill();
         let _ = child.wait();
         self.outcome = match code {
-            Some(code) => format!("exit {code}"),
-            None if began.elapsed() >= self.within => {
+            Some(Some(code)) => format!("exit {code}"),
+            Some(None) if began.elapsed() >= self.within => {
                 format!("killed at its {} s bound", self.within.as_secs())
             }
+            Some(None) => "no exit status".into(),
             None => "stopped".into(),
         };
-        code == Some(0) && !cancelled() && Instant::now() < until
+        // Cut short by the run's stop or deadline: it says nothing of the
+        // gateway, and a read served after them hands nothing over.
+        let code = code?;
+        if code == Some(0) && (cancelled() || Instant::now() >= until) {
+            return None;
+        }
+        Some(code == Some(0))
     }
 }
 
@@ -419,11 +870,42 @@ impl Probe for ApprovalsRead {
     }
 
     fn ready_until(&mut self, until: Instant, cancelled: &dyn Fn() -> bool) -> bool {
-        if self.last.is_some_and(|last| last.elapsed() < self.every) {
+        let mut turn = self.turns.turn();
+        if turn.reading {
+            // Another run's read is in flight: wait for it and share what
+            // it found, within this run's own stop and deadline.
+            let finished = turn.finished;
+            while turn.reading && turn.finished == finished {
+                let left = until.saturating_duration_since(Instant::now());
+                if cancelled() || left.is_zero() {
+                    return false;
+                }
+                turn = self
+                    .turns
+                    .done
+                    .wait_timeout(turn, left.min(SHARED_LOOK))
+                    .map_or_else(|poisoned| poisoned.into_inner().0, |(turn, _)| turn);
+            }
+            let served = turn.served && !cancelled() && Instant::now() < until;
+            if !served {
+                self.outcome = "another run's read in flight did not serve".into();
+            }
+            return served;
+        }
+        if turn.next.is_some_and(|next| Instant::now() < next) {
             return false;
         }
-        self.last = Some(Instant::now());
-        self.read(until, cancelled)
+        turn.reading = true;
+        drop(turn);
+        let turns = self.turns.clone();
+        let mut reading = Reading {
+            turns: &turns,
+            every: self.every,
+            most: self.most,
+            outcome: None,
+        };
+        reading.outcome = self.read(until, cancelled);
+        reading.outcome == Some(true)
     }
 
     fn not_ready(&self) -> String {
@@ -568,6 +1050,7 @@ impl Gateway {
         cancelled: &dyn Fn() -> bool,
     ) -> Result<(), String> {
         let began = Instant::now();
+        mark_wanted();
         let mut until = deadline.min(began + self.ready_within);
         // Whether the port has answered in this wait: once it has, the
         // Gateway is up or starting, and only `until` bounds it.
@@ -576,6 +1059,7 @@ impl Gateway {
         // is starting, so the port is waited for to `until`.
         let mut starting = false;
         loop {
+            mark_wanted();
             if cancelled() {
                 return Err("the OpenClaw wait was cancelled".into());
             }
@@ -815,12 +1299,14 @@ pub const INTERPRETER: &str = "python3";
 /// folders, lamp-control's socket, SDK, token) for the launcher
 /// ([`crate::skill_start`]) to claim once, and the Harness task
 /// ([`prompt`]) asks the agent to run the launcher with the run's id.
+/// A run granted `net` names its own `egress` socket in its grant (#7742).
 /// Refused before anything is made live for a fixed write.
 pub fn open_start(
     starts: &crate::skill_start::Starts,
     folder: &Path,
     run: &SkillRun,
     token: &str,
+    egress: Option<&Path>,
 ) -> Result<(crate::skill_start::Live, String), String> {
     if run.script.as_os_str().is_empty() {
         return Err(
@@ -844,6 +1330,9 @@ pub fn open_start(
             socket: env_of(SOCKET_ENV),
             pythonpath: env_of(PYTHONPATH_ENV),
             token: token.to_owned(),
+            // A run granted `net` (#7742): its own egress socket, made
+            // before this, which its fence gets as a descriptor.
+            egress: egress.map(Path::to_path_buf),
         },
     )?;
     Ok((live, prompt(Path::new(crate::skill_start::LAUNCHER), run)))
@@ -1075,11 +1564,76 @@ cd "$r" || no "the run's folder"
 exec unshare --user --map-user="$u" --map-group="$g" -- env -i PATH="$SCRIPT_PATH" HOME="$r" LAMP_CONTROL_SOCKET="$so" PYTHONPATH="$py" /bin/sh -c 'IFS= read -r t <&3 || exit 1; exec 3<&-; LAMP_CONTROL_TOKEN=$t; unset t; export LAMP_CONTROL_TOKEN; printf "started\n" >&4 || exit 1; exec 4>&-; exec "$@"' run "$i" "$s"
 "#;
 
+/// lamp-tasks' own program, which the fence of a run granted `net` starts
+/// its relay with (`lamp-tasks net-relay --egress`, #7742): the one
+/// lamp-update's agent namespace scripts start, `/opt` shown in the
+/// gateway's namespace.
+pub const RELAY: &str = "/opt/lampOS/tasks/current/lamp-tasks";
+
+/// The line [`FENCE_NET_EDITS`] adds that starts a run's relay to its own
+/// egress socket ([`crate::skill_start::EGRESS_FD`]): lamp-tasks reads the
+/// installed launcher for it before it gives a gateway agent's run its way
+/// out (#7742), so an older launcher, whose fence has none, is refused in
+/// words before anything is made.
+pub const FENCE_NET_LINE: &str = "m=$(unshare --user --map-user=\"$u\" --map-group=\"$g\" -- /opt/lampOS/tasks/current/lamp-tasks net-relay --egress /proc/self/fd/5 &)\n";
+
+/// What [`fence_args`] changes in [`FENCE_TEXT`] for a run granted `net`
+/// (#7742, its grant naming its egress socket), each found exactly once (a
+/// test holds it), the same way out a held Hermes run's namespace script
+/// gives it (`lamp_update::hermes_install`'s `TASKS_EDITS`): in the run's
+/// own network namespace (only `lo`), before the script, `lo` brought up
+/// (`ip`; none, the fence fails), port 53 opened to its own ids, a
+/// `resolv.conf` naming `127.0.0.1` bound read-only over the lamp's, and
+/// [`RELAY`] `net-relay --egress` started as the caller's own ids in a
+/// nested user namespace (no capability over these mounts) with its web
+/// proxy on `127.0.0.1:3128` and DNS on `127.0.0.1:53`, both piped to the
+/// egress socket on fd 5, where lamp-tasks lets out only the public web on
+/// ports 80 and 443 ([`crate::egress`]); its `ready` is waited for (none,
+/// the fence fails). Fd 5 is then closed, so the script holds no
+/// descriptor of it, and the script is given `HTTPS_PROXY`, `HTTP_PROXY`
+/// (both cases), `NO_PROXY` and `NODE_USE_ENV_PROXY=1`. The PID namespace
+/// ends the relay with the script. Nothing else the fence shows or hides
+/// changes: the run still sees only its own folder and its skill's.
+pub const FENCE_NET_EDITS: [(&str, &str); 2] = [
+    (
+        "cd \"$r\" || no \"the run's folder\"\n",
+        concat!(
+            "[ -S /proc/self/fd/5 ] || no \"the run's egress socket\"\n",
+            "x=; for c in /usr/sbin/ip /sbin/ip; do if [ -x \"$c\" ]; then x=$c; break; fi; done\n",
+            "[ -n \"$x\" ] && \"$x\" link set lo up || no \"lo up in the run's own network\"\n",
+            "echo 53 > /proc/sys/net/ipv4/ip_unprivileged_port_start || no \"port 53 in the run's own network\"\n",
+            "q=$(readlink -f /etc/resolv.conf) || q=/etc/resolv.conf\n",
+            "[ -f \"$q\" ] && printf 'nameserver 127.0.0.1\\n' > /tmp/.lampos-dns && mount -n --bind /tmp/.lampos-dns \"$q\" && mount -n -o remount,bind,ro,nosuid,nodev,noexec \"$q\" && rm -f /tmp/.lampos-dns || no \"resolv.conf naming 127.0.0.1\"\n",
+            "m=$(unshare --user --map-user=\"$u\" --map-group=\"$g\" -- /opt/lampOS/tasks/current/lamp-tasks net-relay --egress /proc/self/fd/5 &)\n",
+            "[ \"$m\" = ready ] || no \"the run's relay on 127.0.0.1:3128 and 127.0.0.1:53\"\n",
+            "exec 5<&-\n",
+            "cd \"$r\" || no \"the run's folder\"\n",
+        ),
+    ),
+    (
+        " PYTHONPATH=\"$py\" /bin/sh -c ",
+        " PYTHONPATH=\"$py\" HTTPS_PROXY=http://127.0.0.1:3128 HTTP_PROXY=http://127.0.0.1:3128 https_proxy=http://127.0.0.1:3128 http_proxy=http://127.0.0.1:3128 NO_PROXY=127.0.0.1,localhost no_proxy=127.0.0.1,localhost NODE_USE_ENV_PROXY=1 /bin/sh -c ",
+    ),
+];
+
+/// [`FENCE_TEXT`] as a run's fence runs it: with [`FENCE_NET_EDITS`] when
+/// `net` (its grant names its egress socket), else byte for byte.
+pub fn fence_text(net: bool) -> String {
+    let mut text = FENCE_TEXT.to_owned();
+    if net {
+        for (from, to) in FENCE_NET_EDITS {
+            text = text.replacen(from, to, 1);
+        }
+    }
+    text
+}
+
 /// The launcher's `unshare` arguments for `grant` (its run's folder in the
 /// runs' project, its parent), the caller's `uid` and `gid`, and `hidden`
 /// covered ([`HIDDEN`] on a lamp): a user (root mapped), network (only
 /// `lo`), mount and PID namespace of its own, then [`FENCE_TEXT`] with its
-/// arguments. Never the token.
+/// arguments ([`fence_text`]: with the run's way out when its grant names
+/// an egress socket, #7742). Never the token.
 pub fn fence_args(
     grant: &crate::skill_start::Grant,
     uid: u32,
@@ -1104,7 +1658,11 @@ pub fn fence_args(
     .iter()
     .map(Into::into)
     .collect();
-    args.push(FENCE_TEXT.replace("\"$SCRIPT_PATH\"", SCRIPT_PATH).into());
+    args.push(
+        fence_text(grant.egress.is_some())
+            .replace("\"$SCRIPT_PATH\"", SCRIPT_PATH)
+            .into(),
+    );
     args.push("fence".into());
     args.push(uid.to_string().into());
     args.push(gid.to_string().into());
@@ -1137,6 +1695,171 @@ pub fn prompt(launcher: &Path, run: &SkillRun) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #8105: a mark holds OpenClaw in use for the hold, not after it, and
+    /// the hold is the first builder's 4 h.
+    #[test]
+    fn a_wait_for_the_gateway_marks_openclaw_in_use_for_the_hold() {
+        assert_eq!(IN_USE_HOLD, Duration::from_secs(4 * 60 * 60));
+        mark_wanted();
+        let now = mono_ms();
+        assert!(wanted_within(IN_USE_HOLD, now));
+        assert!(wanted_within(IN_USE_HOLD, now + 60_000));
+        assert!(!wanted_within(Duration::from_secs(60), now + 10 * 60_000));
+        assert_eq!(in_use_said(), Some(true));
+    }
+
+    /// #8105 (Twelve on #8223): the wait itself marks OpenClaw wanted, at
+    /// its first look, ready or not.
+    #[test]
+    fn the_wait_for_the_gateway_itself_marks_openclaw_wanted() {
+        let before = mono_ms() + 1;
+        let fake = Fake {
+            ready_from: Some(1),
+            ..Fake::default()
+        };
+        let mut waited = Gateway::with_bounds(
+            Box::new(fake),
+            Duration::from_millis(50),
+            Duration::from_millis(1),
+        );
+        assert!(waited.before_launch().is_ok());
+        assert!(WANTED_AT_MS.load(std::sync::atomic::Ordering::Acquire) >= before);
+    }
+
+    /// #8105 (Twelve on #8223): lamp-update's read says `openclaw_in_use`
+    /// as a bool or null, the field lamp-update reads, and notes the ask.
+    #[test]
+    fn lamp_updates_read_says_whether_openclaw_is_in_use() {
+        let body = crate::runtime::update_read_body(serde_json::json!({"default": "hermes"}));
+        assert!(body["openclaw_in_use"].is_boolean() || body["openclaw_in_use"].is_null());
+        assert!(body.get("openclaw_in_use").is_some());
+        assert!(panes_due(None));
+    }
+
+    /// #8105 (Twelve on #8223): a "none on OpenClaw" reading goes unknown
+    /// after two reads' worth of time.
+    #[test]
+    fn an_old_reading_of_the_panes_is_unknown() {
+        let now = mono_ms();
+        assert!(panes_fresh(now + 1, now));
+        assert!(panes_fresh(now + 1, now + 2 * 60_000));
+        assert!(!panes_fresh(now + 1, now + 2 * 60_000 + 1));
+        assert!(!panes_fresh(0, now));
+    }
+
+    /// #8105 (Twelve on #8234): a held launch's default look is the serving
+    /// read: the port answering with the approvals read failing is not
+    /// served; the read succeeding then is.
+    #[test]
+    fn a_held_launchs_look_waits_for_the_serving_read_not_the_port() {
+        let port = Fake {
+            ready_from: Some(1),
+            ..Fake::default()
+        };
+        let read = Fake {
+            ready_from: Some(3),
+            ..Fake::default()
+        };
+        let mut look = serving_look(Serving::new(Box::new(port), Box::new(read.clone())));
+        assert!(!look(), "the port answers, the read fails: held");
+        assert!(*read.looks.lock().unwrap() >= 1, "the read was made");
+        let mut served = false;
+        for _ in 0..10 {
+            if look() {
+                served = true;
+                break;
+            }
+            thread::sleep(READ_EVERY);
+        }
+        assert!(served, "the read succeeds: released");
+    }
+
+    /// #8105 (Twelve on #8234): once lamp-update has asked, it stays asked
+    /// with no new ask; never asked, the switch file decides.
+    #[test]
+    fn lamp_updates_ask_is_kept_for_the_process() {
+        update_asked();
+        assert!(UPDATE_EVER_ASKED.load(std::sync::atomic::Ordering::Acquire));
+        assert_eq!(
+            asking_of(
+                UPDATE_EVER_ASKED.load(std::sync::atomic::Ordering::Acquire),
+                || false
+            ),
+            Asking::Yes
+        );
+        assert_eq!(asking_of(false, || true), Asking::Yes);
+        assert_eq!(asking_of(false, || false), Asking::No);
+    }
+
+    /// #8105: the switch file is read by lamp-update's rule.
+    #[test]
+    fn the_switch_file_is_read_as_lamp_update_reads_it() {
+        let on = |text: &str| switch_file_says_on(text.as_bytes(), BY_DEFAULT_SWITCH);
+        assert!(on("LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on\n"));
+        assert!(on(
+            "# note\n\nLAMP_UPDATE_NOW=on\nLAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on\n"
+        ));
+        assert!(!on(
+            "LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on\nLAMP_OPENCLAW_GATEWAY_BY_DEFAULT=off\n"
+        ));
+        assert!(!on("LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=On\n"));
+        assert!(!on("LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on\ngarbled line\n"));
+        assert!(!on(""));
+        assert!(!on(&"#".repeat(5000)));
+    }
+
+    /// #8105 (Twelve's P1 on #8223): the panes are read only while
+    /// lamp-update asks, at once on its first ask, then once a minute.
+    #[test]
+    fn the_panes_are_read_only_while_lamp_update_asks() {
+        update_asked();
+        assert!(panes_due(None));
+        assert!(!panes_due(Some(Instant::now())));
+        assert!(panes_due(Instant::now().checked_sub(PANES_EVERY)));
+    }
+
+    /// #8105 (the first builder's 15:33): a pane is OpenClaw's by Harness's
+    /// `agent`, an unreadable agent counts as OpenClaw, a stopped pane
+    /// doesn't, and a failed read keeps the last good one.
+    #[test]
+    fn a_pane_on_openclaw_keeps_it_in_use() {
+        let pane = |agent: Option<&str>, state: &str| crate::harness::Listed {
+            agent_id: "11111111-1111-4111-8111-111111111111".into(),
+            state: state.into(),
+            last_active_unix_ms: None,
+            about: None,
+            agent: agent.map(str::to_owned),
+        };
+        assert!(!panes_on_openclaw(&[]));
+        assert!(!panes_on_openclaw(&[pane(Some("hermes"), "idle")]));
+        assert!(panes_on_openclaw(&[
+            pane(Some("hermes"), "idle"),
+            pane(Some("openclaw"), "working")
+        ]));
+        assert!(panes_on_openclaw(&[pane(None, "idle")]));
+        assert!(!panes_on_openclaw(&[pane(Some("openclaw"), "stopped")]));
+        assert!(!panes_on_openclaw(&[
+            pane(None, "failed"),
+            pane(Some("openclaw"), "offline")
+        ]));
+        panes_read(&Ok(vec![pane(Some("openclaw"), "idle")]));
+        assert_eq!(
+            PANES_ON_OPENCLAW.load(std::sync::atomic::Ordering::Acquire),
+            1
+        );
+        panes_read(&Err("harness_failed".into()));
+        assert_eq!(
+            PANES_ON_OPENCLAW.load(std::sync::atomic::Ordering::Acquire),
+            1
+        );
+        assert_eq!(in_use_said(), Some(true));
+        panes_read(&Ok(vec![pane(Some("hermes"), "idle")]));
+        assert_eq!(
+            PANES_ON_OPENCLAW.load(std::sync::atomic::Ordering::Acquire),
+            2
+        );
+    }
 
     /// #7246: the approvals read's JSON allows the launcher only with an
     /// exact `pattern` in main's or `*`'s allow-list.
@@ -1479,17 +2202,19 @@ mod tests {
     /// fits.
     #[test]
     fn a_gateway_starting_mid_wait_is_waited_for_and_has_its_whole_start() {
-        // The port answers at 300 ms, past its 100 ms bound; the read is
-        // served on its second run, 200 ms after its first, so at about
-        // 500 ms: past a 400 ms serving bound from the wait's start, within
-        // one from the port's answer.
+        // The port answers at 900 ms, past its 100 ms bound and within a
+        // 1000 ms serving bound; the read is served on its second run, 200
+        // ms after its first ends (#7174: spaced from a read's end), so
+        // past that bound from the wait's start and within one from the
+        // port's answer, with room for a slow `sh` (150-400 ms a read on a
+        // loaded Mac).
         let wait = |unit: Option<bool>, dir: &Path| {
             let (argv, at) = read_script(dir, Some(2));
             let gateway = Gateway::with_bounds(
                 Box::new(Serving::new(
                     Box::new(TimedPort {
                         from: Instant::now(),
-                        after: Duration::from_millis(300),
+                        after: Duration::from_millis(900),
                     }),
                     Box::new(ApprovalsRead::new(
                         argv,
@@ -1497,7 +2222,7 @@ mod tests {
                         Duration::from_millis(200),
                     )),
                 )),
-                Duration::from_millis(400),
+                Duration::from_millis(1000),
                 Duration::from_millis(1),
             )
             .with_port_within(Duration::from_millis(100))
@@ -1514,7 +2239,7 @@ mod tests {
         let waited_out = waited.before_launch_until(far(), &|| false);
         assert_eq!(waited_out, Ok(()));
         assert!(
-            began.elapsed() >= Duration::from_millis(400),
+            began.elapsed() >= Duration::from_millis(1000),
             "served past the bound from the wait's start: {:?}",
             began.elapsed()
         );
@@ -1729,7 +2454,10 @@ mod tests {
         let mut argv = ALLOWLIST_ADD.map(str::to_owned).to_vec();
         argv[0] = script.display().to_string();
         argv.insert(0, "/bin/sh".into());
-        let add = ApprovalsRead::new(argv, Duration::from_secs(5), Duration::from_millis(1));
+        // No spacing, as the product's add ([`Serving::lamp`]): a failed add
+        // is tried once more at once, never held by the read's back-off
+        // (#7174 counts that from the read's end).
+        let add = ApprovalsRead::new(argv, Duration::from_secs(5), Duration::ZERO);
         (add, list)
     }
 
@@ -1888,6 +2616,72 @@ mod tests {
         let began = Instant::now();
         assert!(!read.ready(), "not read again before its spacing");
         assert!(began.elapsed() < Duration::from_millis(100));
+    }
+
+    /// #7174: runs waiting together on a gateway still starting run one
+    /// approvals read at a time, never one each, and wait longer after
+    /// each failed read, so the reads do not slow the start they wait on.
+    #[test]
+    fn runs_waiting_on_a_starting_gateway_share_one_read_and_back_off() {
+        let dir = tempfile::tempdir().unwrap();
+        let script = dir.path().join("starting");
+        let runs = dir.path().join("runs");
+        let busy = dir.path().join("busy");
+        let overlap = dir.path().join("overlap");
+        // A Node CLI that takes 100 ms to start and is never served; a
+        // read that finds another in flight leaves a mark.
+        std::fs::write(
+            &script,
+            format!(
+                "#!/bin/sh\nmkdir {busy} 2>/dev/null || touch {overlap}\necho x >> {runs}\nsleep 0.1\nrmdir {busy} 2>/dev/null\nexit 1\n",
+                busy = busy.display(),
+                overlap = overlap.display(),
+                runs = runs.display(),
+            ),
+        )
+        .unwrap();
+        let turns = Arc::new(ReadTurns::default());
+        let began = Instant::now();
+        let waited: Vec<_> = (0..3)
+            .map(|_| {
+                let argv = vec!["/bin/sh".into(), script.display().to_string()];
+                let turns = turns.clone();
+                thread::spawn(move || {
+                    let read =
+                        ApprovalsRead::new(argv, Duration::from_secs(5), Duration::from_millis(50))
+                            .at_most(Duration::from_millis(800))
+                            .sharing(turns);
+                    let port = Fake {
+                        ready_from: Some(1),
+                        ..Fake::default()
+                    };
+                    let mut gateway = Gateway::with_bounds(
+                        Box::new(Serving::new(Box::new(port), Box::new(read))),
+                        Duration::from_millis(3000),
+                        Duration::from_millis(10),
+                    );
+                    gateway.before_launch().is_err()
+                })
+            })
+            .collect();
+        for run in waited {
+            assert!(
+                run.join().unwrap(),
+                "a gateway never served was handed over"
+            );
+        }
+        assert!(began.elapsed() < Duration::from_secs(6), "past the bound");
+        let reads = std::fs::read_to_string(&runs).unwrap().lines().count();
+        assert!(!overlap.exists(), "two reads in flight at once");
+        // One at a time and backing off (50, 100, 200, 400, 800, 800 ms
+        // after each 100 ms read): about 7 in 3 s; one at a time at a
+        // fixed 50 ms: about 20; three runs each reading alone: more.
+        assert!((4..=10).contains(&reads), "{reads} reads in 3 s");
+        assert_eq!(
+            turns.turn().gap,
+            Some(Duration::from_millis(800)),
+            "the wait after {reads} failed reads did not grow to its cap"
+        );
     }
 
     #[test]
@@ -2108,6 +2902,7 @@ mod tests {
             not_made: Default::default(),
             net: false,
             tells: false,
+            cancel: Default::default(),
         }
     }
 
@@ -2119,7 +2914,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let run = fixed_write_run(dir.path());
         let starts = crate::skill_start::Starts::default();
-        let said = open_start(&starts, dir.path(), &run, "run-secret")
+        let said = open_start(&starts, dir.path(), &run, "run-secret", None)
             .err()
             .unwrap();
         assert!(said.contains("fixed write is not taken"), "{said}");
@@ -2196,6 +2991,63 @@ mod tests {
         }
     }
 
+    /// #7742: a grant naming its egress socket gets the fence with the
+    /// run's way out, each edit made once ([`FENCE_NET_EDITS`]): the relay
+    /// to fd 5 started as the caller's ids before the script, its `ready`
+    /// waited for, fd 5 closed before the script and the proxy given it;
+    /// the folders shown and the paths hidden as for any run. A grant with
+    /// none gets [`FENCE_TEXT`] byte for byte.
+    #[test]
+    fn a_net_grant_gets_the_fence_with_its_relay_and_no_other_grant_does() {
+        let mut grant = crate::skill_start::Grant {
+            script: "/var/lib/lampOS/skills/s/scripts/main.py".into(),
+            interpreter: INTERPRETER.into(),
+            skill: "/var/lib/lampOS/skills/s".into(),
+            run: "/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-task-1".into(),
+            socket: "/run/lampos-control/control.sock".into(),
+            pythonpath: "/opt/lampOS/sdk".into(),
+            token: "secret".into(),
+            egress: None,
+        };
+        let hidden: Vec<&Path> = HIDDEN.iter().map(Path::new).collect();
+        let text_of = |grant: &crate::skill_start::Grant| {
+            fence_args(grant, 990, 990, &hidden)[12]
+                .to_string_lossy()
+                .into_owned()
+        };
+        let plain = text_of(&grant);
+        assert_eq!(plain, FENCE_TEXT.replace("\"$SCRIPT_PATH\"", SCRIPT_PATH));
+        assert!(!plain.contains("net-relay") && !plain.contains("PROXY"));
+        grant.egress = Some("/run/lampos-tasks/egress/skill-task-1.sock".into());
+        let net = text_of(&grant);
+        for (from, to) in FENCE_NET_EDITS {
+            assert_eq!(FENCE_TEXT.matches(from).count(), 1, "{from}");
+            assert_eq!(net.matches(to).count(), 1, "{to}");
+        }
+        assert_eq!(net.matches(FENCE_NET_LINE).count(), 1);
+        assert!(FENCE_NET_LINE.contains(RELAY));
+        assert!(
+            FENCE_NET_LINE.contains(&format!("/proc/self/fd/{}", crate::skill_start::EGRESS_FD))
+        );
+        // Relay ready, then fd 5 closed, then the script, in that order.
+        let at = |line: &str| net.find(line).unwrap();
+        assert!(at(FENCE_NET_LINE) < at("[ \"$m\" = ready ]"));
+        assert!(at("[ \"$m\" = ready ]") < at("exec 5<&-"));
+        assert!(at("exec 5<&-") < at("exec unshare --user --map-user"));
+        assert!(net.contains("HTTPS_PROXY=http://127.0.0.1:3128"));
+        assert!(net.contains("NODE_USE_ENV_PROXY=1"));
+        // Every mount of the fence as for any run.
+        for line in plain.lines().filter(|line| line.contains("mount")) {
+            assert!(net.contains(line), "{line}");
+        }
+        // The egress path itself is never an argument: fd 5 alone.
+        assert!(
+            fence_args(&grant, 990, 990, &hidden)
+                .iter()
+                .all(|arg| !arg.to_string_lossy().contains("egress/skill-task-1"))
+        );
+    }
+
     /// The launcher's fence, run for real with `unshare`, `mount` and the
     /// interpreter stood in for: what each was given, in order, the
     /// script's environment, and what the fence said on fd 4.
@@ -2242,6 +3094,7 @@ mod tests {
             socket: "/run/lampos-control/control.sock".into(),
             pythonpath: "/sdk".into(),
             token: "run-secret".into(),
+            egress: None,
         };
         let hidden = vec![dir.path().join("state"), dir.path().join("absent")];
         Fenced {

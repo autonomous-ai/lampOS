@@ -216,6 +216,34 @@ pub fn set_net_here(on: Option<bool>) {
     NET_HERE.with(|here| here.set(on));
 }
 
+/// The switch for a run granted [`NET`] on a gateway agent (OpenClaw,
+/// #7742), in lamp-tasks (`lamp_tasks::skill_task::GATEWAY_NET_SWITCH`)
+/// and the voice: `on` only. With it and [`NET_ENVIRONMENT`] on, such a
+/// run's script reaches the public web from its own skill-start fence, so
+/// a make on OpenClaw may write a task whose own script fetches from the
+/// web (`make_skill_local`); off, as before.
+pub const GATEWAY_NET_ENVIRONMENT: &str = "LAMP_TASK_NET_GATEWAY";
+
+thread_local! {
+    /// [`GATEWAY_NET_ENVIRONMENT`] as a test of this thread sets it.
+    static GATEWAY_NET_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether a gateway agent's run granted [`NET`] is on in this process:
+/// [`GATEWAY_NET_ENVIRONMENT`] `on` and [`net_on`].
+pub fn gateway_net_on() -> bool {
+    net_on()
+        && GATEWAY_NET_HERE
+            .with(std::cell::Cell::get)
+            .unwrap_or_else(|| std::env::var(GATEWAY_NET_ENVIRONMENT).ok().as_deref() == Some("on"))
+}
+
+/// [`GATEWAY_NET_ENVIRONMENT`] for this test's thread alone: tests only.
+#[doc(hidden)]
+pub fn set_gateway_net_here(on: Option<bool>) {
+    GATEWAY_NET_HERE.with(|here| here.set(on));
+}
+
 /// [`GRANTS`], and [`NET`] while [`net_on`].
 fn known() -> impl Iterator<Item = &'static (&'static str, &'static str)> {
     GRANTS.iter().chain(net_on().then_some(&NET))
@@ -423,8 +451,20 @@ pub fn read_back(
     if !asking.heard {
         return Some(json!({ "error": READ_BACK_NOT_ASKED }));
     }
+    // As [`crate::made_skill::name_asked`] writes it, then as written
+    // ([`crate::made_skill::names_written`]): a skill named `my-day` is
+    // never only `day` (#7874). One ask of the helper when the first finds.
     let asked = crate::made_skill::name_asked(name);
-    let found = match asks(&asked) {
+    let mut found = asks(&asked);
+    for written in crate::made_skill::names_written(name) {
+        if !matches!(found, Ok(None)) {
+            break;
+        }
+        if written != asked {
+            found = asks(&written);
+        }
+    }
+    let found = match found {
         Ok(None) => match pushed_named(pushed, &asked) {
             Some(named) if named != asked => asks(&named),
             _ => Ok(None),
@@ -1116,6 +1156,26 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dev);
     }
 
+    /// #7874: a skill named `my-day` is read back as "my day", never
+    /// looked up only as `day`; `desk-check` asked as "my desk check skill"
+    /// is still found.
+    #[test]
+    fn a_skill_named_my_something_is_read_back() {
+        let now = Instant::now();
+        for (said, name) in [("my day", "my-day"), ("my desk check skill", "desk-check")] {
+            let mut asked = Vec::new();
+            let told = read_back(
+                said,
+                asking(45),
+                nowhere(),
+                helper(&["my-day", "desk-check"], &mut asked),
+                now,
+            );
+            assert!(told.is_some(), "{said}");
+            assert_eq!(asked.last().map(String::as_str), Some(name), "{said}");
+        }
+    }
+
     /// Two pushed skills alike but for number words or dashes, neither
     /// named exactly, find neither; the exact name wins over one alike; and
     /// a miss journals the name asked as written, nothing else.
@@ -1325,7 +1385,10 @@ mod tests {
         assert!(cut.contains("say it again, word for word"), "{cut}");
         // A no to a cut say-back keeps it off; it doesn't bring it back.
         assert!(
-            cut.contains("If they decline or wait, say it stays off, and call nothing"),
+            cut.contains(
+                "If they decline or wait, say only that it stays off, never how to start it, and \
+                 call nothing"
+            ),
             "{cut}"
         );
         assert!(cut.contains(&say_back), "{cut}");

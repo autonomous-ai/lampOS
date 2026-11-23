@@ -54,7 +54,14 @@ pub struct Place {
     pub room_sounds: bool,
     /// Seen activity applies: lamp-seen is switched on.
     pub seen_activity: bool,
+    /// Posture too (`LAMP_SEEN_POSTURE=on` in `lamp-cloud`'s own unit,
+    /// #6543): said in the desk noticing reply, so the app shows the
+    /// disclosure that names posture.
+    pub posture: bool,
 }
+
+/// lamp-seen's posture switch, read here only to say it: `on` exactly.
+pub const POSTURE_ENVIRONMENT: &str = "LAMP_SEEN_POSTURE";
 
 /// Whether both kinds are taken: `LAMP_CLOUD=on` and `LAMP_APP_CONSENT=on`.
 pub fn gates(cloud: Option<&str>, consent: Option<&str>) -> bool {
@@ -71,6 +78,7 @@ impl Place {
             wait: WAIT,
             room_sounds: var(PRIVACY_ENVIRONMENT).as_deref() == Some(NO_SLIDE),
             seen_activity: var(SEEN_ENVIRONMENT).as_deref() == Some("on"),
+            posture: false,
         })
     }
 
@@ -140,6 +148,99 @@ pub fn get(place: &Place) -> Value {
     now(place)
 }
 
+/// The owner's desk noticing switch in the app (#6543, the owner's call
+/// c6946201674, "like muted sound"): `desk_noticing.get` (`{}`) and
+/// `desk_noticing.set` (`{"allow": bool, "request_id": N}`, N the app's
+/// send time in Unix ms, so the helper refuses a yes resent or sent before
+/// the lamp's last change). Taken with lamp-seen switched
+/// on alone (`LAMP_SEEN_ACTIVITY=on` in `lamp-cloud`'s own unit, with
+/// `LAMP_CLOUD=on`), not behind [`ENVIRONMENT`]: it is the same yes as
+/// `consent.set`'s `seen_activity`, the same file, made by the same helper
+/// with `"by":"app"`, so a yes from the app and one spoken at the lamp are
+/// one yes. Off is what the voice's stop does: the file removed, and
+/// lamp-seen closes its gate at its next read and forgets the sitting.
+pub const DESK_KINDS: [&str; 2] = ["desk_noticing.get", "desk_noticing.set"];
+
+/// The desk noticing switch's place, as the environment says: none unless
+/// `LAMP_CLOUD=on` and [`SEEN_ENVIRONMENT`]`=on`, exactly.
+pub fn desk_from_environment() -> Option<Place> {
+    desk_from(|name| std::env::var(name).ok())
+}
+
+/// [`desk_from_environment`] with `var` as the environment.
+pub fn desk_from(var: impl Fn(&str) -> Option<String>) -> Option<Place> {
+    desk_gates(
+        var("LAMP_CLOUD").as_deref(),
+        var(SEEN_ENVIRONMENT).as_deref(),
+    )
+    .then(|| Place {
+        posture: var(POSTURE_ENVIRONMENT).as_deref() == Some("on"),
+        ..desk_in(
+            Path::new(lamp_msgs::consent::FOLDER),
+            Path::new(crate::settings::SOCKET),
+        )
+    })
+}
+
+/// Whether the desk noticing kinds are taken: `LAMP_CLOUD=on` and
+/// `LAMP_SEEN_ACTIVITY=on`.
+pub fn desk_gates(cloud: Option<&str>, seen: Option<&str>) -> bool {
+    cloud == Some("on") && seen == Some("on")
+}
+
+/// The desk noticing switch's place in `folder`, the helper at `socket`.
+pub fn desk_in(folder: &Path, socket: &Path) -> Place {
+    place_in(folder, socket, false)
+}
+
+/// What the switch says now: `{"desk_noticing": {"on", "by", "posture"}}`,
+/// `on` only while the file holds a yes, `by` `"app"` for the app's,
+/// `"voice"` for any other (a file from before `by` is the voice's), null
+/// when off; `posture`, whether `LAMP_SEEN_POSTURE=on`, so the app shows
+/// the disclosure naming it.
+pub fn desk_now(place: &Place) -> Value {
+    let kept = lamp_msgs::consent::file_in(&place.folder, SEEN_ACTIVITY)
+        .map(|file| lamp_msgs::consent::read(&file, SEEN_ACTIVITY))
+        .unwrap_or_default();
+    let by = kept.yes.then(|| {
+        if kept.by_app() {
+            lamp_msgs::consent::BY_APP
+        } else {
+            lamp_msgs::consent::BY_VOICE
+        }
+    });
+    json!({"desk_noticing": {"on": kept.yes, "by": by, "posture": place.posture}})
+}
+
+/// A `desk_noticing.set` with no `request_id`, or one that is no positive
+/// integer.
+pub const DESK_REQUEST_ID: &str = "request_id must be the app's send time in Unix milliseconds";
+
+/// `desk_noticing.set`: `allow` true or false and the app's `request_id`,
+/// handed to the helper as `{"desk_noticing": {"allow", "request_id"}}`,
+/// and answered with [`desk_now`]. The helper keeps a yes only with an id
+/// above the mark beside it, and refuses it otherwise; a yes already kept,
+/// the voice's too, is left as it is.
+pub fn desk_set(place: &Place, data: &Value) -> Result<Value, String> {
+    let line = desk_line(data)?;
+    crate::settings::ask(&place.socket, &line, place.wait)?;
+    Ok(desk_now(place))
+}
+
+/// The helper's line for `desk_noticing.set`'s `data`, or why not.
+fn desk_line(data: &Value) -> Result<String, String> {
+    let allow = data
+        .get("allow")
+        .and_then(Value::as_bool)
+        .ok_or("allow must be true or false")?;
+    let id = data
+        .get("request_id")
+        .and_then(Value::as_u64)
+        .filter(|id| *id > 0)
+        .ok_or(DESK_REQUEST_ID)?;
+    Ok(json!({"desk_noticing": {"allow": allow, "request_id": id}}).to_string())
+}
+
 /// A place in `folder`, the helper at `socket`, for tests and rigs.
 pub fn place_in(folder: &Path, socket: &Path, room_sounds: bool) -> Place {
     Place {
@@ -148,6 +249,7 @@ pub fn place_in(folder: &Path, socket: &Path, room_sounds: bool) -> Place {
         wait: WAIT,
         room_sounds,
         seen_activity: false,
+        posture: false,
     }
 }
 
@@ -175,6 +277,78 @@ mod tests {
         ] {
             assert!(!gates(cloud, consent), "{cloud:?} {consent:?}");
         }
+    }
+
+    /// #6543 (Twelve's P2 on #7551): desk noticing is taken only with both
+    /// switches `on` exactly.
+    #[test]
+    fn desk_noticing_needs_the_cloud_and_lamp_seen_on_exactly() {
+        assert!(desk_gates(Some("on"), Some("on")));
+        for (cloud, seen) in [
+            (Some("on"), None),
+            (Some("on"), Some("1")),
+            (Some("on"), Some("ON")),
+            (None, Some("on")),
+            (Some("on "), Some("on")),
+            (Some("off"), Some("on")),
+        ] {
+            assert!(!desk_gates(cloud, seen), "{cloud:?} {seen:?}");
+            let var = |name: &str| match name {
+                "LAMP_CLOUD" => cloud.map(str::to_owned),
+                SEEN_ENVIRONMENT => seen.map(str::to_owned),
+                _ => Some("on".to_owned()),
+            };
+            assert_eq!(desk_from(var), None, "{cloud:?} {seen:?}");
+        }
+        // On: the product's folder and helper, posture said only with its
+        // own switch `on` exactly.
+        for (posture, said) in [(Some("on"), true), (None, false), (Some("yes"), false)] {
+            let var = |name: &str| match name {
+                POSTURE_ENVIRONMENT => posture.map(str::to_owned),
+                _ => Some("on".to_owned()),
+            };
+            assert_eq!(
+                desk_from(var),
+                Some(Place {
+                    posture: said,
+                    ..place_in(
+                        Path::new(lamp_msgs::consent::FOLDER),
+                        Path::new(crate::settings::SOCKET),
+                        false
+                    )
+                }),
+                "{posture:?}"
+            );
+        }
+    }
+
+    /// #6543 (Heron's P2 on #7551): the set carries the app's request_id
+    /// to the helper; none, or one that is no positive integer, is refused
+    /// before it.
+    #[test]
+    fn a_desk_noticing_set_needs_the_apps_request_id() {
+        assert_eq!(
+            desk_line(&json!({"allow": true, "request_id": 1_763_380_000_000_u64})).unwrap(),
+            r#"{"desk_noticing":{"allow":true,"request_id":1763380000000}}"#
+        );
+        assert_eq!(
+            desk_line(&json!({"allow": false, "request_id": 7})).unwrap(),
+            r#"{"desk_noticing":{"allow":false,"request_id":7}}"#
+        );
+        for data in [
+            json!({"allow": true}),
+            json!({"allow": true, "request_id": 0}),
+            json!({"allow": true, "request_id": -3}),
+            json!({"allow": true, "request_id": 1.5}),
+            json!({"allow": true, "request_id": "17"}),
+            json!({"allow": false, "request_id": null}),
+        ] {
+            assert_eq!(desk_line(&data).unwrap_err(), DESK_REQUEST_ID, "{data}");
+        }
+        assert_eq!(
+            desk_line(&json!({"request_id": 5})).unwrap_err(),
+            "allow must be true or false"
+        );
     }
 
     #[test]

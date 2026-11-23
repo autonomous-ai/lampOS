@@ -41,6 +41,19 @@
 //!   or the environment), the socket kept open as fd 4. Just before the
 //!   script is exec'd, the fence writes [`STARTED`] to fd 4 and closes it;
 //!   lamp-tasks reads it on that connection ([`Live::ran`]).
+//! - **A run granted `net`** (#7742, with
+//!   `crate::skill_task::GATEWAY_NET_SWITCH` on): lamp-tasks makes the
+//!   run's own egress socket (`crate::egress`, `skill-<run id>.sock`)
+//!   before Harness is asked, names it in the grant and sends an `O_PATH`
+//!   descriptor of that socket alone with the grant's line (`SCM_RIGHTS`;
+//!   the gateway sees no `/run/lampos-tasks`). The launcher refuses a
+//!   grant naming one with no descriptor, puts it on [`EGRESS_FD`], and the
+//!   fence (`crate::gateway::FENCE_NET_EDITS`) brings up `lo` in the run's
+//!   own network, starts `lamp-tasks net-relay --egress /proc/self/fd/5`
+//!   as the caller's ids, waits for its `ready`, closes fd 5 and only then
+//!   says [`STARTED`] and runs the script with the proxy in its
+//!   environment. The socket goes when the run ends, the relay and the
+//!   network with the fence's PID namespace.
 //!
 //! A sibling agent could race the launcher for a live run's id: through
 //! the launcher it gets only that run's own approved script, fenced, once,
@@ -110,7 +123,12 @@ pub const BIND_AGAIN: Duration = Duration::from_secs(2);
 
 /// What a claimed run's launcher is given, one JSON line: its script and
 /// interpreter, its skill's folder, its run's folder, lamp-control's
-/// socket, the SDK's path and the run's token.
+/// socket, the SDK's path and the run's token; for a run granted `net`
+/// (#7742, [`crate::skill_task::GATEWAY_NET_SWITCH`]) its egress socket
+/// too, which the launcher can't open (`/run/lampos-tasks` is hidden from
+/// the gateway): the line names it, and lamp-tasks sends it with that line
+/// as an `O_PATH` descriptor ([`EGRESS_FD`]). With no egress the field is
+/// left out, so the line is as before for every other run.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Grant {
@@ -121,7 +139,14 @@ pub struct Grant {
     pub socket: String,
     pub pythonpath: String,
     pub token: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub egress: Option<PathBuf>,
 }
+
+/// The fd a run granted `net` gets its egress socket on in its fence
+/// (#7742): after the token's pipe (3) and the launcher's socket (4). The
+/// fence starts the run's relay on it and closes it before the script.
+pub const EGRESS_FD: i32 = 5;
 
 impl std::fmt::Debug for Grant {
     /// Never the token.
@@ -133,6 +158,7 @@ impl std::fmt::Debug for Grant {
             .field("run", &self.run)
             .field("socket", &self.socket)
             .field("pythonpath", &self.pythonpath)
+            .field("egress", &self.egress)
             .finish_non_exhaustive()
     }
 }
@@ -147,6 +173,10 @@ fn plain_id(id: &str) -> bool {
 
 struct Entry {
     grant: Grant,
+    /// When it was made live (the run's start, before Harness is asked).
+    opened: std::time::Instant,
+    /// When its launcher claimed it.
+    claimed_at: Option<std::time::Instant>,
     claimed: bool,
     started: bool,
     /// Why its start was refused, after which it is never claimed.
@@ -178,6 +208,8 @@ impl Starts {
             id.to_owned(),
             Entry {
                 grant,
+                opened: std::time::Instant::now(),
+                claimed_at: None,
                 claimed: false,
                 started: false,
                 refused: None,
@@ -203,6 +235,7 @@ impl Starts {
             return Err("that run's start was claimed already".into());
         }
         entry.claimed = true;
+        entry.claimed_at = Some(std::time::Instant::now());
         Ok(entry.grant.clone())
     }
 
@@ -221,12 +254,22 @@ impl Starts {
         self.lock().get(id).and_then(|entry| entry.refused.clone())
     }
 
-    /// Run `id`'s fence said [`STARTED`]: only a claimed live run.
+    /// Run `id`'s fence said [`STARTED`]: only a claimed live run. For a
+    /// run granted `net` (#7742), its fence says it only once the run's
+    /// relay to its egress socket is ready: the ms since the run was made
+    /// live and since its claim are journaled, to measure that setup.
     fn started(&self, id: &str) {
         if let Some(entry) = self.lock().get_mut(id)
             && entry.claimed
         {
             entry.started = true;
+            if entry.grant.egress.is_some() {
+                eprintln!(
+                    "[lamp-tasks] skill start: run {id}'s egress ready in its fence: {} ms after the run's start, {} ms after its claim",
+                    entry.opened.elapsed().as_millis(),
+                    entry.claimed_at.map_or(0, |at| at.elapsed().as_millis())
+                );
+            }
         }
     }
 
@@ -895,13 +938,33 @@ impl Server {
             self.starts.refuse(&id, why);
             return answer(&error_line(why));
         };
+        // A run granted `net` (#7742): its own egress socket goes with the
+        // line as an `O_PATH` descriptor of that socket alone; the gateway
+        // the launcher runs in sees no `/run/lampos-tasks`.
+        let egress = match grant.egress.as_deref().map(egress_fd).transpose() {
+            Ok(egress) => egress,
+            Err(error) => {
+                let why = format!(
+                    "the run's egress socket could not be sent ({})",
+                    error.kind()
+                );
+                self.starts.refuse(&id, &why);
+                return answer(&error_line(&why));
+            }
+        };
         eprintln!(
-            "[lamp-tasks] skill start: run {id} claimed by the launcher (pid {})",
-            peer.pid
+            "[lamp-tasks] skill start: run {id} claimed by the launcher (pid {}){}",
+            peer.pid,
+            if egress.is_some() {
+                ", its egress socket sent with its start"
+            } else {
+                ""
+            }
         );
-        if write_line(&stream, &line).is_err() {
+        if send_with(&stream, &line, egress.as_ref()).is_err() {
             return;
         }
+        drop(egress);
         drop(line);
         if stream.set_read_timeout(Some(self.started_within)).is_ok()
             && read_line(&stream, STARTED.len()).is_ok_and(|line| line == STARTED)
@@ -964,6 +1027,107 @@ fn read_line(mut stream: &UnixStream, most: usize) -> io::Result<String> {
 
 fn write_line(mut stream: &UnixStream, line: &str) -> io::Result<()> {
     stream.write_all(format!("{line}\n").as_bytes())
+}
+
+/// A run's egress socket at `path` opened `O_PATH` (#7742): that socket
+/// alone, never through a link; anything else is refused.
+#[cfg(target_os = "linux")]
+fn egress_fd(path: &Path) -> io::Result<OwnedFd> {
+    use rustix::fs::{FileType, Mode, OFlags};
+    let fd = rustix::fs::open(
+        path,
+        OFlags::PATH | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+        Mode::empty(),
+    )?;
+    if FileType::from_raw_mode(rustix::fs::fstat(&fd)?.st_mode) != FileType::Socket {
+        return Err(io::ErrorKind::InvalidInput.into());
+    }
+    Ok(fd)
+}
+
+/// Off Linux no descriptor is sent: refused.
+#[cfg(not(target_os = "linux"))]
+fn egress_fd(_: &Path) -> io::Result<OwnedFd> {
+    Err(io::ErrorKind::Unsupported.into())
+}
+
+/// `line` written, with `fd` sent on its first byte (`SCM_RIGHTS`) when
+/// there is one; else as [`write_line`].
+#[cfg(target_os = "linux")]
+fn send_with(stream: &UnixStream, line: &str, fd: Option<&OwnedFd>) -> io::Result<()> {
+    use rustix::net::{SendAncillaryBuffer, SendAncillaryMessage, SendFlags};
+    use std::mem::MaybeUninit;
+    let Some(fd) = fd else {
+        return write_line(stream, line);
+    };
+    let bytes = format!("{line}\n");
+    let fds = [fd.as_fd()];
+    let mut space = [MaybeUninit::uninit(); rustix::cmsg_space!(ScmRights(1))];
+    let mut control = SendAncillaryBuffer::new(&mut space);
+    if !control.push(SendAncillaryMessage::ScmRights(&fds)) {
+        return Err(io::Error::other("no room for the egress socket"));
+    }
+    let sent = rustix::net::sendmsg(
+        stream,
+        &[io::IoSlice::new(bytes.as_bytes())],
+        &mut control,
+        SendFlags::NOSIGNAL,
+    )?;
+    (&*stream).write_all(&bytes.as_bytes()[sent..])
+}
+
+#[cfg(not(target_os = "linux"))]
+fn send_with(stream: &UnixStream, line: &str, fd: Option<&OwnedFd>) -> io::Result<()> {
+    match fd {
+        None => write_line(stream, line),
+        Some(_) => Err(io::ErrorKind::Unsupported.into()),
+    }
+}
+
+/// [`read_line`], and the one descriptor sent with it (`SCM_RIGHTS`), if
+/// any: read a byte at a time by `recvmsg`, so nothing after the line is
+/// taken. A second descriptor is closed, never kept.
+#[cfg(target_os = "linux")]
+fn read_line_fd(stream: &UnixStream, most: usize) -> io::Result<(String, Option<OwnedFd>)> {
+    use rustix::net::{RecvAncillaryBuffer, RecvAncillaryMessage, RecvFlags};
+    use std::mem::MaybeUninit;
+    let mut line = Vec::new();
+    let mut kept: Option<OwnedFd> = None;
+    loop {
+        let mut byte = [0u8; 1];
+        let mut space = [MaybeUninit::uninit(); rustix::cmsg_space!(ScmRights(1))];
+        let mut control = RecvAncillaryBuffer::new(&mut space);
+        let got = rustix::net::recvmsg(
+            stream,
+            &mut [io::IoSliceMut::new(&mut byte)],
+            &mut control,
+            RecvFlags::CMSG_CLOEXEC,
+        )?;
+        for message in control.drain() {
+            if let RecvAncillaryMessage::ScmRights(fds) = message {
+                for fd in fds {
+                    if kept.is_none() {
+                        kept = Some(fd);
+                    }
+                }
+            }
+        }
+        if got.bytes == 0 {
+            return Err(io::ErrorKind::UnexpectedEof.into());
+        }
+        match byte[0] {
+            b'\n' => break,
+            _ if line.len() >= most => return Err(io::ErrorKind::InvalidData.into()),
+            other => line.push(other),
+        }
+    }
+    let line = String::from_utf8(line).map_err(|_| io::Error::from(io::ErrorKind::InvalidData))?;
+    Ok((line, kept))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn read_line_fd(stream: &UnixStream, most: usize) -> io::Result<(String, Option<OwnedFd>)> {
+    read_line(stream, most).map(|line| (line, None))
 }
 
 /// The bound socket, removed at the drop if it is still the one bound.
@@ -1146,6 +1310,17 @@ pub fn ask(
     id: &str,
     undumpable: impl FnOnce() -> io::Result<()>,
 ) -> Result<Grant, (i32, String)> {
+    ask_for(stream, id, undumpable).map(|(grant, _)| grant)
+}
+
+/// [`ask`], with the egress socket a run granted `net` is sent beside its
+/// grant (#7742, [`EGRESS_FD`]): refused when the grant names one and none
+/// came, or one came for a grant that names none.
+pub fn ask_for(
+    stream: &UnixStream,
+    id: &str,
+    undumpable: impl FnOnce() -> io::Result<()>,
+) -> Result<(Grant, Option<OwnedFd>), (i32, String)> {
     let refused = |why: String| (1, format!("the run's start was refused: {why}"));
     send_line(stream, id).map_err(|_| (1, "lamp-tasks was not asked".to_owned()))?;
     let nonce = match read_line(stream, MOST_ANSWER_BYTES) {
@@ -1163,10 +1338,18 @@ pub fn ask(
     })?;
     send_line(stream, &format!("{READY} {nonce}"))
         .map_err(|_| (1, "lamp-tasks was not told ready".to_owned()))?;
-    read_line(stream, MOST_ANSWER_BYTES)
-        .map_err(|_| "lamp-tasks did not answer".to_owned())
-        .and_then(|line| parse_answer(&line))
-        .map_err(refused)
+    let (line, egress) = read_line_fd(stream, MOST_ANSWER_BYTES)
+        .map_err(|_| refused("lamp-tasks did not answer".to_owned()))?;
+    let grant = parse_answer(&line).map_err(refused)?;
+    match (grant.egress.is_some(), egress) {
+        (true, None) => Err(refused(
+            "the run's egress socket did not come with its start".into(),
+        )),
+        (false, Some(_)) => Err(refused(
+            "a descriptor came with a start that names no egress socket".into(),
+        )),
+        (_, egress) => Ok((grant, egress)),
+    }
 }
 
 /// The launcher past its own checks: lamp-tasks asked for run `id`.
@@ -1192,14 +1375,14 @@ fn launch(id: &str) -> (i32, String) {
     {
         return (1, "lamp-tasks was not asked".into());
     }
-    let grant = match ask(&stream, id, undumpable) {
-        Ok(grant) => grant,
+    let (grant, egress) = match ask_for(&stream, id, undumpable) {
+        Ok(asked) => asked,
         Err(refused) => return refused,
     };
     if stream.set_read_timeout(None).is_err() || stream.set_write_timeout(None).is_err() {
         return (1, "the launcher socket could not be kept".into());
     }
-    match exec_fence(&grant, stream) {
+    match exec_fence(&grant, stream, egress) {
         Ok(never) => match never {},
         Err(error) => (1, format!("the run's fence was not started: {error}")),
     }
@@ -1252,9 +1435,14 @@ fn place(fd: impl AsFd, at: i32) -> io::Result<OwnedFd> {
 }
 
 /// The run's fence exec'd: `unshare` with `crate::gateway::fence_args`,
-/// the token in a pipe on fd 3, the socket on fd 4, an environment of
+/// the token in a pipe on fd 3, the socket on fd 4, a run granted `net`'s
+/// egress socket on [`EGRESS_FD`] (#7742), an environment of
 /// `crate::gateway::SCRIPT_PATH` only.
-fn exec_fence(grant: &Grant, stream: UnixStream) -> io::Result<std::convert::Infallible> {
+fn exec_fence(
+    grant: &Grant,
+    stream: UnixStream,
+    egress: Option<OwnedFd>,
+) -> io::Result<std::convert::Infallible> {
     use std::os::unix::process::CommandExt;
     let (reader, writer) = rustix::pipe::pipe()?;
     let mut writer = std::fs::File::from(writer);
@@ -1264,11 +1452,20 @@ fn exec_fence(grant: &Grant, stream: UnixStream) -> io::Result<std::convert::Inf
     // whatever the fds were.
     let high_reader = rustix::io::fcntl_dupfd_cloexec(&reader, 10)?;
     let high_stream = rustix::io::fcntl_dupfd_cloexec(&stream, 10)?;
-    drop((reader, stream));
+    let high_egress = egress
+        .as_ref()
+        .map(|egress| rustix::io::fcntl_dupfd_cloexec(egress, 10))
+        .transpose()?;
+    drop((reader, stream, egress));
     let (reader, stream) = (high_reader, high_stream);
     let token_fd = place(&reader, 3)?;
     let socket_fd = place(&stream, 4)?;
     above_4_closed_at_exec()?;
+    // After every fd above 4 was made close-on-exec, so this one stays.
+    let egress_fd = high_egress
+        .as_ref()
+        .map(|egress| place(egress, EGRESS_FD))
+        .transpose()?;
     let hidden: Vec<&Path> = crate::gateway::HIDDEN.iter().map(Path::new).collect();
     let error = std::process::Command::new("unshare")
         .args(crate::gateway::fence_args(
@@ -1280,7 +1477,7 @@ fn exec_fence(grant: &Grant, stream: UnixStream) -> io::Result<std::convert::Inf
         .env_clear()
         .env("PATH", crate::gateway::SCRIPT_PATH)
         .exec();
-    drop((token_fd, socket_fd));
+    drop((token_fd, socket_fd, egress_fd));
     Err(error)
 }
 
@@ -1297,6 +1494,7 @@ mod tests {
             socket: "/run/lampos-control/control.sock".into(),
             pythonpath: "/opt/lampOS/sdk".into(),
             token: "secret-7133".into(),
+            egress: None,
         }
     }
 
@@ -2188,6 +2386,84 @@ mod tests {
         drop(near);
         serving.join().unwrap();
         assert_eq!(live.ran(), Ok(()));
+    }
+
+    /// #7742, end to end against lamp-tasks' own side: a grant naming a
+    /// run's egress socket comes with an `O_PATH` descriptor of that socket
+    /// alone, through which the fence's relay connects
+    /// (`/proc/self/fd/<fd>`) with no path to it; a link at that path is
+    /// refused, the run's start with it, and nothing is sent.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_net_grant_comes_with_its_egress_socket_as_a_descriptor() {
+        use std::os::unix::net::UnixListener;
+        let dir = tempfile::tempdir().unwrap();
+        let socket = dir.path().join("skill-task-1.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let mut net = grant();
+        net.egress = Some(socket.clone());
+        let starts = Starts::default();
+        let live = starts.open("task-1", net.clone()).unwrap();
+        let (near, far) = UnixStream::pair().unwrap();
+        let served = server(&starts, Fake::good());
+        let serving = std::thread::spawn(move || served.one(far));
+        let (got, fd) = ask_for(&near, "task-1", || Ok(())).unwrap();
+        assert_eq!(got, net);
+        let fd = fd.expect("its egress socket");
+        let mut through = UnixStream::connect(format!("/proc/self/fd/{}", fd.as_raw_fd())).unwrap();
+        through.write_all(b"P").unwrap();
+        let (mut accepted, _) = listener.accept().unwrap();
+        let mut byte = [0u8; 1];
+        accepted.read_exact(&mut byte).unwrap();
+        assert_eq!(&byte, b"P");
+        write_line(&near, STARTED).unwrap();
+        drop(near);
+        serving.join().unwrap();
+        assert_eq!(live.ran(), Ok(()));
+        drop(live);
+
+        // A link where the socket was named: refused, never followed.
+        let link = dir.path().join("skill-task-2.sock");
+        std::os::unix::fs::symlink(&socket, &link).unwrap();
+        let mut linked = grant();
+        linked.egress = Some(link);
+        let live = starts.open("task-2", linked).unwrap();
+        let (near, far) = UnixStream::pair().unwrap();
+        let served = server(&starts, Fake::good());
+        let serving = std::thread::spawn(move || served.one(far));
+        let refused = ask_for(&near, "task-2", || Ok(())).unwrap_err();
+        assert!(
+            refused.1.contains("egress socket could not be sent"),
+            "{refused:?}"
+        );
+        drop(near);
+        serving.join().unwrap();
+        assert!(live.ran().is_err());
+    }
+
+    /// #7742: a grant naming an egress socket with no descriptor beside it
+    /// (an older lamp-tasks) is refused by the launcher, never run without.
+    #[test]
+    fn a_net_grant_with_no_descriptor_is_refused_by_the_launcher() {
+        let mut net = grant();
+        net.egress = Some("/run/lampos-tasks/egress/skill-task-1.sock".into());
+        let (near, far) = UnixStream::pair().unwrap();
+        let lamp = std::thread::spawn(move || {
+            let _ = read_line(&far, MOST_ID_BYTES);
+            write_line(&far, "checked 0123456789abcdef").unwrap();
+            let _ = read_line(&far, 64);
+            write_line(&far, &serde_json::to_string(&net).unwrap()).unwrap();
+        });
+        let refused = ask_for(&near, "task-1", || Ok(())).unwrap_err();
+        lamp.join().unwrap();
+        assert_eq!(
+            refused,
+            (
+                1,
+                "the run's start was refused: the run's egress socket did not come with its start"
+                    .into()
+            )
+        );
     }
 
     #[test]

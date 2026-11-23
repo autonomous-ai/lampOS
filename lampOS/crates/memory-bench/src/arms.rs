@@ -41,6 +41,8 @@ struct History {
 pub struct Basic {
     kind: BasicKind,
     owner: String,
+    /// The persona's zone: each event is shown with its local day.
+    zone: lamp_memory::store::LocalTime,
     path: PathBuf,
     key: Hmac<Sha256>,
     state: History,
@@ -72,7 +74,8 @@ pub fn forgetting(text: &str) -> Option<String> {
     }
 }
 impl Basic {
-    pub fn open(kind: BasicKind, owner: String, path: &Path) -> Result<Self> {
+    pub fn open(kind: BasicKind, owner: String, timezone: &str, path: &Path) -> Result<Self> {
+        let zone = crate::when::zone(timezone)?;
         let mut bytes = [0; 32];
         File::open("/dev/urandom")?.read_exact(&mut bytes)?;
         let key = Hmac::<Sha256>::new_from_slice(&bytes)
@@ -87,6 +90,7 @@ impl Basic {
         let arm = Self {
             kind,
             owner,
+            zone,
             path: path.to_owned(),
             key,
             state: History::default(),
@@ -235,7 +239,15 @@ impl MemoryArm for Basic {
         }
         let mut recall = Recall::default();
         if !self.state.events.is_empty() {
-            recall.context = serde_json::to_string(&self.state.events)?;
+            // Each event with its local day as the voice says it, never a raw
+            // epoch, so the ceiling reads time as the product arms do.
+            let dated = self
+                .state
+                .events
+                .iter()
+                .map(|e| crate::when::dated(serde_json::to_value(e)?, query.at_unix_ms, &self.zone))
+                .collect::<Result<Vec<_>>>()?;
+            recall.context = serde_json::to_string(&dated)?;
             recall.source_ids = self
                 .state
                 .events

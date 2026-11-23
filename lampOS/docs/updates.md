@@ -66,7 +66,7 @@ Read for this task: `docs/bootstrap-ota.md` (sections 1, 2, 4 and 5) and
 | GO-3.6 | A journal written and flushed before the live tree is replaced; recovery before any new update | `rebuild from the idea` | Taken: the journal and the units as they were are written before any unit changes; at the next round an unfinished switch is put back before any build is looked at (only a wait on lamp-update's own unconfirmed switch and the settings writer's refresh come first) | `lamp-update` | built |
 | GO-3.6 | Core binaries: a `--version` probe within 15 s, then a health URL and "the service remains active" | `rebuild from the idea` | The second half is taken: a part must stay up with one process for a minute and not say it is worse in `lamp/health`. No `--version` probe: the folder is named by the binary's SHA-256, which says more, and a probe would start a second copy of a part beside the one running | `lamp-update`, `judge.rs` | built |
 | GO-3.7 | Ten progress phases; `/security` posture with the key's fingerprint and the last fetch | `later` | The log says each outcome, and the key's fingerprint is printed at start; a page and progress belong with the surround's pages | The surround | partly |
-| GO-3.4 | LED feedback while updating (orange breath, green, red) | `ignore` | The ring is the voice's; an update at a quiet moment says nothing | Nowhere | none |
+| GO-3.4 | LED feedback while updating (orange breath, green, red) | `rebuild from the idea` | The ring is the voice's, so the voice's ring worker shows it (#7516, `LAMP_RING_UPDATE`, off until its row): a slower, deeper breath in the person's own colour while a round brings a build, then one 3 s swell when the build is kept or one 3 s dip when it is not. No orange, green or red, never over a conversation, privacy, sleep or a light someone asked for ([ring-choreography.md](ring-choreography.md), "An update on the ring") | The voice's ring worker (`ring_update.rs`) | built, off |
 
 The safeguard the old updater lacked, by its own record: two runs 30 s
 apart lost the live tree, staging and backup. Here a second
@@ -235,11 +235,28 @@ and the V2 image's default (`scripts/imager/build-orangepi-v2.sh`) follow it
 from the first customer lamps on (26 Oct), and since #6256 (F2) through its
 CDN mirror, `--channel-url https://cdn.autonomous.ai/lampos/stable/` ("The
 stable build on the CDN"), so a lamp in China, which can't reach GitHub,
-updates too. There is no GitHub fallback: the updater reads one feed. No
-round switches its own unit, so a lamp installed before keeps the GitHub
-stable feed. `lamp-update install` still fetches the models it lacks from
-the URLs `deploy/product/models.json` compiles in (GitHub); a round takes
-them from the manifest, which the mirror points at the CDN. A lamp in a home gets a build only
+updates too. Every lamp on the CDN feed, a product unit's too, switch or
+not, falls back to GitHub only after an hour of CDN failures, one round at a
+time ("GitHub after an hour of CDN failures", below); any other feed is read
+alone. No round switches its own unit, so a lamp installed before keeps the
+GitHub stable feed, unless `LAMP_UPDATE_CDN_FEED=on` moves it ("Moving a lamp
+to the CDN feed", below; on in the product by the carried
+`/etc/lampOS/update.env`). A model has two sources (#7709, `install::model_urls`):
+`lamp-update install` and `lamp-keeper prepare` ask for a model of
+`deploy/product/models.json` (a GitHub release URL) at the CDN's
+sequence-free copy `lampos/models/<release>/<name>` first, then at GitHub; a
+round takes the manifest's URL, which the mirror points at
+`lampos/stable/<sequence>/models/...`, and falls back to that model's GitHub
+release. The URL the manifest or `models.json` names is always asked as
+before, with a whole fetch's waits and asks again: for a lamp in China the
+CDN is the only way. Only the sequence-free copy put in front of a GitHub
+URL is asked once, given 5 s (`MIRROR_QUICK`) to connect and begin
+answering. On a missing file, no answer or a file that does not match its
+size and SHA-256 (never taken) the next URL is asked. When GitHub fails
+too and the quick CDN try was cut short (out of reach, a timeout, a server
+error; not "not there"), the CDN is asked once more with a whole fetch: a
+lamp that can't reach GitHub gets its waits there. The journal
+says which URL served each model. A lamp in a home gets a build only
 once it is promoted here, never each lamp-voice publish, and a lamp the image
 makes starts on the promoted build. Until a first promotion the feed is absent
 and such a lamp keeps the build it has. This tool does not install anything on
@@ -295,7 +312,9 @@ until repository variable `LAMPOS_CDN_MIRROR` is exactly `on`, and a failure
 in it never fails the promotion. A lamp installed or imaged with the product
 unit since #6256 (F2) reads this feed, so when the mirror fails such a lamp
 keeps the build it has until a later promotion is mirrored; a lamp installed
-before reads the GitHub stable feed above.
+before reads the GitHub stable feed above until `LAMP_UPDATE_CDN_FEED=on`, which
+the carried `/etc/lampOS/update.env` sets in the product, moves it to this feed
+("Moving a lamp to the CDN feed", below).
 
 The job builds `lamp-update` from its own commit and never runs an updater
 it downloads. It reads the stable envelope, refuses it unless its files
@@ -304,8 +323,9 @@ verifies its signature with the trusted public key using that locally built
 `lamp-update check` before anything else is fetched. It then downloads every file, unit
 and model the signed manifest names from the build's own releases and checks
 each size and SHA-256. It copies them to `lampos/stable/<sequence>/files/`
-and `lampos/stable/<sequence>/models/<release>/<name>`. A folder of one
-sequence is never overwritten: an object already there with the same bytes is
+and `lampos/stable/<sequence>/models/<release>/<name>`, and each model once
+more to `lampos/models/<release>/<name>`, a path no sequence names (#7709).
+Neither is ever overwritten: an object already there with the same bytes is
 left alone, one with other bytes fails the job. It then rewrites `files_url`
 and each model's `url` to those copies, signs the manifest again with the
 same key (same sequence, commit and channel; nothing else changes) and puts it
@@ -320,6 +340,87 @@ made; any other destination stops the step. The job runs from `lamp-voice`
 only, never for a pull request or a tag. The `lampos-cdn-probe` workflow,
 run by hand on `lamp-voice`, writes one file under `lampos/_probe/`, reads it
 back with `gcloud` and through the CDN, and deletes it.
+
+### Moving a lamp to the CDN feed (`LAMP_UPDATE_CDN_FEED`, on)
+
+A lamp installed before #6589 follows
+`--channel-url https://github.com/autonomous-ai/lampOS/releases/download/lampos-stable/`,
+and no round rewrites lamp-update's unit. With `LAMP_UPDATE_CDN_FEED=on`
+(#7728; in lamp-update's environment, or, not set there, in the carried
+`/etc/lampOS/update.env`, which turns it on in the product, so a lamp in a
+home takes it from the file every round carries: off unless set), a `serve`
+that acts does this after every round, an up-to-date or unreachable one too
+(`cdn_feed::move_to_cdn`). It is read with lamp-update's other switches
+(`switches::update_switches`, "The update switch file"), so the round that
+first carries the file turning it on leaves them differing from the
+start's, lamp-update starts itself again in its own place
+(`switches::restart_for`), and on that start it moves: the build that
+carries it moves the lamp itself, not one build later (the rule #7018
+gives a new unit):
+
+1. It reads lamp-update's own `ExecStart` from the unit and its `.conf`
+   drop-ins in name order, the last one winning and an empty `ExecStart=`
+   clearing those before. Only when that line's `--channel-url` and the one
+   lamp-update runs with are both exactly the GitHub stable feed does it go
+   on. The lamp-voice feed (the canary, #6300), a `file:///` folder, the CDN
+   feed already, and every other feed are left alone, as is a `once` by hand
+   with another feed.
+2. It reads the CDN's `lampos-manifest.json`, checks its signature with the
+   lamp's key and its channel, and reads GitHub's the same way. A CDN
+   envelope it can't read or trust, or one whose build is older than
+   GitHub's, keeps the lamp on GitHub. GitHub out of reach does not hold the
+   move.
+3. It writes the drop-in
+   `/etc/systemd/system/lamp-update.service.d/zz-cdn-feed.conf` whole
+   (`ExecStart=` and the same line with only the feed changed to
+   `https://cdn.autonomous.ai/lampos/stable/`), reads it back, and checks
+   that the unit and its drop-ins now leave the CDN feed. The unit file
+   itself is not changed.
+4. It runs `systemctl daemon-reload`, then starts itself again in its own
+   place with the same options but the CDN feed, as a changed
+   `update.env` does: no restart through systemd, so `OnFailure=` is not
+   involved.
+
+Any failure in 2 to 4 puts the drop-in back as it was (removed when there
+was none, and systemd reloaded again after a failed reload), says one line
+(`kept on the GitHub stable feed: ...`, said again only when the reason
+changes), and the lamp keeps updating from GitHub; it is tried again after
+the next round. Removing the drop-in and `systemctl daemon-reload` put the
+GitHub feed back by hand. While the drop-in is there it wins over the
+unit's own `ExecStart`, so a lamp moved by hand to another feed (the
+canary, say) has the drop-in removed too. The GitHub stable feed keeps being promoted until
+the fleet has moved. Shown on lamps as well as in `cdn_feed::tests`: on
+52e6 by kit-8054 (a round on the GitHub feed moved it, the next round was
+on the CDN), and on lamp-06c1, which took three promotes from the CDN by
+its own rounds, its lamp-update changing 0074158a872d → 80f8d01ce2b7 →
+7eb3e77d47e6 → 7b50d16e4820, with GitHub never read (#7814).
+
+**GitHub after an hour of CDN failures.** Every `serve` that acts and runs
+with `--channel-url https://cdn.autonomous.ai/lampos/stable/` (moved there,
+or a product unit's own), with `LAMP_UPDATE_CDN_FEED` set or not
+(`cdn_feed::falls_back`, the lead's call on #7728), reads the CDN first on
+every round (`cdn_feed::round_on`). A round that can't read it (out of reach, or no
+build published there) starts a clock: the unix ms of that first failure,
+kept in `/var/lib/lampos-update/cdn-down-since`, so a lamp-update started
+again (its own switch, a changed `update.env`, a restart) keeps counting. A
+file there that is not a number, longer than 32 bytes, or ahead of the
+clock counts as no clock, and the next failure starts it again. Once the
+CDN has failed for an hour (`FALLBACK_AFTER_MS`), a round that fails on the
+CDN is done again, the same round, on the GitHub stable feed: the same key,
+channel and switches (`cdn_feed::on_github`), so the same signature,
+channel and SHA-256 checks. The journal says `the CDN feed has failed for N
+min (...): this round reads <GitHub>, the next one the CDN first`, then
+`on <GitHub>: <outcome>`. Nothing sticks: the next round reads the CDN
+first again, and the unit and drop-in are not touched. A round that reads
+the CDN (any other outcome) removes the file and says `the CDN feed is read
+again`. A new lamp-update taken from GitHub this way confirms itself on
+GitHub too when its dry round on the CDN is not proven and the clock is
+past the hour, switch or not. A refused build, a quiet wait or any other outcome on the
+CDN is not a CDN failure and never reads GitHub. Shown on a lamp as well
+as in `cdn_feed::tests`: on 52e6 by kit-8054, an hour of the CDN blocked
+gave one round on GitHub, and with it unblocked the next round read the
+CDN again; on lamp-06c1, three promotes taken from the CDN with no
+fallback line (#7814).
 
 ### The build and its identity
 
@@ -655,13 +756,13 @@ that build could never be promoted. Now:
   A newer head refuses as stale, as before.
 
 `min_updater` remains a signed level, not the build sequence:
-`manifest::UPDATER` is 12 (2 reads models, 3 settings, 4 image, 5 reset plans,
+`manifest::UPDATER` is 13 (2 reads models, 3 settings, 4 image, 5 reset plans,
 6 product service units, 7 a part's templates, sockets and timers, 8 a
 product unit the lamp lacks added, 9 the switch in the build's own order,
 which every product build asks for: `ORDER_UPDATER`, #4582, 10 the Skills
 Store's switch file among the settings: `STORE_ENV_UPDATER`, 11 the models
 switch file among the settings: `MODELS_ENV_UPDATER`, 12 lamp-update's own
-switch file among the settings: `UPDATE_ENV_UPDATER`, #6607). With its product deploy tree, this workflow now
+switch file among the settings: `UPDATE_ENV_UPDATER`, #6607, 13 the factory's acceleration drop-in admitted and moved aside, which every product build asks for since: `ACCELERATION_UPDATER`, #7946). With its product deploy tree, this workflow now
 carries ordinary service templates, allowlisted settings and the reset plan
 by default. Models and image inputs remain separate; publication does not
 enable their lamp switches. The manifest CLI can specify `--min-updater N`;
@@ -1358,7 +1459,10 @@ one-shot unit of its own, as the settings writer's (below) and
 `lamp-update-apply.service` do. Widening this line never reaches a lamp
 already in a home. A test pins the product unit's sandbox to 7071's and
 each folder a round writes itself to inside it (`own_unit_line_tests` in
-`main.rs`, #4540).
+`main.rs`, #4540). The one exception is the feed: with
+`LAMP_UPDATE_CDN_FEED=on`, a drop-in beside this unit moves a lamp on the
+GitHub stable feed to the CDN feed, its `ExecStart` otherwise the same and
+the unit file untouched ("Moving a lamp to the CDN feed", above).
 
 When planning a newer product build, the round names an installed regular
 `lamp-update.service` as "not carried by rounds; its installed unit is kept"
@@ -1542,7 +1646,12 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `placed N files of the product skills` | the build's skills written: in the switch, or alone when the build changes no part (`place_alone`). N counts the files written or put back this round (`product_skills::backs`), not the bundle's: one already the build's is only recorded, and a switch that writes none says nothing (9063 to 9276, 31 Oct: 4, `pose`'s two and `welcome-back`'s two) |
 | **The switch** (`switch`) | |
 | `waiting for a quiet moment: …` | once per wait, with why it isn't quiet yet |
+| `the owner asked to update now: the switch waits for no quiet moment` | the owner's Update now (#7517) started this round, or took over its wait for quiet |
+| `Update now: the voice gave way; switching` | an Update now round's moment for the voice ended in its 3 s of quiet: the switch goes on |
+| `Update now: no quiet in 10 s (…); switching anyway` | an Update now round's 10 s for the voice passed without 3 s of quiet: the switch goes on anyway |
 | `switching to build N` | the parts' switch begins |
+| `… is moved aside to …, the build's lamp-body taking the servo's own acceleration cap (#7946)` | a switch that changes lamp-body, after its journal is saved: the factory's acceleration drop-in (`head_touch::acceleration_only`) is copied into the records' `aside/` folder, never deleted, and taken from its place |
+| `… is put back where it was (#7946)` | a build put back, or a round cut short: that drop-in written back where it was, before the reload, for the old lamp-body |
 | `wrote …: the exit note install writes, which its unit was without` | a switch on a managed updater, before the reload: one of Cloud's fixed services, on the lamp or written by the round, had no `UNIT.d/exit-note.conf`, so `install`'s note is written (0644); one there is kept (#7135, "A part added over the air") |
 | `… is not written: …; the round goes on` | that exit note could not be written (its folder is a file, say); it is skipped, not listed as written, and the switch goes on (#7166) |
 | `the voice is stopped before the parts it reads restart` | see "The voice stopped first" |
@@ -1680,6 +1789,32 @@ on lamp-e82d on 11 Nov.
    marker written and its unit ended with exit 0 is setup done and keeps
    the build ("One round", step 9, #6820); a setup that fails there still puts it
    back.
+
+### Update now (#7517, `LAMP_UPDATE_NOW`)
+
+With `LAMP_UPDATE_NOW=on` for `lamp-update` (on in the product: its
+environment, else the carried `/etc/lampOS/update.env`, as its own switches
+are read, "The update switch file"; off unless set either way),
+`serve` takes the owner's Update now: an `update/check` with `now`,
+vouched for by `lamp-cloud`'s mark (`/var/lib/lampos-cloud/update-now`, at
+most 5 s old, each once; `crate::update_now`). Between rounds it starts
+one, not held to the check's minute. During a round it is heard at each
+look of the quiet wait (step 7), where a plain check is dropped as before.
+
+A round Update now asked for, or took over, keeps every rule but the quiet
+moment: once, before its switch, it gives the voice
+`update_now::GIVE_WAY_QUIET` (3 s) of quiet, at most `GIVE_WAY_MOST` (10 s),
+watched afresh, so a voice talking with someone can say it is updating and
+end its turn; then it switches, quiet or not, and is not asked quiet again
+at the voice's own boundary. A lamp asleep or muted is quiet at once. The
+setup walk still holds it (lamp-cloud refuses Update now during the walk),
+and so do the reset journal and the first 180 s after a boot.
+`update/status`'s `round` says `waiting` (`quiet`, `give_way`) and `asked`
+(`now`). Journal lines: `the owner asked to update now: the switch waits
+for no quiet moment`, `Update now: the voice gave way; switching` or
+`Update now: no quiet in 10 s (…); switching anyway`, and `an Update now is
+taken as a plain check: …`. The app's side is [cloud.md](cloud.md), "Update
+now".
 
 ### lamp-update's own build on a product lamp
 
@@ -2117,7 +2252,7 @@ A build can carry the models its parts read (`models.rs`, #1680): a
 an optional `archive` for a file inside a pinned `.tgz`).
 `lamp-update manifest --models deploy/product/models.json` writes it and
 raises `min_updater` to 2 (`manifest::MODELS_UPDATER`), so an updater from
-before the field climbs first. The current `UPDATER` is 12; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order". A manifest
+before the field climbs first. The current `UPDATER` is 13; a build with the product's units raises the floor to 13 (`manifest::ACCELERATION_UPDATER`, #7946: an updater at 12 or below refuses the factory's acceleration drop-in, so it climbs first), past the switch in the build's own order (9), their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order". A manifest
 without models doesn't write the field and is byte for byte what it was.
 The publish (`.github/scripts/lampos-publish.py`) passes `--models` with
 the product's `deploy/product/models.json`, so every published build
@@ -2354,7 +2489,8 @@ and no unit of this lamp starts through it`), so a lamp that took the
 region's build through a round refused every later build. That unit's `lamp-update region`, from `update/current` at every boot, is
 also how install's sysstat drop-ins (#7254, [install.md](install.md),
 "sysstat's collection off") reach a lamp in a home: a round never writes
-install's side files itself. A part new to the
+install's side files itself. sysstat's kept files are the exception: a
+round removes them too ("sysstat's kept files at a round", below). A part new to the
 lamp is installed afresh in the folder of its
 binary's SHA-256, as a switch installs a build, and its `current` link is
 made to name it. A part's template, socket or timer is added when its part
@@ -2443,6 +2579,26 @@ recovery among them), and gets them enabled for its next start. A stop of
 an added unit systemd never loaded (the switch cut before its reload) is
 taken as done. The tests use the round's fake systemd.
 
+### sysstat's kept files at a round (#7254)
+
+Most lamps in homes take a build by a round and never reboot for it, so
+the boot run of `lamp-update region` that removes sysstat's kept files
+([install.md](install.md), "sysstat's collection off") left them on the
+RAM log disk until the next power cut, and the journal stayed short. Every
+round that applies (not a dry round, and not one waiting for lamp-update's
+own switch) now runs the same `install::sysstat_kept_removed` after its
+build work, on an up-to-date round too: as with lamp-control above, the
+new updater's first round finds the lamp up to date, so the files go
+within one `--every-s` of the update. The round's sandbox cannot write
+`/var/log`, so it asks systemd for the same transient unit the boot run
+does (`Systemd::systemd_run`, which runs only `systemd-run`). Each file is
+said by name and size once removed. A removal that fails is said once per
+updater run for each distinct error, never again each round. Once none is left the round finds
+nothing and runs nothing, so a round, install and the boot run never
+repeat one another. With `/etc/lampOS/sysstat-on`, nothing is removed.
+journald is never restarted or signalled. The tests use the round's fake
+systemd; not shown yet on a lamp.
+
 ### Settings and tmpfiles (`LAMP_UPDATE_APPLY`)
 
 
@@ -2480,7 +2636,7 @@ production key after any round on the channel, because every round writes the
 file again. A test-environment Store check needs a lamp off the channel. Settings alone need
 `min_updater` 3 (`manifest::SETTINGS_UPDATER`); `--settings on` also carries
 the reset plan described below and therefore raises the floor to 5
-(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 12; a build with the product's units raises the floor to 9 (`manifest::ORDER_UPDATER`), past their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order".
+(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 13; a build with the product's units raises the floor to 13 (`manifest::ACCELERATION_UPDATER`, #7946: an updater at 12 or below refuses the factory's acceleration drop-in, so it climbs first), past the switch in the build's own order (9), their service units (6), a part's templates, sockets and timers (7) and the units it adds (8): see "Every lamp switches in its build's order".
 A manifest without settings doesn't write the field. A path must be
 `/etc/lampOS/records.json`, `/etc/tmpfiles.d/lampos.conf`,
 `/etc/lampOS/skills/store.env` (from updater 10), `/etc/lampOS/models.env`
@@ -2543,8 +2699,11 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   (`manifest::UPDATE_ENV`, `deploy/product/settings/update.env`,
   `install::UPDATE_SETTING`) is carried by every build with settings from
   updater 12 (`manifest::UPDATE_ENV_UPDATER`, #6607): `LAMP_APP_ENGINES=on`,
-  `LAMP_SKILL_TASKS=on` and `LAMP_SKILL_DEFAULT_AGENT=on` (the one run
-  path, #6685, read only with `LAMP_SKILL_TASKS` on). No round rewrites lamp-update's own unit, so
+  `LAMP_SKILL_TASKS=on`, `LAMP_SKILL_DEFAULT_AGENT=on` (the one run
+  path, #6685, read only with `LAMP_SKILL_TASKS` on) and
+  `LAMP_UPDATE_NOW=on` (the owner's Update now, #7517, on any lamp, as
+  `LAMP_APP_ENGINES` is), and `LAMP_UPDATE_CDN_FEED=on` (the move to the
+  CDN feed, #7728, on any lamp, as `LAMP_APP_ENGINES` is). No round rewrites lamp-update's own unit, so
   these lines in `lamp-update.service` never reached a lamp already in a
   home. lamp-update reads each switch at its start
   (`switches::update_switches`): set in its environment, `on` exactly, and
@@ -2606,7 +2765,18 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   written bytes. Local wiring is still kept by the three-way rule; an
   incompatible custom file, partial pair, or nonliteral/local override of
   the mode refuses the round rather than guessing. Harmless exit-note
-  drop-ins do not block it. Controls' effective `--pins` path selects the
+  drop-ins do not block it, nor does the factory's acceleration drop-in
+  (#7946): a `lamp-body.service.d/*.conf` holding exactly an `ExecStart=`
+  reset and the installed unit's own command, word for word but for the
+  number after `--servo-acceleration` (`head_touch::acceleration_only`).
+  The bench wrote it (`zz-acceleration-50.conf`) for servos whose EEPROM caps
+  acceleration at 50. A round that changes lamp-body moves it aside after
+  its journal is saved: copied into the records' `aside/` folder (never
+  deleted), then taken from its place, one journal line each, so the
+  build's own unit runs (its lamp-body takes each servo's cap itself,
+  docs/body.md). A build put back, or a round cut short, puts it back where
+  it was (`Journal::aside`). Any other change in such a file is refused as
+  before. Controls' effective `--pins` path selects the
   file checked: build-local/custom active pins are kept byte-for-byte and
   checked against their readers, while an unused product pins file follows
   ordinary settings handling without imposing a head-reader restart.
@@ -2746,7 +2916,7 @@ by install as "this lamp's own" and never carried by a round.
 - **Carried.** `lamp-update manifest --settings on` also writes
   `reset_plan`, the fixture `crates/setup/fixtures/reset-plan-product.json`
   as one setting (`install::reset_plan_setting`), 0644, and raises
-  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 12. It
+  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 13. It
   is a field of its own, not in `settings`, for the image's reason: a
   lamp-update-back from before it refuses a setting path it doesn't know,
   and passes over a field it doesn't know. Its path must be the plan's,
@@ -3107,14 +3277,26 @@ committed, never the owner's real key). `L` is the runbook's SSH alias.
    scp -r ~/lampos-channel LAMP:/var/tmp/      # with the runbook's key options
    H=$(shasum -a 256 ~/lampos-channel/lamp-update | cut -c1-64)
    L "sudo install -D -m 0755 /var/tmp/lampos-channel/lamp-update /opt/lampOS/update/$H/lamp-update"
-   L 'sudo mkdir -p /etc/lampOS/update && sudo tee /etc/lampOS/update/key.pub >/dev/null' < ~/lampos-update-test.pub
+   L 'sudo install -m 0644 /dev/stdin /var/tmp/lampos-channel/test.pub' < ~/lampos-update-test.pub
    L 'sudo sync'
    ```
+
+   **Never write the test key into `/etc/lampOS/update/key.pub`.** That file is
+   the lamp's trust root, put there at the factory and never written by
+   setup or a round; a lamp that keeps a test key there trusts nothing the
+   product signs, so no round can read stable's manifest and it never updates
+   (lamp-9adf, 23 Nov, #8353: refused every round with "signed with key
+   54213f8d3aa2f241, and this lamp trusts key acdeb27da34006fe"). The test
+   key rides beside the channel folder and is passed as `--key-file` to each
+   command below, as the row scripts do; the lamp's real key is never touched.
+   If one was written by hand, put the production one back (its fingerprint,
+   the first 16 hex of the SHA-256 of the base64-decoded line, is
+   `54213f8d3aa2f241`) and check it before and after.
 
 5. **The dry run** (writes nothing):
 
    ```sh
-   L "sudo /opt/lampOS/update/$H/lamp-update check --channel-url file:///var/tmp/lampos-channel/"
+   L "sudo /opt/lampOS/update/$H/lamp-update check --channel-url file:///var/tmp/lampos-channel/ --key-file /var/tmp/lampos-channel/test.pub"
    ```
 
    It names each unit that would change, old folder to new, and every line
@@ -3128,12 +3310,15 @@ committed, never the owner's real key). `L` is the runbook's SSH alias.
    `file:///var/tmp/lampos-channel/` and `@UPDATE_APPLY@` `off`; then
    `sudo systemctl start lamp-update`, a minute, and
    `journalctl -u lamp-update -o cat` says what it would do. Step 2's
-   commands again: the same.
+   commands again: the same. The unit keeps the lamp's own key; for this
+   minute a drop-in (`ExecStart=` emptied, then the same line with
+   `--key-file /var/tmp/lampos-channel/test.pub`) carries the test key,
+   removed after, as the row scripts' `serve_dropin` does.
 
 7. **One round, attended:**
 
    ```sh
-   L "sudo /opt/lampOS/update/$H/lamp-update once --channel-url file:///var/tmp/lampos-channel/ --apply on; echo status \$?"
+   L "sudo /opt/lampOS/update/$H/lamp-update once --channel-url file:///var/tmp/lampos-channel/ --key-file /var/tmp/lampos-channel/test.pub --apply on; echo status \$?"
    L 'sudo tail -n 5 /var/lib/lampos-update/log.jsonl; lamp-health; sudo sync'
    ```
 
@@ -3702,7 +3887,28 @@ that runs past its bound ends only the waiting: systemd's job goes on, so
 its result is read from what the command leaves, not from the start.
 
 A round runs it to refresh the settings writer ("The settings writer
-refreshed", below). The unit has been checked by its tests' reading of the
+refreshed", below), and for the build's own lampos SDK (#7415). Before #7415
+only the Hermes one-shot wrote `/usr/local/lib/lampos/sdk-python`, so a lamp
+where that one-shot doesn't run (OpenClaw by default, or no Hermes round)
+kept the first SDK it got: lamp-0c89 on 14420 still had 18 Nov's, with no
+`Lamp.connect_app`. Now:
+
+- **Every run of the unit** that changes the writer, or finds it this build
+  already, also writes the build's SDK when the folder isn't exactly the
+  build's files (`sdk_tree::present`, then `sdk_tree::write`). So a newer
+  build's SDK lands with its writer. A failed write is said, never the end of
+  the writer's run.
+- **A round whose writer is this lamp-update already** (`writer_swap::holds`)
+  and whose SDK isn't the build's asks the same unit for the SDK alone
+  (`writer_swap::Op::Sdk`). The unit's program writes the SDK and nothing
+  else: the writer and its record (`writer-refresh.done`) stay as they are.
+  The round says `the build's lampos SDK is written at
+  /usr/local/lib/lampos/sdk-python (it differs from this build's)`. A second
+  round finds the SDK in place and asks nothing.
+- A lamp with no writer at all, or a writer refreshed and not proved yet, is
+  not asked: the SDK comes once the writer is this build's.
+
+The unit has been checked by its tests' reading of the
 text and a fake systemd, not by a real systemd: neither `systemd-analyze
 verify` nor a start on Bookworm has run.
 

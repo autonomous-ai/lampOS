@@ -513,6 +513,16 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (second_seems, flags) = crate::seems_told::take(flags);
     let (second_doing, flags) = crate::doing_told::take(flags);
     let (health_facts, flags) = crate::health_told::take(flags);
+    // `LAMP_VOICE_DAY_SHED` (#7664): the relay's share of the day read on
+    // every answer, and kept for the coordinator.
+    let (day_shed, flags) = crate::day_shed::take(flags);
+    if day_shed {
+        crate::day_shed::start_worker();
+        eprintln!(
+            "lamp-voice second: the lamp's day is read on the relay's answers, and what nobody asked for is shed near its end ({})",
+            crate::day_shed::ENVIRONMENT
+        );
+    }
     let (keep_link, flags) = take_keep_link(flags);
     let (wait_for_room, flags) = take_wait_for_room(flags);
     let (mut tools, flags) = crate::tools::take(flags)?;
@@ -961,6 +971,18 @@ pub enum ProviderInput {
         /// repeat ([`crate::reminders::Offer::again`]).
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         again: bool,
+        /// The Schedule ids said in it, its own then those joined, for the
+        /// second route's reminder rows (`LAMP_SERVICE_RECORDS_REMINDERS`,
+        /// [`crate::service_records::reminder_rows::said`]). Given only
+        /// with that switch on, so the packet is as before when off.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        ids: Vec<u64>,
+        /// A timer (Schedule's `kind`), not a reminder: at the usage limit
+        /// the second route rings it with its own fixed line
+        /// (`LAMP_LIMIT_LOCAL_ASKS`, #7642). Sent only when true, so an
+        /// older build's packet is a reminder's.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        timer: bool,
     },
 }
 impl ProviderInput {
@@ -1812,6 +1834,11 @@ pub async fn run_with_continuation(
     // Who work can go to, if the person may name them.
     if let Some(place) = &files.tools.tasks {
         crate::agent_tasks::start(place);
+    }
+    // The watches of the cycle before (a mute or a sleep ended that worker),
+    // and the watcher that tells them.
+    if files.tools.watch {
+        crate::watches::resume();
     }
     let (provider_config, patience) =
         ProviderConfig::load_with_patience(config_path, files.provider_patience)?;
@@ -4013,8 +4040,10 @@ impl ToolDesk {
                         | Route::Onboarding(_)
                         | Route::ReportsStop(_)
                         | Route::Devices(_)
+                        | Route::DeskStop
+                        | Route::Watch
                         | Route::Sleep
-                        | Route::SeenActivity(_)
+                        | Route::SeenActivity(..)
                 ))
         {
             let (sent, sent_us) = tell(&crate::tools::declined());
@@ -4131,6 +4160,33 @@ impl ToolDesk {
                     }
                 );
             }
+            Route::DeskTime => {
+                // Answered at once, as the time is, and only for a line heard
+                // at the lamp: one the lamp wrote itself, a skill's say, is
+                // told nothing (#7694, never volunteered).
+                let heard = crate::attention::own_request()
+                    .load(std::sync::atomic::Ordering::Acquire)
+                    != request;
+                let told = crate::desk_time::told_now(heard);
+                let (sent, sent_us) = tell(&told);
+                self.line(
+                    lineage.session,
+                    request,
+                    &call.name,
+                    called_us,
+                    sent_us,
+                    true,
+                    sent,
+                );
+                eprintln!(
+                    "lamp-voice provider: request {request}: the model asked how long the person has sat at the desk; told {}",
+                    if told.get("at_the_desk").is_some() {
+                        "the sitting"
+                    } else {
+                        "it is not known"
+                    }
+                );
+            }
             Route::Clock => {
                 let told = crate::tools::time_now_for(self.settings.places, &call.args);
                 let (sent, sent_us) = tell(&told);
@@ -4193,7 +4249,9 @@ impl ToolDesk {
             | Route::Onboarding(_)
             | Route::ReportsStop(_)
             | Route::Devices(_)
-            | Route::SeenActivity(_))
+            | Route::DeskStop
+            | Route::Watch
+            | Route::SeenActivity(..))
                 if self.waiting < lamp_gemini::MAX_TOOL_CALLS =>
             {
                 self.run(provider, lineage, call, route, called_us, memory, false);
@@ -4210,7 +4268,9 @@ impl ToolDesk {
             | Route::Onboarding(_)
             | Route::ReportsStop(_)
             | Route::Devices(_)
-            | Route::SeenActivity(_)
+            | Route::DeskStop
+            | Route::Watch
+            | Route::SeenActivity(..)
             | Route::AgentAsk
             | Route::Nobody => {
                 let (sent, sent_us) = tell(&crate::tools::unavailable());
@@ -4263,8 +4323,7 @@ impl ToolDesk {
                     | Route::Faces(..)
                     | Route::Mark(_)
                     | Route::ReportsStop(_)
-                    | Route::Devices(_)
-                    | Route::SeenActivity(_)
+                    | Route::SeenActivity(..)
             )
         {
             self.acted = Some(request);
@@ -6999,7 +7058,7 @@ fn rise_in(
 /// P3 on #6912).
 fn withdraws(route: &crate::tools::Route, name: &str) -> bool {
     matches!(route, crate::tools::Route::ReportsStop(_))
-        || (matches!(route, crate::tools::Route::SeenActivity(_)) && name == crate::seen_yes::STOP)
+        || (matches!(route, crate::tools::Route::SeenActivity(..)) && name == crate::seen_yes::STOP)
 }
 
 #[cfg(test)]
@@ -7011,15 +7070,15 @@ mod withdraws_tests {
         use crate::tools::Route;
         assert!(super::withdraws(&Route::ReportsStop(false), "stop_reports"));
         assert!(super::withdraws(
-            &Route::SeenActivity(false),
+            &Route::SeenActivity(false, false),
             crate::seen_yes::STOP
         ));
         assert!(!super::withdraws(
-            &Route::SeenActivity(false),
+            &Route::SeenActivity(false, false),
             crate::seen_yes::LOOK
         ));
         assert!(!super::withdraws(
-            &Route::SeenActivity(false),
+            &Route::SeenActivity(false, false),
             crate::seen_yes::OFFER
         ));
         assert!(!super::withdraws(&Route::Clock, crate::seen_yes::STOP));

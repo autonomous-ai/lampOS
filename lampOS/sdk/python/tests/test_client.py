@@ -82,6 +82,7 @@ def test_every_op_has_a_call_and_every_error_code_a_class():
     named = {
         "sound.upload": "upload_sound", "sound.list": "sounds", "sound.remove": "remove_sound",
         "skill.push": "push_skill", "skill.list": "skills", "skill.remove": "remove_skill",
+        "app.push": "push_app", "app.list": "apps", "app.remove": "remove_app",
         "turn.start": "start_turn", "turn.end": "end_turn", "listen.set": "set_listening",
     }
     for op in schema.ops():
@@ -113,6 +114,18 @@ def test_the_lamps_language_comes_from_hello_and_is_english_when_it_says_none(tm
                 async with await Lamp.connect(keyring=ring) as lamp:
                     assert lamp.language == shown, said
                     assert lamp.info.get("language") == said, said
+
+    run(go())
+
+
+def test_the_lamps_build_comes_from_hello_and_is_none_when_it_says_none(tmp_path):
+    async def go():
+        for said in ("143+ab12cd34ef56", None):
+            async with FakeLamp(build=said) as fake:
+                ring = await paired(fake, tmp_path / f"{said}")
+                async with await Lamp.connect(keyring=ring) as lamp:
+                    assert lamp.build == said
+                    assert lamp.info.get("build") == said
 
     run(go())
 
@@ -862,7 +875,7 @@ def test_get_answers_the_states_asked(tmp_path):
                 state = await lamp.get("presence", "lamp")
             # As lamp-control answers: the states by the names asked, `lamp` included, and nothing else.
             assert state == {"presence": {"count": 2, "near": 0.4, "facing": True},
-                             "lamp": {"talking": False, "paused": False, "private": False, "asleep": False}}
+                             "lamp": {"talking": False, "paused": False, "private": False, "asleep": False, "muted_after_fault": False}}
 
     run(go())
 
@@ -2264,6 +2277,75 @@ def test_the_camera_gives_a_picture_and_a_stream_with_the_camera_grant_only(tmp_
             async with await Lamp.connect(keyring=ring) as lamp:
                 with pytest.raises(errors.BY_CODE["no_grant"]):
                     await lamp.camera_snapshot()
+
+    run(go())
+
+
+def test_pose_sends_the_jpeg_in_base64_and_answers_the_17_keypoints(tmp_path):
+    async def go():
+        from lampos.client import POSE_KEYPOINTS
+        from lampos.testing import FAKE_JPEG
+
+        async with FakeLamp(grants=("camera",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                answer = await lamp.pose(FAKE_JPEG)
+                assert fake.asked("pose") == [{"jpeg": base64.b64encode(FAKE_JPEG).decode()}]
+                assert set(answer) == {"pose", "width", "height", "model", "ms"}
+                assert (answer["width"], answer["height"], answer["model"]) == (640, 480, "fake-movenet")
+                assert len(answer["pose"]["keypoints"]) == len(POSE_KEYPOINTS) == 17
+                assert set(answer["ms"]) == {"decode", "npu", "post", "total"}
+                fake.pose = None
+                assert (await lamp.pose(FAKE_JPEG))["pose"] is None
+                with pytest.raises(errors.BY_CODE["bad_request"], match="not a JPEG"):
+                    await lamp.pose(b"GIF89a")
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = await paired(fake, tmp_path / "plain")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["no_grant"]):
+                    await lamp.pose(FAKE_JPEG)
+
+    run(go())
+
+
+def test_pose_checks_the_size_before_sending_and_keeps_the_lamps_refusals(tmp_path):
+    async def go():
+        from lampos.client import POSE_JPEG_MAX_BYTES, POSE_JPEG_MAX_CHARS
+        from lampos.testing import FAKE_JPEG
+
+        assert POSE_JPEG_MAX_BYTES == 150 * 1024
+        assert len(base64.b64encode(b"\xff" * POSE_JPEG_MAX_BYTES)) == POSE_JPEG_MAX_CHARS
+        async with FakeLamp(grants=("camera",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(LampError, match="over the 153600") as too_big:
+                    await lamp.pose(b"\xff\xd8" + b"\0" * POSE_JPEG_MAX_BYTES)
+                assert too_big.value.code == "bad_request"
+                with pytest.raises(LampError, match="empty"):
+                    await lamp.pose(b"")
+                assert fake.asked("pose") == []
+                # The biggest that fits goes.
+                await lamp.pose(b"\xff\xd8" + b"\0" * (POSE_JPEG_MAX_BYTES - 2))
+                fake.refuse_next("pose", "preparing", "fetching the pose model", 2000)
+                with pytest.raises(errors.BY_CODE["preparing"]) as preparing:
+                    await lamp.pose(FAKE_JPEG)
+                assert (preparing.value.retry_ms, type(preparing.value).__name__) == (2000, "PreparingError")
+                assert "retry_ms" in preparing.value.what_to_do
+                fake.refuse_next("pose", "unavailable", "this lamp has no NPU")
+                with pytest.raises(errors.BY_CODE["unavailable"]) as unavailable:
+                    await lamp.pose(FAKE_JPEG)
+                assert unavailable.value.retry_ms is None
+                fake.refuse_next("pose", "off", "the NPU service is off on this lamp: switch LAMP_NPU")
+                with pytest.raises(errors.BY_CODE["off"]):
+                    await lamp.pose(FAKE_JPEG)
+                # A code from a newer lamp is still a LampError with its code.
+                fake.refuse_next("pose", "warming_up", "a code this SDK has never heard")
+                with pytest.raises(LampError) as unknown:
+                    await lamp.pose(FAKE_JPEG)
+                assert (unknown.value.code, unknown.value.what_to_do) == ("warming_up", "")
+                await fake.set_private(True)
+                with pytest.raises(errors.BY_CODE["private"]):
+                    await lamp.pose(FAKE_JPEG)
 
     run(go())
 

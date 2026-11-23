@@ -69,9 +69,27 @@ pub struct Part<'a> {
 pub struct Pushes {
     flight: Option<(String, Flight)>,
     installing: Option<String>,
+    /// What is pushed, for a refusal's words: a skill unless [`Self::apps`].
+    apps: bool,
+}
+
+/// What a part did, with the package's bytes once whole ([`Pushes::gather`]).
+#[derive(Debug, PartialEq)]
+pub enum Gathered {
+    Got(u32),
+    Whole { sha256: String, bytes: Vec<u8> },
 }
 
 impl Pushes {
+    /// The pushes of apps (`app.push`, docs/apps.md, "An app from your own
+    /// computer"): one in flight on the lamp, apart from the skills' one.
+    pub fn apps() -> Self {
+        Self {
+            apps: true,
+            ..Self::default()
+        }
+    }
+
     /// Whether `client` has a push in flight (part 0 taken, not finished).
     pub fn in_flight(&self, client: &str) -> bool {
         self.flight
@@ -94,6 +112,30 @@ impl Pushes {
         now_us: u64,
         keep: Option<(&Path, &Value)>,
     ) -> Result<Step, Error> {
+        let (sha256, bytes) = match self.gather(client, part, now_us)? {
+            Gathered::Got(got) => return Ok(Step::Got(got)),
+            Gathered::Whole { sha256, bytes } => (sha256, bytes),
+        };
+        if let Some((folder, about)) = keep {
+            keep_package(folder, &bytes, &sha256, part.name, about).map_err(|error| {
+                // Nothing to install: another push may begin.
+                self.installing = None;
+                eprintln!("lamp-control: skill.push: keeping the package: {error}");
+                Error::new(ErrorCode::Refused, "the lamp could not keep the package")
+            })?;
+        }
+        Ok(Step::Whole { sha256 })
+    }
+
+    /// One part, as [`Self::part`], the whole package's bytes handed back
+    /// rather than kept; once whole, its install is under way until
+    /// [`Self::installed`] (or [`Self::not_installed`]).
+    pub fn gather(
+        &mut self,
+        client: &str,
+        part: &Part<'_>,
+        now_us: u64,
+    ) -> Result<Gathered, Error> {
         let bad = |why: &str| Error::new(ErrorCode::BadRequest, why);
         if part.part == 0 {
             if let Some(installing) = &self.installing {
@@ -110,7 +152,11 @@ impl Pushes {
             {
                 return Err(Error::new(
                     ErrorCode::Busy,
-                    "another computer is pushing a skill",
+                    if self.apps {
+                        "another computer is pushing an app"
+                    } else {
+                        "another computer is pushing a skill"
+                    },
                 ));
             }
             self.flight = Some((
@@ -164,7 +210,7 @@ impl Pushes {
         flight.bytes.extend_from_slice(&bytes);
         flight.next += 1;
         if flight.next < flight.parts {
-            return Ok(Step::Got(flight.next));
+            return Ok(Gathered::Got(flight.next));
         }
         let (_, flight) = self.flight.take().expect("in flight");
         if flight.bytes.len() != flight.size {
@@ -174,14 +220,17 @@ impl Pushes {
         if sha256 != flight.sha256 {
             return Err(bad("sha256: not the package's"));
         }
-        if let Some((folder, about)) = keep {
-            keep_package(folder, &flight.bytes, &sha256, &flight.name, about).map_err(|error| {
-                eprintln!("lamp-control: skill.push: keeping the package: {error}");
-                Error::new(ErrorCode::Refused, "the lamp could not keep the package")
-            })?;
-        }
         self.installing = Some(client.to_owned());
-        Ok(Step::Whole { sha256 })
+        Ok(Gathered::Whole {
+            sha256,
+            bytes: flight.bytes,
+        })
+    }
+
+    /// A whole package that was never asked of the helper (refused on the
+    /// lamp first): another push may begin.
+    pub fn not_installed(&mut self) {
+        self.installing = None;
     }
 
     /// The helper has answered the install (or failed to): another may
@@ -265,6 +314,9 @@ pub struct Ask {
     /// install answered under another one tells the helper again what the
     /// computer may have now.
     pub rev: u64,
+    /// What the door read of a pushed app's manifest (`app.push`), said in
+    /// the install's answer beside the helper's; null otherwise.
+    pub told: Value,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -272,6 +324,41 @@ pub enum AskKind {
     Install,
     List,
     Remove,
+    /// `app.push`, `app.list` and `app.remove`: asked of the apps' helper
+    /// (`lamp-apps-manage`), not the skills'.
+    AppInstall,
+    AppList,
+    AppRemove,
+}
+
+impl AskKind {
+    /// Whether it is asked of the apps' helper.
+    pub fn of_apps(self) -> bool {
+        matches!(self, Self::AppInstall | Self::AppList | Self::AppRemove)
+    }
+}
+
+/// The apps' helper's socket (`lamp-apps-manage.socket`).
+pub const APPS_MANAGE_SOCKET: &str = "/run/lampos-apps-manage/manage.sock";
+/// The folder a pushed app's package is staged in for the apps' helper,
+/// lampos's (`lamp-apps-folders.service`), as lamp-cloud stages a Store one.
+pub const APPS_STAGING: &str = "/var/lib/lampos-apps-staging";
+
+/// The staged file of a pushed app's package of `sha256` in `staging`.
+pub fn app_staged(staging: &Path, sha256: &str) -> std::path::PathBuf {
+    staging.join(format!("pushed-{sha256}.tar"))
+}
+
+/// A pushed app's package staged for the apps' helper: written aside,
+/// synced and renamed, 0600, as a skill's is kept.
+pub fn stage_app(
+    staging: &Path,
+    sha256: &str,
+    bytes: &[u8],
+) -> std::io::Result<std::path::PathBuf> {
+    let path = app_staged(staging, sha256);
+    write_aside(&path, bytes)?;
+    Ok(path)
 }
 
 impl Ask {
@@ -282,6 +369,53 @@ impl Ask {
             kind: AskKind::Install,
             request: json!({ "install_pushed": sha256 }),
             rev: 0,
+            told: Value::Null,
+        }
+    }
+
+    /// `app.push`'s whole package, staged at `path`, asked of the apps'
+    /// helper for `client` (named `client_name`); `told` is what the door
+    /// read of its manifest.
+    pub fn app_install(
+        re: u64,
+        client: &str,
+        client_name: Option<&str>,
+        path: &Path,
+        told: Value,
+    ) -> Self {
+        Self {
+            re,
+            client: client.to_owned(),
+            kind: AskKind::AppInstall,
+            request: json!({ "install_pushed": {
+                "path": path.display().to_string(),
+                "client": client,
+                "client_name": client_name,
+            } }),
+            rev: 0,
+            told,
+        }
+    }
+
+    pub fn app_list(re: u64, client: &str) -> Self {
+        Self {
+            re,
+            client: client.to_owned(),
+            kind: AskKind::AppList,
+            request: json!({ "list_pushed_by": client }),
+            rev: 0,
+            told: Value::Null,
+        }
+    }
+
+    pub fn app_remove(re: u64, client: &str, name: &str) -> Self {
+        Self {
+            re,
+            client: client.to_owned(),
+            kind: AskKind::AppRemove,
+            request: json!({ "remove_pushed": { "client": client, "name": name } }),
+            rev: 0,
+            told: json!({ "name": name }),
         }
     }
 
@@ -292,6 +426,7 @@ impl Ask {
             kind: AskKind::List,
             request: json!({ "list_pushed_by": client }),
             rev: 0,
+            told: Value::Null,
         }
     }
 
@@ -302,14 +437,17 @@ impl Ask {
             kind: AskKind::Remove,
             request: json!({ "remove_pushed": { "client": client, "name": name } }),
             rev: 0,
+            told: Value::Null,
         }
     }
 
     /// How long the helper may take.
     pub fn wait(&self) -> Duration {
         match self.kind {
-            AskKind::Install => INSTALL_WAIT,
-            AskKind::List | AskKind::Remove => ASK_WAIT,
+            AskKind::Install | AskKind::AppInstall => INSTALL_WAIT,
+            // A remove waits for the app's processes to go.
+            AskKind::AppRemove => INSTALL_WAIT,
+            AskKind::List | AskKind::Remove | AskKind::AppList => ASK_WAIT,
         }
     }
 
@@ -318,6 +456,9 @@ impl Ask {
     /// for more than the pairing grants), or from why it could not be
     /// asked.
     pub fn answer(&self, helper: Result<Value, String>) -> Value {
+        if self.kind.of_apps() {
+            return self.app_answer(helper);
+        }
         let code = match helper.as_ref().ok().and_then(|answer| answer.get("code")) {
             Some(Value::String(code)) if code == "no_grant" => ErrorCode::NoGrant,
             _ => ErrorCode::Refused,
@@ -328,7 +469,11 @@ impl Ask {
                 (Some(done), None) => match self.kind {
                     AskKind::Install => json!({"re": self.re, "ok": true, "skill": done}),
                     AskKind::List => json!({"re": self.re, "ok": true, "skills": done}),
-                    AskKind::Remove => json!({"re": self.re, "ok": true}),
+                    // Asked of the apps' helper, never here.
+                    AskKind::Remove
+                    | AskKind::AppInstall
+                    | AskKind::AppList
+                    | AskKind::AppRemove => json!({"re": self.re, "ok": true}),
                 },
                 (None, Some(Value::String(why))) => refused(why.clone()),
                 _ => refused("the lamp's skill helper answered something else".to_owned()),
@@ -337,6 +482,62 @@ impl Ask {
                 eprintln!("lamp-control: the manage helper: {why}");
                 refused("the lamp's skill helper did not answer".to_owned())
             }
+        }
+    }
+}
+
+impl Ask {
+    /// The client's answer from the apps' helper's (`{"ok": …}` or
+    /// `{"refused": WHY}`), or from why it could not be asked.
+    fn app_answer(&self, helper: Result<Value, String>) -> Value {
+        let refused = |why: String| {
+            crate::protocol::refused(Some(self.re), &Error::new(ErrorCode::Refused, why))
+        };
+        let answer = match helper {
+            Ok(answer) => answer,
+            Err(why) => {
+                eprintln!("lamp-control: the apps' helper: {why}");
+                return refused("the lamp's apps helper did not answer".to_owned());
+            }
+        };
+        match (answer.get("ok"), answer.get("refused")) {
+            (Some(done), None) => match self.kind {
+                AskKind::AppInstall => {
+                    let mut app = self.told.clone();
+                    for field in ["version", "updated", "started", "pushed_by"] {
+                        if let Some(value) = done.get(field) {
+                            app[field] = value.clone();
+                        }
+                    }
+                    app["from"] = json!("computer");
+                    json!({"re": self.re, "ok": true, "app": app})
+                }
+                AskKind::AppList => {
+                    let apps: Vec<Value> = done["apps"]
+                        .as_array()
+                        .map(Vec::as_slice)
+                        .unwrap_or_default()
+                        .iter()
+                        .map(|app| {
+                            let mut row = json!({
+                                "name": app["name"], "title": app["title"],
+                                "version": app["version"], "sha256": app["sha256"],
+                                "grants": app["grants"], "net": app["net"],
+                                "logs": app["logs"], "stopped": app["stopped"],
+                            });
+                            // The pushing computer, as a pushed skill's row says it.
+                            if let Some(by) = app.get("pushed_by") {
+                                row["pushed_by"] = by.clone();
+                            }
+                            row
+                        })
+                        .collect();
+                    json!({"re": self.re, "ok": true, "apps": apps})
+                }
+                _ => json!({"re": self.re, "ok": true, "removed": self.told["name"]}),
+            },
+            (None, Some(Value::String(why))) => refused(why.clone()),
+            _ => refused("the lamp's apps helper answered something else".to_owned()),
         }
     }
 }

@@ -131,7 +131,9 @@ it must advance, but need not be consecutive at the consumer.
 With `LAMP_PRIVACY_GAP_RIDE=on`, the conversation's worker has one bounded
 exception after it published an allowed capture lease: its own missing-acquisition
 expiry becomes `PrivacyUnavailable`, and it keeps reading while publishing
-only denied/unknown privacy leases. The deadline is one second from the last
+only denied/unknown privacy leases. A state that holds but carries a stale or
+level-less acquisition is that expiry too (`SwitchFence::accept_riding`,
+#7224), its envelope kept for the order and its acquisition not taken. The deadline is one second from the last
 accepted acquisition's 50 ms expiry, including the fresh-open gate's 60 ms
 stabilization. A late-publication notice may be ridden inside that deadline;
 publisher loss/replacement, invalid evidence and sequence discontinuity still
@@ -251,7 +253,8 @@ Denied authority that comes during that ride re-arms the worker at once, as
 Denied; with none by 1.75 s after the start the worker ends as before. The
 voice does not retry a worker that ended. The switch's own checks run
 on every look, ride or not: a stale or missing reading, or the publisher
-gone or late, ends the worker as before. A worker that ended abnormally
+gone or late, ends the worker as before, unless `LAMP_PRIVACY_GAP_RIDE`
+rides it (above). A worker that ended abnormally
 still ends the wait with an error that is not an unreadable switch, so the
 voice exits and the restart guard counts it.
 
@@ -520,6 +523,36 @@ root:
 `printf '{"face_expressions":"yes"}' > /var/lib/lampOS/consent/face-expressions.json`,
 `chown root:lampos` and `chmod 0640` it, and remove it after.
 
+**One rule for the yeses, and the default (#7767).** The face-expressions
+and room-sounds files above, seen activity's (seen.md) and health and crash
+reports' `share` (cloud.md) are all read by one rule,
+`lamp_msgs::consent::allowed`: exactly `"yes"` is on, exactly `"no"` is
+off, a file that can't be read, over 4096 bytes or not JSON is off, and a
+missing file is off unless `LAMP_NOTICING_BY_DEFAULT=on` (switches.md, off
+unless set, in no unit). With the switch on, a missing face-expressions or
+room-sounds file reads as a yes, so faces are read and room sounds
+classified by default, while a kept `{"face_expressions":"no",...}` or
+`{"room_sounds":"no",...}` (`consent::no_bytes`) stays no. Off, each reader
+answers exactly as described above. With the switch on, the voice's "stop
+looking" (`stop_looking_at_my_desk`) keeps a face-expressions no as well as
+seen activity's (`"by":"voice"`), and "start looking again" turns both back
+to a yes for the owner's own line; forget everything removes only a kept
+yes, so a kept face-expressions or room-sounds no stays (told to the model
+as `"kept as a no"`) and the forget never turns either on. The voice's
+start and every progress write of setup's walk leave a kept no in place,
+and a "no" in the walk keeps one where it would remove the file
+([onboarding.md](onboarding.md), "Room sounds"). A no from before
+the switch, whose file was removed (a walk's "no", or for seen activity
+the app's mark beside no yes), is kept as a no once by lamp-voice's start
+with the switch on, and until its done mark `noticing-old-nos.done` is in
+the consent folder every reader reads a missing file as no, so a person
+who declined face expressions, room sounds or seen activity never reads as
+on afterwards (the first builder's c7002724376 and c7003588081;
+[onboarding.md](onboarding.md), "Room sounds"). The reset still removes
+both files, a no too. The app's `consent.set` off still removes the file
+(slice 6 of #7767, behind `LAMP_APP_CONSENT`), so the switch goes on in no
+unit before that slice. Body sounds are not under it.
+
 **Only for a board with no slide.** Controls refuses `no-slide` only when the
 pins file has a `privacy` section, and no pins file has one today. A slide
 that is fitted but not declared (the product's hardware contract gives it
@@ -664,3 +697,9 @@ and indicator startup/cleanup latency. Pull-up means a disconnected switch
 wire may resemble HIGH; this software does not establish electrical
 fail-closed wiring or microphone power removal. First must establish those
 physical facts separately. No lamp or acoustic result is asserted here.
+
+## Faces kept with nothing asked
+
+This switch closes the microphones and the camera; it does not decide whose face is kept. A face kept with nothing
+asked (`LAMP_FACE_NO_ASK=on`, off unless set) is biometric, and at the lamp is kept only with the speaker's own "I'm X"
+proof, the face the eyes saw saying that line ([eyes.md](eyes.md), "A new face with nothing asked").

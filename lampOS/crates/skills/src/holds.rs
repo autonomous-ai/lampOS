@@ -144,6 +144,9 @@ pub(crate) struct SkillLimits {
     pub(crate) ran_us: Option<u64>,
     /// Snoozed until then.
     pub(crate) snoozed_until_us: Option<u64>,
+    /// That snooze is a `[stop.done]`'s rest, which keeps a chance that
+    /// comes (#7753).
+    pub(crate) done_until_us: Option<u64>,
     /// Its `[rest]`: its last nudge, whether that is still being judged,
     /// the runs nobody noticed in a row, and until when it rests.
     pub(crate) rest: Option<Nudge>,

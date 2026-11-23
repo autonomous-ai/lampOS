@@ -1,0 +1,38 @@
+# 10:00, eating seen at 10, 12, 43 and 75 minutes: a line at 10, 43 and 75; the one at 12 is the same meal as the one at 10, and 43 is 31 minutes after the last bite at 12, a new meal (the owner, 01:5x on #7668: a meal ends after 30 minutes with no eating seen).
+clock = "10:00"
+
+[[expect]]
+at = "10m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "10m"
+within = "1m"
+call = "say"
+args = { note = "You just saw them eating at the desk. Say one friendly, casual sentence about it, the way a friend would, at most twenty words: enjoy it, or a light question about the meal. Not advice and no count. Say only what you saw; nothing about their health, diet, body or looks, and never mention a camera." }
+
+[[expect]]
+at = "43m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "43m"
+within = "1m"
+call = "say"
+args = { note = "You just saw them eating at the desk. Say one friendly, casual sentence about it, the way a friend would, at most twenty words: enjoy it, or a light question about the meal. Not advice and no count. Say only what you saw; nothing about their health, diet, body or looks, and never mention a camera." }
+
+[[expect]]
+at = "75m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "75m"
+within = "1m"
+call = "say"
+args = { note = "You just saw them eating at the desk. Say one friendly, casual sentence about it, the way a friend would, at most twenty words: enjoy it, or a light question about the meal. Not advice and no count. Say only what you saw; nothing about their health, diet, body or looks, and never mention a camera." }

@@ -1,0 +1,67 @@
+# The lamp plays a URL (#7415, docs/control.md "The speaker"): lamp-play fetches an MP3 over https from a host the
+# lamp's cloud named for that play and decodes it, and hands the sound to lamp-control, which plays it as a computer's
+# stream (the voice does not change). It is a unit of its own, apart from lamp-voice: no bus, no lamp file, no speaker,
+# the internet only. OFF: it exits 0 at once unless LAMP_PLAY_URL=on (a drop-in, here and in lamp-control's unit; no
+# product unit sets it), so installing this unit changes nothing on a lamp. It is a part in lampos.target like the others: a round or a
+# reset restarts or stops it with the target.
+# The sandbox is lamp-app-net@.service's (the apps' net variant, #7956): IPv4 and the local socket only, and the cgroup's
+# IP filter refuses this lamp itself, the home network and every link-local address, so a play can reach the internet
+# and nothing near the lamp. Names are looked up at public resolvers by address (the apps helper's resolv.conf, bound
+# in as that unit does; without it a lookup fails, and a play ends "unreachable": it fails closed, never to the
+# router's or the lamp's stub, which the filter drops).
+[Unit]
+Description=lampOS play a URL (lamp-play)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+After=local-fs.target lamp-setup.service network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+Slice=lampos-parts.slice
+ExecStart=/opt/lampOS/play/current/lamp-play
+Restart=on-failure
+RestartSec=5
+# A decoder must not starve the voice on the lamp's small cores, and one play at a time never needs more.
+MemoryMax=96M
+TasksMax=32
+CPUQuota=60%
+Nice=10
+DynamicUser=yes
+RuntimeDirectory=lamp-play
+RuntimeDirectoryMode=0755
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+# The peer is known by its cgroup (/proc/<pid>/cgroup, lamp-control.service's own), so another user's processes must be
+# visible to this unit: not ProtectProc=invisible (which would hide them and refuse everyone). Reading only; nothing else
+# is changed by it, and ProcSubset=pid keeps the rest of /proc away.
+ProtectProc=default
+ProcSubset=pid
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+UMask=0077
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+# IPv4 and the local socket only: the filter below covers v4 and the LAN's v6 prefixes, but a home's global v6 addresses
+# are in no list, so no v6 socket at all (as the apps' net unit, #7956's reads of 20 Nov).
+RestrictAddressFamilies=AF_UNIX AF_INET
+IPAddressDeny=127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16 100.64.0.0/10 224.0.0.0/4 ::1/128 fc00::/7 fe80::/10 ff00::/8
+ReadWritePaths=
+BindReadOnlyPaths=-/opt/lampOS/apps/.resolv.conf:/etc/resolv.conf
+TimeoutStopSec=10
+
+[Install]
+WantedBy=lampos.target

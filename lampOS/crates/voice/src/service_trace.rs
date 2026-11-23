@@ -169,10 +169,12 @@ impl SharedMetadata {
                             "lamp_leads_setup",
                             "photo_face_ask",
                             "run_write_read_back",
+                            "long_make_told",
                             "schedule_reminder",
                             "fixture_at_ms",
                             "head_wake_cue",
                             "look_note",
+                            "update_give_way",
                         ],
                     )
                 })
@@ -224,6 +226,7 @@ impl SharedMetadata {
                             "not_speech",
                             "playback_discarded",
                             "speaker_lapsed",
+                            "update_give_way",
                             "cancelled",
                         ],
                     )

@@ -5,7 +5,7 @@
 use lamp_update::{
     Config, Outcome, World,
     fetch::Web,
-    install::{self, Install, System},
+    install::{self, Host, Install, System},
     judge::UnitState,
     manifest, own, publish, round,
     world::{BusEars, Deaf, Ears, Monotonic, Statvfs, Systemctl, Systemd},
@@ -438,10 +438,17 @@ fn region(options: &BTreeMap<String, String>) -> Result<(), String> {
     // sysstat's collection off (#7254), this unit being the one a lamp in a
     // home runs from `update/current` at every boot.
     let sysstat = install::sysstat_quiet(Path::new("/"), &mut System, &mut changed, &mut say);
+    // What sysstat already kept (#7254 part 2), at every boot, as the
+    // drop-ins are; a round runs the same removal too (crate::round), for a
+    // lamp that updates with no reboot. Each file is said by name and size
+    // as it goes, so nothing more here.
+    let kept =
+        install::sysstat_kept_removed(Path::new("/"), &mut |argv| System.refresh(argv), &mut say)
+            .map(|_| ());
     for line in &changed {
         println!("{line}");
     }
-    servers.and(sysstat)
+    servers.and(sysstat).and(kept)
 }
 
 fn harness_off(options: &BTreeMap<String, String>) -> Result<(), String> {
@@ -631,19 +638,32 @@ fn writer_probe(options: &BTreeMap<String, String>) -> Result<(), String> {
 }
 
 /// `lamp-update writer-refresh`: the running lamp-update put at the settings
-/// writer's fixed path, the copy there kept (#3689). Run as root by
+/// writer's fixed path, the copy there kept (#3689), and the build's lampos
+/// SDK put in place when it differs (#7415). Run as root by
 /// `lamp-update-writer.service`, which a round starts; by hand only when no
 /// round is at work.
 fn writer_refresh(options: &BTreeMap<String, String>) -> Result<(), String> {
     known(options, &[])?;
     let running = lamp_update::fixed_copy::own_bytes()?;
-    let done = lamp_update::writer_swap::refresh(
+    let sdk_dir = lamp_update::sdk_tree::DIR;
+    let ran = lamp_update::writer_swap::unit_run(
         Path::new("/"),
         Path::new(lamp_update::install::RECORDS),
         &running,
         &lamp_update::records::unix_ms,
         &mut |path: &Path| lamp_update::fixed_copy::run_probe(path),
     )?;
+    let (done, sdk) = match ran {
+        lamp_update::writer_swap::UnitRun::Sdk { written: true } => {
+            println!("the build's lampos SDK is written at {sdk_dir}");
+            return Ok(());
+        }
+        lamp_update::writer_swap::UnitRun::Sdk { written: false } => {
+            println!("the build's lampos SDK already is at {sdk_dir}");
+            return Ok(());
+        }
+        lamp_update::writer_swap::UnitRun::Writer { done, sdk } => (done, sdk),
+    };
     // A new writer is judged by its own `back` only: a failure systemd
     // still shows from the copy before is cleared (Seventh's P3 on #4107).
     if done.before.is_some() && !done.proven {
@@ -662,6 +682,11 @@ fn writer_refresh(options: &BTreeMap<String, String>) -> Result<(), String> {
         (Some(_), false) => {
             println!("the settings writer is build {build}, but its folder could not be synced")
         }
+    }
+    match sdk {
+        None => {}
+        Some(Ok(())) => println!("the build's lampos SDK is written at {sdk_dir}"),
+        Some(Err(why)) => println!("the build's lampos SDK is not written: {why}"),
     }
     Ok(())
 }
@@ -995,8 +1020,26 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     say: &mut say,
                     phase: &mut |_| {},
                     target: &mut |_| {},
+                    now: None,
                 };
-                own::confirm(&config, &mut world, running.as_deref())
+                let confirmed = own::confirm(&config, &mut world, running.as_deref());
+                // A new build taken from GitHub while the CDN is down
+                // (#7728) confirms on GitHub too, the CDN read first.
+                if matches!(confirmed, Ok(own::Confirm::NotProven(_)))
+                    && lamp_update::cdn_feed::falls_back(&config, true)
+                    && lamp_update::cdn_feed::due(
+                        &config.on(&config.records),
+                        lamp_update::records::unix_ms(),
+                    )
+                {
+                    own::confirm(
+                        &lamp_update::cdn_feed::on_github(&config),
+                        &mut world,
+                        running.as_deref(),
+                    )
+                } else {
+                    confirmed
+                }
             };
             let why = match confirmed {
                 Ok(own::Confirm::Confirmed) => {
@@ -1062,6 +1105,24 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         })
     };
     let switches = read_switches();
+    // The owner's Update now (#7517): only with its switch on (`switches.now`,
+    // so the carried /etc/lampOS/update.env turns it on for a lamp in a home,
+    // whose unit no round rewrites), vouched for by lamp-cloud's mark under
+    // the lamp's root.
+    if switches.now {
+        app_check = app_check
+            .map(|check| check.with_now(lamp_update::update_now::Marks::under(&config.root)));
+    }
+    // An old lamp's GitHub stable feed moved to its CDN mirror (#7728): off
+    // unless set, here or in the carried /etc/lampOS/update.env (on in the
+    // product), read with the other switches, so the round that first
+    // carries the file starts lamp-update again and it moves in that round;
+    // only a `serve` that acts. Its GitHub fallback is not this switch's.
+    let cdn_feed = config.apply && command == "serve" && switches.cdn_feed;
+    let mut cdn_feed_said = String::new();
+    // Every lamp on the CDN feed, switch or not: GitHub after an hour of
+    // CDN failures (#7728).
+    let falls_back = lamp_update::cdn_feed::falls_back(&config, command == "serve");
     // The agents' switches (#5197, #5978, #6226), read in the one place the
     // image's pre-install reads them too (#7274): only a `serve` that acts
     // takes a product lamp's defaults.
@@ -1147,6 +1208,57 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         }
         acts.then_some((on, shown))
     };
+    // OpenClaw's gateway only while OpenClaw is the lamp's default agent
+    // (#8105, LAMP_OPENCLAW_GATEWAY_BY_DEFAULT): lamp-tasks is asked every
+    // KEEP_EVERY between rounds, on a thread of its own, so a choice in the
+    // app starts the gateway within seconds and another default stops it.
+    // A round asks once more for its own OpenClaw step. One lock is held by
+    // the round for its whole run and by the thread for each look, so the
+    // two never touch the gateway at once (Twelve's P3 on #8116).
+    let gateway_by_default = matches!(openclaw, Some((true, _))) && switches.gateway_by_default;
+    let tasks_app_socket = config
+        .root
+        .join(lamp_update::openclaw_install::TASKS_APP_SOCKET.trim_start_matches('/'));
+    let gateway_lock = std::sync::Arc::new(std::sync::Mutex::new(()));
+    if gateway_by_default {
+        use lamp_update::openclaw_install as openclaw;
+        say(
+            "OpenClaw's gateway runs only while OpenClaw is the lamp's agent (LAMP_OPENCLAW_GATEWAY_BY_DEFAULT)",
+        );
+        let root = config.root.clone();
+        let socket = tasks_app_socket.clone();
+        let shown = openclaw.map(|(_, shown)| shown).unwrap_or_default();
+        let gateway_lock = gateway_lock.clone();
+        let started = std::thread::Builder::new()
+            .name("gateway-by-default".into())
+            .spawn(move || {
+                let mut systemd = Systemctl::default();
+                let mut said = |line: &str| eprintln!("lamp-update: {line}");
+                loop {
+                    // A round holds the lock: this look is skipped.
+                    if let Ok(_look) = gateway_lock.try_lock() {
+                        let gateway =
+                            openclaw::gateway_wanted(true, openclaw::said_default(&socket));
+                        {
+                            openclaw::keep_between_rounds(
+                                &root,
+                                &mut systemd,
+                                gateway,
+                                shown.one_path,
+                                &mut lamp_update::install::output_of,
+                                &mut said,
+                            );
+                        }
+                    }
+                    std::thread::sleep(openclaw::KEEP_EVERY);
+                }
+            });
+        if let Err(error) = started {
+            say(&format!(
+                "OpenClaw's gateway is not kept to the lamp's agent: no thread: {error}"
+            ));
+        }
+    }
     // Hermes's schedule (#5978): each install watched while it runs, the
     // voice heard from the start, so speech freezes it and a lost privacy
     // reading stops it; one watch for Hermes's and OpenClaw's both (#6226).
@@ -1231,6 +1343,8 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         )
     }));
     loop {
+        // Held for the round and its after-steps (#8105).
+        let round_lock = gateway_lock.lock().unwrap_or_else(|e| e.into_inner());
         let before_setup = lamp_update::first_update::before_setup(&config);
         if let Some(first) = &mut first {
             first.begin(lamp_update::records::unix_ms(), &mut say);
@@ -1246,6 +1360,10 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     telling.target(build);
                 }
             };
+            let mut asked_now = app_check.as_mut().map(|check| NowAsked {
+                check,
+                telling: &telling,
+            });
             let mut world = World {
                 channel: &mut channel,
                 systemd: &mut systemd,
@@ -1255,8 +1373,24 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 say: &mut say,
                 phase: &mut phase,
                 target: &mut target,
+                now: asked_now
+                    .as_mut()
+                    .map(|asked| asked as &mut dyn lamp_update::update_now::NowAsk),
             };
-            round(&config, &mut world)
+            if falls_back {
+                // On the CDN feed, GitHub after an hour of CDN failures
+                // (#7728): the CDN first on every round, never sticky.
+                let mut say = |line: &str| eprintln!("lamp-update: {line}");
+                lamp_update::cdn_feed::round_on(
+                    &config,
+                    &records,
+                    lamp_update::records::unix_ms(),
+                    &mut |config| round(config, &mut world),
+                    &mut say,
+                )
+            } else {
+                round(&config, &mut world)
+            }
         };
         // Once the channel was reached, so the lamp has its network; never
         // before a switch of its own, whose new build does its own round.
@@ -1331,10 +1465,19 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                         window
                     }
                 });
-                openclaw_install::after_round(
+                let gateway = if gateway_by_default {
+                    openclaw_install::gateway_wanted(
+                        true,
+                        openclaw_install::said_default(&tasks_app_socket),
+                    )
+                } else {
+                    openclaw_install::Gateway::Wanted
+                };
+                openclaw_install::after_round_with(
                     &config.root,
                     &records,
                     shown,
+                    gateway,
                     &mut systemd,
                     &mut lamp_update::install::output_of,
                     now_unix_ms,
@@ -1460,6 +1603,46 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 Err(error) => eprintln!("lamp-update: its own program is not known: {error}"),
             }
         }
+        // After any round, an up-to-date or unreachable one too (#7018's
+        // rule: the build that carries it acts itself, not one build late).
+        if cdn_feed {
+            use lamp_update::cdn_feed::{self, Moved};
+            match cdn_feed::move_to_cdn(
+                &config.on(&config.units),
+                &config.channel_url,
+                &config.key,
+                &config.channel,
+                &mut channel,
+                &mut || systemd.reload(),
+            ) {
+                Moved::Moved => {
+                    eprintln!(
+                        "lamp-update: {} follows {} now (#7728): lamp-update starts again on it",
+                        lamp_update::round::OWN_UNIT,
+                        cdn_feed::CDN
+                    );
+                    match std::env::current_exe() {
+                        Ok(program) => {
+                            let error = Command::new(&program)
+                                .args(cdn_feed::args_on_cdn(std::env::args_os().skip(1)))
+                                .exec();
+                            eprintln!(
+                                "lamp-update: {} cannot be started: {error}; the CDN feed waits for the next start",
+                                program.display()
+                            );
+                        }
+                        Err(error) => {
+                            eprintln!("lamp-update: its own program is not known: {error}")
+                        }
+                    }
+                }
+                Moved::Kept(why) if why != cdn_feed_said => {
+                    eprintln!("lamp-update: kept on the GitHub stable feed: {why}");
+                    cdn_feed_said = why;
+                }
+                Moved::Kept(_) | Moved::NotGitHub => {}
+            }
+        }
         // A round that says what the one before said is not said again.
         if text != last {
             eprintln!("lamp-update: {text}");
@@ -1468,6 +1651,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         // After each round: `update/current` may have moved and been
         // confirmed by another lamp-update meanwhile (#6898).
         onto_current(&config, &mut reexec_tried);
+        drop(round_lock);
         // Between rounds the bus is still read, so that what the voice said
         // meanwhile does not wait in the sockets. A check from the app ends
         // the wait (#4153); one that came during the round is dropped.
@@ -1563,6 +1747,32 @@ mod product_settings_tests {
 /// no longer took it, a climbed updater would end with 2 at each start,
 /// unconfirmed, and `lamp-update-back` would put 7071's back at its
 /// deadline: every 7071 lamp would climb and fall back, round after round.
+/// The round's side of the owner's Update now (#7517): the app's check heard
+/// during the round, and what the round says of it on `update/status`.
+struct NowAsked<'a, 'b> {
+    check: &'a mut lamp_update::app_check::AppCheck,
+    telling: &'b std::cell::RefCell<Option<lamp_update::status::Telling>>,
+}
+
+impl lamp_update::update_now::NowAsk for NowAsked<'_, '_> {
+    fn heard(&mut self) -> bool {
+        self.check
+            .hear_now(&mut |line| eprintln!("lamp-update: {line}"))
+    }
+
+    fn waiting(&mut self, waiting: Option<&'static str>) {
+        if let Some(telling) = self.telling.borrow_mut().as_mut() {
+            telling.waiting(waiting);
+        }
+    }
+
+    fn asked(&mut self) {
+        if let Some(telling) = self.telling.borrow_mut().as_mut() {
+            telling.asked_now();
+        }
+    }
+}
+
 #[cfg(test)]
 mod own_unit_line_tests {
     use super::*;
@@ -1702,5 +1912,16 @@ mod own_unit_line_tests {
         ] {
             assert!(!writable(&SANDBOX_7071, path), "{path}");
         }
+        // OpenClaw's config (#7868): a round's check of its `gateway`
+        // block only reads it; Harness's one-shot writes it.
+        let openclaw_config = std::path::Path::new(lamp_update::openclaw_install::CONFIG)
+            .parent()
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(
+            !writable(&SANDBOX_7071, openclaw_config),
+            "{openclaw_config}"
+        );
     }
 }

@@ -68,8 +68,10 @@ pub const NOT_ANSWERED: &str = "my skills didn't answer, so it may not have star
 /// first thing heard (lamp-9adf, 16 Nov 15:36: "Lamp, moon time." was
 /// answered "Moon time is running now." first, and the skill's own line
 /// came 20 s after the call, the say service's quiet after that turn).
+/// One turned on for the ask ([`told_turned_on`]) never does: its undo is
+/// said first.
 pub fn speaks_itself(told: &Value) -> bool {
-    told["ran"] == true && told["says"] == true
+    told["ran"] == true && told["says"] == true && told.get(TURNED_ON).is_none()
 }
 
 /// How long after its run now a made skill's exact line, asked as the
@@ -135,6 +137,80 @@ pub fn answers_now(skill: &str, now: std::time::Instant) -> bool {
 /// The most of their skills' names said when none is near.
 const NAMED_MOST: usize = 3;
 
+/// What lamp-skills answers a run now of a skill turned off or snoozed
+/// (`lamp_skills::Engine::run_now`), word for word.
+pub const STOPPED: &str = "it is turned off or snoozed";
+
+/// Whether a run's answer `told` is lamp-skills' refusal of a skill turned
+/// off or snoozed ([`STOPPED`]).
+pub fn stopped(told: &Value) -> bool {
+    told["error"] == STOPPED
+}
+
+/// A made skill the owner turned off, asked to run now, with
+/// `LAMP_MADE_SKILL_OFF_SAID` on (#7562's row on lamp-9adf, 18 Nov: "Lamp,
+/// use my space facts skill." with space facts turned off was the model's
+/// `make_skill` run, refused "it is turned off or snoozed", and the lamp
+/// said "Space facts didn't run — it's turned off at the moment."): turned
+/// on for the ask, as `made_turn::on_for_ask` turns one on for its
+/// function's call, then run, said with one line and its undo. Nothing is
+/// read of the line: the run asked is the ask. A snooze is never turned.
+#[derive(Clone, Copy)]
+pub struct TurnsOn<'a> {
+    /// Whether the skill is turned off, by lamp-skills' `off` file (the
+    /// app's switch or a voice turn-off), never a snooze.
+    pub is_off: &'a dyn Fn(&str) -> bool,
+    /// The skill turned on, as `make_skill`'s own `turn_on`
+    /// (`made_turn::asked_here`): done, or why not.
+    pub turn_on: &'a dyn Fn(&str) -> Result<(), String>,
+    /// The skill turned off again, as the app's switch
+    /// (`made_turn::turned_by_helper`), when its run after the turn on
+    /// failed: the owner's state as it was (Heron's P2 on #7562).
+    pub turn_off: &'a dyn Fn(&str) -> Result<(), String>,
+    /// How long before each run again while lamp-skills still answers it
+    /// off ([`STOPPED`]), at most `made_turn::RERUNS` times: it reads its
+    /// `off` file again within 2 s.
+    pub wait: std::time::Duration,
+}
+
+/// The run's answer `told` ([`asked`]'s `{"run": NAME, "ran": true}`) of a
+/// skill turned on for the ask: the one line to say first, with its undo,
+/// in the conversation's language, then that it is running. Still a run
+/// ([`ran_of`]), never one that speaks itself first ([`speaks_itself`]):
+/// the undo is said.
+pub fn told_turned_on(told: &Value) -> Value {
+    let made = told[RUN].as_str().unwrap_or_default();
+    let spoken = made_skill::spoken_name(made);
+    json!({
+        RUN: made,
+        "ran": true,
+        "says": told["says"],
+        TURNED_ON: spoken,
+        "next": format!(
+            "It was off, so the lamp turned it on and ran it for their ask. Say first, in the \
+             conversation's language: \"{}\" Then say only, in a few words, that it is running \
+             now. Never say what it found, sent or did, nor that it is done. Call nothing.",
+            crate::made_turn::undo_line(&spoken)
+        )
+    })
+}
+
+/// The key of a run's answer naming the skill turned on for the ask
+/// ([`told_turned_on`]).
+pub const TURNED_ON: &str = "turned_on";
+
+/// The answer to the call `name`, `make_skill`'s run now that ran the made
+/// skill `on` the model's own `turn_on` turned on in the turn (`told`),
+/// said with the undo line ([`told_turned_on`]); none for any other.
+pub fn ran_after_turn_on(on: Option<&str>, name: &str, told: &Value) -> Option<Value> {
+    let on = on?;
+    (name == made_skill::MAKE
+        && told["ran"] == true
+        && told[RUN] == on
+        && told.get(TURNED_ON).is_none())
+    .then(|| told_turned_on(told))
+}
+
 /// A run asked by the model's `make_skill` call: the name as heard, in the
 /// voice's request `request` (`heard`: someone spoke it).
 #[derive(Clone, Copy, Debug)]
@@ -143,6 +219,12 @@ pub struct Ask<'a> {
     pub request: u64,
     pub heard: bool,
 }
+
+/// The key of a run's refusal naming the made skill that didn't run
+/// ([`asked_turning`]): so a failed run of the skill the model's own
+/// `turn_on` turned on in the turn is known, and that skill turned off
+/// again (`made_turn::failed_after_turn_on`).
+pub const NOT_RAN: &str = "not_ran";
 
 /// What the model is told of a skill that didn't run, and why.
 fn not_run(spoken: &str, why: &str) -> Value {
@@ -162,14 +244,37 @@ fn not_run(spoken: &str, why: &str) -> Value {
 /// and its task's yes given (`task_agreed`: none for a skill with no task,
 /// else whether lamp-control keeps its yes), is run by `run`
 /// (lamp-skills' [`OP`]: whether it speaks its own words, or why not, in
-/// its words). What the model is told.
+/// its words). What the model is told. With `turns` (the switch on), one
+/// turned off is turned on for the ask first ([`TurnsOn`]).
 pub fn asked(
     ask: Ask<'_>,
     keeping: &Keeping,
     owner_hears: impl FnOnce() -> bool,
     task_agreed: impl FnOnce(&str) -> Result<Option<bool>, String>,
     writes_approved: impl FnOnce(&Asks) -> Option<(bool, bool)>,
-    run: impl FnOnce(&str) -> Result<bool, String>,
+    run: impl FnMut(&str) -> Result<bool, String>,
+) -> Value {
+    asked_turning(
+        ask,
+        keeping,
+        owner_hears,
+        task_agreed,
+        writes_approved,
+        run,
+        None,
+    )
+}
+
+/// [`asked`], with `turns`: a skill turned off is turned on for the ask
+/// ([`TurnsOn`]) once its other bounds hold, then run.
+pub fn asked_turning(
+    ask: Ask<'_>,
+    keeping: &Keeping,
+    owner_hears: impl FnOnce() -> bool,
+    task_agreed: impl FnOnce(&str) -> Result<Option<bool>, String>,
+    writes_approved: impl FnOnce(&Asks) -> Option<(bool, bool)>,
+    mut run: impl FnMut(&str) -> Result<bool, String>,
+    turns: Option<TurnsOn<'_>>,
 ) -> Value {
     let Ask {
         name,
@@ -267,7 +372,49 @@ pub fn asked(
         }
         Err(_) => return not_run(&spoken, "I can't tell now whether what it uses is agreed"),
     }
-    match run(&made) {
+    // Turned off by the owner (`LAMP_MADE_SKILL_OFF_SAID`): turned on for
+    // the ask, then run; a snooze is left as it is.
+    let mut turned_on = false;
+    if let Some(turns) = turns
+        && (turns.is_off)(&made)
+    {
+        if let Err(why) = (turns.turn_on)(&made) {
+            eprintln!(
+                "lamp-voice: request {request}: a made skill turned off wasn't run now: not turned on for the ask"
+            );
+            return not_run(
+                &spoken,
+                &format!("it is turned off, and it wasn't turned on: {why}"),
+            );
+        }
+        eprintln!(
+            "lamp-voice: request {request}: a made skill turned off asked to run now: turned on for the ask (LAMP_MADE_SKILL_OFF_SAID)"
+        );
+        turned_on = true;
+    }
+    let mut ran = run(&made);
+    if let Some(turns) = turns.filter(|_| turned_on) {
+        for _ in 0..crate::made_turn::RERUNS {
+            if !matches!(&ran, Err(why) if why == STOPPED) {
+                break;
+            }
+            std::thread::sleep(turns.wait);
+            eprintln!(
+                "lamp-voice: request {request}: a made skill still off just after its turn on: run again"
+            );
+            ran = run(&made);
+        }
+        if matches!(&ran, Err(why) if why == STOPPED) {
+            return crate::made_turn::turned_on_for_ask(&spoken, &crate::made_turn::just_on());
+        }
+    }
+    match ran {
+        Ok(says) if turned_on => {
+            eprintln!(
+                "lamp-voice: request {request}: a made skill turned on and run now, as its owner asked"
+            );
+            told_turned_on(&json!({ RUN: made, "says": says }))
+        }
         Ok(says) => {
             eprintln!("lamp-voice: request {request}: a made skill run now, as its owner asked");
             json!({
@@ -282,11 +429,111 @@ pub fn asked(
                 )
             })
         }
+        // Turned on for the ask, then refused (it runs only at its own
+        // moment, or lamp-skills didn't answer): turned off again, so the
+        // owner's state is as it was, and said plainly (Heron's P2 on
+        // #7562).
+        Err(why) if turned_on => {
+            let restored = turns.map_or(Err(String::new()), |turns| (turns.turn_off)(&made));
+            if restored.is_ok() {
+                eprintln!(
+                    "lamp-voice: request {request}: a made skill turned on for the ask didn't run now: turned off again: {why}"
+                );
+                crate::made_turn::not_run_still_off(&spoken, &why)
+            } else {
+                eprintln!(
+                    "lamp-voice: request {request}: a made skill turned on for the ask didn't run now, and wasn't turned off again: {why}"
+                );
+                crate::made_turn::not_run_left_on(&spoken, &why)
+            }
+        }
         Err(why) => {
             eprintln!("lamp-voice: request {request}: a made skill wasn't run now: {why}");
-            not_run(&spoken, &why)
+            let mut told = not_run(&spoken, &why);
+            told[NOT_RAN] = json!(made);
+            told
         }
     }
+}
+
+/// Of a `use_skill` call's `skill` (`named`), which names no skill's
+/// function, the owner's own made skill it names ([`made_remove::found`]),
+/// when that one is turned off (`turned_off`, lamp-skills' `off` file;
+/// never a snooze): its name. A made skill has a trigger and no function,
+/// so `use_skill` can't name it: on lamp-9adf, 18 Nov (#7562's row),
+/// "Lamp, tell me a space fact with my space facts skill." with space facts
+/// turned off was the model's `use_skill`, told only that no skill has that
+/// name. Which skill the line asks for stays the model's call: no word of
+/// the line is read.
+pub fn off_named(
+    named: &str,
+    keeping: &Keeping,
+    turned_off: &std::collections::BTreeSet<String>,
+) -> Option<String> {
+    match made_remove::found(named, keeping) {
+        Found::Made { name, .. } if turned_off.contains(&name) => Some(name),
+        _ => None,
+    }
+}
+
+/// A `use_skill` call `call` that named no skill's function (its refusal
+/// came first), on the lamp, with `LAMP_MADE_SKILL_OFF_SAID` on and a heard
+/// line: when it names a made skill turned off ([`off_named`]), the run now
+/// of [`asked_here`], as `make_skill`'s run of it: the owner's alone, turned
+/// on for the ask, run, and said with its undo (turned off again if the run
+/// fails). None otherwise, and with the switch off: the refusal as before.
+pub fn use_skill_off_here(
+    call: &lamp_gemini::ToolCall,
+    request: u64,
+    heard: bool,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    skills: Option<&Path>,
+) -> Option<Value> {
+    if !heard || !made_skill::off_said_on() {
+        return None;
+    }
+    let named = call.args.get("skill").and_then(Value::as_str)?;
+    let keeping = Keeping::when(true)?;
+    let turned_off =
+        crate::skill_about::turned_off(Path::new(crate::skill_about::STATE_DIR)).ok()?;
+    let made = off_named(named, &keeping, &turned_off)?;
+    eprintln!(
+        "lamp-voice: request {request}: use_skill named a made skill turned off: its run now (LAMP_MADE_SKILL_OFF_SAID)"
+    );
+    Some(asked_here(&made, request, heard, lease, skills))
+}
+
+/// Whether one `make_skill` call's `turn_on` (`on`) and run now (`run`)
+/// name one skill: the same words as a skill's name is written
+/// ([`made_remove::apart`]), or the same made skill of theirs found by each
+/// ([`made_remove::found`], with `keeping`).
+pub fn one_skill(on: &str, run: &str, keeping: Option<&Keeping>) -> bool {
+    if made_remove::apart(on, run) == 0 && made_remove::apart(run, on) == 0 {
+        return true;
+    }
+    keeping.is_some_and(|keeping| {
+        match (
+            made_remove::found(on, keeping),
+            made_remove::found(run, keeping),
+        ) {
+            (Found::Made { name: a, .. }, Found::Made { name: b, .. }) => a == b,
+            _ => false,
+        }
+    })
+}
+
+/// What the model is told of one `make_skill` call whose `turn_on` and run
+/// now name two skills (Heron's P3 on #7562: the run alone ran, the turn on
+/// was dropped): nothing done, and each asked again as its own call.
+pub fn two_skills(on: &str, run: &str) -> Value {
+    json!({
+        "error": "one call turned on one skill and ran another, so nothing was done",
+        "next": format!(
+            "Nothing was done yet. Call make_skill again now with turn_on and \"{on}\" alone, \
+             then with run and \"{run}\" alone, saying nothing first; each answer says what to \
+             say."
+        )
+    })
 }
 
 /// The made skill `name` run now by lamp-skills, on its call socket in
@@ -330,7 +577,32 @@ pub fn asked_here(
     };
     made_skill::drop_gone(&keeping);
     let manage = keeping.manage.clone();
-    asked(
+    let is_off = |skill: &str| {
+        crate::skill_about::turned_off(Path::new(crate::skill_about::STATE_DIR))
+            .is_ok_and(|off| off.contains(skill))
+    };
+    let turn_on = |skill: &str| {
+        let on = json!({ crate::made_turn::TURN_ON: skill });
+        let told = crate::made_turn::asked_here(skill, false, request, heard, lease);
+        if crate::made_turn::turned(made_skill::MAKE, &on, &told) && told["off"] == false {
+            Ok(())
+        } else {
+            Err(told["error"]
+                .as_str()
+                .unwrap_or("it couldn't be turned on")
+                .to_owned())
+        }
+    };
+    // Back off as the app's switch: the owner's own state restored, so no
+    // owner's check again, nor a remove's wait dropped.
+    let turn_off = |skill: &str| crate::made_turn::turned_by_helper(&manage, skill, true);
+    let turns = made_skill::off_said_on().then_some(TurnsOn {
+        is_off: &is_off,
+        turn_on: &turn_on,
+        turn_off: &turn_off,
+        wait: crate::made_turn::RERUN_AFTER,
+    });
+    asked_turning(
         Ask {
             name,
             request,
@@ -351,6 +623,7 @@ pub fn asked_here(
         },
         |asks| crate::services::skill_writes_approved(Path::new(crate::services::FOLDER), asks),
         |skill| ran_by(skills, skill),
+        turns,
     )
 }
 
@@ -418,6 +691,29 @@ mod tests {
 
     fn never(_: &str) -> Result<bool, String> {
         panic!("run")
+    }
+
+    /// #7874 on c0a4: OpenClaw made `my-day`, on, but "run my day" found
+    /// it and then looked it up again as `day`, so it "isn't on". A skill
+    /// named `desk-check` asked as "my desk check skill" still runs.
+    #[test]
+    fn a_made_skill_named_my_something_runs_now() {
+        let (root, keeping) = keeping("run-my-day");
+        made_here(&keeping, &[("my-day", true), ("desk-check", true)]);
+        for (heard, name) in [
+            ("my day", "my-day"),
+            ("my-day", "my-day"),
+            ("my desk check skill", "desk-check"),
+        ] {
+            let mut ran = Vec::new();
+            let told = asked(ask(heard), &keeping, owner, no_task, approved, |skill| {
+                ran.push(skill.to_owned());
+                Ok(false)
+            });
+            assert_eq!(ran, [name], "{heard}: {told}");
+            assert_eq!(told[RUN], name, "{heard}: {told}");
+        }
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// The owner's two lines at 15:49 and 15:52, as the model passes the
@@ -598,6 +894,331 @@ mod tests {
         let next = told["next"].as_str().unwrap();
         assert!(next.contains("unread mail"), "{next}");
         assert!(!next.contains("evening dim"), "{next}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// lamp-9adf, 18 Nov, #7562's row: space facts made and on the lamp,
+    /// turned off by the owner (lamp-skills' `off` file).
+    fn space_lamp(test: &str) -> (PathBuf, Keeping) {
+        let (root, keeping) = keeping(test);
+        made_here(&keeping, &[("space-facts", true), ("unread-mail", true)]);
+        (root, keeping)
+    }
+
+    /// lamp-skills as the voice asks it: space facts answers [`STOPPED`]
+    /// while turned off, and `late` more times after its turn on (it reads
+    /// its `off` file again within 2 s); then it runs, saying its own
+    /// words, unless it refuses the run (`refuses`, in lamp-skills' words).
+    /// What was turned on, turned off and run, in order; a turn off refused
+    /// when `keeps_on`.
+    struct Lamp {
+        on: std::cell::Cell<bool>,
+        late: std::cell::Cell<usize>,
+        refuses: Option<&'static str>,
+        keeps_on: bool,
+        turned: std::cell::RefCell<Vec<String>>,
+        offed: std::cell::RefCell<Vec<String>>,
+        ran: std::cell::RefCell<Vec<String>>,
+    }
+
+    impl Lamp {
+        fn new(late: usize) -> Self {
+            Self {
+                on: false.into(),
+                late: late.into(),
+                refuses: None,
+                keeps_on: false,
+                turned: Vec::new().into(),
+                offed: Vec::new().into(),
+                ran: Vec::new().into(),
+            }
+        }
+
+        fn run(&self, skill: &str) -> Result<bool, String> {
+            self.ran.borrow_mut().push(skill.to_owned());
+            if !self.on.get() {
+                return Err(STOPPED.to_owned());
+            }
+            if self.late.get() > 0 {
+                self.late.set(self.late.get() - 1);
+                return Err(STOPPED.to_owned());
+            }
+            if let Some(why) = self.refuses {
+                return Err(why.to_owned());
+            }
+            Ok(true)
+        }
+
+        fn turn_on(&self, skill: &str) -> Result<(), String> {
+            self.turned.borrow_mut().push(skill.to_owned());
+            self.on.set(true);
+            Ok(())
+        }
+
+        fn turn_off(&self, skill: &str) -> Result<(), String> {
+            self.offed.borrow_mut().push(skill.to_owned());
+            if self.keeps_on {
+                return Err("the lamp's skills couldn't be reached".to_owned());
+            }
+            self.on.set(false);
+            Ok(())
+        }
+    }
+
+    /// The model's `make_skill` run, as on lamp-9adf for #7562's requests 6
+    /// and 9, of space facts while the owner has it turned off.
+    fn run_off(lamp: &Lamp, keeping: &Keeping, off: bool, switch: bool) -> Value {
+        let is_off = move |_: &str| off;
+        let turn_on = |skill: &str| lamp.turn_on(skill);
+        let turn_off = |skill: &str| lamp.turn_off(skill);
+        let turns = switch.then_some(TurnsOn {
+            is_off: &is_off,
+            turn_on: &turn_on,
+            turn_off: &turn_off,
+            wait: std::time::Duration::from_millis(1),
+        });
+        asked_turning(
+            ask("space facts"),
+            keeping,
+            owner,
+            no_task,
+            approved,
+            |skill| lamp.run(skill),
+            turns,
+        )
+    }
+
+    /// The undo line said of space facts turned on for the ask.
+    const UNDO: &str = "Space facts was off, so I turned it on. Say 'turn it off' to undo.";
+
+    /// #7562's row on lamp-9adf, 18 Nov, request 6: "Lamp, use my space
+    /// facts skill." with space facts turned off was the model's
+    /// `make_skill` run, not the skill's function; it was refused "it is
+    /// turned off or snoozed" and said "Space facts didn't run — it's turned
+    /// off at the moment." With the switch on, the run turns it on for the
+    /// owner's ask, as its function's call does (`made_turn::on_for_ask`),
+    /// runs it, and tells the model the one line with its undo, asking
+    /// nothing; a run still, never one that speaks before its undo.
+    #[test]
+    fn an_off_skill_asked_to_run_now_is_turned_on_run_and_said_with_its_undo() {
+        let (root, keeping) = space_lamp("run-off-on");
+        let lamp = Lamp::new(0);
+        let told = run_off(&lamp, &keeping, true, true);
+        assert_eq!(*lamp.turned.borrow(), ["space-facts"], "{told}");
+        assert_eq!(*lamp.ran.borrow(), ["space-facts"], "{told}");
+        assert_eq!(told[RUN], "space-facts", "{told}");
+        assert_eq!(told["ran"], true, "{told}");
+        assert_eq!(told[TURNED_ON], "space facts", "{told}");
+        assert_eq!(ran_of(&told).as_deref(), Some("space-facts"), "{told}");
+        assert!(!speaks_itself(&told), "the undo is said first: {told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains(&format!("\"{UNDO}\"")), "{next}");
+        assert!(next.contains("conversation's language"), "{next}");
+        assert!(next.contains("running now"), "{next}");
+        assert!(!next.contains("didn't run"), "{next}");
+        assert!(!next.contains('?'), "nothing asked: {next}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// lamp-skills reads its `off` file again within 2 s: a run just after
+    /// the turn on that still answers off is run again after a short wait;
+    /// still off after every try, the model is told it was just turned on,
+    /// with its undo, never that it is off.
+    #[test]
+    fn an_off_skill_turned_on_for_a_run_is_run_again_while_still_off() {
+        let (root, keeping) = space_lamp("run-off-late");
+        let lamp = Lamp::new(1);
+        let told = run_off(&lamp, &keeping, true, true);
+        assert_eq!(lamp.ran.borrow().len(), 2, "{told}");
+        assert_eq!(told["ran"], true, "{told}");
+        assert_eq!(told[TURNED_ON], "space facts", "{told}");
+        let lamp = Lamp::new(100);
+        let told = run_off(&lamp, &keeping, true, true);
+        assert_eq!(
+            lamp.ran.borrow().len(),
+            1 + crate::made_turn::RERUNS,
+            "{told}"
+        );
+        assert_eq!(told["ran"]["error"], crate::made_turn::JUST_ON, "{told}");
+        assert!(told["next"].as_str().unwrap().contains(UNDO), "{told}");
+        assert!(!told.to_string().contains(STOPPED), "{told}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A snoozed skill (not in the `off` file) is never turned on: its run
+    /// is refused as before and said so. With the switch off, a turned-off
+    /// one is as before too: "didn't run now", nothing turned on.
+    #[test]
+    fn a_snoozed_skill_or_the_switch_off_turns_nothing_on() {
+        let (root, keeping) = space_lamp("run-off-snoozed");
+        for (off, switch) in [(false, true), (true, false)] {
+            let lamp = Lamp::new(0);
+            let told = run_off(&lamp, &keeping, off, switch);
+            assert!(lamp.turned.borrow().is_empty(), "{told}");
+            assert_eq!(*lamp.ran.borrow(), ["space-facts"], "{told}");
+            assert_eq!(told["error"], STOPPED, "{told}");
+            assert!(stopped(&told), "{told}");
+            assert_eq!(ran_of(&told), None, "{told}");
+            let next = told["next"].as_str().unwrap();
+            assert!(next.contains("space facts didn't run now"), "{next}");
+            assert!(!next.contains("undo"), "{next}");
+        }
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A turn on refused (the helper's, or a guest's at `make_skill`'s own
+    /// `turn_on`) runs nothing and is said plainly with why; one whose
+    /// task waits for its yes is never turned on.
+    #[test]
+    fn an_off_skill_not_turned_on_runs_nothing() {
+        let (root, keeping) = space_lamp("run-off-refused");
+        let is_off = |_: &str| true;
+        let turn_on = |_: &str| Err(crate::made_turn::NOT_OWNER.to_owned());
+        let turn_off = |_: &str| -> Result<(), String> { panic!("nothing was turned on") };
+        let turns = Some(TurnsOn {
+            is_off: &is_off,
+            turn_on: &turn_on,
+            turn_off: &turn_off,
+            wait: std::time::Duration::from_millis(1),
+        });
+        let told = asked_turning(
+            ask("space facts"),
+            &keeping,
+            owner,
+            no_task,
+            approved,
+            never,
+            turns,
+        );
+        let why = told["error"].as_str().unwrap();
+        assert!(why.contains("turned off") && why.contains(crate::made_turn::NOT_OWNER));
+        assert!(told["next"].as_str().unwrap().contains("didn't run now"));
+        let lamp = Lamp::new(0);
+        let lamp_on = |skill: &str| lamp.turn_on(skill);
+        let waits = asked_turning(
+            ask("space facts"),
+            &keeping,
+            owner,
+            |_| Ok(Some(false)),
+            approved,
+            never,
+            Some(TurnsOn {
+                is_off: &is_off,
+                turn_on: &lamp_on,
+                turn_off: &turn_off,
+                wait: std::time::Duration::from_millis(1),
+            }),
+        );
+        assert_eq!(waits["error"], "it waits for their yes to what it uses");
+        assert!(lamp.turned.borrow().is_empty(), "{waits}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's P2 on #7562: space facts turned on for the owner's ask,
+    /// then its run refused (it does something only at its own moment, or
+    /// lamp-skills didn't answer): turned off again, as the owner had it,
+    /// and said plainly that it didn't run and is still off, with no undo
+    /// and never as a run. A turn off that fails leaves it on: said so,
+    /// with the undo line.
+    #[test]
+    fn a_run_refused_after_the_turn_on_leaves_it_off() {
+        let (root, keeping) = space_lamp("run-off-then-refused");
+        for why in ["it has nothing to do but at its own moment", NOT_ANSWERED] {
+            let lamp = Lamp {
+                refuses: Some(why),
+                ..Lamp::new(0)
+            };
+            let told = run_off(&lamp, &keeping, true, true);
+            assert_eq!(*lamp.turned.borrow(), ["space-facts"], "{told}");
+            assert_eq!(*lamp.offed.borrow(), ["space-facts"], "{told}");
+            assert!(!lamp.on.get(), "left off: {told}");
+            assert_eq!(told["error"], why, "{told}");
+            assert_eq!(ran_of(&told), None, "{told}");
+            assert!(told.get(TURNED_ON).is_none(), "{told}");
+            let next = told["next"].as_str().unwrap();
+            assert!(next.contains("space facts didn't run now"), "{next}");
+            assert!(next.contains("still off"), "{next}");
+            assert!(!next.contains("undo"), "{next}");
+        }
+        let lamp = Lamp {
+            refuses: Some("it has nothing to do but at its own moment"),
+            keeps_on: true,
+            ..Lamp::new(0)
+        };
+        let told = run_off(&lamp, &keeping, true, true);
+        assert!(lamp.on.get(), "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("didn't run now"), "{next}");
+        assert!(next.contains(&format!("\"{UNDO}\"")), "{next}");
+        // Not turned on for the ask (the switch off, or it was on): a
+        // refusal is as before, nothing turned off.
+        let lamp = Lamp {
+            refuses: Some("it has nothing to do but at its own moment"),
+            ..Lamp::new(0)
+        };
+        lamp.on.set(true);
+        let told = run_off(&lamp, &keeping, false, true);
+        assert!(lamp.offed.borrow().is_empty(), "{told}");
+        assert_eq!(told[NOT_RAN], "space-facts", "{told}");
+        assert!(!told["next"].as_str().unwrap().contains("still off"));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7562's row on lamp-9adf, 18 Nov: "Lamp, tell me a space fact with
+    /// my space facts skill." with space facts turned off was the model's
+    /// `use_skill`, which names no made skill: the name it gave is matched
+    /// to theirs as a run's is, and only one turned off is taken (a snooze,
+    /// one on, or one not theirs is the refusal as before).
+    #[test]
+    fn use_skill_naming_a_made_skill_turned_off_finds_it() {
+        let (root, keeping) = space_lamp("use-skill-off");
+        let off: std::collections::BTreeSet<String> = ["space-facts".to_owned()].into();
+        for named in ["space_facts", "space facts", "my space facts skill"] {
+            assert_eq!(
+                off_named(named, &keeping, &off).as_deref(),
+                Some("space-facts"),
+                "{named}"
+            );
+        }
+        assert_eq!(off_named("unread mail", &keeping, &off), None);
+        assert_eq!(off_named("dance", &keeping, &off), None);
+        assert_eq!(
+            off_named("space facts", &keeping, &Default::default()),
+            None
+        );
+        let call = lamp_gemini::ToolCall {
+            id: "1".into(),
+            name: crate::use_skill::NAME.into(),
+            args: json!({"skill": "space_facts"}),
+        };
+        for switch in [true, false] {
+            made_skill::set_off_said_here(Some(switch));
+            // Unheard, or the switch off: the refusal as before.
+            assert_eq!(use_skill_off_here(&call, 7, false, None, None), None);
+        }
+        made_skill::set_off_said_here(Some(false));
+        assert_eq!(use_skill_off_here(&call, 7, true, None, None), None);
+        made_skill::set_off_said_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's P3 on #7562: one call's `turn_on` and run now name one
+    /// skill, or two; two are never one done and the other dropped.
+    #[test]
+    fn a_turn_on_and_a_run_name_one_skill_or_two() {
+        let (root, keeping) = space_lamp("one-skill-or-two");
+        assert!(one_skill("space facts", "space_facts", None));
+        assert!(one_skill(
+            "space facts",
+            "my space facts skill",
+            Some(&keeping)
+        ));
+        assert!(!one_skill("space facts", "unread mail", Some(&keeping)));
+        assert!(!one_skill("space facts", "unread mail", None));
+        let told = two_skills("space facts", "unread mail");
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("turn_on and \"space facts\" alone"), "{next}");
+        assert!(next.contains("run and \"unread mail\" alone"), "{next}");
         let _ = std::fs::remove_dir_all(&root);
     }
 

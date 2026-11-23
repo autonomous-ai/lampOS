@@ -101,6 +101,10 @@ slider is a joint's degrees from its home, the same `body.state`,
 panel sets each joint's zero and direction against the real lamp, for
 lamp.model.json.
 
+On a real lamp (`examples/twin/try.js --real`) the shoulder's and the elbow's slider range is what the body takes, from its fold to its
+stand (`get('body')`: `stands`, `folded_counts`, `stand_counts`), not the servos' span: a holder's pose above the stand is cut to the stand
+today, so the page draws it "not yet" and says the cut on every step. Letting the arm go above the stand is #7513, part 4.
+
 ## Check a lamp against the fake: conformance
 
 `conformance/conformance.js` runs the same thirteen steps (state, light, gestures,
@@ -244,7 +248,7 @@ await lamp.closed();
   | `touch` | `kind` (`tap`, `pet`, `hold`), `where` | none |
   | `button` | `press` (`press`, `long_press`) | none |
   | `time` | your schedule | none |
-  | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` (each true or false; a lease change is a `lease` event) | none |
+  | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `muted_after_fault` (each true or false; the last is the lamp muted by its restart guard after a fault, not by the person; a lease change is a `lease` event) | none |
   | `volume.changed` | `level` (0–100), `muted`: the speaker's volume changed, whoever changed it (the person by voice or in the app, or a computer) | `speak` |
   | `lamp.said` | `text`, `by`, `source`, `cut`: a line the lamp said out loud (its fixed phrases, a computer's own say back to it, a reply said to the owner); never what a person says | `speech` |
   | `body.state` | `joints` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`: each `deg`, `counts`, `goal_deg`, `load`, `moving`, `temp_c`) and `lamp` (`light`, `talking`, `private`), at most 25 a second (12.5 today) | `body` |
@@ -364,7 +368,19 @@ it.
 
 **On the lamp itself**, a skill's script connects as its run with `await Lamp.local(token, { path })` (the token from `LAMP_CONTROL_TOKEN`, the socket `LAMP_CONTROL_SOCKET`, default `/run/lampos-control/control.sock`): the same `Lamp`, with exactly the grants the owner said yes to for that skill; `lamp.run` is the run's id and `lamp.skill` the skill it runs for. No pairing: the one-run token is the way in, and a wrong or ended one is refused `no_grant`. It is not the local agent's socket (docs/control.md, "The control socket"). The fake lamp serves it with `FakeLamp.start({ local: true })`, `fake.mintToken(grants, run)` and `fake.endRun(run)`.
 
-**An app installed from the Store** (#7415) connects with `await Lamp.connectApp()`: the socket is the one `LAMP_APP_SOCKET` names in the app's own environment (default `/run/lampos-apps/apps.sock`), there is no pairing, key or token (the lamp knows the app by its cgroup), and the grants are the installed manifest's, never the app's word; `lamp.app` and `lamp.appVersion` are its name and version. `await lamp.listenFor([...], handler)` replaces its phrases whole (each told only as `phrase.heard`, never what was said); the manifest's own triggers arrive unasked as `app.trigger` (`lamp.on('app.trigger', ...)`, with a `turn` to `await lamp.took(turn)`); `await lamp.settings()` and the event `app.settings` carry the owner's values; `await lamp.panel(title, lines)` sets the panel, one a minute. When the owner stops, removes or updates the app, its connection closes with the reason (`lamp.closeReason`), no event first. The fake lamp serves all of it with `FakeLamp.start({ app: true, appName, appGrants, appSettings })` and `fake.appPath`, and `fake.hearPhrase(phrase)`, `fake.trigger(name, phrase, turn)`, `fake.setAppSetting(changed)` and `fake.stopApp(why)`.
+**An app installed from the Store** (#7415) connects with `await Lamp.connectApp()`: the socket is the one `LAMP_APP_SOCKET` names in the app's own environment (default `/run/lampos-apps/apps.sock`), there is no pairing, key or token (the lamp knows the app by its cgroup), and the grants are the installed manifest's, never the app's word; `lamp.app` and `lamp.appVersion` are its name and version. `await lamp.listenFor([...], handler)` replaces its phrases whole (each told only as `phrase.heard`, never what was said); the manifest's own triggers arrive unasked as `app.trigger` (`lamp.on('app.trigger', ...)`, with a `turn` to `await lamp.took(turn)`); `await lamp.settings()` and the event `app.settings` carry the owner's values; `await lamp.panel(title, lines)` sets the panel, one a minute. When the owner stops, removes or updates the app, its connection closes with the reason (`lamp.closeReason`), no event first. With the manifest's `remember` grant, `await lamp.remember(text)` keeps a fact for the lamp's known person with the app as its source (at most 280 characters once the lamp tidied it; three a minute), and `await lamp.context(line, { forMs })` tells the voice a live line it never keeps (at most 120 characters, 1 ms to 10 minutes, renewed by the app); `await lamp.clearContext()` (or `context('')`) takes it back. `context` needs a lamp build with `apps.context` (built after `apps.remember`; an older lamp refuses it):
+
+```js
+await lamp.remember('squats 3x10, the 6th too shallow');
+for (let set = 1; set <= 3; set++) {
+  // Once a set, not each rep: Lamp takes one line a second (`rate` with `retryMs` past it).
+  await lamp.context(`set ${set} of 3, 10 squats`, { forMs: 120_000 });
+  // ...
+}
+await lamp.clearContext(); // the workout is over
+```
+
+The fake lamp serves all of it with `FakeLamp.start({ app: true, appName, appGrants, appSettings })` and `fake.appPath`, and `fake.hearPhrase(phrase)`, `fake.trigger(name, phrase, turn)`, `fake.setAppSetting(changed)` and `fake.stopApp(why)`; `fake.appFacts` and `fake.appContext` are what the app told the lamp, and `fake.refuseNext('apps.remember', code)` refuses the next one with any code.
 
 **Seeing every frame:** with `LAMPOS_LOG=debug`, every frame to and from the
 lamp is printed to stderr, one line each (`lampos -> {...}` sent, `lampos <-
@@ -432,6 +448,76 @@ asking only `speak`. What a push needs:
   piece 7). Without it the lamp answers `refused`, "skill push is not on this
   lamp". The product unit passes it from stable 11091 on; 11048 and older don't.
 
+## Publish your app
+
+**Staged:** built against the Store's developer API as Backend3 specified it on
+20 Nov ([#7415](https://github.com/autonomous-ai/lampOS/issues/7415#issuecomment-7035102128)),
+live on production; this SDK has been run only against a fake Store so far.
+An app (format 2, [docs/apps.md](../../docs/apps.md)) goes to the Skills
+Store; a skill goes on through the lamp. Check and pack the app with the
+Python SDK (`lamp app check DIR`, `lamp app pack DIR`); sign in with
+`lamp login` there or here, then:
+
+```js
+import { readFileSync } from 'node:fs';
+import { sendLoginCode, signIn, submitApp, submissions, requestPublic } from 'lampos';
+
+await sendLoginCode('you@example.com');           // the account emails a code
+await signIn('you@example.com', '123456');         // the code; never a password. Kept, 0600
+const app = await submitApp(readFileSync('gym-coach-1.0.0.tar'), {
+  title: 'Gym coach', category: 'health',
+  icon: readFileSync('icon.png'), cover: readFileSync('cover.png'),
+});
+console.log(app.id, app.review_status);            // pending: hidden until approved
+const { data, total } = await submissions();       // your apps; submissions(id) for one
+await requestPublic(app.id);                       // only once approved; the reviewers decide
+```
+
+- The token is kept in `~/.config/lampos/store.json` (`$LAMPOS_HOME`), the
+  file `lamp login` writes, one per account host; `LAMP_STORE_TOKEN` or
+  `{ token }` gives one instead. Production by default; `{ staging: true }`,
+  or `{ store, account }` URLs (`LAMP_STORE_URL`, `LAMP_ACCOUNT_URL`), for
+  another: each must be `https://` (`http://` only for localhost, 127.0.0.1
+  or [::1]), or a `StoreError` with code `bad_url` comes before anything is
+  sent. A redirect is never followed, so the token goes nowhere else: a 3xx
+  is a `StoreError` with code `store`. Every host, path and error code is in
+  `src/store.js`.
+- `submitApp` refuses here, before anything is sent: no sign-in, bytes that
+  are not a format-2 package (a gzip, a skill), art that is not a PNG of
+  exactly 1024x1024 (icon) or 1600x900 (cover) or is over 2 MB, a title over
+  100 or a description over 1000 characters. The Store checks the rest.
+- A refusal is a `StoreError` with the Store's `error_code` as `code` and
+  what to do in `why`: `lampos_package_invalid` with the Store's own reason,
+  `skill_name_exists`, `developer_app_only`, `authentication_error` and
+  `device_key_refused` (sign in again), `app_not_found`, `app_not_approved`,
+  `app_already_public`, and the day's limits `developer_daily_limit` (10
+  accepted uploads), `developer_attempt_limit` (30 attempts) and
+  `developer_public_limit` (3 public asks).
+
+### Push it to your own lamp
+
+The packed tar can also go on your own paired lamp, with no Store and no yes
+at the lamp: the pairing, with its `skills` grant, is the owner's yes. This
+SDK takes the tar only; make it from the app's folder with the Python SDK's
+`lamp app pack DIR` (which also pushes a folder: `lamp app push DIR`). A
+pushed app is **unsigned**: the tar must not carry `lamp-skill.sig`.
+`await lamp.pushApp(path)` checks it and sends it in parts, and resolves
+with the lamp's `app` (`name`, `title`, `version`, `sha256`, `grants`, `net`,
+`logs`, `updated`, `started`, `from`); `await lamp.apps()` and
+`await lamp.removeApp(name)`; on the command line,
+`lamp app push gym-coach-1.0.0.tar` ("gym-coach 1.0.0 pushed, running"),
+`lamp app list` and `lamp app remove NAME`.
+
+`pushApp` refuses on this computer, before a byte is sent: a tar over
+4 MiB, one that is not a plain tar (no gzip) whose `lamp-skill.json` is
+format 2 with `kind` `"app"` and an app's name, a signed one, a pairing
+without `skills`, and a manifest grant this pairing doesn't hold (`remember`
+never is; `net` and `logs` are booleans, not grants). The fuller check is
+`lamp app check` (Python). A re-push of the name replaces your app of it,
+any version. The lamp checks it all again; without `LAMP_STORE_APPS` it
+answers `refused`, "apps are off on this lamp", and without its apps helper,
+"app push is not on this lamp". Try it on `lamp fake`.
+
 ## Everything you can read
 
 What the lamp tells a paired computer, read from lamp-control's `watch.rs`,
@@ -454,7 +540,7 @@ subscribe.
 | `sound.heard` | `class`: `music`, `laughter`, `door` or `footsteps`. `score`: 0.5–1, 2 places | `{"ev":"sound.heard","class":"door","score":0.72}` | a class's score rises past 0.5 (again only after it falls under). Never speech | `sound` |
 | `touch` | `kind`: `tap` (two or more taps are one tap) or `pet`. The schema also has `hold` and `where`, not sent yet | `{"ev":"touch","kind":"pet"}` | a tap or a pet on the lamp | none |
 | `button` | `press`: `long_press`. The schema also has `press`, not sent yet | `{"ev":"button","press":"long_press"}` | the button is held | none |
-| `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` (each true or false) | `{"ev":"lamp.changed","lamp_state":{"talking":true,"paused":false,"private":false,"asleep":false}}` | any of the four changes | none |
+| `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `muted_after_fault` (each true or false) | `{"ev":"lamp.changed","lamp_state":{"talking":true,"paused":false,"private":false,"asleep":false,"muted_after_fault":false}}` | any of the five changes | none |
 | `volume.changed` | `level`: 0–100 of what the lamp allows. `muted`: true at 0 | `{"ev":"volume.changed","level":30,"muted":false}` | the volume changes, whoever changed it: the person by voice or in the app, or a computer | `speak` |
 | `lamp.said` | `text`: what the lamp said, as written. `by`: `lamp` or `computer`. `source`: `reply`, `exact` or `cached`. `cut`: true when it was cut short | `{"ev":"lamp.said","text":"Going to sleep now.","by":"lamp","source":"cached"}` | the lamp says a line out loud (its fixed phrases, a computer's own say back to it alone, a reply only when said to the owner); never what a person says | `speech` |
 | `time` | your schedule | | accepted in a subscription, not produced yet | none |
@@ -478,7 +564,7 @@ And two that come by themselves, with no subscription:
 | `mood` | `energy`, `warmth`, `awake`, `asleep`, the lamp's inner state. `null` until known | `{"energy":0.6,"warmth":0.7,"awake":true,"asleep":false}` | none |
 | `air` | the newest reading, as `air.changed` gives it, and `known: true`; `{"known": false}` with no sensor, its part not running, or no reading in 15 s | `{"pm2_5":7.4,"co2_ppm":912,"feel":"fine","known":true}` | `air` |
 | `device` | the lamp's own computer: `cpu_load` (the last minute's, 1 is every processor busy), `memory_used` and `disk_free` (0–1), `uptime_s`, `temperature_c` (by sensor, °C), and `known: true`; `{"known": false}` with no reading in 15 s | `{"cpu_load":0.42,"memory_used":0.55,"disk_free":0.71,"uptime_s":3600,"temperature_c":{"cpu_thermal":61.5},"known":true}` | `device` |
-| `lamp` | `talking`, `paused`, `private`, `asleep` | `{"talking":false,"paused":false,"private":false,"asleep":false}` | none |
+| `lamp` | `talking`, `paused`, `private`, `asleep`, `muted_after_fault` | `{"talking":false,"paused":false,"private":false,"asleep":false,"muted_after_fault":false}` | none |
 | `volume` | `level` (0–100 of what the lamp allows), `muted`. `null` until lamp-actions has said it | `{"level":50,"muted":false}` | `speak` |
 | `body` | `known`; `joints` (`yaw`, `pitch`, `roll`, `shoulder`, `elbow`), each with `counts`, `deg` from its home, `min_deg`, `max_deg`, `min_counts`, `max_counts`, `home_counts`, `folded_counts`, `stand_counts`; `stands`, `speed_deg_s`, `acceleration_deg_s2`, `load_limit`, `heat_stop_c`, `counts_per_turn` | `{"known":true,"joints":{"yaw":{"counts":2015.0,"deg":0.0,"min_deg":-3.5,"max_deg":3.5,...},...},"stands":true,"speed_deg_s":4.4,...}` | body |
 
@@ -545,9 +631,12 @@ Every fake refuses `joints` naming `roll`, `shoulder` or `elbow` with
 | `lamp.took(turn)` | the `turn` of an `app.trigger`: the voice keeps quiet. A `say`, gesture or light within 3 s counts as well | `{}`. With neither, the voice answers itself |
 | `lamp.settings()` | nothing | the owner's value for every key of the manifest's settings, by key. A change is the event `app.settings` (`changed`, `settings`); a bad value never reaches the app |
 | `lamp.panel(title, lines)` | `title`: 1 to 40 characters; `lines`: at most 6 of 80, text, no control characters | the panel's revision (a number that counts up); `rate` with `retry_ms` over one a minute |
+| `lamp.remember(text)` | one fact for the lamp's known person, the `remember` grant (app socket only). The lamp tidies it (links, markup and double quotes left out) and refuses, never cuts, over 280 characters | `true` once memory kept it; `off`, `no_grant`, `bad_request`, `private`, `unavailable`, `rate` with `retryMs` (three a minute), `refused` (memory did not keep it) |
+| `lamp.context(line, { forMs = 60000 })`, `lamp.clearContext()` | a live line told to the voice, never kept: at most 120 characters, `forMs` 1 to 600000, renewed by the app; `''` or `clearContext()` clears it. The `remember` grant; needs a lamp build with `apps.context` | `undefined`; the same refusals as `remember`, `rate` one set line a second; a clear is never rated nor refused while private |
 | `lamp.info`, `lamp.grants`, `lamp.limits` | | the lamp's id and name, this computer's grants, the lamp's limits: each rate as `{most, within_ms}` windows (`joints`, `motion`, `light`, `say`, `express`, …), `hold_max_ms` (a light's longest `for_ms`, 30000), `lease_max_ms` (the longest one lease take or renewal asks for, 600000), `say_max_bytes` (the longest say's text in UTF-8 bytes, 900) and `quiet_hours` (`{from, to}`, or `off`, the default). There is no ceiling on renewing a lease, and a say is counted in bytes (older lamps also sent `take_max_ms` and `say_max_chars`). By default the rates are off: `rates: "off"`, and only the `refused` and `phrases` windows (a lamp run with `--rates default` gives every class). The fake lamp sends the same as a lamp with its rates off |
 | `lamp.close()` | | lets go of every lease, then closes |
 | `lamp.closed()` | | resolves when the connection ends |
+| `lamp.endedWhy` | | why the connection ended, once it has (undefined while it is open): what the lamp said when it closed it, else `no answer to the keepalive ping for 20 s` when this client ended it, else `the connection dropped, with no reason given` |
 | `find(ms = 3000)` | `ms`: how long to listen for mDNS | the lamps on this network (`id`, `name`, `host`, `port`, `fp`). Finds none today: no lamp announces itself (any build) |
 
 ### Events and state
@@ -592,9 +681,11 @@ resolves with its `done` instead, or with the answer where no `done` follows
 | `lamp.lightOff({ forMs = 30000 })` | put the light out for `forMs`: a ring of black pixels (there is no level 0 for `light`), so the lamp's own light is back when it lapses or at `stop()`; to keep it out longer (a bedtime wants minutes) ask again before it lapses, about every 25 s as the `light` row says (`examples/pomodoro` does the same for a colour), and wake that loop at once on a stop or a wake-up word, or the lamp answers late. A turn's face, the privacy and mute marks, the camera mark and the person's own light stay on top. A lamp with no pixel ring: `bad_request` | `light` | no | as `ring` |
 | `lamp.ringPixels` | how many pixels the ring has, from hello; `undefined` from a lamp before pixel lights | | | |
 | `lamp.language` | the owner's language from hello, one of `'en'`, `'vi'`, `'ja'`, `'zh'`, `'ko'`, so a program's own lines can follow it; `'en'` from a lamp that says none (one from before this) | | | |
+| `lamp.build` | the lamp's build from hello, the text the owner's app shows (`'143+ab12cd34ef56'`: its update sequence, a plus sign and the first twelve of its commit), to quote in a bug report; `null` from a lamp that says none (one from before this, or one without its update state); `lamp hello` prints it | | | |
 | `lamp.say(text, { rephrase, wait })` | `wait`: resolves to its `done` once said (`finished`), or `dropped`/`cut_short` with why. `text`: words, at most 900 UTF-8 bytes (about 900 Latin letters, 300 in a three-byte script), the voice's own cap, checked here before sending as the lamp checks it, never stricter; spoken **exactly as written** through the lamp's speech service (no model, no tools) once the person isn't talking. `{ rephrase: true }`: the lamp's model says it in its own words instead, as before. Since #4958 `say` is exact by default; before it, every say was the model's version, which `{ rephrase: true }` keeps | `speak` | no | 6 a minute, 60 an hour with the rates on; refused in quiet hours where the lamp sets them |
 | `lamp.cameraSnapshot()` | none; resolves to the camera's newest picture, a JPEG `Buffer` about 320 across. Refused while the lamp is private, or with the camera closed. On the fake, `fake.picture = buffer` sets the picture it carries; the default is the smallest whole JPEG, which no image library opens. | `camera` | no |
 | `lamp.cameraStream(on = true, fps, size)` | `fps`: 1 to 30 a second at most (2); `size`: `640x480` (the default) or `1280x720`. Where the eyes serve every frame (the answer's `fast: true`; on in the product's `lamp-eyes.service`, shown on stable 12587), each `camera.frame` comes as the camera made it, with the JPEG as `data` (a Buffer); otherwise the eyes' newest frame, about 1 to 2 a second, with `jpeg` in base64. `fps_now` is the rate lately; each new frame once, until `cameraStream(false)`, `stop` or a `camera.ended` event. Ends with `camera.ended` when the lamp turns private, or after 10 s with the camera closed | `camera` | no |
+| `lamp.pose(jpeg)` | `jpeg`: the JPEG as a `Buffer` or `Uint8Array`. Resolves to one person's pose in a JPEG of this computer's own (a frame it has), from the lamp's NPU: `{pose, width, height, model, ms}`, `pose` being `{score, keypoints}` (the 17 COCO keypoints in COCO order, each `{x, y, score}` in the picture's own pixels) or `null` with no person, `ms` `{decode, npu, post, total}`. At most 150 KiB of JPEG (204,800 characters of base64 on the wire), checked before sending: a 640x480 frame at high quality fits. Off unless the lamp's `LAMP_NPU` is on (`off`); `preparing` with `retry_ms` while the lamp fetches its model on first use; `unavailable` with no model or no NPU; `rate` (15 a second, 5 warm, 1 hot) and `busy` with `retry_ms`; refused while private and beyond the lamp's own network. In development: unit tests only, not yet on a lamp (2026-11-19). On the fake, `fake.pose`, `fake.poseSize` and `fake.poseModel` set the answer (`null` for nobody); `refuse_next('pose', 'preparing', why, 2000)` stands for the lamp's NPU states. | `camera` | no |
 | `lamp.microphoneStream(on = true)` | none but `on`. The room's sound as `microphone.audio` events, one each 20 ms block as the lamp's ears hear it: mono, 16 kHz, signed 16-bit little-endian samples as `data` (a Buffer, 640 bytes a block), with `sequence`, `lost` (blocks lost since the last one sent: on the way, or because this computer read too slowly), `sample_rate`, `channels`, `format` (`s16le`) and `bytes`. The answer says the same shape and `source` (`mic1`). On again replaces it; until `microphoneStream(false)`, `stop` or a `microphone.ended` event: at once when the lamp turns private, at once when more than one person is in view ("someone else is here": the lamp can't tell its owner from anyone else), within 2 s when the lamp's eyes stop saying who is in view ("the room isn't seen"), within 1 s when the ring doesn't say it drew its mark ("the ring is not showing the microphone's mark"), or within 2 s when no sound comes (a lamp that doesn't share its microphone, `LAMP_BUS_AUDIO` off). A re-pairing without `microphone` ends it. Refused while private, with more than one person in view or the room unseen, from beyond the lamp's own network, where the ring can't show its mark, and unless the owner switched it on (`LAMP_CONTROL_MICROPHONE=on`, off by default) | `microphone` | no |
 | `lamp.speakerStream(sampleRate = 16000)` | `sampleRate`: 16000 or 24000. Opens a speaker stream and gives its handle: `speakerWrite(pcm)` (mono S16LE samples, sent as 20 ms binary frames of at most 9,600 bytes, each a 4-byte big-endian header length, the header `{"ev":"speaker.audio","sequence":N}` and the samples), `playWav(path)` (PCM16 mono WAV at the stream's rate, in real time; resolves `{ ms, ended }`), `stop()`, and `turn`, `sampleRate`, `frameMs`, `bufferMs`, `ended`, `stats`. The answer has `sample_rate`, `format` (`s16le`), `frame_ms`, `buffer_ms`, `source` (`speaker`) and `turn`. Events `speaker.stats` every 2 s (`buffered_ms`, `lost`, `underruns`, `limited`, `stray`) and `speaker.ended` (`why`, `turn`) at once when the lamp turns private or is muted, when the ring doesn't show its mark, when the lamp or the person speaks, after 2 s with no frame (`idle`), after 10 minutes (`limit`), or when another stream replaces it (`replaced`). Refused while private or muted, `busy` when the voice can't take it, from beyond the lamp's own network, and unless the owner switched it on | `speaker` | no |
 | `lamp.sound(name)` | `name`: `hum`, the lamp's own short hum, or one of your clips (`uploadSound`), a clip plays once the person isn't talking, as an exact `say` does; the hum is rarer: its `done` says `dropped` within 15 s of the lamp's last turn ("the lamp spoke a moment ago"), or with another sound in the last 30 s | `speak` | no |
@@ -643,7 +734,9 @@ for its code (`WHAT_TO_DO`):
 | `asleep` | The lamp is asleep. Wait for `lamp.changed` with `asleep` false. |
 | `rate` | Too many of one kind too fast: wait `retry_ms` and send it again. With the rates off (the default), only refused actions and phrase changes are bounded. |
 | `bad_request` | The request doesn't fit the protocol; `why` names the field. Check it against the schema (control.schema.json). |
-| `off` | Developer access is off on this lamp: the owner turns it on in the app. |
+| `off` | Developer access is off on this lamp: the owner turns it on in the app. For `pose`, the lamp's NPU service is off (its LAMP_NPU switch). |
+| `preparing` | The lamp is fetching its pose model from the Store on first use: wait `retry_ms` (about 2 s) and ask again. |
+| `unavailable` | No pose model could be fetched or checked, or this lamp has no NPU: with `retry_ms` the lamp tries again then; without it, pose won't work on this lamp. |
 
 On stable 10824 and older, `busy` with `retryMs` also means a motion still
 plays (the last gesture, move or feeling's move lamp-control sent, from any computer; the lamp's own motions don't count): wait `retryMs`
@@ -656,6 +749,22 @@ and send it again. Without `retryMs`, it is a held part, as above.
 | `lamp.pushSkill(folder)` | on customer lamps from stable 11091 on (11048 and older refuse it). A skill folder (`SKILL.md`, `skill.toml` with a `version`): packed and sent in parts. The fuller check is the Python SDK's `lamp skill check` | `skills` |
 | `lamp.skills()` | | `skills` |
 | `lamp.removeSkill(name)` | one of this computer's own pushed skills | `skills` |
+| `lamp.pushApp(path)` | an app of your own as its packed tar (format 2, unsigned, 4 MiB at most; `lamp app pack DIR` in the Python SDK makes it), checked here and sent in parts; resolves with the lamp's `app`. Every manifest grant must be this pairing's (never `remember`) | `skills` |
+| `lamp.apps()` | this computer's own pushed apps, each with `stopped` | `skills` |
+| `lamp.removeApp(name)` | one of this computer's own pushed apps | `skills` |
+
+### The Store
+
+| call | parameters |
+|---|---|
+| `sendLoginCode(email, opts)` | the account emails a sign-in code |
+| `signIn(email, code, opts)` | the account's token; kept for `lamp` unless `{ keep: false }` |
+| `submitApp(tarBytes, { icon, cover, title, description, category, filename, ...opts })` | an unsigned format-2 tar; the app, `review_status` `pending`, hidden |
+| `submissions(id, { page, limit, ...opts })` | one app of yours, or `{ data, total }` |
+| `requestPublic(id, opts)` | an approved app's ask to go public |
+| `saveToken`, `keptToken`, `forgetToken`, `endpoints` | the kept sign-in, and where the Store is |
+
+`opts` is `{ token, where }` or `{ token, staging, store, account }`.
 
 ### The `lamp` command
 
@@ -668,6 +777,9 @@ and send it again. Without `retryMs`, it is a held part, as above.
 | `lamp skill push FOLDER [LAMP_ID]` | a skill folder, put on the paired lamp (`skills` grant). Push, list and remove work on customer lamps from stable 11091 on |
 | `lamp skill list [LAMP_ID]` | this computer's own pushed skills |
 | `lamp skill remove NAME [LAMP_ID]` | takes one of them off the lamp |
+| `lamp app push APP.tar [LAMP_ID]` | an app's packed tar of your own (format 2, unsigned; the Python SDK's `lamp app pack` makes it): checked first, then put on the paired lamp (`skills` grant) |
+| `lamp app list [LAMP_ID]` | this computer's own pushed apps |
+| `lamp app remove NAME [LAMP_ID]` | takes one of them off the lamp |
 | `lamp help` (also `lamp --help`, `lamp -h`) | none: prints the commands and exits 0. A misspelt option is one line and the same list, exit 2 |
 | `lamp fake [--every 10] [--cycles N] [--everything] [--hands]` | `--every`: seconds between arrivals (10). `--cycles`: stop after N (default: until Ctrl-C). `--everything`: answer every op, without refusing what lamp-control doesn't route yet. `--hands`: a hand waves for 3 s after each arrival, and looks are answered, as on a lamp with the body's lease socket |
 

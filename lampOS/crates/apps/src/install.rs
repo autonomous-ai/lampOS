@@ -40,6 +40,23 @@ pub const ALREADY: &str = "this version is already installed";
 /// from the verified manifest, never from a package file (a package may not
 /// have a file of this name).
 pub const RECORD: &str = "lamp-apps.json";
+/// A Store install of an app a computer pushed.
+pub const PUSHED_HERE: &str =
+    "this app was pushed from a computer: remove it before installing it from the Store";
+/// A push of a name a Store app has.
+pub const STORE_HAS_IT: &str = "a Store app has that name";
+/// A push of a name another computer pushed.
+pub const OTHER_COMPUTERS: &str = "another computer's app has that name";
+
+/// The paired computer an app was pushed from (docs/apps.md, "An app from
+/// your own computer"), as lamp-control named it: its pairing id and name.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Pushed {
+    pub client: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_name: Option<String>,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Record {
@@ -50,6 +67,10 @@ pub struct Record {
     #[serde(default)]
     pub logs: bool,
     pub sha256: String,
+    /// Pushed from a paired computer (`dev`), unsigned: never a Store
+    /// install's or update's to replace. Absent: from the Store.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pushed: Option<Pushed>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -80,6 +101,26 @@ fn sorted(grants: &[String]) -> Vec<String> {
     grants.sort();
     grants.dedup();
     grants
+}
+
+/// Whether this install may take the place of `have`: a Store install
+/// only a newer version of a Store app; a push any version of the same
+/// computer's push, never a Store app's or another computer's.
+fn may_replace(
+    have: &Option<Record>,
+    version: &str,
+    pushed: Option<&Pushed>,
+) -> Result<(), String> {
+    match (pushed, have.as_ref().map(|have| have.pushed.as_ref())) {
+        (None, Some(Some(_))) => Err(PUSHED_HERE.to_owned()),
+        (None, _) => newer_than(have, version),
+        (Some(_), None) => Ok(()),
+        (Some(_), Some(None)) => Err(STORE_HAS_IT.to_owned()),
+        (Some(from), Some(Some(had))) if had.client != from.client => {
+            Err(OTHER_COMPUTERS.to_owned())
+        }
+        (Some(_), Some(Some(_))) => Ok(()),
+    }
 }
 
 /// The refusal for a version that is not newer than the one installed.
@@ -160,6 +201,7 @@ fn lay_and_start(
     sha: &str,
     before: &Option<Record>,
     switched: &mut bool,
+    pushed: Option<&Pushed>,
 ) -> Result<Installed, String> {
     let name = &package.app.name;
     let _held = AppsLock::take(&layout.state, layout.lock_wait)?;
@@ -170,7 +212,7 @@ fn lay_and_start(
     }
     let now = installed_record(layout, name);
     if now != *before {
-        newer_than(&now, &package.app.version)?;
+        may_replace(&now, &package.app.version, pushed)?;
     }
     let app_dir = layout.code.join(name);
     make_dirs(&app_dir)?;
@@ -180,6 +222,7 @@ fn lay_and_start(
         net: package.app.net,
         logs: package.app.logs,
         sha256: sha.to_owned(),
+        pushed: pushed.cloned(),
     };
     lay(&app_dir, package, &record, sha)?;
     switch(&app_dir, &package.app.version)?;
@@ -198,6 +241,13 @@ fn lay_and_start(
     }
     let started = !has(&layout.state, name, Mark::Stopped);
     if started {
+        // The shared cap first (it lives in /run: a lost one must not let a new app run uncapped); refused, the
+        // install fails and is put back like any failed start.
+        fx.limit_apps().map_err(|error| {
+            format!("the apps' shared limit is not set, so the app does not start: {error}")
+        })?;
+        // An app that hit its restart limit would refuse the restart of a fixed version: cleared first.
+        fx.systemctl(Verb::ResetFailed, &unit)?;
         fx.systemctl(Verb::Restart, &unit)?;
     }
     clear(&layout.state, name, Mark::Installing).map_err(|e| format!("a mark: {e}"))?;
@@ -229,7 +279,7 @@ pub fn install(
     if before.is_none() && skills.taken_by_skill(&name) {
         return Err(format!("a skill is already called {name}"));
     }
-    newer_than(&before, &package.app.version)?;
+    may_replace(&before, &package.app.version, None)?;
     let sha = sha256_hex(bytes);
     let key = YesKey {
         op: if before.is_some() {
@@ -257,6 +307,11 @@ pub fn install(
     // and nothing is written before it.
     {
         let _held = AppsLock::take(&layout.state, layout.lock_wait)?;
+        // An app being installed or removed is refused before the yes is spent.
+        if has(&layout.state, &name, Mark::Removing) || has(&layout.state, &name, Mark::Installing)
+        {
+            return Err(BUSY_APP.to_owned());
+        }
         yes.take(&key).map_err(|why| format!("no yes: {why}"))?;
         if before.is_none() {
             // A stopped mark left by an earlier remove must not make a fresh install start stopped.
@@ -264,16 +319,73 @@ pub fn install(
         }
         set(&layout.state, &name, Mark::Installing).map_err(|e| format!("a mark: {e}"))?;
     }
+    place_and_lay(layout, fx, skills, &package, &sha, &before, None)
+}
+
+/// The companion skills, then the version laid and started; a failure is
+/// undone.
+fn place_and_lay(
+    layout: &Layout,
+    fx: &mut dyn Effects,
+    skills: &mut dyn Companions,
+    package: &AppPackage,
+    sha: &str,
+    before: &Option<Record>,
+    pushed: Option<&Pushed>,
+) -> Result<Installed, String> {
+    let name = &package.app.name;
     let mut switched = false;
     let result = skills
-        .place(&name, &package.skills)
-        .and_then(|()| lay_and_start(layout, fx, &package, &sha, &before, &mut switched));
+        .place(name, &package.skills)
+        .and_then(|()| lay_and_start(layout, fx, package, sha, before, &mut switched, pushed));
     if result.is_err() {
         // Only an install that put its own version in as `current` may take
         // the whole app out again, and only if it was fresh.
-        undo(layout, skills, &name, before.is_none() && switched);
+        undo(layout, skills, name, before.is_none() && switched);
     }
     result
+}
+
+/// An app pushed from the owner's own paired computer (docs/apps.md, "An
+/// app from your own computer"), from a staged package's bytes: asked by
+/// lamp-control alone ([`crate::ask::answer_door`]), which holds the
+/// pairing and its grants. Read with every check a Store package has but the
+/// signature, which it must not carry
+/// (`lamp_skills::app_package::read_pushed_app_package_bytes`); no owner's
+/// yes is taken (the owner's pairing of that computer is the consent, the
+/// first builder on #7570). A push replaces the same computer's push of that
+/// name, any version; never a Store app, nor another computer's.
+pub fn install_pushed(
+    layout: &Layout,
+    fx: &mut dyn Effects,
+    skills: &mut dyn Companions,
+    reader: &dyn PackageReader,
+    bytes: &[u8],
+    build: Option<u64>,
+    from: &Pushed,
+) -> Result<Installed, String> {
+    let package = reader.read_pushed(bytes)?;
+    check(&package.app, build)?;
+    paths_ok(&package)?;
+    let name = package.app.name.clone();
+    let before = installed_record(layout, &name);
+    if before.is_none() && skills.taken_by_skill(&name) {
+        return Err(format!("a skill is already called {name}"));
+    }
+    may_replace(&before, &package.app.version, Some(from))?;
+    let sha = sha256_hex(bytes);
+    {
+        let _held = AppsLock::take(&layout.state, layout.lock_wait)?;
+        if has(&layout.state, &name, Mark::Removing) || has(&layout.state, &name, Mark::Installing)
+        {
+            return Err(BUSY_APP.to_owned());
+        }
+        if before.is_none() {
+            clear(&layout.state, &name, Mark::Stopped).map_err(|e| format!("a mark: {e}"))?;
+        }
+        set(&layout.state, &name, Mark::Installing).map_err(|e| format!("a mark: {e}"))?;
+    }
+    place_and_lay(layout, fx, skills, &package, &sha, &before, Some(from))
 }
 
 /// A failed install or update is cleaned as the sweep cleans a cut one

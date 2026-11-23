@@ -168,6 +168,9 @@ APP_SOCKET_ENV = "LAMP_APP_SOCKET"
 APP_SOCKET = "/run/lampos-apps/apps.sock"
 # What an app's panel takes (lamp-control checks them again).
 PANEL_TITLE_MAX, PANEL_LINES_MAX, PANEL_LINE_MAX = 40, 6, 80
+# How long an app's context line lasts unless it says (`context`): a minute. The lamp judges the line and its time
+# (at most 120 characters, 1 ms to 10 minutes), as it judges a fact's words (`remember`, 280 once tidied).
+CONTEXT_FOR_MS = 60_000
 
 
 def _agent_socket() -> str | None:
@@ -216,6 +219,17 @@ def _hex(colour) -> str:
 # lamp-control holds too (protocol.rs SAY_MAX_BYTES, lamp-voice's
 # MOST_WORDS_BYTES), checked here at the same bytes, never stricter.
 SAY_MAX_BYTES = 900
+# A `pose` request's longest JPEG: 204800 characters of base64 (protocol.rs
+# POSE_JPEG_MAX_CHARS), 150 KiB of picture, so the frame stays under 256 KiB.
+POSE_JPEG_MAX_CHARS = 204800
+POSE_JPEG_MAX_BYTES = POSE_JPEG_MAX_CHARS // 4 * 3
+# The 17 COCO keypoints a pose's `keypoints` come in, in this order.
+POSE_KEYPOINTS = (
+    "nose", "left_eye", "right_eye", "left_ear", "right_ear",
+    "left_shoulder", "right_shoulder", "left_elbow", "right_elbow",
+    "left_wrist", "right_wrist", "left_hip", "right_hip",
+    "left_knee", "right_knee", "left_ankle", "right_ankle",
+)
 
 
 def _check(op: str, fields: dict) -> None:
@@ -306,6 +320,8 @@ SPEAKER_EVENTS = ("speaker.stats", "speaker.ended")
 SPEAKER_RATES = (16_000, 24_000)
 SPEAKER_FRAME_MAX_BYTES = 9_600
 SPEAKER_FRAME_MS = 100
+# How far ahead of its play time `play_pcm` sends a frame, in ms: over the lamp's 120 ms prefill, under its 300 ms hold (#8373).
+SPEAKER_LEAD_MS = 200
 
 # `keep_connected`'s pauses before connecting again, in seconds: the first
 # after a closed connection, then longer while the lamp can't be reached (a
@@ -592,15 +608,22 @@ class SpeakerStream:
             pcm = clip.readframes(clip.getnframes())
         await self.play_pcm(pcm)
 
-    async def play_pcm(self, pcm: bytes) -> None:
+    async def play_pcm(self, pcm: bytes, lead_ms: int = SPEAKER_LEAD_MS) -> None:
         """`pcm` written in real time as `play_wav` does, in 20 ms frames,
-        returning when it has been played."""
+        returning when it has been played. Each frame goes `lead_ms` before its
+        play time (200 ms unless given, at most 250): the lamp starts a stream
+        only once it holds 120 ms and keeps at most 300 ms of it, so a lead
+        over 120 ms is what adds to what it holds, and a late send is caught
+        up rather than added to. 0 paces each frame at its own play time. On
+        lamp-75c9 (23 Nov, 6 streams of 30 s each, one laptop over Wi-Fi):
+        underruns 8 at a lead of 0, 9 at 100 and 4 at 200 (#8373)."""
+        lead = max(0, min(int(lead_ms), 250)) / 1000
         start = time.monotonic()
         step = self.sample_rate * 2 * 20 // 1000
         sent = 0
         for at in range(0, len(pcm), step):
-            # A frame goes at its own time, so a slow send is caught up, not added to.
-            wait = start + sent / (self.sample_rate * 2) - time.monotonic()
+            # A frame goes at its own time less the lead, so a slow send is caught up, not added to.
+            wait = start + sent / (self.sample_rate * 2) - lead - time.monotonic()
             if wait > 0:
                 await asyncio.sleep(wait)
             piece = pcm[at : at + step]
@@ -1090,6 +1113,10 @@ class Lamp:
         if event not in schema.events() and not is_app_event and event not in ("lease", "done", *CAMERA_EVENTS, *MICROPHONE_EVENTS, *SPEAKER_EVENTS):
             raise _no_event(event, on=True)
         _short_phrase(phrases)
+        if self.app is not None and phrases and event == "phrase.heard":
+            # On an app's socket the phrases are the app's whole list, replaced as one (`phrases.set`): a filter here
+            # would never be sent to the lamp, and the handler would never fire.
+            raise LampError("on an app's socket the phrases are the app's own list: use `await lamp.listen_for(phrases, handler)`", code="bad_request")
         # A handler given `phrases` hears only those; with none it hears every `phrase.heard`.
         self._handlers[event].append(_OnPhrases(handler, phrases) if phrases and event == "phrase.heard" else handler)
         if phrases:
@@ -1137,7 +1164,9 @@ class Lamp:
             handlers.remove(handler)
         if not handlers:
             self._handlers.pop(event, None)
-            if event in schema.events() and self.app is None:
+            # On an app's socket `phrase.heard` and the app's own events were never subscribed: nothing to take back; a door
+            # event `on()` did subscribe is unsubscribed as anywhere.
+            if event in schema.events() and not (self.app is not None and event == "phrase.heard"):
                 task = asyncio.ensure_future(self.request("unsubscribe", events=[event]))
                 self._tasks.add(task)
                 task.add_done_callback(self._tasks.discard)
@@ -1163,9 +1192,11 @@ class Lamp:
         phrase matched, never what was said. The app's manifest triggers (`app.trigger`) are matched whether or not this
         is ever called. Only on an app's socket."""
         _short_phrase(phrases)
+        answer = await self.request("phrases.set", phrases=list(phrases))
+        # After the lamp took it, so a refusal (`no_grant`, `bad_request`) leaves no handler behind.
         if handler is not None:
             self._handlers["phrase.heard"].append(handler)
-        return await self.request("phrases.set", phrases=list(phrases))
+        return answer
 
     async def took(self, turn: str) -> dict:
         """Take the turn an `app.trigger` named (its `turn`): the voice keeps quiet. A `say`, gesture or light within
@@ -1189,7 +1220,29 @@ class Lamp:
             )
         if any(unicodedata.category(c) == "Cc" for c in [*title, *"".join(lines)]):
             raise LampError("panel: text, no control characters", code="bad_request")
+        if any(line == "" for line in lines):
+            raise LampError("panel: a line is text, never empty (leave it out)", code="bad_request")
         return (await self.request("app.panel.set", title=title, lines=lines))["rev"]
+
+    async def remember(self, text: str) -> bool:
+        """Keep one fact for the lamp's known person, marked with this app as its source (the manifest's `remember`
+        grant). The lamp tidies the words first (links, markup and double quotes left out) and refuses, never cuts,
+        what is left over 280 characters (`BadRequestError`). True once memory kept it. Refused `off`, `no_grant`,
+        `private`, `unavailable`, `rate` (three a minute an app; `retry_ms`) or `refused` (memory did not keep it)."""
+        return bool((await self.request("apps.remember", text=text)).get("kept"))
+
+    async def context(self, line: str, *, for_ms: int = CONTEXT_FOR_MS) -> None:
+        """Tell the voice a live line beside what the person says, for `for_ms` (1 ms to 10 minutes), never kept:
+        renew it while it holds ("set 2 of 3, 7 squats"). An empty line clears it (`clear_context`). The `remember`
+        grant, as `remember`'s refusals, and `bad_request` for a line over 120 characters. Needs a lamp build with
+        `apps.context`; an older one refuses it."""
+        if line == "":
+            return await self.clear_context()
+        await self.request("apps.context", line=line, for_ms=for_ms)
+
+    async def clear_context(self) -> None:
+        """Take this app's context line back at once (it goes by itself after its `for_ms`)."""
+        await self.request("apps.context", line="")
 
     async def get(self, *states: str) -> dict:
         """The states asked for (`presence`, `light`, `mood`, `lamp`, `body`),
@@ -1310,6 +1363,14 @@ class Lamp:
         return said if said in ("en", "vi", "ja", "zh", "ko") else "en"
 
     @property
+    def build(self) -> str | None:
+        """The lamp's build, from hello: the text the owner's app shows
+        (`143+ab12cd34ef56`), to quote in a bug report. None from a lamp that
+        says none (one from before this, or one without its update state)."""
+        said = self.info.get("build")
+        return said if isinstance(said, str) and said else None
+
+    @property
     def ring_pixels(self) -> int | None:
         """How many pixels the ring has, from hello's limits (none from a lamp
         before pixel lights)."""
@@ -1381,6 +1442,32 @@ class Lamp:
         if size is not None:
             fields["size"] = size
         return await self.request("camera.stream", **fields)
+
+    async def pose(self, jpeg: bytes) -> dict:
+        """One person's pose in `jpeg`, a JPEG of this computer's own (a
+        camera frame it has), from the lamp's NPU: `{"pose", "width",
+        "height", "model", "ms"}`. `pose` is `{"score", "keypoints"}`, the 17
+        COCO keypoints in COCO order (`POSE_KEYPOINTS`), each `{"x", "y",
+        "score"}` in the picture's own pixels, or None with no person. At most
+        150 KiB of JPEG (`POSE_JPEG_MAX_BYTES`, so the request stays under the
+        256 KiB frame): a 640x480 frame at high quality fits. Needs the
+        camera grant and the lamp's own network; off unless the lamp's
+        LAMP_NPU is on. `PreparingError` (with `retry_ms`) while the lamp
+        fetches its model on first use; `UnavailableError` with no model or
+        no NPU."""
+        if not isinstance(jpeg, (bytes, bytearray, memoryview)):
+            raise LampError("jpeg: the JPEG's bytes", code="bad_request")
+        size = len(jpeg)
+        if size == 0:
+            raise LampError("jpeg: an empty picture, send one JPEG", code="bad_request")
+        if size > POSE_JPEG_MAX_BYTES:
+            raise LampError(
+                f"jpeg: {size} bytes, over the {POSE_JPEG_MAX_BYTES} (150 KiB) a pose takes: "
+                "send a smaller or more compressed frame (a 640x480 one at ordinary quality fits)",
+                code="bad_request",
+            )
+        reply = await self.request("pose", jpeg=base64.b64encode(bytes(jpeg)).decode())
+        return {k: reply.get(k) for k in ("pose", "width", "height", "model", "ms")}
 
     async def volume(self, *, to: int | None = None, step: str | None = None, mute: bool | None = None) -> dict:
         """The speaker's volume, the person's own: one of `to` (0-100), `step`
@@ -1643,4 +1730,47 @@ class Lamp:
     async def remove_skill(self, name: str) -> dict:
         """Take one of this computer's own pushed skills off the lamp."""
         return await self.request("skill.remove", name=name)
+
+    # Apps of this computer's own (the `skills` grant too; docs/apps.md): a
+    # Store-format package, unsigned, with the pairing as the owner's yes.
+
+    async def push_app(self, path) -> dict:
+        """Check the app at `path`, its folder (`app.json`, `src/`, ...) or
+        its packed tar, as `lamp app check` does, pack a folder, and send it
+        in parts; returns the lamp's `app` once installed (`name`, `title`,
+        `version`, `sha256`, `grants`, `net`, `logs`, `updated`, `started`,
+        `from`). A re-push of the name replaces this computer's app of it.
+        A check error, a package over 4 MiB or signed, or a grant this
+        pairing lacks (or `remember`) refuses it here, before any byte is
+        sent."""
+        from .push import app_asks_beyond, app_for_push, app_parts
+
+        package = app_for_push(path)
+        if "skills" not in self.grants:
+            raise BY_CODE["no_grant"]("not granted: skills")
+        beyond = app_asks_beyond(package.manifest, self.grants)
+        if beyond:
+            code, why = beyond
+            raise BY_CODE[code](why)
+        parts = app_parts(package.data)
+        reply: dict = {}
+        for part, data in enumerate(parts):
+            reply = await self.request(
+                "app.push",
+                name=package.name,
+                sha256=package.sha256,
+                size=len(package.data),
+                part=part,
+                parts=len(parts),
+                data=data,
+            )
+        return reply.get("app", {})
+
+    async def apps(self) -> list[dict]:
+        """This computer's own pushed apps."""
+        return (await self.request("app.list")).get("apps", [])
+
+    async def remove_app(self, name: str) -> dict:
+        """Take one of this computer's own pushed apps off the lamp."""
+        return await self.request("app.remove", name=name)
 

@@ -145,7 +145,10 @@ skill package; `sound` plays `hum` or a clip the computer uploaded. With the
 `camera` grant, `lamp_camera_snapshot` returns the newest picture (on stable
 11450 from the eyes' sight file; the fast frame path is merged but off, so not on customer
 lamps). With `skills`, `lamp_skill_push`, `lamp_skills` and
-`lamp_skill_remove` are offered; customer lamps take them from stable 11091 on (11048 and older refuse them).
+`lamp_skill_remove` are offered; customer lamps take them from stable 11091 on (11048 and older refuse them). With `skills` too,
+`lamp_app_push` (an app of your own, its folder or packed format 2 `.tar`, unsigned), `lamp_apps` and `lamp_app_remove` are
+offered; a lamp refuses them without `LAMP_STORE_APPS` ("apps are off on this lamp") or its apps helper ("app push
+is not on this lamp").
 
 **Leases** are taken for you: a body tool (`lamp_look`, `lamp_move`,
 `lamp_play`, `lamp_joints`) takes a 10 s body lease, or renews the one this
@@ -182,7 +185,7 @@ All JSON, read when asked; none takes a parameter.
 | `lamp://state/presence` | who is there: a count and how near, never who | look (listed only with it) |
 | `lamp://state/light` | its light | none |
 | `lamp://state/mood` | its mood | none |
-| `lamp://state/lamp` | whether it is talking, paused, private or asleep | none |
+| `lamp://state/lamp` | whether it is talking, paused, private, asleep or muted after a fault | none |
 | `lamp://state/volume` | its speaker's volume: `level` 0 to 100 and `muted` | speak (listed only with it) |
 | `lamp://state/body` | what its body may do, joint by joint (degrees from home, bounds, poses, speed, load and heat limits), and where each joint is | body (listed only with it) |
 | `lamp://lease` | the leases this server holds now | none |

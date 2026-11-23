@@ -36,6 +36,9 @@ CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 ExecStart=/opt/lampOS/peek/current/lamp-peek
 Restart=on-failure
 RestartSec=5s
+# A stop ends every open page stream at once and exits within 1 s
+# (serve::STOP_WITHIN); never longer than the owner's Off may take (#6401).
+TimeoutStopSec=2s
 StandardInput=null
 StandardOutput=journal
 StandardError=journal

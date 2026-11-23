@@ -10,16 +10,135 @@ guide differ, rules.md wins.
 Take the intent from the person's words in rules.md alone: there is no one to
 ask. Answer for yourself:
 
-1. What should the lamp do? Only the steps rules.md lists (a light, a gesture,
-   words said, a cue, and any other it offers).
+1. What should the lamp do? Any step format.md lists (a light, a light show,
+   a gesture, words said, a cue, a repeating reminder set in the lamp's
+   schedule with `remind`, its own code keeping a note, and every other step
+   there), as rules.md allows.
 2. When should it do it? The one trigger rules.md lists that fits, with the
-   times of day only when the person named them.
+   times of day only when the person named them. Again and again ("every 30
+   minutes", "every minute while I'm here"): a trigger that holds, such as a
+   face at the lamp, with no rearm and its cooldown the repeat (at least a
+   minute), as examples/water-while-here shows. A one-off reminder or timer
+   ("in 25 minutes", "at 22:00") is no skill: the lamp's own reminders set
+   it, so leave it out on rules.md's left-out line.
+   A nudge (it speaks up with no one asking: a trigger, not words) holds
+   back as the lamp's own sip of water does, as examples/break-timer and
+   water-while-here show: `[[while]]` the voice not `speaking` for 30 s and
+   `resting` for 5 s (never on its own words or mid-conversation), the room
+   not `head_down`, those topics in `[permissions]`; and once a sitting
+   (`rearm = "leaves"`) unless they asked for a repeat. The lamp sets its
+   other manners itself.
 3. What did they ask that the form can't do? Leave it out and name it on
    rules.md's left-out line; never invent a field.
 
-If rules.md says a skill like this can't be made, answer its one line and stop.
+Answer rules.md's cannot line only when the request needs something rules.md
+names a skill can't yet do (hearing, knowing who someone is, sending); a light
+show, a note, its own code, a repeat, a reminder and facts you know are steps,
+never limits. Read format.md before any cannot.
+
+What a skill can do, all of it in format.md and examples/:
+
+- **Started by words** (`asks = ["..."]`): the person says them to the lamp;
+  examples/desk-light, coin-flip, breathing-coach.
+- **Started by an event or a time of day** (`[trigger]`): someone at the
+  desk, a long sitting, a sound, a touch, a clock time, named weekdays.
+- **Again every N minutes while it holds**: a held trigger, no rearm, its
+  cooldown the repeat; examples/water-while-here.
+- **A repeating reminder**: `remind = { every, words }`: again every 30
+  minutes (15 m to 24 h) whoever is there; started by words or a trigger;
+  examples/water-breaks. Once in or at a time is the lamp's reminders', not
+  a skill's.
+- **Its own code**: a `task` step running scripts/main.py, Python with the
+  lamp's `lampos` SDK. This is the widest thing a skill can do, so use it
+  whenever steps alone fall short: any call sdk.md lists (light, say,
+  gesture and the body, sounds, events with `lamp.on`, leases, notes, the
+  device, the air, the camera, the microphone, speech, linked services),
+  loops, waits, sums, several steps in order, and Python's own standard
+  library; examples/breathing-coach.
+- **Its `grants` must name every grant its code's calls need**, as sdk.md
+  gives each call's grant: body, light, speak, look, hear, sound, air,
+  device, camera, microphone, notes, speech, net, or a linked service's
+  `<code>-read` / `<code>-write`. A call whose grant isn't named is refused
+  when the skill runs, and the lamp's check can't see that in the code:
+  check each call against sdk.md yourself. Code that talks needs `speak`
+  (`lamp.say`); code that keeps a note needs `notes`. Light, speak and body
+  go on at once; the others the owner says yes to once.
+- **The internet, when rules.md allows `net`**: what only the web knows at
+  the time it runs (a price, the weather, the news, a search) is the skill's
+  own code granted `net` beside `speak`: `grants = ["net", "speak"]`, and
+  scripts/main.py fetches it, says it with `lamp.say`, then prints only
+  `Said aloud through the lamp.`: the lamp's agent that ran it sees that,
+  ends its answer with a dash, and the person hears it once;
+  examples/exchange-rate. Light, body, sound, air and device may join them.
+  Use Python's own `urllib.request` (no packages to install), a public HTTPS
+  API that needs no key, a `timeout` of 15 s or less, and a plain spoken
+  line when the fetch fails. The run's proxy is already set (`HTTPS_PROXY`),
+  and it reaches only the public web on ports 80 and 443, never the home
+  network.
+- **The one limit with `net`**: it never sits beside a private grant
+  (notes, camera, microphone, speech, look, or a linked service), so
+  nothing private leaves the lamp; the check refuses the pair. So a net
+  skill keeps nothing between runs: for "how much it changed", ask the API
+  for its own change (e.g. a 24-hour change), never `lamp.notes`. A request
+  needing both the web and a private grant is two skills. Again every N
+  minutes with the web: the same held trigger and cooldown, its `[[do]]` the
+  `task` step. When rules.md doesn't allow `net`, answer its internet line.
+
+How a skill runs, so its code fits:
+
+- The lamp starts a `task` step's scripts/main.py on its own each time the
+  skill starts: by its words, its trigger, or its repeat. One run at a time;
+  keep a run short (a fetch and a line or two). Only `notes` lasts from one
+  run to the next, and a skill granted `net` has none.
+- What the person hears is what the code says with `lamp.say(text)` (said
+  exactly, within 900 bytes; `wait=True` to say lines in order). Anything
+  printed is not said.
+- Open the lamp with `lamp = await Lamp.local()`, `await` every call, and end
+  with `await lamp.close()`; run blocking work such as a fetch with
+  `await asyncio.to_thread(...)`. sdk.md lists every call, its grant, and its
+  limits (`say`: 6 a minute).
+
+A skill's `[[do]]` steps all start together, never one after another: a
+light's `for` holds that light, it does not wait. Colours in turn are a light
+show (`show`, in a skill started by its words alone) or a `task` step's code
+(any skill, a trigger or a repeat too): `await lamp.light(...)`, then
+`await asyncio.sleep(...)`, in order.
+
+The examples are forms only: never take their names, words, asks or what
+they say; the skill's name and words come from this person's request.
+
+sdk.md's `phrase.heard` is for a paired computer's program; a made skill is
+started by its own words with `asks`, never by listening for phrases in its
+code.
 
 A skill does nothing that would surprise the person who asked for it.
+
+## How a made skill runs
+
+- At run, the lamp's agent is sent `Run <skill-start> <run id>` and the
+  skill's `task` words, as data. It runs that one command: the launcher runs
+  the step's `run` script in a fence, with the `lampos` SDK and the run's
+  grants alone. The agent sees only what the script prints.
+- The agent's last answer is said aloud to the owner, word for word (about
+  400 characters at most), and a lone dash (-) is said as nothing. So code
+  that says its result with `lamp.say` prints only `Said aloud through the
+  lamp.`, and the agent answers only a dash: the person hears it once.
+- The `task` words are read back whole for the owner's yes: one plain
+  sentence a person understands, at most 120 characters. For a
+  linked-service skill they are the work itself.
+- **A linked service** (mail, a calendar, GitHub): `grants =
+  ["<code>-read"]` to read it, or `"<code>-write"` to send with it, and no
+  other grant. scripts/main.py is exactly this one line:
+  `print("The lamp's agent does this task with its lamp-services tools.")`.
+  At run, the agent does the `task` with its lamp-services tools
+  (`services_connected`, `service_read`, `service_write`) under the run's
+  token; a send goes only on the owner's spoken yes. The script never holds
+  a token. examples/agenda-count.
+- **The public web**: the skill's own code granted `net` and `speak`, as
+  "The internet" above says: urllib reaches the public web on ports 80 and
+  443 through the run's proxy (`HTTPS_PROXY`), and the code says the result
+  with `lamp.say`. It is kept only on a lamp whose net switches are on.
+  examples/exchange-rate, sun-times.
 
 ## 2. Write a draft
 
@@ -28,8 +147,12 @@ letters, digits and hyphens. Write in it, as rules.md says:
 
 - skill.toml: kind, version, permissions, the trigger, ask and its steps.
 - SKILL.md: front matter with name (NAME, the same as the folder) and a
-  one-line description, then a few plain lines on what it does and when.
-- scripts/ only when rules.md offers code, and only the files it allows.
+  one-line description, and always made: here (as the examples show; the
+  check needs it), then a few plain lines on what it does and when.
+- scripts/main.py for a task step's code, as rules.md allows, using any
+  call in sdk.md.
+- shows/NAME.toml only for a light show: every frame written out in order, as
+  rules.md says. Within 30 frames and a minute nothing is left out.
 
 ## 3. Check it with the lamp's own check
 

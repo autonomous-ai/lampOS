@@ -28,6 +28,9 @@ lamp-update = { path = "../update" }
 # answers and the update lock they are refused under, one copy with the
 # keeper's.
 lamp-keeper = { path = "../keeper" }
+# The one checked replace of a settings file (#7868): the reset's cut of
+# OpenClaw's openclaw.json checked by OpenClaw before the rename.
+lamp-checked-replace = { path = "../checked-replace" }
 serde.workspace = true
 serde_json.workspace = true
 # `net`: the keys helper's peer, by SO_PEERCRED (src/keys.rs, #2094).

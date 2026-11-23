@@ -8,7 +8,7 @@
 use lamp_bus::Bus;
 use lamp_peek::{
     DEFAULT_LISTEN, DEFAULT_SESSIONS, LISTEN, SESSIONS, SWITCH, TOKEN_CREDENTIAL, check_listen,
-    monitor::{self, Conn, Monitor},
+    monitor::{self, Monitor},
     monitor_mode,
     serve::{self, Peek},
     switched_on,
@@ -121,17 +121,17 @@ fn run(
             tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
         let listener = tokio::net::TcpListener::bind(listen).await?;
         eprintln!("lamp-peek: {mode}, on {listen}");
-        let service = serve::router(peek).into_make_service_with_connect_info::<Conn>();
-        axum::serve(listener, service)
-            .with_graceful_shutdown(async move {
-                tokio::select! {
-                    _ = stopped.recv() => {}
-                    _ = tokio::signal::ctrl_c() => {}
-                }
-                eprintln!("lamp-peek: asked to stop");
-            })
-            .await
+        serve::serve(listener, peek, async move {
+            tokio::select! {
+                _ = stopped.recv() => {}
+                _ = tokio::signal::ctrl_c() => {}
+            }
+            eprintln!("lamp-peek: asked to stop");
+        })
+        .await
     });
+    // Nothing still reading (a unit read, say) holds the exit (#6401).
+    runtime.shutdown_background();
     stop.store(true, Ordering::Relaxed);
     let watched = watching.join().unwrap_or(Ok(()));
     served.and(watched)

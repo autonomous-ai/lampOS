@@ -5,7 +5,8 @@
 //! that held the lease.
 //!
 //! Frames are capped at [`FRAME_MAX`] (the Reviewer-lead's note on #3715:
-//! `parse` itself has no cap). A connection says nothing within
+//! `parse` itself has no cap), but a `pose` on the local door or an app's,
+//! at [`POSE_FRAME_MAX`]. A connection says nothing within
 //! [`HELLO_WITHIN`] of its welcome, or goes quiet for [`QUIET_MAX`], and it
 //! is closed.
 //!
@@ -17,7 +18,7 @@
 
 use std::collections::BTreeSet;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -39,8 +40,53 @@ use crate::protocol::{EventKind, Grant, Op};
 use crate::session::{Door, Parts, SetGrantsRefused, event_of};
 use crate::watch::{Out, Watch, phrases_in};
 
-/// The largest frame a client may send.
+/// The largest frame a client may send, but a `pose` on a door that takes
+/// one ([`POSE_FRAME_MAX`]).
 pub const FRAME_MAX: usize = 64 * 1024;
+/// The largest `pose` frame: room for its JPEG
+/// (`protocol::POSE_JPEG_MAX_CHARS`, 200 KiB of base64) and its request.
+/// Only from a computer that said hello on the lamp's own network, or an
+/// app on the lamp: the remote door, the local agent's and the run sockets
+/// take [`FRAME_MAX`] whole, and any other frame over [`FRAME_MAX`] closes
+/// the connection (Heron's P2 on #7972: every op on every door was raised
+/// to 256 KiB).
+pub const POSE_FRAME_MAX: usize = 256 * 1024;
+
+/// The largest frame a door's WebSocket reads: [`POSE_FRAME_MAX`] on a
+/// door that takes a `pose` while poses are on (`LAMP_NPU=on`), else
+/// [`FRAME_MAX`]: with the switch off every door stays at 64 KiB
+/// (Fourteen's P3 on #7972).
+pub fn transport_max(takes_pose: bool, poses_on: bool) -> usize {
+    if takes_pose && poses_on {
+        POSE_FRAME_MAX
+    } else {
+        FRAME_MAX
+    }
+}
+
+/// Whether a text frame of `len` bytes is taken: any up to [`FRAME_MAX`];
+/// past it, only a `pose` from a computer that said hello, on a door that
+/// takes one, up to [`POSE_FRAME_MAX`].
+pub fn frame_taken(len: usize, takes_pose: bool, said_hello: bool, text: &str) -> bool {
+    if len <= FRAME_MAX {
+        return true;
+    }
+    if !(takes_pose && said_hello && len <= POSE_FRAME_MAX) {
+        return false;
+    }
+    #[derive(serde::Deserialize)]
+    struct Named<'a> {
+        #[serde(borrow)]
+        op: Option<&'a str>,
+    }
+    serde_json::from_str::<Named>(text).is_ok_and(|named| named.op == Some("pose"))
+}
+
+/// What a frame over [`FRAME_MAX`] that is not a `pose` is told before
+/// its connection closes.
+pub const FRAME_TOO_BIG: &str = "frame over 64 KiB: only a pose may be larger (to 256 KiB), on the lamp's own network after hello";
+/// What the close frame says when the app was removed.
+pub const CLOSED_REMOVED: &str = "this app was removed";
 /// What the close frame says when the owner revoked the computer.
 pub const CLOSED_REVOKED: &str = "this computer was revoked by the owner";
 /// What the close frame says when the owner changed the computer's grants (`set_grants`): it connects again
@@ -121,13 +167,13 @@ pub const RETRY_AFTER: [Duration; 2] = [Duration::from_secs(2), Duration::from_s
 /// [`RETRY_AFTER`] while it gives no answer; later changes wait, so the
 /// order holds. An answer of any kind, a refusal included, is the helper's
 /// word and is not asked again.
-fn tell_until_answered(socket: &std::path::Path, request: &Value) {
+fn tell_until_answered(socket: &std::path::Path, request: &Value) -> bool {
     let mut waits = RETRY_AFTER.iter();
     loop {
         match crate::push::ask_helper(socket, request, crate::push::ASK_WAIT) {
             Ok(answer) => {
                 eprintln!("lamp-control: told the helper {request}: {answer}");
-                return;
+                return true;
             }
             Err(error) => match waits.next() {
                 Some(wait) => {
@@ -146,7 +192,7 @@ fn tell_until_answered(socket: &std::path::Path, request: &Value) {
                         "lamp-control: gave up telling the helper {request} after {} tries: {error}; it may still be served",
                         RETRY_AFTER.len() + 1
                     );
-                    return;
+                    return false;
                 }
             },
         }
@@ -198,15 +244,54 @@ pub struct Shared {
     /// The manage helper's socket, root's, which installs, lists and
     /// removes pushed skills (`crate::push`).
     manage: Mutex<Option<PathBuf>>,
+    /// The apps' helper's socket, root's, which installs, lists and removes
+    /// the apps computers pushed (`crate::app_push`).
+    apps_manage: Mutex<Option<PathBuf>>,
     /// Where the owner's yeses to skills' tasks are kept (`--state-dir`,
     /// [`crate::task_yes`]): none, and the yes requests are refused.
     task_yes: Mutex<Option<PathBuf>>,
+    /// The owner's yeses to apps and what lamp-control holds of them
+    /// ([`crate::app_yes`]), in memory only.
+    apps: Mutex<(crate::app_yes::Yeses, crate::app_yes::Live)>,
+    /// Where the installed apps are (`crate::app_yes::APPS_DIR` unless the
+    /// app socket was served from another place).
+    apps_dir: Mutex<PathBuf>,
+    /// Told when an app takes a turn the voice offered it (`apps/took`,
+    /// [`crate::app_triggers`]): none until the bus side is started.
+    took_sink: Mutex<Option<TookSink>>,
+    /// Whether apps are on, as the app socket reads it.
+    apps_on: Mutex<fn() -> bool>,
+    /// Whether `apps.remember` is on (`LAMP_APP_REMEMBER`), as the app
+    /// socket reads it.
+    remember_on: Mutex<fn() -> bool>,
+    /// How an app's fact reaches the voice (`apps/remember`,
+    /// [`crate::app_remember::start`]): none until the bus side is started.
+    remember_sink: Mutex<Option<crate::app_remember::Sink>>,
+    /// How an app's live context line reaches the voice (`apps/context`,
+    /// [`crate::app_context::start`]): none until the bus side is started.
+    context_sink: Mutex<Option<crate::app_context::Sink>>,
+    /// Memory's forget socket, for a removed app's facts
+    /// ([`crate::app_facts_forget::SOCKET`] unless a test says another).
+    forget_socket: Mutex<PathBuf>,
+    /// The kick of the thread that forgets removed apps' facts
+    /// ([`crate::app_facts_forget::start`]): none until it is started.
+    facts_forget: Mutex<Option<std::sync::mpsc::Sender<()>>>,
+    /// The `apps.remember` asks waiting for the voice's word
+    /// (`apps/remembered`), by the door's own number for each.
+    remember_waiting: Mutex<HashMap<u64, RememberWaiting>>,
+    remember_next: AtomicU64,
+    /// Whether the lamp is private, as an app's fact reads it: none set
+    /// counts as private.
+    private: Mutex<Option<crate::camera::Private>>,
     /// Whether computers beyond the lamp's own network may connect
     /// (`--remote on`): off unless given.
     remote: std::sync::atomic::AtomicBool,
     /// Whether a new pairing glows once on the ring (`LAMP_CONTROL_PAIR_CUE`):
     /// off unless the owner's unit sets it.
     pair_cue: std::sync::atomic::AtomicBool,
+    /// Whether `pose` is on (`LAMP_NPU=on`): off, no door reads a frame
+    /// over [`FRAME_MAX`].
+    poses: std::sync::atomic::AtomicBool,
     /// Whether a cue is being shown right now: the one slot a cue takes, so a
     /// second pairing while one runs drops its cue and never queues it.
     cue_busy: std::sync::atomic::AtomicBool,
@@ -225,7 +310,21 @@ pub struct Shared {
     /// late wider grant change must never be served after a newer narrower
     /// one).
     changes: Mutex<Option<std::sync::mpsc::Sender<Value>>>,
+    /// The apps' helper's own queue of pairing changes, as `changes`.
+    app_changes: Mutex<Option<std::sync::mpsc::Sender<Value>>>,
 }
+
+/// An `apps.remember` waiting for the voice's word: the app, the frame's id
+/// and where its answer goes.
+struct RememberWaiting {
+    app: String,
+    re: u64,
+    outbox: mpsc::WeakUnboundedSender<Value>,
+}
+
+/// What is told when an app takes a turn the voice offered it: the app and
+/// the turn.
+pub type TookSink = Arc<dyn Fn(&str, u64) + Send + Sync>;
 
 /// Whether the camera's, the microphone's and the speaker's streams are usable on
 /// this lamp: wired to their parts, and for the microphone and the speaker the
@@ -381,10 +480,25 @@ impl Shared {
             yes: Mutex::new(None),
             peers: Mutex::new(HashMap::new()),
             manage: Mutex::new(None),
+            apps_manage: Mutex::new(None),
             task_yes: Mutex::new(None),
+            apps: Mutex::default(),
+            apps_dir: Mutex::new(PathBuf::from(crate::app_yes::APPS_DIR)),
+            took_sink: Mutex::new(None),
+            apps_on: Mutex::new(crate::app_yes::on),
+            remember_on: Mutex::new(crate::app_remember::on),
+            remember_sink: Mutex::new(None),
+            context_sink: Mutex::new(None),
+            forget_socket: Mutex::new(PathBuf::from(crate::app_facts_forget::SOCKET)),
+            facts_forget: Mutex::new(None),
+            remember_waiting: Mutex::new(HashMap::new()),
+            remember_next: AtomicU64::new(1),
+            private: Mutex::new(None),
             changes: Mutex::new(None),
+            app_changes: Mutex::new(None),
             remote: std::sync::atomic::AtomicBool::new(false),
             pair_cue: std::sync::atomic::AtomicBool::new(false),
+            poses: std::sync::atomic::AtomicBool::new(false),
             cue_busy: std::sync::atomic::AtomicBool::new(false),
             listening: std::sync::atomic::AtomicBool::new(false),
             close_reasons: Mutex::new(HashMap::new()),
@@ -402,6 +516,16 @@ impl Shared {
     /// Lets a new pairing glow once on the ring (`LAMP_CONTROL_PAIR_CUE=on`).
     pub fn set_pair_cue(&self, on: bool) {
         self.pair_cue.store(on, Ordering::Relaxed);
+    }
+
+    /// Lets the local and app doors read a `pose`'s larger frame
+    /// (`LAMP_NPU=on`); off, every door reads [`FRAME_MAX`] at most.
+    pub fn set_poses(&self, on: bool) {
+        self.poses.store(on, Ordering::Relaxed);
+    }
+
+    fn poses(&self) -> bool {
+        self.poses.load(Ordering::Relaxed)
     }
 
     /// Shows the pairing cue, off the connection's task: never waited for, so a
@@ -432,6 +556,11 @@ impl Shared {
         *self.manage.lock().expect("manage") = Some(socket);
     }
 
+    /// The apps' helper's socket, for `app.push`, `app.list` and `app.remove`.
+    pub fn set_apps_manage_socket(&self, socket: PathBuf) {
+        *self.apps_manage.lock().expect("apps_manage") = Some(socket);
+    }
+
     /// The folder the owner's yeses to skills' tasks are kept in
     /// ([`crate::task_yes`], lamp-control's `--state-dir`).
     pub fn set_task_yes_folder(&self, folder: PathBuf) {
@@ -447,6 +576,10 @@ impl Shared {
     ) {
         let shared = self.clone();
         tokio::task::spawn_blocking(move || {
+            if ask.kind.of_apps() {
+                shared.ask_apps_helper(ask, outbox);
+                return;
+            }
             let socket = shared.manage.lock().expect("manage").clone();
             let answer = match socket {
                 Some(socket) => crate::push::ask_helper(&socket, &ask.request, ask.wait()),
@@ -498,7 +631,7 @@ impl Shared {
                             store.remove_skill(&ask.client, name);
                         }
                     }
-                    crate::push::AskKind::List => {}
+                    _ => {}
                 }
             }
             // A pairing changed while the install was with the helper: its
@@ -522,6 +655,64 @@ impl Shared {
                 let _ = outbox.send(reply);
             }
         });
+    }
+
+    /// `ask` of the apps' helper, on a blocking thread: an `app.push`'s
+    /// staged file is removed once answered (the helper read it once), and
+    /// another push may begin; a pushed app that went on is said aloud in one
+    /// line, with its undo (the first builder on #7570).
+    fn ask_apps_helper(&self, ask: crate::push::Ask, outbox: mpsc::WeakUnboundedSender<Value>) {
+        let socket = self.apps_manage.lock().expect("apps_manage").clone();
+        let answer = match socket {
+            Some(socket) => crate::push::ask_helper(&socket, &ask.request, ask.wait()),
+            None => Err("no apps manage socket given".to_owned()),
+        };
+        let reply = ask.answer(answer);
+        {
+            let mut door = self.door.lock().expect("door");
+            match ask.kind {
+                crate::push::AskKind::AppInstall => door.app_push_installed(&ask.client, ask.rev),
+                _ => door.helper_answered(&ask.client),
+            }
+        }
+        if ask.kind == crate::push::AskKind::AppInstall {
+            if let Some(path) = ask.request["install_pushed"]["path"].as_str() {
+                match std::fs::remove_file(path) {
+                    Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+                        eprintln!("lamp-control: app.push: removing the staged package: {error}");
+                    }
+                    _ => {}
+                }
+            }
+            if reply["ok"] == true {
+                let app = &reply["app"];
+                eprintln!(
+                    "lamp-control: app.push: {} {} installed from {}",
+                    app["name"].as_str().unwrap_or_default(),
+                    app["version"].as_str().unwrap_or_default(),
+                    ask.client
+                );
+                let title = app["title"].as_str().unwrap_or_default();
+                let said = self.parts.lock().expect("parts").act(
+                    PIN_SPEAKER,
+                    0,
+                    &Op::Say {
+                        text: crate::app_push::said_on(title, app["net"] == true),
+                        rephrase: None,
+                    },
+                    self.now_us(),
+                );
+                if let Err(error) = said {
+                    eprintln!(
+                        "lamp-control: app.push: the line was not said: {}",
+                        error.why
+                    );
+                }
+            }
+        }
+        if let Some(outbox) = outbox.upgrade() {
+            let _ = outbox.send(reply);
+        }
     }
 
     /// A reply the part gives later (the voice's to a `turn.end` or a
@@ -551,8 +742,68 @@ impl Shared {
 
     /// The door's pairing changes for the manage helper (a computer's
     /// pushed skills off, or held to new grants), sent in order by one
-    /// thread; each answer said in the journal, as nobody waits for it.
+    /// thread; each answer said in the journal, as nobody waits for it. The
+    /// apps' helper is told its own the same way ([`Shared::tell_apps_helper`]).
     fn tell_helper(&self) {
+        self.tell_skills_helper();
+        self.tell_apps_helper(Vec::new());
+    }
+
+    /// The changes the apps' helper is still owed from before this start
+    /// ([`crate::apps_owed`]: a revoke or a narrowed pairing it never
+    /// answered, a restart in between), told first, in order.
+    pub fn tell_owed_app_changes(&self) {
+        let owed = {
+            let door = self.door.lock().expect("door");
+            door.apps_owed().map(crate::apps_owed::owed)
+        };
+        if let Some(owed) = owed
+            && !owed.is_empty()
+        {
+            eprintln!(
+                "lamp-control: telling the apps' helper {} change(s) owed from before",
+                owed.len()
+            );
+            self.tell_apps_helper(owed);
+        }
+    }
+
+    /// `first`, then the door's pairing changes for the apps' helper (a
+    /// computer's pushed apps stopped, or held to new grants), sent in order
+    /// by one thread of their own; each let go of on disk once answered.
+    fn tell_apps_helper(&self, first: Vec<Value>) {
+        let mut queue = self.app_changes.lock().expect("app_changes");
+        let (changes, owed) = {
+            let mut door = self.door.lock().expect("door");
+            let mut changes = first;
+            changes.extend(door.take_app_changes());
+            (changes, door.apps_owed().map(Path::to_path_buf))
+        };
+        if changes.is_empty() {
+            return;
+        }
+        let Some(socket) = self.apps_manage.lock().expect("apps_manage").clone() else {
+            return;
+        };
+        let sender = queue.get_or_insert_with(|| {
+            let (sender, received) = std::sync::mpsc::channel::<Value>();
+            std::thread::spawn(move || {
+                for request in received {
+                    if tell_until_answered(&socket, &request)
+                        && let Some(owed) = &owed
+                    {
+                        crate::apps_owed::answered(owed, &request);
+                    }
+                }
+            });
+            sender
+        });
+        for change in changes {
+            let _ = sender.send(change);
+        }
+    }
+
+    fn tell_skills_helper(&self) {
         // The queue's lock first, then the door's: two threads (an install's
         // answer, a pair or a revoke) can't each take a batch and send them
         // reversed (Reviewer-two's P3 on #3910).
@@ -568,7 +819,7 @@ impl Shared {
             let (sender, received) = std::sync::mpsc::channel::<Value>();
             std::thread::spawn(move || {
                 for request in received {
-                    tell_until_answered(&socket, &request);
+                    let _ = tell_until_answered(&socket, &request);
                 }
             });
             sender
@@ -627,10 +878,25 @@ impl Shared {
                 yes: Mutex::new(None),
                 peers: Mutex::new(HashMap::new()),
                 manage: Mutex::new(None),
+                apps_manage: Mutex::new(None),
                 task_yes: Mutex::new(None),
+                apps: Mutex::default(),
+                apps_dir: Mutex::new(PathBuf::from(crate::app_yes::APPS_DIR)),
+                took_sink: Mutex::new(None),
+                apps_on: Mutex::new(crate::app_yes::on),
+                remember_on: Mutex::new(crate::app_remember::on),
+                remember_sink: Mutex::new(None),
+                context_sink: Mutex::new(None),
+                forget_socket: Mutex::new(PathBuf::from(crate::app_facts_forget::SOCKET)),
+                facts_forget: Mutex::new(None),
+                remember_waiting: Mutex::new(HashMap::new()),
+                remember_next: AtomicU64::new(1),
+                private: Mutex::new(None),
                 changes: Mutex::new(None),
+                app_changes: Mutex::new(None),
                 remote: std::sync::atomic::AtomicBool::new(false),
                 pair_cue: std::sync::atomic::AtomicBool::new(false),
+                poses: std::sync::atomic::AtomicBool::new(false),
                 cue_busy: std::sync::atomic::AtomicBool::new(false),
                 listening: std::sync::atomic::AtomicBool::new(false),
                 close_reasons: Mutex::new(HashMap::new()),
@@ -908,6 +1174,315 @@ impl Shared {
     /// Closes every connection of `client` at once, a listener's included:
     /// dropping its outbox ends the connection once what's queued (its
     /// leases' `lost`) is sent (harness-reviewer's P2 on #3778).
+    /// The triggers of the apps running now ([`crate::app_triggers`]): each
+    /// running app's manifest triggers, apps with none left out.
+    pub fn running_triggers(&self) -> lamp_msgs::AppTriggers {
+        let running = self.apps.lock().expect("apps").1.running();
+        let apps_dir = self.apps_dir.lock().expect("apps_dir").clone();
+        crate::app_triggers::list_of(&apps_dir, &running)
+    }
+
+    /// The voice holds a line that says `trigger` of app `app`
+    /// (`apps/trigger`): offered to the app's sockets, as `app.trigger`, only
+    /// when apps are on, the app is running and the manifest's triggers
+    /// include exactly these words. True when it was offered.
+    pub fn offer_trigger(&self, said: &lamp_msgs::AppTrigger) -> bool {
+        if !(*self.apps_on.lock().expect("apps_on"))() {
+            return false;
+        }
+        // The voice's own contract: the phrase is the manifest's trigger
+        // words, never the line around them.
+        if said.phrase != said.trigger {
+            return false;
+        }
+        // The manifest is read before the apps' lock is taken, not under it.
+        let apps_dir = self.apps_dir.lock().expect("apps_dir").clone();
+        let named = crate::app_yes::installed(&apps_dir, &said.app)
+            .is_some_and(|manifest| manifest.triggers.contains(&said.trigger));
+        if !named {
+            return false;
+        }
+        {
+            let mut apps = self.apps.lock().expect("apps");
+            if !apps.1.is_running(&said.app) {
+                return false;
+            }
+            // Not recorded: not sent, so no answer of the app goes uncounted.
+            if !apps
+                .1
+                .offer(&said.app, said.turn, std::time::Instant::now())
+            {
+                return false;
+            }
+        }
+        self.tell_client(
+            &crate::app_socket::app_client(&said.app),
+            &crate::app_socket::trigger_event(said.turn, &said.trigger, &said.phrase),
+        );
+        true
+    }
+
+    /// The turns apps took, told to the voice by the sink (after the apps'
+    /// lock is let go).
+    fn tell_took(&self, took: Vec<(String, u64)>) {
+        if took.is_empty() {
+            return;
+        }
+        if let Some(sink) = self.took_sink.lock().expect("took_sink").clone() {
+            for (app, turn) in took {
+                sink(&app, turn);
+            }
+        }
+    }
+
+    /// How a turn an app took is told to the voice (`apps/took`).
+    pub fn set_took_sink(&self, sink: TookSink) {
+        *self.took_sink.lock().expect("took_sink") = Some(sink);
+    }
+
+    /// Where memory's forget socket is, for a test.
+    pub fn set_forget_socket(&self, socket: PathBuf) {
+        *self.forget_socket.lock().expect("forget_socket") = socket;
+    }
+
+    /// Starts the thread that forgets removed apps' facts, with the pending
+    /// marks in `state` (`--state-dir`): those left by a restart are tried at
+    /// once.
+    pub fn start_facts_forget(&self, state: PathBuf, every: Duration) {
+        let socket = self.forget_socket.lock().expect("forget_socket").clone();
+        *self.facts_forget.lock().expect("facts_forget") =
+            crate::app_facts_forget::start(state, socket, every);
+    }
+
+    /// How an app's fact is told to the voice (`apps/remember`).
+    pub fn set_remember_sink(&self, sink: crate::app_remember::Sink) {
+        *self.remember_sink.lock().expect("remember_sink") = Some(sink);
+    }
+
+    /// How an app's context line is told to the voice (`apps/context`).
+    pub fn set_context_sink(&self, sink: crate::app_context::Sink) {
+        *self.context_sink.lock().expect("context_sink") = Some(sink);
+    }
+
+    /// App `app`'s checked context line (or its clear) told to the voice:
+    /// whether it was published. The journal says the app, never a word.
+    fn tell_context(
+        &self,
+        line: &lamp_msgs::app_fact::AppContext,
+        now: std::time::Instant,
+    ) -> bool {
+        let Some(sink) = self.context_sink.lock().expect("context_sink").clone() else {
+            eprintln!(
+                "lamp-control: app {}: a context line not told: no voice to tell",
+                line.app
+            );
+            return false;
+        };
+        let sent = sink(line);
+        if sent {
+            self.apps
+                .lock()
+                .expect("apps")
+                .1
+                .context_told(&line.app, (!line.clears()).then_some(now));
+        }
+        sent
+    }
+
+    /// App `name`'s session ended (its last connection closed, or it was
+    /// removed): a context line the voice may hold is cleared there.
+    fn end_context(&self, name: &str) {
+        let ends = self.apps.lock().expect("apps").1.context_ends(name);
+        if ends
+            && !self.tell_context(
+                &lamp_msgs::app_fact::AppContext::clear(name),
+                std::time::Instant::now(),
+            )
+        {
+            // The voice drops it at its own `for_ms` (10 minutes at most).
+            eprintln!("lamp-control: app {name}: its context line's clear was not told");
+        }
+    }
+
+    /// App `app`'s `apps.context` `frame` judged and, when checked, told:
+    /// the answer to send.
+    fn app_context(
+        &self,
+        app: &crate::app_socket::AppPeer,
+        frame: &serde_json::Map<String, Value>,
+    ) -> Value {
+        let gates = self.remember_gates(app);
+        let now = std::time::Instant::now();
+        let asked = crate::app_context::ask(
+            &self.apps.lock().expect("apps").1,
+            &app.name,
+            frame,
+            gates,
+            now,
+        );
+        let (re, line) = match asked {
+            None => {
+                return crate::protocol::refused(
+                    None,
+                    &crate::protocol::Error::new(
+                        crate::protocol::ErrorCode::BadRequest,
+                        "an op has an id and a name",
+                    ),
+                );
+            }
+            Some(crate::app_context::Ask::Refused(reply)) => return reply,
+            Some(crate::app_context::Ask::Clear { re }) => {
+                (re, lamp_msgs::app_fact::AppContext::clear(&app.name))
+            }
+            Some(crate::app_context::Ask::Tell { re, line, for_ms }) => (
+                re,
+                lamp_msgs::app_fact::AppContext {
+                    app: app.name.clone(),
+                    name: lamp_msgs::app_fact::name(&app.title),
+                    line,
+                    for_ms,
+                },
+            ),
+        };
+        crate::app_context::answer_of(re, self.tell_context(&line, now))
+    }
+
+    /// Whether `apps.remember` is on, for a test that can't set
+    /// `LAMP_APP_REMEMBER` (the process's environment is every test's).
+    pub fn set_remember_on(&self, on: fn() -> bool) {
+        *self.remember_on.lock().expect("remember_on") = on;
+    }
+
+    /// Whether the lamp is private now, for an app's fact
+    /// (`speaker::gates`' reading of the privacy switch).
+    pub fn set_private(&self, private: crate::camera::Private) {
+        *self.private.lock().expect("private") = Some(private);
+    }
+
+    fn is_private(&self) -> bool {
+        self.private
+            .lock()
+            .expect("private")
+            .clone()
+            .is_none_or(|private| private())
+    }
+
+    /// The gates an `apps.remember` from `app` is judged by now.
+    fn remember_gates(&self, app: &crate::app_socket::AppPeer) -> crate::app_remember::Gates {
+        crate::app_remember::Gates {
+            apps: (*self.apps_on.lock().expect("apps_on"))(),
+            on: (*self.remember_on.lock().expect("remember_on"))(),
+            granted: app.remember,
+            private: self.is_private(),
+            forgetting: self
+                .task_yes
+                .lock()
+                .expect("task_yes")
+                .clone()
+                .is_some_and(|state| crate::app_facts_forget::pending(&state).contains(&app.name)),
+        }
+    }
+
+    /// App `app`'s checked fact `text` (its request `re`) told to the voice,
+    /// whose word is the answer sent on `outbox`, or [`crate::app_remember::UNANSWERED`]
+    /// past `within`. `Some` is the answer now: no way to the voice.
+    fn remember_fact(
+        self: &Arc<Self>,
+        app: &crate::app_socket::AppPeer,
+        re: u64,
+        text: String,
+        outbox: mpsc::WeakUnboundedSender<Value>,
+        within: Duration,
+    ) -> Option<Value> {
+        let unanswered = || crate::app_remember::answer_of(re, lamp_msgs::app_fact::UNAVAILABLE);
+        let Some(sink) = self.remember_sink.lock().expect("remember_sink").clone() else {
+            eprintln!(
+                "lamp-control: app {}: a fact not kept: no voice to tell",
+                app.name
+            );
+            return Some(unanswered());
+        };
+        let ask = self.remember_next.fetch_add(1, Ordering::Relaxed);
+        self.remember_waiting
+            .lock()
+            .expect("remember_waiting")
+            .insert(
+                ask,
+                RememberWaiting {
+                    app: app.name.clone(),
+                    re,
+                    outbox,
+                },
+            );
+        let fact = lamp_msgs::app_fact::AppRemember {
+            ask,
+            app: app.name.clone(),
+            name: lamp_msgs::app_fact::name(&app.title),
+            text,
+            at_unix_ms: wall_ms(),
+        };
+        if !sink(&fact) {
+            self.remember_waiting
+                .lock()
+                .expect("remember_waiting")
+                .remove(&ask);
+            return Some(unanswered());
+        }
+        let shared = Arc::downgrade(self);
+        let name = app.name.clone();
+        // One short wait an ask, at most three a minute an app.
+        let waits = std::thread::Builder::new()
+            .name("app-remember-wait".into())
+            .spawn(move || {
+                std::thread::sleep(within);
+                if let Some(shared) = shared.upgrade() {
+                    shared.remembered(&lamp_msgs::app_fact::AppRemembered {
+                        ask,
+                        app: name,
+                        outcome: lamp_msgs::app_fact::UNAVAILABLE.to_owned(),
+                    });
+                }
+            });
+        if waits.is_err() {
+            eprintln!(
+                "lamp-control: app {}: a fact's wait has no thread",
+                app.name
+            );
+        }
+        None
+    }
+
+    /// The voice's word on an app's fact (`apps/remembered`), sent as the
+    /// app's answer once: a word for no ask waiting, or for another app's,
+    /// is dropped. The journal says the app and how it went, never a word.
+    pub fn remembered(&self, went: &lamp_msgs::app_fact::AppRemembered) {
+        let waiting = {
+            let mut all = self.remember_waiting.lock().expect("remember_waiting");
+            match all.get(&went.ask) {
+                Some(waiting) if waiting.app == went.app => all.remove(&went.ask),
+                _ => None,
+            }
+        };
+        let Some(waiting) = waiting else {
+            return;
+        };
+        eprintln!(
+            "lamp-control: app {}: a fact for Lamp's memory: {}",
+            went.app, went.outcome
+        );
+        if let Some(outbox) = waiting.outbox.upgrade() {
+            let _ = outbox.send(crate::app_remember::answer_of(waiting.re, &went.outcome));
+        }
+    }
+
+    fn tell_client(&self, client: &str, event: &Value) {
+        for each in self.open.lock().expect("open").values() {
+            if each.client.as_deref() == Some(client) {
+                let _ = each.outbox.send(event.clone());
+            }
+        }
+    }
+
     fn close_client(&self, client: &str, why: &'static str) {
         let mut open = self.open.lock().expect("open");
         let mut reasons = self.close_reasons.lock().expect("close reasons");
@@ -1206,16 +1781,19 @@ pub async fn serve(listener: TcpListener, tls: tokio_rustls::TlsAcceptor, shared
             let within = shared.limits.lock().expect("limits").handshake;
             let opened = tokio::time::timeout(within, async {
                 let stream = tls.accept(stream).await.ok()?;
+                // The remote door never takes a pose (local only): 64 KiB;
+                // nor any door with poses off.
+                let most = transport_max(!remote, shared.poses());
                 let config = WebSocketConfig::default()
-                    .max_message_size(Some(FRAME_MAX))
-                    .max_frame_size(Some(FRAME_MAX));
+                    .max_message_size(Some(most))
+                    .max_frame_size(Some(most));
                 tokio_tungstenite::accept_hdr_async_with_config(stream, only_v1, Some(config))
                     .await
                     .ok()
             })
             .await;
             if let Ok(Some(socket)) = opened {
-                connection(socket, shared, remote, None, false).await;
+                connection(socket, shared, remote, None, false, None).await;
             }
         });
     }
@@ -1290,7 +1868,7 @@ pub async fn serve_agent(
             )
             .await;
             if let Ok(Ok(socket)) = opened {
-                connection(socket, shared, false, Some(client), false).await;
+                connection(socket, shared, false, Some(client), false, None).await;
             }
             held.fetch_sub(1, Ordering::AcqRel);
         });
@@ -1356,9 +1934,121 @@ pub async fn serve_run(
             )
             .await;
             if let Ok(Ok(socket)) = opened {
-                connection(socket, shared, false, None, true).await;
+                connection(socket, shared, false, None, true, None).await;
             }
             held.fetch_sub(1, Ordering::AcqRel);
+        });
+    }
+}
+
+/// The app socket (`crate::app_socket`): the same WebSocket protocol on a unix
+/// socket with no TLS, for the apps installed on this lamp. The kernel names
+/// the peer (`SO_PEERCRED`), and its cgroup the app; a peer in no app's unit,
+/// an app not installed or with a manifest that does not load, or any
+/// connection while apps are off, is closed before a byte is read and said in
+/// the journal.
+pub async fn serve_app(
+    listener: tokio::net::UnixListener,
+    apps: std::path::PathBuf,
+    shared: Arc<Shared>,
+) {
+    serve_app_as(
+        listener,
+        apps,
+        shared,
+        crate::app_socket::app_of,
+        crate::app_yes::on,
+    )
+    .await;
+}
+
+/// [`serve_app`] with who the peer is and whether apps are on given, so a
+/// test can name an app without a cgroup.
+pub async fn serve_app_as(
+    listener: tokio::net::UnixListener,
+    apps: std::path::PathBuf,
+    shared: Arc<Shared>,
+    who: fn(Option<i32>, u32) -> Option<(String, bool)>,
+    on: fn() -> bool,
+) {
+    *shared.apps_dir.lock().expect("apps_dir") = apps.clone();
+    *shared.apps_on.lock().expect("apps_on") = on;
+    let held = Arc::new(Mutex::new(HashMap::<String, usize>::new()));
+    loop {
+        let (stream, _) = match listener.accept().await {
+            Ok(accepted) => accepted,
+            Err(_) => {
+                tokio::time::sleep(ACCEPT_BACKOFF).await;
+                continue;
+            }
+        };
+        let cred = stream.peer_cred().ok();
+        let pid = cred.as_ref().and_then(|cred| cred.pid());
+        let uid = cred.as_ref().map_or(u32::MAX, |cred| cred.uid());
+        if !on() {
+            eprintln!(
+                "lamp-control: app socket: refused pid {}: {}",
+                pid.unwrap_or(-1),
+                crate::app_socket::OFF
+            );
+            continue;
+        }
+        let Some((name, net_unit)) = who(pid, uid) else {
+            eprintln!(
+                "lamp-control: app socket: refused pid {}: in no app's unit",
+                pid.unwrap_or(-1)
+            );
+            continue;
+        };
+        let peer = match crate::app_socket::peer_for(&apps, &name, net_unit) {
+            Ok(peer) => peer,
+            Err(why) => {
+                eprintln!(
+                    "lamp-control: app socket: refused {name} (pid {}): {why}",
+                    pid.unwrap_or(-1)
+                );
+                continue;
+            }
+        };
+        {
+            let mut held = held.lock().expect("held");
+            let all: usize = held.values().sum();
+            let mine = held.entry(name.clone()).or_default();
+            if *mine >= crate::app_socket::MOST_EACH || all >= crate::app_socket::MOST {
+                eprintln!("lamp-control: app socket: refused {name}: too many connections");
+                continue;
+            }
+            *mine += 1;
+        }
+        eprintln!(
+            "lamp-control: app {name} {}: a connection from pid {}",
+            peer.version,
+            pid.unwrap_or(-1)
+        );
+        let (shared, held) = (shared.clone(), held.clone());
+        tokio::spawn(async move {
+            let within = shared.limits.lock().expect("limits").handshake;
+            // An app on the lamp may ask a pose, when poses are on.
+            let most = transport_max(true, shared.poses());
+            let config = WebSocketConfig::default()
+                .max_message_size(Some(most))
+                .max_frame_size(Some(most));
+            let opened = tokio::time::timeout(
+                within,
+                tokio_tungstenite::accept_hdr_async_with_config(stream, only_v1, Some(config)),
+            )
+            .await;
+            if let Ok(Ok(socket)) = opened {
+                shared.apps.lock().expect("apps").1.connection(&name, true);
+                connection(socket, shared.clone(), false, None, false, Some(peer)).await;
+                shared.apps.lock().expect("apps").1.connection(&name, false);
+                // The app's session ended with its last connection: its live
+                // context line goes at the voice (`apps.context`).
+                shared.end_context(&name);
+            }
+            if let Some(count) = held.lock().expect("held").get_mut(&name) {
+                *count = count.saturating_sub(1);
+            }
         });
     }
 }
@@ -1384,6 +2074,7 @@ async fn connection<S>(
     remote: bool,
     local: Option<String>,
     run: bool,
+    app: Option<crate::app_socket::AppPeer>,
 ) where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
@@ -1403,6 +2094,7 @@ async fn connection<S>(
         match &local {
             Some(client) => door.open_local(client),
             None if run => door.open_run(),
+            None if app.is_some() => door.open_app(app.clone().expect("app")),
             None => door.open(),
         }
     };
@@ -1410,6 +2102,10 @@ async fn connection<S>(
     if remote {
         session.set_remote();
     }
+    // The doors that take a pose's larger frame: the lamp's own network's,
+    // and an app's on the lamp; never the remote door, the local agent's or
+    // a run's.
+    let takes_pose = !remote && local.is_none() && !run && shared.poses();
     shared.open.lock().expect("open").insert(
         id,
         Open {
@@ -1467,16 +2163,203 @@ async fn connection<S>(
                         }
                         _ => break,
                     };
+                    // Over 64 KiB: a pose alone, said after hello, on a door
+                    // that takes one; anything else is told and closed, as
+                    // the WebSocket's own cap would close it.
+                    if !frame_taken(text.len(), takes_pose, session.client().is_some(), text.as_str()) {
+                        let refused = crate::protocol::refused(
+                            None,
+                            &crate::protocol::Error::new(
+                                crate::protocol::ErrorCode::BadRequest,
+                                FRAME_TOO_BIG,
+                            ),
+                        );
+                        let _ = socket.send(Message::text(refused.to_string())).await;
+                        break;
+                    }
+                    // An app's fact for Lamp's memory (`apps.remember`): judged
+                    // here, kept by the voice, answered when it says how it went.
+                    if let Some(app) = session.app_peer().cloned()
+                        && let Ok(Value::Object(frame)) = serde_json::from_str::<Value>(text.as_str())
+                        && crate::app_remember::is_ours(&frame)
+                    {
+                        let reply = if session.client().is_none() {
+                            Some(crate::protocol::refused(
+                                frame.get("id").and_then(Value::as_u64),
+                                &crate::protocol::Error::new(
+                                    crate::protocol::ErrorCode::NoHello,
+                                    "say hello first",
+                                ),
+                            ))
+                        } else {
+                            let gates = shared.remember_gates(&app);
+                            let asked = crate::app_remember::ask(
+                                &mut shared.apps.lock().expect("apps").1,
+                                &app.name,
+                                &frame,
+                                gates,
+                                std::time::Instant::now(),
+                            );
+                            match asked {
+                                None => Some(crate::protocol::refused(
+                                    None,
+                                    &crate::protocol::Error::new(
+                                        crate::protocol::ErrorCode::BadRequest,
+                                        "an op has an id and a name",
+                                    ),
+                                )),
+                                Some(crate::app_remember::Ask::Refused(reply)) => Some(reply),
+                                Some(crate::app_remember::Ask::Keep { re, text }) => shared
+                                    .remember_fact(
+                                        &app,
+                                        re,
+                                        text,
+                                        answers.clone(),
+                                        crate::app_remember::WITHIN,
+                                    ),
+                            }
+                        };
+                        if let Some(reply) = reply
+                            && socket.send(Message::text(reply.to_string())).await.is_err()
+                        {
+                            break;
+                        }
+                        quiet_until = tokio::time::Instant::now() + quiet;
+                        continue;
+                    }
+                    // An app's live context line (`apps.context`): judged
+                    // here, told to the voice on the bus, answered once told.
+                    if let Some(app) = session.app_peer().cloned()
+                        && let Ok(Value::Object(frame)) = serde_json::from_str::<Value>(text.as_str())
+                        && crate::app_context::is_ours(&frame)
+                    {
+                        let reply = if session.client().is_none() {
+                            crate::protocol::refused(
+                                frame.get("id").and_then(Value::as_u64),
+                                &crate::protocol::Error::new(
+                                    crate::protocol::ErrorCode::NoHello,
+                                    "say hello first",
+                                ),
+                            )
+                        } else {
+                            shared.app_context(&app, &frame)
+                        };
+                        if socket.send(Message::text(reply.to_string())).await.is_err() {
+                            break;
+                        }
+                        quiet_until = tokio::time::Instant::now() + quiet;
+                        continue;
+                    }
+                    // The ops only an app has, answered before the door parses
+                    // a frame, once it has said hello.
+                    if let Some(name) = session.app_name().map(str::to_owned)
+                        && let Ok(Value::Object(frame)) = serde_json::from_str::<Value>(text.as_str())
+                        && crate::app_socket::is_app_op(&frame)
+                    {
+                        let reply = if session.client().is_none() {
+                            crate::protocol::refused(
+                                frame.get("id").and_then(Value::as_u64),
+                                &crate::protocol::Error::new(
+                                    crate::protocol::ErrorCode::NoHello,
+                                    "say hello first",
+                                ),
+                            )
+                        } else {
+                            let state = shared.task_yes.lock().expect("task_yes").clone();
+                            let apps_dir = shared.apps_dir.lock().expect("apps_dir").clone();
+                            let place = crate::app_yes::Place {
+                                apps: &apps_dir,
+                                state: state.as_deref(),
+                            };
+                            let mut apps = shared.apps.lock().expect("apps");
+                            let reply = crate::app_socket::answer(
+                                &mut apps.1,
+                                &place,
+                                &name,
+                                &frame,
+                                (*shared.apps_on.lock().expect("apps_on"))(),
+                                std::time::Instant::now(),
+                            )
+                            .unwrap_or_else(|| {
+                                crate::protocol::refused(
+                                    None,
+                                    &crate::protocol::Error::new(
+                                        crate::protocol::ErrorCode::BadRequest,
+                                        "an op has an id and a name",
+                                    ),
+                                )
+                            });
+                            // A turn the app took is told to the voice after
+                            // the apps' lock is let go.
+                            let took = apps.1.drain_took();
+                            drop(apps);
+                            shared.tell_took(took);
+                            reply
+                        };
+                        if socket.send(Message::text(reply.to_string())).await.is_err() {
+                            break;
+                        }
+                        quiet_until = tokio::time::Instant::now() + quiet;
+                        continue;
+                    }
                     let now = shared.now_us();
                     let wall = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .map(|since| since.as_secs())
                         .unwrap_or_default();
+                    // An app's `phrases.set` is the door's own `subscribe` to
+                    // `phrase.heard` (or its `unsubscribe`), so its limits,
+                    // its `hear` grant and its rate are the door's; only
+                    // the reply is the app's.
+                    let (door_text, phrases_set) = if session.app_name().is_some() {
+                        match crate::app_socket::phrases_set_as_subscribe(text.as_str()) {
+                            crate::app_socket::PhrasesSet::NotOurs => (text.to_string(), None),
+                            crate::app_socket::PhrasesSet::Door(door, count) => (door, Some(count)),
+                            crate::app_socket::PhrasesSet::Refused(reply) => {
+                                if socket.send(Message::text(reply.to_string())).await.is_err() {
+                                    break;
+                                }
+                                quiet_until = tokio::time::Instant::now() + quiet;
+                                continue;
+                            }
+                        }
+                    } else {
+                        (text.to_string(), None)
+                    };
+                    // An app's `say` within 3 s of a trigger offered it takes
+                    // that line, as an `app.took` does (#7979, App Only), but
+                    // only once the door has accepted the `say`: a refused one
+                    // (a bad field, the rate, quiet hours, no `speak`) takes
+                    // nothing, or the person would hear neither the app nor
+                    // the model (Heron on #7979).
+                    let say_id = (session.app_may_speak() && text.contains("\"say\""))
+                        .then(|| serde_json::from_str::<Value>(text.as_str()).ok())
+                        .flatten()
+                        .filter(|frame| frame.get("op").and_then(Value::as_str) == Some("say"))
+                        .and_then(|frame| frame.get("id").and_then(Value::as_u64));
                     let mut outcome = {
                         let mut door = shared.door.lock().expect("door");
                         let mut parts = shared.parts.lock().expect("parts");
-                        door.handle(&mut session, text.as_str(), parts.as_mut(), now, wall)
+                        door.handle(&mut session, &door_text, parts.as_mut(), now, wall)
                     };
+                    if let (Some(say_id), Some(name)) = (say_id, session.app_name().map(str::to_owned))
+                        && outcome
+                            .send
+                            .iter()
+                            .any(|reply| reply["re"] == say_id && reply["ok"] == true)
+                    {
+                        let took = {
+                            let mut apps = shared.apps.lock().expect("apps");
+                            apps.1.took_by_say(&name, std::time::Instant::now());
+                            apps.1.drain_took()
+                        };
+                        shared.tell_took(took);
+                    }
+                    if let Some(count) = phrases_set {
+                        for reply in &mut outcome.send {
+                            crate::app_socket::phrases_reply(reply, count);
+                        }
+                    }
                     if let Some(client) = session.client() {
                         let grants = shared
                             .door
@@ -1702,6 +2585,10 @@ async fn connection<S>(
 ///   `listening`, whether the door listens on the network (false when lamp-control
 ///   serves only the owner's side and skill runs), so the admin socket's being
 ///   there is not read as the door's being open;
+/// - `{"note_changes": {"since_unix_ms": N}}`, from the voice alone →
+///   `{"computers": [{client, name, changes, last_unix_ms}]}`: each computer
+///   whose pairing the side file marks as the owner's app's
+///   ([`crate::paired_by`]) and whose notes changed since then, a count only;
 ///
 /// [`CODE_FOR_US`]: crate::pairing::CODE_FOR_US
 pub async fn admin(listener: UnixListener, shared: Arc<Shared>) {
@@ -1714,11 +2601,16 @@ pub async fn admin(listener: UnixListener, shared: Arc<Shared>) {
         // that may record the person's yes to a skill's task.
         let from_the_voice =
             crate::task_yes::peer_is_voice(stream.peer_cred().ok().and_then(|peer| peer.pid()));
+        let cred = stream.peer_cred().ok();
+        let peer = crate::app_yes::peer_of(
+            cred.as_ref().and_then(|cred| cred.pid()),
+            cred.as_ref().map(|cred| cred.uid()),
+        );
         tokio::spawn(async move {
             let (read, mut write) = stream.into_split();
             let mut lines = BufReader::new(read).lines();
             while let Ok(Some(line)) = lines.next_line().await {
-                let answer = admin_answer(&shared, &line, from_the_voice);
+                let answer = admin_answer(&shared, &line, from_the_voice, peer);
                 if write
                     .write_all(format!("{answer}\n").as_bytes())
                     .await
@@ -1740,10 +2632,95 @@ fn grant_names(grants: &[Grant]) -> String {
         .join(", ")
 }
 
-fn admin_answer(shared: &Shared, line: &str, from_the_voice: bool) -> Value {
+/// `{"app_forget": NAME}`: an app removed, what lamp-control kept of it gone
+/// and its open connections closed, so a running process cannot set a panel
+/// again at once. The apps helper's alone, with the switch `on`.
+fn forget_app_op(
+    shared: &Shared,
+    name: &str,
+    peer: crate::app_yes::Peer,
+    on: bool,
+    state: Option<&std::path::Path>,
+) -> Value {
+    if !on {
+        return json!({"refused": crate::app_yes::OFF});
+    }
+    // The helper's, or its boot start's finishing a cut remove: nothing else.
+    if !matches!(
+        peer,
+        crate::app_yes::Peer::Helper | crate::app_yes::Peer::Resume
+    ) {
+        return json!({"refused": "not the apps helper"});
+    }
+    if !lamp_skills::app_package::app_name_ok(name) {
+        return json!({"refused": "bad request: name is not an app's name"});
+    }
+    // Kept on disk before anything else of it goes, so a refusal here is
+    // asked again and a cut remove still forgets the app's facts.
+    if let Some(state) = state
+        && let Err(why) = crate::app_facts_forget::mark(state, name)
+    {
+        return json!({"refused": why});
+    }
+    if let Some(state) = state
+        && let Err(why) = crate::app_yes::forget_settings(state, name)
+    {
+        return json!({"refused": why});
+    }
+    let client = crate::app_socket::app_client(name);
+    shared.apps.lock().expect("apps").1.forget_app(name);
+    // Its live context line goes at the voice now, before its connections
+    // are closed below.
+    shared.end_context(name);
+    shared.door.lock().expect("door").forget_data(&client);
+    shared.close_client(&client, CLOSED_REMOVED);
+    // Its facts in Lamp's memory go too: marked first, then asked of
+    // memory's forget socket by the thread until memory says it was done
+    // (`app_facts_forget`), whatever `LAMP_APP_REMEMBER` says now.
+    let facts = match state {
+        Some(_) => {
+            if let Some(kick) = shared.facts_forget.lock().expect("facts_forget").as_ref() {
+                let _ = kick.send(());
+            }
+            "its facts' forget marked"
+        }
+        None => "no state folder to mark its facts' forget in",
+    };
+    eprintln!(
+        "lamp-control: app {name} removed: its settings, panel and notes are gone, its connections closed, {facts}"
+    );
+    json!({"ok": true})
+}
+
+/// The voice's "forget everything" to lamp-control (#7245):
+/// `{"notes_forget_skills": true}`, answered `{"forgot": N}`, every made
+/// skill's notes deleted.
+pub const NOTES_FORGET_SKILLS: &str = "notes_forget_skills";
+
+fn admin_answer(
+    shared: &Shared,
+    line: &str,
+    from_the_voice: bool,
+    peer: crate::app_yes::Peer,
+) -> Value {
     let Ok(Value::Object(asked)) = serde_json::from_str::<Value>(line) else {
         return json!({"error": "one JSON object a line"});
     };
+    // A made skill's notes (#7245): its remove (`task_yes_forget`, sent
+    // by lamp-skills' remove) takes its notes too, before its yes below;
+    // "forget everything" (`notes_forget_skills`) takes every made
+    // skill's. Forgetting grants nothing: any peer.
+    if let Some(Value::String(name)) = asked.get(crate::task_yes::FORGET) {
+        shared
+            .door
+            .lock()
+            .expect("door")
+            .forget_skill_notes(Some(name));
+    }
+    if asked.get(NOTES_FORGET_SKILLS) == Some(&json!(true)) {
+        let forgot = shared.door.lock().expect("door").forget_skill_notes(None);
+        return json!({"forgot": forgot});
+    }
     // The owner's yes to a skill's task (#6305): recorded by the voice
     // alone, checked by lamp-skills, taken back by a remove.
     let folder = shared.task_yes.lock().expect("task_yes").clone();
@@ -1756,8 +2733,60 @@ fn admin_answer(shared: &Shared, line: &str, from_the_voice: bool) -> Value {
     ) {
         return answer;
     }
+    // A removed app's kept settings, panel and notes go: the apps helper's
+    // alone, behind the switch (the first builder's P3 on #7714).
+    if let Some(name) = asked.get(crate::app_yes::FORGET).and_then(Value::as_str) {
+        return forget_app_op(shared, name, peer, crate::app_yes::on(), folder.as_deref());
+    }
+    // The owner's yes to an app, and what lamp-cloud reads of apps (#7415).
+    {
+        let mut apps = shared.apps.lock().expect("apps");
+        let (yeses, live) = &mut *apps;
+        let apps_dir = shared.apps_dir.lock().expect("apps_dir").clone();
+        let place = crate::app_yes::Place {
+            apps: &apps_dir,
+            state: folder.as_deref(),
+        };
+        if let Some(answer) = crate::app_yes::answer(
+            yeses,
+            live,
+            &place,
+            &asked,
+            peer,
+            crate::app_yes::on(),
+            std::time::Instant::now(),
+        ) {
+            // The owner changed settings: the app is told at once, whole map.
+            if let (Some(name), Some(changed)) = (
+                asked
+                    .get(crate::app_yes::SETTINGS_SET)
+                    .and_then(|set| set.get("name"))
+                    .and_then(Value::as_str),
+                answer.get("changed").and_then(Value::as_array),
+            ) && !changed.is_empty()
+                && let Some(settings) = crate::app_yes::settings_of(&place, name)
+            {
+                let changed: Vec<String> = changed
+                    .iter()
+                    .filter_map(|key| key.as_str().map(str::to_owned))
+                    .collect();
+                shared.tell_client(
+                    &crate::app_socket::app_client(name),
+                    &crate::app_socket::settings_event(&changed, &settings),
+                );
+            }
+            return answer;
+        }
+    }
     let now = shared.now_us();
     if let Some(code) = asked.get("code") {
+        // With the door off (developer access off: `LAMP_CONTROL` not on,
+        // nothing listens on the network) no pairing code is made: no
+        // computer could use it, and the app must not show one. The owner's
+        // side stays served for the voice's yes records and skill runs.
+        if !shared.listening.load(Ordering::Relaxed) {
+            return json!({"error": "developer access is off on this lamp"});
+        }
         let say_pin = code.get("say_pin") == Some(&json!(true));
         let grants: Result<BTreeSet<Grant>, _> =
             serde_json::from_value(code.get("grants").cloned().unwrap_or(json!([])));
@@ -1897,6 +2926,34 @@ fn admin_answer(shared: &Shared, line: &str, from_the_voice: bool) -> Value {
             "speaker": features.speaker,
         });
     }
+    // The computers' daily notes counts (C157): for the voice alone, only
+    // the pairings the side file marks as the owner's app's, counts only.
+    if let Some(counts) = asked.get(crate::paired_by::OP) {
+        if !from_the_voice {
+            return json!({"error": "only the voice reads the computers' notes counts"});
+        }
+        let Some(since_ms) = counts.get("since_unix_ms").and_then(Value::as_u64) else {
+            return json!({"error": "note_changes: since_unix_ms, a number of milliseconds"});
+        };
+        // The side file is read off the door's lock.
+        let state = {
+            let door = shared.door.lock().expect("door");
+            door.notes()
+                .and_then(|notes| notes.folder().parent())
+                .map(std::path::Path::to_path_buf)
+        };
+        let marks = state
+            .as_deref()
+            .map(crate::paired_by::app_paired)
+            .unwrap_or_default();
+        let door = shared.door.lock().expect("door");
+        return crate::paired_by::note_changes(
+            &door.clients().clients,
+            &marks,
+            door.notes(),
+            since_ms,
+        );
+    }
     if asked.get("clients").is_some() {
         let door = shared.door.lock().expect("door");
         let clients: Vec<Value> = door
@@ -1921,7 +2978,7 @@ fn admin_answer(shared: &Shared, line: &str, from_the_voice: bool) -> Value {
             "listening": shared.listening.load(Ordering::Relaxed),
         });
     }
-    json!({"error": "ask for code, set_grants, cancel_code, take_back, revoke, clients, task_yes_record, task_yes_check or task_yes_forget"})
+    json!({"error": "ask for code, set_grants, cancel_code, take_back, revoke, clients, note_changes, task_yes_record, task_yes_check, task_yes_forget, app_yes_record, app_yes_take, app_state, app_settings_set or notes_forget_skills"})
 }
 
 /// Who says the spoken pin check, as the voice's say socket and a `stop`
@@ -2118,11 +3175,53 @@ pub fn rfc3339_utc(at: std::time::SystemTime) -> String {
 mod tests {
     use super::*;
 
+    /// 64 KiB for every frame on every door, but a `pose` said after hello
+    /// on a door that takes one, to 256 KiB; the remote door reads 64 KiB
+    /// at most (Heron's P2 on #7972).
+    #[test]
+    fn only_a_pose_after_hello_on_a_local_door_passes_64_kib() {
+        assert_eq!(transport_max(false, true), 64 * 1024);
+        assert_eq!(transport_max(true, true), 256 * 1024);
+        let pose = json!({"id": 1, "op": "pose", "jpeg": "A".repeat(100 * 1024)}).to_string();
+        let other =
+            json!({"id": 1, "op": "notes.set", "key": "k", "value": "A".repeat(100 * 1024)})
+                .to_string();
+        let small = json!({"id": 1, "op": "get", "state": ["lamp"]}).to_string();
+        // Any small frame, anywhere.
+        for (door, hello) in [(false, false), (false, true), (true, false), (true, true)] {
+            assert!(frame_taken(small.len(), door, hello, &small));
+        }
+        assert!(frame_taken(pose.len(), true, true, &pose));
+        // The remote door (and the agent's and a run's).
+        assert!(!frame_taken(pose.len(), false, true, &pose));
+        // Before hello.
+        assert!(!frame_taken(pose.len(), true, false, &pose));
+        // Another op.
+        assert!(!frame_taken(other.len(), true, true, &other));
+        // A pose past its own cap.
+        let huge = json!({"op": "pose", "jpeg": "A".repeat(POSE_FRAME_MAX)}).to_string();
+        assert!(!frame_taken(huge.len(), true, true, &huge));
+        assert!(!frame_taken(FRAME_MAX + 1, true, true, "not json"));
+    }
+
     /// A door whose journal lines go to the list it gives back, and one
     /// connection on it, hello'd as `c_1` with the body grant, subscribed
     /// to `body.state` and `touch`, that never reads what is sent it.
     #[allow(clippy::type_complexity)]
     fn stalled() -> (
+        Arc<Shared>,
+        Arc<Mutex<Vec<String>>>,
+        mpsc::UnboundedReceiver<Value>,
+        watch::Receiver<Option<Value>>,
+    ) {
+        stalled_keeping(None)
+    }
+
+    /// [`stalled`] with the computers' notes and clips kept under `state`.
+    #[allow(clippy::type_complexity)]
+    fn stalled_keeping(
+        state: Option<&std::path::Path>,
+    ) -> (
         Arc<Shared>,
         Arc<Mutex<Vec<String>>>,
         mpsc::UnboundedReceiver<Value>,
@@ -2140,6 +3239,12 @@ mod tests {
         .with_journal(crate::journal::Journal::to(move |line| {
             into.lock().unwrap().push(line.to_owned());
         }));
+        let door = match state {
+            Some(state) => door
+                .with_notes_folder(state.join("notes"))
+                .with_sound_folder(state.join("sounds")),
+            None => door,
+        };
         let shared = Shared::new(door, Box::new(crate::session::Unrouted), String::new());
         let (outbox, inbox) = mpsc::unbounded_channel();
         let (frames, _) = mpsc::channel(FRAMES_QUEUED);
@@ -2159,6 +3264,870 @@ mod tests {
         (shared, lines, inbox, newest)
     }
 
+    /// #7415 piece 3b-2b: a trigger the voice holds is offered to an app only
+    /// when apps are on, the app is running and its manifest has those exact
+    /// words; the app's `app.took` within 3 s, once, is told to the voice.
+    #[test]
+    fn a_trigger_is_offered_to_a_running_app_and_its_took_is_told_once() {
+        let apps_dir =
+            std::env::temp_dir().join(format!("lampos-trigger-offer-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&apps_dir);
+        let dir = apps_dir.join("demo").join("current");
+        std::fs::create_dir_all(&dir).unwrap();
+        let manifest = json!({
+            "format": 2, "kind": "app", "name": "demo", "title": "T", "version": "1.0.0",
+            "min_build": 1, "runtime": {"name": "python", "entry": "src/main.py"},
+            "grants": ["hear"], "triggers": ["start english practice"], "settings": [], "files": []
+        });
+        std::fs::write(dir.join("lamp-skill.json"), manifest.to_string()).unwrap();
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
+        *shared.apps_dir.lock().unwrap() = apps_dir.clone();
+        *shared.apps_on.lock().unwrap() = || true;
+        let (outbox, mut app_inbox) = mpsc::unbounded_channel();
+        let (frames, _) = mpsc::channel(FRAMES_QUEUED);
+        let (body_state, _) = watch::channel(None);
+        shared.open.lock().unwrap().insert(
+            9,
+            Open {
+                client: Some(crate::app_socket::app_client("demo")),
+                outbox,
+                frames,
+                events: Default::default(),
+                phrases: Vec::new(),
+                grants: Default::default(),
+                body_state,
+            },
+        );
+        let said = |app: &str, trigger: &str, turn: u64| lamp_msgs::AppTrigger {
+            turn,
+            app: app.to_owned(),
+            trigger: trigger.to_owned(),
+            phrase: trigger.to_owned(),
+            at_ms: 1,
+        };
+        // Not running: never offered, and never listed.
+        assert!(!shared.offer_trigger(&said("demo", "start english practice", 7)));
+        assert!(shared.running_triggers().apps.is_empty());
+        shared.apps.lock().unwrap().1.connection("demo", true);
+        // Running: listed with its manifest's words, and offered them only.
+        let listed = shared.running_triggers();
+        assert_eq!(listed.apps.len(), 1);
+        assert_eq!(listed.apps[0].triggers, vec!["start english practice"]);
+        assert!(!shared.offer_trigger(&said("demo", "start english lesson", 7)));
+        assert!(!shared.offer_trigger(&said("other", "start english practice", 7)));
+        assert!(app_inbox.try_recv().is_err(), "nothing was offered yet");
+        assert!(shared.offer_trigger(&said("demo", "start english practice", 7)));
+        let event = app_inbox.try_recv().expect("the app is told");
+        assert_eq!(event["ev"], "app.trigger");
+        assert_eq!(event["turn"], "7");
+        assert_eq!(event["trigger"], "start english practice");
+        // The app takes it: told to the voice once, a second took is not.
+        let t0 = std::time::Instant::now();
+        let took = |turn: &str, at: u64| {
+            let apps_dir = shared.apps_dir.lock().unwrap().clone();
+            let place = crate::app_yes::Place {
+                apps: &apps_dir,
+                state: None,
+            };
+            let frame = json!({"id": 1, "op": "app.took", "turn": turn});
+            let mut apps = shared.apps.lock().unwrap();
+            let reply = crate::app_socket::answer(
+                &mut apps.1,
+                &place,
+                "demo",
+                frame.as_object().unwrap(),
+                true,
+                t0 + std::time::Duration::from_secs(at),
+            )
+            .unwrap();
+            assert_eq!(reply["ok"], true, "{reply}");
+            apps.1.drain_took()
+        };
+        assert_eq!(took("7", 1), vec![("demo".to_owned(), 7)]);
+        assert!(took("7", 2).is_empty(), "once");
+        // A turn never offered, and one taken after the hold, are no took.
+        assert!(took("8", 3).is_empty());
+        assert!(shared.offer_trigger(&said("demo", "start english practice", 9)));
+        assert!(took("9", 10).is_empty(), "late");
+        // The reply says whether the turn counted: a late or unoffered one is
+        // `taken: false`, and the app must not speak for it.
+        {
+            let apps_dir = shared.apps_dir.lock().unwrap().clone();
+            let place = crate::app_yes::Place {
+                apps: &apps_dir,
+                state: None,
+            };
+            let reply_at = |turn: &str, at: u64| {
+                let frame = json!({"id": 1, "op": "app.took", "turn": turn});
+                let mut apps = shared.apps.lock().unwrap();
+                let reply = crate::app_socket::answer(
+                    &mut apps.1,
+                    &place,
+                    "demo",
+                    frame.as_object().unwrap(),
+                    true,
+                    t0 + std::time::Duration::from_secs(at),
+                )
+                .unwrap();
+                apps.1.drain_took();
+                reply
+            };
+            assert!(shared.offer_trigger(&said("demo", "start english practice", 30)));
+            // Long past the offer's 3 s, and apart from the calls before it
+            // by the rate's tenth of a second.
+            assert_eq!(reply_at("30", 30)["taken"], false, "late");
+            assert_eq!(reply_at("31", 31)["taken"], false, "never offered");
+            // Offered at 40 s on this clock, taken at 41 s: counted.
+            shared.apps.lock().unwrap().1.offer(
+                "demo",
+                32,
+                t0 + std::time::Duration::from_secs(40),
+            );
+            assert_eq!(reply_at("32", 41)["taken"], true);
+        }
+        // A phrase that is not the trigger's own words is not offered.
+        assert!(!shared.offer_trigger(&lamp_msgs::AppTrigger {
+            phrase: "please start english practice".into(),
+            ..said("demo", "start english practice", 33)
+        }));
+        // With the offers kept full, one more is not sent (and not counted).
+        {
+            let mut apps = shared.apps.lock().unwrap();
+            let now = std::time::Instant::now();
+            for turn in 100..100 + crate::app_yes::MOST_OFFERED as u64 {
+                apps.1.offer("demo", turn, now);
+            }
+        }
+        while app_inbox.try_recv().is_ok() {}
+        assert!(!shared.offer_trigger(&said("demo", "start english practice", 34)));
+        assert!(app_inbox.try_recv().is_err(), "nothing was sent");
+        shared.apps.lock().unwrap().1.forget_run("demo");
+        // An app's `say` within the hold takes the newest turn offered it,
+        // once; one after the hold, or of an app never offered, takes none.
+        assert!(shared.offer_trigger(&said("demo", "start english practice", 21)));
+        {
+            let mut apps = shared.apps.lock().unwrap();
+            let now = std::time::Instant::now();
+            assert!(!apps.1.took_by_say("other", now));
+            assert!(apps.1.took_by_say("demo", now));
+            assert!(!apps.1.took_by_say("demo", now), "once");
+            assert_eq!(apps.1.drain_took(), vec![("demo".to_owned(), 21)]);
+        }
+        assert!(shared.offer_trigger(&said("demo", "start english practice", 22)));
+        {
+            let mut apps = shared.apps.lock().unwrap();
+            let late = std::time::Instant::now() + std::time::Duration::from_secs(30);
+            assert!(!apps.1.took_by_say("demo", late), "after the hold");
+            assert!(apps.1.drain_took().is_empty());
+        }
+        // Apps off: nothing offered.
+        *shared.apps_on.lock().unwrap() = || false;
+        assert!(!shared.offer_trigger(&said("demo", "start english practice", 10)));
+        // The app's last socket closing takes what was offered with it.
+        *shared.apps_on.lock().unwrap() = || true;
+        assert!(shared.offer_trigger(&said("demo", "start english practice", 11)));
+        shared.apps.lock().unwrap().1.connection("demo", false);
+        assert!(shared.running_triggers().apps.is_empty());
+        shared.apps.lock().unwrap().1.connection("demo", true);
+        assert!(took("11", 60).is_empty(), "the run ended");
+    }
+
+    /// #7415 piece 3b-2b, with no app running (every lamp that has none): no
+    /// trigger is listed, none is offered to anyone, and nothing is held, so
+    /// the voice's path is the one it had.
+    #[test]
+    fn with_no_running_app_nothing_is_listed_offered_or_held() {
+        let apps_dir =
+            std::env::temp_dir().join(format!("lampos-trigger-none-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&apps_dir);
+        // An app installed with a trigger, but not running.
+        let dir = apps_dir.join("demo").join("current");
+        std::fs::create_dir_all(&dir).unwrap();
+        let manifest = json!({
+            "format": 2, "kind": "app", "name": "demo", "title": "T", "version": "1.0.0",
+            "min_build": 1, "runtime": {"name": "python", "entry": "src/main.py"},
+            "grants": ["hear"], "triggers": ["start english practice"], "settings": [], "files": []
+        });
+        std::fs::write(dir.join("lamp-skill.json"), manifest.to_string()).unwrap();
+        let (shared, _lines, mut inbox, _newest) = stalled_keeping(None);
+        *shared.apps_dir.lock().unwrap() = apps_dir;
+        *shared.apps_on.lock().unwrap() = || true;
+        assert!(shared.running_triggers().apps.is_empty());
+        let said = lamp_msgs::AppTrigger {
+            turn: 1,
+            app: "demo".into(),
+            trigger: "start english practice".into(),
+            phrase: "start english practice".into(),
+            at_ms: 1,
+        };
+        assert!(!shared.offer_trigger(&said));
+        assert!(inbox.try_recv().is_err(), "no connection was told anything");
+        let mut apps = shared.apps.lock().unwrap();
+        assert!(apps.1.running().is_empty());
+        assert!(
+            !apps.1.took_turn("demo", "1", std::time::Instant::now()),
+            "nothing was offered, so nothing is taken"
+        );
+        assert!(apps.1.drain_took().is_empty());
+    }
+
+    /// #7415 piece 3b-2b on a real bus: the running app's triggers are said on
+    /// `apps/triggers`, the voice's `apps/trigger` reaches the app as
+    /// `app.trigger`, and a turn the app took is said on `apps/took`.
+    #[test]
+    fn the_bus_side_says_the_triggers_offers_one_and_tells_a_took() {
+        use lamp_msgs::{AppTook, AppTrigger, AppTriggers};
+        let base = std::env::temp_dir().join(format!("lampos-trigger-bus-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let apps_dir = base.join("apps");
+        let dir = apps_dir.join("demo").join("current");
+        std::fs::create_dir_all(&dir).unwrap();
+        let manifest = json!({
+            "format": 2, "kind": "app", "name": "demo", "title": "T", "version": "1.0.0",
+            "min_build": 1, "runtime": {"name": "python", "entry": "src/main.py"},
+            "grants": ["hear"], "triggers": ["start english practice"], "settings": [], "files": []
+        });
+        std::fs::write(dir.join("lamp-skill.json"), manifest.to_string()).unwrap();
+        let bus = lamp_bus::Bus::new(base.join("bus")).unwrap();
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
+        *shared.apps_dir.lock().unwrap() = apps_dir;
+        *shared.apps_on.lock().unwrap() = || true;
+        let (outbox, mut app_inbox) = mpsc::unbounded_channel();
+        let (frames, _) = mpsc::channel(FRAMES_QUEUED);
+        let (body_state, _) = watch::channel(None);
+        shared.open.lock().unwrap().insert(
+            9,
+            Open {
+                client: Some(crate::app_socket::app_client("demo")),
+                outbox,
+                frames,
+                events: Default::default(),
+                phrases: Vec::new(),
+                grants: Default::default(),
+                body_state,
+            },
+        );
+        shared.apps.lock().unwrap().1.connection("demo", true);
+        let mut took_reader = bus.subscribe(AppTook::TOPIC, "test").unwrap();
+        crate::app_triggers::start(&bus, shared.clone());
+        let until = |what: &str, mut ready: Box<dyn FnMut() -> bool>| {
+            let start = std::time::Instant::now();
+            while !ready() {
+                assert!(start.elapsed() < Duration::from_secs(5), "{what}");
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            start.elapsed()
+        };
+        // The list is said, with the running app's words.
+        let reader = lamp_bus::Bus::new(base.join("bus")).unwrap();
+        until(
+            "apps/triggers said",
+            Box::new(move || {
+                reader
+                    .latest(AppTriggers::TOPIC)
+                    .ok()
+                    .flatten()
+                    .and_then(|m| m.parse::<AppTriggers>().ok())
+                    .is_some_and(|list| {
+                        list.apps.len() == 1
+                            && list.apps[0].triggers == vec!["start english practice"]
+                    })
+            }),
+        );
+        // The voice's word reaches the app.
+        let mut voice = bus
+            .publisher_declared(AppTrigger::TOPIC, &AppTrigger::declaration(), "voice")
+            .unwrap();
+        // The listener may bind just after the first look: said again until offered.
+        let sent = std::time::Instant::now();
+        let mut event = None;
+        while event.is_none() && sent.elapsed() < Duration::from_secs(5) {
+            voice
+                .publish_json(
+                    lamp_ipc::monotonic_us(),
+                    &AppTrigger {
+                        turn: 5,
+                        app: "demo".into(),
+                        trigger: "start english practice".into(),
+                        phrase: "start english practice".into(),
+                        at_ms: 1,
+                    },
+                )
+                .unwrap();
+            let waited = std::time::Instant::now();
+            while waited.elapsed() < Duration::from_millis(300) {
+                if let Ok(seen) = app_inbox.try_recv() {
+                    event = Some((seen, sent.elapsed()));
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        }
+        let (event, took_us) = event.expect("the app was offered the trigger");
+        eprintln!("apps/trigger to the app's frame: {took_us:?}");
+        assert_eq!(event["ev"], "app.trigger");
+        assert_eq!(event["turn"], "5");
+        // A turn the app took is said to the voice.
+        let sink = shared.took_sink.lock().unwrap().clone().expect("the sink");
+        sink("demo", 5);
+        let said = took_reader
+            .recv(Duration::from_secs(5))
+            .unwrap()
+            .expect("apps/took said");
+        let took: AppTook = said.parse().unwrap();
+        assert_eq!((took.app.as_str(), took.turn), ("demo", 5));
+    }
+
+    /// The admin op `{"app_forget": NAME}`: the helper's alone, with the switch
+    /// on, for an app's name; it clears what is kept and closes the app's open
+    /// connections (Heron's P3 on #7793).
+    #[test]
+    fn app_forget_is_the_helpers_and_closes_the_apps_connections() {
+        let state = std::env::temp_dir().join(format!("lampos-forget-op-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&state);
+        std::fs::create_dir_all(&state).unwrap();
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(Some(&state));
+        let client = crate::app_socket::app_client("demo");
+        let connect = |id: u64| {
+            let (outbox, _inbox) = mpsc::unbounded_channel();
+            let (frames, _) = mpsc::channel(FRAMES_QUEUED);
+            let (body_state, _) = watch::channel(None);
+            shared.open.lock().unwrap().insert(
+                id,
+                Open {
+                    client: Some(client.clone()),
+                    outbox,
+                    frames,
+                    events: Default::default(),
+                    phrases: Vec::new(),
+                    grants: Default::default(),
+                    body_state,
+                },
+            );
+        };
+        connect(7);
+        // The door's notes and clips of the app, and of another.
+        let notes = crate::notes::Notes::new(state.join("notes"));
+        let other = crate::app_socket::app_client("other");
+        for who in [&client, &other] {
+            match notes.set(who, "k", &json!(1)).unwrap() {
+                crate::notes::Step::Later(write) => {
+                    write().unwrap();
+                }
+                crate::notes::Step::Now(_) => {}
+            }
+            std::fs::create_dir_all(state.join("sounds").join(who)).unwrap();
+            std::fs::write(state.join("sounds").join(who).join("a.wav"), b"x").unwrap();
+        }
+        let note_file = |who: &str| crate::notes::Notes::path(&state.join("notes"), who).unwrap();
+        assert!(note_file(&client).is_file() && note_file(&other).is_file());
+        // What is kept of the app, and of another: settings, a panel.
+        std::fs::write(
+            state.join(crate::app_yes::SETTINGS_FILE),
+            json!({"demo": {"k": 1}, "other": {"k": 2}}).to_string(),
+        )
+        .unwrap();
+        {
+            let mut apps = shared.apps.lock().unwrap();
+            let at = std::time::Instant::now();
+            apps.1.set_panel("demo", "T", &[], at).unwrap();
+            apps.1.set_panel("other", "T", &[], at).unwrap();
+        }
+        let op = |peer, on, name: &str| forget_app_op(&shared, name, peer, on, Some(&state));
+        // Off, or anyone but the helper, or a bad name: refused, nothing closed.
+        let off = op(crate::app_yes::Peer::Helper, false, "demo");
+        assert_eq!(off["refused"], crate::app_yes::OFF);
+        for peer in [
+            crate::app_yes::Peer::Cloud,
+            crate::app_yes::Peer::Voice,
+            crate::app_yes::Peer::Other,
+        ] {
+            let refused = op(peer, true, "demo");
+            assert_eq!(refused["refused"], "not the apps helper", "{peer:?}");
+        }
+        let bad = op(crate::app_yes::Peer::Helper, true, "../x");
+        assert!(bad["refused"].as_str().unwrap().contains("name"), "{bad}");
+        assert!(shared.open.lock().unwrap().contains_key(&7));
+        assert!(shared.close_reasons.lock().unwrap().is_empty());
+        // A refusal forgot nothing.
+        assert_eq!(shared.apps.lock().unwrap().1.panel_rev("demo"), Some(1));
+        let kept = std::fs::read_to_string(state.join(crate::app_yes::SETTINGS_FILE)).unwrap();
+        assert!(kept.contains("demo"), "{kept}");
+        // The helper's: its connection closed, with the reason.
+        // The boot start finishing a cut remove may send it too.
+        let resumed = op(crate::app_yes::Peer::Resume, true, "demo");
+        assert_eq!(resumed, json!({"ok": true}));
+        connect(7);
+        let done = op(crate::app_yes::Peer::Helper, true, "demo");
+        assert_eq!(done, json!({"ok": true}));
+        assert!(!shared.open.lock().unwrap().contains_key(&7));
+        assert_eq!(
+            shared.close_reasons.lock().unwrap().get(&7),
+            Some(&CLOSED_REMOVED)
+        );
+        // Its notes and clips are gone too, the other app's stay.
+        assert!(!note_file(&client).exists());
+        assert!(!state.join("sounds").join(&client).exists());
+        assert!(note_file(&other).is_file());
+        assert!(state.join("sounds").join(&other).join("a.wav").is_file());
+        // What was kept of it is gone and the other app's stays.
+        assert_eq!(shared.apps.lock().unwrap().1.panel_rev("demo"), None);
+        assert_eq!(shared.apps.lock().unwrap().1.panel_rev("other"), Some(1));
+        let kept = std::fs::read_to_string(state.join(crate::app_yes::SETTINGS_FILE)).unwrap();
+        assert!(!kept.contains("demo") && kept.contains("other"), "{kept}");
+        // Another client of the door is not touched.
+        assert!(shared.open.lock().unwrap().contains_key(&1));
+        let _ = std::fs::remove_dir_all(&state);
+    }
+
+    /// `apps.remember` past the door's checks: told to the voice with the
+    /// app's checked name and title, answered by the voice's word once (a
+    /// word for another app or none waiting is dropped), unanswered past the
+    /// wait, and unanswered at once with no way to the voice.
+    #[test]
+    fn an_apps_fact_goes_to_the_voice_and_its_word_is_the_answer() {
+        use lamp_msgs::app_fact::{AppRemember, AppRemembered, KEPT};
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
+        let coach = crate::app_socket::AppPeer {
+            name: "gym-coach".into(),
+            title: "Gym  Coach".into(),
+            version: "1.0.4".into(),
+            client: crate::app_socket::app_client("gym-coach"),
+            grants: Default::default(),
+            remember: true,
+        };
+        let (outbox, mut answers) = mpsc::unbounded_channel::<Value>();
+        let long = Duration::from_secs(60);
+        // No way to the voice: answered now, unavailable.
+        let now = shared
+            .remember_fact(&coach, 1, "squats".into(), outbox.downgrade(), long)
+            .expect("answered now");
+        assert_eq!(now["error"]["code"], "unavailable", "{now}");
+        let told = Arc::new(Mutex::new(Vec::<AppRemember>::new()));
+        let into = told.clone();
+        shared.set_remember_sink(Arc::new(move |fact: &AppRemember| {
+            into.lock().unwrap().push(fact.clone());
+            true
+        }));
+        let text = "20 Nov 16:47: squats 3×10, 6 too shallow";
+        assert!(
+            shared
+                .remember_fact(&coach, 7, text.into(), outbox.downgrade(), long)
+                .is_none()
+        );
+        let Some(fact) = told.lock().unwrap().pop() else {
+            panic!("told the voice")
+        };
+        assert_eq!(fact.app, "gym-coach");
+        assert_eq!(fact.source().unwrap().as_str(), "app:gym-coach");
+        assert_eq!(fact.name, "Gym Coach");
+        assert_eq!(fact.text, text);
+        assert!(fact.check().is_ok());
+        assert!(fact.at_unix_ms > 1_700_000_000_000);
+        // Another app's word, or one for no ask, is dropped.
+        let went = |app: &str, ask: u64, outcome: &str| AppRemembered {
+            ask,
+            app: app.into(),
+            outcome: outcome.into(),
+        };
+        shared.remembered(&went("other", fact.ask, KEPT));
+        shared.remembered(&went("gym-coach", fact.ask + 100, KEPT));
+        assert!(answers.try_recv().is_err());
+        shared.remembered(&went("gym-coach", fact.ask, KEPT));
+        assert_eq!(
+            answers.try_recv().unwrap(),
+            json!({"re": 7, "ok": true, "kept": true})
+        );
+        // Once only.
+        shared.remembered(&went("gym-coach", fact.ask, "not_known"));
+        assert!(answers.try_recv().is_err());
+        // Memory's refusal is the app's, in words.
+        assert!(
+            shared
+                .remember_fact(&coach, 8, "squats".into(), outbox.downgrade(), long)
+                .is_none()
+        );
+        let Some(second) = told.lock().unwrap().pop() else {
+            panic!()
+        };
+        shared.remembered(&went("gym-coach", second.ask, "not_known"));
+        let refused = answers.try_recv().unwrap();
+        assert_eq!(
+            (refused["re"].clone(), refused["error"]["code"].clone()),
+            (json!(8), json!("refused"))
+        );
+        // No word in time: unavailable, and a late word is dropped.
+        assert!(
+            shared
+                .remember_fact(
+                    &coach,
+                    9,
+                    "squats".into(),
+                    outbox.downgrade(),
+                    Duration::from_millis(30)
+                )
+                .is_none()
+        );
+        let Some(third) = told.lock().unwrap().pop() else {
+            panic!()
+        };
+        let start = std::time::Instant::now();
+        let late = loop {
+            if let Ok(answer) = answers.try_recv() {
+                break answer;
+            }
+            assert!(start.elapsed() < Duration::from_secs(5), "no answer");
+            std::thread::sleep(Duration::from_millis(5));
+        };
+        assert_eq!(late["re"], 9);
+        assert_eq!(late["error"]["code"], "unavailable");
+        assert_eq!(late["error"]["why"], crate::app_remember::UNANSWERED);
+        shared.remembered(&went("gym-coach", third.ask, KEPT));
+        assert!(answers.try_recv().is_err());
+        // A sink that could not send: answered now.
+        shared.set_remember_sink(Arc::new(|_| false));
+        let failed = shared
+            .remember_fact(&coach, 10, "squats".into(), outbox.downgrade(), long)
+            .expect("answered now");
+        assert_eq!(failed["error"]["code"], "unavailable");
+        assert!(shared.remember_waiting.lock().unwrap().is_empty());
+    }
+
+    /// The gates: the switch, the grant and the privacy switch as the door
+    /// reads them; no privacy reading at all counts as private.
+    #[test]
+    fn an_apps_fact_is_judged_by_the_switch_the_grant_and_privacy() {
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
+        *shared.apps_on.lock().unwrap() = || true;
+        shared.set_remember_on(|| true);
+        let mut coach = crate::app_socket::AppPeer {
+            name: "gym-coach".into(),
+            title: "Gym Coach".into(),
+            version: "1.0.4".into(),
+            client: crate::app_socket::app_client("gym-coach"),
+            grants: Default::default(),
+            remember: true,
+        };
+        let gates = shared.remember_gates(&coach);
+        assert!(gates.apps && gates.on && gates.granted && gates.private);
+        let private = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let reads = private.clone();
+        shared.set_private(Arc::new(move || reads.load(Ordering::SeqCst)));
+        assert!(!shared.remember_gates(&coach).private);
+        private.store(true, Ordering::SeqCst);
+        assert!(shared.remember_gates(&coach).private);
+        coach.remember = false;
+        assert!(!shared.remember_gates(&coach).granted);
+        shared.set_remember_on(|| false);
+        assert!(!shared.remember_gates(&coach).on);
+    }
+
+    fn gym_coach() -> crate::app_socket::AppPeer {
+        crate::app_socket::AppPeer {
+            name: "gym-coach".into(),
+            title: "Gym Coach".into(),
+            version: "1.0.4".into(),
+            client: crate::app_socket::app_client("gym-coach"),
+            grants: Default::default(),
+            remember: true,
+        }
+    }
+
+    /// `apps.context` at the door: refused by `apps.remember`'s gates, a
+    /// checked line told the voice as `AppContext` and answered
+    /// `{"ok":true}`; an empty line clears it; with no voice to tell,
+    /// `unavailable`. The app's last connection closing tells the clear,
+    /// once, and so does its remove.
+    #[test]
+    fn an_apps_context_line_is_told_and_cleared_with_its_session() {
+        use lamp_msgs::app_fact::AppContext;
+        let state = std::env::temp_dir().join(format!("lc-context-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&state);
+        std::fs::create_dir_all(&state).unwrap();
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(Some(&state));
+        *shared.apps_on.lock().unwrap() = || true;
+        shared.set_remember_on(|| true);
+        let private = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let reads = private.clone();
+        shared.set_private(Arc::new(move || reads.load(Ordering::SeqCst)));
+        let coach = gym_coach();
+        let frame = |value: Value| value.as_object().cloned().unwrap();
+        let set = |id: u64, line: &str| {
+            frame(json!({"id": id, "op": "apps.context", "line": line, "for_ms": 60_000}))
+        };
+        // No voice to tell yet.
+        let untold = shared.app_context(&coach, &set(1, "set 1 of 3"));
+        assert_eq!(untold["error"]["code"], "unavailable", "{untold}");
+        let told = Arc::new(Mutex::new(Vec::<AppContext>::new()));
+        let into = told.clone();
+        shared.set_context_sink(Arc::new(move |line: &AppContext| {
+            into.lock().unwrap().push(line.clone());
+            true
+        }));
+        let taken = || std::mem::take(&mut *told.lock().unwrap());
+        // Private, or without the grant: refused, nothing told.
+        private.store(true, Ordering::SeqCst);
+        assert_eq!(
+            shared.app_context(&coach, &set(2, "set 1 of 3"))["error"]["code"],
+            "private"
+        );
+        private.store(false, Ordering::SeqCst);
+        let ungranted = crate::app_socket::AppPeer {
+            remember: false,
+            ..gym_coach()
+        };
+        assert_eq!(
+            shared.app_context(&ungranted, &set(3, "set 1 of 3"))["error"]["code"],
+            "no_grant"
+        );
+        assert!(taken().is_empty());
+        // Told: the checked name, the manifest's title, the tidied line.
+        let ok = shared.app_context(&coach, &set(4, "set 2 of 3, \"7\" squats"));
+        assert_eq!(ok, json!({"re": 4, "ok": true}));
+        let line = AppContext {
+            app: "gym-coach".into(),
+            name: "Gym Coach".into(),
+            line: "set 2 of 3, 7 squats".into(),
+            for_ms: 60_000,
+        };
+        assert_eq!(taken(), std::slice::from_ref(&line));
+        assert!(line.check().is_ok());
+        // Within the second: rate, nothing told.
+        let over = shared.app_context(&coach, &set(5, "set 2 of 3, 8 squats"));
+        assert_eq!(over["error"]["code"], "rate");
+        assert!(over["error"]["retry_ms"].as_u64().unwrap() <= 1_000);
+        // An empty line clears it, rate or not.
+        let cleared = shared.app_context(
+            &coach,
+            &frame(json!({"id": 6, "op": "apps.context", "line": ""})),
+        );
+        assert_eq!(cleared, json!({"re": 6, "ok": true}));
+        assert_eq!(taken(), [AppContext::clear("gym-coach")]);
+        // Cleared by the app: its disconnect tells nothing more.
+        shared.apps.lock().unwrap().1.connection("gym-coach", true);
+        shared.apps.lock().unwrap().1.connection("gym-coach", false);
+        shared.end_context("gym-coach");
+        assert!(taken().is_empty());
+        // A line told, then two connections: only the last one's close
+        // clears it, once.
+        shared.apps.lock().unwrap().1.connection("gym-coach", true);
+        shared.apps.lock().unwrap().1.connection("gym-coach", true);
+        shared
+            .apps
+            .lock()
+            .unwrap()
+            .1
+            .context_told("gym-coach", Some(std::time::Instant::now()));
+        shared.apps.lock().unwrap().1.connection("gym-coach", false);
+        shared.end_context("gym-coach");
+        assert!(taken().is_empty(), "one connection still up");
+        shared.apps.lock().unwrap().1.connection("gym-coach", false);
+        shared.end_context("gym-coach");
+        assert_eq!(taken(), [AppContext::clear("gym-coach")]);
+        shared.end_context("gym-coach");
+        assert!(taken().is_empty(), "once");
+        // A remove clears a line the voice may hold, before its connections
+        // close.
+        shared.apps.lock().unwrap().1.connection("gym-coach", true);
+        shared
+            .apps
+            .lock()
+            .unwrap()
+            .1
+            .context_told("gym-coach", Some(std::time::Instant::now()));
+        let done = forget_app_op(
+            &shared,
+            "gym-coach",
+            crate::app_yes::Peer::Helper,
+            true,
+            Some(&state),
+        );
+        assert_eq!(done, json!({"ok": true}));
+        assert_eq!(taken(), [AppContext::clear("gym-coach")]);
+        shared.apps.lock().unwrap().1.connection("gym-coach", false);
+        shared.end_context("gym-coach");
+        assert!(taken().is_empty());
+        let _ = std::fs::remove_dir_all(&state);
+    }
+
+    /// On a real bus: a line is said on `apps/context` in one hop.
+    #[test]
+    fn the_bus_side_tells_a_context_line() {
+        use lamp_msgs::app_fact::AppContext;
+        let base = std::env::temp_dir().join(format!("lcb-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let bus = lamp_bus::Bus::new(base.join("bus")).unwrap();
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
+        *shared.apps_on.lock().unwrap() = || true;
+        shared.set_remember_on(|| true);
+        shared.set_private(Arc::new(|| false));
+        let mut lines = bus.subscribe(AppContext::TOPIC, "test").unwrap();
+        crate::app_context::start(&bus, shared.clone());
+        let sent = std::time::Instant::now();
+        let ok = shared.app_context(
+            &gym_coach(),
+            json!({"id": 1, "op": "apps.context", "line": "set 2 of 3", "for_ms": 30_000})
+                .as_object()
+                .unwrap(),
+        );
+        assert_eq!(ok, json!({"re": 1, "ok": true}));
+        let line: AppContext = lines
+            .recv(Duration::from_secs(5))
+            .unwrap()
+            .expect("apps/context said")
+            .parse()
+            .unwrap();
+        eprintln!("apps.context to apps/context heard: {:?}", sent.elapsed());
+        assert_eq!(
+            (line.app.as_str(), line.line.as_str(), line.for_ms),
+            ("gym-coach", "set 2 of 3", 30_000)
+        );
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// A removed app's facts are forgotten: `app_forget` marks the app
+    /// before anything else of it goes, whatever `LAMP_APP_REMEMBER` says;
+    /// with memory down (the voice and the bus no part of it) the mark stays
+    /// and the app's new facts wait, and once memory is reachable the thread
+    /// forgets them and lets the mark go.
+    #[test]
+    fn app_forget_forgets_the_apps_facts_even_with_memory_down() {
+        use std::io::{BufRead as _, Write as _};
+        let state = std::env::temp_dir().join(format!("lc-fafm-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&state);
+        std::fs::create_dir_all(&state).unwrap();
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(Some(&state));
+        *shared.task_yes.lock().unwrap() = Some(state.clone());
+        let socket = state.join("f.sock");
+        shared.set_forget_socket(socket.clone());
+        shared.set_remember_on(|| false);
+        let refused = forget_app_op(
+            &shared,
+            "gym-coach",
+            crate::app_yes::Peer::Cloud,
+            true,
+            Some(&state),
+        );
+        assert!(refused.get("refused").is_some());
+        assert!(crate::app_facts_forget::pending(&state).is_empty());
+        shared.start_facts_forget(state.clone(), Duration::from_millis(20));
+        let done = forget_app_op(
+            &shared,
+            "gym-coach",
+            crate::app_yes::Peer::Helper,
+            true,
+            Some(&state),
+        );
+        assert_eq!(done, json!({"ok": true}));
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(crate::app_facts_forget::pending(&state).contains("gym-coach"));
+        let coach = crate::app_socket::AppPeer {
+            name: "gym-coach".into(),
+            title: "Gym Coach".into(),
+            version: "1.0.4".into(),
+            client: crate::app_socket::app_client("gym-coach"),
+            grants: Default::default(),
+            remember: true,
+        };
+        assert!(shared.remember_gates(&coach).forgetting);
+        // Memory comes back: the facts go with no second remove.
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let (asked, lines) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let mut line = String::new();
+                if std::io::BufReader::new(&stream)
+                    .read_line(&mut line)
+                    .is_ok()
+                {
+                    let _ = asked.send(line);
+                    let mut stream = stream;
+                    let _ = writeln!(stream, "{}", json!({"ok": true, "removed": 1}));
+                }
+            }
+        });
+        let begun = std::time::Instant::now();
+        while !crate::app_facts_forget::pending(&state).is_empty() {
+            assert!(begun.elapsed() < Duration::from_secs(5), "never forgotten");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let line: Value =
+            serde_json::from_str(&lines.recv_timeout(Duration::from_secs(5)).unwrap()).unwrap();
+        assert_eq!(
+            line,
+            json!({"op": "forget_app_facts", "source": "app:gym-coach"})
+        );
+        assert!(!shared.remember_gates(&coach).forgetting);
+        let _ = std::fs::remove_dir_all(&state);
+    }
+
+    /// On a real bus: a fact is said on `apps/remember`, and the voice's
+    /// `apps/remembered` is the app's answer.
+    #[test]
+    fn the_bus_side_tells_a_fact_and_answers_the_voices_word() {
+        use lamp_msgs::app_fact::{AppRemember, AppRemembered, KEPT};
+        let base = std::env::temp_dir().join(format!("lampos-remember-bus-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let bus = lamp_bus::Bus::new(base.join("bus")).unwrap();
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
+        let mut facts = bus.subscribe(AppRemember::TOPIC, "test").unwrap();
+        crate::app_remember::start(&bus, shared.clone());
+        let coach = crate::app_socket::AppPeer {
+            name: "gym-coach".into(),
+            title: "Gym Coach".into(),
+            version: "1.0.4".into(),
+            client: crate::app_socket::app_client("gym-coach"),
+            grants: Default::default(),
+            remember: true,
+        };
+        let (outbox, mut answers) = mpsc::unbounded_channel::<Value>();
+        assert!(
+            shared
+                .remember_fact(
+                    &coach,
+                    3,
+                    "squats 3x10".into(),
+                    outbox.downgrade(),
+                    Duration::from_secs(30)
+                )
+                .is_none()
+        );
+        let fact: AppRemember = facts
+            .recv(Duration::from_secs(5))
+            .unwrap()
+            .expect("apps/remember said")
+            .parse()
+            .unwrap();
+        assert_eq!(
+            (fact.app.as_str(), fact.text.as_str()),
+            ("gym-coach", "squats 3x10")
+        );
+        let mut voice = bus
+            .publisher_declared(AppRemembered::TOPIC, &AppRemembered::declaration(), "voice")
+            .unwrap();
+        // The listener may bind just after: said again until answered.
+        let start = std::time::Instant::now();
+        let answer = loop {
+            voice
+                .publish_json(
+                    lamp_ipc::monotonic_us(),
+                    &AppRemembered {
+                        ask: fact.ask,
+                        app: "gym-coach".into(),
+                        outcome: KEPT.into(),
+                    },
+                )
+                .unwrap();
+            std::thread::sleep(Duration::from_millis(50));
+            if let Ok(answer) = answers.try_recv() {
+                break answer;
+            }
+            assert!(start.elapsed() < Duration::from_secs(5), "not answered");
+        };
+        assert_eq!(answer, json!({"re": 3, "ok": true, "kept": true}));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
     fn body_state(yaw: f64) -> Out {
         Out::Event(
             EventKind::BodyState,
@@ -2166,9 +4135,82 @@ mod tests {
         )
     }
 
+    /// The notes counts (C157) are the voice's alone to read, and name a
+    /// since; with no side file nothing is counted.
+    #[test]
+    fn the_notes_counts_are_the_voices_and_need_a_side_file() {
+        let state =
+            std::env::temp_dir().join(format!("lamp-control-note-changes-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&state);
+        let door = Door::new(
+            "lamp-test",
+            "Lamp",
+            [0; 32],
+            crate::pairing::Clients::default(),
+            None,
+        )
+        .with_notes_folder(state.join(crate::notes::NOTES_FOLDER));
+        let shared = Shared::new(door, Box::new(crate::session::Unrouted), String::new());
+        let asked = r#"{"note_changes": {"since_unix_ms": 0}}"#;
+        assert_eq!(
+            admin_answer(&shared, asked, false, crate::app_yes::Peer::Other),
+            json!({"error": "only the voice reads the computers' notes counts"})
+        );
+        let voice = crate::app_yes::Peer::Voice;
+        assert_eq!(
+            admin_answer(&shared, asked, true, voice),
+            json!({"computers": []})
+        );
+        assert!(admin_answer(&shared, r#"{"note_changes": {}}"#, true, voice)["error"].is_string());
+        let _ = std::fs::remove_dir_all(&state);
+    }
+
     /// The Reviewer-lead's P2 on #4564: a stalled computer holds the newest
     /// `body.state` only, however many the body sent, and none in its
     /// outbox.
+    // #7245: a skill's remove (`task_yes_forget`) takes its notes, and
+    // "forget everything" (`notes_forget_skills`) every made skill's, never
+    // a paired computer's.
+    #[test]
+    fn a_remove_and_forget_everything_take_made_skills_notes() {
+        let folder = std::env::temp_dir().join(format!("lamp-control-7245-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        let door = Door::new(
+            "lamp-test",
+            "Lamp",
+            [0; 32],
+            crate::pairing::Clients::default(),
+            None,
+        )
+        .with_notes_folder(folder.clone());
+        let shared = Shared::new(door, Box::new(crate::session::Unrouted), String::new());
+        let notes = crate::notes::Notes::new(folder.clone());
+        let apple = crate::runs::skill_notes_client("apple-facts");
+        let plant = crate::runs::skill_notes_client("plant-log");
+        for (client, key) in [
+            (&apple, "facts"),
+            (&plant, "days"),
+            (&"c_1".to_owned(), "mood"),
+        ] {
+            notes.set(client, key, &json!(1)).unwrap().wait().unwrap();
+        }
+        let file = |client: &str| crate::notes::Notes::path(&folder, client).unwrap();
+        let other = crate::app_yes::Peer::Other;
+        admin_answer(
+            &shared,
+            r#"{"task_yes_forget":"apple-facts"}"#,
+            false,
+            other,
+        );
+        assert!(!file(&apple).exists());
+        assert!(file(&plant).exists());
+        let forgot = admin_answer(&shared, r#"{"notes_forget_skills":true}"#, false, other);
+        assert_eq!(forgot, json!({"forgot": 1}));
+        assert!(!file(&plant).exists());
+        assert!(file("c_1").exists());
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+
     #[test]
     fn a_stalled_computer_holds_one_body_state_the_newest() {
         let (shared, _, mut inbox, newest) = stalled();

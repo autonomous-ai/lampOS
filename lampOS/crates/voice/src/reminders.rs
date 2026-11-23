@@ -1,6 +1,7 @@
 //! Optional Schedule consumer. All path access, storage and Schedule calls are
 //! isolated in one child. The coordinator polls only bounded local datagrams.
 //! A prepared delivery is not permission to speak; a final Voice owner decides.
+use crate::going_on_asks::{names_a_schedule_item, names_the_schedule};
 use lamp_schedule::delivery::{PreparedToken, QualifiedCompletion, QualifiedRetirement};
 use lamp_turn_owner::TurnOwner;
 use serde::{Deserialize, Serialize};
@@ -104,6 +105,188 @@ pub(crate) fn cannot_ring(
             .is_ok_and(|at| at.elapsed().is_ok_and(|age| age < CANNOT_RING_FRESH))
     };
     (sets && on && fresh()).then(|| serde_json::json!({ "error": CANNOT_RING }))
+}
+
+#[cfg(test)]
+thread_local! {
+    /// [`lamp_actions::schedule::ASKS_HOW_LONG_SWITCH`] as a test of this
+    /// thread sets it.
+    static ASKS_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// The switch for this test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_asks_here(on: Option<bool>) {
+    ASKS_HERE.with(|here| here.set(on));
+}
+
+#[cfg(test)]
+thread_local! {
+    /// [`asked_before`]'s words as a test of this thread sets them.
+    static ASKED_HERE: std::cell::RefCell<Option<Option<(String, String)>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// [`asked_before`]'s words for this test's thread alone, the person's lines
+/// and the lamp's question; `None` reads the thread's.
+#[cfg(test)]
+pub(crate) fn set_asked_here(asked: Option<Option<(&str, &str)>>) {
+    ASKED_HERE.with(|here| {
+        *here.borrow_mut() = asked
+            .map(|asked| asked.map(|(lines, question)| (lines.to_owned(), question.to_owned())))
+    });
+}
+
+/// The person's lines the lamp's questions just before `request` answered
+/// ([`crate::thread::Thread::asked_before`]), with the lamp's newest
+/// question, the one the reply answers
+/// ([`crate::thread::Thread::lamp_question_said`]): a reply to "What should
+/// I remind you about?" is set from the line that gave the time.
+fn asked_before(request: u64) -> Option<(String, String)> {
+    #[cfg(test)]
+    if let Some(asked) = ASKED_HERE.with(|here| here.borrow().clone()) {
+        return asked;
+    }
+    let thread = crate::thread::THREAD.lock().ok()?;
+    let lines = thread.asked_before(
+        request,
+        std::time::Instant::now(),
+        crate::said_to_me::QUESTION_WAITS,
+    )?;
+    Some((lines, thread.lamp_question_said(request)?.to_owned()))
+}
+
+/// Whether [`lamp_actions::schedule::ASKS_HOW_LONG_SWITCH`] is on here.
+fn asks_how_long() -> bool {
+    #[cfg(test)]
+    if let Some(on) = ASKS_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    lamp_actions::schedule::asks_how_long_from_environment()
+}
+
+/// The words that state a length or a clock time when no digit does:
+/// numbers, units and a clock's names. Not a list for choosing a tool: it
+/// only says whether the line gave any length at all ("a minute", "ten
+/// minutes", "at nine", "at noon"); "o'clock" is read as "clock". "am"
+/// and "pm" are left out: "I am" is no time, and "4 pm" has its digit.
+const WHEN_WORDS: [&str; 44] = [
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+    "twenty",
+    "thirty",
+    "forty",
+    "fifty",
+    "sixty",
+    "ninety",
+    "hundred",
+    "half",
+    "quarter",
+    "second",
+    "seconds",
+    "sec",
+    "secs",
+    "minute",
+    "minutes",
+    "min",
+    "mins",
+    "hour",
+    "hours",
+    "hr",
+    "hrs",
+    "noon",
+    "midnight",
+    "clock",
+    "oclock",
+];
+
+/// Whether `heard` gives a length or a time: a digit, or a word of
+/// [`WHEN_WORDS`].
+fn gives_when(heard: &str) -> bool {
+    heard.chars().any(|c| c.is_ascii_digit())
+        || heard
+            .split(|c: char| !c.is_alphabetic())
+            .any(|word| WHEN_WORDS.contains(&word.to_lowercase().as_str()))
+}
+
+/// The refusal for a `set_timer` or `set_reminder` whose `request`'s own
+/// heard line gives no length or time (#8182, gate 1126: speech to text
+/// kept "set a timer" and lost "one minute", and the model set ten): the
+/// model is told to ask once, in a few words, and the answer's line, which
+/// gives one, sets it. Nor a reply to the lamp's own question whose asked
+/// line gave one ([`asked_before`]: "Remind me at seven." → "What should I
+/// remind you about?" → "Take my pills."), when the asked line was itself a
+/// timer or reminder ask and the lamp's question asked about it: a fresh
+/// ask ("Set another timer." after "It rings at 4:09. Anything else?")
+/// carries its own length (Fifth's HOLD on #8274), and so does a reply
+/// that names a timer, reminder, alarm or countdown itself ("Set another
+/// timer." after "Want another timer?";
+/// [`crate::going_on_asks::names_a_schedule_item`], Sixth's P3 on #8321),
+/// while one that only says "remind" or the lamp ("Remind me to take my
+/// pills.") still lends (the Reviewer-lead's P2 on #8274). With
+/// [`lamp_actions::schedule::ASKS_HOW_LONG_SWITCH`]
+/// on, in English only (the words are English), and only for a line a
+/// person said: a typed text, or a line not known, checks nothing.
+pub(crate) fn when_not_heard(name: &str, request: u64, heard: bool) -> Option<serde_json::Value> {
+    let ask = match name {
+        "set_timer" => "For how long?",
+        "set_reminder" => "What time?",
+        _ => return None,
+    };
+    if !asks_how_long()
+        || crate::messages::is_text(request)
+        || crate::language::at_start().is_some()
+    {
+        return None;
+    }
+    let words = crate::stop_scope::heard_words(request, heard)?;
+    if gives_when(&words) || (!names_a_schedule_item(&words) && asked_gave_when(request)) {
+        return None;
+    }
+    eprintln!(
+        "lamp-voice: request {request}: {name} refused, its line gave no length or time; the model is told to ask"
+    );
+    Some(serde_json::json!({
+        "error": format!("Nothing was set: the person's words gave no length or time for it, so it may have been lost in hearing. Never choose one. Ask only this, in a few words: \"{ask}\", and set it from their answer.")
+    }))
+}
+
+/// Whether a line the lamp's questions just before `request` answered
+/// ([`asked_before`]) was itself a timer or reminder ask that gave its
+/// length or time ([`crate::going_on_asks::names_the_schedule`] and
+/// [`gives_when`]), and the lamp's question, its last sentence, asked about
+/// the timer or reminder too (the same word set): "What should I remind you
+/// about?" asks for the asked one's label, while "Anything else?" invites a
+/// new ask. Fifth's HOLD on #8274: "What's five plus five?" → "Ten.
+/// Anything else?" lends "five" to nothing, and "Set a timer for ten
+/// minutes." → "It rings at 4:09. Anything else?" lends "ten minutes" to
+/// nothing.
+fn asked_gave_when(request: u64) -> bool {
+    asked_before(request).is_some_and(|(asked, question)| {
+        let question = question.trim_end().trim_end_matches('?');
+        let question = question.rsplit(['.', '!', '?']).next().unwrap_or(question);
+        names_the_schedule(question)
+            && asked
+                .lines()
+                .any(|line| names_the_schedule(line) && gives_when(line))
+    })
 }
 
 /// Whether a call was told [`cannot_ring`]'s refusal: nothing was set.
@@ -239,6 +422,11 @@ pub(crate) struct Offer {
     /// heard part of it, so it is said as a repeat ("Again: …"), once.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub again: bool,
+    /// A timer, by Schedule's `kind` for the item, not a reminder: at the
+    /// usage limit it is rung with its own fixed line
+    /// (`LAMP_LIMIT_LOCAL_ASKS`, #7642). Sent only when true.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub timer: bool,
 }
 impl Offer {
     /// Said late enough to be kept as said and to wait for a pause in the

@@ -1,0 +1,26 @@
+# 21:30, eating seen at 5 minutes (21:35) and at 35 (22:05): a line at each (no quiet hours; a new meal).
+clock = "21:30"
+
+[[expect]]
+at = "5m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "5m"
+within = "1m"
+call = "say"
+args = { note = "You just saw them eating at the desk. Say one friendly, casual sentence about it, the way a friend would, at most twenty words: enjoy it, or a light question about the meal. Not advice and no count. Say only what you saw; nothing about their health, diet, body or looks, and never mention a camera." }
+
+[[expect]]
+at = "35m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "35m"
+within = "1m"
+call = "say"
+args = { note = "You just saw them eating at the desk. Say one friendly, casual sentence about it, the way a friend would, at most twenty words: enjoy it, or a light question about the meal. Not advice and no count. Say only what you saw; nothing about their health, diet, body or looks, and never mention a camera." }

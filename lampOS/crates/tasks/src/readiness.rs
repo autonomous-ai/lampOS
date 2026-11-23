@@ -50,6 +50,11 @@ pub struct Reading<T> {
 /// `installable` is the computer's own `!installed && command && recipe`
 /// (openharness `engineProbe.ts`), passed through by the CLI, which turns
 /// the computer's `installed: false` into `null` (`machineEngines.ts`).
+/// Harness's contract there: "`null` is unknown, never 'not there'", since
+/// the probe reads a missing command, a login shell that timed out (5 s an
+/// engine) and a failed spawn all as not installed, "so only a failed start
+/// says an engine is missing". So `installable: true` comes with a slow
+/// shell too, and never says missing on its own (#8283).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EngineKnown {
@@ -82,15 +87,15 @@ impl EngineKnown {
         self.installed.is_none() && self.installable.is_none() && self.signed_in.is_none()
     }
 
-    /// Not found on the computer: Harness says it could install it there
-    /// (`installable: true`) and doesn't say it is installed. `installable:
-    /// false` with `installed: null` is unknown: the hand-over goes, and
-    /// Harness's own `ENGINE_NOT_INSTALLED` decides. A computer whose shell
-    /// took over 5 s reads so too, so it is said as "not found", never as
-    /// "not installed".
+    /// Not found on the computer: only an explicit `installed: false`, as
+    /// an older Harness or the raw probe may say it. An `installed` Harness
+    /// doesn't give is unknown, whatever `installable` says (#8283): the
+    /// office computer on lamp-06c1 read every engine, Claude Code among
+    /// them, `installed: null` with `installable: true` after a 27 s look,
+    /// while it had Claude Code sessions. The hand-over goes, and Harness's
+    /// own refusal of a failed start (`ENGINE_NOT_INSTALLED`) decides.
     fn not_found(&self) -> bool {
-        self.installable.as_ref().is_some_and(|r| r.value)
-            && !self.installed.as_ref().is_some_and(|r| r.value)
+        self.installed.as_ref().is_some_and(|r| !r.value)
     }
 }
 
@@ -168,9 +173,10 @@ impl Computer {
 
     /// Why a hand-over of `engine`'s work to this computer is refused now,
     /// from what is known: the code and its words. Only a known `offline`,
-    /// an engine not found there ([`EngineKnown::not_found`]) or a known
-    /// `signedIn: false` refuses;
-    /// anything unknown never does. Devin Cloud works in Devin's cloud, not
+    /// an engine said not installed there ([`EngineKnown::not_found`]: an
+    /// explicit `installed: false`, never a `null` with `installable: true`,
+    /// #8283) or a known `signedIn: false` refuses; anything unknown never
+    /// does. Devin Cloud works in Devin's cloud, not
     /// on the computer, and isn't one of Harness's engines: never refused.
     pub fn refusal(&self, engine: EngineKind) -> Option<(&'static str, &'static str)> {
         if engine.cloud() {
@@ -203,7 +209,10 @@ impl Computer {
         self.status.as_ref().is_some_and(|s| s.value == "offline")
     }
 
-    /// Whether `engine` wasn't found on this computer.
+    /// Whether `engine` is said not installed on this computer
+    /// ([`EngineKnown::not_found`]): an explicit `installed: false` only.
+    /// An unknown is never missing (Harness's `machineEngines.ts`, #8283),
+    /// so a target whose computer can't say stays in the voice's staff.
     pub fn missing(&self, engine: EngineKind) -> bool {
         !engine.cloud()
             && self
@@ -276,8 +285,10 @@ impl Known {
             known.installed = merged(known.installed.take(), row.installed, false, now_ms);
             known.installable = merged(known.installable.take(), row.installable, true, now_ms);
             known.signed_in = merged(known.signed_in.take(), row.signed_in, false, now_ms);
-            // Installable now: not installed, whatever was known before.
-            if row.installable == Some(true) && row.installed != Some(true) {
+            // Installable now with `installed` unsaid: a yes known before
+            // is forgotten (unknown, never missing, #8283); an explicit no
+            // said with it is kept.
+            if row.installable == Some(true) && row.installed.is_none() {
                 known.installed = None;
             }
         }
@@ -576,12 +587,23 @@ mod tests {
         }
     }
 
-    /// Harness's row for an engine not on the computer (openharness
-    /// `machineEngines.ts`): `installed` null, `installable` true.
-    fn not_found(engine: &str) -> EngineRow {
+    /// Harness's CLI row for an engine it can't say is installed (openharness
+    /// `machineEngines.ts`): `installed` null, `installable` true. A computer
+    /// without the engine reads so, and so does one whose login shell took
+    /// over 5 s (#8283): unknown, never missing.
+    fn unsaid(engine: &str) -> EngineRow {
         EngineRow {
             installable: Some(true),
             ..row(engine, None, None)
+        }
+    }
+
+    /// A row saying the engine is not installed, in so many words (an
+    /// older Harness or the raw probe): the only one that is missing.
+    fn said_not_installed(engine: &str) -> EngineRow {
+        EngineRow {
+            installable: Some(true),
+            ..row(engine, Some(false), None)
         }
     }
 
@@ -630,8 +652,9 @@ mod tests {
                 .installed(EngineKind::Claude),
             Some(true)
         );
-        // Not found, then a look that can't say: forgotten, so it goes.
-        known.probed(&id, &[not_found("codex")], NOW + 3);
+        // Said not installed, then a look that can't say: forgotten, so it
+        // goes.
+        known.probed(&id, &[said_not_installed("codex")], NOW + 3);
         assert!(
             known
                 .computer(&id, NOW + 3)
@@ -645,21 +668,23 @@ mod tests {
                 .unwrap()
                 .missing(EngineKind::Codex)
         );
-        // Installable once more forgets a yes known before.
-        known.probed(&id, &[not_found("claude")], NOW + 5);
+        // Installable with `installed` unsaid forgets a yes known before,
+        // and is unknown, never missing (#8283).
+        known.probed(&id, &[unsaid("claude")], NOW + 5);
         let gone = known.computer(&id, NOW + 5).unwrap();
         assert_eq!(gone.installed(EngineKind::Claude), None);
-        assert!(gone.missing(EngineKind::Claude));
+        assert!(!gone.missing(EngineKind::Claude));
+        assert_eq!(gone.refusal(EngineKind::Claude), None);
         // Nothing known of an engine is no entry at all.
         let mut nothing = Known::default();
         nothing.probed(&id, &[row("codex", None, None)], NOW);
         assert_eq!(nothing.computer(&id, NOW), None);
     }
 
-    /// Only a known offline, an engine not found (`installed` null with
-    /// `installable` true) or a known not signed in refuses, in that order;
-    /// unknown proceeds (`installable: false` with `installed` null among
-    /// it), and Devin Cloud is never refused.
+    /// Only a known offline, an engine said not installed (an explicit
+    /// `installed: false`) or a known not signed in refuses, in that order;
+    /// unknown proceeds (`installed` null with `installable` true or false,
+    /// #8283), and Devin Cloud is never refused.
     #[test]
     fn each_early_refusal_and_unknown_proceeds() {
         let id = "a".repeat(32);
@@ -672,12 +697,13 @@ mod tests {
             &id,
             &[
                 row("claude", Some(true), Some(false)),
-                not_found("codex"),
+                said_not_installed("codex"),
                 row("opencode", Some(true), None),
                 EngineRow {
                     installable: Some(false),
                     ..row("hermes", None, None)
                 },
+                unsaid("devin"),
             ],
             NOW,
         );
@@ -692,6 +718,11 @@ mod tests {
             !c.missing(EngineKind::Hermes),
             "installable false is unknown"
         );
+        assert!(
+            !c.missing(EngineKind::Devin),
+            "installable true with installed unsaid is unknown (#8283)"
+        );
+        assert_eq!(c.refusal(EngineKind::Devin), None);
         assert_eq!(c.refusal(EngineKind::Opencode), None);
         assert_eq!(c.refusal(EngineKind::Hermes), None);
         assert_eq!(c.refusal(EngineKind::DevinCloud), None);
@@ -1020,7 +1051,7 @@ mod tests {
             &lamp.machine_id,
             &[
                 row("openclaw", Some(true), None),
-                not_found("codex"),
+                unsaid("codex"),
                 row("hermes", Some(true), None),
                 row("claude", Some(true), None),
             ],
@@ -1059,7 +1090,7 @@ mod tests {
             None,
             "not looked at"
         );
-        known.probed(&lamp.machine_id, &[not_found("hermes")], NOW);
+        known.probed(&lamp.machine_id, &[unsaid("hermes")], NOW);
         assert_eq!(known.lamp_engine(&listed, &hermes, NOW), None, "not there");
         known.probed(&lamp.machine_id, &[row("hermes", Some(true), None)], NOW);
         assert_eq!(
@@ -1107,7 +1138,7 @@ mod tests {
         assert_eq!(known.lamp_engine(&listed, &[], NOW), None);
         known.probed(
             &id,
-            &[row("hermes", Some(true), None), not_found("openclaw")],
+            &[row("hermes", Some(true), None), unsaid("openclaw")],
             NOW,
         );
         assert_eq!(
@@ -1120,7 +1151,7 @@ mod tests {
         );
         known.probed(
             &id,
-            &[not_found("hermes"), row("openclaw", Some(true), None)],
+            &[unsaid("hermes"), row("openclaw", Some(true), None)],
             NOW,
         );
         assert_eq!(

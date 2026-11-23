@@ -51,7 +51,7 @@ pub const LEASE_MAX_MS: u32 = 600_000;
 pub const STEP_MS: std::ops::RangeInclusive<u32> = 40..=1_000;
 /// A move's fewest frames: a start and an end. Its most are the body's own
 /// bound, held by `lamp_body::moves::check` (at most 10 s, so at most 251
-/// frames at the shortest step); the frame's 64 KiB bounds the list read.
+/// frames at the shortest step); the frame's cap bounds the list read.
 pub const FRAMES_MIN: usize = 2;
 /// The longest name a client gives itself at pairing, in characters.
 pub const CLIENT_NAME_MAX_CHARS: usize = 64;
@@ -64,6 +64,20 @@ pub const SKILL_PART_MAX_CHARS: usize = 48 * 1024;
 pub const SKILL_PARTS_MAX: u32 = 32;
 /// The longest skill name, as the skill format has it.
 pub const SKILL_NAME_MAX_CHARS: usize = 64;
+/// A pushed app package's largest size, in bytes (docs/apps.md, "An app
+/// from your own computer"): 4 MiB, well under a Store package's 18 MiB,
+/// held in the door's memory while it is gathered.
+pub const APP_PACKAGE_MAX: usize = 4 << 20;
+/// The most parts one `app.push` is sent in: 4 MiB in parts of 36 KiB.
+pub const APP_PARTS_MAX: u32 = 128;
+
+/// The longest `pose` JPEG, in bytes: 150 KiB, the same bound as lamp-npu's
+/// `service::MOST_JPEG_BYTES`, so a 640x480 camera frame at high quality fits.
+pub const POSE_JPEG_MAX_BYTES: usize = 150 * 1024;
+/// The longest `pose` JPEG, in base64 characters ([`POSE_JPEG_MAX_BYTES`]
+/// as base64, 200 KiB), so the request stays under the door's 256 KiB pose
+/// frame (`server::POSE_FRAME_MAX`).
+pub const POSE_JPEG_MAX_CHARS: usize = POSE_JPEG_MAX_BYTES / 3 * 4;
 
 /// A part a lease holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -724,6 +738,25 @@ pub enum Op {
     /// One of the client's own pushed skills, taken off.
     #[serde(rename = "skill.remove")]
     SkillRemove { name: String },
+    /// One part of an app's package (format 2, unsigned), sent in order
+    /// from 0, as `skill.push`'s; the last part's answer comes once the
+    /// apps' helper installed it (docs/apps.md, "An app from your own
+    /// computer").
+    #[serde(rename = "app.push")]
+    AppPush {
+        name: String,
+        sha256: String,
+        size: usize,
+        part: u32,
+        parts: u32,
+        data: String,
+    },
+    /// The client's own pushed apps.
+    #[serde(rename = "app.list")]
+    AppList {},
+    /// One of the client's own pushed apps, removed.
+    #[serde(rename = "app.remove")]
+    AppRemove { name: String },
     /// The camera's newest picture, once: a JPEG, as the eyes keep it.
     #[serde(rename = "camera.snapshot")]
     CameraSnapshot {},
@@ -739,6 +772,12 @@ pub enum Op {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         size: Option<String>,
     },
+    /// One person's pose in a JPEG of the client's own (a camera frame it
+    /// was given), from the lamp's NPU service (`lamp-npu`, docs/npu.md):
+    /// 17 COCO keypoints in the picture's pixels and a score. Needs
+    /// `camera`; off unless `LAMP_NPU=on`.
+    #[serde(rename = "pose")]
+    Pose { jpeg: String },
     /// The microphone's sound as binary `microphone.audio` frames, each
     /// 20 ms block the ears share, until `on: false`, `stop`, the client
     /// goes, the lamp turns private or no block comes for 2 s
@@ -824,10 +863,18 @@ impl Op {
             // A turn speaks and hears what is said to the lamp.
             Self::TurnStart { .. } => vec![Grant::Speak, Grant::Hear],
             Self::ListenSet { .. } => vec![Grant::Hear],
-            Self::SkillPush { .. } | Self::SkillList {} | Self::SkillRemove { .. } => {
-                vec![Grant::Skills]
+            // A computer's own software on the lamp, running after it goes:
+            // a skill or an app, the one grant the owner ticks for it.
+            Self::SkillPush { .. }
+            | Self::SkillList {}
+            | Self::SkillRemove { .. }
+            | Self::AppPush { .. }
+            | Self::AppList {}
+            | Self::AppRemove { .. } => vec![Grant::Skills],
+            // A pose is of a camera's picture: the camera's own grant.
+            Self::CameraSnapshot {} | Self::CameraStream { .. } | Self::Pose { .. } => {
+                vec![Grant::Camera]
             }
-            Self::CameraSnapshot {} | Self::CameraStream { .. } => vec![Grant::Camera],
             Self::MicrophoneStream { .. } => vec![Grant::Microphone],
             Self::SpeakerStream { .. } => vec![Grant::Speaker],
             Self::NotesSet { .. }
@@ -956,6 +1003,45 @@ impl Op {
                 }
             }
             Self::SkillRemove { name } => skill_name(name)?,
+            Self::AppPush {
+                name,
+                sha256,
+                size,
+                part,
+                parts,
+                data,
+            } => {
+                app_name(name)?;
+                if sha256.len() != 64 || !sha256.bytes().all(|b| b.is_ascii_hexdigit()) {
+                    return Err("sha256: the package's SHA-256, 64 hex".to_owned());
+                }
+                if *size == 0 || *size > APP_PACKAGE_MAX {
+                    return Err(format!("size: 1 to {APP_PACKAGE_MAX} bytes"));
+                }
+                if *parts == 0 || *parts > APP_PARTS_MAX || part >= parts {
+                    return Err(format!(
+                        "parts: 1 to {APP_PARTS_MAX}, and part from 0 to parts - 1"
+                    ));
+                }
+                if data.is_empty() || data.len() > SKILL_PART_MAX_CHARS {
+                    return Err(format!(
+                        "data: 1 to {SKILL_PART_MAX_CHARS} characters of base64"
+                    ));
+                }
+            }
+            Self::AppRemove { name } => app_name(name)?,
+            Self::Pose { jpeg } => {
+                if jpeg.is_empty()
+                    || jpeg.len() > POSE_JPEG_MAX_CHARS
+                    || !jpeg
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'/' | b'='))
+                {
+                    return Err(format!(
+                        "jpeg: a JPEG in base64, 1 to {POSE_JPEG_MAX_CHARS} characters (150 KiB)"
+                    ));
+                }
+            }
             Self::CameraStream { fps, size, .. } => {
                 if fps.is_some_and(|fps| !(1..=crate::camera::FPS_MOST).contains(&fps)) {
                     return Err(format!("fps: 1 to {}", crate::camera::FPS_MOST));
@@ -1181,6 +1267,7 @@ impl Op {
             | Self::ListenSet { .. }
             | Self::Stop {}
             | Self::SkillList {}
+            | Self::AppList {}
             | Self::SoundList {}
             | Self::CameraSnapshot {}
             | Self::MicrophoneStream { .. }
@@ -1327,6 +1414,12 @@ pub enum ErrorCode {
     BadRequest,
     /// Developer access is off in the app.
     Off,
+    /// The part is getting ready (the NPU's model being fetched on first
+    /// use): `retry_ms` says when to ask again.
+    Preparing,
+    /// The part can't do it now (no model could be fetched or checked, or
+    /// no NPU): `retry_ms`, when given, says when it tries again.
+    Unavailable,
 }
 
 /// An error's body: its code and why, and when to try again for `rate`.
@@ -1422,6 +1515,14 @@ pub fn lease_event(lease: &str, state: LeaseState, why: Option<LeaseWhy>) -> Val
 /// Whether `text` is standard base64 of exactly `bytes` bytes, padded.
 /// A skill's name as the skill format has it: 1 to 64 of `a-z`, `0-9`
 /// and `-`.
+/// An app's name, as the manifest has it (`^[a-z][a-z0-9-]{0,23}$`).
+fn app_name(name: &str) -> Result<(), String> {
+    if !lamp_skills::app_package::app_name_ok(name) {
+        return Err("name: an app's, a-z first, then up to 23 of a-z, 0-9 and -".to_owned());
+    }
+    Ok(())
+}
+
 fn skill_name(name: &str) -> Result<(), String> {
     if name.is_empty()
         || name.len() > SKILL_NAME_MAX_CHARS
@@ -2092,6 +2193,36 @@ mod tests {
             .chain(SERVICE_CODES_FOLDED.iter().map(|(other, _)| *other))
             .collect();
         assert_eq!(codes, ours);
+    }
+
+    /// `pose` rides the camera's grant (#7415's ruling) and holds one JPEG
+    /// in base64 that fits a frame.
+    #[test]
+    fn a_pose_needs_the_camera_and_one_jpeg_that_fits() {
+        let checked = |frame: String| parse(&frame).map(|request| request.op);
+        let op =
+            checked(json!({"id": 1, "op": "pose", "jpeg": "/9j/4AAQ+w=="}).to_string()).unwrap();
+        assert_eq!(op.needs(), vec![Grant::Camera]);
+        assert_eq!(op.needs_lease(), None);
+        for jpeg in [
+            String::new(),
+            "not base64!".to_owned(),
+            "A".repeat(POSE_JPEG_MAX_CHARS + 1),
+        ] {
+            assert!(
+                checked(json!({"id": 1, "op": "pose", "jpeg": jpeg}).to_string()).is_err(),
+                "{}",
+                jpeg.len()
+            );
+        }
+        assert!(checked(json!({"id": 1, "op": "pose"}).to_string()).is_err());
+        assert!(
+            checked(json!({"id": 1, "op": "pose", "jpeg": "AAAA", "size": 1}).to_string()).is_err()
+        );
+        let most = json!({"id": 1, "op": "pose", "jpeg": "A".repeat(POSE_JPEG_MAX_CHARS)});
+        assert!(checked(most.to_string()).is_ok());
+        assert!(most.to_string().len() < crate::server::POSE_FRAME_MAX);
+        assert_eq!(POSE_JPEG_MAX_CHARS, 200 * 1024);
     }
 
     #[test]

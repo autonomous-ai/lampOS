@@ -134,12 +134,17 @@ pub struct Real {
     /// The owner's face expressions and room sounds yeses from the app,
     /// with `LAMP_APP_CONSENT=on` (#5500, `crate::consent`).
     pub consent: Option<crate::consent::Place>,
+    /// The owner's desk noticing switch from the app, with
+    /// `LAMP_SEEN_ACTIVITY=on` (#6543, `crate::consent::DESK_KINDS`).
+    pub desk_noticing: Option<crate::consent::Place>,
     /// The owner's dev monitor, with `LAMP_APP_MONITOR=on` (#5883,
     /// `crate::monitor`).
     pub monitor: Option<crate::monitor::Place>,
     /// The owner's desk and Hydrate bottles through the cloud, with
     /// `LAMP_DEVICES=on` (#7470, `crate::devices`).
     pub devices: Option<crate::devices::Link>,
+    /// The owner's installed apps, with `LAMP_STORE_APPS=on` (#7415 piece 4, `crate::apps`).
+    pub apps: Option<std::sync::Arc<crate::apps::Apps>>,
 }
 
 /// `on` takes the app's `system.reboot` (#2193), with `LAMP_CLOUD=on`.
@@ -906,9 +911,16 @@ impl Lamp for Real {
     fn consent(&self) -> Option<crate::consent::Place> {
         self.consent.clone()
     }
+    fn desk_noticing(&self) -> Option<crate::consent::Place> {
+        self.desk_noticing.clone()
+    }
 
     fn monitor(&self) -> Option<crate::monitor::Place> {
         self.monitor.clone()
+    }
+
+    fn apps(&self) -> Option<std::sync::Arc<crate::apps::Apps>> {
+        self.apps.clone()
     }
 
     fn update_status(&self) -> Option<lamp_bus::Message> {
@@ -921,6 +933,23 @@ impl Lamp for Real {
 
     fn check_update(&mut self, now: Instant, retry: Option<u64>) -> Result<(), String> {
         self.update_checks.ask(self.bus.as_ref(), now, retry)
+    }
+
+    fn update_now_page(&self) -> bool {
+        self.update_page && self.update_checks.now()
+    }
+
+    fn ask_update_now(&mut self, now: Instant) -> Result<(), String> {
+        let at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_millis() as u64);
+        self.update_checks.ask_now(self.bus.as_ref(), now, at)
+    }
+
+    fn walk_under_way(&self) -> bool {
+        self.latest(lamp_msgs::OnboardingPending::TOPIC)
+            .and_then(|message| message.parse::<lamp_msgs::OnboardingPending>().ok())
+            .is_some_and(|pending| pending.walk)
     }
 
     fn engines_page(&self) -> bool {
@@ -1059,6 +1088,12 @@ impl Lamp for Real {
         }
     }
 
+    fn devices_unsent(&mut self, req_id: &str) {
+        if let Some(link) = self.devices.as_mut() {
+            link.unsent(req_id);
+        }
+    }
+
     fn devices_down(&mut self, kind: &str, data: &Value, now_ms: u64) -> bool {
         match (self.devices.as_mut(), self.bus.as_ref()) {
             (Some(link), Some(bus)) => {
@@ -1175,8 +1210,10 @@ mod tests {
             services: None,
             control: None,
             consent: None,
+            desk_noticing: None,
             monitor: None,
             devices: None,
+            apps: None,
             upload: None,
             shutdown: None,
         };
@@ -1262,8 +1299,10 @@ mod tests {
             services: None,
             control: None,
             consent: None,
+            desk_noticing: None,
             monitor: None,
             devices: None,
+            apps: None,
             upload: None,
             shutdown: None,
         };
@@ -1358,8 +1397,10 @@ mod tests {
             services: None,
             control: None,
             consent: None,
+            desk_noticing: None,
             monitor: None,
             devices: None,
+            apps: None,
             upload: None,
             shutdown: None,
         };
@@ -1467,8 +1508,10 @@ mod tests {
             services: None,
             control: None,
             consent: None,
+            desk_noticing: None,
             monitor: None,
             devices: None,
+            apps: None,
             upload: None,
             shutdown: None,
         };

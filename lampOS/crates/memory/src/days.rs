@@ -217,6 +217,31 @@ pub struct Days {
     /// when, so a record asked before it that was sent to one of them is
     /// refused. Never on disk, held as [`Self::records_forgot_about`] is.
     pub(crate) records_forgot_addresses: std::collections::VecDeque<(String, Vec<String>, u64)>,
+    /// The exchanges the last forget removed, each by its scope, id and
+    /// turn id on the account (#7771): the voice asks the account's history
+    /// to delete the same turns. Never on disk; taken by the request's
+    /// answer ([`Self::take_forgot`]).
+    forgot: Vec<Forgot>,
+    /// What each recent forget's answer had no room for, under the token
+    /// its answer gave, paged by `forgot_exchanges` with that token
+    /// ([`Self::forgot_page`]): a forget between never replaces another's
+    /// rest (the first builder's P2 on #7935). The oldest goes past
+    /// [`FORGOT_RESTS_KEPT`]. Never on disk.
+    forgot_rests: std::collections::VecDeque<(String, std::collections::VecDeque<Forgot>)>,
+    /// This open store's random base for those tokens, read on its first
+    /// rest, and how many it has given.
+    forgot_rest_base: Option<u64>,
+    forgot_rests_made: u64,
+    /// Whether this request's forget was asked with
+    /// `lamp_msgs::MEMORY_HISTORY_UNSENT_FIELD` (set by the request's
+    /// answer, never on disk): its removed ids are then kept in its own
+    /// transaction ([`crate::history_unsent::keep`]), and the rows' range
+    /// told in its answer ([`Self::take_unsent`]).
+    pub(crate) unsent_asked: bool,
+    unsent: Option<(u64, u64)>,
+    /// This store's epoch for the account's history ids
+    /// ([`lamp_msgs::history_turn_id`], #7771), kept in `settings`.
+    epoch: String,
     _held: File,
 }
 
@@ -289,10 +314,18 @@ impl Days {
             said_pending: std::collections::VecDeque::new(),
             records_forgot_about: std::collections::VecDeque::new(),
             records_forgot_addresses: std::collections::VecDeque::new(),
+            forgot: Vec::new(),
+            forgot_rests: std::collections::VecDeque::new(),
+            forgot_rest_base: None,
+            forgot_rests_made: 0,
+            unsent_asked: false,
+            unsent: None,
+            epoch: String::new(),
             taste_rules: false,
             _held: held,
         };
         this.import()?;
+        this.epoch = history_epoch(&mut this.db)?;
         this.clean_legacy()?;
         this.maintain(now)?;
         Ok(this)
@@ -461,10 +494,19 @@ impl Days {
             .map_or_else(|| "1970-01-01".into(), |d| d.to_string());
         let today =
             Day::at(self.now, &self.local).map_or_else(|| "1970-01-01".into(), |d| d.to_string());
+        // An app's fact lasts `app_fact::KEPT_DAYS` local days, the day it
+        // was kept the first (#7415).
+        let app_facts = Day::at(self.now, &self.local)
+            .and_then(|today| today.before(lamp_msgs::app_fact::KEPT_DAYS))
+            .map_or_else(|| "1970-01-01".into(), |d| d.to_string());
         let tx = self.db.transaction()?;
         keep_origins(&tx)?;
         tx.execute("DELETE FROM doomed", [])?;
         tx.execute("INSERT INTO doomed SELECT rid FROM entries WHERE (kind='exchange' AND day<?1) OR (kind='observation' AND coalesce(category,'') NOT IN ('talk','episode','fact','profile','pattern','ahead','feeling','chapter') AND used_unix_ms<?2 AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=entries.rid AND d.day>=?3))",params![day,unused,event])?;
+        tx.execute(
+            "INSERT OR IGNORE INTO doomed SELECT rid FROM app_facts WHERE kept_day<=?1",
+            [&app_facts],
+        )?;
         // Nightly pass B's items close on their own end days, and an
         // episode, feeling or pattern after 90 unused days, never with
         // their source exchanges (`nightly::expire`).
@@ -857,10 +899,11 @@ impl Days {
     }
 
     /// Whether this person's kept list has room for one more. Only active
-    /// kept things count: a replaced version (#2510) is history, not a slot.
+    /// kept things count: a replaced version (#2510) is history, not a slot;
+    /// nor is an app's fact (#7415), held to its source's own bounds.
     fn kept_room(&self, person: &Person) -> Result<()> {
         let count: u64 = self.db.query_row(
-            "SELECT count(*) FROM entries WHERE person=? AND kind='kept' AND active=1",
+            "SELECT count(*) FROM entries WHERE person=? AND kind='kept' AND active=1 AND rid NOT IN (SELECT rid FROM app_facts)",
             [person.as_str()],
             |r| r.get(0),
         )?;
@@ -874,11 +917,12 @@ impl Days {
     }
 
     /// The id of this person's active kept thing with `text`, the same by
-    /// [`once_text`].
+    /// [`once_text`]. Never an app's fact (#7415): a person's own line in
+    /// its words is their own, and stays when the app goes.
     fn kept_already(&self, person: &Person, text: &str) -> Result<Option<u64>> {
         let wanted = once_text(person, text);
         let mut statement = self.db.prepare(
-            "SELECT id,text FROM entries WHERE person=? AND kind='kept' AND active=1 ORDER BY id",
+            "SELECT id,text FROM entries WHERE person=? AND kind='kept' AND active=1 AND rid NOT IN (SELECT rid FROM app_facts) ORDER BY id",
         )?;
         let mut rows = statement.query([person.as_str()])?;
         while let Some(row) = rows.next()? {
@@ -1044,8 +1088,9 @@ impl Days {
         observations: bool,
     ) -> Result<Vec<Kept>> {
         // A replaced kept thing (#2510) is no longer kept: only its history;
-        // and a superseded observation is no longer what was noticed.
-        let mut statement=self.db.prepare("SELECT id,at_unix_ms,text FROM entries WHERE person=?1 AND (kind='kept' OR (?2 AND kind='observation')) AND active=1 ORDER BY id DESC")?;
+        // and a superseded observation is no longer what was noticed. An
+        // app's fact (#7415) is not the person's own list: recall finds it.
+        let mut statement=self.db.prepare("SELECT id,at_unix_ms,text FROM entries WHERE person=?1 AND (kind='kept' OR (?2 AND kind='observation')) AND active=1 AND rid NOT IN (SELECT rid FROM app_facts) ORDER BY id DESC")?;
         let rows = statement.query_map(params![person.as_str(), observations], |r| {
             Ok(Kept {
                 id: r.get(0)?,
@@ -1354,92 +1399,76 @@ impl Days {
             return Ok(0);
         }
         self.forget_mark(person)?;
-        let matching: Vec<u64> = {
-            let mut statement = self.db.prepare(
-                "SELECT id,heard,said FROM entries WHERE person=?1 AND kind='exchange' ORDER BY id",
-            )?;
-            statement
-                .query_map([person.as_str()], |r| {
-                    Ok((
-                        r.get::<_, u64>(0)?,
-                        r.get::<_, String>(1)?,
-                        r.get::<_, String>(2)?,
-                    ))
-                })?
-                .collect::<rusqlite::Result<Vec<_>>>()?
-                .into_iter()
-                .filter(|(_, heard, said)| {
-                    crate::service_records::about_any(&subjects, &format!("{heard} {said}"))
-                })
-                .map(|(id, _, _)| id)
-                .collect()
-        };
-        let mut removed = 0;
+        let matching = self.exchanges_about(person, &subjects)?;
+        // Each is forgotten as `forget {id}` forgets it, in turn, but all in
+        // one transaction: one commit for the lot, not one a turn. lamp-06c1,
+        // 21 Nov: ~101 matching turns took ~15 s at one commit each, far past
+        // the voice's answer budget. A failure part way removes none.
+        let tx = self.db.transaction()?;
+        // The sources kept as `origins` once for the lot, not once a turn:
+        // a forget only removes links, so a second time adds none.
+        keep_origins(&tx)?;
+        let (mut removed, mut gone, mut unsent) = (0, Vec::new(), None);
         for id in matching {
-            if self.forget_here(person, id, false)? > 0 {
-                removed += 1;
+            if let Some((count, took, kept)) =
+                forget_in(&tx, person, id, false, self.unsent_asked, &self.epoch, true)?
+            {
+                if count > 0 {
+                    removed += 1;
+                }
+                gone.extend(took);
+                unsent = crate::history_unsent::joined(unsent, kept);
             }
         }
+        tx.commit()?;
+        self.told(gone);
+        self.unsent = crate::history_unsent::joined(self.unsent, unsent);
         if removed > 0 {
             self.forget_set_aside()?;
         }
         Ok(removed)
     }
 
+    /// `person`'s own exchanges with every key word of any of `subjects`,
+    /// oldest first ([`Self::exchanges_forget`]).
+    fn exchanges_about(&self, person: &Person, subjects: &[Vec<String>]) -> Result<Vec<u64>> {
+        let mut statement = self.db.prepare(
+            "SELECT id,heard,said FROM entries WHERE person=?1 AND kind='exchange' ORDER BY id",
+        )?;
+        Ok(statement
+            .query_map([person.as_str()], |r| {
+                Ok((
+                    r.get::<_, u64>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                ))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?
+            .into_iter()
+            .filter(|(_, heard, said)| {
+                crate::service_records::about_any(subjects, &format!("{heard} {said}"))
+            })
+            .map(|(id, _, _)| id)
+            .collect())
+    }
+
     fn forget_here(&mut self, person: &Person, id: u64, selective: bool) -> Result<u64> {
-        let Some(record) = self.record(person, id)? else {
+        let tx = self.db.transaction()?;
+        let Some((count, gone, unsent)) = forget_in(
+            &tx,
+            person,
+            id,
+            selective,
+            self.unsent_asked,
+            &self.epoch,
+            false,
+        )?
+        else {
             return Ok(0);
         };
-        let tx = self.db.transaction()?;
-        tx.execute("DELETE FROM doomed", [])?;
-        tx.execute(
-            "INSERT INTO doomed SELECT rid FROM entries WHERE person=? AND id=?",
-            params![person.as_str(), id],
-        )?;
-        versions(&tx)?;
-        // Forgetting an extracted fact also removes its evidence, otherwise a
-        // later tidy pass could simply extract the same fact again; and a
-        // kept thing goes with the conversation it came up in (#1693,
-        // `remember_from`). This can remove an entire exchange containing
-        // more than one subject. One step back, the person's own exchanges
-        // only: an exchange's own sources are what its session was shown,
-        // not where the fact came from, so climbing them removed kept things
-        // that were only shown (#2003). A rule the exchange followed, in the
-        // scope beside theirs, is not evidence either.
-        //
-        // The evidence goes, but nothing goes because it derives from the
-        // evidence (#3113): with `LAMP_MEMORY_FORGET_ALL` a kept thing's
-        // sources are its conversation's exchanges, so one exchange can be
-        // the evidence of the colour and a source of the wedding, and of
-        // other things noticed in it. Forgetting the colour took the wedding;
-        // forgetting the wedding took the colour. So the walk below starts
-        // from what is named (with its versions) only, and the evidence joins
-        // after it; a link from something kept to a removed exchange goes by
-        // the foreign key, as on expiry.
-        let evidence: Vec<i64> = if record.kind == "observation" || record.kind == "kept" {
-            tx.prepare("SELECT DISTINCT s.parent FROM sources s JOIN doomed d ON s.child=d.rid JOIN entries e ON e.rid=s.parent WHERE e.person=?1 AND e.kind='exchange'")?
-                .query_map([person.as_str()], |r| r.get(0))?
-                .collect::<rusqlite::Result<_>>()?
-        } else {
-            Vec::new()
-        };
-        // A kept thing or an observation takes what carries its words, not
-        // all that was shown it ([`selective_descendants`]); an exchange,
-        // all that derives from it, as before.
-        if selective && (record.kind == "observation" || record.kind == "kept") {
-            selective_descendants(&tx, person)?;
-        } else {
-            descendants(&tx, None)?;
-        }
-        for rid in evidence {
-            tx.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid])?;
-        }
-        talk_with_doomed(&tx)?;
-        // Nightly pass B: what rests on anything going goes too.
-        crate::nightly::with_doomed(&tx)?;
-        said_again_with_doomed(&tx)?;
-        let count = erase(&tx)?;
         tx.commit()?;
+        self.told(gone);
+        self.unsent = crate::history_unsent::joined(self.unsent, unsent);
         Ok(count)
     }
     /// The room's lines `speaker` said (#2849, the voice's
@@ -1485,8 +1514,12 @@ impl Days {
         }
         talk_with_doomed(&tx)?;
         said_again_with_doomed(&tx)?;
+        let gone = doomed_exchanges(&tx)?;
+        let unsent = crate::history_unsent::keep(&tx, self.unsent_asked, &self.epoch, &gone, None)?;
         let count = erase(&tx)?;
         tx.commit()?;
+        self.told(gone);
+        self.unsent = crate::history_unsent::joined(self.unsent, unsent);
         self.forget_set_aside()?;
         Ok(count)
     }
@@ -1517,11 +1550,109 @@ impl Days {
     }
     pub fn forget_all(&mut self, person: Option<&Person>) -> Result<u64> {
         let tx = self.db.transaction()?;
-        let count = empty(&tx, person)?;
+        let mut gone = Vec::new();
+        let count = empty(&tx, person, &mut gone)?;
         crate::service_records::mark_forgot(&tx, person, self.now)?;
+        // Everyone's forget everything reaches nothing on the account: none
+        // kept for it. A known person's is kept as their whole history.
+        let unsent = match person {
+            Some(person) => crate::history_unsent::keep(
+                &tx,
+                self.unsent_asked,
+                &self.epoch,
+                &gone,
+                Some(person.as_str()),
+            )?,
+            None => None,
+        };
+        // Everyone's forget everything wipes the store whole: a new epoch,
+        // so no id given after it names a turn of before (#7771). What it
+        // removed is told under the old.
+        let epoch = if person.is_none() {
+            Some(mint_history_epoch(&tx)?)
+        } else {
+            None
+        };
         tx.commit()?;
+        self.told(gone);
+        self.unsent = crate::history_unsent::joined(self.unsent, unsent);
+        if let Some(epoch) = epoch {
+            self.epoch = epoch;
+        }
         self.forget_set_aside()?;
         Ok(count)
+    }
+
+    /// `gone` (scope and id) taken for the answer, each with its turn id
+    /// under this store's epoch now.
+    fn told(&mut self, gone: Vec<(String, u64)>) {
+        let epoch = &self.epoch;
+        self.forgot
+            .extend(gone.into_iter().map(|(scope, id)| Forgot {
+                turn: lamp_msgs::history_turn_id(epoch, &scope, id),
+                scope,
+                id,
+            }));
+    }
+
+    /// This store's epoch for the account's history ids (#7771).
+    pub fn history_epoch(&self) -> &str {
+        &self.epoch
+    }
+
+    /// The exchanges the forgets since the last call removed, by scope and
+    /// id, and none kept after (#7771).
+    pub fn take_forgot(&mut self) -> Vec<Forgot> {
+        std::mem::take(&mut self.forgot)
+    }
+
+    /// The range of the rows this request's forgets kept for the account's
+    /// history ([`crate::history_unsent`]), and none kept after.
+    pub fn take_unsent(&mut self) -> Option<(u64, u64)> {
+        self.unsent.take()
+    }
+
+    /// The ids a forget's answer had no room for, kept for paging beside
+    /// every other forget's, under the token returned (`None` for no
+    /// rest, and nothing kept). The token is this open store's own random
+    /// base and a count, so one given before a restart (or a reopen), or by
+    /// another store, never names a rest kept after.
+    pub fn keep_forgot_rest(&mut self, rest: Vec<Forgot>) -> Option<String> {
+        if rest.is_empty() {
+            return None;
+        }
+        let base = *self.forgot_rest_base.get_or_insert_with(forgot_rest_base);
+        self.forgot_rests_made += 1;
+        let token = format!("{:016x}", base.wrapping_add(self.forgot_rests_made));
+        while self.forgot_rests.len() >= FORGOT_RESTS_KEPT {
+            if let Some((_, gone)) = self.forgot_rests.pop_front() {
+                eprintln!(
+                    "lamp-memory days: {} exchange ids of an older forget were never paged; let go",
+                    gone.len()
+                );
+            }
+        }
+        self.forgot_rests.push_back((token.clone(), rest.into()));
+        Some(token)
+    }
+
+    /// The next `most` of what [`Self::keep_forgot_rest`] kept under
+    /// `token`, and whether more remain; `None` for a token not kept (never
+    /// given, let go, paged out, or from before a restart). The last page
+    /// lets the rest go.
+    pub fn forgot_page(&mut self, token: &str, most: usize) -> Option<(Vec<Forgot>, bool)> {
+        let at = self
+            .forgot_rests
+            .iter()
+            .position(|(kept, _)| kept == token)?;
+        let rest = &mut self.forgot_rests[at].1;
+        let take = rest.len().min(most);
+        let page = rest.drain(..take).collect();
+        let more = !rest.is_empty();
+        if !more {
+            self.forgot_rests.remove(at);
+        }
+        Some((page, more))
     }
 
     /// Everything kept for one person and every rule in their rules scope
@@ -1538,8 +1669,8 @@ impl Days {
             .rules()
             .ok_or_else(|| Error::new("bad_person", "the person has no rules scope"))?;
         let tx = self.db.transaction()?;
-        let removed = empty(&tx, Some(person))?;
-        let ruled = empty(&tx, Some(&rules))?;
+        let removed = empty(&tx, Some(person), &mut Vec::new())?;
+        let ruled = empty(&tx, Some(&rules), &mut Vec::new())?;
         tx.execute("DELETE FROM speakers WHERE speaker=?1", [person.as_str()])?;
         crate::service_records::mark_forgot(&tx, Some(person), self.now)?;
         tx.commit()?;
@@ -1550,7 +1681,7 @@ impl Days {
     /// A set-aside database is the person's memory too, and this build can't
     /// reach a fact or a person inside it: every forget removes it whole,
     /// with its sidecars, so nothing said forgotten stays on disk (#2067).
-    fn forget_set_aside(&mut self) -> Result<()> {
+    pub(crate) fn forget_set_aside(&mut self) -> Result<()> {
         remove_set_aside(&self.dir, None)?;
         self.set_aside = None;
         Ok(())
@@ -2736,7 +2867,7 @@ impl Days {
             ("observation", MAX_OBSERVATIONS),
         ] {
             let after: u64 = tx.query_row(
-                "SELECT count(*) FROM entries WHERE kind=?2 AND (kind!='kept' OR active=1) AND coalesce(category,'')!='talk' AND (person=?1 OR rid IN (SELECT rid FROM adopting))",
+                "SELECT count(*) FROM entries WHERE kind=?2 AND (kind!='kept' OR active=1) AND coalesce(category,'')!='talk' AND rid NOT IN (SELECT rid FROM app_facts) AND (person=?1 OR rid IN (SELECT rid FROM adopting))",
                 params![to.as_str(), kind],
                 |r| r.get(0),
             )?;
@@ -3199,7 +3330,7 @@ fn said_after(tx: &Transaction<'_>, rid: i64, at: u64) -> Result<bool> {
 /// the scope as origin, not only an exchange (Reviewer-lead's P3). In the
 /// caller's transaction, before [`erase`]; never on expiry, so an exchange
 /// that ages out at `keep_days` leaves the time it was said again.
-fn said_again_with_doomed(tx: &Transaction<'_>) -> Result<()> {
+pub(crate) fn said_again_with_doomed(tx: &Transaction<'_>) -> Result<()> {
     tx.execute(
         "DELETE FROM said_again WHERE (rid,at_unix_ms) IN (SELECT a.rid,a.at_unix_ms FROM said_again a JOIN entries k ON k.rid=a.rid JOIN entries x ON x.person=k.person AND x.id=a.origin WHERE x.rid IN (SELECT rid FROM doomed))",
         [],
@@ -3288,6 +3419,100 @@ fn event_day(proposal: &tidy::Proposal, at: u64, local: &LocalTime) -> Option<Da
     kept_day(proposal.on.as_deref()?, at, local)
 }
 
+/// What one forget in a transaction took ([`forget_in`]): how many rows
+/// went, the exchanges among them (scope and id), and the range of the rows
+/// kept for the account's history.
+type Forgotten = (u64, Vec<(String, u64)>, Option<(u64, u64)>);
+
+/// One forget of `person`'s record `id` in `tx` ([`Days::forget_here`]),
+/// uncommitted: how many rows went, the exchanges among them (scope and id)
+/// and the rows kept for the account's history (`asked`, under `epoch`).
+/// `None` for a record not there (never, or already gone in `tx`).
+/// `origins_kept`: [`keep_origins`] already ran in `tx` (one of
+/// [`Days::exchanges_forget`]'s turns).
+fn forget_in(
+    tx: &Transaction<'_>,
+    person: &Person,
+    id: u64,
+    selective: bool,
+    asked: bool,
+    epoch: &str,
+    origins_kept: bool,
+) -> Result<Option<Forgotten>> {
+    let Some(record) = read_record(tx, person, id)? else {
+        return Ok(None);
+    };
+    tx.execute("DELETE FROM doomed", [])?;
+    tx.execute(
+        "INSERT INTO doomed SELECT rid FROM entries WHERE person=? AND id=?",
+        params![person.as_str(), id],
+    )?;
+    versions(tx)?;
+    // A kept thing or an observation with no distinctive word ("Stop.")
+    // takes no walk (#8031): it, its literal copies and the exchanges it
+    // came from go, with every version it replaced back to the first
+    // (the same kept thing at an earlier time: the first builder's HOLD
+    // on #8033), and no other kept thing. lamp-06c1, 20 Nov: forgetting
+    // a kept "Stop." by id took 28 rows, four of them kept things.
+    let wordless = selective
+        && (record.kind == "observation" || record.kind == "kept")
+        && walk_words(&doomed_texts(tx)?).is_empty();
+    if wordless {
+        tx.execute(
+            "WITH RECURSIVE chain(rid) AS (SELECT rid FROM entries WHERE person=?1 AND id=?2 UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid) DELETE FROM doomed WHERE rid IN (SELECT rid FROM entries WHERE kind='kept') AND rid NOT IN (SELECT rid FROM chain)",
+            params![person.as_str(), id],
+        )?;
+    }
+    // Forgetting an extracted fact also removes its evidence, otherwise a
+    // later tidy pass could simply extract the same fact again; and a
+    // kept thing goes with the conversation it came up in (#1693,
+    // `remember_from`). This can remove an entire exchange containing
+    // more than one subject. One step back, the person's own exchanges
+    // only: an exchange's own sources are what its session was shown,
+    // not where the fact came from, so climbing them removed kept things
+    // that were only shown (#2003). A rule the exchange followed, in the
+    // scope beside theirs, is not evidence either.
+    //
+    // The evidence goes, but nothing goes because it derives from the
+    // evidence (#3113): with `LAMP_MEMORY_FORGET_ALL` a kept thing's
+    // sources are its conversation's exchanges, so one exchange can be
+    // the evidence of the colour and a source of the wedding, and of
+    // other things noticed in it. Forgetting the colour took the wedding;
+    // forgetting the wedding took the colour. So the walk below starts
+    // from what is named (with its versions) only, and the evidence joins
+    // after it; a link from something kept to a removed exchange goes by
+    // the foreign key, as on expiry.
+    let evidence: Vec<i64> = if record.kind == "observation" || record.kind == "kept" {
+        tx.prepare("SELECT DISTINCT s.parent FROM sources s JOIN doomed d ON s.child=d.rid JOIN entries e ON e.rid=s.parent WHERE e.person=?1 AND e.kind='exchange'")?
+            .query_map([person.as_str()], |r| r.get(0))?
+            .collect::<rusqlite::Result<_>>()?
+    } else {
+        Vec::new()
+    };
+    // A kept thing or an observation takes what carries its words, not
+    // all that was shown it ([`selective_descendants`]); an exchange,
+    // all that derives from it, as before.
+    if selective && (record.kind == "observation" || record.kind == "kept") {
+        selective_descendants(tx, person)?;
+    } else {
+        descendants(tx, None)?;
+    }
+    for rid in evidence {
+        tx.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid])?;
+    }
+    if !origins_kept {
+        keep_origins(tx)?;
+    }
+    talk_from_doomed(tx)?;
+    // Nightly pass B: what rests on anything going goes too.
+    crate::nightly::with_doomed(tx)?;
+    said_again_with_doomed(tx)?;
+    let gone = doomed_exchanges(tx)?;
+    let unsent = crate::history_unsent::keep(tx, asked, epoch, &gone, None)?;
+    let count = erase(tx)?;
+    Ok(Some((count, gone, unsent)))
+}
+
 /// `on` as an event day said at `at`: a real `YYYY-MM-DD` from the local
 /// day of `at` to [`EVENT_WITHIN_DAYS`] after it, else `None`. The one
 /// check of an observation's day ([`event_day`]) and a kept thing's
@@ -3373,15 +3598,14 @@ fn versions(db: &Connection) -> Result<()> {
 /// without the old "teal". A mixed exchange goes whole. A paraphrase with
 /// none of the words ("avoid those") stays: old links say what was shown,
 /// not used, and typed provenance is what replaces this. A fact with no
-/// distinctive word takes the whole walk ([`descendants`]), as before,
-/// and its literal copies too. Kept things never go here unless named.
+/// distinctive word ("Stop.") takes no walk, only its literal copies
+/// (#8031: the whole walk, [`descendants`], took four other kept things on
+/// lamp-06c1). Kept things never go here unless named: no walk, and no
+/// version of a row it reached ([`walk_versions`]), adds one.
 /// Only rows the search index finds are read (#3871): the rule once read
 /// every row of the person's, 9 s on a 9.6 MB store on lamp-4ace.
 fn selective_descendants(db: &Connection, person: &Person) -> Result<()> {
-    let texts: Vec<String> = db
-        .prepare("SELECT text FROM entries WHERE rid IN (SELECT rid FROM doomed)")?
-        .query_map([], |r| r.get(0))?
-        .collect::<rusqlite::Result<_>>()?;
+    let texts = doomed_texts(db)?;
     // A fact whose words the index may hold otherwise ("İstanbul": Fourteen
     // on #3902) reads every row, as before #3871: slow, never short.
     let read = if texts.iter().any(|text| search::splits_unlike_index(text)) {
@@ -3454,13 +3678,7 @@ fn selective_rows(db: &Connection, person: &Person, texts: &[String], read: Read
     // linked "Wants …" observation (C136). A fact of nothing but them keeps
     // them, so the walk is never wider than before. Copies still need every
     // word of a version, openers included.
-    let all: BTreeSet<String> = own.iter().flatten().cloned().collect();
-    let openers: BTreeSet<String> = OPENERS
-        .iter()
-        .flat_map(|word| search::content_words(word))
-        .collect();
-    let distinct: BTreeSet<String> = all.difference(&openers).cloned().collect();
-    let any = if distinct.is_empty() { all } else { distinct };
+    let any = walk_words(texts);
     let doom = |rid: i64| db.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid]);
     // Read when the index found it (`hit`), or its words may be held
     // otherwise; every row read, with `Read::Every`.
@@ -3470,9 +3688,9 @@ fn selective_rows(db: &Connection, person: &Person, texts: &[String], read: Read
         checked.set(checked.get() + u64::from(read));
         read
     };
-    if any.is_empty() {
-        descendants(db, None)?;
-    } else {
+    // No distinctive word ("Stop."): no walk at all, only its copies below
+    // (#8031). The whole walk ([`descendants`]) took other kept things.
+    if !any.is_empty() {
         // Every row reachable through links, those that stay included: one
         // recursive walk on `sources_parent`, each row once (#3871). Of
         // those, only the ones the search index finds with a word of the
@@ -3500,7 +3718,7 @@ fn selective_rows(db: &Connection, person: &Person, texts: &[String], read: Read
     // of one whole text, or past ASCII, are read and checked as before
     // (#3871).
     let Some(copies) = copy_words(&own, &literals) else {
-        versions(db)?;
+        walk_versions(db)?;
         return Ok(checked.get());
     };
     let rows: Vec<(bool, i64, [String; 3])> = db
@@ -3531,8 +3749,45 @@ fn selective_rows(db: &Connection, person: &Person, texts: &[String], read: Read
             doom(rid)?;
         }
     }
-    versions(db)?;
+    walk_versions(db)?;
     Ok(checked.get())
+}
+
+/// The texts of the doomed rows.
+fn doomed_texts(db: &Connection) -> Result<Vec<String>> {
+    Ok(db
+        .prepare("SELECT text FROM entries WHERE rid IN (SELECT rid FROM doomed)")?
+        .query_map([], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?)
+}
+
+/// The words [`selective_rows`]' linked walk follows for `texts`: their
+/// distinctive words ([`search::content_words`]) without the observation
+/// writer's opening verbs ([`OPENERS`]), or with them when there is
+/// nothing else. None: a text with no distinctive word ("Stop."), which
+/// takes no walk (#8031).
+fn walk_words(texts: &[String]) -> BTreeSet<String> {
+    let all: BTreeSet<String> = texts
+        .iter()
+        .flat_map(|text| search::content_words(text))
+        .collect();
+    let openers: BTreeSet<String> = OPENERS
+        .iter()
+        .flat_map(|word| search::content_words(word))
+        .collect();
+    let distinct: BTreeSet<String> = all.difference(&openers).cloned().collect();
+    if distinct.is_empty() { all } else { distinct }
+}
+
+/// [`versions`] for what a forget's walk reached: each doomed row's
+/// versions, but never a kept thing (#8031). The named row's own versions,
+/// of any kind, are doomed before any walk ([`Days::forget_here`]); a kept
+/// thing reached only as the version of a walked row that wasn't named (a
+/// kept thing a tidy observation corrected, finding N11) stays, hidden,
+/// never current again.
+fn walk_versions(db: &Connection) -> Result<()> {
+    db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid JOIN entries e ON e.rid=r.newer WHERE e.kind!='kept' UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid JOIN entries e ON e.rid=r.older WHERE e.kind!='kept') INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
+    Ok(())
 }
 
 /// The search index's question for rows with one of `words`
@@ -3585,7 +3840,7 @@ fn literal(text: &str) -> String {
 /// derives from them and every version, except a kept thing that isn't
 /// itself doomed already (#3113); for expiry, from the first day whose
 /// events no longer hold (`expiry`), what derives from them only.
-fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
+pub(crate) fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
     if let Some(event) = expiry {
         // Expiry: a kept thing never expires, even one remembered with its
         // conversation (#1693): the walk stops at it, and its link to an
@@ -3599,8 +3854,10 @@ fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
         // derives from a doomed row (#3113). With `LAMP_MEMORY_FORGET_ALL` a
         // kept thing's sources are its conversation's exchanges, so a named
         // exchange would take every kept thing said in its conversation. Its
-        // link to the exchange goes by the foreign key, as on expiry.
-        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept' UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
+        // link to the exchange goes by the foreign key, as on expiry. Nor
+        // as a version of a row the walk reached (#8031): a named kept
+        // thing's versions are doomed before the walk ([`Days::forget_here`]).
+        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept' UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid JOIN entries e ON e.rid=r.newer WHERE e.kind!='kept' UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid JOIN entries e ON e.rid=r.older WHERE e.kind!='kept') INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
     }
     Ok(())
 }
@@ -3622,7 +3879,12 @@ fn role_session(tx: &Transaction<'_>, person: &Person, session: &str, expected: 
 
 /// Every entry of `person`, or of every person for `None`, erased in the
 /// caller's transaction, with their session notes, jobs and skipped count.
-fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
+/// `gone` takes the exchanges it removes, by scope and id (#7771).
+fn empty(
+    tx: &Transaction<'_>,
+    person: Option<&Person>,
+    gone: &mut Vec<(String, u64)>,
+) -> Result<u64> {
     tx.execute("DELETE FROM doomed", [])?;
     tx.execute(
         "INSERT INTO doomed SELECT rid FROM entries WHERE ?1 IS NULL OR person=?1",
@@ -3647,6 +3909,7 @@ fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
         "UPDATE people SET generation=generation+1 WHERE (?1 IS NULL OR person=?1) AND NOT EXISTS(SELECT 1 FROM entries e JOIN doomed d ON d.rid=e.rid WHERE e.person=people.person)",
         [person.map(Person::as_str)],
     )?;
+    gone.extend(doomed_exchanges(tx)?);
     let count = erase(tx)?;
     // Empty people also have job and snapshot metadata, but keep the high
     // water mark so a stale external reference can never name a new entry.
@@ -3726,21 +3989,53 @@ fn room_from_citing(tx: &Transaction<'_>, person: &Person) -> Result<()> {
 /// for talk notes): it is one note of the whole conversation, in the
 /// lamp's words, so it may carry what was forgotten in any of them. Never
 /// on expiry: an exchange that ages out leaves the note kept.
-fn talk_with_doomed(tx: &Transaction<'_>) -> Result<()> {
+pub(crate) fn talk_with_doomed(tx: &Transaction<'_>) -> Result<()> {
     keep_origins(tx)?;
+    talk_from_doomed(tx)
+}
+
+/// [`talk_with_doomed`] with `origins` already kept.
+fn talk_from_doomed(tx: &Transaction<'_>) -> Result<()> {
     tx.execute(
         "INSERT OR IGNORE INTO doomed SELECT DISTINCT s.child FROM sources s JOIN entries e ON e.rid=s.child WHERE s.parent IN (SELECT rid FROM doomed) AND e.kind='observation' AND e.category='talk'",
         [],
     )?;
     // Past its exchanges' expiry (reviewer-three's P1 on #4479): a talk note
     // of the same scope that shares a source exchange id with anything
-    // going, or is of an exchange going, goes too ([`keep_origins`]).
+    // going, or is of an exchange going, goes too ([`keep_origins`]). Found
+    // from what goes, by `origins_by` ([`ORIGIN_SHARERS`]), never by joining
+    // every talk note the scope has: that ran once a turn of a forget about
+    // a thing and grew with every note kept (lamp-06c1, 21 Nov).
     tx.execute(
-        "INSERT OR IGNORE INTO doomed SELECT DISTINCT t.rid FROM entries t JOIN origins o ON o.rid=t.rid WHERE t.kind='observation' AND t.category='talk' AND EXISTS (SELECT 1 FROM entries d WHERE d.rid IN (SELECT rid FROM doomed) AND d.person=t.person AND coalesce(d.category,'')!='talk' AND (d.id=o.origin OR EXISTS (SELECT 1 FROM origins od WHERE od.rid=d.rid AND od.origin=o.origin)))",
+        &format!(
+            "INSERT OR IGNORE INTO doomed {}",
+            origin_sharers("entries t", "t.kind='observation' AND t.category='talk'")
+        ),
         [],
     )?;
     Ok(())
 }
+
+/// The rows that share an origin with a doomed row `d` of the same scope,
+/// or have `d` as an origin: `t` of `from`, when `also` holds for it and
+/// `d`. Driven from `doomed` ([`ORIGIN_SHARERS`]).
+pub(crate) fn origin_sharers(from: &str, also: &str) -> String {
+    ORIGIN_SHARERS
+        .iter()
+        .map(|origin| {
+            format!("SELECT t.rid FROM doomed x CROSS JOIN entries d ON d.rid=x.rid {origin} CROSS JOIN {from} ON t.rid=o.rid WHERE t.person=d.person AND coalesce(d.category,'')!='talk' AND {also}")
+        })
+        .collect::<Vec<_>>()
+        .join(" UNION ")
+}
+
+/// How a row `t`'s origin `o` meets a doomed row `d`: `d` is the origin
+/// (`d.id`), or one of `d`'s own origins (`od`) is the same. The two halves
+/// of the one rule, each by an index (`origins_by`, then the primary key).
+const ORIGIN_SHARERS: [&str; 2] = [
+    "CROSS JOIN origins o ON o.origin=d.id",
+    "CROSS JOIN origins od ON od.rid=d.rid CROSS JOIN origins o ON o.origin=od.origin",
+];
 
 /// Each kept thing's and observation's source exchanges, by id in its own
 /// scope, into `origins`, where they outlive the exchanges' expiry: before
@@ -3836,6 +4131,80 @@ fn talk_fitted(text: &str, room: usize) -> Option<String> {
     }
     Some(lines.join("\n"))
 }
+/// An exchange a forget removed (#7771): its scope and id, and its turn id
+/// on the account ([`lamp_msgs::history_turn_id`]) under the epoch it was
+/// given in.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Forgot {
+    pub scope: String,
+    pub id: u64,
+    pub turn: String,
+}
+
+/// The settings key of the store's epoch (#7771).
+const HISTORY_EPOCH: &str = "history_epoch";
+
+/// The most forgets whose rest waits to be paged at once
+/// ([`Days::keep_forgot_rest`]): far past one voice's forgets in flight.
+pub const FORGOT_RESTS_KEPT: usize = 8;
+
+/// A new random base for an open store's [`Days::keep_forgot_rest`]
+/// tokens (the clock and the process id if `/dev/urandom` can't be read).
+fn forgot_rest_base() -> u64 {
+    let mut bytes = [0u8; 8];
+    match File::open("/dev/urandom").and_then(|mut f| io::Read::read_exact(&mut f, &mut bytes)) {
+        Ok(()) => u64::from_be_bytes(bytes),
+        Err(_) => {
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_nanos() as u64);
+            nanos ^ (u64::from(std::process::id()) << 32)
+        }
+    }
+}
+
+/// The store's epoch, minted when there is none: a new store, or one made
+/// before epochs (no turn was saved under it: both of #7771's switches
+/// were off).
+fn history_epoch(db: &mut Connection) -> Result<String> {
+    let kept: Option<u32> = db
+        .query_row(
+            "SELECT value FROM settings WHERE key=?1",
+            [HISTORY_EPOCH],
+            |r| r.get(0),
+        )
+        .optional()?;
+    if let Some(kept) = kept {
+        return Ok(format!("{kept:08x}"));
+    }
+    let tx = db.transaction()?;
+    let epoch = mint_history_epoch(&tx)?;
+    tx.commit()?;
+    Ok(epoch)
+}
+
+/// A new random epoch, kept in place of the old in the caller's
+/// transaction.
+fn mint_history_epoch(tx: &Transaction<'_>) -> Result<String> {
+    let mut bytes = [0u8; 4];
+    io::Read::read_exact(&mut File::open("/dev/urandom")?, &mut bytes)?;
+    let epoch = u32::from_be_bytes(bytes);
+    tx.execute(
+        "INSERT OR REPLACE INTO settings(key,value) VALUES(?1,?2)",
+        params![HISTORY_EPOCH, epoch],
+    )?;
+    Ok(format!("{epoch:08x}"))
+}
+
+/// The exchanges among what is doomed, each by its scope and id, read
+/// before [`erase`] (#7771).
+fn doomed_exchanges(tx: &Transaction<'_>) -> Result<Vec<(String, u64)>> {
+    Ok(tx
+        .prepare("SELECT e.person,e.id FROM entries e JOIN doomed d ON d.rid=e.rid WHERE e.kind='exchange' ORDER BY e.person,e.id")?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?)
+}
+
 pub(crate) fn erase(tx: &Transaction<'_>) -> Result<u64> {
     let people: Vec<String> = tx
         .prepare("SELECT DISTINCT person FROM entries WHERE rid IN (SELECT rid FROM doomed)")?
@@ -4323,6 +4692,205 @@ mod tests {
         for id in [longer, among, unrelated] {
             assert!(store.record(&person, id).unwrap().is_some(), "{id}");
         }
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #8031 (lamp-06c1, 20 Nov): forgetting a kept "Stop." by id took 28
+    /// rows, four of them other things the person kept. A forget with no
+    /// distinctive word takes it, its literal copies and the exchange it
+    /// came from (with the versions it replaced), and no other kept thing:
+    /// not one from the same exchange, one from an exchange shown it, one
+    /// an observation the walk once reached replaced, or that one's older
+    /// version. A worded forget, and forget everything, are as before.
+    #[test]
+    fn a_wordless_forget_takes_no_other_kept_thing() {
+        let (dir, mut store, person, now) = scratch("wordless-kept");
+        let said = store
+            .append(&person, now, "Lamp, stop.", "Okay", &[])
+            .unwrap();
+        let stop = store.remember_from(&person, now, "Stop.", &[said]).unwrap();
+        let same_exchange = store
+            .remember_from(&person, now, "Stop the water nudges", &[said])
+            .unwrap();
+        let shown = store
+            .append(
+                &person,
+                now + 1,
+                "Remind me to drink water",
+                "Sure",
+                &[stop],
+            )
+            .unwrap();
+        let from_shown = store
+            .remember_from(&person, now + 1, "No more water nudges today", &[shown])
+            .unwrap();
+        let older = store
+            .remember(&person, now + 2, "Nudges stop at noon")
+            .unwrap();
+        let replaced = store
+            .remember_replacing(
+                &person,
+                now + 3,
+                "Nudges stop after lunch",
+                &[],
+                older,
+                &[older],
+            )
+            .unwrap();
+        ensure_person(&store.db, &person).unwrap();
+        let observation = next_id(&store.db, &person).unwrap();
+        insert_record(
+            &store.db,
+            &Record {
+                id: observation,
+                person: person.as_str().into(),
+                kind: "observation".into(),
+                at_unix_ms: now + 4,
+                heard: String::new(),
+                said: String::new(),
+                text: "Wants quiet after lunch.".into(),
+                category: Some(tidy::Category::Thread),
+                source_ids: vec![shown],
+                supersedes: Some(replaced),
+                active: true,
+            },
+            &store.local,
+            store.now,
+        )
+        .unwrap();
+        let copy = store.append(&person, now + 5, "stop", "Okay", &[]).unwrap();
+        store.forget(&person, stop).unwrap();
+        for id in [stop, said, copy] {
+            assert!(store.record(&person, id).unwrap().is_none(), "{id}");
+        }
+        let kept = [same_exchange, from_shown, replaced, older];
+        for id in kept.into_iter().chain([shown, observation]) {
+            assert!(store.record(&person, id).unwrap().is_some(), "{id}");
+        }
+
+        // A worded forget still takes its versions, as before.
+        let teal = store
+            .remember(&person, now, "Favourite colour teal")
+            .unwrap();
+        let violet = store
+            .remember_replacing(
+                &person,
+                now + 8,
+                "Favourite colour violet",
+                &[],
+                teal,
+                &[teal],
+            )
+            .unwrap();
+        store.forget(&person, violet).unwrap();
+        assert!(store.record(&person, teal).unwrap().is_none());
+
+        // Forget everything still takes every kept thing.
+        store.forget_all(Some(&person)).unwrap();
+        for id in kept {
+            assert!(store.record(&person, id).unwrap().is_none(), "{id}");
+        }
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// The first builder's HOLD on #8033: a version is the same kept thing
+    /// at an earlier time, so a wordless forget of "Stop!", which replaced
+    /// "Stop", leaves neither, current or not; a kept thing outside the
+    /// chain stays.
+    #[test]
+    fn a_wordless_forget_takes_the_versions_it_replaced() {
+        let (dir, mut store, person, now) = scratch("wordless-versions");
+        let other = store
+            .remember(&person, now, "Stop the water nudges")
+            .unwrap();
+        let first = store.remember(&person, now + 1, "Stop").unwrap();
+        let again = store
+            .remember_replacing(&person, now + 2, "Stop!", &[], first, &[first])
+            .unwrap();
+        store.forget(&person, again).unwrap();
+        for id in [again, first] {
+            assert!(store.record(&person, id).unwrap().is_none(), "{id}");
+        }
+        let kept: Vec<u64> = store
+            .kept(&person, 16384)
+            .unwrap()
+            .iter()
+            .map(|kept| kept.id)
+            .collect();
+        assert_eq!(kept, [other]);
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// The Reviewer-lead's P2 on #8033, a kept thing a tidy observation
+    /// corrected (finding N11: kept "Locker is 440", observation "Locker is
+    /// 441"). A named row's own replaced versions go, of any kind: forgetting
+    /// the observation takes 440. A kept thing reached only as the version
+    /// of an unnamed walked row stays, hidden, never current again: a
+    /// worded forget whose walk takes the observation leaves 440 inactive.
+    #[test]
+    fn a_kept_thing_an_observation_corrected_goes_only_with_the_named_row() {
+        fn corrected(store: &mut Days, person: &Person, now: u64) -> (u64, u64, u64) {
+            let said = store.remember(person, now, "My locker is 441").unwrap();
+            let old = store.remember(person, now, "Locker is 440").unwrap();
+            let shown = store
+                .append(person, now + 1, "Which locker?", "441", &[said])
+                .unwrap();
+            ensure_person(&store.db, person).unwrap();
+            let observation = next_id(&store.db, person).unwrap();
+            insert_record(
+                &store.db,
+                &Record {
+                    id: observation,
+                    person: person.as_str().into(),
+                    kind: "observation".into(),
+                    at_unix_ms: now + 2,
+                    heard: String::new(),
+                    said: String::new(),
+                    text: "Locker is 441.".into(),
+                    category: Some(tidy::Category::Thread),
+                    source_ids: vec![shown],
+                    supersedes: Some(old),
+                    active: true,
+                },
+                &store.local,
+                store.now,
+            )
+            .unwrap();
+            store
+                .db
+                .execute(
+                    "UPDATE entries SET active=0 WHERE person=?1 AND id=?2",
+                    params![person.as_str(), old],
+                )
+                .unwrap();
+            (said, old, observation)
+        }
+        let (dir, mut store, person, now) = scratch("observation-corrected");
+        let (_, old, observation) = corrected(&mut store, &person, now);
+        store.forget(&person, observation).unwrap();
+        for id in [observation, old] {
+            assert!(store.record(&person, id).unwrap().is_none(), "{id}");
+        }
+        drop(store);
+        fs::remove_dir_all(&dir).unwrap();
+
+        let (dir, mut store, person, now) = scratch("observation-walked");
+        let (said, old, observation) = corrected(&mut store, &person, now);
+        store.forget(&person, said).unwrap();
+        for id in [said, observation] {
+            assert!(store.record(&person, id).unwrap().is_none(), "{id}");
+        }
+        assert!(!store.record(&person, old).unwrap().unwrap().active);
+        assert!(
+            store
+                .kept(&person, 16384)
+                .unwrap()
+                .iter()
+                .all(|kept| kept.id != old)
+        );
         drop(store);
         fs::remove_dir_all(dir).unwrap();
     }
@@ -5249,5 +5817,656 @@ mod tests {
         assert!(!given.contains("- fact 000"));
         drop(store);
         fs::remove_dir_all(dir).unwrap();
+    }
+}
+
+/// A forget about a thing's talk notes and nightly items found from what
+/// goes ([`origin_sharers`]) against the statements that joined every one
+/// of them, kept here only as the oracle.
+#[cfg(test)]
+mod origin_walk {
+    use super::*;
+
+    const NOW: u64 = 1_791_892_800_000;
+    const OWNER: &str = "p-0123456789abcdef";
+    const OTHER: &str = "p-fedcba9876543210";
+
+    /// A small deterministic generator: the same seed, the same graph.
+    struct Seeded(u64);
+
+    impl Seeded {
+        fn below(&mut self, n: usize) -> usize {
+            self.0 = self
+                .0
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            ((self.0 >> 33) % n as u64) as usize
+        }
+
+        fn chance(&mut self, percent: usize) -> bool {
+            self.below(100) < percent
+        }
+    }
+
+    fn options(dir: &Path) -> Options {
+        Options {
+            dir: dir.to_path_buf(),
+            keep_days: 30,
+            local: LocalTime::Offset(0),
+        }
+    }
+
+    fn scratch(name: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("lamp-days-one-walk-{}-{name}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        dir
+    }
+
+    /// One row of `person`'s, by hand: its rid.
+    fn entry(
+        db: &Connection,
+        person: &str,
+        id: u64,
+        kind: &str,
+        heard: &str,
+        category: Option<&str>,
+    ) -> i64 {
+        let day = Day::at(NOW, &LocalTime::Offset(0)).unwrap().to_string();
+        db.execute("INSERT OR IGNORE INTO people(person) VALUES(?1)", [person])
+            .unwrap();
+        db.execute(
+            "UPDATE people SET next_id=max(next_id,?2+1) WHERE person=?1",
+            params![person, id],
+        )
+        .unwrap();
+        let (heard, text) = if kind == "exchange" {
+            (heard, "")
+        } else {
+            ("", heard)
+        };
+        db.execute("INSERT INTO entries(person,id,kind,at_unix_ms,day,heard,said,text,category,used_unix_ms,active) VALUES(?1,?2,?3,?4,?5,?6,'ok',?7,?8,?4,1)",params![person,id,kind,NOW,day,heard,text,category]).unwrap();
+        let rid = db.last_insert_rowid();
+        db.execute(
+            "INSERT INTO search(rowid,body) VALUES(?1,?2)",
+            params![rid, search::text(&format!("{heard} {text}"))],
+        )
+        .unwrap();
+        rid
+    }
+
+    fn link(db: &Connection, child: i64, parent: i64) {
+        db.execute(
+            "INSERT OR IGNORE INTO sources(child,parent) VALUES(?1,?2)",
+            [child, parent],
+        )
+        .unwrap();
+    }
+
+    fn replaces(db: &Connection, newer: i64, older: i64) {
+        db.execute(
+            "INSERT OR IGNORE INTO replacements(newer,older) VALUES(?1,?2)",
+            [newer, older],
+        )
+        .unwrap();
+        db.execute("UPDATE entries SET active=0 WHERE rid=?1", [older])
+            .unwrap();
+    }
+
+    /// What a graph has: each row's rid and what it is.
+    #[derive(Default)]
+    struct Graph {
+        exchanges: Vec<(i64, u64, bool)>,
+        kept: Vec<i64>,
+        talk: Vec<i64>,
+        noticed: Vec<i64>,
+        nightly: Vec<i64>,
+    }
+
+    /// A seeded graph of `person`'s, from `first` on: exchanges, half of
+    /// them about coffee, some shown a kept thing or a talk note; kept
+    /// things, talk notes, other observations and nightly items made from
+    /// them (the coffee turns among them), from each other and from
+    /// earlier versions; times said again; and with `expired`, some
+    /// exchanges gone by expiry after their `origins` were kept, so only
+    /// those link what was made from them.
+    fn seeded(
+        db: &Connection,
+        person: &str,
+        seed: u64,
+        first: u64,
+        rows: usize,
+        expired: bool,
+    ) -> Graph {
+        let mut rng = Seeded(seed);
+        let mut graph = Graph::default();
+        let mut id = first;
+        for n in 0..rows {
+            id += 1;
+            let pick = |rng: &mut Seeded, from: &[i64]| from[rng.below(from.len())];
+            let exchanges: Vec<i64> = graph.exchanges.iter().map(|e| e.0).collect();
+            let kind = if exchanges.len() < 3 {
+                0
+            } else {
+                rng.below(10)
+            };
+            match kind {
+                0..=4 => {
+                    let coffee = rng.chance(50);
+                    let heard = if coffee {
+                        format!("coffee {n}")
+                    } else {
+                        format!("tea {n}")
+                    };
+                    let rid = entry(db, person, id, "exchange", &heard, None);
+                    // What its session was shown.
+                    let shown: Vec<i64> = graph
+                        .kept
+                        .iter()
+                        .chain(&graph.talk)
+                        .chain(&graph.nightly)
+                        .copied()
+                        .collect();
+                    if !shown.is_empty() && rng.chance(25) {
+                        link(db, rid, pick(&mut rng, &shown));
+                    }
+                    graph.exchanges.push((rid, id, coffee));
+                }
+                5 => {
+                    let rid = entry(db, person, id, "kept", &format!("kept {n}"), None);
+                    for _ in 0..=rng.below(3) {
+                        link(db, rid, pick(&mut rng, &exchanges));
+                    }
+                    if !graph.kept.is_empty() && rng.chance(25) {
+                        replaces(db, rid, pick(&mut rng, &graph.kept));
+                    }
+                    graph.kept.push(rid);
+                }
+                6 | 7 => {
+                    let rid = entry(
+                        db,
+                        person,
+                        id,
+                        "observation",
+                        &format!("talk {n}"),
+                        Some("talk"),
+                    );
+                    for _ in 0..=rng.below(3) {
+                        link(db, rid, pick(&mut rng, &exchanges));
+                    }
+                    if !graph.talk.is_empty() && rng.chance(20) {
+                        replaces(db, rid, pick(&mut rng, &graph.talk));
+                    }
+                    graph.talk.push(rid);
+                }
+                8 => {
+                    let category = ["promise", "thread", "preference"][rng.below(3)];
+                    let rid = entry(
+                        db,
+                        person,
+                        id,
+                        "observation",
+                        &format!("noticed {n}"),
+                        Some(category),
+                    );
+                    for _ in 0..=rng.below(2) {
+                        link(db, rid, pick(&mut rng, &exchanges));
+                    }
+                    if !graph.kept.is_empty() && rng.chance(30) {
+                        link(db, rid, pick(&mut rng, &graph.kept));
+                    }
+                    graph.noticed.push(rid);
+                }
+                _ => {
+                    let kind = ["episode", "fact", "profile", "pattern"][rng.below(4)];
+                    let rid = entry(
+                        db,
+                        person,
+                        id,
+                        "observation",
+                        &format!("night {n}"),
+                        Some(kind),
+                    );
+                    db.execute(
+                        "INSERT INTO nightly_items(rid,person,kind,night) VALUES(?1,?2,?3,'2026-10-13')",
+                        params![rid, person, kind],
+                    )
+                    .unwrap();
+                    let cited: Vec<i64> = exchanges
+                        .iter()
+                        .chain(&graph.kept)
+                        .chain(&graph.talk)
+                        .chain(&graph.noticed)
+                        .chain(&graph.nightly)
+                        .copied()
+                        .collect();
+                    for _ in 0..=rng.below(3) {
+                        link(db, rid, pick(&mut rng, &cited));
+                    }
+                    if !graph.nightly.is_empty() && rng.chance(25) {
+                        replaces(db, rid, pick(&mut rng, &graph.nightly));
+                    }
+                    graph.nightly.push(rid);
+                }
+            }
+        }
+        for _ in 0..graph.kept.len() / 2 {
+            let (kept, line) = (
+                graph.kept[rng.below(graph.kept.len())],
+                graph.exchanges[rng.below(graph.exchanges.len())].1,
+            );
+            db.execute(
+                "INSERT OR IGNORE INTO said_again(rid,at_unix_ms,origin) VALUES(?1,?2,?3)",
+                params![kept, NOW + line, line],
+            )
+            .unwrap();
+        }
+        db.execute(
+            "INSERT OR IGNORE INTO sessions(person,session,opened_unix_ms,generation,max_bytes,note,ids) VALUES(?1,'s1',?2,0,4096,'a note','[1]')",
+            params![person, NOW],
+        )
+        .unwrap();
+        if expired {
+            let tx = db.unchecked_transaction().unwrap();
+            keep_origins(&tx).unwrap();
+            tx.commit().unwrap();
+            for (rid, _, _) in graph.exchanges.clone() {
+                if rng.chance(15) {
+                    db.execute("DELETE FROM search WHERE rowid=?1", [rid])
+                        .unwrap();
+                    db.execute("DELETE FROM entries WHERE rid=?1", [rid])
+                        .unwrap();
+                    graph.exchanges.retain(|e| e.0 != rid);
+                }
+            }
+        }
+        graph
+    }
+
+    /// One exchange's forget as [`forget_in`] did it before
+    /// [`origin_sharers`] (a8ae82eece), with its statements as they were:
+    /// the oracle.
+    fn forget_turn_before(
+        tx: &Transaction<'_>,
+        person: &Person,
+        id: u64,
+        asked: bool,
+        epoch: &str,
+    ) -> Result<Option<Forgotten>> {
+        if read_record(tx, person, id)?.is_none() {
+            return Ok(None);
+        }
+        tx.execute("DELETE FROM doomed", [])?;
+        tx.execute(
+            "INSERT INTO doomed SELECT rid FROM entries WHERE person=? AND id=?",
+            params![person.as_str(), id],
+        )?;
+        versions(tx)?;
+        descendants(tx, None)?;
+        keep_origins(tx)?;
+        tx.execute("INSERT OR IGNORE INTO doomed SELECT DISTINCT s.child FROM sources s JOIN entries e ON e.rid=s.child WHERE s.parent IN (SELECT rid FROM doomed) AND e.kind='observation' AND e.category='talk'", [])?;
+        tx.execute("INSERT OR IGNORE INTO doomed SELECT DISTINCT t.rid FROM entries t JOIN origins o ON o.rid=t.rid WHERE t.kind='observation' AND t.category='talk' AND EXISTS (SELECT 1 FROM entries d WHERE d.rid IN (SELECT rid FROM doomed) AND d.person=t.person AND coalesce(d.category,'')!='talk' AND (d.id=o.origin OR EXISTS (SELECT 1 FROM origins od WHERE od.rid=d.rid AND od.origin=o.origin)))", [])?;
+        loop {
+            let mut added = tx.execute("INSERT OR IGNORE INTO doomed SELECT DISTINCT s.child FROM sources s JOIN nightly_items n ON n.rid=s.child WHERE s.parent IN (SELECT rid FROM doomed) AND s.child NOT IN (SELECT rid FROM doomed)", [])?;
+            added += tx.execute("INSERT OR IGNORE INTO doomed SELECT DISTINCT t.rid FROM nightly_items t JOIN origins o ON o.rid=t.rid WHERE t.rid NOT IN (SELECT rid FROM doomed) AND EXISTS (SELECT 1 FROM entries d WHERE d.rid IN (SELECT rid FROM doomed) AND d.person=t.person AND coalesce(d.category,'')!='talk' AND NOT EXISTS (SELECT 1 FROM nightly_items nd WHERE nd.rid=d.rid) AND (d.id=o.origin OR EXISTS (SELECT 1 FROM origins od WHERE od.rid=d.rid AND od.origin=o.origin)))", [])?;
+            added += tx.execute("INSERT OR IGNORE INTO doomed SELECT r.older FROM replacements r JOIN nightly_items n ON n.rid=r.older WHERE r.newer IN (SELECT rid FROM doomed) AND r.older NOT IN (SELECT rid FROM doomed)", [])?;
+            added += tx.execute("INSERT OR IGNORE INTO doomed SELECT r.newer FROM replacements r JOIN nightly_items n ON n.rid=r.newer WHERE r.older IN (SELECT rid FROM doomed) AND r.newer NOT IN (SELECT rid FROM doomed)", [])?;
+            if added == 0 {
+                break;
+            }
+        }
+        said_again_with_doomed(tx)?;
+        let gone = doomed_exchanges(tx)?;
+        let unsent = crate::history_unsent::keep(tx, asked, epoch, &gone, None)?;
+        let count = erase(tx)?;
+        Ok(Some((count, gone, unsent)))
+    }
+
+    /// [`Days::exchanges_forget`] as it was before (a8ae82eece): a turn at
+    /// a time by [`forget_turn_before`], `origins` kept each turn.
+    fn per_turn(store: &mut Days, person: &Person, about: &[Vec<String>]) -> Result<u64> {
+        let subjects = crate::service_records::subjects_of(about);
+        store.forget_mark(person)?;
+        let matching = store.exchanges_about(person, &subjects)?;
+        let tx = store.db.transaction()?;
+        let (mut removed, mut gone, mut unsent) = (0, Vec::new(), None);
+        for id in matching {
+            if let Some((count, took, kept)) =
+                forget_turn_before(&tx, person, id, store.unsent_asked, &store.epoch)?
+            {
+                if count > 0 {
+                    removed += 1;
+                }
+                gone.extend(took);
+                unsent = crate::history_unsent::joined(unsent, kept);
+            }
+        }
+        tx.commit()?;
+        store.told(gone);
+        store.unsent = crate::history_unsent::joined(store.unsent, unsent);
+        if removed > 0 {
+            store.forget_set_aside()?;
+        }
+        Ok(removed)
+    }
+
+    /// Every row a forget can touch, as text.
+    fn rows(db: &Connection) -> Vec<String> {
+        let mut all = Vec::new();
+        for query in [
+            "SELECT rid,person,id,kind,active FROM entries ORDER BY rid",
+            "SELECT rowid,'','','','' FROM search ORDER BY rowid",
+            "SELECT child,parent,'','','' FROM sources ORDER BY child,parent",
+            "SELECT newer,older,'','','' FROM replacements ORDER BY newer,older",
+            "SELECT rid,origin,'','','' FROM origins ORDER BY rid,origin",
+            "SELECT rid,at_unix_ms,origin,'','' FROM said_again ORDER BY rid,at_unix_ms,origin",
+            "SELECT rid,person,kind,'','' FROM nightly_items ORDER BY rid",
+            "SELECT seq,scope,coalesce(turn,''),'','' FROM history_unsent ORDER BY seq",
+            "SELECT person,next_id,generation,skipped,'' FROM people ORDER BY person",
+            "SELECT person,session,generation,note,ids||invalidated FROM sessions ORDER BY person,session",
+            "SELECT person,day,at_unix_ms,'','' FROM nightly_forgets ORDER BY person,day,at_unix_ms",
+        ] {
+            let mut statement = db.prepare(query).unwrap();
+            let found = statement
+                .query_map([], |r| {
+                    let mut row = Vec::new();
+                    for column in 0..5 {
+                        row.push(match r.get_ref(column)? {
+                            rusqlite::types::ValueRef::Integer(n) => n.to_string(),
+                            rusqlite::types::ValueRef::Text(t) => {
+                                String::from_utf8_lossy(t).into_owned()
+                            }
+                            other => format!("{other:?}"),
+                        });
+                    }
+                    Ok(row.join("|"))
+                })
+                .unwrap()
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .unwrap();
+            all.push(query.to_owned());
+            all.extend(found);
+        }
+        all
+    }
+
+    /// Two copies of one seeded store (the same epoch): one forgets the
+    /// coffee turns as before ([`per_turn`]), the other as
+    /// [`Days::exchanges_forget`] does now. The same rows go and stay, the
+    /// same account history rows in the same order, the same `removed`, the
+    /// same exchanges told; and the graphs reach what has to stay the same:
+    /// talk notes and nightly items made from the coffee turns, a coffee
+    /// turn taken by another's walk, a time said again.
+    #[test]
+    fn a_forget_about_a_thing_takes_what_it_took_before_its_talk_notes_were_found_by_index() {
+        let about = [vec!["coffee".to_owned()]];
+        let person = Person::new(OWNER).unwrap();
+        let (mut talk, mut nightly, mut taken_by_another, mut said_again) = (0, 0, 0, 0);
+        for seed in 0..120u64 {
+            let (old, new) = (
+                scratch(&format!("old-{seed}")),
+                scratch(&format!("new-{seed}")),
+            );
+            let expired = seed % 3 == 0;
+            let graph = {
+                let store = Days::open(options(&old), NOW).unwrap();
+                let graph = seeded(&store.db, OWNER, seed, 0, 60, expired);
+                // Another person's coffee talk, never reached.
+                seeded(&store.db, OTHER, seed + 1000, 0, 20, false);
+                graph
+            };
+            // The copy's directory made as a store makes it, then the
+            // seeded file put in its place.
+            drop(Days::open(options(&new), NOW).unwrap());
+            fs::copy(old.join(DATABASE), new.join(DATABASE)).unwrap();
+            let (mut a, mut b) = (
+                Days::open(options(&old), NOW).unwrap(),
+                Days::open(options(&new), NOW).unwrap(),
+            );
+            assert_eq!(a.epoch, b.epoch);
+            a.unsent_asked = true;
+            b.unsent_asked = true;
+            let before = rows(&a.db);
+            let count = |db: &Connection, query: &str| -> u64 {
+                db.query_row(query, [], |r| r.get(0)).unwrap()
+            };
+            let said_before = count(&a.db, "SELECT count(*) FROM said_again");
+            let oracle = per_turn(&mut a, &person, &about).unwrap();
+            let walked = b.exchanges_forget(&person, &about).unwrap();
+            assert_eq!(walked, oracle, "seed {seed}: removed");
+            assert_eq!(b.take_forgot(), a.take_forgot(), "seed {seed}: told");
+            assert_eq!(
+                b.take_unsent(),
+                a.take_unsent(),
+                "seed {seed}: unsent range"
+            );
+            let (left_a, left_b) = (rows(&a.db), rows(&b.db));
+            assert_eq!(left_b, left_a, "seed {seed}: rows left");
+            assert_ne!(left_a, before, "seed {seed}: something went");
+            let coffee = graph.exchanges.iter().filter(|e| e.2).count() as u64;
+            if oracle < coffee {
+                taken_by_another += 1;
+            }
+            let gone = |rids: &[i64]| {
+                rids.iter().any(|rid| {
+                    count(
+                        &a.db,
+                        &format!("SELECT count(*) FROM entries WHERE rid={rid}"),
+                    ) == 0
+                })
+            };
+            talk += u64::from(gone(&graph.talk));
+            nightly += u64::from(gone(&graph.nightly));
+            said_again += u64::from(count(&a.db, "SELECT count(*) FROM said_again") < said_before);
+            drop((a, b));
+            let _ = fs::remove_dir_all(old);
+            let _ = fs::remove_dir_all(new);
+        }
+        assert!(
+            talk > 20,
+            "talk notes made from the turns went in {talk} graphs"
+        );
+        assert!(
+            nightly > 20,
+            "nightly items made from the turns went in {nightly} graphs"
+        );
+        assert!(
+            taken_by_another > 5,
+            "a coffee turn taken by another's walk in {taken_by_another} graphs"
+        );
+        assert!(
+            said_again > 5,
+            "a time said again went in {said_again} graphs"
+        );
+    }
+
+    /// The first builder's privacy check on #8125: what outlives a forget
+    /// about a thing is never made from the forgotten turns. No talk note,
+    /// nightly item or other observation made from one stays, by sources
+    /// down through what isn't an exchange (an exchange's sources are what
+    /// its session was shown, not what it was made from) or a kept thing
+    /// (one goes only when it is named, #3113); and no
+    /// talk note or nightly item stays with an `origins` row naming one;
+    /// an `origins` row naming one is a kept thing's. With exchanges gone
+    /// by expiry too, so `origins` alone links some.
+    #[test]
+    fn what_a_forget_about_a_thing_leaves_is_never_made_from_its_turns() {
+        let about = [vec!["coffee".to_owned()]];
+        let person = Person::new(OWNER).unwrap();
+        let mut checked = 0;
+        for seed in 0..80u64 {
+            let dir = scratch(&format!("privacy-{seed}"));
+            let mut store = Days::open(options(&dir), NOW).unwrap();
+            let graph = seeded(&store.db, OWNER, seed, 0, 60, seed % 2 == 0);
+            let forgotten: Vec<i64> = graph
+                .exchanges
+                .iter()
+                .filter(|e| e.2)
+                .map(|e| e.0)
+                .collect();
+            let ids: Vec<u64> = graph
+                .exchanges
+                .iter()
+                .filter(|e| e.2)
+                .map(|e| e.1)
+                .collect();
+            // Made from them: what has one of them as a source, and so on
+            // down, never an exchange or a kept thing.
+            let mut made: BTreeSet<i64> = forgotten.iter().copied().collect();
+            loop {
+                let more: Vec<i64> = store
+                    .db
+                    .prepare("SELECT s.child,s.parent FROM sources s JOIN entries c ON c.rid=s.child WHERE c.kind='observation'")
+                    .unwrap()
+                    .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))
+                    .unwrap()
+                    .filter_map(|row| row.ok())
+                    .filter(|(child, parent)| made.contains(parent) && !made.contains(child))
+                    .map(|(child, _)| child)
+                    .collect();
+                if more.is_empty() {
+                    break;
+                }
+                made.extend(more);
+            }
+            store.exchanges_forget(&person, &about).unwrap();
+            for rid in &made {
+                let kind: Option<String> = store
+                    .db
+                    .query_row("SELECT kind FROM entries WHERE rid=?1", [rid], |r| r.get(0))
+                    .optional()
+                    .unwrap();
+                assert_eq!(
+                    kind, None,
+                    "seed {seed}: row {rid}, made from a forgotten turn, stays"
+                );
+                checked += 1;
+            }
+            for id in &ids {
+                let staying: Vec<(String, Option<String>, bool)> = store
+                    .db
+                    .prepare("SELECT e.kind,e.category,EXISTS(SELECT 1 FROM nightly_items n WHERE n.rid=e.rid) FROM origins o JOIN entries e ON e.rid=o.rid WHERE e.person=?1 AND o.origin=?2")
+                    .unwrap()
+                    .query_map(params![OWNER, id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+                    .unwrap()
+                    .collect::<rusqlite::Result<_>>()
+                    .unwrap();
+                for (kind, category, night) in staying {
+                    assert_eq!(
+                        kind, "kept",
+                        "seed {seed}: a {category:?} (nightly {night}) names forgotten turn {id}"
+                    );
+                }
+            }
+            drop(store);
+            let _ = fs::remove_dir_all(dir);
+        }
+        assert!(
+            checked > 500,
+            "{checked} rows made from forgotten turns checked"
+        );
+    }
+
+    /// Flat round to round (the first builder on #8125): a second 100-turn
+    /// forget about a thing on the same store, after the first left more
+    /// talk notes and nightly items behind and more were made, is no slower
+    /// than the first, with room so a busy machine doesn't fail it.
+    /// Through each turn the old walk re-joined every talk note and nightly
+    /// item the person has, so it slowed as they grew (lamp-06c1, 21 Nov:
+    /// 1861 ms, then 2834 ms).
+    #[test]
+    fn a_second_hundred_turn_forget_about_a_thing_is_no_slower_than_the_first() {
+        let dir = scratch("flat");
+        let mut store = Days::open(options(&dir), NOW).unwrap();
+        let person = Person::new(OWNER).unwrap();
+        let about = [vec!["coffee".to_owned()]];
+        let mut next = 0;
+        let mut round = |store: &mut Days, background: usize| -> std::time::Duration {
+            // What stays: talk notes and nightly items of other talk.
+            let tea: Vec<i64> = (0..background)
+                .map(|n| {
+                    next += 1;
+                    entry(
+                        &store.db,
+                        OWNER,
+                        next,
+                        "exchange",
+                        &format!("tea {n}"),
+                        None,
+                    )
+                })
+                .collect();
+            for (n, pair) in tea.chunks(2).enumerate() {
+                next += 1;
+                let talk = entry(
+                    &store.db,
+                    OWNER,
+                    next,
+                    "observation",
+                    &format!("talk {n}"),
+                    Some("talk"),
+                );
+                next += 1;
+                let night = entry(
+                    &store.db,
+                    OWNER,
+                    next,
+                    "observation",
+                    &format!("night {n}"),
+                    Some("episode"),
+                );
+                store.db.execute("INSERT INTO nightly_items(rid,person,kind,night) VALUES(?1,?2,'episode','2026-10-13')", params![night, OWNER]).unwrap();
+                for rid in pair {
+                    link(&store.db, talk, *rid);
+                    link(&store.db, night, *rid);
+                }
+            }
+            // The 100 turns about it, with what was made from them.
+            for n in 0..100 {
+                next += 1;
+                let turn = entry(
+                    &store.db,
+                    OWNER,
+                    next,
+                    "exchange",
+                    &format!("coffee {n}"),
+                    None,
+                );
+                if n % 4 == 0 {
+                    next += 1;
+                    let talk = entry(
+                        &store.db,
+                        OWNER,
+                        next,
+                        "observation",
+                        &format!("coffee talk {n}"),
+                        Some("talk"),
+                    );
+                    link(&store.db, talk, turn);
+                    next += 1;
+                    let night = entry(
+                        &store.db,
+                        OWNER,
+                        next,
+                        "observation",
+                        &format!("coffee night {n}"),
+                        Some("fact"),
+                    );
+                    store.db.execute("INSERT INTO nightly_items(rid,person,kind,night) VALUES(?1,?2,'fact','2026-10-13')", params![night, OWNER]).unwrap();
+                    link(&store.db, night, turn);
+                }
+            }
+            let started = std::time::Instant::now();
+            assert_eq!(store.exchanges_forget(&person, &about).unwrap(), 100);
+            started.elapsed()
+        };
+        let first = round(&mut store, 100);
+        let second = round(&mut store, 600);
+        assert!(
+            second <= first * 2 + std::time::Duration::from_millis(250),
+            "first {first:?}, second {second:?}"
+        );
+        drop(store);
+        let _ = fs::remove_dir_all(dir);
     }
 }

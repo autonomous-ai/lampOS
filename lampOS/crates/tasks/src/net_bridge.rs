@@ -341,20 +341,24 @@ pub fn relay(listener: &TcpListener, to: &Path, bounds: Bounds, stop: &AtomicBoo
     );
 }
 
-/// What `net-relay` is started with.
+/// What `net-relay` is started with: the model's relay (`listen` and
+/// `to`), its egress (`egress`), or both.
 #[derive(Debug, PartialEq, Eq)]
 pub struct RelayArgs {
-    pub listen: SocketAddr,
-    pub to: PathBuf,
+    /// With `to`, the model's relay; none for a gateway agent's run
+    /// granted `net` (#7742), whose fence relays its egress alone.
+    pub model: Option<(SocketAddr, PathBuf)>,
     /// A run granted `net`: its egress socket, where the proxy and the
     /// name server inside the run pipe to ([`crate::egress::Inside`]).
     pub egress: Option<PathBuf>,
 }
 
-/// `net-relay --listen ADDR --to PATH [--egress PATH]`: a loopback
-/// address and absolute socket paths, each once, nothing else.
+/// `net-relay --listen ADDR --to PATH [--egress PATH]`, or `--egress
+/// PATH` alone (#7742: a gateway agent's run's fence, with no model to
+/// relay): a loopback address and absolute socket paths, each once,
+/// nothing else.
 pub fn relay_args(args: &[String]) -> Result<RelayArgs, String> {
-    let usage = "usage: lamp-tasks net-relay --listen 127.0.0.1:PORT --to /ABS/SOCKET [--egress /ABS/SOCKET]";
+    let usage = "usage: lamp-tasks net-relay [--listen 127.0.0.1:PORT --to /ABS/SOCKET] [--egress /ABS/SOCKET]";
     let (mut listen, mut to, mut egress) = (None, None, None);
     let mut args = args.iter();
     while let Some(arg) = args.next() {
@@ -384,11 +388,12 @@ pub fn relay_args(args: &[String]) -> Result<RelayArgs, String> {
             _ => return Err(usage.into()),
         }
     }
-    Ok(RelayArgs {
-        listen: listen.ok_or(usage)?,
-        to: to.ok_or(usage)?,
-        egress,
-    })
+    let model = match (listen, to) {
+        (Some(listen), Some(to)) => Some((listen, to)),
+        (None, None) if egress.is_some() => None,
+        _ => return Err(usage.into()),
+    };
+    Ok(RelayArgs { model, egress })
 }
 
 /// `lamp-tasks net-relay`: listens (with `--egress`, also the proxy and
@@ -397,8 +402,14 @@ pub fn relay_args(args: &[String]) -> Result<RelayArgs, String> {
 /// namespace script's `$(...)` ends), and relays until it is killed (the
 /// run's PID namespace ending).
 pub fn relay_main(args: &[String]) -> Result<(), String> {
-    let RelayArgs { listen, to, egress } = relay_args(args)?;
-    let listener = TcpListener::bind(listen).map_err(|error| format!("{listen}: {error}"))?;
+    let RelayArgs { model, egress } = relay_args(args)?;
+    let model = match model {
+        Some((listen, to)) => Some((
+            TcpListener::bind(listen).map_err(|error| format!("{listen}: {error}"))?,
+            to,
+        )),
+        None => None,
+    };
     let inside = match &egress {
         Some(_) => Some(crate::egress::Inside::bind(
             crate::egress::PROXY_LISTEN,
@@ -422,7 +433,14 @@ pub fn relay_main(args: &[String]) -> Result<(), String> {
             .serve(&egress, crate::egress::BOUNDS, &stop, &say)
             .map_err(|error| format!("egress relay not started: {error}"))?;
     }
-    relay(&listener, &to, Bounds::LAMP, &stop, &say);
+    match model {
+        Some((listener, to)) => relay(&listener, &to, Bounds::LAMP, &stop, &say),
+        // The egress alone: its threads serve until the run's PID
+        // namespace ends this process.
+        None => loop {
+            std::thread::park();
+        },
+    }
     Ok(())
 }
 
@@ -685,9 +703,16 @@ mod tests {
                 "--listen 127.0.0.1:7741 --to /run/lampos-tasks/model.sock"
             )),
             Ok(RelayArgs {
-                listen: FORWARDER,
-                to: PathBuf::from(MODEL_SOCKET),
+                model: Some((FORWARDER, PathBuf::from(MODEL_SOCKET))),
                 egress: None
+            })
+        );
+        // #7742: a gateway agent's run's fence relays its egress alone.
+        assert_eq!(
+            relay_args(&args("--egress /proc/self/fd/5")),
+            Ok(RelayArgs {
+                model: None,
+                egress: Some(PathBuf::from("/proc/self/fd/5")),
             })
         );
         assert_eq!(
@@ -705,6 +730,9 @@ mod tests {
             "--listen 127.0.0.1:7741 --to run/x.sock",
             "--listen 127.0.0.1:7741",
             "--to /run/x.sock",
+            "--listen 127.0.0.1:7741 --egress /e.sock",
+            "--to /run/x.sock --egress /e.sock",
+            "--egress proc/self/fd/5",
             "--listen 127.0.0.1:7741 --listen 127.0.0.1:7742 --to /run/x.sock",
             "--listen 127.0.0.1:7741 --to /run/x.sock --more x",
             "--listen 127.0.0.1:7741 --to",

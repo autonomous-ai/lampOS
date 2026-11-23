@@ -28,7 +28,7 @@ pub const EVENTS: [&str; 4] = [
     Diagnostic::TOPIC,
 ];
 /// Every topic listened to: [`EVENTS`], and those only the timeline reads.
-pub const LISTENED: [&str; 9] = [
+pub const LISTENED: [&str; 10] = [
     EVENTS[0],
     EVENTS[1],
     EVENTS[2],
@@ -38,6 +38,7 @@ pub const LISTENED: [&str; 9] = [
     timeline::TOPICS[2],
     timeline::TOPICS[3],
     timeline::TOPICS[4],
+    timeline::TOPICS[5],
 ];
 /// The name its subscribers have on the bus.
 pub const SUBSCRIBER: &str = "peek";

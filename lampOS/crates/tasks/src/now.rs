@@ -253,7 +253,9 @@ mod tests {
                 machine_id: MACHINE.into(),
                 agent_id: agent(*task),
                 engine: "claude".into(),
-                accepted_ago_ms: Some(0),
+                // Handed over before the agent's last activity: a row last
+                // active before the hand-over is an earlier task's (#7930).
+                accepted_ago_ms: Some(5_000),
             })
             .collect();
         let listed = tasks
@@ -263,6 +265,7 @@ mod tests {
                 state: "working".into(),
                 last_active_unix_ms: Some(wall - 3_000),
                 about: Some((*about).to_owned()),
+                agent: None,
             })
             .collect();
         let _ = tracker.read(MACHINE, Ok(listed), &watched, wall, 400);

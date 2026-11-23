@@ -70,7 +70,10 @@ Environment=LAMP_SKILL_SECRETS=on
 # 2 min and sent once on the person's spoken yes, as any write. A drop-in setting LAMP_CALENDAR_EDITS=off leaves
 # create_event only.
 Environment=LAMP_CALENDAR_EDITS=on
-ExecStart=/opt/lampOS/services/current/lamp-services --store /var/lib/lampos-services --run /run/lampos-services
+# --run-calls: the last 64 calls across all skill runs, no content, for the voice's run_calls_since, which
+# LAMP_SERVICE_RECORDS_AGENT in lamp-voice.service keeps as the run's person's linked records (services.md, "The last
+# 64 calls across all runs kept"). On in the product by the product owner's rule of 18 Nov (#6811).
+ExecStart=/opt/lampOS/services/current/lamp-services --store /var/lib/lampos-services --run /run/lampos-services --run-calls
 Restart=on-failure
 RestartSec=5s
 StandardInput=null

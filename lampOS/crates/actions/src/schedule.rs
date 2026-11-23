@@ -53,6 +53,11 @@ macro_rules! list_before {
 }
 macro_rules! list_asked {
     () => {
+        "Any question about their own reminders or timers at any point, in any wording or language, even one that sounds a word short, is answered only after calling this in that turn, not recall or lamp_help. set_day/set_clock say when each was set, as 'yesterday at 09:00'; if null, say you don't know when. Never list reminders unasked."
+    };
+}
+macro_rules! list_asked_before {
+    () => {
         "Call this, not recall, for any question about their reminders or timers: what is set, when one is due, or when they set it; never say you do not remember a reminder before calling this. set_day and set_clock say when each was set, as 'yesterday at 09:00'; if they are null, say you don't know when. Never list reminders unasked."
     };
 }
@@ -62,16 +67,28 @@ macro_rules! list_said {
     };
 }
 /// `list_reminders`' description before questions about reminders were
-/// named in it: kept for the probe's old arm (`lamp-voice probe-tools`).
+/// named in it: the first part of every description since.
 pub const LIST_BEFORE: &str = list_before!();
 /// What `list_reminders`' description adds (the person's call, 30 Oct): a
 /// question about a reminder, what is set, when it is due or when it was
 /// set, is answered from this list, not from memory, and the list is never
-/// read out unasked (rule 8). On both routes: they declare the same catalog.
+/// read out unasked (rule 8). Any such question, in any wording or language,
+/// even one heard a word short, is answered only after the call in that turn
+/// (#7987: the exact phrases' forced call stays as it is). Their own
+/// reminders and timers, at any point in a conversation, are this, not
+/// faq's `lamp_help`, which tells how reminders work (#8181: in gate 1126
+/// a 2nd line's reminders question went there); "(what is set, when due or
+/// set)" left to fit 1,024 bytes. On both routes: they declare the same
+/// catalog.
 pub const LIST_ASKED: &str = list_asked!();
 /// What it adds for reminders already said (29e7, 2 Nov: four said late,
 /// then gone, and six minutes later "I don't see either still set").
 pub const LIST_SAID: &str = list_said!();
+/// `list_reminders`' description before a question in any wording or
+/// language, even one heard a word short, was named in it (#7987): kept for
+/// the old arm of `lamp-voice probe-reminders`.
+pub const LIST_DESCRIBED_BEFORE: &str =
+    concat!(list_before!(), " ", list_asked_before!(), " ", list_said!());
 /// `list_reminders`' description.
 pub const LIST_DESCRIBED: &str = concat!(list_before!(), " ", list_asked!(), " ", list_said!());
 
@@ -103,11 +120,50 @@ pub fn is_tool(name: &str) -> bool {
     NAMES.contains(&name)
 }
 
+/// `on` only (#8182), in lamp-actions' unit and lamp-voice's: a timer or a
+/// reminder whose length or time the person's words did not give is never
+/// guessed. Off unless set.
+pub const ASKS_HOW_LONG_SWITCH: &str = "LAMP_TIMER_ASKS_HOW_LONG";
+
+/// Whether [`ASKS_HOW_LONG_SWITCH`] is `on` in this process's environment.
+pub fn asks_how_long_from_environment() -> bool {
+    std::env::var_os(ASKS_HOW_LONG_SWITCH).as_deref() == Some(OsStr::new("on"))
+}
+
 /// The existing provider's small Schema vocabulary. Runtime validation below
 /// is stricter than a model schema; byte limits and unknown fields are checked.
 pub fn catalog() -> Vec<Function> {
-    catalog_with(every_from_environment())
+    asking_how_long(
+        catalog_with(every_from_environment()),
+        asks_how_long_from_environment(),
+    )
 }
+
+/// `catalog` with [`ASKS_HOW_LONG_SWITCH`] on (`on`): `set_timer` and
+/// `set_reminder` say to ask for a length or time not given.
+pub fn asking_how_long(mut catalog: Vec<Function>, on: bool) -> Vec<Function> {
+    if on {
+        for function in &mut catalog {
+            match function.name {
+                "set_timer" => function.description = SET_TIMER_ASKS,
+                "set_reminder" => function.description = SET_REMINDER_ASKS,
+                _ => {}
+            }
+        }
+    }
+    catalog
+}
+
+/// `set_timer`'s description with [`ASKS_HOW_LONG_SWITCH`] on: off's, and
+/// to ask for a length the words did not give. When it asks what a timer is
+/// for, its words are fixed and name the timer, so the voice's reply lends
+/// the asked line's length (`reminders::asked_gave_when` in lamp-voice; the
+/// Reviewer-lead's P2 on #8274).
+const SET_TIMER_ASKS: &str = "Set a timer or a relative reminder only when asked. For a duration from now, such as 'in two minutes', 'in ten minutes', or 'in an hour', use this tool with the requested label and whole seconds (120, 600, or 3600 respectively); never round to a clock time. If the person's words give no length, never choose one: set nothing and ask only, in a few words, 'For how long?', then set it from their answer. If you ask what it is for, ask only 'What's the timer for?'. Confirm the returned time only after durable success. If the outcome is unknown, list current reminders before asking again. If they change the time of one already set, cancel that one before setting the new one; never leave both.";
+
+/// `set_reminder`'s with the switch on: off's, and to ask for a time the
+/// words did not give, and what it is for in fixed words, as `set_timer`'s.
+const SET_REMINDER_ASKS: &str = "Set one reminder at a requested local clock time, such as 'at nine tomorrow morning'. For relative times from now, use set_timer with the requested label and whole seconds instead; do not round to HH:MM. If the person's words give no time, never choose one: set nothing and ask only, in a few words, 'What time?', then set it from their answer. Ask for missing or ambiguous intent; to ask what it is for, ask only 'What should I remind you about?'. Never calculate a Unix timestamp.";
 
 /// [`catalog`] with [`EVERY_SWITCH`] on (`every`) or off: off, it is the
 /// catalog as it was, byte for byte.
@@ -1429,6 +1485,49 @@ mod tests {
         match parse("repeat_reminder", &args, every)? {
             Call::Set { when, .. } => Ok(when),
             _ => Err(Failure::BadArguments),
+        }
+    }
+
+    /// `LAMP_TIMER_ASKS_HOW_LONG` (#8182): on, `set_timer` says to ask "For
+    /// how long?" and `set_reminder` "What time?" when the words gave none,
+    /// and never to choose one; off, the catalog is as it was, byte for byte.
+    #[test]
+    fn set_timer_and_set_reminder_say_to_ask_only_with_the_switch() {
+        let off = asking_how_long(catalog_with(false), false);
+        assert_eq!(
+            serde_json::to_string(&off).unwrap(),
+            serde_json::to_string(&catalog_with(false)).unwrap()
+        );
+        let on = asking_how_long(catalog_with(false), true);
+        let said = |name| on.iter().find(|f| f.name == name).unwrap().description;
+        assert!(
+            said("set_timer").contains("For how long?"),
+            "{}",
+            said("set_timer")
+        );
+        assert!(said("set_timer").contains("never choose one"));
+        assert!(
+            said("set_reminder").contains("What time?"),
+            "{}",
+            said("set_reminder")
+        );
+        // The label questions are fixed too, each naming the schedule, so a
+        // reply to one lends the asked line's time (the Reviewer-lead's P2
+        // on #8274: "What's it for?" lent nothing).
+        assert!(
+            said("set_reminder").contains("'What should I remind you about?'"),
+            "{}",
+            said("set_reminder")
+        );
+        assert!(
+            said("set_timer").contains("'What's the timer for?'"),
+            "{}",
+            said("set_timer")
+        );
+        for (was, now) in catalog_with(false).iter().zip(&on) {
+            if !matches!(was.name, "set_timer" | "set_reminder") {
+                assert_eq!(was.description, now.description);
+            }
         }
     }
 

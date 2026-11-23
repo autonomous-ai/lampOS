@@ -17,6 +17,7 @@
 //! (#4883, [`MOST_FILES`]).
 use super::SOUND_RATE;
 use crate::language::{Language, WOKEN_BY_NAME_LINE};
+use crate::speaker_stream::Feed;
 use sha2::{Digest, Sha256};
 use std::{
     fs,
@@ -36,8 +37,31 @@ pub const DIR: &str = "/var/lib/lampOS/voice/tts-cache";
 pub const MOST_FILES: usize = 64;
 /// The longest line kept: 20 s at the speaker's rate.
 pub const MOST_FRAMES: u32 = SOUND_RATE * 20;
-/// The longest one rendering may take.
+/// The longest one rendering of a short line may take: a line of up to
+/// [`RENDER_SHORT_CHARS`] characters, every cached line ([`WARM`], the fixed
+/// lines) and most exact ones.
 pub const RENDER_WITHIN: Duration = Duration::from_secs(5);
+/// A line up to this many characters (about 8 s of speech at ~15 a second)
+/// is given [`RENDER_WITHIN`], as before (#7742).
+pub const RENDER_SHORT_CHARS: usize = 120;
+/// Past [`RENDER_SHORT_CHARS`], each started this many characters (about
+/// 2 s of speech) adds 1 s: a render at twice the speed it plays, the pace
+/// the first 120 characters' 5 s already asks, connection included. A
+/// skill's agent's two-sentence answer (363 bytes on lamp-c0a4, #7742) was
+/// refused whole at 5 s and nothing was said.
+pub const RENDER_MORE_CHARS: usize = 30;
+/// The longest any render may take: as long as the longest line kept or
+/// played ([`MOST_FRAMES`], 20 s) plays, so a render slower than the line
+/// itself is still refused. Reached at 570 characters, past what fits in
+/// [`MOST_FRAMES`] at the voice's pace.
+pub const RENDER_MOST: Duration = Duration::from_secs((MOST_FRAMES / SOUND_RATE) as u64);
+/// The most characters of an exact line rendered as one piece (#7892):
+/// half of what plays in [`MOST_FRAMES`] at the voice's pace
+/// ([`RENDER_MORE_CHARS`] in about 2 s), so a slower voice's piece still
+/// renders within it. A longer line is rendered in pieces
+/// ([`TtsCache::render_once`]); the cap stays [`MOST_FRAMES`] for every
+/// render.
+pub const MOST_PIECE_CHARS: usize = (MOST_FRAMES / SOUND_RATE) as usize * RENDER_MORE_CHARS / 2 / 2;
 /// Rendered at start, after the speech service is configured, until each is
 /// kept: the safe shutdown's line, one source with the shutdown, then the
 /// hold's sleep line (#3748), read by the coordinator with [`TtsCache::kept`],
@@ -79,6 +103,8 @@ pub struct TtsCache {
     /// is warmed ([`Self::wake_line`]). Off, it is neither warmed nor kept
     /// from going.
     hears_name: bool,
+    /// [`Self::keeping_outage_lines`].
+    outage_lines: bool,
     /// One render at a time, so a line asked while it warms is rendered once.
     /// Held while rendering, so a line asked while it warms is rendered
     /// once. It holds the lines that rendered empty or past [`MOST_FRAMES`]:
@@ -108,6 +134,7 @@ impl TtsCache {
             render_in: None,
             owners: None,
             hears_name: false,
+            outage_lines: false,
             rendering: Mutex::new(std::collections::HashSet::new()),
         }
     }
@@ -133,6 +160,15 @@ impl TtsCache {
         self
     }
 
+    /// `LAMP_OUTAGE_LINE_AGAIN=on` (#8235): an English lamp warms the
+    /// failed turn's line (`language::TURN_LOST`), which its release has no
+    /// file for, and the second route's down line, said by a turn of the
+    /// service's outage; another language warms both as fixed lines.
+    pub fn keeping_outage_lines(mut self, on: bool) -> Self {
+        self.outage_lines = on;
+        self
+    }
+
     /// The lines warmed at start: the owner's fixed lines first, when the
     /// owner's language is not English, then [`WARM`], the English fallback,
     /// and with [`Self::hearing_its_name`] the wake's English on an English
@@ -143,6 +179,15 @@ impl TtsCache {
             .flat_map(Language::fixed_lines)
             .chain(WARM.iter().copied())
             .chain(self.hears_name.then(|| self.wake_words()))
+            .chain(
+                (self.outage_lines && self.owners.is_none())
+                    .then_some([
+                        crate::language::TURN_LOST,
+                        crate::second_provider::DOWN_LINE,
+                    ])
+                    .into_iter()
+                    .flatten(),
+            )
             .collect()
     }
 
@@ -220,17 +265,12 @@ impl TtsCache {
     /// `text` rendered now through the speech service, never kept: a paired
     /// computer's exact words (`exact`, lamp-control's `say`), which are
     /// not the lamp's own fixed lines and must not fill [`MOST_FILES`]. Or
-    /// why not: the service's refusal, or a line empty or past
-    /// [`MOST_FRAMES`].
+    /// why not: the service's refusal, or a piece empty or past
+    /// [`MOST_FRAMES`]. A line past [`MOST_PIECE_CHARS`] is rendered in
+    /// pieces ([`pieces`], #7892) and played as one line, every piece in
+    /// order.
     pub fn render_once(&self, text: &str) -> Result<Vec<i16>, String> {
-        let samples = (self.render)(text).map_err(|why| format!("not rendered: {why}"))?;
-        if samples.is_empty() || samples.len() > MOST_FRAMES as usize {
-            return Err(format!(
-                "rendered empty or past {} s",
-                MOST_FRAMES / SOUND_RATE
-            ));
-        }
-        Ok(samples)
+        in_pieces(text, |piece| (self.render)(piece))
     }
 
     /// `text` rendered now in the lamp's voice named `voice`, never kept:
@@ -242,14 +282,94 @@ impl TtsCache {
             .render_in
             .as_ref()
             .ok_or_else(|| "this lamp's speech service speaks in its own voice only".to_owned())?;
-        let samples = render_in(text, voice).map_err(|why| format!("not rendered: {why}"))?;
-        if samples.is_empty() || samples.len() > MOST_FRAMES as usize {
-            return Err(format!(
-                "rendered empty or past {} s",
-                MOST_FRAMES / SOUND_RATE
-            ));
+        in_pieces(text, |piece| render_in(piece, voice))
+    }
+
+    /// `text` rendered now, never kept, to be played as it comes (#7892,
+    /// V2's 12:35 on #7897), in `voice` when one is given (the app's voice
+    /// preview, as [`Self::render_once_in`]). A line within
+    /// [`MOST_PIECE_CHARS`] is rendered whole, as before. A longer one's
+    /// first piece is rendered here, so its failure refuses the line as
+    /// before, and played at once from a feed of its own; the pieces after
+    /// it are rendered on a thread of their own ([`Self::render_rest`]),
+    /// each while the one before it plays.
+    pub fn render_played(
+        self: &Arc<Self>,
+        text: &str,
+        voice: Option<&str>,
+    ) -> Result<Played, String> {
+        let pieces = pieces(text);
+        if pieces.len() == 1 {
+            return match voice {
+                Some(voice) => self.render_once_in(text, voice),
+                None => self.render_once(text),
+            }
+            .map(Played::Whole);
         }
-        Ok(samples)
+        let first = self.render_piece(&pieces[0], voice)?;
+        // Room for the piece playing and the one rendered after it, each
+        // within the cap.
+        let feed = Feed::for_line(2 * MOST_FRAMES as usize);
+        feed.push(&first);
+        let cache = Arc::clone(self);
+        let rest = pieces[1..].to_vec();
+        let voice = voice.map(str::to_owned);
+        let fed = Arc::clone(&feed);
+        let spawned = std::thread::Builder::new()
+            .name("say-pieces".into())
+            .spawn(move || cache.render_rest(&rest, voice.as_deref(), first.len(), &fed));
+        if let Err(why) = spawned {
+            eprintln!("lamp-voice: a long exact line's later pieces are not rendered: {why}");
+            feed.close_short();
+        }
+        Ok(Played::Pieces(Arc::new(Pieces { feed })))
+    }
+
+    /// One piece rendered, in `voice` when given, or why not, as
+    /// [`Self::render_once`] says it.
+    fn render_piece(&self, piece: &str, voice: Option<&str>) -> Result<Vec<i16>, String> {
+        match voice {
+            None => in_pieces(piece, |piece| (self.render)(piece)),
+            Some(voice) => {
+                let render_in = self.render_in.as_ref().ok_or_else(|| {
+                    "this lamp's speech service speaks in its own voice only".to_owned()
+                })?;
+                in_pieces(piece, |piece| render_in(piece, voice))
+            }
+        }
+    }
+
+    /// The pieces after the first, rendered in turn into `feed`, in order.
+    /// Each is rendered once all before the last one put in was taken to
+    /// play (`last` its samples): while that one plays, so at most one
+    /// piece waits rendered and the next is ready before it ends. Stopped,
+    /// and nothing more rendered, once nobody plays the line
+    /// ([`Feed::abandoned`]); a piece not rendered ends the line there,
+    /// not said whole ([`Feed::close_short`]).
+    fn render_rest(&self, rest: &[String], voice: Option<&str>, mut last: usize, feed: &Feed) {
+        for piece in rest {
+            while feed.held_samples() > last && !feed.abandoned() {
+                std::thread::sleep(PIECE_LOOK);
+            }
+            if feed.abandoned() {
+                return;
+            }
+            match self.render_piece(piece, voice) {
+                Ok(_) if feed.abandoned() => return,
+                Ok(samples) => {
+                    last = samples.len();
+                    feed.push(&samples);
+                }
+                Err(why) => {
+                    eprintln!(
+                        "lamp-voice: a long exact line's next piece was {why}: the line ends there"
+                    );
+                    feed.close_short();
+                    return;
+                }
+            }
+        }
+        feed.close();
     }
 
     /// `text`'s samples if kept already, never rendered here: for a caller
@@ -382,8 +502,159 @@ pub fn from_environment() -> Option<Arc<TtsCache>> {
     SHARED.get_or_init(made_from_environment).clone()
 }
 
+/// `text` rendered by `render` piece by piece ([`pieces`]), the samples
+/// one after another, or why not: the service's refusal, or a piece empty
+/// or past [`MOST_FRAMES`], the cap of every render.
+fn in_pieces(
+    text: &str,
+    render: impl Fn(&str) -> Result<Vec<i16>, String>,
+) -> Result<Vec<i16>, String> {
+    let mut samples = Vec::new();
+    for piece in pieces(text) {
+        let rendered = render(&piece).map_err(|why| format!("not rendered: {why}"))?;
+        if rendered.is_empty() || rendered.len() > MOST_FRAMES as usize {
+            return Err(format!(
+                "rendered empty or past {} s",
+                MOST_FRAMES / SOUND_RATE
+            ));
+        }
+        samples.extend_from_slice(&rendered);
+    }
+    Ok(samples)
+}
+
+/// A long exact line's sound (#7892): played from its feed as its pieces
+/// come ([`TtsCache::render_played`]). Let go, by the last say or turn
+/// that holds it (the line cut, refused, expired or ended), its renderer
+/// stops and no later piece is rendered or played.
+#[derive(Debug)]
+pub struct Pieces {
+    feed: Arc<Feed>,
+}
+
+impl Pieces {
+    /// The feed its pieces come through, for the speaker.
+    pub fn feed(&self) -> Arc<Feed> {
+        Arc::clone(&self.feed)
+    }
+}
+
+impl Drop for Pieces {
+    fn drop(&mut self) {
+        self.feed.abandon();
+    }
+}
+
+/// A line's pieces are their own: equal only to themselves.
+impl PartialEq for Pieces {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self, other)
+    }
+}
+
+impl Eq for Pieces {}
+
+/// An exact line rendered to play ([`TtsCache::render_played`]): whole, or
+/// in pieces that come as they are rendered.
+#[derive(Debug)]
+pub enum Played {
+    Whole(Vec<i16>),
+    Pieces(Arc<Pieces>),
+}
+
+/// How often a long line's renderer looks whether its last piece began.
+const PIECE_LOOK: Duration = Duration::from_millis(10);
+
+/// Where a long line is cut, coarsest first: sentence ends, then clause
+/// ends; past both, between words.
+const MARKS: [&[char]; 2] = [&['.', '!', '?'], &[',', ';', ':']];
+
+/// An exact `line` as it is rendered (#7892): whole within
+/// [`MOST_PIECE_CHARS`], else in pieces within it, cut at sentence ends,
+/// then clause ends, then between words, every word kept in its order.
+pub fn pieces(line: &str) -> Vec<String> {
+    split(line, &MARKS)
+}
+
+/// `text` within [`MOST_PIECE_CHARS`]: whole when it fits, else its units
+/// (its words up to each one ending in one of `marks`' first; each word,
+/// with no marks left) packed in order, a unit past it split again by the
+/// finer marks. A word alone past it is cut between its characters.
+fn split(text: &str, marks: &[&[char]]) -> Vec<String> {
+    let count = |text: &str| text.chars().count();
+    if count(text) <= MOST_PIECE_CHARS {
+        return vec![text.to_owned()];
+    }
+    let units: Vec<String> = match marks.first() {
+        Some(ends) => {
+            let mut units = Vec::new();
+            let mut unit = String::new();
+            for word in text.split_whitespace() {
+                if !unit.is_empty() {
+                    unit.push(' ');
+                }
+                unit.push_str(word);
+                if word.ends_with(*ends) {
+                    units.push(std::mem::take(&mut unit));
+                }
+            }
+            if !unit.is_empty() {
+                units.push(unit);
+            }
+            units
+        }
+        None if !text.contains(char::is_whitespace) => {
+            let chars: Vec<char> = text.chars().collect();
+            return chars
+                .chunks(MOST_PIECE_CHARS)
+                .map(|cut| cut.iter().collect())
+                .collect();
+        }
+        None => text.split_whitespace().map(str::to_owned).collect(),
+    };
+    let finer = marks.get(1..).unwrap_or_default();
+    let mut said = Vec::new();
+    let mut piece = String::new();
+    for part in units.iter().flat_map(|unit| split(unit, finer)) {
+        if !piece.is_empty() && count(&piece) + 1 + count(&part) > MOST_PIECE_CHARS {
+            said.push(std::mem::take(&mut piece));
+        }
+        if !piece.is_empty() {
+            piece.push(' ');
+        }
+        piece.push_str(&part);
+    }
+    if !piece.is_empty() {
+        said.push(piece);
+    }
+    said
+}
+
+/// How long rendering `text` whole may take: [`RENDER_WITHIN`] for a short
+/// line, 1 s more for each started [`RENDER_MORE_CHARS`] past
+/// [`RENDER_SHORT_CHARS`], at most [`RENDER_MOST`]. Counted in characters,
+/// not bytes, so a line in Vietnamese is given the time its English would.
+pub fn render_within(text: &str) -> Duration {
+    let past = text.chars().count().saturating_sub(RENDER_SHORT_CHARS);
+    let more = Duration::from_secs(past.div_ceil(RENDER_MORE_CHARS) as u64);
+    (RENDER_WITHIN + more).min(RENDER_MOST)
+}
+
+/// `render`, `text`'s whole rendering, awaited at most
+/// [`render_within`]`(text)`, or why not.
+async fn whole_within<E: std::fmt::Display>(
+    text: &str,
+    render: impl std::future::Future<Output = Result<Vec<i16>, E>>,
+) -> Result<Vec<i16>, String> {
+    let within = render_within(text);
+    match tokio::time::timeout(within, render).await {
+        Ok(samples) => samples.map_err(|why| why.to_string()),
+        Err(_) => Err(format!("not within {} s", within.as_secs())),
+    }
+}
+
 /// `text` rendered through the speech service `config` names, whole, within
-/// [`RENDER_WITHIN`], on a runtime of its own.
+/// [`render_within`], on a runtime of its own.
 fn render_with(
     config: &crate::second_config::SecondConfig,
     text: &str,
@@ -403,10 +674,7 @@ fn render_with(
             }
             Ok::<_, crate::second_provider::net::Error>(samples)
         };
-        match tokio::time::timeout(RENDER_WITHIN, whole).await {
-            Ok(samples) => samples.map_err(|why| why.to_string()),
-            Err(_) => Err(format!("not within {} s", RENDER_WITHIN.as_secs())),
-        }
+        whole_within(text, whole).await
     })
 }
 
@@ -452,6 +720,12 @@ fn made_from_environment() -> Option<Arc<TtsCache>> {
             .speaking(crate::language::at_start())
             .hearing_its_name(
                 crate::sleep_capture::Mode::from_environment() == crate::sleep_capture::Mode::On,
+            )
+            .keeping_outage_lines(
+                std::env::var(crate::coordinator::OUTAGE_LINE_AGAIN_ENVIRONMENT)
+                    .ok()
+                    .as_deref()
+                    == Some("on"),
             ),
     );
     let warming = Arc::clone(&cache);
@@ -773,5 +1047,178 @@ mod tests {
         assert!(!cache.path("line 0").exists());
         assert_eq!(fs::read_dir(&dir).unwrap().count(), MOST_FILES);
         assert_eq!(calls.load(Ordering::SeqCst), MOST_FILES + 1);
+    }
+
+    /// A renderer taking `secs` (paused time) to give `text`'s samples.
+    async fn slow(secs: u64) -> Result<Vec<i16>, String> {
+        tokio::time::sleep(Duration::from_secs(secs)).await;
+        Ok(vec![1; 2_400])
+    }
+
+    /// A skill's agent's two-sentence answer (#7742, 363 bytes on c0a4) is
+    /// rendered whole in 7 s and said; a short line keeps the 5 s.
+    #[tokio::test(start_paused = true)]
+    async fn a_long_exact_line_is_given_time_by_its_length_and_a_short_one_keeps_5_s() {
+        let long = "Bitcoin is trading at about sixty-one thousand two hundred dollars \
+            right now, up one point eight percent over the last twenty-four hours on the \
+            major exchanges I checked. It has stayed between sixty thousand and sixty-two \
+            thousand dollars all week, so nothing unusual yet, and I will check again in \
+            three minutes and tell you if it moves by much at all today.";
+        assert_eq!(long.chars().count(), 359);
+        assert_eq!(whole_within(long, slow(7)).await.unwrap().len(), 2_400);
+        assert_eq!(render_within(long), Duration::from_secs(13));
+
+        let short = "Build passed.";
+        assert_eq!(render_within(short), RENDER_WITHIN);
+        assert_eq!(
+            render_within(&"a".repeat(RENDER_SHORT_CHARS)),
+            RENDER_WITHIN
+        );
+        assert_eq!(
+            render_within(&"a".repeat(RENDER_SHORT_CHARS + 1)),
+            RENDER_WITHIN + Duration::from_secs(1)
+        );
+        assert_eq!(
+            whole_within(short, slow(6)).await.unwrap_err(),
+            "not within 5 s"
+        );
+        assert!(whole_within(short, slow(4)).await.is_ok());
+        assert_eq!(render_within(&"a".repeat(10_000)), RENDER_MOST);
+    }
+
+    /// A cache whose speech service speaks at the voice's pace,
+    /// [`RENDER_MORE_CHARS`] characters in 2 s, and the lines it was asked
+    /// to render, in turn.
+    fn paced(dir: &Path) -> (TtsCache, Arc<Mutex<Vec<String>>>) {
+        let asked = Arc::new(Mutex::new(Vec::new()));
+        let seen = Arc::clone(&asked);
+        let render: Render = Box::new(move |text: &str| {
+            seen.lock().unwrap().push(text.to_owned());
+            let frames =
+                text.chars().count() * 2 * crate::say::SOUND_RATE as usize / RENDER_MORE_CHARS;
+            Ok(vec![1; frames])
+        });
+        (TtsCache::new(dir, "Rachel", "m", "en", render), asked)
+    }
+
+    /// How long `text` plays at the paced voice's pace, in frames.
+    fn paced_frames(text: &str) -> usize {
+        text.chars().count() * 2 * crate::say::SOUND_RATE as usize / RENDER_MORE_CHARS
+    }
+
+    /// The words of `pieces`, in order.
+    fn words_of(pieces: &[String]) -> Vec<&str> {
+        pieces
+            .iter()
+            .flat_map(|piece| piece.split_whitespace())
+            .collect()
+    }
+
+    /// #7892: an exact line about a minute long (a task's told answer,
+    /// OpenClaw's, on lamp-52e6) rendered past 20 s and was refused whole,
+    /// so nothing was said. It is rendered whole, in pieces each within
+    /// [`MOST_FRAMES`], and played as one line: every piece, in order.
+    #[test]
+    fn a_minute_long_exact_line_is_rendered_whole_in_pieces() {
+        let dir = scratch("minute");
+        let (cache, asked) = paced(&dir);
+        let sentence = "The lamp kept the room warm at night, dimmed itself slowly \
+            while you read, and asked before it turned the speaker up past half. ";
+        let line = sentence.repeat(7);
+        let line = line.trim_end();
+        assert!(line.len() <= crate::say::MOST_WORDS_BYTES);
+        let seconds = paced_frames(line) / crate::say::SOUND_RATE as usize;
+        assert!((55..=60).contains(&seconds), "{seconds} s");
+
+        let samples = cache.render_once(line).unwrap();
+        let asked = asked.lock().unwrap().clone();
+        assert!(asked.len() > 1, "rendered in pieces: {asked:?}");
+        for piece in &asked {
+            assert!(paced_frames(piece) <= MOST_FRAMES as usize, "{piece:?}");
+        }
+        assert_eq!(
+            samples.len(),
+            asked.iter().map(|piece| paced_frames(piece)).sum::<usize>(),
+            "every piece played, none dropped"
+        );
+        assert!(samples.len() > MOST_FRAMES as usize);
+        assert_eq!(
+            words_of(&asked),
+            line.split_whitespace().collect::<Vec<_>>()
+        );
+        assert!(cache.kept(line).is_none(), "never kept");
+    }
+
+    /// A sentence alone past 20 s is cut where its clauses end; one with no
+    /// clause mark, between its words. No word is cut, lost, added or moved.
+    #[test]
+    fn an_exact_sentence_past_20_s_is_split_at_a_clause_or_a_word() {
+        let dir = scratch("sentence");
+        let (cache, asked) = paced(&dir);
+        let clauses = (1..=8)
+            .map(|at| format!("the {at} small lamp on the shelf by the window glows softly"))
+            .collect::<Vec<_>>()
+            .join(", ")
+            + ".";
+        assert!(paced_frames(&clauses) > MOST_FRAMES as usize);
+        cache.render_once(&clauses).unwrap();
+        let pieces = std::mem::take(&mut *asked.lock().unwrap());
+        assert!(pieces.len() > 1, "{pieces:?}");
+        for piece in &pieces {
+            assert!(paced_frames(piece) <= MOST_FRAMES as usize, "{piece:?}");
+            assert!(
+                piece.ends_with([',', '.']),
+                "cut inside a clause: {piece:?}"
+            );
+        }
+        assert_eq!(
+            words_of(&pieces),
+            clauses.split_whitespace().collect::<Vec<_>>()
+        );
+
+        let plain = (1..=70)
+            .map(|at| format!("word{at}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(paced_frames(&plain) > MOST_FRAMES as usize);
+        cache.render_once(&plain).unwrap();
+        let pieces = std::mem::take(&mut *asked.lock().unwrap());
+        assert!(pieces.len() > 1, "{pieces:?}");
+        let original: Vec<&str> = plain.split_whitespace().collect();
+        for piece in &pieces {
+            assert!(paced_frames(piece) <= MOST_FRAMES as usize, "{piece:?}");
+            for word in piece.split_whitespace() {
+                assert!(original.contains(&word), "a word cut: {word:?}");
+            }
+        }
+        assert_eq!(words_of(&pieces), original);
+    }
+
+    /// No word is lost, added or moved, whatever marks a long line has;
+    /// a short line is rendered once as it is; and a piece that still
+    /// renders past [`MOST_FRAMES`] refuses the line, the cap unchanged.
+    #[test]
+    fn an_exact_lines_pieces_keep_its_words_in_order_and_the_cap_stays() {
+        let dir = scratch("words");
+        let (cache, asked) = paced(&dir);
+        let line = "First: the kettle is on! Is the door shut? Yes; it is, and \
+            the window too. "
+            .repeat(6)
+            + "Then (at nine) the lamp dims - slowly - to a glow; that's all.";
+        cache.render_once(&line).unwrap();
+        let pieces = std::mem::take(&mut *asked.lock().unwrap());
+        assert!(pieces.len() > 1, "{pieces:?}");
+        assert_eq!(
+            words_of(&pieces),
+            line.split_whitespace().collect::<Vec<_>>()
+        );
+
+        cache.render_once("Build passed.").unwrap();
+        assert_eq!(*asked.lock().unwrap(), ["Build passed."]);
+
+        let render: Render = Box::new(|_: &str| Ok(vec![1; MOST_FRAMES as usize + 1]));
+        let slow = TtsCache::new(&dir, "Rachel", "m", "en", render);
+        assert!(slow.render_once("Hi.").is_err());
+        assert!(slow.render_once(&line).is_err());
     }
 }

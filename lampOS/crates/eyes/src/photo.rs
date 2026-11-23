@@ -527,6 +527,32 @@ pub fn speaker_from_environment() -> bool {
     std::env::var(SPEAKER_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// Off unless `LAMP_FACE_NO_ASK=on` on lamp-eyes (the first builder 18:50,
+/// from the product owner: nothing is asked of the person): the one face of
+/// a photo is kept at once as an ordinary print ([`keep_at_once`]), with no
+/// yes at the lamp. Off, it is kept unconfirmed as before.
+pub const NO_ASK_ENVIRONMENT: &str = "LAMP_FACE_NO_ASK";
+
+pub fn no_ask_from_environment() -> bool {
+    std::env::var(NO_ASK_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// With [`NO_ASK_ENVIRONMENT`] on: a photo's one face kept under `name` at
+/// once, so "forget my face" and the app's removal forget it as any other.
+/// A face already known by another name is refused as at the lamp
+/// (`known_as`). Never `apart`: with nobody at the lamp to judge it, a face
+/// only near someone already kept under `name` (a sibling's photo sent
+/// under the owner's name) is refused (`near_to`), never put beside their
+/// prints (Heron's P2-2 on #7787); one not like them at all, `not_like_them`.
+pub fn keep_at_once(
+    people: &mut crate::who::People,
+    name: &str,
+    print: Vec<f32>,
+    now_unix_s: u64,
+) -> std::result::Result<crate::who::Remembered, crate::who::Refused> {
+    people.remember_one_replacing(name, vec![print], now_unix_s, false, false)
+}
+
 /// Whether a yes's `face` is the one that matched the photo here (`here`,
 /// `boot/f3`, `None` while speaking isn't judged): the same id under the
 /// same boot, or the yes is not kept. It closes the gap between the voice's
@@ -889,6 +915,62 @@ mod tests {
         let mut print = vec![0.0f32; crate::who::PRINT];
         print[n] = 1.0;
         print
+    }
+
+    /// `LAMP_FACE_NO_ASK` (the first builder 18:50): a photo's face is kept
+    /// at once in the people's file, recognised with no yes, and forgotten
+    /// as any other face; a face known by another name is refused.
+    #[test]
+    fn with_no_ask_a_face_from_a_photo_is_kept_at_once_and_forgets() {
+        let dir = folder("no-ask");
+        let mut people = crate::who::People::open(dir.join("people.json")).unwrap();
+        let kept = keep_at_once(&mut people, "Lan", unit(3), 1).unwrap();
+        assert_eq!(kept.name, "Lan");
+        assert_eq!(
+            people.who(&unit(3)).map(|(name, _)| name).as_deref(),
+            Some("Lan")
+        );
+        assert!(matches!(
+            keep_at_once(&mut people, "Mai", unit(3), 2),
+            Err(crate::who::Refused::KnownAs(known)) if known == "Lan"
+        ));
+        // Read back from the file: kept, not held apart.
+        let reopened = crate::who::People::open(dir.join("people.json")).unwrap();
+        assert_eq!(reopened.names(), ["Lan"]);
+        // "Forget my face" removes it.
+        people.forget("Lan").unwrap();
+        assert!(people.who(&unit(3)).is_none());
+        assert!(people.names().is_empty());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// Heron's P2-2 on #7787: a sibling's photo sent under the owner's name,
+    /// near the owner's face but not theirs, is refused (`near_to`) with
+    /// nobody at the lamp, and the owner's record is left as it was.
+    #[test]
+    fn with_no_ask_a_near_photo_under_a_kept_name_is_refused() {
+        let dir = folder("no-ask-near");
+        let path = dir.join("people.json");
+        let mut people = crate::who::People::open(path.clone()).unwrap();
+        keep_at_once(&mut people, "Owner", unit(3), 1).unwrap();
+        let before = std::fs::read(&path).unwrap();
+        // Between NEAR_PERSON (0.30) and SAME_PERSON (0.363) to theirs.
+        let mut sibling = vec![0.0f32; crate::who::PRINT];
+        sibling[3] = 0.33;
+        sibling[4] = (1.0f32 - 0.33 * 0.33).sqrt();
+        assert_eq!(
+            keep_at_once(&mut people, "Owner", sibling.clone(), 2),
+            Err(crate::who::Refused::NearTo("Owner".into()))
+        );
+        assert_eq!(std::fs::read(&path).unwrap(), before, "owner unchanged");
+        assert!(people.who(&sibling).is_none(), "the sibling is nobody");
+        assert_eq!(people.names(), ["Owner"]);
+        // Someone not like them at all is refused too.
+        assert_eq!(
+            keep_at_once(&mut people, "Owner", unit(9), 3),
+            Err(crate::who::Refused::NotLikeThem)
+        );
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     /// The first builder on #1968, 22:12: a face from a photo is kept

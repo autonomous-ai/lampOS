@@ -1958,6 +1958,7 @@ fn told_the_face(
         Some(owed.clone()),
         None,
         None,
+        None,
         |on_state, gate| {
             for look in 0..looks {
                 if let Some(switch) = between(fixture, look) {

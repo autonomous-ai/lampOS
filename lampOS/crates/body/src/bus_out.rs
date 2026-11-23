@@ -16,19 +16,29 @@ use crate::{
 };
 use lamp_bus::{Bus, Publisher};
 use lamp_msgs::{
-    BodyGesture, BodyLimits, Diagnostic, GestureState, Hand, JointLimits, JointState, KeyValue,
-    Level,
+    BodyGesture, BodyLimits, Diagnostic, DidOutcome, DidWhat, GestureState, Hand, JointLimits,
+    JointState, KeyValue, LampDid, Level,
 };
 use std::{
     f64::consts::TAU,
     io,
-    sync::mpsc,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+        mpsc,
+    },
     thread,
     time::{Duration, Instant},
 };
 
 /// Where the body reads whether to publish. `on` only.
 pub const ENVIRONMENT: &str = "LAMP_BUS";
+/// `on` to tell what the body chooses to do on `lamp/did` (#7757): a shift at
+/// rest and the turn to a call, each once, when it ends. Off: nothing is
+/// declared or told.
+pub const DID_ENVIRONMENT: &str = "LAMP_DID_BODY";
+/// The most often a did is told: one in this long, the rest counted and let go.
+const DID_EVERY: Duration = Duration::from_secs(2);
 /// The name the body publishes under.
 pub const SOURCE: &str = crate::ask::SOURCE;
 /// The joints, in the order of their servos' numbers, 1 to 5. Every list
@@ -756,6 +766,9 @@ pub struct BusOut {
     pub let_go: u64,
     /// `body/gesture` news the thread had no room for.
     pub gestures_let_go: u64,
+    /// `lamp/did` told too often (1 in [`DID_EVERY`]) and let go; none when
+    /// it is off.
+    dids_let_go: Option<Arc<AtomicU64>>,
     /// The lamp is paused (`lamp/pause`): the state it says is `paused`.
     pub paused: bool,
 }
@@ -784,10 +797,21 @@ struct Publishing {
     limits: Publisher,
     bounds: Option<(Limits, Option<Standing>)>,
     limits_said: Option<Instant>,
+    /// `lamp/did`, only under [`DID_ENVIRONMENT`], with when one was last told
+    /// and how many the cap let go.
+    did: Option<Publisher>,
+    did_last: Option<Instant>,
+    did_let_go: Arc<AtomicU64>,
 }
 
 impl Publishing {
-    fn on(bus: &Bus) -> io::Result<Self> {
+    fn on(bus: &Bus, did: Option<Arc<AtomicU64>>) -> io::Result<Self> {
+        let did_publisher = match &did {
+            Some(_) => {
+                Some(bus.publisher_declared(LampDid::TOPIC, &LampDid::declaration(), SOURCE)?)
+            }
+            None => None,
+        };
         let mut joints =
             bus.publisher_declared(JointState::TOPIC, &JointState::declaration(), SOURCE)?;
         joints.expires_after(Some(LASTS));
@@ -814,7 +838,56 @@ impl Publishing {
             waiting_sent: None,
             resisted: Vec::new(),
             resisted_in_all: 0,
+            did: did_publisher,
+            did_last: None,
+            did_let_go: did.unwrap_or_default(),
         })
+    }
+
+    /// What the body chose to do, told once it is over (#7757): a shift at
+    /// rest or the turn to a call, by the body's own test of what it makes of
+    /// itself. Over is done; dropped (something higher came) is cut. The
+    /// reason is fixed words and a clip's name, never a word heard.
+    fn told_did(&mut self, gesture: &BodyGesture) {
+        let Some(did) = self.did.as_mut() else {
+            return;
+        };
+        let outcome = match gesture.state {
+            GestureState::Over => DidOutcome::Done,
+            GestureState::Dropped => DidOutcome::Cut,
+            _ => return,
+        };
+        let called = gesture.name == crate::clips::CALLED.name;
+        if !called && !crate::idle::is_move_name(&gesture.name) {
+            return;
+        }
+        let now = Instant::now();
+        if self
+            .did_last
+            .is_some_and(|last| now.duration_since(last) < DID_EVERY)
+        {
+            self.did_let_go.fetch_add(1, Ordering::Relaxed);
+            return;
+        }
+        self.did_last = Some(now);
+        let told = LampDid {
+            who: if called {
+                "lamp-body:look-at-name".to_owned()
+            } else {
+                "lamp-body:idle".to_owned()
+            },
+            what: DidWhat::Moved,
+            why: if called {
+                "it turned to a call heard on name/heard".to_owned()
+            } else {
+                format!("it shifted by itself at rest ({})", gesture.name)
+            },
+            at_us: lamp_ipc::monotonic_us(),
+            outcome,
+        };
+        if told.check().is_ok() {
+            let _ = did.publish_json(lamp_ipc::monotonic_us(), &told);
+        }
     }
 
     fn at_us(&self) -> u64 {
@@ -912,7 +985,16 @@ impl BusOut {
     }
 
     pub fn on(bus: &Bus) -> io::Result<Self> {
-        let mut publishing = Publishing::on(bus)?;
+        Self::on_told(
+            bus,
+            std::env::var(DID_ENVIRONMENT).ok().as_deref() == Some("on"),
+        )
+    }
+
+    /// The same, with `lamp/did` told or not whatever the environment says.
+    pub fn on_told(bus: &Bus, did: bool) -> io::Result<Self> {
+        let did_let_go = did.then(Arc::<AtomicU64>::default);
+        let mut publishing = Publishing::on(bus, did_let_go.clone())?;
         // Room for a little over a second of offered steps.
         let (steps, offered) = mpsc::sync_channel::<Out>(16);
         let thread = thread::Builder::new().name("bus".into()).spawn(move || {
@@ -930,6 +1012,7 @@ impl BusOut {
                     Out::Gesture(gesture) => {
                         let at_us = publishing.at_us();
                         let _ = publishing.gesture.publish_json(at_us, &gesture);
+                        publishing.told_did(&gesture);
                     }
                 }
             }
@@ -939,8 +1022,16 @@ impl BusOut {
             thread: Some(thread),
             let_go: 0,
             gestures_let_go: 0,
+            dids_let_go: did_let_go,
             paused: false,
         })
+    }
+
+    /// How many dids the cap let go, counted by the publishing thread.
+    pub fn dids_let_go(&self) -> u64 {
+        self.dids_let_go
+            .as_ref()
+            .map_or(0, |count| count.load(Ordering::Relaxed))
     }
 
     /// The body's own limits and pose to stand in, said on `body/limits`
@@ -1971,7 +2062,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         let bus = Bus::new(&root).unwrap();
-        let mut publishing = Publishing::on(&bus).unwrap();
+        let mut publishing = Publishing::on(&bus, None).unwrap();
         let mut seen = glimpse(0);
         seen.hand = true;
         let now = Instant::now();
@@ -2020,7 +2111,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         let bus = Bus::new(&root).unwrap();
-        let mut publishing = Publishing::on(&bus).unwrap();
+        let mut publishing = Publishing::on(&bus, None).unwrap();
         publishing.step(&glimpse(0), false, Instant::now());
         let boot = bus.latest(JointState::TOPIC).unwrap().unwrap().header.boot;
         let fifo = root
@@ -2064,5 +2155,104 @@ mod tests {
         assert!(each < Duration::from_millis(1), "{each:?}");
         drop(out);
         std::fs::remove_dir_all(root).unwrap();
+    }
+    /// What the body chooses is told on `lamp/did` once it ends (#7757): a
+    /// shift at rest and the turn to a call; a gesture a skill asked, and
+    /// the news of one beginning, are not; one in two seconds.
+    #[test]
+    fn what_the_body_chooses_is_told_on_lamp_did_once_it_ends() {
+        let root = std::path::PathBuf::from(format!("/tmp/lb-did-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut heard = bus
+            .subscribe_typed(LampDid::TOPIC, "test", LampDid::TYPE)
+            .unwrap();
+        let mut out = BusOut::on_told(&bus, true).unwrap();
+        let wait = Duration::from_secs(2);
+        let next = |heard: &mut lamp_bus::Subscriber| -> Option<LampDid> {
+            heard
+                .recv(wait)
+                .unwrap()
+                .map(|message| message.parse().unwrap())
+        };
+        // A shift at rest: began says nothing, over is told, Done.
+        out.gesture("tilt_left", GestureState::Began);
+        out.gesture("tilt_left", GestureState::Over);
+        let told = next(&mut heard).expect("a did");
+        assert_eq!(told.who, "lamp-body:idle");
+        assert_eq!(told.what, DidWhat::Moved);
+        assert_eq!(told.outcome, DidOutcome::Done);
+        assert_eq!(told.why, "it shifted by itself at rest (tilt_left)");
+        // A gesture a skill asked is told by the skill, not here; and one
+        // told within two seconds of the last is let go and counted.
+        out.gesture("nod", GestureState::Over);
+        out.gesture("dip", GestureState::Over);
+        std::thread::sleep(Duration::from_millis(300));
+        assert_eq!(out.dids_let_go(), 1, "the dip came within two seconds");
+        assert!(heard.recv(Duration::from_millis(300)).unwrap().is_none());
+        // After the cap, a turn to a call dropped for something higher: Cut,
+        // with the topic's name and none of what was heard.
+        std::thread::sleep(DID_EVERY);
+        out.gesture(crate::clips::CALLED.name, GestureState::Dropped);
+        let told = next(&mut heard).expect("a did");
+        assert_eq!(told.who, "lamp-body:look-at-name");
+        assert_eq!(told.outcome, DidOutcome::Cut);
+        assert_eq!(told.why, "it turned to a call heard on name/heard");
+        drop(out);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// Off, nothing is declared and nothing is told.
+    #[test]
+    fn with_the_switch_off_no_did_is_declared_or_told() {
+        let root = std::path::PathBuf::from(format!("/tmp/lb-didoff-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut heard = bus.subscribe(LampDid::TOPIC, "test").unwrap();
+        let mut out = BusOut::on_told(&bus, false).unwrap();
+        out.gesture("tilt_left", GestureState::Over);
+        assert!(heard.recv(Duration::from_millis(400)).unwrap().is_none());
+        assert_eq!(out.dids_let_go(), 0);
+        assert_eq!(DID_ENVIRONMENT, "LAMP_DID_BODY");
+        drop(out);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// Rule 7: the body's loop calls `offer` and `gesture` and never waits;
+    /// with `lamp/did` on, its cost is the same. The slowest and the mean of
+    /// 20,000 calls of each, on and off, are printed and bounded.
+    #[test]
+    fn the_loops_calls_cost_the_same_with_did_on_and_off() {
+        fn time(did: bool) -> (Duration, Duration) {
+            let root =
+                std::path::PathBuf::from(format!("/tmp/lb-didtime-{}-{did}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&root);
+            std::fs::create_dir_all(&root).unwrap();
+            let bus = Bus::new(&root).unwrap();
+            let mut out = BusOut::on_told(&bus, did).unwrap();
+            let mut slowest = Duration::ZERO;
+            let started = Instant::now();
+            for step in 0..20_000u64 {
+                let call = Instant::now();
+                out.offer(&glimpse(step));
+                if step % 100 == 0 {
+                    out.gesture("tilt_left", GestureState::Over);
+                }
+                slowest = slowest.max(call.elapsed());
+            }
+            let mean = started.elapsed() / 20_000;
+            drop(out);
+            std::fs::remove_dir_all(root).unwrap();
+            (mean, slowest)
+        }
+        let (off_mean, off_slowest) = time(false);
+        let (on_mean, on_slowest) = time(true);
+        eprintln!(
+            "loop-side calls, 20,000 steps: off mean {off_mean:?} slowest {off_slowest:?}; on mean {on_mean:?} slowest {on_slowest:?}"
+        );
+        assert!(on_mean < Duration::from_micros(50), "{on_mean:?}");
+        assert!(on_slowest < Duration::from_millis(5), "{on_slowest:?}");
     }
 }
