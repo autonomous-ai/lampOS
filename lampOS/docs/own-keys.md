@@ -85,6 +85,7 @@ followed, and the only request setup or the helper makes with the key:
 | Deepgram | `GET https://api.deepgram.com/v1/auth/token` | `Authorization: Token <key>` |
 | OpenRouter (#8420) | `GET https://openrouter.ai/api/v1/key`, then `GET https://openrouter.ai/api/v1/models/<model>/endpoints` | `Authorization: Bearer <key>` on the first alone |
 | Gemini (#8420) | `GET https://generativelanguage.googleapis.com/v1beta/openai/models/<model>` | `Authorization: Bearer <key>` |
+| Anthropic (#8420) | `GET https://api.anthropic.com/v1/models/<model>` | `x-api-key: <key>` and `anthropic-version: 2023-06-01`, no bearer |
 
 - **2xx:** kept. The answer names where the person's data goes now:
   "that key works: your conversations now go to api.deepseek.com with your
@@ -363,13 +364,13 @@ on the same `keys.*` path and the same switch, with the contract agreed on
   that fails to the person's endpoint is not yet a fallback.
 - **Off:** nothing new is read or said; today's behaviour as it is.
 
-## Named model providers: OpenRouter and Gemini (#8420, built, off unless set)
+## Named model providers: OpenRouter, Gemini and Anthropic (#8420, built, off unless set)
 
 A person's own model by its provider's name, on the same `keys.*` path and
 switch as the OpenAI-compatible one, with the plan the first builder agreed
-on #8362 (22:02, 23 Nov). OpenRouter is the first, Gemini the second (below);
-Anthropic comes in its own PR. One rule for all three: **the endpoint is fixed** in the
-lamp, never taken from the app, so the person's key only ever goes to its
+on #8362 (22:02, 23 Nov). OpenRouter is the first, Gemini the second and
+Anthropic the third (below). One rule for all three: **the endpoint is
+fixed** in the lamp, never taken from the app, so the person's key only ever goes to its
 own provider (#2094's rule). The tests that pin it:
 `setup/tests/it/keys.rs`
 (`an_openrouter_model_is_kept_with_its_model_at_openrouters_own_endpoint`),
@@ -480,6 +481,69 @@ endpoint, fixed. The tests that pin it: `setup/tests/it/keys.rs`
   2.5-series model may answer 400 to it, which is not a fallback: the row
   with the person's own 2.5 model reads it, and if it does, the field is
   dropped for models other than 3.
+- **Not yet run on a lamp:** a real key and model from the app, as for
+  OpenRouter.
+
+### Anthropic (#8420, built, off unless set)
+
+The third named provider, by the same rule: Anthropic's API, fixed. The
+tests that pin it: `setup/tests/it/keys.rs`
+(`an_anthropic_model_is_kept_with_its_model_at_anthropics_own_endpoint`),
+`setup/src/keys.rs`
+(`an_anthropic_check_reads_the_one_model_with_its_own_headers`),
+`cloud/src/settings.rs` (`an_anthropic_key_goes_to_the_helper_with_its_model`),
+`voice/src/second_config.rs`
+(`the_persons_anthropic_model_is_used_only_with_the_switch`) and
+`voice/src/second_provider/services.rs`
+(`the_persons_anthropic_model_is_asked_with_its_max_tokens`,
+`the_persons_anthropic_chat_warms_with_its_own_headers`,
+`the_persons_anthropic_key_refused_falls_back_to_the_lamps_own`).
+
+- **`offers`:** `{"service": "anthropic", "name": "Anthropic", "kind":
+  "model", "models": [], "base_url": false, "fields": ["model"], "endpoint":
+  "https://api.anthropic.com/v1"}`, after Gemini's.
+- **`keys.set`** `{"service": "anthropic", "key", "model"}`: the model is
+  needed ("an Anthropic key needs its model"), a name as above
+  (`claude-sonnet-4-5`). Any `base_url` is refused before any check,
+  "Anthropic takes no endpoint" (`bad_field`).
+- **The check** (the table above), one request within 5 s, no redirect
+  followed: the one model read with Anthropic's own headers, never a bearer.
+  Seen live on 24 Nov with a made-up key: `401` `{"type": "error", "error":
+  {"type": "authentication_error", "message": "invalid x-api-key"}}`; with
+  a bearer instead, the same 401. Any 2xx works: Anthropic answers an alias
+  (`claude-sonnet-4-5`) with its dated id, so the id isn't matched. 404 is
+  "Anthropic has no model by that name" (`bad_field`); 401 and 403 are
+  "that key was refused"; anything else is "couldn't reach Anthropic". A
+  real key with a made-up model isn't seen yet; the row reads it.
+- **Kept:** `anthropic.key`, `anthropic.model` and `anthropic.checked`,
+  0600, no endpoint file. One of the model services: keeping it takes
+  DeepSeek's own, the OpenAI-compatible, OpenRouter's and Gemini's away,
+  and keeping any of them takes it away. `keys.get` adds `anthropic`,
+  `since.anthropic`, `model.anthropic`, `checked.anthropic`, and
+  `in_use.model` is `"anthropic"` while it is kept.
+- **The voice** (`own_anthropic.key` and `.model`, read only with the
+  switch on): the spoken chat goes to Anthropic's OpenAI-compatible
+  endpoint, `https://api.anthropic.com/v1/chat/completions`, with the key
+  as a bearer (a made-up one is answered there `401` `{"error": {"code":
+  "authentication_error", "message": "Invalid Anthropic API Key"}}`, seen
+  live on 24 Nov), as `Chat::anthropic`: plain OpenAI chat with
+  `max_tokens: 4096`, which every Claude model takes. Its warm asks
+  `GET /v1/models` with `x-api-key` and `anthropic-version`, never a
+  bearer, and a warm's status is only the journal's: it never stands for
+  a refused key. The journal's line is `Anthropic: the person's own key,
+  model <id> (LAMP_OWN_KEYS)`, and the start's ends `through Anthropic`.
+  Any other own model's key, if one were somehow there too, is used over
+  it.
+- **The fallback:** as the other own models': 401, 403, 429 and 5xx (529,
+  overloaded, among them) go to the lamp's own model through the relay
+  with one line.
+- **Limits of the OpenAI-compatible endpoint** (Anthropic's docs call it a
+  way to test, not for production): no prompt caching, so every turn pays
+  for its whole prompt; `system` messages anywhere in the conversation are
+  hoisted to the top and joined; an answer longer than 4096 tokens is cut.
+  Streaming, tools, `tool_choice` and images as data URLs work. The native
+  Messages API is for later, for subscriptions or if a row shows bad tool
+  calls.
 - **Not yet run on a lamp:** a real key and model from the app, as for
   OpenRouter.
 
