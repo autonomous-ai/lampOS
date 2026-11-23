@@ -296,7 +296,9 @@ impl Apps {
             row.insert("version".into(), json!(package.version));
         }
         // Where it came from: the Store, or the owner's own computer.
-        let from_computer = package.as_ref().is_some_and(|package| package.from_computer);
+        let from_computer = package
+            .as_ref()
+            .is_some_and(|package| package.from_computer);
         row.insert(
             "from".into(),
             json!(if from_computer { "computer" } else { "store" }),
