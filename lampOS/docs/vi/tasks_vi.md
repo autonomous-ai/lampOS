@@ -3140,8 +3140,13 @@ bao giờ phải chờ sau câu "I'll look into that":
   now; ask me again later." (`UPDATING_LINE`), và mọi `error` khác
   (Gateway sập từ 6 phút trở lên, các lần mở lỗi quá số lần thử, một lần
   giữ lâu dài) nói "I'm having a problem right now; ask me again later."
-  (`LATER_LINE`); cả hai tính cho "ready again". `starting` (cả với why
-  `tasks_restarting`) và `recovering` nhận câu báo lỗi. Không có gì được chuẩn
+  (`LATER_LINE`); cả hai tính cho "ready again". Một lần khởi động bình thường, `starting` với why `gateway_starting`,
+  `session_starting` hoặc `harness_starting` (Gateway sau khi bật nguội mất vài
+  phút), nói câu đang chuẩn bị của đèn, "I'm still getting ready. Give me a
+  minute and ask me again." (`skill_words::NOT_READY_LINE`, câu mà một lần
+  chạy skill nghe, #7351), không bao giờ "a problem", và tính cho "ready
+  again". `starting` với why `tasks_restarting` hoặc không có why, và
+  `recovering`, nhận câu báo lỗi. Không có gì được chuẩn
   bị, nên không có câu đọc
   lại hay "I'll look into that" nào đi trước; model nói câu đó bằng ngôn
   ngữ của người dùng. Việc cho máy tính không bao giờ bị giữ theo trạng
