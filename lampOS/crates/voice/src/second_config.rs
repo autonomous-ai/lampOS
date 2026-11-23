@@ -162,6 +162,8 @@ pub enum OwnChat {
     OpenRouter,
     /// Gemini's, at [`GEMINI_BASE_URL`] (#8420).
     Gemini,
+    /// Anthropic's OpenAI-compatible chat, at [`ANTHROPIC_BASE_URL`] (#8420).
+    Anthropic,
 }
 
 impl OwnChat {
@@ -171,6 +173,7 @@ impl OwnChat {
             Self::OpenAiCompatible => "OpenAI-compatible",
             Self::OpenRouter => "OpenRouter",
             Self::Gemini => "Gemini",
+            Self::Anthropic => "Anthropic",
         }
     }
 }
@@ -636,6 +639,13 @@ pub const OWN_OPENROUTER_MODEL: &str = "own_openrouter.model";
 /// own, [`GEMINI_BASE_URL`].
 pub const OWN_GEMINI_KEY: &str = "own_gemini.key";
 pub const OWN_GEMINI_MODEL: &str = "own_gemini.model";
+/// The person's own Anthropic key and model (#8420); its endpoint is
+/// Anthropic's own, [`ANTHROPIC_BASE_URL`].
+pub const OWN_ANTHROPIC_KEY: &str = "own_anthropic.key";
+pub const OWN_ANTHROPIC_MODEL: &str = "own_anthropic.model";
+/// Anthropic's API, whose OpenAI-compatible chat the person's own
+/// Anthropic model is asked at (#8420).
+pub const ANTHROPIC_BASE_URL: &str = "https://api.anthropic.com/v1";
 
 /// A model's name as it goes in a request's body: 1 to 128 letters,
 /// digits, `-`, `.`, `_`, `/` and `:`.
@@ -739,17 +749,31 @@ impl SecondConfig {
             })
         };
         let (chat, found) = match compatible {
-            Ok(None) => match named(
-                OWN_OPENROUTER_KEY,
-                OPENROUTER_BASE_URL,
-                OWN_OPENROUTER_MODEL,
-            ) {
-                Ok(None) => (
-                    OwnChat::Gemini,
-                    named(OWN_GEMINI_KEY, GEMINI_BASE_URL, OWN_GEMINI_MODEL),
+            // The first named provider with a key, in this order.
+            Ok(None) => [
+                (
+                    OwnChat::OpenRouter,
+                    OWN_OPENROUTER_KEY,
+                    OPENROUTER_BASE_URL,
+                    OWN_OPENROUTER_MODEL,
                 ),
-                found => (OwnChat::OpenRouter, found),
-            },
+                (
+                    OwnChat::Gemini,
+                    OWN_GEMINI_KEY,
+                    GEMINI_BASE_URL,
+                    OWN_GEMINI_MODEL,
+                ),
+                (
+                    OwnChat::Anthropic,
+                    OWN_ANTHROPIC_KEY,
+                    ANTHROPIC_BASE_URL,
+                    OWN_ANTHROPIC_MODEL,
+                ),
+            ]
+            .into_iter()
+            .map(|(chat, key, url, model)| (chat, named(key, url, model)))
+            .find(|(_, found)| !matches!(found, Ok(None)))
+            .unwrap_or((OwnChat::OpenRouter, Ok(None))),
             found => (OwnChat::OpenAiCompatible, found),
         };
         let compatible_line = match found {
@@ -759,7 +783,7 @@ impl SecondConfig {
                         "OpenAI-compatible: the person's own key, at {}, model {model} (LAMP_OWN_KEYS)",
                         host(&url)
                     ),
-                    OwnChat::OpenRouter | OwnChat::Gemini => format!(
+                    OwnChat::OpenRouter | OwnChat::Gemini | OwnChat::Anthropic => format!(
                         "{}: the person's own key, model {model} (LAMP_OWN_KEYS)",
                         chat.name()
                     ),
