@@ -1631,8 +1631,9 @@ pub fn lockfile_pinned(lockfile: &str, sha256: &str, version: &str) -> Result<()
 /// when no [`ASK`] is there. Asked to remove, the gateway is stopped and
 /// the entry points taken out, the record with them. Else
 /// [`steps`]; a failure takes the entry points out, unless an OpenClaw
-/// worked before this run: then what it had is put back and its gateway
-/// left running ([`Before`], #7156). An error only when another install
+/// worked before this run: then what it had is put back, and its gateway
+/// is never stopped; one the failed restart left down is reset and started
+/// by the next round's look (`keep_gateway`, #8238) ([`Before`], #7156). An error only when another install
 /// holds [`LOCK`].
 pub fn install_now(
     root: &Path,
@@ -1794,7 +1795,7 @@ impl Before {
             }
         }
         say(
-            "the reinstall failed: the OpenClaw there before is put back, its gateway left running",
+            "the reinstall failed: the OpenClaw there before is put back (a gateway its restart left down is started by the next round)",
         );
         true
     }

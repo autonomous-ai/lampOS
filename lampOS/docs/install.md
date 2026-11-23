@@ -2588,8 +2588,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `installed`, or the wrapper, `openclaw-ns` and the package there)
      puts the Node and package it moved to `/var/lib/lampos-openclaw.old`
      back, then the wrapper, `openclaw-ns` and `skill-start` as they were,
-     and never stops the gateway; the record still says `failed`, so it is
-     retried as before. Only a failure with nothing working before (or no
+     and never stops the gateway (one that a failed restart left down is
+     reset and started by the next round's look, #8238); the record still
+     says `failed`, so it is retried as before. Only a failure with nothing working before (or no
      package to go back to) stops the gateway and takes the entry points
      out (#7156).
    - **The forwarder token:** the wrapper exports `LAMP_HERMES_TOKEN` from
