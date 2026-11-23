@@ -5,7 +5,7 @@ use super::net::{
     routes::{self, Routes},
 };
 use super::second_try::ChatTold;
-use crate::second_config::{SecondConfig, Stt};
+use crate::second_config::{OwnChat, SecondConfig, Stt};
 use futures_util::{
     StreamExt, TryStreamExt,
     future::BoxFuture,
@@ -701,24 +701,34 @@ impl Net {
             .deepseek_base_url
             .clone()
             .unwrap_or_else(|| crate::second_config::DEEPSEEK_BASE_URL.to_owned());
-        // The person's own OpenAI-compatible model (#8362) is asked plainly,
-        // with none of DeepSeek's own fields unless it is DeepSeek's.
-        self.chat = Arc::new(if self.config.hosted.lamps_own.is_some() {
-            Chat::own_compatible(
+        // The person's own model is asked with none of DeepSeek's own
+        // fields: an OpenAI-compatible one plainly (#8362), OpenRouter's as
+        // OpenRouter's chat, never searching, as the search stays the
+        // lamp's own (#8420).
+        let hosted = &self.config.hosted;
+        self.chat = Arc::new(match hosted.own_chat {
+            Some(OwnChat::OpenAiCompatible) => Chat::own_compatible(
                 &base,
-                &self.config.hosted.deepseek_model,
+                &hosted.deepseek_model,
                 key,
                 self.declare.clone(),
-                self.config.hosted.relay_deepseek_base_url.as_deref(),
-            )?
-        } else {
-            Chat::deepseek_at(
+                hosted.relay_deepseek_base_url.as_deref(),
+            )?,
+            Some(OwnChat::OpenRouter) => Chat::openrouter_at(
                 &base,
-                &self.config.hosted.deepseek_model,
+                &hosted.deepseek_model,
+                &hosted.openrouter_effort,
                 key,
                 self.declare.clone(),
                 false,
-            )?
+            )?,
+            None => Chat::deepseek_at(
+                &base,
+                &hosted.deepseek_model,
+                key,
+                self.declare.clone(),
+                false,
+            )?,
         });
         Ok(self)
     }

@@ -1284,11 +1284,15 @@ pub fn services(
                     .falling_back_to_the_relay(relay, Arc::new(own_key_refused))
                     .map_err(io::Error::other)?;
             }
-            if hosted.lamps_own.is_some() {
+            if let Some(chat) = hosted.own_chat {
                 eprintln!(
-                    "lamp-voice second: the text model is the person's own {} {}, OpenAI-compatible (LAMP_SECOND_CHAT=deepseek)",
+                    "lamp-voice second: the text model is the person's own {} {}, {} (LAMP_SECOND_CHAT=deepseek)",
                     hosted.deepseek_model,
-                    deepseek_where(&hosted)
+                    deepseek_where(&hosted),
+                    match chat {
+                        crate::second_config::OwnChat::OpenAiCompatible => "OpenAI-compatible",
+                        crate::second_config::OwnChat::OpenRouter => "through OpenRouter",
+                    }
                 );
             } else {
                 eprintln!(
