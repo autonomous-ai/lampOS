@@ -3379,12 +3379,22 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
     let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
                 if [ -n \"$FAIL_ON\" ]; then case \"${0##*/} $*\" in *\"$FAIL_ON\"*) exit 1;; esac; fi\n\
                 case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; esac\n\
-                if [ \"${0##*/}\" = mount ] && [ -f \"$LINK\" ] && [ \"$4\" = \"$(cat \"$LINK\")\" ]; then /bin/mkdir -p \"${4%/*}\" && /bin/ln -s /elsewhere \"$4\" || exit 9; fi\n";
+                if [ \"${0##*/}\" = mount ] && [ -f \"$LINK\" ] && [ \"$4\" = \"$(cat \"$LINK\")\" ]; then /bin/mkdir -p \"${4%/*}\" && /bin/ln -s /elsewhere \"$4\" || exit 9; fi\n\
+                if [ \"${0##*/}\" = mount ] && [ -f \"$REDIRECT\" ] && read -r rt rs < \"$REDIRECT\"; then for a; do src=$dst; dst=$a; done; if [ \"$dst\" = \"$rt\" ]; then /bin/mv \"$rs\" \"$rs.real\" && /bin/ln -s \"$SWAPPED_IN\" \"$rs\" && /usr/bin/stat -L -c %i \"$src\" > \"$BOUND\"; /bin/rm -f \"$rs\"; /bin/mv \"$rs.real\" \"$rs\" || exit 9; fi; fi\n";
     // `mount`, for the path named in the `link` file, leaves a link at
     // that bind target: the target, seen through the `installs` bind, is
     // the source's directory entry swapped for a link after the `-L`
     // checks, and a `stat` of it matches the source's (#7043).
     let link = base.join("link");
+    // `mount`, for the bind target named first in the `redirect` file,
+    // swaps the source named second for a link to `swapped-in` just before
+    // the bind, keeps in `bound` the inode of what its own source names
+    // then (by the real `stat`, not the stand-in), and puts the original
+    // back before the check after it: the ordering #7051 names.
+    let redirect = base.join("redirect");
+    let bound = base.join("bound");
+    let swapped_in = base.join("swapped-in");
+    fs::write(&swapped_in, "").unwrap();
     for name in ["mount", "umount", "findmnt", "mkdir", "rmdir"] {
         let path = stubs.join(name);
         fs::write(&path, stub).unwrap();
@@ -3417,6 +3427,9 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
             .env("FAIL_ON", fail_on)
             .env("SWAP", &swap)
             .env("LINK", &link)
+            .env("REDIRECT", &redirect)
+            .env("BOUND", &bound)
+            .env("SWAPPED_IN", &swapped_in)
             .env("HOME", "/lasting");
         match home {
             Some(home) => command.env(HOME_ENV, home),
@@ -3721,6 +3734,47 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
     }
     fs::remove_file(&link).unwrap();
     let _ = fs::remove_dir_all(base.join("x"));
+    // Thirteen's P3 on #7051: each source is real at its checks, a link is
+    // swapped in just before the bind and the original put back before the
+    // check after it, so the target is not a link and its device and inode
+    // match. The bind must still be of the source's own file, never of the
+    // file the link named. `/proc/self/fd` is Linux's.
+    if cfg!(target_os = "linux") {
+        for (source, target) in [
+            (
+                format!("{h}/.hermes/installs/k/.install.lock"),
+                format!("{x}/i/k/.install.lock"),
+            ),
+            (
+                format!("{h}/.hermes/installs/k/pm-runtime/.prepare.lock"),
+                format!("{x}/i/k/pm-runtime/.prepare.lock"),
+            ),
+            (
+                format!("{h}/.hermes/installs/k/pm-runtime/generations/r1/.leases"),
+                format!("{x}/i/k/pm-runtime/generations/r1/.leases"),
+            ),
+        ] {
+            let own = std::os::unix::fs::MetadataExt::ino(&fs::metadata(&source).unwrap());
+            let _ = fs::remove_file(&bound);
+            fs::write(&redirect, format!("{target} {source}\n")).unwrap();
+            let (out, _) = run(Some(&home), "");
+            fs::remove_file(&redirect).unwrap();
+            let put_back = fs::symlink_metadata(&source).unwrap();
+            assert!(!put_back.file_type().is_symlink(), "{source}");
+            assert_eq!(
+                std::os::unix::fs::MetadataExt::ino(&put_back),
+                own,
+                "{source}"
+            );
+            let seen = fs::read_to_string(&bound).unwrap_or_default();
+            assert_eq!(
+                seen.trim(),
+                own.to_string(),
+                "the bind onto {target} took the link swapped in for {source}: {out:?}"
+            );
+        }
+        let _ = fs::remove_file(&bound);
+    }
     // A home outside the work folder's `lamp`, or missing, is refused
     // before anything is mounted.
     let other = base.join("other/make-task-1/home");
