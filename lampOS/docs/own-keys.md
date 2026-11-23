@@ -290,6 +290,52 @@ test (#8367): a real key and voice ID entered from the app by that lamp's
 person, a few turns in that voice, a bad key told plainly, and a remove
 giving the lamp's own voice back.
 
+## An OpenAI-compatible model (#8362 step 1b, designed, not built yet)
+
+A person's own model at any OpenAI-compatible endpoint (Grok and the like),
+on the same `keys.*` path and the same switch, with the contract agreed on
+#8362 (the first builder at 11:44, Mobile's shape at 11:46) and #8367's
+`kind`. The tests that pin it are red until it is built:
+`setup/tests/it/keys.rs` (`an_openai_compatible_*`), `setup/src/keys.rs`
+(`an_openai_compatible_check_finds_the_model_in_the_endpoints_list`),
+`cloud/src/settings.rs` (`an_openai_compatible_key_goes_to_the_helper_*`),
+`voice/src/second_config.rs`
+(`the_persons_openai_compatible_model_is_used_only_with_the_switch`) and
+`voice/src/second_provider/tests/chat_second_try.rs`
+(`the_persons_endpoint_down_or_spent_falls_back_to_the_lamps_own`).
+
+- **`offers`** in `keys.get`, #8367's shape: `{"service":
+  "openai_compatible", "name": "OpenAI-compatible", "kind": "model",
+  "models": [], "base_url": true, "fields": ["model"]}`, after DeepSeek's,
+  Deepgram's and ElevenLabs'. `models` is empty because the endpoint's own
+  list decides; `fields` tells the app to ask for the model's name.
+- **`keys.set`** `{"service": "openai_compatible", "key", "base_url",
+  "model"}`: all three needed. The endpoint is https only, with no user,
+  query or fragment (`fit_url`); the model is a slug (letters, digits, `-`,
+  `.`, `_`, `/`, `:`). Each refused as `bad_field` in fixed words before any
+  check, nothing of the request said back.
+- **The check:** one `GET <base_url>/models` with the key as the bearer, as
+  DeepSeek's. It works only when the endpoint lists the model; a list
+  without it is "that endpoint has no model by that name" (`bad_field`),
+  and the list itself is never said back.
+- **Kept:** `openai_compatible.key`, `.url` and `.model`, 0600, as
+  DeepSeek's are. **One own model at a time:** keeping one takes the other
+  model service's own key away, so `in_use.model` is the one kept and the
+  voice never guesses.
+- **`keys.get`** adds `openai_compatible` (`own` | `lamp`),
+  `openai_compatible_host`, `model` (`{"<service>": id | null}`), `checked`
+  (`{"<service>": "works" | "refused" | "unreached" | null}`, the last
+  check's code) and `in_use` (`{"model": service | null}`). Never the key.
+- **The voice** (`with_own_keys`): the chat goes to the endpoint with the
+  person's key and model, over the relay it falls back to, in one journal
+  line by host and model: `OpenAI-compatible: the person's own key, at
+  <host>, model <id> (LAMP_OWN_KEYS)`. DeepSeek's `thinking` field is not
+  sent to it. The web search stays on the relay.
+- **Mid-use failure:** a 401 or 403 falls back to the relay as today; so
+  do a 429 and a 5xx before any answer (the endpoint down or spent), told
+  once to `lamp-health`'s `voice-keys` part, never a silent turn.
+- **Off:** nothing new is read or said; today's behaviour as it is.
+
 ## Updates
 
 Read one version ahead (#1680): `serve.json`'s `own_keys` field (the
