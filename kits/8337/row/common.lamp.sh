@@ -29,7 +29,8 @@ updbusy(){ w=; [ -e $REC/journal.json ] && w="$w journal.json"; [ -e $REC/self.j
 exesha(){ p=$(pid $1); [ "${p:-0}" != 0 ] && sha256sum /proc/$p/exe 2>/dev/null | cut -d' ' -f1 || echo none; }
 line(){ systemctl show -p ExecStart --value lamp-update.service | grep -oE 'lamp-update serve [^;]*' | head -1; }
 product_line(){ line | grep -qE -- '--channel-url https://(github.com/autonomous-ai/lampOS/releases/download/lampos-stable/|cdn.autonomous.ai/lampos/stable/) --channel lamp-voice --key-file /etc/lampOS/update/key.pub --apply on'; }
-dropins(){ for u in lamp-update lamp-update-apply lamp-update-writer lamp-update-back lamp-update-harness lamp-tasks; do d=$(systemctl show -p DropInPaths --value $u.service 2>/dev/null | tr " " "\n" | grep -v "/etc/systemd/system/$u.service.d/exit-note.conf$" | tr "\n" " " | sed "s/ *$//"); [ -n "$d" ] && echo "DROPIN $u: $d"; done; }
+# lamp-update's own CDN feed drop-in (docs/updates.md, "The CDN feed": lamp-update writes it) is the product's, not a row's.
+dropins(){ for u in lamp-update lamp-update-apply lamp-update-writer lamp-update-back lamp-update-harness lamp-tasks; do d=$(systemctl show -p DropInPaths --value $u.service 2>/dev/null | tr " " "\n" | grep -v "/etc/systemd/system/$u.service.d/exit-note.conf$" | grep -v "^/etc/systemd/system/lamp-update.service.d/zz-cdn-feed.conf$" | tr "\n" " " | sed "s/ *$//"); [ -n "$d" ] && echo "DROPIN $u: $d"; done; }
 failed(){ systemctl --failed --no-legend --plain 2>/dev/null | awk '{print $1}' | LC_ALL=C sort | tr '\n' ' '; }
 # The lamp's speaker volume, READ ONLY (amixer -c 0 sget; never set): SPK_CTL, else the card's first control with a
 # playback volume. Prints SPEAKER <control> <n>% | SPEAKER unread.

@@ -22,6 +22,9 @@ for x in lamp-voice lamp-tasks lamp-openclaw-gateway lamp-cloud lamp-update; do 
 F=$(failed); echo "FAILED $F"
 for x in $F; do case " ${FAILED0:-} " in *" $x "*) ;; *) why="$why newly-failed-$x";; esac; done
 a=$(agent_now); echo "$a"
-echo "$a" | grep -q 'state=ready ' || why="$why agent-not-ready"
-echo "$a" | grep -q 'engine=openclaw ' || why="$why agent-engine-not-openclaw"
+# lamp-ee17 keeps no tasks/agent value on the bus (23 Nov: AGENT unreadable on stable too): then the units being active
+# and the default engine (engine-default.json, else lamp-tasks' LAMP_LAMP_ENGINE) stand in, said as such.
+if echo "$a" | grep -q '^AGENT unreadable'; then e=$(engine); echo "ENGINE ${e:-none} (tasks/agent not kept on this lamp)"; [ "$e" = openclaw ] || why="$why engine-not-openclaw"
+else echo "$a" | grep -q 'state=ready ' || why="$why agent-not-ready"
+  echo "$a" | grep -q 'engine=openclaw ' || why="$why agent-engine-not-openclaw"; fi
 [ -z "$why" ] && echo "VERIFY PASS" || echo "VERIFY FAIL:$why"
