@@ -1050,34 +1050,49 @@ mod tests {
     /// has returned by then, so a second request of its own has connected,
     /// and one more look finds it.
     fn answering_with(reply: &str) -> (String, Served) {
+        answering_each(&[reply])
+    }
+
+    /// [`answering_with`] for a check of more than one request: each reply
+    /// in turn, one request each, and none after the last.
+    fn answering_each(replies: &[&str]) -> (String, Served) {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
-        let reply = reply.to_owned();
+        let replies: Vec<String> = replies.iter().map(|reply| (*reply).to_owned()).collect();
         let (stop, stopped) = std::sync::mpsc::channel::<()>();
         let thread = std::thread::spawn(move || {
-            let (mut socket, _) = listener.accept().unwrap();
-            let mut request = vec![0; 8_192];
-            let n = socket.read(&mut request).unwrap();
-            socket.write_all(reply.as_bytes()).unwrap();
-            drop(socket);
+            let mut asked = Vec::new();
+            for reply in replies {
+                let (mut socket, _) = listener.accept().unwrap();
+                let mut request = vec![0; 8_192];
+                let n = socket.read(&mut request).unwrap();
+                socket.write_all(reply.as_bytes()).unwrap();
+                drop(socket);
+                asked.push(String::from_utf8_lossy(&request[..n]).to_lowercase());
+            }
             // Up to the check's bound, as before, unless stopped sooner.
             let _ = stopped.recv_timeout(Duration::from_millis(300));
             listener.set_nonblocking(true).unwrap();
-            assert!(listener.accept().is_err(), "a second request with the key");
-            String::from_utf8_lossy(&request[..n]).to_lowercase()
+            assert!(listener.accept().is_err(), "a request more than asked for");
+            asked
         });
         (format!("http://{address}"), Served { stop, thread })
     }
 
-    /// The server [`answering_with`] runs.
+    /// The server [`answering_each`] runs.
     struct Served {
         stop: std::sync::mpsc::Sender<()>,
-        thread: std::thread::JoinHandle<String>,
+        thread: std::thread::JoinHandle<Vec<String>>,
     }
 
     impl Served {
         /// What it was asked, once it is stopped and has looked once more.
         fn join(self) -> std::thread::Result<String> {
+            self.join_each().map(|asked| asked.concat())
+        }
+
+        /// [`Self::join`], each request apart.
+        fn join_each(self) -> std::thread::Result<Vec<String>> {
             let _ = self.stop.send(());
             self.thread.join()
         }
@@ -1313,6 +1328,80 @@ mod tests {
                 );
                 assert!(!reply.to_string().contains("grok-3-mini"), "{reply}");
                 assert!(!store.0.join("openai_compatible.key").exists());
+            }
+            let _ = fs::remove_dir_all(&folder);
+        }
+    }
+
+    /// #8420: OpenRouter's check is two requests to its fixed endpoint:
+    /// `GET /key` with the key as the bearer, since its model list is public
+    /// and proves nothing about a key, then `GET /models/<model>/endpoints`
+    /// without it, where a 404 means no such model. Refused on the first
+    /// asks nothing more; the key is never said back.
+    #[test]
+    fn an_openrouter_check_asks_for_the_key_then_the_models_endpoints() {
+        fn status(status: u16) -> String {
+            format!("HTTP/1.1 {status} X\r\ncontent-length: 0\r\nconnection: close\r\n\r\n")
+        }
+        /// The real check, sent to the local server in place of OpenRouter.
+        struct Local(String);
+        impl Check for Local {
+            fn check(&mut self, given: &Given) -> Verdict {
+                assert_eq!(
+                    given.base_url.as_deref(),
+                    Some("https://openrouter.ai/api/v1")
+                );
+                let local = Given {
+                    base_url: Some(self.0.clone()),
+                    ..given.clone()
+                };
+                HttpCheck::local(String::new()).check(&local)
+            }
+        }
+        let line = json!({"set": "openrouter", "key": "sk-or-made-up-8420", "model": "openai/gpt-4o-mini"}).to_string();
+        for (replies, code, asks) in [
+            (vec![status(200), status(200)], "works", 2),
+            (vec![status(200), status(404)], "bad_field", 2),
+            (vec![status(401)], "refused", 1),
+            (vec![status(200), status(500)], "unreached", 2),
+        ] {
+            let replies: Vec<&str> = replies.iter().map(String::as_str).collect();
+            let (base, served) = answering_each(&replies);
+            let folder = std::env::temp_dir().join(format!(
+                "lamp-setup-keys-openrouter-{code}-{}",
+                std::process::id()
+            ));
+            let _ = fs::remove_dir_all(&folder);
+            let store = Store(folder.join("own"));
+            let (reply, done) = answer(&line, &store, &mut Local(format!("{base}/api/v1")), true);
+            assert!(done.is_some(), "the check never ran: {reply}");
+            let asked = served.join_each().unwrap();
+            assert_eq!(asked.len(), asks, "{code}: {asked:?}");
+            assert!(
+                asked[0].starts_with("get /api/v1/key http/1.1"),
+                "{asked:?}"
+            );
+            assert!(asked[0].contains("authorization: bearer sk-or-made-up-8420"));
+            if asks == 2 {
+                assert!(
+                    asked[1]
+                        .starts_with("get /api/v1/models/openai/gpt-4o-mini/endpoints http/1.1"),
+                    "{asked:?}"
+                );
+                assert!(!asked[1].contains("sk-or-made-up"), "{asked:?}");
+            }
+            let said = done.unwrap().said;
+            assert!(!reply.to_string().contains("sk-or"), "{reply}");
+            assert!(!said.contains("sk-or"), "{said}");
+            if code == "works" {
+                assert_eq!(reply["done"]["code"], "works", "{reply}");
+                assert!(store.0.join("openrouter.key").is_file());
+            } else {
+                assert_eq!(reply["code"], code, "{reply}");
+                assert!(!store.0.join("openrouter.key").exists());
+            }
+            if code == "bad_field" {
+                assert_eq!(reply["refused"], "OpenRouter has no model by that name");
             }
             let _ = fs::remove_dir_all(&folder);
         }
