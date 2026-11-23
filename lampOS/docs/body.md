@@ -1669,6 +1669,24 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   (`dropped: lamp-control holds it`). Every other gesture is taken under the lease as before, so level 1
   is today exactly.
 
+### Kept still for someone (`{"quiet":true}`, #7689)
+
+The voice tells the body `{"quiet":true}` on the mood socket, a datagram of its own, as often as a mood
+(every 40 ms), while its care hold holds (`LAMP_CARE_LINE`, [second-voice.md](second-voice.md), "Words of
+self-harm"), and `{"quiet":false}` once when it ends. The body keeps it until `{"quiet":false}` or for
+`MOOD_STALE` (1.5 s) after the last one, so a voice gone lets it go (`Asked::quiet`). While it holds:
+
+- **No shift at rest:** the idle shifts do not begin.
+- **A plain nod only:** every other gesture, a lively one (a nod too), a skill's, and a paired computer's
+  or an app's from lamp-control, is dropped and said `held` (`body::QUIET_HELD`), which lamp-control
+  passes to its asker as the why. Nothing says why.
+- **lamp-control's lease stands back** as in a conversation: `{"lease":"suspended","why":"conversation"}`,
+  so a holder's look, pose and limp wait.
+- **The face is still followed** whenever the lamp listens or speaks, as before.
+
+A body built before it drops the datagram (`not a mood or a gesture this body has`) and keeps the mood.
+A mood datagram with `quiet` in it is refused whole, as any unknown field is.
+
 ### A stand asked by voice
 
 With `LAMP_BODY_POSE_ASK=on`, a person can ask the lamp lower ("get lower",
