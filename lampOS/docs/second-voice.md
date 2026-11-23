@@ -3066,7 +3066,10 @@ gives one fixed line with a real place to turn. Off unless
 - **Never an app's trigger** (#7689 part 2). Such a line, or within the
   hold one asking who they can call, is never offered to a running app's
   spoken trigger (`LAMP_APP_TRIGGERS`, #7415 piece 6): taken, the turn
-  would end with no caring answer and no line. A `start_app` the model
+  would end with no caring answer and no line. **With `LAMP_CARE_LINE` off
+  too** (App Only's 10:00 on #8341, Store apps going to users), a line
+  `care_line::said_harm` catches is never offered to an app's trigger: it
+  goes to the model as any line does, with no note, no hold and no line. A `start_app` the model
   calls in a care turn starts nothing either: it is answered "not now:
   nothing was started", as for a line not plainly for the lamp. The care
   turns are kept per route (`Care::turn`, `Care::is_turn`, the last 16).
