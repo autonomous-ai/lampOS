@@ -22718,3 +22718,31 @@ fn kept_still_for_someone_it_does_not_shift_at_rest() {
         "{still_shifts:?}"
     );
 }
+
+/// #7689 (b), Twelve's 2 on #8408: a skill's gesture under way when the
+/// lamp begins to keep still ends at once, eased out, said `held`.
+#[test]
+fn a_gesture_under_way_ends_as_the_lamp_begins_to_keep_still() {
+    let mut asked = false;
+    let (report, fates, _) = skill_run(
+        14,
+        standing(100, 5),
+        gesture_limits(),
+        |_| {},
+        || Some((Mood::Speaking, 60)),
+        move |now| {
+            let due = !asked && now >= Duration::from_secs(8);
+            asked |= due;
+            Asked {
+                quiet: now >= Duration::from_millis(8_500),
+                gesture: due.then_some(&crate::clips::LAUGH),
+                ..Asked::default()
+            }
+        },
+    );
+    assert_eq!(report.gestures, 1, "{report:?}");
+    assert!(
+        fates.contains(&("laugh", crate::body::QUIET_HELD)),
+        "{fates:?}"
+    );
+}
