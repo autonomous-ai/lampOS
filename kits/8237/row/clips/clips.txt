@@ -1,2 +1,3 @@
 RUN	Hey Lamp, start desk hello.	1.0
 YES	Yes, go ahead.	1.0
+RUN2	Lamp, run the desk hello skill.	1.0

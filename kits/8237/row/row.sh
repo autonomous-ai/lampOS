@@ -10,9 +10,13 @@ o(){ echo "$*" | tee -a $O; }
 # lamp-voice "its final words came back empty", #6840). Returns 1 when neither was heard: the leg is VOID, never FAIL.
 RUN_HEARD=${RUN_HEARD:-25}
 # $2: the skill calls this leg's journal must hold once this RUN is heard (each leg's journal is its own, from jstart).
-PLAYRUN(){ local f=$1 need=${2:-1}; PLAY RUN
-  for try in 1 2; do local s=0; while [ $s -lt $RUN_HEARD ]; do [ "$(c "$TRIG" $f)" -ge "$need" ] && return 0; sleep $POLL; s=$((s + POLL)); done
-    [ $try = 1 ] && { o "RUN not heard in ${RUN_HEARD} s (no skill call): played again"; PLAY RUN; }; done; return 1; }
+# RUN, then RUN2 (another plain ask form the named-skill match reads, lampOS/crates/voice/src/skill_named.rs
+# `named_among`: AROUND, RUNS, REQUESTS), then RUN again, each heard for RUN_HEARD s: on lamp-ee17 the same
+# "Hey Lamp, desk hello." matched in run 4's P and not in run 5's (speech to text varies). Not heard at all: 1 (VOID).
+PLAYRUN(){ local f=$1 need=${2:-1} clip try s; for try in 1 2 3; do clip=RUN; [ $try = 2 ] && clip=RUN2
+    [ $try -gt 1 ] && o "RUN not heard in ${RUN_HEARD} s (no skill call): playing $clip"; PLAY $clip
+    s=0; while [ $s -lt $RUN_HEARD ]; do [ "$(c "$TRIG" $f)" -ge "$need" ] && return 0; sleep $POLL; s=$((s + POLL)); done
+  done; return 1; }
 S=$SKILL
 # patterns (lampOS/crates/tasks/src/skill_task.rs, lampOS/crates/skills/src/main.rs at #8237's head)
 TOLD_T="skill task: the agent's start-up wait passed 5 s: told getting ready"
@@ -35,7 +39,7 @@ case $x in
 P) o "== P: the fixture's yes, asked once with a warm gateway"
    # The yes is played only once the lamp has asked for it (said the task back): on a lamp whose kept session
    # opens cold after put, that ask comes a minute or more after RUN, and a yes played before it is not kept.
-   jstart p; PLAYRUN $L/p.journal || { jstop; leg P VOID "RUN not heard twice (no skill call): G and W can't run"; continue; }
+   jstart p; PLAYRUN $L/p.journal || { jstop; leg P VOID "RUN not heard in three plays (no skill call): G and W can't run"; continue; }
    if ! waitfor "$ASKED" $L/p.journal $YESWAIT; then jstop; o "CHECK (P0) the lamp never asked for the yes within ${YESWAIT} s (logs/p.journal)"; leg P VOID "no ask for the yes: G and W can't run"; continue; fi
    o "CHECK (P0) the lamp asked for the yes: $(grep -F -- "$ASKED" $L/p.journal | tail -1 | cut -d: -f4- | cut -c1-90)"
    sleep $YESAFTER; PLAY YES
@@ -43,7 +47,7 @@ P) o "== P: the fixture's yes, asked once with a warm gateway"
    # next trigger"; voice skill_task_yes.rs APPROVED_NEXT): RUN is asked again once lamp-control kept the yes.
    if ! waitfor "$KEPT" $L/p.journal $WWAIT; then jstop; o "CHECK (P1) lamp-control kept no yes within ${WWAIT} s (logs/p.journal)"; leg P VOID "the yes was not kept: G and W can't run"; continue; fi
    o "CHECK (P1) lamp-control kept the owner's yes"
-   sleep $RUNAFTER; PLAYRUN $L/p.journal 2 || { jstop; leg P VOID "the second RUN not heard twice: G and W can't run"; continue; }
+   sleep $RUNAFTER; PLAYRUN $L/p.journal 2 || { jstop; leg P VOID "the second RUN not heard in three plays: G and W can't run"; continue; }
    if waitfor "$ANS" $L/p.journal $GWAIT; then sleep $SETTLE; jstop; o "CHECK (P2) a run handed over and answered: $(grep -F -- "$ANS" $L/p.journal | tail -1 | cut -d: -f4- | cut -c1-90)"; leg P PASS
    else jstop; o "CHECK (P2) no answer from lamp-tasks within ${GWAIT} s (logs/p.journal)"; leg P VOID "no answer after the yes: G and W can't run"; fi;;
 G) o "== G: cold gateway: the line once, before the answer"
@@ -51,7 +55,7 @@ G) o "== G: cold gateway: the line once, before the answer"
    GATE lamp-openclaw-gateway || { leg G VOID "start budget"; continue; }
    jstart g; LAMP "SECS=$((GWAIT + 40))" $D/reads.lamp.sh > $L/g.reads 2>&1 & RP=$!
    LAMP "" $D/gw.lamp.sh | tee $L/gw.txt; grep -q '^GW RESTARTED' $L/gw.txt || { jstop; kill $RP 2>/dev/null; leg G VOID "gateway not restarted"; continue; }
-   sleep ${ASKAFTER:-10}; PLAYRUN $L/g.journal || { jstop; kill $RP 2>/dev/null; wait $RP 2>/dev/null; leg G VOID "RUN not heard twice (no skill call)"; continue; }
+   sleep ${ASKAFTER:-10}; PLAYRUN $L/g.journal || { jstop; kill $RP 2>/dev/null; wait $RP 2>/dev/null; leg G VOID "RUN not heard in three plays (no skill call)"; continue; }
    got=0; waitfor "$ANS" $L/g.journal $GWAIT && got=1; sleep $SETTLE; jstop; kill $RP 2>/dev/null; wait $RP 2>/dev/null
    nt=$(c "$TOLD_T" $L/g.journal); ns=$(c "$TOLD_S" $L/g.journal); sp=$(grep -F -- "$TOLD_S" $L/g.journal | grep -c "${TOLD_S}say: spoken" | tr -d ' ')
    out=$(grep -F -- "$TOLD_S" $L/g.journal | sed "s/.*getting ready: //" | tr '\n' ';')
@@ -94,7 +98,7 @@ W) o "== W: warm gateway: nothing said"
    grep -q '^P=PASS' $L/verdicts.env || { leg W VOID "no P PASS"; continue; }
    # W is the warm gateway: after G's restart, wait for the gateway's "ready" line (run 4 on lamp-ee17: 158 s cold), else VOID.
    jstart w; grep -qF -- "$GWREADY" $L/g.journal 2>/dev/null || waitfor "$GWREADY" $L/w.journal $WARMWAIT || { jstop; leg W VOID "the gateway was not ready within ${WARMWAIT} s after G"; continue; }
-   PLAYRUN $L/w.journal || { jstop; leg W VOID "RUN not heard twice (no skill call)"; continue; }; got=0; waitfor "$ANS" $L/w.journal $WWAIT && got=1; sleep $SETTLE; jstop
+   PLAYRUN $L/w.journal || { jstop; leg W VOID "RUN not heard in three plays (no skill call)"; continue; }; got=0; waitfor "$ANS" $L/w.journal $WWAIT && got=1; sleep $SETTLE; jstop
    nt=$(c "$TOLD_T" $L/w.journal); ns=$(c "$TOLD_S" $L/w.journal)
    o "CHECK (W1) lamp-tasks told nothing: $nt line(s)"; o "CHECK (W2) lamp-skills asked no line: $ns ask(s)"
    o "CHECK (W3) the run's answer was read: $([ $got = 1 ] && echo yes || echo no)"
