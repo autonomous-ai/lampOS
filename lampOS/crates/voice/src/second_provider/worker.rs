@@ -1396,7 +1396,12 @@ pub(crate) fn relay_routable(
             && config.hosted.own_deepseek.is_none()
             && config.hosted.deepseek_base_url.is_some()
             && !config.pinned.chat,
-        speech: !route.gemini_speech() && config.tts_key == config.llm_key && !config.pinned.speech,
+        // Never the person's own voice (#8367): their key goes to
+        // ElevenLabs' own API alone, never to the relay's near address.
+        speech: !route.gemini_speech()
+            && config.tts_key == config.llm_key
+            && config.hosted.lamps_voice.is_none()
+            && !config.pinned.speech,
         listening: matches!(&config.stt, crate::second_config::Stt::Autonomous { key, .. } if *key == config.llm_key)
             && !config.pinned.listening,
         gemini: (route.chat == Some(ChatRoute::Gemini) || route.gemini_speech())
