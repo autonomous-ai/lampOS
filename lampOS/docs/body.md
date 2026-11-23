@@ -957,7 +957,17 @@ rest by itself and then stands as ever:
    (10 min), is let down slowly: its force drops to `GIVE_WAY_FORCE` (12%)
    and stays there, so it sinks under its own weight. With the arm already
    resting the run ends held, as before, and systemd's start limit bounds
-   the retries. The base and the roll keep inside one turn by their own
+   the retries, with one exception: a fold that stops on the load of an arm
+   joint it is folding, with the arm within `ARM_LET_GO_NEAR` of folded, has
+   met its rest (a factory lamp, 23 Nov: the elbow lay 61 counts above
+   folded, its head askew under it, at a load of 252 against `--recover-load
+   250`). The arm is folded there: its goals are walked to where it lies, a
+   goal step a write, so it stops pushing, and the lamp wakes and may
+   stand. Before, the hold was refused (61 counts from the last goal), the
+   elbow went on pushing and heating, and each restart ended on `Window`
+   until the unit failed. Likewise an arm joint found held with torque on,
+   pushing (over `STALL_LOAD`) at a goal more than a goal step from where it
+   reads, is held where it lies rather than at that goal. The base and the roll keep inside one turn by their own
    stored limits; a head or base joint found more than half a turn from
    home is refused rather than woken across the seam. The arm is let go for a hand only within
    `ARM_LET_GO_NEAR` (150) of folded; raised, let go, it would fall. The load
