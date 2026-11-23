@@ -109,3 +109,10 @@ New mocks: `U.pass-push-probe`, `U.pass-volume-same`, `U.pass-volume-moved`, `B.
   `ASKYES` answers it with YES2. A waiting run spends nothing and comes again only on the next ask, so once
   lamp-control logs "the owner's yes to <skill>'s task kept", the kit lets the lamp finish and asks again.
 - **C is VOID, not FAIL,** when the model never ran the fixture: no grant was tested.
+- **P, fork past the cap (19:1x run):** the fence's `prlimit --nproc=64` refuses forks before the run leaf's
+  `pids.max` 72 (`skill_run.rs`), so `pids.events.max` stays 0 by design, and a run's stderr is never journaled.
+  fork-probe tells its refusals by its exit code: 0 when some of its 120 forks were refused, 3 when none were.
+  P1 passes on exit 0 or on a cgroup count. Run steps are one at a time across the lamp, and a clip during the run
+  speaks over its say, so P2 asks the price only after the fork run ends: the lamp runs the next task after it.
+- **H's yes-ask cut by a room sound** ("asked aloud: say: dropped (user_interrupted)") is kept as tried and asked
+  again on the next call (`task.rs`, `ask_yes`). `ASKYES` waits for quiet and asks the clip once more.

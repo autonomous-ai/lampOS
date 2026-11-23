@@ -77,11 +77,11 @@ PASS = {
  "out/cgwatch.lamp.sh.H": cg(["run-h1"]),
  "out/restart-tasks.lamp.sh": "BEFORE pid=905 kids=serve run-h1 \nAFTER 3s pid=1777 cgroup=/system.slice/lamp-tasks.service/serve leaf=serve subtree=cpu,memory,pids kids=serve \nAFTER serve_procs=[1777 ] root_procs=[] mainpid_in_serve=yes\nJ " + SETUP.split(": ", 1)[1] + "\n",
  # P: fork-probe past pids.max while the price run answers
- "j/P.FORK": j([(1, started("run-p1", "fork-probe")), (1.1, token("run-p1", "fork-probe", "speak"))]),
+ "j/P.FORK": j([(1, started("run-p1", "fork-probe")), (1.1, token("run-p1", "fork-probe", "speak")),
+                (1.3, handover("run-p1", 136)), (3.2, ended("run-p1", "its script exited 0", 1))]),
  "j/P.PRICEASK": j([(0.9, started("run-p2", "price-check")), (1.0, token("run-p2", "price-check", "net, speak")), (1.8, say("run-p2", 30)),
-                    (1.9, handover("run-p2", 700)), (2.0, ended("run-p2", "its script exited 0", 1)),
-                    (3.0, "lamp-skills[700]: FORKPROBE started=64 refused=56"), (3.1, handover("run-p1", 350)), (3.2, ended("run-p1", "its script exited 0", 1))]),
- "out/cgwatch.lamp.sh.P": cg(["run-p1", "run-p2"], pe="56"),
+                    (1.9, handover("run-p2", 700)), (2.0, ended("run-p2", "its script exited 0", 1))]),
+ "out/cgwatch.lamp.sh.P": cg(["run-p1", "run-p2"], pe="0"),
  # W
  "out/wshop.lamp.sh.hash.1": "WSHOP 3f2a9c0d11aa22bb files=4\n", "out/wshop.lamp.sh.hash.2": "WSHOP 3f2a9c0d11aa22bb files=4\n",
  "out/wshop.lamp.sh.config": 'DENY ["skill_workshop"]\nCHECK (W1) tools.deny holds skill_workshop: PASS\nGATEWAY active since \'Sat 2026-11-21 09:00:00 +07\' restarts=0 exit78_lines=0\nCHECK (W2) OpenClaw accepts the file (gateway active, no exit 78 since start): PASS\n',
@@ -201,7 +201,11 @@ case("C.void-nocall", "C", over={"j/C.PROBE": j([(1, V2 + "request 131 tools: no
 case("H.pass-yes", "H", over={"j/H.SLOW.1": j([(1, RUNYES("slow-probe"))]), "j/H.YES2": YESK("slow-probe"), "j/H.SLOW.2": PASS["j/H.SLOW.1"], "j/H.SLOW.3": PASS["j/H.SLOW.2"]}, env={"GREP": "SLOW.asked.again.after.the.yes"})
 case("H.fail-yesnotkept", "H", over={"j/H.SLOW.1": j([(1, RUNYES("slow-probe"))]), "j/H.YES2": j([(1, V2 + "request 140: tools: remember_offered=y calls=none prepared=n")]), "j/H.SLOW.2": PASS["j/H.SLOW.1"], "j/H.SLOW.3": PASS["j/H.SLOW.2"]}, env={"GREP": "the.yes.was.not.kept"})
 case("P.pass", "B P")
-case("P.fail", "B P", over={"out/cgwatch.lamp.sh.P": cg(["run-p1", "run-p2"], pe="0"), "j/P.PRICEASK": PASS["j/P.PRICEASK"].replace("refused=56", "refused=0")})
+# ee17 23 Nov: the fence's nproc 64 refuses forks before the leaf's pids.max 72 (pids.events 0); the script's exit tells it
+case("P.fail", "B P", over={"j/P.FORK": PASS["j/P.FORK"].replace("its script exited 0", "its script exited 3")})
+case("P.pass-cgcap", "B P", over={"out/cgwatch.lamp.sh.P": cg(["run-p1", "run-p2"], pe="56"), "j/P.FORK": PASS["j/P.FORK"].replace("its script exited 0", "its script exited 3")})
+case("P.fail-noprice", "B P", over={"j/P.PRICEASK": j([(1, V2 + "request 150: tools: remember_offered=y calls=web_search:1 prepared=n")])})
+case("H.pass-yesdropped", "H", over={"j/H.SLOW.1": j([(1, RUNYES("slow-probe").replace("say: spoken (2140 ms)", "say: dropped (user_interrupted) (27085 ms)"))]), "j/H.SLOW.2": j([(1, RUNYES("slow-probe"))]), "j/H.YES2": YESK("slow-probe"), "j/H.SLOW.3": PASS["j/H.SLOW.1"], "j/H.SLOW.4": PASS["j/H.SLOW.2"]}, env={"GREP": "run.yes.ask.dropped..try.1"})
 case("P.void", "P")
 # P needs B's kept price skill, not B's PASS (e82d 14:38: B failed, so P went VOID)
 case("P.pass-bfail", "B P", over={"j/B.PRICEASK": PASS["j/B.PRICEASK"].replace("@+1.8 ", "@+9.0 ")})
