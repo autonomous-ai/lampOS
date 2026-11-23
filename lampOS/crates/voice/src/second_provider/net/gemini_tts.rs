@@ -104,7 +104,7 @@ impl GeminiTts {
             &self.used,
             WARM_AFTER,
             &self.model_url,
-            ("x-goog-api-key", &self.key),
+            &[("x-goog-api-key", &self.key)],
             WARM_BYTES,
         )
         .await?;

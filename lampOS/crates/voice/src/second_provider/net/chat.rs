@@ -279,6 +279,13 @@ pub const WARM_AFTER_KEPT: std::time::Duration = std::time::Duration::from_secs(
 /// At most this much of the warming answer is read: enough to finish a
 /// models list, so its connection goes back to the pool.
 const WARM_BYTES: usize = 256 << 10;
+/// The most an answer of the person's own Anthropic model takes (#8420):
+/// set, as Anthropic asks, and taken by every Claude model, the oldest
+/// (Claude 3 Haiku) included.
+// ponytail: one bound for every model; per-model if a longer answer is wanted.
+const ANTHROPIC_MAX_TOKENS: u32 = 4096;
+/// The `anthropic-version` Anthropic's model list is asked with.
+const ANTHROPIC_VERSION: &str = "2023-06-01";
 
 /// When an answer or a warm on a chat's client last ended ([`Chat::send_watched`]).
 type LastEnded = Arc<std::sync::Mutex<Option<std::time::Instant>>>;
@@ -318,6 +325,9 @@ pub struct Chat {
     /// Gemini's 400 for a bad key is [`Error::KeyInvalid`]: the person's
     /// own Gemini alone (#8420).
     key_400: bool,
+    /// Anthropic's: its warm asks `models` with `x-api-key`, never a
+    /// bearer, which its model list refuses (#8420).
+    anthropic: bool,
 }
 
 /// A request's tools and first message, hashed: what has to stay the same
@@ -379,6 +389,17 @@ impl Chat {
     pub fn gemini_own(base_url: &str, model: &str, key: &str, declare: Declare) -> Result<Self> {
         let mut chat = Self::gemini(base_url, model, key, declare)?;
         chat.key_400 = true;
+        Ok(chat)
+    }
+
+    /// Anthropic's OpenAI-compatible chat for the person's own key (#8420):
+    /// `<base>/chat/completions` with the key as a bearer, plain OpenAI chat
+    /// with [`ANTHROPIC_MAX_TOKENS`], which every Claude model takes.
+    pub fn anthropic(base_url: &str, model: &str, key: &str, declare: Declare) -> Result<Self> {
+        let mut chat = Self::with(base_url, model, key, declare)?;
+        chat.extra
+            .insert("max_tokens".into(), json!(ANTHROPIC_MAX_TOKENS));
+        chat.anthropic = true;
         Ok(chat)
     }
 
@@ -498,12 +519,18 @@ impl Chat {
     /// when not due, or when it failed (the chat then connects as before).
     pub async fn warm(&self) -> Option<(u16, std::time::Duration)> {
         let models = self.url.replacen("/chat/completions", "/models", 1);
+        let key = self.auth.strip_prefix("Bearer ").unwrap_or_default();
+        let headers: &[(&'static str, &str)] = if self.anthropic {
+            &[("x-api-key", key), ("anthropic-version", ANTHROPIC_VERSION)]
+        } else {
+            &[("authorization", &self.auth)]
+        };
         let (status, took, ..) = super::warm_get(
             &self.client,
             &self.last_sent,
             self.warm_after,
             &models,
-            ("authorization", &self.auth),
+            headers,
             WARM_BYTES,
         )
         .await?;
@@ -537,6 +564,7 @@ impl Chat {
             last_ended: LastEnded::default(),
             warm_after: if kept { WARM_AFTER_KEPT } else { WARM_AFTER },
             key_400: false,
+            anthropic: false,
             url: format!("{}/chat/completions", openai_base(base_url)),
             auth: format!("Bearer {key}"),
             model: model.to_owned(),

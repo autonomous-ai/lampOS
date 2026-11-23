@@ -1028,7 +1028,7 @@ impl Tts {
             &self.used,
             after,
             &models,
-            (header, &value),
+            &[(header, &value)],
             WARM_BYTES,
         )
         .await?;
