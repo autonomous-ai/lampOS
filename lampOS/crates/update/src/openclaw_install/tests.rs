@@ -1141,6 +1141,8 @@ fn the_gateway_unit_runs_through_the_wrapper_as_lampos_with_caps() {
         "WorkingDirectory=/var/lib/lampos-openclaw/state",
         "Restart=always",
         "RestartSec=10",
+        // (#8320) room for a first-start drain (~80 s) before a SIGKILL
+        "TimeoutStopSec=150",
         "Nice=10",
         "CPUQuota=100%",
         "Environment=HOME=/var/lib/lampos-openclaw OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state LAMP_OPENCLAW_GATEWAY=on",
@@ -3984,7 +3986,11 @@ fn a_gateway_unit_written_anew_with_the_control_socket_restarts_it_once() {
     // A unit written anew over one that had `PartOf=` already: lamp-control's
     // restart in the round's switch restarted the gateway, so no second
     // stop lands in its first start (#8324, gate G).
-    fs::write(lamp.unit(), format!("{}# an earlier text\n", unit_text_for(shown))).unwrap();
+    fs::write(
+        lamp.unit(),
+        format!("{}# an earlier text\n", unit_text_for(shown)),
+    )
+    .unwrap();
     let mut systemd = Fake {
         loaded: Some(running),
         ..Fake::default()
