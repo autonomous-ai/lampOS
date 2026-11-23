@@ -1,0 +1,5 @@
+#!/bin/sh
+# Mock ROUND*_CMD / HOLD_CMD / UNHOLD_CMD: logs what it got; HOLD and UNHOLD are events of leg L9 for the followers.
+echo "$(date +%s) cmd ${1:-round} n=${ROUND_N:-} seq=${ROUND_SEQ:-} host=$LAMP_HOST head=${HEAD_SHA:-}" >> "$MOCK_LOG"
+case "${1:-}" in hold|unhold) python3 -c 'import sys,time;print("%.6f L9 %s" % (time.time(), sys.argv[1]))' $1 >> "$MOCK_STATE/events";; esac
+exit ${MOCK_ROUNDCMD_RC:-0}

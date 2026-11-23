@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "$(date +%s) scp $*" >> "$MOCK_LOG"; exit ${MOCK_SCP_RC:-0}

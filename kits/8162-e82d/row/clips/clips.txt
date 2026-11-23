@@ -1,0 +1,10 @@
+# id	words (ElevenLabs, pre-rendered for the #8138 kit, 19 Nov; no live TTS)	gain (afplay -v)
+20-ask-a	Hey Lamp, OpenClaw, suggest three friendly names for a desk lamp.	1.0
+21-ask-b	Hey Lamp, OpenClaw, write a two-line poem about green tea.	1.0
+22-ask-c	Hey Lamp, OpenClaw, give me one short tip for falling asleep faster.	1.0
+23-ask-d	Hey Lamp, OpenClaw, name three fruits that are yellow.	1.0
+24-ask-e	Hey Lamp, OpenClaw, what is a good name for a small grey cat?	1.0
+25-ask-f	Hey Lamp, OpenClaw, tell me one fun fact about octopuses.	1.0
+26-ask-g	Hey Lamp, OpenClaw, suggest a short title for a story about a lighthouse.	1.0
+27-ask-h	Hey Lamp, OpenClaw, give me two easy breakfast ideas.	1.0
+40-long	Hey Lamp, OpenClaw, write me a story of about four hundred words about a lighthouse keeper and his cat, then give it a title.	
