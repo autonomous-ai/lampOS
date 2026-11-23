@@ -413,7 +413,7 @@ min (...): this round reads <GitHub>, the next one the CDN first`, then
 `on <GitHub>: <outcome>`. Nothing sticks: the next round reads the CDN
 first again, and the unit and drop-in are not touched. A round that reads
 the CDN (any other outcome) removes the file and says `the CDN feed is read
-again`. A new lamp-update taken from GitHub this way confirms itself on
+again: GitHub is not read`. A new lamp-update taken from GitHub this way confirms itself on
 GitHub too when its dry round on the CDN is not proven and the clock is
 past the hour, switch or not. A refused build, a quiet wait or any other outcome on the
 CDN is not a CDN failure and never reads GitHub. Shown on a lamp as well
@@ -2585,8 +2585,8 @@ Most lamps in homes take a build by a round and never reboot for it, so
 the boot run of `lamp-update region` that removes sysstat's kept files
 ([install.md](install.md), "sysstat's collection off") left them on the
 RAM log disk until the next power cut, and the journal stayed short. Every
-round that applies (not a dry round, and not one waiting for lamp-update's
-own switch) now runs the same `install::sysstat_kept_removed` after its
+round that applies (not a dry round, not one waiting for lamp-update's
+own switch, and not one that finds the update lock held or cannot take it) now runs the same `install::sysstat_kept_removed` after its
 build work, on an up-to-date round too: as with lamp-control above, the
 new updater's first round finds the lamp up to date, so the files go
 within one `--every-s` of the update. The round's sandbox cannot write
@@ -2710,7 +2710,8 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   that always wins; not set there at all, this file, by the models switch
   file's rule (`LAMP_SKILL_TASKS` and `LAMP_SKILL_DEFAULT_AGENT` from the
   file only on a product lamp); a
-  missing or garbled file is off. A round places it as it does
+  missing or garbled file is off. `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` (#8105) is
+  read the same way, but this file doesn't set it, so it is off unless set. A round places it as it does
   `models.env`. After each `serve` round lamp-update reads them again, and
   when they differ from its start's (the round wrote or changed the file,
   as the promote round that first carries it does) it starts itself again
