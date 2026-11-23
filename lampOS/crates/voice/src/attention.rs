@@ -345,7 +345,7 @@ pub const NOT_SPOKEN_TO: &str =
 /// lamp's work is taken so ([`about_its_work`]): two colleagues talking a
 /// minute or two after the news were answered every line (#1378).
 pub const NEWS_REPLY_US: u64 = 180_000_000;
-const AFTER_NEWS: &str = "the first thing said after the lamp's own news";
+pub(crate) const AFTER_NEWS: &str = "the first thing said after the lamp's own news";
 
 /// With the switch, a question about the lamp's own work
 /// ([`about_its_work`]) is for it this long after the lamp's news, or after
@@ -1967,6 +1967,15 @@ pub struct Attention {
     /// hearing at its start, its first word, set off, not the name
     /// ([`Self::near_not_the_name`]).
     near_not_the_name_of: Option<u64>,
+    /// A line `said_to_me` held as not said to the lamp is no reply to the
+    /// lamp's news (`LAMP_NEWS_REPLY_HEEDS_HELD=on`,
+    /// [`Self::heed_held_in_news_reply`], #8383).
+    news_reply_heeds_held: bool,
+    /// The request whose line `said_to_me` held ([`Self::said_held`]).
+    said_held_of: Option<u64>,
+    /// The line last weighed would have been the reply to the lamp's news
+    /// but `said_to_me` held it, for the journal (#8383).
+    news_reply_held: bool,
     /// The voice rose close to the lamp while a hearing of
     /// [`NEAR_SCORE`] or more was said ([`Self::set_near_at_the_name`]).
     near_at_the_name: bool,
@@ -2402,6 +2411,26 @@ impl Attention {
     /// name (`second_provider::named_near`).
     pub fn near_not_the_name(&mut self, request: u64) {
         self.near_not_the_name_of = Some(request);
+    }
+
+    /// `LAMP_NEWS_REPLY_HEEDS_HELD=on` (#8383): a line `said_to_me` held
+    /// ([`Self::said_held`]) is not let out as [`AFTER_NEWS`]; it is judged
+    /// by the rules after it as any other line. On lamp-74ff on 23 Nov at
+    /// 08:40:35 a 2-word line, 0 looks, held by `said_to_me`, was answered
+    /// as the reply to the lamp's news 13 s before.
+    pub fn heed_held_in_news_reply(&mut self, on: bool) {
+        self.news_reply_heeds_held = on;
+    }
+
+    /// `said_to_me` held `request`'s line as not said to the lamp.
+    pub fn said_held(&mut self, request: u64) {
+        self.said_held_of = Some(request);
+    }
+
+    /// Whether the line last weighed was kept from [`AFTER_NEWS`] by
+    /// [`Self::heed_held_in_news_reply`], for the journal.
+    pub fn news_reply_held(&self) -> bool {
+        self.news_reply_held
     }
 
     /// Whether the voice rose close to the lamp
@@ -3174,6 +3203,7 @@ impl Attention {
         self.going_on_alone = false;
         self.going_on_asked = false;
         self.went_on = false;
+        self.news_reply_held = false;
         let fresh = self.begun <= FRESH_REQUESTS;
         self.name_taken_as_a_word = false;
         // `LAMP_ONE_AS_LAMP`: "Wang," and "Lung," are the lamp's name only
@@ -3304,7 +3334,12 @@ impl Attention {
             && let Some(began) = self.began_us
         {
             let since = |at: Option<u64>| at.filter(|at| *at <= began).map(|at| began - at);
-            let why = if news_ago.is_some_and(|ago| ago <= NEWS_REPLY_US) && room != Room::Busy {
+            let news_reply = news_ago.is_some_and(|ago| ago <= NEWS_REPLY_US) && room != Room::Busy;
+            // `LAMP_NEWS_REPLY_HEEDS_HELD` (#8383): a line `said_to_me`
+            // held is no reply; its words may still ask about the work.
+            self.news_reply_held =
+                news_reply && self.news_reply_heeds_held && self.said_held_of == Some(self.request);
+            let why = if news_reply && !self.news_reply_held {
                 Some(AFTER_NEWS)
             } else if since(self.worked_us).is_some_and(|ago| ago <= WORK_ASKED_US)
                 && about_its_work(&self.heard)
@@ -5482,6 +5517,49 @@ mod tests {
         let mut unswitched = vec![GOING_ON; 6];
         unswitched.push(BUSY_HELD);
         assert_eq!(after_news(false, Room::Busy, &at(17_000)), unswitched);
+    }
+
+    /// #8383 (lamp-74ff, 23 Nov 08:40:35, request 22): a 2-word line in the
+    /// window, `said_to_me` held, 13 s after the lamp's news in a quiet
+    /// room, was answered as the news's reply. With
+    /// `LAMP_NEWS_REPLY_HEEDS_HELD` the hold keeps it from `AFTER_NEWS`;
+    /// off, or not held (or held for another request), as before. A held
+    /// line asking about the lamp's work is still taken so.
+    #[test]
+    fn a_line_said_to_me_held_is_no_reply_to_the_news_with_the_switch() {
+        const S: u64 = 1_000_000;
+        let reply = |on: bool, held: Option<u64>, heard: &str| {
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.heed_held_in_news_reply(on);
+            attention.news_told(100 * S);
+            attention.began_at(22, 4, 113 * S);
+            if let Some(request) = held {
+                attention.said_held(request);
+            }
+            attention.heard(heard);
+            let verdict = attention.first_output(22, Room::Quiet, false).unwrap();
+            (verdict, attention.news_reply_held())
+        };
+        let (verdict, journaled) = reply(true, Some(22), "Okay then.");
+        assert_ne!(verdict, Verdict::Play(AFTER_NEWS));
+        assert!(journaled);
+        assert_eq!(
+            reply(false, Some(22), "Okay then."),
+            (Verdict::Play(AFTER_NEWS), false)
+        );
+        assert_eq!(
+            reply(true, None, "Okay then."),
+            (Verdict::Play(AFTER_NEWS), false)
+        );
+        assert_eq!(
+            reply(true, Some(21), "Okay then."),
+            (Verdict::Play(AFTER_NEWS), false)
+        );
+        assert_eq!(
+            reply(true, Some(22), "How is that task going?").0,
+            Verdict::Play(ABOUT_ITS_WORK)
+        );
     }
 
     /// The Second on #1378 (20:29): with `AFTER_NEWS` taken on timing alone,
