@@ -102,6 +102,9 @@ pub(crate) enum Applied {
 #[derive(Debug, Default)]
 pub(crate) struct Runs {
     list: Vec<Run>,
+    /// A run ended by a drop since the session last looked
+    /// ([`Runs::take_dropped`]).
+    dropped: bool,
 }
 
 impl Runs {
@@ -252,6 +255,7 @@ impl Runs {
             // ended it: the same words as any drop, never run again.
             "run.interrupted" => {
                 close(run, Closed::Failed(DROPPED.to_owned()));
+                self.dropped = true;
                 return Applied::Ended;
             }
             // approval.request|responded, run.steered, replay.truncated: a
@@ -294,7 +298,10 @@ impl Runs {
                 );
             }
             "cancelled" => close(run, Closed::Aborted),
-            "interrupted" => close(run, Closed::Failed(DROPPED.to_owned())),
+            "interrupted" => {
+                close(run, Closed::Failed(DROPPED.to_owned()));
+                self.dropped = true;
+            }
             "running" | "waiting_for_approval" | "stopping" => {
                 run.started();
                 return false;
@@ -356,8 +363,15 @@ impl Runs {
             && run.closed.is_none()
         {
             close(run, Closed::Failed(why.to_owned()));
+            self.dropped |= why == DROPPED;
         }
         self.prune();
+    }
+
+    /// Whether a run ended by a drop since the last call: the dead gateway
+    /// may still hold the kept session's turn lease.
+    pub(crate) fn take_dropped(&mut self) -> bool {
+        std::mem::take(&mut self.dropped)
     }
 
     /// A run of this exact turn (task and words) that a drop ended no more

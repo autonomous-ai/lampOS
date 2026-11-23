@@ -10,7 +10,8 @@
 //!   (`GET /api/sessions/{id}`, else `POST /api/sessions {id}`).
 //! - One kept session: its id is lamp-tasks' own (`lamp-main-<ms>`), kept
 //!   in a 0600 file ([`Config::state_path`]) so it survives restarts of
-//!   lamp-tasks, of the gateway, and reboots; rotated only by [`reset`].
+//!   lamp-tasks, of the gateway, and reboots; rotated by [`reset`] and
+//!   after a drop.
 //!   Hermes compresses the context itself and follows its own compression
 //!   chain from that id.
 //! - Hand-over: `POST /v1/runs {input, session_id}` with an
@@ -18,7 +19,9 @@
 //! - Done: the run's terminal event, or its status after a broken stream.
 //! - A drop (the gateway gone mid-run) ends the run at once with
 //!   [`crate::DROPPED`]; the same turn handed over again within [`STRAYS_FOR`]
-//!   gets that ended run back, so nothing is ever run twice.
+//!   gets that ended run back, so nothing is ever run twice. The next
+//!   turn goes into a fresh kept session: the dead gateway still holds the
+//!   old one's turn lease until its TTL.
 //! - Approvals: answered at once by policy (`once` only for the
 //!   skill-start launcher, else `deny`), never `session`/`always`.
 //!
@@ -725,6 +728,63 @@ impl Session {
         self.size_fresh = true;
     }
 
+    /// A fresh session id in place of the kept one (the server serving):
+    /// open runs stopped, the new id kept and made, the old session (and
+    /// its compression tip) deleted, best effort.
+    fn replace(&mut self, deadline: Instant) -> Result<(), Error> {
+        let open = self.shared.lock().runs.open();
+        for run in &open {
+            let _ = self.stop_run(run, deadline);
+            self.shared.lock().runs.abort(run);
+        }
+        for f in &mut self.followers {
+            f.halt();
+        }
+        self.followers.clear();
+        self.shared.cv.notify_all();
+        let old = self.kept.session_id.clone();
+        let tip = self.tip.take();
+        self.kept = Kept::fresh();
+        self.save();
+        self.session_ok = false;
+        self.size = None;
+        self.size_fresh = false;
+        let made = self.open_session(deadline);
+        for id in std::iter::once(old.clone()).chain(tip.filter(|t| *t != old)) {
+            let path = format!("/api/sessions/{id}");
+            match self.http(Req::new("DELETE", &path), deadline) {
+                Ok(r) if r.status == 200 || r.status == 404 => {}
+                Ok(r) => self.log(&format!("deleting session {id}: {}", r.error_words())),
+                Err(e) => self.log(&format!("deleting session {id}: {e}")),
+            }
+        }
+        self.log(&format!(
+            "session {old} replaced by {}",
+            self.kept.session_id
+        ));
+        made
+    }
+
+    /// After a run ended by a drop, the kept session is replaced before the
+    /// next turn. The dead gateway still holds the session's turn lease in
+    /// Hermes' state.db (`session_turn_leases`, a fixed 300 s TTL,
+    /// `agent/turn_facade_lease.py`), and the restarted gateway can't free
+    /// it early: its own PID namespace defers a dead holder to the TTL
+    /// (`hermes_state_pidns`), and no API releases another holder's lease.
+    /// A turn into the same id would wait out that lease (ee17, 24 Nov
+    /// 04:23: 211 s). A run that ended normally, also across a graceful
+    /// restart, keeps the id. Called with the server serving.
+    fn replace_after_drop(&mut self, deadline: Instant) -> Result<(), Error> {
+        if !self.shared.lock().runs.take_dropped() {
+            return Ok(());
+        }
+        self.log(&format!(
+            "a run was ended by a drop; replacing session {} (the dead gateway's turn lease)",
+            self.kept.session_id
+        ));
+        self.replace(deadline)
+    }
+
     /// `POST /v1/runs/{id}/stop`: the server's reply status, or why not.
     fn stop_run(&self, run: &RunId, deadline: Instant) -> Result<Resp, Error> {
         let path = format!("/v1/runs/{}/stop", run.0);
@@ -771,7 +831,9 @@ impl AgentSession for Session {
     }
 
     fn ready(&mut self, within: Duration) -> Result<(), Error> {
-        self.ensure(Instant::now() + within, true)
+        let deadline = Instant::now() + within;
+        self.ensure(deadline, true)?;
+        self.replace_after_drop(deadline.max(self.call_deadline()))
     }
 
     fn send(&mut self, turn: &Turn) -> Result<RunId, Error> {
@@ -786,6 +848,7 @@ impl AgentSession for Session {
         }
         let deadline = self.call_deadline();
         self.ensure(deadline, false)?;
+        self.replace_after_drop(deadline)?;
         let key = match self.unconfirmed.get(&pending) {
             Some(key) => key.clone(),
             None => {
@@ -985,37 +1048,7 @@ impl AgentSession for Session {
     fn reset(&mut self) -> Result<(), Error> {
         let deadline = self.call_deadline();
         self.ensure(deadline, false)?;
-        let open = self.shared.lock().runs.open();
-        for run in &open {
-            let _ = self.stop_run(run, deadline);
-            self.shared.lock().runs.abort(run);
-        }
-        for f in &mut self.followers {
-            f.halt();
-        }
-        self.followers.clear();
-        self.shared.cv.notify_all();
-        let old = self.kept.session_id.clone();
-        let tip = self.tip.take();
-        self.kept = Kept::fresh();
-        self.save();
-        self.session_ok = false;
-        self.size = None;
-        self.size_fresh = false;
-        let made = self.open_session(deadline);
-        for id in std::iter::once(old.clone()).chain(tip.filter(|t| *t != old)) {
-            let path = format!("/api/sessions/{id}");
-            match self.http(Req::new("DELETE", &path), deadline) {
-                Ok(r) if r.status == 200 || r.status == 404 => {}
-                Ok(r) => self.log(&format!("deleting session {id}: {}", r.error_words())),
-                Err(e) => self.log(&format!("deleting session {id}: {e}")),
-            }
-        }
-        self.log(&format!(
-            "session {old} replaced by {}",
-            self.kept.session_id
-        ));
-        made
+        self.replace(deadline)
     }
 }
 

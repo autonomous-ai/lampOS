@@ -268,6 +268,9 @@ ExecStartPost=/bin/sh -c 'i=0; until /usr/bin/curl -fs -o /dev/null -m 2 http://
 TimeoutStartSec=180
 Restart=always
 RestartSec=10
+# Hermes's gateway exits 1 on the SIGTERM of a stop (lamp-ee17, 24 Nov): a stop is no failure, so a later start
+# (the default agent switched back to Hermes) finds it inactive, not failed.
+SuccessExitStatus=1
 StandardInput=null
 SyslogIdentifier=lamp-hermes-gateway
 Nice=10
@@ -426,7 +429,11 @@ pub fn keep_between_rounds(
         Gateway::Unknown => true,
     };
     if !settled {
-        keep_gateway(root, systemd, gateway, false, say);
+        // Just wanted (not enabled yet: the default agent switched to
+        // Hermes): a `failed` left from before is reset and started now,
+        // as a round's look would, never left for a round hours away.
+        let round = gateway == Gateway::Wanted && !enabled;
+        keep_gateway(root, systemd, gateway, round, say);
     }
 }
 

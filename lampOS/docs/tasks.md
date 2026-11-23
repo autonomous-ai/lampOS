@@ -6395,7 +6395,8 @@ same as OpenClaw's skills. What is Hermes's own:
   `/var/lib/lampos-tasks/hermes-direct.json` (0600, `direct::KEPT_FILE`). A
   restart of lamp-tasks, of Hermes's gateway or of the lamp adopts it, so the
   conversation goes on; one the gateway no longer has is replaced by a fresh
-  one. A rotation names a new id and the old one is deleted.
+  one. A rotation names a new id and the old one is deleted. A drop mid-run
+  is the exception: the next turn goes into a fresh one (see **A drop**).
 - **A spoken task.** A Hermes task for the lamp's own machine with no session
   named is queued and answered `joined`, as above. The tasks-harness worker
   waits for Hermes's own session to be ready (`direct::not_ready_for`, at most
@@ -6443,7 +6444,14 @@ same as OpenClaw's skills. What is Hermes's own:
   status unreadable for 30 s) ends the run, and every turn queued behind it,
   with the same `lamp_agent_gateway::DROPPED` words. Nothing is run again: the
   same turn handed over again within 15 min gets that ended run back, and a
-  new ask is a new task.
+  new ask is a new task. Once the gateway serves again, the next turn goes
+  into a fresh kept session (a new id, kept in the state file; the old one
+  deleted, best effort), as `reset` does: the dropped gateway still holds the
+  old session's turn lease in Hermes's `state.db` until its 300 s TTL, and the
+  restarted gateway, in its own PID namespace, can't see that holder is dead,
+  so a turn into the old id waited it out (lamp-ee17, 24 Nov: 211 s for
+  "capital of Spain"). A run that ends normally, also across a graceful
+  restart where Hermes drains it, keeps the session.
 - **Stays on Harness.** Computers' sessions (any engine on a Mac),
   `harness reply-named`, `LAMP_TASKS_RESUME_CLOSED`, sign-in, and
   `LAMP_HERMES_ON_LAMP`'s target discovery. Harness's `hooks:` block in
