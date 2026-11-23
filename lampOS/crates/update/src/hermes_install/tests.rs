@@ -4500,3 +4500,58 @@ fn a_net_run_sees_only_its_own_skills_folder() {
     }
     assert!(!ns_text(true, false).contains(OWN_SKILL_LINES));
 }
+
+/// #8151 (First's ruling): Hermes's own wrapper, with the tasks switch on,
+/// turns approvals off only in lamp-tasks' kept-session folder
+/// (`HERMES_YOLO_MODE=1`); in any other folder, a person's own pane's, it
+/// is unset even when the caller set it. Its line is the one path's too,
+/// for the same folder.
+#[test]
+fn hermes_wrapper_turns_approvals_off_only_in_the_kept_session_folder() {
+    const KEPT: &str = "/var/lib/lampos-tasks/harnesses/lamp-tasks/one-session";
+    let line = |p: &str| {
+        format!(
+            "[ \"{p}\" != {KEPT} ] || {{ HERMES_YOLO_MODE=1 HERMES_ACCEPT_HOOKS=1; export HERMES_YOLO_MODE HERMES_ACCEPT_HOOKS; }}\n"
+        )
+    };
+    let text = wrapper_text(true);
+    assert_eq!(text.matches(&line("$P")).count(), 1, "{text}");
+    assert_eq!(AGENT_ENV.matches(&line("${P-}")).count(), 1);
+    let folder = tempfile::tempdir().unwrap();
+    let top = fs::canonicalize(folder.path()).unwrap();
+    let kept = top.join("one-session");
+    let own = top.join("my-pane");
+    fs::create_dir_all(&kept).unwrap();
+    fs::create_dir_all(&own).unwrap();
+    let printer = top.join("unshare");
+    fs::write(
+        &printer,
+        "#!/bin/sh\necho \"yolo=${HERMES_YOLO_MODE-unset} hooks=${HERMES_ACCEPT_HOOKS-unset}\"\n",
+    )
+    .unwrap();
+    fs::set_permissions(&printer, fs::Permissions::from_mode(0o755)).unwrap();
+    let token = top.join("hermes-token");
+    fs::write(&token, "tok_0123456789abcdef0123456789abcdef\n").unwrap();
+    let wrapper = top.join("hermes");
+    fs::write(
+        &wrapper,
+        text.replace(TOKEN, &token.to_string_lossy())
+            .replace("/usr/bin/unshare", &printer.to_string_lossy())
+            .replace(KEPT, &kept.to_string_lossy()),
+    )
+    .unwrap();
+    let ran = |at: &Path, yolo: &str| {
+        let out = std::process::Command::new("/bin/sh")
+            .arg(&wrapper)
+            .arg("chat")
+            .current_dir(at)
+            .env("HERMES_YOLO_MODE", yolo)
+            .env_remove("HERMES_ACCEPT_HOOKS")
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "{out:?}");
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    };
+    assert_eq!(ran(&kept, "0"), "yolo=1 hooks=1\n");
+    assert_eq!(ran(&own, "1"), "yolo=unset hooks=unset\n");
+}

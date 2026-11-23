@@ -383,7 +383,7 @@ fi
 /// there, as the pushed skills are. Nothing else of
 /// `LAMP_NS_NET`'s (no network namespace, no `model.sock`, no relay)
 /// comes with it.
-const RUNS_EDITS: [(&str, &str); 6] = [
+pub(crate) const RUNS_EDITS: [(&str, &str); 6] = [
     (
         "# It also shows the skills the owner's computer pushed, /var/lib/lampOS/skills-dev, read-only, when there.\n",
         "# It also shows the skills the owner's computer pushed, /var/lib/lampOS/skills-dev, read-only, when there, for the\n\
