@@ -30,6 +30,9 @@ fn known_file(what: &str, eyes: &SpeakingFaces) -> std::path::PathBuf {
 /// at the wait's start and end ([`FORGET_STALL`]).
 type ForgetStall = (Duration, Arc<Mutex<Vec<Instant>>>);
 
+/// Whom the face cache names before a line, by line ([`NAMED_LINES`]).
+type NamedBy = fn(u64) -> Option<bool>;
+
 /// The eyes' boot the known file was written under.
 const BOOT: &str = "eyes";
 
@@ -93,6 +96,18 @@ thread_local! {
     /// end, for the next [`lines_known`] on this thread, once (#8204).
     static FORGET_STALL: std::cell::RefCell<Option<ForgetStall>> =
         const { std::cell::RefCell::new(None) };
+    /// `LAMP_SESSION_PERSON` ([`Engine::keeping_session_person`]) for the
+    /// next [`lines_known`] on this thread, once.
+    static SESSION: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// Whom the face cache names before each line of the next
+    /// [`lines_known`] on this thread, once, by line: `Some(false)` the
+    /// known file's person matched, `Some(true)` their name the eyes hold
+    /// (sticky), `None` nobody. Unset, as `named` says once at the start.
+    static NAMED_LINES: std::cell::Cell<Option<NamedBy>> =
+        const { std::cell::Cell::new(None) };
+    /// The line of the next [`lines_known`] on this thread, once, before
+    /// which privacy goes on (the camera not allowed, `memory_camera`).
+    static PRIVACY_AT: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
     /// Added to each line's request in the next [`lines_known`] on this
     /// thread, once, for a test reading what is kept by request across the
     /// crate (`remember::kept_out`).
@@ -689,11 +704,13 @@ async fn lines_known(
             })
         }
     });
+    let session_on = SESSION.with(|on| on.replace(false));
     let mut engine = engine
         .saving_carried(saves)
         .reading_carried(CARRIED_MEMORY.with(|on| on.replace(false)))
         .carrying_own_track(OWN_TRACK.with(|on| on.replace(false)))
         .holding_sticky(STICKY.with(|on| on.replace(false)))
+        .keeping_session_person(session_on)
         .reading_carried_where_heard(!CARRIED_UNHEARD.with(|unheard| unheard.replace(false)));
     if let Some(found) = DONT_KNOW_FOUND.with(|found| found.borrow_mut().take()) {
         engine = engine.recalling_before_a_dont_know(found);
@@ -723,6 +740,13 @@ async fn lines_known(
         ))
         .announcing(false);
     engine.memory_camera(true, 1);
+    // With the session, a lamp running a while: past the cache's cold
+    // start, so a room's session may begin.
+    if session_on {
+        cache.cold_since(Instant::now() - Duration::from_secs(60));
+    }
+    let named_lines = NAMED_LINES.with(std::cell::Cell::take);
+    let privacy_at = PRIVACY_AT.with(|at| at.replace(0));
     if named {
         cache.replace(
             cache.begin_refresh(),
@@ -752,6 +776,20 @@ async fn lines_known(
         }
         *now.lock().unwrap() += Duration::from_secs(after);
         known_at(line, &path);
+        if privacy_at == line {
+            engine.memory_camera(false, 1);
+        }
+        if let Some(named_lines) = named_lines {
+            let observation = named_lines(line)
+                .and_then(|held| Some((crate::known_faces::FaceObservation::read(&path)?, held)));
+            let held = observation.as_ref().is_some_and(|(_, held)| *held);
+            cache.replace_marked(
+                cache.begin_refresh(),
+                observation.map(|(observation, _)| observation),
+                None,
+                held,
+            );
+        }
         let done = Arc::new(AtomicBool::new(false));
         // S4's opening line: her mouth read speaking in one look of four,
         // unread in the rest (lamp-06c1, 5 Nov: read speaking in 1 of 9).
@@ -6471,5 +6509,453 @@ async fn her_own_covered_face_carries_with_the_own_track_switch() {
             Message::system("for None")
         };
         assert_eq!(got.asked[1], told, "{what}: the covered line");
+    }
+}
+
+/// `LAMP_SESSION_PERSON` (the memory owner's decisions of 23 Nov): `lines`
+/// said with the switch `on` or off, the product's one-face rule with reads
+/// on and no other voice heard, the face cache naming by `named` before each
+/// line, and the known file rewritten by `known_at`.
+async fn session_lines(
+    what: &str,
+    on: bool,
+    lines: Vec<Line>,
+    named: NamedBy,
+    known_at: fn(u64, &std::path::Path),
+    chats: Vec<Vec<net::Result<ChatEvent>>>,
+) -> Outcome {
+    SESSION.with(|session| session.set(on));
+    ONE_FACE_READS.with(|reads| reads.set(true));
+    NAMED_LINES.with(|lines| lines.set(Some(named)));
+    lines_known(
+        what,
+        lines,
+        chats,
+        (BOOT, true, true),
+        None,
+        None,
+        false,
+        false,
+        None,
+        Voice::One,
+        (false, &[]),
+        known_at,
+        (false, None, None),
+    )
+    .await
+}
+
+/// One "Okay." answer for each of `lines` lines.
+fn session_answers(lines: usize) -> Vec<Vec<net::Result<ChatEvent>>> {
+    (0..lines)
+        .map(|_| vec![text("Okay."), Ok(ChatEvent::Done)])
+        .collect()
+}
+
+/// A's name matched before every line.
+fn a_matched(_: u64) -> Option<bool> {
+    Some(false)
+}
+
+/// The known file as written at the start, every line.
+fn known_unchanged(_: u64, _: &std::path::Path) {}
+
+/// Whose scope each line's memory note was asked in, by its words.
+fn whose_lines(got: &Outcome, words: &[&str]) -> Vec<Option<String>> {
+    words
+        .iter()
+        .map(|words| {
+            got.noted
+                .iter()
+                .find(|(_, noted)| noted == words)
+                .unwrap_or_else(|| panic!("{words:?} not noted: {:?}", got.noted))
+                .0
+                .clone()
+        })
+        .collect()
+}
+
+fn said(words: &str, in_view: Vec<(&'static str, bool)>) -> Line {
+    (words.to_owned(), in_view, 0)
+}
+
+#[tokio::test]
+async fn a_session_person_alone_is_theirs_with_the_switch_on_and_off() {
+    let a = crate::remember::person_id("A");
+    for on in [true, false] {
+        let got = session_lines(
+            &format!("session-alone-{on}"),
+            on,
+            vec![said("I like green tea.", vec![("f1", false)])],
+            a_matched,
+            known_unchanged,
+            session_answers(1),
+        )
+        .await;
+        assert_eq!(
+            whose_lines(&got, &["I like green tea."]),
+            [Some(a.clone())],
+            "{on}"
+        );
+    }
+}
+
+/// The owner's failure: the user alone, a passer-by's silent face in view
+/// through a line. On, the line stays the user's; off, the room's, as
+/// before.
+#[tokio::test]
+async fn a_silent_passerby_keeps_the_session_persons_line_theirs_only_with_the_switch() {
+    let a = crate::remember::person_id("A");
+    for (on, want) in [(true, Some(a.clone())), (false, None)] {
+        let got = session_lines(
+            &format!("session-passer-{on}"),
+            on,
+            vec![
+                said("I like green tea.", vec![("f1", false)]),
+                said(
+                    "My sister is called Lan.",
+                    vec![("f1", false), ("f2", false)],
+                ),
+            ],
+            a_matched,
+            known_unchanged,
+            session_answers(2),
+        )
+        .await;
+        assert_eq!(
+            whose_lines(&got, &["I like green tea.", "My sister is called Lan."]),
+            [Some(a.clone()), want],
+            "{on}"
+        );
+    }
+}
+
+/// The user covered or misread, the eyes holding their name on their
+/// followed face (sticky), a passer-by in view: theirs with the switch, the
+/// room's without.
+#[tokio::test]
+async fn a_misread_on_the_session_persons_followed_face_stays_theirs_only_with_the_switch() {
+    let a = crate::remember::person_id("A");
+    fn held_after_the_first(line: u64) -> Option<bool> {
+        Some(line > 1)
+    }
+    for (on, want) in [(true, Some(a.clone())), (false, None)] {
+        STICKY.with(|sticky| sticky.set(true));
+        let got = session_lines(
+            &format!("session-misread-{on}"),
+            on,
+            vec![
+                said("I like green tea.", vec![("f1", false)]),
+                said(
+                    "My sister is called Lan.",
+                    vec![("f1", false), ("f2", false)],
+                ),
+            ],
+            held_after_the_first,
+            known_unchanged,
+            session_answers(2),
+        )
+        .await;
+        assert_eq!(
+            whose_lines(&got, &["I like green tea.", "My sister is called Lan."]),
+            [Some(a.clone()), want],
+            "{on}"
+        );
+    }
+}
+
+/// Another face seen speaking a line: that line the room's either way; the
+/// next line, the passer-by silent again, the user's with the switch and the
+/// room's without.
+#[tokio::test]
+async fn another_face_seen_speaking_takes_that_line_only_and_the_next_is_the_session_persons() {
+    let a = crate::remember::person_id("A");
+    for (on, next) in [(true, Some(a.clone())), (false, None)] {
+        let got = session_lines(
+            &format!("session-spoken-{on}"),
+            on,
+            vec![
+                said("I like green tea.", vec![("f1", false)]),
+                said("I prefer coffee.", vec![("f1", false), ("f2", true)]),
+                said(
+                    "My sister is called Lan.",
+                    vec![("f1", false), ("f2", false)],
+                ),
+            ],
+            a_matched,
+            known_unchanged,
+            session_answers(3),
+        )
+        .await;
+        assert_eq!(
+            whose_lines(
+                &got,
+                &[
+                    "I like green tea.",
+                    "I prefer coffee.",
+                    "My sister is called Lan."
+                ]
+            ),
+            [Some(a.clone()), None, next],
+            "{on}"
+        );
+    }
+}
+
+/// The user leaves and an unknown face comes: its line the room's, switch
+/// on or off.
+#[tokio::test]
+async fn the_session_person_gone_and_an_unknown_face_is_the_rooms_either_way() {
+    let a = crate::remember::person_id("A");
+    fn gone_after_the_first(line: u64) -> Option<bool> {
+        (line == 1).then_some(false)
+    }
+    for on in [true, false] {
+        let got = session_lines(
+            &format!("session-unknown-{on}"),
+            on,
+            vec![
+                said("I like green tea.", vec![("f1", false)]),
+                said("What does she like?", vec![("f2", false)]),
+            ],
+            gone_after_the_first,
+            known_unchanged,
+            session_answers(2),
+        )
+        .await;
+        assert_eq!(
+            whose_lines(&got, &["I like green tea.", "What does she like?"]),
+            [Some(a.clone()), None],
+            "{on}"
+        );
+    }
+}
+
+/// The user leaves and B, enrolled, is taken alone by the eyes: B's line is
+/// B's, switch on or off.
+#[tokio::test]
+async fn the_session_person_gone_and_b_alone_is_bs_either_way() {
+    let (a, b) = (
+        crate::remember::person_id("A"),
+        crate::remember::person_id("B"),
+    );
+    fn b_from_the_second(line: u64, path: &std::path::Path) {
+        if line == 2 {
+            std::fs::write(path, "B").unwrap();
+            std::fs::write(known_face_of(path), "f2\n").unwrap();
+        }
+    }
+    for on in [true, false] {
+        let got = session_lines(
+            &format!("session-b-{on}"),
+            on,
+            vec![
+                said("I like green tea.", vec![("f1", false)]),
+                said("I like black tea.", vec![("f2", false)]),
+            ],
+            a_matched,
+            b_from_the_second,
+            session_answers(2),
+        )
+        .await;
+        assert_eq!(
+            whose_lines(&got, &["I like green tea.", "I like black tea."]),
+            [Some(a.clone()), Some(b.clone())],
+            "{on}"
+        );
+    }
+}
+
+/// A guest's room conversation, then the user comes with the guest still in
+/// view: the user's silent-mouthed line the room's either way (the session
+/// waits); their line seen said by them, theirs either way; then, the guest
+/// silent beside them, theirs only with the switch.
+#[tokio::test]
+async fn a_guests_session_holds_the_user_until_they_are_seen_speaking() {
+    let a = crate::remember::person_id("A");
+    fn after_the_guest(line: u64) -> Option<bool> {
+        (line > 1).then_some(false)
+    }
+    for (on, last) in [(true, Some(a.clone())), (false, None)] {
+        let got = session_lines(
+            &format!("session-guest-{on}"),
+            on,
+            vec![
+                said("Is it raining?", vec![("f2", false)]),
+                said("I like green tea.", vec![("f1", false), ("f2", false)]),
+                said(
+                    "My sister is called Lan.",
+                    vec![("f1", true), ("f2", false)],
+                ),
+                said("I prefer oolong.", vec![("f1", false), ("f2", false)]),
+            ],
+            after_the_guest,
+            known_unchanged,
+            session_answers(4),
+        )
+        .await;
+        assert_eq!(
+            whose_lines(
+                &got,
+                &[
+                    "Is it raining?",
+                    "I like green tea.",
+                    "My sister is called Lan.",
+                    "I prefer oolong."
+                ]
+            ),
+            [None, None, Some(a.clone()), last],
+            "{on}"
+        );
+    }
+}
+
+/// 2 min quiet ends a guest's room session: the user's line after it, the
+/// guest's face silent beside them, begins their own session with the
+/// switch, and is the room's without.
+#[tokio::test]
+async fn two_minutes_quiet_ends_a_guests_session() {
+    let a = crate::remember::person_id("A");
+    fn after_the_guest(line: u64) -> Option<bool> {
+        (line > 1).then_some(false)
+    }
+    for (on, want) in [(true, Some(a.clone())), (false, None)] {
+        let got = session_lines(
+            &format!("session-quiet-{on}"),
+            on,
+            vec![
+                said("Is it raining?", vec![("f2", false)]),
+                (
+                    "I like green tea.".to_owned(),
+                    vec![("f1", false), ("f2", false)],
+                    crate::memory_scope::NO_FACE_QUIET.as_secs(),
+                ),
+            ],
+            after_the_guest,
+            known_unchanged,
+            session_answers(2),
+        )
+        .await;
+        assert_eq!(
+            whose_lines(&got, &["Is it raining?", "I like green tea."]),
+            [None, want],
+            "{on}"
+        );
+    }
+}
+
+/// Privacy on: the line is the room's, switch on or off; the session is
+/// over, and the user's next line, the camera back and the user alone,
+/// begins another.
+#[tokio::test]
+async fn privacy_on_makes_the_line_the_rooms_either_way() {
+    let a = crate::remember::person_id("A");
+    for on in [true, false] {
+        PRIVACY_AT.with(|at| at.set(2));
+        let got = session_lines(
+            &format!("session-privacy-{on}"),
+            on,
+            vec![
+                said("I like green tea.", vec![("f1", false)]),
+                said(
+                    "My sister is called Lan.",
+                    vec![("f1", false), ("f2", false)],
+                ),
+            ],
+            a_matched,
+            known_unchanged,
+            session_answers(2),
+        )
+        .await;
+        assert_eq!(
+            whose_lines(&got, &["I like green tea.", "My sister is called Lan."]),
+            [Some(a.clone()), None],
+            "{on}"
+        );
+    }
+}
+
+/// A forget on a session line their mouth wasn't seen saying, a passer-by in
+/// view: with the switch it is refused, nothing forgotten in anyone's
+/// memory; without, the line is the room's and the forget runs there, as
+/// before.
+#[tokio::test]
+async fn a_forget_without_the_session_persons_mouth_is_refused() {
+    for on in [true, false] {
+        let mut chats = session_answers(1);
+        chats.push(vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "f1",
+                crate::remember::FORGET,
+                json!({"about": "the coffee"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]);
+        chats.push(vec![text("Okay."), Ok(ChatEvent::Done)]);
+        let got = session_lines(
+            &format!("session-forget-{on}"),
+            on,
+            vec![
+                said("I like green tea.", vec![("f1", false)]),
+                said(
+                    "Forget what I said about the coffee.",
+                    vec![("f1", false), ("f2", false)],
+                ),
+            ],
+            a_matched,
+            known_unchanged,
+            chats,
+        )
+        .await;
+        let forgets = got
+            .ran
+            .iter()
+            .filter(|(name, _)| name == crate::remember::FORGET)
+            .count();
+        if on {
+            assert_eq!(forgets, 0, "refused: {:?}", got.ran);
+            assert!(
+                got.rounds
+                    .iter()
+                    .flatten()
+                    .any(|message| format!("{message:?}").contains("say it again")),
+                "told why"
+            );
+        } else {
+            assert_eq!(forgets, 1, "the room's forget: {:?}", got.ran);
+            assert_eq!(got.calls, [None]);
+        }
+    }
+}
+
+/// The seat swap (the memory owner's choice "B with 5s", 23 Nov): with
+/// `LAMP_SESSION_PERSON` on, the eyes follow a new face (`f2`) in the user's
+/// seat only within `who::FOLLOW_GAP` (5 s) of their last sighting. Past it
+/// the eyes name nobody on it, so its silent line, another face beside it,
+/// is the room's, the switch on or off.
+#[tokio::test]
+async fn a_new_face_in_the_users_seat_past_the_follow_gap_is_the_rooms() {
+    let a = crate::remember::person_id("A");
+    fn gone_after_the_first(line: u64) -> Option<bool> {
+        (line == 1).then_some(false)
+    }
+    for on in [true, false] {
+        let got = session_lines(
+            &format!("session-seat-swap-{on}"),
+            on,
+            vec![
+                said("I like green tea.", vec![("f1", false)]),
+                said("I like black tea.", vec![("f2", false), ("f3", false)]),
+            ],
+            gone_after_the_first,
+            known_unchanged,
+            session_answers(2),
+        )
+        .await;
+        assert_eq!(
+            whose_lines(&got, &["I like green tea.", "I like black tea."]),
+            [Some(a.clone()), None],
+            "{on}"
+        );
     }
 }

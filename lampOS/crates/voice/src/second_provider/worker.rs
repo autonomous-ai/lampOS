@@ -493,6 +493,12 @@ pub const REOPEN_QUIET_ENVIRONMENT: &str = "LAMP_MEMORY_REOPEN_QUIET";
 /// on its own evidence (T0's counts).
 pub const CARRIED_JOURNAL_ENVIRONMENT: &str = "LAMP_CARRIED_JOURNAL";
 
+/// The session person (the memory owner's decisions of 23 Nov,
+/// `crate::session_person`): while the session person's face is in view,
+/// another face in view does not take their line to the room; only a face
+/// not theirs seen speaking it does. `on` only; off, as before.
+pub const SESSION_PERSON_ENVIRONMENT: &str = "LAMP_SESSION_PERSON";
+
 /// Whether the service's environment says `LAMP_CARRIED_JOURNAL=on`, read
 /// once.
 pub fn carried_journal_on() -> bool {
@@ -4008,6 +4014,11 @@ pub fn serve(
             .is_ok_and(|value| value == "on"),
     );
     engine = engine_seeing;
+    // One session person per conversation (`LAMP_SESSION_PERSON`): beside
+    // the eyes seeing who speaks, which it needs.
+    engine = engine.keeping_session_person(
+        std::env::var(SESSION_PERSON_ENVIRONMENT).is_ok_and(|value| value == "on"),
+    );
     // A services write is the owner's only with their face seen saying its
     // line (`crate::services`): that reading is kept for it.
     engine = engine.keeping_sight_for_services(services_on);
