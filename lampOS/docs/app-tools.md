@@ -363,9 +363,19 @@ moves the dates (Wed 25, Thu 26, Fri 27 Nov).
    phrasings, each with the expected tool and arguments (or none), run
    against the model and the route the lamp actually ships, never a
    stronger one, in each language the app lists (Vietnamese too). The file
-   must include stop phrasings and out-of-order phrasings. Its pass rate is
-   part of the Store review, which Backend3 checks before listing (proposed:
-   90%). Gym Coach 2.0 and English lessons 0.4.0 ship with one.
+   must include stop phrasings and out-of-order phrasings. Gym Coach 2.0
+   and English lessons 0.4.0 ship with one. **The bar** (the first
+   builder's, 20:13 on #8406), in every language the app lists:
+   - **No fails on rules 1 and 3:** every out-of-order call is refused with
+     what to do instead, and stop, pause and the care hold never go
+     through the model. One miss here is a stop that doesn't stop.
+   - **At least 90% of the other cases** pick the right tool with the
+     right arguments.
+   - **Enough cases to mean something:** at least 5 phrasings for each
+     tool, and each of the app's stop and pause phrases at least once.
+   - **Checked by Backend3 before listing,** as part of the Store review:
+     against the shipped model and route, with the package's hash checked
+     against the tar, and the eval's output kept with the handover.
 5. **Only a session's tools, as data.** A result may carry `"tools":
    [...]`, a subset of the tools the app declared; the voice offers only
    those of that app until its next result. A name it never declared is
