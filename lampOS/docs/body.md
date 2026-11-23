@@ -655,6 +655,33 @@ to make every nod a large one. At the reach used without `--reach` the
 lift for listening is 18 counts and does not happen either; the tilt, the
 look away and the way back do.
 
+### A long thinking wanders
+
+A thinking that goes on past its deep pose (0.8 s of glance and 4 s of
+deepening) wanders slowly around it, in `gesture.rs`'s `Gestures::wander`
+(#7418, rule 8; the first builder's yes on #8432, 24 Nov). On lamp-06c1 a
+make thought on with no turn held one pose for 119 s, every joint still to
+a tenth of a degree: two minutes of that read as a machine stuck. A person
+thinking a while drifts and settles.
+
+| Value | Now | Why |
+|---|---|---|
+| Start | once the deep pose is reached, grown in from nothing over 3 s (`WANDER_EASE_US`) | the glance and the deepening stay as they were; a short thinking never wanders, and the head never jumps |
+| Amplitude | pitch ±3°, roll ±2°, the base's yaw ±4° (`WANDER_DEGREES`) | big enough to see across a room, small enough to stay thinking |
+| Shape | per axis three sines, periods 7.3 to 19 s, no two in a simple ratio (`WANDER_PERIODS_S`, weights 0.5, 0.3, 0.2) | slow, never a visible loop |
+| Settle | the drift's time slows to a stop and goes on every 12.7 s (`WANDER_SETTLE_S`) | the look drifts and rests, as a person's does |
+| Variety | each exchange's thinking starts the sines at other phases (`WANDER_PHASE_STEP`), from the exchange count, no chance | no two long thinkings drift alike, and the same time gives the same pose |
+| Speed | the body's own speed, acceleration and reach bounds, no new one | under about 8° a second asked, inside them |
+
+The wander is an offset in degrees laid on the thinking pose's counts. A
+person's voice ends it at the next step (listening wins, as before), and
+while the lamp keeps still for someone (`{"quiet":true}`, the voice's care
+hold, #7689) there is none. A joint that has arrived rests as above, so the
+head moves on again once the wander has taken it 20 counts away. Test:
+`gesture.rs`'s `a_long_thinking_wanders_around_its_deep_pose_and_a_short_one_never`.
+The numbers wait on a camera rerun of #8432's long thinking, judged by a
+person: if it reads as fidgeting, the amplitudes are halved first.
+
 ## Waking
 
 No power cut has been tried. On lamp-52e6 on 2026-10-14, folded, with its

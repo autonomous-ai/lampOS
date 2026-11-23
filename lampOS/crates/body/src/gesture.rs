@@ -69,6 +69,36 @@ pub const AWAY: f32 = 0.9;
 const LISTENING_PITCH: f32 = -0.4;
 const LISTENING_ROLL: f32 = 0.85;
 
+/// A thinking that goes on past its deep pose wanders around it (#7418,
+/// rule 8; the first builder's yes on #8432, 24 Nov): on lamp-06c1 a make
+/// thought on with no turn held one pose for 119 s, every joint still to
+/// a tenth of a degree, and two minutes of that read as a machine stuck,
+/// not a lamp thinking. A person thinking a while drifts and settles. The
+/// wander is an offset in degrees ([`Gestures::wander`]), at most these
+/// either way: pitch, roll, and the base's yaw. Big enough to see across a
+/// room, small enough to stay thinking.
+pub const WANDER_DEGREES: [f32; 3] = [3.0, 2.0, 4.0];
+/// The wander begins once the deep pose is reached ([`GLANCE_US`] and
+/// [`DEEPEN_US`]) and grows in from nothing over this, eased, so the head
+/// never jumps from the deep pose. A short thinking never wanders.
+const WANDER_EASE_US: f32 = 3_000_000.0;
+/// Each axis is three slow sines, their periods in seconds between 7 and
+/// 19 and no two in a simple ratio, so the drift never visibly loops. Their
+/// weights add up to 1, so an axis never goes past its
+/// [`WANDER_DEGREES`].
+const WANDER_PERIODS_S: [[f32; 3]; 3] = [[7.3, 11.9, 17.1], [8.7, 13.3, 18.3], [9.1, 15.7, 19.0]];
+const WANDER_WEIGHTS: [f32; 3] = [0.5, 0.3, 0.2];
+/// Every this many seconds the drift slows to a stop and moves on again, a
+/// settle: its time runs at `1 - cos` of this period's phase, never
+/// backwards, at most twice as fast, so the head is never asked to move
+/// faster than about twice the sines alone (under 8 degrees a second on
+/// the base, inside the body's own speed bounds, which still apply).
+const WANDER_SETTLE_S: f32 = 12.7;
+/// Each exchange's thinking starts the sines at other phases (near a golden
+/// turn on per exchange), so no two long thinkings drift alike. From the
+/// exchange count, never chance: the same time and exchange, the same pose.
+const WANDER_PHASE_STEP: f32 = 2.4;
+
 #[derive(Clone, Debug)]
 pub struct Gestures {
     mood: Mood,
@@ -172,6 +202,42 @@ impl Gestures {
                 }
             }
         }
+    }
+}
+
+impl Gestures {
+    /// The wander around a long thinking's deep pose at `now_us`, in
+    /// degrees of pitch, roll and the base's yaw ([`WANDER_DEGREES`]): none
+    /// but in thinking past its deep pose, as [`Gestures::target`] last saw
+    /// the mood, so a person's voice (listening) ends it at the next step.
+    /// None while the lamp keeps still for someone (`still`, the voice's
+    /// care hold, #7689): that hold's still body wins.
+    pub fn wander(&self, now_us: u64, still: bool) -> [f32; 3] {
+        if self.mood != Mood::Thinking || still {
+            return [0.0; 3];
+        }
+        let deep_us = GLANCE_US + DEEPEN_US;
+        let past_us = now_us.saturating_sub(self.since_us) as f32 - deep_us;
+        if past_us <= 0.0 {
+            return [0.0; 3];
+        }
+        let share = (past_us / WANDER_EASE_US).min(1.0);
+        let grown = share * share * (3.0 - 2.0 * share);
+        // Time that slows to a stop once a settle period and goes on.
+        let seconds = past_us / 1_000_000.0;
+        let settle = std::f32::consts::TAU / WANDER_SETTLE_S;
+        let drift = seconds - (settle * seconds).sin() / settle;
+        let phase = self.exchanges as f32 * WANDER_PHASE_STEP;
+        std::array::from_fn(|axis| {
+            let sum: f32 = (0..3)
+                .map(|wave| {
+                    let at = std::f32::consts::TAU * drift / WANDER_PERIODS_S[axis][wave]
+                        + phase * (axis * 3 + wave + 1) as f32;
+                    WANDER_WEIGHTS[wave] * at.sin()
+                })
+                .sum();
+            WANDER_DEGREES[axis] * grown * sum
+        })
     }
 }
 
@@ -293,6 +359,71 @@ mod tests {
         gestures.target(Mood::Listening, 0, start + 32_000_000);
         let again = gestures.target(Mood::Thinking, 0, start + 33_000_000);
         assert_eq!(again.yaw, -glance.yaw);
+    }
+
+    /// #7418, rule 8 (the first builder's yes on #8432): a thinking that
+    /// goes on past its deep pose wanders around it, slowly and within its
+    /// degrees; before the deep pose nothing changes; a person's voice ends
+    /// it at the next step, and the care hold keeps the head still.
+    #[test]
+    fn a_long_thinking_wanders_around_its_deep_pose_and_a_short_one_never() {
+        let start = 5_000_000u64;
+        let deep_us = (GLANCE_US + DEEPEN_US) as u64;
+        let mut gestures = Gestures::new().glancing(0.15);
+        let mut today = Gestures::new().glancing(0.15);
+        gestures.target(Mood::Listening, 0, start - 20_000);
+        today.target(Mood::Listening, 0, start - 20_000);
+        // Up to the deep pose: the pose is today's, with no wander at all.
+        let mut at = start;
+        while at <= start + deep_us {
+            assert_eq!(
+                gestures.target(Mood::Thinking, 0, at),
+                today.target(Mood::Thinking, 0, at)
+            );
+            assert_eq!(gestures.wander(at, false), [0.0; 3], "{at}");
+            at += 20_000;
+        }
+        // It grows in from nothing: no jump at the deep pose.
+        let first = gestures.wander(start + deep_us + 20_000, false);
+        assert!(
+            first.iter().all(|degrees| degrees.abs() < 0.01),
+            "{first:?}"
+        );
+        // Over the next minute it moves at least a degree on some axis,
+        // never past its degrees, and never more than a step's worth of a
+        // slow drift between steps 20 ms apart.
+        let mut low = [f32::MAX; 3];
+        let mut high = [f32::MIN; 3];
+        let mut before = first;
+        let mut at = start + deep_us + 20_000;
+        while at <= start + deep_us + 60_000_000 {
+            gestures.target(Mood::Thinking, 0, at);
+            let wander = gestures.wander(at, false);
+            for (axis, &degrees) in wander.iter().enumerate() {
+                assert!(
+                    degrees.abs() <= WANDER_DEGREES[axis] + 1e-4,
+                    "{at} {wander:?}"
+                );
+                // At most about 8 degrees a second: 0.16 in 20 ms.
+                assert!((degrees - before[axis]).abs() <= 0.2, "{at} {wander:?}");
+                low[axis] = low[axis].min(degrees);
+                high[axis] = high[axis].max(degrees);
+            }
+            before = wander;
+            at += 20_000;
+        }
+        assert!(
+            (0..3).any(|axis| high[axis] - low[axis] >= 1.0),
+            "{low:?} {high:?}"
+        );
+        // Kept still for someone (the care hold): no wander.
+        assert_eq!(gestures.wander(at, true), [0.0; 3]);
+        // The same time, the same wander: from time alone, no chance.
+        assert_eq!(gestures.wander(at, false), gestures.wander(at, false));
+        assert_ne!(gestures.wander(at, false), [0.0; 3]);
+        // A person's voice: listening, and the wander is over at once.
+        gestures.target(Mood::Listening, 0, at + 20_000);
+        assert_eq!(gestures.wander(at + 20_000, false), [0.0; 3]);
     }
 
     #[test]
