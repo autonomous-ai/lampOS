@@ -580,6 +580,8 @@ class FakeLamp:
         app_version: str = "1.0.0",
         app_settings: dict[str, Any] | None = None,
         panel_rate_s: float = 60.0,
+        store_apps: bool = True,
+        apps_helper: bool = True,
     ):
         # `app`: also serve an installed app's socket (a unix socket, `app_path`, what LAMP_APP_SOCKET names on the lamp)
         # for `Lamp.connect_app`: no token and no key, the kernel's word on who connects is the trust, so a connection
@@ -698,6 +700,14 @@ class FakeLamp:
         # Pushed skills by name, and the one push in flight on the lamp.
         self.pushed: dict[str, dict] = {}
         self._pushing: dict | None = None
+        # Pushed apps by name (`app.push`, docs/apps.md), and the one app push in flight. `store_apps` False is a lamp
+        # without LAMP_STORE_APPS, `apps_helper` False one without the apps helper: every app op is refused, in the
+        # lamp's words. `store_app_names` are the Store apps installed here, whose names a push may not take.
+        self.store_apps = store_apps
+        self.apps_helper = apps_helper
+        self.pushed_apps: dict[str, dict] = {}
+        self._app_pushing: dict | None = None
+        self.store_app_names: set[str] = set()
         self.subscribed: dict[str, set[str]] = defaultdict(set)
         self.state: dict[str, Any] = {
             "presence": {"count": 0, "near": 0.0, "facing": False},
@@ -1416,6 +1426,9 @@ class FakeLamp:
             "skill.push": ["skills"],
             "skill.list": ["skills"],
             "skill.remove": ["skills"],
+            "app.push": ["skills"],
+            "app.list": ["skills"],
+            "app.remove": ["skills"],
             # A turn speaks and hears what is said to the lamp.
             "turn.start": ["speak", "hear"],
             "turn.end": ["speak"],
@@ -1580,6 +1593,91 @@ class FakeLamp:
             ws, id_, skill={**skill, "asks": [], "shown": []},
             moves={"kept": sorted(moves), "left_out": [{"name": n, "why": w} for n, w in left_out]},
         )
+
+    async def _app_pushed_op(self, ws, client: str, id_: int, request: dict) -> None:
+        """`app.push`, `app.list` and `app.remove`, as lamp-control and the apps helper take them: only with
+        LAMP_STORE_APPS and the helper, and only this computer's own apps."""
+        if not self.store_apps:
+            await self._refuse(ws, id_, "refused", "apps are off on this lamp")
+            return
+        if not self.apps_helper:
+            await self._refuse(ws, id_, "refused", "app push is not on this lamp")
+            return
+        op = request["op"]
+        if op == "app.push":
+            await self._push_app(ws, client, id_, request)
+        elif op == "app.list":
+            await self._ok(ws, id_, apps=[{k: v for k, v in a.items() if k != "client"} for a in self.pushed_apps.values() if a["client"] == client])
+        else:
+            kept = self.pushed_apps.get(request["name"])
+            if not kept or kept["client"] != client:
+                await self._refuse(ws, id_, "refused", "not one of this computer's pushed apps")
+                return
+            del self.pushed_apps[request["name"]]
+            await self._ok(ws, id_, removed=request["name"])
+
+    async def _push_app(self, ws, client: str, id_: int, request: dict) -> None:
+        """A part of an app push, as a skill's (`_push`): in order from 0, one push at a time, the whole checked
+        against its SHA-256, then its manifest (format 2, kind app, unsigned, grants within this pairing's, never
+        `remember`), then kept as this computer's, replacing its app of that name."""
+        import tarfile
+
+        going = self._app_pushing
+        if request["part"] == 0:
+            if going and going["client"] != client:
+                await self._refuse(ws, id_, "busy", "another computer's push is in flight")
+                return
+            going = self._app_pushing = {"client": client, "data": b""}
+        elif not going or going["client"] != client or request["part"] != going["part"] + 1:
+            await self._refuse(ws, id_, "bad_request", "parts out of order")
+            return
+        going["part"] = request["part"]
+        going["data"] += base64.b64decode(request["data"])
+        if request["part"] < request["parts"] - 1:
+            await self._ok(ws, id_, got=request["part"] + 1)
+            return
+        self._app_pushing = None
+        data = going["data"]
+        sha = hashlib.sha256(data).hexdigest()
+        if len(data) != request["size"] or sha != request["sha256"].lower():
+            await self._refuse(ws, id_, "bad_request", "the package's SHA-256 doesn't match")
+            return
+        try:
+            with tarfile.open(fileobj=io.BytesIO(data), mode="r:") as tar:
+                names = tar.getnames()
+                manifest = json.loads(tar.extractfile("lamp-skill.json").read())
+        except (tarfile.TarError, KeyError, AttributeError, ValueError):
+            await self._refuse(ws, id_, "refused", "not an app package")
+            return
+        if "lamp-skill.sig" in names:
+            await self._refuse(ws, id_, "refused", "it carries lamp-skill.sig: a pushed app is unsigned")
+            return
+        if not isinstance(manifest, dict) or manifest.get("format") != 2 or manifest.get("kind") != "app" or manifest.get("name") != request["name"]:
+            await self._refuse(ws, id_, "refused", "not a package of that app")
+            return
+        grants = self.clients[client]["grants"]
+        for grant in manifest.get("grants", []):
+            if grant == "remember" or grant not in grants:
+                await self._refuse(ws, id_, "no_grant", f"not granted: {grant}")
+                return
+        if request["name"] in self.store_app_names:
+            await self._refuse(ws, id_, "refused", "a Store app has that name")
+            return
+        kept = self.pushed_apps.get(request["name"])
+        if kept and kept["client"] != client:
+            await self._refuse(ws, id_, "refused", "another computer's app has that name")
+            return
+        app = {
+            "name": manifest["name"],
+            "title": manifest.get("title", manifest["name"]),
+            "version": manifest.get("version", ""),
+            "sha256": sha,
+            "grants": list(manifest.get("grants", [])),
+            "net": bool(manifest.get("net", False)),
+            "logs": bool(manifest.get("logs", False)),
+        }
+        self.pushed_apps[request["name"]] = {**app, "stopped": False, "client": client}
+        await self._ok(ws, id_, app={**app, "updated": kept is not None, "started": True, "from": "computer"})
 
     # An installed app's ops and events (#7415).
 
@@ -1929,6 +2027,8 @@ class FakeLamp:
                 return
             del self.pushed[request["name"]]
             await self._ok(ws, id_)
+        elif op in ("app.push", "app.list", "app.remove"):
+            await self._app_pushed_op(ws, client, id_, request)
         elif op.startswith("notes."):
             await self._notes(ws, client, request)
         elif op == "sound.upload":

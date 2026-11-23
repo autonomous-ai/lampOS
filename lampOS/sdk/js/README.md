@@ -490,6 +490,30 @@ await requestPublic(app.id);                       // only once approved; the re
   accepted uploads), `developer_attempt_limit` (30 attempts) and
   `developer_public_limit` (3 public asks).
 
+### Push it to your own lamp
+
+The packed tar can also go on your own paired lamp, with no Store and no yes
+at the lamp: the pairing, with its `skills` grant, is the owner's yes. This
+SDK takes the tar only; make it from the app's folder with the Python SDK's
+`lamp app pack DIR` (which also pushes a folder: `lamp app push DIR`). A
+pushed app is **unsigned**: the tar must not carry `lamp-skill.sig`.
+`await lamp.pushApp(path)` checks it and sends it in parts, and resolves
+with the lamp's `app` (`name`, `title`, `version`, `sha256`, `grants`, `net`,
+`logs`, `updated`, `started`, `from`); `await lamp.apps()` and
+`await lamp.removeApp(name)`; on the command line,
+`lamp app push gym-coach-1.0.0.tar` ("gym-coach 1.0.0 pushed, running"),
+`lamp app list` and `lamp app remove NAME`.
+
+`pushApp` refuses on this computer, before a byte is sent: a tar over
+4 MiB, one that is not a plain tar (no gzip) whose `lamp-skill.json` is
+format 2 with `kind` `"app"` and an app's name, a signed one, a pairing
+without `skills`, and a manifest grant this pairing doesn't hold (`remember`
+never is; `net` and `logs` are booleans, not grants). The fuller check is
+`lamp app check` (Python). A re-push of the name replaces your app of it,
+any version. The lamp checks it all again; without `LAMP_STORE_APPS` it
+answers `refused`, "apps are off on this lamp", and without its apps helper,
+"app push is not on this lamp". Try it on `lamp fake`.
+
 ## Everything you can read
 
 What the lamp tells a paired computer, read from lamp-control's `watch.rs`,
@@ -721,6 +745,9 @@ and send it again. Without `retryMs`, it is a held part, as above.
 | `lamp.pushSkill(folder)` | on customer lamps from stable 11091 on (11048 and older refuse it). A skill folder (`SKILL.md`, `skill.toml` with a `version`): packed and sent in parts. The fuller check is the Python SDK's `lamp skill check` | `skills` |
 | `lamp.skills()` | | `skills` |
 | `lamp.removeSkill(name)` | one of this computer's own pushed skills | `skills` |
+| `lamp.pushApp(path)` | an app of your own as its packed tar (format 2, unsigned, 4 MiB at most; `lamp app pack DIR` in the Python SDK makes it), checked here and sent in parts; resolves with the lamp's `app`. Every manifest grant must be this pairing's (never `remember`) | `skills` |
+| `lamp.apps()` | this computer's own pushed apps, each with `stopped` | `skills` |
+| `lamp.removeApp(name)` | one of this computer's own pushed apps | `skills` |
 
 ### The Store
 
@@ -746,6 +773,9 @@ and send it again. Without `retryMs`, it is a held part, as above.
 | `lamp skill push FOLDER [LAMP_ID]` | a skill folder, put on the paired lamp (`skills` grant). Push, list and remove work on customer lamps from stable 11091 on |
 | `lamp skill list [LAMP_ID]` | this computer's own pushed skills |
 | `lamp skill remove NAME [LAMP_ID]` | takes one of them off the lamp |
+| `lamp app push APP.tar [LAMP_ID]` | an app's packed tar of your own (format 2, unsigned; the Python SDK's `lamp app pack` makes it): checked first, then put on the paired lamp (`skills` grant) |
+| `lamp app list [LAMP_ID]` | this computer's own pushed apps |
+| `lamp app remove NAME [LAMP_ID]` | takes one of them off the lamp |
 | `lamp help` (also `lamp --help`, `lamp -h`) | none: prints the commands and exits 0. A misspelt option is one line and the same list, exit 2 |
 | `lamp fake [--every 10] [--cycles N] [--everything] [--hands]` | `--every`: seconds between arrivals (10). `--cycles`: stop after N (default: until Ctrl-C). `--everything`: answer every op, without refusing what lamp-control doesn't route yet. `--hands`: a hand waves for 3 s after each arrival, and looks are answered, as on a lamp with the body's lease socket |
 

@@ -1251,4 +1251,28 @@ export class Lamp {
   async skills() { return (await this.request('skill.list')).skills ?? []; }
 
   removeSkill(name) { return this.request('skill.remove', { name }); }
+
+  // Apps of this computer's own (the `skills` grant too; docs/apps.md): a Store-format package, unsigned, with the
+  // pairing as the owner's yes. `pushApp(path)` sends the format 2 `.tar` at `path` in parts and resolves with the
+  // lamp's `app` once installed (name, title, version, sha256, grants, net, logs, updated, started, from); a re-push of
+  // the name replaces this computer's app of it. A package over 4 MiB, not format 2 kind app, signed, or asking a grant
+  // this pairing lacks (or `remember`) is refused here, before any byte is sent.
+  async pushApp(path) {
+    const { appAsksBeyond, readApp } = await import('./push.js');
+    const pkg = readApp(path);
+    if (!this.grants.includes('skills')) throw new byCode.no_grant('not granted: skills');
+    const beyond = appAsksBeyond(pkg.manifest, this.grants);
+    if (beyond) throw new byCode[beyond[0]](beyond[1]);
+    let reply = {};
+    for (const [part, data] of pkg.parts.entries()) {
+      reply = await this.request('app.push', {
+        name: pkg.name, sha256: pkg.sha256, size: pkg.data.length, part, parts: pkg.parts.length, data,
+      });
+    }
+    return reply.app ?? {};
+  }
+
+  async apps() { return (await this.request('app.list')).apps ?? []; }
+
+  removeApp(name) { return this.request('app.remove', { name }); }
 }

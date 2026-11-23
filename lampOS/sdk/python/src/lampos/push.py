@@ -212,3 +212,61 @@ def asks_beyond(folder: str | Path, grants: list[str]) -> tuple[str, str] | None
         if isinstance(grant, str) and grant != "camera" and grant not in grants:
             return "no_grant", f"grants {grant}: a task's script needs the {grant} grant, which this computer doesn't hold"
     return None
+
+
+
+# An app of this computer's own (docs/apps.md): its folder or the Store's
+# tar, checked as `lamp app check` does and pushed as `app.push` in the same
+# parts as a skill. Unsigned: the pairing is the owner's yes.
+APP_PUSH_MAX = 4 << 20
+APP_PARTS_MAX = 128
+# The app-only grant a pushed app is never given (`apps.remember`).
+APP_ONLY_GRANTS = ("remember",)
+
+
+def app_for_push(path: str | Path):
+    """The app at `path` (a folder, packed here, or a packed tar) as
+    `app.push` sends it: checked as `lamp app check` does, then held to
+    what a push takes beyond the Store's format: no `lamp-skill.sig` (a
+    pushed app is unsigned) and 4 MiB at most. An `app.AppPackage`."""
+    import io
+    import tarfile
+
+    from . import app as apps
+    from .errors import BY_CODE
+
+    path = Path(path)
+    report = apps.check(path)
+    if not report.ok:
+        raise BY_CODE["bad_request"](f"{report.folder.name}: {report.errors[0]}")
+    if path.is_dir():
+        package = apps.pack(path)
+    else:
+        data = path.read_bytes()
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:") as tar:
+            if apps.SIGNATURE in tar.getnames():
+                raise BY_CODE["refused"](f"it carries {apps.SIGNATURE}: a pushed app is unsigned")
+        manifest, _ = apps.read_tar(data, apps.Report(path))
+        assert manifest is not None  # the check above read it
+        package = apps.AppPackage(manifest["name"], manifest["version"], manifest, data)
+    if len(package.data) > APP_PUSH_MAX:
+        raise BY_CODE["bad_request"](f"the package is {len(package.data)} bytes: a pushed app is 4 MiB at most")
+    if len(app_parts(package.data)) > APP_PARTS_MAX:
+        raise BY_CODE["bad_request"](f"more than {APP_PARTS_MAX} parts")
+    return package
+
+
+def app_parts(data: bytes) -> list[str]:
+    """An app package as base64 parts, in order, as a skill's."""
+    return Package("", "", data).parts()
+
+
+def app_asks_beyond(manifest: dict, grants: list[str]) -> tuple[str, str] | None:
+    """The code and why the lamp would refuse this app's manifest grants for
+    this pairing's, or None: each grant within the pairing's, and never an
+    app-only one (`remember`). `net` and `logs` are the manifest's own
+    booleans, not grants."""
+    for grant in manifest.get("grants", []):
+        if grant in APP_ONLY_GRANTS or grant not in grants:
+            return "no_grant", f"not granted: {grant}"
+    return None

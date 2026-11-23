@@ -82,6 +82,7 @@ def test_every_op_has_a_call_and_every_error_code_a_class():
     named = {
         "sound.upload": "upload_sound", "sound.list": "sounds", "sound.remove": "remove_sound",
         "skill.push": "push_skill", "skill.list": "skills", "skill.remove": "remove_skill",
+        "app.push": "push_app", "app.list": "apps", "app.remove": "remove_app",
         "turn.start": "start_turn", "turn.end": "end_turn", "listen.set": "set_listening",
     }
     for op in schema.ops():

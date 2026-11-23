@@ -12,7 +12,7 @@
 import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
-import { LampError } from './errors.js';
+import { LampError, byCode } from './errors.js';
 
 export const PACKAGE_MAX = 1 << 20;
 // A part's bytes, so its base64 is at most 48 KiB and a frame stays under 64 KiB.
@@ -131,4 +131,89 @@ export function pack(folder) {
   const parts = [];
   for (let at = 0; at < data.length; at += PART_BYTES) parts.push(data.subarray(at, at + PART_BYTES).toString('base64'));
   return { name, version, data, sha256: sha256(data), parts };
+}
+
+// An app of this computer's own (docs/apps.md, "The package (format 2)"): a
+// Store-format package the developer built, pushed as `app.push` in the same
+// parts as a skill. Unsigned: the pairing is the owner's yes.
+export const APP_PACKAGE_MAX = 4 << 20;
+export const APP_PARTS_MAX = 128;
+export const APP_SIGNATURE = 'lamp-skill.sig';
+const APP_NAME = /^[a-z][a-z0-9-]{0,23}$/;
+// The app-only grant a pushed app is never given (`apps.remember`).
+export const APP_ONLY_GRANTS = ['remember'];
+
+// The entries of a plain ustar tar, as [path, bytes]; anything but plain files, or bytes that are no tar (a gzip), is
+// refused.
+function untar(data, file) {
+  const notTar = () => new byCode.bad_request(`${file}: not a tar (an app package is a plain ustar tar, no gzip)`);
+  const entries = [];
+  let at = 0;
+  for (;;) {
+    if (at + 512 > data.length) throw notTar();
+    const header = data.subarray(at, at + 512);
+    if (header.every((byte) => byte === 0)) break;
+    if (header.subarray(257, 262).toString('ascii') !== 'ustar') throw notTar();
+    let sum = 0;
+    for (let n = 0; n < 512; n++) sum += n >= 148 && n < 156 ? 32 : header[n];
+    if (parseInt(header.subarray(148, 156).toString('ascii'), 8) !== sum) throw notTar();
+    const field = (from, length) => header.subarray(from, from + length).toString('utf8').replace(/\0.*$/s, '');
+    const name = field(0, 100);
+    const prefix = field(345, 155);
+    const size = parseInt(field(124, 12).trim() || '0', 8);
+    const type = header[156];
+    // A pax header (`x`, `g`) says more of the entry after it, as some tars write for any file: passed over, as
+    // Python's tarfile and the tar crate read past it.
+    if (type === 0x78 || type === 0x67) { at += 512 + Math.ceil(size / 512) * 512; continue; }
+    if (type !== 0x30 && type !== 0) throw new byCode.bad_request(`${file}: an app package holds plain files only`);
+    if (at + 512 + size > data.length) throw notTar();
+    entries.push([prefix ? `${prefix}/${name}` : name, data.subarray(at + 512, at + 512 + size)]);
+    at += 512 + Math.ceil(size / 512) * 512;
+  }
+  return entries;
+}
+
+// The app package at `path` as `app.push` sends it, checked on this computer before any byte goes: 4 MiB at most, a
+// plain tar (no gzip) whose `lamp-skill.json` is format 2, kind app, with an app's name, and no `lamp-skill.sig` (a
+// pushed app is unsigned). The lamp checks it all again, and the rest of the format (docs/apps.md) too.
+export function readApp(path) {
+  const file = basename(path);
+  let data;
+  try {
+    data = readFileSync(path);
+  } catch (error) {
+    throw new byCode.bad_request(`${file}: ${error.message}`);
+  }
+  if (!data.length) throw new byCode.bad_request(`${file}: empty`);
+  if (data.length > APP_PACKAGE_MAX) throw new byCode.bad_request(`the package is ${data.length} bytes: a pushed app is 4 MiB at most`);
+  const entries = untar(data, file);
+  const names = entries.map(([name]) => name);
+  if (names.includes(APP_SIGNATURE)) throw new byCode.refused(`it carries ${APP_SIGNATURE}: a pushed app is unsigned`);
+  const manifests = entries.filter(([name]) => name === 'lamp-skill.json');
+  if (manifests.length !== 1) throw new byCode.bad_request(`${file}: no lamp-skill.json: not an app package`);
+  let manifest;
+  try {
+    manifest = JSON.parse(manifests[0][1].toString('utf8'));
+  } catch (error) {
+    throw new byCode.bad_request(`lamp-skill.json: ${error.message}`);
+  }
+  if (typeof manifest !== 'object' || manifest === null || manifest.format !== 2 || manifest.kind !== 'app') {
+    throw new byCode.bad_request('lamp-skill.json: not an app\'s: a pushed app is format 2, kind "app"');
+  }
+  if (typeof manifest.name !== 'string' || !APP_NAME.test(manifest.name)) {
+    throw new byCode.bad_request(`lamp-skill.json: name ${JSON.stringify(manifest.name)}: an app's name is a-z, then up to 23 of a-z, 0-9 and -`);
+  }
+  const parts = [];
+  for (let at = 0; at < data.length; at += PART_BYTES) parts.push(data.subarray(at, at + PART_BYTES).toString('base64'));
+  if (parts.length > APP_PARTS_MAX) throw new byCode.bad_request(`more than ${APP_PARTS_MAX} parts`);
+  return { name: manifest.name, version: typeof manifest.version === 'string' ? manifest.version : '', manifest, data, sha256: sha256(data), parts };
+}
+
+// The code and why the lamp would refuse this app's manifest grants for this pairing's, or null: each grant within
+// the pairing's, and never an app-only one (`remember`). `net` and `logs` are the manifest's own booleans, not grants.
+export function appAsksBeyond(manifest, grants) {
+  const asked = manifest.grants ?? [];
+  if (!Array.isArray(asked) || !asked.every((grant) => typeof grant === 'string')) return ['bad_request', 'lamp-skill.json: grants is a list of grant names'];
+  for (const grant of asked) if (APP_ONLY_GRANTS.includes(grant) || !grants.includes(grant)) return ['no_grant', `not granted: ${grant}`];
+  return null;
 }

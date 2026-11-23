@@ -6,6 +6,7 @@
 //   lamp fake [--every 10] [--cycles N] [--everything] [--hands]
 //   lamp speaker FILE.wav|- [--rate 16000|24000]
 //   lamp skill push FOLDER [LAMP_ID] | lamp skill list [LAMP_ID] | lamp skill remove NAME [LAMP_ID]
+//   lamp app push APP.tar [LAMP_ID] | lamp app list [LAMP_ID] | lamp app remove NAME [LAMP_ID]
 import { parseArgs } from 'node:util';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,13 +22,15 @@ const USAGE = `usage: lamp find
        lamp fake [--every S] [--cycles N] [--everything] [--hands]
        lamp speaker FILE.wav|- [LAMP_ID] [--rate N]
        lamp skill push FOLDER [LAMP_ID] | list [LAMP_ID] | remove NAME [LAMP_ID]
+       lamp app push APP.tar [LAMP_ID] | list [LAMP_ID] | remove NAME [LAMP_ID]
 
   find    lamps on this network
   pair    pair this computer with a lamp, with the owner's code
   hello   connect to a paired lamp and show its grants
   speaker play a WAV (or raw PCM16 on stdin) through the lamp's speaker, in real time (the speaker grant)
   fake    a fake lamp here, paired at once, saying an arrival now and then
-  skill   this computer's pushed skills (the skills grant): push, list, remove`;
+  skill   this computer's pushed skills (the skills grant): push, list, remove
+  app     this computer's own app packages, format 2 and unsigned (the skills grant): push, list, remove`;
 
 let parsed;
 try {
@@ -42,6 +45,8 @@ try {
 }
 const { values, positionals } = parsed;
 const [command, arg, third, fourth] = positionals;
+
+const running = (app) => (app.stopped || app.started === false ? 'stopped' : 'running');
 
 async function main() {
   if (values.help || command === 'help') {
@@ -121,6 +126,27 @@ async function main() {
     const lamp = await Lamp.connect(third);
     try {
       for (const skill of await lamp.skills()) console.log(`${skill.name}\t${skill.version}\t${skill.on ? 'on' : 'off'}${skill.held ? ` (held: ${skill.held})` : ''}`);
+    } finally {
+      await lamp.close();
+    }
+  } else if (command === 'app' && third && (arg === 'push' || arg === 'remove')) {
+    // An app package of this computer's own on its paired lamp (the skills grant).
+    const lamp = await Lamp.connect(fourth);
+    try {
+      if (arg === 'push') {
+        const app = await lamp.pushApp(third);
+        console.log(`${app.name} ${app.version} pushed${app.updated ? ', replacing the one before' : ''}, ${running(app)}`);
+      } else {
+        await lamp.removeApp(third);
+        console.log(`${third} removed`);
+      }
+    } finally {
+      await lamp.close();
+    }
+  } else if (command === 'app' && arg === 'list') {
+    const lamp = await Lamp.connect(third);
+    try {
+      for (const app of await lamp.apps()) console.log(`${app.name}\t${app.version}\t${running(app)}`);
     } finally {
       await lamp.close();
     }

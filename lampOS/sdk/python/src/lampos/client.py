@@ -1722,3 +1722,46 @@ class Lamp:
         """Take one of this computer's own pushed skills off the lamp."""
         return await self.request("skill.remove", name=name)
 
+    # Apps of this computer's own (the `skills` grant too; docs/apps.md): a
+    # Store-format package, unsigned, with the pairing as the owner's yes.
+
+    async def push_app(self, path) -> dict:
+        """Check the app at `path`, its folder (`app.json`, `src/`, ...) or
+        its packed tar, as `lamp app check` does, pack a folder, and send it
+        in parts; returns the lamp's `app` once installed (`name`, `title`,
+        `version`, `sha256`, `grants`, `net`, `logs`, `updated`, `started`,
+        `from`). A re-push of the name replaces this computer's app of it.
+        A check error, a package over 4 MiB or signed, or a grant this
+        pairing lacks (or `remember`) refuses it here, before any byte is
+        sent."""
+        from .push import app_asks_beyond, app_for_push, app_parts
+
+        package = app_for_push(path)
+        if "skills" not in self.grants:
+            raise BY_CODE["no_grant"]("not granted: skills")
+        beyond = app_asks_beyond(package.manifest, self.grants)
+        if beyond:
+            code, why = beyond
+            raise BY_CODE[code](why)
+        parts = app_parts(package.data)
+        reply: dict = {}
+        for part, data in enumerate(parts):
+            reply = await self.request(
+                "app.push",
+                name=package.name,
+                sha256=package.sha256,
+                size=len(package.data),
+                part=part,
+                parts=len(parts),
+                data=data,
+            )
+        return reply.get("app", {})
+
+    async def apps(self) -> list[dict]:
+        """This computer's own pushed apps."""
+        return (await self.request("app.list")).get("apps", [])
+
+    async def remove_app(self, name: str) -> dict:
+        """Take one of this computer's own pushed apps off the lamp."""
+        return await self.request("app.remove", name=name)
+
