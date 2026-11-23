@@ -1676,7 +1676,9 @@ The voice tells the body `{"quiet":true}` on the mood socket, a datagram of its 
 self-harm"), and `{"quiet":false}` once when it ends. The body keeps it until `{"quiet":false}` or for
 `MOOD_STALE` (1.5 s) after the last one, so a voice gone lets it go (`Asked::quiet`). While it holds:
 
-- **No shift at rest:** the idle shifts do not begin.
+- **No shift at rest:** the idle shifts do not begin, and no rest glance is taken from Expression.
+- **What is under way ends:** as it begins, a gesture playing or waiting to begin (but a plain nod),
+  whoever asked it, ends eased out, said `held`.
 - **A plain nod only:** every other gesture, a lively one (a nod too), a skill's, and a paired computer's
   or an app's from lamp-control, is dropped and said `held` (`body::QUIET_HELD`), which lamp-control
   passes to its asker as the why. Nothing says why.
@@ -1684,6 +1686,10 @@ self-harm"), and `{"quiet":false}` once when it ends. The body keeps it until `{
   so a holder's look, pose and limp wait.
 - **The face is still followed** whenever the lamp listens or speaks, as before.
 
+Only the voice sends it. Any process the mood socket lets write (the `lampos` group: lamp-skills,
+lamp-control, lamp-addons) could send it too, but none does, and none passes a skill's or an app's
+words through as a datagram: no skill or app can reach the socket. Expression's small offsets (the
+head's breath) go on; only its rest glances stop.
 A body built before it drops the datagram (`not a mood or a gesture this body has`) and keeps the mood.
 A mood datagram with `quiet` in it is refused whole, as any unknown field is.
 
