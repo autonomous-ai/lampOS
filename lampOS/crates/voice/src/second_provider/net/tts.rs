@@ -222,6 +222,30 @@ impl OwnVoiceLost {
             said.push(line);
         }
     }
+
+    /// ElevenLabs refused the person's voice with `status`: the lamp's own
+    /// voice from now on, journalled by the first piece to see it only.
+    fn refused(&self, status: u16) {
+        OWN_VOICE_REFUSED.store(status, Ordering::Relaxed);
+        if !self.lost.swap(true, Ordering::AcqRel) {
+            self.say(format!(
+                "lamp-voice second: ElevenLabs refused the person's own key or voice (HTTP {status}); the lamp's own voice from now on (LAMP_OWN_KEYS)"
+            ));
+        }
+    }
+
+    /// `text` as the lamp's own voice says it: after [`OWN_VOICE_LOST_LINE`]
+    /// for the first piece of the process only, with its own journal line.
+    fn told(&self, text: &str) -> String {
+        if self.told.swap(true, Ordering::AcqRel) {
+            return text.to_owned();
+        }
+        self.say(
+            "lamp-voice second: the person's ElevenLabs voice isn't working: told once, in the lamp's own voice (LAMP_OWN_KEYS)"
+                .to_owned(),
+        );
+        format!("{OWN_VOICE_LOST_LINE} {text}")
+    }
 }
 
 /// The process's one [`OwnVoiceLost`].
@@ -1037,8 +1061,21 @@ impl Tts {
     /// never the speech socket or a pooled connection that may have held the
     /// first try. In the turn's model, so the answer keeps one voice.
     pub async fn speak_fresh(&self, text: &str, turn: Turn) -> Result<TtsStream> {
+        if let Some(lamps) = &self.lamps
+            && !self.lost.lost.load(Ordering::Acquire)
+        {
+            // Asked again, so counted again (#7347).
+            crate::day_tally::spoken(text);
+            match self.speak_http(&self.fresh, text, Some(turn)).await {
+                // The person's voice refused here too: the one refusal and
+                // the one notice of the process ([`OwnVoiceLost`]).
+                Err(Error::Status(status @ 401..=404)) => self.lost.refused(status),
+                spoken => return spoken,
+            }
+            return Box::pin(lamps.speak_fresh(&self.lost.told(text), turn)).await;
+        }
         if let Some(lamps) = self.fallen_back() {
-            return Box::pin(lamps.speak_fresh(text, turn)).await;
+            return Box::pin(lamps.speak_fresh(&self.lost.told(text), turn)).await;
         }
         // Asked again, so counted again (#7347).
         crate::day_tally::spoken(text);
@@ -1054,22 +1091,19 @@ impl Tts {
         let Some(lamps) = &self.lamps else {
             return self.speak_own(text, turn).await;
         };
-        if self.lost.lost.load(Ordering::Relaxed) {
-            return lamps.speak_own(text, turn).await;
-        }
-        match self.speak_own(text, turn).await {
-            Err(Error::Status(status @ 401..=404)) => {
-                self.lost.lost.store(true, Ordering::Relaxed);
-                OWN_VOICE_REFUSED.store(status, Ordering::Relaxed);
-                self.lost.say(format!(
-                    "lamp-voice second: ElevenLabs refused the person's own key or voice (HTTP {status}); the lamp's own voice from now on, said once (LAMP_OWN_KEYS)"
-                ));
-                lamps
-                    .speak_own(&format!("{OWN_VOICE_LOST_LINE} {text}"), turn)
-                    .await
+        if !self.lost.lost.load(Ordering::Acquire) {
+            match self.speak_own(text, turn).await {
+                Err(Error::Status(status @ 401..=404)) => self.lost.refused(status),
+                spoken => return spoken,
             }
-            spoken => spoken,
         }
+        // The notice goes with an answer's piece only, never a line
+        // rendered ahead with no turn (the Start's, kept for later).
+        let text = match turn {
+            Some(_) => self.lost.told(text),
+            None => text.to_owned(),
+        };
+        lamps.speak_own(&text, turn).await
     }
 
     async fn speak_own(&self, text: &str, turn: Option<Turn>) -> Result<TtsStream> {
@@ -2793,6 +2827,10 @@ mod tests {
             own
         };
         let (one, two) = (voice(&state), voice(&state));
+        // A line rendered ahead with no turn (the Start's) sees the refusal
+        // first: in the lamp's voice, with no notice.
+        let mut ahead = one.speak("Ahead.").await.unwrap();
+        while ahead.next().await.unwrap().is_some() {}
         let pieces = futures_util::future::join_all([
             said(&one, "A.", 1),
             said(&one, "B.", 1),
@@ -2811,13 +2849,13 @@ mod tests {
             said[1].contains("told once, in the lamp's own voice"),
             "{said:?}"
         );
-        let told = lamps_asked
-            .lock()
-            .unwrap()
+        let asked = lamps_asked.lock().unwrap().clone();
+        assert!(!asked[0].contains(OWN_VOICE_LOST_LINE), "{asked:?}");
+        let told = asked
             .iter()
             .filter(|body| body.contains(OWN_VOICE_LOST_LINE))
             .count();
-        assert_eq!(told, 1, "the notice said once");
+        assert_eq!(told, 1, "the notice said once, with an answer: {asked:?}");
     }
 
     /// #8367: ElevenLabs refuses the person's own key (401, as a bad key or
