@@ -276,13 +276,17 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     // Store one (`--apps-staging`, for a test), and only with LAMP_STORE_APPS=on.
     let apps_manage = option(arguments, "--apps-manage-socket").map(PathBuf::from);
     if apps_manage.is_some() {
-        door = door.with_app_push(
-            option(arguments, "--apps-staging").map_or_else(
-                || PathBuf::from(lamp_control::push::APPS_STAGING),
-                PathBuf::from,
-            ),
-            lamp_control::app_push::on(),
-        );
+        door = door
+            .with_app_push(
+                option(arguments, "--apps-staging").map_or_else(
+                    || PathBuf::from(lamp_control::push::APPS_STAGING),
+                    PathBuf::from,
+                ),
+                lamp_control::app_push::on(),
+            )
+            // A revoke's or a narrowed pairing's change for the apps' helper,
+            // kept until answered, so a restart re-tells it (Heron's P1 on #8358).
+            .with_apps_owed(state.join(lamp_control::apps_owed::OWED));
     }
     let body = option(arguments, "--mood-socket").map(PathBuf::from);
     let say = option(arguments, "--say-socket").map(PathBuf::from);
@@ -577,6 +581,8 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     }
     if let Some(apps_manage) = apps_manage {
         shared.set_apps_manage_socket(apps_manage);
+        // What the apps' helper was owed when lamp-control last stopped.
+        shared.tell_owed_app_changes();
     }
     // The owner's yeses to skills' tasks (#6305), in its own state folder,
     // which lamp-skills can't write (`lamp_control::task_yes`).

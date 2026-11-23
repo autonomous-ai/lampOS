@@ -308,11 +308,13 @@ impl Apps {
             "from".into(),
             json!(if from_computer { "computer" } else { "store" }),
         );
-        if let Some(by) = package
-            .as_ref()
-            .and_then(|package| package.pushed_by.as_ref())
+        if let Some(package) = &package
+            && let Some(by) = &package.pushed_by
         {
             row.insert("pushed_by".into(), json!(by));
+            // Whether it can use the internet, from the helper's record: a
+            // pushed app took no yes that named it (Heron's P2 on #8358).
+            row.insert("net".into(), json!(package.net));
         }
         row.insert("state".into(), json!(state_of(&marks, &unit)));
         // Values and panel are lamp-control's (`app_state`: `settings` are the
@@ -1307,6 +1309,7 @@ pub mod tests {
         let mut app = Fake::app("gym-coach");
         let package = app.4.as_mut().unwrap();
         package.from_computer = true;
+        package.net = true;
         package.pushed_by = Some(PushedBy {
             computer: "desk mac".into(),
             client: "c_1".into(),
@@ -1315,6 +1318,8 @@ pub mod tests {
         let (apps, _) = apps(fake);
         let row = &apps.list()["apps"][0];
         assert_eq!(row["from"], "computer");
+        // `net` from the record, whatever the manifest left out.
+        assert_eq!(row["net"], true);
         assert_eq!(
             row["pushed_by"],
             json!({"computer": "desk mac", "client": "c_1"})

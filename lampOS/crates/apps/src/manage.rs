@@ -184,6 +184,55 @@ pub fn list_pushed_by(layout: &Layout, client: &str) -> Vec<Listed> {
         .collect()
 }
 
+/// What [`off_pushed_by`] and [`grants_pushed_by`] did: the apps stopped,
+/// and those that could not be (each with why), by name.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Held {
+    pub stopped: Vec<String>,
+    pub not_stopped: Vec<String>,
+}
+
+/// A revoked computer's pushed apps stopped, not removed (Heron's P1 on
+/// #8358): each takes the owner's stop mark, so the boot's [`start_all`]
+/// leaves it stopped, and the owner can still remove it, or start it, from
+/// the phone. Another computer's apps and the Store's are not touched.
+pub fn off_pushed_by(layout: &Layout, fx: &mut dyn Effects, client: &str) -> Held {
+    hold_pushed_by(layout, fx, client, |_| true)
+}
+
+/// A computer's pushed apps held to its grants now (`set_grants` narrowed the
+/// pairing): one whose record asks a grant outside `grants` is stopped as
+/// [`off_pushed_by`] stops it; the rest run on.
+pub fn grants_pushed_by(
+    layout: &Layout,
+    fx: &mut dyn Effects,
+    client: &str,
+    grants: &[String],
+) -> Held {
+    hold_pushed_by(layout, fx, client, |app| {
+        app.grants.iter().any(|grant| !grants.contains(grant))
+    })
+}
+
+fn hold_pushed_by(
+    layout: &Layout,
+    fx: &mut dyn Effects,
+    client: &str,
+    beyond: impl Fn(&Listed) -> bool,
+) -> Held {
+    let mut held = Held::default();
+    for app in list_pushed_by(layout, client) {
+        if !beyond(&app) {
+            continue;
+        }
+        match stop(layout, fx, &app.name) {
+            Ok(()) => held.stopped.push(app.name),
+            Err(why) => held.not_stopped.push(format!("{}: {why}", app.name)),
+        }
+    }
+    held
+}
+
 /// What a remove of another's app or a Store app by a computer says.
 pub const NOT_PUSHED_BY: &str = "this computer did not push an app of that name";
 
