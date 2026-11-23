@@ -19,7 +19,7 @@ set -u; K=$(cd "$(dirname "$0")" && pwd); D=$K/row; . $D/kit.sh
 STEPS="lock base engines0 round1 verify engines round2 putback read release"
 FROM=${1:-lock}; THEN=${2:-}
 for x in $FROM $THEN; do case " $STEPS " in *" $x "*) ;; *) echo "no step '$x' (steps: $STEPS)"; exit 2;; esac; done
-ROUNDWAIT=${ROUNDWAIT:-900}; ENGWAIT=${ENGWAIT:-420}; ROUNDPOLL=${ROUNDPOLL:-20}; VERIFYWAIT=${VERIFYWAIT:-900}; VERIFYPOLL=${VERIFYPOLL:-30}; READGAP=${READGAP:-60}
+ROUNDWAIT=${ROUNDWAIT:-900}; ENGWAIT=${ENGWAIT:-900}; ROUNDPOLL=${ROUNDPOLL:-20}; VERIFYWAIT=${VERIFYWAIT:-900}; VERIFYPOLL=${VERIFYPOLL:-30}; READGAP=${READGAP:-60}
 T(){ echo "$(date '+%T') $*" | tee -a $L/times.log; }
 STOP(){ T "STOP at $st: $*"; exit 3; }
 need(){ grep -qE "$2" $L/$1.txt 2>/dev/null || STOP "no '$2' (read row/logs/$1.txt)"; }
@@ -108,7 +108,10 @@ for st in $STEPS; do
            s0=$(date +%s)
            while :; do RENEW || exit 1
              LAMP "N=1" $D/engines.lamp.sh > $L/engines1.txt 2>&1
-             grep -qE '^HLOOK1 (said|not)' $L/engines1.txt && break
+             # A round's own OpenClaw (or Hermes) step reinstalls it on stable as on the PR build (lamp-ee17, 23 Nov:
+             # "OpenClaw 2026.11.2 is not set up ... started to put it there" after each round): judge only once both
+             # are settled (not installing, frozen or waiting) and the Harness look has spoken.
+             grep -qE '^HLOOK1 (said|not)' $L/engines1.txt && ! grep -qE '"(hermes|openclaw)":\{[^}]*"state":"(installing|frozen|waiting)"' $L/engines1.txt && break
              [ $(( $(date +%s) - s0 )) -ge $ENGWAIT ] && break; sleep $VERIFYPOLL; done
            cat $L/engines1.txt
            python3 -I - $L/engines0.txt $L/engines1.txt <<'P' | tee $L/engines.txt
@@ -125,6 +128,8 @@ print("CHECK (E0) on stable the app was shown: %s" % (e0 or "-"))
 print("CHECK (E1) on the PR build the app is shown: %s" % (e1 or "-"))
 print("CHECK (E2) lamp-update's Harness look since round 1: %s" % (look or "-"))
 if not e1.startswith("{"): print("LEG E VOID (the PR build's list not read)"); sys.exit()
+busy = [k for k, v in json.loads(e1).items() if isinstance(v, dict) and v.get("state") in ("installing", "frozen", "waiting")]
+if busy: print("LEG E VOID (%s still in its round's install step after ENGWAIT)" % ", ".join(sorted(busy))); sys.exit()
 a = st(json.loads(e1)); b = st(json.loads(e0)) if e0.startswith("{") else {}
 why = []
 for k in ("hermes", "openclaw"):

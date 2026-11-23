@@ -19,7 +19,9 @@ for x in lamp-voice lamp-tasks lamp-openclaw-gateway lamp-cloud lamp-update; do 
 F=$(failed); echo "FAILED $F"; for x in $F; do case " ${FAILED0:-} " in *" $x "*) ;; *) why="$why newly-failed-$x";; esac; done
 set -- $(kept); echo "KEPT_AGENT $1"
 K=$(journalctl -u lamp-tasks --since "$(systemctl show -p ActiveEnterTimestamp --value lamp-tasks)" --no-pager -o cat 2>/dev/null | grep -E "one session: kept session (new|live|reused) " | tail -1 | cut -c1-140)
-echo "T J ${K:-no kept session line since lamp-tasks started}"; [ -n "$K" ] || why="$why kept-session-not-open"
+# #8337: a fact only. The #8162 kit judged it (its legs used the kept session); #8337 changes neither lamp-tasks nor
+# the session, and stable's lamp-tasks opens one only at its first turn (lamp-ee17, 23 Nov 19:35).
+echo "T J ${K:-no kept session line since lamp-tasks started}"
 S=$(stopped_lampos); echo "STOPPED_PIDS ${S:-none}"; [ -z "$S" ] || why="$why stopped-pids"
 grep -q t8337 $OCW 2>/dev/null && { echo "WRAPPER the kit's line left"; why="$why wrapper"; } || echo "WRAPPER clean"
 exeshas
