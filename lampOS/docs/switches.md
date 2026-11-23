@@ -883,6 +883,8 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_TASKS_OPENCLAW_DIRECT` | On in the product: the lamp's OpenClaw takes each task straight from the lamp, with no Harness pane to get stuck. |
 | `LAMP_TASKS_HERMES_DIRECT` | Off for now: the lamp's Hermes would take each task straight from the lamp, as OpenClaw does, with no Harness pane to get stuck. |
 | `LAMP_HERMES_GATEWAY` | Off for now: runs Hermes's gateway while Hermes is the lamp's agent, so the line above has something to speak to. |
+| `LAMP_TASKS_HERMES_DIRECT` | Off for now: the lamp's Hermes would take each task straight from the lamp, as OpenClaw does, with no Harness pane to get stuck. |
+| `LAMP_HERMES_GATEWAY` | Off for now: runs Hermes's gateway while Hermes is the lamp's agent, so the line above has something to speak to. |
 | `LAMP_SECOND_SPEECH_SOCKET` | Nothing you'd notice: opens the speech connection early to try to start talking sooner. |
 | `LAMP_SECOND_SPEECH_SOCKET_MODEL` | Nothing you'd notice: picks the voice engine for the early speech connection, keeping one voice per answer. |
 | `LAMP_SECOND_CHAT_SECOND_TRY` | When a reply is slow to start, the lamp asks once more, so fewer turns end with "my thoughts are slow". |
