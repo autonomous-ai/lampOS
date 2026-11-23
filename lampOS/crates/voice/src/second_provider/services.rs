@@ -377,13 +377,16 @@ pub struct RefusedTo {
 
 /// Whether a chat's failure on the person's own key sends the request to
 /// the lamp's own at the relay: the key refused (401, 403, #2094), or the
-/// endpoint down or out of use (a 5xx or a 429, #8362). A 400 is the
-/// request's own, and a slow answer is the second try's.
+/// endpoint down or out of use (a 5xx or a 429, #8362), or Gemini's 400
+/// for the key (#8420). Any other 400 is the request's own, and a slow
+/// answer is the second try's.
 pub fn key_refused(error: &net::Error) -> Option<u16> {
     match error {
         // Refused (#2094), or the endpoint down or out of use (#8362).
         net::Error::Status(status @ (401 | 403 | 429 | 500..=599)) => Some(*status),
         net::Error::UsageLimit(_) => Some(429),
+        // Gemini's 400 for the person's key itself (#8420).
+        net::Error::KeyInvalid => Some(400),
         _ => None,
     }
 }
@@ -715,7 +718,8 @@ impl Net {
         // The person's own model is asked with none of DeepSeek's own
         // fields: an OpenAI-compatible one plainly (#8362), OpenRouter's as
         // OpenRouter's chat, never searching, as the search stays the
-        // lamp's own (#8420).
+        // lamp's own, Gemini's as Gemini's, its 400 for the key read as a
+        // refusal (#8420).
         let hosted = &self.config.hosted;
         self.chat = Arc::new(match hosted.own_chat {
             Some(OwnChat::OpenAiCompatible) => Chat::own_compatible(
@@ -733,6 +737,9 @@ impl Net {
                 self.declare.clone(),
                 false,
             )?,
+            Some(OwnChat::Gemini) => {
+                Chat::gemini_own(&base, &hosted.deepseek_model, key, self.declare.clone())?
+            }
             None => Chat::deepseek_at(
                 &base,
                 &hosted.deepseek_model,
@@ -1888,8 +1895,7 @@ pub(crate) mod tests {
     /// other 400 stays the request's own, with no fallback.
     #[tokio::test]
     async fn the_persons_gemini_key_refused_by_its_400_falls_back_and_a_plain_400_does_not() {
-        const REFUSED: &str =
-            "HTTP/1.1 400 Bad Request\r\ncontent-type: application/json\r\nconnection: close\r\n\r\n";
+        const REFUSED: &str = "HTTP/1.1 400 Bad Request\r\ncontent-type: application/json\r\nconnection: close\r\n\r\n";
         for (name, body, falls) in [
             (
                 "live",

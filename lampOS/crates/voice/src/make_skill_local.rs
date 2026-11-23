@@ -1314,7 +1314,7 @@ pub fn again(error: &net::Error) -> bool {
         // all, is not whole either.
         net::Error::Protocol(what) => [CUT, AT_LENGTH, NO_BLOCK].contains(what),
         // A usage limit doesn't pass in a moment (#7346).
-        net::Error::Url | net::Error::UsageLimit(_) => false,
+        net::Error::Url | net::Error::UsageLimit(_) | net::Error::KeyInvalid => false,
     }
 }
 

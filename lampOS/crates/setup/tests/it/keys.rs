@@ -963,7 +963,10 @@ fn a_gemini_model_is_kept_with_its_model_at_geminis_own_endpoint() {
     // Removed: nothing of it left.
     keys::answer(&line, &store, &mut works, true);
     let (reply, done) = keys::answer(r#"{"remove":"gemini"}"#, &store, &mut works, true);
-    assert_eq!(reply, json!({"done": {"service": "gemini", "uses": "lamp"}}));
+    assert_eq!(
+        reply,
+        json!({"done": {"service": "gemini", "uses": "lamp"}})
+    );
     assert!(done.unwrap().restart_voice);
     for file in ["gemini.key", "gemini.model", "gemini.checked"] {
         assert!(!store.0.join(file).exists(), "{file}");
