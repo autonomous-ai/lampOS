@@ -200,6 +200,7 @@ C["RUN.e-openclaw-moved"] = ("EFAIL", RUN, {"out/engines.lamp.sh.1": DEF["out/en
 C["RUN.e-look-said-none"] = ("EFAIL", RUN, {"out/engines.lamp.sh.1": "ENGINES1 %s\nHLOOK1 said\n" % E0})
 C["RUN.e-openclaw-reinstall-then-settled"] = ("PASS", RUN, {"out/engines.lamp.sh.1.1": DEF["out/engines.lamp.sh.1"].replace('"openclaw":{"state":"installed","version":"2026.11.10"}', '"openclaw":{"state":"installing"}')})
 C["RUN.e-openclaw-never-settles"] = ("EVOID", dict(RUN, ENGWAIT="2"), {"out/engines.lamp.sh.1": DEF["out/engines.lamp.sh.1"].replace('"openclaw":{"state":"installed","version":"2026.11.10"}', '"openclaw":{"state":"installing"}')})
+C["RUN.e0-settles-then-read"] = ("PASS", RUN, {"out/engines.lamp.sh.0.1": DEF["out/engines.lamp.sh.0"].replace('"openclaw":{"state":"installed","version":"2026.11.10"}', '"openclaw":{"state":"installing"}')})
 C["RUN.e-unread"] = ("EVOID", dict(RUN, ENGWAIT="2"), {"out/engines.lamp.sh.1": "ENGINES1 unreadable:FileNotFoundError\nHLOOK1 none\n"})
 if os.path.isdir(OUT): shutil.rmtree(OUT)
 for name, (exp, env, over) in C.items():

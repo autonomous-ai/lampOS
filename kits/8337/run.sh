@@ -100,7 +100,14 @@ for st in $STEPS; do
              [ $(( $(date +%s) - s0 )) -ge $VERIFYWAIT ] && break; sleep $VERIFYPOLL; done
            cp $L/verify-look.txt $L/verify.txt; cat $L/verify.txt; need verify '^VERIFY PASS';;
   engines0) # The app's agents list on stable, before any change (the leg's "before").
-           LAMP "N=0" $D/engines.lamp.sh > $L/engines0.txt 2>&1; cat $L/engines0.txt
+           # A round just before (another row's) leaves its own OpenClaw step running: wait for it to settle as engines
+           # does (lamp-ee17, 23 Nov 20:01: stable's list read `installing` after the previous row's round).
+           s0=$(date +%s)
+           while :; do RENEW || exit 1
+             LAMP "N=0" $D/engines.lamp.sh > $L/engines0.txt 2>&1
+             ! grep -qE '"(hermes|openclaw)":\{[^}]*"state":"(installing|frozen|waiting)"' $L/engines0.txt && break
+             [ $(( $(date +%s) - s0 )) -ge $ENGWAIT ] && break; sleep $VERIFYPOLL; done
+           cat $L/engines0.txt
            grep -q '^ENGINES0 {' $L/engines0.txt || T "engines0: stable's list not read ($(grep '^ENGINES0' $L/engines0.txt)): leg E can only be VOID";;
   engines) # #8337's leg E on the PR build: wait (at most ENGWAIT s) for lamp-update's first Harness look since round 1,
            # then read the list the app is shown. PASS: read; Hermes and OpenClaw as stable said them; no engine stable
@@ -134,6 +141,7 @@ a = st(json.loads(e1)); b = st(json.loads(e0)) if e0.startswith("{") else {}
 why = []
 for k in ("hermes", "openclaw"):
     if k not in a: why.append("%s-not-listed" % k)
+    elif b.get(k) in ("installing", "frozen", "waiting"): print("NOTE (E3) %s on stable was still in its round's step (%s): not compared" % (k, b[k]))
     elif b and a[k] != b.get(k): why.append("%s-%s-was-%s" % (k, a[k], b.get(k)))
 lost = sorted(k for k, v in b.items() if v == "installed" and a.get(k) == "not_installed")
 if lost: why.append("said-not-installed:" + ",".join(lost))
