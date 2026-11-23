@@ -1,0 +1,6 @@
+STABLE lamp-skills aaa
+STABLE lamp-tasks bbb
+PASS lamp-skills runs #8237 lamp-skills x
+PASS lamp-tasks runs #8237 lamp-tasks y
+PASS lamp-voice LAMP_NAME_NEAR=off
+PUT NOT OK

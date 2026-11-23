@@ -13,6 +13,7 @@ if [ $W = 1 ]; then systemctl stop lamp-skills lamp-tasks; n "stopped lamp-skill
       echo "$src" | grep -q "/opt/lampOS/$part" || { echo "NOT OURS: $f bound from $src: left"; ok=0; break; }
       umount "$f" || { echo "UMOUNT FAILED $f"; ok=0; break; }; n "umounted $f"; done; done; fi
 [ -f $HD ] && { rm -f $HD; rmdir ${HD%/*} 2>/dev/null; n "removed $HD"; }
+AD=/run/systemd/system/lamp-skills-manage@.service.d/zz-row-8237-anyasker.conf; [ -f $AD ] && { rm -f $AD; rmdir ${AD%/*} 2>/dev/null; n "removed $AD"; }
 V=0; [ -f $ND ] && { rm -f $ND; rmdir ${ND%/*} 2>/dev/null; n "removed $ND"; V=1; }
 for p in $PUTP; do part=${p%%:*}; [ -d $(tdir $part) ] && { rm -rf $(tdir $part); n "removed $(tdir $part)"; }; done
 rm -rf /tmp/t8237; systemctl daemon-reload
@@ -25,6 +26,6 @@ for p in $PUTP; do part=${p%%:*}; r=${p#*:}; unit=${r%%:*}; bin=${r#*:}; f=$(ins
   elif [ "$fs" = "$want" ] && [ "$rs" = "$want" ]; then echo "PASS $unit back on stable $want (file and running exe)"
   else echo "FAIL $unit: file $fs running ${rs:-none} stable $want"; ok=0; fi
   [ "$(mounted "$f")" = 0 ] || { echo "FAIL a mount left over $f"; ok=0; }; done
-[ -f $HD ] && { echo "FAIL hold left: $HD"; ok=0; }; [ -f $ND ] && { echo "FAIL drop-in left: $ND"; ok=0; }
+[ -f $HD ] && { echo "FAIL hold left: $HD"; ok=0; }; [ -f $AD ] && { echo "FAIL drop-in left: $AD"; ok=0; }; [ -f $ND ] && { echo "FAIL drop-in left: $ND"; ok=0; }
 [ -n "$(envval "$(pid lamp-voice)" LAMP_NAME_NEAR | grep -x off)" ] && [ ! -f $ND ] && echo "NOTE lamp-voice still has LAMP_NAME_NEAR=off from elsewhere"
 [ $ok = 1 ] && { rm -f $R/*.stable; echo "PUTBACK OK"; } || echo "PUTBACK NOT OK"

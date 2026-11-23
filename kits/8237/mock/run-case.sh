@@ -11,11 +11,12 @@ cp -R $KIT/row $W/row; cp $KIT/run.sh $W/run.sh; rm -rf $W/row/logs; mkdir -p $W
 while IFS=$'\t' read -r id text gain; do [ -n "$id" ] || continue; : > $W/row/clips/$id-el.wav; printf '%s\tpad=0.4\n' "$text" > $W/row/clips/$id-el.txt; done < $W/row/clips/clips.txt
 echo skills-bin > $W/bins/lamp-skills; echo tasks-bin > $W/bins/lamp-tasks
 s1=$(shasum -a 256 $W/bins/lamp-skills | cut -d' ' -f1); s2=$(shasum -a 256 $W/bins/lamp-tasks | cut -d' ' -f1)
-MOCK_STARTS=0; MOCK_VOL=50; MOCK_LOCKFAIL=; BADSHA=; . $FXD/case.env; [ -n "$BADSHA" ] && s1=0000
+MOCK_STARTS=0; MOCK_VOL=50; MOCK_LOCKFAIL=; BADSHA=; MOCK_PUSHCMD=; . $FXD/case.env; [ -n "$MOCK_PUSHCMD" ] && MOCK_PUSHCMD="bash $W/row/stage.sh"; [ -n "$BADSHA" ] && s1=0000
 printf 'LAMP=lamp-mock\nLAMP_HOST=mock-host\nLAMP_USER=mockuser\nLOCK_WHO=mock-runner\nLAMP_SUDO_PASS=mock\nPR_SKILLS_BIN=%s\nPR_TASKS_BIN=%s\nPR_SKILLS_SHA=%s\nPR_TASKS_SHA=%s\n' $W/bins/lamp-skills $W/bins/lamp-tasks $s1 $s2 > $W/kit.env
 export MOCK_FX=$FXD MOCK_LOG=$W/calls.log MOCK_STATE=$W/state MOCK_STARTS MOCK_VOL MOCK_LOCKFAIL
 export PATH=$M/bin:$PATH BASH_ENV=$M/shim.bash SLEEPDIV=${SLEEPDIV:-25}
-export PUSHCMD=$M/bin/push KIT_ENV=$W/kit.env KIT_LL=$M/bin/lamplock SSH=$M/bin/ssh SCP=$M/bin/scp AFPLAY=$M/bin/afplay OSASCRIPT=$M/bin/osascript
+export STAGE_SDK=$(cd $KIT/../.. && pwd)/lampOS/sdk/python/src
+export PUSHCMD="${MOCK_PUSHCMD:-$M/bin/push}" KIT_ENV=$W/kit.env KIT_LL=$M/bin/lamplock SSH=$M/bin/ssh SCP=$M/bin/scp AFPLAY=$M/bin/afplay OSASCRIPT=$M/bin/osascript
 export POLL=1 GWAIT=8 WWAIT=6 YESAFTER=1 SETTLE=1 ASKAFTER=1
 bash $W/run.sh > $W/out.txt 2>&1; rc=$?; echo "exit $rc" >> $W/out.txt; L=$W/row/logs
 touch $L/RELEASED; [ -f $L/renew.pid ] && kill $(cat $L/renew.pid) 2>/dev/null

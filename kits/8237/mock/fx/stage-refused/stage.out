@@ -1,0 +1,2 @@
+HELPER {"refused":"not installed: it asks speak, which this computer was not granted"}
+PUSH REFUSED {"refused":"..."}

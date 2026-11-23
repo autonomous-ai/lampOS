@@ -1,0 +1,5 @@
+RUNS lamp-skills #8237 x
+RUNS lamp-tasks #8237 y
+VOICE_MUTE muted=True reason=none
+PRIVACY physical_muted=True
+NOT READY mute

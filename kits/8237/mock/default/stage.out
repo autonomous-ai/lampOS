@@ -1,0 +1,4 @@
+HELPER {"done":{"name":"desk-hello"}}
+PUSHED {"done":{"name":"desk-hello"}}
+REMOVED desk-hello
+YES-FILE as found abc
