@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+# Mock afplay: no sound. An event "play.<clip>" for the playing leg (logs/plays.log's last PLAY line).
+import os, sys, re, time, signal
+wav = sys.argv[-1]; clip = re.sub(r"\.wav$", "", os.path.basename(wav)); leg = "?"
+try:
+    ls = [l for l in open(os.path.join(os.environ["MOCK_ROW"], "logs/plays.log")) if " PLAY " in l]
+    leg = re.search(r"leg=(\S+)", ls[-1]).group(1)
+except Exception: pass
+with open(os.path.join(os.environ["MOCK_STATE"], "events"), "a") as f: f.write("%.6f %s play.%s\n" % (time.time(), leg, clip))
+with open(os.environ["MOCK_LOG"], "a") as f: f.write("%.3f afplay %s leg %s args %s\n" % (time.time(), clip, leg, sys.argv[1:-1]))
+if os.environ.get("MOCK_INT_ON") == clip:     # a Ctrl-C at this clip: SIGINT to the whole foreground group
+    with open(os.environ["MOCK_LOG"], "a") as f: f.write("%.3f CTRL-C\n" % time.time())
+    os.killpg(os.getpgid(0), signal.SIGINT)
+time.sleep(0.05)

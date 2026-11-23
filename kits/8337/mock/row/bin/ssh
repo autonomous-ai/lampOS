@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+# Mock ssh: never connects. A LAMP body -> its fixture (fx/<case>/out/<script>[.<mode>.<n>|.<leg>...][.<k>]), and an
+# event "<t> <leg> <script>[.<mode>]" for the followers. `journalctl -f` and aw.lamp.sh -> the leg's chunks
+# (j/<leg>.<event>[.k], a/<leg>.<event>[.k]: "@+<s> <text>"), written at once with the event's time + s.
+import os, sys, time, re, glob, signal
+FX = os.environ["MOCK_FX"]; ROW = os.environ["MOCK_ROW"]; LOG = os.environ["MOCK_LOG"]; ST = os.environ["MOCK_STATE"]
+a = sys.argv[1:]; i = 0
+while i < len(a) and a[i].startswith("-"):
+    i += 2 if a[i] in ("-o", "-p", "-i", "-l") else 1
+host = a[i] if i < len(a) else ""; cmd = " ".join(a[i + 1:])
+def log(m):
+    with open(LOG, "a") as f: f.write("%.3f ssh %s\n" % (time.time(), m))
+def fx(*names):
+    for nm in names:
+        p = os.path.join(FX, nm)
+        if os.path.exists(p): return open(p).read()
+    return None
+def bump(key):
+    p = os.path.join(ST, "n." + key.replace("/", "_")); k = int(open(p).read()) + 1 if os.path.exists(p) else 1
+    open(p, "w").write(str(k)); return k
+def event(leg, ev):
+    with open(os.path.join(ST, "events"), "a") as f: f.write("%.6f %s %s\n" % (time.time(), leg, ev))
+def sub(t, now):
+    return re.sub(r"@NOW([+-][0-9.]+)?@", lambda m: "%.3f" % (now + float(m.group(1) or 0)), t)
+def follow(kind, leg, emit):
+    # every event of this leg (state/events and the afplay plays) -> its chunk, once
+    seen = 0; count = {}; t0 = time.time(); pp = os.getppid()
+    ch = fx("%s/%s.start" % (kind, leg), "%s/start" % kind)
+    if ch: emit(ch, t0)
+    end = t0 + 90
+    while time.time() < end and os.getppid() == pp and not os.path.exists(os.path.join(ST, "stop")):
+        try: ev = open(os.path.join(ST, "events")).read().splitlines()
+        except FileNotFoundError: ev = []
+        for line in ev[seen:]:
+            at, lg, name = line.split()
+            if lg != leg: continue
+            count[name] = count.get(name, 0) + 1; k = count[name]
+            ch = fx("%s/%s.%s.%d" % (kind, leg, name, k), "%s/%s.%s" % (kind, leg, name))
+            if ch: emit(ch, float(at))
+        seen = len(ev); time.sleep(0.05)
+if "sudo sh -s" in cmd:
+    body = sys.stdin.read()
+    names = {}
+    for f in glob.glob(os.path.join(ROW, "*.lamp.sh")):
+        c = open(f).read()
+        if os.path.basename(f) != "common.lamp.sh" and body.endswith(c): names[os.path.basename(f)] = c
+    s = max(names, key=lambda k: len(names[k])) if names else "unknown"
+    pre = body[: len(body) - len(names.get(s, ""))].rstrip("\n").split("\n")[-1]
+    v = lambda n: (re.search(r"(?:^| )%s=(\S+)" % n, pre) or [None, ""])[1]
+    leg, mode, n = v("LEG") or "run", v("MODE"), v("N")
+    k = bump("%s.%s.%s.%s" % (s, leg, mode, n))
+    log("LAMP %s leg=%s mode=%s n=%s k=%d" % (s, leg, mode, n, k))
+    if os.environ.get("MOCK_FAIL_SSH_AFTER_LOCK") and os.path.exists(os.path.join(ST, "lock-lost")): log("AFTER LOCK LOST %s" % s)
+    if s == "aw.lamp.sh":
+        seq = [0]
+        def emit(ch, at):
+            for line in ch.splitlines():
+                m = re.match(r"@\+([0-9.]+) (\S+) (\S+)", line)
+                if m: seq[0] += 1; sys.stdout.write("AW %.3f %s %s 1 %d\n" % (at + float(m.group(1)), m.group(2), m.group(3), seq[0]))
+            sys.stdout.flush()
+        follow("a", leg, emit); sys.exit(0)
+    now = time.time(); ev = s.replace(".lamp.sh", "") + ("." + mode if mode else "")
+    event(leg, ev)
+    cand = ["%s.%s.%s.%d" % (s, mode, n, k), "%s.%s.%s" % (s, mode, n), "%s.%s.%s.%d" % (s, leg, mode, k), "%s.%s.%s" % (s, leg, mode),
+            "%s.%s.%d" % (s, leg, k), "%s.%s" % (s, leg), "%s.%s.%d" % (s, mode, k), "%s.%s" % (s, mode), "%s.%d" % (s, k), s]
+    out = fx(*["out/" + c.replace("..", ".") for c in cand])
+    if out is None: log("NO FIXTURE out/%s (leg %s mode %s n %s k %d)" % (s, leg, mode, n, k)); sys.exit(0)
+    sys.stdout.write(sub(out, now)); sys.exit(0)
+log("CMD " + cmd[:160])
+if "journalctl -f" in cmd:
+    leg = (re.search(r"LEG=(\S+)", cmd) or [None, "none"])[1]
+    def emit(ch, at):
+        for line in ch.splitlines():
+            m = re.match(r"@\+([0-9.]+) (.*)", line)
+            if m: sys.stdout.write("%.6f lamp-mock %s\n" % (at + float(m.group(1)), m.group(2)))
+        sys.stdout.flush()
+    follow("j", leg, emit); sys.exit(0)
+if cmd.startswith("date +%s.%N"): print("%.6f" % time.time()); sys.exit(0)
+if "--since -10min" in cmd:
+    u = (re.search(r"-u (\S+)", cmd) or [None, ""])[1]; c = int(os.environ.get("MOCK_STARTS_" + u.replace("-", "_"), "0"))
+    for _ in range(c): print("Started %s.service - mock." % u)
+    sys.exit(0)
+sys.exit(0)

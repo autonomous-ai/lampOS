@@ -1,0 +1,4 @@
+#!/bin/sh
+# Mock curl: -o <file> <url> writes the fixture's harness file named by the url's basename.
+o=; while [ $# -gt 1 ]; do [ "$1" = -o ] && { o=$2; shift; }; shift; done
+echo "$(date +%s) curl $1 -> $o" >> "$MOCK_LOG"; cp "$MOCK_HFILES/$(basename $1)" "$o"

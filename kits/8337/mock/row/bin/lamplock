@@ -1,0 +1,6 @@
+#!/bin/sh
+# Mock lamp-lock: try/renew/release. MOCK_RENEW_FAIL_AFTER=<n>: the n-th renew and every later one fails.
+echo "$(date +%s) lock $*" >> "$MOCK_LOG"
+if [ "$2" = renew ]; then n=$(( $(cat "$MOCK_STATE/renews" 2>/dev/null || echo 0) + 1 )); echo $n > "$MOCK_STATE/renews"
+  if [ -n "${MOCK_RENEW_FAIL_AFTER:-}" ] && [ $n -ge $MOCK_RENEW_FAIL_AFTER ]; then touch "$MOCK_STATE/lock-lost"; echo "$(date +%s) RENEW REFUSED" >> "$MOCK_LOG"; exit 1; fi; exit 0; fi
+exit ${MOCK_LOCK_RC:-0}

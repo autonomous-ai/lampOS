@@ -1,0 +1,6 @@
+row/logs/
+row/harness/0.6.*/
+row/__pycache__/
+mock/row/fx/
+mock/row/work/
+mock/row/results.txt

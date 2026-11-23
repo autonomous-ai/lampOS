@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+# Mock osascript: the Mac's volume, read only. MOCK_MACVOL (default 50); MOCK_MACVOL_AFTER="<n>:<v>": from the n-th read on, v.
+import os, sys, time
+st = os.path.join(os.environ["MOCK_STATE"], "vols"); n = int(open(st).read()) + 1 if os.path.exists(st) else 1; open(st, "w").write(str(n))
+s = " ".join(sys.argv[1:])
+with open(os.environ["MOCK_LOG"], "a") as f: f.write("%.3f osascript %s\n" % (time.time(), s))
+if "set volume" in s: sys.exit(0)
+v = os.environ.get("MOCK_MACVOL", "50"); a = os.environ.get("MOCK_MACVOL_AFTER", "")
+if a and n >= int(a.split(":")[0]): v = a.split(":")[1]
+print(v)
