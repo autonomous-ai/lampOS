@@ -3219,7 +3219,7 @@ fn the_gateway_unit_keeps_the_start_socket_folder_with_the_one_path() {
     let on = unit_text_for(one_path());
     assert_eq!(
         on.replacen(START_DIR_LINES, "", 1).replace(
-            "After=network-online.target lamp-cloud.service lamp-control.service\nWants=lamp-control.service\n",
+            CONTROL_LINES,
             "After=network-online.target lamp-cloud.service\n"
         ),
         UNIT_TEXT
@@ -3664,6 +3664,55 @@ fn gateway_waits_for_control_only_with_the_one_run_path() {
     }
 }
 
+/// #8320: the gateway's namespace binds lamp-control's socket file once,
+/// at its start, and each lamp-control start makes a new one, so with that
+/// socket shown the gateway is `PartOf=` lamp-control (restarted and
+/// stopped with it), in its `[Unit]` section; without it, not.
+#[test]
+fn the_gateway_restarts_with_lamp_control_when_it_shows_its_socket() {
+    for skills in [false, true] {
+        for tasks in [false, true] {
+            for one_path in [false, true] {
+                let unit = unit_text_for(Shown {
+                    skills,
+                    tasks,
+                    one_path,
+                });
+                let part_of = unit
+                    .lines()
+                    .position(|line| line == "PartOf=lamp-control.service");
+                assert_eq!(part_of.is_some(), tasks && one_path, "{unit}");
+                if let Some(at) = part_of {
+                    let unit_section = unit.lines().position(|line| line == "[Unit]").unwrap();
+                    let service = unit.lines().position(|line| line == "[Service]").unwrap();
+                    assert!(unit_section < at && at < service, "{unit}");
+                    assert_eq!(unit.matches("PartOf=").count(), 1, "{unit}");
+                }
+            }
+        }
+    }
+}
+
+/// #8320 (the Reviewer-lead's P3 2): each lamp-control start restarts the
+/// gateway (`PartOf=`), so lamp-control gives the gateway its start count
+/// back first, as root, a missing gateway no error; else a lamp-control
+/// crash loop leaves the gateway at `start-limit-hit` once it is up again.
+#[test]
+fn lamp_control_gives_the_gateway_its_start_count_back() {
+    let control = include_str!("../../../../deploy/product/lamp-control.service");
+    let line =
+        format!("ExecStartPost=-+/bin/sh -c '/usr/bin/systemctl reset-failed {UNIT} 2>/dev/null'");
+    assert_eq!(
+        control.lines().filter(|l| *l == line).count(),
+        1,
+        "{control}"
+    );
+    let service = control.find("[Service]").unwrap();
+    let install = control.find("[Install]").unwrap();
+    let at = control.find(&line).unwrap();
+    assert!(service < at && at < install);
+}
+
 /// A round of [`after_round`] with the switch on and the lines it said.
 fn round_said(lamp: &Lamp, systemd: &mut Fake) -> Vec<String> {
     let runs = Runs::new(lamp);
@@ -3876,6 +3925,77 @@ fn a_gateway_started_again_during_the_wait_is_waited_for_from_its_new_start() {
     let mut began = vec![990; 50];
     began.push(1090);
     assert_eq!(install_settling(&began, 0), 121);
+}
+
+/// #8320 (the first builder's and the Reviewer-lead's HOLD): the round
+/// that ships `PartOf=` restarts lamp-control before it writes the
+/// gateway's unit, so a running gateway showing lamp-control's socket is
+/// try-restarted once when its unit is written anew; the next round, the
+/// same bytes, restarts nothing.
+#[test]
+fn a_gateway_unit_written_anew_with_the_control_socket_restarts_it_once() {
+    let lamp = Lamp::new();
+    let shown = one_path();
+    assert!(shown.tasks && shown.one_path);
+    let before = unit_text_for(shown).replacen("PartOf=lamp-control.service\n", "", 1);
+    fs::write(lamp.unit(), before).unwrap();
+    let running = "DropInPaths=\nNeedDaemonReload=no\nCPUQuotaPerSecUSec=1s\nActiveState=active\n";
+    let round = |systemd: &mut Fake| {
+        let runs = Runs::new(&lamp);
+        let mut said = Vec::new();
+        after_round(
+            lamp.root(),
+            &lamp.records(),
+            shown,
+            systemd,
+            &mut runs.runner(),
+            1,
+            Ok(crate::hermes_schedule::Window::Reached),
+            &mut |line: &str| said.push(line.to_owned()),
+        );
+        said
+    };
+    let mut systemd = Fake {
+        loaded: Some(running),
+        ..Fake::default()
+    };
+    let said = round(&mut systemd);
+    assert_eq!(
+        fs::read_to_string(lamp.unit()).unwrap(),
+        unit_text_for(shown)
+    );
+    let restarts = |systemd: &Fake| {
+        systemd
+            .asked
+            .iter()
+            .filter(|a| **a == "try-restart")
+            .count()
+    };
+    assert_eq!(restarts(&systemd), 1, "{:?}", systemd.asked);
+    assert!(said.iter().any(|line| line.contains("#8320")), "{said:?}");
+
+    let mut systemd = Fake {
+        loaded: Some(running),
+        ..Fake::default()
+    };
+    round(&mut systemd);
+    assert_eq!(restarts(&systemd), 0, "{:?}", systemd.asked);
+
+    // A unit written anew over one that had `PartOf=` already: lamp-control's
+    // restart in the round's switch restarted the gateway, so no second
+    // stop lands in its first start (#8324, gate G).
+    fs::write(lamp.unit(), format!("{}# an earlier text\n", unit_text_for(shown))).unwrap();
+    let mut systemd = Fake {
+        loaded: Some(running),
+        ..Fake::default()
+    };
+    let said = round(&mut systemd);
+    assert_eq!(
+        fs::read_to_string(lamp.unit()).unwrap(),
+        unit_text_for(shown)
+    );
+    assert_eq!(restarts(&systemd), 0, "{:?}", systemd.asked);
+    assert!(!said.iter().any(|line| line.contains("#8320")), "{said:?}");
 }
 
 /// #8105: lamp-tasks' answer read, and the rule: the switch off is always
