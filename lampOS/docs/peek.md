@@ -210,7 +210,11 @@ these kinds are taken, and of each only the fields named:
 Peek ignores a `transcript` record or any field not named. This reader-side
 filter does not make a file safe for another account to open: shared files
 use the producer projection described below. A name that is not plain (letters, digits, `-_./`) shows as `?`. A newer session starts
-the turns again. A file first read when it is longer than 4 MB is read from
+the turns again. The voice fills its segments in turn and empties one
+before filling it again, so the files are read in the order they were last
+written, not by name, and a file shorter than was read, or whose first line
+(the segment's `service_segment` line) changed, is read again from its
+start, dropping any half line kept of it. A file first read when it is longer than 4 MB is read from
 4 MB before its end: only the newest turns are kept. On this Mac, in
 release, the first read of a 63 MB session took 7.5 ms, a read of one more
 turn 0.26 ms, a read with nothing new 0.08 ms, and making the section of 20
@@ -755,6 +759,10 @@ own, and asks for it over HTTP:
   and `turns::tests::missing_and_failed_reads_are_distinct_from_an_empty_readable_session`:
   a denied new session keeps the old rows until recovery; missing, failed,
   and successfully empty reads stay distinct.
+- `turns::tests::a_segment_emptied_and_filled_again_is_read_from_its_start`
+  and `turns::tests::segments_are_read_in_the_order_they_were_written`: a
+  segment filled again past the last read's end is read from its start
+  without the old half line; what held a turn is its newest file's record.
 - `serve::tests::a_cancelled_turn_read_keeps_its_cache_lock_without_blocking_the_runtime`:
   a held filesystem-side lock and a cancelled requester keep one read in
   flight while another task can still run on the single runtime thread.
