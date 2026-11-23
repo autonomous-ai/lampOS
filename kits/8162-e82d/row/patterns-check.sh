@@ -30,7 +30,9 @@ chk READY_AGAIN "I'm ready again; you can ask me now." voice/src/agent_ready.rs
 chk P_U_TASKSSTOP '{TASKS_UNIT} stopped while {UNIT} restarts' update/src/openclaw_install.rs
 chk P_U_HEALTH '{UNIT} answers health {} s after its restart' update/src/openclaw_install.rs
 chk P_U_TASKSBACK '{TASKS_UNIT} started again' update/src/openclaw_install.rs
-chk P_U_CUTBACK "{TASKS_UNIT} started again: OpenClaw's install ended while it was stopped for the gateway's restart (#8138)" update/src/openclaw_install.rs
+# #8263 moved the cut-back to harness_install::tasks_back, formatted from TasksStop::Gateway's words: the same line.
+chk P_U_CUTBACK '{TASKS} started again: {what} ended while it was stopped for {for_what} (#8138)' update/src/harness_install.rs
+chk P_U_CUTBACK_WORDS "TasksStop::Gateway => (\"OpenClaw's install\", \"the gateway's restart\")" update/src/harness_install.rs
 chk P_U_END 'switched to build {sequence}; every part is well' update/src/round.rs
 chk P_U_SELF 'lamp-update switches to its build {}; it must confirm itself' update/src/round.rs
 chk P_U_CONFIRMED 'confirmed: lamp-update runs its new build' update/src/main.rs
