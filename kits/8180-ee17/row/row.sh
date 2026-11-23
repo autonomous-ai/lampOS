@@ -174,7 +174,11 @@ MAKE(){ local n0 w r y; MK=; MN=; ML=; RB=0; MADELINE=
   MADELINE=$(tail -n +$(( n0 + 1 )) $J | grep -oE "$SAIDON( \([0-9]+ chars, (no )?uses named\)|: .*)" | head -1)
   echo "  MADELINE ${MADELINE:-none (not in the journal)}"; echo "MADELINE $LEG ${MADELINE:-none}" >> $LG/madelines.txt
   LAMP "" $D/made.lamp.sh > $LG/made-$LEG.txt 2>&1
-  ML=$(grep '^MADE ' $LG/made-$LEG.txt | while read -r _ nm rest; do grep -qx "$nm" $LG/seen.names 2>/dev/null || { echo "MADE $nm $rest"; break; }; done)
+  # This make's own skill, by name from its journal line ("a made skill is on the lamp: <name>, sha256 ..."); the first
+  # unseen made skill only when that line is missing (ee17 23 Nov: an earlier leg's skill was taken for K's).
+  ON=$(tail -n +$(( n0 + 1 )) $J | head -n $(( w - n0 + 40 )) | grep -oE 'a made skill is on the lamp: [^ ,]+' | head -1 | sed 's/.*: //')
+  if [ -n "$ON" ]; then ML=$(grep "^MADE $ON " $LG/made-$LEG.txt | head -1)
+  else ML=$(grep '^MADE ' $LG/made-$LEG.txt | while read -r _ nm rest; do grep -qx "$nm" $LG/seen.names 2>/dev/null || { echo "MADE $nm $rest"; break; }; done); fi
   MN=$(echo "$ML" | awk '{print $2}'); [ -n "$MN" ] && echo "$MN" >> $LG/seen.names
   echo "  $ML" | cut -c1-400; grep "^CARD $MN " $LG/made-$LEG.txt | cut -c1-300 | sed 's/^/  /'
   [ -n "$MN" ] || { WHY="kept line seen but no new made skill found"; return 1; }
@@ -343,7 +347,7 @@ legG(){ local k pl n cg sv up bad gone left nc
 # A token's grants as lamp-control journals them (control/src/server.rs:404 a run's, :459 a try's, by grant_names
 # :2202): the wire names of protocol.rs's Grant (the camera is "camera", the mic "microphone"; "look" and "hear" are
 # presence and own-phrase grants, not the camera or the mic). K wants exactly KG, sorted, nothing more.
-KG=${KG:-camera,speak}
+KGSET=${KG:+1}; KG=${KG:-camera,speak}
 GSET(){ grep -oE 'a token for \[[^]]*\]' | head -1 | sed 's/^a token for \[//; s/\]$//' | tr -d ' ' | tr ',' '\n' | sort | paste -sd, -; }
 legK(){ local n0 w tt rt s rb2 e k1 k2 k3 k4 k5
   BEGIN K || return 1; quiet; MAKE LOOK || { END; echo "CHECK (K1) made and kept: FAIL ($WHY)"; return 0; }
@@ -355,16 +359,22 @@ legK(){ local n0 w tt rt s rb2 e k1 k2 k3 k4 k5
   [ -n "$rt" ] && echo "  $(show $rt)"; [ -n "$e" ] && echo "  $(show $e)"; [ -n "$s" ] && echo "  first say $(since $(ep $s) $PEND) s after the clip: $(show $s | cut -c1-140)"
   quiet; END
   k1=PASS; k2=FAIL; k3=FAIL; k4=FAIL; k5=FAIL
-  [ -n "$tt" ] && [ "$(echo "$tt" | GSET)" = "$KG" ] && k2=PASS; [ -n "$rt" ] && [ "$(show $rt | GSET)" = "$KG" ] && k3=PASS
+  # The tokens must be exactly the made skill's own grants (least privilege), and those must hold the camera or the
+  # mic. A run step speaks by its own say (speak among its grants); a task step speaks by its agent's answer, so its
+  # grants need no speak (ee17 23 Nov: camera-look, kind task, grants camera). KG, when set, still overrides.
+  local kg; kg=$(echo "$ML" | field grants | tr ',' '\n' | sort | paste -sd, -); [ "${KGSET:-}" = 1 ] && kg=$KG
+  case ",$kg," in *,camera,*|*,microphone,*) ;; *) k1="FAIL:grants [$kg] hold no camera or mic";; esac
+  case "$(echo "$ML" | field kind)" in run|both) case ",$kg," in *,speak,*) ;; *) k1="FAIL:a run step without speak";; esac;; esac
+  [ -n "$tt" ] && [ "$(echo "$tt" | GSET)" = "$kg" ] && k2=PASS; [ -n "$rt" ] && [ "$(show $rt | GSET)" = "$kg" ] && k3=PASS
   [ -n "$s" ] && { [ -z "$e" ] || sed -n "${e}p" $J | grep -qvE "exited [1-9]|said 0"; } && k4=PASS
   [ "$RB" = 0 ] && [ -z "$rb2" ] && k5=PASS
   echo "CHECK (K1) $MN made, kept, its said-on line right: $k1 (kind $(echo "$ML" | field kind), grants $(echo "$ML" | field grants))"
-  echo "CHECK (K2) its try's token is exactly [$KG]: $k2 ${tt:+($(echo "$tt" | grep -oE 'a token for \[[^]]*\]'))}"
-  echo "CHECK (K3) its run's token is exactly [$KG]: $k3 ${rt:+($(show $rt | grep -oE 'a token for \[[^]]*\]'))}"
+  echo "CHECK (K2) its try's token is exactly its grants [$kg]: $k2 ${tt:+($(echo "$tt" | grep -oE 'a token for \[[^]]*\]'))}"
+  echo "CHECK (K3) its run's token is exactly its grants [$kg]: $k3 ${rt:+($(show $rt | grep -oE 'a token for \[[^]]*\]'))}"
   echo "CHECK (K4) the run's say was spoken: $k4"
   echo "CHECK (K5) no yes asked (make or run): $k5"
   [ -n "$MADEWHY" ] && k1="FAIL:$MADEWHY"
-  [ "$k1$k2$k3$k4$k5" = PASSPASSPASSPASSPASS ] && { VK=PASS; WHY="$MN: try and run tokens exactly [$KG], said, no yes"; } || WHY="$MN: K1 $k1 K2 $k2 K3 $k3 K4 $k4 K5 $k5"; }
+  [ "$k1$k2$k3$k4$k5" = PASSPASSPASSPASSPASS ] && { VK=PASS; WHY="$MN (kind $(echo "$ML" | field kind)): try and run tokens exactly its grants [$kg], said, no yes"; } || WHY="$MN: K1 $k1 K2 $k2 K3 $k3 K4 $k4 K5 $k5"; }
 # ---- W (#8130, folded in): tools.deny holds skill_workshop, OpenClaw accepts the file, workshop-skills/ unchanged
 wpre(){ LAMP "MODE=hash" $D/wshop.lamp.sh > $LG/wshop-before.txt 2>&1; echo "  workshop before: $(grep '^WSHOP ' $LG/wshop-before.txt)"; }
 legW(){ local b a

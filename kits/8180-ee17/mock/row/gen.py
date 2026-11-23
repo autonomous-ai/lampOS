@@ -181,6 +181,14 @@ case("K.fail-notoken", "K", over={"j/K.LOOKASK": PASS["j/K.LOOKASK"].replace("[s
 # the lamp's 21 Nov line named "look" where the old check wanted it: the token's real names are camera/microphone
 case("K.fail-oldname", "K", over={"j/K.LOOK": PASS["j/K.LOOK"].replace("[speak, camera]", "[speak, look]")})
 case("K.fail-extragrant", "K", over={"j/K.LOOKASK": PASS["j/K.LOOKASK"].replace("[speak, camera]", "[speak, camera, microphone]")})
+# ee17 23 Nov: a task step speaks by its agent's answer, so its grants are [camera] alone; tokens equal its own grants
+case("K.pass-task", "K", over={"out/made.lamp.sh.K": made("desk-look", "task", "camera"),
+     "j/K.LOOK": PASS["j/K.LOOK"].replace("[speak, camera]", "[camera]"), "j/K.LOOKASK": PASS["j/K.LOOKASK"].replace("[speak, camera]", "[camera]")})
+case("K.fail-task-extra", "K", over={"out/made.lamp.sh.K": made("desk-look", "task", "camera"),
+     "j/K.LOOK": PASS["j/K.LOOK"].replace("[speak, camera]", "[camera]")})
+# ee17 23 Nov: an earlier leg's unseen skill must not be taken for this make's; the name comes from its own line
+case("K.pass-name-from-line", "K", over={"out/made.lamp.sh.K": made("mail-brief", "task", "mail-read") + made("desk-look", "run", "camera,speak"),
+     "j/K.LOOK": PASS["j/K.LOOK"] + "@+30.2 " + V + "a made skill is on the lamp: desk-look, sha256 28c3568ee026162a\n"})
 case("H.pass", "H")
 case("H.fail-nocgroup", "H", over={"out/restart-tasks.lamp.sh": PASS["out/restart-tasks.lamp.sh"].replace("J " + SETUP.split(": ", 1)[1], "J [lamp-tasks] runs have no own cgroup: memory not handed down: Permission denied (lamp-tasks.service needs Delegate=memory cpu pids); every run step and make's try is refused")})
 case("H.fail-leafleft", "H", over={"out/cgwatch.lamp.sh.H": cg(["run-h1"], gone=False)})
