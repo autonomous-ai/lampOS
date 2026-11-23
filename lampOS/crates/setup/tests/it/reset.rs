@@ -3852,3 +3852,42 @@ fn the_cuts_check_joins_a_running_gateway_and_runs_alone_with_none() {
         "{alone}"
     );
 }
+
+/// #3710: `lamp-setup serve` finishes an interrupted reset in its own process,
+/// so what the in-process reset removes (the Store apps' folders it empties,
+/// and the parents it removes each `lampapp-*` entry from) lies inside what the
+/// unit's sandbox may write. The plan's own wipe list is held in
+/// `lamp-update`'s install test.
+#[test]
+fn setups_sandbox_holds_what_the_reset_removes_of_the_apps() {
+    let unit = include_str!("../../../../deploy/product/lamp-setup.service");
+    let service: Vec<&str> = unit
+        .lines()
+        .map(str::trim)
+        .skip_while(|line| *line != "[Service]")
+        .skip(1)
+        .take_while(|line| !line.starts_with('['))
+        .collect();
+    let allowed: Vec<&str> = service
+        .iter()
+        .filter_map(|line| line.strip_prefix("ReadWritePaths="))
+        .flat_map(str::split_whitespace)
+        .map(|path| path.trim_start_matches('-'))
+        .collect();
+    assert!(!allowed.is_empty(), "the unit lists what it writes");
+    let inside = |path: &str| {
+        allowed
+            .iter()
+            .any(|root| path == *root || path.starts_with(&format!("{root}/")))
+    };
+    // Emptied in place: the folder itself.
+    for folder in reset::APPS_FOLDERS {
+        let path = format!("/{folder}");
+        assert!(inside(&path), "{path} is emptied by the reset");
+    }
+    // Entries removed by name from each parent: the parent must be writable.
+    for parent in reset::APP_DATA_PARENTS {
+        let path = format!("/{parent}");
+        assert!(inside(&path), "{path} loses its lampapp-* entries");
+    }
+}

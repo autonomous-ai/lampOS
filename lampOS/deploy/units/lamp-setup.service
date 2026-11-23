@@ -19,6 +19,22 @@ StateDirectoryMode=0700
 ExecStart=/opt/lampOS/setup/@SETUP_SHA256@/lamp-setup serve --config /etc/lampOS/setup/serve.json --plan /etc/lampOS/setup/reset-plan.json --enable
 # V1's nginx held port 80; setup's own page takes it, and stops it again when done.
 ExecStopPost=/usr/bin/systemctl stop nginx
+# Its sandbox (#3710): the file system is read-only to it but what its work writes, and nothing it starts gains
+# privileges. The list is wide on purpose, and the reasons are these: it saves each setting by a temporary file
+# renamed into place, so the folder must be writable (`/etc`: localtime, timezone, `lampOS/` and its settings, the
+# radio's files and the systemd drop-ins; `/var/lib`: the marker, the first-update file, the consent folder and the sound
+# card's saved level); the hotspot and the Wi-Fi join are the image's scripts, which keep their files in `/run` and `/tmp`
+# (as lamp-setup-wifi@.service, which runs the same scripts, lists them, and so no PrivateTmp); and it finishes an
+# interrupted reset in this process, which wipes the plan's paths (all under `/etc`, `/var/lib` and `/run`), empties the
+# Store apps' folders (`/opt/lampOS/apps` and two under `/var/lib`) and removes each `lampapp-*` entry of `/var/lib` and
+# `/var/lib/private` by name (so `/var/lib` is whole: systemd takes no globs, and removing an entry needs its folder) and
+# rotates the journal (a RAM disk under `/run` on the product, `-/var/log/journal` where a lamp keeps one). No home
+# and no new privileges: nothing in it reads `/root` or `/home`. The install test pins this list and holds the
+# reset plan's wipe list inside it.
+ProtectSystem=strict
+ReadWritePaths=/etc /run /tmp /var/lib -/opt/lampOS/apps -/var/log/journal
+ProtectHome=yes
+NoNewPrivileges=yes
 Restart=on-failure
 RestartSec=20
 SyslogIdentifier=lamp-setup

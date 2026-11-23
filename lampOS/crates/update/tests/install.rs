@@ -1599,7 +1599,7 @@ fn every_start_of_the_voice_starts_the_waking_face() {
 #[test]
 fn root_units_write_only_what_their_work_needs() {
     // (unit, what it writes, its own /tmp)
-    let rows: [(&str, &[&str], bool); 2] = [
+    let rows: [(&str, &[&str], bool); 3] = [
         // The release socket, in its runtime directory, and the ring's
         // device: nothing else (crates/setup/src/wake.rs). No PrivateTmp:
         // it would order this early unit after the /tmp mounts and
@@ -1609,6 +1609,22 @@ fn root_units_write_only_what_their_work_needs() {
         // Its subscriber's socket under the bus; the reset is detached
         // (below), so the wipe is not this unit's to write.
         ("lamp-setup-reset.service", &["/run/lampos-bus"], true),
+        // First-boot setup (#3710): its settings are renamed into place in
+        // `/etc` and `/var/lib`, the radio scripts keep files in `/run` and
+        // `/tmp` (so no PrivateTmp, as lamp-setup-wifi@ has), and a resumed
+        // reset rotates a journal that may be at `/var/log/journal`.
+        (
+            "lamp-setup.service",
+            &[
+                "/etc",
+                "/run",
+                "/tmp",
+                "/var/lib",
+                "-/opt/lampOS/apps",
+                "-/var/log/journal",
+            ],
+            false,
+        ),
     ];
     // The reset's wipe, stop and reboot run in a unit of their own
     // (`start_reset`), so watch-reset's sandbox never has to hold them.
@@ -1652,6 +1668,47 @@ fn root_units_write_only_what_their_work_needs() {
             .collect();
         assert_eq!(written, writes, "{unit}");
     }
+}
+
+/// #3710: setup finishes an interrupted reset in its own process, so every
+/// path the reset plan wipes, and the plan's marker and journal, lies inside
+/// what its sandbox may write (or in its own state folder), and the wipe
+/// that is detached runs in a unit of its own outside it.
+#[test]
+fn setups_sandbox_holds_every_path_the_reset_plan_wipes() {
+    let text = PRODUCT
+        .iter()
+        .find_map(|(name, text)| (*name == "lamp-setup.service").then_some(*text))
+        .unwrap();
+    let service = section(text, "Service");
+    let allowed: Vec<&str> = service
+        .iter()
+        .filter_map(|line| line.strip_prefix("ReadWritePaths="))
+        .flat_map(str::split_whitespace)
+        .map(|path| path.trim_start_matches('-'))
+        .chain(["/var/lib/lampos-setup"]) // its StateDirectory
+        .collect();
+    let inside = |path: &str| {
+        allowed
+            .iter()
+            .any(|root| path == *root || path.starts_with(&format!("{root}/")))
+    };
+    let plan: serde_json::Value = serde_json::from_str(install::RESET_PLAN).unwrap();
+    let mut paths: Vec<String> = plan["wipe"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|path| path.as_str().unwrap().to_owned())
+        .collect();
+    paths.extend(["marker", "journal"].map(|key| plan[key].as_str().unwrap().to_owned()));
+    assert!(paths.len() > 30, "the plan's wipe list was read");
+    let outside: Vec<&String> = paths.iter().filter(|path| !inside(path)).collect();
+    assert!(
+        outside.is_empty(),
+        "the reset plan wipes outside setup's sandbox: {outside:?}"
+    );
+    // The wipe the plan detaches is a unit of its own, not this sandbox.
+    assert_eq!(plan["detach"][0], "/usr/bin/systemd-run");
 }
 
 /// #811: no battery clock. Every product part that acts on the time of day
