@@ -578,3 +578,146 @@ fn with_the_switch_off_an_elevenlabs_key_changes_nothing() {
     assert!(check.1.is_empty());
     assert!(!store.0.exists());
 }
+
+/// #8362 step 1b: a person's own model at an OpenAI-compatible endpoint (Grok
+/// and the like), on the same `keys.*` path. `offers` names it with
+/// `base_url: true` and `fields: ["model"]` (#8367's shape); its key, endpoint and model are kept as three private
+/// files once the check passes; `keys.get` gives the endpoint's host and the
+/// model, never the key; and one own model is kept at a time, so the model
+/// in use is never a guess.
+#[test]
+fn an_openai_compatible_model_is_kept_with_its_endpoint_and_model() {
+    let store = Store(folder("compatible"));
+    let mut works = Told(Verdict::Works, vec![]);
+    let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
+    let which = &reply["done"];
+    let offers = which["offers"].as_array().expect("offers");
+    let compatible = offers
+        .iter()
+        .find(|offer| offer["service"] == "openai_compatible")
+        .expect("openai_compatible offered");
+    assert_eq!(
+        compatible,
+        &json!({"service": "openai_compatible", "name": "OpenAI-compatible", "kind": "model", "models": [], "base_url": true, "fields": ["model"]})
+    );
+    assert_eq!(which["openai_compatible"], "lamp");
+    assert_eq!(which["model"]["openai_compatible"], Value::Null);
+    assert_eq!(which["in_use"], json!({"model": null}));
+
+    // DeepSeek's own first, then the OpenAI-compatible one over it.
+    keys::answer(&set("deepseek", ""), &store, &mut works, true);
+    let line = json!({"set": "openai_compatible", "key": PLANTED, "base_url": "https://api.compatible.invalid/v1/", "model": "grok-4"}).to_string();
+    let (reply, done) = keys::answer(&line, &store, &mut works, true);
+    never_said(&reply, &done);
+    assert_eq!(reply["done"]["service"], "openai_compatible");
+    assert_eq!(reply["done"]["uses"], "own");
+    assert_eq!(reply["done"]["code"], "works");
+    let answer = reply["done"]["answer"].as_str().unwrap();
+    assert!(
+        answer.starts_with(
+            "that key works: your conversations now go to api.compatible.invalid with your key"
+        ),
+        "{answer}"
+    );
+    assert!(done.unwrap().restart_voice);
+    let asked = works.1.last().unwrap();
+    assert_eq!(
+        asked.base_url.as_deref(),
+        Some("https://api.compatible.invalid/v1")
+    );
+    for file in [
+        "openai_compatible.key",
+        "openai_compatible.url",
+        "openai_compatible.model",
+    ] {
+        let mode = fs::metadata(store.0.join(file))
+            .unwrap_or_else(|error| panic!("{file}: {error}"))
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600, "{file}");
+    }
+    assert_eq!(
+        fs::read_to_string(store.0.join("openai_compatible.model"))
+            .unwrap()
+            .trim(),
+        "grok-4"
+    );
+    // One own model at a time: DeepSeek's own key was taken away.
+    assert!(!store.0.join("deepseek.key").exists());
+    let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
+    let which = &reply["done"];
+    never_said(&reply, &None);
+    assert_eq!(which["openai_compatible"], "own");
+    assert_eq!(which["deepseek"], "lamp");
+    assert_eq!(which["openai_compatible_host"], "api.compatible.invalid");
+    assert_eq!(which["model"]["openai_compatible"], "grok-4");
+    assert_eq!(which["checked"]["openai_compatible"], "works");
+    assert_eq!(which["in_use"], json!({"model": "openai_compatible"}));
+    // Removed: the lamp's own model again, and nothing of it left.
+    let (reply, done) = keys::answer(
+        r#"{"remove":"openai_compatible"}"#,
+        &store,
+        &mut works,
+        true,
+    );
+    assert_eq!(
+        reply,
+        json!({"done": {"service": "openai_compatible", "uses": "lamp"}})
+    );
+    assert!(done.unwrap().restart_voice);
+    for file in [
+        "openai_compatible.key",
+        "openai_compatible.url",
+        "openai_compatible.model",
+    ] {
+        assert!(!store.0.join(file).exists(), "{file}");
+    }
+    let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
+    assert_eq!(reply["done"]["in_use"], json!({"model": null}));
+}
+
+/// An OpenAI-compatible key needs its https endpoint and a model, each
+/// refused plainly before any check, with no part of the key, the endpoint or
+/// the model said back.
+#[test]
+fn an_openai_compatible_key_needs_an_https_endpoint_and_a_model() {
+    let store = Store(folder("compatible-bad"));
+    for (line, words) in [
+        (
+            json!({"set": "openai_compatible", "key": PLANTED, "base_url": "http://api.compatible.invalid/v1", "model": "grok-4"}),
+            "the endpoint must be an https address",
+        ),
+        (
+            json!({"set": "openai_compatible", "key": PLANTED, "base_url": "not a url", "model": "grok-4"}),
+            "the endpoint must be an https address",
+        ),
+        (
+            json!({"set": "openai_compatible", "key": PLANTED, "model": "grok-4"}),
+            "an OpenAI-compatible key needs its endpoint",
+        ),
+        (
+            json!({"set": "openai_compatible", "key": PLANTED, "base_url": "https://api.compatible.invalid/v1"}),
+            "an OpenAI-compatible key needs its model",
+        ),
+        (
+            json!({"set": "openai_compatible", "key": PLANTED, "base_url": "https://api.compatible.invalid/v1", "model": "grok 4; drop"}),
+            "a model name is letters, digits, '-', '.', '_', '/' and ':'",
+        ),
+    ] {
+        let line = line.to_string();
+        let mut check = Told(Verdict::Works, vec![]);
+        let (reply, done) = keys::answer(&line, &store, &mut check, true);
+        assert_eq!(
+            reply,
+            json!({"refused": words, "code": "bad_field"}),
+            "{line}"
+        );
+        never_said(&reply, &done);
+        for part in ["compatible.invalid", "grok", "drop"] {
+            assert!(!reply.to_string().contains(part), "{line}: {part}");
+        }
+        assert!(check.1.is_empty(), "{line}");
+        assert!(done.is_none(), "{line}");
+    }
+    assert!(!store.0.exists());
+}

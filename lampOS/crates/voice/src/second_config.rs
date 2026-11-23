@@ -1653,6 +1653,73 @@ mod tests {
         );
     }
 
+    /// #8362 step 1b: the person's own OpenAI-compatible model (Grok and the
+    /// like) as the helper keeps it, `own_openai_compatible.key`, `.url` and
+    /// `.model`: the chat goes to their endpoint with their key and model,
+    /// over the relay it falls back to, said in one line by host and model,
+    /// never the key or the path. Off, none of it is read.
+    #[test]
+    fn the_persons_openai_compatible_model_is_used_only_with_the_switch() {
+        let planted = "sk-planted-8362-0000000000000000";
+        let (_, config) = written("own-compatible", "");
+        let mut relay = load_from_path(&config).unwrap();
+        relay.hosted.deepseek_base_url = Some("https://relay.example.invalid/deepseek".into());
+        let units = directory("own-compatible-units");
+        let dir = Some(units.as_os_str());
+        private(
+            &units.join("own_openai_compatible.key"),
+            &format!("{planted}\n"),
+        );
+        private(
+            &units.join("own_openai_compatible.url"),
+            "https://api.compatible.invalid/v1\n",
+        );
+        private(&units.join("own_openai_compatible.model"), "grok-4\n");
+        // Off: as it was, byte for byte, and no line.
+        let (off, lines) = relay.clone().with_own_keys(false, dir);
+        assert_eq!(off, relay);
+        assert!(lines.is_empty());
+        // On.
+        let (own, lines) = relay.clone().with_own_keys(true, dir);
+        assert_eq!(
+            own.hosted.own_deepseek.as_ref().map(Key::expose),
+            Some(planted)
+        );
+        assert_eq!(
+            own.hosted.deepseek_base_url.as_deref(),
+            Some("https://api.compatible.invalid/v1")
+        );
+        assert_eq!(own.hosted.deepseek_model, "grok-4");
+        assert_eq!(
+            own.hosted.relay_deepseek_base_url.as_deref(),
+            Some("https://relay.example.invalid/deepseek")
+        );
+        assert!(
+            lines.contains(
+                &"OpenAI-compatible: the person's own key, at api.compatible.invalid, model grok-4 (LAMP_OWN_KEYS)"
+                    .to_owned()
+            ),
+            "{lines:?}"
+        );
+        assert!(!format!("{own:?}").contains(planted));
+        assert!(!lines.join(" ").contains(planted), "{lines:?}");
+        assert!(!lines.join(" ").contains("/v1"), "{lines:?}");
+        // An endpoint that is not https: passed over for the relay.
+        private(
+            &units.join("own_openai_compatible.url"),
+            "http://api.compatible.invalid/v1",
+        );
+        let (passed, lines) = relay.clone().with_own_keys(true, dir);
+        assert_eq!(passed.hosted, relay.hosted);
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.starts_with("OpenAI-compatible: the relay")
+                    && line.contains("could not be read")),
+            "{lines:?}"
+        );
+    }
+
     /// #2094: the voice's drop-in turns the switch on and loads the keys'
     /// folder as `own`, so each file is the `own_<file>` read here, the
     /// files root's helper writes.
