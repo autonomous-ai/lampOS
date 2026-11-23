@@ -141,6 +141,7 @@ pub fn list(layout: &Layout) -> Vec<Listed> {
         })
         .filter_map(|name| {
             let record = installed_record(layout, &name)?;
+            let title = title_of(layout, &name);
             Some(Listed {
                 stopped: has(&layout.state, &name, Mark::Stopped),
                 name,
@@ -148,7 +149,7 @@ pub fn list(layout: &Layout) -> Vec<Listed> {
                 grants: record.grants,
                 net: record.net,
                 sha256: record.sha256,
-                title: title_of(layout, &name),
+                title,
                 logs: record.logs,
                 pushed: record.pushed,
             })
@@ -158,8 +159,14 @@ pub fn list(layout: &Layout) -> Vec<Listed> {
 
 /// The installed manifest's title.
 fn title_of(layout: &Layout, name: &str) -> Option<String> {
-    let text =
-        fs::read_to_string(layout.code.join(name).join("current").join("lamp-skill.json")).ok()?;
+    let text = fs::read_to_string(
+        layout
+            .code
+            .join(name)
+            .join("current")
+            .join("lamp-skill.json"),
+    )
+    .ok()?;
     let manifest: serde_json::Value = serde_json::from_str(&text).ok()?;
     manifest.get("title")?.as_str().map(str::to_owned)
 }
