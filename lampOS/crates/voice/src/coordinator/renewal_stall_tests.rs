@@ -92,7 +92,11 @@ fn a_closed_control_socket_still_ends_the_voice() {
             }
         }
     };
-    assert_ne!(error.kind(), io::ErrorKind::WouldBlock, "a peer gone is no skipped renewal");
+    assert_ne!(
+        error.kind(),
+        io::ErrorKind::WouldBlock,
+        "a peer gone is no skipped renewal"
+    );
     assert_eq!(rig.provider.renewal_stall.skipped(), 0);
 }
 
