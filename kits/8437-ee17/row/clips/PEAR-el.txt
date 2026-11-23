@@ -1,1 +1,1 @@
-Hey Lamp, run the pear probe skill now.	pad=0.4
+Hey Lamp, run the fruit check now.	pad=0.4

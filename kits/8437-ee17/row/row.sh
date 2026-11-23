@@ -595,14 +595,20 @@ legS(){ local s1 s2 s3 s4 s5
   [ "$s1$s2$s3$s4$s5" = PASSPASSPASSPASSPASS ] && { VS=PASS; WHY="pear-probe by fruit_check: yes-ask priority 8, the yes ran it at once"; } || WHY="S1 $s1 S2 $s2 S3 $s3 S4 $s4 S5 $s5"; }
 # ---- L (#8414): the ask's clip end -> the voice begins the yes-ask; before (stable) and after (the swap)
 LIMIT_L=${LIMIT_L:-3}
-legL(){ local m c n0 p r pr lat ms fms f k
+# First's bar (#8437, 24 Nov 05:14): the yes-ask within this many s of the lamp's own reply ending (voice/state).
+LIMIT_GAP=${LIMIT_GAP:-1.5}
+legL(){ local m c n0 p r pr lat ms fms f k gap gms
   m=${L_MODE:-auto}
   if [ "$m" = auto ]; then
     if grep -q '^SWAPPED OK' $D/logs/swap.txt 2>/dev/null && { [ ! -f $D/logs/restore.txt ] || [ $D/logs/swap.txt -nt $D/logs/restore.txt ]; }; then m=after; else m=before; fi; fi
   echo "  L mode $m (L_MODE=${L_MODE:-auto})"
   BEGIN L || return 1; quiet
   FIXTURE quick-probe || { WHY="quick-probe not pushed (VOID: kit)"; VL=VOID; END; return 0; }
-  sleep 5; HUSH; n0=$(lines); ASK QUICK; c=$PEND
+  sleep 5; HUSH; n0=$(lines)
+  # The voice's own state changes, logged on the lamp beside the ask (First's bar, #8437 24 Nov 05:14: the yes-ask
+  # within LIMIT_GAP s of the lamp's own reply ending; no journal line says when a reply's audio ended).
+  LAMP "MODE=start VS_FOR=$(( ${LWAIT:-60} + 60 ))" $D/vstate.lamp.sh > $LG/vstate-L-start.txt 2>&1
+  ASK QUICK; c=$PEND
   p=$(waitfor "$(SAYING quick-probe)" $n0 ${LWAIT:-60})
   r=$(waitfor "$(RUNYESOF quick-probe)" $n0 $(( ${LWAIT:-60} + 40 )))
   k=$(between $n0 ${p:-$(lines)} "$CODEMATCH"); [ -n "$k" ] && echo "  $(show $k | cut -c1-200)"
@@ -611,20 +617,37 @@ legL(){ local m c n0 p r pr lat ms fms f k
     [ -n "$f" ] && { fms=$(toms $(since $(fsub $(ep $r) $(python3 -c "print(${f}/1000)")) $c)); echo "  the run came due $fms ms after QUICK's end"; }; fi
   # unanswered: its yes waits 45 s from the say-back's end; let it lapse so the next leg's turn is not taken for it
   quiet; sleep ${LLAPSE:-50}; END
-  [ -n "$p" ] && echo "L $m $(date '+%F %T') yesask_ms=$ms priority=$pr due_ms=${fms:-?} lamp=$LAMP" >> $LG/latency-L.txt
+  LAMP "MODE=read" $D/vstate.lamp.sh > $LG/vstate-L.txt 2>&1; grep '^VSTATE [0-9]' $LG/vstate-L.txt | sed 's/^/  /' | head -12
+  # the reply's end: the last change out of "speaking" at or before the yes-ask's line
+  gap=; [ -n "$p" ] && gap=$(python3 - "$(ep $p)" $LG/vstate-L.txt <<'PY'
+import sys
+pe = float(sys.argv[1]); prev = None; end = None
+for l in open(sys.argv[2]):
+    f = l.split()
+    if len(f) != 3 or f[0] != "VSTATE": continue
+    t, st = float(f[1]), f[2]
+    if t > pe + 0.05: break
+    if prev == "speaking" and st != "speaking": end = t
+    prev = st
+print("%.3f %.3f" % (pe - end, end) if end is not None else "")
+PY
+)
+  gms=; [ -n "$gap" ] && { gms=$(toms ${gap%% *}); echo "  the lamp's own reply ended (voice/state out of speaking) at ${gap#* }; the yes-ask began $gms ms after it"; }
+  [ -n "$p" ] && echo "L $m $(date '+%F %T') yesask_ms=$ms priority=$pr due_ms=${fms:-?} gap_ms=${gms:-?} lamp=$LAMP" >> $LG/latency-L.txt
   local bl al; bl=$(grep '^L before ' $LG/latency-L.txt 2>/dev/null | tail -1); al=$(grep '^L after ' $LG/latency-L.txt 2>/dev/null | tail -1)
   echo "LATENCY before: ${bl:-none yet} | after: ${al:-none yet}"
   echo "CHECK (L1) the yes-ask said after the ask aloud: $([ -n "$p" ] && echo PASS || echo FAIL)"
   echo "CHECK (L2) its priority ($m): ${pr:-none} $([ "$m" = after ] && { [ "${pr:-}" = 8 ] && echo PASS || echo FAIL; } || echo '(baseline)')"
-  [ "$m" = after ] && echo "CHECK (L3) begun within $LIMIT_L s of the clip's end: $([ -n "${lat:-}" ] && fge $LIMIT_L $lat && echo PASS || echo FAIL) (${ms:-none} ms)"
+  [ "$m" = after ] && echo "CHECK (L3) begun within $LIMIT_GAP s of the lamp's own reply ending: $([ -n "$gap" ] && fge $LIMIT_GAP ${gap%% *} && echo PASS || echo FAIL) (${gms:-unread} ms; from the clip's end ${ms:-none} ms)"
   if [ -z "$p" ]; then
     if [ -z "$r" ] && [ -z "$k" ]; then WHY="QUICK ran no quick-probe (no code match, no hand line) (VOID: the ask, not the build)"; VL=VOID
     elif [ -n "$r" ] && ! show $r | grep -q "asked aloud: say: spoken"; then WHY="its yes-ask not said: $(show $r | grep -oE '(not )?asked aloud: .*' | cut -c1-140) (VOID)"; VL=VOID
     else WHY="no 'saying what the skill quick-probe asked' line in ${LWAIT:-60} s"; fi
   elif [ "$m" = before ]; then VL=PASS; WHY="before (stable, no swap) baseline: yes-ask begun $ms ms after the clip's end, priority $pr"
   elif [ "$pr" != 8 ]; then WHY="after: priority $pr, not 8 ($ms ms)"
-  elif ! fge $LIMIT_L $lat; then WHY="after: yes-ask begun $ms ms after the clip's end (limit $LIMIT_L s), priority 8"
-  else VL=PASS; WHY="after: yes-ask begun $ms ms after the clip's end at priority 8 (before: ${bl:+$(echo "$bl" | grep -oE 'yesask_ms=[0-9]+ priority=[0-9]+')}${bl:-not measured yet})"; fi; }
+  elif [ -z "$gap" ]; then WHY="after: no change out of speaking read before the yes-ask (logs/vstate-L.txt) ($ms ms from the clip's end) (VOID: the kit)"; VL=VOID
+  elif ! fge $LIMIT_GAP ${gap%% *}; then WHY="after: yes-ask begun $gms ms after the lamp's own reply ended (limit $LIMIT_GAP s; $ms ms from the clip's end), priority 8"
+  else VL=PASS; WHY="after: yes-ask begun $gms ms after the lamp's own reply ended, $ms ms after the clip's end, at priority 8 (before: ${bl:+$(echo "$bl" | grep -oE 'yesask_ms=[0-9]+ priority=[0-9]+')}${bl:-not measured yet})"; fi; }
 # ---- T (#8414): a trigger's run (no words) still asks its yes at 5, after the 15 s quiet
 T_MIN=${T_MIN:-12}
 legT(){ local c n0 p r pr t ch pe gap gc gf f fire u t1 t2 t3

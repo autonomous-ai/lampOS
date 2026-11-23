@@ -15,5 +15,5 @@ SLOW	Hey Lamp, run the slow probe skill now.	1.0
 FORK	Hey Lamp, run the fork probe skill now.	1.0
 NAMED	Hey Lamp, OpenClaw, look up the weather in Hanoi this weekend.	1.0
 QUICK	Hey Lamp, run the quick probe skill now.	1.0
-PEAR	Hey Lamp, run the pear probe skill now.	1.0
+PEAR	Hey Lamp, run the fruit check now.	1.0
 TCHAT	Hey Lamp, what is two plus two?	1.0

@@ -42,6 +42,11 @@ if "sudo sh -s" in cmd:
     log("LAMP %s key=%s pre=%r" % (nm, key, pre[:120]))
     out = fx("out/%s.%s" % (nm, key), "out/%s" % nm)
     if out is None: log("NO FIXTURE out/%s.%s" % (nm, key)); sys.exit(0)
+    # @PLAY+t@: the last clip's play time plus t (vstate.lamp.sh's read, #8437 leg L)
+    def lastplay():
+        try: return float(open(os.path.join(os.environ["MOCK_STATE"], "played")).read().splitlines()[-1].split()[0])
+        except Exception: return time.time()
+    out = re.sub(r"@PLAY\+([0-9.]+)@", lambda mm: "%.3f" % (lastplay() + float(mm.group(1))), out)
     sys.stdout.write(out.replace("@NOW@", "%.3f" % time.time())); sys.exit(0)
 log("CMD " + cmd)
 if "journalctl -f" in cmd:

@@ -92,6 +92,9 @@ PASS = {
  "out/unrow.lamp.sh": "PASS LAMP_MAKE_MAY_RUN_ON not set\nPASS LAMP_NAMED_AGENT_TAKES_LINE not set\nPASS LAMP_NAME_NEAR back to the product's ('on')\nPASS lamp-cloud active\nUNROW OK\n",
  "out/micoff.lamp.sh": "RECORD_BACK {\"muted\":true}\nMUTE BACK OK after 4s\n",
  "out/idle.lamp.sh": "IDLE resting after 3.0s\n",
+ # #8437 leg L: voice/state changes beside the ask; the lamp's own reply ends 0.6 s before the yes-ask's line (1.6)
+ "out/vstate.lamp.sh.start": "VSTATE STARTED for 120s\n",
+ "out/vstate.lamp.sh.read": "VSTATE @PLAY+0.2@ listening\nVSTATE @PLAY+0.4@ thinking\nVSTATE @PLAY+0.6@ speaking\nVSTATE @PLAY+1.0@ resting\nVSTATE @PLAY+1.8@ speaking\n",
  "out/queue.lamp.sh": "QUEUE CLEAR (close loop lines in 20s: 0)\n",
  # ee17 (23 Nov): swap binds #8180's four parts over stable, restore takes them away (swap/*.lamp.sh)
  "out/swap.lamp.sh": "".join("INSTALLED %s 11aa (/opt/lampOS/%s/15543/%s)\n" % (b, b[5:], b) for b in ("lamp-tasks", "lamp-control", "lamp-skills", "lamp-voice"))
@@ -286,6 +289,8 @@ LJ = j([(0.5, code(321, "quick_probe")), (1.6, saying("quick-probe", 8)), (1.7, 
 case("L.pass-after", "L", over={"j/L.QUICK": LJ}, env={"L_MODE": "after", "GREP": "'^LATENCY before: none yet \\| after: L after '"})
 case("L.fail-after-slow", "L", over={"j/L.QUICK": j([(0.5, code(321, "quick_probe")), (16.2, saying("quick-probe", 5)), (16.3, pieces(321, 110)), (26, runyes("quick-probe", 25500))])}, env={"L_MODE": "after"})
 case("L.pass-before", "L", over={"j/L.QUICK": j([(0.5, code(321, "quick_probe")), (16.2, saying("quick-probe", 5)), (16.3, pieces(321, 110)), (26, runyes("quick-probe", 25500))])}, env={"L_MODE": "before", "GREP": "'baseline: yes-ask begun 1[0-9]{4} ms'"})
+case("L.fail-after-gap", "L", over={"j/L.QUICK": j([(0.5, code(321, "quick_probe")), (6.2, saying("quick-probe", 8)), (6.3, pieces(321, 110)), (16, runyes("quick-probe", 15500))])}, env={"L_MODE": "after", "GREP": "'yes-ask begun 5200 ms after the lamp.s own reply ended'"})
+case("L.void-nostate", "L", over={"j/L.QUICK": LJ, "out/vstate.lamp.sh.read": "VSTATE NONE\n"}, env={"L_MODE": "after"})
 case("L.void-noask", "L", over={"j/L.QUICK": j([(2, pieces(321, 40))])}, env={"L_MODE": "after"})
 # T: TCHAT's answer (24 chars, ends ~+4 s), rest-probe due at +4.5, its yes-ask at +19.5 (priority 5), said by +24
 TJ = j([(2, pieces(331, 24)), (19.5, saying("rest-probe", 5)), (19.6, pieces(332, 110)), (24, runyes("rest-probe", 19500))])
