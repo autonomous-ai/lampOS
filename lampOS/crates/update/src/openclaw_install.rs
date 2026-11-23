@@ -15,8 +15,8 @@
 //! is (the owner on #6226: every lamp has 6 GB): the round enables and
 //! starts it once OpenClaw is there, an install restarts it, and the
 //! switch off disables and stops it. The install leaves the gateway's token ([`GATEWAY_TOKEN`])
-//! in OpenClaw's first config ([`CONFIG`], its `gateway` block and the
-//! queue's mode, [`QUEUE_MODE`], only: lamp-tasks merges its models, agents and skills keys in at its start),
+//! in OpenClaw's first config ([`CONFIG`], its `gateway` block only:
+//! lamp-tasks merges its models, agents and skills keys in at its start),
 //! checked by OpenClaw's own `config validate` before it lands (#7868).
 //!
 //! **As `lampos`, in a namespace, as Hermes.** [`WRAPPER`] and [`NS`] are
@@ -125,7 +125,7 @@ pub const STATE: &str = "/var/lib/lampos-openclaw/state";
 /// The variable OpenClaw reads its state folder from.
 pub const STATE_ENV: &str = "OPENCLAW_STATE_DIR";
 /// OpenClaw's config, in [`STATE`]: written here with its `gateway` block
-/// and [`QUEUE_MODE`] only; lamp-tasks merges in the rest.
+/// only; lamp-tasks merges in the rest.
 pub const CONFIG: &str = "/var/lib/lampos-openclaw/state/openclaw.json";
 /// The gateway's token, made once at the install: `lampos`'s, 0600.
 pub const GATEWAY_TOKEN: &str = "/var/lib/lampos-openclaw/gateway-token";
@@ -2549,25 +2549,11 @@ pub fn runs_long_step(argv: &[String]) -> bool {
         .any(|arg| arg.contains(&format!("/{DOWNLOADS}")) || *arg == npm_ci)
 }
 
-/// The mode OpenClaw's queue is given (`messages.queue.mode`, M8): a
-/// message that comes in while a run is going waits for a turn of its
-/// own after it, never steered into it. OpenClaw 2026.11.2's default
-/// with the key unset is `steer` (its `docs/concepts/queue.md`,
-/// "Defaults" and "Precedence"); lamp-tasks hands turns over one at a
-/// time, so this only matters for a turn sent while one still runs, and
-/// then a task's words never end up inside another task's run. Kept
-/// while the lamp's Harness path exists (`LAMP_TASKS_OPENCLAW_DIRECT`
-/// off): the direct path also sends `queueMode` with each `chat.send`.
-pub const QUEUE_MODE: &str = "followup";
-
 /// The gateway's token made once (32 random bytes, hex; `lampos`'s, 0600)
 /// and OpenClaw's config given its `gateway` block: written when there is
 /// none, the block's own keys set in one there (every other key kept, in
 /// the block and out of it) when it lacks them or holds others (#7868: a
-/// round runs it too, [`gateway_block`]). And [`QUEUE_MODE`] as
-/// `messages.queue.mode` when the config has no such key (one there, a
-/// person's own, is kept; a `messages` or `messages.queue` that is not an
-/// object is left as it is, and said). Whether it wrote is returned. A
+/// round runs it too, [`gateway_block`]). Whether it wrote is returned. A
 /// config lamp-update cannot read as a JSON object is left as it is, and
 /// said. The new text is checked by
 /// OpenClaw's own `config validate --json` ([`validate_argv`], #7868) on a
@@ -2618,23 +2604,8 @@ fn gateway_config(
         Err(error) => return Err(format!("{CONFIG}: {error}")),
     };
     let block = config.entry("gateway").or_insert(serde_json::Value::Null);
-    let set_gateway = set_within(block, gateway);
-    let set_queue = queue_mode_wanted(&config, say);
-    if !set_gateway && !set_queue && !made {
+    if !set_within(block, gateway) && !made {
         return Ok(false);
-    }
-    if set_queue {
-        let messages = config
-            .entry("messages")
-            .or_insert_with(|| serde_json::json!({}));
-        if let Some(messages) = messages.as_object_mut() {
-            let queue = messages
-                .entry("queue")
-                .or_insert_with(|| serde_json::json!({}));
-            if let Some(queue) = queue.as_object_mut() {
-                queue.insert("mode".to_owned(), QUEUE_MODE.into());
-            }
-        }
     }
     let text = serde_json::to_vec_pretty(&config).map_err(|error| error.to_string())?;
     // #7868: checked by OpenClaw itself before it is renamed into place,
@@ -2678,34 +2649,6 @@ fn gateway_config(
     )
     .map_err(|error| format!("{CONFIG}: {error}"))?;
     give_to_lampos(run, CONFIG).map(|()| true)
-}
-
-/// Whether `config` needs [`QUEUE_MODE`]: no `messages.queue.mode` there,
-/// and `messages` and `messages.queue` objects or absent. One that holds
-/// something else is said and left as it is.
-fn queue_mode_wanted(
-    config: &serde_json::Map<String, serde_json::Value>,
-    say: &mut dyn FnMut(&str),
-) -> bool {
-    let Some(messages) = config.get("messages") else {
-        return true;
-    };
-    let Some(messages) = messages.as_object() else {
-        say(&format!(
-            "{CONFIG}: messages is not an object, so messages.queue.mode is not set"
-        ));
-        return false;
-    };
-    let Some(queue) = messages.get("queue") else {
-        return true;
-    };
-    let Some(queue) = queue.as_object() else {
-        say(&format!(
-            "{CONFIG}: messages.queue is not an object, so its mode is not set"
-        ));
-        return false;
-    };
-    !queue.contains_key("mode")
 }
 
 /// What a `gateway` block whose check did not finish says (#8225): on
