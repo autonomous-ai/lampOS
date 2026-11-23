@@ -6007,6 +6007,11 @@ pub fn serve(
                 "lamp-voice second: a short sound is held as before, whatever lamp-name heard in it: lamp-name's hearings {why} (#7891)"
             ),
         }
+        // Under `LAMP_NAME_FACE_OR_WORDS`, a line that was only the lamp's
+        // name with no words back is judged by its own empty words (#8114).
+        if crate::second_look::face_or_words_on() {
+            engine = engine.judging_a_wordless_call_by_its_words();
+        }
         // A line that was only the lamp's name, with no words back, is a
         // call only on a sure hearing (`LAMP_NAME_WORDLESS_BAR`, #5385).
         if crate::second_provider::wordless_call::on(

@@ -2379,6 +2379,10 @@ struct Shared {
     /// one marked as only the name whose words came back empty
     /// ([`Engine::holding_a_wordless_call`]).
     wordless_bar: Option<wordless_call::BestHeard>,
+    /// `LAMP_NAME_FACE_OR_WORDS=on`: a line marked as only the name whose
+    /// words came back empty is judged by its own (empty) words, not by the
+    /// call word put in for it ([`Engine::judging_a_wordless_call_by_its_words`], #8114).
+    wordless_by_own_words: bool,
     /// lamp-name's best hearing in a line, for a short sound heard in it
     /// at its bar ([`Engine::knowing_the_name_in_a_line`], #7891).
     name_in_line: Option<wordless_call::BestHeard>,
@@ -5490,6 +5494,7 @@ impl Engine {
                 name_near: None,
                 near_not_the_name: None,
                 wordless_bar: None,
+                wordless_by_own_words: false,
                 name_in_line: None,
                 name_as_a_sentence: false,
                 own_echo: false,
@@ -6677,6 +6682,17 @@ impl Engine {
     /// when `best` says lamp-name heard it there at
     /// [`wordless_call::BAR`] or more; under it, it is left as a sound.
     /// Without it, as before. Before any turn only.
+    /// A line that was only the lamp's name, with no words back, is judged
+    /// by the rule with its own empty words, so the call word put in for it
+    /// never counts as "its words calling it" (`LAMP_NAME_FACE_OR_WORDS`,
+    /// #8114).
+    pub fn judging_a_wordless_call_by_its_words(mut self) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.wordless_by_own_words = true;
+        }
+        self
+    }
+
     pub fn holding_a_wordless_call(mut self, best: wordless_call::BestHeard) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.wordless_bar = Some(best);
@@ -11233,6 +11249,14 @@ async fn spoken(
         );
     }
     let called = called && !held_call;
+    // The call word put in for a line with no words below is the
+    // coordinator's, not the person's: with `LAMP_NAME_FACE_OR_WORDS` the
+    // rule judges the line by its own (empty) words, so it counts as called
+    // only on a sure hearing or a face turned to the lamp, never as "its
+    // words calling it" (#8114: lamp-74ff, 23 Nov 16:17:44, a 0-word line in
+    // a busy room answered as "the text shows it was called", then seven
+    // lines of the room's talk answered as its conversation).
+    let wordless_call = called && heard_none && shared.wordless_by_own_words;
     let text = if called && text.trim().is_empty() {
         eprintln!(
             "lamp-voice second: request {request}: only the lamp's name was said, and no words of it came back: asked as the name"
@@ -11596,7 +11620,8 @@ async fn spoken(
             // A reply to a yes or no the lamp waits for is said to it
             // (`LAMP_SAID_TO_ME`, #7442).
             crate::said_to_me::awaiting_yes(a_yes_held(&shared), || {
-                heed(request, window, &text, continues_from, lead_us)
+                let judged: &str = if wordless_call { "" } else { &text };
+                heed(request, window, judged, continues_from, lead_us)
             })
         }
         _ => None,

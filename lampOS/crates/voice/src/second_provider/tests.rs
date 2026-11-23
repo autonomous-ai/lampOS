@@ -16950,6 +16950,52 @@ async fn only_the_lamps_name_is_told_so_and_asked_as_the_name_with_no_words() {
     );
 }
 
+/// #8114 (lamp-74ff, 23 Nov 16:17:44): with `LAMP_NAME_FACE_OR_WORDS`, a
+/// line marked as only the lamp's name whose words came back empty is given
+/// to the rule with its own empty words, so the call word put in for it is
+/// never "its words calling it"; the model is still asked with that word if
+/// the rule lets the line through. A line with words is judged by them, and
+/// without the switch the rule sees the call word, as before.
+#[tokio::test]
+async fn a_wordless_call_is_judged_by_its_own_words_with_face_or_words() {
+    let judged = |seen: Arc<std::sync::Mutex<Vec<String>>>, own: bool| {
+        move |engine: Engine| {
+            let engine = engine.heeding(Arc::new(move |_, _, heard: &str, _, _| {
+                seen.lock().unwrap().push(heard.to_owned());
+                None
+            }));
+            if own {
+                engine.judging_a_wordless_call_by_its_words()
+            } else {
+                engine
+            }
+        }
+    };
+    let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let asked = asked_with("", judged(seen.clone(), true), start(1), true, false).await;
+    assert_eq!(seen.lock().unwrap().as_slice(), [String::new()]);
+    assert_eq!(asked[0].last(), Some(&Message::user(super::CALLED_WORDS)));
+    let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+    asked_with(
+        "Lamp, what time is it?",
+        judged(seen.clone(), true),
+        start(1),
+        true,
+        false,
+    )
+    .await;
+    assert_eq!(
+        seen.lock().unwrap().as_slice(),
+        ["Lamp, what time is it?".to_owned()]
+    );
+    let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+    asked_with("", judged(seen.clone(), false), start(1), true, false).await;
+    assert_eq!(
+        seen.lock().unwrap().as_slice(),
+        [super::CALLED_WORDS.to_owned()]
+    );
+}
+
 /// `LAMP_NAME_WORDLESS_BAR=on` (#5385, the first builder's rule): a line
 /// marked as only the lamp's name whose words came back empty, heard under
 /// 0.99 (lamp-75c9's 0.941 in its own move's sound, or none said in full),
