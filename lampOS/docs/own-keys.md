@@ -84,6 +84,7 @@ followed, and the only request setup or the helper makes with the key:
 | DeepSeek | `GET <endpoint>/models` | `Authorization: Bearer <key>` |
 | Deepgram | `GET https://api.deepgram.com/v1/auth/token` | `Authorization: Token <key>` |
 | OpenRouter (#8420) | `GET https://openrouter.ai/api/v1/key`, then `GET https://openrouter.ai/api/v1/models/<model>/endpoints` | `Authorization: Bearer <key>` on the first alone |
+| Gemini (#8420) | `GET https://generativelanguage.googleapis.com/v1beta/openai/models/<model>` | `Authorization: Bearer <key>` |
 
 - **2xx:** kept. The answer names where the person's data goes now:
   "that key works: your conversations now go to api.deepseek.com with your
@@ -362,12 +363,12 @@ on the same `keys.*` path and the same switch, with the contract agreed on
   that fails to the person's endpoint is not yet a fallback.
 - **Off:** nothing new is read or said; today's behaviour as it is.
 
-## Named model providers: OpenRouter (#8420, built, off unless set)
+## Named model providers: OpenRouter and Gemini (#8420, built, off unless set)
 
 A person's own model by its provider's name, on the same `keys.*` path and
 switch as the OpenAI-compatible one, with the plan the first builder agreed
-on #8362 (22:02, 23 Nov). OpenRouter is the first; Gemini and Anthropic come
-in their own PRs. One rule for all three: **the endpoint is fixed** in the
+on #8362 (22:02, 23 Nov). OpenRouter is the first, Gemini the second (below);
+Anthropic comes in its own PR. One rule for all three: **the endpoint is fixed** in the
 lamp, never taken from the app, so the person's key only ever goes to its
 own provider (#2094's rule). The tests that pin it:
 `setup/tests/it/keys.rs`
@@ -424,6 +425,63 @@ own provider (#2094's rule). The tests that pin it:
 - **Off:** nothing new is read or said.
 - **Not yet run on a lamp:** a real key and model from the app, a few
   turns, a bad key and a made-up model told plainly, and a remove.
+
+### Gemini (#8420, built, off unless set)
+
+The second named provider, by the same rule: Google's OpenAI-compatible
+endpoint, fixed. The tests that pin it: `setup/tests/it/keys.rs`
+(`a_gemini_model_is_kept_with_its_model_at_geminis_own_endpoint`),
+`setup/src/keys.rs`
+(`a_gemini_check_reads_the_one_model_and_refuses_a_bad_key_by_its_400`),
+`cloud/src/settings.rs` (`a_gemini_key_goes_to_the_helper_with_its_model`),
+`voice/src/second_config.rs`
+(`the_persons_gemini_model_is_used_only_with_the_switch`) and
+`voice/src/second_provider/services.rs`
+(`the_persons_gemini_model_is_asked_as_geminis_chat`,
+`the_persons_gemini_key_refused_by_its_400_falls_back_and_a_plain_400_does_not`).
+
+- **`offers`:** `{"service": "gemini", "name": "Gemini", "kind": "model",
+  "models": [], "base_url": false, "fields": ["model"], "endpoint":
+  "https://generativelanguage.googleapis.com/v1beta/openai"}`, after
+  OpenRouter's.
+- **`keys.set`** `{"service": "gemini", "key", "model"}`: the model is needed
+  ("a Gemini key needs its model"), a name as above (`gemini-2.5-flash`).
+  Any `base_url` is refused before any check, "Gemini takes no endpoint"
+  (`bad_field`).
+- **The check** (the table above), one request within 5 s, no redirect
+  followed. Gemini answers a bad key with **400, not 401**: seen live on
+  24 Nov with a made-up key, the OpenAI-compatible endpoint says `400`
+  `{"error": {"message": "Please pass a valid API key", "status":
+  "INVALID_ARGUMENT"}}`, with no `API_KEY_INVALID` (the native API's word,
+  which is in its `details[].reason`). A 400 whose error message says "valid
+  API key", or whose details name `API_KEY_INVALID`, is "that key was
+  refused"; so are 401 and 403. Any other 400 is not the key's and is
+  "couldn't reach Gemini". 2xx works when the answer's `id` is the model, as
+  `models/<id>` or `<id>`; 404 is "Gemini has no model by that name"
+  (`bad_field`). Seen live too: a made-up model asked with no key is 404.
+  A real key with a made-up model isn't seen yet; the row reads it.
+- **Kept:** `gemini.key`, `gemini.model` and `gemini.checked`, 0600, no
+  endpoint file. One of the model services: keeping it takes DeepSeek's own,
+  the OpenAI-compatible and OpenRouter's away, and keeping any of them takes
+  it away. `keys.get` adds `gemini`, `since.gemini`, `model.gemini`,
+  `checked.gemini`, and `in_use.model` is `"gemini"` while it is kept.
+- **The voice** (`own_gemini.key` and `.model`, read only with the switch
+  on): the spoken chat goes to Google's API as Gemini's chat
+  (`Chat::gemini_own`, the lamp's `Chat::gemini` with its
+  `reasoning_effort: minimal`). The journal's line is `Gemini: the person's
+  own key, model <id> (LAMP_OWN_KEYS)`, and the start's ends `through
+  Gemini`. An OpenAI-compatible or OpenRouter key, if one were somehow
+  there too, is used over it.
+- **The fallback:** as the other own models', plus Gemini's 400 for the key.
+  Only the person's own Gemini chat reads a 400's body for it
+  (`net::Error::KeyInvalid`, told as 400); every other 400, and every other
+  chat's, stays the request's own, with no fallback.
+- **`reasoning_effort: minimal`** is the lamp's floor for Gemini 3. A
+  2.5-series model may answer 400 to it, which is not a fallback: the row
+  with the person's own 2.5 model reads it, and if it does, the field is
+  dropped for models other than 3.
+- **Not yet run on a lamp:** a real key and model from the app, as for
+  OpenRouter.
 
 ## Updates
 
