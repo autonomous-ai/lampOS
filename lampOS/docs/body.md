@@ -1813,6 +1813,33 @@ to 113 (250 less 0.27 of 727 times 0.7) and the face to -0.11, inside what
 counts as looked at. It has not yet been seen with a living person in front
 of it.
 
+### A lamp whose gaze is not measured (`LAMP_BODY_GAZE_DEFAULT=on`, #8344)
+
+The product unit passes `--gaze-socket` and `--gaze-reach` but no `--gaze`:
+that is measured with a face, `lamp-body-measure` does not write it, and it
+is not a factory step. Such a lamp runs with gaze off, so a person who calls
+it from a side desk is in the picture and never turned to (#8343, #8344).
+
+With `LAMP_BODY_GAZE_DEFAULT=on` (off unless exactly `on`; off in the
+product unit until its row) a lamp started with `--gaze-socket` and no
+`--gaze` looks with the product camera's turn, `760,555`
+(`gaze::PRODUCT_TURN`), and says so in its first lines:
+
+```text
+lamp-body: gaze on the product's --gaze 760,555 (LAMP_BODY_GAZE_DEFAULT=on): this lamp's own is not measured
+```
+
+The number lies between the three lamps measured with a face: lamp-4ace
+727,553, lamp-fc4b 755,555, lamp-52e6 and lamp-06c1 782,557, all the same
+camera (`--usb 01da:5875`), within about 4% of each other. A gain a few
+percent off still settles, since each correction takes 70% of what it sees.
+A `--gaze` in the lamp's `lamp.env` always wins. Nothing else changes: the
+same stillness, sights, reach and no search, so a called lamp with nobody in
+view still makes only the small glance of "Turning to a call" and lets it
+go. Test: `an_unmeasured_lamp_looks_with_the_products_gaze_when_switched_on`.
+Not yet run on a lamp; the row on lamp-52e6 runs it with its own `--gaze`
+taken out by a drop-in.
+
 ## Turning to a call
 
 With `--look-at-name on` the body reads `name/heard` on the bus

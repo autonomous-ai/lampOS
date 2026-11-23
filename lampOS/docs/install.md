@@ -764,7 +764,9 @@ units stopped:
    ([body.md](body.md)), and the body runs without it until then: the
    product unit's `--gaze-socket` and `--gaze-reach` without `--gaze` are
    gaze off, said in the body's first line (thirteen-P1; before it, the body
-   refused them and never started on a factory `lamp.env`). Without
+   refused them and never started on a factory `lamp.env`), unless
+   `LAMP_BODY_GAZE_DEFAULT=on` gives it the product camera's `760,555`
+   ([body.md](body.md), #8344; off in the product unit until its row). Without
    `--write` it only prints, so a lamp can be read first and written later.
    Not a factory step yet: `lamp-body-measure sweep ... --seconds 25
    [--write /etc/lampOS/body/lamp.env]`, torque off, while a person moves

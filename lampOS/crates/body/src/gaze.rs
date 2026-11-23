@@ -67,6 +67,25 @@ impl Looking {
     }
 }
 
+/// `LAMP_BODY_GAZE_DEFAULT=on` (#8344): a lamp started with a gaze socket
+/// but no `--gaze` of its own (every product lamp until it is measured with
+/// a face) looks with [`PRODUCT_TURN`] instead of running with gaze off.
+/// Only the exact value `on` turns it on.
+pub const PRODUCT_DEFAULT: &str = "LAMP_BODY_GAZE_DEFAULT";
+
+/// The product camera's turn (`--usb 01da:5875`), between the three lamps
+/// measured with a face: lamp-4ace 727,553, lamp-fc4b 755,555, lamp-52e6 and
+/// lamp-06c1 782,557, within about 4% of each other. A gain a few percent
+/// off still settles: each correction takes [`SHARE`] of what it sees, so
+/// any gain under about 2.8 times the true one converges, and it never
+/// searches.
+pub const PRODUCT_TURN: [i16; 2] = [760, 555];
+
+/// Whether a value of [`PRODUCT_DEFAULT`] turns the product's turn on.
+pub fn product_default_from(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
 /// A picture counts only if the head has been still this long: one taken
 /// while it moved, or just after, shows where the face was.
 const STILL_US: u64 = 400_000;
