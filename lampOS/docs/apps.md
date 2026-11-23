@@ -448,7 +448,9 @@ behind the same two switches and, at the voice, `LAMP_APP_MEMORY`.
   holds for it as for a line: RAM only, the owner's turn only, nothing while
   private, cleared with the app's line (its last connection closing), by
   Lamp going private, a forget about the app or of everything, and a
-  "remember that" carrying it keeps nothing. A `rephrase` say is the
+  "remember that" that is mostly its words (at least half the keep's words)
+  keeps nothing, while the person's own answer to it ("I trained before, at
+  school" after "Trained before?") is kept. A `rephrase` say is the
   model's own turn and needs none. Until app tools (#8406), this is how a
   reply the app's phrases don't take is answered in context.
 - **A remove forgets, and the forget holds.** `app_forget` (the helper's
