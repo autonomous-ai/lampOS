@@ -1351,7 +1351,7 @@ class Lamp:
         program's own lines can follow it. `en` from a lamp that says none (one
         from before this), and from a code this SDK does not know."""
         said = self.info.get("language")
-        return said if said in ("en", "vi", "ja", "zh", "ko") else "en"
+        return said if said in ("en", "vi", "ja", "zh", "ko", "fr") else "en"
 
     @property
     def build(self) -> str | None:

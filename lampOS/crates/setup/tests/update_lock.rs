@@ -187,7 +187,7 @@ fn a_language_takes_the_update_lock_before_it_is_written() {
     assert!(records.lock().is_ok(), "the same language holds nothing");
     // A bad language under no update: refused, nothing held.
     let (reply, _, lock) = change::answer_holding(
-        r#"{"language": "fr"}"#,
+        r#"{"language": "de"}"#,
         &config,
         true,
         &records,
@@ -195,7 +195,7 @@ fn a_language_takes_the_update_lock_before_it_is_written() {
     );
     assert_eq!(
         reply,
-        json!({"refused": "language must be one of en, vi, ja, zh, ko"})
+        json!({"refused": "language must be one of en, vi, ja, zh, ko, fr"})
     );
     assert!(lock.is_none());
     assert_eq!(fs::read_to_string(&config.language).unwrap(), "ja\n");

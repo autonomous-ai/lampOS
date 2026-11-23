@@ -240,6 +240,7 @@ fn openings() -> impl Iterator<Item = &'static str> {
             Language::Japanese,
             Language::Chinese,
             Language::Korean,
+            Language::French,
         ]
         .into_iter()
         .filter_map(|language| language.fixed(MAKE_OPENING)),

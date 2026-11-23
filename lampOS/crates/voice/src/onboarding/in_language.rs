@@ -1,11 +1,11 @@
 //! The walk in the owner's language (#4473 (b), `docs/onboarding.md`, "The
 //! owner's language"). English never comes here: its rules and lines are
-//! the walk's own, byte for byte. For Vietnamese, Japanese, Chinese and
-//! Korean ([`crate::language::Language`]):
+//! the walk's own, byte for byte. For Vietnamese, Japanese, Chinese, Korean
+//! and French ([`crate::language::Language`]):
 //! - what the person says is read by the same rules English is read by
 //!   (a yes, a no, the hello's answer, a question that is no answer, the
 //!   quiet hours), from each language's own words ([`Lexicon`]): whole words
-//!   in Vietnamese, the start of a word in Korean, whose endings join the
+//!   in Vietnamese and French, the start of a word in Korean, whose endings join the
 //!   word, and anywhere in the line in Japanese and Chinese, which have no
 //!   spaces;
 //! - the walk's fixed lines keep their English note around them, the
@@ -782,12 +782,193 @@ const KOREAN: Lexicon = Lexicon {
     short_name: 2,
 };
 
+// French (#8381): whole words, as Vietnamese. The line is read as
+// [`plain`] writes it, so a hyphen is a space ("peut-être" is "peut être",
+// "allez-y" "allez y") and a typographic apostrophe splits a word ("d’accord"
+// is "d accord"). "pas" is a no word as "không" is; the yes phrases that
+// hold it ("pas de problème") and "pas mal" are taken out first. Not checked
+// by a French speaker yet.
+const FRENCH: Lexicon = Lexicon {
+    found: Found::Whole,
+    yes: &[
+        "oui",
+        "ouais",
+        "ok",
+        "okay",
+        "d'accord",
+        "d accord",
+        "bien sûr",
+        "volontiers",
+        "avec plaisir",
+        "allez y",
+        "vas y",
+        "carrément",
+        "exactement",
+        "absolument",
+        "parfait",
+        "c'est bon",
+        "ça marche",
+        "entendu",
+        "évidemment",
+    ],
+    no: &["non", "nan", "pas", "jamais", "surtout pas"],
+    yes_phrases: &[
+        "pas de problème",
+        "pas de souci",
+        "pas de soucis",
+        "aucun problème",
+        "aucun souci",
+        "ça ne me dérange pas",
+        "ça me dérange pas",
+        "pourquoi pas",
+    ],
+    strict_yes: &[
+        "oui",
+        "ouais",
+        "ok",
+        "okay",
+        "d'accord",
+        "d accord",
+        "bien sûr",
+        "volontiers",
+        "avec plaisir",
+        "allez y",
+        "vas y",
+        "absolument",
+        "exactement",
+        "carrément",
+        "c'est bon",
+        "ça marche",
+        "entendu",
+    ],
+    strict_no: &["non", "nan", "surtout pas", "jamais", "pas question"],
+    put_off: &[
+        "peut être",
+        "peut etre",
+        "probablement",
+        "attends",
+        "attendez",
+        "je ne sais pas",
+        "je sais pas",
+        "sais pas",
+        "aucune idée",
+        "euh",
+        "hum",
+        "bof",
+        "mais",
+        "laisse moi réfléchir",
+        "laissez moi réfléchir",
+        "je réfléchis",
+        "on verra",
+        "plus tard",
+        "tout à l'heure",
+        "pas encore",
+        "plus lentement",
+        "explique",
+        "expliquez",
+        "vérifier",
+    ],
+    but: &[],
+    polite: &[
+        "s'il vous plaît",
+        "s'il te plaît",
+        "s il vous plaît",
+        "s il te plaît",
+        "merci",
+        "merci beaucoup",
+        "je vous en prie",
+    ],
+    question: &[],
+    hello: &["bonjour", "salut", "saluer", "salue"],
+    greet: &["bonjour", "bonsoir", "salut", "coucou", "hello", "hi"],
+    again: &[
+        "répète",
+        "répétez",
+        "répéter",
+        "redis",
+        "redites",
+        "pardon",
+        "comment",
+        "quoi",
+        "hein",
+        "pas compris",
+        "pas entendu",
+    ],
+    ignore: &["pas mal", "désolé", "désolée"],
+    when: &[
+        "matin",
+        "midi",
+        "après midi",
+        "soir",
+        "nuit",
+        "minuit",
+        "après",
+        "avant",
+        "une heure",
+        "deux heures",
+        "trois heures",
+        "quatre heures",
+        "cinq heures",
+        "six heures",
+        "sept heures",
+        "huit heures",
+        "neuf heures",
+        "dix heures",
+        "onze heures",
+        "douze heures",
+    ],
+    quiet: &[
+        "calme",
+        "silence",
+        "silencieuse",
+        "silencieux",
+        "tranquille",
+        "heure",
+        "heures",
+    ],
+    name_marks: &[
+        "je m'appelle",
+        "je m appelle",
+        "mon prénom",
+        "mon nom",
+        "appelle moi",
+        "appelez moi",
+        "je suis",
+        "moi c'est",
+    ],
+    not_a_name: &[
+        "bien",
+        "prêt",
+        "prête",
+        "là",
+        "ici",
+        "occupé",
+        "occupée",
+        "fatigué",
+        "fatiguée",
+        "lamp",
+        "lampe",
+        "euh",
+        "hum",
+        "merci",
+        "rien",
+        "super",
+        "génial",
+        "parfait",
+        "ça",
+        "moi",
+    ],
+    short_answer: 5,
+    short_name: 2,
+};
+
 fn lexicon(language: Language) -> &'static Lexicon {
     match language {
         Language::Vietnamese => &VIETNAMESE,
         Language::Japanese => &JAPANESE,
         Language::Chinese => &CHINESE,
         Language::Korean => &KOREAN,
+        Language::French => &FRENCH,
     }
 }
 
@@ -995,8 +1176,8 @@ pub(super) fn read(language: Language, text: &str) -> Reading {
 }
 
 /// One fixed line in English and in each language, in that order: vi, ja,
-/// zh, ko. A `{slot}` is filled before the line is said, in any language.
-type Line = (&'static str, [&'static str; 4]);
+/// zh, ko, fr. A `{slot}` is filled before the line is said, in any language.
+type Line = (&'static str, [&'static str; 5]);
 
 /// Every quoted line of the walk's notes: the skill's (`skills/onboarding/
 /// skill.toml`) and the code's (`skill.rs`).
@@ -1007,48 +1188,56 @@ pub(super) const LINES: &[Line] = &[
         "まずは設定をしましょう！数分で終わります。私の案内に沿って一つずつ進めてください。終わったら、何でも聞いてくださいね。いつも座る場所に座って、私の方を見てください。見えたらお知らせします。",
         "我们先来设置一下吧！只要几分钟。请按我的提示一步一步来，完成后你可以问我任何问题。请坐在你平时坐的地方，看着我。看到你时我会告诉你。",
         "먼저 설정부터 시작할게요! 몇 분이면 끝나요. 제 안내에 따라 하나씩 해 주세요. 다 끝나면 무엇이든 물어보셔도 돼요. 평소 앉는 자리에 앉아 저를 바라봐 주세요. 얼굴이 보이면 알려 드릴게요.",
+        "Commençons par la configuration ! Cela ne prend que quelques minutes. Suivez mes instructions étape par étape, et une fois terminé, vous pourrez me demander ce que vous voulez. Asseyez-vous là où vous vous asseyez d'habitude et regardez-moi. Je vous dirai quand je vous vois.",
     ]),
     ("Sit where you usually sit and look at me. I'll tell you when I see you.", [
         "Bạn ngồi chỗ quen thuộc và nhìn về phía mình. Khi thấy bạn, mình sẽ báo.",
         "いつも座る場所に座って、私の方を見てください。見えたらお知らせします。",
         "请坐在你平时坐的地方，看着我。看到你时我会告诉你。",
         "평소 앉는 자리에 앉아 저를 바라봐 주세요. 얼굴이 보이면 알려 드릴게요.",
+        "Asseyez-vous là où vous vous asseyez d'habitude et regardez-moi. Je vous dirai quand je vous vois.",
     ]),
     ("Okay, we'll skip where you sit for now.", [
         "Được rồi, tạm bỏ qua phần chỗ ngồi nhé.",
         "わかりました。座る場所は、いったん飛ばしますね。",
         "好的，座位这一步我们先跳过。",
         "알겠어요. 앉는 자리는 일단 건너뛸게요.",
+        "D'accord, on passe l'étape de votre place pour l'instant.",
     ]),
     ("One more thing: sit where you usually sit and look at me. I'll tell you when I see you.", [
         "Còn một việc nữa: bạn ngồi chỗ quen thuộc và nhìn về phía mình. Khi thấy bạn, mình sẽ báo.",
         "もう一つだけ。いつも座る場所に座って、私の方を見てください。見えたらお知らせします。",
         "还有一件事：请坐在你平时坐的地方，看着我。看到你时我会告诉你。",
         "아, 아직 안 한 게 하나 있어요. 평소 앉는 자리에 앉아 저를 바라봐 주세요. 얼굴이 보이면 알려 드릴게요.",
+        "Encore une chose : asseyez-vous là où vous vous asseyez d'habitude et regardez-moi. Je vous dirai quand je vous vois.",
     ]),
     ("What should I call you?", [
         "Mình nên gọi bạn là gì?",
         "何とお呼びすればいいですか？",
         "我该怎么称呼你？",
         "어떻게 불러 드릴까요?",
+        "Comment dois-je vous appeler ?",
     ]),
     ("May I remember your face, so I know you next time?", [
         "Mình nhớ khuôn mặt bạn được không, để lần sau nhận ra bạn?",
         "次に会ったときわかるように、お顔を覚えてもいいですか？",
         "我可以记住你的脸吗？这样下次我就能认出你。",
         "다음에 알아볼 수 있게 얼굴을 기억해도 될까요?",
+        "Puis-je retenir votre visage, pour vous reconnaître la prochaine fois ?",
     ]),
     ("That's fine. You can tell me your name any time.", [
         "Không sao đâu. Lúc nào bạn cũng có thể cho mình biết tên.",
         "大丈夫です。お名前はいつでも教えてくださいね。",
         "没关系。你随时可以告诉我你的名字。",
         "괜찮아요. 이름은 언제든 알려 주세요.",
+        "Pas de souci. Vous pourrez me dire votre prénom quand vous voudrez.",
     ]),
     ("Earlier we didn't get to your name. Let's try it now.", [
         "Lúc nãy mình chưa kịp hỏi tên bạn. Giờ mình thử nhé.",
         "さっきはお名前を聞けませんでした。今やってみましょう。",
         "刚才我们还没问到你的名字。现在试试吧。",
         "아까는 이름을 여쭤보지 못했어요. 지금 여쭤볼게요.",
+        "Tout à l'heure, on n'a pas eu le temps pour votre prénom. Essayons maintenant.",
     ]),
     // The lead's lines for the walk (#4080, 9 Nov).
     ("Sit where you usually sit, and look at me.", [
@@ -1056,84 +1245,98 @@ pub(super) const LINES: &[Line] = &[
         "いつもの席に座って、私を見てください。",
         "坐在你平时坐的地方，看着我。",
         "평소 앉는 자리에 앉아서 저를 봐 주세요.",
+        "Asseyez-vous à votre place habituelle, et regardez-moi.",
     ]),
     ("One more thing: sit where you usually sit, and look at me.", [
         "Còn một việc nữa: bạn ngồi ở chỗ quen thuộc và nhìn mình nhé.",
         "もう一つだけ。いつもの席に座って、私を見てください。",
         "还有一件事：坐在你平时坐的地方，看着我。",
         "아, 하나 더 있어요. 평소 앉는 자리에 앉아서 저를 봐 주세요.",
+        "Encore une chose : asseyez-vous à votre place habituelle, et regardez-moi.",
     ]),
     ("I can't see you yet. Look at me for a moment.", [
         "Mình chưa thấy bạn. Bạn nhìn mình một chút nhé.",
         "まだ見えません。少しの間、私を見てください。",
         "我还看不到你。看着我一会儿。",
         "아직 안 보여요. 잠깐 저를 봐 주세요.",
+        "Je ne vous vois pas encore. Regardez-moi un instant.",
     ]),
     ("There you are. I can see you.", [
         "Thấy bạn rồi. Mình nhìn thấy bạn rồi.",
         "いました。見えますよ。",
         "找到你了。我看到你了。",
         "거기 계셨네요. 잘 보여요.",
+        "Vous voilà. Je vous vois.",
     ]),
     ("No problem. You can turn me toward you any time.", [
         "Không sao. Lúc nào bạn cũng có thể xoay mình về phía bạn.",
         "大丈夫です。いつでも私をあなたの方に向けてください。",
         "没关系。你随时可以把我转向你。",
         "괜찮아요. 언제든 저를 당신 쪽으로 돌려 주세요.",
+        "Pas de problème. Vous pourrez me tourner vers vous quand vous voudrez.",
     ]),
     ("Pet the top of my head.", [
         "Bạn vuốt nhẹ đỉnh đầu mình nhé.",
         "私の頭のてっぺんをなでてください。",
         "摸摸我的头顶吧。",
         "제 머리 맨 위를 쓰다듬어 주세요.",
+        "Caressez le haut de ma tête.",
     ]),
     ("Gently, on top of my head.", [
         "Nhẹ nhàng thôi, trên đỉnh đầu mình.",
         "やさしく、頭のてっぺんを。",
         "轻轻地，在我头顶上。",
         "부드럽게, 제 머리 맨 위를요.",
+        "Doucement, sur le haut de ma tête.",
     ]),
     ("May I remember your face, so I know you next time?", [
         "Mình nhớ khuôn mặt bạn nhé, để lần sau mình nhận ra bạn?",
         "次に会ったときにわかるように、顔を覚えてもいいですか？",
         "我可以记住你的脸吗？这样下次就能认出你。",
         "다음에 알아볼 수 있게 얼굴을 기억해도 될까요?",
+        "Puis-je retenir votre visage, pour vous reconnaître la prochaine fois ?",
     ]),
     ("Mmm, that feels nice.", [
         "Ưm, dễ chịu quá.",
         "んー、気持ちいいです。",
         "嗯，好舒服。",
         "음, 기분 좋아요.",
+        "Mmm, c'est agréable.",
     ]),
     ("That's okay. You can pet my head any time.", [
         "Không sao đâu. Lúc nào bạn cũng có thể vuốt đầu mình.",
         "大丈夫です。いつでも頭をなでてくださいね。",
         "没关系。你随时可以摸摸我的头。",
         "괜찮아요. 언제든 제 머리를 쓰다듬어 주세요.",
+        "Pas de souci. Vous pourrez caresser ma tête quand vous voudrez.",
     ]),
     ("When you want me, start with 'Hey Lamp'. When I stop talking, give it a try.", [
         "Khi cần mình, bạn hãy bắt đầu bằng 'Hey Lamp'. Khi mình nói xong, bạn thử nhé.",
         "私を呼ぶときは、「Hey Lamp」から始めてください。私が話し終えたら、試してみてください。",
         "想找我的时候，先说“Hey Lamp”。等我说完，试一下吧。",
         "저를 부를 땐 'Hey Lamp'로 시작해 주세요. 제 말이 끝나면 한번 해 보세요.",
+        "Quand vous voulez me parler, commencez par 'Hey Lamp'. Quand j'aurai fini de parler, essayez.",
     ]),
     ("That's me! Say 'Hey Lamp' whenever you need me.", [
         "Là mình đây! Khi nào cần mình, cứ nói 'Hey Lamp' nhé.",
         "はい、私です！用があるときは、いつでも「Hey Lamp」と言ってください。",
         "是我！需要我的时候，就说“Hey Lamp”。",
         "저예요! 제가 필요할 땐 언제든 'Hey Lamp'라고 말해 주세요.",
+        "C'est moi ! Dites 'Hey Lamp' dès que vous avez besoin de moi.",
     ]),
     ("I didn't catch that. Try once more when I stop talking.", [
         "Mình chưa nghe rõ. Khi mình nói xong, bạn thử lại lần nữa nhé.",
         "聞き取れませんでした。私が話し終わったら、もう一度試してください。",
         "我没听清。等我说完，再试一次。",
         "잘 못 들었어요. 제가 말을 마치면 한 번 더 해 보세요.",
+        "Je n'ai pas bien entendu. Réessayez quand j'aurai fini de parler.",
     ]),
     ("No worries. Just say 'Hey Lamp' whenever you need me.", [
         "Không sao. Khi nào cần mình, cứ nói 'Hey Lamp' nhé.",
         "大丈夫です。用があるときは、いつでも「Hey Lamp」と言ってください。",
         "没关系。需要我的时候，就说“Hey Lamp”。",
         "괜찮아요. 제가 필요할 땐 언제든 'Hey Lamp'라고 말해 주세요.",
+        "Pas de souci. Dites simplement 'Hey Lamp' dès que vous avez besoin de moi.",
     ]),
     // #4080: petting and "Hey Lamp" taught (the lead, 9 Nov).
     ("When you want me, say 'Hey Lamp' first. Try it now.", [
@@ -1141,372 +1344,434 @@ pub(super) const LINES: &[Line] = &[
         "私を呼びたいときは、最初に「Hey Lamp」と言ってください。今、試してみてください。",
         "想找我的时候，先说“Hey Lamp”。现在试试吧。",
         "저를 부르고 싶을 땐 먼저 'Hey Lamp'라고 말해 주세요. 지금 해 보세요.",
+        "Quand vous voulez me parler, dites d'abord 'Hey Lamp'. Essayez maintenant.",
     ]),
     ("Earlier we skipped saying 'Hey Lamp'. Let's try it now.", [
         "Lúc nãy mình bỏ qua phần nói 'Hey Lamp'. Giờ mình thử nhé.",
         "さっきは「Hey Lamp」を飛ばしました。今やってみましょう。",
         "刚才我们跳过了说“Hey Lamp”。现在试试吧。",
         "아까 'Hey Lamp'라고 말하는 단계를 건너뛰었어요. 지금 해 볼게요.",
+        "Tout à l'heure, on a passé 'Hey Lamp'. Essayons maintenant.",
     ]),
     ("I didn't catch that. Say 'Hey Lamp' once more.", [
         "Mình chưa nghe rõ. Bạn nói 'Hey Lamp' thêm lần nữa nhé.",
         "聞き取れませんでした。もう一度「Hey Lamp」と言ってください。",
         "我没听清。再说一次“Hey Lamp”。",
         "잘 못 들었어요. 'Hey Lamp'라고 한 번 더 말해 주세요.",
+        "Je n'ai pas bien entendu. Dites encore une fois 'Hey Lamp'.",
     ]),
     ("Got it. Just say 'Hey Lamp' whenever you want me.", [
         "Rồi. Khi nào cần mình, bạn chỉ cần nói 'Hey Lamp'.",
         "はい。用があるときは、いつでも「Hey Lamp」と言ってください。",
         "好的。想找我的时候，说“Hey Lamp”就行。",
         "좋아요. 저를 부르고 싶을 땐 언제든 'Hey Lamp'라고 말해 주세요.",
+        "C'est noté. Dites simplement 'Hey Lamp' quand vous voulez me parler.",
     ]),
     ("Try petting the top of my head.", [
         "Bạn thử vuốt nhẹ đỉnh đầu mình xem.",
         "私の頭のてっぺんをなでてみてください。",
         "试着摸摸我的头顶吧。",
         "제 머리 맨 위를 쓰다듬어 보세요.",
+        "Essayez de caresser le haut de ma tête.",
     ]),
     ("One more thing: try petting the top of my head.", [
         "Còn một việc nữa: bạn thử vuốt nhẹ đỉnh đầu mình xem.",
         "もう一つだけ。私の頭のてっぺんをなでてみてください。",
         "还有一件事：试着摸摸我的头顶吧。",
         "아, 아직 안 한 게 하나 있어요. 제 머리 맨 위를 쓰다듬어 보세요.",
+        "Encore une chose : essayez de caresser le haut de ma tête.",
     ]),
     ("Earlier we skipped petting my head. Let's try it now.", [
         "Lúc nãy mình bỏ qua phần vuốt đầu. Giờ mình thử nhé.",
         "さっきは頭をなでるところを飛ばしました。今やってみましょう。",
         "刚才我们跳过了摸头。现在试试吧。",
         "아까 제 머리를 쓰다듬는 단계를 건너뛰었어요. 지금 해 볼게요.",
+        "Tout à l'heure, on a passé la caresse sur la tête. Essayons maintenant.",
     ]),
     ("I didn't feel that. Try petting the top of my head.", [
         "Mình chưa cảm thấy. Bạn thử vuốt nhẹ đỉnh đầu mình xem.",
         "感じませんでした。私の頭のてっぺんをなでてみてください。",
         "我没感觉到。试着摸摸我的头顶吧。",
         "방금은 느껴지지 않았어요. 제 머리 맨 위를 쓰다듬어 보세요.",
+        "Je n'ai rien senti. Essayez de caresser le haut de ma tête.",
     ]),
     ("That feels nice.", [
         "Dễ chịu quá.",
         "気持ちいいです。",
         "好舒服。",
         "기분 좋아요.",
+        "C'est agréable.",
     ]),
     ("Now I'll learn how you call me. When I stop talking, say 'Hey Lamp' from your seat, the way you'd get my attention. I'll ask until I've heard you three times.", [
         "Giờ mình sẽ học cách bạn gọi mình. Khi mình nói xong, bạn ngồi tại chỗ và nói 'Hey Lamp', như khi muốn gọi mình. Mình sẽ nhờ bạn cho đến khi nghe được ba lần.",
         "次は、呼びかけ方を覚えます。私が話し終えたら、座ったまま、呼びかけるように「Hey Lamp」と言ってください。三回聞こえるまでお願いします。",
         "现在我来学习你怎么叫我。我说完后，请坐在原位说“Hey Lamp”，就像平时叫我那样。我会一直请你说，直到听到三次。",
         "이제 저를 부르는 목소리를 익혀 볼게요. 제 말이 끝나면 평소처럼 앉은 자리에서 'Hey Lamp'라고 불러 주세요. 제가 세 번 들을 때까지 다시 부탁드릴게요.",
+        "Maintenant, je vais apprendre comment vous m'appelez. Quand j'aurai fini de parler, dites 'Hey Lamp' depuis votre place, comme pour attirer mon attention. Je vous le redemanderai jusqu'à vous avoir entendu trois fois.",
     ]),
     ("Earlier we skipped how you call me. Let's try it now.", [
         "Lúc nãy mình bỏ qua phần bạn gọi mình. Giờ mình thử nhé.",
         "さっきは呼びかけ方を飛ばしました。今やってみましょう。",
         "刚才我们跳过了你怎么叫我。现在试试吧。",
         "아까 저를 부르는 단계를 건너뛰었어요. 지금 해 볼게요.",
+        "Tout à l'heure, on a passé la façon dont vous m'appelez. Essayons maintenant.",
     ]),
     ("Okay, we'll skip how you call me for now.", [
         "Được rồi, tạm bỏ qua phần bạn gọi mình nhé.",
         "わかりました。呼びかけ方は、いったん飛ばしますね。",
         "好的，叫我这一步我们先跳过。",
         "알겠어요. 부르는 단계는 일단 건너뛸게요.",
+        "D'accord, on passe pour l'instant la façon dont vous m'appelez.",
     ]),
     ("OK, next step. Tap the top of my head once, then let go.", [
         "Được rồi, bước tiếp theo. Bạn chạm nhẹ lên đỉnh đầu mình một lần, rồi buông tay ra.",
         "では、次です。私の頭のてっぺんを一回軽くたたいて、手を離してください。",
         "好，下一步。轻点一下我的头顶，然后松手。",
         "좋아요. 다음 단계예요. 제 머리 맨 위를 한 번 톡 두드리고 손을 떼 주세요.",
+        "D'accord, étape suivante. Tapotez une fois le haut de ma tête, puis lâchez.",
     ]),
     ("One more thing: tap the top of my head once, then let go.", [
         "Còn một việc nữa: bạn chạm nhẹ lên đỉnh đầu mình một lần, rồi buông tay ra.",
         "もう一つだけ。私の頭のてっぺんを一回軽くたたいて、手を離してください。",
         "还有一件事：轻点一下我的头顶，然后松手。",
         "아, 아직 안 한 게 하나 있어요. 제 머리 맨 위를 한 번 톡 두드리고 손을 떼 주세요.",
+        "Encore une chose : tapotez une fois le haut de ma tête, puis lâchez.",
     ]),
     ("Earlier we skipped the tap on my head. Let's try it now.", [
         "Lúc nãy mình bỏ qua phần chạm đầu. Giờ mình thử nhé.",
         "さっきは頭をたたくところを飛ばしました。今やってみましょう。",
         "刚才我们跳过了轻点头顶。现在试试吧。",
         "아까 제 머리를 톡 두드리는 단계를 건너뛰었어요. 지금 해 볼게요.",
+        "Tout à l'heure, on a passé le tapotement sur ma tête. Essayons maintenant.",
     ]),
     ("Okay, we'll skip the touch for now.", [
         "Được rồi, tạm bỏ qua phần chạm nhé.",
         "わかりました。タッチは、いったん飛ばしますね。",
         "好的，触摸这一步我们先跳过。",
         "알겠어요. 터치는 일단 건너뛸게요.",
+        "D'accord, on passe le toucher pour l'instant.",
     ]),
     ("Find my privacy switch {location}. Close it, then open it again.", [
         "Bạn tìm công tắc riêng tư của mình ({location}). Gạt đóng lại, rồi mở ra lại.",
         "プライバシースイッチを探してください（{location}）。一度閉じてから、また開けてください。",
         "请找到我的隐私开关（{location}）。把它关上，再打开。",
         "제 프라이버시 스위치를 찾아 주세요({location}). 밀어서 닫았다가 다시 열어 주세요.",
+        "Trouvez mon interrupteur de confidentialité ({location}). Fermez-le, puis rouvrez-le.",
     ]),
     ("Earlier we skipped my privacy switch. Let's try it now.", [
         "Lúc nãy mình bỏ qua công tắc riêng tư. Giờ mình thử nhé.",
         "さっきはプライバシースイッチを飛ばしました。今やってみましょう。",
         "刚才我们跳过了隐私开关。现在试试吧。",
         "아까 프라이버시 스위치를 건너뛰었어요. 지금 해 볼게요.",
+        "Tout à l'heure, on a passé mon interrupteur de confidentialité. Essayons maintenant.",
     ]),
     ("Hold my base with one hand. With the other, tilt my head gently to one side. Let go when I say so.", [
         "Một tay giữ đế của mình. Tay kia nhẹ nhàng nghiêng đầu mình sang một bên. Khi mình bảo thì buông tay.",
         "片手で私の台座を押さえて、もう片方の手で頭をそっと横に傾けてください。私が言ったら手を離してください。",
         "一只手扶住我的底座，另一只手轻轻把我的头歪向一边。我说好了再松手。",
         "한 손으로 제 받침대를 잡고, 다른 손으로 제 머리를 한쪽으로 살짝 기울여 주세요. 제가 손을 떼라고 하면 떼 주세요.",
+        "Tenez mon socle d'une main. De l'autre, inclinez doucement ma tête sur le côté. Lâchez quand je vous le dirai.",
     ]),
     ("Earlier we skipped my head giving way. Let's try it now.", [
         "Lúc nãy mình bỏ qua phần đầu mình đi theo tay bạn. Giờ mình thử nhé.",
         "さっきは頭を動かすところを飛ばしました。今やってみましょう。",
         "刚才我们跳过了让我的头顺着你的手动。现在试试吧。",
         "아까 제 머리가 손을 따라 움직이는지 확인하는 단계를 건너뛰었어요. 지금 해 볼게요.",
+        "Tout à l'heure, on a passé l'étape où ma tête suit votre main. Essayons maintenant.",
     ]),
     ("Okay, we'll skip my head giving way for now.", [
         "Được rồi, tạm bỏ qua phần đầu mình đi theo tay bạn nhé.",
         "わかりました。頭を動かすところは、いったん飛ばしますね。",
         "好的，让我的头顺着你的手动这一步我们先跳过。",
         "알겠어요. 머리를 움직이는 단계는 일단 건너뛸게요.",
+        "D'accord, on passe pour l'instant l'étape où ma tête suit votre main.",
     ]),
     ("May I notice music and laughter in the room? Nothing is recorded. Just say yes or no.", [
         "Mình để ý tiếng nhạc và tiếng cười trong phòng được không? Không có gì bị ghi lại đâu. Bạn chỉ cần nói có hoặc không.",
         "部屋の音楽や笑い声に気づくようにしてもいいですか？録音はしません。はいか、いいえで答えてください。",
         "我可以留意房间里的音乐和笑声吗？不会录下任何东西。请说好或者不好。",
         "방 안에서 음악이나 웃음소리가 나는지 알아봐도 될까요? 아무것도 녹음하지 않아요. '네' 또는 '아니요'로 대답해 주세요.",
+        "Puis-je remarquer la musique et les rires dans la pièce ? Rien n'est enregistré. Répondez simplement oui ou non.",
     ]),
     ("Sorry, was that a yes or a no?", [
         "Xin lỗi, vậy là có hay không?",
         "すみません、はいですか、いいえですか？",
         "不好意思，是好还是不好？",
         "죄송해요. '네'라고 하셨나요, '아니요'라고 하셨나요?",
+        "Pardon, c'était oui ou non ?",
     ]),
     ("Got it, I'll notice music and laughter.", [
         "Rồi, mình sẽ để ý tiếng nhạc và tiếng cười.",
         "わかりました。音楽や笑い声に気づくようにしますね。",
         "好的，我会留意音乐和笑声。",
         "알겠어요. 음악이나 웃음소리가 나는지 알아볼게요.",
+        "C'est noté, je remarquerai la musique et les rires.",
     ]),
     ("Okay, I won't.", [
         "Được rồi, mình sẽ không làm vậy.",
         "わかりました、しませんね。",
         "好的，我不会的。",
         "알겠어요, 안 할게요.",
+        "D'accord, je ne le ferai pas.",
     ]),
     ("May I notice when people look happy or upset, so I can answer more warmly? A yes covers everyone at this lamp. I never say it aloud and keep no pictures. Just say yes or no.", [
         "Mình để ý khi mọi người trông vui hay buồn được không, để trả lời ấm áp hơn? Đồng ý là áp dụng cho mọi người ở đây. Mình không bao giờ nói ra và không lưu ảnh nào. Bạn chỉ cần nói có hoặc không.",
         "もっと温かく応えられるように、人がうれしそうか、つらそうかに気づいてもいいですか？はいと答えると、ここにいる全員が対象になります。口に出すことはなく、写真も残しません。はいか、いいえで答えてください。",
         "我可以留意大家看起来开心还是难过吗？这样我能回应得更贴心。同意的话，对我身边的每个人都适用。我从不说出来，也不保存任何照片。请说好或者不好。",
         "사람들이 기뻐 보이는지 속상해 보이는지 알아봐도 될까요? 그러면 더 다정하게 대답할 수 있어요. '네'라고 하시면 여기 계신 모든 분께 적용돼요. 제가 알아챈 감정은 소리 내어 말하지 않고, 사진도 저장하지 않아요. '네' 또는 '아니요'로 대답해 주세요.",
+        "Puis-je remarquer quand les gens ont l'air heureux ou contrariés, pour répondre avec plus de chaleur ? Un oui vaut pour tout le monde près de cette lampe. Je ne le dis jamais à voix haute et je ne garde aucune photo. Répondez simplement oui ou non.",
     ]),
     ("Got it, I'll notice how people look.", [
         "Rồi, mình sẽ để ý vẻ mặt mọi người.",
         "わかりました。みなさんの表情に気づくようにしますね。",
         "好的，我会留意大家的表情。",
         "알겠어요. 사람들의 표정을 살펴볼게요.",
+        "C'est noté, je ferai attention à l'expression des gens.",
     ]),
     ("Are there hours when I should keep quiet? For example, 'after ten at night', or 'no'.", [
         "Có khung giờ nào mình nên giữ yên lặng không? Ví dụ: 'sau mười giờ tối', hoặc 'không'.",
         "静かにしていてほしい時間はありますか？たとえば「夜十時以降」や「ない」などです。",
         "有没有需要我保持安静的时间？比如“晚上十点以后”，或者“没有”。",
         "제가 조용히 해야 하는 시간이 있나요? 예를 들어 '밤 열 시 이후'라고 하시거나, 없으면 '없어요'라고 말씀해 주세요.",
+        "Y a-t-il des heures où je dois rester silencieuse ? Par exemple, 'après dix heures du soir', ou 'non'.",
     ]),
     ("Earlier we didn't get to your preferences. Let's do them now.", [
         "Lúc nãy mình chưa kịp hỏi bạn thích thế nào. Giờ mình làm nhé.",
         "さっきはお好みの設定まで進めませんでした。今やりましょう。",
         "刚才我们还没来得及设置你的偏好。现在来吧。",
         "아까는 원하시는 설정을 여쭤보지 못했어요. 지금 해 볼게요.",
+        "Tout à l'heure, on n'a pas eu le temps pour vos préférences. Faisons-les maintenant.",
     ]),
     ("I can't see your face yet. Sit where you usually sit, and look at me.", [
         "Mình chưa thấy mặt bạn. Bạn ngồi chỗ quen thuộc và nhìn về phía mình nhé.",
         "まだお顔が見えません。いつも座る場所に座って、私の方を見てください。",
         "我还看不到你的脸。请坐在你平时坐的地方，看着我。",
         "아직 얼굴이 안 보여요. 평소에 앉는 자리에 앉아서 저를 봐 주세요.",
+        "Je ne vois pas encore votre visage. Asseyez-vous à votre place habituelle, et regardez-moi.",
     ]),
     ("You're a little far. Move me closer to you, or stay as you are.", [
         "Bạn hơi xa. Bạn dời mình lại gần hơn, hoặc cứ giữ nguyên cũng được.",
         "少し遠いです。私をもう少し近くに動かすか、そのままでも大丈夫です。",
         "你离得有点远。把我挪近一点，或者保持现在这样也行。",
         "조금 멀리 계시네요. 저를 더 가까이 옮겨 주셔도 되고, 지금 그대로 계셔도 돼요.",
+        "Vous êtes un peu loin. Rapprochez-moi de vous, ou restez comme vous êtes.",
     ]),
     ("I can see you at the edge of my view. Turn my head toward you until I'm facing you, or stay as you are.", [
         "Mình thấy bạn ở rìa tầm nhìn. Bạn xoay đầu mình về phía bạn cho tới khi mình nhìn thẳng vào bạn, hoặc cứ giữ nguyên cũng được.",
         "視界のはしに見えています。私の頭を、正面になるまであなたの方に向けてください。そのままでも大丈夫です。",
         "我在视野边缘看到你了。把我的头转向你，直到我正对着你，或者保持现在这样也行。",
         "제 시야 가장자리에 보여요. 제 머리를 돌려 저와 마주 보게 해 주시거나, 그대로 계셔도 돼요.",
+        "Je vous vois au bord de mon champ de vision. Tournez ma tête vers vous jusqu'à ce que je sois face à vous, ou restez comme vous êtes.",
     ]),
     ("Got it, I can see you well there.", [
         "Rồi, ở đó mình thấy bạn rõ lắm.",
         "はい、そこならよく見えます。",
         "好的，在那里我能看清你。",
         "좋아요. 그 자리에서는 얼굴이 잘 보여요.",
+        "C'est noté, je vous vois bien de là.",
     ]),
     ("I still can't see you well there. That's fine, you can turn me toward your seat later.", [
         "Ở đó mình vẫn chưa thấy rõ bạn. Không sao, lát nữa bạn xoay mình về phía chỗ ngồi cũng được.",
         "そこだとまだよく見えません。大丈夫です、あとで私を席の方に向けてください。",
         "在那里我还是看不清你。没关系，你之后可以把我转向你的座位。",
         "거기서는 아직 잘 안 보여요. 괜찮아요, 나중에 저를 자리 쪽으로 돌려 주세요.",
+        "Je ne vous vois toujours pas bien de là. Ce n'est pas grave, vous pourrez me tourner vers votre place plus tard.",
     ]),
     ("Sorry, what should I call you?", [
         "Xin lỗi, mình nên gọi bạn là gì?",
         "すみません、何とお呼びすればいいですか？",
         "不好意思，我该怎么称呼你？",
         "죄송해요, 어떻게 불러 드릴까요?",
+        "Pardon, comment dois-je vous appeler ?",
     ]),
     ("I didn't feel that. Touch the very top of my head with your fingertip, once.", [
         "Mình chưa cảm thấy. Bạn dùng đầu ngón tay chạm lên chính giữa đỉnh đầu mình một lần nhé.",
         "感じませんでした。指先で私の頭のいちばん上を一回さわってください。",
         "我没感觉到。用指尖碰一下我头顶最上面，一次就好。",
         "방금은 터치가 느껴지지 않았어요. 손끝으로 제 머리 맨 위를 한 번 톡 건드려 주세요.",
+        "Je n'ai rien senti. Touchez une fois le sommet de ma tête du bout du doigt.",
     ]),
     ("Got it, I felt that.", [
         "Rồi, mình cảm thấy rồi.",
         "はい、感じました。",
         "好的，我感觉到了。",
         "좋아요, 느꼈어요.",
+        "C'est noté, je l'ai senti.",
     ]),
     ("I didn't feel a tap this time. That's fine, you can redo the setup later. Just ask me to redo the setup.", [
         "Lần này mình chưa cảm thấy cái chạm. Không sao, bạn có thể cài đặt lại sau. Chỉ cần bảo mình cài đặt lại.",
         "今回はタッチを感じませんでした。大丈夫です、設定はあとでやり直せます。「設定をやり直して」と言ってください。",
         "这次我没感觉到触碰。没关系，你可以稍后重新设置。只要让我重新设置就行。",
         "이번에는 터치를 못 느꼈어요. 괜찮아요. 설정은 나중에 다시 하실 수 있어요. 다시 설정하고 싶을 땐 저에게 말씀해 주세요.",
+        "Je n'ai pas senti de tapotement cette fois. Ce n'est pas grave, vous pourrez refaire la configuration plus tard. Demandez-moi simplement de refaire la configuration.",
     ]),
     ("Got it, the switch closes my microphones.", [
         "Rồi, công tắc đó tắt micrô của mình.",
         "はい、スイッチでマイクが閉じます。",
         "好的，这个开关会关闭我的麦克风。",
         "좋아요. 스위치를 닫으면 제 마이크가 차단돼요.",
+        "C'est noté, l'interrupteur coupe mes micros.",
     ]),
     ("Got it, the switch closes my microphones and my camera.", [
         "Rồi, công tắc đó tắt micrô và camera của mình.",
         "はい、スイッチでマイクとカメラが閉じます。",
         "好的，这个开关会关闭我的麦克风和摄像头。",
         "좋아요. 스위치를 닫으면 제 마이크와 카메라가 차단돼요.",
+        "C'est noté, l'interrupteur coupe mes micros et ma caméra.",
     ]),
     ("The switch check didn't finish. You can try it again later by redoing the setup. Just ask me to redo the setup.", [
         "Phần kiểm tra công tắc chưa xong. Bạn có thể thử lại sau bằng cách cài đặt lại. Chỉ cần bảo mình cài đặt lại.",
         "スイッチの確認が終わりませんでした。あとで設定をやり直せば、もう一度試せます。「設定をやり直して」と言ってください。",
         "开关检查没有完成。你可以稍后重新设置再试一次。只要让我重新设置就行。",
         "스위치 확인을 끝내지 못했어요. 나중에 설정을 다시 하면 이 단계도 다시 해 볼 수 있어요. 다시 설정하고 싶을 땐 저에게 말씀해 주세요.",
+        "La vérification de l'interrupteur n'est pas terminée. Vous pourrez réessayer plus tard en refaisant la configuration. Demandez-moi simplement de refaire la configuration.",
     ]),
     ("Got it. Say 'Hey Lamp' once more.", [
         "Rồi. Bạn nói 'Hey Lamp' thêm lần nữa nhé.",
         "はい。もう一度「Hey Lamp」と言ってください。",
         "好的。再说一次“Hey Lamp”。",
         "좋아요. 'Hey Lamp'라고 한 번 더 말해 주세요.",
+        "C'est noté. Dites encore une fois 'Hey Lamp'.",
     ]),
     ("I didn't catch that. Say 'Hey Lamp' again, from your seat.", [
         "Mình chưa nghe rõ. Bạn ngồi tại chỗ nói lại 'Hey Lamp' nhé.",
         "聞き取れませんでした。座ったまま、もう一度「Hey Lamp」と言ってください。",
         "我没听清。请坐在原位再说一次“Hey Lamp”。",
         "잘 못 들었어요. 자리에서 다시 'Hey Lamp'라고 말해 주세요.",
+        "Je n'ai pas bien entendu. Redites 'Hey Lamp', depuis votre place.",
     ]),
     ("Got it, that's three.", [
         "Rồi, đủ ba lần rồi.",
         "はい、これで三回です。",
         "好的，三次了。",
         "좋아요, 세 번 들었어요.",
+        "C'est noté, ça fait trois.",
     ]),
     ("I couldn't learn how you call me this time. That's fine, you can redo the setup later. Just ask me to redo the setup.", [
         "Lần này mình chưa học được cách bạn gọi mình. Không sao, bạn có thể cài đặt lại sau. Chỉ cần bảo mình cài đặt lại.",
         "今回は呼びかけ方を覚えられませんでした。大丈夫です、設定はあとでやり直せます。「設定をやり直して」と言ってください。",
         "这次我没学会你怎么叫我。没关系，你可以稍后重新设置。只要让我重新设置就行。",
         "이번에는 저를 부르는 목소리를 익히지 못했어요. 괜찮아요. 나중에 설정을 다시 하실 수 있어요. 다시 설정하고 싶을 땐 저에게 말씀해 주세요.",
+        "Je n'ai pas pu apprendre comment vous m'appelez cette fois. Ce n'est pas grave, vous pourrez refaire la configuration plus tard. Demandez-moi simplement de refaire la configuration.",
     ]),
     ("Now say any sentence to me, the way you'd talk to me.", [
         "Giờ bạn nói với mình một câu bất kỳ, như lúc bình thường nói chuyện với mình.",
         "では、ふだん話しかけるように、何か一言話しかけてください。",
         "现在随便对我说一句话，就像平时跟我说话那样。",
         "이제 평소 저에게 이야기하듯 아무 문장이나 하나 말해 주세요.",
+        "Maintenant, dites-moi n'importe quelle phrase, comme quand vous me parlez.",
     ]),
     ("Say another sentence from your seat, a little louder.", [
         "Bạn ngồi tại chỗ nói thêm một câu nữa, to hơn một chút nhé.",
         "座ったまま、もう少し大きな声でもう一言話してください。",
         "请坐在原位再说一句，声音大一点。",
         "앉은 자리에서 조금 더 큰 목소리로 다른 문장 하나를 말해 주세요.",
+        "Dites une autre phrase depuis votre place, un peu plus fort.",
     ]),
     ("Come a little closer and say another sentence.", [
         "Bạn lại gần hơn một chút và nói thêm một câu nữa nhé.",
         "もう少し近づいて、もう一言話してください。",
         "请再靠近一点，再说一句。",
         "조금 더 가까이 오셔서 다른 문장 하나를 말해 주세요.",
+        "Approchez-vous un peu et dites une autre phrase.",
     ]),
     ("Say another sentence from your seat.", [
         "Bạn ngồi tại chỗ nói thêm một câu nữa nhé.",
         "座ったまま、もう一言話してください。",
         "请坐在原位再说一句。",
         "앉은 자리에서 다른 문장 하나를 말해 주세요.",
+        "Dites une autre phrase depuis votre place.",
     ]),
     ("Got it, I hear you well from there.", [
         "Rồi, từ chỗ đó mình nghe bạn rõ lắm.",
         "はい、そこからよく聞こえます。",
         "好的，在那里我能听清你。",
         "좋아요, 거기서 잘 들려요.",
+        "C'est noté, je vous entends bien de là.",
     ]),
     ("I couldn't hear you well enough this time. I'll get used to your voice as we talk.", [
         "Lần này mình chưa nghe bạn đủ rõ. Mình sẽ quen dần với giọng bạn khi mình trò chuyện.",
         "今回は十分に聞き取れませんでした。話しているうちに、あなたの声に慣れていきますね。",
         "这次我没能听清楚。我们多聊聊，我会慢慢熟悉你的声音。",
         "이번에는 말씀을 충분히 또렷하게 듣지 못했어요. 앞으로 대화하면서 목소리에 익숙해질게요.",
+        "Je n'ai pas pu vous entendre assez bien cette fois. Je m'habituerai à votre voix au fil de nos conversations.",
     ]),
     ("I didn't feel my head move. Hold my base with one hand. With the other, tilt my head gently to one side. Let go when I say so.", [
         "Mình chưa thấy đầu mình chuyển động. Một tay giữ đế của mình. Tay kia nhẹ nhàng nghiêng đầu mình sang một bên. Khi mình bảo thì buông tay.",
         "頭が動いたのを感じませんでした。片手で私の台座を押さえて、もう片方の手で頭をそっと横に傾けてください。私が言ったら手を離してください。",
         "我没感觉到头在动。一只手扶住我的底座，另一只手轻轻把我的头歪向一边。我说好了再松手。",
         "제 머리가 움직이는 걸 느끼지 못했어요. 한 손으로 제 받침대를 잡고, 다른 손으로 제 머리를 한쪽으로 살짝 기울여 주세요. 제가 손을 떼라고 하면 떼 주세요.",
+        "Je n'ai pas senti ma tête bouger. Tenez mon socle d'une main. De l'autre, inclinez doucement ma tête sur le côté. Lâchez quand je vous le dirai.",
     ]),
     ("That's it, now let go.", [
         "Đúng rồi, giờ buông tay ra nhé.",
         "そうです、では手を離してください。",
         "对，现在松手吧。",
         "바로 그거예요. 이제 손을 떼 주세요.",
+        "C'est ça, maintenant lâchez.",
     ]),
     ("Hold my base with one hand. With the other, tilt my head gently to one side, then let go.", [
         "Một tay giữ đế của mình. Tay kia nhẹ nhàng nghiêng đầu mình sang một bên, rồi buông tay.",
         "片手で私の台座を押さえて、もう片方の手で頭をそっと横に傾けてから、手を離してください。",
         "一只手扶住我的底座，另一只手轻轻把我的头歪向一边，然后松手。",
         "한 손으로 제 받침대를 잡고, 다른 손으로 제 머리를 한쪽으로 살짝 기울인 다음 손을 떼 주세요.",
+        "Tenez mon socle d'une main. De l'autre, inclinez doucement ma tête sur le côté, puis lâchez.",
     ]),
     ("A little more, then let go.", [
         "Thêm chút nữa, rồi buông tay nhé.",
         "もう少しだけ。それから手を離してください。",
         "再多一点，然后松手。",
         "조금만 더 기울인 다음 손을 떼 주세요.",
+        "Encore un peu, puis lâchez.",
     ]),
     ("No problem, we'll try that one later.", [
         "Không sao, mình sẽ thử lại phần đó sau nhé.",
         "大丈夫です、それはあとでやりましょう。",
         "没问题，这一步我们稍后再试。",
         "괜찮아요, 그건 나중에 해 볼게요.",
+        "Pas de problème, on réessaiera plus tard.",
     ]),
     ("Got it, my head moved with your hand.", [
         "Rồi, đầu mình đã đi theo tay bạn.",
         "はい、手に合わせて頭が動きました。",
         "好的，我的头跟着你的手动了。",
         "좋아요, 손을 따라 머리가 움직였어요.",
+        "C'est noté, ma tête a suivi votre main.",
     ]),
     ("I didn't feel my head move this time. That's fine, you can redo the setup later. Just ask me to redo the setup.", [
         "Lần này mình chưa thấy đầu mình chuyển động. Không sao, bạn có thể cài đặt lại sau. Chỉ cần bảo mình cài đặt lại.",
         "今回は頭が動いたのを感じませんでした。大丈夫です、設定はあとでやり直せます。「設定をやり直して」と言ってください。",
         "这次我没感觉到头在动。没关系，你可以稍后重新设置。只要让我重新设置就行。",
         "이번에는 제 머리가 움직이는 걸 느끼지 못했어요. 괜찮아요. 나중에 설정을 다시 하실 수 있어요. 다시 설정하고 싶을 땐 저에게 말씀해 주세요.",
+        "Je n'ai pas senti ma tête bouger cette fois. Ce n'est pas grave, vous pourrez refaire la configuration plus tard. Demandez-moi simplement de refaire la configuration.",
     ]),
     ("Did I get that right, {name}?", [
         "{name}, mình nghe đúng chưa?",
         "{name}さん、で合っていますか？",
         "{name}，我没听错吧？",
         "{name} 님이라고 들었는데, 맞나요?",
+        "J'ai bien compris, {name} ?",
     ]),
     ("May I say hello when you sit down?", [
         "Khi bạn ngồi xuống, mình chào bạn được không?",
         "座ったときに、あいさつしてもいいですか？",
         "你坐下的时候，我可以跟你打个招呼吗？",
         "자리에 앉으시면 인사해도 될까요?",
+        "Puis-je vous dire bonjour quand vous vous asseyez ?",
     ]),
     ("You can add more skills in the Autonomous app. Now, ask me anything.", [
         "Bạn có thể thêm kỹ năng trong app Autonomous. Giờ thì hỏi mình bất cứ điều gì nhé.",
         "Autonomous アプリでスキルを追加できます。では、何でも聞いてください。",
         "你可以在 Autonomous App 里添加更多技能。现在，问我什么都行。",
         "Autonomous 앱에서 스킬을 더 추가할 수 있어요. 이제 무엇이든 물어보세요.",
+        "Vous pouvez ajouter d'autres compétences dans l'application Autonomous. Maintenant, demandez-moi ce que vous voulez.",
     ]),
     ("You can add more skills in the Autonomous app. Now, ask me anything. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one.", [
         "Bạn có thể thêm kỹ năng trong app Autonomous. Giờ thì hỏi mình bất cứ điều gì nhé. Nếu bạn muốn bắt đầu từ đâu đó, cứ nhờ mình hẹn giờ, hỏi thời tiết, hay hỏi bất cứ điều gì bạn tò mò. Bạn cũng có thể thêm kỹ năng từ Skill Store trong app, hoặc cứ nhờ mình tạo một kỹ năng.",
         "Autonomous アプリでスキルを追加できます。では、何でも聞いてください。まずは、タイマーや天気、気になることを何でも聞いてみてください。アプリの Skill Store からスキルを追加したり、私にスキルを作ってと頼んだりもできますよ。",
         "你可以在 Autonomous App 里添加更多技能。现在，问我什么都行。想先试试的话，可以让我定个计时器、问问天气，或者问任何你好奇的事。你也可以在 App 的 Skill Store 里添加技能，或者直接让我帮你做一个。",
         "Autonomous 앱에서 스킬을 더 추가할 수 있어요. 이제 무엇이든 물어보세요. 처음이라면 타이머나 날씨, 아니면 궁금한 건 뭐든 물어봐 주세요. 앱의 Skill Store에서 스킬을 추가하거나, 저한테 하나 만들어 달라고 하셔도 돼요.",
+        "Vous pouvez ajouter d'autres compétences dans l'application Autonomous. Maintenant, demandez-moi ce que vous voulez. Pour commencer, demandez-moi un minuteur, la météo, ou tout ce qui vous intrigue. Vous pouvez aussi ajouter une compétence depuis le Skill Store de l'application, ou simplement me demander d'en créer une.",
     ]),
     // The sentence about Harness (#5488, `harness_line::SENTENCE`), alone
     // and ending each closing it goes into.
@@ -1515,18 +1780,21 @@ pub(super) const LINES: &[Line] = &[
         "パソコンでお仕事をしているなら、アプリの Harness でつなぐと、私が作業を引き受けられますよ。",
         "如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
         "컴퓨터로 일하신다면 앱의 Harness에서 연결해 주세요, 제가 일을 맡아 드릴게요.",
+        "Si vous travaillez sur un ordinateur, je peux prendre des tâches en charge pour vous : ouvrez Harness dans l'application pour vous connecter.",
     ]),
     ("You can add more skills in the Autonomous app. Now, ask me anything. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.", [
         "Bạn có thể thêm kỹ năng trong app Autonomous. Giờ thì hỏi mình bất cứ điều gì nhé. Nếu bạn làm việc trên máy tính, mình có thể nhận việc giúp bạn: mở mục Harness trong app để kết nối nhé.",
         "Autonomous アプリでスキルを追加できます。では、何でも聞いてください。パソコンでお仕事をしているなら、アプリの Harness でつなぐと、私が作業を引き受けられますよ。",
         "你可以在 Autonomous App 里添加更多技能。现在，问我什么都行。如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
         "Autonomous 앱에서 스킬을 더 추가할 수 있어요. 이제 무엇이든 물어보세요. 컴퓨터로 일하신다면 앱의 Harness에서 연결해 주세요, 제가 일을 맡아 드릴게요.",
+        "Vous pouvez ajouter d'autres compétences dans l'application Autonomous. Maintenant, demandez-moi ce que vous voulez. Si vous travaillez sur un ordinateur, je peux prendre des tâches en charge pour vous : ouvrez Harness dans l'application pour vous connecter.",
     ]),
     ("You can add more skills in the Autonomous app. Now, ask me anything. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.", [
         "Bạn có thể thêm kỹ năng trong app Autonomous. Giờ thì hỏi mình bất cứ điều gì nhé. Nếu bạn muốn bắt đầu từ đâu đó, cứ nhờ mình hẹn giờ, hỏi thời tiết, hay hỏi bất cứ điều gì bạn tò mò. Bạn cũng có thể thêm kỹ năng từ Skill Store trong app, hoặc cứ nhờ mình tạo một kỹ năng. Nếu bạn làm việc trên máy tính, mình có thể nhận việc giúp bạn: mở mục Harness trong app để kết nối nhé.",
         "Autonomous アプリでスキルを追加できます。では、何でも聞いてください。まずは、タイマーや天気、気になることを何でも聞いてみてください。アプリの Skill Store からスキルを追加したり、私にスキルを作ってと頼んだりもできますよ。パソコンでお仕事をしているなら、アプリの Harness でつなぐと、私が作業を引き受けられますよ。",
         "你可以在 Autonomous App 里添加更多技能。现在，问我什么都行。想先试试的话，可以让我定个计时器、问问天气，或者问任何你好奇的事。你也可以在 App 的 Skill Store 里添加技能，或者直接让我帮你做一个。如果你在电脑上工作，我可以帮你接手任务：在 App 里打开 Harness 就能连接。",
         "Autonomous 앱에서 스킬을 더 추가할 수 있어요. 이제 무엇이든 물어보세요. 처음이라면 타이머나 날씨, 아니면 궁금한 건 뭐든 물어봐 주세요. 앱의 Skill Store에서 스킬을 추가하거나, 저한테 하나 만들어 달라고 하셔도 돼요. 컴퓨터로 일하신다면 앱의 Harness에서 연결해 주세요, 제가 일을 맡아 드릴게요.",
+        "Vous pouvez ajouter d'autres compétences dans l'application Autonomous. Maintenant, demandez-moi ce que vous voulez. Pour commencer, demandez-moi un minuteur, la météo, ou tout ce qui vous intrigue. Vous pouvez aussi ajouter une compétence depuis le Skill Store de l'application, ou simplement me demander d'en créer une. Si vous travaillez sur un ordinateur, je peux prendre des tâches en charge pour vous : ouvrez Harness dans l'application pour vous connecter.",
     ]),
     // The first update's line (#6284, `FIRST_UPDATE_LINE`), said while the
     // walk waits for it.
@@ -1535,6 +1803,7 @@ pub(super) const LINES: &[Line] = &[
         "先にソフトウェアを更新しますね。数分かかります。",
         "我先更新一下软件，需要几分钟。",
         "먼저 소프트웨어를 업데이트할게요. 몇 분 걸려요.",
+        "Je mets d'abord mon logiciel à jour. Cela prend quelques minutes.",
     ]),
     // Said to a person who talks to the lamp while that first update holds
     // the walk (#6284, `FIRST_UPDATE_WAIT_LINE`).
@@ -1543,6 +1812,7 @@ pub(super) const LINES: &[Line] = &[
         "まだソフトウェアを更新しています。少しお待ちください、もうすぐ準備できます。",
         "我还在更新软件，请稍等一下，马上就好。",
         "아직 소프트웨어를 업데이트하고 있어요. 조금만 기다려 주세요, 곧 준비돼요.",
+        "Je suis encore en train de mettre mon logiciel à jour. Patientez un instant, je serai bientôt prête.",
     ]),
     // Said once that first update has switched the lamp (#6284,
     // `FIRST_UPDATE_DONE_LINE`), just before the walk begins.
@@ -1551,12 +1821,14 @@ pub(super) const LINES: &[Line] = &[
         "ソフトウェアの更新が終わりました。もう準備できましたよ。",
         "我的软件更新完成了，现在准备好了。",
         "소프트웨어 업데이트가 끝났어요. 이제 준비됐어요.",
+        "La mise à jour de mon logiciel est terminée, et je suis prête.",
     ]),
     ("That's fine, you can redo the setup later. Just ask me to redo the setup.", [
         "Không sao, bạn có thể cài đặt lại sau. Chỉ cần bảo mình cài đặt lại.",
         "大丈夫です、設定はあとでやり直せます。「設定をやり直して」と言ってください。",
         "没关系，你可以稍后重新设置。只要让我重新设置就行。",
         "괜찮아요. 나중에 다시 설정하실 수 있어요. 다시 설정하고 싶을 땐 저에게 말씀해 주세요.",
+        "Ce n'est pas grave, vous pourrez refaire la configuration plus tard. Demandez-moi simplement de refaire la configuration.",
     ]),
 ];
 
@@ -1566,6 +1838,7 @@ fn column(language: Language) -> usize {
         Language::Japanese => 1,
         Language::Chinese => 2,
         Language::Korean => 3,
+        Language::French => 4,
     }
 }
 
@@ -1605,7 +1878,7 @@ pub(super) fn said(note: String, language: Option<Language>) -> String {
                     || part.to_owned(),
                     |said| {
                         let said = match language {
-                            Language::Vietnamese => first_letter(&said, false),
+                            Language::Vietnamese | Language::French => first_letter(&said, false),
                             _ => said,
                         };
                         format!("{}{said}", counter.said(Some(language)))
@@ -1640,6 +1913,9 @@ const VI_NUMBERS: [&str; 9] = [
     "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín",
 ];
 const ZH_NUMBERS: [&str; 9] = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
+const FR_NUMBERS: [&str; 9] = [
+    "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf",
+];
 
 fn number(words: &[&str; 9], count: usize) -> String {
     words
@@ -1718,6 +1994,21 @@ impl Counter {
                     format!("{at}단계: ")
                 },
             ),
+            Some(Language::French) => (
+                if of == 1 {
+                    "Bonjour ! Je suis votre lampe. Faisons connaissance. Une étape rapide, juste quelques minutes. ".to_owned()
+                } else {
+                    format!(
+                        "Bonjour ! Je suis votre lampe. Faisons connaissance. {} étapes rapides, juste quelques minutes. ",
+                        first_letter(&number(&FR_NUMBERS, of), true)
+                    )
+                },
+                if last {
+                    "Dernière étape : ".to_owned()
+                } else {
+                    format!("Étape {} : ", number(&FR_NUMBERS, at))
+                },
+            ),
         };
         if intro { opening + &step } else { step }
     }
@@ -1794,6 +2085,7 @@ fn step_words() -> Vec<String> {
         Some(Language::Japanese),
         Some(Language::Chinese),
         Some(Language::Korean),
+        Some(Language::French),
     ];
     languages
         .into_iter()
@@ -1903,6 +2195,8 @@ fn all_done(language: Language, name: Option<&str>) -> String {
         (Language::Chinese, Some(name)) => format!("{name}，全部完成！"),
         (Language::Korean, None) => "모두 끝났어요! ".into(),
         (Language::Korean, Some(name)) => format!("{name}님, 모두 끝났어요! "),
+        (Language::French, None) => "C'est terminé ! ".into(),
+        (Language::French, Some(name)) => format!("C'est terminé, {name} ! "),
     }
 }
 
@@ -1938,11 +2232,12 @@ pub(super) fn with_counter(note: &str, counter: Counter) -> String {
 mod tests {
     use super::*;
 
-    const ALL: [Language; 4] = [
+    const ALL: [Language; 5] = [
         Language::Vietnamese,
         Language::Japanese,
         Language::Chinese,
         Language::Korean,
+        Language::French,
     ];
 
     /// Every note the walk can say: the shipped skill's, and the code's.
@@ -2039,6 +2334,10 @@ mod tests {
             (
                 Some(Language::Korean),
                 "모두 끝났어요! Autonomous 앱에서 스킬을 더 추가할 수 있어요. 이제 무엇이든 물어보세요.",
+            ),
+            (
+                Some(Language::French),
+                "C'est terminé ! Vous pouvez ajouter d'autres compétences dans l'application Autonomous. Maintenant, demandez-moi ce que vous voulez.",
             ),
         ];
         for (language, line) in closing {
@@ -2143,7 +2442,7 @@ mod tests {
     /// An unknown language is English: nothing here changes.
     #[test]
     fn an_unknown_language_falls_back_to_english() {
-        let chosen = Language::parse("fr").ok().flatten();
+        let chosen = Language::parse("de").ok().flatten();
         assert_eq!(chosen, None);
         let note = super::super::skill::PREFERENCES_HELLO.to_owned();
         assert_eq!(said(note.clone(), chosen), note);
@@ -2210,6 +2509,23 @@ mod tests {
                 ],
                 greetings: &["안녕하세요, Lamp.", "좋은 아침이에요."],
                 names: &["민수", "제 이름은 민수예요."],
+            },
+            Language::French => Said {
+                yes: &["Oui.", "Oui, bien sûr.", "D'accord, pas de problème."],
+                no: &["Non.", "Non, merci.", "Surtout pas."],
+                questions: &[
+                    "C'est quoi, les heures calmes ?",
+                    "Vous avez dit quoi ?",
+                    "Ça veut dire quoi ?",
+                ],
+                hello_yes: &["Oui, s'il vous plaît.", "Volontiers."],
+                times: &[
+                    "Après dix heures du soir.",
+                    "De 22 heures à 6 heures du matin.",
+                    "après dix heures du soir",
+                ],
+                greetings: &["Bonjour Lamp.", "Bonsoir."],
+                names: &["Camille", "Je m'appelle Camille."],
             },
         }
     }
@@ -2391,6 +2707,23 @@ mod tests {
                     "그렇죠",
                 ][..],
             ),
+            (
+                Language::French,
+                &[
+                    "Peut-être",
+                    "Oui, peut-être",
+                    "Euh",
+                    "Je ne sais pas",
+                    "Oui, mais plus tard",
+                    "Attendez",
+                    "Laissez-moi réfléchir",
+                    "Oui, plus tard",
+                    "On verra",
+                    "D'accord, mais expliquez d'abord",
+                    "Oui, euh",
+                    "Bof",
+                ][..],
+            ),
         ] {
             for line in lines {
                 let read = read(language, line);
@@ -2407,6 +2740,7 @@ mod tests {
             (Language::Japanese, "いいえ"),
             (Language::Chinese, "不要"),
             (Language::Korean, "아니요"),
+            (Language::French, "Non"),
         ] {
             assert_eq!(read(language, no).yes_or_no, Some(false), "{language:?}");
         }
@@ -2426,6 +2760,10 @@ mod tests {
             (Language::Japanese, &["はい", "うん", "もちろん"][..]),
             (Language::Chinese, &["好的", "可以", "是的", "当然"][..]),
             (Language::Korean, &["네", "좋아요"][..]),
+            (
+                Language::French,
+                &["Oui", "D'accord", "Bien sûr", "Ouais", "Pas de problème"][..],
+            ),
         ] {
             for line in lines {
                 assert!(read(language, line).agrees, "{language:?}: {line}");
@@ -2480,6 +2818,17 @@ mod tests {
                     "네, 해도 돼요",
                     "네, 돼요",
                     "네, 됩니다",
+                ][..],
+            ),
+            (
+                Language::French,
+                &[
+                    "Oui, merci",
+                    "Oui, s'il vous plaît",
+                    "D'accord, merci",
+                    "Avec plaisir",
+                    "Oui, d’accord",
+                    "Allez-y",
                 ][..],
             ),
         ] {

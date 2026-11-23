@@ -146,6 +146,7 @@ fn a_search_begun_with_nothing_said_is_begun_in_the_owners_language() {
         Language::Japanese,
         Language::Chinese,
         Language::Korean,
+        Language::French,
     ] {
         let line = fixed_in(Some(language), CHECKING);
         assert_ne!(line, CHECKING, "{language:?} has its own words");

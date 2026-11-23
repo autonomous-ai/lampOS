@@ -45,7 +45,7 @@ pub const KINDS: [&str; 6] = [
     "timezone.set",
     "person.name.set",
     "device.rename",
-    // The owner's language (#4473): `{"language": "en"|"vi"|"ja"|"zh"|"ko"}`,
+    // The owner's language (#4473, fr #8381): `{"language": "en"|"vi"|"ja"|"zh"|"ko"|"fr"}`,
     // checked by the helper, which restarts the voice once it rests.
     "language.set",
     CONTROL_KIND,
@@ -1407,7 +1407,7 @@ impl Changes {
 }
 
 /// The languages the voice speaks (#4473), as setup writes them.
-pub const LANGUAGES: [&str; 5] = ["en", "vi", "ja", "zh", "ko"];
+pub const LANGUAGES: [&str; 6] = ["en", "vi", "ja", "zh", "ko", "fr"];
 
 /// `system.info`'s `host.language` from `text` (setup's file): its code,
 /// else `en`, the voice's own reading of no file or one it doesn't know.
@@ -1754,7 +1754,7 @@ mod tests {
         for code in LANGUAGES {
             assert_eq!(language(&format!("{code}\n")), code);
         }
-        for other in ["", "\n", "fr", "JA", "ja-JP"] {
+        for other in ["", "\n", "de", "JA", "ja-JP"] {
             assert_eq!(language(other), "en", "{other:?}");
         }
     }

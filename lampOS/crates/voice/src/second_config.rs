@@ -1708,7 +1708,7 @@ mod tests {
         assert_eq!(today.stt_language, None);
         assert_eq!(today.tts_model.as_deref(), Some("eleven_v4_turbo"));
         assert_eq!(today.tts_voice, None);
-        for english in ["", "en", "en\n", "fr"] {
+        for english in ["", "en", "en\n", "de"] {
             fs::write(&file, english).unwrap();
             assert_eq!(
                 route().with_environment(product).unwrap(),
@@ -1723,6 +1723,9 @@ mod tests {
             ("ja", "Shizuka", "eleven_flash_v2_5"),
             ("zh", "Amy", "eleven_flash_v2_5"),
             ("ko", "Kanna", "eleven_v4_turbo"),
+            // French (#8381): English's default voice on flash, until a
+            // French speaker picks one.
+            ("fr", "Rachel", "eleven_flash_v2_5"),
         ] {
             fs::write(&file, format!("{code}\n")).unwrap();
             let spoken = route().with_environment(product).unwrap();

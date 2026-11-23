@@ -139,6 +139,21 @@ pub(crate) fn line_at(
             };
             format!("사용 한도를 다 썼어요. {when}에 돌아와요.")
         }
+        // French (#8381): the 24-hour clock, "7 h", "19 h 30".
+        Some(Language::French) => {
+            let when = if a_day_or_more {
+                [
+                    "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi",
+                ][weekday]
+                    .to_owned()
+            } else {
+                match minute {
+                    0 => format!("à {hour} h"),
+                    _ => format!("à {hour} h {minute:02}"),
+                }
+            };
+            format!("J'ai atteint ma limite d'utilisation. Elle revient {when}.")
+        }
     })
 }
 
@@ -183,6 +198,20 @@ mod tests {
             line_at(Some(Language::Vietnamese), RESET, now, HCM).as_deref(),
             Some("Mình hết hạn mức rồi, thứ Ba sẽ có lại.")
         );
+        assert_eq!(
+            line_at(Some(Language::French), RESET, now, HCM).as_deref(),
+            Some("J'ai atteint ma limite d'utilisation. Elle revient mardi.")
+        );
+        assert_eq!(
+            line_at(
+                Some(Language::French),
+                RESET + 12 * 3_600 + 30 * 60,
+                RESET - 3_600,
+                HCM
+            )
+            .as_deref(),
+            Some("J'ai atteint ma limite d'utilisation. Elle revient à 19 h 30.")
+        );
         assert_eq!(line_at(None, RESET, RESET, HCM), None);
         assert_eq!(line_at(None, RESET, RESET + 60, HCM), None);
     }
@@ -190,7 +219,12 @@ mod tests {
     #[test]
     fn each_language_says_the_hour() {
         let now = RESET - 3_600;
-        for language in [Language::Japanese, Language::Chinese, Language::Korean] {
+        for language in [
+            Language::Japanese,
+            Language::Chinese,
+            Language::Korean,
+            Language::French,
+        ] {
             let line = line_at(Some(language), RESET, now, HCM).unwrap_or_default();
             assert!(line.contains('7'), "{language:?}: {line}");
         }

@@ -165,10 +165,10 @@ pub fn spoken_is_off(value: Option<&str>) -> bool {
 pub const LANGUAGE_FILE: &str = "LAMP_LANGUAGE_FILE";
 
 /// Whether the language file's text is a language the lamp speaks other
-/// than English (vi, ja, zh, ko). Missing, empty, `en` or unknown is
+/// than English (vi, ja, zh, ko, fr). Missing, empty, `en` or unknown is
 /// English, as the voice takes it.
 pub fn speaks_other_than_english(text: Option<&str>) -> bool {
-    text.is_some_and(|text| matches!(text.trim(), "vi" | "ja" | "zh" | "ko"))
+    text.is_some_and(|text| matches!(text.trim(), "vi" | "ja" | "zh" | "ko" | "fr"))
 }
 
 /// Whether an ask takes the touch alone: in a busy room, with
@@ -1620,11 +1620,11 @@ mod tests {
             window.line("yes", AFTER, true, false, true),
             Heard::NotTaken("the ask took the touch alone")
         );
-        for language in ["vi", "zh", " ko "] {
+        for language in ["vi", "zh", " ko ", "fr"] {
             assert!(takes_touch_alone(false, None, Some(language)), "{language}");
         }
 
-        for language in [None, Some(""), Some("en\n"), Some("fr")] {
+        for language in [None, Some(""), Some("en\n"), Some("de")] {
             let touch_alone = takes_touch_alone(false, None, language);
             assert!(!touch_alone, "{language:?}");
             let mut window = opened(touch_alone);

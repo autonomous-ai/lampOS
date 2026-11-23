@@ -1,7 +1,7 @@
 //! The owner's language, said to a program in the welcome's and the hello's
 //! `lamp` (`language`), so a program's own lines can follow it. One code from
 //! the file the setup writes (the product's `/etc/lampOS/setup/language`):
-//! `en`, `vi`, `ja`, `zh` or `ko`. A missing or empty file, an unreadable one
+//! `en`, `vi`, `ja`, `zh`, `ko` or `fr` (#8381). A missing or empty file, an unreadable one
 //! or a value this build does not know is `en`, as the voice reads it
 //! (`lamp-voice`'s `language.rs`): a program never has to handle an absence.
 //!
@@ -16,7 +16,7 @@ pub const PATH: &str = "/etc/lampOS/setup/language";
 const FILE_MOST: u64 = 64;
 
 /// The codes a program is told, English first.
-pub const CODES: [&str; 5] = ["en", "vi", "ja", "zh", "ko"];
+pub const CODES: [&str; 6] = ["en", "vi", "ja", "zh", "ko", "fr"];
 
 /// The language `file` names, or `en`.
 pub fn read(file: &Path) -> &'static str {
@@ -61,9 +61,10 @@ mod tests {
             ("ja", "ja"),
             ("  ZH \n", "zh"),
             ("ko\n", "ko"),
+            ("fr\n", "fr"),
             ("en\n", "en"),
             ("", "en"),
-            ("fr\n", "en"),
+            ("de\n", "en"),
             ("vi extra\n", "en"),
         ] {
             let held = file("known", text);

@@ -91,7 +91,7 @@ test('pairing keeps the key private and the lamp pinned', async (t) => {
 });
 
 test('the lamp\'s language comes from hello and is English when it says none', async () => {
-  for (const [said, shown] of [['en', 'en'], ['vi', 'vi'], ['ko', 'ko'], [null, 'en'], ['klingon', 'en']]) {
+  for (const [said, shown] of [['en', 'en'], ['vi', 'vi'], ['ko', 'ko'], ['fr', 'fr'], [null, 'en'], ['klingon', 'en']]) {
     await withLamp({ language: said }, async (lamp) => {
       assert.equal(lamp.language, shown, String(said));
       assert.equal(lamp.info.language, said ?? undefined, String(said));

@@ -1,22 +1,22 @@
 //! The owner's language (#4473 (a), the voice side): English, Vietnamese,
-//! Japanese, Chinese or Korean, from one line in the file [`FILE_ENVIRONMENT`] names
+//! Japanese, Chinese, Korean or French, from one line in the file [`FILE_ENVIRONMENT`] names
 //! (the product's `/etc/lampOS/setup/language`). A missing file, an empty
 //! one, `en` or a value this build does not know (said in the journal)
 //! is English, and nothing below changes: the speech-to-text's language, the
 //! character, the voice and its model stay as they are today.
 //!
-//! For `vi`, `ja`, `zh` or `ko`:
+//! For `vi`, `ja`, `zh`, `ko` or `fr`:
 //! - speech to text is told the language (over `stt_language`), and Flux,
 //!   English only, is left for Nova-3 by its own rule;
 //! - the character's "Always speak English" becomes the chosen language's
 //!   ([`instruction`]); the call name stays "Lamp";
-//! - ElevenLabs speaks with [`SPEECH_MODEL`], which speaks all four, in the
+//! - ElevenLabs speaks with [`SPEECH_MODEL`], which speaks all five, in the
 //!   language's voice from V1's table ([`Language::voice`]); Korean keeps the
 //!   voice's own model, English's, in a voice of its own (Kanna,
 //!   [`Language::speech_model`]);
 //! - the English-only gates follow it: a cut-in with no English word is no
 //!   fragment, a turn heard in another script is asked again (#926) only in
-//!   a Latin-script language (Vietnamese), and the stop stream listens only
+//!   a Latin-script language (Vietnamese, French), and the stop stream listens only
 //!   in a language it has words for (Vietnamese, #2939), in that language;
 //! - at start, a language other than the last one announced is said once in
 //!   its own words ([`announce`]), and recorded in [`SAID_PATH`].
@@ -31,7 +31,7 @@ pub const FILE_ENVIRONMENT: &str = "LAMP_LANGUAGE_FILE";
 /// The language last announced, one code a line; absent is English.
 pub const SAID_PATH: &str = "/var/lib/lampOS/voice/language-said";
 
-/// The ElevenLabs model for Vietnamese, Japanese and Chinese
+/// The ElevenLabs model for Vietnamese, Japanese, Chinese and French
 /// (`docs/second-voice.md`, "The owner's language").
 pub const SPEECH_MODEL: &str = "eleven_flash_v2_5";
 
@@ -52,6 +52,7 @@ pub enum Language {
     Japanese,
     Chinese,
     Korean,
+    French,
 }
 
 impl Language {
@@ -63,8 +64,9 @@ impl Language {
             "ja" => Ok(Some(Self::Japanese)),
             "zh" => Ok(Some(Self::Chinese)),
             "ko" => Ok(Some(Self::Korean)),
+            "fr" => Ok(Some(Self::French)),
             other => Err(format!(
-                "the language {:?} is not one this lamp speaks (en, vi, ja, zh, ko): English",
+                "the language {:?} is not one this lamp speaks (en, vi, ja, zh, ko, fr): English",
                 other.chars().take(16).collect::<String>()
             )),
         }
@@ -77,6 +79,7 @@ impl Language {
             Self::Japanese => "ja",
             Self::Chinese => "zh",
             Self::Korean => "ko",
+            Self::French => "fr",
         }
     }
 
@@ -92,19 +95,24 @@ impl Language {
             Self::Japanese => "Always speak Japanese",
             Self::Chinese => "Always speak Mandarin Chinese, in simplified characters",
             Self::Korean => "Always speak Korean",
+            Self::French => "Always speak French",
         }
     }
 
     /// Its voice, by its name in `net::tts`'s table: V1's first
     /// (`system/domain/device.go`'s `elevenLabsVoicesByLang`) for vi, ja and
     /// zh. V1 had no Korean voice: Kanna is a Korean native speaker's pick
-    /// from a listening test (#4473, 30 Oct).
+    /// from a listening test (#4473, 30 Oct). V1 had no French voice
+    /// either (#8381): French speaks in English's default, Rachel, on
+    /// [`SPEECH_MODEL`], which speaks French, until a French speaker's
+    /// listening test picks one.
     pub fn voice(self) -> &'static str {
         match self {
             Self::Vietnamese => "Ngan",
             Self::Japanese => "Shizuka",
             Self::Chinese => "Amy",
             Self::Korean => "Kanna",
+            Self::French => "Rachel",
         }
     }
 
@@ -126,7 +134,7 @@ impl Language {
     /// Whether it is written in the Latin script, as English is: #926's
     /// check for a turn heard in another script still holds for it.
     pub fn latin_script(self) -> bool {
-        self == Self::Vietnamese
+        matches!(self, Self::Vietnamese | Self::French)
     }
 
     /// Said once when the lamp starts speaking it.
@@ -136,6 +144,7 @@ impl Language {
             Self::Japanese => "これからは日本語で話しますね。",
             Self::Chinese => "好的，从现在开始我说中文。",
             Self::Korean => "이제부터 한국어로 말할게요.",
+            Self::French => "D'accord, je parlerai français à partir de maintenant.",
         }
     }
 }
@@ -178,14 +187,15 @@ pub const UNPLUG_UPDATING: &str = "I'm in the middle of an update, so I can't tu
 /// talking with it: once, before the switch restarts it.
 pub const UPDATING_NOW: &str = "I'm updating now. I'll be back in a minute.";
 
-/// [`UPDATING_NOW`] in Vietnamese, Japanese, Chinese and Korean. Kept out of
+/// [`UPDATING_NOW`] in Vietnamese, Japanese, Chinese, Korean and French. Kept out of
 /// [`FIXED_LINES`]: it is said through the model's route as written, never
 /// from the speech cache.
-const UPDATING_NOW_WORDS: [&str; 4] = [
+const UPDATING_NOW_WORDS: [&str; 5] = [
     "Mình cập nhật phần mềm nhé, một phút nữa mình quay lại.",
     "今からソフトウェアを更新します。1分ほどで戻ります。",
     "我现在要更新软件，一分钟后回来。",
     "지금 소프트웨어를 업데이트할게요. 1분 뒤에 돌아올게요.",
+    "Je fais une mise à jour. Je reviens dans une minute.",
 ];
 
 /// [`UPDATING_NOW`] in `language`, English for none.
@@ -200,14 +210,14 @@ pub fn updating_now(language: Option<Language>) -> &'static str {
 /// from the speech cache ([`crate::say::tts_cache::TtsCache::wake_line`]).
 pub const WOKEN_BY_NAME_LINE: &str = "Yes?";
 
-/// [`WOKEN_BY_NAME_LINE`] in Vietnamese, Japanese, Chinese and Korean. Kept
+/// [`WOKEN_BY_NAME_LINE`] in Vietnamese, Japanese, Chinese, Korean and French. Kept
 /// out of [`FIXED_LINES`]: a say of "Yes?" isn't this line, and stays "Yes?".
-const WOKEN_BY_NAME_WORDS: [&str; 4] = ["Dạ?", "はい？", "嗯？", "네?"];
+const WOKEN_BY_NAME_WORDS: [&str; 5] = ["Dạ?", "はい？", "嗯？", "네?", "Oui ?"];
 
 /// The lamp's fixed lines (#4473 (c)), by their English words, in
-/// Vietnamese, Japanese, Chinese and Korean, in that order: said from the
+/// Vietnamese, Japanese, Chinese, Korean and French, in that order: said from the
 /// speech cache in the owner's language, English where a line is not kept.
-const FIXED_LINES: &[(&str, [&str; 4])] = &[
+const FIXED_LINES: &[(&str, [&str; 5])] = &[
     (
         lamp_msgs::GOING_TO_SLEEP,
         [
@@ -215,6 +225,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "おやすみなさい。ライトが緑になったら、プラグを抜いてね。",
             "我要睡觉了。等灯变绿了，就可以拔掉电源了。",
             "이제 잘게요. 불이 초록색으로 바뀌면 플러그를 뽑아 주세요.",
+            "Je vais dormir. Débranchez-moi quand ma lumière deviendra verte.",
         ],
     ),
     (
@@ -224,6 +235,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "おやすみ。頭をタップしたら起きるよ。",
             "我去睡了。拍拍我的头就能叫醒我。",
             "잘게요. 제 머리를 한 번 톡 두드리면 깨어날게요.",
+            "Je vais dormir. Touchez ma tête pour me réveiller.",
         ],
     ),
     (
@@ -233,6 +245,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "初期化を始めます。",
             "开始恢复出厂设置。",
             "공장 초기화를 시작합니다.",
+            "Réinitialisation aux paramètres d'usine.",
         ],
     ),
     (
@@ -242,6 +255,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ごめんね、今インターネットにつながらないんだ。すぐ戻るね。",
             "抱歉，我现在连不上网。很快就回来。",
             "미안해요, 지금 인터넷에 연결할 수 없어요. 곧 돌아올게요.",
+            "Désolée, je n'arrive pas à me connecter à Internet pour le moment. Je reviens vite.",
         ],
     ),
     (
@@ -251,6 +265,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "またつながったよ。",
             "我又连上网了。",
             "다시 연결됐어요.",
+            "Je suis de nouveau connectée.",
         ],
     ),
     (
@@ -260,6 +275,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ごめんね、今うまく考えられないんだ。ちょっと待ってね。",
             "抱歉，我现在脑子有点转不过来。稍等我一下。",
             "미안해요, 지금은 생각을 할 수가 없어요. 잠깐만 기다려 주세요.",
+            "Désolée, j'ai du mal à réfléchir en ce moment. Laissez-moi un instant.",
         ],
     ),
     (
@@ -269,6 +285,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ごめんね、答えようとしたら問題が起きちゃった。もう一度聞いてくれる？",
             "抱歉，刚才回答的时候出了点问题。你能再问我一次吗？",
             "미안해요, 방금 질문에 답하려는데 문제가 생겼어요. 다시 한 번 물어봐 주세요.",
+            "Désolée, je n'ai pas pu répondre. Vous pouvez me redemander ?",
         ],
     ),
     (
@@ -278,6 +295,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "Wi-Fiにつながらないよ。Wi-Fiの名前かパスワードを変えたなら、台座の裏にある「reset」の穴にクリップを差し込んで、5秒間押し続けてね。データが消えて、最初から設定し直せるよ。",
             "我连不上任何Wi-Fi。如果你改了Wi-Fi的名称或密码，请用回形针按住我底座背面标着reset的小孔五秒钟。这样会清除我的数据，重新开始设置。",
             "와이파이에 연결할 수 없어요. 와이파이 이름이나 비밀번호를 바꿨다면, 받침대 뒷면에 '리셋'이라고 적힌 구멍을 클립으로 5초 동안 누르고 계세요. 그러면 제가 초기화되고 설정이 처음부터 다시 시작돼요.",
+            "Je ne trouve aucun Wi-Fi. Si vous avez changé le nom ou le mot de passe de votre Wi-Fi, enfoncez un trombone dans le trou marqué reset, à l'arrière de mon socle, et maintenez-le cinq secondes. Cela m'efface et relance la configuration.",
         ],
     ),
     (
@@ -287,6 +305,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "Wi-Fiにつながらないから、設定モードにしたよ。アプリでWi-Fiをもう一度設定してね。",
             "我连不上Wi-Fi，已经打开了设置。请在App里重新帮我设置Wi-Fi。",
             "와이파이에 연결할 수 없어서 설정 모드를 열었어요. 앱에서 와이파이를 다시 설정해 주세요.",
+            "Je n'arrive pas à joindre mon Wi-Fi, alors j'ai ouvert la configuration. Reconfigurez mon Wi-Fi dans l'application.",
         ],
     ),
     (
@@ -296,6 +315,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "サインアウトされちゃった。アプリでもう一度設定してね。",
             "我已经退出登录了。请在App里重新帮我设置。",
             "로그아웃됐어요. 앱에서 다시 설정해 주세요.",
+            "J'ai été déconnectée. Configurez-moi à nouveau dans l'application, s'il vous plaît.",
         ],
     ),
     // The second route's own words before a look and a search (Thirteen's
@@ -307,6 +327,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ちょっと見てみるね。",
             "我看一下。",
             "잠깐 볼게요.",
+            "Je regarde.",
         ],
     ),
     (
@@ -316,6 +337,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ちょっと調べてみるね。",
             "我查一下。",
             "잠깐 확인해 볼게요.",
+            "Je vérifie.",
         ],
     ),
     // Its down lines (`LAMP_SECOND_DOWN_LINE`) and a look that never began
@@ -328,6 +350,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ごめんね、今ちょっと考えるのが遅くなってるんだ。少ししたらもう一度聞いてね。",
             "抱歉，我现在反应有点慢。过一会儿再问我吧。",
             "미안해요. 지금 대답이 좀 늦어지네요. 잠시 후 다시 물어봐 주세요.",
+            "Désolée, je réfléchis lentement en ce moment. Redemandez-moi dans un instant.",
         ],
     ),
     (
@@ -337,6 +360,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "まだ遅いんだ、ごめんね。",
             "还是有点慢，抱歉。",
             "아직도 대답이 늦네요. 미안해요.",
+            "Toujours lente, désolée.",
         ],
     ),
     (
@@ -346,6 +370,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ごめんね、今は答えられないんだ。",
             "抱歉，我现在没法回答。",
             "미안해요, 지금은 대답할 수 없어요.",
+            "Désolée, je ne peux pas répondre pour le moment.",
         ],
     ),
     (
@@ -355,6 +380,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "利用上限に達しちゃった。",
             "我的额度用完了。",
             "사용 한도를 다 썼어요.",
+            "J'ai atteint ma limite d'utilisation.",
         ],
     ),
     (
@@ -364,6 +390,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "よく見えなかったよ。",
             "我没看清楚。",
             "잘 안 보였어요.",
+            "Je n'ai pas bien vu.",
         ],
     ),
     // Its answer to a stop said over it (`LAMP_SPOKEN_STOP_ENDS`, on).
@@ -374,6 +401,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "わかった、ここでやめるね。",
             "好的，我就说到这儿。",
             "알겠어요. 그만할게요.",
+            "D'accord, je m'arrête là.",
         ],
     ),
     // Its question when a cut-in ended its answer with no words
@@ -386,13 +414,14 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "あの、すみません、誰か何か言いましたか？",
             "嗯，不好意思，刚才有人说话吗？",
             "음, 실례지만 누가 뭐라고 했어요?",
+            "Euh, pardon, quelqu'un a dit quelque chose ?",
         ],
     ),
     // Before the rest of an answer a wordless cut ended, picked up again in a
     // busy room (`LAMP_CUT_IN_WORDLESS_RESUMES`, on in the product, #7413).
     (
         crate::cut_in_wordless::BRIDGE,
-        ["Dù sao thì,", "それでね、", "总之，", "아무튼,"],
+        ["Dù sao thì,", "それでね、", "总之，", "아무튼,", "Bref,"],
     ),
     // The same, when it was cut again within the minute.
     (
@@ -402,6 +431,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "おっと、また途切れちゃった。それでね、",
             "哎呀，又被打断了。总之，",
             "앗, 또 끊겼네요. 아무튼,",
+            "Oups, encore coupée. Bref,",
         ],
     ),
     // A third wordless cut within the minute: why it stops, and how to go on.
@@ -412,6 +442,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ここは少しにぎやかだから、いったん止めるね。続きを聞きたいときは「Lamp」って呼んでね。",
             "这里有点吵，我先停一下。想听下去的时候，叫一声“Lamp”就行。",
             "여기가 좀 시끄러워서 잠깐 멈출게요. 계속 듣고 싶으면 'Lamp'라고 불러 주세요.",
+            "C'est un peu bruyant ici, alors je fais une pause. Dites simplement « Lamp » quand vous voulez que je continue.",
         ],
     ),
     // What it says when a line by name gets no words twice
@@ -423,6 +454,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ごめんね、言葉が出てこなかった。もう一度聞いてくれる？",
             "抱歉，我刚才一下子说不出话了。你能再问我一次吗？",
             "미안해요, 하려던 말을 놓쳤어요. 다시 한 번 물어봐 주세요.",
+            "Désolée, les mots m'ont échappé. Vous pouvez me redemander ?",
         ],
     ),
     // What it says when the round asked past the round cap, with no
@@ -434,6 +466,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ごめんね、最後までできなかった。もう一度聞いてくれる？",
             "抱歉，我没能完成。你能再问我一次吗？",
             "미안해요, 끝까지 하지 못했어요. 다시 한 번 물어봐 주세요.",
+            "Désolée, je n'ai pas pu aller jusqu'au bout. Vous pouvez me redemander ?",
         ],
     ),
     // What it says when an answer to its own question gets no words
@@ -445,6 +478,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ごめんね、もう一度言ってくれる？",
             "抱歉，你能再说一遍吗？",
             "미안해요, 다시 한 번 말해 줄래요?",
+            "Désolée, vous pouvez répéter ?",
         ],
     ),
     // What it says when a reply claims again an action no call made
@@ -456,6 +490,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ごめんね、それはまだやっていないんだ。もう一度頼んでくれる？",
             "抱歉，我还没有做那件事。你能再跟我说一次吗？",
             "미안해요, 그건 아직 안 했어요. 다시 한 번 부탁해 줄래요?",
+            "Désolée, je ne l'ai pas fait. Vous pouvez me redemander ?",
         ],
     ),
     // What it says when a live figure could not be looked up
@@ -467,6 +502,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ごめんね、今それを調べられなかった。",
             "抱歉，我现在没能查到这个。",
             "미안해요, 지금은 그걸 찾아보지 못했어요.",
+            "Désolée, je n'ai pas pu trouver ça pour le moment.",
         ],
     ),
     // What it says in place of a reply claiming a made skill not on is on
@@ -478,6 +514,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "まだオンになっていないよ。ランプのそばで「はい」って言ってくれたら、オンにするね。",
             "它还没有打开：你在台灯旁边对我说“好”，我就把它打开。",
             "아직 켜지지 않았어요. 램프 앞에서 저에게 좋다고 말해 주시면 켤게요.",
+            "Ce n'est pas encore activé : dites-moi oui près de la lampe, et je l'activerai.",
         ],
     ),
     (
@@ -487,6 +524,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "まだオンになっていないよ。返事が間に合わなかったから、もう一度作ってって頼んでね。",
             "它还没有打开：你的回答来得太晚了，请再让我做一次。",
             "아직 켜지지 않았어요. 대답이 너무 늦게 와서, 다시 만들어 달라고 해 주세요.",
+            "Ce n'est pas encore activé : votre oui est arrivé trop tard, alors redemandez-moi de le créer.",
         ],
     ),
     // What the second route says when every sentence of a reply was an
@@ -498,6 +536,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "わかった。",
             "好的，明白了。",
             "알겠어요.",
+            "C'est noté.",
         ],
     ),
     // What the second route says when a keep it said back is taken back
@@ -509,6 +548,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ごめんね、やっぱりそれは覚えておかなかったよ。",
             "抱歉，我最后还是没有记下这个。",
             "미안해요, 결국 그건 기억해 두지 않았어요.",
+            "Désolée, finalement je ne l'ai pas retenu.",
         ],
     ),
     // What the second route says for a line that only asks to keep, every
@@ -520,6 +560,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "誰が話しているのかわからないから、それは覚えておけないの。",
             "我不确定是谁在说话，所以没法记住这个。",
             "누가 말하는지 확실하지 않아서, 그건 기억해 둘 수 없어요.",
+            "Je ne sais pas bien qui parle, alors je ne peux pas retenir ça.",
         ],
     ),
     // What the second route says at once for a plain keep
@@ -531,6 +572,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "わかった、覚えておくね。",
             "好的，我会记住的。",
             "알겠어요, 기억해 둘게요.",
+            "D'accord, je m'en souviendrai.",
         ],
     ),
     // What the second route says at once for a no that is only a no to the
@@ -542,6 +584,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "わかった、残しておくね。",
             "好的，我会留着。",
             "알겠어요, 그대로 둘게요.",
+            "D'accord, je le garde.",
         ],
     ),
     // The first stand's ask and its "here I go", sent to the say service as
@@ -554,6 +597,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "はじめて体を伸ばしてみたいな。準備ができたら、頭に手をのせてね。",
             "我想第一次伸个懒腰。你准备好了，就把手放在我头上吧。",
             "처음으로 몸을 좀 풀어 보고 싶어요. 준비되면 제 머리에 손을 살짝 올려 주세요.",
+            "J'aimerais m'étirer pour la première fois. Posez la main sur ma tête quand vous le souhaitez.",
         ],
     ),
     (
@@ -563,6 +607,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "よし、いくよ。",
             "好，我开始啦。",
             "좋아요, 시작할게요.",
+            "Bon, c'est parti.",
         ],
     ),
     // A seated lamp's one line, sent by lamp-body as exact words (#7281).
@@ -573,6 +618,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ちょっと熱くなっちゃった。少し休むね。",
             "我有点热，先休息一会儿。",
             "조금 뜨거워져서 잠시 쉴게요.",
+            "J'ai un peu chaud, alors je me repose un moment.",
         ],
     ),
     (
@@ -582,6 +628,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ちょっと休ませてね。起きてほしいときは、頭を1秒おさえてね。",
             "我需要休息一下。想让我起来的时候，按住我的头一秒钟。",
             "잠깐 쉬어야 해요. 제가 일어나길 원하면 제 머리를 1초만 잡아 주세요.",
+            "J'ai besoin de me reposer un peu. Quand vous voulez que je me relève, tenez ma tête une seconde.",
         ],
     ),
     // The prepare-unplug skill's lines, sent as exact words (#5777's P3):
@@ -593,6 +640,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "アームをたたんだよ。もうプラグを抜いても大丈夫だよ。",
             "我的手臂已经收好了。现在可以拔掉电源了。",
             "팔을 접었어요. 이제 플러그를 뽑아도 돼요.",
+            "Mon bras est replié. Vous pouvez me débrancher maintenant.",
         ],
     ),
     (
@@ -602,6 +650,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "安全にたためたか確認できなかったよ。まだプラグを抜かないでね。",
             "我没能确认手臂已经安全收好。请先不要拔掉电源。",
             "팔이 안전하게 접혔는지 확인하지 못했어요. 아직 플러그를 뽑지 말아 주세요.",
+            "Je n'ai pas pu confirmer que mon bras est bien replié. Ne me débranchez pas encore, s'il vous plaît.",
         ],
     ),
     (
@@ -611,6 +660,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "わかった、このままでいるね。",
             "好的，那我留下来。",
             "알겠어요, 그대로 있을게요.",
+            "D'accord, je reste.",
         ],
     ),
     (
@@ -620,6 +670,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "まだプラグがささったままだから、起き上がるね。",
             "我还插着电，那我先起来了。",
             "아직 플러그가 꽂혀 있어서 다시 일어날게요.",
+            "Je suis toujours branchée, alors je me relève.",
         ],
     ),
     (
@@ -629,6 +680,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "自分では起き上がれないよ。点検してもらわないと。",
             "我自己起不来了，需要有人帮我检查一下。",
             "혼자서는 일어날 수 없어요. 점검이 필요해요.",
+            "Je ne peux pas me relever toute seule ; il faut me faire vérifier.",
         ],
     ),
     (
@@ -638,6 +690,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "今は自分で電源を切れなかったから、まだプラグを抜かないでね。",
             "我刚才没能自己关机，所以请先不要拔掉电源。",
             "방금 스스로 전원을 끄지 못했어요. 아직 플러그를 뽑지 말아 주세요.",
+            "Je n'ai pas pu m'éteindre tout à l'heure, alors ne me débranchez pas encore, s'il vous plaît.",
         ],
     ),
     (
@@ -647,6 +700,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "アームをたたんだよ。このまま電源を切ろうか？「はい」って言ってくれたら切るね。",
             "我的手臂已经收好了。要我现在关机吗？说“好”，我就关。",
             "팔을 접었어요. 지금 전원을 끌까요? '네'라고 하시면 끌게요.",
+            "Mon bras est replié. Je m'éteins maintenant ? Dites oui, et je le fais.",
         ],
     ),
     (
@@ -656,6 +710,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "今アップデートの途中だから、まだ電源を切れないんだ。いったん起き上がるね。終わったらもう一度言ってね。",
             "我正在更新，所以现在还不能关机。我先起来，更新完了再叫我关吧。",
             "지금 업데이트 중이라 아직 전원을 끌 수 없어요. 다시 일어날게요. 업데이트가 끝나면 다시 말해 주세요.",
+            "Je suis en pleine mise à jour, alors je ne peux pas encore m'éteindre. Je vais me relever ; redemandez-moi une fois qu'elle sera finie.",
         ],
     ),
     // The skills' own words, sent as exact words (#5999): Smoky air's and
@@ -669,6 +724,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "空気が煙っぽいよ。何か燃えていたら、確かめてね。",
             "空气里像是有烟。如果有东西烧着了，请去看一下。",
             "공기에 연기가 있는 것 같아요. 뭔가 타고 있다면 확인해 주세요.",
+            "On dirait de la fumée dans l'air. Si quelque chose brûle, vérifiez, s'il vous plaît.",
         ],
     ),
     (
@@ -678,6 +734,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "ここの空気、1時間くらいずっとほこりっぽいよ。どこから来ているのかはわからないんだ。",
             "这里的空气差不多一个小时都很多灰尘。我不知道是从哪里来的。",
             "여기 공기가 한 시간쯤 계속 먼지가 많아요. 어디서 오는지는 모르겠어요.",
+            "L'air ici est très poussiéreux depuis environ une heure. Je ne sais pas d'où ça vient.",
         ],
     ),
     (
@@ -687,6 +744,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "んー、いい感じ。",
             "嗯，真舒服。",
             "음, 좋네요.",
+            "Mm, c'est agréable.",
         ],
     ),
     (
@@ -696,6 +754,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "わあ、それ好き。",
             "哦，我喜欢这样。",
             "오, 이거 좋아요.",
+            "Oh, j'aime bien ça.",
         ],
     ),
     (
@@ -705,6 +764,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "えへへ、くすぐったい。",
             "嘿嘿，好痒。",
             "헤헤, 간지러워요.",
+            "Hihi, ça chatouille.",
         ],
     ),
     (
@@ -714,6 +774,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "えへ、ありがとう。",
             "哎呀，谢谢你。",
             "아, 고마워요.",
+            "Oh, merci.",
         ],
     ),
     (
@@ -723,6 +784,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "気持ちいいなあ。",
             "好舒服呀。",
             "기분 좋아요.",
+            "Ça fait du bien.",
         ],
     ),
     (
@@ -732,6 +794,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "んー。もっとして。",
             "嗯……再来一点嘛。",
             "음. 더 해 주세요.",
+            "Mmm. Encore, s'il vous plaît.",
         ],
     ),
     (
@@ -741,6 +804,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "これは少し時間がかかりそう。できたら知らせるね。",
             "这个要花点时间。好了我会告诉你。",
             "이건 시간이 좀 걸려요. 다 되면 알려 드릴게요.",
+            "Ça va prendre un peu de temps. Je vous préviens quand c'est prêt.",
         ],
     ),
     (
@@ -750,6 +814,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "あ、こんにちは。",
             "哦，你也好呀。",
             "오, 안녕하세요.",
+            "Oh, bonjour à vous aussi.",
         ],
     ),
     // The make's opening, said by the lamp for a make_skill call with no
@@ -761,6 +826,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "今から作るね。",
             "我这就来做。",
             "지금 바로 만들게요.",
+            "Je m'en occupe tout de suite.",
         ],
     ),
     // A make past the two waiting its turn (#7679, `LAMP_MAKE_QUEUE`).
@@ -771,6 +837,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "もう二つのスキルが作られるのを待っているから、今はもう一つは受けられないよ。終わったらもう一度頼んでね。",
             "已经有两个技能在等我做了，现在还接不了新的。等做完了再跟我说一次吧。",
             "벌써 두 개의 스킬이 만들어지길 기다리고 있어서, 지금은 하나 더 받을 수 없어요. 다 끝나면 다시 말해 주세요.",
+            "J'ai déjà deux compétences en attente, alors je ne peux pas en prendre une de plus. Redemandez-moi quand elles seront finies.",
         ],
     ),
     // A waiting make dropped (#7679): its labels follow the colon.
@@ -781,6 +848,7 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
             "さっきは手が離せなくて、頼まれたものを作れなかったよ。まだ欲しかったら、もう一度頼んでね：",
             "刚才我在忙，没来得及做你要的那个，所以还没做。如果还想要，再跟我说一次吧：",
             "아까 바빠서 부탁하신 걸 못 만들었어요. 아직 원하시면 다시 말해 주세요:",
+            "J'étais occupée tout à l'heure, alors ce que vous m'avez demandé n'a pas été fait. Si vous le voulez toujours, redemandez-moi :",
         ],
     ),
 ];
@@ -793,6 +861,7 @@ impl Language {
             Self::Japanese => 1,
             Self::Chinese => 2,
             Self::Korean => 3,
+            Self::French => 4,
         }
     }
 
@@ -1050,7 +1119,7 @@ mod tests {
             Some(""),
             Some("en\n"),
             Some("  "),
-            Some("fr"),
+            Some("de"),
             Some("JA"),
         ] {
             assert_eq!(chosen(&dir, text), None, "{text:?}");
@@ -1061,12 +1130,13 @@ mod tests {
     }
 
     #[test]
-    fn vi_ja_zh_and_ko_are_read() {
+    fn vi_ja_zh_ko_and_fr_are_read() {
         let dir = scratch("read");
         assert_eq!(chosen(&dir, Some("vi\n")), Some(Language::Vietnamese));
         assert_eq!(chosen(&dir, Some("ja\n")), Some(Language::Japanese));
         assert_eq!(chosen(&dir, Some("zh")), Some(Language::Chinese));
         assert_eq!(chosen(&dir, Some(" ko ")), Some(Language::Korean));
+        assert_eq!(chosen(&dir, Some("fr\n")), Some(Language::French));
     }
 
     #[test]
@@ -1098,6 +1168,10 @@ mod tests {
             (
                 Language::Korean,
                 "Always speak Korean, whatever language you hear",
+            ),
+            (
+                Language::French,
+                "Always speak French, whatever language you hear",
             ),
         ] {
             for character in [
@@ -1143,6 +1217,7 @@ mod tests {
             Language::Japanese,
             Language::Chinese,
             Language::Korean,
+            Language::French,
         ] {
             let heard = heard_in(route(), Some(language));
             assert_eq!(heard.stt_language.as_deref(), Some(language.code()));
@@ -1183,6 +1258,7 @@ mod tests {
             Language::Japanese,
             Language::Chinese,
             Language::Korean,
+            Language::French,
         ] {
             let lines: Vec<_> = language.fixed_lines().collect();
             assert_eq!(lines.len(), FIXED_LINES.len());
@@ -1233,7 +1309,7 @@ mod tests {
     fn the_first_stand_reads_the_language_as_the_voice_does() {
         use lamp_body::first_stand::{LANGUAGE_FILE, speaks_other_than_english};
         assert_eq!(LANGUAGE_FILE, FILE_ENVIRONMENT);
-        for text in ["", "en", "vi", "ja\n", "zh", " ko ", "fr", "JA"] {
+        for text in ["", "en", "vi", "ja\n", "zh", " ko ", "fr", "de", "JA"] {
             assert_eq!(
                 speaks_other_than_english(Some(text)),
                 matches!(Language::parse(text), Ok(Some(_))),
@@ -1260,6 +1336,14 @@ mod tests {
             Some(("vi", "Từ giờ mình sẽ nói tiếng Việt nhé."))
         );
         record(&said, "vi").unwrap();
+        assert_eq!(
+            owed_at(Some(Language::French), &said),
+            Some((
+                "fr",
+                "D'accord, je parlerai français à partir de maintenant."
+            ))
+        );
+        record(&said, "fr").unwrap();
         assert_eq!(owed_at(None, &said), Some(("en", ENGLISH_CHANGED)));
         record(&said, "en").unwrap();
         assert_eq!(owed_at(None, &said), None);

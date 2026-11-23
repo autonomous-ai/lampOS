@@ -2395,7 +2395,12 @@ mod tests {
         let heard = Some("heard-always");
         assert_eq!(listen_in(None, heard), Listen::Always);
         assert_eq!(listen_in(Some(Language::Vietnamese), heard), Listen::Always);
-        for language in [Language::Japanese, Language::Chinese, Language::Korean] {
+        for language in [
+            Language::Japanese,
+            Language::Chinese,
+            Language::Korean,
+            Language::French,
+        ] {
             assert_eq!(
                 listen_in(Some(language), heard),
                 Listen::Off,
