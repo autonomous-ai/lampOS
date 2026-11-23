@@ -4,6 +4,20 @@ use crate::wire::{ClockPrimed, PreparedPrime, PrimeDisposition, ReferenceFaultKi
 use lamp_audio::ownership::QueuedRange;
 
 const MAX_PRIME_US: u64 = 100_000;
+/// The first start after the voice starts (epoch 1) may be held up on a cold
+/// boot, while the whole board is starting: on 52e6 it once took more than
+/// 100 ms and the voice exited (#8391). Later epochs keep 100 ms.
+const FIRST_PRIME_US: u64 = 1_000_000;
+
+/// The start barrier's bound for a playback epoch, from the first prime write
+/// to the clock's start. Speaker and capture both use it.
+pub fn barrier_us(playback_epoch: u64) -> u64 {
+    if playback_epoch == 1 {
+        FIRST_PRIME_US
+    } else {
+        MAX_PRIME_US
+    }
+}
 
 #[derive(Default)]
 pub struct PrimeBarrier {
@@ -51,7 +65,7 @@ impl PrimeBarrier {
         if now < prime.queue_observed_at_us
             || now
                 .checked_sub(began_at)
-                .is_none_or(|age| age >= MAX_PRIME_US)
+                .is_none_or(|age| age >= barrier_us(prime.playback_epoch))
         {
             return Err(Kind::BarrierTimeout);
         }

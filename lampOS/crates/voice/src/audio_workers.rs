@@ -14,6 +14,7 @@ use crate::{
     playback::SpeechPlayback,
     reference::{
         PRIME_FRAMES, PrimeBarrier, RecoveryPolicy, ReferenceAssembly, accepted_write_survived,
+        barrier_us,
         hold::{self, CaptureHold},
     },
     stage_cost::Stage,
@@ -63,7 +64,6 @@ const TICK: Duration = Duration::from_millis(2);
 const WAIT_AT_MOST: Duration = Duration::from_millis(20);
 const MAX_CONTROL: usize = 8;
 const MAX_REFERENCE: usize = 16;
-const BARRIER_US: u64 = 100_000;
 /// The reference's cursor as a recording keeps it, for a capture block and
 /// for a step whose block is held back.
 fn reference_meta(timing: &ReferenceTiming) -> diagnostics::ReferenceMeta {
@@ -1194,7 +1194,9 @@ fn capture_loop<D: CaptureDevice>(
         // While a reopen holds its blocks back (#7224), its own two steps
         // bound the clock's start, not the barrier.
         if !reopen_hold.waiting()
-            && primed_at.is_some_and(|at| monotonic_us().saturating_sub(at) >= BARRIER_US)
+            && primed_at.is_some_and(|at| {
+                monotonic_us().saturating_sub(at) >= barrier_us(reference.timing().playback_epoch)
+            })
         {
             return Err(reference
                 .fault(ReferenceFaultKind::BarrierTimeout, monotonic_us())
@@ -2688,10 +2690,9 @@ fn speaker_passes(
                 }
             }
         }
-        if output
-            .primed_at
-            .is_some_and(|at| monotonic_us().saturating_sub(at) >= BARRIER_US)
-        {
+        if output.primed_at.is_some_and(|at| {
+            monotonic_us().saturating_sub(at) >= barrier_us(speaker.queued_range().epoch)
+        }) {
             return Err(output
                 .fault(speaker, ReferenceFaultKind::BarrierTimeout)
                 .into());

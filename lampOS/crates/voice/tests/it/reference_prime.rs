@@ -259,7 +259,8 @@ fn changed_hardware_cursor_privacy_deadline_and_reset_reject_ack() {
             Err(ReferenceFaultKind::PrivacyMismatch)
         );
     }
-    for now in [8_999, 109_000] {
+    // Epoch 1, the first start after the voice starts, has 1 s (#8391).
+    for now in [8_999, 1_009_000] {
         let (mut barrier, prepared) = armed();
         assert_eq!(
             barrier.acknowledge(prepared, queued(1), 2, now),
@@ -350,11 +351,49 @@ fn duplicate_prime_or_bad_ack_does_not_refresh_original_deadline() {
         Err(ReferenceFaultKind::InvalidStart)
     );
     assert_eq!(
-        barrier.acknowledge(prepared, queued(1), 2, 109_000),
+        barrier.acknowledge(prepared, queued(1), 2, 1_009_000),
         Err(ReferenceFaultKind::BarrierTimeout)
     );
     let (mut barrier, prepared) = armed();
-    assert_eq!(barrier.acknowledge(prepared, queued(1), 2, 108_999), Ok(1));
+    assert_eq!(
+        barrier.acknowledge(prepared, queued(1), 2, 1_008_999),
+        Ok(1)
+    );
+}
+
+/// A cold boot once held the first start for more than 100 ms and the voice
+/// exited on `BarrierTimeout: epoch=1` (#8391). The first start has 1 s; a
+/// later epoch's start, after a lapse, underrun or reopen, still has 100 ms.
+#[test]
+fn first_start_has_one_second_and_later_starts_keep_100_ms() {
+    let (mut barrier, prepared) = armed();
+    assert_eq!(barrier.acknowledge(prepared, queued(1), 2, 309_000), Ok(1));
+
+    let later = |at: u64| {
+        let mut barrier = PrimeBarrier::default();
+        let prime = ClockPrimed {
+            playback_epoch: 2,
+            privacy_generation: 2,
+            accepted_zero_frames: 480,
+            accepted_at_us: 10_000,
+            queue_observed_at_us: 10_001,
+            queued_frames: 480,
+            discarded: Some(queued(1)),
+        };
+        barrier.sent(prime, 9_000).unwrap();
+        barrier.acknowledge(
+            PreparedPrime {
+                playback_epoch: 2,
+                ..prepared
+            },
+            queued(2),
+            2,
+            at,
+        )
+    };
+    assert_eq!(later(108_999), Ok(2));
+    assert_eq!(later(109_000), Err(ReferenceFaultKind::BarrierTimeout));
+    assert_eq!(later(309_000), Err(ReferenceFaultKind::BarrierTimeout));
 }
 
 #[test]
