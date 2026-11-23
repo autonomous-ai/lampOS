@@ -2004,7 +2004,7 @@ fn steps(
     if let Err(why) = run(&["systemctl", "reset-failed", UNIT].map(str::to_owned)) {
         say(&format!("{UNIT} not reset-failed: {why}"));
     }
-    settled(run, say);
+    settled(root, run, say);
     if let Err(why) = run(&["systemctl", "restart", UNIT].map(str::to_owned)) {
         return fail("gateway", format!("systemctl restart {UNIT}: {why}"), say);
     }
@@ -2192,42 +2192,45 @@ const SETTLE_SLEEP: Duration = if cfg!(test) {
     SETTLE_EVERY
 };
 
-/// #8324: before the install's restart, a running gateway still in its
-/// first start is waited for until it is past its startup drain: it listens
-/// on [`PORT`], [`SETTLED_AFTER_START`] has passed since systemd started
-/// it, and [`SETTLED_AFTER_LISTEN`] since a listen seen to begin here.
-/// [`SETTLE_AT_MOST`] at most, looking every [`SETTLE_EVERY`]. A stop at
-/// the first listen drained 79.9 s against the 90 s `TimeoutStopSec`
-/// (kit-8306b); a second stop seconds after a start was SIGKILLed and
-/// left OpenClaw's state unreadable (gate G on lamp-52e6). The earlier
-/// start may be `gateway_config`'s supervisor restart, a round's
-/// `gateway_on`, a lamp-control restart or a boot. A gateway not running,
-/// or a listen not readable, waits for nothing; listening at the first look
-/// with its start not said, it is restarted at once.
-fn settled(run: &mut Runner, say: &mut dyn FnMut(&str)) {
-    let now_unix_ms = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |since| since.as_millis() as u64);
+/// #8324: before a restart of the gateway in Harness's one-shot (the
+/// install's in `steps`, the gateway block's in [`gateway_block`]), a
+/// running gateway still in its first start is waited for until it is past
+/// its startup drain: it listens on [`PORT`], [`SETTLED_AFTER_START`] has
+/// passed since systemd started its current process, and
+/// [`SETTLED_AFTER_LISTEN`] since a listen seen to begin here (one look
+/// not listening forgets the listen seen). [`SETTLE_AT_MOST`] at most,
+/// looking every [`SETTLE_EVERY`]. A stop at the first listen drained
+/// 79.9 s against the 90 s `TimeoutStopSec` (kit-8306b); a second stop
+/// seconds after a start was SIGKILLed and left OpenClaw's state
+/// unreadable (gate G on lamp-52e6). The earlier start may be
+/// `gateway_config`'s supervisor restart, a round's `gateway_on`, a crash's
+/// `Restart=always` during the wait, or a boot.
+///
+/// The start is re-read at each look (`ExecMainStartTimestampMonotonic`),
+/// so a process started again during the wait is waited for anew, and
+/// compared with `/proc/uptime` read once at entry plus the steps waited:
+/// both count from the boot, so an NTP jump after a boot on a lamp with no
+/// RTC moves neither (the lamp never suspends, where they would part). A
+/// gateway not running, or a listen not readable, waits for nothing;
+/// listening at the first look with its start or the uptime not read, it
+/// is restarted at once.
+fn settled(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
     if !gateway_active(run) {
         return;
     }
-    let started = run(&[
-        "systemctl",
-        "show",
-        "--timestamp=unix",
-        "--property=ExecMainStartTimestamp",
-        "--value",
-        "--",
-        UNIT,
-    ]
-    .map(str::to_owned))
-    .ok()
-    .and_then(|value| value.trim().strip_prefix('@')?.parse::<u64>().ok())
-    .map(|seconds| Duration::from_millis(now_unix_ms.saturating_sub(seconds * 1000)));
+    let uptime = fs::read_to_string(on(root, crate::reset_hold::UPTIME))
+        .ok()
+        .and_then(|text| text.split_whitespace().next()?.parse::<f64>().ok())
+        .filter(|seconds| seconds.is_finite() && *seconds >= 0.0)
+        .map(Duration::from_secs_f64);
     let sport = format!("sport = :{PORT}");
     let mut listen_seen: Option<Duration> = None;
+    let mut quiet = false;
     let mut waited = Duration::ZERO;
     loop {
+        let age = uptime
+            .zip(gateway_start(run))
+            .map(|(uptime, start)| (uptime + waited).saturating_sub(start));
         let listening = match run(&["ss", "-Hltn", &sport].map(str::to_owned)) {
             Ok(out) => !out.trim().is_empty(),
             Err(why) => {
@@ -2237,10 +2240,13 @@ fn settled(run: &mut Runner, say: &mut dyn FnMut(&str)) {
                 return;
             }
         };
-        if listening && listen_seen.is_none() && waited > Duration::ZERO {
+        if !listening {
+            listen_seen = None;
+            quiet = true;
+        } else if quiet && listen_seen.is_none() {
             listen_seen = Some(waited);
         }
-        let past_start = started.is_none_or(|age| age + waited >= SETTLED_AFTER_START);
+        let past_start = age.is_none_or(|age| age >= SETTLED_AFTER_START);
         let past_listen = listen_seen.is_none_or(|at| waited - at >= SETTLED_AFTER_LISTEN);
         if listening && past_start && past_listen {
             if waited > Duration::ZERO {
@@ -2266,6 +2272,24 @@ fn settled(run: &mut Runner, say: &mut dyn FnMut(&str)) {
         std::thread::sleep(SETTLE_SLEEP);
         waited += SETTLE_EVERY;
     }
+}
+
+/// When systemd started the gateway's current process, on the monotonic
+/// clock (`ExecMainStartTimestampMonotonic`, microseconds since the boot);
+/// none when it can't say or never started one.
+fn gateway_start(run: &mut Runner) -> Option<Duration> {
+    let said = run(&[
+        "systemctl",
+        "show",
+        "--property=ExecMainStartTimestampMonotonic",
+        "--value",
+        "--",
+        UNIT,
+    ]
+    .map(str::to_owned))
+    .ok()?;
+    let micros: u64 = said.trim().parse().ok()?;
+    (micros > 0).then(|| Duration::from_micros(micros))
 }
 
 /// An [`exec_allowlist_args`] edit as it is run: as `lampos`, through
@@ -2644,7 +2668,8 @@ fn gateway_block_due(root: &Path) -> bool {
 /// install, so nothing else writes the block again. Missing or not as the
 /// install writes it, it is written again through OpenClaw's own check
 /// ([`gateway_config`]), and the gateway, when it runs, restarted on it
-/// (`try-restart`; the round's [`gateway_on`] starts one that does not).
+/// (`try-restart`, past its first start, [`settled`], #8324; the round's
+/// [`gateway_on`] starts one that does not).
 /// Refused, `openclaw.json` stays byte for byte and nothing is restarted.
 /// One line, with no values of the config; still due, the next round asks
 /// again. No switch of its own: it only keeps what the install writes.
@@ -2673,15 +2698,19 @@ fn gateway_block(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
     };
     match written {
         Ok(false) => {}
-        Ok(true) => match run(&["systemctl", "try-restart", "--", UNIT].map(str::to_owned)) {
-            Ok(_) => say(&format!(
-                "{CONFIG}'s gateway block was not as lamp-update writes it: written again, checked by OpenClaw, and the gateway restarted if it ran"
-            )),
-            Err(why) => say(&format!(
-                "{CONFIG}'s gateway block was not as lamp-update writes it: written again, checked by OpenClaw, but the gateway not restarted: {}",
-                crate::world::clean_line(&why)
-            )),
-        },
+        Ok(true) => {
+            // #8324: as the install's restart, never in a first start.
+            settled(root, run, say);
+            match run(&["systemctl", "try-restart", "--", UNIT].map(str::to_owned)) {
+                Ok(_) => say(&format!(
+                    "{CONFIG}'s gateway block was not as lamp-update writes it: written again, checked by OpenClaw, and the gateway restarted if it ran"
+                )),
+                Err(why) => say(&format!(
+                    "{CONFIG}'s gateway block was not as lamp-update writes it: written again, checked by OpenClaw, but the gateway not restarted: {}",
+                    crate::world::clean_line(&why)
+                )),
+            }
+        }
         Err(why) => say(&format!(
             "{CONFIG}'s gateway block is not as lamp-update writes it and not written again, the gateway not restarted: {why}"
         )),
