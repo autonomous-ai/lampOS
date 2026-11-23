@@ -185,6 +185,8 @@ pub fn start(root: &Path) -> Option<Arc<dyn Apps>> {
     if !on() {
         return None;
     }
+    // The process's start, for each call's id.
+    std::sync::LazyLock::force(&BOOT_MS);
     if let Some(apps) = APPS.get() {
         return Some(apps.clone());
     }
@@ -238,10 +240,15 @@ struct State {
     declared: Vec<String>,
 }
 
-/// How many called app functions are kept by name.
-const CALLED_KEPT: usize = 64;
+/// How many app functions given the model are kept by name: far past
+/// what one process meets (8 apps of 8 tools each at once), so a function
+/// given as an app's never falls out and is then kept with its arguments
+/// (the Reviewer-lead's P3 3 on #8449).
+const CALLED_KEPT: usize = 4_096;
 
-/// This process's start, in ms: the first part of each call's id.
+/// This process's start, in ms: the first part of each call's id. Taken
+/// when the worker starts the app tools ([`start`]), not at the first call
+/// (the Reviewer-lead's P3 2 on #8449).
 static BOOT_MS: std::sync::LazyLock<u64> = std::sync::LazyLock::new(now_ms);
 
 static STATE: std::sync::LazyLock<Mutex<State>> = std::sync::LazyLock::new(Mutex::default);
