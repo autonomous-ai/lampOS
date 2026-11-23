@@ -709,7 +709,7 @@ fn a_preview_says_the_mode_and_the_lamps_line_for_it_and_sends_nothing() {
 #[test]
 fn every_mode_has_a_line_in_every_language_and_english_for_any_other() {
     let mut seen = std::collections::HashSet::new();
-    for language in ["en", "vi", "ja", "zh", "ko"] {
+    for language in ["en", "vi", "ja", "zh", "ko", "fr"] {
         for mode in VISIBILITIES {
             let line = visibility_note(mode, language);
             assert!(!line.trim().is_empty(), "{language} {mode}");
@@ -719,8 +719,8 @@ fn every_mode_has_a_line_in_every_language_and_english_for_any_other() {
             }
         }
     }
-    assert_eq!(seen.len(), 15);
-    for other in ["", "fr", "EN", "ja_JP", "en_GB"] {
+    assert_eq!(seen.len(), 18);
+    for other in ["", "de", "EN", "ja_JP", "en_GB"] {
         for mode in VISIBILITIES {
             assert_eq!(visibility_note(mode, other), visibility_note(mode, "en"));
         }

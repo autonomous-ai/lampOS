@@ -1100,10 +1100,24 @@ no words.
 
 The walk follows the language setting the voice reads at start
 (`LAMP_LANGUAGE_FILE`, [second-voice.md](second-voice.md), "The owner's
-language"): `en`, `vi`, `ja`, `zh` or `ko`. A missing file, `en` or an
-unknown value is English, and English is exactly as above: the same words,
-rules and lines, byte for byte. The new paths run only for `vi`, `ja`, `zh`
-and `ko` (`crates/voice/src/onboarding/in_language.rs`).
+language"): `en`, `vi`, `ja`, `zh`, `ko` or `fr` (#8381). A missing file,
+`en` or an unknown value is English, and English is exactly as above: the
+same words, rules and lines, byte for byte. The new paths run only for `vi`,
+`ja`, `zh`, `ko` and `fr` (`crates/voice/src/onboarding/in_language.rs`).
+
+**French (#8381).** Read as Vietnamese is, by whole words, on the line as
+`plain` writes it: a hyphen is a space ("peut-être" is "peut être", "allez-y"
+"allez y"), and a typographic apostrophe splits a word ("d’accord" is "d
+accord", listed too). A strict yes or no is at most five words. "pas" is a
+no word, as "không" is; the yes phrases that hold it ("pas de problème",
+"pas de souci", "ça ne me dérange pas") and "pas mal" are taken out first.
+"mais", "peut-être", "plus tard", "attendez", "euh" and "je ne sais pas" put
+an answer off. The step words are "Étape un : " … "Dernière étape : ", the
+walk opens "Bonjour ! Je suis votre lampe. Faisons connaissance. Quatre
+étapes rapides, juste quelques minutes." and ends "C'est terminé !" ("C'est
+terminé, {Name} !"). The lines say "vous" to the person, and the lamp speaks
+of itself in the feminine, as its voice. Not checked by a French speaker,
+and not walked on a lamp yet.
 
 **Its fixed lines.** Every note keeps its English instruction to the model
 ("Say only this, …", "Ask exactly this: …"), and each quoted line in it is

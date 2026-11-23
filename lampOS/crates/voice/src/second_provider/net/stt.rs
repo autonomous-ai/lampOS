@@ -3189,7 +3189,7 @@ mod tests {
                 .map(|(_, value)| value.into_owned())
         };
         assert_eq!(asked(None).as_deref(), Some("en"));
-        for code in ["vi", "ja", "zh", "ko"] {
+        for code in ["vi", "ja", "zh", "ko", "fr"] {
             let language = crate::language::Language::parse(code).unwrap().unwrap();
             assert_eq!(asked(Some(language.stt())).as_deref(), Some(code));
             assert!(

@@ -33872,6 +33872,7 @@ mod tests {
             Language::Japanese,
             Language::Chinese,
             Language::Korean,
+            Language::French,
         ] {
             assert!(!super::says_at_once(true, Some(language)), "{language:?}");
         }

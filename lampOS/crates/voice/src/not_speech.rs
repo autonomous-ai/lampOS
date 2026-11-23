@@ -1152,6 +1152,10 @@ mod tests {
             unclear_arguments_in(Some(Language::Vietnamese), Some(UNCLEAR)),
             asking
         );
+        assert_eq!(
+            unclear_arguments_in(Some(Language::French), Some(UNCLEAR)),
+            asking
+        );
         for language in [Language::Japanese, Language::Chinese, Language::Korean] {
             assert!(unclear_arguments_in(Some(language), Some(UNCLEAR)).is_empty());
         }

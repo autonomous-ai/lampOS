@@ -202,6 +202,16 @@ pub fn visibility_note(mode: &str, language: &str) -> &'static str {
             "링크 공개: 스킬이 스토어로 전송되어 다른 스킬과 똑같이 검토됩니다. 목록에는 나오지 않고, 링크를 가진 사람은 누구나 설치할 수 있습니다."
         }
         ("ko", _) => "공개: 스킬이 스토어로 전송되어 검토된 뒤, 누구나 보고 설치할 수 있습니다.",
+        // French (#8381).
+        ("fr", "private") => {
+            "Privée : elle est envoyée au Store et vérifiée comme toute autre compétence ; vous seul pouvez la voir et l'installer sur vos lampes."
+        }
+        ("fr", "unlisted") => {
+            "Non répertoriée : elle est envoyée au Store et vérifiée comme toute autre compétence ; elle n'apparaît pas dans la liste, et toute personne qui a son lien peut l'installer."
+        }
+        ("fr", _) => {
+            "Publique : elle est envoyée au Store et vérifiée, puis tout le monde peut la voir et l'installer."
+        }
         (_, "private") => {
             "Private: it goes to the Store and is checked like any other skill; only you can see it and install it on your lamps."
         }

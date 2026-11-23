@@ -865,6 +865,7 @@ mod tests {
             Language::Japanese,
             Language::Chinese,
             Language::Korean,
+            Language::French,
         ] {
             let dir = scratch(&format!("owners-{}", language.code()));
             let (cache, calls) = counted(&dir, "Rachel");

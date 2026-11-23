@@ -1022,9 +1022,9 @@ export class Lamp {
     return { stop: () => clearInterval(timer) };
   }
   // How many pixels the ring has, from hello's limits (undefined from a lamp before pixel lights).
-  // The owner's language, from hello: 'en', 'vi', 'ja', 'zh' or 'ko', so a program's own lines can follow it. 'en' from a lamp
+  // The owner's language, from hello: 'en', 'vi', 'ja', 'zh', 'ko' or 'fr', so a program's own lines can follow it. 'en' from a lamp
   // that says none (one from before this), and from a code this SDK does not know.
-  get language() { return ['en', 'vi', 'ja', 'zh', 'ko'].includes(this.info.language) ? this.info.language : 'en'; }
+  get language() { return ['en', 'vi', 'ja', 'zh', 'ko', 'fr'].includes(this.info.language) ? this.info.language : 'en'; }
   // The lamp's build, from hello: the text the owner's app shows (143+ab12cd34ef56), to quote in a bug report. null from a lamp that says none.
   get build() { return typeof this.info.build === 'string' && this.info.build ? this.info.build : null; }
 
