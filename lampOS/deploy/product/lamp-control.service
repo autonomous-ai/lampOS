@@ -18,6 +18,12 @@ ConditionPathExists=/var/lib/lampos-setup/done
 After=local-fs.target network-online.target lamp-voice.service lamp-body.service lamp-actions.service lamp-skills-manage.socket
 StartLimitIntervalSec=600
 StartLimitBurst=5
+# The apps' manage helper socket and folders (#7415, #8131): a round that adds the apps' part enables the socket into
+# sockets.target, which no round starts, and may start the folders unit before its `current` link is made. The round
+# restarts lamp-control (changed in the same build) after the links, so its start starts both; a boot starts them
+# anyway. No order on the folders: lamp-control needs neither to start.
+Wants=lamp-apps-manage.socket lamp-apps-folders.service
+After=lamp-apps-manage.socket
 
 [Service]
 Type=simple
