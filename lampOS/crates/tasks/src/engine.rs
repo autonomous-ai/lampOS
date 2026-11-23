@@ -2397,6 +2397,17 @@ impl<P: Persistence> Engine<P> {
             .collect()
     }
 
+    /// How long the queued task launched as `name` has before it expires
+    /// unconfirmed ([`CONFIRM_MS`], from its prepare): `None` when no
+    /// queued task has that name.
+    pub fn queued_left_ms(&self, name: &str, now: &Clock) -> Option<u64> {
+        self.state
+            .tasks
+            .iter()
+            .find(|task| task.launch.name == name && task.dispatch.state == DispatchState::Queued)
+            .map(|task| task.expires_monotonic_ms.saturating_sub(now.monotonic_ms))
+    }
+
     /// Whether the task launched as `name` is done with its session: spent
     /// (its answer read), not accepted, or no longer kept (#7246).
     pub fn launch_answer(&self, name: &str) -> Option<&str> {

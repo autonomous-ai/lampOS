@@ -224,7 +224,9 @@ pub const NOT_STARTED: &str = "one_session_not_started";
 /// [`Turn::send`]'s why when a spoken task's resumes are spent.
 const STARTING_SPENT: &str = "the kept session did not take the words after its resumes";
 /// The `not_sent` code of a spoken task waiting when #7906 sign 5 closed
-/// its stuck kept session: ended at once, never put back. A put-back past
+/// its stuck kept session, once its one re-queue into the replacement
+/// ([`OneSession::requeue_once`]) was refused too or its wait ran out
+/// ([`REQUEUED_ENDS_WITHIN`]); never put back again. A put-back past
 /// the store's confirm bound ([`crate::engine::CONFIRM_MS`], from the
 /// task's prepare) expires it silently, so it was left to its 480 s bound
 /// (lamp-c0a4, 19 Nov). Task news tells it once with its "ask me again in a
@@ -232,6 +234,17 @@ const STARTING_SPENT: &str = "the kept session did not take the words after its 
 pub const STUCK_ENDED: &str = "one_session_stuck";
 /// [`Turn::send`]'s why for [`STUCK_ENDED`].
 const STUCK_CLOSED: &str = "sign 5 closed the stuck kept session; ended, asked again later";
+/// The most spoken tasks remembered as re-queued once
+/// ([`OneSession::requeue_once`]): more than the pane's queue holds.
+pub const REQUEUED_MOST: usize = QUEUE_MOST * 2;
+/// A spoken task re-queued once into the kept session's replacement waits
+/// for it only while more than this is left of the store's confirm bound
+/// ([`crate::engine::CONFIRM_MS`]): a queued task past it expires with no
+/// word to its asker. Then it is handed over at once, typed if the session
+/// takes input by then, else ended told as it would have been
+/// ([`NOT_STARTED`], [`STUCK_ENDED`]). It covers the store's retry gap and
+/// a hand-over's own few seconds.
+pub const REQUEUED_ENDS_WITHIN: Duration = Duration::from_secs(20);
 /// Between two looks at a pane `wait` read idle but whose turn is not this
 /// task's yet, or a busy pane before its words are typed again.
 pub const TURN_LOOK: Duration = Duration::from_millis(500);
@@ -1013,6 +1026,23 @@ struct Inner {
     /// only on a pane opened before it, the one that was held; a pane
     /// opened since must be seen at work, or idle after its first line.
     lasting_since: Option<Instant>,
+    /// Spoken tasks the kept session refused while warming up, stuck or
+    /// not ready, each re-queued once into its replacement (or into it
+    /// once confirmed taking input), newest last, at most
+    /// [`REQUEUED_MOST`] ([`OneSession::requeue_once`]).
+    requeued: VecDeque<Requeued>,
+}
+
+/// One spoken task re-queued once ([`Inner::requeued`]).
+struct Requeued {
+    id: String,
+    /// The told why it would have ended with ([`STARTING_SPENT`] or
+    /// [`STUCK_CLOSED`]), and ends with if it is not taken in time.
+    why: &'static str,
+    /// Its wait is over (the store's confirm bound near,
+    /// [`REQUEUED_ENDS_WITHIN`]): handed over to be tried once more, or to
+    /// end told, never left to expire unheard.
+    spent: bool,
 }
 
 /// [`OneSession::keep_open`]'s own: when it looks at the lamp next, and
@@ -1442,7 +1472,11 @@ pub fn lamp_key(slot: &crate::skill_task::SkillHarnessSlot) -> Option<String> {
 
 /// Whether the store's `launch` is a spoken task for the lamp's pane:
 /// the lamp's own machine and default engine, as the pane open now is,
-/// and no session the person named.
+/// and no session the person named, or one naming the lamp's own kept
+/// session ([`OneSession::names_kept`]). Any other name goes the per-task
+/// way ([`crate::harness::Cli::reply_named`]): a name the lamp's list does
+/// not have may be a computer's session (#5978), so it is never guessed
+/// here to be the pane's.
 pub fn for_the_pane(one: &OneSession, launch: &Launch) -> Option<Place> {
     // Harness takes no reply here: every task the per-task way.
     if !one.takes_reply() {
@@ -1450,7 +1484,10 @@ pub fn for_the_pane(one: &OneSession, launch: &Launch) -> Option<Place> {
     }
     let place = one.place().or_else(|| one.lock().home.clone())?;
     (shares(place.engine)
-        && launch.session.is_none()
+        && launch
+            .session
+            .as_deref()
+            .is_none_or(|session| one.names_kept(session, place.engine))
         && launch.target.machine_id == place.machine
         && launch.target.engine == place.engine)
         .then_some(place)
@@ -1490,6 +1527,19 @@ pub fn spoken_launch(
     if one.not_up_spent(&launch.name) {
         return Some(not_started(one, &launch.name));
     }
+    // Re-queued once and its wait spent near the store's bound: tried in
+    // the session only if it takes input now and is free, else ended told
+    // as its refusal would have ended it, never left to expire.
+    if let Some(why) = one.requeue_spent(&launch.name)
+        && !(one.free() && one.ready_now())
+    {
+        one.requeue_done(&launch.name);
+        eprintln!(
+            "tasks: {}: re-queued once, and the kept session took no input before the store's bound; ended",
+            launch.name
+        );
+        return Some(refused_end(one, &launch.name, why));
+    }
     let began = Instant::now();
     let (within, stop) = match &one.spoken_bound {
         Some((within, stop)) => ((*within).min(one.queue_wait), Some(stop)),
@@ -1509,7 +1559,29 @@ pub fn spoken_launch(
     // with no fresh pane, `busy`, put back, and the one-session thread
     // opens it.
     turn.opens = false;
-    match turn.send(harness, &place, &launch.prompt, until, &ended) {
+    let sent = turn.send(harness, &place, &launch.prompt, until, &ended);
+    // Refused while the kept session warmed up, was stuck or not ready:
+    // re-queued once (`busy`, which the store puts back), held in the store
+    // until the replacement (or the same session, confirmed) takes input,
+    // then typed there. A second refusal ends it told, as before. The
+    // replacement's own count and backoff are not touched.
+    if let Sent::NotTyped(why) = &sent
+        && let Some(why) = told_why(why)
+        && one.requeue_once(&launch.name, why)
+    {
+        eprintln!(
+            "tasks: {}: the kept session refused it ({why}); re-queued once for its replacement",
+            launch.name
+        );
+        return Some(LaunchOutcome::NotSent {
+            code: "busy".into(),
+        });
+    }
+    // Any end but `busy` (put back, its once kept) is the task's last.
+    if !matches!(&sent, Sent::NotTyped(why) if told_why(why).is_none()) {
+        one.requeue_done(&launch.name);
+    }
+    match sent {
         Sent::Typed(_) => {
             // Typed: never the per-run way after this, even if the pane
             // was let go meanwhile, or the task would run twice.
@@ -1561,21 +1633,39 @@ pub fn spoken_launch(
             turn.keep();
             Some(LaunchOutcome::Uncertain { code })
         }
-        // Its resumes spent (#7895): failed, so the store ends it and Task
-        // news tells the asker once; never put back again.
-        Sent::NotTyped(why) if why == STARTING_SPENT => Some(not_started(one, &launch.name)),
-        // #7906 sign 5 closed its stuck session: ended at once, never put
-        // back to expire unheard.
-        Sent::NotTyped(why) if why == STUCK_CLOSED => Some(LaunchOutcome::NotSent {
-            code: STUCK_ENDED.into(),
-        }),
-        // `busy`, as a full queue: never a second session.
-        Sent::NotTyped(_) => Some(LaunchOutcome::NotSent {
-            code: "busy".into(),
+        // Its resumes spent (#7895), or #7906 sign 5 closed its stuck
+        // session, after its one re-queue: failed, so the store ends it and
+        // Task news tells the asker once; never put back again.
+        Sent::NotTyped(why) => Some(match told_why(&why) {
+            Some(why) => refused_end(one, &launch.name, why),
+            // `busy`, as a full queue: never a second session.
+            None => LaunchOutcome::NotSent {
+                code: "busy".into(),
+            },
         }),
         // Harness takes no reply here: the task's own `harness new`, as
         // with the switch off (nothing was typed).
         Sent::NoReply => None,
+    }
+}
+
+/// The told why of a refused hand-over ([`STARTING_SPENT`],
+/// [`STUCK_CLOSED`]) as the constant, or `None` for any other.
+fn told_why(why: &str) -> Option<&'static str> {
+    [STARTING_SPENT, STUCK_CLOSED]
+        .into_iter()
+        .find(|told| *told == why)
+}
+
+/// A spoken task's end for its refused hand-over's told why: its resumes
+/// spent ([`NOT_STARTED`]), or its stuck session closed ([`STUCK_ENDED`]).
+fn refused_end(one: &OneSession, name: &str, why: &'static str) -> LaunchOutcome {
+    if why == STUCK_CLOSED {
+        LaunchOutcome::NotSent {
+            code: STUCK_ENDED.into(),
+        }
+    } else {
+        not_started(one, name)
     }
 }
 
@@ -3190,6 +3280,72 @@ impl OneSession {
                 .is_some_and(|pane| pane.fresh_at(&pane.place))
     }
 
+    /// The pane open, no rotation or close due, and confirmed taking
+    /// input: a re-queued task is typed now ([`spoken_launch`]).
+    pub fn ready_now(&self) -> bool {
+        self.has_fresh_pane() && self.lock().pane.as_ref().is_some_and(|pane| pane.confirmed)
+    }
+
+    /// Spoken task `id` re-queued once for `why` ([`Inner::requeued`]):
+    /// `false` when it already was, so it ends told now.
+    fn requeue_once(&self, id: &str, why: &'static str) -> bool {
+        let mut inner = self.lock();
+        if inner.requeued.iter().any(|was| was.id == id) {
+            return false;
+        }
+        if inner.requeued.len() >= REQUEUED_MOST {
+            inner.requeued.pop_front();
+        }
+        inner.requeued.push_back(Requeued {
+            id: id.to_owned(),
+            why,
+            spent: false,
+        });
+        true
+    }
+
+    /// Spoken task `id` ended or typed: no longer re-queued.
+    fn requeue_done(&self, id: &str) {
+        self.lock().requeued.retain(|was| was.id != id);
+    }
+
+    /// Whether spoken task `id`, re-queued once, still waits in the store
+    /// for a session that takes input: the pane not open, a close or
+    /// rotation due, or not confirmed taking input yet (a warming one
+    /// refused it). The store holds it until then ([`REQUEUED_ENDS_WITHIN`]
+    /// bounds it).
+    pub fn requeue_waits(&self, id: &str) -> bool {
+        let waiting = self
+            .lock()
+            .requeued
+            .iter()
+            .any(|was| was.id == id && !was.spent);
+        waiting && !self.ready_now()
+    }
+
+    /// Spoken task `id`'s re-queue wait is over: the store's bound near
+    /// ([`REQUEUED_ENDS_WITHIN`]). Handed over at once from now.
+    pub fn spend_requeue(&self, id: &str) {
+        if let Some(was) = self
+            .lock()
+            .requeued
+            .iter_mut()
+            .find(|was| was.id == id && !was.spent)
+        {
+            was.spent = true;
+            eprintln!("tasks: {id}: re-queued once, the store's bound is near; handed over now");
+        }
+    }
+
+    /// The told why of spoken task `id` when its re-queue wait is spent.
+    pub fn requeue_spent(&self, id: &str) -> Option<&'static str> {
+        self.lock()
+            .requeued
+            .iter()
+            .find(|was| was.id == id && was.spent)
+            .map(|was| was.why)
+    }
+
     /// Whether `launch` may be for the lamp's pane, whose place is not
     /// known yet (H5 on #7258): an OpenClaw hand-over naming no session,
     /// to the lamp's machine and default engine as last looked at, or with
@@ -3200,13 +3356,18 @@ impl OneSession {
     /// took no reply (`reply_off`, [`OneSession::takes_reply`]): then the
     /// per-task way.
     pub fn waits_for_place(&self, launch: &Launch) -> bool {
+        // Read before the lock below: it takes the lock itself.
+        let ours = launch
+            .session
+            .as_deref()
+            .is_none_or(|session| self.names_kept(session, launch.target.engine));
         let inner = self.lock();
         // Harness takes no reply here: the per-task way, never held.
         if !self.takes_reply() || inner.pane.is_some() || inner.home.is_some() {
             return false;
         }
         shares(launch.target.engine)
-            && launch.session.is_none()
+            && ours
             && inner.lamp_key.as_ref().is_none_or(|key| {
                 *key == format!(
                     "{} {}",
@@ -3229,6 +3390,43 @@ impl OneSession {
 
     fn lock(&self) -> MutexGuard<'_, Inner> {
         self.inner.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Whether `session`, a session named for a hand-over, is the lamp's
+    /// own kept session on `engine` while the kept session is on
+    /// ([`KEPT_SWITCH`], and Harness keeps program sessions or was not
+    /// asked yet): its name in Harness ([`name_for`], `lamp-one-hermes`,
+    /// `lamp-one-openclaw`), its agent id (the pane's or the kept
+    /// record's), or an engine session it was named ([`STATE_FILE`]).
+    /// Such a hand-over goes into the kept session as one naming none
+    /// ([`for_the_pane`]), never to a lookup that could miss it and end
+    /// `session_not_found`.
+    pub fn names_kept(&self, session: &str, engine: EngineKind) -> bool {
+        if self.kept_token.is_none() || self.lock().programs == Some(false) {
+            return false;
+        }
+        let said = session.trim();
+        if said.eq_ignore_ascii_case(&name_for(engine)) {
+            return true;
+        }
+        let pane = self
+            .lock()
+            .pane
+            .as_ref()
+            .filter(|pane| pane.kept && pane.place.engine == engine)
+            .map(|pane| pane.agent.clone());
+        let record = self.record();
+        let recorded = (record["kept"].as_bool() == Some(true)
+            && record["engine"].as_str() == Some(engine.argument()))
+        .then(|| record["agent"].as_str().map(str::to_owned))
+        .flatten();
+        pane.into_iter().chain(recorded).any(|agent| {
+            agent.eq_ignore_ascii_case(said)
+                || self
+                    .recorded_sessions(&agent)
+                    .iter()
+                    .any(|id| id.eq_ignore_ascii_case(said))
+        })
     }
 
     /// The pane's agent id now, if one is open.
@@ -4736,8 +4934,15 @@ impl OneSession {
             }
             // Harness 0.6.74: its first turn's wait said its launch
             // failed: the ladder at once, within the open's bound.
-            if let Some(why) = self.first_words(harness, &name, token, until, ended) {
+            if let Some((why, again)) = self.first_words(harness, &name, token, until, ended) {
                 self.revive_or_replace(harness, &place.machine, &agent, &why, true);
+                // Not ready through its first words' window: replaced, and
+                // the fresh one is opened by the next open, never in this
+                // one, whose bound the window spent (a fresh session would
+                // get one try). [`REPLACE_MOST`] and its slow retry bound it.
+                if !again {
+                    return Err(format!("{why}; a fresh one is opened next"));
+                }
                 // The open's last try failed too: never kept as opened. A
                 // failed open, its backoff counted (`next_open`), as any
                 // other open that failed.
@@ -4796,8 +5001,12 @@ impl OneSession {
     /// A new kept session's first words ([`OPEN_PROMPT`]), taken and
     /// waited for within `until`, so the first task finds it idle. Not a
     /// turn; a failure is journaled only, and the first task waits instead,
-    /// except a launch Harness says failed (`wait` exit 1, Harness 0.6.74):
-    /// `Some` with why, so the open replaces it at once.
+    /// except two: a launch Harness says failed (`wait` exit 1, Harness
+    /// 0.6.74), `Some((why, true))`, so the open replaces it and tries again
+    /// at once; and a session not ready through the whole window, its last
+    /// try refused `ENGINE_NOT_READY` or not taken within Harness's hold,
+    /// `Some((why, false))`, so it is replaced and the next open makes the
+    /// fresh one. Never a session kept warming that refuses every hand-over.
     fn first_words(
         &self,
         harness: &dyn PaneHarness,
@@ -4805,7 +5014,7 @@ impl OneSession {
         token: &Path,
         until: Instant,
         ended: &dyn Fn() -> bool,
-    ) -> Option<String> {
+    ) -> Option<(String, bool)> {
         // A fresh OpenClaw session refuses its first reply ENGINE_NOT_READY
         // for a while (~35 s seen): tried again within the open's bound,
         // never counted as stuck.
@@ -4827,6 +5036,25 @@ impl OneSession {
                 self.no_reply_here();
                 return None;
             }
+            // Still not ready when its window ended (the open's bound, or
+            // `open_idle_within`): a broken session, not one warming up.
+            // `Some`, so the open replaces it fresh through the same ladder
+            // as any broken kept session ([`OneSession::revive_or_replace`],
+            // counted toward [`REPLACE_MOST`]). Engine-neutral: OpenClaw's
+            // and Hermes's kept sessions both open through here, so nothing
+            // here reads one engine's own signs. A stop (`ended`) is no
+            // verdict: the session is kept as before.
+            took @ (Took::EngineNotReady | Took::Timeout) if !ended() => {
+                eprintln!(
+                    "tasks: one session: the kept session's first words not taken through its window: {took:?}; replaced fresh"
+                );
+                let why = if took == Took::EngineNotReady {
+                    "its first words were refused ENGINE_NOT_READY through its window"
+                } else {
+                    "it did not take its first words within Harness's hold"
+                };
+                return Some((why.into(), false));
+            }
             other => {
                 eprintln!(
                     "tasks: one session: the kept session's first words not taken: {other:?}"
@@ -4843,7 +5071,7 @@ impl OneSession {
                     eprintln!(
                         "tasks: one session: the kept session's launch failed at its first words"
                     );
-                    return Some("Harness says its launch failed".into());
+                    return Some(("Harness says its launch failed".into(), true));
                 }
                 Ok(Some(state)) => {
                     eprintln!("tasks: one session: the kept session's first turn ended {state}");

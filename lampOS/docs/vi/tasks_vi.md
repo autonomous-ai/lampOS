@@ -2564,6 +2564,49 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   `show` lấy câu trả lời; 3 có câu hỏi; 4 đã mất; 1 kèm một dòng `failed`,
   lần khởi chạy thất bại của Harness 0.6.74). Phiên được giữ đã mất
   hoặc bị kẹt thì được thay như bên dưới (#7906, dấu hiệu 1-4).
+- **Việc nói không bao giờ bị bỏ khi phiên được giữ đang được thay.** Ba
+  quy tắc, như nhau cho OpenClaw và Hermes (không đọc dấu hiệu riêng của
+  engine nào):
+  - **Chưa sẵn sàng ở câu mở đầu: thay mới.** Một phiên được giữ mới mà câu
+    mở đầu vẫn bị từ chối `ENGINE_NOT_READY` khi hết khung thời gian của nó
+    (giới hạn của lần mở, tối đa `OPEN_IDLE_WITHIN`), hoặc không được nhận
+    trong cả thời gian giữ của Harness (`TIMEOUT`), là phiên hỏng, không
+    phải đang khởi động: `first_words` báo như vậy, và lần mở thay nó như
+    mọi phiên được giữ bị hỏng (`revive_or_replace`: đóng `--now`, quên đi,
+    tính vào `REPLACE_MOST`). Lần mở đó dừng ở đây; lần nhìn kế tiếp của
+    keep-open (`KEEP_OPEN_EVERY`) mở phiên mới bằng `ensure --fresh`, nên
+    ba lần liên tiếp vẫn chờ `OPEN_SLOW_RETRY` và đọc `error`. Dừng giữa
+    khung thời gian thì chưa có kết luận. Trước đây phiên như vậy cứ ở trạng
+    thái khởi động và mọi lần giao việc kết thúc `one_session_not_started`.
+    Lần mở bình thường không đổi: câu mở đầu được nhận (hoặc watch, hoặc
+    `confirm_if_warmed`) đưa nó tới `ready`.
+  - **Giao việc có nêu tên phiên được giữ thì vào chính nó.** Khi phiên
+    được giữ bật (và Harness không nói là không giữ phiên chương trình), một
+    lần giao có `session` nêu tên phiên được giữ của chính đèn trên target
+    của đèn đi qua `for_the_pane` như lần giao không nêu tên: tên của nó
+    trong Harness (`lamp-one-hermes`, `lamp-one-openclaw`, không phân biệt
+    hoa thường, bỏ khoảng trắng hai đầu), agent id của nó (của pane hoặc
+    trong `one-session.json`), hoặc một engine session nó từng mang ở đó
+    (`names_kept`). Trước đây nó đi tới `reply_named` và có thể kết thúc
+    `session_not_found`. Tên khác vẫn đi đường có tên như trước, kể cả tên
+    không khớp gì trong danh sách của đèn: với target của chính đèn,
+    `find_named` còn đọc danh sách của từng máy tính (#5978), nên tên như
+    vậy có thể là phiên của một máy tính, và chỉ lần tìm đó mới biết được;
+    không bao giờ đoán nó là của pane.
+  - **Đặt lại hàng đợi một lần vào phiên thay thế.** Một việc nói bị phiên
+    được giữ từ chối (đang khởi động, bị kẹt hoặc chưa sẵn sàng: những
+    trường hợp trên kết thúc bằng `one_session_not_started` hoặc
+    `one_session_stuck`) giờ được đặt lại một lần (`busy`, `requeue_once`).
+    Store giữ nó khi chưa có phiên nào nhận lời (không có pane, đang chờ
+    thay, hoặc chưa được xác nhận: `requeue_waits` trong `pane_turn`), rồi
+    gõ vào phiên thay thế, hoặc vào chính phiên đó khi nó đã được xác nhận.
+    Bị từ chối lần nữa thì kết thúc có báo như trước. Thời gian chờ bị giới
+    hạn bởi hạn xác nhận của store: việc đang xếp hàng hết hạn mà không ai
+    được báo ở `CONFIRM_MS` (120 s từ lúc prepare), nên khi còn
+    `REQUEUED_ENDS_WITHIN` (20 s) hoặc ít hơn, việc được giao đi ngay, được
+    gõ nếu lúc đó phiên nhận lời và đang rảnh, nếu không thì kết thúc có
+    báo. Số lần thay liên tiếp và back-off của phiên thay thế không đổi;
+    không có vòng lặp nào.
 - **Khởi chạy thất bại, xử lý ngay (#8062: openharness#4499 của Harness 0.6.74, có trong bản ghim 0.6.75).**
   `harness wait` thoát mã 1 khi một lần khởi chạy trên máy này thất bại (ví
   dụ `OPENCLAW_NO_TOKEN`, hoặc `FIRST_TASK_NOT_TAKEN` sau 3 phút), dòng của
@@ -3130,7 +3173,8 @@ nay.
   từ chối trong lúc khởi động ấm và không gì được giao cho phiên đang ấm
   lên. Một lần giao bị phiên còn đang ấm từ chối `ENGINE_NOT_READY` (chưa
   xác nhận, hoặc `ensure` tạo mới dưới 120 s trước, `made_new`) kết thúc
-  việc đó có báo (`one_session_not_started`) nhưng không thay phiên: agent
+  việc đó có báo (`one_session_not_started`; việc nói thì chỉ sau một lần
+  đặt lại hàng đợi, xem "Phiên được giữ") nhưng không thay phiên: agent
   đọc `starting` lại cho tới khi được xác nhận. `NOT_RUNNING` (chết) hoặc
   cả lần giữ không được nhận (một lần giao muộn sẽ chạy việc đã báo là
   không làm) là lỗi kể cả khi đang ấm: close `--now`, phục hồi mới. Một
@@ -3139,7 +3183,9 @@ nay.
   được xác nhận (HOLD 2 trên #8138); không bao giờ đè lên một lỗi thấy trên
   chính phiên đó trong lúc ấy, hay lên một lần giữ lâu dài (dưới đây).
 - **Một lần giao bị từ chối kết thúc việc ngay ở dấu hiệu đầu, trước mọi
-  phục hồi.** Reply đầu tiên của một lần giao vào phiên được giữ được giữ
+  phục hồi.** (Việc nói được đặt lại hàng đợi một lần vào phiên thay thế
+  trước: xem "Phiên được giữ" ở trên.) Reply đầu tiên của một lần giao vào
+  phiên được giữ được giữ
   10 s (`REPLY_KEPT_FIRST_HELD`). `ENGINE_NOT_READY` đầu tiên kết thúc việc
   ngay, `not_sent` `one_session_stuck` (`STUCK_ENDED`); `NOT_RUNNING`, hoặc
   `TIMEOUT` sau cả 60 s giữ (`REPLY_KEPT_HELD`: một `TIMEOUT` của 10 s đầu

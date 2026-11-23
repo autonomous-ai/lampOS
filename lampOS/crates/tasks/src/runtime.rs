@@ -774,7 +774,20 @@ fn one_session_holds(
         // its conversation deleted, as one ended unanswered.
         one.release_unanswered(&id);
     }
-    pane_turn(one, &engine.queued_launches(), launching, backing_off)
+    // A spoken task re-queued once into the kept session's replacement
+    // waits for it only while the store's confirm bound is not near: past
+    // that it would expire unheard, so it is handed over now, to be typed
+    // or ended told ([`crate::one_session::REQUEUED_ENDS_WITHIN`]).
+    let queued = engine.queued_launches();
+    if let Some(first) = queued.first()
+        && one.requeue_waits(&first.name)
+        && engine.queued_left_ms(&first.name, now).is_some_and(|left| {
+            u128::from(left) <= crate::one_session::REQUEUED_ENDS_WITHIN.as_millis()
+        })
+    {
+        one.spend_requeue(&first.name);
+    }
+    pane_turn(one, &queued, launching, backing_off)
 }
 
 /// How long a spoken task waits for the lamp's pane on the tasks-harness
@@ -815,11 +828,17 @@ fn pane_turn(
     let next_is_spoken = queued
         .first()
         .is_some_and(|launch| crate::one_session::for_the_pane(one, launch).is_some());
-    // One that found the pane not up past its bound (#7895) does not wait
-    // for the pane: handed over next, to end `one_session_not_started`.
-    let spent = queued
+    // One that found the pane not up past its bound (#7895), or whose one
+    // re-queue's wait is spent, does not wait for the pane: handed over
+    // next, to end told (or, re-queued, be typed if the session is up).
+    let spent = queued.first().is_some_and(|launch| {
+        one.not_up_spent(&launch.name) || one.requeue_spent(&launch.name).is_some()
+    });
+    // Re-queued once: held until its replacement takes input, not only
+    // until a pane is open (a warming one refused it).
+    let requeued = queued
         .first()
-        .is_some_and(|launch| one.not_up_spent(&launch.name));
+        .is_some_and(|launch| one.requeue_waits(&launch.name));
     one.set_spoken_queue(
         launching
             .map(str::to_owned)
@@ -835,7 +854,7 @@ fn pane_turn(
     next_is_spoken
         && (launching.is_some()
             || backing_off
-            || (!spent && (!one.free() || !one.has_fresh_pane())))
+            || (!spent && (!one.free() || !one.has_fresh_pane() || requeued)))
 }
 
 /// [`place_wait`]'s answer for the next launch.

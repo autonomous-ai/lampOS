@@ -3580,6 +3580,41 @@ mod tests {
         );
     }
 
+    /// Every way a hand-over to the lamp's own Hermes ends `not_sent`
+    /// (a named session not found, the kept session not started or stuck,
+    /// the pane busy past its wait, or no code) is news, said in plain
+    /// words as not done with an offer to try again, never as done and
+    /// never naming the engine; the lamp's own faults with the stuck line.
+    #[test]
+    fn every_not_sent_hand_over_to_the_lamps_hermes_is_told_in_plain_words() {
+        let item = json!({"id":3,"observations":0,"dispatch":{"state":"not_sent",
+            "confirmed":{"boot_id":"boot-a"},
+            "finished":{"boot_id":"boot-a","monotonic_ms":NOW - 5_000}}});
+        assert_eq!(failed_hand_over(&item, &now()), Some(false));
+        let task = json!({"ok":true,"text":"Turn the light blue",
+            "target":{"engine":"hermes","machine_id":"c533fbfda3de5f8f1fdb6619ae2e30b5","project":"lamp-tasks"},
+            "task":{"target_alias":"lamp"},"observations":[]});
+        for code in [
+            Some("session_not_found"),
+            Some("one_session_not_started"),
+            Some("one_session_stuck"),
+            Some("busy"),
+            None,
+        ] {
+            let told = note_failed(&own(), &task, false, code).unwrap_or_default();
+            let fault = code.is_some_and(|code| crate::agent_ready::FAULT_CODES.contains(&code));
+            assert!(
+                if fault {
+                    told.contains(crate::skill_words::STUCK_LINE)
+                } else {
+                    told.contains("did not reach the lamp") && told.contains("offer to try again")
+                },
+                "{code:?}: {told}"
+            );
+            assert!(!told.contains("Hermes"), "{code:?}: {told}");
+        }
+    }
+
     /// `serve --folder-missing` (#2840): a hand-over Harness refused for a
     /// folder that isn't on the computer is told as that, in plain words,
     /// naming the computer; only a sure failure is.

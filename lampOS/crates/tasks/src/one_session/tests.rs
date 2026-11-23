@@ -3897,6 +3897,12 @@ fn an_idle_kept_session_working_with_its_record_unmoved_is_reopened_after_two_lo
 
 /// A spoken kept session past its start window (1 s here), Harness
 /// reading it `idle` and its Gateway record at seq 7, its last row `role`.
+/// Spoken task `id` marked as already re-queued once, so a refusal ends it
+/// told at once, as before the re-queue: the tests of the first refusal.
+fn requeued_already(one: &OneSession, id: &str) {
+    assert!(one.requeue_once(id, STUCK_CLOSED));
+}
+
 fn spoken_idle(dir: &std::path::Path, role: &str) -> (OneSession, Fake) {
     let (one, fake) = spoken_working(dir, role);
     fake.states.lock().unwrap().remove(&agent_of(1));
@@ -3937,6 +3943,8 @@ fn a_deaf_idle_kept_session_ends_the_spoken_task_stuck_at_the_first_refusal() {
         .lock()
         .unwrap()
         .extend(std::iter::repeat_n(Took::EngineNotReady, 3));
+    // Its one re-queue into a replacement already had: ended told now.
+    requeued_already(&one, "lamp-1");
     assert_eq!(
         spoken_launch(&one, &fake, &spoken("lamp-1")),
         stuck(),
@@ -3977,6 +3985,8 @@ fn a_short_refusal_with_a_final_assistant_reply_last_is_deaf() {
         .lock()
         .unwrap()
         .extend(std::iter::repeat_n(Took::EngineNotReady, 3));
+    // Its one re-queue into a replacement already had: ended told now.
+    requeued_already(&one, "lamp-1");
     assert_eq!(
         spoken_launch(&one, &fake, &spoken("lamp-1")),
         stuck(),
@@ -4054,6 +4064,8 @@ fn a_short_refusal_with_a_lost_gateway_link_ends_the_spoken_task_stuck() {
     let (one, fake) = spoken_working(dir.path(), "user");
     let before = holds(&fake).len();
     fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    // Its one re-queue into a replacement already had: ended told now.
+    requeued_already(&one, "lamp-1");
     assert_eq!(
         spoken_launch(&one, &fake, &spoken("lamp-1")),
         stuck(),
@@ -4166,6 +4178,8 @@ fn a_skill_run_after_a_stuck_end_closes_first_and_never_types_into_the_frozen_ag
     // Signal D: idle, its record readable, the user's row last.
     *fake.seq.lock().unwrap() = Some(7);
     fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    // Its one re-queue into a replacement already had: ended told now.
+    requeued_already(&one, "lamp-1");
     assert_eq!(spoken_launch(&one, &fake, &spoken("lamp-1")), stuck());
     assert_eq!(fake.count("close-kept"), 0);
     let from = fake.calls().len();
@@ -4556,6 +4570,8 @@ fn a_spoken_task_refused_once_ends_at_once_and_is_never_typed_again() {
     // Past its first words' window (1 s here): no longer warming up.
     thread::sleep(Duration::from_millis(1100));
     fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    // Its one re-queue into a replacement already had: ended told now.
+    requeued_already(&one, "lamp-1");
     let began = Instant::now();
     assert_eq!(
         spoken_launch(&one, &fake, &spoken("lamp-1")),
@@ -4838,17 +4854,17 @@ fn a_warming_session_reads_starting_and_is_never_replaced_for_its_refusal() {
     use lamp_msgs::Readiness;
     let dir = tempfile::tempdir().unwrap();
     let (one, fake) = kept_on(dir.path());
-    // Its first words refused through the whole (1 s) window.
-    fake.takes
-        .lock()
-        .unwrap()
-        .extend(std::iter::repeat_n(Took::EngineNotReady, 1000));
+    // Its first words not taken yet (busy: no verdict). Refused through
+    // the whole window it would be replaced instead, as
+    // `a_kept_session_not_ready_at_its_first_words_is_replaced_fresh` shows.
+    fake.takes.lock().unwrap().push_back(Took::NotIdle);
     one.open_if_due(&fake, &place());
     assert_eq!(one.agent(), Some(agent_of(1)));
     assert_eq!(
         one.readiness().state(),
         (Readiness::Starting, Some("session_starting"))
     );
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
     let turn = one.enter("task-1", Kind::Skill, far(), &|| false).unwrap();
     assert!(matches!(
         turn.send(&fake, &place(), "Run the skill.", far(), &|| false),
@@ -4881,12 +4897,9 @@ fn a_fresh_session_confirmed_after_a_fault_reads_ready_and_takes_a_task() {
         (Readiness::Recovering, Some("held"))
     );
     one.restart_if_due(&fake);
-    // The fresh session's first words refused through the whole window:
+    // The fresh session's first words not taken yet (busy, no verdict):
     // open, not yet confirmed.
-    fake.takes
-        .lock()
-        .unwrap()
-        .extend(std::iter::repeat_n(Took::EngineNotReady, 1000));
+    fake.takes.lock().unwrap().push_back(Took::NotIdle);
     one.open_if_due(&fake, &place());
     let fresh = one.agent().expect("a fresh session open");
     assert_ne!(fresh, agent_of(1));
@@ -4950,6 +4963,8 @@ fn a_short_refusal_inside_the_start_window_is_not_deaf() {
     let (one, fake) = spoken_idle(dir.path(), "user");
     one.lock().pane.as_mut().unwrap().made_new = Some(Instant::now());
     fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    // Its one re-queue into a replacement already had: ended told now.
+    requeued_already(&one, "lamp-1");
     assert_eq!(
         spoken_launch(&one, &fake, &spoken("lamp-1")),
         Some(LaunchOutcome::NotSent {
@@ -5924,4 +5939,188 @@ fn a_hermes_id_short_enough_to_be_a_prefix_is_never_passed_on() {
     assert!(cli.delete(&gone_ids(&["2026", whole])).is_empty());
     assert_eq!(hermes_calls(home.path(), &log), [whole]);
     assert!(cli.delete_one("2026").is_err());
+}
+
+/// A new kept session not ready through its first words' window (its
+/// last try refused `ENGINE_NOT_READY`, or not taken within Harness's
+/// hold) is replaced fresh by the open, never kept warming to refuse every
+/// hand-over; the next open makes the fresh one, which reads `ready`. The
+/// same for OpenClaw and Hermes: the rule reads no engine's own signs.
+#[test]
+fn a_kept_session_not_ready_at_its_first_words_is_replaced_fresh() {
+    use lamp_msgs::Readiness;
+    let cases = [
+        (place(), Took::EngineNotReady),
+        (place(), Took::Timeout),
+        (hermes_place(), Took::EngineNotReady),
+    ];
+    for (at, took) in cases {
+        let dir = tempfile::tempdir().unwrap();
+        let (one, fake, _, _) = hermes_kept_on(dir.path());
+        let name = name_for(at.engine);
+        // Refused through the whole (1 s) window; a timeout is one whole hold.
+        let refusals = if took == Took::Timeout { 1 } else { 1000 };
+        fake.takes
+            .lock()
+            .unwrap()
+            .extend(std::iter::repeat_n(took.clone(), refusals));
+        one.open_if_due(&fake, &at);
+        assert_eq!(one.agent(), None, "{took:?}: {:?}", fake.calls());
+        assert!(
+            fake.calls().contains(&format!("close-kept {name} --now")),
+            "{took:?}: {:?}",
+            fake.calls()
+        );
+        assert_eq!(one.readiness().state().0, Readiness::Recovering);
+        assert_eq!(one.lock().replaced_in_row, 1, "counted as any replacement");
+        // The next open (the keep-open loop's next look) makes it fresh.
+        fake.takes.lock().unwrap().clear();
+        one.open_if_due(&fake, &at);
+        assert_eq!(one.agent(), Some(agent_of(2)), "{took:?}");
+        assert!(
+            fake.calls().contains(&format!("ensure {name} --fresh")),
+            "{took:?}: {:?}",
+            fake.calls()
+        );
+        assert_eq!(one.readiness().state(), (Readiness::Ready, None));
+    }
+}
+
+/// A spoken task for the lamp's Hermes on its own target.
+fn hermes_spoken(name: &str) -> Launch {
+    let mut launch = spoken(name);
+    launch.target.engine = EngineKind::Hermes;
+    launch
+}
+
+/// A hand-over that names the lamp's own kept session (its name in
+/// Harness, any case, its agent id, or its engine session) goes into it as
+/// one naming none, never to the named lookup that ended it
+/// `session_not_found` on a lamp.
+#[test]
+fn a_hand_over_naming_the_lamps_kept_session_goes_into_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake, _, _) = hermes_kept_on(dir.path());
+    one.open_if_due(&fake, &hermes_place());
+    let names = [
+        "lamp-one-hermes".to_owned(),
+        " Lamp-One-Hermes ".to_owned(),
+        agent_of(1),
+        "hermes-1".to_owned(),
+    ];
+    for (n, named) in names.into_iter().enumerate() {
+        let mut launch = hermes_spoken(&format!("lamp-{n}"));
+        launch.session = Some(named.clone());
+        assert!(for_the_pane(&one, &launch).is_some(), "{named}");
+        assert!(
+            matches!(
+                spoken_launch(&one, &fake, &launch),
+                Some(LaunchOutcome::Joined { ref agent_id, .. }) if *agent_id == agent_of(1)
+            ),
+            "{named}: {:?}",
+            fake.calls()
+        );
+        one.release(&launch.name);
+    }
+    assert_eq!(fake.count("ensure"), 1, "one kept session");
+}
+
+/// Any other session named on the lamp's own target (another computer's,
+/// the other engine's kept name, words that match nothing on the lamp's
+/// list) is not the pane's: it goes the named way as before
+/// ([`crate::harness::Cli::reply_named`], `session_not_found` when no
+/// list has it), and nothing is typed into the kept session. With the
+/// kept session off, even its name goes that way.
+#[test]
+fn a_hand_over_naming_another_session_still_goes_the_named_way() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake, _, _) = hermes_kept_on(dir.path());
+    one.open_if_due(&fake, &hermes_place());
+    let replies = fake.count("reply-kept");
+    for named in ["mac-docs", "lamp-one-openclaw", "docs update"] {
+        let mut launch = hermes_spoken("lamp-1");
+        launch.session = Some(named.into());
+        assert!(for_the_pane(&one, &launch).is_none(), "{named}");
+        assert_eq!(spoken_launch(&one, &fake, &launch), None, "{named}");
+    }
+    assert_eq!(fake.count("reply-kept"), replies, "{:?}", fake.calls());
+    // Harness keeps no program sessions: the pane is not the kept one.
+    let dir = tempfile::tempdir().unwrap();
+    let one = kept_session(dir.path()).with_kept_session(dir.path().join(TOKEN_FILE));
+    let fake = Fake::default();
+    one.open_if_due(&fake, &hermes_place());
+    let mut launch = hermes_spoken("lamp-2");
+    launch.session = Some("lamp-one-hermes".into());
+    assert!(for_the_pane(&one, &launch).is_none());
+}
+
+/// A spoken task the kept session refused (stuck, not ready, or warming
+/// up) is re-queued once (`busy`, which the store puts back), held while
+/// the replacement is not taking input, and typed into it; refused a
+/// second time it ends told as before. The replacements' count is not
+/// touched, and one whose wait reaches the store's bound ends told, never
+/// left to expire.
+#[test]
+fn a_refused_spoken_task_is_requeued_once_into_the_replacement() {
+    let busy = || {
+        Some(LaunchOutcome::NotSent {
+            code: "busy".into(),
+        })
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    // Past its first words' window (1 s here): stuck, not warming.
+    thread::sleep(Duration::from_millis(1100));
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    assert_eq!(spoken_launch(&one, &fake, &spoken("lamp-1")), busy());
+    assert!(one.requeue_waits("lamp-1"), "held for the replacement");
+    fake.takes.lock().unwrap().clear();
+    one.restart_if_due(&fake);
+    one.open_if_due(&fake, &place());
+    assert_eq!(one.agent(), Some(agent_of(2)));
+    assert!(!one.requeue_waits("lamp-1"), "the replacement takes input");
+    assert!(matches!(
+        spoken_launch(&one, &fake, &spoken("lamp-1")),
+        Some(LaunchOutcome::Joined { ref agent_id, .. }) if *agent_id == agent_of(2)
+    ));
+    assert!(
+        fake.asked
+            .lock()
+            .unwrap()
+            .get(&agent_of(2))
+            .is_some_and(|ask| ask.starts_with("New task lamp-1:")),
+        "typed into the replacement"
+    );
+    one.release("lamp-1");
+    // Once only: refused again (the replacement still warming up) it ends
+    // told, `one_session_not_started`.
+    thread::sleep(Duration::from_millis(1100));
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    assert_eq!(spoken_launch(&one, &fake, &spoken("lamp-2")), busy());
+    one.restart_if_due(&fake);
+    fake.takes.lock().unwrap().clear();
+    one.open_if_due(&fake, &place());
+    assert!(one.warming(&agent_of(3)));
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    assert_eq!(
+        spoken_launch(&one, &fake, &spoken("lamp-2")),
+        Some(LaunchOutcome::NotSent {
+            code: NOT_STARTED.into()
+        })
+    );
+    assert_eq!(one.lock().replaced_in_row, 2, "one per refused session");
+    // The store's bound near while no session takes input (the same one,
+    // still not confirmed since its warm-up refusal): ended told.
+    fake.takes.lock().unwrap().push_back(Took::EngineNotReady);
+    assert_eq!(spoken_launch(&one, &fake, &spoken("lamp-3")), busy());
+    assert!(one.requeue_waits("lamp-3"));
+    one.spend_requeue("lamp-3");
+    assert_eq!(
+        spoken_launch(&one, &fake, &spoken("lamp-3")),
+        Some(LaunchOutcome::NotSent {
+            code: NOT_STARTED.into()
+        })
+    );
+    assert!(!one.requeue_waits("lamp-3"));
 }

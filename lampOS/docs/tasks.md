@@ -5380,6 +5380,47 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   <inputId>` (0 idle, then `show` for the answer; 3 an ask; 4 gone; 1
   with a `failed` row, Harness 0.6.74's failed launch). A
   kept session gone or stuck is replaced as below (#7906, signs 1-4).
+- **Voice work is never dropped while the kept session is replaced.**
+  Three rules, the same for OpenClaw and Hermes (nothing here reads one
+  engine's own signs):
+  - **Not ready at its first words: replaced.** A new kept session whose
+    first words are still refused `ENGINE_NOT_READY` when their window
+    ends (the open's bound, at most `OPEN_IDLE_WITHIN`), or not taken
+    within Harness's whole hold (`TIMEOUT`), is broken, not warming up:
+    `first_words` says so, and the open replaces it as any broken kept
+    session (`revive_or_replace`: closed `--now`, forgotten, counted
+    toward `REPLACE_MOST`). That open ends there; the next keep-open look
+    (`KEEP_OPEN_EVERY`) makes the fresh one with `ensure --fresh`, so three
+    in a row still wait `OPEN_SLOW_RETRY` and read `error`. A stop during
+    the window is no verdict. Before, such a session stayed warming and
+    every hand-over ended `one_session_not_started`. A normal open is
+    unchanged: its first words taken (or the watch, or
+    `confirm_if_warmed`) make it `ready`.
+  - **A hand-over naming the kept session goes into it.** With the kept
+    session on (and Harness not saying it keeps no program sessions), a
+    launch whose `session` names the lamp's own kept session on its own
+    target goes through `for_the_pane` like one naming none: its name in
+    Harness (`lamp-one-hermes`, `lamp-one-openclaw`, any case, spaces
+    trimmed), its agent id (the pane's or `one-session.json`'s), or an
+    engine session it was named there (`names_kept`). Before, it went to
+    `reply_named` and could end `session_not_found`. Any other name goes
+    the named way as before, including one matching nothing on the lamp's
+    list: for the lamp's own target `find_named` also reads each
+    computer's list (#5978), so such a name may be a computer's session,
+    and only that lookup can tell; it is never guessed to be the pane's.
+  - **Re-queued once into the replacement.** A spoken task the kept
+    session refused (warming up, stuck or not ready: what ended it
+    `one_session_not_started` or `one_session_stuck` above) is put back
+    once (`busy`, `requeue_once`) instead. The store holds it while no
+    session takes input (no pane, a replacement due, or not confirmed yet:
+    `requeue_waits` in `pane_turn`), then types it into the replacement,
+    or into the same session once it is confirmed. Refused again, it ends
+    told as before. Its wait is bounded by the store's confirm bound: a
+    queued task expires unheard at `CONFIRM_MS` (120 s from its prepare),
+    so with `REQUEUED_ENDS_WITHIN` (20 s) or less left it is handed over at
+    once, typed if the session takes input then and is free, else ended
+    told. The replacement's own count in a row and back-off are not
+    touched; nothing loops.
 - **A failed launch, at once (#8062: Harness 0.6.74's openharness#4499, carried by the 0.6.75 pin).**
   `harness wait` exits 1 when a launch on this machine failed (for example
   `OPENCLAW_NO_TOKEN`, or `FIRST_TASK_NOT_TAKEN` after 3 min), its row
@@ -5938,7 +5979,8 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
   warm-up and nothing is handed to a warming session. A hand-over refused
   `ENGINE_NOT_READY` by a session still warming (not confirmed, or
   `ensure` made it new under 120 s ago, `made_new`) ends that task told
-  (`one_session_not_started`) but does not replace the session: the agent
+  (`one_session_not_started`, a spoken task only after its one re-queue,
+  "The kept session") but does not replace the session: the agent
   reads `starting` again until it is confirmed. `NOT_RUNNING` (dead) or a
   whole hold not taken (a late delivery would run a task told not done)
   is a fault even while warming: closed `--now`, recovered fresh. A fresh
@@ -5947,7 +5989,9 @@ backoffs, a spoken task's 3 put-backs, a skill run's words typed again,
   (HOLD 2 on #8138); never over a fault seen on that same session
   meanwhile, nor over a lasting hold (below).
 - **A hand-over refused ends the task at the first sign, before any
-  recovery.** The kept session's first reply of a hand-over is held 10 s
+  recovery.** (A spoken task is re-queued once into the replacement
+  first: "The kept session", above.) The kept session's first reply of a
+  hand-over is held 10 s
   (`REPLY_KEPT_FIRST_HELD`). Its first `ENGINE_NOT_READY` ends the task
   at once `not_sent` `one_session_stuck` (`STUCK_ENDED`); `NOT_RUNNING`,
   or a `TIMEOUT` after the whole 60 s hold (`REPLY_KEPT_HELD`: a `TIMEOUT`
