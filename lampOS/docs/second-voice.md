@@ -3063,6 +3063,14 @@ gives one fixed line with a real place to turn. Off unless
   `care_line::MOST_SAMPLES`), else streamed, and ends its words again
   (`Transcript` empty and finished). Only a line that played counts as
   said; one that didn't stays owed.
+- **Never an app's trigger** (#7689 part 2). Such a line, or within the
+  hold one asking who they can call, is never offered to a running app's
+  spoken trigger (`LAMP_APP_TRIGGERS`, #7415 piece 6): taken, the turn
+  would end with no caring answer and no line. A `start_app` the model
+  calls in a care turn starts nothing either: it is answered "not now:
+  nothing was started", as for a line not plainly for the lamp. The care
+  turns are kept per route (`Care::turn`, `Care::is_turn`, the last 16).
+  Any other line is offered as before.
 - **Nothing after a cut** (`care_line::StillHere`, the coordinator's): a
   care turn's answer cut or stopped, and the lamp quiet and free for 3 s
   (no later answer played whole), within 2 min: one written turn,

@@ -182,3 +182,63 @@ fn a_care_turns_request_is_held_from_the_summary() {
     let _ = care_turn(care(Some("US")), "honestly I want to kill myself", REPLY);
     assert!(crate::care_line::held_from_summary(1));
 }
+
+/// #7689 part 2: words of self-harm, or the person asking who to call
+/// within the hold, are never offered to a running app's spoken trigger
+/// (`LAMP_APP_TRIGGERS`, #7415 piece 6): an app that took one would end the
+/// turn with no caring answer and no care line. Here the app takes every
+/// line it is offered; an ordinary line is still offered and taken.
+#[test]
+fn words_of_self_harm_are_never_offered_to_a_running_apps_trigger() {
+    let run = |care: Arc<crate::care_line::Care>, heard: &str| {
+        let offered: Arc<Mutex<Vec<String>>> = Arc::default();
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(heard.to_owned())].into()),
+            chats: Mutex::new([vec![text(REPLY), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (mut engine, _, _) = scripted(script.clone());
+        let seen = offered.clone();
+        engine = engine
+            .announcing(false)
+            .caring(Some(care))
+            .taking_app_lines(Arc::new(move |_, words: &str| {
+                seen.lock().unwrap().push(words.to_owned());
+                true
+            }));
+        let labels = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                engine.submit(start(1));
+                engine.submit(audio(1, 1));
+                engine.submit(end(1));
+                turn(&mut engine).await
+            });
+        let said: Vec<String> = labels
+            .into_iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        let offered = offered.lock().unwrap().clone();
+        (offered, said, !script.asked.lock().unwrap().is_empty())
+    };
+    let line = crate::care_line::CareLines::shipped()
+        .line(Some("US"), "en")
+        .to_owned();
+    let fresh = || Arc::new(care(Some("US")).unwrap());
+    let (offered, said, asked) = run(fresh(), "honestly I want to kill myself");
+    assert!(offered.is_empty(), "offered to the app: {offered:?}");
+    assert!(asked, "the model answers it");
+    assert_eq!(said, [format!("said:{REPLY}"), format!("said:{line}")]);
+    // Within the hold, "who can I call" is a care turn too.
+    let held = fresh();
+    held.mark(Instant::now(), false);
+    let (offered, _, asked) = run(held, "who can I call");
+    assert!(offered.is_empty(), "offered to the app: {offered:?}");
+    assert!(asked, "the model answers it");
+    // An ordinary line is still the app's.
+    let (offered, said, asked) = run(fresh(), "start the store test");
+    assert_eq!(offered, ["start the store test".to_owned()]);
+    assert!(!asked && said.is_empty(), "taken by the app: {said:?}");
+}

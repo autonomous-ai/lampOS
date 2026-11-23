@@ -12170,7 +12170,16 @@ async fn spoken(
     // nothing here. Taken: the request ends as a normal end does, nothing of
     // it carried, with no chat round and no words from the lamp; the app
     // speaks for itself.
+    // `LAMP_CARE_LINE` (#7689 part 2): words of self-harm, or within the
+    // hold the person asking who to call, are never offered to an app's
+    // trigger: taken, the turn would end with no caring answer and no care
+    // line. Judged as the care turn below judges them.
+    let care_turn = care_caught
+        || shared.care.as_ref().is_some_and(|care| {
+            care.holds(Instant::now()) && crate::care_line::asks_who_to_call(&text)
+        });
     if let Some(take) = &shared.app_line
+        && !care_turn
         && began_clear
         && carried.is_none()
         && !lamp_awaits_an_answer(&shared, request)
@@ -12618,6 +12627,7 @@ async fn spoken(
         let asks = care.holds(now) && crate::care_line::asks_who_to_call(&text);
         if care_caught || asks {
             care.mark(now, asks);
+            care.turn(request);
             crate::remember::keep_out(request);
             crate::care_line::hold_from_summary(request);
             // The lamp's line follows only when it is due: said in the last
@@ -22304,11 +22314,13 @@ async fn answer(
                         .as_ref()
                         .and_then(|note| note(request))
                         == Some(worker::CONVERSATION_ALONE)
-                        || lamp_awaits_an_answer(shared, request));
+                        || lamp_awaits_an_answer(shared, request)
+                        // A care turn (#7689 part 2): no app takes it.
+                        || shared.care.as_ref().is_some_and(|care| care.is_turn(request)));
                 let answering = async {
                     if app_start_blocked {
                         eprintln!(
-                            "lamp-voice second: request {request}: start_app refused: the line is not plainly for the lamp, or an answer is awaited ({})",
+                            "lamp-voice second: request {request}: start_app refused: the line is not plainly for the lamp, an answer is awaited, or it is a care turn ({})",
                             crate::app_triggers::ENVIRONMENT
                         );
                         return crate::tools::ToolAnswer::plain(serde_json::json!({

@@ -367,7 +367,14 @@ pub struct Care {
     /// caught as the person's.
     said_line: std::sync::Mutex<Option<(String, std::time::Instant)>>,
     clip: std::sync::Mutex<Option<(String, Vec<i16>)>>,
+    /// The requests that were care turns, the last [`CARE_TURNS_KEPT`]: no
+    /// `start_app` runs in them (#7689 part 2). This route's own, not the
+    /// process's.
+    turns: std::sync::Mutex<std::collections::VecDeque<u64>>,
 }
+
+/// How many care turns' requests [`Care`] keeps for [`Care::is_turn`].
+pub const CARE_TURNS_KEPT: usize = 16;
 
 impl Care {
     /// For a lamp in `region` (fixed), speaking `language`.
@@ -390,6 +397,7 @@ impl Care {
             last: Default::default(),
             said_line: Default::default(),
             clip: Default::default(),
+            turns: Default::default(),
         }
     }
 
@@ -422,6 +430,25 @@ impl Care {
         if let Ok(mut last) = self.last.lock() {
             *last = Some(now);
         }
+    }
+
+    /// `request` kept as a care turn ([`Care::is_turn`]).
+    pub fn turn(&self, request: u64) {
+        if let Ok(mut turns) = self.turns.lock()
+            && !turns.contains(&request)
+        {
+            if turns.len() == CARE_TURNS_KEPT {
+                turns.pop_front();
+            }
+            turns.push_back(request);
+        }
+    }
+
+    /// Whether `request` was a care turn on this route ([`Care::turn`]).
+    pub fn is_turn(&self, request: u64) -> bool {
+        self.turns
+            .lock()
+            .is_ok_and(|turns| turns.contains(&request))
     }
 
     /// Whether a line is owed at `now` and due ([`Said::is_due`]): the
