@@ -596,6 +596,10 @@ pub fn wrapper_text_for(shown: Shown) -> String {
 /// that exits 0, and leaves the start to its supervisor; `on-failure` took
 /// that as done and left the gateway down. A `systemctl stop` (every stop
 /// lamp-update and lamp-setup make) still stops it.
+/// `TimeoutStopSec=150` (#8320): a stop that lands in the gateway's first
+/// start (a `PartOf=` restart by lamp-control, which [`settled`] never
+/// sees) drains about 80 s (79.9 s on kit-8306b); the default 90 s SIGKILLed
+/// one and left OpenClaw's state unreadable (gate G), so it gets 150 s.
 pub const UNIT_TEXT: &str = "\
 # lamp-openclaw-gateway: OpenClaw's gateway on the lamp, which Harness's OpenClaw panes talk to (lampOS/docs/install.md,
 # \"OpenClaw on the lamp\", #6226). Written by a round of lamp-update with LAMP_OPENCLAW_ON_LAMP on, enabled and always
@@ -617,6 +621,8 @@ WorkingDirectory=/var/lib/lampos-openclaw/state
 ExecStart=/usr/local/bin/openclaw gateway run
 Restart=always
 RestartSec=10
+# (#8320) a stop in the gateway's first start drains about 80 s: room for it before a SIGKILL.
+TimeoutStopSec=150
 StandardInput=null
 SyslogIdentifier=lamp-openclaw-gateway
 Nice=10
@@ -2248,7 +2254,7 @@ const SETTLE_SLEEP: Duration = if cfg!(test) {
 /// [`SETTLED_AFTER_LISTEN`] since a listen seen to begin here (one look
 /// not listening forgets the listen seen). [`SETTLE_AT_MOST`] at most,
 /// looking every [`SETTLE_EVERY`]. A stop at the first listen drained
-/// 79.9 s against the 90 s `TimeoutStopSec` (kit-8306b); a second stop
+/// 79.9 s against the then 90 s `TimeoutStopSec` (kit-8306b, 150 s since #8320); a second stop
 /// seconds after a start was SIGKILLed and left OpenClaw's state
 /// unreadable (gate G on lamp-52e6). The earlier start may be
 /// `gateway_config`'s supervisor restart, a round's `gateway_on`, a crash's

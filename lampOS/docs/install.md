@@ -2716,7 +2716,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      switch, `lamp-setup restart`, the keeper, its own `Restart=on-failure`)
      restarts the gateway, and a stop stops it until it is started again (a
      round's `gateway_on`). The cost is the gateway's start, about 60 s, after
-     each lamp-control restart. As each of those starts spends one of the
+     each lamp-control restart. Such a restart can land in the gateway's
+     first start, where a stop drains about 80 s, and the 90 s default
+     SIGKILLed one (gate G), so the unit has `TimeoutStopSec=150`.
+     As each of those starts spends one of the
      gateway's `StartLimitBurst=5` per 600 s, lamp-control's unit gives it back
      first (`ExecStartPost=-+… systemctl reset-failed
      lamp-openclaw-gateway.service`, before the gateway's start, a missing
