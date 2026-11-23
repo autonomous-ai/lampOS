@@ -108,7 +108,7 @@ def test_pairing_keeps_the_key_private_and_the_lamp_pinned(tmp_path):
 
 def test_the_lamps_language_comes_from_hello_and_is_english_when_it_says_none(tmp_path):
     async def go():
-        for said, shown in (("en", "en"), ("vi", "vi"), ("ko", "ko"), (None, "en"), ("klingon", "en")):
+        for said, shown in (("en", "en"), ("vi", "vi"), ("ko", "ko"), ("fr", "fr"), (None, "en"), ("klingon", "en")):
             async with FakeLamp(language=said) as fake:
                 ring = await paired(fake, tmp_path / f"{said}")
                 async with await Lamp.connect(keyring=ring) as lamp:

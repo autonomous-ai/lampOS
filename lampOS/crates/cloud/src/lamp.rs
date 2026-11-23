@@ -1403,7 +1403,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(info["host"]["language"], "ja");
-        std::fs::write(&file, "fr\n").unwrap();
+        std::fs::write(&file, "de\n").unwrap();
         assert_eq!(lamp.host()["language"], "en");
         assert_eq!(
             crate::answer::answer(&mut lamp, "mic.get", &Value::Null),

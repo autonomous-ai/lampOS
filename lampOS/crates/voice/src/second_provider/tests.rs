@@ -7339,6 +7339,7 @@ fn the_usage_limit_line_has_each_language() {
         Language::Japanese,
         Language::Chinese,
         Language::Korean,
+        Language::French,
     ] {
         assert_ne!(
             fixed_in(Some(language), DOWN_LINE_LIMIT),

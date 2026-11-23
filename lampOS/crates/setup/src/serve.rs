@@ -625,7 +625,7 @@ pub fn check(request: &SetupRequest, config: &Config) -> Result<Accepted, String
     let language = language(given);
     if language.is_none() && !given.is_empty() {
         eprintln!(
-            "lamp-setup: the request's language is not one of en, vi, ja, zh, ko; none is written"
+            "lamp-setup: the request's language is not one of en, vi, ja, zh, ko, fr; none is written"
         );
     }
     Ok(Accepted {
@@ -702,12 +702,12 @@ pub fn zone_known(zone: &str, zoneinfo: &Path) -> bool {
         && &magic == b"TZif"
 }
 
-/// The languages the lamp speaks (#4473), as the voice reads them
+/// The languages the lamp speaks (#4473, fr #8381), as the voice reads them
 /// (`crates/voice/src/language.rs`).
-pub const LANGUAGES: [&str; 5] = ["en", "vi", "ja", "zh", "ko"];
+pub const LANGUAGES: [&str; 6] = ["en", "vi", "ja", "zh", "ko", "fr"];
 
 /// Why a language is refused: the app shows it.
-pub const LANGUAGE_REFUSED: &str = "language must be one of en, vi, ja, zh, ko";
+pub const LANGUAGE_REFUSED: &str = "language must be one of en, vi, ja, zh, ko, fr";
 
 /// `text` as one of [`LANGUAGES`], exactly; anything else is none.
 pub fn language(text: &str) -> Option<&'static str> {

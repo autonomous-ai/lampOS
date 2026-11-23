@@ -14367,6 +14367,15 @@ mod tests {
                 "네.",
                 "아니요.",
             ),
+            (
+                Language::French,
+                "C'est quoi, les heures calmes ?",
+                "Après dix heures du soir.",
+                "Oui, laissez-moi réfléchir",
+                "Oui, merci.",
+                "Oui.",
+                "Non.",
+            ),
         ] {
             let said = |note: &str| in_language::said(note.to_owned(), Some(language));
             let code = language.code();

@@ -180,9 +180,9 @@ Who writes it at onboarding is not built (below).
 
 ## The owner's language (#4473 (a), the voice side)
 
-The lamp speaks English, Vietnamese, Japanese, Chinese or Korean, as the
-owner chooses (`crates/voice/src/language.rs`). The setting is one line,
-`en`, `vi`, `ja`, `zh` or `ko`, in the file `LAMP_LANGUAGE_FILE` names; the
+The lamp speaks English, Vietnamese, Japanese, Chinese, Korean or French
+(#8381), as the owner chooses (`crates/voice/src/language.rs`). The setting
+is one line, `en`, `vi`, `ja`, `zh`, `ko` or `fr`, in the file `LAMP_LANGUAGE_FILE` names; the
 product's unit names `/etc/lampOS/setup/language`. Each process reads it as
 it starts, so a change takes effect at the voice's next start. Writing it
 from the app (`lamp-cloud`, root's change helper) is not built yet: its
@@ -198,13 +198,14 @@ value this build doesn't know (said in the journal) is English: the
 speech-to-text query, the character, the voice and its model are
 exactly what they were.
 
-For `vi`, `ja`, `zh` or `ko`:
+For `vi`, `ja`, `zh`, `ko` or `fr`:
 
 | Part | What changes | Where |
 |---|---|---|
 | Speech to text | `language` is the code, over `stt_language`; Flux hears English only, so Nova-3 hears it (`nova-3-general`, as for `vi` above) | `SecondConfig::with_environment` |
 | The character | "Always speak English" becomes "Always speak Vietnamese", "Japanese", "Mandarin Chinese, in simplified characters" or "Korean"; a character without the rule gets it at its end. The call name stays "Lamp" | `ProviderConfig::instruction` |
 | The voice (ElevenLabs only) | vi, ja, zh: `eleven_flash_v2_5`, over `LAMP_SECOND_SPEECH_MODEL` (`eleven_v4_turbo`), with V1's first voice for the language (`system/domain/device.go`): Ngan (vi), Shizuka (ja), Amy (zh). Speech tags are then off, as for any model that does not read them. ko: English's model, `LAMP_SECOND_SPEECH_MODEL` (`eleven_v4_turbo`), kept (only where the unit names it: without the variable Korean keeps the configured `tts_model`, and with neither falls to `eleven_flash_v2_5`; every unit in `deploy/` that runs the second route names v4), so the speech tags stay on as in English, in Kanna's voice (`5I7B1di44aCL15NkP0jn`). V1 had no Korean voice; Kanna and v4 are a Korean native speaker's picks from a listening test ([#4473](https://github.com/autonomous-ai/lampOS/issues/4473#issuecomment-6535649111)): `eleven_flash_v2_5` drops the pitch at the end of a Korean sentence | `SecondConfig::with_environment`, `Language::voice`, `Language::speech_model` |
+| French (#8381) | `fr`: Nova-3 hears it; the character says "Always speak French"; ElevenLabs speaks `eleven_flash_v2_5` in English's default voice, Rachel (`21m00Tcm4TlvDq8ikWAM`): V1 has no French voice, and none is picked until a French speaker's listening test, as Kanna was for Korean. Latin script, as Vietnamese: a turn heard in another script is asked again; no stop words. The name: "Lamp" as English reads it, and "lampe", French speech to text's writing and the everyday word for a lamp, only as Vietnamese's stand-ins are read (first clause, greeted by hey, hé or eh, or with more clauses after: "Hé lampe, quelle heure est-il ?", "Lampe, allume la lumière."; "La lampe est cassée." and a bare "Lampe." are none). Not heard on a lamp yet | `Language::voice`, `Language::speech_model`, `attention::written` |
 | English-only gates | #926: a cut-in with no English word is no fragment in any of them; Vietnamese, written in the Latin script, still asks again for a turn heard in another script, while Japanese, Chinese and Korean have no `--ask-unclear` (their script is the conversation's own). The stop-word stream: Vietnamese keeps it, hearing in Vietnamese with #2939's Vietnamese backchannels; Japanese, Chinese and Korean, which it has no words for, have none | `not_speech::unclear_arguments_from_environment`, `not_speech::unclear_in_conversation`, `stop_words::listen`, the coordinator's stop stream |
 | The lamp's name | heard as English hears it, unchanged, and also as the language's speech to text writes it (#4473: on lamp-52e6 on 30 Oct, with `ja`, "Hey Lamp. 今何時ですか？" came back as 「エイランク、今何時ですか。」 and was not answered). Each clause (split at any punctuation, 、 and 。 too) is read past greetings at its start; the name itself counts opening a clause, a stand-in (also an everyday word) only set off, alone in its clause past any greetings (a greeting alone is not enough: "Ê làm bài tập chưa?", 「エイランクだね。」 are none). `ja`: greetings ヘイ, エイ, a (Latin, 「Aランク。」 on lamp-52e6, #4554; 「Aランクだね。」 is none); name ランプ, らんぷ, not with more katakana or ー right after (「ランプシェード」 is none, 「ランプを消して」 a call); stand-ins ランク, マンプ (「ヘイ、マンプ。」 on lamp-52e6, #4554; 「マンプス」 is none), in any clause: 「今何時ですか。ランク。」 is a call. Also 前, only as the line's whole first token with no greeting, followed by punctuation, a space or the line's end (「前、今何時？」, 「前。ちょっと…」, 「前 今夜は…」 on lamp-52e6, #4866): 前 is a common word (「前に言ったけど」, 「前回」, 「この前の話」, 「駅の前で」, a bare 「前。」 as "forward." later in a line), so 前 joined to the next character, past a filler (「はい、前。」) or past the first clause is none. Seen on lamp-52e6 but missed on purpose: 「前のプレゼントを…」 (the call merged into a word) and 「はい、前。…」, taken over answering room talk that opens with 前の. `zh`: greetings 嘿, 嗨; name 兰普, 蓝普, "Lamp" with no space after a greeting, and anything after it ("兰普现在几点" is a call). `ko`: greeting 헤이; name 램프, 렘프, "야" attached ("렘프야"); with a subject or object particle (가, 를, 이, 은, 는, 의, 도) it is talk about the lamp ("램프가 고장났어." is none). `vi`: greetings hey, hây, hê, ê, này; stand-ins lam, lăm, làm, lắm, lem, whole words, and everyday one-word replies, so only in the line's first clause, greeted ("Hây lăm, …", "Hây lăm.") or with more clauses after ("Làm, mấy giờ rồi?"); a bare one, greeted in a clause of its own or not ("Làm!", "Lắm.", "Này, làm.", "Nhiều không? Lắm."), is no call and never the name alone. Every language also takes "hey". The sound inside a word is no call (「クランクを回す」, 「캠프」). It reaches the wake and address checks (`called`, `called_by_name_on`, `called_by_real_name`, which takes the name and not a stand-in), `begins_with_the_name` (greeted or set off), `only_the_name`, and onboarding how_you_sound's call by text (`second_provider::name_alone`). The key term stays "Lamp" in every language | `attention::calls_as_written`, `attention::only_the_name_as_written` |
 | The first route (Live) | stays English: only the `second` worker is given `LAMP_LANGUAGE_FILE` | `process::second_route_worker_environment` |
@@ -246,7 +247,8 @@ each line plays exactly as before.
 | The prepare-unplug skill's lines | `language::UNPLUG_READY`, `UNPLUG_FAILED`, `UNPLUG_STAY`, `UNPLUG_TIMEOUT`, `UNPLUG_CHECK`, `UNPLUG_NOT_OFF`, `UNPLUG_ASK_OFF`, `UNPLUG_UPDATING` (the skill's `[unplug]`, lamp-skills' `UnplugLines::built_in`) | `ready` as guarded `text`, the rest as exact words rendered as written (unplug.md, #5777) | an exact line that is one of them is said in the owner's words, kept or rendered now (`Recordings::rendered`, #5777's P3); `ready` is told to the model in the owner's words, as the first stand's |
 
 The words are `language::FIXED_LINES`, one row per English line with its
-Vietnamese, Japanese, Chinese and Korean; "Wi-Fi" and the pinhole's
+Vietnamese, Japanese, Chinese, Korean and French (#8381, the lamp's words
+feminine, as its voice, and the person "vous"); "Wi-Fi" and the pinhole's
 "reset" stay as they are printed. At start the cache warms the owner's
 lines first, thirty-four today (`FIXED_LINES`), then the English two
 (`TtsCache::warm_lines`), on its

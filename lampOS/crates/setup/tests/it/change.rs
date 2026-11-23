@@ -660,7 +660,7 @@ fn a_zone_is_written_as_setup_writes_it_and_only_a_new_one_restarts_schedule() {
 fn a_language_is_written_and_only_a_new_one_restarts_the_voice() {
     let root = Root::new();
     let config = root.config();
-    for code in ["vi", "ja", "zh", "ko", "en"] {
+    for code in ["vi", "ja", "zh", "ko", "fr", "en"] {
         let (reply, done) = answer(&json!({"language": code}).to_string(), &config, true);
         assert_eq!(reply, json!({"done": {"language": code}}));
         let done = done.unwrap();
@@ -676,7 +676,7 @@ fn a_language_is_written_and_only_a_new_one_restarts_the_voice() {
     let (_, done) = answer(r#"{"language": "en"}"#, &config, true);
     assert!(!done.unwrap().restart_voice);
     for bad in [
-        json!("fr"),
+        json!("de"),
         json!("EN"),
         json!(" ja"),
         json!(""),
@@ -686,7 +686,7 @@ fn a_language_is_written_and_only_a_new_one_restarts_the_voice() {
         let (reply, done) = answer(&json!({ "language": bad }).to_string(), &config, true);
         assert_eq!(
             reply,
-            json!({"refused": "language must be one of en, vi, ja, zh, ko"}),
+            json!({"refused": "language must be one of en, vi, ja, zh, ko, fr"}),
             "{bad}"
         );
         assert!(done.is_none());

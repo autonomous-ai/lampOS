@@ -1023,6 +1023,7 @@ mod loading_tests {
             (Language::Japanese, 'ぁ'..='ゖ'),
             (Language::Chinese, '一'..='鿿'),
             (Language::Korean, '가'..='힣'),
+            (Language::French, 'À'..='ÿ'),
         ] {
             let words = language.fixed(english).unwrap();
             assert!(has(words, script), "{language:?}: {words}");

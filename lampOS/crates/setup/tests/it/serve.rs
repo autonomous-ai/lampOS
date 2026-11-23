@@ -351,11 +351,11 @@ fn setup_saves_a_language_the_lamp_speaks_after_the_zone() {
         body["language"] = language;
         check(&request(body), &config).unwrap().language
     };
-    for code in ["en", "vi", "ja", "zh", "ko"] {
+    for code in ["en", "vi", "ja", "zh", "ko", "fr"] {
         assert_eq!(with(json!(code)), Some(code));
     }
     assert_eq!(with(json!(" ko\n")), Some("ko"), "trimmed");
-    for other in [json!("fr"), json!("JA"), json!(""), json!(null), json!(7)] {
+    for other in [json!("de"), json!("JA"), json!(""), json!(null), json!(7)] {
         assert_eq!(with(other.clone()), None, "{other}");
     }
     let mut body = good();
