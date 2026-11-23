@@ -311,6 +311,8 @@ Environment=LAMP_PROVIDER_PATIENCE=on
 Environment=LAMP_START_OFFLINE=on
 # LAMP_OFFLINE_VOICE: its why and rules are its row in docs/switches.md (#830).
 Environment=LAMP_OFFLINE_VOICE=on
+# LAMP_OUTAGE_LINE_AGAIN: with LAMP_OFFLINE_VOICE, its why and rules are its row in docs/switches.md (#8235).
+Environment=LAMP_OUTAGE_LINE_AGAIN=on
 Environment=LAMP_RING_ASLEEP=on
 # LAMP_HEAD_TOUCH: its why and rules are its row in docs/switches.md (#711, #1798).
 Environment=LAMP_HEAD_TOUCH=on
