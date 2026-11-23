@@ -1060,6 +1060,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_KEEP_ANSWERS_AT_ONCE` | When you only ask the lamp to remember something, it says it will at once, without the usual pause. |
 | `LAMP_MEMORY_NEWER_FIRST` | When you tell the lamp something has changed, it recalls your newer words before the old ones. |
 | `LAMP_APP_MEMORY` | In an app session, like a coach's, the lamp answers from the app's note and last question; it keeps neither. |
+| `LAMP_APP_TOOLS` | During an app session, the lamp can use the app's tools for you, on your turn only; it keeps nothing of them. |
 | `LAMP_MEMORY_REPLACES` | When you correct something the lamp remembered, it keeps the new version in place of the old one. |
 | `LAMP_MEMORY_NIGHTLY` | Overnight, while the lamp is idle, what you said that day is sorted into what it remembers about you. |
 | `LAMP_MEMORY_NIGHTLY_PATTERNS` | Overnight, the lamp can also notice things you do again and again, across days. |
