@@ -39,6 +39,24 @@ aarch64 emulation `lamp-ipc` passed and `capture_hold_worker` passed 3/3 in each
 of five runs. `crates/ipc/tests/sockets.rs` checks both answers.
 
 
+## A worker that cannot be spawned
+
+Every worker is spawned from the voice's own binary, `current_exe()`. A spawn
+that fails names its program: `spawn <program>: <error>`, with the error's
+kind kept (#7402). A bare `No such file or directory (os error 2)` had not said
+which program was missing. A failure to read `current_exe()` itself is said as
+`spawn lamp-voice's own binary: <error>`. Only the words change: the start
+fails as before.
+
+A binary removed while it runs (a build folder cleaned away under the
+service) reads from `/proc/self/exe` as `<path> (deleted)`, the same rule as
+lamp-update's `own.rs`. `serve` reads it once before its first worker and,
+when it reads so, ends with `lamp-voice: its own binary <path> was removed
+while it ran: it cannot start its workers; start lamp-voice again from an
+installed build`. It exits 1, as any failed start does, so systemd, the
+restart guard and the start limit see what they saw before. There is no
+retry and no fallback path.
+
 ## Optional ring startup
 
 An unavailable ring no longer turns a healthy voice startup into a failed run.
