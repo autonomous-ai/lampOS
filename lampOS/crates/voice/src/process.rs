@@ -3465,6 +3465,7 @@ fn second_route_worker_environment(
         crate::speaking_faces::EYES_ENVIRONMENT,
         crate::speaking_faces::READ_LOOKS_ENVIRONMENT,
         crate::said_to_me::ENVIRONMENT,
+        crate::said_to_me::NAME_IN_LINE_ENVIRONMENT,
         crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
         // A line asking to remember the person's face, with their name,
         // calls remember_my_face (the owner's try on lamp-4ace, 23 Oct).
@@ -3861,6 +3862,7 @@ mod tests {
             crate::speaking_faces::EYES_ENVIRONMENT,
             crate::speaking_faces::READ_LOOKS_ENVIRONMENT,
             crate::said_to_me::ENVIRONMENT,
+            crate::said_to_me::NAME_IN_LINE_ENVIRONMENT,
             crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
             crate::known_faces::ASKED_ENVIRONMENT,
             crate::known_faces::RECORD_TOLD_ENVIRONMENT,
@@ -5083,6 +5085,7 @@ mod tests {
                     || name == crate::speaking_faces::EYES_ENVIRONMENT
                     || name == crate::speaking_faces::READ_LOOKS_ENVIRONMENT
                     || name == crate::said_to_me::ENVIRONMENT
+                    || name == crate::said_to_me::NAME_IN_LINE_ENVIRONMENT
                     || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
                     || name == crate::known_faces::ASKED_ENVIRONMENT
                     || name == crate::known_faces::RECORD_TOLD_ENVIRONMENT
@@ -5346,6 +5349,7 @@ mod tests {
                     "LAMP_REST_THROUGH_SOUNDS=on",
                     "LAMP_ROOM_HELD_TALK=on",
                     "LAMP_SAID_TO_ME=on",
+                    "LAMP_SAID_TO_ME_NAME_IN_LINE=on",
                     "LAMP_SAME_SPEAKER_CARRIES=on",
                     "LAMP_SAME_VOICE_CALLER_ONLY=on",
                     "LAMP_SCHEDULE_ASKED=on",

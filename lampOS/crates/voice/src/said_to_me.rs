@@ -61,6 +61,13 @@
 /// Where the second route's worker reads the switch: `on` only.
 pub const ENVIRONMENT: &str = "LAMP_SAID_TO_ME";
 
+/// Where the second route's worker reads whether only a hearing of the
+/// name that counts for the line's own sound
+/// ([`crate::attention::hearing_counts_for_line`]) makes it named
+/// ([`Line::name_heard`]), not any hearing drained with it, however old:
+/// `on` only (#8384).
+pub const NAME_IN_LINE_ENVIRONMENT: &str = "LAMP_SAID_TO_ME_NAME_IN_LINE";
+
 /// A line of this many words or fewer is a short line.
 pub const SHORT_WORDS: usize = 2;
 
