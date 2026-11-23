@@ -967,7 +967,12 @@ rest by itself and then stands as ever:
    elbow went on pushing and heating, and each restart ended on `Window`
    until the unit failed. Likewise an arm joint found held with torque on,
    pushing (over `STALL_LOAD`) at a goal more than a goal step from where it
-   reads, is held where it lies rather than at that goal. The base and the roll keep inside one turn by their own
+   reads, is held where it lies rather than at that goal. The fold's order is:
+   the head's pitch lifted clear of the base if it droops, then the head's
+   roll and the base's yaw brought home with the arm held where it was
+   found (so the head lies straight under the arm as it comes down, and the
+   lamp is seen to face front first; a joint more than half a turn from
+   home is left), then the arm. The base and the roll keep inside one turn by their own
    stored limits; a head or base joint found more than half a turn from
    home is refused rather than woken across the seam. The arm is let go for a hand only within
    `ARM_LET_GO_NEAR` (150) of folded; raised, let go, it would fall. The load
