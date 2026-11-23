@@ -62,11 +62,30 @@ export class StoreError extends LampError {
   }
 }
 
-// Production by default; `staging`, then the URLs given or in LAMP_STORE_URL and LAMP_ACCOUNT_URL, change it.
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+// `url` without a trailing slash, when it is https://, or http:// on this
+// computer (for tests); a StoreError before anything is sent otherwise,
+// since the account's token goes there.
+export function checkedUrl(url, what) {
+  let parsed = null;
+  try {
+    parsed = new URL(url);
+  } catch {
+    // not a URL at all: refused below
+  }
+  if (parsed && parsed.hostname && (parsed.protocol === 'https:' || (parsed.protocol === 'http:' && LOOPBACK.has(parsed.hostname)))) return url.replace(/\/+$/, '');
+  throw new StoreError(`${what} ${JSON.stringify(url)}: the Store and the account take https:// only (http:// only for localhost)`, { code: 'bad_url' });
+}
+
+// Production by default; `staging`, then the URLs given or in LAMP_STORE_URL
+// and LAMP_ACCOUNT_URL, change it. Each must be https:// (http:// only for localhost).
 export function endpoints({ staging = false, store, account } = {}) {
   const base = staging ? STAGING : PRODUCTION;
-  const trim = (url) => url.replace(/\/+$/, '');
-  return { account: trim(account || process.env.LAMP_ACCOUNT_URL || base.account), store: trim(store || process.env.LAMP_STORE_URL || base.store) };
+  return {
+    account: checkedUrl(account || process.env.LAMP_ACCOUNT_URL || base.account, 'LAMP_ACCOUNT_URL'),
+    store: checkedUrl(store || process.env.LAMP_STORE_URL || base.store, 'LAMP_STORE_URL'),
+  };
 }
 
 const tokenPath = () => join(home(), TOKEN_FILE);
@@ -158,8 +177,11 @@ async function call(method, url, { body, token, auth = true, json } = {}) {
   }
   let answer;
   try {
-    answer = await fetch(url, { method, headers, body });
+    // The Store answers JSON and never redirects: a 3xx is refused, so the
+    // bearer header never goes to another host.
+    answer = await fetch(url, { method, headers, body, redirect: 'error' });
   } catch (error) {
+    if (/redirect/i.test(error.cause?.message ?? '')) throw new StoreError('the Store answered HTTP 3xx', { code: 'store' });
     throw new StoreError(`no answer from ${new URL(url).host} (${error.cause?.code ?? error.message})`, { code: 'unreachable' });
   }
   let said;
@@ -177,7 +199,8 @@ async function call(method, url, { body, token, auth = true, json } = {}) {
 }
 
 const options = (opts = {}) => {
-  const where = opts.where ?? endpoints(opts);
+  const given = opts.where;
+  const where = given ? { account: checkedUrl(given.account, 'the account URL'), store: checkedUrl(given.store, 'the Store URL') } : endpoints(opts);
   return { where, token: opts.token ?? keptToken(where) };
 };
 
