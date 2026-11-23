@@ -155,7 +155,7 @@ pub struct Entry {
     /// the turn still knows how its task ended.
     pub agent: Option<Agent>,
     /// The skill's `do.task` run it began (#7873), as [`Timeline::newest`]
-    /// joins it ([`RUNS_A_SKILL`]).
+    /// joins it ([`RUNS_A_SKILL`]): a run goes to one turn at most.
     pub skill_run: Option<SkillRun>,
 }
 
@@ -256,10 +256,12 @@ impl Timeline {
 
     /// The turns kept, newest first, each with its task's agent.
     pub fn newest(&self) -> Vec<Entry> {
+        let mut runs = self.runs_begun();
         self.entries
             .iter()
+            .zip(runs.iter_mut())
             .rev()
-            .map(|entry| {
+            .map(|(entry, run)| {
                 let mut entry = entry.clone();
                 let kept = entry.agent.take();
                 entry.agent = entry
@@ -267,41 +269,53 @@ impl Timeline {
                     .and_then(|task| self.tasks.get(&task))
                     .cloned()
                     .or(kept);
-                entry.skill_run = self.run_begun_by(&entry);
+                entry.skill_run = run.take();
                 entry
             })
             .collect()
     }
 
-    /// The skill's run `entry` began (#7873): a turn whose decision called
-    /// one of [`RUNS_A_SKILL`] begins the newest run lamp-tasks began
-    /// within its minute ([`TURN_LASTS_MS`] from its first step). No
-    /// number joins them: lamp-skills runs the skill and lamp-tasks its
-    /// task, neither knowing the turn.
+    /// The skill's run each kept turn began (#7873), by the turn's place
+    /// in `entries`: a run lamp-tasks began goes to the nearest turn begun
+    /// before it, within its minute ([`TURN_LASTS_MS`] from its first
+    /// step), whose decision called one of [`RUNS_A_SKILL`] and that has no
+    /// run yet; the newest run first, so a turn with two runs in its minute
+    /// shows the newest. Two such turns in one minute never both take one
+    /// run. No number joins them: lamp-skills runs the skill
+    /// and lamp-tasks its task, neither knowing the turn.
     // ponytail: joined by time, so a trigger's run begun in that minute
     // would be taken for the turn's; carry the request in `skills/tasks`
     // if that is ever seen.
-    fn run_begun_by(&self, entry: &Entry) -> Option<SkillRun> {
-        let called = entry.decision().is_some_and(|decision| {
-            decision.kind == DecisionKind::Answered
-                && decision
-                    .tools
-                    .iter()
-                    .any(|tool| RUNS_A_SKILL.contains(&tool.as_str()))
-        });
-        if !called {
-            return None;
-        }
-        let start = entry.start();
-        self.skill_runs
-            .iter()
-            .rev()
-            .find(|run| {
-                run.run.is_some()
-                    && run.at_unix_ms >= start
-                    && run.at_unix_ms - start < TURN_LASTS_MS
+    fn runs_begun(&self) -> Vec<Option<SkillRun>> {
+        let mut runs: Vec<Option<SkillRun>> = vec![None; self.entries.len()];
+        let calls = |entry: &Entry| {
+            entry.decision().is_some_and(|decision| {
+                decision.kind == DecisionKind::Answered
+                    && decision
+                        .tools
+                        .iter()
+                        .any(|tool| RUNS_A_SKILL.contains(&tool.as_str()))
             })
-            .cloned()
+        };
+        for run in self.skill_runs.iter().rev().filter(|run| run.run.is_some()) {
+            let turn = self
+                .entries
+                .iter()
+                .enumerate()
+                .filter(|(index, entry)| {
+                    let start = entry.start();
+                    runs[*index].is_none()
+                        && calls(entry)
+                        && run.at_unix_ms >= start
+                        && run.at_unix_ms - start < TURN_LASTS_MS
+                })
+                .max_by_key(|(index, entry)| (entry.start(), *index))
+                .map(|(index, _)| index);
+            if let Some(turn) = turn {
+                runs[turn] = Some(run.clone());
+            }
+        }
+        runs
     }
 
     /// The skills' runs and answers kept, newest first (#7873).
