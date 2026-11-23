@@ -16,7 +16,7 @@ fi
 for p in $PARTS; do part=${p%%:*}; bin=${p##*:}; install -d $(tdir $part); install -m 0755 -o root -g root /tmp/t8180/$bin $(tdir $part)/$bin; n "placed $(tdir $part)/$bin"; done
 mkdir -p ${UD_TASKS%/*} ${UD_CONTROL%/*}
 printf '[Service]\n# #8180 row: its unit line (deploy/product/lamp-tasks.service), gone at reboot\nDelegate=memory cpu pids\n' > $UD_TASKS; n "added $UD_TASKS"
-printf '[Service]\n# #8180 row: its unit line (deploy/product/lamp-control.service), gone at reboot\nEnvironment=LAMP_MADE_CODE_ON_AT_ONCE=on\n' > $UD_CONTROL; n "added $UD_CONTROL"
+printf '[Service]\n# #8180 row: its unit line (deploy/product/lamp-control.service), gone at reboot\nEnvironment=LAMP_MADE_CODE_ON_AT_ONCE=on\n# a row at night: a run'"'"'s say is held in the quiet hours (22:00-07:00, #7625); the legs need it said. Test only.\nEnvironment=LAMP_CONTROL_QUIET_RUNS=off\n' > $UD_CONTROL; n "added $UD_CONTROL"
 rm -rf /tmp/t8180; systemctl daemon-reload
 [ -f $HD ] && { systemctl restart lamp-update; n "lamp-update restarted apply off"; }
 systemctl stop $UNITS; n "stopped $UNITS for the binds"

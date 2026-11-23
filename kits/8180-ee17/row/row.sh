@@ -507,6 +507,9 @@ RT=$LG/row-$(echo $LEGS $TAILS | tr -d ' ').txt     # this invocation's lines; r
 echo "== row.sh $LEGS $TAILS on $LAMP $(date '+%F %T')" | tee $RT >> $LG/row.txt
 case " $LEGS $TAILS " in *" W "*) { RENEW || exit 1; wpre; } 2>&1 | tee -a $RT;; esac
 for g in $LEGS $TAILS; do RENEW || { echo "LOCK lost before leg $g: stop"; exit 1; }; WHY=; ASKN=; MKBUSY=; J=/dev/null
+  # a leg run again starts at FAIL: KEEP_VERDICTS=1 loads the earlier runs' verdicts, and a leg that never sets its
+  # own on a failed check (H4) would print the old PASS (#8180 r5, 24 Nov 00:16).
+  eval "V$g=FAIL"
   case $g in A) legA; POST A; echo "LEG A $VA ($WHY)";; B) legB; POST B; MKB=$MK; [ -n "$MK" ] && [ -n "$MN" ] && MNB=$MN; echo "LEG B $VB ($WHY)"; printf 'MNB=%s\nMKB=%s\n' "$MNB" "$MKB" >> $LG/verdicts.env;; C) legC; POST C; echo "LEG C $VC ($WHY)";;
     D) legD; POST D; echo "LEG D $VD ($WHY) [$DNOTE]";; E) legE; POST E; echo "LEG E $VE ($WHY)";; F) legF; POST F; echo "LEG F $VF ($WHY)";; G) legG; POST G; echo "LEG G $VG ($WHY)";;
     K) legK; POST K; echo "LEG K $VK ($WHY)";; H) legH; POST H; echo "LEG H $VH ($WHY)";; P) legP; POST P; echo "LEG P $VP ($WHY)";; W) legW; POST W; echo "LEG W $VW ($WHY)";;
