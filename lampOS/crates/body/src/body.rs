@@ -8895,13 +8895,19 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             }
             _ => (0.0, None),
         };
+        // A long thinking's wander around its deep pose (#7418, rule 8), in
+        // degrees: none while kept still for someone (#7689). The reach and
+        // the speed bounds below hold it as they hold the rest.
+        let wander = gestures
+            .wander(now_us, asked_now.quiet)
+            .map(|degrees| degrees * lease::COUNTS_PER_DEGREE);
         let offsets = if unplug_latched {
             [0.0; 3]
         } else {
             [
-                head_pitch,
-                roll * roll_reach + extra[1],
-                yaw * limits.yaw + look[0] + extra[2] + aim,
+                head_pitch + wander[0],
+                roll * roll_reach + extra[1] + wander[1],
+                yaw * limits.yaw + look[0] + extra[2] + aim + wander[2],
             ]
         };
         // A joint that met resistance is asked nothing for now, at rest or not.
