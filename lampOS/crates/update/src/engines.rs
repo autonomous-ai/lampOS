@@ -132,10 +132,12 @@ pub fn lamp_machine(said: &str) -> Option<String> {
 /// What `harness machines engines <machine> --json` says of `machine` (one
 /// object a line, `{machineId, engine, installed, installable, …}`, as
 /// lamp-tasks reads it), as the app is told it: `installed: true` is
-/// `installed` (with `version` when Harness gives a plain one), `installed:
-/// false`, or `null` with `installable: true` (Harness's "not found
-/// there"), `not_installed`. Any other is unknown: kept as `before` said
-/// it, else left out. Rows of another machine are passed over. A line that
+/// `installed` (with `version` when Harness gives a plain one), an explicit
+/// `installed: false` `not_installed`. Any other, `null` with `installable:
+/// true` among them, is unknown: Harness's `null` "is unknown, never 'not
+/// there'" (openharness `machineEngines.ts`; a login shell slower than 5 s
+/// an engine reads an installed one so, #8286), kept as `before` said it,
+/// else left out. Rows of another machine are passed over. A line that
 /// is not a row, an engine twice, more than [`MOST_HARNESS_ENGINES`], or no
 /// row of `machine` is no answer.
 pub fn harness_engines(
@@ -192,7 +194,9 @@ pub fn harness_engines(
                     }
                 })
             }
-            (Some(false), _) | (None, Some(true)) => Some(EngineInstall {
+            // Only an explicit `false` (#8286): `null` with `installable:
+            // true` is a look that couldn't tell, never "not there".
+            (Some(false), _) => Some(EngineInstall {
                 state: "not_installed".to_owned(),
                 version: None,
                 reason: None,
@@ -1178,7 +1182,7 @@ mod tests {
 {"machineId":"LAMP","engine":"openclaw","installed":true}
 {"machineId":"LAMP","engine":"codex","installed":true,"version":"0.58.0","signedIn":true}
 {"machineId":"LAMP","engine":"cursor","installed":true}
-{"machineId":"LAMP","engine":"claude","installed":null,"installable":true}
+{"machineId":"LAMP","engine":"claude","installed":false,"installable":true}
 {"machineId":"LAMP","engine":"gemini","installed":null,"installable":false}
 {"machineId":"aa11","engine":"opencode","installed":true}
 "#;
@@ -1197,7 +1201,8 @@ mod tests {
     /// and OpenClaw stay read from their own records (their richer states),
     /// whatever Harness says of them; a computer's engines are not the
     /// lamp's; one Harness cannot say yet (`null`, nothing installable) is
-    /// left out, one not found there is `not_installed`.
+    /// left out, one said not there (an explicit `installed: false`) is
+    /// `not_installed`.
     #[test]
     fn engines_lists_every_engine_harness_says_the_lamp_has() {
         let folder = tempfile::tempdir().unwrap();
@@ -1339,6 +1344,43 @@ mod tests {
                 "{\"machineId\":\"a\",\"current\":false}\n{\"machineId\":\"../x\",\"current\":true}\n"
             ),
             None
+        );
+    }
+
+    /// #8286: Harness's CLI says `installed` only as `true` or `null`, and
+    /// `null` "is unknown, never 'not there'" (openharness
+    /// `machineEngines.ts`): a login shell slower than 5 s an engine reads
+    /// an installed one as `null` with `installable: true`. The rows are the
+    /// shape lamp-06c1's Harness gave on 22 Nov (#8283): none of them is
+    /// said `not_installed`; each keeps what the last look said, or is left
+    /// out. Only an explicit `installed: false` is `not_installed`.
+    #[test]
+    fn an_engine_harness_does_not_say_is_installed_is_never_said_not_installed() {
+        let rows: String = ["claude", "codex", "opencode", "pi", "hermes", "openclaw"]
+            .iter()
+            .map(|engine| {
+                format!(
+                    "{{\"machineId\":\"m1\",\"engine\":\"{engine}\",\"installed\":null,\"signedIn\":null,\"installable\":true,\"firstPrompt\":null}}\n"
+                )
+            })
+            .collect();
+        let none = BTreeMap::new();
+        let first = harness_engines(&rows, "m1", &none).unwrap();
+        assert!(
+            first.values().all(|said| said.state != "not_installed"),
+            "{first:?}"
+        );
+        assert!(first.is_empty(), "{first:?}");
+        let mut before = BTreeMap::new();
+        before.insert("claude".to_owned(), state("installed", Some("2.0.1")));
+        let kept = harness_engines(&rows, "m1", &before).unwrap();
+        assert_eq!(kept["claude"], state("installed", Some("2.0.1")));
+        assert_eq!(kept.len(), 1, "{kept:?}");
+        let said_false =
+            r#"{"machineId":"m1","engine":"claude","installed":false,"installable":true}"#;
+        assert_eq!(
+            harness_engines(said_false, "m1", &before).unwrap()["claude"],
+            state("not_installed", None)
         );
     }
 
