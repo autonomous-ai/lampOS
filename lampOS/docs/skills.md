@@ -2144,8 +2144,9 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   in the app, on its page."; any other refusal before its agent began, or
   lamp-tasks not reached, "<Skill> couldn't run this time."; a refusal as
   the lamp's agent never got ready (`openclaw_gateway_not_ready`,
-  `harness_not_running`, past the 180 s start window that says
-  `NOT_READY_LINE` instead) "<Skill> couldn't run this time: the lamp
+  `harness_not_running`; past the 180 s start window, or any run nobody
+  asked by voice; a run asked by voice within it hears `NOT_READY_LINE`
+  instead) "<Skill> couldn't run this time: the lamp
   couldn't get it started." (#6577); `run_failed`,
   no answer or anything else "<Skill> didn't finish this time.". As news,
   the journal says `do.task: what became of its run: told 1` (or the

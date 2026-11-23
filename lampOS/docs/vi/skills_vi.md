@@ -6053,8 +6053,9 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   mọi lời từ chối khác trước khi agent bắt đầu, hoặc không tới được
   lamp-tasks, "<Skill> couldn't run this time."; bị từ chối vì agent của
   đèn chưa bao giờ sẵn sàng (`openclaw_gateway_not_ready`,
-  `harness_not_running`, quá 180 s đầu sau khi khởi động, lúc đó nói
-  `NOT_READY_LINE`) "<Skill> couldn't run this time: the lamp couldn't get
+  `harness_not_running`; quá 180 s đầu sau khi khởi động, hoặc lần chạy
+  không ai hỏi bằng giọng nói; lần chạy được hỏi bằng giọng nói trong 180 s
+  đó nghe `NOT_READY_LINE`) "<Skill> couldn't run this time: the lamp couldn't get
   it started." (#6577); `run_failed`, không có trả
   lời hay mọi thứ khác "<Skill> didn't finish this time.". Nhật ký ghi
   `do.task: what became of its run: told 1` (hoặc kết quả của cổng). Trước
