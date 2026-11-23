@@ -130,7 +130,9 @@ impl BodyLink {
     /// so a body hearing none lets it go as it lets a mood go, and
     /// `{"quiet":false}` once when it ends. A datagram of its own, so a body
     /// built before it drops it and keeps the mood. It says nothing of why,
-    /// and the socket is the body's alone: nothing a skill or app reads.
+    /// and goes only to the body's socket, which no skill or app can reach
+    /// or read (lamp-skills, lamp-control and lamp-addons write to it too,
+    /// never this).
     pub fn quiet(&mut self, on: bool, now_us: u64) {
         let message: &[u8] = if on {
             if self

@@ -7230,6 +7230,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // The last step's mood was a conversation's (listening, thinking or
     // speaking): one beginning ends an unprompted gesture.
     let mut talked = false;
+    // Whether the lamp was kept still for someone last step (#7689).
+    let mut was_quiet = false;
     // A skill's or idle gesture paused as listening began (#2602): when,
     // when the gesture playing then began (it is that one's pause only),
     // and its offsets and their speed a step then, which it eases to a hold
@@ -7726,9 +7728,11 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         };
         // Under `--rest-glance`, what Expression asks of a lamp at rest
         // takes its head out of rest for as long as it is asked.
+        // Not while kept still for someone (#7689).
         let glance = limits.rest_glance
             && mood == Mood::Resting
             && leaving.is_none()
+            && !asked_now.quiet
             && asked_now.expression.is_some();
         if glance {
             // Where it rests: a rest that has lasted, or, as a glance
@@ -7778,8 +7782,14 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // from where it was. Off, a conversation beginning ends it (#2668).
         paused = paused.filter(|(_, of, ..)| playing.is_some_and(|(_, since)| since == *of));
         let answering = matches!(mood, Mood::Thinking | Mood::Speaking);
+        // Kept still for someone from now (#7689): a skill's, an app's or
+        // idle life's gesture under way ends, eased out, said `held`.
+        let quiet_began = asked_now.quiet && !was_quiet;
+        was_quiet = asked_now.quiet;
         let ends = if in_hand_now {
             Some(crate::moves::ENDED_BY_HAND)
+        } else if quiet_began {
+            Some(QUIET_HELD)
         } else if let Some((at, ..)) = paused {
             (answering || now.saturating_sub(at) >= RESUME_WITHIN)
                 .then(|| crate::moves::ended(Priority::Conversation))
@@ -7822,10 +7832,30 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             );
             pending = None;
         }
+        // One waiting to begin (standing up for it) goes too as the lamp
+        // begins to keep still (#7689).
+        // Whoever asked it, but a plain nod, as the lamp keeps still.
+        let stilled =
+            |clip: &Clip| quiet_began && from_outside(clip) && clip.name != clips::NOD.name;
+        if quiet_began
+            && !in_hand_now
+            && let Some((old, _)) = pending.filter(|(old, _)| stilled(old))
+        {
+            gesture_fates.push_told(
+                (old.name, QUIET_HELD),
+                Told {
+                    source: pending_by.1,
+                    by: None,
+                },
+            );
+            pending = None;
+        }
         if let Some(why) = ends {
             paused = None;
             resumed = None;
-            if let Some((old, _)) = playing.filter(|(old, _)| unprompted(old, playing_by.0)) {
+            if let Some((old, _)) = playing.filter(|(old, _)| {
+                unprompted(old, playing_by.0) || (why == QUIET_HELD && stilled(old))
+            }) {
                 gesture_fates.push_told(
                     (old.name, why),
                     Told {
