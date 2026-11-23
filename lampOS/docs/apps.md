@@ -127,6 +127,74 @@ unsigned, and the Store signs it at approval. The SDK READMEs' "Publish your
 app" has the commands and the Store's refusals. Staged: tested against a fake
 Store only so far.
 
+## An app from your own computer (`app.push`, #8351)
+
+A developer installs their own app on their own lamp from a computer paired
+with it, with no Store, the way a skill is pushed (control.md, "Skills
+pushed from a computer"). The first builder's ruling on #7570: **no yes is
+asked**, at the lamp or in the app (the owner's 18 Nov rule: installs are
+not asked about); the consent is the pairing.
+
+- **Who may push.** Only a computer this lamp's owner paired, with the
+  `skills` grant, the one the pairing screen says "can put skills on the lamp
+  that run on their own". A computer never paired here (another owner's) is
+  refused at `hello` (`unpaired`), before any op. The app may ask only
+  grants that pairing holds now (`no_grant`, "not granted: camera"), never
+  `remember`, an app's own grant no computer holds. `net` and `logs` are
+  the manifest's, as for a Store app.
+- **Unsigned, on this path only.** The package is format 2, as `lamp app
+  pack` makes it, and must **not** carry `lamp-skill.sig` ("it carries
+  lamp-skill.sig: an app pushed from a computer is unsigned"). It is read
+  with every other check of "What the reader checks, in order"
+  (`lamp_skills::app_package::read_pushed_app_package_bytes`), by
+  lamp-control first and by the apps' helper again. The helper takes its
+  `install_pushed`, `list_pushed_by` and `remove_pushed` from lamp-control's
+  cgroup alone (`lamp_apps::ask::answer_door`), and takes none of the
+  Store's verbs from it; lamp-cloud and the voice can't ask the pushed
+  verbs. So an unsigned package reaches the lamp only from a paired
+  computer.
+- **On the lamp** it is installed as a Store app is (the same folders,
+  unit, sandbox and launcher, started at once unless the owner stopped
+  it), with no yes taken, and its record (`lamp-apps.json`) says `pushed`:
+  the computer's pairing id and name. The phone's `apps.list` row says
+  `"from": "computer"` (a Store app's `"store"`), for "From your computer".
+  Once it is on, the lamp says one line with its undo: "Gym Coach is on,
+  from your computer. To undo, remove it in the app."
+- **Replaced only by its computer.** A push of the same name from the same
+  computer replaces it, any version, older too. A push never takes a Store
+  app's name ("a Store app has that name") nor another computer's ("another
+  computer's app has that name"), and the Store never updates a pushed app
+  ("this app was pushed from a computer: remove it before installing it
+  from the Store").
+- **Removed** by its computer (`app.remove`, no yes) or by the owner in the
+  phone's app (`apps.remove`, the owner's yes as for any app), with the same
+  remove as any app's, its data and what lamp-control kept of it going too.
+  `app.list` shows the computer's own pushed apps only.
+- **The wire** (lamp-control, `--apps-manage-socket`; with `LAMP_STORE_APPS`
+  off every op is refused "apps are off on this lamp", and without the
+  socket "app push is not on this lamp"): `app.push`
+  `{name, sha256, size, part, parts, data}` as `skill.push`'s parts, the
+  package at most 4 MiB in 1 to 128 parts of at most 48 KiB of base64, all
+  within 60 s, one push in flight on the lamp (`busy`), one every 10 s and 20
+  an hour a computer; each part but the last answers `{"got": N}`, the last
+  `{"app": {"name", "title", "version", "sha256", "grants", "net", "logs",
+  "updated", "started", "from": "computer"}}` once installed. `app.list`
+  answers `{"apps": [{"name", "title", "version", "sha256", "grants", "net",
+  "logs", "stopped"}]}`; `app.remove` `{name}` answers `{"removed": NAME}`.
+  Both 6 a minute. lamp-control stages the whole package, checked, as
+  `/var/lib/lampos-apps-staging/pushed-<sha256>.tar` (0600, the unit's
+  `ReadWritePaths=`), asks the helper `{"install_pushed": {"path",
+  "client", "client_name"}}`, and removes the file once answered.
+- **The SDKs:** `lamp app push FOLDER|TAR` (checked and packed by `lamp app
+  check`/`pack` first), `lamp app list`, `lamp app remove NAME`;
+  `push_app`, `apps`, `remove_app` (Python), `pushApp`, `apps`, `removeApp`
+  (JS); the fake lamp serves all three.
+- **Not yet:** a spoken "remove it" as the undo (the voice has no such
+  intent; the line points at the app instead), and turning a revoked
+  computer's pushed apps off (they keep running until removed; a pushed
+  skill is turned off). Tested with a fake helper and the helper's own
+  tests; not yet run on a lamp.
+
 ## What the reader checks, in order
 
 `lamp_skills::app_package::read_app_package_bytes(bytes, store_keys)` reads in
