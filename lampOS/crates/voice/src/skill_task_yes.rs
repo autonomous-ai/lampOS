@@ -760,12 +760,21 @@ pub fn asked_aloud_here(skill: &str) -> Result<String, String> {
             quiet_hours,
             owner_sees_alone: crate::run_write_yes::read_back_allowed_now(),
             // Looked for only in quiet hours, where it matters, and waited
-            // for a little there (the voice keeps it off the turn's thread).
+            // for a little there (the voice keeps it off the turn's thread);
+            // under the skill's name or its tool, as the ask is kept under
+            // the function the call named (lamp-ee17 on #8437, 24 Nov 05:4x:
+            // a skill whose tool is not its name was refused in quiet hours).
             asked_by_voice: quiet_hours
                 && crate::told_when_asked::on()
-                && crate::told_when_asked::asked_within_waiting(
+                && asked_by_voice_in(
                     Path::new(crate::told_when_asked::SPOKEN_ASKS_FILE),
                     skill,
+                    || {
+                        read_by(Path::new(crate::made_skill::MANAGE_SOCKET), skill)
+                            .ok()
+                            .flatten()
+                            .and_then(|asks| asks.tool)
+                    },
                     now_unix_ms,
                     crate::told_when_asked::ASKED_WAIT,
                 ),
@@ -1032,6 +1041,31 @@ pub fn asked_aloud_now(skill: &str, tool: Option<&str>) -> bool {
 pub fn asked_aloud_in(path: &Path, skill: &str, tool: Option<&str>, now_ms: u64) -> bool {
     crate::told_when_asked::asked_within(path, skill, now_ms)
         || tool.is_some_and(|tool| crate::told_when_asked::asked_within(path, tool, now_ms))
+}
+
+/// Whether the owner asked for `skill` by voice just now, in the spoken asks
+/// kept at `path`, under its name or its tool (`tool`, read once, only
+/// here), waited for up to `wait` (the ask is kept on a thread of its own,
+/// `told_when_asked::ASKED_WAIT`): the quiet hours' exception for a task's
+/// yes-ask (#7180), found as [`asked_aloud_in`] finds it.
+pub fn asked_by_voice_in(
+    path: &Path,
+    skill: &str,
+    tool: impl FnOnce() -> Option<String>,
+    now_ms: u64,
+    wait: std::time::Duration,
+) -> bool {
+    let tool = tool();
+    let began = Instant::now();
+    loop {
+        if asked_aloud_in(path, skill, tool.as_deref(), now_ms) {
+            return true;
+        }
+        if began.elapsed() >= wait {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
 }
 
 /// [`asked_aloud_now`] for the skill `skill` on the lamp, its tool read by
@@ -1824,6 +1858,50 @@ mod tests {
             helper.join().unwrap();
             lamp_control.join().unwrap();
         }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// lamp-ee17 on #8437 (24 Nov 05:4x): in quiet hours a run asked aloud by
+    /// its tool, which is not its name (`fruit_check` for `pear-probe`), is
+    /// still the owner's spoken ask, so its yes-ask is said, not kept for later.
+    #[test]
+    fn a_run_asked_aloud_by_its_tool_is_asked_by_voice_in_quiet_hours() {
+        let dir = std::env::temp_dir().join(format!("lamp-voice-by-tool-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let spoken = dir.join("spoken-asks.json");
+        let now_ms = 1_800_000_000_000;
+        let none = std::time::Duration::ZERO;
+        crate::told_when_asked::keep(&spoken, "fruit_check", now_ms - 30_000).unwrap();
+        assert!(asked_by_voice_in(
+            &spoken,
+            "pear-probe",
+            || Some("fruit_check".into()),
+            now_ms,
+            none
+        ));
+        assert!(!asked_by_voice_in(
+            &spoken,
+            "pear-probe",
+            || None,
+            now_ms,
+            none
+        ));
+        assert!(!asked_by_voice_in(
+            &spoken,
+            "pear-probe",
+            || Some("other_tool".into()),
+            now_ms,
+            none
+        ));
+        crate::told_when_asked::keep(&spoken, "pear-probe", now_ms - 30_000).unwrap();
+        assert!(asked_by_voice_in(
+            &spoken,
+            "pear-probe",
+            || None,
+            now_ms,
+            none
+        ));
         let _ = std::fs::remove_dir_all(&dir);
     }
 
