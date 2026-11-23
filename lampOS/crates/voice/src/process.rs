@@ -3483,6 +3483,8 @@ fn second_route_worker_environment(
         crate::speaking_faces::READ_LOOKS_ENVIRONMENT,
         crate::said_to_me::ENVIRONMENT,
         crate::said_to_me::NAME_IN_LINE_ENVIRONMENT,
+        // Only the first quick reply to the lamp's question skips its look (#8395).
+        crate::said_to_me::ASKED_LOOKS,
         crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
         // A line asking to remember the person's face, with their name,
         // calls remember_my_face (the owner's try on lamp-4ace, 23 Oct).
@@ -3880,6 +3882,7 @@ mod tests {
             crate::speaking_faces::READ_LOOKS_ENVIRONMENT,
             crate::said_to_me::ENVIRONMENT,
             crate::said_to_me::NAME_IN_LINE_ENVIRONMENT,
+            crate::said_to_me::ASKED_LOOKS,
             crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
             crate::known_faces::ASKED_ENVIRONMENT,
             crate::known_faces::RECORD_TOLD_ENVIRONMENT,
@@ -5113,6 +5116,7 @@ mod tests {
                     || name == crate::speaking_faces::READ_LOOKS_ENVIRONMENT
                     || name == crate::said_to_me::ENVIRONMENT
                     || name == crate::said_to_me::NAME_IN_LINE_ENVIRONMENT
+                    || name == crate::said_to_me::ASKED_LOOKS
                     || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
                     || name == crate::known_faces::ASKED_ENVIRONMENT
                     || name == crate::known_faces::RECORD_TOLD_ENVIRONMENT
@@ -5226,6 +5230,7 @@ mod tests {
                     "LAMP_APP_HELP=on",
                     "LAMP_APP_TOOLS=on",
                     "LAMP_APP_TRIGGERS=on",
+                    "LAMP_ASKED_LOOKS=on",
                     "LAMP_ATTACHMENTS=on",
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_BUSY_CALLED_STRICT=on",
