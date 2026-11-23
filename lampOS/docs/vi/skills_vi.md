@@ -3951,7 +3951,25 @@ cả hai người viết.
   `MakeWaiting`), nên phần phát dừng lại, vòng đèn và thân đèn chuyển sang
   dáng suy nghĩ (`ring_wire::RingPhase::Waiting`) cho tới khi có âm thanh
   tiếp theo; sau đó câu trả lời phát hết dưới một lần phát mới và lượt kết
-  thúc. Tắt: câu chờ như hôm nay, và không có câu thứ hai. Test:
+  thúc. Micro bị nghẽn cắt lượt giữa lúc chờ không còn làm thân đèn rũ về
+  dáng nghỉ (#7418): worker báo cho coordinator số lần tạo đang chạy
+  (`ProviderOutput::MakesUnderWay`, tính từ lúc công việc bắt đầu tới khi
+  nó trả về, không tính lúc câu của nó chờ trong dịch vụ nói, không tính
+  lần tạo được để chạy tiếp), và khi không có lượt nào thân đèn vẫn suy
+  nghĩ cho tới khi lượt của chính câu đó nói, tối đa `MAKE_WITHIN` từ lần
+  báo bắt đầu nó (chỉ lùi thêm khi số tăng, tức một lần tạo mới); dừng, tắt
+  tiếng, dừng bằng đầu hoặc bằng lời, thân bị đẩy, máy tính kết thúc lượt,
+  micro không được phép và worker của đường thứ hai mất đi thì kết thúc nó
+  (một lần cắt do nghẽn thì không), và sau một lần dừng không số nào bật
+  lại nó cho tới khi số về 0; lượt nào cũng giành lại ngay, kể cả lượt của
+  người nói. Test: `a_make_cut_by_a_gap_keeps_thinking_with_no_turn_until_its_line`,
+  `a_count_queued_behind_a_stop_never_re_arms_a_makes_thinking`,
+  `a_makes_bound_moves_on_only_for_a_new_make`,
+  `a_second_worker_that_exits_mid_make_rests_at_once`,
+  `a_hand_stop_ends_a_makes_thinking_with_no_turn`,
+  `a_cut_make_is_under_way_while_its_work_runs_not_while_its_line_is_said`,
+  `a_make_let_run_on_is_no_longer_under_way` và
+  `the_second_worker_tells_the_makes_under_way_only_on_the_one_path`. Tắt: câu chờ như hôm nay, và không có câu thứ hai. Test:
   `the_one_path_waiting_line_says_how_long`,
   `a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more`,
   `a_one_path_makes_waiting_line_completes_its_generation_after_its_audio`

@@ -3339,6 +3339,88 @@ pub fn pending() -> bool {
     PENDING.load(std::sync::atomic::Ordering::Acquire) > 0
 }
 
+/// The requests whose make's work runs now in this process ([`MakeUnderWay`]),
+/// each with whether it was let run on ([`let_go`]).
+static MAKING: std::sync::Mutex<Vec<(u64, bool)>> = std::sync::Mutex::new(Vec::new());
+
+fn making_now() -> std::sync::MutexGuard<'static, Vec<(u64, bool)>> {
+    MAKING
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// How many of [`MAKING`] count as under way, sent as it changes: the
+/// second route's engine forwards it to the coordinator
+/// (`ProviderOutput::MakesUnderWay`, #7418).
+fn under_way_sender() -> &'static tokio::sync::watch::Sender<u32> {
+    static SENDER: std::sync::OnceLock<tokio::sync::watch::Sender<u32>> =
+        std::sync::OnceLock::new();
+    SENDER.get_or_init(|| tokio::sync::watch::Sender::new(0))
+}
+
+/// One voice make's work running for its request, the turn's or a queued
+/// one's (#7418): from just before `work()` until it returns, not until
+/// its line is said, which the say service may hold far longer. The lamp
+/// thinks while any counts ([`under_way`]); a make let run on
+/// ([`crate::long_make::let_go`], [`let_go`]) never counts again, as its
+/// person was told they'd hear when it's ready.
+pub struct MakeUnderWay(u64);
+
+impl MakeUnderWay {
+    pub fn begin(request: u64) -> Self {
+        let mut making = making_now();
+        making.push((request, false));
+        recount(&making);
+        Self(request)
+    }
+}
+
+impl Drop for MakeUnderWay {
+    fn drop(&mut self) {
+        let mut making = making_now();
+        if let Some(at) = making.iter().position(|(of, _)| *of == self.0) {
+            making.remove(at);
+        }
+        recount(&making);
+    }
+}
+
+/// `request`'s make was let run on (`crate::long_make::let_go`): it no
+/// longer counts as under way.
+pub fn let_go(request: u64) {
+    let mut making = making_now();
+    for (of, let_go) in making.iter_mut() {
+        if *of == request {
+            *let_go = true;
+        }
+    }
+    recount(&making);
+}
+
+/// Whether `request`'s make counts as under way now ([`MakeUnderWay`]).
+pub fn making(request: u64) -> bool {
+    making_now()
+        .iter()
+        .any(|(of, let_go)| *of == request && !let_go)
+}
+
+/// The count of `making` under way told again, only when it changed: with
+/// [`MAKING`] held, so two changes are never told out of their order.
+fn recount(making: &[(u64, bool)]) {
+    let count = making.iter().filter(|(_, let_go)| !let_go).count();
+    let count = u32::try_from(count).unwrap_or(u32::MAX);
+    under_way_sender().send_if_modified(|told| {
+        let changed = *told != count;
+        *told = count;
+        changed
+    });
+}
+
+/// The count of makes under way ([`MakeUnderWay`]), as it changes.
+pub fn under_way() -> tokio::sync::watch::Receiver<u32> {
+    under_way_sender().subscribe()
+}
+
 /// The newest request whose line the person said with words and the
 /// lamp answered ([`person_went_on`]).
 static WENT_ON: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -5485,6 +5567,31 @@ light = { dim = 1 }
 
     pub(crate) fn good() -> String {
         format!("```skill.toml\n{TOML}```\n\n```SKILL.md\n{CARD}```\n")
+    }
+
+    /// #7418: a make counts as under way from its work's start until it
+    /// returns, and a make let run on (`long_make::let_go`) no longer
+    /// counts: its person was told they'd hear when it's ready.
+    #[test]
+    fn a_make_let_run_on_is_no_longer_under_way() {
+        const MADE_IN: u64 = 7_418_003;
+        let (root, keeping) = keeping("under-way-let-go");
+        std::fs::create_dir_all(&keeping.directory).unwrap();
+        assert!(!making(MADE_IN));
+        let under_way = MakeUnderWay::begin(MADE_IN);
+        assert!(making(MADE_IN));
+        crate::long_make::begin(MADE_IN, &keeping.directory);
+        assert!(crate::long_make::let_go(MADE_IN, NOW));
+        assert!(!making(MADE_IN), "let run on: not thought on");
+        crate::long_make::settle(MADE_IN);
+        drop(under_way);
+        assert!(!making(MADE_IN));
+        // Another make of the same request, not let go, counts again.
+        let again = MakeUnderWay::begin(MADE_IN);
+        assert!(making(MADE_IN));
+        drop(again);
+        assert!(!making(MADE_IN));
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// A folder of the test's own, with a stand-in for `lamp-skills pack`

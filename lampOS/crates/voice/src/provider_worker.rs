@@ -1246,6 +1246,20 @@ pub enum ProviderOutput {
     MakeWaiting {
         request: u64,
     },
+    /// With the make's one run path (`LAMP_MAKE_AGENT_ONE_PATH`, #7418):
+    /// how many voice makes run now in the worker, `count`, sent as it
+    /// changes. A make counts from its work's start until the work
+    /// returns, not until its line is said, and never once it was let run
+    /// on (`crate::long_make::let_go`: its person was told they'd hear when
+    /// it's ready). Tied to no request, so it outlives a turn its make's
+    /// wait was cut from: the coordinator shows thinking with no turn for
+    /// at most `within_ms` ([`crate::make_skill_agent::MAKE_WITHIN`] at
+    /// most) while it is over 0. Nothing is asked or granted by it. Never
+    /// sent with the switch off.
+    MakesUnderWay {
+        count: u32,
+        within_ms: u64,
+    },
     /// The second route's times for `request` (19 Oct: an A/B is scored on
     /// each request's first answer audio, never a wait cue), sent once,
     /// before its `TurnComplete` or `TurnFailed`, for every request: in
@@ -1617,6 +1631,8 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
             | ProviderOutput::OwnershipAssumed { .. }
             // A run made: the coordinator keeps it whatever the turn.
             | ProviderOutput::MadeRunNow { .. }
+            // The makes under way, whatever turn was cut (#7418).
+            | ProviderOutput::MakesUnderWay { .. }
             | ProviderOutput::Ended { .. } => None,
             ProviderOutput::Transcript { request, .. } => *request,
             ProviderOutput::Started { request, .. }

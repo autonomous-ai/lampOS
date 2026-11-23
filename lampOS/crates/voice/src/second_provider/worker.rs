@@ -4970,6 +4970,9 @@ pub fn serve(
     engine = engine.waiting_on_one_path(
         crate::make_skill_agent::one_path_on().then_some(crate::make_skill_agent::LONG_WAIT_AFTER),
     );
+    // The makes under way told to the coordinator as they change, so a
+    // make whose turn a stall cut keeps the lamp thinking (#7418).
+    engine = engine.telling_makes_under_way(crate::make_skill_agent::one_path_on());
     // An agent make past a minute runs on, and its person is told when
     // it's ready (`LAMP_MAKE_MAY_RUN_ON=on`, #6811).
     let run_on = crate::long_make::on();
@@ -7034,7 +7037,11 @@ fn made_on_this_thread<F: FnOnce() + Send + 'static>(
     crate::make_skill_agent::set_made_for(request);
     // Nothing an earlier call left on this thread is taken as this one's.
     let _ = crate::make_skill_local::take_said_outcome();
+    // Under way while the work runs, not while its line waits to be said:
+    // the lamp thinks for it even with its turn cut (#7418).
+    let making = crate::make_skill_local::MakeUnderWay::begin(request);
     let answer = work();
+    drop(making);
     crate::make_skill_agent::set_made_for(0);
     let made = crate::make_skill_local::take_said_outcome();
     let queued = given.is_none();
@@ -24992,6 +24999,46 @@ mod tests {
             rest.iter().any(|(request, ..)| *request == plain),
             "{rest:?}"
         );
+    }
+
+    /// #7418: with the make's one run path, a voice make's work under way
+    /// is told to the coordinator as its count changes, tied to no request,
+    /// with the bound `MAKE_WITHIN`; with it off, never.
+    #[test]
+    fn the_second_worker_tells_the_makes_under_way_only_on_the_one_path() {
+        let engine = |on: bool| {
+            Engine::new(
+                Arc::new(Silent),
+                Told::default,
+                Arc::new(|_, _, _, _| Box::pin(async { serde_json::Value::Null })),
+            )
+            .telling_makes_under_way(on)
+        };
+        let mut off = engine(false);
+        let mut on = engine(true);
+        let making = crate::make_skill_local::MakeUnderWay::begin(7_418_002);
+        assert!(next_output(&mut off).is_none());
+        match next_output(&mut on) {
+            Some(ProviderOutput::MakesUnderWay { count, within_ms }) => {
+                // Other tests' makes may run beside this one.
+                assert!(count >= 1, "{count}");
+                assert_eq!(
+                    within_ms,
+                    crate::make_skill_agent::MAKE_WITHIN.as_millis() as u64
+                );
+            }
+            other => panic!("the count under way, not {other:?}"),
+        }
+        // Told once a change: nothing more until it changes again.
+        assert!(
+            !matches!(
+                next_output(&mut on),
+                Some(ProviderOutput::MakesUnderWay { count: 0, .. })
+            ),
+            "the make is still under way"
+        );
+        drop(making);
+        assert!(next_output(&mut off).is_none());
     }
 
     /// #2137's redesign, step 5: the second worker's own path, not only

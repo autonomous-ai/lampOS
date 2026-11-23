@@ -127,6 +127,9 @@ struct Script {
     /// (`LAMP_SECOND_SKILL_LOOK`, #941): `LookAsked` for the session that
     /// began it, before its audio.
     second_looks: bool,
+    /// The second route tells one voice make under way as its first line
+    /// starts (`MakesUnderWay`, #7418), and never that it ended.
+    second_makes: bool,
     /// `second_looks`' look is the route's own `take_a_look`, no skill's
     /// search.
     own_look: bool,
@@ -298,6 +301,7 @@ impl Script {
             second_packets: 12,
             second_says: None,
             second_looks: false,
+            second_makes: false,
             own_look: false,
             look_answers: &[],
             note_answer: LookAnswer::Other,
@@ -570,6 +574,8 @@ struct Peers {
     second_session: u64,
     /// The second route has asked its look (`Script::second_looks`).
     second_looked: bool,
+    /// The second route has told its make under way (`Script::second_makes`).
+    second_made: bool,
     /// Look's turns the second route has answered (`Script::look_answers`).
     look_turns: usize,
     /// Written notes refused (`Script::second_refuses_notes`).
@@ -1091,6 +1097,17 @@ impl Peers {
                         session,
                         waiting_for_barrier: false,
                     });
+                    if !live
+                        && self.script.second_makes
+                        && !std::mem::replace(&mut self.second_made, true)
+                    {
+                        self.peers[index]
+                            .queued
+                            .push_back(ProviderOutput::MakesUnderWay {
+                                count: 1,
+                                within_ms: crate::make_skill_agent::MAKE_WITHIN.as_millis() as u64,
+                            });
+                    }
                     // The held call's words, back once this line began.
                     if !live
                         && let Some((at, held)) = self.call_words_held
@@ -1883,6 +1900,7 @@ fn run(script: Script) -> Run {
         second_died_at: None,
         second_session: 0,
         second_looked: false,
+        second_made: false,
         look_turns: 0,
         notes_refused: 0,
         murmur_at: None,
@@ -3969,6 +3987,55 @@ fn a_second_worker_that_exits_mid_line_leaves_no_queued_input_behind() {
     assert_eq!(dropped[0]["active"], true);
     assert_eq!(run.finished(1)["outcome"], "second_route_failed");
     assert!(run.played(1).is_empty());
+}
+
+/// #7418, Heron's P2 on #8432: the second route's worker exits while a
+/// make of its own is thought on. Its makes went with it: the thinking
+/// ends as the route is dropped, not at the bound, nor at the mute.
+#[test]
+fn a_second_worker_that_exits_mid_make_rests_at_once() {
+    let _one = super::pilot_faults::one_session();
+    let run = run(Script {
+        second_makes: true,
+        second_dies: Some(40),
+        mute_after_second_dies: true,
+        ..Script::question(Live::DropLink)
+    });
+    run.assert_clean();
+    assert_eq!(run.events("makes_under_way").len(), 1, "{}", run.summary());
+    let ended = run.events("make_held_ended");
+    assert_eq!(ended.len(), 1, "{}", run.summary());
+    assert_eq!(ended[0]["why"], "second_route_dropped");
+    let at = |kind: &str| run.trace.iter().position(|e| e["kind"] == kind).unwrap();
+    assert!(at("voice_route_dropped") < at("make_held_ended"));
+}
+
+/// #7418, Heron's P2 on #8432, through the loop: a hand Stop with no turn
+/// ends a make's thinking at once, and its count, still 1, never re-arms
+/// it; the run's mute finds nothing left to end.
+#[test]
+fn a_hand_stop_ends_a_makes_thinking_with_no_turn() {
+    let _one = super::pilot_faults::one_session();
+    let run = run(Script {
+        only: true,
+        second: false,
+        second_makes: true,
+        murmur: Some(When::Settled(1)),
+        hand_stop: Some(20),
+        turn_taking: TurnTaking::VadOnly,
+        mute_at_frame: Some(800),
+        ..Script::question(Live::Answer(12))
+    });
+    run.assert_clean();
+    assert_eq!(run.events("makes_under_way").len(), 1, "{}", run.summary());
+    assert!(
+        !run.events("hand_control_cancel").is_empty(),
+        "{}",
+        run.summary()
+    );
+    let ended = run.events("make_held_ended");
+    assert_eq!(ended.len(), 1, "{}", run.summary());
+    assert_eq!(ended[0]["why"], "stopped");
 }
 
 /// (m) #960, lamp-4ace 09:03-09:06: on the second route in a busy room the

@@ -4430,6 +4430,8 @@ fn observe_provider_output(
         | ProviderOutput::StopAnswered { .. }
         | ProviderOutput::OwnWordsSaid { .. }
         | ProviderOutput::RequestedAudio { .. } => {}
+        // Tied to no turn: taken by the loop (#7418).
+        ProviderOutput::MakesUnderWay { .. } => {}
         // A finished task's news the person asked about, answered in this
         // turn: the tasks part is told so only once the turn is heard whole
         // (#1390), as with news told unasked.
@@ -4522,6 +4524,162 @@ fn observe_provider_output(
         }
     }
     Ok(())
+}
+
+/// A voice make still under way in the worker with no turn waiting on it
+/// (#7418, `ProviderOutput::MakesUnderWay`, the make's one run path only):
+/// a microphone stall cut its turn after its waiting line, and the lamp
+/// keeps thinking until its line, never slumps to rest and pops back.
+/// Until when, on this loop's clock: [`crate::make_skill_agent::MAKE_WITHIN`]
+/// at most from the count that began it, moved on only by a count that rose
+/// (a new make), never by one that fell. Any turn wins over it. Ended by a
+/// stop, the head's stop, a spoken stop, the body pushed and a computer's
+/// end; after these, no count re-arms it until the worker's count has gone
+/// to 0, so a count already queued behind the stop never does. Also ended,
+/// every pass, while the microphone is not allowed (a mute and a privacy
+/// loss end the whole conversation), which latches nothing: the microphone
+/// is not yet known on a conversation's first passes, and that must not
+/// hold off its first make. A
+/// fail-safe: a make begun after a stop while an older one runs rests. Also
+/// ended by the worker's count of 0, and by the second route's worker gone
+/// or begun again, whose new process runs none. Never by a gap cut, which is
+/// the stall itself.
+#[derive(Debug, Default)]
+struct MakeHeld {
+    until_us: Option<u64>,
+    /// The worker's count last told.
+    count: u32,
+    /// Stopped: no count re-arms it until the count is 0.
+    stopped: bool,
+}
+
+impl MakeHeld {
+    /// The worker's count of makes under way, at `at_us`: risen, thinking
+    /// for at most `within_ms`, itself at most `MAKE_WITHIN`, from now,
+    /// never earlier than before; fallen but over 0, as before; 0, over.
+    fn told(&mut self, count: u32, within_ms: u64, at_us: u64) {
+        let rose = count > self.count;
+        self.count = count;
+        if count == 0 {
+            self.until_us = None;
+            self.stopped = false;
+            return;
+        }
+        if !rose || self.stopped {
+            return;
+        }
+        let most_ms = crate::make_skill_agent::MAKE_WITHIN.as_millis() as u64;
+        let bound = at_us.saturating_add(within_ms.min(most_ms).saturating_mul(1_000));
+        self.until_us = Some(self.until_us.map_or(bound, |until| until.max(bound)));
+    }
+
+    /// The turn was cut at this pass: by a gap alone (`gap_alone`) the make
+    /// is still thought on; by anything else it is stopped ([`Self::stop`]).
+    /// Whether it ended.
+    fn cut(&mut self, gap_alone: bool) -> bool {
+        !gap_alone && self.stop()
+    }
+
+    /// Stopped: it ends, and no count re-arms it until the count is 0.
+    /// Whether it was held.
+    fn stop(&mut self) -> bool {
+        self.stopped = true;
+        self.until_us.take().is_some()
+    }
+
+    /// The worker that counted is gone or began again: its count is 0.
+    /// Whether it was held.
+    fn gone(&mut self) -> bool {
+        self.count = 0;
+        self.stopped = false;
+        self.until_us.take().is_some()
+    }
+
+    /// The microphone is not allowed: it ends, on every pass while so, but
+    /// latches nothing ([`Self::stop`]), so the microphone not yet known as
+    /// a conversation begins never holds off a make told after. Whether it
+    /// ended.
+    fn microphone(&mut self, allowed: bool) -> bool {
+        !allowed && self.until_us.take().is_some()
+    }
+
+    /// Whether the lamp thinks for it at `at_us`: only with no turn
+    /// (`no_turn`). Past its bound it ends.
+    fn shows(&mut self, no_turn: bool, at_us: u64) -> bool {
+        no_turn && self.thinking(at_us)
+    }
+
+    /// Whether it holds at `at_us`. Past its bound it ends.
+    fn thinking(&mut self, at_us: u64) -> bool {
+        match self.until_us {
+            Some(until) if at_us < until => true,
+            Some(_) => {
+                self.until_us = None;
+                eprintln!(
+                    "lamp-voice: a make cut from its turn ran past its bound with no line: the lamp rests"
+                );
+                false
+            }
+            None => false,
+        }
+    }
+}
+
+/// The trace's word that a make cut from its turn is no longer thought on,
+/// and why (#7418).
+fn make_held_ended(trace: &mut SessionState, why: &str) -> Result<()> {
+    eprintln!("lamp-voice: a make cut from its turn is no longer thought on: {why}");
+    record(
+        trace,
+        json!({"kind":"make_held_ended","at_us":monotonic_us(),"why":why}),
+    )
+}
+
+/// What the loop knows of the turn in hand as it tells the body its phase
+/// ([`body_phase`]).
+#[derive(Clone, Copy, Debug, Default)]
+struct BodyCues {
+    /// Onboarding's walk looks at the person, or rises to.
+    walk_looks: bool,
+    /// The lamp stopped speaking for someone and looks at them.
+    attending: bool,
+    /// The answer has arrived and is about to be spoken ([`about_to_speak`]).
+    about_to_speak: bool,
+    /// The turn in hand is a sound sent on for the model to judge.
+    sound_turn: bool,
+    /// The talk around it has not been for the lamp.
+    attention_settled: bool,
+    /// A make cut from its turn is thought on, with no turn ([`MakeHeld`]).
+    make_thinking: bool,
+}
+
+/// The phase the body is told, from the ring's phase of the turn in hand
+/// (none with no turn, or a sound of the lamp's own) and [`BodyCues`].
+fn body_phase(
+    phase: Option<crate::ring_wire::RingPhase>,
+    cues: BodyCues,
+) -> Option<crate::ring_wire::RingPhase> {
+    use crate::ring_wire::RingPhase;
+    match phase {
+        // "Where you sit": between turns the lamp looks at the person, its
+        // gaze turning the head to them, before it asks to be moved (#1722
+        // row 10, rule 8). A walk not yet begun rises and looks too (#5931).
+        None if cues.walk_looks => Some(RingPhase::Listening),
+        // A make its stall cut from its turn still runs: the lamp thinks
+        // on with no turn until its line, and any turn takes over at once
+        // (#7418).
+        None if cues.make_thinking => Some(RingPhase::Waiting),
+        Some(RingPhase::Speaking) if cues.attending => Some(RingPhase::Listening),
+        Some(RingPhase::Waiting) if cues.about_to_speak => Some(RingPhase::Speaking),
+        // A sound sent on for the model to judge is not something to think
+        // about: the head stays as it was while the sound was heard, and an
+        // answer brings it back.
+        Some(RingPhase::Waiting) if cues.sound_turn => None,
+        // The talk around it has not been for it: the head stays where it
+        // is until the lamp has something to say.
+        Some(RingPhase::Listening | RingPhase::Waiting) if cues.attention_settled => None,
+        phase => phase,
+    }
 }
 
 /// The answer has arrived and is about to be spoken: the body's head comes
@@ -7021,6 +7179,9 @@ fn conversation_with_gate_inner(
     // The turn telling a long make's news, and its key: acted on only once
     // that turn was heard through (`crate::long_make::heard`).
     let mut long_make_turn: Option<(u64, String)> = None;
+    // A make still under way whose turn a stall cut: thinking with no turn
+    // until its line, bounded (#7418).
+    let mut make_held = MakeHeld::default();
     // The lamp's agent's answer to a full read is said only while the
     // owner is seen alone, looked at by the say client here
     // (`LAMP_SERVICES_TO_AGENT`, `agent_asks`).
@@ -7789,7 +7950,13 @@ fn conversation_with_gate_inner(
         let stall_pass = stalls.begin();
         // A second route whose worker exited is dropped before anything
         // else of this tick touches it, and a turn it held ends (#960).
-        if second::dropped_if_gone(rig, &mut cloud, &mut output_flow, trace)? {
+        let had_second = rig.second.is_some();
+        let second_active = second::dropped_if_gone(rig, &mut cloud, &mut output_flow, trace)?;
+        // Its makes went with it (#7418): a new worker's count begins at 0.
+        if had_second && rig.second.is_none() && make_held.gone() {
+            make_held_ended(trace, "second_route_dropped")?;
+        }
+        if second_active {
             // As a turn the provider interrupted: its unsent input and
             // unwritten speech go with it, and the rest of a line still
             // being said is drained, never taken for a new request.
@@ -8382,6 +8549,13 @@ fn conversation_with_gate_inner(
         {
             if stop || muted || gap_cut || head_stop || spoken_stop || body_pushed || control_ended
             {
+                // A gap alone keeps a make's thinking: it is the stall that
+                // cut the turn (#7418).
+                if make_held.cut(
+                    !(stop || muted || head_stop || spoken_stop || body_pushed || control_ended),
+                ) {
+                    make_held_ended(trace, "stopped")?;
+                }
                 let observed_at_us = monotonic_us();
                 let cancellation = hand::cancel(
                     owner,
@@ -8980,9 +9154,22 @@ fn conversation_with_gate_inner(
                     )?;
                 }
                 ProviderOutput::Ready { setup_us } => {
+                    // A worker begun again runs no make of the old one's.
+                    if make_held.gone() {
+                        make_held_ended(trace, "provider_ready")?;
+                    }
                     record(
                         trace,
                         json!({"kind":"provider_ready_data_ignored","at_us":monotonic_us(),"setup_us":setup_us}),
+                    )?;
+                }
+                // The worker's makes under way (#7418): thinking with no
+                // turn while any runs, bounded.
+                ProviderOutput::MakesUnderWay { count, within_ms } => {
+                    make_held.told(count, within_ms, monotonic_us());
+                    record(
+                        trace,
+                        json!({"kind":"makes_under_way","at_us":monotonic_us(),"count":count,"within_ms":within_ms}),
                     )?;
                 }
                 ProviderOutput::Audio {
@@ -12568,6 +12755,12 @@ fn conversation_with_gate_inner(
                 out.foretell(current.owner.turn(), &ahead, clock);
             }
         }
+        // No make is thought on without the microphone (#7418): a mute and
+        // a privacy loss end the conversation; this keeps it so whatever
+        // else takes the microphone.
+        if make_held.microphone(snapshot.microphone_permission() == Permission::Allowed) {
+            make_held_ended(trace, "microphone_not_allowed")?;
+        }
         if let Some(body) = body_link.as_mut() {
             use crate::ring_wire::RingPhase;
             let phase = RingPhase::from_snapshot(snapshot).filter(|_| !sound_now);
@@ -12579,37 +12772,18 @@ fn conversation_with_gate_inner(
                     .map(|current| (current.owner.turn(), current.had_audio)),
                 clock,
             );
-            body.tell(
-                match phase {
-                    // "Where you sit": between turns the lamp looks at the
-                    // person, its gaze turning the head to them, before it
-                    // asks to be moved (#1722 row 10, rule 8).
-                    // A walk not yet begun rises and looks too (#5931).
-                    None if onboarding
-                        .as_ref()
-                        .is_some_and(|walk| walk.looking() || walk.rising(clock)) =>
-                    {
-                        Some(RingPhase::Listening)
-                    }
-                    Some(RingPhase::Speaking) if attending => Some(RingPhase::Listening),
-                    Some(RingPhase::Waiting) if about_to_speak => Some(RingPhase::Speaking),
-                    // A sound sent on for the model to judge is not something
-                    // to think about: the head stays as it was while the
-                    // sound was heard, and an answer brings it back.
-                    Some(RingPhase::Waiting)
-                        if sound_turn.is_some()
-                            && sound_turn == reply.as_ref().map(|current| current.owner.turn()) =>
-                    {
-                        None
-                    }
-                    // The talk around it has not been for it: the head
-                    // stays where it is until the lamp has something to say.
-                    Some(RingPhase::Listening | RingPhase::Waiting) if attention.settled() => None,
-                    phase => phase,
-                },
-                voice_level,
-                clock,
-            );
+            let cues = BodyCues {
+                walk_looks: onboarding
+                    .as_ref()
+                    .is_some_and(|walk| walk.looking() || walk.rising(clock)),
+                attending,
+                about_to_speak,
+                sound_turn: sound_turn.is_some()
+                    && sound_turn == reply.as_ref().map(|current| current.owner.turn()),
+                attention_settled: attention.settled(),
+                make_thinking: make_held.shows(reply.is_none(), clock),
+            };
+            body.tell(body_phase(phase, cues), voice_level, clock);
             // After words of self-harm the body keeps still (#7689): no
             // shift at rest, a plain nod only, an app's moves held.
             body.quiet(care_holds, clock);
@@ -19847,21 +20021,30 @@ mod tests {
     }
 
     /// What the ring shows for `owner`'s turn, and the body's mood for it as
-    /// the loop tells the body, the waiting arm alone (nothing attended, no
-    /// walk, no sound), read back from the body's socket.
+    /// the loop tells the body ([`body_phase`]), with nothing attended, no
+    /// walk and no sound, a make cut from its turn as `held` has it (#7418),
+    /// read back from the body's socket.
     fn shown(
         owner: &mut Controller,
         reply: &Option<Reply>,
-        body: &mut crate::body_link::BodyLink,
-        socket: &std::os::unix::net::UnixDatagram,
+        held: &mut MakeHeld,
+        (body, socket): (
+            &mut crate::body_link::BodyLink,
+            &std::os::unix::net::UnixDatagram,
+        ),
         at_us: u64,
     ) -> (Option<crate::ring_wire::RingPhase>, String) {
         use crate::ring_wire::RingPhase;
         let ring = RingPhase::from_snapshot(owner.snapshot(now()).unwrap());
-        let told = match ring {
-            Some(RingPhase::Waiting) if about_to_speak(reply.as_ref()) => Some(RingPhase::Speaking),
-            phase => phase,
-        };
+        // The loop's own phase for the body, with nothing else in hand.
+        let told = body_phase(
+            ring,
+            BodyCues {
+                about_to_speak: about_to_speak(reply.as_ref()),
+                make_thinking: held.shows(reply.is_none(), at_us),
+                ..BodyCues::default()
+            },
+        );
         body.tell(told, 0, at_us);
         let mut message = [0; 128];
         let read = socket.recv(&mut message).unwrap();
@@ -19893,7 +20076,13 @@ mod tests {
             cloud.observe(ready_link(1, 1), monotonic_us()).unwrap();
             let mut seen = Vec::new();
             // The waiting line's audio, in play.
-            seen.push(shown(&mut owner, &reply, &mut body, &socket, 1_000_000));
+            seen.push(shown(
+                &mut owner,
+                &reply,
+                &mut MakeHeld::default(),
+                (&mut body, &socket),
+                1_000_000,
+            ));
             if one_path {
                 for event in [
                     ProviderOutput::GenerationComplete {
@@ -19924,8 +20113,8 @@ mod tests {
                 seen.push(shown(
                     &mut owner,
                     &reply,
-                    &mut body,
-                    &socket,
+                    &mut MakeHeld::default(),
+                    (&mut body, &socket),
                     second * 1_000_000,
                 ));
             }
@@ -19934,7 +20123,13 @@ mod tests {
                 .as_mut()
                 .unwrap()
                 .append_provider_packet(vec![22; 480], monotonic_us(), true);
-            seen.push(shown(&mut owner, &reply, &mut body, &socket, 4_000_000));
+            seen.push(shown(
+                &mut owner,
+                &reply,
+                &mut MakeHeld::default(),
+                (&mut body, &socket),
+                4_000_000,
+            ));
             // The answer is its own generation: it plays to its end under a
             // new playback, and then the turn settles (Thirteen on #7395).
             for event in [
@@ -19961,7 +20156,13 @@ mod tests {
             current.playback = Some(answer_token);
             assert_eq!(waiting_token.is_some(), one_path);
             assert_ne!(Some(answer_token), waiting_token);
-            seen.push(shown(&mut owner, &reply, &mut body, &socket, 5_000_000));
+            seen.push(shown(
+                &mut owner,
+                &reply,
+                &mut MakeHeld::default(),
+                (&mut body, &socket),
+                5_000_000,
+            ));
             let current = reply.as_mut().unwrap();
             let mut played = 0;
             while let Some((samples, last)) = current.next_speaker_chunk() {
@@ -20002,6 +20203,260 @@ mod tests {
             phases(run(false)),
             [speaking(), speaking(), speaking(), speaking(), speaking()]
         );
+    }
+
+    /// #7418, extending the test above: on lamp-c0a4 a microphone stall
+    /// during a make's wait cut its turn, and the lamp slumped to rest
+    /// until the make's line came back through the say service. With the
+    /// worker's count of makes under way (`ProviderOutput::MakesUnderWay`)
+    /// the lamp thinks on with no turn after a gap cut, until the say turn
+    /// speaks; it rests past the bound; and a person's new turn takes over
+    /// at once. The stop and the route dropped go through the loop itself
+    /// (`second_route.rs`).
+    #[test]
+    fn a_make_cut_by_a_gap_keeps_thinking_with_no_turn_until_its_line() {
+        use crate::ring_wire::RingPhase::{Listening, Speaking, Waiting};
+        #[derive(Clone, Copy, Debug)]
+        enum Then {
+            GapThenSay,
+            Bound,
+            Spoken,
+        }
+        let within = crate::make_skill_agent::MAKE_WITHIN.as_micros() as u64;
+        let run = |then: Then| {
+            let dir = SessionDirectory::create().unwrap();
+            let at = dir.path.join("body.sock");
+            let socket = std::os::unix::net::UnixDatagram::bind(&at).unwrap();
+            let mut body = crate::body_link::BodyLink::to(at).unwrap();
+            let (mut owner, current, _) = active_reply();
+            let turn = current.owner;
+            let mut reply = Some(current);
+            let mut cloud = CloudAvailability::default();
+            cloud.observe(ready_link(1, 1), monotonic_us()).unwrap();
+            let mut held = MakeHeld::default();
+            let mut seen = Vec::new();
+            // The waiting line in play; the make's work begins meanwhile.
+            held.told(1, within / 1_000, 1_000_000);
+            seen.push(shown(
+                &mut owner,
+                &reply,
+                &mut held,
+                (&mut body, &socket),
+                1_000_000,
+            ));
+            for event in [
+                ProviderOutput::GenerationComplete {
+                    request: turn.turn(),
+                },
+                ProviderOutput::MakeWaiting {
+                    request: turn.turn(),
+                },
+                ProviderOutput::MakesUnderWay {
+                    count: 1,
+                    within_ms: within / 1_000,
+                },
+            ] {
+                observe_provider_output(&mut cloud, &mut reply, &event).unwrap();
+            }
+            let current = reply.as_mut().unwrap();
+            let mut sequence = 40;
+            while let Some((_, last)) = current.next_speaker_chunk() {
+                sequence += 1;
+                if last {
+                    current.final_chunk = Some(sequence);
+                    let token = current.retire_playback(sequence, 240).unwrap();
+                    owner.playback_ended(now(), token).unwrap();
+                }
+            }
+            // Thinking within its turn.
+            seen.push(shown(
+                &mut owner,
+                &reply,
+                &mut held,
+                (&mut body, &socket),
+                2_000_000,
+            ));
+            // The microphone stalls: a gap cuts the turn, and the make is
+            // still thought on.
+            assert!(!held.cut(true));
+            cancel_reply(
+                &mut owner,
+                &mut reply,
+                &mut SessionState::default(),
+                "capture_gap",
+            )
+            .unwrap();
+            assert!(reply.is_none());
+            seen.push(shown(
+                &mut owner,
+                &reply,
+                &mut held,
+                (&mut body, &socket),
+                3_000_000,
+            ));
+            match then {
+                Then::GapThenSay => {
+                    seen.push(shown(
+                        &mut owner,
+                        &reply,
+                        &mut held,
+                        (&mut body, &socket),
+                        4_000_000,
+                    ));
+                    // The work returned; its line through the say service
+                    // is a turn of its own, speaking.
+                    held.told(0, within / 1_000, 5_000_000);
+                    let (mut said_by, saying, _) = active_reply();
+                    seen.push(shown(
+                        &mut said_by,
+                        &Some(saying),
+                        &mut held,
+                        (&mut body, &socket),
+                        5_000_000,
+                    ));
+                    // Its line said, the lamp rests.
+                    seen.push(shown(
+                        &mut owner,
+                        &None,
+                        &mut held,
+                        (&mut body, &socket),
+                        6_000_000,
+                    ));
+                }
+                Then::Bound => {
+                    seen.push(shown(
+                        &mut owner,
+                        &reply,
+                        &mut held,
+                        (&mut body, &socket),
+                        1_000_000 + within,
+                    ));
+                }
+                // The person speaks mid-wait: their turn, listening, at once.
+                Then::Spoken => {
+                    let until = MonoTime::from_micros(monotonic_us() + 600_000);
+                    owner
+                        .set_capture(now(), CaptureState::RetainingUntil(until))
+                        .unwrap();
+                    owner
+                        .set_admission(now(), AdmissionState::OpenUntil(until))
+                        .unwrap();
+                    owner.admit(now(), AdmittedInput::NewTurn).unwrap();
+                    seen.push(shown(
+                        &mut owner,
+                        &None,
+                        &mut held,
+                        (&mut body, &socket),
+                        4_000_000,
+                    ));
+                }
+            }
+            seen
+        };
+        let speaking = || (Some(Speaking), "speaking".to_owned());
+        let thinking = || (Some(Waiting), "thinking".to_owned());
+        let cut_thinking = || (None, "thinking".to_owned());
+        let resting = || (None, "resting".to_owned());
+        assert_eq!(
+            run(Then::GapThenSay),
+            [
+                speaking(),
+                thinking(),
+                cut_thinking(),
+                cut_thinking(),
+                speaking(),
+                resting()
+            ]
+        );
+        assert_eq!(
+            run(Then::Bound),
+            [speaking(), thinking(), cut_thinking(), resting()]
+        );
+        assert_eq!(
+            run(Then::Spoken),
+            [
+                speaking(),
+                thinking(),
+                cut_thinking(),
+                (Some(Listening), "listening".to_owned())
+            ]
+        );
+        // The bound is `MAKE_WITHIN` whatever the worker says.
+        let mut held = MakeHeld::default();
+        held.told(1, u64::MAX, 10);
+        assert!(held.thinking(9 + within));
+        assert!(!held.thinking(10 + within));
+        assert!(!held.thinking(11));
+        // A count of 0 rests it; so does the worker gone.
+        held.told(2, 1_000, 10);
+        held.told(0, 1_000, 20);
+        assert!(!held.thinking(30));
+        held.told(1, 1_000, 10);
+        assert!(held.gone());
+        assert!(!held.thinking(30));
+        // The microphone not allowed ends it; allowed, nothing changes.
+        let mut held = MakeHeld::default();
+        held.told(1, 1_000, 10);
+        assert!(!held.microphone(true));
+        assert!(held.thinking(20));
+        assert!(held.microphone(false));
+        assert!(!held.thinking(20));
+        // Not yet known as the conversation begins (`Permission::Unknown`
+        // on its first passes): nothing held, nothing latched, so the
+        // first make told after it is thought on.
+        let mut held = MakeHeld::default();
+        assert!(!held.microphone(false));
+        held.told(1, 1_000, 10);
+        assert!(held.shows(true, 20));
+    }
+
+    /// Heron's P3 on #8432: a count already queued behind a stop, drained
+    /// later in the same pass, never re-arms the thinking; only once the
+    /// worker's count has gone to 0 does a new make's.
+    #[test]
+    fn a_count_queued_behind_a_stop_never_re_arms_a_makes_thinking() {
+        let mut held = MakeHeld::default();
+        // Stopped as the make's turn is cut, its count still on its way.
+        assert!(!held.cut(false));
+        held.told(1, 600_000, 1_000_000);
+        assert!(!held.shows(true, 2_000_000), "re-armed behind the stop");
+        // Stopped while held: the same.
+        let mut held = MakeHeld::default();
+        held.told(1, 600_000, 1_000_000);
+        assert!(held.shows(true, 2_000_000));
+        assert!(held.cut(false));
+        held.told(2, 600_000, 2_000_000);
+        assert!(!held.shows(true, 3_000_000));
+        // The worker's count gone to 0, a new make is thought on again.
+        held.told(0, 600_000, 4_000_000);
+        held.told(1, 600_000, 5_000_000);
+        assert!(held.shows(true, 6_000_000));
+        // Never with a turn in hand.
+        assert!(!held.shows(false, 6_000_000));
+    }
+
+    /// Heron's P3 on #8432: the bound runs from the count that began it; a
+    /// count that falls never moves it on, one that rises (a new make)
+    /// does.
+    #[test]
+    fn a_makes_bound_moves_on_only_for_a_new_make() {
+        let within = crate::make_skill_agent::MAKE_WITHIN.as_micros() as u64;
+        let within_ms = within / 1_000;
+        let mut held = MakeHeld::default();
+        held.told(1, within_ms, 0);
+        held.told(2, within_ms, 100_000_000);
+        // Two makes: the bound is the second's.
+        assert!(held.thinking(100_000_000 + within - 1));
+        // One ended: the bound stays where it was, not from now.
+        held.told(1, within_ms, 200_000_000);
+        assert!(held.thinking(100_000_000 + within - 1));
+        assert!(!held.thinking(100_000_000 + within));
+        // Past the bound, a count that falls doesn't bring it back.
+        let mut held = MakeHeld::default();
+        held.told(2, within_ms, 0);
+        assert!(!held.thinking(within));
+        held.told(1, within_ms, within + 1);
+        assert!(!held.thinking(within + 2));
     }
 
     #[test]
