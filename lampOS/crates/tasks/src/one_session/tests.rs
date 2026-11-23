@@ -3810,10 +3810,35 @@ fn a_close_harness_keeps_refusing_ends_after_its_tries_and_a_fresh_session_opens
     assert!(!one.drop_if_due(&fake), "no close tried again");
     one.open_if_due(&fake, &place());
     assert_eq!(one.agent(), Some(agent_of(2)), "{:?}", fake.calls());
-    // Harness out of reach is not a refusal: tried again as before.
+    // Harness out of reach is not a refusal: tried again, but not past
+    // CLOSE_GIVE_UP_AFTER (23 Nov ee17: 8 min held the queue).
     assert!(!refused_close("daemon_unreachable"));
     assert!(!refused_close("busy"));
     assert!(refused_close("working"));
+}
+
+/// 23 Nov, lamp-ee17 (run 6): a close failing `daemon_unreachable` is not
+/// a refusal and is tried again, but not for ever: failing past
+/// [`CLOSE_GIVE_UP_AFTER`] it is given up and a fresh session opens.
+#[test]
+fn a_close_failing_out_of_reach_is_given_up_after_its_time() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    *fake.failing_closes.lock().unwrap() = 100; // `busy`: out of reach
+    one.replace_kept(&fake, MACHINE, &agent_of(1), "a test");
+    for _ in 0..5 {
+        one.drop_if_due(&fake);
+    }
+    assert!(one.kept().is_some(), "still tried within its time");
+    one.lock().close_failing_since =
+        Some(Instant::now() - CLOSE_GIVE_UP_AFTER - Duration::from_secs(1));
+    one.drop_if_due(&fake);
+    assert_eq!(one.kept(), None, "given up past its time");
+    assert!(!one.drop_if_due(&fake), "no close tried again");
+    one.open_if_due(&fake, &place());
+    assert_eq!(one.agent(), Some(agent_of(2)), "{:?}", fake.calls());
 }
 
 /// #7906 sign 4b after a tool's result: the Gateway writes the assistant's

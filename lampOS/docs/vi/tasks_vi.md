@@ -2616,7 +2616,10 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     nào Harness còn từ chối, và hàng đợi phải chờ sau nó (23/11, lamp-ee17,
     hai lần). Harness không liên lạc được (`daemon_unreachable`, hết giờ,
     một lần chạy lỗi) hoặc khoá của chính lamp-tasks (`busy`) không tính là
-    từ chối: vẫn thử lại như trước.
+    từ chối và vẫn được thử lại, nhưng lệnh đóng thất bại liên tiếp theo bất
+    kỳ cách nào trong `CLOSE_GIVE_UP_AFTER` (120 s) cũng bị bỏ theo cách
+    đó (`close_failing_since`): trước đây một lần đóng như vậy giữ hàng đợi
+    8 phút (23/11, lamp-ee17, `daemon_unreachable` rồi `working`).
 - **Khởi chạy thất bại, xử lý ngay (#8062: openharness#4499 của Harness 0.6.74, có trong bản ghim 0.6.75).**
   `harness wait` thoát mã 1 khi một lần khởi chạy trên máy này thất bại (ví
   dụ `OPENCLAW_NO_TOKEN`, hoặc `FIRST_TASK_NOT_TAKEN` sau 3 phút), dòng của

@@ -193,6 +193,10 @@ fn engine_named(name: &str) -> Option<EngineKind> {
 /// is forgotten and a fresh one opens.
 pub const CLOSE_TRIES: u32 = 3;
 
+/// How long the kept session's close may keep failing, any way, before it
+/// is given up and a fresh session opens next.
+pub const CLOSE_GIVE_UP_AFTER: Duration = Duration::from_secs(120);
+
 /// Whether a failed close of the kept session was Harness refusing it
 /// (counted toward [`CLOSE_TRIES`]), not Harness out of reach (its daemon
 /// down or starting, a run that failed: tried again for as long as it
@@ -971,6 +975,11 @@ struct Inner {
     /// refusing (`working` while its resume failed, 23 Nov ee17) never
     /// loops for ever and never holds the queue.
     close_refused: u32,
+    /// Since when the kept session's close has failed in a row, any way
+    /// (Harness out of reach too): past [`CLOSE_GIVE_UP_AFTER`] it is given
+    /// up as at [`CLOSE_TRIES`] refusals, so a close never holds the queue
+    /// for long (23 Nov ee17: 8 min, `daemon_unreachable` then `working`).
+    close_failing_since: Option<Instant>,
     /// A removal under way ([`OneSession::drop_pane_as`]): the pane taken,
     /// its close, its OpenClaw session's delete and its token's removal
     /// not all done yet.
@@ -2887,18 +2896,23 @@ impl OneSession {
                 if refused {
                     inner.close_refused += 1;
                 }
-                if inner.close_refused >= CLOSE_TRIES {
+                let failing_since = *inner.close_failing_since.get_or_insert_with(Instant::now);
+                if inner.close_refused >= CLOSE_TRIES
+                    || failing_since.elapsed() >= CLOSE_GIVE_UP_AFTER
+                {
                     // Harness refused the close every time, `--now` too:
                     // taken as gone, its record forgotten, a fresh one
                     // next. Never a close loop that holds the queue.
                     inner.close_refused = 0;
+                    inner.close_failing_since = None;
                     inner.drop_due = None;
                     inner.drop_now = false;
                     inner.drop_keeps_token = false;
                     drop(inner);
                     eprintln!(
-                        "tasks: one session: the kept session {} not closed after {CLOSE_TRIES} refusals ({code}); taken as gone, its record forgotten, a fresh one next",
-                        short(&agent)
+                        "tasks: one session: the kept session {} not closed ({code}, refused or failing past {} s); taken as gone, its record forgotten, a fresh one next",
+                        short(&agent),
+                        CLOSE_GIVE_UP_AFTER.as_secs()
                     );
                     self.kept_closed(&agent, kind);
                     self.forget_record();
@@ -2921,7 +2935,11 @@ impl OneSession {
                 inner.drop_keeps_token |= !token;
                 return;
             }
-            self.lock().close_refused = 0;
+            {
+                let mut inner = self.lock();
+                inner.close_refused = 0;
+                inner.close_failing_since = None;
+            }
             self.kept_closed(&agent, kind);
             if token {
                 self.forget_token();

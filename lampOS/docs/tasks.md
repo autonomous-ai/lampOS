@@ -5430,7 +5430,11 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     every look for as long as Harness refused it, and the queue waited
     behind it (23 Nov, lamp-ee17, twice). Harness out of reach
     (`daemon_unreachable`, a timeout, a run that failed) or lamp-tasks'
-    own lock (`busy`) is not a refusal: tried again as before.
+    own lock (`busy`) is not a refusal and is tried again, but a close
+    failing in a row any way for `CLOSE_GIVE_UP_AFTER` (120 s) is given
+    up the same way (`close_failing_since`): before, one such close held
+    the queue 8 min (23 Nov, lamp-ee17, `daemon_unreachable` then
+    `working`).
 - **A failed launch, at once (#8062: Harness 0.6.74's openharness#4499, carried by the 0.6.75 pin).**
   `harness wait` exits 1 when a launch on this machine failed (for example
   `OPENCLAW_NO_TOKEN`, or `FIRST_TASK_NOT_TAKEN` after 3 min), its row
