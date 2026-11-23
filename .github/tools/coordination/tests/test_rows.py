@@ -109,8 +109,35 @@ class Row(unittest.TestCase):
                      "ROW FAILED #8306 on lamp-52e6 build 15543"):
             self.assertEqual(rows([c("writer-a", body + J)], HEAD, W, "8306"), "none", body)
 
+    def test_a_verdict_first_line_s_own_word_decides_whatever_counts_follow(self):
+        # SubDarren's P2 on #8333: runners add per-leg counts after the verdict, so a PASS among them must not clear
+        # the FAIL or VOID the line opens with, and a FAIL among them must not sink the PASS it opens with.
+        for body in ("ROW FAIL: #8306 %s on lamp-52e6 build 15543, legs 1-3 PASS, leg 4 timed out" % HEAD,
+                     "ROW VOID: #8306 on lamp-52e6 build 15543 (leg A PASS, B not judged)",
+                     "ROW FAIL %s on lamp-52e6 build 15543, 2/3 PASS" % HEAD,
+                     "**ROW FAIL**: #8306 on lamp-52e6 build 15543, leg 1 PASS"):
+            self.assertEqual(rows([c("writer-a", body + J)], HEAD, W, "8306"), "none", body)
+        body = "ROW PASS: #8306 %s on lamp-52e6 build 15543, leg 4 FAIL then PASS on its rerun" % HEAD + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8306"), "row")
+
+    def test_a_verdict_first_number_is_this_pr_s_whole_number(self):
+        # SubDarren's P3 on #8333: pins the (?!\d) guards, after the verdict and after "via".
+        for body in ("ROW PASS: #83061 %s on lamp-52e6 build 15543" % HEAD,
+                     "ROW #8294 via #83061 (head %s) on lamp-52e6 build 15543: PASS" % HEAD[:10]):
+            self.assertEqual(rows([c("writer-a", body + J)], HEAD, W, "8306"), "none", body)
+
+    def test_another_pr_s_numberless_row_can_t_clear_a_mid_post_fail(self):
+        # The Reviewer-lead's P3 on #8333: line 1 is this PR's row line only when opens_row holds, heads and all, so
+        # "ROW PASS <another PR's sha>" above an unquoted "lamp row for #N …: FAIL" is no row.
+        body = ("ROW PASS %s, the earlier PR's run.\n\nlamp row for #8306 on lamp-52e6 build 15543: FAIL on leg 2" % OTHER) + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8306"), "none")
+
     def test_a_verdict_first_switch_on_row_at_another_patch_is_stale(self):
         body = "ROW PASS: #8306 %s on lamp-52e6 build 15543" % EARLIER + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8306", switch_on=True), "row-stale " + EARLIER[:10])
+        self.assertEqual(rows([c("writer-a", body)], [HEAD, EARLIER], W, "8306", switch_on=True), "row")
+        # The Reviewer-lead's P2 on #8333: Sixth's via shape names its head in brackets, "(head <sha>".
+        body = "ROW #8294 via #8306 (head %s, staged lamp-update) on lamp-52e6 build 15543: PASS" % EARLIER[:10] + J
         self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8306", switch_on=True), "row-stale " + EARLIER[:10])
         self.assertEqual(rows([c("writer-a", body)], [HEAD, EARLIER], W, "8306", switch_on=True), "row")
 
