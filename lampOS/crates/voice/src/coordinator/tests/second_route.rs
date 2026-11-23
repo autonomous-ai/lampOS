@@ -4917,6 +4917,19 @@ fn computers_turn_with_an_end(
     holds: bool,
     other_id: bool,
 ) -> (Run, Vec<crate::say::Answer>, Vec<crate::say::Answer>, bool) {
+    computers_turn_started_with(
+        holds,
+        other_id,
+        r#"{"skill":"control","turn":"start","expires_in_ms":60000}"#,
+    )
+}
+
+/// [`computers_turn_with_an_end`] with the turn's start line as given.
+fn computers_turn_started_with(
+    holds: bool,
+    other_id: bool,
+    start: &str,
+) -> (Run, Vec<crate::say::Answer>, Vec<crate::say::Answer>, bool) {
     // The thread is the whole voice's: hold it from the other tests that
     // read or reset it (`provider_worker::tests::one_thread`).
     let _thread = crate::provider_worker::tests::one_thread();
@@ -4925,9 +4938,7 @@ fn computers_turn_with_an_end(
     // A conversation another loop test left with the lamp would refuse
     // the turn: none goes on here.
     *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
-    let (says, line, answered) = crate::say::Says::line_for_test(
-        r#"{"skill":"control","turn":"start","expires_in_ms":60000}"#,
-    );
+    let (says, line, answered) = crate::say::Says::line_for_test(start);
     let ending = line.clone();
     let end_answered = std::rc::Rc::new(std::cell::RefCell::new(None));
     let kept = end_answered.clone();
@@ -5013,6 +5024,42 @@ fn a_line_in_a_computers_window_is_answered_on_the_second_route() {
             .iter()
             .all(|event| event["reason"] != "control_ended")
     );
+}
+
+/// `LAMP_SECOND_TURN_LANGUAGE`: the line a person begins in a computer's
+/// turn that asked for `multi` is sent to the second route with it, on
+/// its Start; with the switch off the ask is dropped and the Start is the
+/// lamp's own, as for a turn that asked for nothing.
+#[test]
+fn a_line_in_a_turn_that_asked_for_a_language_carries_it_only_with_the_switch_on() {
+    use crate::turn_language::TurnLanguage;
+    let _one = super::pilot_faults::one_session();
+    let asked = r#"{"skill":"control","turn":"start","expires_in_ms":60000,"language":"multi"}"#;
+    let plain = r#"{"skill":"control","turn":"start","expires_in_ms":60000}"#;
+    for (start, armed, expected) in [
+        (asked, true, Some(TurnLanguage::Multi)),
+        (asked, false, None),
+        (plain, true, None),
+    ] {
+        crate::turn_language::force_for_test(Some(armed));
+        let (run, _, _, _) = computers_turn_started_with(false, true, start);
+        crate::turn_language::force_for_test(None);
+        let languages: Vec<_> = run
+            .seen
+            .second
+            .iter()
+            .filter_map(|input| match input {
+                ProviderInput::Start { language, .. } => Some(*language),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            languages,
+            vec![expected],
+            "{start} armed {armed}: {}",
+            run.summary()
+        );
+    }
 }
 
 #[test]

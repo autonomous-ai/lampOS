@@ -396,6 +396,7 @@ async fn a_name_is_never_carried_across_sessions_or_a_stop() {
             over_the_lamps_voice: false,
             heard_of_cut: None,
             soft_lead_us: 0,
+            language: None,
         });
         engine.submit(audio_at(2, 3_000_000));
         engine.submit(ended(2, false));

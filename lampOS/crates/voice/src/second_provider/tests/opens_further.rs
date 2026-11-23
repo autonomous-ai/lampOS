@@ -33,6 +33,7 @@ async fn asked(on: bool, busy: bool, after_stop: bool, heard: &str) -> Vec<Messa
         over_the_lamps_voice: false,
         heard_of_cut: None,
         soft_lead_us: 0,
+        language: None,
     });
     engine.submit(audio(1, 1));
     engine.submit(end(1));

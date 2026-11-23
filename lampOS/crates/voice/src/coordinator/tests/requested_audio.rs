@@ -387,6 +387,7 @@ impl Test {
                 false,
                 None,
                 true,
+                None,
                 PlayoutStart::default(),
                 &mut self.trace,
                 |state| self.speaker.publish_speaker_snapshot(state),
@@ -1890,6 +1891,7 @@ fn an_accepted_offer_stays_bound_to_its_original_worker_session_and_privacy() {
         over_the_lamps_voice: false,
         heard_of_cut: None,
         soft_lead_us: 0,
+        language: None,
     }]);
     assert!(second::rebind(&replacement, test.reply.as_mut().unwrap(), &mut replay,).is_err());
     assert_eq!(

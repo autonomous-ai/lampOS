@@ -23817,6 +23817,7 @@ mod tests {
                     follows_on:false, over_the_lamps_voice:false,
                     heard_of_cut: None,
                     soft_lead_us: 0,
+                    language: None,
                 },
                 ProviderInput::Audio {
                     request, privacy_generation, sequence:1,
@@ -24218,6 +24219,7 @@ mod tests {
             over_the_lamps_voice: false,
             heard_of_cut: None,
             soft_lead_us: 0,
+            language: None,
         }
     }
 
@@ -24568,6 +24570,7 @@ mod tests {
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
                 soft_lead_us: 0,
+                language: None,
             });
             engine.submit(ProviderInput::End {
                 request,
@@ -24778,6 +24781,7 @@ mod tests {
             over_the_lamps_voice: false,
             heard_of_cut: None,
             soft_lead_us: 0,
+            language: None,
         };
         assert!(gate.admits(now_us, &start(first.turn())).unwrap());
         engine.submit(start(first.turn()));

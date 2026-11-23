@@ -239,6 +239,7 @@ async fn a_line_going_on_from_an_earlier_piece_is_not_rewritten() {
         over_the_lamps_voice: false,
         heard_of_cut: None,
         soft_lead_us: 0,
+        language: None,
     });
     engine.submit(audio(2, 1));
     engine.submit(end(2));
