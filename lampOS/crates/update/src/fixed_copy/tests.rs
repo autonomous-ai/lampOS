@@ -168,6 +168,27 @@ fn a_wrong_answer_or_none_leaves_everything_as_it_was() {
     }
 }
 
+/// #7402: a new copy that does not answer is named by its path, so a
+/// `No such file or directory` says which copy it was.
+#[test]
+fn a_new_copy_that_does_not_answer_is_named() {
+    let folder = folder();
+    let path = folder.path().join("lamp-update-back");
+    let candidate = beside(&path).unwrap();
+    let why = place(&path, b"new", None, &mut |_: &Path| {
+        Err("No such file or directory (os error 2)".to_owned())
+    })
+    .unwrap_err();
+    assert!(
+        why.contains(&format!(
+            "the new copy {} did not answer",
+            candidate.display()
+        )),
+        "{why}"
+    );
+    assert!(!candidate.exists());
+}
+
 #[test]
 fn a_link_or_folder_at_either_path_refuses_before_anything_is_written() {
     let folder = folder();

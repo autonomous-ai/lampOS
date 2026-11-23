@@ -78,7 +78,7 @@ impl Transport {
             // closed they reached no journal on lamp-4ace (2026-10-16).
             .stderr(Stdio::inherit())
             .process_group(0);
-        let child = command.spawn()?;
+        let child = crate::process::spawn_named(&mut command)?;
         Ok(Self {
             socket: parent,
             child: Some(child),
@@ -854,6 +854,22 @@ mod tests {
         drop(first);
         let second = when_free(|| acquire_claim(&scratch.claim())).unwrap();
         assert_eq!(second.metadata().unwrap().ino(), metadata.ino());
+    }
+
+    /// #7402: the schedule consumer's start, its program missing, names it,
+    /// the kind kept: a bare `os error 2` did not say which was missing.
+    #[test]
+    fn a_consumer_spawn_of_a_missing_program_names_it() {
+        let error = Transport::spawn(Path::new("/nonexistent/lamp-voice-7402"))
+            .err()
+            .expect("a missing program is not started");
+        assert_eq!(error.kind(), io::ErrorKind::NotFound);
+        assert!(
+            error
+                .to_string()
+                .starts_with("spawn /nonexistent/lamp-voice-7402: "),
+            "{error}"
+        );
     }
 
     fn subprocess(scratch: &Scratch, mode: &str) -> Transport {

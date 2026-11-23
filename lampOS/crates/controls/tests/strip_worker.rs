@@ -207,6 +207,24 @@ fn failed_spawn_cleans_only_its_socket_and_does_not_remove_foreign_files() {
     );
 }
 
+/// #7402: a strip worker whose program is missing names it, its kind kept:
+/// a bare `No such file or directory (os error 2)` did not say which.
+#[test]
+fn a_strip_worker_spawn_of_a_missing_program_names_it() {
+    let root = Root::new();
+    let missing = root.0.join("missing-executable");
+    let error = Worker::spawn(Command::new(&missing), &root.0, "clock", "session", 1)
+        .err()
+        .expect("a missing program is not started");
+    assert_eq!(error.kind(), io::ErrorKind::NotFound);
+    assert!(
+        error
+            .to_string()
+            .starts_with(&format!("spawn {}: ", missing.display())),
+        "{error}"
+    );
+}
+
 #[test]
 fn an_existing_socket_path_is_never_unlinked_by_a_second_worker() {
     let root = Root::new();

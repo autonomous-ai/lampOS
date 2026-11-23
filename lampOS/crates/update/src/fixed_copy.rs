@@ -130,7 +130,8 @@ pub fn place(
         Err(why) => {
             remove(&candidate);
             return Err(format!(
-                "the new copy did not answer ({why}): nothing was replaced"
+                "the new copy {} did not answer ({why}): nothing was replaced",
+                candidate.display()
             ));
         }
     }

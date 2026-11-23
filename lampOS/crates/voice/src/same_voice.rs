@@ -439,7 +439,7 @@ impl Prints {
 
     /// The child installed beside the running executable.
     pub fn beside_voice(model: PathBuf) -> io::Result<Self> {
-        let program = std::env::current_exe()?.with_file_name(EXECUTABLE);
+        let program = crate::process::own_binary()?.with_file_name(EXECUTABLE);
         Ok(Self::start(program, model))
     }
 }

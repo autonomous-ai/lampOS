@@ -10992,19 +10992,19 @@ fn run_pack(
         eprintln!("lamp-voice: a made skill was not checked: {why}");
         Refused::new(NOT_CHECKED)
     })?;
-    let mut child = Command::new(program)
+    let mut command = Command::new(program);
+    command
         .arg("pack")
         .arg("--out")
         .arg(out)
         .arg(folder)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(stderr)
-        .spawn()
-        .map_err(|why| {
-            eprintln!("lamp-voice: a made skill was not checked: {why}");
-            Refused::new(NOT_CHECKED)
-        })?;
+        .stderr(stderr);
+    let mut child = crate::process::spawn_named(&mut command).map_err(|why| {
+        eprintln!("lamp-voice: a made skill was not checked: {why}");
+        Refused::new(NOT_CHECKED)
+    })?;
     let began = Instant::now();
     let status = loop {
         match child.try_wait() {
