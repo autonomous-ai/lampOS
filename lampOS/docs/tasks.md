@@ -5898,8 +5898,13 @@ waiting after "I'll look into that":
   (`UPDATING_LINE`), and any other `error` (the Gateway down 6 min or
   more, opens failed past their tries, a lasting hold) "I'm having a
   problem right now; ask me again later." (`LATER_LINE`); both count for
-  "ready again". `starting` (with why `tasks_restarting` too) and
-  `recovering` get the problem line. Nothing is prepared, so no read-back and no "I'll
+  "ready again". A normal start, `starting` with why `gateway_starting`,
+  `session_starting` or `harness_starting` (a cold boot's Gateway takes
+  minutes), says the lamp's getting-ready line, "I'm still getting ready.
+  Give me a minute and ask me again." (`skill_words::NOT_READY_LINE`, the
+  line a skill run hears, #7351), never "a problem", and counts for "ready
+  again". `starting` with why `tasks_restarting` or none, and `recovering`,
+  get the problem line. Nothing is prepared, so no read-back and no "I'll
   look into that" comes first; the model says the line in the person's
   language. Work for a computer is never held to the lamp's readiness.
 - **A handed-over task that fails is told as not done.** `not_sent` with
