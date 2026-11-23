@@ -705,7 +705,9 @@ fn card(
     {
         let mut steps = entry.steps.clone();
         steps.sort_by_key(|(at, _)| *at);
-        let record = records.turns.iter().find(|turn| turn.turn == entry.request);
+        // A voice restart counts its turns from 1 again: a record joins
+        // only a card begun in its own session.
+        let record = records.record(entry.request, entry.start());
         let ended = entry.speech_ended();
         let heard = steps.iter().find_map(|(_, step)| match step {
             timeline::Step::Heard(kept) => Some(kept),

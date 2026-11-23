@@ -97,7 +97,13 @@ and an **END** line.
 
 `timeline::Timeline` is fed by the same watcher as `/bus`, from the request
 number `voice/heard`, `voice/turn` and `voice/said` share (the records'
-`turn` is the same number):
+`turn` is the same number). A voice restart is a new session that counts
+from 1 again, so a record joins a card only when the card began after the
+records' session did (`turns::Snapshot::record`): when its folder was made,
+or, where the filesystem does not say, about when peek first saw a session
+that followed another. Until peek's next read sees the new session, a new
+card can still meet the old session's record of its number, for at most a
+second.
 
 - **heard**: `voice/heard`, finished, with a request number; the end of
   speech is its bus time. A turn the lamp began itself has no heard, and
@@ -759,6 +765,10 @@ own, and asks for it over HTTP:
   and `turns::tests::missing_and_failed_reads_are_distinct_from_an_empty_readable_session`:
   a denied new session keeps the old rows until recovery; missing, failed,
   and successfully empty reads stay distinct.
+- `a_record_joins_only_a_card_of_its_own_voice_session`: a card begun
+  before the records' session keeps its own timings and status (DONE, no
+  ERROR, no first audio) where the new session has a failed turn of its
+  number.
 - `turns::tests::a_segment_emptied_and_filled_again_is_read_from_its_start`
   and `turns::tests::segments_are_read_in_the_order_they_were_written`: a
   segment filled again past the last read's end is read from its start

@@ -12,6 +12,7 @@ use std::{
     fs,
     io::{self, Read, Seek, SeekFrom},
     path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 /// The most turns kept, newest first on the page.
@@ -59,9 +60,22 @@ pub enum ReadStatus {
 pub struct Snapshot {
     pub turns: Vec<Turn>,
     pub status: ReadStatus,
+    /// When the records' session began, ms since 1970, when known: the
+    /// voice counts its turns again from 1 in each session, so a turn
+    /// begun before it is another session's of the same number.
+    pub since_unix_ms: Option<u64>,
 }
 
 impl Snapshot {
+    /// The record of the turn numbered `request` that began at `start`
+    /// (ms since 1970): none for a turn begun before the records' session.
+    pub fn record(&self, request: u64, start: u64) -> Option<&Turn> {
+        if self.since_unix_ms.is_some_and(|since| start < since) {
+            return None;
+        }
+        self.turns.iter().find(|turn| turn.turn == request)
+    }
+
     pub(crate) fn failed(mut self, why: ReadFailure) -> Self {
         self.status = if self.turns.is_empty() {
             ReadStatus::Unavailable(why)
@@ -188,6 +202,8 @@ pub struct Turns {
     status: ReadStatus,
     /// The session being read.
     session: Option<PathBuf>,
+    /// When it began, ms since 1970, when known.
+    since: Option<u64>,
     /// Each events file's bytes read so far.
     read: BTreeMap<PathBuf, u64>,
     /// A line not yet ended, by file.
@@ -203,6 +219,7 @@ impl Turns {
         Snapshot {
             turns: self.newest(),
             status: self.status,
+            since_unix_ms: self.since,
         }
     }
 
@@ -229,8 +246,18 @@ impl Turns {
         if self.session.as_ref() != Some(&newest) {
             // Keep the previous session's rows, marked stale, until a
             // complete first read of the new session is possible.
+            // It began when its folder was made; where the filesystem
+            // does not say, a session that follows another began about
+            // now, and the first one seen is taken as it always was.
+            let made = fs::metadata(&newest)
+                .and_then(|folder| folder.created())
+                .ok()
+                .or_else(|| self.session.is_some().then(SystemTime::now));
             let mut next = Self {
                 session: Some(newest.clone()),
+                since: made
+                    .and_then(|made| made.duration_since(UNIX_EPOCH).ok())
+                    .map(|since| u64::try_from(since.as_millis()).unwrap_or(u64::MAX)),
                 ..Self::default()
             };
             next.read_session(&newest)?;
@@ -548,6 +575,17 @@ mod tests {
         assert_eq!(snapshot.turns.len(), 1);
         assert_eq!(snapshot.turns[0].turn, 1);
         assert_eq!(snapshot.turns[0].first_audio_ms(), Some(197));
+        // The new session's records join only turns begun since it began.
+        let since = snapshot.since_unix_ms.expect("a following session's start");
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        // (macOS moves a folder's birth time back with its modified time,
+        // as set above, so only the order is asserted.)
+        assert!(since > 0 && since <= now, "{since} {now}");
+        assert!(snapshot.record(1, since).is_some());
+        assert!(snapshot.record(1, since - 1).is_none());
         fs::remove_dir_all(sessions).unwrap();
     }
 
