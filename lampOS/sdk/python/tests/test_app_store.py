@@ -414,3 +414,74 @@ def test_the_studio_answers_only_its_own_page(fake):
         assert _studio_call(studio, "api/me")[0] == 200
     finally:
         studio.close()
+
+
+# redirects and plain-http URLs (Migrate's HOLD on #8358)
+
+
+def _server(status: int, headers: dict[str, str], seen: list[dict]) -> ThreadingHTTPServer:
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def _handle(self):
+            seen.append(dict(self.headers))
+            body = json.dumps({"status": 1, "data": {"data": [], "total": 0}}).encode()
+            self.send_response(status)
+            for key, value in headers.items():
+                self.send_header(key, value)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        do_GET = do_POST = _handle
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+@pytest.mark.parametrize("status", [301, 302, 307, 308])
+def test_a_redirect_is_refused_and_the_token_goes_nowhere_else(status):
+    elsewhere_seen: list[dict] = []
+    elsewhere = _server(200, {}, elsewhere_seen)
+    other = f"http://127.0.0.1:{elsewhere.server_address[1]}/store/apps"
+    store_seen: list[dict] = []
+    redirecting = _server(status, {"Location": other}, store_seen)
+    base = f"http://127.0.0.1:{redirecting.server_address[1]}"
+    try:
+        store = stores.Store(TOKEN, where=stores.Endpoints(account=base + "/account", store=base + "/store"), timeout=5)
+        with pytest.raises(stores.StoreError) as raised:
+            store.apps()
+        assert raised.value.code == "store" and raised.value.status == status
+        assert raised.value.why == f"the Store answered HTTP {status}"
+        assert len(store_seen) == 1 and store_seen[0]["Authorization"] == f"Bearer {TOKEN}"
+        assert elsewhere_seen == [], "the redirect's target got no request"
+    finally:
+        for server in (elsewhere, redirecting):
+            server.shutdown()
+            server.server_close()
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["https://store.example.com/api", "http://localhost:8080/store", "http://127.0.0.1:9/store", "http://[::1]:9/store"],
+)
+def test_https_or_this_computer_is_taken(url, monkeypatch):
+    monkeypatch.setenv("LAMP_STORE_URL", url + "/")
+    monkeypatch.setenv("LAMP_ACCOUNT_URL", url)
+    assert stores.endpoints() == stores.Endpoints(account=url, store=url)
+
+
+@pytest.mark.parametrize("env", ["LAMP_STORE_URL", "LAMP_ACCOUNT_URL"])
+@pytest.mark.parametrize("url", ["http://store.example.com/api", "http://10.0.0.5/store", "ftp://store.example.com", "store.example.com"])
+def test_plain_http_elsewhere_is_refused_before_any_call(env, url, monkeypatch, fake):
+    monkeypatch.setenv(env, url)
+    with pytest.raises(stores.StoreError) as raised:
+        stores.endpoints()
+    assert raised.value.code == "bad_url" and env in str(raised.value) and "https://" in str(raised.value)
+    with pytest.raises(stores.StoreError):
+        stores.Store(TOKEN, where=stores.Endpoints(account=url, store=url))
+    monkeypatch.setenv("LAMP_STORE_TOKEN", TOKEN)
+    assert main(["app", "status"]) == 1
+    assert fake.requests == []

@@ -6,7 +6,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { StoreError, forgetToken, keptToken, requestPublic, sendLoginCode, signIn, submissions, submitApp } from '../src/index.js';
+import { StoreError, endpoints, forgetToken, keptToken, requestPublic, sendLoginCode, signIn, submissions, submitApp } from '../src/index.js';
 
 const OTP = '123456';
 const TOKEN = 'tok-dev-1';
@@ -132,5 +132,58 @@ test('with no sign-in, or a package that is plainly not an app, nothing is sent'
   await assert.rejects(submitApp(Buffer.from([0x1f, 0x8b, 0, 0]), opts), (e) => /gzip/.test(e.why));
   await assert.rejects(submitApp(APP, { ...opts, icon: png(512, 512) }), (e) => /512x512; the Store takes exactly 1024x1024/.test(e.why));
   await assert.rejects(submitApp(APP, { ...opts, title: 'x'.repeat(101) }), (e) => /title/.test(e.why));
+  assert.equal(fake.requests.length, 0);
+});
+
+// Redirects and plain-http URLs (Migrate's HOLD on #8358).
+async function listen(t, handler) {
+  const seen = [];
+  const server = createServer((req, res) => { seen.push(req.headers); handler(req, res); });
+  await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
+  t.after(() => server.close());
+  return { seen, base: `http://127.0.0.1:${server.address().port}` };
+}
+
+for (const status of [301, 302, 307, 308]) {
+  test(`a ${status} is refused and the token goes nowhere else`, async (t) => {
+    const elsewhere = await listen(t, (req, res) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"status":1,"data":{"data":[],"total":0}}'); });
+    const store = await listen(t, (req, res) => { res.writeHead(status, { Location: `${elsewhere.base}/store/apps` }); res.end(); });
+    const where = { account: `${store.base}/account`, store: `${store.base}/store` };
+    await assert.rejects(submissions(undefined, { where, token: TOKEN }), (e) => e instanceof StoreError && e.code === 'store' && e.why === 'the Store answered HTTP 3xx');
+    await assert.rejects(submitApp(APP, { where, token: TOKEN }), (e) => e instanceof StoreError && e.code === 'store');
+    assert.equal(store.seen.length, 2);
+    assert.equal(store.seen[0].authorization, `Bearer ${TOKEN}`);
+    assert.deepEqual(elsewhere.seen, [], "the redirect's target got no request");
+  });
+}
+
+test('https://, or http:// on this computer, is taken', (t) => {
+  const before = [process.env.LAMP_STORE_URL, process.env.LAMP_ACCOUNT_URL];
+  t.after(() => {
+    for (const [key, value] of [['LAMP_STORE_URL', before[0]], ['LAMP_ACCOUNT_URL', before[1]]]) if (value === undefined) delete process.env[key]; else process.env[key] = value;
+  });
+  for (const url of ['https://store.example.com/api', 'http://localhost:8080/store', 'http://127.0.0.1:9/store', 'http://[::1]:9/store']) {
+    process.env.LAMP_STORE_URL = `${url}/`;
+    process.env.LAMP_ACCOUNT_URL = url;
+    assert.deepEqual(endpoints(), { account: url, store: url });
+  }
+});
+
+test('plain http:// elsewhere is refused before any call', async (t) => {
+  const fake = await fakeStore(t);
+  const before = [process.env.LAMP_STORE_URL, process.env.LAMP_ACCOUNT_URL];
+  t.after(() => {
+    for (const [key, value] of [['LAMP_STORE_URL', before[0]], ['LAMP_ACCOUNT_URL', before[1]]]) if (value === undefined) delete process.env[key]; else process.env[key] = value;
+  });
+  for (const env of ['LAMP_STORE_URL', 'LAMP_ACCOUNT_URL']) {
+    for (const url of ['http://store.example.com/api', 'http://10.0.0.5/store', 'ftp://store.example.com', 'store.example.com']) {
+      delete process.env.LAMP_STORE_URL;
+      delete process.env.LAMP_ACCOUNT_URL;
+      process.env[env] = url;
+      assert.throws(() => endpoints(), (e) => e instanceof StoreError && e.code === 'bad_url' && e.why.includes(env) && e.why.includes('https://'));
+      await assert.rejects(submissions(undefined, { token: TOKEN }), (e) => e.code === 'bad_url');
+      await assert.rejects(submissions(undefined, { where: { account: url, store: url }, token: TOKEN }), (e) => e.code === 'bad_url');
+    }
+  }
   assert.equal(fake.requests.length, 0);
 });

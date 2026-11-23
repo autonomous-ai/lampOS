@@ -454,7 +454,10 @@ lamp app studio                     # the same, as a page on this computer
   reaches the browser, and it answers no other site's page.
 - **Another Store:** `--staging` for the staging Store and account, or
   `--store URL` and `--account URL` (`LAMP_STORE_URL`, `LAMP_ACCOUNT_URL`).
-  Every host, path and error code is in `lampos/store.py`'s constants.
+  Each must be `https://` (`http://` only for localhost, 127.0.0.1 or
+  [::1]), or `lamp` stops with a `bad_url` error before anything is sent. A
+  redirect is never followed, so the token goes nowhere else: a 3xx is a
+  `StoreError` with code `store`. Every host, path and error code is in `lampos/store.py`'s constants.
 
 In code: `lampos.app.check(path)`, `lampos.app.pack(folder)`, and
 `lampos.store.Store`: `send_code(email)`, `sign_in(email, code)`,
