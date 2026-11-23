@@ -236,9 +236,28 @@ against ElevenLabs' own service.
   `lamp-health` "your ElevenLabs key was refused, using the lamp's own".
 - **Off:** the kinds are "not on this lamp", the helper refuses, and the
   voice reads neither file, so the route is as it was.
+- **Test lamps only, `LAMP_OWN_ELEVENLABS_URL` (#8394's lamp row):** an
+  https address that takes the place of ElevenLabs' own API for the
+  person's key and voice, read in one place (`lamp_msgs::own_voice`) by
+  both the keys helper's unit and the voice's. It sends the person's key
+  to that address: never set on a customer's lamp. Set, the check is one
+  word said in that voice, `POST <root>/text-to-speech/<voice_id>/stream`
+  (the relay has no `/voices`: a 404 on 23 Nov), where `<root>` is the
+  address as the voice speaks to it (`/elevenlabs` added off ElevenLabs'
+  own hosts, after the `/v1` the company relay's `/ai` takes), and the
+  speech goes to the same address. The voice says one more line, "the
+  person's own voice goes to <host>, not ElevenLabs' own API
+  (LAMP_OWN_ELEVENLABS_URL, test lamps only)", the host alone. Unset,
+  empty or not https: ElevenLabs' own API, as above, byte for byte. With
+  the relay's address, key and voice it lets the lamp row run the person's
+  path through the relay with no key of anyone's.
 
 **Tests:** `crates/setup/src/keys.rs`
-(`the_elevenlabs_check_asks_for_the_voice_with_the_key_in_its_header`),
+(`the_elevenlabs_check_asks_for_the_voice_with_the_key_in_its_header`,
+`a_switched_check_asks_the_given_address_for_one_word_with_the_key`),
+`crates/msgs/src/own_voice.rs` (the switch, its check and its root),
+`crates/voice/src/second_provider/net/tts.rs`
+(`the_own_voice_check_root_is_where_the_voice_speaks`),
 `crates/setup/tests/it/keys.rs`
 (`elevenlabs_is_offered_beside_the_model_services`,
 `an_elevenlabs_key_and_voice_are_checked_kept_and_never_said`,
@@ -247,7 +266,8 @@ against ElevenLabs' own service.
 `crates/cloud/src/settings.rs`
 (`keys_line_passes_an_elevenlabs_key_and_voice_or_a_voice_alone`),
 `crates/voice/src/second_config.rs`
-(`the_persons_elevenlabs_key_and_voice_speak_in_place_of_the_lamps`) and
+(`the_persons_elevenlabs_key_and_voice_speak_in_place_of_the_lamps`,
+`a_test_lamps_switch_sends_the_persons_voice_to_its_address`) and
 `crates/voice/src/second_provider/net/tts.rs`
 (`a_refused_own_voice_falls_back_to_the_lamps_with_one_line`),
 `crates/voice/src/second_provider/probe.rs`

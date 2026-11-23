@@ -530,13 +530,26 @@ impl HttpCheck {
             Service::Deepgram => client
                 .get(&self.deepgram)
                 .header("authorization", format!("Token {}", given.key)),
-            Service::ElevenLabs => client
-                .get(format!(
-                    "{}/voices/{}",
-                    self.elevenlabs,
-                    given.voice_id.as_deref().unwrap_or_default()
-                ))
-                .header("xi-api-key", &given.key),
+            Service::ElevenLabs => {
+                let id = given.voice_id.as_deref().unwrap_or_default();
+                match &self.switched {
+                    None => client.get(format!("{}/voices/{id}", self.elevenlabs)),
+                    // A test lamp's address (lamp_msgs::own_voice): one
+                    // word said in that voice, as the speech will ask.
+                    Some(base) => {
+                        let (_, url) = lamp_msgs::own_voice::check(Some(base), id);
+                        let body = serde_json::json!({
+                            "text": "Hi.",
+                            "model_id": lamp_msgs::own_voice::CHECK_MODEL,
+                        });
+                        client
+                            .post(url)
+                            .header("content-type", "application/json")
+                            .body(body.to_string())
+                    }
+                }
+                .header("xi-api-key", &given.key)
+            }
         };
         // The error is dropped whole: reqwest's names the URL.
         let response = tokio::time::timeout(CHECK_WITHIN, request.send())
@@ -984,7 +997,11 @@ mod tests {
     /// 404 the voice ID, anything else is not reached.
     #[test]
     fn a_switched_check_asks_the_given_address_for_one_word_with_the_key() {
-        for (status, verdict) in [(200, Verdict::Works), (401, Verdict::Refused), (404, Verdict::VoiceRefused)] {
+        for (status, verdict) in [
+            (200, Verdict::Works),
+            (401, Verdict::Refused),
+            (404, Verdict::VoiceRefused),
+        ] {
             let (base, served) = answering(status);
             let voice = Given {
                 voice_id: Some("Voice8367".into()),

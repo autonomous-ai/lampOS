@@ -59,14 +59,11 @@ pub fn voice_told(provider: TtsProvider, voice: Option<&str>) -> &str {
     }
     name
 }
-const ELEVENLABS_HOSTS: &[&str] = &[
-    "api.elevenlabs.io",
-    "api.us.elevenlabs.io",
-    "api.eu.elevenlabs.io",
-];
 /// V1's curated ElevenLabs voices by name, so a V1 `tts_voice` works here;
 /// any other value is taken as a voice id. The first is the default.
 use lamp_msgs::chosen_voice::ELEVENLABS_VOICES;
+/// ElevenLabs' own hosts, one list with the keys helper's check (#8394).
+use lamp_msgs::own_voice::ELEVENLABS_HOSTS;
 
 /// One request's URL, key header and body.
 #[derive(Debug, PartialEq)]
