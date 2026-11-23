@@ -1809,6 +1809,10 @@ fn worker_command(
             role,
             var(crate::app_triggers::ENVIRONMENT).as_deref(),
         ))
+        .envs(app_tools_worker_environment(
+            role,
+            var(crate::app_tools::ENVIRONMENT).as_deref(),
+        ))
         .envs(make_skill_asked_worker_environment(
             role,
             var(crate::tools::make_skill_asked::ENVIRONMENT).as_deref(),
@@ -2970,6 +2974,17 @@ fn app_triggers_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::app_triggers::ENVIRONMENT, "on"))
+}
+
+// A running app's tools offered to the model (`app_tools::ENVIRONMENT`,
+// #8406): the exact `on`, to the second route, which declares its
+// functions at each request.
+fn app_tools_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::app_tools::ENVIRONMENT, "on"))
 }
 
 // A plain ask to make a skill calls make_skill (`tools::make_skill_asked`,
@@ -4505,6 +4520,13 @@ mod tests {
                         "LAMP_APP_TRIGGERS",
                         ["second"].as_slice(),
                     ),
+                    // A running app's tools offered to the model: the
+                    // second route alone (#8406).
+                    (
+                        app_tools_worker_environment,
+                        "LAMP_APP_TOOLS",
+                        ["second"].as_slice(),
+                    ),
                     // A plain ask to make a skill calls make_skill: the
                     // second route alone (#6835).
                     (
@@ -4829,6 +4851,7 @@ mod tests {
                     crate::history_send::ENVIRONMENT,
                     crate::did_ring::ENVIRONMENT,
                     crate::app_triggers::ENVIRONMENT,
+                    crate::app_tools::ENVIRONMENT,
                     crate::tools::make_skill_asked::ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
@@ -5166,6 +5189,7 @@ mod tests {
                     "LAMP_ACTION_CLAIM_DOING=on",
                     "LAMP_ACTION_CLAIM_WORDED=on",
                     "LAMP_ANSWER_ASK_AGAIN=on",
+                    "LAMP_APP_TOOLS=on",
                     "LAMP_APP_TRIGGERS=on",
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_BUSY_CALLED_STRICT=on",

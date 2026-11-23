@@ -51,6 +51,7 @@ pub mod air_told;
 pub mod app_context;
 pub mod app_make;
 pub mod app_remember;
+pub mod app_tools;
 pub mod app_triggers;
 pub mod asker_first;
 pub mod attention;

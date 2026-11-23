@@ -8911,6 +8911,27 @@ Not shown on the host: the real second worker behind the switch (the
 tests' second route is a peer). On a lamp: a switch mid-line and Gemini's
 return, and the latency targets, which lamp-52e6 did not meet (above).
 
+## An installed app's tools (#8406, `LAMP_APP_TOOLS`, off)
+
+The voice's side of #8406's design (`docs/app-tools.md`), on the second route only
+(its functions are declared at each request; Live's are fixed when its
+session opens). lamp-control lists each running app's checked tools on
+`apps/tools`; `crate::app_tools` holds them to the Store's checks again
+(`lamp_msgs::AppTools::check`) and, on the owner's turn only, tells the
+model a section of their own in the turn's notes (at most 1,536 bytes of
+lines, `SECTION_MOST_BYTES`; the app running longest kept whole) and
+declares each tool as `<app>_<tool>` with its schema. A call is checked
+against the schema in code, sent as `AppCall` on `apps/call` and answered
+from `AppCalled` on `apps/called` within 5 s, off the runtime's thread; the
+result goes back tidied, inside the app's frame, as data. The turn after a
+result declares that app's functions alone. A guest's or the room's turn, a
+private lamp, the care hold or a care turn, a line let in only as the
+conversation going on, or an answer awaited: nothing offered or sent, and
+the call is told `not now: nothing was done`. The thread keeps the call by
+its name and outcome only, and the exchange stays out of memory. Tools in
+the file's `outside` list are not offered in this build. Off: nothing
+changes ([switches.md](switches.md)).
+
 ## An installed app's spoken trigger (#7415 pieces 6 and 3b-2b, `LAMP_APP_TRIGGERS`, on in the product)
 
 A final line, heard clear of the lamp's voice and not let in only as the conversation going on (`CONVERSATION_ALONE`; the caller's own `FOLLOW_UP_NOTE` follow-up counts), and not while the lamp waits on an answer (a task read back, a write or skill say-back, a held forget or rename) or another person's cut words are kept for it, that **is** a trigger of a running app (the manifest's `triggers`, which lamp-control keeps on `apps/triggers`) is told to lamp-control on `apps/trigger` (the manifest's own trigger words, never the line around them) and held up to 3 s for `apps/took` (`app_triggers::told_and_taken`). "Is" means the whole line, once normalised: case, punctuation and apostrophes out, the trigger's words heard run together or apart, and the lamp's own name at the line's start left off (`attention::past_the_name`, the attention rule's own reading of the name). There is **no list of polite words** (the owner's 13 Nov rule: the model judges meaning, with no word lists; the first builder at 19:49 on #7415): "please start english practice", "hey lamp, start english practice" and "Lamp ơi, bắt đầu tập nhé" are no fast path. A trigger made only of the lamp's own words ("yes go ahead", "send it now") is never matched, nor offered. When the app takes the line the request ends in code as a normal end does (nothing of it carried), with no chat round and no words from the lamp (the app speaks for itself); a line nothing takes goes to the model as any other.

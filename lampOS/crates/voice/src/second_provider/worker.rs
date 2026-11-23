@@ -2051,6 +2051,21 @@ fn with_app_start(
     })
 }
 
+/// Spoken turns are offered the running apps' tools, on a turn whose notes
+/// offered them (`app_tools::notes_for`), asked at each chat request so an
+/// app that stops is never offered (#8406).
+fn with_app_tools(
+    declare: crate::second_provider::net::Declare,
+) -> crate::second_provider::net::Declare {
+    Arc::new(move || {
+        crate::app_tools::declared(
+            declare(),
+            crate::second_provider::MAX_TOOLS,
+            crate::app_tools::now_ms(),
+        )
+    })
+}
+
 /// [`answered_here`] with the weather's call too when it is on: a lookup,
 /// never the lamp's action, so the Policy never holds it.
 pub(crate) fn answered_here_with_weather(
@@ -2909,6 +2924,12 @@ pub fn serve(
         spoken_declare
     };
     let spoken_declare = without_desk_offer_in_walk(spoken_declare);
+    // An installed app's tools (`LAMP_APP_TOOLS`, #8406), outermost: on the
+    // turn after an app's result only that app's are declared.
+    let spoken_declare = match files.bus_root.as_deref().and_then(crate::app_tools::start) {
+        Some(_) => with_app_tools(spoken_declare),
+        None => spoken_declare,
+    };
     // A few emotion tags, given to the voice only when it reads them
     // (ElevenLabs, with a model that reads them, the speech socket's too),
     // with `LAMP_SECOND_SPEECH_TAGS=on` (#2901).

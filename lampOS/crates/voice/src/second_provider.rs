@@ -528,6 +528,11 @@ pub(crate) fn without_kept_calls(history: &[Message]) -> Option<(Vec<Message>, u
 /// asks were told as words alone, the lamp's answer with no call).
 pub(crate) fn kept_args(name: &str, args: &serde_json::Value) -> Option<serde_json::Value> {
     let bare = || serde_json::Value::Object(serde_json::Map::new());
+    // An installed app's tool is kept by its name alone, never an argument
+    // (`LAMP_APP_TOOLS`, #8406: "a bad knee" never rides a later turn).
+    if crate::app_tools::is_app_function(name) {
+        return Some(bare());
+    }
     if args.as_object().is_none_or(serde_json::Map::is_empty) {
         return Some(bare());
     }
@@ -666,6 +671,11 @@ pub(crate) fn failed_then_note(names: &[&str]) -> String {
 /// [`SKILL_RAN_EARLIER`]; `None` for any other call, told the plain kept
 /// result.
 pub(crate) fn kept_result(name: &str, told: &serde_json::Value) -> Option<&'static str> {
+    // An installed app's tool: its outcome alone, never a word of the
+    // result (`LAMP_APP_TOOLS`, #8406).
+    if crate::app_tools::is_app_function(name) {
+        return Some(crate::app_tools::outcome(told));
+    }
     if name == crate::use_skill::NAME {
         return Some(SKILL_RAN_EARLIER);
     }
@@ -12938,6 +12948,29 @@ async fn spoken(
                 .filter(|_| known_in_view)
                 .and_then(|scope| scope.person()),
         ))
+        // An installed app's tools (`LAMP_APP_TOOLS`, #8406): their section,
+        // on the owner's turn by the same gate, never while private, in the
+        // care hold or for a line let in only as the conversation going on;
+        // this also marks the request the tools are offered on.
+        .chain(crate::app_tools::notes_for(
+            request,
+            crate::app_tools::now_ms(),
+            shared.private_now.load(Ordering::SeqCst),
+            shared
+                .care
+                .as_ref()
+                .is_some_and(|care| care.holds(Instant::now()) || care.is_turn(request)),
+            shared
+                .conversation_alone
+                .as_ref()
+                .and_then(|note| note(request))
+                == Some(worker::CONVERSATION_ALONE),
+            scope
+                .as_ref()
+                .and_then(crate::memory_scope::ScopeLease::scope)
+                .filter(|_| known_in_view)
+                .and_then(|scope| scope.person()),
+        ))
         .chain(records)
         .chain(read_ids)
         .chain(remembered)
@@ -22980,7 +23013,33 @@ async fn answer(
                         || lamp_awaits_an_answer(shared, request)
                         // A care turn (#7689 part 2): no app takes it.
                         || shared.care.as_ref().is_some_and(|care| care.is_turn(request)));
+                // An installed app's tool (`LAMP_APP_TOOLS`, #8406): refused,
+                // nothing sent, as `start_app` is for the same lines, and
+                // otherwise checked and told to the app off the runtime's
+                // thread, up to `app_tools::ANSWER_WITHIN`.
+                let app_tool = crate::app_tools::is_app_function(&call.name);
+                let app_tool_blocked = app_tool
+                    && (lamp_awaits_an_answer(shared, request)
+                        || shared.care.as_ref().is_some_and(|care| {
+                            care.is_turn(request) || care.holds(Instant::now())
+                        })
+                        || shared.private_now.load(Ordering::SeqCst));
                 let answering = async {
+                    if app_tool {
+                        let (function, args) = (call.name.clone(), call.args.clone());
+                        let told = tokio::task::spawn_blocking(move || {
+                            crate::app_tools::answer(
+                                request,
+                                &function,
+                                &args,
+                                app_tool_blocked,
+                                crate::app_tools::now_ms(),
+                            )
+                        })
+                        .await
+                        .unwrap_or_else(|_| crate::tools::unavailable());
+                        return crate::tools::ToolAnswer::plain(told);
+                    }
                     if app_start_blocked {
                         eprintln!(
                             "lamp-voice second: request {request}: start_app refused: the line is not plainly for the lamp, an answer is awaited, or it is a care turn ({})",
