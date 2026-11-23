@@ -1,0 +1,3 @@
+owner: twelve; shared with thirteen and subdarren (the manager schedules it; hold `lamp-lock.sh lamp-ee17` for every action, reads included; volume at most 40, lamp-cloud stays on, no factory reset, everything put back after each test)
+runs: lampOS stable build 15545 (lamp-tasks b93a1471, lamp-control 90113e0c, lamp-skills 801ad295, lamp-voice fd7d0352), read by twelve on 2026-11-23 10:29 +07 under the lock; product units lamp-voice, lamp-tasks, lamp-update and lamp-cloud active; default engine OpenClaw (engine-default.json set by twelve at 10:18, as the app's choice)
+since: 2026-11-23 08:5x +07, in place of lamp-c0a4 (retired by its person), from twelve/lamp-ee17
