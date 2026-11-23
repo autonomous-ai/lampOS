@@ -3210,21 +3210,17 @@ pub(crate) fn sounds_like_the_name(word: &str) -> bool {
 }
 
 /// What French speech to text (Deepgram, `language=fr`) writes for "Hey
-/// Lamp," or "Hé lampe," at a line's start, with how it counts in
-/// [`named_near`] (#8381). On lamp-e82d on 23 Nov (#8387's check, build
-/// 15677) "Hey Lamp, quelle heure est-il ?" and "Hé lampe, quel temps fait-il
-/// aujourd'hui ?" both came back as "Et non, …", so no call sign was
-/// written. "Et non", "Hé non" and "Eh non" are everyday French ("Et non,
-/// je ne viens pas."): like a name's shape, they count only with a face
-/// turned to the lamp as well as lamp-name's near hearing. "Et lampe" is
-/// said by nobody, so like the words heard for the name in English it needs
-/// the near hearing only. "Hey Lamp," and "Hé lampe," themselves are read
-/// as written already (`attention::written`), so they are not here.
-pub(crate) const FRENCH_HEARD_FOR_THE_NAME: [(&str, LikeTheName); 4] = [
+/// Lamp," at a line's start, with how it counts in [`named_near`] (#8381).
+/// The call in French is "Hey Lamp", as in English (the owner, 23 Nov):
+/// "lampe" is never the name. On lamp-e82d on 23 Nov (#8387's check, build
+/// 15677) "Hey Lamp, quelle heure est-il ?" came back as "Et non, …", so no
+/// call sign was written. "Et non", "Hé non" and "Eh non" are everyday
+/// French ("Et non, je ne viens pas."): like a name's shape, they count only
+/// with a face turned to the lamp as well as lamp-name's near hearing.
+pub(crate) const FRENCH_HEARD_FOR_THE_NAME: [(&str, LikeTheName); 3] = [
     ("et non", LikeTheName::Shape),
     ("hé non", LikeTheName::Shape),
     ("eh non", LikeTheName::Shape),
-    ("et lampe", LikeTheName::AsHeard),
 ];
 
 /// Where a line's opening on [`FRENCH_HEARD_FOR_THE_NAME`] lies, with how
