@@ -61,11 +61,6 @@ RestartSec=5s
 # nowhere. A stop removes it, by root (the `+`: outside this unit's sandbox), and a missing file is no error. A start with
 # the switch on makes it again.
 ExecStopPost=-+/usr/bin/rm -f /run/lampos-agent/agent.sock
-# OpenClaw's gateway is PartOf= this unit (#8320: its namespace binds this socket file once, at its start), so each start
-# here starts it again, which spends one of its own StartLimitBurst=5 starts per 600 s: a crash loop here would leave it
-# failed (start-limit-hit) after this unit is up again. Each start here gives its count back first, by root (the `+`),
-# before the gateway's start (it is After= this unit). No gateway (a lamp without OpenClaw) is no error.
-ExecStartPost=-+/bin/sh -c '/usr/bin/systemctl reset-failed lamp-openclaw-gateway.service 2>/dev/null'
 StandardInput=null
 StandardOutput=journal
 StandardError=journal
