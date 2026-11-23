@@ -3831,6 +3831,40 @@ fn fold_joints<P: PortIo, R: Runtime>(
     outcome
 }
 
+/// After a start's recovery stopped and its hold where the joints lie was
+/// refused (an arm joint farther than `ARM_GOAL_STEP` from its last goal):
+/// walk each arm goal from the one last written to where its joint lies,
+/// a step a write, so no servo is left pushing at a goal it cannot reach.
+/// Whether the arm's goals ended where it lies.
+fn stop_pushing<P: PortIo, R: Runtime>(
+    bus: &mut Bus<'_, P, R>,
+    report: &mut BodyReport,
+    hold: [u16; 3],
+    arm: [u16; 2],
+) -> bool {
+    // 4,095 counts at 50 a step.
+    for _ in 0..82 {
+        let from: [u16; 2] =
+            std::array::from_fn(|index| bus.goals[ARM[index].index()].unwrap_or(arm[index]));
+        if from == arm {
+            return true;
+        }
+        let step: [u16; 2] = std::array::from_fn(|index| {
+            if arm[index] >= from[index] {
+                from[index].saturating_add(ARM_GOAL_STEP).min(arm[index])
+            } else {
+                from[index].saturating_sub(ARM_GOAL_STEP).max(arm[index])
+            }
+        });
+        if bus.send_holds_where_they_are(hold, step).is_err() {
+            bus.refused = None;
+            return false;
+        }
+        report.goal_writes += 1;
+    }
+    false
+}
+
 /// The shoulder or the elbow, as the journal and a stop name it.
 fn arm_part(joint: Joint) -> &'static str {
     if joint == Joint::BasePitch {
@@ -6265,69 +6299,104 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                             bus.refused = None;
                         }
                     }
-                    // An arm joint stopped short of folded (#2940): with
-                    // `--refused-let-go` a hand can fold it, so the lamp is
-                    // let go and waits for that, the head judged again when
-                    // it starts. Only an arm resting near folded (#5693,
-                    // `ARM_LET_GO_NEAR`): farther up, let go it would fall.
-                    // Anything else ends the run held where it is.
-                    let short = match stop {
-                        Stop::Tracking { joint, .. } => {
-                            ARM.into_iter().find(|arm| arm.id() == joint)
-                        }
-                        _ => None,
-                    };
+                    // An arm joint that met its rest (a factory lamp, 23 Nov):
+                    // the fold stopped on the load of a joint it was
+                    // folding, with the arm down (`ARM_LET_GO_NEAR`). The
+                    // arm is folded: nothing is under it to fall to, and
+                    // it no longer pushes. The lamp wakes and may stand.
                     let near_folded = report.last.is_some_and(|last| {
                         arm_rests(ARM.map(|joint| last[joint.index()].position), up.folded)
                     });
-                    if limits.refused_let_go
-                        && near_folded
-                        && let Some(joint) = short
-                    {
-                        // Only the arm is let go: it rests folded by its
-                        // own weight, and the head, held where it was, is
-                        // judged by the run's bounds while it waits
-                        // (#2938; the Reviewer-lead's P3 on #3168).
+                    let met_rest = match stop {
+                        Stop::Load { joint, .. } => ARM
+                            .into_iter()
+                            .find(|arm| arm.id() == joint)
+                            .filter(|arm| fold.joints.contains(arm)),
+                        _ => None,
+                    };
+                    if let (true, Some(joint), Some(last)) = (near_folded, met_rest, report.last) {
+                        // Not left pushing at a goal under its rest
+                        // (a factory lamp's elbow pressed there at a load of
+                        // 252, heating, its hold refused as 61 counts from
+                        // its last goal): the arm's goals are walked to
+                        // where it lies, a step a write.
+                        let at = |joint: Joint| last[joint.index()].position;
+                        let hold = COMMANDED.map(at);
+                        if stop_pushing(bus, &mut report, hold, ARM.map(at)) {
+                            report.held_at = Some(hold);
+                        }
+                        eprintln!(
+                            "lamp-body: the {} met its rest at {}, {} from folded: the arm is folded there",
+                            arm_part(joint),
+                            last[joint.index()].position,
+                            last[joint.index()]
+                                .position
+                                .abs_diff(up.folded[usize::from(joint == Joint::ElbowPitch)]),
+                        );
+                        found = last;
+                        folded_pose = Some(COMMANDED.map(|joint| found[joint.index()].position));
+                    } else {
+                        // An arm joint stopped short of folded (#2940): with
+                        // `--refused-let-go` a hand can fold it, so the lamp is
+                        // let go and waits for that, the head judged again when
+                        // it starts. Only an arm resting near folded (#5693,
+                        // `ARM_LET_GO_NEAR`): farther up, let go it would fall.
+                        // Anything else ends the run held where it is.
+                        let short = match stop {
+                            Stop::Tracking { joint, .. } => {
+                                ARM.into_iter().find(|arm| arm.id() == joint)
+                            }
+                            _ => None,
+                        };
+                        if limits.refused_let_go
+                            && near_folded
+                            && let Some(joint) = short
+                        {
+                            // Only the arm is let go: it rests folded by its
+                            // own weight, and the head, held where it was, is
+                            // judged by the run's bounds while it waits
+                            // (#2938; the Reviewer-lead's P3 on #3168).
+                            report.pose_wait = Some(PoseWait {
+                                ranges: [(0, 4_095); 3],
+                                joints: ARM.to_vec(),
+                                say: ARM_FOLD,
+                                arm: Some(up.folded),
+                                follow_arm: false,
+                                follow_force: None,
+                            });
+                            bus.after_arm_wait = true;
+                            report.stop = refused(format!(
+                                "the {} stopped short of folded while lowered: {stop:?}",
+                                arm_part(joint)
+                            ));
+                            return report;
+                        }
+                        // An arm that rests ends the run held, as before: the
+                        // restart is bounded by systemd and nothing is raised.
+                        if near_folded {
+                            report.kept_holding = true;
+                            report.stop = stop;
+                            return report;
+                        }
+                        // A raised arm, held where it stopped with torque on all
+                        // five: nothing falls. The run stays up and watches
+                        // (#5693, the Reviewer-lead on #6836: an exit would be
+                        // restarted into the same fold and die holding a raised
+                        // arm): it says so, gives way to a hand and follows it,
+                        // and starts again once the arm is folded and still.
                         report.pose_wait = Some(PoseWait {
                             ranges: [(0, 4_095); 3],
                             joints: ARM.to_vec(),
-                            say: ARM_FOLD,
+                            say: ARM_HELD,
                             arm: Some(up.folded),
-                            follow_arm: false,
-                            follow_force: None,
+                            follow_arm: true,
+                            follow_force: start_force,
                         });
                         bus.after_arm_wait = true;
-                        report.stop = refused(format!(
-                            "the {} stopped short of folded while lowered: {stop:?}",
-                            arm_part(joint)
-                        ));
-                        return report;
-                    }
-                    // An arm that rests ends the run held, as before: the
-                    // restart is bounded by systemd and nothing is raised.
-                    if near_folded {
                         report.kept_holding = true;
-                        report.stop = stop;
+                        report.stop = refused(format!("held where the fold stopped: {stop:?}"));
                         return report;
                     }
-                    // A raised arm, held where it stopped with torque on all
-                    // five: nothing falls. The run stays up and watches
-                    // (#5693, the Reviewer-lead on #6836: an exit would be
-                    // restarted into the same fold and die holding a raised
-                    // arm): it says so, gives way to a hand and follows it,
-                    // and starts again once the arm is folded and still.
-                    report.pose_wait = Some(PoseWait {
-                        ranges: [(0, 4_095); 3],
-                        joints: ARM.to_vec(),
-                        say: ARM_HELD,
-                        arm: Some(up.folded),
-                        follow_arm: true,
-                        follow_force: start_force,
-                    });
-                    bus.after_arm_wait = true;
-                    report.kept_holding = true;
-                    report.stop = refused(format!("held where the fold stopped: {stop:?}"));
-                    return report;
                 }
             }
             arm_profiles = match bus.arm_profiles() {
@@ -6402,10 +6471,22 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 // the joint is found; otherwise where it is. lamp-4ace's
                 // elbow register held 37,639 on 2026-10-17, and taken raw
                 // it was written as 4,095.
+                // Nor one the joint pushes at (over `STALL_LOAD`) from farther
+                // than a goal step (`ARM_GOAL_STEP`): a factory lamp's elbow lay
+                // on its rest 61 counts above the goal it held, at a load
+                // of 256, and that goal, taken as written, was then refused
+                // as a goal on every start (`Stop::Window`). A reading that
+                // far off with nothing pushing keeps the goal (a misread,
+                // #1192).
                 arm_written = std::array::from_fn(|index| {
                     let register = arm_profiles[index].3;
                     let at = found[ARM[index].index()].position;
-                    if register <= 4_095 && register.abs_diff(at) <= Standing::FOUND_SLACK {
+                    let pushes = found[ARM[index].index()].load > STALL_LOAD
+                        && register.abs_diff(at) > ARM_GOAL_STEP;
+                    if register <= 4_095
+                        && register.abs_diff(at) <= Standing::FOUND_SLACK
+                        && !pushes
+                    {
                         register
                     } else {
                         at
