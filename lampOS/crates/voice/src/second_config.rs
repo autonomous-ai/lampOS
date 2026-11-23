@@ -1804,6 +1804,67 @@ mod tests {
         );
     }
 
+    /// #8420: the person's own OpenRouter key and model, kept as
+    /// `openrouter.key` and `.model` (no endpoint: OpenRouter's is fixed),
+    /// speak the lamp's chat at OpenRouter's own API with their key and
+    /// model, over the relay it falls back to, said in one line by name and
+    /// model, never the key. Off, none of it is read.
+    #[test]
+    fn the_persons_openrouter_model_is_used_only_with_the_switch() {
+        let planted = "sk-or-planted-8420-0000000000000000";
+        let (_, config) = written("own-openrouter", "");
+        let mut relay = load_from_path(&config).unwrap();
+        relay.hosted.deepseek_base_url = Some("https://relay.example.invalid/deepseek".into());
+        let units = directory("own-openrouter-units");
+        let dir = Some(units.as_os_str());
+        private(&units.join("own_openrouter.key"), &format!("{planted}\n"));
+        private(&units.join("own_openrouter.model"), "openai/gpt-4o-mini\n");
+        // Off: as it was, byte for byte, and no line.
+        let (off, lines) = relay.clone().with_own_keys(false, dir);
+        assert_eq!(off, relay);
+        assert!(lines.is_empty());
+        // On.
+        let (own, lines) = relay.clone().with_own_keys(true, dir);
+        assert_eq!(
+            own.hosted.own_deepseek.as_ref().map(Key::expose),
+            Some(planted)
+        );
+        assert_eq!(
+            own.hosted.deepseek_base_url.as_deref(),
+            Some(OPENROUTER_BASE_URL)
+        );
+        assert_eq!(own.hosted.deepseek_model, "openai/gpt-4o-mini");
+        assert_eq!(
+            own.hosted.relay_deepseek_base_url.as_deref(),
+            Some("https://relay.example.invalid/deepseek")
+        );
+        assert_eq!(
+            own.hosted.lamps_own.as_deref(),
+            Some(&relay.hosted),
+            "the lamp's own kept for the search and the memory"
+        );
+        assert!(
+            lines.contains(
+                &"OpenRouter: the person's own key, model openai/gpt-4o-mini (LAMP_OWN_KEYS)"
+                    .to_owned()
+            ),
+            "{lines:?}"
+        );
+        assert!(!format!("{own:?}").contains(planted));
+        assert!(!lines.join(" ").contains(planted), "{lines:?}");
+        // A model's name that can't go in a request: passed over for the relay.
+        private(&units.join("own_openrouter.model"), "gpt 4; drop");
+        let (passed, lines) = relay.clone().with_own_keys(true, dir);
+        assert_eq!(passed.hosted, relay.hosted);
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.starts_with("OpenRouter: the relay")
+                    && line.contains("could not be read")),
+            "{lines:?}"
+        );
+    }
+
     /// #2094: the voice's drop-in turns the switch on and loads the keys'
     /// folder as `own`, so each file is the `own_<file>` read here, the
     /// files root's helper writes.

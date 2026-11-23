@@ -1514,7 +1514,7 @@ mod tests {
         let reply = changes.take()[0].reply(&identity, "t");
         assert_eq!(
             reply["error"],
-            "service must be deepseek, deepgram, elevenlabs or openai_compatible"
+            "service must be deepseek, deepgram, elevenlabs, openai_compatible or openrouter"
         );
         assert_eq!(
             reply["data"],
@@ -1586,6 +1586,29 @@ mod tests {
         assert_eq!(got["data"]["deepseek"], "lamp");
         helper.join().unwrap();
         let _ = std::fs::remove_file(&socket);
+    }
+
+    /// #8420: an OpenRouter key goes to the helper with its model, and any
+    /// endpoint sent with it too, for the helper to refuse: the helper alone
+    /// decides what a service takes.
+    #[test]
+    fn an_openrouter_key_goes_to_the_helper_with_its_model() {
+        let (line, id) = keys_line(
+            "keys.set",
+            &json!({"service": "openrouter", "key": "sk-or-planted-8420", "model": "openai/gpt-4o-mini", "request_id": "o1"}),
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&line).unwrap(),
+            json!({"set": "openrouter", "key": "sk-or-planted-8420", "model": "openai/gpt-4o-mini"})
+        );
+        assert_eq!(id.as_deref(), Some("o1"));
+        assert_eq!(
+            keys_line("keys.remove", &json!({"service": "openrouter"}))
+                .unwrap()
+                .0,
+            r#"{"remove":"openrouter"}"#
+        );
     }
 
     /// #8362 step 1b: an OpenAI-compatible key goes to the helper with its

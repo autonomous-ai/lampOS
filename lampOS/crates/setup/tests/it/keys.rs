@@ -50,11 +50,10 @@ fn a_key_absent_present_and_removed() {
     let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
     // With #8367's and #8362's fields beside today's (`offers` is pinned
     // below).
-    let none =
-        json!({"deepseek": null, "deepgram": null, "elevenlabs": null, "openai_compatible": null});
+    let none = json!({"deepseek": null, "deepgram": null, "elevenlabs": null, "openai_compatible": null, "openrouter": null});
     assert_eq!(
         reply,
-        json!({"done": {"deepseek": "lamp", "deepgram": "lamp", "elevenlabs": "lamp", "openai_compatible": "lamp", "since": none, "deepseek_host": null, "voice_id": {"elevenlabs": null}, "openai_compatible_host": null, "model": none, "checked": none, "in_use": {"model": null}, "offers": reply["done"]["offers"]}})
+        json!({"done": {"deepseek": "lamp", "deepgram": "lamp", "elevenlabs": "lamp", "openai_compatible": "lamp", "openrouter": "lamp", "since": none, "deepseek_host": null, "voice_id": {"elevenlabs": null}, "openai_compatible_host": null, "model": none, "checked": none, "in_use": {"model": null}, "offers": reply["done"]["offers"]}})
     );
     for service in ["deepseek", "deepgram"] {
         let (reply, done) = keys::answer(&set(service, ""), &store, &mut works, true);
@@ -469,6 +468,7 @@ fn elevenlabs_is_offered_beside_the_model_services() {
             {"service": "deepgram", "name": "Deepgram", "kind": "model", "models": [], "base_url": false, "fields": []},
             {"service": "elevenlabs", "name": "ElevenLabs", "kind": "voice", "models": [], "base_url": false, "fields": ["voice_id"]},
             {"service": "openai_compatible", "name": "OpenAI-compatible", "kind": "model", "models": [], "base_url": true, "fields": ["model"]},
+            {"service": "openrouter", "name": "OpenRouter", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://openrouter.ai/api/v1"},
         ])
     );
     assert_eq!(which["elevenlabs"], "lamp");
@@ -724,4 +724,138 @@ fn an_openai_compatible_key_needs_an_https_endpoint_and_a_model() {
         assert!(done.is_none(), "{line}");
     }
     assert!(!store.0.exists());
+}
+
+/// #8420: a person's own OpenRouter key and model, by name. `offers` gives
+/// OpenRouter's fixed endpoint for the app to show (`base_url: false`, so
+/// the key only ever goes to OpenRouter); an endpoint sent with it is
+/// refused before any check. Its key and model are kept as private files,
+/// `keys.get` names the model and `in_use.model`, and keeping it takes the
+/// other own models away.
+#[test]
+fn an_openrouter_model_is_kept_with_its_model_at_openrouters_own_endpoint() {
+    let store = Store(folder("openrouter"));
+    let mut works = Told(Verdict::Works, vec![]);
+    let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
+    let which = &reply["done"];
+    let offer = which["offers"]
+        .as_array()
+        .expect("offers")
+        .iter()
+        .find(|offer| offer["service"] == "openrouter")
+        .expect("openrouter offered")
+        .clone();
+    assert_eq!(
+        offer,
+        json!({"service": "openrouter", "name": "OpenRouter", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://openrouter.ai/api/v1"})
+    );
+    assert_eq!(which["openrouter"], "lamp");
+    assert_eq!(which["model"]["openrouter"], Value::Null);
+
+    // An endpoint of the person's, or no model: refused before any check,
+    // nothing of either said back.
+    for (line, words) in [
+        (
+            json!({"set": "openrouter", "key": PLANTED, "base_url": "https://elsewhere.invalid/v1", "model": "openai/gpt-4o-mini"}),
+            "OpenRouter takes no endpoint",
+        ),
+        (
+            json!({"set": "openrouter", "key": PLANTED}),
+            "an OpenRouter key needs its model",
+        ),
+        (
+            json!({"set": "openrouter", "key": PLANTED, "model": "gpt 4; drop"}),
+            "a model name is letters, digits, '-', '.', '_', '/' and ':'",
+        ),
+    ] {
+        let line = line.to_string();
+        let mut check = Told(Verdict::Works, vec![]);
+        let (reply, done) = keys::answer(&line, &store, &mut check, true);
+        assert_eq!(
+            reply,
+            json!({"refused": words, "code": "bad_field"}),
+            "{line}"
+        );
+        never_said(&reply, &done);
+        assert!(!reply.to_string().contains("elsewhere"), "{line}");
+        assert!(check.1.is_empty(), "{line}");
+    }
+    assert!(!store.0.exists());
+
+    // DeepSeek's own and an OpenAI-compatible one first, then OpenRouter's.
+    keys::answer(&set("deepseek", ""), &store, &mut works, true);
+    let compatible = json!({"set": "openai_compatible", "key": PLANTED, "base_url": "https://api.compatible.invalid/v1", "model": "grok-4"}).to_string();
+    keys::answer(&compatible, &store, &mut works, true);
+    let line =
+        json!({"set": "openrouter", "key": PLANTED, "model": "openai/gpt-4o-mini"}).to_string();
+    let (reply, done) = keys::answer(&line, &store, &mut works, true);
+    never_said(&reply, &done);
+    assert_eq!(reply["done"]["service"], "openrouter");
+    assert_eq!(reply["done"]["code"], "works");
+    let answer = reply["done"]["answer"].as_str().unwrap();
+    assert!(
+        answer.starts_with(
+            "that key works: your conversations now go to openrouter.ai with your key"
+        ),
+        "{answer}"
+    );
+    assert!(done.unwrap().restart_voice);
+    // The check went to OpenRouter's own endpoint, with the model.
+    let asked = works.1.last().unwrap();
+    assert_eq!(
+        asked.base_url.as_deref(),
+        Some("https://openrouter.ai/api/v1")
+    );
+    assert_eq!(asked.model.as_deref(), Some("openai/gpt-4o-mini"));
+    for file in ["openrouter.key", "openrouter.model", "openrouter.checked"] {
+        let mode = fs::metadata(store.0.join(file))
+            .unwrap_or_else(|error| panic!("{file}: {error}"))
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600, "{file}");
+    }
+    // No endpoint file: OpenRouter's is fixed.
+    assert!(!store.0.join("openrouter.url").exists());
+    // One own model at a time: the other two are gone, with their files.
+    for file in [
+        "deepseek.key",
+        "deepseek.url",
+        "openai_compatible.key",
+        "openai_compatible.url",
+        "openai_compatible.model",
+    ] {
+        assert!(!store.0.join(file).exists(), "{file}");
+    }
+    let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
+    let which = &reply["done"];
+    never_said(&reply, &None);
+    assert_eq!(which["openrouter"], "own");
+    assert_eq!(
+        (&which["deepseek"], &which["openai_compatible"]),
+        (&json!("lamp"), &json!("lamp"))
+    );
+    assert_eq!(which["model"]["openrouter"], "openai/gpt-4o-mini");
+    assert_eq!(which["checked"]["openrouter"], "works");
+    assert_eq!(which["in_use"], json!({"model": "openrouter"}));
+    // An OpenAI-compatible one over it takes OpenRouter's away in turn.
+    keys::answer(&compatible, &store, &mut works, true);
+    for file in ["openrouter.key", "openrouter.model", "openrouter.checked"] {
+        assert!(!store.0.join(file).exists(), "{file}");
+    }
+    let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
+    assert_eq!(
+        reply["done"]["in_use"],
+        json!({"model": "openai_compatible"})
+    );
+    // Removed: nothing of it left.
+    keys::answer(&line, &store, &mut works, true);
+    let (reply, done) = keys::answer(r#"{"remove":"openrouter"}"#, &store, &mut works, true);
+    assert_eq!(
+        reply,
+        json!({"done": {"service": "openrouter", "uses": "lamp"}})
+    );
+    assert!(done.unwrap().restart_voice);
+    for file in ["openrouter.key", "openrouter.model", "openrouter.checked"] {
+        assert!(!store.0.join(file).exists(), "{file}");
+    }
 }

@@ -844,6 +844,8 @@ fn a_leftover_temporary_key_is_removed() {
             // An OpenAI-compatible key's endpoint, model and last check
             // share its one too (#8362).
             tmp(&config.own_keys.join("openai_compatible.key")),
+            // OpenRouter's key and model (#8420).
+            tmp(&config.own_keys.join("openrouter.key")),
             tmp(&config.own_keys.join("deepseek.url")),
         ]
     );
