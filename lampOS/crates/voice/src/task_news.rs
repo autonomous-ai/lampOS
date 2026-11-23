@@ -84,6 +84,24 @@ const TOGETHER_TASK_CHARS: usize = 60;
 const TOGETHER_ANSWER_LEAST: usize = 120;
 /// Nothing said by or to the lamp for this long before news is told.
 pub const QUIET_US: u64 = 15_000_000;
+/// News of a task's agent that settled waits for a quiet moment at most
+/// this long from when it came in (#8240, the first builder's bar: the
+/// asker hears it within about a minute, and others' talk never holds it
+/// for good). Past it, it is told at the next pause of [`PAUSE_US`] in
+/// anyone's speech, a busy room no longer holds it, and never over the
+/// lamp's own words; a room still talking hears one short line first
+/// ([`News::short`]). Into a room where nobody was seen or heard since it
+/// came in, it still waits as before.
+pub const WAITS_AT_MOST: Duration = Duration::from_secs(60);
+/// A finished answer this short (in characters, whole) is one short line
+/// already: past [`WAITS_AT_MOST`] it is told as it is, with no short line
+/// first.
+pub const SHORT_FITS_CHARS: usize = 80;
+/// The short lines said to a room still talking past [`WAITS_AT_MOST`]:
+/// fixed, one for each kind of news, never the agent's answer.
+pub const SHORT_DONE: &str = "Excuse me: the work you handed over is done.";
+pub const SHORT_ASKING: &str = "Excuse me: the work you handed over needs your answer.";
+pub const SHORT_STOPPED: &str = "Excuse me: the work you handed over has stopped.";
 /// `on`: news is told at the first pause of [`PAUSE_US`] instead of after
 /// [`QUIET_US`] with no turn (#560). The first builder's bound (20:49 on
 /// #560): a person at the lamp who handed work to it hears the result
@@ -282,6 +300,11 @@ pub struct News {
     pub finished: Option<Finished>,
     /// The keys of the news told with this, in the same turn.
     pub also: Vec<String>,
+    /// For a task's agent that settled: the one short line said in its
+    /// place to a room still talking once it has waited [`WAITS_AT_MOST`]
+    /// (#8240), the whole news following when the person answers or asks;
+    /// none when the news fits one short line already, or for other news.
+    pub short: Option<String>,
 }
 
 impl News {
@@ -399,6 +422,65 @@ pub struct TaskNews {
     /// The newest news sent to the tasks part as begun ([`Self::begun`]),
     /// at most [`BEGUN_KEPT`]: each is sent once.
     begun: VecDeque<String>,
+    /// The news first in line and why it was last journaled as held
+    /// ([`Self::held`]): a hold is said once, and again only when its
+    /// reason changes.
+    held_said: Option<(String, &'static str)>,
+    /// News whose short line was said to a room still talking, by key,
+    /// with when (the voice's clock, µs): its whole news waits for the
+    /// person to answer or ask ([`Self::overdue`], #8240).
+    short_said: BTreeMap<String, u64>,
+}
+
+/// How news first in line that has waited [`WAITS_AT_MOST`] is told
+/// (#8240).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Overdue {
+    /// Its one short line, to a room still talking: the note.
+    Short(String),
+    /// The whole news, at the next pause.
+    Whole,
+}
+
+/// What the voice's loop found this tick of the gates news waits for
+/// (#8240): only for the journal, never to decide.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Gates {
+    /// A reminder is held for its moment.
+    pub reminder: bool,
+    /// The lamp's agent is still wording the news.
+    pub wording: bool,
+    /// Not quiet enough: someone spoke, or the lamp did, too lately.
+    pub not_quiet: bool,
+    /// Nobody seen at the lamp, nor heard lately.
+    pub nobody: bool,
+    /// People around the lamp talking to each other.
+    pub room_busy: bool,
+    /// The lamp is answering.
+    pub replying: bool,
+    /// A turn is open or still being sent.
+    pub turn_open: bool,
+    /// Listening not ready, or no session to speak in.
+    pub not_ready: bool,
+}
+
+impl Gates {
+    /// Why news is held, the first gate shut in the order the voice's loop
+    /// looks at them; `None` when all are open.
+    pub fn reason(self) -> Option<&'static str> {
+        [
+            (self.reminder, "reminder_waiting"),
+            (self.wording, "agent_wording"),
+            (self.not_quiet, "speech_not_paused"),
+            (self.nobody, "nobody_there"),
+            (self.room_busy, "room_busy"),
+            (self.replying, "lamp_replying"),
+            (self.turn_open, "turn_open"),
+            (self.not_ready, "not_ready"),
+        ]
+        .into_iter()
+        .find_map(|(shut, why)| shut.then_some(why))
+    }
 }
 
 /// How many keys of news begun [`TaskNews`] keeps, so that one is sent to
@@ -898,6 +980,8 @@ impl TaskNews {
             retell: retell_on(std::env::var(RETELL_ENVIRONMENT).ok().as_deref()),
             retelling: BTreeMap::new(),
             begun: VecDeque::new(),
+            held_said: None,
+            short_said: BTreeMap::new(),
         })
     }
 
@@ -1036,6 +1120,12 @@ impl TaskNews {
         }
     }
 
+    /// Whether any news waits, as the last [`Self::waiting`] left it, without
+    /// taking in what came since. Never blocks.
+    pub fn has_waiting(&self) -> bool {
+        !self.waiting.is_empty()
+    }
+
     /// The news waiting to be told, if any. Call every tick: it never blocks.
     pub fn waiting(&mut self) -> Option<&News> {
         while let Ok(news) = self.offered.try_recv() {
@@ -1073,9 +1163,12 @@ impl TaskNews {
                     .is_none_or(|of| still_current(status.as_ref(), of))
             });
         }
-        // Only what still waits keeps when it came in.
+        // Only what still waits keeps when it came in, and whether its
+        // short line was said.
         let waiting = &self.waiting;
         self.found
+            .retain(|key, _| waiting.iter().any(|news| news.key == *key));
+        self.short_said
             .retain(|key, _| waiting.iter().any(|news| news.key == *key));
         self.waiting.front()
     }
@@ -1088,6 +1181,14 @@ impl TaskNews {
     /// on #1667).
     pub fn found_at(&self, key: &str) -> Option<Instant> {
         self.found.get(key).copied()
+    }
+
+    /// Whether a sign-in's news waits, as [`Self::sign_in_first`] says,
+    /// without putting it first: for the journal's look at the gates.
+    pub fn sign_in_waits(&self) -> bool {
+        self.waiting
+            .iter()
+            .any(|news| crate::sign_in::is_news(&news.key))
     }
 
     /// Whether a sign-in's news waits (#2602, finding 4), put first if so:
@@ -1150,6 +1251,8 @@ impl TaskNews {
             retell: false,
             retelling: BTreeMap::new(),
             begun: VecDeque::new(),
+            held_said: None,
+            short_said: BTreeMap::new(),
         };
         (news, heard_out)
     }
@@ -1185,12 +1288,99 @@ impl TaskNews {
             _ => false,
         };
         let news = self.waiting.pop_front()?;
+        let landed = self.found.get(&news.key).copied();
         self.taken(&news.key);
+        self.held_said = None;
         if past || moved_on {
             return None;
         }
+        // One line a telling (#8240): its task and how long it waited since
+        // it came in, never what it says.
+        eprintln!(
+            "lamp-voice: task news told: task {}, {} ms after it landed",
+            news.task().map_or("?".into(), |task| task.to_string()),
+            landed.map_or("?".into(), |at| at.elapsed().as_millis().to_string())
+        );
         let _ = self.told.send(Wake::Told(news.key.clone()));
         Some(news)
+    }
+
+    /// Whether the news first in line has waited [`WAITS_AT_MOST`] since it
+    /// came in, and how it is told now (#8240): its short line first, if
+    /// it has one and none was said; after that the whole news only once
+    /// the person spoke to the lamp (`said_at_us`, the voice's clock)
+    /// since the short line. None for progress, for news told once more
+    /// (the person speaking always wins, #4342) and for news that has not
+    /// waited so long: those wait as before. Never blocks.
+    pub fn overdue(&self, said_at_us: Option<u64>) -> Option<Overdue> {
+        let front = self.waiting.front()?;
+        if front.progress.is_some() || self.retelling_first() {
+            return None;
+        }
+        if self.found.get(&front.key)?.elapsed() < WAITS_AT_MOST {
+            return None;
+        }
+        match (self.short_said.get(&front.key), &front.short) {
+            (Some(at), _) => said_at_us
+                .is_some_and(|said| said > *at)
+                .then_some(Overdue::Whole),
+            (None, Some(note)) => Some(Overdue::Short(note.clone())),
+            (None, None) => Some(Overdue::Whole),
+        }
+    }
+
+    /// When the news first in line came in, on the voice's clock (`now_us`
+    /// now), if it waits.
+    pub fn landed_us(&self, now_us: u64) -> Option<u64> {
+        let found = self.found.get(&self.waiting.front()?.key)?;
+        Some(now_us.saturating_sub(u64::try_from(found.elapsed().as_micros()).unwrap_or(u64::MAX)))
+    }
+
+    /// The short line of the news first in line was said at `now_us`
+    /// (#8240): it stays first in line, its whole news still to tell.
+    pub fn short_told(&mut self, now_us: u64) {
+        let Some(front) = self.waiting.front() else {
+            return;
+        };
+        eprintln!(
+            "lamp-voice: task news short line told: task {}, {} ms after it landed",
+            front.task().map_or("?".into(), |task| task.to_string()),
+            self.found
+                .get(&front.key)
+                .map_or("?".into(), |at| at.elapsed().as_millis().to_string())
+        );
+        self.short_said.insert(front.key.clone(), now_us);
+        self.held_said = None;
+    }
+
+    /// Journal why the news first in line is held this tick (#8240): once
+    /// for each reason it is held for, with its task and how long it has
+    /// waited since it came in; nothing while nothing waits or nothing
+    /// holds it. Never what it says. Changes nothing told.
+    pub fn held(&mut self, gates: Gates) {
+        let Some(front) = self.waiting.front() else {
+            self.held_said = None;
+            return;
+        };
+        let Some(why) = gates.reason() else {
+            self.held_said = None;
+            return;
+        };
+        if self
+            .held_said
+            .as_ref()
+            .is_some_and(|(key, said)| *key == front.key && *said == why)
+        {
+            return;
+        }
+        eprintln!(
+            "lamp-voice: task news held: task {}, {why}, {} ms since it landed",
+            front.task().map_or("?".into(), |task| task.to_string()),
+            self.found
+                .get(&front.key)
+                .map_or("?".into(), |at| at.elapsed().as_millis().to_string())
+        );
+        self.held_said = Some((front.key.clone(), why));
     }
 
     /// [`Self::tell`], with other tasks that finished told in the same
@@ -1358,6 +1548,7 @@ fn read_forever(
                 progress: None,
                 finished: None,
                 also: Vec::new(),
+                short: None,
             };
             if offer.send(news).is_err() {
                 return;
@@ -1542,6 +1733,7 @@ fn read_once_with(
                         progress: None,
                         finished: None,
                         also: Vec::new(),
+                        short: None,
                     });
                 }
             }
@@ -1564,6 +1756,7 @@ fn read_once_with(
                         progress: None,
                         finished: None,
                         also: Vec::new(),
+                        short: None,
                     });
                 }
                 continue;
@@ -1609,6 +1802,7 @@ fn read_once_with(
                         progress: None,
                         finished: None,
                         also: Vec::new(),
+                        short: None,
                     });
                 }
                 continue;
@@ -1673,6 +1867,7 @@ fn read_once_with(
                     progress: None,
                     finished,
                     also: Vec::new(),
+                    short: short_note(&data),
                 });
             }
         }
@@ -1918,6 +2113,41 @@ fn note_failed(
 
 /// News said unprompted, as the voice frames it: "(Nobody has spoken. "
 /// opens it, which `messages` reads, and ")" closes it.
+/// Whether anyone was at the lamp since news came in (`landed_us`, the
+/// voice's clock): seen there now (`present`), or heard speaking
+/// (`last_speech_us`) or speaking to it (`said_at_us`) since. News that has
+/// waited [`WAITS_AT_MOST`] into a room with nobody waits as before
+/// (#8240).
+pub fn someone_since(
+    landed_us: u64,
+    present: bool,
+    last_speech_us: u64,
+    said_at_us: Option<u64>,
+) -> bool {
+    present || last_speech_us >= landed_us || said_at_us.is_some_and(|at| at >= landed_us)
+}
+
+/// The note for the one short line said in place of a settled agent's
+/// news to a room still talking ([`WAITS_AT_MOST`], #8240): its fixed line
+/// for the agent's state; none when the news fits one short line already
+/// (an answer of at most [`SHORT_FITS_CHARS`], whole).
+fn short_note(data: &Value) -> Option<String> {
+    let answer = data["answer"].as_str().unwrap_or_default().trim();
+    let line = match data["state"].as_str()? {
+        "idle"
+            if answer.chars().count() <= SHORT_FITS_CHARS && data["truncated"] != json!(true) =>
+        {
+            return None;
+        }
+        "idle" => SHORT_DONE,
+        "needs-input" => SHORT_ASKING,
+        _ => SHORT_STOPPED,
+    };
+    Some(unprompted(&format!(
+        "People near you are still talking. Say only these words, once, and nothing more, then let them go on: \"{line}\""
+    )))
+}
+
 pub(crate) fn unprompted(words: &str) -> String {
     format!("(Nobody has spoken. {words})")
 }
@@ -2511,6 +2741,7 @@ impl ProgressReader {
             }),
             finished: None,
             also: Vec::new(),
+            short: None,
         })
     }
 }
@@ -4226,6 +4457,8 @@ mod tests {
             retell: false,
             retelling: BTreeMap::new(),
             begun: VecDeque::new(),
+            held_said: None,
+            short_said: BTreeMap::new(),
         };
         let soon = News {
             key: "s:3:progress-1".into(),
@@ -4234,6 +4467,7 @@ mod tests {
             progress: None,
             finished: None,
             also: Vec::new(),
+            short: None,
         };
         offer.send(soon.clone()).unwrap();
         assert_eq!(news.waiting(), Some(&soon));
@@ -4258,6 +4492,8 @@ mod tests {
             retell: false,
             retelling: BTreeMap::new(),
             begun: VecDeque::new(),
+            held_said: None,
+            short_said: BTreeMap::new(),
         };
         let waiting = |key: &str| News {
             key: key.into(),
@@ -4266,6 +4502,7 @@ mod tests {
             progress: None,
             finished: None,
             also: Vec::new(),
+            short: None,
         };
         for key in ["s:1:1", "s:2:1", "sign-in-3-asking"] {
             offer.send(waiting(key)).unwrap();
@@ -4296,6 +4533,8 @@ mod tests {
             retell: false,
             retelling: BTreeMap::new(),
             begun: VecDeque::new(),
+            held_said: None,
+            short_said: BTreeMap::new(),
         };
         assert!(news.waiting().is_none());
         let one = News {
@@ -4305,6 +4544,7 @@ mod tests {
             progress: None,
             finished: None,
             also: Vec::new(),
+            short: None,
         };
         offer.send(one.clone()).unwrap();
         offer.send(one.clone()).unwrap();
@@ -4320,6 +4560,7 @@ mod tests {
             progress: None,
             finished: None,
             also: Vec::new(),
+            short: None,
         };
         offer.send(two.clone()).unwrap();
         assert_eq!(news.waiting(), Some(&two));
@@ -4340,6 +4581,7 @@ mod tests {
             progress: None,
             finished: None,
             also: Vec::new(),
+            short: None,
         };
         let before = Instant::now();
         offer.send(one.clone()).unwrap();
@@ -4369,6 +4611,7 @@ mod tests {
                 progress: None,
                 finished: None,
                 also: Vec::new(),
+                short: None,
             }
             .task()
         };
@@ -4396,6 +4639,8 @@ mod tests {
             retell: false,
             retelling: BTreeMap::new(),
             begun: VecDeque::new(),
+            held_said: None,
+            short_said: BTreeMap::new(),
         };
         (news, offer, heard)
     }
@@ -4418,6 +4663,7 @@ mod tests {
             progress: None,
             finished: finished(&task, &data, 0),
             also: Vec::new(),
+            short: None,
         }
     }
 
@@ -5067,6 +5313,7 @@ mod tests {
             progress: None,
             finished: None,
             also: Vec::new(),
+            short: None,
         }
     }
 
@@ -5424,5 +5671,83 @@ mod tests {
             json!({"text":"Write a poem","target":{"engine":"openclaw"},"target_alias":"office"});
         assert!(!on_the_lamp(&office));
         assert_eq!(their_computer(&office), "their computer");
+    }
+
+    /// A settled agent's news for #8240's tests: `short` its short line.
+    fn settled_news(short: Option<&str>) -> News {
+        News {
+            key: "s1:2:4".into(),
+            note: "The whole news.".into(),
+            until: None,
+            progress: None,
+            finished: None,
+            also: Vec::new(),
+            short: short.map(str::to_owned),
+        }
+    }
+
+    /// #8240: news that waited less than [`WAITS_AT_MOST`] waits as before;
+    /// past it, a room still talking hears its short line first, and the
+    /// whole news only once the person spoke to the lamp after that line.
+    /// News with no short line is told whole; progress and news told once
+    /// more wait as before.
+    #[test]
+    fn news_past_its_wait_is_told_short_then_whole_once_the_person_speaks() {
+        let early =
+            TaskNews::waiting_for_test(settled_news(Some("short")), Duration::from_secs(59));
+        assert_eq!(early.overdue(None), None);
+        let mut late =
+            TaskNews::waiting_for_test(settled_news(Some("short")), Duration::from_secs(61));
+        assert_eq!(late.overdue(None), Some(Overdue::Short("short".into())));
+        late.short_told(1_000);
+        assert_eq!(
+            late.waiting().map(|news| news.key.clone()),
+            Some("s1:2:4".into())
+        );
+        assert_eq!(late.overdue(None), None, "the short line is said once");
+        assert_eq!(late.overdue(Some(900)), None, "spoken before it");
+        assert_eq!(late.overdue(Some(1_001)), Some(Overdue::Whole));
+        let fits = TaskNews::waiting_for_test(settled_news(None), Duration::from_secs(61));
+        assert_eq!(fits.overdue(None), Some(Overdue::Whole));
+        let mut progress = settled_news(Some("short"));
+        progress.progress = Some(ProgressOf {
+            store: "s1".into(),
+            task: 2,
+            change: 1,
+            run: 1,
+        });
+        assert_eq!(
+            TaskNews::waiting_for_test(progress, Duration::from_secs(61)).overdue(None),
+            None
+        );
+        let retold =
+            TaskNews::waiting_for_test(settled_news(Some("short")), Duration::from_secs(61))
+                .retelling_for_test(&["s1:2:4"]);
+        assert_eq!(retold.overdue(None), None);
+    }
+
+    /// #8240: past its wait, news goes only to a room someone was seen in
+    /// or heard in since it came in; an empty room waits as before.
+    #[test]
+    fn news_past_its_wait_never_goes_into_an_empty_room() {
+        assert!(!someone_since(10_000, false, 9_000, Some(8_000)));
+        assert!(someone_since(10_000, true, 0, None));
+        assert!(someone_since(10_000, false, 10_500, None));
+        assert!(someone_since(10_000, false, 0, Some(10_000)));
+    }
+
+    /// #8240: the short line is fixed for each kind of news, never the
+    /// agent's answer; an answer that fits one short line has none.
+    #[test]
+    fn the_short_line_is_fixed_for_its_kind_and_none_when_the_news_fits() {
+        let long = "word ".repeat(40);
+        let note =
+            |state: &str, answer: &str| short_note(&json!({"state": state, "answer": answer}));
+        assert!(note("needs-input", &long).unwrap().contains(SHORT_ASKING));
+        assert!(note("needs-input", "").unwrap().contains(SHORT_ASKING));
+        assert!(note("idle", &long).unwrap().contains(SHORT_DONE));
+        assert!(!note("idle", &long).unwrap().contains("word word"));
+        assert!(note("stopped", "").unwrap().contains(SHORT_STOPPED));
+        assert_eq!(note("idle", "Three names: Lumi, Sunny and Archie."), None);
     }
 }
