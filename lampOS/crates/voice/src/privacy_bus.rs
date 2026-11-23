@@ -2382,6 +2382,11 @@ pub(crate) mod tests {
         /// first fresh one after it.
         lapsed_us: Option<u64>,
         back_us: Option<u64>,
+        /// The longest gap between two of Controls' publishes in the run.
+        /// At [`PRIVACY_FRESH_US`] or more the runner was starved, and a
+        /// worker that read the reading stale faulted on the runner, not
+        /// on itself ([`ride_run`]).
+        longest_gap_us: u64,
     }
 
     impl Ridden {
@@ -2443,6 +2448,35 @@ pub(crate) mod tests {
     ///
     /// The run ends early if the worker ends.
     fn ride_run(
+        ride: bool,
+        lapse_done: impl Fn(&Ridden, u64) -> bool,
+        after: Option<bool>,
+        done: impl Fn(&Ridden, u64) -> bool,
+    ) -> Ridden {
+        // A whole-lib run starves this runner: Controls' 5 ms publishes
+        // came 50 ms or more apart, and the worker faulted the reading as
+        // stale ("publisher/clock/order changed", `publication`), 4 of
+        // 7809 failed on this Mac, each passing alone (P2, 23 Nov). Such a
+        // run is tried again on a new root, as the lease tests do
+        // ([`STALLED_ATTEMPTS`], [`after_a_stall`]); a fault with no
+        // starved gap fails as before.
+        let mut stalls = 0;
+        loop {
+            let ridden = ride_run_once(ride, &lapse_done, after, &done);
+            let starved = ridden.longest_gap_us >= PRIVACY_FRESH_US
+                && ridden
+                    .fault()
+                    .is_some_and(|(_, code)| code.contains("publisher/clock/order changed"));
+            stalls += 1;
+            if !starved || stalls >= STALLED_ATTEMPTS {
+                return ridden;
+            }
+            thread::sleep(after_a_stall(stalls));
+        }
+    }
+
+    /// One run of [`ride_run`].
+    fn ride_run_once(
         ride: bool,
         lapse_done: impl Fn(&Ridden, u64) -> bool,
         after: Option<bool>,
@@ -2514,9 +2548,12 @@ pub(crate) mod tests {
         };
         let (mut sequence, mut read) = (0, (started, 0));
         let mut phase = (1, started);
+        let mut published = started;
         loop {
             take(&mut voice, &mut lease, &mut ridden);
             let now = lamp_ipc::monotonic_us();
+            ridden.longest_gap_us = ridden.longest_gap_us.max(now.saturating_sub(published));
+            published = now;
             if worker.is_finished() || now.saturating_sub(phase.1) >= PHASE_MOST_US {
                 break;
             }
