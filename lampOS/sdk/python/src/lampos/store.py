@@ -96,14 +96,41 @@ class StoreError(LampError):
         self.status = status
 
 
+LOOPBACK = ("localhost", "127.0.0.1", "::1")
+
+
+def checked_url(url: str, what: str) -> str:
+    """`url` without a trailing slash, when it is https://, or http:// on
+    this computer (for tests); a StoreError before anything is sent
+    otherwise, since the account's token goes there."""
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme == "https" and parts.hostname:
+        return url.rstrip("/")
+    if parts.scheme == "http" and parts.hostname in LOOPBACK:
+        return url.rstrip("/")
+    raise StoreError(f"{what} {url!r}: the Store and the account take https:// only (http:// only for localhost)", code="bad_url")
+
+
 def endpoints(*, staging: bool = False, store: str | None = None, account: str | None = None) -> Endpoints:
     """Production by default; `staging`, then the URLs given or in
-    LAMP_STORE_URL and LAMP_ACCOUNT_URL, change it."""
+    LAMP_STORE_URL and LAMP_ACCOUNT_URL, change it. Each must be https://
+    (http:// only for localhost)."""
     base = STAGING if staging else PRODUCTION
     return Endpoints(
-        account=(account or os.environ.get(ENV_ACCOUNT) or base.account).rstrip("/"),
-        store=(store or os.environ.get(ENV_STORE) or base.store).rstrip("/"),
+        account=checked_url(account or os.environ.get(ENV_ACCOUNT) or base.account, ENV_ACCOUNT),
+        store=checked_url(store or os.environ.get(ENV_STORE) or base.store, ENV_STORE),
     )
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """The Store answers JSON and never redirects: a 3xx is refused, so the
+    bearer header never goes to another host."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
 
 
 def _token_path() -> Path:
@@ -201,7 +228,8 @@ class Store:
 
     def __init__(self, token: str | None = None, *, where: Endpoints | None = None, timeout: float = 120.0):
         self.token = token
-        self.where = where or endpoints()
+        where = where or endpoints()
+        self.where = Endpoints(account=checked_url(where.account, "the account URL"), store=checked_url(where.store, "the Store URL"))
         self.timeout = timeout
 
     @classmethod
@@ -224,9 +252,12 @@ class Store:
             headers["Authorization"] = f"Bearer {self.token}"
         request = urllib.request.Request(url, data=body, method=method, headers=headers)
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as answer:
+            with _OPENER.open(request, timeout=self.timeout) as answer:
                 status, text = answer.status, answer.read()
         except urllib.error.HTTPError as error:
+            if 300 <= error.code < 400:
+                error.close()
+                raise StoreError(f"the Store answered HTTP {error.code}", code="store", status=error.code) from None
             status, text = error.code, error.read()
         except (urllib.error.URLError, OSError) as error:
             reason = getattr(error, "reason", error)

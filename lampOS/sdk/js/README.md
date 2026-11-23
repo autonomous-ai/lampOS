@@ -477,7 +477,11 @@ await requestPublic(app.id);                       // only once approved; the re
   file `lamp login` writes, one per account host; `LAMP_STORE_TOKEN` or
   `{ token }` gives one instead. Production by default; `{ staging: true }`,
   or `{ store, account }` URLs (`LAMP_STORE_URL`, `LAMP_ACCOUNT_URL`), for
-  another. Every host, path and error code is in `src/store.js`.
+  another: each must be `https://` (`http://` only for localhost, 127.0.0.1
+  or [::1]), or a `StoreError` with code `bad_url` comes before anything is
+  sent. A redirect is never followed, so the token goes nowhere else: a 3xx
+  is a `StoreError` with code `store`. Every host, path and error code is in
+  `src/store.js`.
 - `submitApp` refuses here, before anything is sent: no sign-in, bytes that
   are not a format-2 package (a gzip, a skill), art that is not a PNG of
   exactly 1024x1024 (icon) or 1600x900 (cover) or is over 2 MB, a title over
