@@ -18,8 +18,11 @@ echo "BUILD $(build)"
 ES=/var/lib/lampos-tasks/store
 echo "ENGINE $(python3 -I -c 'import json,sys
 try: print(json.load(open(sys.argv[1])).get("engine") or "none")
-except FileNotFoundError: print("openclaw")
+except FileNotFoundError: print("absent")
 except Exception: print("unreadable")' $ES/engine-default.json)"
+# With no app choice the engine is lamp-tasks' own default for its target (hermes on a stable lamp, 23 Nov ee17),
+# never guessed: read the last line lamp-tasks wrote about it.
+echo "ENGINE_SAID $(journalctl -u lamp-tasks --no-pager -o cat -n 4000 2>/dev/null | sed -nE 's/.*(default engine chosen in the app|on its default engine), ([a-z]+).*/\2/p' | tail -1)"
 echo "ENGINE_FILE $([ -f $ES/engine-default.json ] && sha256sum $ES/engine-default.json | cut -c1-16 || echo absent)"
 echo "ENGINE_B64 $([ -f $ES/engine-default.json ] && base64 -w0 < $ES/engine-default.json || echo absent)"
 echo "KEPT_ENGINE $(python3 -I -c 'import json,sys
