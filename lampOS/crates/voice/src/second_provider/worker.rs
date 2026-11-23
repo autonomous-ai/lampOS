@@ -1292,6 +1292,7 @@ pub fn services(
                     match chat {
                         crate::second_config::OwnChat::OpenAiCompatible => "OpenAI-compatible",
                         crate::second_config::OwnChat::OpenRouter => "through OpenRouter",
+                        crate::second_config::OwnChat::Gemini => "through Gemini",
                     }
                 );
             } else {

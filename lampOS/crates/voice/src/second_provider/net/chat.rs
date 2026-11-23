@@ -2,7 +2,9 @@
 //! as it is written, then the tool calls the model asked for. The caller
 //! runs the tools and sends their results back as `tool` messages.
 use super::watch::{Opens, Watch};
-use super::{Error, Result, chat_client, chunk, fresh_client_watched, openai_base, post};
+use super::{
+    Error, Result, chat_client, chunk, fresh_client_watched, openai_base, post_reading_the_key,
+};
 use crate::second_config::SecondConfig;
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -313,6 +315,9 @@ pub struct Chat {
     /// Idle this long, a line's warm opens the connection ahead:
     /// [`WARM_AFTER`], or [`WARM_AFTER_KEPT`] with a kept client.
     warm_after: std::time::Duration,
+    /// Gemini's 400 for a bad key is [`Error::KeyInvalid`]: the person's
+    /// own Gemini alone (#8420).
+    key_400: bool,
 }
 
 /// A request's tools and first message, hashed: what has to stay the same
@@ -366,6 +371,14 @@ impl Chat {
         )?;
         chat.extra
             .insert("reasoning_effort".into(), json!(GEMINI_REASONING));
+        Ok(chat)
+    }
+
+    /// [`Self::gemini`] for the person's own key (#8420): a 400 for the key
+    /// itself is [`Error::KeyInvalid`], which falls back to the lamp's own.
+    pub fn gemini_own(base_url: &str, model: &str, key: &str, declare: Declare) -> Result<Self> {
+        let mut chat = Self::gemini(base_url, model, key, declare)?;
+        chat.key_400 = true;
         Ok(chat)
     }
 
@@ -523,6 +536,7 @@ impl Chat {
             opens,
             last_ended: LastEnded::default(),
             warm_after: if kept { WARM_AFTER_KEPT } else { WARM_AFTER },
+            key_400: false,
             url: format!("{}/chat/completions", openai_base(base_url)),
             auth: format!("Bearer {key}"),
             model: model.to_owned(),
@@ -704,11 +718,12 @@ impl Chat {
             .ok()
             .and_then(|mut last| if second { *last } else { last.replace(prefix) });
         let opened_before = opens.began();
-        let mut going = std::pin::pin!(post(
+        let mut going = std::pin::pin!(post_reading_the_key(
             client,
             &self.url,
             ("authorization", &self.auth),
-            &body
+            &body,
+            self.key_400,
         ));
         // One poll sets it going: there the client takes a kept connection, or
         // begins to open a new one. It says so for a request that never
@@ -1186,6 +1201,7 @@ impl Deltas {
 
 #[cfg(test)]
 mod tests {
+    use super::super::post;
     use super::*;
 
     /// #1712: as a line begins, a chat idle past `WARM_AFTER` opens its
