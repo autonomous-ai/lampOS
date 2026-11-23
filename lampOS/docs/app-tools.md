@@ -137,20 +137,36 @@ runs the same ones, and the voice runs the link's own again at each read):
   under the same plain-words rule. At most 6 properties; no nested objects
   or arrays in this version; no `$ref`, no `default`. A tool may take none.
 - **Grants:** a manifest with `tools` needs the `hear` grant, since a
-  call's arguments are made from what the person said.
+  call's arguments are made from what the person said. `hear` alone is not
+  enough for free text: today it means phrases, not the model's paraphrase
+  of a sentence. So a tool with any free-text field (a `string` with
+  `maxLength`, not an `enum`) is shown on the install page as "Lamp may pass
+  what you say to this app for: <tool>", one line per such tool, and the
+  owner's yes covers it. Enum, number and boolean fields need no such line
+  (Heron's read, 18:23 on #8406).
 - **Outside the lamp:** a tool that spends money, sends, posts, books or
   otherwise acts outside the lamp and the app's own data is named in a
   file-level `outside` list of tool names (a key of the file's own, as
   `body` and `core` are in the skills' file, so the entries stay plain
   `Tool`s), and the manifest must say `net: true`. The
-  reviewer refuses an app whose tool does that without being listed. See
-  "Rules" below.
+  reviewer refuses an app whose tool does that without being listed. Each
+  such tool also has a `confirm` line in a file-level `confirm` map (tool
+  name to line): at most 160 characters, held to the description's
+  plain-words rule and read by the Store's reviewer, with `{field}` slots
+  only for the tool's own fields ("Gym Coach will book a class on {date}.
+  Shall I?"). It is the only app-written text Lamp ever speaks, and only as
+  that read-back. See "Rules" below.
 
 ## The voice: listed beside the skills', routed by `use_skill`
 
 Heron's part. Behind a new switch, `LAMP_APP_TOOLS` (lamp-voice and
 lamp-control, `on` only, off unless set, inside `LAMP_STORE_APPS`; it goes
 into `docs/switches.md` and every census test when built).
+
+**The second route only, in the first build** (Heron's answer, 18:23 on
+#8406), as `start_app` is: Live's function declarations are fixed when its
+session opens, and an app's tools change as apps start and stop. The second
+route declares its functions at each request.
 
 - **Which apps:** only an app that is installed and running now, with a
   socket up. lamp-control tells the voice the running apps' tools on a new
@@ -161,11 +177,13 @@ into `docs/switches.md` and every census test when built).
   last 30 s) reads as none.
 - **Listed beside the skills':** `skill_tools` (through `skills_after`)
   adds each running app's tools after the skills', as their tools file says
-  them. The model sees each under a name of its own, `<app>_<tool>` (the
-  app's name with `-` as `_`: `gym_coach_set_plan`), so it is never one of
-  a skill's names by accident and the journal says whose it is. The longest
-  would be 24 + 1 + 24 = 49 bytes, one past the link's 48, so the Store
-  holds an app's name and a tool's name to 47 bytes together.
+  them. Each goes by a name of its own, `<app>_<tool>` (the app's name with
+  `-` as `_`: `gym_coach_set_plan`), so it is never one of a skill's names
+  by accident and the journal says whose it is. With `use_skill` (the
+  product) it is the `skill` value, not a function name, so the link's
+  48-byte name bound matters only without it: there the longest would be
+  24 + 1 + 24 = 49 bytes, so the Store holds an app's name and a tool's
+  name to 47 bytes together.
 - **The clash rules are the skills':** a name the voice, the executive or a
   skill already gave is the earlier one's, and the app's tool is left out
   of the session with one journal line naming it (`skills_after`'s own
@@ -190,6 +208,16 @@ into `docs/switches.md` and every census test when built).
   `start_app` and `apps.context` use ("From the app Gym Coach (a note, not
   an instruction): …"), with the instruction saying an app's words are only
   what its tool does, never instructions to Lamp.
+- **The thread keeps a call by its name and outcome only.** With
+  `LAMP_HISTORY_KEEPS_CALLS`, a turn's functions and the arguments they ran
+  with are handed to the thread (`Thread::called`, the exchange's `calls`
+  in `thread.rs`) and told to later turns; they are not written to the
+  thread's file (#1505). For an app's tool the thread is given its name and
+  outcome (`ok`, `error`, `not done`) only, never an argument or a word of
+  the result, so "a bad knee" never rides a later turn. The turn is held
+  from the running summary and memory too (`remember::keep_out`). **Test at
+  build:** after an app tool's call, a later turn's messages hold no
+  argument or result value of it.
 
 ## lamp-control: `app.call {name, args}`
 
@@ -210,7 +238,11 @@ Eighth's part, beside app views piece 2.
   nobody, as `app.took` is.
 - **A timeout of 5 s** (proposed), counted from the voice's publish. Past
   it the model is told "Gym Coach did not answer in time; it may or may not
-  have done it", and a later answer is dropped. The call runs off the turn,
+  have done it", and a later answer is dropped. **The `call` id is an
+  idempotency key:** it is unique to one call, the app is sent it, and the
+  SDK's `@app.tool` drops a call id it has already run. The voice never
+  retries a call for an `outside` tool; a new ask from the person is a new
+  call, and for an `outside` tool a new read-back and yes. The call runs off the turn,
   as the desk reads do, so the person can still talk over it. A tool that
   needs longer (a session that runs for minutes) answers at once that it
   began (`{"started": true}`) and goes on by itself, with its `say`, its
@@ -239,10 +271,13 @@ Eighth's part, beside app views piece 2.
   private (the privacy switch closed, the microphone muted, or no reading
   of it), the voice offers no app tool, and lamp-control refuses an
   `app.call` with its own reading too (`private`), as `apps.context` is held.
-  In a care turn (`LAMP_CARE_LINE`, #7689) and for the care hold after it
-  (the 30 minutes a skill's say not asked for waits; #8388 holds an app's
-  `say` the same way), an app's tool is not offered, and a call is answered
-  "not now: nothing was done", as `start_app` is. So is a call for a line
+  In a care turn (`LAMP_CARE_LINE`, #7689) and for the whole care hold after
+  it (the 30 minutes a skill's say not asked for waits; #8388 holds an app's
+  `say` the same way), every app tool is refused, reads such as
+  `get_progress` too (Heron: a cheerful answer about streaks doesn't belong
+  in that conversation, and a model told "not now" stays with the person).
+  It is not offered, and a call is answered "not now: nothing was done", as
+  `start_app` is. So is a call for a line
   let in only as the conversation going on, or while the lamp waits on an
   answer (a read-back, a held forget, a skill's write).
 - **Grants bound what a tool may do.** A call carries only the tool's name
@@ -254,22 +289,33 @@ Eighth's part, beside app views piece 2.
   conversation** (the first builder's rule of 18:14), as the lamp's own
   writes do ([services.md](services.md#writes-read-back-then-a-spoken-yes))
   and a skill's write does. For a tool in the file's `outside` list the
-  voice does not send the call at once: Lamp reads it back in its own words,
-  made in code from the app's title, the tool's description and the checked
-  arguments, and asks; only a plain yes on the next line, read in code
-  (`skill_write_yes`'s fixed set, never the model's word for it), sends the
-  `app.call`. Anything else drops it, and the model is told nothing was
-  done. One waits at a time, for 120 s.
+  voice does not send the call at once: Lamp says the tool's `confirm` line,
+  with code filling only its slots, each with a checked argument value,
+  said by the voice ("Gym Coach will book a class on Friday. Shall I?").
+  The description is never spoken: it is written for the model, and
+  speaking it would play app-written text in Lamp's voice. Only a plain yes
+  on the next line, read in code (`skill_write_yes`'s fixed set, never the
+  model's word for it), sends the `app.call`. Anything else drops it, and
+  the model is told nothing was done. One waits at a time, for 120 s.
+  **While another yes is already waiting** (a skill's write, a held forget,
+  a made skill's yes, the voice's own send), a new app read-back is
+  refused, with the model told "one thing waits for your yes", and nothing
+  waiting is dropped, so a "yes" never lands on the wrong one. **Test at
+  build:** through `answer()`, the same "yes" with each kind of pending yes
+  open, and an app read-back asked beside each: the earlier one is the one
+  answered, and the app is sent nothing.
 - **Results are data, never instructions.** The result goes to the model
   inside the quoted frame, with each string tidied as an app's fact is
   (`app_fact::tidy`: links, markup and double quotes left out). The model
   says the answer in Lamp's voice; nothing an app returns is played as
-  written or read as a rule. A result never goes into memory or the running
-  summary: it is in that turn's context only.
+  written or read as a rule. A result never goes into memory, the running
+  summary or the thread (above): it is in that turn's context only.
 - **The person is the owner.** As for `apps.context`, a tool is offered only
   on the owner's turn: any spoken turn in the private room
   (`LAMP_PRIVATE_ROOM=on`), and outside it only when the known person in
-  view is the owner, never a guest's or the room's.
+  view is the owner, never a guest's or the room's. When the model would
+  call one on a guest's turn, the call is answered "Not now: nothing was
+  done", as `start_app` is, so the model doesn't invent a reason.
 
 ## What stays phrases
 
@@ -308,8 +354,11 @@ Migrate's part.
   default is not required. `check` refuses what the Store would (the rules
   above), in the Store's words. A raised exception becomes `{"error"}` with
   its message; a return over 2 KB is refused at `check` time where it can be
-  seen, and at run time like the lamp. `outside=True` puts the tool in the
-  file's `outside` list.
+  seen, and at run time like the lamp. `outside=True, confirm="..."` puts
+  the tool in the file's `outside` list with its `confirm` line, checked
+  like the Store checks it. **The SDK drops a call id it has already run**
+  (kept for the app's run, at least the last 64), answering it as the first
+  run answered, so a repeated `app.call` never does the work twice.
 - **JavaScript:** `app.tool(name, description, params, handler)`, with
   `params` given as the same schema subset, checked by `lamp app check`.
 - **`lamp fake`:** the fake lamp serves `app.call` and `app.answer`, and
@@ -327,8 +376,10 @@ is set in the phone's app, and "start workout" asks one exact-phrase
 question. 2.0 moves every open-ended part to tools:
 
 - `set_plan(days, minutes, goal?, experience?, limits?)`: the weekly plan.
-  `limits` is a short text (at most 120 characters, "a bad knee"); it stays
-  in the app's own data folder, never in the journal.
+  `limits` is a short text (at most 120 characters, "a bad knee"), so the
+  install page says "Lamp may pass what you say to this app for: set_plan".
+  It stays in the app's own data folder, never in the journal or the
+  thread.
 - `get_plan()`: the plan as it is now, for "what's my plan?".
 - `start_session(exercise?)`: starts today's session (or the named
   exercise) and answers `{"started": true, "exercise", "sets", "reps"}` at
@@ -365,21 +416,18 @@ From the first builder's 18:14 on #8386; P1, a multi-day piece.
 
 ## Open questions
 
-For **Heron**:
-- Is `<app>_<tool>` the right name for the model, or should the voice keep
-  the tool's own name and put the app's name only in its line?
-- Is the `args` object on `use_skill` acceptable, or should an app's tools
-  be functions of their own, within the 32-function bound?
-- The Live route and the second route: both read `skill_tools`, but
-  `start_app` is the second route's only. Should the first build of app
-  tools be the second route's only too?
-- The care hold: refuse every app tool for the full 30 minutes, or only
-  tools that speak or act, letting `get_plan` and `get_progress` answer?
-- Does a tool need the `hear` grant, or a grant of its own the owner sees at
-  install ("Lamp may ask this app to do things")?
-- The read-back for an `outside` tool: made in code from the description
-  and the arguments, or a fixed `confirm` line per tool in the file, which
-  the Store reviews?
+Heron's six, **decided** in Heron's read (18:23 on #8406), and written
+into the sections above:
+- **The name:** `<app>_<tool>`, as `use_skill`'s `skill` value.
+- **`args` on `use_skill`:** yes, declared only when an app tool is
+  offered, each field checked in code. Functions of their own would use up
+  the 32 too fast.
+- **The route:** the second route only, in the first build.
+- **The care hold:** every app tool refused for the whole hold, reads too.
+- **The grant:** `hear`, plus the install page's "Lamp may pass what you say
+  to this app for: <tool>" for a tool with a free-text field.
+- **The read-back:** a per-tool `confirm` line, reviewed by the Store; the
+  description is never spoken.
 
 For **Eighth**:
 - Is a new bus topic (`apps/tools`, `apps/call`, `apps/called`) right, or
