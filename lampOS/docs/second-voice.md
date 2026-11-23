@@ -427,6 +427,44 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   route's transcript hint only: this route's language is `stt_language`
   (Fourth and the first builder on #1722, 22:52 and 22:54).
 
+  **A turn heard in `multi` (`LAMP_SECOND_TURN_LANGUAGE=on`, off unless set,
+  in no unit; mixed-language speech to text, step 2).** A paired computer's
+  turn (`turn: "start"` on the say socket, lamp-control's alone) may carry
+  `language`, one value of a closed set: `multi`, Deepgram's `language=multi`,
+  which follows a speaker between languages inside a line. Any other value,
+  or the field on anything but a turn start, is refused where the line is
+  parsed, so no string reaches the relay's URL. With the switch off the ask
+  is dropped and the journal says so once ("a turn asked to be heard in
+  multi: ignored, LAMP_SECOND_TURN_LANGUAGE is not on"); the lamp hears the
+  turn as it always has. On, the coordinator gives each line that begins
+  inside the turn the turn's language (`ControlTurns::language_at`, by the
+  same rule `admitted` takes a line into the turn: its prompt, its window
+  of 8 s, or its conversation until its answer is over) on the line's
+  `Start` (`language`, left off the wire when none), and the second route
+  opens that line's speech to text with it: `nova-3-general` with
+  `language=multi` and the same key terms, endpointing and key, never Flux
+  (English only). Nothing else changes, and nothing outlives the turn: the
+  next line is the lamp's own. A listener kept ready for the next line
+  (`LAMP_SECOND_STT_WARM`) is opened in the language of the line it was
+  kept after, so a line whose language differs does not use it: the kept
+  socket is dropped (the journal names both languages) and the line opens its
+  own, which costs that line the warm socket's saving (0.9 to 2.3 s on
+  lamp-4ace, above) once at the turn's first line and once at the lamp's
+  first line after the turn. Why `multi` and not the owner's language: on 12
+  Vietnamese lines with English words (one synthetic voice, Ngan; a floor, not
+  a promise; #7814, 20 Nov), `multi` heard 86% of the words, `vi` 61% and `en`
+  23%, and `vi` heard almost none of the English phrases ("Hey Lamp, set a
+  timer for ten minutes" 0.7 of 8 words). No wire field in lamp-control's
+  protocol carries it yet (step 3, under the owner's grant). The stop words'
+  own stream is not changed. Journal, the value only, never words: "this
+  line's speech to text hears multi (LAMP_SECOND_TURN_LANGUAGE)". Tests:
+  `turn_language::tests`, `control_turn::tests` (`language_at`),
+  `say::tests` (the wire), `services::tests`
+  (`a_turns_language_is_in_that_lines_query_alone`),
+  `second_provider::tests`
+  (`a_turns_language_is_its_lines_and_a_listener_kept_in_another_is_dropped`),
+  `coordinator::tests::second_route` (a line in a turn that asked for it).
+
   Flux tells turns itself. Each `TurnInfo` carries one turn's words so
   far, and `EndOfTurn` ends the turn: by Flux's own model (`trigger`
   `model`), by `ForceEndTurn` (`manual`), or after 5 s of quiet

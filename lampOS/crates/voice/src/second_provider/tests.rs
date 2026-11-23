@@ -69,6 +69,9 @@ use std::sync::atomic::AtomicUsize;
 /// back; a sentence containing "FAIL" cannot be spoken.
 #[derive(Default)]
 struct Script {
+    /// The language each `listen_in` was asked for (a turn's,
+    /// `LAMP_SECOND_TURN_LANGUAGE`), in order, none for the lamp's own.
+    languages: Mutex<Vec<Option<crate::turn_language::TurnLanguage>>>,
     listen_error: Option<net::Error>,
     heard: Mutex<VecDeque<net::Result<String>>>,
     samples_heard: Arc<AtomicUsize>,
@@ -211,6 +214,14 @@ impl Listener for ScriptListener {
 impl Services for Script {
     fn turn_begins(&self) {
         self.turns_begun.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn listen_in(
+        &self,
+        language: Option<crate::turn_language::TurnLanguage>,
+    ) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
+        self.languages.lock().unwrap().push(language);
+        self.listen()
     }
 
     fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
@@ -443,6 +454,7 @@ fn start(request: u64) -> ProviderInput {
         over_the_lamps_voice: false,
         heard_of_cut: None,
         soft_lead_us: 0,
+        language: None,
     }
 }
 fn audio(request: u64, sequence: u64) -> ProviderInput {
@@ -4544,6 +4556,7 @@ fn start_over(request: u64) -> ProviderInput {
             over_the_lamps_voice: true,
             heard_of_cut,
             soft_lead_us: 0,
+            language: None,
         },
         _ => unreachable!(),
     }
@@ -6523,6 +6536,7 @@ async fn the_sentence_is_heard_for_its_count_and_never_asked_of_the_model() {
         over_the_lamps_voice: false,
         heard_of_cut: None,
         soft_lead_us: 0,
+        language: None,
     });
     engine.submit(audio(2, 1));
     engine.submit(end(2));
@@ -6709,6 +6723,7 @@ async fn the_sentences_sound_is_not_carried_into_the_next_line() {
             over_the_lamps_voice: false,
             heard_of_cut: None,
             soft_lead_us: 0,
+            language: None,
         });
         engine.submit(audio_at(2, 1, 9_000));
         engine.submit(end(2));
@@ -6771,6 +6786,7 @@ async fn a_request_going_on_from_one_given_up_begins_with_its_words() {
         over_the_lamps_voice: false,
         heard_of_cut: None,
         soft_lead_us: 0,
+        language: None,
     });
     engine.submit(audio(2, 1));
     engine.submit(end(2));
@@ -6808,6 +6824,7 @@ async fn a_request_going_on_takes_only_the_words_of_the_one_just_before_it_in_it
         over_the_lamps_voice: false,
         heard_of_cut: None,
         soft_lead_us: 0,
+        language: None,
     };
     let script = Arc::new(Script {
         heard: Mutex::new(
@@ -6878,6 +6895,7 @@ async fn the_first_request_after_a_stop_is_told_of_it_beside_its_words() {
         over_the_lamps_voice: false,
         heard_of_cut: None,
         soft_lead_us: 0,
+        language: None,
     });
     engine.submit(audio(1, 1));
     engine.submit(end(1));
@@ -6917,6 +6935,7 @@ async fn a_stop_whose_request_is_never_asked_is_told_with_the_next_one() {
         over_the_lamps_voice: false,
         heard_of_cut: None,
         soft_lead_us: 0,
+        language: None,
     };
     let stopped = Message::system(crate::provider_worker::STOPPED_NOTE);
     for (next_session, told) in [(1, true), (2, false)] {
@@ -6959,6 +6978,7 @@ async fn a_stop_goes_with_a_request_going_on_and_never_past_two_minutes() {
         over_the_lamps_voice: false,
         heard_of_cut: None,
         soft_lead_us: 0,
+        language: None,
     };
     let stopped = Message::system(crate::provider_worker::STOPPED_NOTE);
     let answered = || vec![text("Sure."), Ok(ChatEvent::Done)];
@@ -7688,6 +7708,7 @@ async fn a_request_going_on_names_the_one_begun_before_it_in_its_session() {
         over_the_lamps_voice: false,
         heard_of_cut: None,
         soft_lead_us: 0,
+        language: None,
     };
     let script = Arc::new(Script {
         heard: Mutex::new(
@@ -8342,6 +8363,7 @@ async fn the_first_line_after_a_stop_tells_the_rule_of_it() {
             over_the_lamps_voice: false,
             heard_of_cut: None,
             soft_lead_us: 0,
+            language: None,
         });
         engine.submit(audio(request, 1));
         engine.submit(end(request));
@@ -13903,6 +13925,7 @@ async fn asked_after(
                 over_the_lamps_voice,
                 heard_of_cut,
                 soft_lead_us: 0,
+                language: None,
             });
             engine.retire_through(1);
         }
@@ -15523,6 +15546,7 @@ fn start_marked(
         over_the_lamps_voice: over_the_voice,
         heard_of_cut: None,
         soft_lead_us: 0,
+        language: None,
     }
 }
 
@@ -16232,6 +16256,7 @@ fn start_cutting(request: u64, cut: u64, samples: u64) -> ProviderInput {
             samples,
         }),
         soft_lead_us: 0,
+        language: None,
     }
 }
 
@@ -17950,6 +17975,84 @@ async fn the_next_lines_listener_is_kept_ready_and_one_closed_since_is_not_used(
     assert_eq!(listened(&plain), 2);
 }
 
+/// `LAMP_SECOND_TURN_LANGUAGE`: a line of a computer's turn that asked for
+/// `multi` opens its speech to text in it, and the listener kept ready in the
+/// lamp's own language is dropped for it (and the reverse), but one kept in
+/// the same language is used as before. Each line's listener is opened in the
+/// language of the line it is opened for.
+#[tokio::test]
+async fn a_turns_language_is_its_lines_and_a_listener_kept_in_another_is_dropped() {
+    use crate::turn_language::TurnLanguage::Multi;
+    let lines = ["One.", "Two.", "Three.", "Four."];
+    let played = Arc::new(Script {
+        heard: Mutex::new(lines.iter().map(|line| Ok((*line).to_owned())).collect()),
+        chats: Mutex::new(
+            lines
+                .iter()
+                .map(|_| vec![text("Sure."), Ok(ChatEvent::Done)])
+                .collect(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(played.clone());
+    let mut engine = engine.keeping_a_listener_ready(true);
+    let listened = |script: &Script| script.listened.load(Ordering::Relaxed);
+    let languages = |script: &Script| script.languages.lock().unwrap().clone();
+    let begin = |request: u64, asked: Option<crate::turn_language::TurnLanguage>| {
+        let mut input = start(request);
+        if let ProviderInput::Start { language, .. } = &mut input {
+            *language = asked;
+        }
+        input
+    };
+    // 1: the lamp's own, its next line's kept in it.
+    engine.submit(begin(1, None));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    assert_eq!(
+        (listened(&played), languages(&played)),
+        (2, vec![None, None])
+    );
+    // 2: a turn's `multi`: the kept one (lamp's own) is dropped, its own is
+    // opened in `multi`, and the next line's is kept in `multi`.
+    engine.submit(begin(2, Some(Multi)));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    assert_eq!(
+        languages(&played),
+        vec![None, None, Some(Multi), Some(Multi)]
+    );
+    // 3: the same turn's next line takes the one kept in `multi`.
+    engine.submit(begin(3, Some(Multi)));
+    engine.submit(audio(3, 1));
+    engine.submit(end(3));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    assert_eq!(
+        languages(&played),
+        vec![None, None, Some(Multi), Some(Multi), Some(Multi)]
+    );
+    // 4: the lamp's own again: the one kept in `multi` is dropped and its
+    // own opened in the lamp's language.
+    engine.submit(begin(4, None));
+    engine.submit(audio(4, 1));
+    engine.submit(end(4));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    assert_eq!(
+        languages(&played),
+        vec![
+            None,
+            None,
+            Some(Multi),
+            Some(Multi),
+            Some(Multi),
+            None,
+            None
+        ]
+    );
+}
+
 /// #1712, the first builder at 00:31: a kept listener lasts at most
 /// [`KEPT_FOR`], so a lamp nobody talks to keeps nothing open; and it goes
 /// at once when listening stops (the privacy switch, a mute) or the privacy
@@ -18107,6 +18210,7 @@ async fn a_line_ending_before_its_name_waits_for_it() {
         over_the_lamps_voice: false,
         heard_of_cut: None,
         soft_lead_us: 0,
+        language: None,
     };
     let script = |heard: &[&str]| {
         Arc::new(Script {
@@ -18513,6 +18617,7 @@ async fn a_named_asks_call_goes_to_the_agent_its_words_name() {
         over_the_lamps_voice: over,
         heard_of_cut: None,
         soft_lead_us: 0,
+        language: None,
     };
     for (line, named, given, over, wanted) in [
         (

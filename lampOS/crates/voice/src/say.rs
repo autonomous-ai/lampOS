@@ -519,6 +519,9 @@ pub enum Words {
     TurnStart {
         prompt: Option<String>,
         after: Option<u64>,
+        /// The language the turn is heard in (`language`, one value:
+        /// [`crate::turn_language`]); none is the lamp's own, as always.
+        language: Option<crate::turn_language::TurnLanguage>,
     },
     /// lamp-control asks for the turn it opened as `id` to be ended
     /// (`turn: "end"`).
@@ -796,6 +799,11 @@ struct Wire {
     /// `begun` named it, whose conversation the new turn may continue.
     #[serde(default)]
     after: Option<u64>,
+    /// With `turn: "start"` only: the language the turn is heard in
+    /// ([`crate::turn_language::TurnLanguage`], a closed set), ignored
+    /// unless `LAMP_SECOND_TURN_LANGUAGE=on`.
+    #[serde(default)]
+    language: Option<String>,
     /// A computer's mute: `false` holds one, `true` lifts it
     /// ([`TURN_SKILL`] only, alone).
     #[serde(default)]
@@ -915,6 +923,9 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     }
     if wire.after.is_some() {
         return Err("after goes only with turn start".into());
+    }
+    if wire.language.is_some() {
+        return Err("language goes only with turn start".into());
     }
     let Some(expires_in_ms) = wire.expires_in_ms else {
         return Err("not a say request".into());
@@ -1302,6 +1313,13 @@ fn parse_turn(skill: String, turn: TurnWire, wire: Wire) -> Result<Request, Stri
                     "note or text is 1 to {MOST_WORDS_BYTES} bytes, with no control characters"
                 ));
             }
+            let language = match wire.language.as_deref() {
+                None => None,
+                Some(name) => Some(
+                    crate::turn_language::TurnLanguage::parse(name)
+                        .ok_or_else(|| "language is multi".to_owned())?,
+                ),
+            };
             let expires_in_ms = wire
                 .expires_in_ms
                 .filter(|expires| (1..=LONGEST_EXPIRY_MS).contains(expires))
@@ -1310,6 +1328,7 @@ fn parse_turn(skill: String, turn: TurnWire, wire: Wire) -> Result<Request, Stri
                 Words::TurnStart {
                     prompt: wire.text,
                     after: wire.after,
+                    language,
                 },
                 expires_in_ms,
             )
@@ -1319,6 +1338,7 @@ fn parse_turn(skill: String, turn: TurnWire, wire: Wire) -> Result<Request, Stri
                 || wire.expires_in_ms.is_some()
                 || wire.start_before_us.is_some()
                 || wire.after.is_some()
+                || wire.language.is_some()
             {
                 return Err("turn end goes with its id only".into());
             }
@@ -1428,6 +1448,7 @@ fn asks_for_more(wire: &Wire) -> bool {
         || wire.turn.is_some()
         || wire.id.is_some()
         || wire.after.is_some()
+        || wire.language.is_some()
         || wire.exact
         || wire.made
         || wire.who
@@ -1436,6 +1457,15 @@ fn asks_for_more(wire: &Wire) -> bool {
         || wire.app.is_some()
         || wire.app_name.is_some()
 }
+
+/// A computer's turn start taken: its prompt, the earlier turn it names, the
+/// language it asks to be heard in, and its ticket.
+pub type TurnStartTaken = (
+    Option<String>,
+    Option<u64>,
+    Option<crate::turn_language::TurnLanguage>,
+    Ticket,
+);
 
 /// A request handed to the voice, with where its answer goes and when it
 /// expires: its `expires_in_ms` from the moment its line was read, on the
@@ -2496,13 +2526,14 @@ impl Says {
     /// Take the oldest turn start, as the voice opens or refuses it at
     /// `now_us`: its prompt, if any, the earlier turn it names, if any, and
     /// its ticket. Those whose time ran out are answered `expired` first.
-    pub fn take_turn_start(
-        &mut self,
-        now_us: u64,
-    ) -> Option<(Option<String>, Option<u64>, Ticket)> {
+    pub fn take_turn_start(&mut self, now_us: u64) -> Option<TurnStartTaken> {
         self.take_turn_of(now_us, |words| matches!(words, Words::TurnStart { .. }))
             .map(|(words, ticket)| match words {
-                Words::TurnStart { prompt, after } => (prompt, after, ticket),
+                Words::TurnStart {
+                    prompt,
+                    after,
+                    language,
+                } => (prompt, after, language, ticket),
                 _ => unreachable!("only a turn start was chosen"),
             })
     }
@@ -7078,14 +7109,16 @@ mod tests {
             words(r#"{"skill":"control","turn":"start","expires_in_ms":5000}"#),
             Ok(Words::TurnStart {
                 prompt: None,
-                after: None
+                after: None,
+                language: None
             })
         );
         assert_eq!(
             words(r#"{"skill":"control","turn":"start","text":"Ready?","expires_in_ms":5000}"#),
             Ok(Words::TurnStart {
                 prompt: Some("Ready?".into()),
-                after: None
+                after: None,
+                language: None
             })
         );
         // A start may name the same computer's earlier turn it continues.
@@ -7095,9 +7128,29 @@ mod tests {
             ),
             Ok(Words::TurnStart {
                 prompt: Some("And?".into()),
-                after: Some(7)
+                after: Some(7),
+                language: None
             })
         );
+        // A start may ask for the turn to be heard in one language of a
+        // closed set; any other value, or the field anywhere else, is refused.
+        assert_eq!(
+            words(r#"{"skill":"control","turn":"start","expires_in_ms":5000,"language":"multi"}"#),
+            Ok(Words::TurnStart {
+                prompt: None,
+                after: None,
+                language: Some(crate::turn_language::TurnLanguage::Multi)
+            })
+        );
+        for refused in [
+            r#"{"skill":"control","turn":"start","expires_in_ms":5000,"language":"vi"}"#,
+            r#"{"skill":"control","turn":"start","expires_in_ms":5000,"language":"multi&model=x"}"#,
+            r#"{"skill":"control","turn":"start","expires_in_ms":5000,"language":""}"#,
+            r#"{"skill":"control","turn":"end","id":7,"language":"multi"}"#,
+            r#"{"skill":"control","text":"Hi","expires_in_ms":5000,"language":"multi"}"#,
+        ] {
+            assert!(words(refused).is_err(), "{refused}");
+        }
         let end = parse(r#"{"skill":"control","turn":"end","id":7}"#).unwrap();
         assert_eq!(end.words, Words::TurnEnd(7));
         assert_eq!(end.expires_in_ms, TURN_END_EXPIRY_MS);
@@ -7238,7 +7291,7 @@ mod tests {
         let (id, _) = says.take_turn_end(10).unwrap();
         assert_eq!(id, 4);
         assert_eq!(says.turn_start_after(10), None);
-        let (prompt, after, ticket) = says.take_turn_start(10).unwrap();
+        let (prompt, after, _, ticket) = says.take_turn_start(10).unwrap();
         assert_eq!(prompt.as_deref(), Some("Ready?"));
         assert_eq!(after, None);
         assert!(!says.turn_start_waits(10));
@@ -7290,7 +7343,7 @@ mod tests {
             Answer::Done(Outcome::Dropped(ASKER_GONE.into()))
         );
         assert!(stays_answered.try_recv().is_err());
-        let (prompt, _, ticket) = says.take_turn_start(20).unwrap();
+        let (prompt, _, _, ticket) = says.take_turn_start(20).unwrap();
         assert_eq!(prompt.as_deref(), Some("Second?"));
         assert!(says.take_turn_start(20).is_none());
         ticket.answer(Outcome::Spoken);

@@ -466,6 +466,7 @@ fn a_held_line_goes_again_with_its_note_but_not_without_its_first_part_or_pictur
             over_the_lamps_voice: false,
             heard_of_cut: None,
             soft_lead_us: 0,
+            language: None,
         },
         other => other,
     };

@@ -6,6 +6,7 @@ use super::net::{
 };
 use super::second_try::ChatTold;
 use crate::second_config::{SecondConfig, Stt};
+use crate::turn_language::TurnLanguage;
 use futures_util::{
     StreamExt, TryStreamExt,
     future::BoxFuture,
@@ -18,6 +19,16 @@ use tokio::sync::mpsc;
 pub trait Services: Send + Sync + 'static {
     /// Open speech-to-text for one utterance.
     fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>>;
+    /// [`Self::listen`], in the language a computer's turn asked for
+    /// (`LAMP_SECOND_TURN_LANGUAGE`, [`crate::turn_language`]); none is the
+    /// lamp's own. A service with no language to change hears as it does.
+    fn listen_in(
+        &self,
+        language: Option<TurnLanguage>,
+    ) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
+        let _ = language;
+        self.listen()
+    }
     /// The answer to `messages`, as it is written; a failure to connect is
     /// the stream's first item.
     fn chat(&self, messages: Vec<Message>) -> BoxStream<'static, net::Result<ChatEvent>>;
@@ -1030,10 +1041,41 @@ impl Net {
     }
 }
 
+/// `config` as a line of a computer's turn hears with it: the turn's
+/// language in place of the lamp's, on Nova-3 (Flux hears English only),
+/// every other part of the query as it is. With none, `config` itself.
+fn heard_in(config: &Arc<SecondConfig>, language: Option<TurnLanguage>) -> Arc<SecondConfig> {
+    let Some(language) = language else {
+        return config.clone();
+    };
+    let mut config = (**config).clone();
+    config.stt_language = Some(language.code().to_owned());
+    config.stt_flux = false;
+    Arc::new(config)
+}
+
 impl Services for Net {
     fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
-        let config = self.config.clone();
-        let near = self.near_hearing();
+        self.listen_in(None)
+    }
+
+    fn listen_in(
+        &self,
+        language: Option<TurnLanguage>,
+    ) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
+        // The turn's language replaces the lamp's for this line alone, on
+        // Nova-3 (Flux hears English only), with every other part of the
+        // query as it is: the same key terms, endpointing and key.
+        if let Some(language) = language {
+            eprintln!(
+                "lamp-voice second: this line's speech to text hears {} (LAMP_SECOND_TURN_LANGUAGE)",
+                language.code()
+            );
+        }
+        let config = heard_in(&self.config, language);
+        let near = self
+            .near_hearing()
+            .map(|(hearing, url, near)| (heard_in(&hearing, language), url, near));
         // A line ending on "um" waits only if the service keeps it
         // (`LAMP_SECOND_UNFINISHED_WAIT`, #3126).
         let fillers = crate::unfinished_words::on();
@@ -2224,6 +2266,67 @@ pub(crate) mod tests {
             let expected: Vec<&str> = ["Lamp"].into_iter().chain(stop.iter().copied()).collect();
             assert_eq!(terms, expected, "switch {on}: {seen:?}");
         }
+    }
+
+    /// A computer's turn heard in `multi` (`LAMP_SECOND_TURN_LANGUAGE`): its
+    /// line's socket asks for `language=multi` on Nova-3, with the lamp's own
+    /// key terms; the next line, with none, asks as the lamp always has.
+    #[tokio::test]
+    async fn a_turns_language_is_in_that_lines_query_alone() {
+        let own = stub("k-turn-language", vec![]).await;
+        let mut config = config_at("turn-language", "k-turn-language", &own.url, &own.url);
+        config.stt_key_terms = vec!["Hanoi".to_owned()];
+        // Flux, as a unit that runs it: English only, so a turn's language
+        // is never asked of it.
+        config.stt_flux = true;
+        let net = Net::new(config, Arc::new(Vec::new)).unwrap();
+        assert!(net.listen_in(Some(TurnLanguage::Multi)).await.is_err());
+        assert!(net.listen_in(None).await.is_err());
+        let seen = own.seen();
+        assert_eq!(seen.len(), 2, "{seen:?}");
+        let query = |line: &str| -> Vec<(String, String)> {
+            reqwest::Url::parse(&format!("ws://x{}", line.split(' ').nth(1).unwrap()))
+                .unwrap()
+                .query_pairs()
+                .map(|(key, value)| (key.into_owned(), value.into_owned()))
+                .collect()
+        };
+        let value = |pairs: &[(String, String)], name: &str| -> Vec<String> {
+            pairs
+                .iter()
+                .filter(|(key, _)| key == name)
+                .map(|(_, value)| value.clone())
+                .collect()
+        };
+        let turn = query(&seen[0]);
+        assert_eq!(value(&turn, "language"), ["multi"], "{seen:?}");
+        assert_eq!(value(&turn, "model"), ["nova-3-general"], "{seen:?}");
+        assert_eq!(value(&turn, "keyterm"), ["Lamp", "Hanoi"], "{seen:?}");
+        // The lamp's own line: no turn language in it.
+        let own_line = query(&seen[1]);
+        assert!(value(&own_line, "language") != ["multi"], "{seen:?}");
+        assert_eq!(value(&own_line, "keyterm"), ["Lamp", "Hanoi"], "{seen:?}");
+    }
+
+    /// The config a turn's line hears with changes only its language and
+    /// Flux; with no language it is the same one.
+    #[test]
+    fn a_turns_language_changes_nothing_else_of_the_config() {
+        let config = Arc::new({
+            let mut config = config_at("turn-config", "k-turn-config", "http://x", "http://x");
+            config.stt_key_terms = vec!["Hanoi".to_owned()];
+            config.stt_language = Some("vi".to_owned());
+            config.stt_flux = true;
+            config
+        });
+        assert!(Arc::ptr_eq(&heard_in(&config, None), &config));
+        let turn = heard_in(&config, Some(TurnLanguage::Multi));
+        assert_eq!(turn.stt_language.as_deref(), Some("multi"));
+        assert!(!turn.stt_flux);
+        assert_eq!(turn.stt_key_terms, config.stt_key_terms);
+        // The lamp's own is not touched.
+        assert_eq!(config.stt_language.as_deref(), Some("vi"));
+        assert!(config.stt_flux);
     }
 
     /// #2882 (f): a relay that never answers its routes delays no turn: the

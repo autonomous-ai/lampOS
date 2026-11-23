@@ -995,6 +995,7 @@ mod reminder_tests {
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
                     soft_lead_us: 0,
+                    language: None,
                 },
             )
             .unwrap();
@@ -1295,6 +1296,7 @@ mod timed_tests {
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
                     soft_lead_us: 0,
+                    language: None,
                 },
             )
             .unwrap();

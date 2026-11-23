@@ -271,6 +271,7 @@ impl Paired {
             over_the_lamps_voice: false,
             heard_of_cut: None,
             soft_lead_us: 0,
+            language: None,
         });
         self.queue.push_back(ProviderInput::Audio {
             request,
@@ -832,6 +833,7 @@ mod continuation_or_discard {
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
                 soft_lead_us: 0,
+                language: None,
             });
             self.publish();
             self.flush(selected);
@@ -1649,6 +1651,7 @@ mod duplex_through_the_worker {
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
                 soft_lead_us: 0,
+                language: None,
             },
             ProviderInput::Audio {
                 request: old,

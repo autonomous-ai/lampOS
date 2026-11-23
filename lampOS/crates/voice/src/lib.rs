@@ -150,6 +150,7 @@ pub mod remember_speaker;
 pub mod scoped_session;
 pub mod setup_journal;
 pub mod sign_in;
+pub mod turn_language;
 // A microphone that hears nothing, for `directed-fixture` alone (`--microphone-device silent`).
 #[cfg(unix)]
 pub mod silent_capture;
