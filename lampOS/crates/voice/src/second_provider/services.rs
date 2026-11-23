@@ -1781,6 +1781,48 @@ pub(crate) mod tests {
 
     /// The route at `relay` (its chat, speech and the routes asked of it),
     /// ElevenLabs through the relay, the relay's key `key`, and listening at `listening`.
+    /// #8420: the person's own OpenRouter model is asked as OpenRouter's
+    /// chat (the fastest provider first, the lamp's reasoning effort) at
+    /// OpenRouter's own API with their key and model, never searching: the
+    /// search stays on the lamp's own.
+    #[test]
+    fn the_persons_openrouter_model_is_asked_as_openrouters_chat_without_search() {
+        use std::os::unix::fs::PermissionsExt;
+        let config = config_at(
+            "own-openrouter",
+            "relay-key",
+            "http://127.0.0.1:9",
+            "http://127.0.0.1:9",
+        );
+        let units = std::env::temp_dir().join(format!(
+            "lamp-voice-own-openrouter-units-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&units).unwrap();
+        for (file, text) in [
+            ("own_openrouter.key", "sk-or-planted-8420"),
+            ("own_openrouter.model", "openai/gpt-4o-mini"),
+        ] {
+            std::fs::write(units.join(file), text).unwrap();
+            std::fs::set_permissions(units.join(file), std::fs::Permissions::from_mode(0o600))
+                .unwrap();
+        }
+        let (config, _) = config.with_own_keys(true, Some(units.as_os_str()));
+        let effort = config.hosted.openrouter_effort.clone();
+        let key = crate::second_provider::worker::deepseek_key(&config, None).unwrap();
+        let net = Net::new(config, Arc::new(Vec::new))
+            .unwrap()
+            .chatting_with_deepseek(key.expose())
+            .unwrap();
+        let body = net.chat.body(&[Message::user("What time is it?")]);
+        assert_eq!(body["model"], "openai/gpt-4o-mini");
+        assert_eq!(body["provider"], serde_json::json!({"sort": "latency"}));
+        assert_eq!(body["reasoning"], serde_json::json!({"effort": effort}));
+        assert!(body.get("plugins").is_none(), "{body}");
+        assert!(body.get("thinking").is_none(), "{body}");
+        let _ = std::fs::remove_dir_all(&units);
+    }
+
     pub(crate) fn config_at(name: &str, key: &str, relay: &str, listening: &str) -> SecondConfig {
         use std::os::unix::fs::PermissionsExt;
         let directory =
