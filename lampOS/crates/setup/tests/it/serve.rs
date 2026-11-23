@@ -841,6 +841,9 @@ fn a_leftover_temporary_key_is_removed() {
             tmp(&config.own_keys.join("deepgram.key")),
             // ElevenLabs' key and voice ID share one too (#8367).
             tmp(&config.own_keys.join("elevenlabs.key")),
+            // An OpenAI-compatible key's endpoint, model and last check
+            // share its one too (#8362).
+            tmp(&config.own_keys.join("openai_compatible.key")),
             tmp(&config.own_keys.join("deepseek.url")),
         ]
     );
