@@ -1271,17 +1271,16 @@ fn written(language: Language) -> Written {
             everyday: true,
             line_start: &[],
         },
-        // French (#8381): "Lamp" stays Latin and is read as English reads
-        // it; French speech to text may write it "Lampe", the everyday word
-        // for a lamp ("la lampe est cassée"), so it is a stand-in, never one
-        // mid-sentence. Not heard on a lamp yet.
+        // French (#8381): the call is "Hey Lamp", as in English, and read
+        // as English reads it. "Lampe", the everyday word for a lamp ("la
+        // lampe est cassée"), is never the name (the owner, 23 Nov).
         Language::French => Written {
-            greetings: &["hey", "hé", "eh"],
+            greetings: &[],
             real: &[],
-            stand_ins: &["lampe"],
+            stand_ins: &[],
             whole_words: true,
             not_the_name: |_| false,
-            everyday: true,
+            everyday: false,
             line_start: &[],
         },
     }
@@ -3908,9 +3907,6 @@ mod tests {
             (Vietnamese, "Này lem, mấy giờ rồi?"),
             (Vietnamese, "Làm, mấy giờ rồi?"),
             (Vietnamese, "Ê lắm."),
-            (French, "Hé lampe, quelle heure est-il ?"),
-            (French, "Lampe, allume la lumière."),
-            (French, "Hey lampe."),
         ] {
             assert!(called(heard, Some(language)), "{heard}");
             assert!(!called(heard, None), "English adds nothing: {heard}");
@@ -3944,11 +3940,15 @@ mod tests {
             (Vietnamese, "Này, làm."),
             (Vietnamese, "Lem."),
             (Vietnamese, "Ừ, làm đi."),
-            // French's "lampe" is the everyday word for a lamp.
+            // French's call is "Hey Lamp", as English's: "lampe", the
+            // everyday word for a lamp, never is one (the owner, 23 Nov).
             (French, "La lampe est cassée."),
             (French, "Éteins la lampe."),
             (French, "Lampe."),
             (French, "Oui, lampe."),
+            (French, "Hé lampe, quelle heure est-il ?"),
+            (French, "Lampe, allume la lumière."),
+            (French, "Hey lampe."),
             // The name opening a longer word, or Korean's subject or
             // object particle after it, is talk about a lamp.
             (Japanese, "ランプシェード"),
@@ -3977,10 +3977,12 @@ mod tests {
         assert!(!begins_as_written("今何時ですか。ランプ。", Some(Japanese)));
         assert!(begins_as_written("Làm, mấy giờ rồi?", Some(Vietnamese)));
         assert!(!begins_as_written("Làm!", Some(Vietnamese)));
-        assert!(begins_as_written(
+        assert!(!begins_as_written(
             "Lampe, quelle heure est-il ?",
             Some(French)
         ));
+        // "Hey Lamp" in French is read as English reads it.
+        assert!(super::called("Hey Lamp, quelle heure est-il ?"));
         assert!(!begins_as_written("La lampe est cassée.", Some(French)));
         // Onboarding's how_you_sound: the name alone, greetings at most.
         for (language, alone) in [
@@ -3991,7 +3993,6 @@ mod tests {
             (Chinese, "嘿兰普。"),
             (Korean, "헤이 램프."),
             (Vietnamese, "Hây lăm."),
-            (French, "Hé lampe."),
         ] {
             assert!(only_the_name_as_written(alone, Some(language)), "{alone}");
             assert!(!only_the_name_as_written(alone, None), "{alone}");
@@ -4008,6 +4009,7 @@ mod tests {
             (Vietnamese, "Này, làm."),
             (French, "Lampe."),
             (French, "La lampe."),
+            (French, "Hé lampe."),
         ] {
             assert!(!only_the_name_as_written(not, Some(language)), "{not}");
         }
