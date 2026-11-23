@@ -50,7 +50,8 @@ analysis. `ReferenceAssembly::prime` mints the typed acknowledgement only after
 its existing epoch/discard/privacy/freshness checks and successful DSP/ring
 preparation. `PrimeBarrier` is the same portable validation path called by the
 Linux speaker immediately before its guarded start. It is one-shot and retains
-the original 100 ms deadline. Reset requires a new certified prime; it cannot
+the original deadline: 1 s for epoch 1, the first start after the voice
+starts (#8391), 100 ms for every later epoch. Reset requires a new certified prime; it cannot
 reuse the old acknowledgement.
 
 The fixed-mode default and DSP counters are unchanged. In capture-clock mode,

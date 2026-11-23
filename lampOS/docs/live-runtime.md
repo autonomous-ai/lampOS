@@ -105,12 +105,15 @@ to prepare the reference; it is not DSP analysis or microphone readiness.
 
 The speaker's one-shot `PrimeBarrier` accepts only these exact states, the
 original pending prime, matching current privacy, and an unchanged 480-frame
-unretired hardware cursor. It checks the original 100 ms prime deadline before
-starting; receipt does not extend it. Duplicate, unsolicited, malformed,
+unretired hardware cursor. It checks the original prime deadline before
+starting; receipt does not extend it. The deadline is 1 s for epoch 1, the
+first start after the voice starts, which a cold boot can hold up (#8391),
+and 100 ms for every later epoch. Duplicate, unsolicited, malformed,
 wrong-epoch/privacy or expired acknowledgements fail. Only then does the speaker
 explicitly start, after another live privacy check; capture then starts its
 prepared microphone and retains sequence 1. The prime/ack barrier has a checked
-100 ms bound and reference connection has
+bound (1 s on epoch 1, 100 ms after; speaker and capture both use
+`reference::barrier_us`) and reference connection has
 a 3 s startup bound. Neither is a guarantee that arbitrary driver calls finish
 within that time. There is no blind warmup mute or discarded opening audio.
 
