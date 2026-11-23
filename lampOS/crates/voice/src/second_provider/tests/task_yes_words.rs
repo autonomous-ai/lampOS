@@ -20,6 +20,7 @@ fn booth() -> TaskAsks {
         package: None,
         from: "your computer".into(),
         approved: false,
+        tool: None,
     }
 }
 
