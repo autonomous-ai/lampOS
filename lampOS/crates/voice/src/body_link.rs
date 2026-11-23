@@ -159,6 +159,18 @@ impl BodyLink {
     }
 }
 
+/// What of an answer's gesture the body is asked for while the care hold
+/// holds (`LAMP_CARE_LINE`, #7689, the first builder's go of 23 Nov): a
+/// nod only. A lamp with someone in distress stays still and turned to
+/// them: no greeting, laugh, surprise or headshake, and no lively fill.
+/// Outside the hold, the gesture as it came.
+pub fn care_gesture(
+    care_holds: bool,
+    cue: Option<(&'static str, bool)>,
+) -> Option<(&'static str, bool)> {
+    cue.filter(|&(gesture, lively)| !care_holds || (!lively && gesture == "nod"))
+}
+
 /// The gesture that goes with how an answer begins, as a person's head does:
 /// a nod with "yes", a shake with "no", a greeting with "hello", in English
 /// or Vietnamese. Most answers begin with none of these and get none.
@@ -546,6 +558,43 @@ impl Drop for EyesLink {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #7689 (the first builder's go, 23 Nov): during the care hold an
+    /// answer's gesture is a nod or nothing. No greeting, laugh, surprise
+    /// or headshake, and no lively fill; outside it every gesture goes as
+    /// before.
+    #[test]
+    fn during_the_care_hold_an_answer_only_nods() {
+        let mut cue = Cue::seeded(7);
+        for (turn, line, said) in [
+            (1, "Yes, I'm here with you.", Some("nod")),
+            (2, "Hello there!", None),
+            (3, "Haha, good one.", None),
+            (4, "No, not today.", None),
+            (5, "Xin chào!", None),
+        ] {
+            let heard = cue.heard_lively(turn, line, true, 1_000_000 * turn);
+            assert_eq!(
+                care_gesture(true, heard).map(|(gesture, _)| gesture),
+                said,
+                "{line}"
+            );
+            assert_eq!(care_gesture(false, heard), heard, "{line}");
+            assert!(heard.is_some(), "{line} has a gesture outside the hold");
+        }
+        for gesture in ["nod", "happy", "greeting"] {
+            assert_eq!(
+                care_gesture(true, Some((gesture, true))),
+                None,
+                "lively {gesture}"
+            );
+            assert_eq!(
+                care_gesture(false, Some((gesture, true))),
+                Some((gesture, true))
+            );
+        }
+        assert_eq!(care_gesture(true, None), None);
+    }
 
     /// Every datagram the eyes have been sent so far.
     fn told(eyes: &UnixDatagram) -> Vec<String> {
