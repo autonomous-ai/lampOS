@@ -60,7 +60,9 @@ for st in $STEPS; do
            need micon '^MUTE (LIFTED OK|NOT MUTED)';;
   save)    VOLOK || exit 2; HEARD save
            LAMP "" $D/mute.lamp.sh > $L/mute.txt 2>&1; cat $L/mute.txt; need mute '^MUTE OFF OK'
-           rm -f $L/verdicts.env $L/named-on.txt $L/named-off.txt
+           # KEEP_VERDICTS=1: a split rerun keeps the earlier runs' verdicts, so a later G still reads A, B and D.
+           [ "${KEEP_VERDICTS:-}" = 1 ] || rm -f $L/verdicts.env
+           rm -f $L/named-on.txt $L/named-off.txt
            LAMP "" $D/save.lamp.sh > $L/save.txt 2>&1; cat $L/save.txt; need save '^SAVED OK';;
   legs)    HEARD legs; bash $D/row.sh ${LEGS:-A B C D K H P N E}; T "legs: $(grep '^VERDICT' $L/row-$(echo ${LEGS:-A B C D K H P N E} | tr -d ' ').txt | cut -c1-90)";;
   tails)   HEARD tails; bash $D/row.sh ${TAILS:-F G}; T "tails: $(grep '^VERDICT' $L/row-$(echo ${TAILS:-F G} | tr -d ' ').txt | cut -c1-90)";;

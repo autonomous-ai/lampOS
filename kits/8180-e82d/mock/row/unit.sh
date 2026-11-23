@@ -64,6 +64,12 @@ for f in sys.argv[1:]:
   for n,l in enumerate(open(f),1):
     if re.search(r"(^|[; ])([A-Z][A-Z0-9_]*)=\$\2(;|$)",l.rstrip("\n")): print("%s:%d:%s"%(f,n,l.strip()))' $KIT/row/*.sh $KIT/run.sh)
     v "every kit variable has a default (no bare NAME=\$NAME)" '[ -z "$o" ]';;
+  keep-verdicts)
+    # A split rerun (rows of 20 min or less, 23 Nov) keeps the earlier runs' verdicts: save clears verdicts.env only
+    # without KEEP_VERDICTS=1, so a later G still reads A, B and D.
+    o=$(awk '/^  save\)/,/;;$/' $KIT/run.sh | grep -n 'verdicts.env')
+    v "save keeps verdicts.env with KEEP_VERDICTS=1, and clears it otherwise" \
+      'echo "$o" | grep -q "KEEP_VERDICTS:-}\" = 1 \] || rm -f \$L/verdicts.env" && [ "$(echo "$o" | wc -l | tr -d " ")" = 1 ]';;
   fixtures) o=$(python3 -I $KIT/mock/row/fixcheck.py $KIT/row/probe); rc=$?
     v "grant-probe, slow-probe and fork-probe load: a tool and a [[do]] each" '[ $rc = 0 ] && [ "$(echo "$o" | grep -c " OK$")" = 3 ]';;
   # every fresh-turn clip opens with the lamp's name said as a call: each clip row.sh ASKs or MAKEs, and every clip in

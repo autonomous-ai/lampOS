@@ -51,7 +51,7 @@ one step, then goes on at `<then>`. `UNTIL=<step>` stops before that step, and t
 | putback | optional, only with `PUTBACK_CMD`: your own put-back command, then `row/putback.lamp.sh` until it is installed | 0-20 | `PUTBACK OK` or `PUTBACK skipped` |
 | release | the lock released (needs UNROW OK, MUTE BACK OK, and PUTBACK OK when PUTBACK_CMD is set) | 0 | `LOCK RELEASED` |
 
-The whole run takes about 70-75 min. After it, do your own put-back to stable, unless the putback step did it.
+The whole run takes about 70-75 min. **A split rerun** (rows of 20 min or less): `LEGS="A B"`, then `KEEP_VERDICTS=1 LEGS="C D K"`, then `KEEP_VERDICTS=1 LEGS="H P G"`, each with `SKIP="tails boot"`. `save` clears `logs/verdicts.env` unless `KEEP_VERDICTS=1`, and G reads A, B and D from it, so runs 2 and 3 set it. After it, do your own put-back to stable, unless the putback step did it.
 
 `LEGS="..."` picks the legs step's legs. `SKIP="<step> ..."` leaves steps out. **The rerun of the failed legs** (First,
 22 Nov 14:39: A, B, C, D, K, H, G and P on the same build, 15510; 7170 stays with #7170), from a fresh lock:
