@@ -1052,7 +1052,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_MEMORY_KEEP_HEARD` | When you ask the lamp to remember something, it keeps your own words rather than its rewording. |
 | `LAMP_KEEP_ANSWERS_AT_ONCE` | When you only ask the lamp to remember something, it says it will at once, without the usual pause. |
 | `LAMP_MEMORY_NEWER_FIRST` | When you tell the lamp something has changed, it recalls your newer words before the old ones. |
-| `LAMP_APP_MEMORY` | During an app session, like a gym coach's, the lamp can answer from its live note and from what the app just asked you; it never keeps either. |
+| `LAMP_APP_MEMORY` | In an app session, like a coach's, the lamp answers from the app's note and last question; it keeps neither. |
 | `LAMP_MEMORY_REPLACES` | When you correct something the lamp remembered, it keeps the new version in place of the old one. |
 | `LAMP_MEMORY_NIGHTLY` | Overnight, while the lamp is idle, what you said that day is sorted into what it remembers about you. |
 | `LAMP_MEMORY_NIGHTLY_PATTERNS` | Overnight, the lamp can also notice things you do again and again, across days. |
