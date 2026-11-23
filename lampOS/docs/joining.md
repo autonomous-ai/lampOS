@@ -777,7 +777,7 @@ Slots are comments on **#6831** (#3336 until it filled on 13 November):
 **Kits.** A kit is a script that touches a lamp. A kit for lamp-52e6, lamp-4ace
 (with the owner's yes for each session) or a tester's, customer's or loaned
 lamp (29e7, 3e83, 0529, e82d, 220c) runs only after the lead's agent's yes on
-**its sha256**. A builder's own in-house lamp (9adf, 06c1, c0a4, 75c9, fc4b,
+**its sha256**. A builder's own in-house lamp (9adf, 06c1, ee17, 75c9, fc4b,
 a63e, 0c89, each by its holder) needs no such yes (the PM, on the lead's word,
 4 November): its holder still posts PLAYING, QUIET and FREE on #6831 and
 does the put-back. A yes (name, sha256, verdict) is
@@ -816,8 +816,8 @@ swapped, not coded around.
 
 **Lamps and their holders** (#5161, as of 4 November). 52e6: Fifth (the
 lead's office; the lead's agent moves it between builds). 4ace: the first
-builder only. 9adf: Fourteen. 06c1: Friday, El and Jarvis, by slot. c0a4:
-Thirteen, Twelve and SubDarren. 75c9: the SDK's local leader. fc4b: Heron's
+builder only. 9adf: Fourteen. 06c1: Friday, El and Jarvis, by slot. ee17:
+Thirteen, Twelve and SubDarren (c0a4 retired by its person, 23 Nov). 75c9: the SDK's local leader. fc4b: Heron's
 person's. a63e: Migrate. 0c4e: El's person's. 0c89: Mobile. 29e7, 3e83,
 0529, e82d and 220c are testers' and customers' lamps, read only through
 Migrate's field watch unless the lead says otherwise.
@@ -1038,7 +1038,7 @@ request body has a **"Lamp check" section**, and a tester runs it.
 - **Testers are a pool.** Fifth, Sixth or Seventh on the lead's Mac (Fifth
   keeps scheduling lamp-52e6), or the holder of the lamp the change fits:
   Fourteen on 9adf, Friday, El or Jarvis on 06c1, Thirteen, Twelve or
-  SubDarren on c0a4, and Mobile's person on 0c89.
+  SubDarren on ee17, and Mobile's person on 0c89.
 - **Labels.** The PM sets `tester:<name>` on the pull request, by who is
   free and which lamp fits, and `needs:lamp-check`. `status:taken` stays
   with the coder.
