@@ -990,7 +990,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_TURNED_FACE_SPEAKS` | Someone facing the lamp but silent while others talk isn't taken as talking to it; the room counts as busy. |
 | `LAMP_SAID_TO_ME` | A lip smack, a word to someone else, talk head down at a phone, or talk across a meeting or to a call while facing the lamp is not taken as said to the lamp. |
 | `LAMP_NEWS_REPLY_HEEDS_HELD` | Talk not meant for the lamp, just after it tells you its news, is no longer answered as a reply. |
-| `LAMP_ASKED_LOOKS` | In a conversation, only the first reply soon after the lamp's question is taken whatever the speaker looks at; later talk looking away is not. |
+| `LAMP_ASKED_LOOKS` | After the lamp asks something, only the first quick reply counts without a look. |
 | `LAMP_SPEAKING_READ_LOOKS` | A line you said while the eyes briefly lost your mouth is still taken as yours. |
 | `LAMP_TWO_FACES_HELD` | A second face seen just once, like a passer-by or a photo, no longer makes the lamp treat the room as busy. |
 | `LAMP_ENDPOINT_PAUSE_JOIN` | When you pause mid-sentence to think, the lamp waits a moment and answers what you said as one request. |
