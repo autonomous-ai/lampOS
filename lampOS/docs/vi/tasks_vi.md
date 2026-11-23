@@ -3385,7 +3385,8 @@ grant skill-start của nó, giống hệt kỹ năng của OpenClaw. Phần ri�
   `/var/lib/lampos-tasks/hermes-direct.json` (0600, `direct::KEPT_FILE`). Khởi
   động lại lamp-tasks, gateway của Hermes hay cả đèn đều nhận lại nó, nên cuộc
   trò chuyện tiếp tục; phiên mà gateway không còn thì được thay bằng phiên mới.
-  Một lần xoay vòng đặt id mới và xóa id cũ.
+  Một lần xoay vòng đặt id mới và xóa id cũ. Rớt giữa lượt chạy là ngoại lệ:
+  lượt kế tiếp vào một phiên mới (xem **Rớt**).
 - **Việc nói ra.** Một việc Hermes cho chính máy của đèn, không nêu tên phiên,
   được xếp hàng và trả lời `joined`, như trên. Worker tasks-harness chờ chính
   phiên của Hermes sẵn sàng (`direct::not_ready_for`, tối đa 60 s,
@@ -3433,7 +3434,15 @@ grant skill-start của nó, giống hệt kỹ năng của OpenClaw. Phần ri�
   không đọc được trạng thái trong 30 s) làm lượt đang chạy, và mọi lượt xếp
   hàng sau nó, kết thúc với cùng câu `lamp_agent_gateway::DROPPED`. Không gì
   được chạy lại: cùng lượt được giao lại trong 15 phút nhận lại lượt đã kết
-  thúc đó, và một yêu cầu mới là một việc mới.
+  thúc đó, và một yêu cầu mới là một việc mới. Khi gateway phục vụ lại, lượt
+  kế tiếp vào một phiên giữ mới (id mới, lưu trong file trạng thái; phiên cũ
+  bị xoá, cố gắng hết mức), như `reset` làm: gateway đã rớt vẫn giữ turn
+  lease của phiên cũ trong `state.db` của Hermes tới khi hết TTL 300 s, và
+  gateway khởi động lại, trong PID namespace riêng của nó, không thấy được
+  rằng tiến trình giữ lease đã chết, nên một lượt vào id cũ phải chờ hết lease
+  đó (lamp-ee17, 24/11: 211 s cho "capital of Spain"). Lượt chạy kết thúc bình
+  thường, kể cả qua một lần khởi động lại êm mà Hermes chạy xong nó, giữ
+  nguyên phiên.
 - **Vẫn ở Harness.** Phiên trên máy tính (mọi engine trên Mac),
   `harness reply-named`, `LAMP_TASKS_RESUME_CLOSED`, đăng nhập, và việc tìm
   target của `LAMP_HERMES_ON_LAMP`. Khối `hooks:` của Harness trong
