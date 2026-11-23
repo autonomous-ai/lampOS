@@ -846,6 +846,8 @@ fn a_leftover_temporary_key_is_removed() {
             tmp(&config.own_keys.join("openai_compatible.key")),
             // OpenRouter's key and model (#8420).
             tmp(&config.own_keys.join("openrouter.key")),
+            // Gemini's key and model (#8420).
+            tmp(&config.own_keys.join("gemini.key")),
             tmp(&config.own_keys.join("deepseek.url")),
         ]
     );
