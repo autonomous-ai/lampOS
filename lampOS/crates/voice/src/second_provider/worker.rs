@@ -1293,6 +1293,7 @@ pub fn services(
                         crate::second_config::OwnChat::OpenAiCompatible => "OpenAI-compatible",
                         crate::second_config::OwnChat::OpenRouter => "through OpenRouter",
                         crate::second_config::OwnChat::Gemini => "through Gemini",
+                        crate::second_config::OwnChat::Anthropic => "through Anthropic",
                     }
                 );
             } else {

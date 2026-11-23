@@ -719,7 +719,7 @@ impl Net {
         // fields: an OpenAI-compatible one plainly (#8362), OpenRouter's as
         // OpenRouter's chat, never searching, as the search stays the
         // lamp's own, Gemini's as Gemini's, its 400 for the key read as a
-        // refusal (#8420).
+        // refusal, Anthropic's with its `max_tokens` (#8420).
         let hosted = &self.config.hosted;
         self.chat = Arc::new(match hosted.own_chat {
             Some(OwnChat::OpenAiCompatible) => Chat::own_compatible(
@@ -739,6 +739,9 @@ impl Net {
             )?,
             Some(OwnChat::Gemini) => {
                 Chat::gemini_own(&base, &hosted.deepseek_model, key, self.declare.clone())?
+            }
+            Some(OwnChat::Anthropic) => {
+                Chat::anthropic(&base, &hosted.deepseek_model, key, self.declare.clone())?
             }
             None => Chat::deepseek_at(
                 &base,

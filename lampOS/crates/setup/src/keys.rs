@@ -52,6 +52,12 @@ pub const OPENROUTER_API: &str = "https://openrouter.ai/api/v1";
 /// Gemini's OpenAI-compatible API (#8420): fixed, so its key goes nowhere
 /// else. The check asks `<it>/models/<model>`.
 pub const GEMINI_API: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
+/// Anthropic's API (#8420): fixed, so its key goes nowhere else. The check
+/// asks `<it>/models/<model>` with [`ANTHROPIC_VERSION`]; the voice chats at
+/// its OpenAI-compatible `<it>/chat/completions`.
+pub const ANTHROPIC_API: &str = "https://api.anthropic.com/v1";
+/// The `anthropic-version` its model read is asked with.
+pub const ANTHROPIC_VERSION: &str = "2023-06-01";
 /// The most an OpenAI-compatible endpoint's model list is read (#8362).
 pub const MODELS_MOST: usize = 1 << 20;
 /// The longest voice ID taken: ElevenLabs' are 20 letters and digits.
@@ -169,24 +175,29 @@ pub enum Service {
     /// A person's own Gemini model, by name (#8420): a key and a model, at
     /// [`GEMINI_API`] alone.
     Gemini,
+    /// A person's own Anthropic model, by name (#8420): a key and a model,
+    /// at [`ANTHROPIC_API`] alone.
+    Anthropic,
 }
 
 impl Service {
-    pub const ALL: [Service; 6] = [
+    pub const ALL: [Service; 7] = [
         Service::DeepSeek,
         Service::Deepgram,
         Service::ElevenLabs,
         Service::OpenAiCompatible,
         Service::OpenRouter,
         Service::Gemini,
+        Service::Anthropic,
     ];
 
     /// The services that are the lamp's model: one own key among them is
     /// kept at a time, so the model in use is never a guess (#8362).
-    pub const MODELS: [Service; 4] = [
+    pub const MODELS: [Service; 5] = [
         Service::OpenAiCompatible,
         Service::OpenRouter,
         Service::Gemini,
+        Service::Anthropic,
         Service::DeepSeek,
     ];
 
@@ -199,6 +210,7 @@ impl Service {
             Self::OpenAiCompatible => "openai_compatible",
             Self::OpenRouter => "openrouter",
             Self::Gemini => "gemini",
+            Self::Anthropic => "anthropic",
         }
     }
 
@@ -211,6 +223,7 @@ impl Service {
             Self::OpenAiCompatible => "OpenAI-compatible",
             Self::OpenRouter => "OpenRouter",
             Self::Gemini => "Gemini",
+            Self::Anthropic => "Anthropic",
         }
     }
 
@@ -227,6 +240,7 @@ impl Service {
             Self::OpenAiCompatible => "openai_compatible.key",
             Self::OpenRouter => "openrouter.key",
             Self::Gemini => "gemini.key",
+            Self::Anthropic => "anthropic.key",
         }
     }
 
@@ -235,7 +249,11 @@ impl Service {
         match self {
             Self::DeepSeek => Some(DEEPSEEK_URL_FILE),
             Self::OpenAiCompatible => Some("openai_compatible.url"),
-            Self::Deepgram | Self::ElevenLabs | Self::OpenRouter | Self::Gemini => None,
+            Self::Deepgram
+            | Self::ElevenLabs
+            | Self::OpenRouter
+            | Self::Gemini
+            | Self::Anthropic => None,
         }
     }
 
@@ -245,6 +263,7 @@ impl Service {
             Self::OpenAiCompatible => Some("openai_compatible.model"),
             Self::OpenRouter => Some("openrouter.model"),
             Self::Gemini => Some("gemini.model"),
+            Self::Anthropic => Some("anthropic.model"),
             Self::DeepSeek | Self::Deepgram | Self::ElevenLabs => None,
         }
     }
@@ -255,6 +274,7 @@ impl Service {
         match self {
             Self::OpenRouter => Some(OPENROUTER_API),
             Self::Gemini => Some(GEMINI_API),
+            Self::Anthropic => Some(ANTHROPIC_API),
             _ => None,
         }
     }
@@ -268,6 +288,7 @@ impl Service {
             Self::OpenAiCompatible => "openai_compatible.checked",
             Self::OpenRouter => "openrouter.checked",
             Self::Gemini => "gemini.checked",
+            Self::Anthropic => "anthropic.checked",
         }
     }
 
@@ -284,7 +305,9 @@ impl Service {
             "base_url": self.url_file().is_some(),
             "fields": match self {
                 Self::ElevenLabs => json!(["voice_id"]),
-                Self::OpenAiCompatible | Self::OpenRouter | Self::Gemini => json!(["model"]),
+                Self::OpenAiCompatible | Self::OpenRouter | Self::Gemini | Self::Anthropic => {
+                    json!(["model"])
+                }
                 Self::DeepSeek | Self::Deepgram => json!([]),
             },
         });
@@ -402,16 +425,19 @@ pub fn given_model(
     let key = fit_key(key)?;
     let sent = base_url.map(str::trim).filter(|url| !url.is_empty());
     let (base_url, model) = match (service.endpoint(), sent) {
-        (Some(_), Some(_)) if service == Service::Gemini => {
-            return Err("Gemini takes no endpoint");
+        (Some(_), Some(_)) => {
+            return Err(match service {
+                Service::Gemini => "Gemini takes no endpoint",
+                Service::Anthropic => "Anthropic takes no endpoint",
+                _ => "OpenRouter takes no endpoint",
+            });
         }
-        (Some(_), Some(_)) => return Err("OpenRouter takes no endpoint"),
         (Some(endpoint), None) => (
             endpoint.to_owned(),
-            model.ok_or(if service == Service::Gemini {
-                "a Gemini key needs its model"
-            } else {
-                "an OpenRouter key needs its model"
+            model.ok_or(match service {
+                Service::Gemini => "a Gemini key needs its model",
+                Service::Anthropic => "an Anthropic key needs its model",
+                _ => "an OpenRouter key needs its model",
             })?,
         ),
         (None, sent) => (
@@ -442,7 +468,10 @@ pub fn given(service: Service, key: &str, base_url: Option<&str>) -> Result<Give
         (Service::Deepgram, Some(_)) => return Err("Deepgram takes no endpoint"),
         (Service::ElevenLabs, None) => None,
         (Service::ElevenLabs, Some(_)) => return Err("ElevenLabs takes no endpoint"),
-        (Service::OpenAiCompatible | Service::OpenRouter | Service::Gemini, url) => {
+        (
+            Service::OpenAiCompatible | Service::OpenRouter | Service::Gemini | Service::Anthropic,
+            url,
+        ) => {
             return given_model(service, &key, url, None);
         }
     };
@@ -471,7 +500,7 @@ pub fn parse(line: &str) -> Result<Asked, String> {
             .and_then(Value::as_str)
             .and_then(Service::from_id)
             .ok_or_else(|| {
-                "the service is deepseek, deepgram, elevenlabs, openai_compatible, openrouter or gemini"
+                "the service is deepseek, deepgram, elevenlabs, openai_compatible, openrouter, gemini or anthropic"
                     .to_owned()
             })
     };
@@ -621,7 +650,11 @@ pub fn host(url: &str) -> &str {
 /// What goes where with the person's own key, by name.
 pub fn goes_where(given: &Given) -> String {
     match given.service {
-        Service::DeepSeek | Service::OpenAiCompatible | Service::OpenRouter | Service::Gemini => format!(
+        Service::DeepSeek
+        | Service::OpenAiCompatible
+        | Service::OpenRouter
+        | Service::Gemini
+        | Service::Anthropic => format!(
             "your conversations now go to {} with your key: your words, what the lamp remembers that's sent with them, and what it sees when asked to look",
             host(given.base_url.as_deref().unwrap_or(DEEPSEEK_BASE_URL))
         ),
@@ -716,6 +749,16 @@ impl HttpCheck {
                     given.model.as_deref().unwrap_or_default()
                 ))
                 .bearer_auth(&given.key),
+            // Anthropic's one model, read with its own headers: its model
+            // read takes no bearer (#8420).
+            Service::Anthropic => client
+                .get(format!(
+                    "{}/models/{}",
+                    given.base_url.as_deref().unwrap_or(ANTHROPIC_API),
+                    given.model.as_deref().unwrap_or_default()
+                ))
+                .header("x-api-key", &given.key)
+                .header("anthropic-version", ANTHROPIC_VERSION),
             Service::DeepSeek | Service::OpenAiCompatible => client
                 .get(format!(
                     "{}/models",
@@ -774,7 +817,9 @@ impl HttpCheck {
                     status => Verdict::of_status(status),
                 });
             }
-            (Service::Gemini, 404, _) => return Some(Verdict::NoModel),
+            (Service::Gemini | Service::Anthropic, 404, _) => return Some(Verdict::NoModel),
+            // Any 2xx is Anthropic's model: an alias is answered by its
+            // dated id, so the id isn't matched (#8420).
             // A bad key is a 400 at Gemini, told by its body, read below.
             (Service::OpenAiCompatible | Service::Gemini, 200..=299, Some(model))
             | (Service::Gemini, 400, Some(model)) => model,
