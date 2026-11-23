@@ -81,6 +81,26 @@ fn a_worker_role_not_on_the_voices_list_is_never_started() {
     }
 }
 
+/// #7402: a worker whose program is not there fails naming that program,
+/// not on a bare `No such file or directory (os error 2)`.
+#[test]
+fn a_worker_spawn_of_a_missing_program_names_it() {
+    // No other test's socket is copied into these children (`spawns`).
+    let _spawning = crate::spawns::spawning();
+    let missing = Path::new("/nonexistent/lamp-voice-7402");
+    let dir = SessionDirectory::create().unwrap();
+    let error = Worker::spawn(missing, &dir.path, "probe", new_boot().unwrap(), &[])
+        .err()
+        .expect("a missing program is not started");
+    assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
+    assert!(
+        error
+            .to_string()
+            .starts_with("spawn /nonexistent/lamp-voice-7402: "),
+        "{error}"
+    );
+}
+
 /// #1071 (Twelve's P3 on #1095): every first word the voice's `main.rs`
 /// dispatches is on its list, and a word not on it is refused before
 /// anything runs, so a command added there and not to the list fails here.
