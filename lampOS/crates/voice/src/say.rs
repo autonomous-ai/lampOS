@@ -2424,10 +2424,6 @@ impl Says {
     }
 }
 
-/// Whether `request` is one a person asked for, which the care hold
-/// (`LAMP_CARE_LINE`, #7689) lets through: the shutdown's last words, the
-/// lamp's agent's answer to the owner's ask, a made skill's run the owner
-/// asked for now, or a line marked as answering the owner.
 /// What a say nobody asked for is told when the care hold
 /// (`LAMP_CARE_LINE`, #7689) refuses or cuts it. It says nothing of why: a
 /// skill or a computer is never told that words of self-harm were heard.
@@ -2437,6 +2433,10 @@ pub const CARE_HELD: &str = "held: the lamp is not taking lines nobody asked for
 /// asker is told `dropped` with it, and it too says nothing of why.
 pub const CARE_CUT: &str = "held";
 
+/// Whether `request` is one a person asked for, which the care hold
+/// (`LAMP_CARE_LINE`, #7689) lets through: the shutdown's last words, the
+/// lamp's agent's answer to the owner's ask, a made skill's run the owner
+/// asked for now, or a line marked as answering the owner.
 pub fn asked_for(request: &Request, now: std::time::Instant) -> bool {
     is_last_words(request)
         || request.answers

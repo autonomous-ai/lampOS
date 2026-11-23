@@ -361,18 +361,15 @@ fn the_care_hold_cuts_a_skills_say_under_way_and_tells_its_asker_only_held() {
         "the hold not holding"
     );
     assert!(care_cuts(true, test.reply.as_ref()));
-    cancel_reply(
-        &mut test.owner,
-        &mut test.reply,
-        &mut test.trace,
-        crate::say::CARE_CUT,
-    )
-    .unwrap();
+    cut_for_care(&mut test.owner, &mut test.reply, &mut test.trace).unwrap();
     assert_eq!(
         answered.try_recv(),
         Ok(Answer::Done(Outcome::Dropped("held".into())))
     );
     assert!(test.reply.is_none());
+    // The queued sound the speaker drops is the cut's own, expected: never
+    // an unexpected discard that ends the voice (App Only's P1 on #8388).
+    assert!(test.trace.receipts.discard(first.permit.owner()));
     assert!(!care_cuts(true, test.reply.as_ref()), "nothing left to cut");
 }
 

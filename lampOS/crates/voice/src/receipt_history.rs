@@ -64,7 +64,12 @@ pub(crate) const ASKER_STOPPED: &str = crate::say::ASKER_STOPPED;
 /// cancelled tail and ended the voice).
 pub(crate) const STREAM_REPLACED: &str = "stream_replaced";
 pub(crate) const STREAM_REMINDER_DUE: &str = "stream_reminder_due";
-pub(crate) const LOCAL_CANCELS: [&str; 12] = [
+/// A say nobody asked for cut by the care hold (`LAMP_CARE_LINE`, #7689,
+/// `cut_for_care`): the cut revokes the speaker as a hand's Stop does, so
+/// the queued sound it drops is expected, never a cancelled tail that ends
+/// the voice. Its asker is told only `held` (`say::CARE_CUT`).
+pub(crate) const CARE_HELD: &str = "care_held";
+pub(crate) const LOCAL_CANCELS: [&str; 13] = [
     LAST_WORDS,
     HEAD_SLEEP,
     SOFTWARE_MUTED,
@@ -77,6 +82,7 @@ pub(crate) const LOCAL_CANCELS: [&str; 12] = [
     ASKER_STOPPED,
     STREAM_REPLACED,
     STREAM_REMINDER_DUE,
+    CARE_HELD,
 ];
 
 impl ReceiptHistory {
@@ -406,6 +412,7 @@ mod tests {
             ("requested_audio_revoked", true),
             ("privacy_gap", true),
             ("update_give_way", true),
+            ("care_held", true),
             ("reminder_authority_lost", false),
             ("playback_discarded", false),
         ] {
