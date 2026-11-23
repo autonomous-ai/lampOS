@@ -87,6 +87,23 @@ pub fn long_form_on() -> bool {
     LONG_FORM.load(Ordering::Relaxed)
 }
 
+/// The switch for the long-form gain (`on` exactly; off unless set). It lifts only a
+/// long-form stream, so it does nothing without [`LONG_FORM_ENVIRONMENT`].
+pub const GAIN_ENVIRONMENT: &str = "LAMP_LONG_FORM_GAIN";
+
+/// Whether [`GAIN_ENVIRONMENT`] was `on` when the service started.
+static GAIN: AtomicBool = AtomicBool::new(false);
+
+/// The service started with the gain switch `on` or not.
+pub fn set_gain(on: bool) {
+    GAIN.store(on, Ordering::Relaxed);
+}
+
+/// Whether a long-form stream is lifted toward the gain's target.
+pub fn gain_on() -> bool {
+    GAIN.load(Ordering::Relaxed)
+}
+
 /// The speaker's chunk, in samples: 10 ms at 24 kHz, as a lamp's own sound is
 /// handed to the speaker worker.
 pub const CHUNK: usize = 240;
@@ -541,11 +558,123 @@ pub const LONG_FORM_LOUDEST_DBFS: f64 = -20.0;
 /// full-scale clicks is still held.
 pub const LONG_FORM_PEAK_DBFS: f64 = -6.0;
 
+/// The long-form bounds with the gain on. The per-window RMS bound is -10
+/// dBFS, not the -20 of a stream without the gain and not off: speech has
+/// words 10 dB over its average, so a -17 cap undoes the lift on exactly the
+/// loud words (by hand on the person's excerpt: -17 cut 966 of 3000 windows
+/// and left the whole RMS at the source's -21), while no bound at all lets a
+/// stream that turns loud play at its own level until the slow gain has come
+/// down (Heron on #8399). -10 sits over the person's loudest words with the
+/// gain (about -9 by hand, a few windows cut by less than 1 dB) and 10 dB over
+/// what the gain is aiming for. The peak is held at -1, as in the by-hand
+/// files the person picked.
+pub const LIFTED_LOUDEST_DBFS: f64 = -10.0;
+pub const LIFTED_PEAK_DBFS: f64 = -1.0;
+
 /// The RMS the limiter aims at, a part of the cap: 2% (0.18 dB) under it.
 const RMS_MARGIN: f64 = 0.98;
 
 /// The peak the limiter aims at, a part of the bound: 0.1% under it.
 const PEAK_MARGIN: f64 = 0.999;
+
+/// The level the long-form gain brings a quiet stream up to, dBFS RMS of the
+/// windows that are not pauses. The person's pick on the by-hand files was the
+/// source +3 dB, whole-file RMS -18; the whole file counts its pauses, which
+/// the level here does not, so on that excerpt (active level about -20) the
+/// same +3 dB is this target.
+pub const GAIN_TARGET_DBFS: f64 = -17.0;
+
+/// The most the gain adds, dB.
+pub const GAIN_MOST_DB: f64 = 6.0;
+
+/// The most the gain takes off, dB: a stream louder than the target is brought
+/// down to it, at the same slow rates, so a loud stream is not louder with the
+/// gain on than the target says (Heron on #8399).
+pub const GAIN_LEAST_DB: f64 = -20.0;
+
+/// How fast the gain rises, dB per 10 ms window (3 dB a second), and how fast
+/// it falls when the stream gets louder (6 dB a second): slow, so a changed
+/// level is followed over seconds and no word is pumped.
+const GAIN_UP_DB: f64 = 0.03;
+const GAIN_DOWN_DB: f64 = 0.06;
+
+/// The level estimate's time constant, in windows (4 s).
+const GAIN_LEVEL_WINDOWS: f64 = 400.0;
+
+/// A window under this RMS (dBFS) is a pause: it does not move the level
+/// estimate or the gain, so a pause never makes the next word louder, and a
+/// quiet intro or room tone (a -40 breath) neither seeds the gain nor gives it
+/// the full lift before the first speech.
+const GAIN_PAUSE_DBFS: f64 = -36.0;
+
+/// The long-form gain: a slow follower of a stream's own level. It keeps a
+/// running mean square of the windows that are not pauses (4 s time
+/// constant) and wants the gain that brings it to [`GAIN_TARGET_DBFS`],
+/// between [`GAIN_LEAST_DB`] and [`GAIN_MOST_DB`] dB. The first block that has
+/// anything that is not a pause sets the level and the
+/// gain at once, so a stream does not swell in (a stream louder than the
+/// target is brought down from its first block); after that the gain moves at
+/// most [`GAIN_UP_DB`] up or [`GAIN_DOWN_DB`] down per window. Nothing is
+/// read ahead and no sound is held back. It only computes the factor: the
+/// [`Limiter`] applies it before it measures the window, so a lifted peak is
+/// lowered with its window and never clipped.
+#[derive(Debug, Default)]
+struct Gain {
+    /// The running mean square of the windows that were not pauses; 0 until
+    /// the first.
+    level: f64,
+    /// How many such windows were taken in, up to the time constant.
+    taken: f64,
+    /// The gain now, dB.
+    db: f64,
+}
+
+impl Gain {
+    fn wanted(&self) -> f64 {
+        let level_dbfs = 10.0 * (self.level / (32_767.0 * 32_767.0)).log10();
+        (GAIN_TARGET_DBFS - level_dbfs).clamp(GAIN_LEAST_DB, GAIN_MOST_DB)
+    }
+
+    /// Sets the level and the gain from the windows of the first block that
+    /// are not pauses; once set, does nothing.
+    fn start(&mut self, block: &[i16]) {
+        if self.taken > 0.0 {
+            return;
+        }
+        let pause = 32_767.0 * 10f64.powf(GAIN_PAUSE_DBFS / 20.0);
+        let mut sum = 0.0;
+        let mut count = 0.0;
+        for window in block.chunks(LIMIT_WINDOW) {
+            let power =
+                window.iter().map(|&s| f64::from(s).powi(2)).sum::<f64>() / window.len() as f64;
+            if power.sqrt() > pause {
+                sum += power;
+                count += 1.0;
+            }
+        }
+        if count > 0.0 {
+            self.level = sum / count;
+            self.taken = count.min(GAIN_LEVEL_WINDOWS);
+            self.db = self.wanted();
+        }
+    }
+
+    /// The linear factor for a window whose RMS is `rms`.
+    fn window(&mut self, rms: f64) -> f64 {
+        let pause = 32_767.0 * 10f64.powf(GAIN_PAUSE_DBFS / 20.0);
+        if self.taken > 0.0 && rms > pause {
+            self.taken = (self.taken + 1.0).min(GAIN_LEVEL_WINDOWS);
+            self.level += (rms * rms - self.level) / self.taken;
+            let wanted = self.wanted();
+            if wanted > self.db {
+                self.db = (self.db + GAIN_UP_DB).min(wanted);
+            } else {
+                self.db = (self.db - GAIN_DOWN_DB).max(wanted);
+            }
+        }
+        10f64.powf(self.db / 20.0)
+    }
+}
 
 /// A stream's limiter: per 10 ms window (240 samples, one speaker chunk) the
 /// gain that brings its RMS to the cap, taken at once when it must go down
@@ -559,6 +688,9 @@ struct Limiter {
     loudest_dbfs: f64,
     /// The peak bound, dBFS.
     peak_dbfs: f64,
+    /// The long-form gain, lifted before the window is measured; none for a
+    /// short sound or with the switch off.
+    lift: Option<Gain>,
 }
 
 impl Default for Limiter {
@@ -568,6 +700,7 @@ impl Default for Limiter {
             gain: 1.0,
             loudest_dbfs: crate::say::SOUND_LOUDEST_DBFS,
             peak_dbfs: crate::say::SOUND_PEAK_DBFS,
+            lift: None,
         }
     }
 }
@@ -579,6 +712,19 @@ impl Limiter {
             gain: 1.0,
             loudest_dbfs: LONG_FORM_LOUDEST_DBFS,
             peak_dbfs: LONG_FORM_PEAK_DBFS,
+            lift: None,
+        }
+    }
+
+    /// The long-form bound with the gain: a lifted stream would be cut by the
+    /// -20 RMS bound, so that is off ([`LIFTED_LOUDEST_DBFS`]) and the peak is
+    /// [`LIFTED_PEAK_DBFS`] (the person's pick held it at -1).
+    fn lifted() -> Self {
+        Self {
+            gain: 1.0,
+            loudest_dbfs: LIFTED_LOUDEST_DBFS,
+            peak_dbfs: LIFTED_PEAK_DBFS,
+            lift: Some(Gain::default()),
         }
     }
 
@@ -590,16 +736,23 @@ impl Limiter {
         // puts a window a hair over it.
         let loudest = full * 10f64.powf(self.loudest_dbfs / 20.0) * RMS_MARGIN;
         let mut limited = 0;
+        if let Some(lift) = self.lift.as_mut() {
+            lift.start(block);
+        }
         for window in block.chunks_mut(LIMIT_WINDOW) {
             let power = window.iter().map(|&s| f64::from(s).powi(2)).sum::<f64>();
-            let rms = (power / window.len() as f64).sqrt();
+            let raw_rms = (power / window.len() as f64).sqrt();
+            // The gain's factor for this window; the window is measured as
+            // it will play, so the bounds hold with the lift.
+            let lift = self.lift.as_mut().map_or(1.0, |lift| lift.window(raw_rms));
+            let rms = raw_rms * lift;
             // The loudest sample of the window brings the gain down too, so a
             // peak past the bound is lowered with the whole window (its shape
             // kept) and not cut flat. A part under 0.1% leaves the rounding
             // of whole samples no way to put one over.
             let top = window
                 .iter()
-                .map(|&s| f64::from(s).abs())
+                .map(|&s| f64::from(s).abs() * lift)
                 .fold(0.0, f64::max);
             let by_rms = if rms > loudest { loudest / rms } else { 1.0 };
             let by_peak = if top > peak {
@@ -623,7 +776,7 @@ impl Limiter {
                 } else {
                     start + (target - start) * (at as f64 + 1.0) / count
                 };
-                let mut value = f64::from(*sample) * gain;
+                let mut value = f64::from(*sample) * lift * gain;
                 // Only the rounding's own last hair: the gain above already
                 // keeps every sample under the bound.
                 if value.abs() > peak {
@@ -653,7 +806,9 @@ impl Sound {
         Ok(Self {
             blocks: bus.subscribe_typed(Audio::SPEAKER_TOPIC, NAME, Audio::TYPE)?,
             counts: Counts::default(),
-            limiter: if long_form_on() {
+            limiter: if long_form_on() && gain_on() {
+                Limiter::lifted()
+            } else if long_form_on() {
                 Limiter::long_form()
             } else {
                 Limiter::default()
@@ -1013,6 +1168,158 @@ mod tests {
             "a short sound at speech level must be refused"
         );
         assert!(quiet.is_ok());
+    }
+
+    /// Plays `input` through a lifted limiter in 240-sample blocks; the played
+    /// sound and the gain (dB) each window ended on.
+    fn lifted_through(input: &[i16]) -> (Vec<i16>, Vec<f64>) {
+        let mut limiter = Limiter::lifted();
+        let mut played = Vec::new();
+        let mut gains = Vec::new();
+        for part in input.chunks(240) {
+            let mut block = part.to_vec();
+            limiter.limit(&mut block);
+            played.extend(block);
+            gains.push(limiter.lift.as_ref().unwrap().db);
+        }
+        (played, gains)
+    }
+
+    #[test]
+    fn a_quiet_long_form_stream_is_lifted_toward_minus_17_and_never_past_the_ceiling() {
+        // Eight seconds at -26 dBFS: wants +9, held to the +6 ceiling.
+        let (played, gains) = lifted_through(&tone_at(-26.0, 24_000 * 8));
+        let top = gains.iter().copied().fold(0.0, f64::max);
+        assert!((top - GAIN_MOST_DB).abs() < 0.01, "{top}");
+        // A -21 stream wants +4: the last second is within 1 dB of -18.
+        let (played_22, _) = lifted_through(&tone_at(-21.0, 24_000 * 8));
+        let (rms, _) = loudest(&played_22[24_000 * 7..]);
+        let dbfs = 20.0 * (rms / 32_767.0).log10();
+        assert!((dbfs - GAIN_TARGET_DBFS).abs() < 1.0, "{dbfs}");
+        assert!(played.len() == 24_000 * 8);
+    }
+
+    #[test]
+    fn a_stream_at_the_target_gets_no_gain_and_a_louder_one_is_brought_down_to_it() {
+        let (_, gains) = lifted_through(&tone_at(-16.5, 24_000 * 4));
+        assert!(gains.iter().all(|&db| db.abs() < 0.6), "{gains:?}");
+        // A -12 stream wants -5 and has it from the first block.
+        let (played, gains) = lifted_through(&tone_at(-12.0, 24_000 * 4));
+        assert!((gains[0] + 5.0).abs() < 0.5, "{}", gains[0]);
+        assert!(gains.iter().all(|&db| db < 0.0), "{gains:?}");
+        let (rms, _) = loudest(&played[24_000 * 3..]);
+        let dbfs = 20.0 * (rms / 32_767.0).log10();
+        assert!((dbfs - GAIN_TARGET_DBFS).abs() < 1.0, "{dbfs}");
+    }
+
+    /// The RMS of every 1 s stretch of `samples`, stepping by 100 ms, in dBFS.
+    fn second_stretches(samples: &[i16]) -> Vec<f64> {
+        samples
+            .windows(24_000)
+            .step_by(2_400)
+            .map(|stretch| {
+                let (rms, _) = loudest(stretch);
+                20.0 * (rms / 32_767.0).log10()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_loud_stream_with_the_gain_on_ends_near_the_target_and_never_plays_at_its_own_level() {
+        // Heron on #8399: -6 dBFS RMS must not play at -6 with the gain on.
+        let (played, _) = lifted_through(&tone_at(-6.0, 24_000 * 6));
+        let stretches = second_stretches(&played);
+        let worst = stretches.iter().copied().fold(f64::MIN, f64::max);
+        assert!(worst < GAIN_TARGET_DBFS + 1.0, "{worst}");
+        let last = *stretches.last().unwrap();
+        assert!((last - GAIN_TARGET_DBFS).abs() < 1.0, "{last}");
+    }
+
+    #[test]
+    fn a_quiet_intro_gives_no_lift_and_the_speech_after_it_does_not_swell() {
+        // Heron on #8399: 2 s of -40 (a pause: no gain, no seed), then -12.
+        let mut input = tone_at(-40.0, 24_000 * 2);
+        input.extend(tone_at(-12.0, 24_000 * 3));
+        let (played, gains) = lifted_through(&input);
+        assert!(
+            gains[..199].iter().all(|&db| db == 0.0),
+            "{:?}",
+            &gains[..5]
+        );
+        let stretches = second_stretches(&played[24_000 * 2..]);
+        let worst = stretches.iter().copied().fold(f64::MIN, f64::max);
+        assert!(worst < GAIN_TARGET_DBFS + 3.0, "{worst}");
+    }
+
+    #[test]
+    fn a_stream_that_turns_loud_while_the_gain_lags_is_held_at_the_window_bound() {
+        // Quiet for 6 s (gain +6), then -8 dBFS: the gain comes down at 6 dB a
+        // second, and no 10 ms window passes the lifted RMS bound meanwhile.
+        let mut input = tone_at(-26.0, 24_000 * 6);
+        input.extend(tone_at(-8.0, 24_000 * 3));
+        let (played, _) = lifted_through(&input);
+        let cap = 32_767.0 * 10f64.powf(LIFTED_LOUDEST_DBFS / 20.0);
+        for window in played.chunks(240) {
+            let (rms, _) = loudest(window);
+            assert!(rms <= cap, "{rms} past {cap}");
+        }
+    }
+
+    #[test]
+    fn the_gain_is_there_from_the_first_block_and_moves_slowly_after() {
+        let (_, gains) = lifted_through(&tone_at(-20.0, 24_000 * 4));
+        // Wanted +3 from the first window on: no swell.
+        assert!((gains[0] - 3.0).abs() < 0.5, "{}", gains[0]);
+        // Then a louder second part brings it down at most 6 dB a second
+        // (0.06 dB a window) and a quieter one up at most 3 dB a second.
+        let mut input = tone_at(-20.0, 24_000 * 2);
+        input.extend(tone_at(-26.0, 24_000 * 4));
+        let (_, gains) = lifted_through(&input);
+        for pair in gains.windows(2) {
+            assert!(pair[1] - pair[0] <= GAIN_UP_DB + 1e-9, "{pair:?}");
+            assert!(pair[0] - pair[1] <= GAIN_DOWN_DB + 1e-9, "{pair:?}");
+        }
+        assert!(gains.last().unwrap() > &4.0);
+    }
+
+    #[test]
+    fn a_pause_does_not_lift_the_next_word() {
+        let mut input = tone_at(-22.0, 24_000);
+        input.extend(vec![0; 24_000 * 5]);
+        input.extend(tone_at(-12.0, 4_800));
+        let (_, gains) = lifted_through(&input);
+        let before_pause = gains[99];
+        let after_pause = gains[gains.len() - 21];
+        assert!(
+            (before_pause - after_pause).abs() < 1e-9,
+            "{before_pause} {after_pause}"
+        );
+        // The loud word then brings it down, never up.
+        assert!(gains[gains.len() - 1] <= after_pause);
+    }
+
+    #[test]
+    fn a_lifted_stream_never_passes_minus_1_dbfs_and_a_peak_is_lowered_with_its_window() {
+        let cap_peak = 32_767.0 * 10f64.powf(LIFTED_PEAK_DBFS / 20.0);
+        let mut input = sine(3_000.0, 24_000 * 3);
+        for window in input.chunks_mut(240) {
+            window[100] = 20_000;
+        }
+        let (played, _) = lifted_through(&input);
+        let (_, peak) = loudest(&played);
+        assert!(peak <= cap_peak, "{peak} past {cap_peak}");
+        // Not cut flat: the pulse stands well over the tone beside it.
+        for window in played.chunks(240).skip(300) {
+            assert!(window[100] > 10_000, "pulse cut to {}", window[100]);
+        }
+    }
+
+    #[test]
+    fn the_gain_switch_is_one_name_off_unless_set_and_the_short_bound_is_not_lifted() {
+        assert_eq!(GAIN_ENVIRONMENT, "LAMP_LONG_FORM_GAIN");
+        assert!(!gain_on());
+        assert!(Limiter::default().lift.is_none());
+        assert!(Limiter::long_form().lift.is_none());
     }
 
     #[test]
