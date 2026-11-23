@@ -2458,7 +2458,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, set by lamp-tasks
      as `agents.defaults.workspace`); and an initial
      `<state>/openclaw.json` with only its `gateway` block
-     (`mode: "local"`, `bind: "loopback"`, token auth). lamp-tasks merges
+     (`mode: "local"`, `bind: "loopback"`, token auth). The queue's mode
+     is not written: lamp-tasks' direct path sends `queueMode: "followup"`
+     with each `chat.send` (docs/tasks.md). lamp-tasks merges
      the rest in at its start (docs/tasks.md, "OpenClaw's settings on the
      lamp"). The block is checked by OpenClaw before it lands (#7868), as
      lamp-tasks' writes are (#7108): the new text goes to a new 0600 file
@@ -2679,6 +2681,39 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      check still failing is found again by the next round. There is no
      switch of its own: it only makes systemd run lamp-update's own unit
      as its text says.
+   - **lamp-tasks, straight to the Gateway** (`LAMP_TASKS_OPENCLAW_DIRECT=on`
+     in the product's `lamp-tasks.service`, M8; docs/switches.md, its row):
+     lamp-tasks hands every OpenClaw turn to the Gateway over its WebSocket
+     itself, with no Harness pane, no `openclaw tui`, no tmux and no
+     `openclaw … --gateway` CLI call. Nothing in lamp-update changes for it,
+     and none is needed for it to reach the Gateway:
+     - The Gateway's namespaces are user, mount and PID only (the
+       `unshare` flags above, `openclaw_install::NS_FLAGS`), never a network
+       one, so `127.0.0.1:18789` is the lamp's own loopback. That is how the
+       CLI calls reach it today: the wrapper's `nsenter` joins the user,
+       mount and PID namespaces, not the network, and lamp-tasks' port probe
+       (`answers`) already connects from its own unit. lamp-tasks'
+       unit sets no `PrivateNetwork`, `IPAddressDeny`,
+       `RestrictAddressFamilies`, `ProtectHome` or `ProtectSystem`, and
+       hides only lamp-control's state and the apps socket folder, so it
+       runs as `lampos` and reads the token at
+       `/var/lib/lampos-openclaw/gateway-token` (0600 `lampos`, in the
+       0700 `lampos` folder) as it is. A test holds all of this
+       (`the_product_speaks_to_openclaws_gateway_directly`).
+     - It connects as OpenClaw's trusted local backend client
+       (`gateway-client`, mode `backend`) with the shared token, which
+       OpenClaw 2026.11.2 admits on a direct loopback connection without a
+       pairing approval (its `docs/gateway/protocol/handshake.md`), so no
+       one is asked anything.
+     - The token is made once and kept, but an install that set OpenClaw's
+       folder aside makes a new one, so lamp-tasks reads it again at each
+       connect.
+     - The exec approvals stay as below: the install still adds agent
+       `main`'s skill-start entry with the CLI, through the wrapper, and
+       lamp-tasks puts it back over its own socket (`exec.approvals.get` and
+       `set`) before each skill run, so a Gateway whose approvals were wiped
+       needs no CLI call from lamp-tasks.
+     - Off, lamp-tasks uses Harness as before; Hermes always does.
    - **The forwarder token:** the wrapper exports `LAMP_HERMES_TOKEN` from
      lamp-cloud's `/var/lib/lampos-cloud/hermes-token`, as Hermes's does,
      for the `lampos` provider's `apiKey` (`${LAMP_HERMES_TOKEN}`).

@@ -3403,7 +3403,7 @@ for each run, and is answered once the run ends
       run goes through Harness's own lamp target instead, as when signed
       in, which works with no account (#6407: no machines look, no
       `--machine`, work under the computer's own id). One line is
-      journaled: "skill task <run>: direct execution is unavailable;
+      journaled: "skill task <run>: a run without Harness is unavailable;
       Harness is signed out, so trying Harness's own lamp target". This
       describes an attempt, not a final refusal or a claim of success.
       So a reset lamp with
@@ -5764,6 +5764,197 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   it is told only #7919's `one_session_not_started` failure through Task
   news, never both. The line is heard with the answer, not at the moment
   of the replacement.
+
+### OpenClaw spoken to directly (`LAMP_TASKS_OPENCLAW_DIRECT=on` in the product's lamp-tasks unit)
+
+With `LAMP_TASKS_OPENCLAW_DIRECT=on` in lamp-tasks' own environment (`on`
+exactly; anything else, unset too, is off), lamp-tasks hands every OpenClaw
+turn straight to OpenClaw's gateway through `lamp_agent_gateway::AgentSession`
+(`crates/agent-gateway`): one connection and one long-lived session. This
+replaces the Harness CLI for OpenClaw (`harness new/reply/ensure/wait/show/
+close/ps`, `openclaw tui` in tmux, where the stuck sessions of #7906, #8001
+and #6226 came from) and the `openclaw … --gateway` CLI calls (`approvals get`,
+`approvals allowlist add`, `gateway call sessions.delete`). Hermes keeps its
+path as before. The code is `crates/tasks/src/direct.rs`.
+
+The session is `lamp_agent_gateway::openclaw::Session` (`direct::lamp_session`):
+its default `Config` with the URL from `gateway::PORT` and the fence from
+`skill_start::LAUNCHER`. That means `ws://127.0.0.1:18789`, the token
+in `/var/lib/lampos-openclaw/gateway-token`, the kept session
+`agent:main:lamp`, each task handed over as its own run (`queueMode`
+`followup`), and approval prompts answered by the skill-start fence's policy.
+The product's `lamp-tasks.service` sets it on (M8; [switches.md](switches.md)).
+
+With the switch on and a session built:
+
+- **At the start.** A pump thread (`openclaw-direct`) connects at once and
+  opens or adopts the kept session, with no ask needed. A failed look is tried
+  again after 0.5 s, doubled each time, at most 30 s (2 s while something
+  waits). While ready and idle, it looks again every 30 s. The one session's
+  pane (`LAMP_TASKS_ONE_SESSION`) is not opened: it only ever took OpenClaw's
+  turns.
+- **A spoken task.** An OpenClaw task for the lamp's own machine with no session
+  named is queued in the direct session and answered `joined`, with an agent id
+  of its own: a fresh UUID per turn. The store then follows it as it follows
+  any joined task, through `observe` and `status`, which answer such ids from
+  the run itself. It is never put in Harness's `wait` or `watch`
+  (`direct::harness_watched`), which never had it (`UNKNOWN_HARNESS`): its end
+  is read from its run. The routing is one variant of the production backend
+  (`runtime::Production::Direct`): the lamp's OpenClaw turns go to the direct
+  session, every other call to the Harness backend inside it. The
+  tasks-harness worker's wait (`gateway::launch_with`) stays the same, but its
+  probe is the session's readiness (`OpenclawDirect::gateway`, a
+  `gateway::Probe`), not the port. The launch waits for the session to be
+  ready, at most 60 s (`gateway::READY_WITHIN`). Not ready by then, it is `not_sent`
+  `openclaw_gateway_not_ready`, which Task news tells as "I'm still getting
+  ready".
+- **A skill's `do.task` and a make.** `HarnessRunner::run` hands the run to the
+  direct session in place of its gateway wait and pane. Whether the run goes
+  direct (the lamp's default agent is OpenClaw's gateway agent) is checked
+  before the no-Harness check, so a direct run never reads Harness's sign-in. Its folder, its skill-start
+  grant (`gateway::open_start`, the fence) and its token stay as they are. Only
+  the hand-over and the wait for its end change. The session's readiness is
+  waited for at most 240 s (`gateway::SERVING_WITHIN`) or to the run's
+  deadline, by the same `Gateway::before_launch_until` wait. A run that ended
+  well journals `skill task <run>: ended, OpenClaw's gateway says idle, after
+  <N> s; its agent: started (the lamp's default agent)`. A skill's answer is kept only when the launcher claimed the start
+  and the fence said the script started (`Live::ran`); otherwise the run fails
+  closed, as before. A make's answer is its folder's `answer.md`, else its chat
+  (`make_answer`). A cancelled run or one past its deadline is aborted on the
+  gateway (`chat.abort`).
+- **One turn at a time.** Turns go in one at a time, spoken tasks ahead of
+  skill runs and makes, then the oldest first. Each turn's text is the one
+  session's: `New task <id>:`, then the reply-language line, then the words.
+  A turn waiting for the one before it reads `starting`, with the line
+  `waiting for the task before it to end`.
+- **Stuck.** If a run has had no event from the gateway for 5 min (V1's
+  busyTTL, `STUCK_AFTER`), it is stuck. If the run's last event is a tool's start with no result
+  yet (`last_tool.running`: a build or a `sleep` sends nothing until it ends),
+  the quiet limit is 6 times that, 30 min, so a legit long tool is not ended. A
+  stuck run is aborted (best effort) and ends `failed` with "the agent stopped
+  responding, so the task was stopped". The next turn then goes in. For tests
+  on a lamp, `LAMP_TASKS_DIRECT_STUCK_S` (whole seconds, 10 or more; anything
+  else is ignored) sets the base limit at lamp-tasks' start, journaled as
+  `tasks: direct: a quiet run is checked for stuck after <s> s
+  (LAMP_TASKS_DIRECT_STUCK_S), a running tool after <6×s> s`. The product
+  leaves it unset.
+- **A broken session.** A refused send, or two failed sends in a row (a gateway
+  not up does not count), make the session broken. It is reset (a fresh
+  conversation) and the waiting turn tried once more. Broken again after that,
+  or past 4 sends, the turn ends `failed`. Before a turn that was tried already
+  is sent again, the gateway's running runs are looked at, and one it already
+  has for that turn is taken over rather than sent twice.
+- **The gateway down.** The pump keeps reconnecting. A queued turn waits at most
+  2 min of a gateway not ready (`QUEUED_MOST`), counted from when it stopped
+  being ready, then ends `failed` with "the agent's gateway was not ready in
+  time (openclaw_gateway_not_ready)".
+- **Getting ready.** If the session has not been ready for 5 s while something
+  waits, a hook is told once per not-ready stretch. #8237's
+  `tell_getting_ready` is not at this head, so for now the hook journals
+  `tasks: direct: still getting ready: <why>` (a TODO in `direct.rs`).
+- **The skill-start allow-list.** Before each skill run, agent `main`'s exec
+  allow-list is read over the session. If the launcher's entry is missing, it
+  is put back. A read the engine can't do never blocks the run. A put-back that
+  fails ends the run with `skill-start is not on agent main's exec allow-list
+  yet`. These calls are on `direct::DirectSession`, beside the
+  engine-neutral `AgentSession`.
+- **Progress.** Each run's `Progress` from the gateway is given in the shapes
+  `harness ps` and `harness show` gave, so the tracker (`tasks/status`,
+  `get_progress`), the work records (`work`, `work_list`) and "tasks now" read
+  it unchanged, one task per run (no shared-pane caveat).
+  - The state is `starting` while queued in lamp-tasks, `working` from the
+    moment the gateway takes the turn (before its first event too) until it
+    ends (never `idle`), `idle` with its whole answer once answered, `failed`
+    for a failure or an empty answer, and `stopped` once aborted.
+  - The bus's `tasks/status` is given a direct task's row each time it changes
+    (its state, line or last activity), in the next turn of lamp-tasks' loop.
+  - **No Harness calls for a direct task.** An OpenClaw task on the lamp's own
+    machine (`direct::lamp_path`) makes no Harness `ps` due
+    (`progress::Tracker::due`), its look is the run's in place of `harness
+    show` (`direct::lamp_observe`; a run gone here, pruned or from before a
+    restart, is `observe_failed` and read as `missing`), and its close never
+    asks Harness (`close_told`, gone). Each such call took ~2 s on the lamp on
+    the one `tasks-harness` worker that launches also run on, so a hand-over
+    could wait behind it (`turn accepted in 6346 ms` on the lamp). Hermes
+    tasks, OpenClaw on another machine and the switch off keep the Harness
+    poller as before; a Hermes read in flight can still hold a launch back.
+  - A skill run's or make's turn is named by its run id; a make with none (its
+    folder's name has no run id) gets `<skill>-<8 hex>`, so the journal's
+    `tasks: <id>: turn accepted …` line always names it.
+  - The line (`about`, at most 160 characters) is the plan's `on step k of n:
+    <step>` when the agent keeps one, then the tool running or last run with its
+    brief. With neither, it is the tail of what it has written. It is made plain
+    (`now::step`), with no file paths and no word the sign matcher reads as
+    `done` (`progress::signs_in`: `done`, `finished`, `completed`,
+    `implemented`) mid-run, so no `done` sign starts an unasked turn.
+  - `tools` is the tools finished. A work record's `step` is `{n, tool}`, with
+    `n` the tools finished plus the one running and `tool` the tool's name only,
+    put on the records once per refresh of the work records.
+  - The answer is cut to 16 KiB with `truncated`.
+  - A `get_progress`, `tasks_now`, `work` or `work_list` request first reads
+    the direct tasks' progress at once, so "how far along is it?" is right
+    mid-run.
+  - The store keeps a direct turn's idle answer at its first look (it is the
+    run's final event, whole), not after a second identical one, so the
+    unasked news is told at once.
+  - That look comes at the run's end. The owner loop pushes a read of each
+    watched direct task whose run has ended (`Engine::push_direct_ended`),
+    once, as Harness's `watch`/`wait` push theirs. It does not wait for the
+    watch's next read, up to 30 s later (ee17 task 13: 23 s from
+    `session.ended` to the observation).
+- **Lost.** If the connection breaks, the session reconnects with the same
+  backoff, and a run the gateway still has goes on. A run the restart lost
+  (`UnknownRun`) ends `failed` with "the agent's gateway lost the run in a
+  restart", and the next task goes in once ready.
+- **Gateway restart or drop.** This is the owner's call (2026-11-23). On any
+  drop (close 1012 at a restart, a crash, 1006, a lost socket), every run in
+  flight ends `failed` at once with `openclaw::DROPPED`: "A small system error
+  stopped this task. Please try again in a few minutes." The turns queued
+  behind it end the same, never handed over. So does a run the gateway no
+  longer knows after the reconnect (`UnknownRun`). That line is the failed
+  observation's `data.answer`, which `get_observation` returns and the voice's
+  news of a stopped task reads, so the voice says it in the person's language.
+  `get_task` lists only the observation's metadata, never its answer. There is no wait for OpenClaw's restart recovery. A run
+  whose final came before the drop keeps its answer. A crashed gateway is
+  restarted by its unit (`Restart=always`, #8238, `openclaw_install.rs`).
+  lamp-tasks has no restart path of its own.
+  - **Stray recovery runs.** After the reconnect, OpenClaw's
+    `main-session-restart-recovery` re-runs the failed task by itself (ee17
+    17:0x: 76 s after ready, 4 min 22 s long, under a new gateway run id).
+    A short next task waited 4 min behind it. For 15 min after a drop that
+    failed a run (`STRAYS_FOR`), any run of the kept session that is not one
+    of ours still going is aborted once (`chat.abort {sessionKey, runId}`):
+    one going at the reconnect (one `chat.history`, `activeRunIds` /
+    `inFlightRun`), or one at its first event. Its events change nothing.
+  - **Reconnect.** Each connect (dial, challenge, hello, a first
+    `sessions.list`) has its own bound, whatever the caller's slice: 30 s
+    (`connect_timeout`), or 60 s after a 1012 or while the gateway says it is
+    starting (`restart_connect_timeout`). A slow handshake retries in 1 s
+    without growing the backoff. ee17 2026-11-23 15:59-16:07 shows why: a
+    gateway saturated by its startup took more than the old 2 s ready look
+    and 10 s call bound, and lamp-tasks dropped each half-made connect.
+- **Rotation.** The context rotation is `reset()`, a fresh conversation, before
+  a turn, at the one session's bounds (`one_session::near_context_limit`: 85 %
+  of the 128k context or more than 150 messages for a task, 60 % or more than
+  100 for a make). It weighs the gateway's own size of the session
+  (`DirectSession::session_size`): the larger of `sessionInfo.totalTokens`
+  and `contextBudgetStatus.estimatedPromptTokens`, and `totalMessages`, from a
+  one-message `chat.history`. That read is made at each (re)connect, after each
+  run and before a send when it was not read since. Where it can't be read,
+  the words handed over and read are used, 4 characters a token (ee17 reached
+  224 messages and 127k tokens with no rotation under the old 150k-token
+  bound). Nothing is resynced or re-adopted after a reset or a lamp-tasks
+  restart.
+- **Closing.** The store's close of a direct turn cancels it on the gateway if
+  it still runs (`chat.abort`); an ended one is gone.
+- **Harness's `ps` failing.** The direct rows are still given, so the tracker
+  reads them.
+
+Journal: `tasks: direct: OpenClaw's gateway is ready, the kept session open`,
+`tasks: <id>: turn accepted in <ms> ms (<nth>)`, `tasks: direct: <why>` when
+not ready, `tasks: direct: run <run> had no event in <s> s and is stuck; ended,
+the next turn goes on`, and `tasks: direct: a fresh conversation for <id> (a
+full conversation | a broken session), about <n> tokens in the last`.
 
 ### The limit accepted for Monday: a running skill's grants inside the gateway
 

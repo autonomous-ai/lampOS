@@ -168,6 +168,7 @@ impl Follows {
         if self.lane.is_none() {
             return;
         }
+        let watched = &crate::direct::harness_watched(watched);
         self.take_notes(now);
         let watching: BTreeSet<u64> = watched.iter().map(|task| task.task_id).collect();
         // A task no longer watched, or given up, lets its child go.
@@ -657,6 +658,28 @@ mod tests {
             f.held() == 0 && f.ending.is_empty()
         });
         assert_eq!(lane.live.load(Ordering::SeqCst), 0);
+    }
+
+    /// ee17: a direct OpenClaw task on the lamp's path is read from its
+    /// gateway run, never followed by Harness's `watch` (`UNKNOWN_HARNESS`
+    /// every 30 s); a Hermes task, or OpenClaw on another machine, still is.
+    #[test]
+    fn a_direct_task_is_never_watched_by_harness() {
+        const LAMP: &str = "0123456789abcdef0123456789abcdef";
+        let direct = crate::direct::tests::lamp_owning("agent-1", "done");
+        direct.set_lamp_machine(Box::new(|| Some(LAMP.to_owned())));
+        crate::direct::set_test_lamp(Some(direct));
+        let mut tasks = watched(3);
+        tasks[0].engine = "openclaw".into();
+        tasks[1].engine = "hermes".into();
+        tasks[2].engine = "openclaw".into();
+        tasks[2].machine_id = "fedcba9876543210fedcba9876543210".into();
+        let lane = Arc::new(Scripted::default());
+        let mut follows = Follows::new(Some(lane.clone()));
+        follows.tend(&tasks, &BTreeSet::new(), Instant::now());
+        crate::direct::set_test_lamp(None);
+        let held: Vec<u64> = follows.held.keys().copied().collect();
+        assert_eq!(held, vec![2, 3]);
     }
 
     #[test]

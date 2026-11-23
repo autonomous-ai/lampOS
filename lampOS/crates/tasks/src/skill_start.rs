@@ -273,6 +273,13 @@ impl Starts {
         }
     }
 
+    /// [`Self::started`] for the crate's tests: the fence's word, as the
+    /// launcher's socket would take it.
+    #[cfg(test)]
+    pub(crate) fn started_for_tests(&self, id: &str) {
+        self.started(id);
+    }
+
     /// Whether run `id` is live now.
     pub fn is_live(&self, id: &str) -> bool {
         self.lock().contains_key(id)

@@ -13,6 +13,8 @@ lamp-checked-replace = { path = "../checked-replace" }
 # OpenClaw's own-namespace check and its gateway's MainPID, as lamp-update
 # and lamp-setup run them (#8060): one command, never a copy.
 lamp-update = { path = "../update" }
+# OpenClaw's gateway spoken to directly (`direct`, LAMP_TASKS_OPENCLAW_DIRECT).
+lamp-agent-gateway = { path = "../agent-gateway" }
 serde.workspace = true
 # `raw_value`: the stored receipt is read as its own text, so a field
 # written twice in it is refused, never kept as the last (#1570).

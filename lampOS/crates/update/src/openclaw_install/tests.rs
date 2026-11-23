@@ -512,12 +512,14 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
         serde_json::from_slice(&fs::read(lamp.at(CONFIG)).unwrap()).unwrap();
     assert_eq!(
         config,
-        serde_json::json!({"gateway": {
-            "mode": "local",
-            "bind": "loopback",
-            "port": 18789,
-            "auth": {"mode": "token", "token": token},
-        }}),
+        serde_json::json!({
+            "gateway": {
+                "mode": "local",
+                "bind": "loopback",
+                "port": 18789,
+                "auth": {"mode": "token", "token": token},
+            },
+        }),
         "the gateway block only"
     );
     assert_eq!(mode(&lamp.at(CONFIG)), 0o600);
@@ -2795,7 +2797,8 @@ fn the_one_path_lets_agent_main_run_the_launcher_alone() {
         serde_json::from_slice(&fs::read(lamp.at(CONFIG)).unwrap()).unwrap();
     assert_eq!(
         config.as_object().unwrap().keys().collect::<Vec<_>>(),
-        ["gateway"]
+        ["gateway"],
+        "the install's own key alone: the one path writes none"
     );
 
     // Done: a round asks nothing, and an install asked again runs no

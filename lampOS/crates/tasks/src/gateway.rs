@@ -35,7 +35,7 @@ pub const PORT: u16 = 18789;
 /// launch is held in the queue for that ([`COLD_WITHIN`]) before this wait.
 pub const READY_WITHIN: Duration = Duration::from_secs(60);
 /// Between two looks at the port while it is waited for.
-const READY_EVERY: Duration = Duration::from_millis(250);
+pub const READY_EVERY: Duration = Duration::from_millis(250);
 /// One connection try's bound.
 const CONNECT_WITHIN: Duration = Duration::from_millis(500);
 /// How long an answer to one look is waited for.

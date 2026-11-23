@@ -1467,40 +1467,60 @@ impl Adapter for Cli {
 
 /// The production adapter: Harness's CLI, or, with `serve --set-up-later`
 /// and no program at `--harness`, nothing to hand over with. Harness put on
-/// later is used once the part starts again.
+/// later is used once the part starts again. With
+/// `LAMP_TASKS_OPENCLAW_DIRECT` on, [`Production::Direct`] routes the lamp's
+/// own OpenClaw turns to its gateway (`crate::direct`) and every other call
+/// to the Harness backend inside, so callers stay engine-neutral.
 enum Production {
     Cli(Box<Cli>),
     Absent,
+    Direct(Arc<crate::direct::OpenclawDirect>, Box<Production>),
+}
+impl Production {
+    /// Wrapped in [`Production::Direct`] when the lamp's direct session is on.
+    fn routed(self) -> Self {
+        match crate::direct::lamp() {
+            Some(direct) => Self::Direct(direct, Box::new(self)),
+            None => self,
+        }
+    }
 }
 impl Adapter for Production {
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
         match self {
             Self::Cli(cli) => Adapter::wait_lane(&**cli),
             Self::Absent => None,
+            Self::Direct(_, harness) => harness.wait_lane(),
         }
     }
     fn watch_lane(&self) -> Option<Arc<dyn WatchLane>> {
         match self {
             Self::Cli(cli) => Adapter::watch_lane(&**cli),
             Self::Absent => None,
+            Self::Direct(_, harness) => harness.watch_lane(),
         }
     }
     fn engines_lane(&self) -> Option<Arc<dyn EnginesLane>> {
         match self {
             Self::Cli(cli) => Adapter::engines_lane(&**cli),
             Self::Absent => None,
+            Self::Direct(_, harness) => harness.engines_lane(),
         }
     }
     fn openclaw_gateway(&self) -> Option<crate::gateway::Gateway> {
         match self {
             Self::Cli(cli) => Adapter::openclaw_gateway(&**cli),
             Self::Absent => None,
+            // The lamp's OpenClaw is waited for as its kept session finds
+            // it, never by a port probe.
+            Self::Direct(direct, _) => Some(direct.gateway(crate::gateway::READY_WITHIN)),
         }
     }
     fn session_lane(&self) -> Option<Arc<dyn SessionLane>> {
         match self {
             Self::Cli(cli) => Adapter::session_lane(&**cli),
             Self::Absent => Some(Arc::new(NoSessions)),
+            Self::Direct(_, harness) => harness.session_lane(),
         }
     }
     fn launch(&self, launch: &Launch) -> LaunchOutcome {
@@ -1514,30 +1534,62 @@ impl Adapter for Production {
             Self::Absent => LaunchOutcome::NotSent {
                 code: "no_harness".into(),
             },
+            // An OpenClaw task for the lamp straight into its gateway's
+            // kept session.
+            Self::Direct(direct, harness) => direct
+                .spoken_launch(launch)
+                .unwrap_or_else(|| harness.launch(launch)),
         }
     }
     fn observe(&self, machine_id: &str, agent_id: &str) -> Result<Observation, String> {
         match self {
             Self::Cli(cli) => cli.observe(machine_id, agent_id),
             Self::Absent => Err("no_harness".into()),
+            // A direct turn is read from its own run, never from Harness.
+            Self::Direct(direct, harness) => direct
+                .observe(agent_id)
+                .map_or_else(|| harness.observe(machine_id, agent_id), Ok),
         }
     }
     fn status(&self, machine_id: &str) -> Result<Vec<Listed>, String> {
         match self {
             Self::Cli(cli) => cli.status(machine_id),
             Self::Absent => Err("no_harness".into()),
+            // The direct turns beside Harness's own rows, each its own agent.
+            Self::Direct(direct, harness) => {
+                let ours = direct.listed_on(machine_id);
+                match harness.status(machine_id) {
+                    Ok(mut rows) => {
+                        rows.extend(ours);
+                        Ok(rows)
+                    }
+                    // Harness's `ps` failed: the direct turns still read.
+                    Err(_) if !ours.is_empty() => Ok(ours),
+                    Err(code) => Err(code),
+                }
+            }
         }
     }
     fn close(&self, machine_id: &str, agent_id: &str) -> Result<Closed, String> {
         match self {
             Self::Cli(cli) => cli.close(machine_id, agent_id),
             Self::Absent => Err("no_harness".into()),
+            // A direct turn has no harness to close: one still going is
+            // cancelled on the gateway, an ended one is gone.
+            Self::Direct(direct, _) if direct.owns(agent_id) => {
+                direct.cancel(agent_id);
+                Ok(Closed::Gone)
+            }
+            Self::Direct(_, harness) => harness.close(machine_id, agent_id),
         }
     }
     fn observe_to_close(&self, machine_id: &str, agent_id: &str) -> Result<Observation, String> {
         match self {
             Self::Cli(cli) => cli.observe_to_close(machine_id, agent_id),
             Self::Absent => Err("no_harness".into()),
+            Self::Direct(direct, harness) => direct
+                .observe(agent_id)
+                .map_or_else(|| harness.observe_to_close(machine_id, agent_id), Ok),
         }
     }
     fn close_within(
@@ -1549,51 +1601,66 @@ impl Adapter for Production {
         match self {
             Self::Cli(cli) => cli.close_within(machine_id, agent_id, within),
             Self::Absent => Err("no_harness".into()),
+            Self::Direct(direct, _) if direct.owns(agent_id) => {
+                direct.cancel(agent_id);
+                Ok(Closed::Gone)
+            }
+            Self::Direct(_, harness) => harness.close_within(machine_id, agent_id, within),
         }
     }
     fn signed_in(&self) -> Result<SignIn, String> {
         match self {
             Self::Cli(cli) => cli.signed_in(),
             Self::Absent => Err("no_harness".into()),
+            Self::Direct(_, harness) => harness.signed_in(),
         }
     }
     fn signed_in_here(&self) -> Result<(SignIn, Option<String>), String> {
         match self {
             Self::Cli(cli) => cli.signed_in_here(),
             Self::Absent => Err("no_harness".into()),
+            Self::Direct(_, harness) => harness.signed_in_here(),
         }
     }
     fn machines(&self) -> Result<Vec<AccountMachine>, String> {
         match self {
             Self::Cli(cli) => cli.machines(),
             Self::Absent => Err("no_harness".into()),
+            Self::Direct(_, harness) => harness.machines(),
         }
     }
     fn absent(&self) -> bool {
-        matches!(self, Self::Absent)
+        match self {
+            Self::Direct(_, harness) => harness.absent(),
+            other => matches!(other, Self::Absent),
+        }
     }
     fn sign_in_starter(&self) -> Option<Starter> {
         match self {
             Self::Cli(cli) => Adapter::sign_in_starter(&**cli),
             Self::Absent => Some(Box::new(|_| Err("no_harness".into()))),
+            Self::Direct(_, harness) => harness.sign_in_starter(),
         }
     }
     fn start_daemon(&self) -> Result<(), String> {
         match self {
             Self::Cli(cli) => Adapter::start_daemon(&**cli),
             Self::Absent => Err("no_harness".into()),
+            Self::Direct(_, harness) => harness.start_daemon(),
         }
     }
     fn restart_wanted(&self) -> bool {
         match self {
             Self::Cli(cli) => Adapter::restart_wanted(&**cli),
             Self::Absent => false,
+            Self::Direct(_, harness) => harness.restart_wanted(),
         }
     }
     fn restart_daemon(&self) -> Result<(), String> {
         match self {
             Self::Cli(cli) => Adapter::restart_daemon(&**cli),
             Self::Absent => Err("no_harness".into()),
+            Self::Direct(_, harness) => harness.restart_daemon(),
         }
     }
 }
@@ -1619,6 +1686,14 @@ impl Adapter for Production {
 /// `observe_background_commands` or `close_background_commands`, tried
 /// again the same way without counting as a try.
 fn close_told(adapter: &impl Adapter, job: &CloseJob) -> Result<Closed, String> {
+    // A direct OpenClaw task whose run is gone here has no harness: never
+    // asked of Harness (`show`, `close`). One still here is the adapter's
+    // (cancelled on the gateway, no Harness either).
+    if crate::direct::lamp_path(&job.engine.bus_name(), &job.machine_id)
+        && crate::direct::lamp_owns(&job.agent_id).is_none()
+    {
+        return Ok(Closed::Gone);
+    }
     let began = Instant::now();
     let now = adapter
         .observe_to_close(&job.machine_id, &job.agent_id)
@@ -2159,6 +2234,9 @@ fn owner<C: Clock>(
     // however it ends.
     let mut follows = Follows::new(watch_lane);
     let mut waits = Waits::new(lane);
+    // The direct tasks already read at their run's end
+    // (`Engine::push_direct_ended`).
+    let mut direct_pushed = std::collections::BTreeSet::new();
     // Progress lives here, beside the engine, and only in memory: what an
     // agent says while it works is not part of the durable record.
     // Each run counts changes afresh, and says which run it is.
@@ -2724,6 +2802,20 @@ fn owner<C: Clock>(
         }
         match incoming.recv_timeout(TICK) {
             Ok(work) => {
+                // "How far along is it?": a direct task's progress read from
+                // its run at once, before the tracker or the records answer.
+                if let Some(direct) = crate::direct::lamp()
+                    && matches!(
+                        work.request,
+                        Request::GetProgress { .. }
+                            | Request::TasksNow {}
+                            | Request::Work { .. }
+                            | Request::WorkList { .. }
+                    )
+                {
+                    let now = clock.sample()?;
+                    direct.refresh(tracker.as_mut(), &engine.watched(&now));
+                }
                 if Instant::now() >= work.deadline {
                     let _ = work.response.try_send(Err(EngineError {
                         code: "timeout",
@@ -3150,6 +3242,11 @@ fn owner<C: Clock>(
                     // read first, and its idle answer kept at once.
                     follows.push(&mut engine, &now).map_err(io::Error::other)?;
                     waits.push(&mut engine, &now).map_err(io::Error::other)?;
+                    // A direct run that ended is read at once too: it has
+                    // no `watch` or `wait` to say so.
+                    engine
+                        .push_direct_ended(&now, &mut direct_pushed)
+                        .map_err(io::Error::other)?;
                     if watch {
                         engine.watch(&now).map_err(io::Error::other)?;
                     }
@@ -3240,6 +3337,12 @@ fn owner<C: Clock>(
         if let Some(tracker) = tracker.as_mut() {
             let found = engine.settled_within(&clock.sample()?, crate::progress::SETTLED_FOR_MS);
             tracker.settled(&found, unix_ms());
+        }
+        // A direct task's row, as it changes, on the bus at once: its run
+        // has no `ps` to wait for.
+        if let Some(direct) = crate::direct::lamp() {
+            let now = clock.sample()?;
+            direct.refresh_if_changed(tracker.as_mut(), &engine.watched(&now));
         }
         if let Some(tracker) = tracker.as_mut()
             && let Some(fresh) = tracker.take(engine.store_id())
@@ -4490,6 +4593,7 @@ impl Waits {
         let Some(lane) = self.lane.clone() else {
             return;
         };
+        let watched = &crate::direct::harness_watched(watched);
         while let Ok((machine, number, result)) = self.ended.1.try_recv() {
             let Some(held) = self.held.get(&machine).filter(|held| held.number == number) else {
                 continue;
@@ -4629,6 +4733,10 @@ fn works_refresh(
     crate::works::with(|board| {
         board.tasks(&seen, |task| crate::works::line_of(tracker, task), at);
     });
+    // A direct task's step, once its record is open.
+    if let Some(direct) = crate::direct::lamp() {
+        direct.record_steps(&engine.watched(now));
+    }
 }
 
 /// The steps' reader for [`crate::steps::SWITCH`]'s value and
@@ -4992,6 +5100,52 @@ fn set_no_harness(
     }
 }
 
+/// The lamp's direct session ([`crate::direct`]), with
+/// [`crate::direct::SWITCH`] on: built, set as [`crate::direct::LAMP`] and
+/// its pump started, connecting at once. Whether it is in use.
+fn direct_start(config: &Config, stop: Arc<AtomicBool>) -> bool {
+    if !crate::direct::on(std::env::var(crate::direct::SWITCH).ok().as_deref()) {
+        return false;
+    }
+    let Some(session) = crate::direct::lamp_session() else {
+        eprintln!(
+            "tasks: direct: {}=on, but no gateway session is built in yet; OpenClaw keeps the Harness path",
+            crate::direct::SWITCH
+        );
+        return false;
+    };
+    let mut direct = crate::direct::OpenclawDirect::new(session, stop);
+    let stuck = std::env::var(crate::direct::STUCK_SWITCH).ok();
+    if let Some(after) = crate::direct::stuck_after_of(stuck.as_deref()) {
+        eprintln!(
+            "tasks: direct: a quiet run is checked for stuck after {} s ({}), a running tool after {} s",
+            after.as_secs(),
+            crate::direct::STUCK_SWITCH,
+            after.as_secs() * u64::from(crate::direct::TOOL_QUIET_TIMES)
+        );
+        direct = direct.with_stuck_after(after);
+    }
+    let direct = Arc::new(direct);
+    let lamp = lamp_target_of(config);
+    direct.set_lamp_machine(Box::new(move || lamp().map(|target| target.machine_id)));
+    if crate::direct::LAMP.set(direct.clone()).is_err() {
+        return true;
+    }
+    match direct.start() {
+        Ok(_) => {
+            eprintln!(
+                "tasks: direct: on ({}=on): OpenClaw's turns go straight to its gateway",
+                crate::direct::SWITCH
+            );
+            true
+        }
+        Err(error) => {
+            eprintln!("tasks: direct: its pump not started: {error}");
+            false
+        }
+    }
+}
+
 pub fn serve<C: Clock>(
     config: Config,
     clock: C,
@@ -5017,11 +5171,18 @@ pub fn serve<C: Clock>(
     // Joined at the stop, so a skill's run is ended before the process exits.
     let mut skill_served: Option<thread::JoinHandle<()>> = None;
     let skill_stop = stop.clone();
+    // `LAMP_TASKS_OPENCLAW_DIRECT` on: OpenClaw's gateway spoken to
+    // directly (`crate::direct`), connected at once on its own thread, in
+    // place of the one session's pane for OpenClaw. Off, or no session
+    // built, nothing is made and the Harness path is as before.
+    let direct = direct_start(&config, stop.clone());
     // `LAMP_TASKS_ONE_SESSION` on (#7246): the lamp's one standing pane,
     // opened as soon as it can be, on a thread of its own as the start's
     // sweep is (a pane's open waits on Harness, which the owner loop's one
-    // worker must not). Off, nothing is made.
+    // worker must not). Off, nothing is made. With the direct session on
+    // there is no pane: the one session takes OpenClaw's turns only.
     let one_session = (skill_tasks
+        && !direct
         && crate::one_session::on(std::env::var(crate::one_session::SWITCH).ok().as_deref()))
     .then(|| {
         let one = crate::one_session::OneSession::lamp(&config.dir)
@@ -5241,7 +5402,7 @@ pub fn serve<C: Clock>(
             eprintln!("{line}");
         }
         if absent {
-            return Ok(Production::Absent);
+            return Ok(Production::Absent.routed());
         }
         let mut cli = CliConfig::new(executable);
         cli.cancel = Some(cancelled);
@@ -5373,7 +5534,7 @@ pub fn serve<C: Clock>(
                 }
             }
         }
-        Ok(Production::Cli(Box::new(cli)))
+        Ok(Production::Cli(Box::new(cli)).routed())
     });
     // A skill's run Harness's daemon holds is ended (its token revoked, its
     // session closed) before lamp-tasks exits (Thirteen's P2 on #6684);
@@ -5604,7 +5765,14 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                                 }),
                             ),
                             Job::Observe(job) => {
-                                let result = adapter.observe(&job.machine_id, &job.agent_id);
+                                // A direct OpenClaw task: its gateway run's
+                                // look, never Harness's `show`.
+                                let result = crate::direct::lamp_observe(
+                                    &job.engine.bus_name(),
+                                    &job.machine_id,
+                                    &job.agent_id,
+                                )
+                                .unwrap_or_else(|| adapter.observe(&job.machine_id, &job.agent_id));
                                 Outcome::Observe(job, result)
                             }
                             Job::Status(machine) => {
@@ -6190,6 +6358,7 @@ mod tests {
             task_id: 7,
             machine_id: "0123456789abcdef0123456789abcdef".into(),
             agent_id: "11111111-1111-4111-8111-111111111111".into(),
+            engine: EngineKind::Claude,
             answer: "A poem about coffee.".into(),
             asked: Some("Write a poem".into()),
             tries: 1,
@@ -6246,6 +6415,7 @@ mod tests {
             task_id: 7,
             machine_id: "0123456789abcdef0123456789abcdef".into(),
             agent_id: "11111111-1111-4111-8111-111111111111".into(),
+            engine: EngineKind::Claude,
             answer: String::new(),
             asked: None,
             tries: 1,
@@ -6319,6 +6489,37 @@ mod tests {
             assert!(Instant::now() < until, "wait {started} never started");
             thread::sleep(Duration::from_millis(2));
         }
+    }
+
+    /// ee17: a direct OpenClaw task on the lamp's path is never in a
+    /// Harness `wait` (`UNKNOWN_HARNESS` every 30 s, ~2 s each); a Hermes
+    /// task, or OpenClaw on another machine, still is.
+    #[test]
+    fn a_direct_task_is_never_in_a_harness_wait() {
+        let direct = crate::direct::tests::lamp_owning("a", "done");
+        direct.set_lamp_machine(Box::new(|| Some("m".to_owned())));
+        crate::direct::set_test_lamp(Some(direct));
+        let mut tasks = watched(&["a", "b", "c"]);
+        tasks[0].engine = "openclaw".into();
+        tasks[1].engine = "hermes".into();
+        tasks[2].engine = "openclaw".into();
+        tasks[2].machine_id = "elsewhere".into();
+        let lane = Arc::new(SlowLane::default());
+        let mut waits = Waits::new(Some(lane.clone()));
+        waits.tend(&tasks, &BTreeSet::new(), &BTreeSet::new(), Instant::now());
+        crate::direct::set_test_lamp(None);
+        let held: Vec<(&str, &[String])> = waits
+            .held
+            .iter()
+            .map(|(machine, held)| (machine.as_str(), held.agents.as_slice()))
+            .collect();
+        assert_eq!(
+            held,
+            vec![
+                ("elsewhere", &["c".to_owned()][..]),
+                ("m", &["b".to_owned()][..])
+            ]
+        );
     }
 
     /// #1157 review: {A}, then {A, B}, then {A} again. The first wait,
