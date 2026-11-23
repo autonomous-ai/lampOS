@@ -115,6 +115,18 @@ optional `hint` up to 120, and a `default` valid for its type.
 
 A field with a key its type does not have (`max` on a toggle) is refused.
 
+## From the developer's computer
+
+The Python SDK checks and packs an app, and submits it to the Store
+(`lamp app check`, `lamp app pack`, `lamp login`, `lamp app submit`,
+`lamp app status`, `lamp app request-public`, `lamp app studio`; the JS SDK's
+`submitApp`, `submissions`, `requestPublic`). The developer's folder holds
+`app.json` (the manifest above without `format`, `kind` and `files`) beside
+`src/`, `assets/` and `skills/`; `pack` adds those three and writes the tar
+unsigned, and the Store signs it at approval. The SDK READMEs' "Publish your
+app" has the commands and the Store's refusals. Staged: tested against a fake
+Store only so far.
+
 ## What the reader checks, in order
 
 `lamp_skills::app_package::read_app_package_bytes(bytes, store_keys)` reads in
