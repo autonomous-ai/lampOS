@@ -161,6 +161,14 @@ every `lamp-app@*` and `lamp-app-net@*` unit with the other writers, and a step 
 starts with no app, no app data and nothing to start at boot; the apps' facts in memory go with the person's
 forget-everything.
 
+The first round that adds the apps' part (#8131's build, done by the lamp's stable lamp-update) can start
+`lamp-apps-folders.service` before it makes `/opt/lampOS/apps-manage/current`, which fails it 203/EXEC, and it enables
+`lamp-apps-manage.socket` into `sockets.target`, which no round starts (lamp-9adf, 23 Nov). So the folders unit has
+`Restart=on-failure`, `RestartSec=2s` and at most five starts a minute, and `lamp-control.service`, which that round
+restarts after the links, has `Wants=lamp-apps-manage.socket lamp-apps-folders.service` and
+`After=lamp-apps-manage.socket`: after the round the folders are made and the socket listens, with no reboot and no
+restart by hand.
+
 ### The owner's yes
 
 An install, an update or a remove needs the owner's yes, recorded in
