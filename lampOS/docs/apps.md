@@ -20,8 +20,8 @@ way nothing is installed.
 
 **App tools: designed, not built** ([app-tools.md](app-tools.md), #8386). An
 app's actions become functions Lamp's model calls, as it calls a skill's:
-a `tools` file in the skills' format in the manifest, listed by the voice
-beside the skills' while the app runs, and called through lamp-control's
+a `tools` file in the skills' format in the manifest, offered by the voice
+in a section of its own while the app runs, and called through lamp-control's
 `app.call`. It retires `phrases.set` for answers and replaces `apps.ask`;
 phrases stay for a session's fast words.
 
