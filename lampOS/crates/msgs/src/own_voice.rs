@@ -20,8 +20,8 @@ pub const CHECK_MODEL: &str = "eleven_flash_v2_5";
 /// The address `var` (the switch's value) names, when it is an https URL;
 /// `None` unset, empty or anything else.
 pub fn switched(var: Option<&str>) -> Option<String> {
-    let _ = var;
-    None
+    var.filter(|url| url.starts_with("https://") && url.len() > "https://".len())
+        .map(|url| url.trim_end_matches('/').to_owned())
 }
 
 /// The switch from this process's environment ([`switched`]).
@@ -35,8 +35,16 @@ pub fn switched_from_environment() -> Option<String> {
 /// said as the voice says it, `POST <root>/text-to-speech/<id>/stream`, the
 /// root as [`root`] gives it. `(post, url)`.
 pub fn check(switched: Option<&str>, voice_id: &str) -> (bool, String) {
-    let _ = switched;
-    (false, format!("{ELEVENLABS_API}/voices/{voice_id}"))
+    match switched {
+        None => (false, format!("{ELEVENLABS_API}/voices/{voice_id}")),
+        Some(base) => (
+            true,
+            format!(
+                "{}/text-to-speech/{voice_id}/stream?output_format=pcm_24000",
+                root(base)
+            ),
+        ),
+    }
 }
 
 /// ElevenLabs' API root at `base` as the voice speaks to it
@@ -44,8 +52,30 @@ pub fn check(switched: Option<&str>, voice_id: &str) -> (bool, String) {
 /// relay's `/elevenlabs`, under the `/v1` the company relay's `/ai` takes
 /// (`net::openai_base`).
 pub fn root(base: &str) -> String {
-    base.trim_end_matches('/').to_owned()
+    let mut base = base.trim_end_matches('/').to_owned();
+    if base.contains("campaign-api.autonomous.ai") && base.ends_with("/ai") {
+        base.push_str("/v1");
+    }
+    let host = base
+        .strip_prefix("https://")
+        .and_then(|rest| rest.split(['/', ':']).next())
+        .unwrap_or_default();
+    if ELEVENLABS_HOSTS
+        .iter()
+        .any(|own| host.eq_ignore_ascii_case(own))
+    {
+        base
+    } else {
+        format!("{base}/elevenlabs")
+    }
 }
+
+/// ElevenLabs' own hosts (`net::tts::ELEVENLABS_HOSTS`).
+pub const ELEVENLABS_HOSTS: &[&str] = &[
+    "api.elevenlabs.io",
+    "api.us.elevenlabs.io",
+    "api.eu.elevenlabs.io",
+];
 
 #[cfg(test)]
 mod tests {
@@ -55,7 +85,10 @@ mod tests {
     fn the_switch_names_an_https_address_or_nothing() {
         assert_eq!(switched(None), None);
         assert_eq!(switched(Some("")), None);
-        assert_eq!(switched(Some("http://relay.example.invalid/api/v1/ai")), None);
+        assert_eq!(
+            switched(Some("http://relay.example.invalid/api/v1/ai")),
+            None
+        );
         assert_eq!(switched(Some("relay.example.invalid")), None);
         assert_eq!(
             switched(Some("https://relay.example.invalid/api/v1/ai/")).as_deref(),
@@ -67,7 +100,10 @@ mod tests {
     fn unswitched_the_check_asks_elevenlabs_for_the_voice_as_before() {
         assert_eq!(
             check(None, "Voice8367"),
-            (false, "https://api.elevenlabs.io/v1/voices/Voice8367".to_owned())
+            (
+                false,
+                "https://api.elevenlabs.io/v1/voices/Voice8367".to_owned()
+            )
         );
     }
 

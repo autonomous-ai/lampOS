@@ -625,7 +625,6 @@ impl SecondConfig {
         credentials: Option<&std::ffi::OsStr>,
         switched: Option<&str>,
     ) -> (Self, Vec<String>) {
-        let _ = switched;
         if !on {
             return (self, Vec::new());
         }
@@ -672,6 +671,7 @@ impl SecondConfig {
         // The person's voice (#8367): their key and voice ID straight at
         // ElevenLabs, over the language's and the chosen voice; the lamp's
         // kept for the fallback. Only when the route speaks with ElevenLabs.
+        let mut switched_line = None;
         if self.tts_provider == TtsProvider::ElevenLabs {
             let voice = own(OWN_ELEVENLABS_KEY).and_then(|key| {
                 let Some(key) = key else { return Ok(None) };
@@ -683,8 +683,13 @@ impl SecondConfig {
             });
             lines.push(match voice {
                 Ok(Some((key, id))) => {
+                    let at = switched.unwrap_or(ELEVENLABS_API);
+                    switched_line = switched.map(|at| format!(
+                        "ElevenLabs: the person's own voice goes to {}, not ElevenLabs' own API (LAMP_OWN_ELEVENLABS_URL, test lamps only)",
+                        host(at)
+                    ));
                     self.hosted.lamps_voice = Some(LampsVoice {
-                        base_url: std::mem::replace(&mut self.tts_base_url, ELEVENLABS_API.to_owned()),
+                        base_url: std::mem::replace(&mut self.tts_base_url, at.to_owned()),
                         key: std::mem::replace(&mut self.tts_key, key),
                         voice: self.tts_voice.replace(id),
                     });
@@ -696,6 +701,7 @@ impl SecondConfig {
                 ),
             });
         }
+        lines.extend(switched_line);
         (self, lines)
     }
 }
@@ -1593,12 +1599,22 @@ mod tests {
         // Unset: ElevenLabs' own API, and no such line.
         let (own, lines) = relay.clone().with_own_keys_at(true, dir, None);
         assert_eq!(own.tts_base_url, ELEVENLABS_API);
-        assert!(!lines.iter().any(|line| line.contains("LAMP_OWN_ELEVENLABS_URL")), "{lines:?}");
+        assert!(
+            !lines
+                .iter()
+                .any(|line| line.contains("LAMP_OWN_ELEVENLABS_URL")),
+            "{lines:?}"
+        );
         // No key of the person's: the switch changes nothing.
         fs::remove_file(units.join("own_elevenlabs.key")).unwrap();
         let (alone, lines) = relay.clone().with_own_keys_at(true, dir, Some(at));
         assert_eq!(alone.tts_base_url, relay.tts_base_url);
-        assert!(!lines.iter().any(|line| line.contains("LAMP_OWN_ELEVENLABS_URL")), "{lines:?}");
+        assert!(
+            !lines
+                .iter()
+                .any(|line| line.contains("LAMP_OWN_ELEVENLABS_URL")),
+            "{lines:?}"
+        );
     }
 
     #[test]
