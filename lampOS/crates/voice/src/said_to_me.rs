@@ -53,6 +53,15 @@
 //! (the Reviewer-lead's HOLD on #7705). Any other line out of the window is
 //! judged as before.
 //!
+//! With `LAMP_ASKED_LOOKS=on` ([`ASKED_LOOKS`], #8395) the lamp's question
+//! lets a line in the window skip the pitch and look checks only when the
+//! line is the first after the lamp's words and begins within
+//! `follows_on::WITHIN_US` (20 s) of their end
+//! ([`Line::first_after_asked`]); any later line, or one answering an older
+//! question, is judged by its pose as a line with no question waiting
+//! (lamp-74ff, 23 Nov 16:09-16:21: in a meeting, lines looking away were let
+//! in on a question asked 423 s before).
+//!
 //! Anything else loses those signs and is journaled `held: <reason>`
 //! ([`Held`]). A lip smack heard as one or two words while the owner faced
 //! the lamp was answered as "someone is turned to the lamp" (lamp-74ff,
@@ -67,6 +76,15 @@ pub const ENVIRONMENT: &str = "LAMP_SAID_TO_ME";
 /// ([`Line::name_heard`]), not any hearing drained with it, however old:
 /// `on` only (#8384).
 pub const NAME_IN_LINE_ENVIRONMENT: &str = "LAMP_SAID_TO_ME_NAME_IN_LINE";
+
+/// Where the second route's worker reads `LAMP_ASKED_LOOKS` (#8395): `on`
+/// only.
+pub const ASKED_LOOKS: &str = "LAMP_ASKED_LOOKS";
+
+/// Whether `LAMP_ASKED_LOOKS` is on in this process's environment.
+pub fn asked_looks_on() -> bool {
+    std::env::var(ASKED_LOOKS).ok().as_deref() == Some("on")
+}
 
 /// A line of this many words or fewer is a short line.
 pub const SHORT_WORDS: usize = 2;
@@ -196,6 +214,14 @@ pub struct Line<'a> {
     /// (`skill_write_yes::answer_awaited`) within its own wait. Unlike
     /// [`Self::lamp_asked`], never a question gone stale.
     pub question_waits: bool,
+    /// `LAMP_ASKED_LOOKS=on` (#8395): [`Self::lamp_asked`] lets the line
+    /// skip the pose checks in the window only with
+    /// [`Self::first_after_asked`].
+    pub asked_looks: bool,
+    /// The first line with words after the lamp's words, begun within
+    /// `follows_on::WITHIN_US` of their end (the worker's
+    /// `Heeding::first_after_asked`).
+    pub first_after_asked: bool,
     /// A face turned to the lamp through it (the eyes' `facing`, yaw).
     pub turned: bool,
     /// The pitch, in radians, down positive (`lamp_msgs::Face::pitch`),
@@ -243,6 +269,13 @@ pub struct Line<'a> {
 }
 
 impl Line<'_> {
+    /// The lamp's question lets this line in the window skip the pose
+    /// checks: [`Self::lamp_asked`], and with [`Self::asked_looks`] only the
+    /// first line soon after the lamp's words (#8395).
+    pub fn asked_lets_in(self) -> bool {
+        self.lamp_asked && (!self.asked_looks || self.first_after_asked)
+    }
+
     /// This line with the eyes' signs from `from` to `to`, as the second
     /// route's worker (`Heeding::not_said_to_me`) and the replay of saved
     /// lamp journals (`crate::replay`, #7772) both read them: out of a
@@ -357,7 +390,7 @@ pub fn judge(line: Line<'_>) -> Said {
                 Said::Held(Held::NoLook)
             };
         }
-        return if line.lamp_asked {
+        return if line.asked_lets_in() {
             Said::InConversation
         } else if words <= SHORT_WORDS && !line.seen_speaking && line.read_silent {
             Said::Held(Held::NotSeenSpeaking)
@@ -414,7 +447,7 @@ pub fn short_stood_by(line: Line<'_>) -> Option<&'static str> {
         "named"
     } else if yes_awaited() {
         "yes awaited"
-    } else if line.lamp_asked {
+    } else if line.asked_lets_in() {
         "lamp_asked"
     } else if line.seen_speaking {
         "seen_speaking"
@@ -644,6 +677,54 @@ mod tests {
         // The lamp's own yes awaited: the same, asked or not.
         let held_yes = in_the_window("Yes.", Some(40.0), Some(false));
         assert_eq!(awaiting_yes(true, || judge(held_yes)), Said::Stands);
+    }
+
+    /// #8395 (lamp-74ff, 23 Nov 16:09-16:21): with `LAMP_ASKED_LOOKS` the
+    /// lamp's question lets only the first line soon after its words skip
+    /// the pose checks; a later line, or one long after the question
+    /// (request 132: asked 423 s before), is judged by its look.
+    #[test]
+    fn with_asked_looks_only_the_first_line_after_the_question_skips_its_look() {
+        let line = |heard, looking, first_after_asked, asked_looks| Line {
+            lamp_asked: true,
+            asked_looks,
+            first_after_asked,
+            ..in_the_window(heard, Some(-8.0), looking)
+        };
+        let talk = "Then we ship it on Monday";
+        // (a) The first line, soon after: let in, looking away or not.
+        assert_eq!(
+            judge(line(talk, Some(false), true, true)),
+            Said::InConversation
+        );
+        // (b)-(d) A later line, one begun past 20 s, or an old question.
+        assert_eq!(
+            judge(line(talk, Some(false), false, true)),
+            Said::Held(Held::AwayInConversation)
+        );
+        // (e) Looking at the lamp: let in.
+        assert_eq!(
+            judge(line(talk, Some(true), false, true)),
+            Said::InConversation
+        );
+        // (f) Naming the lamp: stands.
+        assert_eq!(
+            judge(line("Lamp, ship it on Monday", Some(false), false, true)),
+            Said::Stands
+        );
+        // A short line standing by its look is not said to stand by the
+        // question.
+        assert_eq!(
+            short_stood_by(line("Okay.", Some(true), false, true)),
+            Some("seen_speaking")
+        );
+        // Off: the question lets any line in, as before.
+        for first in [true, false] {
+            assert_eq!(
+                judge(line(talk, Some(false), first, false)),
+                Said::InConversation
+            );
+        }
     }
 
     #[test]
