@@ -723,7 +723,9 @@ fn record(file: &Path, line: &str) {
 
 /// Keep one authenticated connection through refusal and recovery, as
 /// the browser does. Chunk-size lines are ignored between SSE events.
-struct EventStream(BufReader<TcpStream>);
+/// The page's stream as the page keeps it: each section's newest text,
+/// kept across reads, since a section is sent again only when it changed.
+struct EventStream(BufReader<TcpStream>, BTreeMap<String, String>);
 
 impl EventStream {
     fn open(rig: &Rig) -> Self {
@@ -745,7 +747,7 @@ impl EventStream {
                 break;
             }
         }
-        Self(reader)
+        Self(reader, BTreeMap::new())
     }
 
     fn until(
@@ -753,7 +755,6 @@ impl EventStream {
         ready: impl Fn(&BTreeMap<String, String>) -> bool,
     ) -> BTreeMap<String, String> {
         let started = Instant::now();
-        let mut sections = BTreeMap::new();
         let mut name = None;
         let mut data = Vec::new();
         let mut line = String::new();
@@ -768,19 +769,84 @@ impl EventStream {
             } else if line.is_empty()
                 && let Some(name) = name.take()
             {
-                sections.insert(name, data.join("\n"));
+                self.1.insert(name, data.join("\n"));
                 data.clear();
                 if page::SECTIONS
                     .iter()
-                    .all(|(id, _)| sections.contains_key(*id))
-                    && ready(&sections)
+                    .all(|(id, _)| self.1.contains_key(*id))
+                    && ready(&self.1)
                 {
-                    return sections;
+                    return self.1.clone();
                 }
             }
             assert!(started.elapsed() < WAIT, "stream did not reach its state");
         }
     }
+}
+
+impl EventStream {
+    /// The names of the events sent within `long`, read as they come.
+    fn names_for(&mut self, long: Duration) -> Vec<String> {
+        let started = Instant::now();
+        self.0
+            .get_ref()
+            .set_read_timeout(Some(Duration::from_millis(100)))
+            .unwrap();
+        let mut names = Vec::new();
+        let mut line = String::new();
+        while started.elapsed() < long {
+            line.clear();
+            match self.0.read_line(&mut line) {
+                Ok(0) => panic!("stream ended"),
+                Ok(_) => {
+                    if let Some(name) = line.trim_end().strip_prefix("event: ") {
+                        names.push(name.to_owned());
+                    }
+                }
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                    ) => {}
+                Err(error) => panic!("{error}"),
+            }
+        }
+        self.0.get_ref().set_read_timeout(Some(WAIT)).unwrap();
+        names
+    }
+}
+
+/// One push serves every viewer, and a section is sent again only when
+/// its text changed: a page left open on a quiet lamp gets no Timeline,
+/// Turns or Tasks after the first, then the Timeline again when a turn
+/// comes.
+#[test]
+fn a_quiet_section_is_sent_once_and_again_when_it_changes() {
+    let rig = Rig::new("sent-once", Some(TOKEN));
+    let mut stream = EventStream::open(&rig);
+    let sections = stream.until(|sections| sections["timeline"].contains("No turn heard yet."));
+    assert_eq!(sections["turns"], page::TURNS_IN_TIMELINE);
+    let names = stream.names_for(Duration::from_millis(2_500));
+    for quiet in ["timeline", "turns", "tasks"] {
+        assert!(
+            !names.iter().any(|name| name == quiet),
+            "{quiet}: {names:?}"
+        );
+    }
+    let mut heard = rig.publisher(Speech::TOPICS[0], &Speech::declaration(), "voice");
+    heard
+        .publish_json(
+            1,
+            &Speech {
+                text: "Ossifrage".into(),
+                finished: true,
+                locale: None,
+                request: Some(7),
+            },
+        )
+        .unwrap();
+    let sections = stream.until(|sections| sections["timeline"].contains("request 7"));
+    assert_eq!(sections["turns"], page::TURNS_IN_TIMELINE);
 }
 
 struct Unreadable(PathBuf, fs::Permissions);
@@ -837,10 +903,12 @@ fn the_stream_reports_denied_sessions_and_recovers_without_words_or_paths() {
     };
     let started = Instant::now();
     let mut stream = EventStream::open(&rig);
-    // Both fall back to the bus (#7208): Turns, no bus turn yet, an empty
-    // state; Overview's first audio, not known. Never the permission error.
+    // Both fall back to the bus (#7208): Turns points to Timeline's cards,
+    // which have no bus turn yet, an empty state; Overview's first audio,
+    // not known. Never the permission error.
     let sections = stream.until(|sections| {
-        sections["turns"].contains("No turn heard yet.")
+        sections["turns"] == page::TURNS_IN_TIMELINE
+            && sections["timeline"].contains("No turn heard yet.")
             && sections["overview"].contains(FIRST_AUDIO_FROM_BUS)
     });
     let first = started.elapsed();
@@ -899,9 +967,11 @@ fn the_stream_reports_denied_sessions_and_recovers_without_words_or_paths() {
 }
 
 /// #7208: on a product lamp the voice's sessions are `root:root 0700` and
-/// peek runs as `lampos`, so the records are never readable. Turns is then
-/// built from the bus's turns, as cards, never the permission error; with
-/// no bus turn either, an empty state. No word shows outside monitor mode.
+/// peek runs as `lampos`, so the records are never readable. The bus's
+/// turns are then Timeline's cards and Turns points there, once, never
+/// the permission error and never the same cards again (two cards with one
+/// id closed an opened card); with no bus turn either, an empty state. No
+/// word shows outside monitor mode.
 #[test]
 fn with_the_voices_sessions_private_turns_shows_the_bus_turns() {
     const PERMISSION: &str = "Can't read the voice's sessions: permission.";
@@ -915,10 +985,13 @@ fn with_the_voices_sessions_private_turns_shows_the_bus_turns() {
         "the permission fixture must run as an ordinary user"
     );
     let mut stream = EventStream::open(&rig);
-    let sections = stream.until(|sections| sections["turns"].contains("No turn heard yet."));
-    let turns = &sections["turns"];
-    assert!(!turns.contains(PERMISSION), "{turns}");
-    assert!(!turns.contains("turn card"), "{turns}");
+    let sections = stream.until(|sections| {
+        sections["turns"] == page::TURNS_IN_TIMELINE
+            && sections["timeline"].contains("No turn heard yet.")
+    });
+    let timeline = &sections["timeline"];
+    assert!(!timeline.contains(PERMISSION), "{timeline}");
+    assert!(!timeline.contains("turn card"), "{timeline}");
 
     let mut heard = rig.publisher(Speech::TOPICS[0], &Speech::declaration(), "voice");
     let mut said = rig.publisher(Speech::TOPICS[1], &Speech::declaration(), "voice");
@@ -931,12 +1004,15 @@ fn with_the_voices_sessions_private_turns_shows_the_bus_turns() {
     heard.publish_json(1, &speech("Ossifrage heard")).unwrap();
     thread::sleep(Duration::from_millis(60));
     said.publish_json(2, &speech("Ossifrage said")).unwrap();
-    let sections = stream.until(|sections| sections["turns"].contains("request 12"));
+    let sections = stream.until(|sections| sections["timeline"].contains("request 12"));
+    let timeline = &sections["timeline"];
+    assert!(timeline.contains("class=\"turn card\""), "{timeline}");
+    assert!(!timeline.contains(PERMISSION), "{timeline}");
+    assert!(!timeline.contains("Ossifrage"), "{timeline}");
+    // Turns draws none of them again: one card, one id.
     let turns = &sections["turns"];
-    assert!(turns.contains("class=\"turn card\""), "{turns}");
-    assert!(turns.contains("from the bus"), "{turns}");
-    assert!(!turns.contains(PERMISSION), "{turns}");
-    assert!(!turns.contains("Ossifrage"), "{turns}");
+    assert_eq!(turns, page::TURNS_IN_TIMELINE);
+    assert!(!turns.contains("turn card"), "{turns}");
     // Overview's first audio: the bus carries no timing peek joins to a
     // turn, so it says so quietly, never the permission error.
     let overview = &sections["overview"];
@@ -1861,7 +1937,7 @@ fn a_turn_card_carries_its_status_and_latency_classes_at_the_edges() {
             "{html}"
         );
         // The Turns section's cards carry the same ⚡ class.
-        let turns = page::turns(&current(vec![card_record(4, ttft, "played")]), &[], false);
+        let turns = page::turns(&current(vec![card_record(4, ttft, "played")]));
         assert!(turns.contains("class=\"turn card\""), "{turns}");
         assert!(
             turns.contains(&format!(

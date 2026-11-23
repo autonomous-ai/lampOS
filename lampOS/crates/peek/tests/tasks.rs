@@ -61,7 +61,7 @@ fn a_working_a_settled_and_an_unread_task_are_three_cards_with_their_badges() {
         "{html}"
     );
     assert!(html.contains("started 5 min ago"), "{html}");
-    assert!(html.contains("last active 20 s ago"), "{html}");
+    assert!(html.contains("last active under a minute ago"), "{html}");
     assert!(html.contains("3 changes"), "{html}");
     assert!(
         html.contains("<span class=\"chip\">tests pass</span>"),
