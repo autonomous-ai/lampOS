@@ -5189,6 +5189,10 @@ struct Marks {
     follows_on: bool,
     /// Its End marked a short sound; the turn's [`Turn::sound`].
     sound: Arc<AtomicBool>,
+    /// The language its speech to text is asked for, when the line began in
+    /// a computer's turn that asked for one ([`crate::turn_language`]); none
+    /// is the lamp's own.
+    language: Option<crate::turn_language::TurnLanguage>,
     /// Only the lamp's name, its call's wait run out
     /// (`ProviderInput::Called`, [`crate::provider_worker::CALLED_NOTE`]).
     called: AtomicBool,
@@ -6677,7 +6681,7 @@ impl Engine {
         *warmed = Some(generation);
         drop(warmed);
         if self.shared.spare.lock().is_ok_and(|spare| spare.is_none()) {
-            keep_a_listener(&self.shared, generation);
+            keep_a_listener(&self.shared, generation, None);
             eprintln!(
                 "lamp-voice second: speech to text's socket opened before the first line (LAMP_SECOND_STT_WARM)"
             );
@@ -8429,6 +8433,7 @@ impl Engine {
                 over_the_lamps_voice,
                 soft_lead_us,
                 heard_of_cut,
+                language,
                 ..
             } => {
                 // Token acquisition is the Start-processing observation boundary,
@@ -8735,6 +8740,7 @@ impl Engine {
                     words_back: Mutex::default(),
                     name_carried: AtomicBool::new(false),
                     soft_lead_us: AtomicU64::new(soft_lead_us),
+                    language,
                 });
                 let said = Arc::new(Mutex::new((0, 0)));
                 if let Some(call) = calls_sound {
@@ -10281,11 +10287,26 @@ async fn spoken(
     // closed is dropped without a word.
     let kept = shared.spare.lock().ok().and_then(|mut spare| spare.take());
     let kept = match kept {
-        Some(kept) if kept.generation == marks.privacy => match kept.opening.await {
-            Ok(Ok(listener)) if listener.open() => Some(listener),
-            _ => None,
-        },
+        // Of this line's privacy generation and its language: a listener
+        // kept in the lamp's own is no use to a turn that asked for another
+        // (nor the other way round), and is dropped for its own, opened now.
+        Some(kept) if kept.generation == marks.privacy && kept.language == marks.language => {
+            match kept.opening.await {
+                Ok(Ok(listener)) if listener.open() => Some(listener),
+                _ => None,
+            }
+        }
         Some(kept) => {
+            if kept.generation == marks.privacy {
+                eprintln!(
+                    "lamp-voice second: request {request}: the listener kept ready hears {}, this line {}: its own is opened",
+                    kept.language
+                        .map_or("the lamp's language", |language| language.code()),
+                    marks
+                        .language
+                        .map_or("the lamp's language", |language| language.code()),
+                );
+            }
             kept.opening.abort();
             None
         }
@@ -10298,7 +10319,7 @@ async fn spoken(
     };
     let connected = match kept {
         Some(listener) => Ok(listener),
-        None => shared.services.listen().await,
+        None => shared.services.listen_in(marks.language).await,
     };
     let mut listener = match connected {
         Ok(listener) => listener,
@@ -10315,7 +10336,7 @@ async fn spoken(
     );
     // And the next line's, opened while this one is heard.
     if shared.keep_listener {
-        keep_a_listener(&shared, marks.privacy);
+        keep_a_listener(&shared, marks.privacy, marks.language);
     }
     // The words before they are final, for a chat begun on them.
     let mut early = if shared.prepare {
@@ -14512,13 +14533,18 @@ fn unsay_pieces(shared: &Shared, request: u64, carried: &Carried) -> Option<usiz
 /// Opens a listener for the next line under privacy `generation` and keeps
 /// it, in place of any kept before, at most [`KEPT_FOR`]: a lamp nobody
 /// talks to keeps nothing open ([`Engine::keeping_a_listener_ready`]).
-fn keep_a_listener(shared: &Arc<Shared>, generation: u64) {
+fn keep_a_listener(
+    shared: &Arc<Shared>,
+    generation: u64,
+    language: Option<crate::turn_language::TurnLanguage>,
+) {
     let number = shared.spares.fetch_add(1, Ordering::Relaxed) + 1;
     if let Ok(mut spare) = shared.spare.lock()
         && let Some(old) = spare.replace(Kept {
             number,
             generation,
-            opening: tokio::spawn(shared.services.listen()),
+            language,
+            opening: tokio::spawn(shared.services.listen_in(language)),
         })
     {
         old.opening.abort();
@@ -14542,6 +14568,8 @@ fn keep_a_listener(shared: &Arc<Shared>, generation: u64) {
 struct Kept {
     number: u64,
     generation: u64,
+    /// The language it was opened for, the lamp's own when none.
+    language: Option<crate::turn_language::TurnLanguage>,
     opening: JoinHandle<net::Result<Box<dyn Listener>>>,
 }
 
@@ -16305,6 +16333,12 @@ struct LettingGo(Arc<dyn Services>);
 impl Services for LettingGo {
     fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
         self.0.listen()
+    }
+    fn listen_in(
+        &self,
+        language: Option<crate::turn_language::TurnLanguage>,
+    ) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
+        self.0.listen_in(language)
     }
     fn chat(
         &self,
@@ -24915,6 +24949,7 @@ mod requested_audio_tests {
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
                     soft_lead_us: 0,
+                    language: None,
                 });
                 engine.submit(ProviderInput::Audio {
                     request: 7,
@@ -25116,6 +25151,7 @@ mod requested_audio_tests {
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
                     soft_lead_us: 0,
+                    language: None,
                 });
                 if mode != "empty-input" {
                     engine.submit(ProviderInput::Audio {
@@ -25250,6 +25286,7 @@ mod requested_audio_tests {
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
                 soft_lead_us: 0,
+                language: None,
             });
             engine.submit(ProviderInput::Audio {
                 request: 7,

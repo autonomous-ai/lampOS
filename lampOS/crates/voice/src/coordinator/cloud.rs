@@ -351,6 +351,7 @@ mod tests {
                         over_the_lamps_voice: false,
                         heard_of_cut: None,
                         soft_lead_us: 0,
+                        language: None,
                     })
                     .is_err()
             );
@@ -371,6 +372,7 @@ mod tests {
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
                 soft_lead_us: 0,
+                language: None,
             })
             .unwrap();
         assert!(request.confirm_start(3).is_err());
@@ -398,6 +400,7 @@ mod tests {
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
                     soft_lead_us: 0,
+                    language: None,
                 })
                 .unwrap();
             if stage == FailedStage::AwaitingResponse {
@@ -447,6 +450,7 @@ mod tests {
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
                 soft_lead_us: 0,
+                language: None,
             })
             .unwrap();
         if ended {
@@ -819,6 +823,7 @@ mod tests {
                             over_the_lamps_voice: false,
                             heard_of_cut: None,
                             soft_lead_us: 0,
+                            language: None,
                         })
                         .unwrap();
                     fresh.confirm_start(2).unwrap();

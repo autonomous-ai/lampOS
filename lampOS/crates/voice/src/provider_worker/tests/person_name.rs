@@ -189,6 +189,7 @@ async fn begin(rig: &mut LiveRig, dial: &Dial) -> u64 {
             over_the_lamps_voice: false,
             heard_of_cut: None,
             soft_lead_us: 0,
+            language: None,
         })
         .unwrap();
     rig.parent

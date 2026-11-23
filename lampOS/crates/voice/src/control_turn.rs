@@ -148,6 +148,9 @@ struct Turn {
     /// The start's ticket, until its outcome is told.
     asker: Option<Ticket>,
     phase: Phase,
+    /// The language its lines are heard in, if its start asked for one
+    /// ([`crate::turn_language`]); set once, as the turn opens.
+    language: Option<crate::turn_language::TurnLanguage>,
 }
 
 impl Turn {
@@ -221,6 +224,7 @@ impl ControlTurns {
             skill: asker.skill().to_owned(),
             asker: Some(asker),
             phase: Phase::Open { since_us: at_us },
+            language: None,
         };
         turn.open(at_us);
         self.turn = Some(turn);
@@ -240,8 +244,31 @@ impl ControlTurns {
             skill: asker.skill().to_owned(),
             asker: Some(asker),
             phase: Phase::Prompting(answered),
+            language: None,
         });
         said
+    }
+
+    /// The turn just opened or begun with a prompt is heard in `language`
+    /// ([`crate::turn_language`]); none, or no turn, changes nothing.
+    pub fn heard_in(&mut self, language: Option<crate::turn_language::TurnLanguage>) {
+        if let Some(turn) = self.turn.as_mut() {
+            turn.language = language;
+        }
+    }
+
+    /// The language a line that begins at `at_us` is heard in: the turn's,
+    /// when the line would be taken into it ([`Self::admitted`]'s rule: its
+    /// prompt's, its window open, or its conversation not yet answered),
+    /// else none. Asks nothing of the turn.
+    pub fn language_at(&self, at_us: u64) -> Option<crate::turn_language::TurnLanguage> {
+        let turn = self.turn.as_ref()?;
+        let takes = match &turn.phase {
+            Phase::Prompting(_) => true,
+            Phase::Open { since_us } => at_us <= since_us.saturating_add(OPEN_FOR_US),
+            Phase::Grown { answered, .. } => !*answered,
+        };
+        takes.then_some(turn.language).flatten()
     }
 
     /// The person's line was admitted as `request` at `at_us`: whether it
@@ -728,5 +755,61 @@ mod tests {
         );
         // The prompt's asker hears nothing until its prompt is said.
         assert!(answers(&third).is_empty());
+    }
+
+    /// A turn's language is heard only by a line the turn would take
+    /// (`admitted`'s rule), and by no line once the turn is over: not the
+    /// window passed, not an answered conversation, not a turn that is gone.
+    #[test]
+    fn a_turns_language_is_heard_only_by_the_lines_it_takes() {
+        use crate::turn_language::TurnLanguage::Multi;
+        let mut turns = ControlTurns::default();
+        assert_eq!(turns.language_at(10 * S), None);
+        let (asker, answered) = ticket_for_test("control");
+        turns.open(asker, 10 * S);
+        let _ = answers(&answered);
+        // Opened with no language: the lamp's own.
+        assert_eq!(turns.language_at(11 * S), None);
+        turns.heard_in(Some(Multi));
+        assert_eq!(turns.language_at(11 * S), Some(Multi));
+        assert_eq!(turns.language_at(10 * S + OPEN_FOR_US), Some(Multi));
+        // The window passed: such a line is the person's own, not the turn's.
+        assert_eq!(turns.language_at(10 * S + OPEN_FOR_US + 1), None);
+        // The same rule `admitted` applies.
+        assert!(!turns.admitted(1, 10 * S + OPEN_FOR_US + 1));
+    }
+
+    #[test]
+    fn a_grown_turns_language_goes_on_until_its_answer_is_over() {
+        use crate::turn_language::TurnLanguage::Multi;
+        let mut turns = ControlTurns::default();
+        let (asker, answered) = ticket_for_test("control");
+        turns.open(asker, 10 * S);
+        turns.heard_in(Some(Multi));
+        let _ = answers(&answered);
+        assert!(turns.admitted(7, 11 * S));
+        // Its conversation goes on in it, whenever the next line begins.
+        assert_eq!(turns.language_at(40 * S), Some(Multi));
+        turns.ended_by_its_computer();
+        assert!(!turns.going_on());
+        assert_eq!(turns.language_at(41 * S), None);
+    }
+
+    #[test]
+    fn a_prompted_turn_is_heard_in_its_language_and_a_newer_turn_does_not_inherit_it() {
+        use crate::turn_language::TurnLanguage::Multi;
+        let mut turns = ControlTurns::default();
+        let (asker, _answered) = ticket_for_test("control");
+        let _said = turns.prompt(asker);
+        turns.heard_in(Some(Multi));
+        assert_eq!(turns.language_at(5 * S), Some(Multi));
+        // The same computer's next turn, with no language of its own.
+        let (asker, _next) = ticket_for_test("control");
+        turns.open(asker, 6 * S);
+        assert_eq!(turns.language_at(7 * S), None);
+        // Cancelled by the person: gone.
+        turns.heard_in(Some(Multi));
+        turns.cancelled(MUTED);
+        assert_eq!(turns.language_at(8 * S), None);
     }
 }

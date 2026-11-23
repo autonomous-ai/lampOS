@@ -809,6 +809,14 @@ pub enum ProviderInput {
         /// `LAMP_NAME_START_USUAL=on`. Left off the wire when 0.
         #[serde(default, skip_serializing_if = "no_soft_lead")]
         soft_lead_us: u64,
+        /// The line began in a computer's turn that asked to be heard in
+        /// one language of a closed set (`LAMP_SECOND_TURN_LANGUAGE=on`,
+        /// [`crate::turn_language`]): the second route opens its speech to
+        /// text with it for this line, and does not take a listener kept
+        /// ready in another. The Live worker takes nothing from it. Left
+        /// off the wire when none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        language: Option<crate::turn_language::TurnLanguage>,
     },
     Audio {
         request: u64,
@@ -8249,6 +8257,7 @@ pub(crate) mod tests {
             over_the_lamps_voice: false,
             heard_of_cut: None,
             soft_lead_us: 0,
+            language: None,
         }
     }
 
@@ -8627,6 +8636,7 @@ pub(crate) mod tests {
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
                 soft_lead_us: 0,
+                language: None,
             }
         ));
         for field in ["request", "session", "privacy_generation"] {
@@ -8653,6 +8663,7 @@ pub(crate) mod tests {
             over_the_lamps_voice: false,
             heard_of_cut: None,
             soft_lead_us: 0,
+            language: None,
         };
         // Without `LAMP_CUT_KEEPS_NAME` the coordinator never sets it, and
         // the line on the worker's socket is the one it always was.
@@ -8708,6 +8719,7 @@ pub(crate) mod tests {
                     samples: 36_000,
                 }),
                 soft_lead_us: 0,
+                language: None,
             };
             mark_cut_read_back(&mut thread, 2, start_cuts_read_back(&start));
             thread.person("Yes.", true, now);
@@ -8735,6 +8747,7 @@ pub(crate) mod tests {
             over_the_lamps_voice: true,
             heard_of_cut,
             soft_lead_us: 0,
+            language: None,
         };
         let plain = serde_json::to_string(&start(None)).unwrap();
         assert!(!plain.contains("heard_of_cut"), "{plain}");
@@ -8776,6 +8789,7 @@ pub(crate) mod tests {
             over_the_lamps_voice: false,
             heard_of_cut: None,
             soft_lead_us: 0,
+            language: None,
         };
         assert_eq!(
             serde_json::to_string(&plain).unwrap(),
@@ -8793,6 +8807,7 @@ pub(crate) mod tests {
             over_the_lamps_voice: false,
             heard_of_cut: None,
             soft_lead_us: 0,
+            language: None,
         };
         let written = serde_json::to_value(&cut_off).unwrap();
         assert_eq!(written["continues_cut_off"], true);
@@ -8815,6 +8830,7 @@ pub(crate) mod tests {
             over_the_lamps_voice: false,
             heard_of_cut: None,
             soft_lead_us: 0,
+            language: None,
         };
         assert_eq!(serde_json::to_value(&stopped).unwrap()["after_stop"], true);
         let old =
@@ -9011,6 +9027,7 @@ pub(crate) mod tests {
                         over_the_lamps_voice: false,
                         heard_of_cut: None,
                         soft_lead_us: 0,
+                        language: None,
                     },
                     NOW,
                     &sink
@@ -9134,6 +9151,7 @@ pub(crate) mod tests {
                                 over_the_lamps_voice: false,
                                 heard_of_cut: None,
                                 soft_lead_us: 0,
+                                language: None,
                             })?;
                         }
                         Ok(control)
@@ -9198,6 +9216,7 @@ pub(crate) mod tests {
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
                     soft_lead_us: 0,
+                    language: None,
                 })
                 .unwrap();
             assert_eq!(rig.tick(NOW).unwrap(), ControlDrain::Empty);
@@ -9275,6 +9294,7 @@ pub(crate) mod tests {
                                     over_the_lamps_voice: false,
                                     heard_of_cut: None,
                                     soft_lead_us: 0,
+                                    language: None,
                                 },
                                 ProviderInput::Audio {
                                     request: new.turn(),
@@ -9422,6 +9442,7 @@ pub(crate) mod tests {
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
                     soft_lead_us: 0,
+                    language: None,
                 })
                 .unwrap();
             rig.parent
@@ -9529,6 +9550,7 @@ pub(crate) mod tests {
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
                 soft_lead_us: 0,
+                language: None,
             })
             .unwrap();
         let error = rig.tick(NOW).unwrap_err();
@@ -9658,6 +9680,7 @@ pub(crate) mod tests {
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
                 soft_lead_us: 0,
+                language: None,
             },
             ProviderInput::Audio {
                 request: next.turn(),
@@ -10908,6 +10931,7 @@ pub(crate) mod tests {
                     over_the_lamps_voice,
                     heard_of_cut: None,
                     soft_lead_us: 0,
+                    language: None,
                 })
                 .unwrap();
             self.parent
@@ -13067,6 +13091,7 @@ pub(crate) mod tests {
             over_the_lamps_voice: false,
             heard_of_cut: None,
             soft_lead_us: 0,
+            language: None,
         };
 
         first.service.send(resumable()).await;
@@ -13151,6 +13176,7 @@ pub(crate) mod tests {
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
                     soft_lead_us: 0,
+                    language: None,
                 },
                 NOW,
                 &provider,
@@ -13687,6 +13713,7 @@ pub(crate) mod tests {
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
                 soft_lead_us: 0,
+                language: None,
             })
             .unwrap();
         assert!(
@@ -14023,6 +14050,7 @@ pub(crate) mod tests {
                     over_the_lamps_voice: false,
                     heard_of_cut: None,
                     soft_lead_us: 0,
+                    language: None,
                 },
                 NOW,
                 &provider,
@@ -14101,6 +14129,7 @@ pub(crate) mod tests {
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
                 soft_lead_us: 0,
+                language: None,
             })
             .unwrap();
         rig.parent
@@ -14306,6 +14335,7 @@ pub(crate) mod tests {
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
                 soft_lead_us: 0,
+                language: None,
             })
             .unwrap();
         let message = rig.exit().await.0.unwrap_err().to_string();
@@ -14862,6 +14892,7 @@ pub(crate) mod tests {
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
                 soft_lead_us: 0,
+                language: None,
             })
             .unwrap();
         rig.parent
@@ -15600,6 +15631,7 @@ pub(crate) mod tests {
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
                 soft_lead_us: 0,
+                language: None,
             },
             ProviderInput::Audio {
                 request: next,
@@ -15747,6 +15779,7 @@ pub(crate) mod tests {
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
                 soft_lead_us: 0,
+                language: None,
             })
             .unwrap();
         assert!(matches!(
@@ -15941,6 +15974,7 @@ pub(crate) mod tests {
                         over_the_lamps_voice: false,
                         heard_of_cut: None,
                         soft_lead_us: 0,
+                        language: None,
                     })
                     .unwrap();
                 loop {

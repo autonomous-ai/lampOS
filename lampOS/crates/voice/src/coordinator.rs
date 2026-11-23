@@ -7055,6 +7055,8 @@ fn conversation_with_gate_inner(
     // and the person's newest line: its turn and when it was admitted, so
     // that a computer's turn is refused while they talk with the lamp.
     let mut control_turns = crate::control_turn::ControlTurns::default();
+    // `LAMP_SECOND_TURN_LANGUAGE`, read once: off, a turn's language is ignored.
+    let turn_language_on = crate::turn_language::armed();
     let mut person_line: Option<(u64, u64)> = None;
     // The body's ask when it lets go for its pose, said through the say
     // service from a thread of its own (#2938, `LAMP_BODY_ASK=on`).
@@ -11273,6 +11275,9 @@ fn conversation_with_gate_inner(
                     let trigger_us = accepted.candidate.trigger_read_at_us;
                     let woken_by_name = name_wake
                         .filter(|woke| crate::attention::in_name_wakes_wait(*woke, trigger_us));
+                    // The language of a computer's turn this line begins in
+                    // (`LAMP_SECOND_TURN_LANGUAGE`), as `admitted` below takes it.
+                    let turn_language = control_turns.language_at(monotonic_us());
                     snapshot = commit_admitted_input(
                         owner,
                         reply,
@@ -11294,6 +11299,7 @@ fn conversation_with_gate_inner(
                         // comes while a candidate is pending (the
                         // Reviewer-lead's P3 on #4286).
                         detector.began_ordinarily(),
+                        turn_language,
                         rig.playout_start_now(),
                         trace,
                         |state| rig.publish(state),
@@ -11546,6 +11552,9 @@ fn conversation_with_gate_inner(
                                             crate::attention::in_name_wakes_wait(*woke, at)
                                         })
                                     }),
+                                    // The same utterance goes on in the
+                                    // language of the turn it began in.
+                                    control_turns.language_at(monotonic_us()),
                                     rig.playout_start_now(),
                                     trace,
                                     |state| rig.publish(state),
@@ -13647,7 +13656,7 @@ fn conversation_with_gate_inner(
                 speaking: signs[3..].iter().any(|(_, on)| *on),
             });
             if let Some(why) = refusal {
-                if let Some((_, _, ticket)) = says.take_turn_start(control_now_us) {
+                if let Some((_, _, _, ticket)) = says.take_turn_start(control_now_us) {
                     // Which signs refused it, never what was said.
                     let by: Vec<&str> = signs
                         .iter()
@@ -13678,11 +13687,16 @@ fn conversation_with_gate_inner(
                 && !(refused_hold && model_refusing.holds(control_now_us))
                 && !care_holds
                 && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
-                && let Some((prompt, _, ticket)) = says.take_turn_start(control_now_us)
+                && let Some((prompt, _, asked_language, ticket)) =
+                    says.take_turn_start(control_now_us)
             {
+                // Off unless `LAMP_SECOND_TURN_LANGUAGE=on`: the ask is then
+                // dropped, said once, and the turn is heard as ever.
+                let turn_language = crate::turn_language::allowed(asked_language, turn_language_on);
                 match prompt {
                     Some(prompt) => {
                         let said = control_turns.prompt(ticket);
+                        control_turns.heard_in(turn_language);
                         snapshot = commit_written_turn(
                             owner,
                             reply,
@@ -13723,6 +13737,7 @@ fn conversation_with_gate_inner(
                         )?;
                         snapshot = now_state;
                         control_turns.open(ticket, monotonic_us());
+                        control_turns.heard_in(turn_language);
                     }
                 }
                 last_publish = monotonic_us();
@@ -16792,6 +16807,9 @@ fn commit_admitted_input(
     // the lamp's sound ended (`TurnDetector::began_ordinarily`): only then
     // does its soft start's lead count (#4226).
     began_ordinarily: bool,
+    // The language of the computer's turn it begins in, if that turn asked
+    // for one (`LAMP_SECOND_TURN_LANGUAGE`, [`crate::turn_language`]).
+    language: Option<crate::turn_language::TurnLanguage>,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
@@ -16864,6 +16882,7 @@ fn commit_admitted_input(
         heard_of_cut,
         // Its sound's soft lead before the usual start (#4226).
         soft_lead_us,
+        language,
     });
     let marks = after_start(
         turn.turn(),
@@ -17230,6 +17249,8 @@ fn continue_after_early_end(
     not_now: bool,
     // Its line began in the wait after a wake by name (migrate-P2).
     woken_by_name: Option<u64>,
+    // The language of the computer's turn the sentence began in.
+    language: Option<crate::turn_language::TurnLanguage>,
     playout_start: PlayoutStart,
     trace: &mut SessionState,
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
@@ -17272,6 +17293,7 @@ fn continue_after_early_end(
         // detector's: no soft lead is known, and a part going on keeps the
         // first part's usual start (#4226).
         soft_lead_us: 0,
+        language,
     });
     let marks = after_start(
         turn.turn(),
@@ -19808,6 +19830,7 @@ mod tests {
                 over_the_lamps_voice: false,
                 heard_of_cut: None,
                 soft_lead_us: 0,
+                language: None,
             })
             .unwrap();
         request.confirm_start(1).unwrap();
@@ -21723,6 +21746,7 @@ mod tests {
             over_the_lamps_voice: false,
             heard_of_cut: None,
             soft_lead_us: 0,
+            language: None,
         }
     }
 
