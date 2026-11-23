@@ -1,0 +1,3 @@
+#!/bin/sh
+# mock file(1): every ART binary is an ARM64 ELF
+echo "$1: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV)"

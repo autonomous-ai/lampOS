@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+# Mock afplay: no sound; records "<epoch> <leg> <clip>" for the mock journal follower.
+import os, sys, re, time
+wav = sys.argv[-1]; clip = re.sub(r"-el\.wav$", "", os.path.basename(wav))
+row = os.environ["MOCK_ROW"]; leg = "?"
+try:
+    ls = [l for l in open(os.path.join(row, "logs/plays.log")) if " PLAY " in l]
+    m = re.search(r"leg=(\S+)", ls[-1]); leg = m.group(1)
+except Exception: pass
+time.sleep(0.05)
+with open(os.path.join(os.environ["MOCK_STATE"], "played"), "a") as f: f.write("%.6f %s %s\n" % (time.time(), leg, clip))
+with open(os.environ["MOCK_LOG"], "a") as f: f.write("%.3f afplay %s (leg %s) args %s\n" % (time.time(), clip, leg, sys.argv[1:-1]))

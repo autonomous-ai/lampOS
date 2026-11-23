@@ -1,0 +1,4 @@
+Only YES and YES2 are rendered here (ElevenLabs, voice ErXwobaYiN019PkySvjV). Every other clip in clips.txt is
+rendered on the runner's Mac by `./run.sh render` (row/render.sh): through the lamp's own ElevenLabs relay over ssh,
+eleven_flash_v2_5, speed 1.0, pcm 24 kHz, 0.4 s of digital silence in front. It changes no lamp state and starts
+nothing. It skips a clip already rendered with the same text. Never live TTS, never macOS `say`.
