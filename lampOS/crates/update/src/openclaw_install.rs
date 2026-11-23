@@ -383,22 +383,36 @@ fi
 /// starts and passes it on (a child that has no handler yet just ends),
 /// waits for OpenClaw and exits with its status, 0 when it ended on the
 /// SIGTERM passed on (143), as systemd takes a SIGTERM for a clean stop.
+/// (#8324) A gateway stopped while it still starts drains that start
+/// before it ends (79.9 s on lamp-52e6 as :18789 first listened, against
+/// the unit's 90 s `TimeoutStopUSec`; 10-21 s off the lamp): 30 s after
+/// the first SIGTERM the shell kills it (one journal line), and its own
+/// exit as PID 1 ends whatever else runs in the namespace. That end, 137
+/// after a stop, is 0 too, so the unit ends `inactive` well inside its
+/// timeout instead of SIGKILLed and `failed`.
 /// The unit's `MainPID` is still the `unshare` outside, so a pane's way in
 /// (`pid_for_children`) is the same namespace. Every other call runs
 /// OpenClaw by [`RUN_LINE`], as before.
 pub const GATEWAY_RUN: &str = "# (#8289) The gateway runs as this shell's child, not as the PID namespace's PID 1, which drops a signal from
 # outside that it has no handler for (Node has none for SIGTERM until the gateway has loaded): this shell passes a
-# stop's SIGTERM on and exits as the gateway does, 0 when it ended on that SIGTERM.
+# stop's SIGTERM on and exits as the gateway does, 0 when it ended on that SIGTERM. (#8324) A gateway stopped while it
+# still starts drains that start first (79.9 s on lamp-52e6, against the unit's 90 s): 30 s after the SIGTERM it is
+# killed, and this shell's exit ends the rest of the namespace, so a stop ends inactive well inside the unit's timeout.
 if [ \"${1-}\" = gateway ] && [ \"${2-}\" = run ]; then
   t=
+  w=
   trap 't=TERM' TERM
   /usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" /var/lib/lampos-openclaw/npm/node_modules/.bin/openclaw \"$@\" &
   c=$!
-  trap 't=TERM; kill -TERM \"$c\" 2>/dev/null' TERM
-  [ -z \"$t\" ] || kill -TERM \"$c\" 2>/dev/null
+  stop() {
+    kill -TERM \"$c\" 2>/dev/null
+    [ -n \"$w\" ] || { (sleep 30; kill -0 \"$c\" 2>/dev/null && echo \"openclaw: its gateway did not end within 30 s of a stop; killed (#8324)\" >&2 && kill -KILL \"$c\" 2>/dev/null) & w=$!; }
+  }
+  trap 't=TERM; stop' TERM
+  [ -z \"$t\" ] || stop
   while wait \"$c\"; s=$?; [ \"$s\" -gt 128 ] && kill -0 \"$c\" 2>/dev/null; do :; done
   if [ \"$s\" -gt 128 ]; then wait \"$c\"; r=$?; [ \"$r\" = 127 ] || s=$r; fi
-  if [ \"$s\" = 143 ] && [ -n \"$t\" ]; then s=0; fi
+  if { [ \"$s\" = 143 ] || [ \"$s\" = 137 ]; } && [ -n \"$t\" ]; then s=0; fi
   exit \"$s\"
 fi
 ";

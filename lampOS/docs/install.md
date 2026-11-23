@@ -2502,6 +2502,14 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        `inactive` in seconds. The unit's `MainPID` is still the `unshare`
        outside, so a pane's way in below joins the same namespace. Every
        other call (`--version`, the install's steps) still execs OpenClaw.
+     - (#8324) A gateway stopped while it still starts drains that start
+       before it ends: 79.9 s on lamp-52e6 as :18789 first listened
+       (kit-8306b), against the unit's 90 s `TimeoutStopUSec`, and 10-21 s
+       off the lamp. So 30 s after the first SIGTERM the shell kills
+       OpenClaw (`openclaw: its gateway did not end within 30 s of a stop;
+       killed (#8324)` in the journal) and exits 0; its exit as PID 1 ends
+       the rest of the namespace. A stop then ends `inactive` within about
+       30 s, never SIGKILLed by systemd and `failed`.
      - Any other call (a Harness pane) takes the gateway's main process
        from systemd (`systemctl show -p MainPID`, never a file OpenClaw
        could write), checks it is `lampos`'s, in another user namespace and

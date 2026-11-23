@@ -725,7 +725,8 @@ fn the_gateway_runs_as_a_child_of_the_namespaces_shell() {
 /// (#8289) [`GATEWAY_RUN`] run by `sh` (dash where there is one, as on a
 /// lamp) with a stand-in OpenClaw: a SIGTERM to the shell ends a gateway
 /// with no handler of its own and one that stops on it, the shell exiting
-/// 0 (a clean stop) within a few seconds; a gateway that fails its stop or
+/// 0 (a clean stop) within a few seconds, and so does one still draining
+/// its start past the bound (#8324); a gateway that fails its stop or
 /// exits by itself gives its own status; any other call falls through to
 /// [`RUN_LINE`]. The kernel's PID 1 rule itself needs a PID namespace (a
 /// lamp's row).
@@ -754,12 +755,25 @@ fn the_gateway_mode_passes_a_stop_on_and_exits_as_the_gateway_does() {
             1,
         ),
         ("exits-by-itself", "sleep 0.3\nexit 3", false, 3),
+        // (#8324) Still draining its start past the bound (1 s here, 30 s
+        // on a lamp): killed, and the stop is still clean.
+        (
+            "drains-past-the-bound",
+            "trap : TERM\nwhile :; do sleep 0.1; done",
+            true,
+            0,
+        ),
     ];
+    let bound = "(sleep 30; ";
+    assert_eq!(GATEWAY_RUN.matches(bound).count(), 1);
     for (name, body, stop, want) in cases {
         let child = dir.path().join(name);
         std::fs::write(&child, format!("#!/bin/sh\n{body}\n")).unwrap();
         std::fs::set_permissions(&child, std::fs::Permissions::from_mode(0o755)).unwrap();
-        let script = GATEWAY_RUN.replacen(run, &child.to_string_lossy(), 1) + "exit 99\n";
+        let script = GATEWAY_RUN
+            .replacen(run, &child.to_string_lossy(), 1)
+            .replacen(bound, "(sleep 1; ", 1)
+            + "exit 99\n";
         let started = Instant::now();
         let mut shell = std::process::Command::new(sh)
             .args(["-c", &script, "openclaw-ns", "gateway", "run"])
