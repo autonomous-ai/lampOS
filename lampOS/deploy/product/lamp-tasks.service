@@ -77,6 +77,12 @@ Environment=LAMP_TASKS_RESUME_CLOSED=on
 Environment=LAMP_TASKS_ONE_SESSION=on
 # The one session as Harness's kept session (openharness#4393, #7507; docs/switches.md).
 Environment=LAMP_TASKS_KEPT_SESSION=on
+# OpenClaw spoken to directly (docs/switches.md, docs/install.md "OpenClaw on the lamp"): each OpenClaw turn handed to its
+# gateway over its WebSocket (127.0.0.1:18789, the lamp's own loopback: the gateway's namespaces are user, mount and PID,
+# never a network one), one connection and one kept session, with the token lamp-update leaves in
+# /var/lib/lampos-openclaw/gateway-token (lampos's, 0600); no Harness CLI, no TUI, no tmux. Hermes keeps Harness. Off,
+# the Harness path as before. On in the product.
+Environment=LAMP_TASKS_OPENCLAW_DIRECT=on
 # #7245: an agent make's own lamp-skills pack check takes a skill started by its words (docs/switches.md).
 Environment=LAMP_MADE_SKILL_ASKS=on
 RuntimeDirectory=lampos-tasks

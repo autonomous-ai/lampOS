@@ -3056,7 +3056,7 @@ impl HarnessRunner {
             Err(_) if signed_out_through_harness(here) => {
                 if let Some(run) = run {
                     eprintln!(
-                        "[lamp-tasks] skill task {run}: direct execution is unavailable; Harness is signed out, so trying Harness's own lamp target"
+                        "[lamp-tasks] skill task {run}: a run without Harness is unavailable; Harness is signed out, so trying Harness's own lamp target"
                     );
                 }
                 None
@@ -3620,8 +3620,13 @@ impl Runner for HarnessRunner {
         let began = std::time::Instant::now();
         // With the switch on and no Harness account (or no Harness), the
         // lamp's own agent with no Harness (#6685 PR 3), read as last
-        // known: nothing is asked here.
+        // known: nothing is asked here. A run that goes straight to
+        // OpenClaw's gateway (`crate::direct`, below) is checked first, so
+        // it never reads Harness's sign-in.
+        let direct = crate::direct::lamp().is_some()
+            && matches!(self.make_agent(), Ok(Some((EngineKind::Openclaw, true))));
         if !self.makes
+            && !direct
             && let Some(local) = self.without_harness(Some(&run.run))
         {
             return self.run_without_harness(local, run, end_token);
@@ -3861,6 +3866,33 @@ impl Runner for HarnessRunner {
             },
             session: None,
         };
+        // `LAMP_TASKS_OPENCLAW_DIRECT` on: a gateway agent's run or a make
+        // handed straight into OpenClaw's kept session (`crate::direct`):
+        // its folder, skill-start grant and token as above; no port probe,
+        // no Harness pane.
+        if engine == EngineKind::Openclaw
+            && (by_start || self.makes)
+            && let Some(direct) = crate::direct::lamp()
+        {
+            let stopping = self.stopping.get().cloned();
+            let stopped = || {
+                run.cancelled()
+                    || stopping
+                        .as_ref()
+                        .is_some_and(|stop| stop.load(Ordering::Acquire))
+            };
+            return crate::direct::skill_turn(
+                &direct,
+                run,
+                started.live.as_ref(),
+                &started.folder,
+                &launch.prompt,
+                self.makes,
+                began,
+                began + run.deadline,
+                &stopped,
+            );
+        }
         // As a spoken task's launch (#6226): an engine whose Gateway must
         // answer first is waited for, else not sent; for a run, until it
         // serves its RPCs, not only its port, at most SERVING_WITHIN (#7170).
