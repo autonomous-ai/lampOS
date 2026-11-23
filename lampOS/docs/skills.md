@@ -7505,7 +7505,9 @@ the same code for both writers.
   spoken stop, the body pushed, a computer's end, the microphone not
   allowed and the second route's worker gone end it (a gap cut doesn't),
   and after a stop no count re-arms it until the count has gone to 0; any
-  turn, the person's included, takes over at once. Tests:
+  turn, the person's included, takes over at once. Past its deep pose the
+  head wanders slowly around it ([body.md](body.md), "A long thinking
+  wanders"), so a long one never reads as a machine stuck. Tests:
   `a_make_cut_by_a_gap_keeps_thinking_with_no_turn_until_its_line`,
   `a_count_queued_behind_a_stop_never_re_arms_a_makes_thinking`,
   `a_makes_bound_moves_on_only_for_a_new_make`,
@@ -7513,7 +7515,8 @@ the same code for both writers.
   `a_hand_stop_ends_a_makes_thinking_with_no_turn`,
   `a_cut_make_is_under_way_while_its_work_runs_not_while_its_line_is_said`,
   `a_make_let_run_on_is_no_longer_under_way` and
-  `the_second_worker_tells_the_makes_under_way_only_on_the_one_path`. Off: today's line,
+  `the_second_worker_tells_the_makes_under_way_only_on_the_one_path`, with
+  `a_long_thinking_wanders_around_its_deep_pose_and_a_short_one_never`. Off: today's line,
   and no second. Tests: `the_one_path_waiting_line_says_how_long`,
   `a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more`,
   `a_one_path_makes_waiting_line_completes_its_generation_after_its_audio`

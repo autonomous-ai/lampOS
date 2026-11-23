@@ -3955,14 +3955,18 @@ cả hai người viết.
   micro không được phép và worker của đường thứ hai mất đi thì kết thúc nó
   (một lần cắt do nghẽn thì không), và sau một lần dừng không số nào bật
   lại nó cho tới khi số về 0; lượt nào cũng giành lại ngay, kể cả lượt của
-  người nói. Test: `a_make_cut_by_a_gap_keeps_thinking_with_no_turn_until_its_line`,
+  người nói. Qua dáng sâu của nó, đầu đèn lững thững trôi chậm quanh dáng
+  đó ([body.md](../body.md), "A long thinking wanders"), nên một lần nghĩ
+  lâu không bao giờ trông như một cỗ máy bị kẹt. Test:
+  `a_make_cut_by_a_gap_keeps_thinking_with_no_turn_until_its_line`,
   `a_count_queued_behind_a_stop_never_re_arms_a_makes_thinking`,
   `a_makes_bound_moves_on_only_for_a_new_make`,
   `a_second_worker_that_exits_mid_make_rests_at_once`,
   `a_hand_stop_ends_a_makes_thinking_with_no_turn`,
   `a_cut_make_is_under_way_while_its_work_runs_not_while_its_line_is_said`,
   `a_make_let_run_on_is_no_longer_under_way` và
-  `the_second_worker_tells_the_makes_under_way_only_on_the_one_path`. Tắt: câu chờ như hôm nay, và không có câu thứ hai. Test:
+  `the_second_worker_tells_the_makes_under_way_only_on_the_one_path`, cùng
+  `a_long_thinking_wanders_around_its_deep_pose_and_a_short_one_never`. Tắt: câu chờ như hôm nay, và không có câu thứ hai. Test:
   `the_one_path_waiting_line_says_how_long`,
   `a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more`,
   `a_one_path_makes_waiting_line_completes_its_generation_after_its_audio`
