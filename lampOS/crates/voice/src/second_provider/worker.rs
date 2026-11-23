@@ -867,6 +867,8 @@ fn memory_observer(
     config: &crate::second_config::SecondConfig,
     credentials: Option<&std::ffi::OsStr>,
 ) -> io::Result<crate::remember::Observer> {
+    // The lamp's own model, with the person's OpenAI-compatible one (#8362).
+    let config = &*config.lamps_own();
     let key = deepseek_key(config, credentials)?;
     let base = config
         .hosted
@@ -948,6 +950,8 @@ fn conversation_summarizer(
     config: &crate::second_config::SecondConfig,
     credentials: Option<&std::ffi::OsStr>,
 ) -> io::Result<crate::conversation_summary::Summarizer> {
+    // The lamp's own model, with the person's OpenAI-compatible one (#8362).
+    let config = &*config.lamps_own();
     let key = deepseek_key(config, credentials)?;
     let base = config
         .hosted
@@ -1016,14 +1020,24 @@ pub const OWN_KEY_PUBLISHER: &str = "voice_keys";
 
 /// The warning lamp-health shows once the person's key was refused.
 pub const OWN_KEY_REFUSED_WORDS: &str = "your DeepSeek key was refused, using the lamp's own";
+/// The warning once the person's own endpoint was down or out of use (a
+/// 429 or a 5xx, #8362): the lamp's own model answers.
+pub const OWN_MODEL_DOWN_WORDS: &str = "your own model couldn't answer, using the lamp's own";
 
-/// A request the person's own key was refused for: one journal line, and
-/// the health warning from then on. Never the key.
+/// A request the person's own key was refused for, or their endpoint
+/// couldn't answer (#8362): one journal line, and the health warning from
+/// then on. Never the key.
 fn own_key_refused(status: u16) {
     OWN_KEY_REFUSED.store(status, std::sync::atomic::Ordering::Relaxed);
-    eprintln!(
-        "lamp-voice second: DeepSeek: the person's own key was refused (HTTP {status}); this request goes through the relay (LAMP_OWN_KEYS)"
-    );
+    if matches!(status, 401 | 403) {
+        eprintln!(
+            "lamp-voice second: DeepSeek: the person's own key was refused (HTTP {status}); this request goes through the relay (LAMP_OWN_KEYS)"
+        );
+    } else {
+        eprintln!(
+            "lamp-voice second: the person's own model couldn't answer (HTTP {status}); this request goes to the lamp's own (LAMP_OWN_KEYS)"
+        );
+    }
 }
 
 /// `voice-keys`' report: well, with whose DeepSeek key it uses (`uses`:
@@ -1038,7 +1052,11 @@ pub fn own_key_health(own: bool, refused: u16) -> lamp_msgs::Diagnostic {
         (true, status) => lamp_msgs::Diagnostic::new(
             lamp_msgs::Level::Warn,
             OWN_KEY_HEALTH,
-            OWN_KEY_REFUSED_WORDS,
+            if matches!(status, 401 | 403) {
+                OWN_KEY_REFUSED_WORDS
+            } else {
+                OWN_MODEL_DOWN_WORDS
+            },
         )
         .with("status", status),
     }
@@ -1266,11 +1284,19 @@ pub fn services(
                     .falling_back_to_the_relay(relay, Arc::new(own_key_refused))
                     .map_err(io::Error::other)?;
             }
-            eprintln!(
-                "lamp-voice second: the text model is DeepSeek's {} {}, thinking off (LAMP_SECOND_CHAT=deepseek)",
-                hosted.deepseek_model,
-                deepseek_where(&hosted)
-            );
+            if hosted.lamps_own.is_some() {
+                eprintln!(
+                    "lamp-voice second: the text model is the person's own {} {}, OpenAI-compatible (LAMP_SECOND_CHAT=deepseek)",
+                    hosted.deepseek_model,
+                    deepseek_where(&hosted)
+                );
+            } else {
+                eprintln!(
+                    "lamp-voice second: the text model is DeepSeek's {} {}, thinking off (LAMP_SECOND_CHAT=deepseek)",
+                    hosted.deepseek_model,
+                    deepseek_where(&hosted)
+                );
+            }
         }
     }
     if !route.gemini_speech() {
@@ -1422,6 +1448,9 @@ pub fn search_for(
     let search = match route.search {
         None | Some(SearchRoute::OpenRouter) => return Ok(None),
         Some(SearchRoute::DeepSeek) => {
+            // DeepSeek's search is the lamp's own with the person's
+            // OpenAI-compatible model (#8362), which has none.
+            let config = &*config.lamps_own();
             let key = deepseek_key(config, credentials)?;
             let base = config
                 .hosted
@@ -2914,8 +2943,8 @@ pub fn serve(
                 crate::remember::observe_with(observer);
                 eprintln!(
                     "lamp-voice second: at each conversation's end the memory's observation pass asks {} {} (LAMP_MEMORY_OBSERVE)",
-                    config.hosted.deepseek_model,
-                    deepseek_where(&config.hosted)
+                    config.lamps_own().hosted.deepseek_model,
+                    deepseek_where(&config.lamps_own().hosted)
                 );
             }
             Err(error) => eprintln!(
@@ -2931,8 +2960,8 @@ pub fn serve(
                 crate::conversation_summary::summarize_with(summarizer);
                 eprintln!(
                     "lamp-voice second: the exchanges leaving a conversation's view are summarised by {} {}, off the turn's path (LAMP_CONVERSATION_SUMMARY)",
-                    config.hosted.deepseek_model,
-                    deepseek_where(&config.hosted)
+                    config.lamps_own().hosted.deepseek_model,
+                    deepseek_where(&config.lamps_own().hosted)
                 );
             }
             Err(error) => eprintln!(

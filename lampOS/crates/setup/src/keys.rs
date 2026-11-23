@@ -46,6 +46,8 @@ pub const DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com";
 pub const DEEPGRAM_CHECK_URL: &str = "https://api.deepgram.com/v1/auth/token";
 /// ElevenLabs' API: the check asks `<it>/voices/<voice_id>` (#8367).
 pub const ELEVENLABS_API: &str = "https://api.elevenlabs.io/v1";
+/// The most an OpenAI-compatible endpoint's model list is read (#8362).
+pub const MODELS_MOST: usize = 1 << 20;
 /// The longest voice ID taken: ElevenLabs' are 20 letters and digits.
 pub const VOICE_ID_MOST: usize = 64;
 /// The person's ElevenLabs voice ID, kept beside its key.
@@ -152,10 +154,22 @@ pub enum Service {
     Deepgram,
     /// The lamp's voice (#8367): a key and a voice ID.
     ElevenLabs,
+    /// A person's own model at any OpenAI-compatible endpoint, Grok and the
+    /// like (#8362 step 1b): a key, its endpoint and a model.
+    OpenAiCompatible,
 }
 
 impl Service {
-    pub const ALL: [Service; 3] = [Service::DeepSeek, Service::Deepgram, Service::ElevenLabs];
+    pub const ALL: [Service; 4] = [
+        Service::DeepSeek,
+        Service::Deepgram,
+        Service::ElevenLabs,
+        Service::OpenAiCompatible,
+    ];
+
+    /// The services that are the lamp's model: one own key among them is
+    /// kept at a time, so the model in use is never a guess (#8362).
+    pub const MODELS: [Service; 2] = [Service::OpenAiCompatible, Service::DeepSeek];
 
     /// The name the app and the reply use.
     pub fn id(self) -> &'static str {
@@ -163,6 +177,7 @@ impl Service {
             Self::DeepSeek => "deepseek",
             Self::Deepgram => "deepgram",
             Self::ElevenLabs => "elevenlabs",
+            Self::OpenAiCompatible => "openai_compatible",
         }
     }
 
@@ -172,6 +187,7 @@ impl Service {
             Self::DeepSeek => "DeepSeek",
             Self::Deepgram => "Deepgram",
             Self::ElevenLabs => "ElevenLabs",
+            Self::OpenAiCompatible => "OpenAI-compatible",
         }
     }
 
@@ -185,6 +201,31 @@ impl Service {
             Self::DeepSeek => "deepseek.key",
             Self::Deepgram => "deepgram.key",
             Self::ElevenLabs => "elevenlabs.key",
+            Self::OpenAiCompatible => "openai_compatible.key",
+        }
+    }
+
+    /// The endpoint's file beside the key, for a service that takes one.
+    pub fn url_file(self) -> Option<&'static str> {
+        match self {
+            Self::DeepSeek => Some(DEEPSEEK_URL_FILE),
+            Self::OpenAiCompatible => Some("openai_compatible.url"),
+            Self::Deepgram | Self::ElevenLabs => None,
+        }
+    }
+
+    /// The model's file beside the key, for a service that is given one.
+    pub fn model_file(self) -> Option<&'static str> {
+        (self == Self::OpenAiCompatible).then_some("openai_compatible.model")
+    }
+
+    /// The last check's code (`works`, `refused`, `unreached`): never a key.
+    pub fn checked_file(self) -> &'static str {
+        match self {
+            Self::DeepSeek => "deepseek.checked",
+            Self::Deepgram => "deepgram.checked",
+            Self::ElevenLabs => "elevenlabs.checked",
+            Self::OpenAiCompatible => "openai_compatible.checked",
         }
     }
 
@@ -197,8 +238,12 @@ impl Service {
             "name": self.name(),
             "kind": if self == Self::ElevenLabs { "voice" } else { "model" },
             "models": [],
-            "base_url": self == Self::DeepSeek,
-            "fields": if self == Self::ElevenLabs { json!(["voice_id"]) } else { json!([]) },
+            "base_url": self.url_file().is_some(),
+            "fields": match self {
+                Self::ElevenLabs => json!(["voice_id"]),
+                Self::OpenAiCompatible => json!(["model"]),
+                Self::DeepSeek | Self::Deepgram => json!([]),
+            },
         })
     }
 }
@@ -216,6 +261,8 @@ pub struct Given {
     /// ElevenLabs' voice ID (#8367), 1 to 64 letters and digits; the
     /// others have none.
     pub voice_id: Option<String>,
+    /// The OpenAI-compatible model (#8362); the others are given none.
+    pub model: Option<String>,
 }
 
 impl fmt::Debug for Given {
@@ -225,6 +272,7 @@ impl fmt::Debug for Given {
             .field("key", &"<hidden>")
             .field("base_url", &self.base_url)
             .field("voice_id", &self.voice_id)
+            .field("model", &self.model)
             .finish()
     }
 }
@@ -278,6 +326,40 @@ pub fn fit_voice(id: &str) -> Result<String, &'static str> {
     Ok(id.to_owned())
 }
 
+/// A model's name, as the voice takes one in a request's body: 1 to 128
+/// letters, digits, `-`, `.`, `_`, `/` and `:`.
+pub fn fit_model(model: &str) -> Result<String, &'static str> {
+    let model = model.trim();
+    if model.is_empty()
+        || model.len() > 128
+        || !model
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"-._/:".contains(&b))
+    {
+        return Err("a model name is letters, digits, '-', '.', '_', '/' and ':'");
+    }
+    Ok(model.to_owned())
+}
+
+/// An OpenAI-compatible key as the app gives it (#8362): its endpoint and
+/// its model both needed, each checked for its shape.
+pub fn given_compatible(
+    key: &str,
+    base_url: Option<&str>,
+    model: Option<&str>,
+) -> Result<Given, &'static str> {
+    let key = fit_key(key)?;
+    let base_url = fit_url(base_url.ok_or("an OpenAI-compatible key needs its endpoint")?)?;
+    let model = fit_model(model.ok_or("an OpenAI-compatible key needs its model")?)?;
+    Ok(Given {
+        service: Service::OpenAiCompatible,
+        key,
+        base_url: Some(base_url),
+        voice_id: None,
+        model: Some(model),
+    })
+}
+
 /// A key as setup's request or the app gives it, checked for its shape.
 pub fn given(service: Service, key: &str, base_url: Option<&str>) -> Result<Given, &'static str> {
     let key = fit_key(key)?;
@@ -291,12 +373,14 @@ pub fn given(service: Service, key: &str, base_url: Option<&str>) -> Result<Give
         (Service::Deepgram, Some(_)) => return Err("Deepgram takes no endpoint"),
         (Service::ElevenLabs, None) => None,
         (Service::ElevenLabs, Some(_)) => return Err("ElevenLabs takes no endpoint"),
+        (Service::OpenAiCompatible, url) => return given_compatible(&key, url, None),
     };
     Ok(Given {
         service,
         key,
         base_url,
         voice_id: None,
+        model: None,
     })
 }
 
@@ -315,16 +399,21 @@ pub fn parse(line: &str) -> Result<Asked, String> {
             .get(field)
             .and_then(Value::as_str)
             .and_then(Service::from_id)
-            .ok_or_else(|| "the service is deepseek, deepgram or elevenlabs".to_owned())
+            .ok_or_else(|| {
+                "the service is deepseek, deepgram, elevenlabs or openai_compatible".to_owned()
+            })
     };
     if object.contains_key("set") {
         if object
             .keys()
-            .any(|field| !["set", "key", "base_url", "voice_id"].contains(&field.as_str()))
+            .any(|field| !["set", "key", "base_url", "voice_id", "model"].contains(&field.as_str()))
         {
             return Err("a key is set with set, key, base_url and voice_id only".into());
         }
         let set = service("set")?;
+        if set != Service::OpenAiCompatible && object.contains_key("model") {
+            return Err("a key is set with set, key, base_url and voice_id only".into());
+        }
         let voice_id = match (set, object.get("voice_id")) {
             (_, None | Some(Value::Null)) => None,
             (Service::ElevenLabs, Some(Value::String(id))) => Some(fit_voice(id)?),
@@ -347,6 +436,14 @@ pub fn parse(line: &str) -> Result<Asked, String> {
             Some(Value::String(url)) => Some(url.as_str()),
             Some(_) => return Err("the endpoint must be text".into()),
         };
+        if set == Service::OpenAiCompatible {
+            let model = match object.get("model") {
+                None | Some(Value::Null) => None,
+                Some(Value::String(model)) => Some(model.as_str()),
+                Some(_) => return Err("the model must be text".into()),
+            };
+            return Ok(Asked::Set(given_compatible(key, base_url, model)?));
+        }
         return Ok(Asked::Set(Given {
             voice_id,
             ..given(set, key, base_url)?
@@ -381,6 +478,9 @@ pub enum Verdict {
     /// be, so the lamp uses its own, and the voice is restarted to take that
     /// (the reviewer's P3 2 on #2167).
     NotKept,
+    /// The OpenAI-compatible endpoint took the key but lists no model by the
+    /// name given (#8362): not kept, and its list is never said back.
+    NoModel,
 }
 
 impl Verdict {
@@ -398,6 +498,10 @@ impl Verdict {
                 "that key works, but that voice ID isn't on its ElevenLabs account; nothing changed"
                     .into()
             }
+            Self::Unreached if service == Service::OpenAiCompatible => {
+                "the lamp couldn't reach that endpoint to check that key; nothing changed".into()
+            }
+            Self::NoModel => "that endpoint has no model by that name".into(),
             Self::Unreached => format!(
                 "the lamp couldn't reach {} to check that key; nothing changed",
                 service.name()
@@ -415,6 +519,7 @@ impl Verdict {
             Self::VoiceRefused => "voice_refused",
             Self::Unreached => "unreached",
             Self::NotKept => "not_kept",
+            Self::NoModel => "bad_field",
         }
     }
 
@@ -441,7 +546,7 @@ pub fn host(url: &str) -> &str {
 /// What goes where with the person's own key, by name.
 pub fn goes_where(given: &Given) -> String {
     match given.service {
-        Service::DeepSeek => format!(
+        Service::DeepSeek | Service::OpenAiCompatible => format!(
             "your conversations now go to {} with your key: your words, what the lamp remembers that's sent with them, and what it sees when asked to look",
             host(given.base_url.as_deref().unwrap_or(DEEPSEEK_BASE_URL))
         ),
@@ -512,7 +617,7 @@ impl HttpCheck {
         }
     }
 
-    async fn ask(&self, given: &Given) -> Option<u16> {
+    async fn ask(&self, given: &Given) -> Option<Verdict> {
         let client = reqwest::Client::builder()
             .tls_backend_preconfigured(tls()?)
             .https_only(self.https_only)
@@ -521,7 +626,7 @@ impl HttpCheck {
             .build()
             .ok()?;
         let request = match given.service {
-            Service::DeepSeek => client
+            Service::DeepSeek | Service::OpenAiCompatible => client
                 .get(format!(
                     "{}/models",
                     given.base_url.as_deref().unwrap_or(DEEPSEEK_BASE_URL)
@@ -556,7 +661,32 @@ impl HttpCheck {
             .await
             .ok()?
             .ok()?;
-        Some(response.status().as_u16())
+        let status = response.status().as_u16();
+        let model = match (given.service, status, given.model.as_deref()) {
+            (Service::ElevenLabs, 400 | 404, _) => return Some(Verdict::VoiceRefused),
+            (Service::OpenAiCompatible, 200..=299, Some(model)) => model,
+            _ => return Some(Verdict::of_status(status)),
+        };
+        // The endpoint's own list decides the model (#8362): read within
+        // the same bound and at most [`MODELS_MOST`], never said back.
+        let mut response = response;
+        let mut body = Vec::new();
+        while let Ok(Ok(Some(chunk))) = tokio::time::timeout(CHECK_WITHIN, response.chunk()).await {
+            body.extend_from_slice(&chunk);
+            if body.len() > MODELS_MOST {
+                return None;
+            }
+        }
+        let listed: Value = serde_json::from_slice(&body).ok()?;
+        let found = listed["data"]
+            .as_array()?
+            .iter()
+            .any(|entry| entry["id"].as_str() == Some(model));
+        Some(if found {
+            Verdict::Works
+        } else {
+            Verdict::NoModel
+        })
     }
 }
 
@@ -570,10 +700,7 @@ impl Check for HttpCheck {
         };
         runtime
             .block_on(self.ask(given))
-            .map_or(Verdict::Unreached, |status| match (given.service, status) {
-                (Service::ElevenLabs, 400 | 404) => Verdict::VoiceRefused,
-                _ => Verdict::of_status(status),
-            })
+            .unwrap_or(Verdict::Unreached)
     }
 }
 
@@ -595,12 +722,10 @@ impl Store {
     /// starts in between never sends one key to another key's endpoint.
     pub fn keep(&self, given: &Given) -> io::Result<()> {
         self.folder()?;
-        if let Some(url) = &given.base_url {
-            remove(&self.0.join(given.service.key_file()))?;
-            write_private(
-                &self.0.join(DEEPSEEK_URL_FILE),
-                format!("{url}\n").as_bytes(),
-            )?;
+        let service = given.service;
+        if let (Some(url), Some(file)) = (&given.base_url, service.url_file()) {
+            remove(&self.0.join(service.key_file()))?;
+            write_private(&self.0.join(file), format!("{url}\n").as_bytes())?;
         }
         if let Some(id) = &given.voice_id {
             write_private(
@@ -608,7 +733,36 @@ impl Store {
                 format!("{id}\n").as_bytes(),
             )?;
         }
-        write_private(&self.0.join(given.service.key_file()), given.key.as_bytes())
+        // An OpenAI-compatible model's name, before its key (#8362).
+        if let (Some(model), Some(file)) = (&given.model, service.model_file()) {
+            write_private(&self.0.join(file), format!("{model}\n").as_bytes())?;
+        }
+        write_private(&self.0.join(service.key_file()), given.key.as_bytes())?;
+        // One own model at a time (#8362): keeping one model service's key
+        // takes the other's away, so the model in use is never a guess.
+        if Service::MODELS.contains(&service) {
+            for other in Service::MODELS
+                .into_iter()
+                .filter(|other| *other != service)
+            {
+                self.remove(other)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// The last check's code for `service`, kept beside its key; best
+    /// effort, as it holds nothing a voice reads (#8362).
+    pub fn checked(&self, service: Service, verdict: Verdict) {
+        let code = match verdict {
+            Verdict::Works => "works",
+            Verdict::Refused | Verdict::NoModel | Verdict::VoiceRefused => "refused",
+            Verdict::Unreached => "unreached",
+            Verdict::NotKept => return,
+        };
+        if self.folder().is_ok() {
+            let _ = write_private(&self.0.join(service.checked_file()), code.as_bytes());
+        }
     }
 
     /// ElevenLabs' kept key with `voice_id` in place of the kept voice, for
@@ -620,6 +774,7 @@ impl Store {
             key,
             base_url: None,
             voice_id: Some(voice_id),
+            model: None,
         })
     }
 
@@ -638,8 +793,17 @@ impl Store {
         match service {
             Service::DeepSeek => remove(&self.0.join(DEEPSEEK_URL_FILE))?,
             Service::ElevenLabs => remove(&self.0.join(ELEVENLABS_VOICE_FILE))?,
+            Service::OpenAiCompatible => {
+                for file in [service.url_file(), service.model_file()]
+                    .into_iter()
+                    .flatten()
+                {
+                    remove(&self.0.join(file))?;
+                }
+            }
             Service::Deepgram => {}
         }
+        remove(&self.0.join(service.checked_file()))?;
         Ok(())
     }
 
@@ -686,6 +850,44 @@ impl Store {
             .then(|| self.voice_id())
             .flatten();
         which.insert("voice_id".into(), json!({"elevenlabs": voice}));
+        // #8362: the OpenAI-compatible endpoint's host, the model and the
+        // last check by service, and which own model is in use. Never a key.
+        let read = |service: Service, file: Option<&str>| {
+            self.has(service)
+                .then(|| fs::read_to_string(self.0.join(file?)).ok())
+                .flatten()
+                .map(|text| text.trim().to_owned())
+                .filter(|text| !text.is_empty())
+        };
+        let compatible = Service::OpenAiCompatible;
+        which.insert(
+            "openai_compatible_host".into(),
+            json!(
+                read(compatible, compatible.url_file())
+                    .map(|url| host(&url).to_owned())
+                    .filter(|host| !host.is_empty())
+            ),
+        );
+        let mut model = serde_json::Map::new();
+        let mut checked = serde_json::Map::new();
+        for service in Service::ALL {
+            model.insert(
+                service.id().into(),
+                json!(read(service, service.model_file())),
+            );
+            let code = fs::read_to_string(self.0.join(service.checked_file()))
+                .ok()
+                .map(|code| code.trim().to_owned())
+                .filter(|code| ["works", "refused", "unreached"].contains(&code.as_str()));
+            checked.insert(service.id().into(), json!(code));
+        }
+        which.insert("model".into(), Value::Object(model));
+        which.insert("checked".into(), Value::Object(checked));
+        let in_use = Service::MODELS
+            .into_iter()
+            .find(|service| self.has(*service))
+            .map(Service::id);
+        which.insert("in_use".into(), json!({ "model": in_use }));
         which.insert(
             "offers".into(),
             Value::Array(Service::ALL.into_iter().map(Service::offer).collect()),
@@ -802,6 +1004,7 @@ pub fn answer(
 /// Check `given`, keep it if it works, and the reply and the journal's line.
 fn set(given: Given, store: &Store, check: &mut impl Check) -> (Value, Option<Done>) {
     let (verdict, changed) = check_and_keep(&given, store, check);
+    store.checked(given.service, verdict);
     let service = given.service;
     let said = format!(
         "the person's {} key: {}",
@@ -812,6 +1015,7 @@ fn set(given: Given, store: &Store, check: &mut impl Check) -> (Value, Option<Do
             Verdict::VoiceRefused => "the voice ID was not on its account, not kept",
             Verdict::Unreached => "the check reached nothing, not kept",
             Verdict::NotKept => "it works but could not be written, the lamp's own used",
+            Verdict::NoModel => "the endpoint lists no such model, not kept",
         }
     );
     let done = Some(Done {
@@ -947,6 +1151,7 @@ mod tests {
                 key: "sk-planted-2094".into(),
                 base_url: Some(format!("{base}/v1")),
                 voice_id: None,
+                model: None,
             };
             let mut check = HttpCheck::local(String::new());
             assert_eq!(check.check(&deepseek), verdict);
@@ -971,6 +1176,7 @@ mod tests {
             key: "sk-planted-2094".into(),
             base_url: Some(base),
             voice_id: None,
+            model: None,
         };
         assert_eq!(
             HttpCheck::local(String::new()).check(&deepseek),
