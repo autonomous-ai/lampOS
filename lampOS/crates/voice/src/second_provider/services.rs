@@ -375,11 +375,15 @@ pub struct RefusedTo {
     pub told: Arc<dyn Fn(u16) + Send + Sync>,
 }
 
-/// Whether a chat's failure is its key refused: the request goes to the
-/// relay then, and for nothing else.
+/// Whether a chat's failure on the person's own key sends the request to
+/// the lamp's own at the relay: the key refused (401, 403, #2094), or the
+/// endpoint down or out of use (a 5xx or a 429, #8362). A 400 is the
+/// request's own, and a slow answer is the second try's.
 pub fn key_refused(error: &net::Error) -> Option<u16> {
     match error {
-        net::Error::Status(status @ (401 | 403)) => Some(*status),
+        // Refused (#2094), or the endpoint down or out of use (#8362).
+        net::Error::Status(status @ (401 | 403 | 429 | 500..=599)) => Some(*status),
+        net::Error::UsageLimit(_) => Some(429),
         _ => None,
     }
 }
@@ -653,10 +657,16 @@ impl Net {
         relay: &str,
         told: Arc<dyn Fn(u16) + Send + Sync>,
     ) -> net::Result<Self> {
+        // The lamp's own model, with the person's OpenAI-compatible one
+        // (#8362).
+        let model = match &self.config.hosted.lamps_own {
+            Some(hosted) => hosted.deepseek_model.clone(),
+            None => self.config.hosted.deepseek_model.clone(),
+        };
         self.refused_to = Some(RefusedTo {
             relay: Arc::new(Chat::deepseek_at(
                 relay,
-                &self.config.hosted.deepseek_model,
+                &model,
                 self.config.llm_key.expose(),
                 self.declare.clone(),
                 false,
@@ -702,13 +712,24 @@ impl Net {
             .deepseek_base_url
             .clone()
             .unwrap_or_else(|| crate::second_config::DEEPSEEK_BASE_URL.to_owned());
-        self.chat = Arc::new(Chat::deepseek_at(
-            &base,
-            &self.config.hosted.deepseek_model,
-            key,
-            self.declare.clone(),
-            false,
-        )?);
+        // The person's own OpenAI-compatible model (#8362) is asked plainly,
+        // with none of DeepSeek's own fields.
+        self.chat = Arc::new(if self.config.hosted.lamps_own.is_some() {
+            Chat::with(
+                &base,
+                &self.config.hosted.deepseek_model,
+                key,
+                self.declare.clone(),
+            )?
+        } else {
+            Chat::deepseek_at(
+                &base,
+                &self.config.hosted.deepseek_model,
+                key,
+                self.declare.clone(),
+                false,
+            )?
+        });
         Ok(self)
     }
 
