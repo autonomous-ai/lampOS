@@ -5,7 +5,10 @@ use crate::{
     effects::Effects,
     install::{Pushed, install, install_pushed},
     layout::Layout,
-    manage::{Listed, list, list_pushed_by, remove_pushed, remove_with_yes, start, stop},
+    manage::{
+        Held, Listed, grants_pushed_by, list, list_pushed_by, off_pushed_by, remove_pushed,
+        remove_with_yes, start, stop,
+    },
     package::PackageReader,
     remove::Companions,
     staging::read_staged,
@@ -47,12 +50,21 @@ pub enum DoorRequest {
         client: String,
         name: String,
     },
+    /// A revoked computer's pushed apps stopped (`manage::off_pushed_by`).
+    OffPushedBy(String),
+    /// A computer's pushed apps held to its grants now
+    /// (`manage::grants_pushed_by`).
+    GrantsPushedBy {
+        client: String,
+        grants: Vec<String>,
+    },
 }
 
 pub fn parse_door(line: &str) -> Result<DoorRequest, String> {
     serde_json::from_str(line.trim()).map_err(|_| {
         "lamp-control's request is one line: {\"install_pushed\":{\"path\",\"client\",\"client_name\"}}, \
-         {\"list_pushed_by\":CLIENT} or {\"remove_pushed\":{\"client\",\"name\"}}"
+         {\"list_pushed_by\":CLIENT}, {\"remove_pushed\":{\"client\",\"name\"}}, \
+         {\"off_pushed_by\":CLIENT} or {\"grants_pushed_by\":{\"client\",\"grants\"}}"
             .to_owned()
     })
 }
@@ -99,6 +111,10 @@ pub fn pushed_by(pushed: &Pushed) -> Value {
     json!({"computer": computer, "client": pushed.client})
 }
 
+fn held_json(held: &Held) -> Value {
+    json!({"stopped": held.stopped, "not_stopped": held.not_stopped})
+}
+
 /// lamp-control's answer line, as [`answer`]'s: `{"ok":...}` or
 /// `{"refused":WHY}`; with the switch off everything is refused.
 pub fn answer_door(on: bool, line: &str, parts: &mut Parts) -> Value {
@@ -120,6 +136,11 @@ pub fn answer_door(on: bool, line: &str, parts: &mut Parts) -> Value {
                 .collect();
             return json!({"ok": {"apps": apps}});
         }
+        DoorRequest::OffPushedBy(client) => {
+            client_ok(&client).map(|()| held_json(&off_pushed_by(parts.layout, parts.fx, &client)))
+        }
+        DoorRequest::GrantsPushedBy { client, grants } => client_ok(&client)
+            .map(|()| held_json(&grants_pushed_by(parts.layout, parts.fx, &client, &grants))),
         DoorRequest::RemovePushed { client, name } => client_ok(&client)
             .and_then(|()| remove_pushed(parts.layout, parts.fx, parts.skills, &client, &name))
             .map(|_| json!("removed")),

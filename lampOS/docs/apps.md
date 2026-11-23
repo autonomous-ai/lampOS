@@ -148,7 +148,8 @@ not asked about); the consent is the pairing.
   with every other check of "What the reader checks, in order"
   (`lamp_skills::app_package::read_pushed_app_package_bytes`), by
   lamp-control first and by the apps' helper again. The helper takes its
-  `install_pushed`, `list_pushed_by` and `remove_pushed` from lamp-control's
+  `install_pushed`, `list_pushed_by`, `remove_pushed`, `off_pushed_by` and
+  `grants_pushed_by` from lamp-control's
   cgroup alone (`lamp_apps::ask::answer_door`), and takes none of the
   Store's verbs from it; lamp-cloud and the voice can't ask the pushed
   verbs. So an unsigned package reaches the lamp only from a paired
@@ -161,9 +162,28 @@ not asked about); the consent is the pairing.
   and `"pushed_by": {"computer", "client"}` (the name at pairing, at most 64
   bytes, and the pairing id, from that record), the shape a pushed skill's
   `skills.list` row has; a Store app's row has no `pushed_by`. Like a pushed
-  skill's row, it carries no push time.
-  Once it is on, the lamp says one line with its undo: "Gym Coach is on,
-  from your computer. To undo, remove it in the app."
+  skill's row, it carries no push time. A pushed app's row always carries
+  `net`, from that record. Once it is on, the lamp says one line with its
+  undo: "Gym Coach is on, from your computer. To undo, remove it in the
+  app."; for an app whose manifest says `net: true`, "Gym Coach is on, from
+  your computer, and can use the internet. To undo, remove it in the app."
+  (no yes named the internet, as a Store app's does).
+- **Stopped when the computer is revoked or loses the grant.** On the
+  owner's revoke, lamp-control asks the apps' helper `{"off_pushed_by":
+  CLIENT}`: each app that computer pushed is stopped (not removed) with the
+  owner's stop mark, so the boot's `start-all` leaves it stopped, and the
+  owner can still remove or start it from the phone; another computer's
+  pushed apps and Store apps are not touched. When the owner narrows a
+  pairing (`set_grants`, or a re-pair with other grants), it asks
+  `{"grants_pushed_by": {"client", "grants"}}`: a pushed app that asks a
+  grant the pairing no longer holds is stopped the same way, and the rest
+  run on. Each answers `{"ok": {"stopped": [NAME], "not_stopped": ["NAME:
+  why"]}}`. Each change is kept in lamp-control's `--state-dir` as
+  `apps-helper-owed.json` (0600) before it is sent, and let go once the
+  helper answered (asked three times, as the skills' helper is), so one the
+  helper never answered, a restart in between, is told again at
+  lamp-control's next start. An install answered after the pairing changed
+  is followed by the change again, as for a pushed skill.
 - **Replaced only by its computer.** A push of the same name from the same
   computer replaces it, any version, older too. A push never takes a Store
   app's name ("a Store app has that name") nor another computer's ("another
@@ -195,10 +215,8 @@ not asked about); the consent is the pairing.
   `push_app`, `apps`, `remove_app` (Python), `pushApp`, `apps`, `removeApp`
   (JS); the fake lamp serves all three.
 - **Not yet:** a spoken "remove it" as the undo (the voice has no such
-  intent; the line points at the app instead), and turning a revoked
-  computer's pushed apps off (they keep running until removed; a pushed
-  skill is turned off). Tested with a fake helper and the helper's own
-  tests; not yet run on a lamp.
+  intent; the line points at the app instead). Tested with a fake helper
+  and the helper's own tests; not yet run on a lamp.
 
 ## What the reader checks, in order
 

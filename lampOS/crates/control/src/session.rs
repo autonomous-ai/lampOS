@@ -10,7 +10,7 @@
 //! fake and the routing to the lamp's sockets comes as its own piece.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use ring::rand::SystemRandom;
 use serde_json::{Value, json};
@@ -365,6 +365,12 @@ pub struct Door {
     /// What the helper must be told of pairings, in order: drained by the
     /// server into one queue, so a later change is never served first.
     helper_changes: Vec<Value>,
+    /// What the apps' helper must be told of pairings, in order, as
+    /// `helper_changes` (Heron's P1 on #8358), with app push on.
+    app_changes: Vec<Value>,
+    /// Where those are kept until answered ([`crate::apps_owed`]): none in a
+    /// door with no state folder.
+    apps_owed: Option<PathBuf>,
     /// One line for every command and its answer ([`crate::journal`]).
     journal: Journal,
 }
@@ -503,6 +509,8 @@ impl Door {
             last_rev: 0,
             asking: BTreeSet::new(),
             helper_changes: Vec::new(),
+            app_changes: Vec::new(),
+            apps_owed: None,
             journal: Journal::default(),
         }
     }
@@ -655,10 +663,61 @@ impl Door {
         self
     }
 
-    /// The apps' helper has answered `client`'s `app.push` (or failed to):
-    /// another may begin. The server removes the staged file.
-    pub fn app_push_installed(&mut self) {
+    /// The changes the apps' helper is still owed kept in `path`
+    /// (`--state-dir`'s [`crate::apps_owed::OWED`]), so a restart re-tells them.
+    pub fn with_apps_owed(mut self, path: PathBuf) -> Self {
+        self.apps_owed = Some(path);
+        self
+    }
+
+    /// Where the apps' helper's owed changes are kept, if anywhere.
+    pub fn apps_owed(&self) -> Option<&Path> {
+        self.apps_owed.as_deref()
+    }
+
+    /// The apps' helper has answered `client`'s `app.push`, asked under
+    /// pairing generation `rev` (or failed to): another may begin. The server
+    /// removes the staged file. If the pairing changed while the install was
+    /// with the helper, the apps' helper is told again what the computer may
+    /// have now, after the install, as [`Door::push_installed`] does.
+    pub fn app_push_installed(&mut self, client: &str, rev: u64) {
         self.app_pushes.installed(None);
+        if self.rev_of(client) == rev {
+            return;
+        }
+        match self.clients.get(client).map(|paired| paired.grants.clone()) {
+            Some(grants) => self.tell_apps_grants(client, &grants),
+            None => self.tell_apps_off(client),
+        }
+    }
+
+    /// What the apps' helper must be told of pairings since the last call,
+    /// in order; each kept on disk first when a state folder is given.
+    pub fn take_app_changes(&mut self) -> Vec<Value> {
+        std::mem::take(&mut self.app_changes)
+    }
+
+    /// `client`'s pushed apps stopped (not removed), with app push given.
+    fn tell_apps_off(&mut self, client: &str) {
+        self.owe_apps(json!({ "off_pushed_by": client }));
+    }
+
+    /// `client`'s pushed apps held to `grants`: one asking a grant outside
+    /// them is stopped.
+    fn tell_apps_grants(&mut self, client: &str, grants: &BTreeSet<Grant>) {
+        self.owe_apps(json!({ "grants_pushed_by": { "client": client, "grants": grants } }));
+    }
+
+    fn owe_apps(&mut self, change: Value) {
+        if self.apps_staging.is_none() {
+            return;
+        }
+        if let Some(path) = &self.apps_owed
+            && let Err(why) = crate::apps_owed::keep(path, &change)
+        {
+            eprintln!("lamp-control: {why}: it is told now, but not again after a restart");
+        }
+        self.app_changes.push(change);
     }
 
     /// The computers' own notes, if kept.
@@ -742,11 +801,13 @@ impl Door {
         self.revs.insert(client.to_owned(), self.last_rev);
     }
 
-    /// `client`'s pushed skills off (not deleted), with skill push on.
+    /// `client`'s pushed skills off (not deleted), with skill push on, and
+    /// its pushed apps stopped, with app push given.
     fn tell_helper_off(&mut self, client: &str) {
         if self.push_folder.is_some() {
             self.helper_changes.push(json!({ "off_pushed_by": client }));
         }
+        self.tell_apps_off(client);
     }
 
     /// `client`'s pushed skills held to `grants`: one asking a grant
@@ -756,6 +817,7 @@ impl Door {
             self.helper_changes
                 .push(json!({ "grants_pushed_by": { "client": client, "grants": grants } }));
         }
+        self.tell_apps_grants(client, grants);
     }
 
     /// A new connection, and the `welcome` to send it first.
@@ -1456,13 +1518,10 @@ impl Door {
                 };
                 let client_name = self.clients.get(&client).map(|paired| paired.name.clone());
                 return Outcome {
-                    ask: Some(Ask::app_install(
-                        re,
-                        &client,
-                        client_name.as_deref(),
-                        &path,
-                        told,
-                    )),
+                    ask: Some(Ask {
+                        rev: self.rev_of(&client),
+                        ..Ask::app_install(re, &client, client_name.as_deref(), &path, told)
+                    }),
                     ..Outcome::default()
                 };
             }
