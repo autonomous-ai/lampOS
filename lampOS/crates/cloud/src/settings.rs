@@ -1604,6 +1604,44 @@ mod tests {
             assert!(!why.contains("sk-planted"), "{why}");
         }
     }
+
+    /// #8367: `keys.set` takes ElevenLabs with a key and a voice ID, or a
+    /// voice ID alone (the helper changes only the voice beside a kept key);
+    /// `keys.remove` takes it too. A key is still needed for every other
+    /// service, and no refusal quotes a key or a voice ID.
+    #[test]
+    fn keys_line_passes_an_elevenlabs_key_and_voice_or_a_voice_alone() {
+        let line = |data: Value| {
+            serde_json::from_str::<Value>(&keys_line("keys.set", &data).unwrap().0).unwrap()
+        };
+        assert_eq!(
+            line(
+                json!({"service": "elevenlabs", "key": "sk-planted", "voice_id": "Voice8367", "request_id": "r2"})
+            ),
+            json!({"set": "elevenlabs", "key": "sk-planted", "voice_id": "Voice8367"})
+        );
+        assert_eq!(
+            line(json!({"service": "elevenlabs", "voice_id": "Voice8367"})),
+            json!({"set": "elevenlabs", "voice_id": "Voice8367"})
+        );
+        assert_eq!(
+            keys_line("keys.remove", &json!({"service": "elevenlabs"}))
+                .unwrap()
+                .0,
+            r#"{"remove":"elevenlabs"}"#
+        );
+        for data in [
+            json!({"service": "deepseek", "voice_id": "Voice8367"}),
+            json!({"service": "elevenlabs", "key": "sk-planted", "voice_id": 7}),
+            json!({"service": "elevenlabs", "key": "sk-planted", "voice_id": "x".repeat(65)}),
+        ] {
+            let why = keys_line("keys.set", &data).unwrap_err();
+            assert!(
+                !why.contains("sk-planted") && !why.contains("xxxx"),
+                "{why}"
+            );
+        }
+    }
     use super::*;
     use crate::answer::{answer, tests::Fake};
     use crate::online::reply;

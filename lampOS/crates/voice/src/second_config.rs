@@ -1508,6 +1508,47 @@ mod tests {
         assert_eq!(none, relay);
     }
 
+    /// #8367: the person's own ElevenLabs key and voice ID, kept by root's
+    /// helper as `elevenlabs.key` and `elevenlabs.voice`, speak the lamp's
+    /// live speech straight at ElevenLabs' own API in their voice, with one
+    /// journal line that names neither the key nor the voice ID. Off, the
+    /// same files change nothing.
+    #[test]
+    fn the_persons_elevenlabs_key_and_voice_speak_in_place_of_the_lamps() {
+        let planted = "sk-planted-8367-elevenlabs-fake";
+        let voice = "PersonVoice8367abcdef";
+        let (_, config) = written("own-voice", r#","tts_provider":"elevenlabs""#);
+        let relay = load_from_path(&config).unwrap();
+        let units = directory("own-voice-units");
+        let dir = Some(units.as_os_str());
+        private(&units.join("own_elevenlabs.key"), &format!("{planted}\n"));
+        private(&units.join("own_elevenlabs.voice"), &format!("{voice}\n"));
+        let (own, lines) = relay.clone().with_own_keys(true, dir);
+        assert_eq!(own.tts_base_url, "https://api.elevenlabs.io/v1");
+        assert_eq!(own.tts_key.expose(), planted);
+        assert_eq!(own.tts_voice.as_deref(), Some(voice));
+        assert!(
+            lines
+                .contains(&"ElevenLabs: the person's own key and voice (LAMP_OWN_KEYS)".to_owned()),
+            "{lines:?}"
+        );
+        for line in &lines {
+            assert!(!line.contains(planted) && !line.contains(voice), "{line}");
+        }
+        assert!(!format!("{own:?}").contains(planted));
+        // Off: the same files are never read, the route as it was.
+        let (off, lines) = relay.clone().with_own_keys(false, dir);
+        assert_eq!(off, relay);
+        assert!(lines.is_empty());
+        // A voice ID without its key is no own voice: the lamp's.
+        fs::remove_file(units.join("own_elevenlabs.key")).unwrap();
+        let (alone, _) = relay.clone().with_own_keys(true, dir);
+        assert_eq!(
+            (&alone.tts_base_url, &alone.tts_key, &alone.tts_voice),
+            (&relay.tts_base_url, &relay.tts_key, &relay.tts_voice)
+        );
+    }
+
     /// #2094: the voice's drop-in turns the switch on and loads the keys'
     /// folder as `own`, so each file is the `own_<file>` read here, the
     /// files root's helper writes.
