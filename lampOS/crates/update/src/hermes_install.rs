@@ -374,6 +374,9 @@ T=$(cat /var/lib/lampos-cloud/hermes-token 2>/dev/null) && [ -n "$T" ] || {
   exit 1
 }
 LAMP_NS_UID=$(id -u) && LAMP_NS_GID=$(id -g) || exit 1
+# Nobody answers a prompt in a Harness pane on the lamp (#7781, #8151): set before the exec, as Harness starts an engine
+# with an environment of its own list.
+export HERMES_NONINTERACTIVE=1
 export LAMP_HERMES_TOKEN="$T" HERMES_HOME=/var/lib/lampos-hermes/.hermes LAMP_NS_UID LAMP_NS_GID
 unset T HERMES_YOLO_MODE
 exec /usr/bin/unshare --map-root-user --mount --pid --kill-child --mount-proc --propagation private /usr/local/lib/lampos/hermes-ns "$@"
@@ -473,11 +476,20 @@ macro_rules! run_lines {
         concat!(
             $crate::hermes_install::run_lines_find!(),
             "unset HERMES_YOLO_MODE\n",
+            "# Nobody answers a prompt in a Harness pane on the lamp (#7781, #8151): set before the exec, as Harness starts an\n",
+            "# engine with an environment of its own list.\n",
+            "HERMES_NONINTERACTIVE=1\n",
+            "export HERMES_NONINTERACTIVE\n",
             $crate::hermes_install::run_lines_read!(),
             "  # Nobody answers a skill's run: Hermes asks no approval in it, its hardline list still holds (#6684).\n",
             "  HERMES_YOLO_MODE=1\n",
             "  export HERMES_YOLO_MODE\n",
-            "fi\n"
+            "fi\n",
+            "# lamp-tasks' kept session (#8151), started by Harness in its own folder: nobody answers it either, so Hermes asks\n",
+            "# no approval in it; its hardline list still holds. Only lampos reaches that folder (0700 under its home).\n",
+            "# Hermes reads HERMES_YOLO_MODE once, when it starts (tools/approval.py), so it is set here, before its exec. Harness's\n",
+            "# own hooks (on_session_start, pre_llm_call) would be asked \"Allow this hook to run?\": HERMES_ACCEPT_HOOKS takes them.\n",
+            "[ \"$P\" != /var/lib/lampos-tasks/harnesses/lamp-tasks/one-session ] || { HERMES_YOLO_MODE=1 HERMES_ACCEPT_HOOKS=1; export HERMES_YOLO_MODE HERMES_ACCEPT_HOOKS; }\n"
         )
     };
 }
@@ -615,6 +627,14 @@ pub const AGENT_ENV: &str = r#"  T=$(cat /var/lib/lampos-cloud/hermes-token 2>/d
   LAMP_HERMES_TOKEN=$T HERMES_HOME=/var/lib/lampos-hermes/.hermes
   export LAMP_HERMES_TOKEN HERMES_HOME
   unset T HERMES_YOLO_MODE
+  # Nobody answers a prompt in a Harness pane on the lamp (#7781, #8151): Hermes's setup questions (its telemetry
+  # consent, any yes/no) take their default. Set here, before its exec: Harness starts an engine with an environment of
+  # its own list, so the copy in Harness's env file never reaches Hermes (seen on c0a4, 21 Nov).
+  HERMES_NONINTERACTIVE=1
+  export HERMES_NONINTERACTIVE
+  # lamp-tasks' kept session (#8151), in its own folder: nobody answers it either; its hardline list still holds.
+  # Read once at Hermes's start (tools/approval.py), so set before its exec; Harness's hooks are accepted too, unasked.
+  [ "${P-}" != /var/lib/lampos-tasks/harnesses/lamp-tasks/one-session ] || { HERMES_YOLO_MODE=1 HERMES_ACCEPT_HOOKS=1; export HERMES_YOLO_MODE HERMES_ACCEPT_HOOKS; }
 "#;
 /// Hermes's own lines in a skill's run only (#6684): nobody answers a
 /// skill's run, so Hermes asks no approval in it; its hardline list still
