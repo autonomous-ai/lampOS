@@ -341,6 +341,41 @@ fn a_say_cut_short_is_dropped_with_why() {
     );
 }
 
+/// #7689 (`LAMP_CARE_LINE`): with the care hold holding, a skill's say
+/// nobody asked for that is under way is cut, and its asker is told only
+/// `held`, nothing of why. The voice's own say, or any say with the hold
+/// not holding, is never cut by it.
+#[test]
+fn the_care_hold_cuts_a_skills_say_under_way_and_tells_its_asker_only_held() {
+    let mut test = Test::writing("Here's a fun fact about otters!");
+    let first = test.generation(17);
+    test.accept(&first, 120);
+    assert!(
+        !care_cuts(true, test.reply.as_ref()),
+        "the voice's own say is not the hold's"
+    );
+    let (ticket, answered) = crate::say::unasked_ticket_for_test("fun-facts");
+    test.reply.as_mut().unwrap().say = Some(ticket);
+    assert!(
+        !care_cuts(false, test.reply.as_ref()),
+        "the hold not holding"
+    );
+    assert!(care_cuts(true, test.reply.as_ref()));
+    cancel_reply(
+        &mut test.owner,
+        &mut test.reply,
+        &mut test.trace,
+        crate::say::CARE_CUT,
+    )
+    .unwrap();
+    assert_eq!(
+        answered.try_recv(),
+        Ok(Answer::Done(Outcome::Dropped("held".into())))
+    );
+    assert!(test.reply.is_none());
+    assert!(!care_cuts(true, test.reply.as_ref()), "nothing left to cut");
+}
+
 /// "Where you sit"'s intro through the coordinator's own path (jarvis's P3
 /// on #4120): the walk's note committed as a written turn, bound to it by
 /// `bind_opener`, and reported as the loop reports it. Played whole and
