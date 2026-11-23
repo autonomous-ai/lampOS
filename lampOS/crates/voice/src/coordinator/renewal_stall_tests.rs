@@ -68,13 +68,31 @@ fn a_full_control_socket_skips_the_renewal_and_the_next_tick_delivers_it() {
 #[test]
 fn a_closed_control_socket_still_ends_the_voice() {
     let directory = SessionDirectory::create().unwrap();
-    let (mut rig, _peers, second) = second_only(&directory);
+    let (mut rig, mut peers, second) = second_only(&directory);
     let (mut controller, _, _) = super::tests::active_reply();
     drop(second);
-    let error = rig
-        .publish(controller.snapshot(now()).unwrap())
-        .expect_err("a peer gone is no skipped renewal");
-    assert_ne!(error.kind(), io::ErrorKind::WouldBlock);
+    // A child another test forks as `second` drops holds a copy of its
+    // socket until its exec (CLOEXEC), so for a moment the second worker is
+    // still there and a send to it is taken. Publish until one is refused,
+    // for at most 5 s, reading what the other workers were sent so that
+    // none of them fills (as `send_stop_until_peer_gone` does).
+    let until = std::time::Instant::now() + Duration::from_secs(5);
+    let error = loop {
+        match rig.publish(controller.snapshot(now()).unwrap()) {
+            Err(error) => break error,
+            Ok(()) => {
+                assert!(
+                    std::time::Instant::now() < until,
+                    "the second worker's peer was not gone after 5 s"
+                );
+                for peer in [&mut peers.speaker, &mut peers.capture, &mut peers.privacy] {
+                    read_backlog(peer);
+                }
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        }
+    };
+    assert_ne!(error.kind(), io::ErrorKind::WouldBlock, "a peer gone is no skipped renewal");
     assert_eq!(rig.provider.renewal_stall.skipped(), 0);
 }
 
