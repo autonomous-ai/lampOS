@@ -201,6 +201,7 @@ pub mod ring_caps;
 pub mod ring_face;
 pub mod ring_head;
 pub mod ring_light;
+pub mod ring_making;
 pub mod ring_mark;
 pub mod ring_mood;
 pub mod ring_night;

@@ -12682,6 +12682,14 @@ fn conversation_with_gate_inner(
             clock,
         );
         if let Some(bus) = bus_out.as_mut() {
+            // The ring's resting face thinks quietly for a make cut from
+            // its turn, as the body does (#7418).
+            bus.making(
+                reply.is_none()
+                    && snapshot.microphone_permission() == Permission::Allowed
+                    && make_held.thinking(clock),
+                clock,
+            );
             bus.settle(reply.is_some(), monotonic_us());
             tell_voice_of_turn(
                 bus,

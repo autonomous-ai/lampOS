@@ -1,6 +1,6 @@
 //! Sole, bounded ring writer. Control authority is never renewed by frame data.
 use crate::{
-    ring_face::{Face, Lit, Mood},
+    ring_face::{Face, Lit},
     ring_light::RingLight,
     ring_sight::RingSight,
     ring_wire::{RingBlankReason, RingFeedback, RingFrame, RingPhase, RingRejection},
@@ -85,6 +85,9 @@ pub struct Senses {
     /// A computer seeing or hearing through the lamp (`light/mark`): its
     /// mark over every frame drawn ([`crate::ring_mark`]).
     pub marks: Option<crate::ring_mark::Marks>,
+    /// A make cut from its turn still runs (`voice/making`, #7418): the
+    /// resting face thinks quietly ([`crate::ring_making`]).
+    pub making: Option<crate::ring_making::RingMaking>,
 }
 
 /// The shutdown's warning while the primary button is held in its window
@@ -333,7 +336,17 @@ pub fn run_continuous(
             }
         }
     });
+    // Whenever there is a bus: the voice says it only with the make's one
+    // run path, and with nothing said the face rests as before.
+    let making = bus_root.and_then(|root| match crate::ring_making::RingMaking::on(root) {
+        Ok(making) => Some(making),
+        Err(error) => {
+            eprintln!("lamp-voice ring: a make's thinking at rest cannot be read: {error}");
+            None
+        }
+    });
     let senses = Senses {
+        making,
         caps,
         unplug,
         night,
@@ -643,6 +656,7 @@ fn service(
         mut button,
         mut reset,
         mut marks,
+        making,
     } = senses;
     let mut light = light.map(|(light, begins)| {
         face.light(begins);
@@ -857,13 +871,7 @@ fn service(
         let look = update
             .as_mut()
             .map_or(crate::ring_update::Look::Plain, |update| {
-                let held = light.as_ref().is_some_and(|light| {
-                    light.held().is_some()
-                        || light.pixels().is_some()
-                        || light.fade().is_some()
-                        || light.pattern().is_some()
-                });
-                let can = if held {
+                let can = if crate::ring_making::light_held(light.as_ref()) {
                     crate::ring_update::Can::Held
                 } else if rested && face.lit().on && !update.asleep() && face.rests_on_its_light(at)
                 {
@@ -922,7 +930,13 @@ fn service(
                     }
                 }
             } else {
-                let mut pixels = face.render(Mood::Resting, 0, at, ceiling.get());
+                // A make cut from its turn: thinking, quietly (#7418).
+                let rest_mood = crate::ring_making::resting_mood(
+                    making.as_ref().is_some_and(|making| making.hinted(at)),
+                    face.lit().on,
+                    crate::ring_making::light_held(light.as_ref()),
+                );
+                let mut pixels = face.render(rest_mood, 0, at, ceiling.get());
                 pixels = crate::ring_update::scaled(&pixels, update_share, ceiling.get());
                 // Asleep at night, the asleep face eases in; the person's
                 // light, on, wins, as at a hand's sleep (#3748).
@@ -1080,6 +1094,7 @@ fn draw(
 #[cfg(test)]
 mod drawn_tests {
     use super::*;
+    use crate::ring_face::Mood;
     use crate::ring_light::DRAWN_TOPIC;
     use lamp_bus::Bus;
     use lamp_msgs::Light;

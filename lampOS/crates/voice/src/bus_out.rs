@@ -1217,6 +1217,11 @@ pub struct BusOut {
     /// The model service refusing turns: its kinds and for how long (#4265).
     model_refusing: Option<(String, u64)>,
     signed_out: bool,
+    /// `voice/making` (#7418), with the make's one run path: a make cut
+    /// from its turn is thought on, for the ring's resting face.
+    making: Option<Publisher>,
+    /// What it last said, and when.
+    making_told: Option<(bool, u64)>,
 }
 
 impl BusOut {
@@ -1230,13 +1235,16 @@ impl BusOut {
         match Bus::from_environment().and_then(|bus| {
             // What the owner scope of a reply reads, kept in this process.
             crate::said_scope::keep(bus.clone());
-            Self::on(&bus)?.with_link(&bus, link)?.with_onboarding(
-                &bus,
-                std::env::var(crate::onboarding::ENVIRONMENT)
-                    .ok()
-                    .as_deref()
-                    == Some("on"),
-            )
+            Self::on(&bus)?
+                .with_link(&bus, link)?
+                .with_onboarding(
+                    &bus,
+                    std::env::var(crate::onboarding::ENVIRONMENT)
+                        .ok()
+                        .as_deref()
+                        == Some("on"),
+                )?
+                .with_making(&bus, crate::make_skill_agent::one_path_on())
         }) {
             Ok(out) => Some(out),
             Err(error) => {
@@ -1277,7 +1285,41 @@ impl BusOut {
             chat_key_refused: false,
             model_refusing: None,
             signed_out: false,
+            making: None,
+            making_told: None,
         })
+    }
+
+    /// Publishes `voice/making` as well, when `on` (#7418).
+    pub fn with_making(mut self, bus: &Bus, on: bool) -> io::Result<Self> {
+        if on {
+            self.making = Some(bus.publisher_declared(
+                crate::ring_making::TOPIC,
+                &crate::ring_making::declaration(),
+                SOURCE,
+            )?);
+        }
+        Ok(self)
+    }
+
+    /// Whether a make cut from its turn is thought on now, for the ring's
+    /// quiet thinking hint at rest ([`crate::ring_making`]). Call every
+    /// tick: said every second while it holds, and once as it ends.
+    pub fn making(&mut self, making: bool, now_us: u64) {
+        let Some(out) = self.making.as_mut() else {
+            return;
+        };
+        if self.making_told.is_some_and(|(told, at)| {
+            told == making && (!making || now_us.saturating_sub(at) < REPEAT_US)
+        }) {
+            return;
+        }
+        if out
+            .publish_json(now_us, &crate::ring_making::Making { making })
+            .is_ok()
+        {
+            self.making_told = Some((making, now_us));
+        }
     }
 
     /// Only enabled onboarding publishes invitation identities. This carries no
