@@ -1,15 +1,17 @@
 > **This branch ships lampOS (V2).** Everything that runs on a lamp today is in [`lampOS/`](lampOS/).
 > Start there: [`lampOS/README.md`](lampOS/README.md) and [`lampOS/docs/`](lampOS/docs/).
 >
-> **The other top-level folders are V1**, the earlier OS. No shipped lamp runs them. They stay for reference,
-> and lampOS reads a few files from them at build time (V1's motion recordings in `hal/recordings/`, to
-> match V1's movement). V1's own home is the [`main`](../../tree/main) branch. The rest of this README
+> **The other top-level folders are V1**, the earlier OS. No shipped lamp runs V1's services. They stay for
+> reference, and V2 still uses a few files from them: V1's motion recordings in `hal/recordings/` (to match
+> V1's movement), and the V2 image build in `scripts/imager/` with the lamp's base files in
+> `robots/lamp/rootfs/`. V1's own home is the [`main`](../../tree/main) branch. The rest of this README
 > describes V1.
 >
 > | Folder | What it is | Runs on lamps today? |
 > |---|---|---|
 > | `lampOS/` | V2: the OS the lamp ships | **Yes** |
-> | `system/`, `hal/`, `runtimes/`, `robots/`, `skills/`, `scripts/`, `integrations/`, `docs/` | V1 | No |
+> | `scripts/imager/`, `robots/lamp/rootfs/` | Used to build V2's image | On the image, not as V1 services |
+> | `system/`, `hal/`, `runtimes/`, the rest of `robots/` and `scripts/`, `skills/`, `integrations/`, `docs/` | V1 | No |
 
 # Physical AI Operating System
 
