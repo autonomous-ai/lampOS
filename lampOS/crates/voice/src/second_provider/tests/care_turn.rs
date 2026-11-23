@@ -242,3 +242,67 @@ fn words_of_self_harm_are_never_offered_to_a_running_apps_trigger() {
     assert_eq!(offered, ["start the store test".to_owned()]);
     assert!(!asked && said.is_empty(), "taken by the app: {said:?}");
 }
+
+/// App Only's 10:00 on #8341: with `LAMP_CARE_LINE` off (no care on the
+/// route), words of self-harm are still never offered to a running app's
+/// trigger, and go to the model as any line does: no note, no care line.
+/// An ordinary line is still the app's.
+#[test]
+fn with_the_switch_off_words_of_self_harm_are_still_never_offered_to_an_app() {
+    let run = |heard: &str| {
+        let offered: Arc<Mutex<Vec<String>>> = Arc::default();
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(heard.to_owned())].into()),
+            chats: Mutex::new([vec![text(REPLY), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (mut engine, _, _) = scripted(script.clone());
+        let seen = offered.clone();
+        engine = engine
+            .announcing(false)
+            .caring(None)
+            .taking_app_lines(Arc::new(move |_, words: &str| {
+                seen.lock().unwrap().push(words.to_owned());
+                true
+            }));
+        let labels = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                engine.submit(start(1));
+                engine.submit(audio(1, 1));
+                engine.submit(end(1));
+                turn(&mut engine).await
+            });
+        let said: Vec<String> = labels
+            .into_iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        let offered = offered.lock().unwrap().clone();
+        let asked = script.asked.lock().unwrap().clone();
+        (offered, said, asked)
+    };
+    for heard in [
+        "honestly I want to kill myself",
+        "I don't want to live anymore",
+        "tôi muốn chết",
+    ] {
+        let (offered, said, asked) = run(heard);
+        assert!(offered.is_empty(), "offered to the app: {offered:?}");
+        assert!(!asked.is_empty(), "the model answers it: {heard}");
+        assert_eq!(said, [format!("said:{REPLY}")], "no care line: {heard}");
+        let told = asked
+            .iter()
+            .flatten()
+            .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
+            .any(|content| content.contains(crate::care_line::NOTE));
+        assert!(!told, "no care note with the switch off: {heard}");
+    }
+    let (offered, said, asked) = run("start the store test");
+    assert_eq!(offered, ["start the store test".to_owned()]);
+    assert!(
+        asked.is_empty() && said.is_empty(),
+        "taken by the app: {said:?}"
+    );
+}
