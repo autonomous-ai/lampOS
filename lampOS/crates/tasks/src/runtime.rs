@@ -7816,6 +7816,7 @@ mod tests {
                     tools: 0,
                 },
                 taken: !self.untaken.load(Ordering::Acquire),
+                engine_session: None,
                 shell: false,
             })
         }
@@ -8335,8 +8336,9 @@ mod tests {
     /// lamp's place is known, a hand-over that may be for its pane is held
     /// in the queue, never the per-run way. Once the place is known (and
     /// the thread opened the pane) it goes into the pane; held past the
-    /// queue's wait it fails `busy`, with no `harness new`. One to another
-    /// engine, named for a session, or to another machine once the lamp's
+    /// queue's wait it fails `busy`, with no `harness new`. One to Hermes
+    /// waits as well (#8151). One to an engine the pane never takes, named
+    /// for a session, or to another machine once the lamp's
     /// is looked at, goes on.
     #[test]
     fn before_the_lamps_place_is_known_a_hand_over_for_it_waits() {
@@ -8359,6 +8361,7 @@ mod tests {
             None,
             "the per-run way, were it sent now"
         );
+        // Hermes shares the one session too (#8151): held as OpenClaw's.
         let hermes = Launch {
             target: Target {
                 engine: EngineKind::Hermes,
@@ -8368,6 +8371,17 @@ mod tests {
         };
         assert_eq!(
             place_wait(&one, Some(&hermes), &mut None, start, cap),
+            PlaceWait::Hold
+        );
+        let codex = Launch {
+            target: Target {
+                engine: EngineKind::Codex,
+                ..spoken.target.clone()
+            },
+            ..spoken.clone()
+        };
+        assert_eq!(
+            place_wait(&one, Some(&codex), &mut None, start, cap),
             PlaceWait::Go
         );
         let named = Launch {

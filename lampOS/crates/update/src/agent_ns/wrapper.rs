@@ -58,6 +58,7 @@
 //! with none takes no such run.
 use crate::{
     hermes_install::{self, Shown, holds, on},
+    openclaw_install,
     records::write_whole,
 };
 use std::{
@@ -606,6 +607,11 @@ pub fn ns_text(shown: Shown) -> String {
         }
         text = text.replacen(ONE_PATH_HOME_ANCHOR, &one_path_home_check(), 1);
         text = text.replacen(MAKE_HOME_ANCHOR, &one_path_make_home(), 1);
+        if shown.tasks {
+            for (from, to) in one_path_start_edits() {
+                text = text.replacen(from, &to, 1);
+            }
+        }
     }
     if text.contains(super::PATH_LINES) {
         text
@@ -633,6 +639,34 @@ pub const ONE_PATH_NS_EDITS: [(&str, &str); 3] = [
         "unset LAMP_NS_UID LAMP_NS_GID LAMP_NS_ENGINE LAMP_NS_ENGINE_BIN LAMP_NS_HOME\n",
     ),
 ];
+
+/// What [`ns_text`] changes with [`Shown::one_path`] and [`Shown::tasks`]
+/// (#8151's parity, the same skill path for every engine): OpenClaw's
+/// gateway's own edits ([`openclaw_install::RUNS_EDITS`]), each found
+/// exactly once (a test holds it), with the agent namespace's words in the
+/// comment. The pushed skills' folder is shown read-only whenever it is
+/// there, not only with `LAMP_NS_NET=run`, and the skill-start launcher's
+/// socket folder `/run/lampos-skill-start` read-only when there: a
+/// default agent with no gateway (the lamp's Hermes) runs a skill's run in
+/// its kept session as `skill-start <run-id>`, the launcher's fence
+/// running the run's script, as OpenClaw's gateway does. Nothing else of
+/// `LAMP_NS_NET`'s (no network namespace, no `model.sock`, no relay)
+/// comes with it, and lamp-tasks' admin socket is never shown.
+pub fn one_path_start_edits() -> Vec<(&'static str, String)> {
+    openclaw_install::RUNS_EDITS
+        .iter()
+        .enumerate()
+        .map(|(at, (from, to))| match at {
+            0 => (*from, ONE_PATH_START_COMMENT.to_owned()),
+            _ => (*from, (*to).to_owned()),
+        })
+        .collect()
+}
+
+/// [`one_path_start_edits`]'s comment, in place of the skills' line.
+const ONE_PATH_START_COMMENT: &str = "# It also shows the skills the owner's computer pushed, /var/lib/lampOS/skills-dev, read-only, when there, to every\n\
+     # agent on the one run path (a skill's run in a kept session runs its script from it), and /run/lampos-skill-start,\n\
+     # read-only, when there: /usr/local/lib/lampos/skill-start's way to lamp-tasks, the same door OpenClaw's gateway has.\n";
 
 /// The line of [`ns_text`] the home check ([`one_path_home_check`]) goes
 /// after, with [`Shown::one_path`]: the program's own check.

@@ -2025,6 +2025,18 @@ pub fn wrapper_takes_runs(wrapper: &str, engine: crate::harness::EngineKind) -> 
         && AGENT_NS_NET_LINES.iter().all(|line| wrapper.contains(line))
 }
 
+/// The line lamp-update's agent namespace has right after
+/// [`AGENT_NS_TASKS_LINE`] when it shows the skill-start launcher's
+/// socket folder read-only (#8151's parity,
+/// `lamp_update::agent_ns::wrapper::one_path_start_edits`).
+pub const AGENT_NS_START_LINE: &str = "Q=/run/lampos-skill-start\n";
+
+/// Whether [`AGENT_NS`]'s text `script` shows the skill-start launcher's
+/// socket folder ([`AGENT_NS_START_LINE`] after [`AGENT_NS_TASKS_LINE`]).
+pub fn ns_takes_starts(script: &str) -> bool {
+    script.contains(&format!("{AGENT_NS_TASKS_LINE}{AGENT_NS_START_LINE}"))
+}
+
 /// Whether [`AGENT_NS`]'s text `script` takes the agent's home from its
 /// wrapper ([`AGENT_NS_HOME_LINE`]) and shows lamp-control's socket
 /// ([`AGENT_NS_TASKS_LINE`]).
@@ -2630,7 +2642,29 @@ pub struct HarnessRunner {
     /// relay line ([`crate::gateway::FENCE_NET_LINE`]) before the run's
     /// egress socket is made. None: such a run is refused as before.
     pub gateway_net: Option<PathBuf>,
+    /// The skill-start launcher a default agent with no gateway (the
+    /// lamp's Hermes) takes a skill's run through in its kept session
+    /// (#8151's parity, [`crate::skill_start::LAUNCHER`] on a lamp), the
+    /// same door OpenClaw's gateway has ([`HarnessRunner::start_door`]).
+    /// None, or not there: such a run keeps its own pane.
+    pub start_door: Option<PathBuf>,
+    /// The exact exec allow-list that holds a default agent with no
+    /// gateway's kept session to the launcher, read as
+    /// [`Self::skill_start_allowed`] reads agent `main`'s (the #8213 HOLD,
+    /// `crate::skill_start`'s residual). Only such an allow-list keeps other
+    /// code at the agent's own uid out of a door run's launcher and fenced
+    /// script, which hold the run's token. `None`: there is none, and every
+    /// run of such an agent keeps its own pane, its token file read once by
+    /// its own wrapper. The lamp's Hermes runs its kept session with
+    /// approvals off (`HERMES_YOLO_MODE`) and has no such list today, so a
+    /// lamp's runner has `None`.
+    pub kept_allow_list: Option<crate::gateway::SkillStartAllowed>,
 }
+
+/// Why a default agent with no gateway keeps a skill's run in its own pane
+/// while its kept session is held to no exact exec allow-list
+/// ([`HarnessRunner::kept_allow_list`], the #8213 HOLD).
+pub const NO_EXEC_ALLOW_LIST: &str = "its kept session is held to no exact exec allow-list with the launcher, so a run's token never goes through it";
 
 /// lamp-tasks' Harness project in `home`, `~/harnesses/lamp-tasks`
 /// (`runtime::MACHINES_PROJECT`), where each run's folder is made.
@@ -2776,6 +2810,81 @@ impl HarnessRunner {
         Ok(())
     }
 
+    /// Whether a skill's run of the default agent `engine` with no gateway
+    /// goes through the skill-start door in its kept session (#8151's
+    /// parity), by what is installed, never by the engine's name: a kept
+    /// session it is typed into (`kept`: lamp-tasks' one session, Harness
+    /// called as the person), the agent namespace showing the launcher's
+    /// socket folder ([`ns_takes_starts`]), the launcher there
+    /// ([`Self::start_door`]), the run's own script (a fixed write has
+    /// none), no keys file (its pane's wrapper reads those), and for a run
+    /// granted `net` a launcher whose fence relays it ([`fence_takes_net`],
+    /// as a gateway agent's). First of all, the kept session held to an
+    /// exact exec allow-list with the launcher ([`Self::kept_allow_list`],
+    /// as OpenClaw's gateway is): with none, any code at the agent's uid
+    /// could take a door run's token (the #8213 HOLD). Each `Err` says why
+    /// it keeps its own pane.
+    fn through_door(
+        &self,
+        run: &SkillRun,
+        engine: crate::harness::EngineKind,
+        kept: bool,
+    ) -> Result<(), String> {
+        if !crate::one_session::skill_runs_share(engine) {
+            return Err(format!(
+                "{} has no kept session for skill runs",
+                engine.argument()
+            ));
+        }
+        if !kept {
+            return Err("no kept session is typed into here".into());
+        }
+        match &self.kept_allow_list {
+            None => return Err(NO_EXEC_ALLOW_LIST.into()),
+            Some(allowed) => allowed.check().map_err(str::to_owned)?,
+        }
+        let script = self
+            .agent_ns
+            .as_deref()
+            .and_then(|path| std::fs::read_to_string(path).ok());
+        if !script.as_deref().is_some_and(ns_takes_starts) {
+            return Err(format!(
+                "the agent namespace doesn't show {}: lamp-update's round hasn't run",
+                crate::skill_start::START_DIR
+            ));
+        }
+        let Some(launcher) = self.start_door.as_deref().filter(|path| path.is_file()) else {
+            return Err(format!("no launcher at {}", crate::skill_start::LAUNCHER));
+        };
+        if run.script.as_os_str().is_empty() {
+            return Err("a fixed write has no script for the launcher".into());
+        }
+        if run.env_file.is_some() {
+            return Err("a run given its keys reads them in its own pane".into());
+        }
+        if run.net
+            && !(self.egress.is_some() && self.gateway_net.is_some() && fence_takes_net(launcher))
+        {
+            return Err("the launcher's fence gives no run its way out here".into());
+        }
+        Ok(())
+    }
+
+    /// Whether the default agent `engine`'s own pane finds a run's egress
+    /// socket by its id ([`takes_net_runs`]), as [`Self::way_out`] checks.
+    fn per_run_takes_net(&self, engine: crate::harness::EngineKind) -> bool {
+        let read = |path: &Path| std::fs::read_to_string(path).ok();
+        let wrapper = self
+            .wrappers
+            .as_ref()
+            .and_then(|wrappers| read(&wrappers.join(engine.argument())));
+        let script = self.agent_ns.as_deref().and_then(read);
+        wrapper
+            .as_deref()
+            .zip(script.as_deref())
+            .is_some_and(|(wrapper, script)| takes_net_runs(wrapper, script))
+    }
+
     /// The way out of a run granted `net` on the one run path, made before
     /// the agent starts: refused for a gateway agent (`gateway`: its turns
     /// run in its gateway's namespaces, shared by every turn, which no one
@@ -2900,6 +3009,10 @@ impl HarnessRunner {
             makes: false,
             egress: None,
             gateway_net: None,
+            start_door: Some(PathBuf::from(crate::skill_start::LAUNCHER)),
+            // No agent with no gateway has an exact exec allow-list today
+            // (the lamp's Hermes runs its kept session with approvals off).
+            kept_allow_list: None,
         }
     }
 
@@ -2949,6 +3062,39 @@ impl HarnessRunner {
         let script = std::fs::read_to_string(&gateway.ns).ok();
         default_agent_takes_runs(engine, wrapper.as_deref(), script.as_deref())
             .map(|()| Some((engine, true)))
+    }
+
+    /// The lamp's default agent for a voice make (#8151's parity): as
+    /// [`Self::make_agent`], and a default agent with no gateway (the
+    /// lamp's Hermes) is `true` too while its kept session takes the make
+    /// ([`Self::kept_make`]): its make typed into that pane, as a gateway
+    /// agent's is. Else `false`, its own make (`MakeHermes`) as before.
+    pub fn make_pick(&self) -> Result<Option<(crate::harness::EngineKind, bool)>, String> {
+        let picked = self.make_agent()?;
+        Ok(match (picked, self.harness.get()) {
+            (Some((engine, false)), Some(harness))
+                if self.kept_make(engine, harness.config.as_person) =>
+            {
+                Some((engine, true))
+            }
+            (picked, _) => picked,
+        })
+    }
+
+    /// Whether a make of the default agent `engine` with no gateway goes
+    /// into lamp-tasks' kept session (#8151's parity), by what is there,
+    /// never by the engine's name: its engine's skill runs share the kept
+    /// session ([`crate::one_session::skill_runs_share`]), Harness is
+    /// called as the person (`as_person`), and the one session is there and
+    /// takes a reply. A make needs no launcher: it runs no skill script.
+    pub fn kept_make(&self, engine: crate::harness::EngineKind, as_person: bool) -> bool {
+        let one = self
+            .one_session
+            .clone()
+            .or_else(|| crate::one_session::LAMP.get().cloned());
+        crate::one_session::skill_runs_share(engine)
+            && as_person
+            && one.is_some_and(|one| one.takes_reply())
     }
 
     /// Whether the lamp's default agent takes a skill's run with no
@@ -3630,16 +3776,19 @@ impl Runner for HarnessRunner {
             None
         };
         let by_one_path = one_path.is_some();
-        let (engine, agent, by_start) = match one_path {
-            // A make goes only to a gateway agent here: the lamp's Hermes
-            // takes its makes in its own namespace (`MakeHermes`).
-            Some((engine, false)) if self.makes => {
+        let (engine, agent, is_gateway) = match one_path {
+            // A make goes to a gateway agent here, or to a default agent
+            // whose kept session takes it (`kept_make`, #8151's parity);
+            // else the lamp's Hermes takes it in its namespace (`MakeHermes`).
+            Some((engine, false))
+                if self.makes && !self.kept_make(engine, harness.config.as_person) =>
+            {
                 return Err(format!(
                     "the lamp's default agent ({}) is not a gateway agent, so a make is not handed to it on the one run path and nothing was started",
                     engine.argument()
                 ));
             }
-            Some((engine, by_start)) => (engine, "the lamp's default agent", by_start),
+            Some((engine, is_gateway)) => (engine, "the lamp's default agent", is_gateway),
             None if self.makes => {
                 return Err("a make goes only on the one run path, so nothing was started".into());
             }
@@ -3653,6 +3802,31 @@ impl Runner for HarnessRunner {
                 (EngineKind::Hermes, "the lamp's Hermes", false)
             }
         };
+        // #8151's parity: a default agent with no gateway (the lamp's
+        // Hermes) takes a skill's run through the same skill-start door as
+        // OpenClaw's gateway, typed into its kept session, when what is
+        // installed has that door ([`Self::through_door`]); else its own
+        // pane, as before, said once in the journal.
+        // A make of an agent with no gateway the kept session takes, as a
+        // gateway agent's make (#8151's parity): typed into that pane.
+        let kept_make = self.makes && !is_gateway;
+        let mut by_start = is_gateway
+            || kept_make
+            || (by_one_path
+                && !self.makes
+                && {
+                    let one_session = self.one_session.is_some();
+                    match self.through_door(run, engine, one_session && harness.config.as_person) {
+                        Ok(()) => true,
+                        Err(why) => {
+                            eprintln!(
+                                "[lamp-tasks] skill task {}: its own pane, not the skill-start door: {why}",
+                                run.run
+                            );
+                            false
+                        }
+                    }
+                });
         if !self.makes {
             tell_run(&run.skill, &run.run, SkillTaskStage::Started, Some(engine));
         }
@@ -3780,7 +3954,7 @@ impl Runner for HarnessRunner {
         } else {
             RUN_FOLDER_PREFIX
         };
-        let launch = Launch {
+        let mut launch = Launch {
             name: format!("{head}{}", run.run),
             prompt,
             target: Target {
@@ -3823,7 +3997,9 @@ impl Runner for HarnessRunner {
         // Only with Harness called as the person, as the product's
         // lamp-tasks is: Harness closes an idle pane an agent started after
         // 30 min, so as an agent each run keeps its own.
-        // OpenClaw's only: a Hermes default keeps the per-run path.
+        // Every kept session's engine (`skill_runs_share`): a Hermes
+        // default's run too, by the skill-start door (`by_start`, #8151's
+        // parity); one that door can't take goes on below, per run.
         // A make (#7245, the owner 18 Nov 13:4x) is typed into the same
         // kept pane: its runner is built before the pane is, so it reads
         // the lamp's one session here; a fresh `new` per make spent 73 s
@@ -3835,13 +4011,14 @@ impl Runner for HarnessRunner {
         });
         if by_start
             && harness.config.as_person
-            && crate::one_session::shares(engine)
+            && crate::one_session::skill_runs_share(engine)
             && let Some(one) = &one_session
             && let Some(ended) = self.run_in_one_session(
                 one,
                 &cli,
                 &lamp.machine_id,
                 engine,
+                is_gateway,
                 run,
                 &mut started,
                 &launch.prompt,
@@ -3851,6 +4028,33 @@ impl Runner for HarnessRunner {
             )
         {
             return ended;
+        }
+        // A door run of an agent with no gateway the kept session didn't
+        // take (#8151's parity): its pane's wrapper reads a token file only
+        // (`lamp_update::hermes_install`), so its live start is ended here,
+        // never claimable, its token file written and its own words sent,
+        // the per-run way as before the door.
+        if by_start && !is_gateway {
+            started.live = None;
+            if run.net && !self.per_run_takes_net(engine) {
+                let why = net_refused(&format!(
+                    "the lamp's default agent ({}) has no wrapper or namespace line that finds a run's egress socket by its id",
+                    engine.argument()
+                ));
+                eprintln!("[lamp-tasks] skill task {}: {why}", run.run);
+                return Err(why);
+            }
+            if let Some(token) = &token {
+                started.token = Some(crate::run_token_file::RunTokenFile::write(
+                    &self.runs, &run.run, token,
+                )?);
+            }
+            launch.prompt = run.prompt.clone();
+            by_start = false;
+            eprintln!(
+                "[lamp-tasks] skill task {}: the kept session didn't take it; its own pane, its token file written",
+                run.run
+            );
         }
         // No Harness daemon here (`harness_not_running`, #7275): started,
         // after any start lamp-tasks already has under way, and the run
@@ -4204,6 +4408,7 @@ impl HarnessRunner {
         cli: &crate::harness::Cli,
         machine: &str,
         engine: crate::harness::EngineKind,
+        gateway: bool,
         run: &SkillRun,
         started: &mut Started<'_>,
         words: &str,
@@ -4220,8 +4425,11 @@ impl HarnessRunner {
         }
         // Never typed while agent main may not exec the launcher: its exec
         // would be denied headless and the run end as never started.
-        // A make runs no skill script, so it needs no launcher.
+        // A make runs no skill script, so it needs no launcher. Only a
+        // gateway agent's: an agent with no gateway runs the launcher from
+        // its kept session's own terminal, its approvals off there.
         if !self.makes
+            && gateway
             && let Err(why) = self.skill_start_allowed.check()
         {
             eprintln!("tasks: {}: not typed into the one session: {why}", run.run);
@@ -4231,6 +4439,18 @@ impl HarnessRunner {
         let Some(folder_text) = folder.to_str().map(str::to_owned) else {
             return Some(Err("the one session's folder is not a plain path".into()));
         };
+        // The project as a run makes it (0700, `lampos`'s): a make makes no
+        // run folder, so a make first after a start finds none yet.
+        if !self.project.is_dir()
+            && let Err(error) = std::fs::DirBuilder::new()
+                .recursive(true)
+                .mode(0o700)
+                .create(&self.project)
+        {
+            return Some(Err(format!(
+                "lamp-tasks' Harness project not made: {error}"
+            )));
+        }
         if let Err(error) = std::fs::DirBuilder::new().mode(0o700).create(&folder)
             && error.kind() != std::io::ErrorKind::AlreadyExists
         {
@@ -7218,6 +7438,8 @@ mod tests {
             makes: false,
             egress: None,
             gateway_net: None,
+            start_door: None,
+            kept_allow_list: None,
         }
     }
 
@@ -7293,7 +7515,9 @@ mod tests {
     /// no skill-start until lamp-update re-adds it, and the agent's exec is
     /// denied headless. Such a run is never typed into the one session: it
     /// fails at once with the clear reason, nothing queued or made. With
-    /// the entry there, the run goes on to the pane.
+    /// the entry there, the run goes on to the pane. #8151's parity: an
+    /// agent with no gateway (the lamp's Hermes) runs the launcher from its
+    /// own terminal, so OpenClaw's allow-list never holds its run back.
     #[test]
     fn a_skill_run_is_not_typed_while_main_may_not_exec_skill_start() {
         use std::os::unix::fs::PermissionsExt;
@@ -7303,7 +7527,7 @@ mod tests {
         std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
         let cli = crate::harness::Cli::new(crate::harness::CliConfig::new(bin), "session".into())
             .unwrap();
-        for present in [false, true] {
+        for (present, gateway) in [(false, true), (true, true), (false, false)] {
             let mut runner = local_runner(dir.path(), HarnessHere::SignedOut, true, None);
             runner.skill_start_allowed = allowed_read(present);
             std::fs::create_dir_all(&runner.project).unwrap();
@@ -7332,7 +7556,12 @@ mod tests {
                 &one,
                 &cli,
                 "m",
-                crate::harness::EngineKind::Openclaw,
+                if gateway {
+                    crate::harness::EngineKind::Openclaw
+                } else {
+                    crate::harness::EngineKind::Hermes
+                },
+                gateway,
                 &run,
                 &mut started,
                 "words",
@@ -7341,7 +7570,7 @@ mod tests {
                 &|| false,
             );
             let folder = runner.project.join(crate::one_session::FOLDER);
-            if present {
+            if present || !gateway {
                 assert_ne!(
                     ended,
                     Some(Err(crate::gateway::SKILL_START_NOT_ALLOWED.into()))
