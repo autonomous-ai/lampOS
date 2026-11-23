@@ -1,5 +1,5 @@
 #!/bin/sh
-# Mock push.py (legs S, K and unrow): never connects. push <folder> -> the fixture out/push.<name> (exit 0 when it says
+# Mock push.py (leg S and unrow; K goes in by push.sh): never connects. push <folder> -> the fixture out/push.<name> (exit 0 when it says
 # PUSHED, else 3); with none, the lamp's refusal of a net grant at #7901's f162be0fcb (package.rs). remove -> REMOVED.
 op=$1; n=$(basename "$2"); echo "$(date +%s) push $op $n" >> "$MOCK_LOG"
 [ "$op" = remove ] && { echo "REMOVED $n"; exit 0; }

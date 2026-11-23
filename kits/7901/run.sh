@@ -58,8 +58,9 @@ for st in $STEPS; do
   unrow)   # The row's put-back: the notes drop-ins (1 lamp-voice and 1 lamp-control start if there), the row's skills
            # (removed by the lamp's own lamp-skills), made.json, the legs' notes files, the row's /tmp files.
            GATE lamp-voice lamp-control || { T "STOP at unrow: start budget"; exit 3; }
-           # The pushed fixtures of legs S and K, taken off by the computer that pushed them (the door's skill.remove)
-           : > $L/unpush.txt; for f in $L/push-*.txt; do [ -f $f ] && grep -q '^PUSHED ' $f || continue; s=${f##*/push-}; s=${s%.txt}
+           # Leg S's pushed fixture, taken off by the computer that pushed it (the door's skill.remove). K's (push.sh, PUSH
+           # INSTALLED in its log) went in by the manage helper with no pairing: unrow.lamp.sh's remove_pushed takes it off.
+           : > $L/unpush.txt; for f in $L/push-*.txt; do [ -f $f ] && grep -q '^PUSHED ' $f || continue; grep -q '^PUSH INSTALLED' $f && continue; s=${f##*/push-}; s=${s%.txt}
              ${PUSHCMD:-python3 $D/push.py} remove $s ${LAMP_PAIRED:-} 2>&1 | tail -1 | tee -a $L/unpush.txt; done
            grep -q 'REMOVE REFUSED' $L/unpush.txt 2>/dev/null && { T "STOP at unrow: a pushed fixture was not removed (row/logs/unpush.txt)"; exit 3; }
            LAMP "" $D/unrow.lamp.sh > $L/unrow.txt 2>&1; cat $L/unrow.txt; need unrow '^UNROW OK';;

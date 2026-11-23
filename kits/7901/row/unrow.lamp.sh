@@ -1,6 +1,7 @@
 # lamp, root sh (row common first, then KEEP_SKILLS=0|1). The row's put-back, run after the legs and BEFORE the runner's
 # round back to stable: the notes drop-ins gone (lamp-voice and lamp-control restarted once, only if one was there),
-# the row's new skills removed by the installed lamp-skills, made.json back to save's entries (a changed one put back
+# leg K's pushed fixture removed by the manage helper's remove_pushed (its ANY_ASKER drop-in gone, task-yes.json as
+# found), the row's new skills removed by the installed lamp-skills, made.json back to save's entries (a changed one put back
 # from save's tar), the legs' new notes files removed, the row's /tmp files gone. Idempotent; with no save baseline it
 # only does the drop-ins and /tmp. Never touches volume, lamp-cloud or a reset. Prints UNROW OK or UNROW NOT OK.
 set -u; ok=1
@@ -8,6 +9,24 @@ ch=
 for x in voice:$ND_VOICE control:$ND_CONTROL voice:$ND_NAMENEAR; do f=${x#*:}; [ -f $f ] && { rm -f $f; rmdir ${f%/*} 2>/dev/null; n "removed $f"; ch="$ch lamp-${x%%:*}"; }; done
 [ -n "$ch" ] && { systemctl daemon-reload; for u in $ch; do systemctl restart $u; n "restarted $u (notes drop-in gone)"; done; sleep 15; echo "DROPINS removed; restarted:$ch"; }
 for f in $ND_VOICE $ND_CONTROL $ND_NAMENEAR; do [ -f $f ] && { echo "FAIL $f still there"; ok=0; }; done
+# Leg K's pushed fixture (push.lamp.sh): each name in pushed.names taken off by the manage helper's
+# {"remove_pushed": {client, name}}, the one-request ANY_ASKER drop-in gone after it, task-yes.json back as found.
+for s in $(cat $PUSHED 2>/dev/null); do
+  [ -d $DEV/$s ] || { echo "PUSHED $s already gone from $DEV"; continue; }
+  r=$(mhelper "{\"remove_pushed\": {\"client\": \"$PCLIENT\", \"name\": \"$s\"}}")
+  echo "PUSHED by the row, removed: $s (helper: $(echo "$r" | cut -c1-140))"; n "remove_pushed $s by the manage helper"
+done
+any_off || { echo "FAIL $AD still there"; ok=0; }
+x=; for s in $(cat $PUSHED 2>/dev/null); do [ -d $DEV/$s ] && x="$x $s"; done
+if [ -n "$x" ]; then echo "FAIL pushed fixtures still in $DEV:$x"; ok=0
+else [ -f $PUSHED ] && { mv -f $PUSHED $PUSHED.used; n "the row's pushed fixtures gone ($PUSHED.used)"; }; echo "PASS pushed fixtures gone from $DEV, no ANY_ASKER drop-in"; fi
+if [ -f $R/task-yes.before ]; then
+  if [ "$(sha $YESF)" = "$(sha $R/task-yes.before)" ]; then echo "YES-FILE as found $(sha $YESF)"
+  else cp -p $R/task-yes.before $YESF; n "put $YESF back as found"; echo "YES-FILE put back $(sha $YESF)"; fi
+  [ "$(sha $YESF)" = "$(sha $R/task-yes.before)" ] && rm -f $R/task-yes.before || { echo "FAIL $YESF not as found"; ok=0; }
+elif [ -f $R/task-yes.none ]; then
+  [ -f $YESF ] && { rm -f $YESF; n "removed $YESF (none before the push)"; }; echo "YES-FILE none, as found"; rm -f $R/task-yes.none
+fi
 if [ "${KEEP_SKILLS:-0}" != 1 ] && [ -f $R/skills.before ]; then
   for s in $(skillnames | LC_ALL=C comm -13 $R/skills.before -); do
     out=$($SKBIN remove --dir $SK --state-dir $SKST "$s" 2>&1); rc=$?

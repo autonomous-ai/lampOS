@@ -28,6 +28,8 @@
 #      reaches out, and its try at the notes is refused no_grant (no skill reads another's notes).
 #   K  a PUSHED skill whose task needs a key never added in the app (fixtures/key-probe, secrets): after its yes, its
 #      run is refused by lamp-tasks before any token, with its journal line (keys stay refused).
+#      Its fixture goes in by the product's push install with no pairing (push.sh: the SDK's package staged as
+#      lamp-control's door keeps a push, then the manage helper's install_pushed); the network door is skipped.
 #   ./row.sh [legs]   (default A B C D S K). Each leg prints CHECK lines and LEG x PASS|FAIL|VOID; then VERDICT.
 #   VOID = could not be shown (clip not heard, no make end, a fixture missing); FAIL = shown wrong. Exit 0 on PASS.
 set -u; D=$(cd "$(dirname "$0")" && pwd); . $D/kit.sh
@@ -136,11 +138,17 @@ ASK(){ PLAY $1; }
 # An ask or answer the voice held back as said to nobody (voice attention.rs): the leg is VOID, not FAIL.
 HELDRE="its answer is held back: nobody spoke to the lamp"
 held(){ grep -E "$HELDRE" $J 2>/dev/null | head -1 | cut -c1-200; }
-# PUSH <fixture>: the install route of S and K (push.py: the developer door's skill.push, then the manage helper's
+# PUSH <fixture>: the install route of S (push.py: the developer door's skill.push, then the manage helper's
 # install_pushed_at). PUSHCMD is the runner's python3 with the lampos SDK; LAMP_PAIRED names the pairing (optional).
 PUSHCMD=${PUSHCMD:-python3 $D/push.py}
 PUSH(){ $PUSHCMD push $D/fixtures/$1 ${LAMP_PAIRED:-} > $LG/push-$1.txt 2>&1; sed 's/^/  push: /' $LG/push-$1.txt | cut -c1-240; grep -q '^PUSHED ' $LG/push-$1.txt; }
 pushwhy(){ grep -E 'REFUSED' $LG/push-$1.txt 2>/dev/null | head -1 | cut -c1-200 || echo "no answer"; }
+# PUSHL <fixture>: K's install route, with no pairing (push.sh: the SDK's package from this worktree, staged on the lamp
+# as lamp-control's door keeps a push, then the manage helper's {"install_pushed": SHA}; unrow's remove_pushed takes
+# it off). Same log and PUSHED marker as PUSH; PUSH INSTALLED is its end. LPUSHCMD overrides the command (mocks).
+LPUSHCMD=${LPUSHCMD:-bash $D/push.sh}
+PUSHL(){ $LPUSHCMD push $D/fixtures/$1 > $LG/push-$1.txt 2>&1; sed 's/^/  push: /' $LG/push-$1.txt | cut -c1-240
+  grep -q '^PUSHED ' $LG/push-$1.txt && grep -q '^PUSH INSTALLED' $LG/push-$1.txt; }
 ASKW(){ SSHR -n $H "rm -f /tmp/t7901-stop.ask$1"; LAMP "SECS=$(( RUNWAIT * 3 + 300 )) STOPF=/tmp/t7901-stop.ask$1" $D/asked.lamp.sh > $LG/asked-$1.txt 2>&1 & FP=$!; }
 UNASKW(){ SSHR -n $H "touch /tmp/t7901-stop.ask$1"; sleep 2; kill $FP 2>/dev/null; FP=; }
 # A pushed skill's task yes (skills task.rs ask_yes, voice skill_task_yes.rs, control task_yes.rs, skill_write_yes.rs)
@@ -352,7 +360,7 @@ legS(){ local sk=photo-search n0 n1 n2 a rb y t g gs e rid ej ref nt sb kp tk h 
 KEYREF="\[lamp-tasks\] skill task: %s not run: [0-9]+ key\(s\) not added in the app|a run given its keys can't be given them on this lamp yet"
 legK(){ local sk=key-probe n0 n1 rb y k tk h c1=0 c2=0 why=
   BEGIN K || return 1; quiet
-  PUSH $sk || { VK=VOID; WHY="the install route is unavailable: the push was refused ($(pushwhy $sk))"; END; return 0; }
+  PUSHL $sk || { VK=VOID; WHY="the install route is unavailable: the push was refused ($(pushwhy $sk))"; END; return 0; }
   HUSH; n0=$(lines); ASK KEYUSES
   rb=$(waitfor "$RBWAITS|$RBNOT|$RBAGREED|$UNASKED" $n0 $RUNWAIT); [ -n "$rb" ] && echo "  ask: $(show $rb)"
   if [ -z "$rb" ]; then VK=VOID; why="no read-back of $sk in $RUNWAIT s"

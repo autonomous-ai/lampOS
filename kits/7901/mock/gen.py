@@ -83,7 +83,8 @@ BASE = {
                   (1.4, token("task-s1", "photo-search", "camera")), (3, C + "c_9a1b2c3d (photo-search): notes.get: refused: no_grant, 0.1 ms"),
                   (5, ended("task-s1", "photo-search")), (5.2, pieces(147, 70))]),
  # K: the pushed key-probe: its yes, then its run refused for a key never added (tasks skill_task.rs run_keys)
- "out/push.key-probe": 'PUSHED {"asks": ["speak"], "name": "key-probe", "on": true, "version": "1.0.0"}\n',
+ # (its install: push.sh's lamp side, push.lamp.sh, the manage helper's install_pushed; no pairing, no push.py)
+ "out/push.lamp.sh.key-probe": 'HELPER {"done": "installed key-probe"}\nPUSHED {"done": "installed key-probe"}\nPUSH INSTALLED\n',
  "j/K.KEYUSES": j([(1, heard(151)), (2, V + "request 151: a skill's task read back: it waits for the person's yes (1 grant(s))"), (2.2, pieces(151, 200))]),
  "j/K.YES": j([(1, C + "the owner's yes to key-probe's task kept (1 grant(s))"), (1.5, pieces(152, 40))]),
  "j/K.KEYRUN": j([(1, heard(153)), (1.5, T + "skill task: key-probe not run: 1 key(s) not added in the app"), (2, pieces(154, 90))]),
@@ -194,9 +195,10 @@ case("S.void-later", "S", "VOID", {"j/S.RUNS.1": j([(1, heard(141)), (1.5, S + "
 # ---- K: a pushed skill whose key was never added (First's 16:06 line 4: keys refused)
 case("K.pass", "K", "PASS")
 case("K.fail-token", "K", "FAIL", {"j/K.KEYRUN": j([(1, heard(153)), (1.4, token("task-k1", "key-probe", "speak")), (3, ended("task-k1", "key-probe")), (3.2, pieces(154, 30))])})
-case("K.void-nopush", "K", "VOID", drop=["out/push.key-probe"])
+case("K.void-nopush", "K", "VOID", drop=["out/push.lamp.sh.key-probe"])
+case("K.void-helperrefused", "K", "VOID", {"out/push.lamp.sh.key-probe": 'HELPER {"refused": "not installed: a bad package"}\nPUSH REFUSED {"refused": "not installed: a bad package"}\nPUSH NOT INSTALLED\n'})
 # ---- kit helpers alone (unit.sh), the fixes ported from the #8180 e82d kit: engine(), the mute check, SSHR; Mac volume
 for u in ("engine-env", "engine-voice", "engine-app", "engine-none", "mute-oldstamp", "mute-timed", "mute-recoff", "mute-live",
-          "mute-liveoff", "ssh-retry", "ssh-sshpass", "ssh-giveup", "ssh-other", "macvol", "fixtures", "namenear"):
+          "mute-liveoff", "ssh-retry", "ssh-sshpass", "ssh-giveup", "ssh-other", "macvol", "fixtures", "namenear", "push-k"):
     case("U." + u, "-", "PASS", env={"UNIT": u})
 print("gen: %d cases in %s" % (n, FX))

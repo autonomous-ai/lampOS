@@ -56,3 +56,32 @@ print("VOICE_MUTE muted=%s reason=%s muted_by=%s control=%s age_s=%s seq=%s" % (
 print("PRIVACY permitted=%s physical_muted=%s age_s=%s" % ((p or {}).get("permitted"), (p or {}).get("physical_muted"), "%.1f" % pa if pa is not None else "-"))
 PY
 }
+# Leg K's fixture goes in by the product's push install, as lamp-control's door keeps a push it took, with only the
+# network door (the Mac's pairing) skipped (the #8180 ee17 kit's, twelve/kit-8180-ee17 9c7e115ad1):
+# /var/lib/lampos-control/push/{push.json, package.tar} (skills package.rs PUSH_DIR, read within 60 s), then
+# {"install_pushed": SHA} to root's manage helper; lamp-skills' install_pushed_at puts the skill in skills-dev
+# (lib.rs PUSHED_DIR). Removed by {"remove_pushed": {client, name}} (push.lamp.sh OP=remove, unrow).
+PUSHD=/var/lib/lampos-control/push; DEV=/var/lib/lampOS/skills-dev; YESF=/var/lib/lampos-control/task-yes.json
+MSOCK=/run/lampos-skills-manage/manage.sock
+PCLIENT=${PCLIENT:-c_row7901}                       # the stand-in computer's id (the helper's c_... shape)
+PUSHED=$R/pushed.names                              # the row's pushed fixtures, one name each, for unrow
+sha(){ sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
+mask(){ python3 -I - "$MSOCK" "$1" <<'PY'
+import socket, sys
+s = socket.socket(socket.AF_UNIX); s.settimeout(40); s.connect(sys.argv[1]); s.sendall(sys.argv[2].encode() + b"\n")
+b = b""
+while not b.endswith(b"\n"):
+    c = s.recv(65536)
+    if not c: break
+    b += c
+print(b.decode(errors="replace").strip())
+PY
+}
+okreply(){ python3 -I -c 'import json,sys; v=json.loads(sys.argv[1]); sys.exit(0 if "done" in v and "refused" not in v else 1)' "$1" 2>/dev/null; }
+# The helper takes pushed requests from lamp-control's cgroup only (package.rs asker_of). For the one request, its own
+# test switch LAMP_SKILLS_ANY_ASKER=on (main.rs "asked": said in the journal each time) by a /run drop-in on
+# lamp-skills-manage@ (socket-activated, so the next connection reads it), removed right after the answer.
+AD=/run/systemd/system/lamp-skills-manage@.service.d/zz-row-7901-anyasker.conf
+any_on(){ mkdir -p ${AD%/*}; printf '[Service]\nEnvironment=LAMP_SKILLS_ANY_ASKER=on\n' > $AD; systemctl daemon-reload; n "added $AD"; }
+any_off(){ [ -f $AD ] && { rm -f $AD; rmdir ${AD%/*} 2>/dev/null; systemctl daemon-reload; n "removed $AD"; }; [ ! -f $AD ]; }
+mhelper(){ any_on; r=$(mask "$1"); any_off || r="$r (ANY_ASKER drop-in NOT removed)"; echo "$r"; }

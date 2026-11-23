@@ -69,5 +69,36 @@ S
   # legs S and K's pushed fixtures load by the product's skill.toml rules (fixcheck.py cites them)
   fixtures) o=$(python3 -I $KIT/mock/fixcheck.py $KIT/row/fixtures); rc=$?; echo "$o" | sed 's/^/  /'
     v "every pushed fixture loads by the loader's rules: $(echo "$o" | tr '\n' ' ')" '[ $rc = 0 ] && [ "$(echo "$o" | grep -c " OK$")" = 2 ]';;
+  push-k)
+    # Leg K's fixture by the product's push install, no pairing (the #8180 ee17 kit's, ported): row.sh's K goes by PUSHL
+    # (push.sh), not push.py; push.sh packs key-probe with this worktree's SDK; push.lamp.sh writes push.json +
+    # package.tar in lamp-control's push folder and asks the manage helper {"install_pushed": SHA} with the one-request
+    # ANY_ASKER drop-in laid, then removed; unrow asks {"remove_pushed": {client, name}} and checks the fixture and the
+    # drop-in are gone. A fake helper (python) on the socket records each request, what it found in the push folder
+    # and whether the drop-in was there.
+    SD=$(mktemp -d /tmp/u7901.XXXXXX); SOCK=$SD/m.sock; DEV=$RT/var/lib/lampOS/skills-dev
+    AD=$RT/run/systemd/system/lamp-skills-manage@.service.d/zz-row-7901-anyasker.conf; Y=$RT/var/lib/lampos-control/task-yes.json
+    mkdir -p $DEV $RT/var/lib/lampOS/skills $RT/var/lib/lampos-control $RT/tmp/t7901-push $RT/home/mockuser; echo '{"yes":[]}' > $Y
+    printf '#!/bin/sh\nshasum -a 256 "$@"\n' > $RT/bin/sha256sum; chmod +x $RT/bin/sha256sum; penv 4244 PATH=/usr/bin
+    python3 -I $KIT/mock/fakehelper.py $SOCK $RT/var/lib/lampos-control/push $DEV $AD $Y $W/helper.log &
+    hp=$!; for i in 1 2 3 4 5 6 7 8 9 10; do [ -S $SOCK ] && break; sleep 0.2; done
+    m=$( (unset D; LAMP=mock LAMP_HOST=mock-lamp LAMP_USER=mockuser KIT_ENV= KIT_LL= bash $KIT/row/push.sh pack $KIT/row/fixtures/key-probe $RT/tmp/t7901-push/package.tar) 2>&1 )
+    printf 'OP=push SUM=%s NAME=%s\n' "${m#* }" "${m% *}" > $W/pre.sh
+    # (the helper's socket moved to a short path: AF_UNIX paths are at most 104 bytes on macOS)
+    psh(){ { printf 'LAMP_USER=mockuser; LOCK_WHO=unit\n'; cat $KIT/row/common.lamp.sh "$@"; } |
+      sed -e "s#/run/lampos-skills-manage/manage.sock#$SOCK#g" -e "s#/tmp/t7901-push#$RT/tmp/t7901-push#g" -e "s#/var/lib/#$RT/var/lib/#g" -e "s#/run/#$RT/run/#g" -e "s#/proc/#$RT/proc/#g" -e "s#/home/#$RT/home/#g" -e "s#/opt/#$RT/opt/#g" | sh 2>&1; }
+    o1=$(psh $W/pre.sh $KIT/row/push.lamp.sh); ad1=$([ -f $AD ] && echo laid || echo gone)
+    left=$(ls $RT/var/lib/lampos-control/push 2>/dev/null | tr '\n' ' '); pushed=$([ -d $DEV/key-probe ] && echo yes || echo no)
+    o2=$(psh $KIT/row/unrow.lamp.sh); { kill $hp; wait $hp; } 2>/dev/null; rm -rf $SD
+    r=$(python3 -I -c 'import json,sys
+L=[json.loads(l) for l in open(sys.argv[1])]; nm, sm = sys.argv[2], sys.argv[3]
+i=L[0]; p=i.get("push", {})
+ok1 = i["q"] == {"install_pushed": sm} and i["dropin"] and i["tar"] == sm and p.get("name") == nm and p.get("client") == "c_row7901" and p.get("grants") == ["skills", "speak"] and isinstance(p.get("at_unix_ms"), int)
+ok2 = len(L) == 2 and L[1]["q"] == {"remove_pushed": {"client": "c_row7901", "name": nm}} and L[1]["dropin"]
+print("install %s remove %s" % (ok1, ok2))' $W/helper.log "${m% *}" "${m#* }" 2>&1)
+    kr=$(sed -n '/^legK(){/,/^RT=/p' $KIT/row/row.sh | grep -cE '^  PUSHL \$sk \|\|'); kp=$(sed -n '/^legK(){/,/^RT=/p' $KIT/row/row.sh | grep -cE '^  PUSH \$sk')
+    o="K route PUSHL=$kr push.py=$kp; pack '$m'; $r; pushed $pushed; drop-in after push $ad1; push folder left '$left'; $(echo "$o1" | grep -E '^PUSH' | tr '\n' ' ')/ $(echo "$o2" | grep -E 'pushed fixtures|YES-FILE|^UNROW' | tr '\n' ' ')"
+    v "K pushed with no pairing (push.json + package.tar, install_pushed, drop-in laid then removed), unrow takes it off by remove_pushed" \
+      '[ "$kr" -ge 1 ] && [ "$kp" = 0 ] && [ "$r" = "install True remove True" ] && [ $pushed = yes ] && [ $ad1 = gone ] && [ -z "$left" ] && echo "$o1" | grep -q "^PUSH INSTALLED" && echo "$o2" | grep -q "^PASS pushed fixtures gone" && echo "$o2" | grep -q "^YES-FILE put back" && echo "$o2" | grep -q "^UNROW OK" && [ ! -d $DEV/key-probe ] && [ ! -f $AD ] && grep -q "added $AD" $RT/home/mockuser/changes.txt && grep -q "removed $AD" $RT/home/mockuser/changes.txt && [ "$(cat $Y)" = "{\"yes\":[]}" ]';;
   *) echo "UNIT FAIL no such test $t";;
 esac
