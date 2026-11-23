@@ -3121,7 +3121,9 @@ gives one fixed line with a real place to turn. Off unless
   instead of played, and the reply in hand is cut if it is a say nobody
   asked for (`say::Ticket::unasked`, set from `asked_for` as it is taken;
   the coordinator's `care_cuts`), its asker told `dropped` with `held`
-  (`say::CARE_CUT`). Neither tells the skill or the computer why: never that
+  (`say::CARE_CUT`). The cut is a local cancel (`receipt_history::CARE_HELD`,
+  in `LOCAL_CANCELS`), as a hand's Stop is: the sound it drops is expected
+  and the voice goes on. Neither tells the skill or the computer why: never that
   words of self-harm were heard. The person's own turn, a reminder, the
   voice's own says (a computer's turn's prompt) and what a person asked for
   are never cut by it.
