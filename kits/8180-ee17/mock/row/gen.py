@@ -49,9 +49,9 @@ PASS = {
  "out/made.lamp.sh.B": made("price-check", "run", "net,speak"),
  "out/fence.lamp.sh.B": fence(4202, eg=True),
  "out/cgwatch.lamp.sh.B": cg(["run-b2"]),
- # C: grant-probe asks the camera with no grant
+ # C: lemon-probe asks the camera with no grant
  "out/probe.lamp.sh": "PROBE INSTALLED\n",
- "j/C.PROBE": j([(1, started("run-c1", "grant-probe")), (1.2, token("run-c1", "grant-probe", "speak")),
+ "j/C.PROBE": j([(1, started("run-c1", "lemon-probe")), (1.2, token("run-c1", "lemon-probe", "speak")),
                  (1.5, C + "run-c1: look (center): refused: no_grant"), (1.6, handover("run-c1", 300)), (1.8, ended("run-c1", "its script exited 0", 1))]),
  # D: mail task step
  "j/D.MAIL": j([(1, V + "request 121: a skill to make: asked"), (40, KEPT(39020)), (41, pieces(122, 60))]),
@@ -163,8 +163,8 @@ case("B.pass-oldform-uses", "B", over={"j/B.PRICE": PASS["j/B.PRICE"].replace("a
 case("B.fail-nocgroup", "B", over={"j/B.PRICEASK": j([(0.9, started("run-b2", "price-check")), (1.0, T + "run run-b2: refused, no own cgroup: lamp-tasks serve did not set them up"),
      (1.2, ended("run-b2", "the run's own memory and CPU bounds could not be set, so it was not run", "unknown"))])})
 case("C.pass", "C")
-case("C.fail", "C", over={"j/C.PROBE": j([(1, started("run-c1", "grant-probe")), (1.6, handover("run-c1", 300)), (1.8, ended("run-c1", "its script exited 0", 1))])})
-case("C.void", "C", over={"out/probe.lamp.sh": "PROBE install grant-probe exit 1: refused\nPROBE NOT INSTALLED\n"})
+case("C.fail", "C", over={"j/C.PROBE": j([(1, started("run-c1", "lemon-probe")), (1.6, handover("run-c1", 300)), (1.8, ended("run-c1", "its script exited 0", 1))])})
+case("C.void", "C", over={"out/probe.lamp.sh": "PROBE install lemon-probe exit 1: refused\nPROBE NOT INSTALLED\n"})
 case("D.pass", "D")
 NOTKEPT_D = {"j/D.MAIL": j([(1, V + "request 121: a skill to make: asked"), (40, V + "a skill made here wasn't kept in 39020 ms: its try failed")])}
 case("D.void-nolink", "D", over=NOTKEPT_D, env={"LINKED": "'google none (files: gmail-app=expired)'"})
@@ -194,10 +194,12 @@ case("H.fail-nocgroup", "H", over={"out/restart-tasks.lamp.sh": PASS["out/restar
 case("H.fail-leafleft", "H", over={"out/cgwatch.lamp.sh.H": cg(["run-h1"], gone=False)})
 case("H.void", "H", over={"out/probe.lamp.sh": "PROBE NOT INSTALLED\n"})
 # ee17 23 Nov: a pushed probe's run asks the person's yes first; ASKYES answers it with YES2, then the run goes on
+YESK = lambda n: j([(1, C + "the owner's yes to %s's task kept (1 grant(s))" % n)])
 RUNYES = lambda n: "lamp-skills[700]: skill:%s: do.run: not handed over: waiting for the owner's yes (the lamp says it back and asks); asked aloud: say: spoken (2140 ms)" % n
-case("C.pass-yes", "C", over={"j/C.PROBE": j([(1, RUNYES("grant-probe"))]), "j/C.YES2": PASS["j/C.PROBE"]}, env={"GREP": "YES2.played.for.the.run.s.yes"})
+case("C.pass-yes", "C", over={"j/C.PROBE.1": j([(1, RUNYES("lemon-probe"))]), "j/C.YES2": YESK("lemon-probe"), "j/C.PROBE.2": PASS["j/C.PROBE"]}, env={"GREP": "PROBE.asked.again.after.the.yes"})
 case("C.void-nocall", "C", over={"j/C.PROBE": j([(1, V2 + "request 131 tools: none calls=none")])})
-case("H.pass-yes", "H", over={"j/H.SLOW.1": j([(1, RUNYES("slow-probe"))]), "j/H.YES2": PASS["j/H.SLOW.1"]}, env={"GREP": "YES2.played.for.the.run.s.yes"})
+case("H.pass-yes", "H", over={"j/H.SLOW.1": j([(1, RUNYES("slow-probe"))]), "j/H.YES2": YESK("slow-probe"), "j/H.SLOW.2": PASS["j/H.SLOW.1"], "j/H.SLOW.3": PASS["j/H.SLOW.2"]}, env={"GREP": "SLOW.asked.again.after.the.yes"})
+case("H.fail-yesnotkept", "H", over={"j/H.SLOW.1": j([(1, RUNYES("slow-probe"))]), "j/H.YES2": j([(1, V2 + "request 140: tools: remember_offered=y calls=none prepared=n")]), "j/H.SLOW.2": PASS["j/H.SLOW.1"], "j/H.SLOW.3": PASS["j/H.SLOW.2"]}, env={"GREP": "the.yes.was.not.kept"})
 case("P.pass", "B P")
 case("P.fail", "B P", over={"out/cgwatch.lamp.sh.P": cg(["run-p1", "run-p2"], pe="0"), "j/P.PRICEASK": PASS["j/P.PRICEASK"].replace("refused=56", "refused=0")})
 case("P.void", "P")

@@ -10,7 +10,7 @@
 #      DAYSASK once: the made skill's own run (or task) starts, ends exit 0 having said >= 1, and its say is spoken.
 #   B  PRICE make (a `run` step), then PRICEASK: "skill run R: hand-over to script start N ms", ended exit 0
 #      said >= 1, NO agent session (no "skill task" start/Harness/gateway line), clip end -> first say <= LIMIT_B s.
-#   C  grant-probe fixture (grants speak) asks the camera: lamp-control "refused: no_grant". C, H and P's fixtures go
+#   C  lemon-probe fixture (grants speak) asks the camera: lamp-control "refused: no_grant". C, H and P's fixtures go
 #      in by the product's push install (FIXTURE, push.sh), the network door (the Mac's pairing) skipped.
 #   D  (needs a linked Google account; VOID without one) MAIL make (a `task` step), then MAILASK: the task's prompt names <folder>/SKILL.md first, the agent's
 #      session names no lamp file beyond its prompt's, clip end -> answer <= LIMIT_D s (about 30).
@@ -86,11 +86,16 @@ AGAIN="a skill wasn't made again: the same ask is being made already"
 NOTKEPT="a skill made here wasn't kept in|a skill wasn't made|the lamp's model said no made skill can do it|wasn't kept: |was not kept: |a long make made nothing"
 READBACK="read back: it waits for the person's yes|said back unasked waits for the [a-z]+'s yes|with no yes is said back unasked"
 # A pushed skill's run asks once (ee17 23 Nov): "do.run: not handed over: waiting for the owner's yes (the lamp says it
-# back and asks); asked aloud: say: spoken". ASKYES plays the clip, and on that line answers YES2, then waits on.
+# back and asks); asked aloud: say: spoken". ASKYES plays the clip, and on that line answers YES2. The run that
+# waited spent nothing and comes again only on the next ask (crates/skills, "the next time its trigger holds"), so
+# once lamp-control keeps the yes ("the owner's yes to <skill>'s task kept"), the lamp is let finish and asked again.
 RUNYES="do.run: not handed over: waiting for the [a-z]+'s yes .*asked aloud: say: spoken"
-ASKYES(){ local a y; a=$(lines); ASK $1; y=$(waitfor "$RUNYES|$STARTED" $a ${YESWAIT:-90}) || return 0
+YESKEPT="yes to [^ ]+'s task kept"
+ASKYES(){ local a y k; a=$(lines); ASK $1; y=$(waitfor "$RUNYES|$STARTED" $a ${YESWAIT:-90}) || return 0
   sed -n "${y}p" $J | grep -qE "$RUNYES" || return 0
-  echo "  run yes asked: $(show $y | cut -c1-160)"; sleep 2; PLAY YES2; echo "  YES2 played for the run's yes"; }
+  echo "  run yes asked: $(show $y | cut -c1-160)"; sleep 2; PLAY YES2; echo "  YES2 played for the run's yes"
+  k=$(waitfor "$YESKEPT" $y ${YESWAIT:-90}) || { echo "  the yes was not kept in ${YESWAIT:-90} s: not asked again"; return 0; }
+  echo "  yes kept: $(show $k | cut -c1-140)"; quiet; HUSH; ASK $1; echo "  $1 asked again after the yes"; }
 YESOK="is on, on the person's yes|approved on the person's yes"
 TRY="\[lamp-tasks\] make try: "
 # The voice's journal of the made line (voice/src/made_skill.rs tried_journal, worktree 21 Nov): only its length and
@@ -239,20 +244,20 @@ legB(){ local n0 h e s a lat
   elif [ -z "$e" ] || ! sed -n "${e}p" $J | grep -qE "exited 0, said [1-9]"; then WHY="run $rid did not end exit 0 with a say: $(show ${e:-1} | cut -c1-160)"
   elif [ -z "$lat" ] || ! python3 -c "import sys;sys.exit(0 if float(sys.argv[1])<=float(sys.argv[2]) else 1)" $lat $LIMIT_B; then WHY="first say ${lat:-none} s after the clip (limit $LIMIT_B)"
   else VB=PASS; WHY="$MN: $(sed -n "${h}p" $J | grep -oE 'hand-over to script start [0-9]+ ms'), no agent session, first say $lat s after the clip"; fi; }
-# ---- C: the grant-probe fixture asks the camera
+# ---- C: the lemon-probe fixture asks the camera
 legC(){ local n0 e x
   BEGIN C || return 1; quiet
-  FIXTURE grant-probe || { WHY="probe not pushed: $(grep -E '^PUSH REFUSED' $LG/probe-grant-probe.txt | tail -1 | cut -c1-160) (VOID: kit, not the build)"; VC=VOID; END; return 0; }
+  FIXTURE lemon-probe || { WHY="probe not pushed: $(grep -E '^PUSH REFUSED' $LG/probe-lemon-probe.txt | tail -1 | cut -c1-160) (VOID: kit, not the build)"; VC=VOID; END; return 0; }
   sleep 5; for i in 1 2; do HUSH; n0=$(lines); ASKYES PROBE
-    e=$(waitfor "refused: no_grant|of skill grant-probe: (no token made|its time is up)|skill run [^ ]+: ended in|$READBACK" $n0 $RUNWAIT)
+    e=$(waitfor "refused: no_grant|of skill lemon-probe: (no token made|its time is up)|skill run [^ ]+: ended in|$READBACK" $n0 $RUNWAIT)
     [ -n "$e" ] && echo "  $(show $e)"
     sed -n "${e:-1}p" $J | grep -qE "$READBACK" && { saydone $e; PLAY YES2; sleep 15; continue; }
     break; done
-  sleep 8; x=$(tail -n +$(( n0 + 1 )) $J | grep -E "lamp-control: .*refused: no_grant"); tail -n +$(( n0 + 1 )) $J | grep -E "of skill grant-probe" | cut -c1-200 | sed 's/^/  /'
+  sleep 8; x=$(tail -n +$(( n0 + 1 )) $J | grep -E "lamp-control: .*refused: no_grant"); tail -n +$(( n0 + 1 )) $J | grep -E "of skill lemon-probe" | cut -c1-200 | sed 's/^/  /'
   quiet; END
-  # ee17 23 Nov: "grant probe" alone drew an answer with no call; a probe the model never ran tests no grant: VOID.
+  # ee17 23 Nov: "lemon probe" alone drew an answer with no call; a probe the model never ran tests no grant: VOID.
   if [ -n "$x" ]; then VC=PASS; WHY="$(echo "$x" | head -1 | cut -c1-200)"
-  elif ! tail -n +$(( n0 + 1 )) $J | grep -qE "of skill grant-probe|skill (run|task) [^ ]+: hand-over"; then VC=VOID; WHY="the model never ran grant-probe ($(tail -n +$(( n0 + 1 )) $J | grep -oE 'tools: [^ ]+ calls=[^ ]+' | head -1)): no grant was tested (VOID: the ask, not the build)"
+  elif ! tail -n +$(( n0 + 1 )) $J | grep -qE "of skill lemon-probe|skill (run|task) [^ ]+: hand-over"; then VC=VOID; WHY="the model never ran lemon-probe ($(tail -n +$(( n0 + 1 )) $J | grep -oE 'tools: [^ ]+ calls=[^ ]+' | head -1)): no grant was tested (VOID: the ask, not the build)"
   else WHY="no lamp-control 'refused: no_grant' line after the probe's ask"; fi; }
 # ---- D: the mail task step: SKILL.md first, no lamp files, ~30 s. An optional Google leg: its verdict says so.
 DNOTE="needs a linked Google account; VOID without one"

@@ -123,7 +123,7 @@ for f in sys.argv[1:]:
     v "save keeps verdicts.env with KEEP_VERDICTS=1, and clears it otherwise" \
       'echo "$o" | grep -q "KEEP_VERDICTS:-}\" = 1 \] || rm -f \$L/verdicts.env" && [ "$(echo "$o" | wc -l | tr -d " ")" = 1 ]';;
   fixtures) o=$(python3 -I $KIT/mock/row/fixcheck.py $KIT/row/probe); rc=$?
-    v "grant-probe, slow-probe and fork-probe load: a tool and a [[do]] each" '[ $rc = 0 ] && [ "$(echo "$o" | grep -c " OK$")" = 3 ]';;
+    v "lemon-probe, slow-probe and fork-probe load: a tool and a [[do]] each" '[ $rc = 0 ] && [ "$(echo "$o" | grep -c " OK$")" = 3 ]';;
   # every fresh-turn clip opens with the lamp's name said as a call: each clip row.sh ASKs or MAKEs, and every clip in
   # clips.txt but the answers to the lamp's own question (ANSWERS: YES)
   clips-call) ANSWERS=" YES "; CL=$KIT/row/clips/clips.txt
@@ -144,10 +144,10 @@ for f in sys.argv[1:]:
     printf '#!/bin/sh\nshasum -a 256 "$@"\n' > $RT/bin/sha256sum; chmod +x $RT/bin/sha256sum; penv 4244 PATH=/usr/bin
     python3 -I $KIT/mock/row/fakehelper.py $LAMPSH_SOCK $RT/var/lib/lampos-control/push $DEV $AD $Y $W/helper.log &
     hp=$!; for i in 1 2 3 4 5 6 7 8 9 10; do [ -S $LAMPSH_SOCK ] && break; sleep 0.2; done
-    m=$( (unset D; LAMP_HOST=mock-lamp KIT_ENV= bash $KIT/row/push.sh pack $KIT/row/probe/grant-probe $RT/tmp/t8180-probe/package.tar) 2>&1 )
+    m=$( (unset D; LAMP_HOST=mock-lamp KIT_ENV= bash $KIT/row/push.sh pack $KIT/row/probe/lemon-probe $RT/tmp/t8180-probe/package.tar) 2>&1 )
     printf 'OP=push SUM=%s NAME=%s\n' "${m#* }" "${m% *}" > $W/pre.sh
     o1=$(lampsh $W/pre.sh $KIT/row/probe.lamp.sh); ad1=$([ -f $AD ] && echo laid || echo gone)
-    left=$(ls $RT/var/lib/lampos-control/push 2>/dev/null | tr '\n' ' '); pushed=$([ -d $DEV/grant-probe ] && echo yes || echo no)
+    left=$(ls $RT/var/lib/lampos-control/push 2>/dev/null | tr '\n' ' '); pushed=$([ -d $DEV/lemon-probe ] && echo yes || echo no)
     o2=$(lampsh $KIT/row/unrow.lamp.sh); { kill $hp; wait $hp; } 2>/dev/null; rm -rf $SD
     r=$(python3 -I -c 'import json,sys
 L=[json.loads(l) for l in open(sys.argv[1])]; nm, sm = sys.argv[2], sys.argv[3]
@@ -157,7 +157,7 @@ ok2 = len(L) == 2 and L[1]["q"] == {"remove_pushed": {"client": "c_row8180", "na
 print("install %s remove %s" % (ok1, ok2))' $W/helper.log "${m% *}" "${m#* }" 2>&1)
     o="pack '$m'; $r; pushed $pushed; drop-in after push $ad1; push folder left '$left'; $(echo "$o1" | grep -E '^PROBE' | tr '\n' ' ')/ $(echo "$o2" | grep -E 'pushed fixtures|YES-FILE|^UNROW' | tr '\n' ' ')"
     v "fixture pushed (push.json + package.tar, install_pushed, drop-in laid then removed), unrow takes it off by remove_pushed" \
-      '[ "$r" = "install True remove True" ] && [ $pushed = yes ] && [ $ad1 = gone ] && [ -z "$left" ] && echo "$o1" | grep -q "^PROBE INSTALLED" && echo "$o2" | grep -q "^PASS pushed fixtures gone" && echo "$o2" | grep -q "^YES-FILE put back" && echo "$o2" | grep -q "^UNROW OK" && [ ! -d $DEV/grant-probe ] && [ ! -f $AD ] && grep -q "added $AD" $RT/home/orangepi/changes.txt && grep -q "removed $AD" $RT/home/orangepi/changes.txt && [ "$(cat $Y)" = "{\"yes\":[]}" ]';;
+      '[ "$r" = "install True remove True" ] && [ $pushed = yes ] && [ $ad1 = gone ] && [ -z "$left" ] && echo "$o1" | grep -q "^PROBE INSTALLED" && echo "$o2" | grep -q "^PASS pushed fixtures gone" && echo "$o2" | grep -q "^YES-FILE put back" && echo "$o2" | grep -q "^UNROW OK" && [ ! -d $DEV/lemon-probe ] && [ ! -f $AD ] && grep -q "added $AD" $RT/home/orangepi/changes.txt && grep -q "removed $AD" $RT/home/orangepi/changes.txt && [ "$(cat $Y)" = "{\"yes\":[]}" ]';;
   volume-*)
     # save records the speaker's volume (kept-volume + the bus's speaker/volume, read only), unrow compares: the same
     # is PASS; a change is FAIL and UNROW NOT OK (never set back by the kit). Only the volume part of save runs here.

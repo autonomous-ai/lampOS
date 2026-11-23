@@ -1,5 +1,5 @@
 #!/bin/bash
-# Mac. A row fixture (row/probe/<name>: grant-probe, slow-probe, fork-probe; legs C, H, P) by the product's push
+# Mac. A row fixture (row/probe/<name>: lemon-probe, slow-probe, fork-probe; legs C, H, P) by the product's push
 # install, with no pairing: the #8237 kit's row/stage.sh ported (thirteen/kit-8237 5b5e8e4291). The same package the
 # SDK's push sends (lampOS/sdk/python lampos.push.pack, imported from this repo's source: no pip, no pairing), staged
 # on the lamp as lamp-control's door keeps a push it took, then root's manage helper asked {"install_pushed": SHA} on

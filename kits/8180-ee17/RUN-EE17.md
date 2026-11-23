@@ -67,7 +67,7 @@ The ROW line says the gateway was restarted after the swap.
 
 ## Fixtures by the product's push install (legs C, H, P)
 
-On the lamp, a hand install (`lamp-skills install`) of grant-probe, slow-probe or fork-probe is refused: "do.task:
+On the lamp, a hand install (`lamp-skills install`) of lemon-probe, slow-probe or fork-probe is refused: "do.task:
 only a skill from the Skills Store or pushed by the owner's own computer may carry a script" (skills `task.rs`). So the
 fixtures go in by the product's own push install, as the #8237 kit does (thirteen/kit-8237 `row/stage.sh`, ported as
 `row/push.sh` + `row/probe.lamp.sh`):
@@ -97,3 +97,15 @@ again: the same ask is being made already". MAKE skips that line (a NOTE) and wa
 not-kept line (mock `B.pass-again`).
 
 New mocks: `U.pass-push-probe`, `U.pass-volume-same`, `U.pass-volume-moved`, `B.pass-again`.
+
+## The asks (ee17, 23 Nov, 17:2x run)
+
+- **Only a plain ask is matched in code.** The heard line must be the skill's name or one of its asks, with only
+  greetings and "run / use / now" words around it (`voice/src/skill_named.rs`, `named_among`). Any other word sends
+  the line to the model.
+  - K's make names its skill ("make a skill called camera look …"), and its ask is "Hey Lamp, camera look.".
+  - C's fixture is `lemon-probe`: "grant probe" was twice not matched, while "slow probe" in the same form was.
+- **A pushed fixture's run asks the person's yes once.** "do.run: not handed over: waiting for the owner's yes".
+  `ASKYES` answers it with YES2. A waiting run spends nothing and comes again only on the next ask, so once
+  lamp-control logs "the owner's yes to <skill>'s task kept", the kit lets the lamp finish and asks again.
+- **C is VOID, not FAIL,** when the model never ran the fixture: no grant was tested.

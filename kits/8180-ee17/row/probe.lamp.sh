@@ -10,7 +10,7 @@
 # remove: {"remove_pushed": {client, name}} (unrow does the same for every name in pushed.names). Prints REMOVED <name>
 # or REMOVE REFUSED <why>.
 set -u
-OP=${OP:-push}; NAME=${NAME:-grant-probe}; SUM=${SUM:-}
+OP=${OP:-push}; NAME=${NAME:-lemon-probe}; SUM=${SUM:-}
 refused(){ echo "PUSH REFUSED $*"; echo "PROBE NOT INSTALLED"; exit 3; }
 case "$OP" in
 push)

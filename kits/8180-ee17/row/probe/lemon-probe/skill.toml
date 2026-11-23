@@ -1,10 +1,10 @@
-asks = ["grant probe"]
+asks = ["lemon probe"]
 kind = "installable"
 version = "1.0.0"
 grants = ["speak"]
 # A tool loads it: an installed skill's asks call its tool, and only a made-here one is started by its asks alone
 # (crates/skills/src/lib.rs:4521, :3723, :3800; the load test's BRIEF, lib.rs:14225).
-tool = "grant_probe"
+tool = "lemon_probe"
 
 [permissions]
 speak = true

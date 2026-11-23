@@ -2,15 +2,15 @@ DAYS	Hey Lamp, make a skill that tells me how many days are left in the year whe
 DAYSASK	Hey Lamp, how many days are left in the year?	1.0
 PRICE	Hey Lamp, make a skill that tells me the bitcoin price when I ask.	1.0
 PRICEASK	Hey Lamp, what's the bitcoin price?	1.0
-PROBE	Hey Lamp, run the grant probe skill now.	1.0
+PROBE	Hey Lamp, run the lemon probe skill now.	1.0
 MAIL	Hey Lamp, make a skill that sums up my unread mail when I ask.	1.0
 MAILASK	Hey Lamp, sum up my unread mail.	1.0
 LONGMAKE	Hey Lamp, make a skill that every morning tells me the weather, my first meeting and the top news headline, then dims the light slowly.	1.0
 READY	Hey Lamp, is my skill ready?	1.0
 YES	Yes, go ahead.	1.0
 YES2	Hey Lamp, yes, go ahead.	1.0
-LOOK	Hey Lamp, make a skill that looks through the camera and tells me out loud what it sees when I ask.	1.0
-LOOKASK	Hey Lamp, look through the camera view and tell me what you see.	1.0
+LOOK	Hey Lamp, make a skill called camera look that looks through the camera and tells me out loud what it sees.	1.0
+LOOKASK	Hey Lamp, camera look.	1.0
 SLOW	Hey Lamp, run the slow probe skill now.	1.0
 FORK	Hey Lamp, run the fork probe skill now.	1.0
 NAMED	Hey Lamp, OpenClaw, look up the weather in Hanoi this weekend.	1.0
