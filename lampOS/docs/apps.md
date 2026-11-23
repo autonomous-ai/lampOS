@@ -157,7 +157,11 @@ not asked about); the consent is the pairing.
   unit, sandbox and launcher, started at once unless the owner stopped
   it), with no yes taken, and its record (`lamp-apps.json`) says `pushed`:
   the computer's pairing id and name. The phone's `apps.list` row says
-  `"from": "computer"` (a Store app's `"store"`), for "From your computer".
+  `"from": "computer"` (a Store app's `"store"`), for "From your computer",
+  and `"pushed_by": {"computer", "client"}` (the name at pairing, at most 64
+  bytes, and the pairing id, from that record), the shape a pushed skill's
+  `skills.list` row has; a Store app's row has no `pushed_by`. Like a pushed
+  skill's row, it carries no push time.
   Once it is on, the lamp says one line with its undo: "Gym Coach is on,
   from your computer. To undo, remove it in the app."
 - **Replaced only by its computer.** A push of the same name from the same
@@ -178,9 +182,10 @@ not asked about); the consent is the pairing.
   within 60 s, one push in flight on the lamp (`busy`), one every 10 s and 20
   an hour a computer; each part but the last answers `{"got": N}`, the last
   `{"app": {"name", "title", "version", "sha256", "grants", "net", "logs",
-  "updated", "started", "from": "computer"}}` once installed. `app.list`
-  answers `{"apps": [{"name", "title", "version", "sha256", "grants", "net",
-  "logs", "stopped"}]}`; `app.remove` `{name}` answers `{"removed": NAME}`.
+  "updated", "started", "from": "computer", "pushed_by"}}` once installed
+  (`updated` a bool: it replaced one already there). `app.list` answers
+  `{"apps": [{"name", "title", "version", "sha256", "grants", "net",
+  "logs", "stopped", "pushed_by"}]}`; `app.remove` `{name}` answers `{"removed": NAME}`.
   Both 6 a minute. lamp-control stages the whole package, checked, as
   `/var/lib/lampos-apps-staging/pushed-<sha256>.tar` (0600, the unit's
   `ReadWritePaths=`), asks the helper `{"install_pushed": {"path",

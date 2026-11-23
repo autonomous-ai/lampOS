@@ -4127,6 +4127,7 @@ fn apps_helper(socket: &std::path::Path) -> Arc<std::sync::Mutex<AppsHelper>> {
                 };
                 helper.read.push(bytes);
                 let client = install["client"].as_str().unwrap().to_owned();
+                let by = json!({"computer": install["client_name"], "client": client});
                 let had = helper
                     .installed
                     .iter()
@@ -4137,11 +4138,11 @@ fn apps_helper(socket: &std::path::Path) -> Arc<std::sync::Mutex<AppsHelper>> {
                     }
                     Some(at) => {
                         helper.installed[at].2 = sha;
-                        json!({"ok": {"name": "gym-coach", "version": "0.1.0", "updated": true, "started": true}})
+                        json!({"ok": {"name": "gym-coach", "version": "0.1.0", "updated": true, "started": true, "pushed_by": by}})
                     }
                     None => {
                         helper.installed.push(("gym-coach".into(), client, sha));
-                        json!({"ok": {"name": "gym-coach", "version": "0.1.0", "updated": false, "started": true}})
+                        json!({"ok": {"name": "gym-coach", "version": "0.1.0", "updated": false, "started": true, "pushed_by": by}})
                     }
                 }
             } else if let Some(client) = request.get("list_pushed_by").and_then(Value::as_str) {
@@ -4149,8 +4150,9 @@ fn apps_helper(socket: &std::path::Path) -> Arc<std::sync::Mutex<AppsHelper>> {
                     .installed
                     .iter()
                     .filter(|(_, by, _)| by == client)
-                    .map(|(name, _, sha)| json!({"name": name, "title": "Gym Coach", "version": "0.1.0",
-                        "sha256": sha, "grants": ["speak"], "net": false, "logs": false, "stopped": false}))
+                    .map(|(name, by, sha)| json!({"name": name, "title": "Gym Coach", "version": "0.1.0",
+                        "sha256": sha, "grants": ["speak"], "net": false, "logs": false, "stopped": false,
+                        "pushed_by": {"computer": "test", "client": by}}))
                     .collect();
                 json!({"ok": {"apps": apps}})
             } else if let Some(remove) = request.get("remove_pushed") {
@@ -4214,6 +4216,13 @@ async fn a_paired_computer_pushes_its_own_app_which_installs_runs_is_replaced_an
     assert_eq!(app["from"], "computer");
     assert_eq!(app["started"], true, "the app runs once installed");
     assert_eq!(app["updated"], false);
+    assert_eq!(app["pushed_by"]["computer"], "test", "{installed}");
+    assert!(
+        app["pushed_by"]["client"]
+            .as_str()
+            .unwrap()
+            .starts_with("c_")
+    );
     {
         let seen = helper.lock().unwrap();
         assert_eq!(
@@ -4242,6 +4251,7 @@ async fn a_paired_computer_pushes_its_own_app_which_installs_runs_is_replaced_an
     let listed = send(&mut socket, json!({"id": 30, "op": "app.list"})).await;
     assert_eq!(listed["apps"][0]["name"], "gym-coach", "{listed}");
     assert_eq!(listed["apps"].as_array().unwrap().len(), 1);
+    assert_eq!(listed["apps"][0]["pushed_by"], app["pushed_by"], "{listed}");
     let removed = send(
         &mut socket,
         json!({"id": 31, "op": "app.remove", "name": "gym-coach"}),

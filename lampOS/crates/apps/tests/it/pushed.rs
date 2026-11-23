@@ -114,7 +114,8 @@ fn a_paired_computers_push_installs_and_runs_with_no_yes_marked_with_the_compute
     let said = push(&mut r, "0.1.0", "c_1", "one");
     assert_eq!(
         said,
-        json!({"ok": {"name": "gym-coach", "version": "0.1.0", "updated": false, "started": true}})
+        json!({"ok": {"name": "gym-coach", "version": "0.1.0", "updated": false, "started": true,
+                     "pushed_by": {"computer": "desk mac", "client": "c_1"}}})
     );
     assert!(
         r.fx.calls
@@ -133,6 +134,10 @@ fn a_paired_computers_push_installs_and_runs_with_no_yes_marked_with_the_compute
     let listed = door(&mut r, &reader, &json!({"list_pushed_by": "c_1"}));
     assert_eq!(listed["ok"]["apps"][0]["name"], "gym-coach");
     assert_eq!(listed["ok"]["apps"][0]["pushed"]["client"], "c_1");
+    assert_eq!(
+        listed["ok"]["apps"][0]["pushed_by"],
+        json!({"computer": "desk mac", "client": "c_1"})
+    );
     let other = door(&mut r, &reader, &json!({"list_pushed_by": "c_2"}));
     assert_eq!(other, json!({"ok": {"apps": []}}));
 }
