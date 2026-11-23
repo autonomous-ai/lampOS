@@ -3572,7 +3572,12 @@ fn run_source(
             .then(|| fs::canonicalize(output))
             .transpose()?;
         if lifetime.continuous() {
-            let executable = std::env::current_exe()?;
+            let executable = crate::process::own_binary()?;
+            // A binary removed under the running service (an update's prune,
+            // a hand) reads as `<path> (deleted)`: no worker can be spawned
+            // from it, so the start says so and ends as any failed start does
+            // (#7402), not on a bare `os error 2`.
+            crate::process::refuse_removed_binary(&executable)?;
             // While it waits out a mute or a closed privacy switch, a lamp
             // with a ring shows the asleep face (#712, `LAMP_RING_ASLEEP=on`).
             // Not with the Controls privacy route's slide: its wait paints the
@@ -4889,7 +4894,7 @@ fn spawn_rig(
 ) -> Result<Rig> {
     controls_startup(controls)?;
     termination.check()?;
-    let executable = std::env::current_exe()?;
+    let executable = crate::process::own_binary()?;
     // Model loading overlaps the remaining startup; nothing waits for it.
     let endpoint = EndpointRig::start(&options, &executable);
     let provider_boot = new_boot()?;

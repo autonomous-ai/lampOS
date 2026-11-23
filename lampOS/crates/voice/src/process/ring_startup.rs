@@ -181,8 +181,14 @@ impl Worker {
             let channels = WorkerChannels::bind(&path, role, parent, boot, false)?;
             // The same command every worker starts with, so the ring gets
             // its role's switches (`LAMP_UNPLUG`, the reviewer on #1699).
-            let child =
-                worker_command(executable, &path, role, (parent, boot), extra, &var).spawn()?;
+            let child = super::spawn_named(&mut worker_command(
+                executable,
+                &path,
+                role,
+                (parent, boot),
+                extra,
+                &var,
+            ))?;
             let (bound, grace_on) = super::startup_bound(role, &var);
             worker = Some(Box::new(Self {
                 channels,

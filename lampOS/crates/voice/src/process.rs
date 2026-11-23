@@ -609,8 +609,14 @@ impl Worker {
     ) -> io::Result<Self> {
         listed(role)?;
         let channels = WorkerChannels::bind(directory, role, parent, boot, false)?;
-        let child =
-            worker_command(executable, directory, role, (parent, boot), extra, &var).spawn()?;
+        let child = spawn_named(&mut worker_command(
+            executable,
+            directory,
+            role,
+            (parent, boot),
+            extra,
+            &var,
+        ))?;
         let (bound, grace_on) = startup_bound(role, &var);
         let mut worker = Self {
             channels,
@@ -1560,6 +1566,52 @@ static DEVICES_NAMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicB
 /// given the sound session's names ([`sound_session_worker_environment`]).
 pub fn name_devices(named: bool) {
     DEVICES_NAMED.store(named, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// `command` spawned, its failure naming the program (#7402): a bare
+/// `No such file or directory (os error 2)` did not say which was missing.
+/// The error's kind is kept.
+pub(crate) fn spawn_named(command: &mut Command) -> io::Result<Child> {
+    command
+        .spawn()
+        .map_err(|error| spawn_failed(Path::new(command.get_program()), error))
+}
+
+/// `spawn <program>: <error>`, with `error`'s kind (#7402).
+fn spawn_failed(program: &Path, error: io::Error) -> io::Error {
+    io::Error::new(
+        error.kind(),
+        format!("spawn {}: {error}", program.display()),
+    )
+}
+
+/// The voice's own binary, the program its workers are spawned from, a
+/// failure to read it named as that spawn's (#7402).
+pub(crate) fn own_binary() -> io::Result<PathBuf> {
+    std::env::current_exe()
+        .map_err(|error| spawn_failed(Path::new("lamp-voice's own binary"), error))
+}
+
+/// Where the running binary was, when `running` (`current_exe()`) reads as
+/// `<path> (deleted)`: Linux's `/proc/self/exe` once its file is removed,
+/// the same rule as lamp-update's `own.rs` (#7402). None while it is there.
+fn removed_binary(running: &Path) -> Option<&Path> {
+    running.to_str()?.strip_suffix(" (deleted)").map(Path::new)
+}
+
+/// A serve's refusal to start when its own binary, `running`, is gone
+/// ([`removed_binary`], #7402): no worker could be spawned from it.
+pub(crate) fn refuse_removed_binary(running: &Path) -> io::Result<()> {
+    match removed_binary(running) {
+        Some(path) => Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!(
+                "its own binary {} was removed while it ran: it cannot start its workers; start lamp-voice again from an installed build",
+                path.display()
+            ),
+        )),
+        None => Ok(()),
+    }
 }
 
 /// The command a worker starts with: its arguments, and a cleared
@@ -3487,6 +3539,45 @@ fn rest_through_sounds_worker_environment(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #7402: a serve whose own binary was removed under it reads
+    /// `current_exe()` as `<path> (deleted)` (the same rule as lamp-update's
+    /// `own.rs`) and refuses to start, naming the path; a binary that is
+    /// there, or only has "deleted" elsewhere in its path, starts as before.
+    #[test]
+    fn a_removed_own_binary_is_read_from_its_deleted_suffix_and_refused() {
+        let gone = Path::new("/opt/lampos/builds/abc/lamp-voice (deleted)");
+        assert_eq!(
+            removed_binary(gone),
+            Some(Path::new("/opt/lampos/builds/abc/lamp-voice"))
+        );
+        let said = refuse_removed_binary(gone).unwrap_err();
+        assert_eq!(said.kind(), io::ErrorKind::NotFound);
+        assert_eq!(
+            said.to_string(),
+            "its own binary /opt/lampos/builds/abc/lamp-voice was removed while it ran: it cannot start its workers; start lamp-voice again from an installed build"
+        );
+        for there in [
+            "/opt/lampos/builds/abc/lamp-voice",
+            "/opt/lampos/builds/(deleted)/lamp-voice",
+            "/opt/lampos/builds/abc/lamp-voice (deleted) ",
+        ] {
+            assert_eq!(removed_binary(Path::new(there)), None, "{there}");
+            refuse_removed_binary(Path::new(there)).unwrap();
+        }
+    }
+
+    /// #7402: a spawn that fails names its program, keeping the error's kind.
+    #[test]
+    fn a_failed_spawn_names_its_program() {
+        let missing = "/nonexistent/lamp-voice-7402";
+        let error = spawn_named(&mut Command::new(missing)).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::NotFound);
+        assert!(
+            error.to_string().starts_with(&format!("spawn {missing}: ")),
+            "{error}"
+        );
+    }
 
     #[test]
     fn the_audio_workers_get_the_sound_session_only_when_devices_are_named() {
