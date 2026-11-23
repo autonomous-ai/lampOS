@@ -8619,7 +8619,7 @@ fn conversation_with_gate_inner(
         // `refuse_unasked_sounds` below). Its asker is told only `held`.
         if care_cuts(care_holds, reply.as_ref()) {
             eprintln!("lamp-voice: a say nobody asked for was cut: the care hold (LAMP_CARE_LINE)");
-            cancel_reply(owner, reply, trace, crate::say::CARE_CUT)?;
+            cut_for_care(owner, reply, trace)?;
             provider_queue.clear();
             speaker_pending = None;
             snapshot = owner.snapshot(now())?;
@@ -15388,6 +15388,22 @@ fn care_cuts(care_holds: bool, reply: Option<&Reply>) -> bool {
         && reply
             .and_then(|current| current.say.as_ref())
             .is_some_and(crate::say::Ticket::unasked)
+}
+
+/// Cuts the reply in hand for the care hold: its asker is told `dropped`
+/// with only `held` ([`crate::say::CARE_CUT`]), and its turn is cancelled as
+/// a local cancel ([`crate::receipt_history::CARE_HELD`]), so the queued
+/// sound the speaker drops is an expected discard and the voice goes on
+/// (App Only's P1 on #8388: the lamp-75c9 and lamp-e82d shape).
+fn cut_for_care(
+    owner: &mut Controller,
+    reply: &mut Option<Reply>,
+    trace: &mut SessionState,
+) -> Result<()> {
+    if let Some(ticket) = reply.as_mut().and_then(|current| current.say.take()) {
+        ticket.answer(crate::say::Outcome::Dropped(crate::say::CARE_CUT.into()));
+    }
+    cancel_reply(owner, reply, trace, crate::receipt_history::CARE_HELD)
 }
 
 /// A computer's stream for the speaker, if one waits (`speaker.stream`,
