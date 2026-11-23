@@ -456,7 +456,8 @@ that one too, aborts a burst under way.
   `room/stood_up` or a forget; a stranger, a second face or a misread ends
   nothing (no stranger check). When the gate's presence line says nobody,
   it is kept, unsaid, for up to 120 s and goes on if the face is back
-  within them on the same passing id (another id starts afresh); past
+  within them on the same passing id, or within 4 s on a new id in the
+  same place with one face in view (another id starts afresh); past
   them it ends (below, "A short closing keeps the sitting"). Its timers count from the desk arrival
   until something is seen, and from the last sighting after.
 - **Published**, on the topics `lamp_msgs` declares (`doing.rs`):
@@ -768,7 +769,9 @@ go whenever someone is at the desk with a face in view, whoever they are,
 under the same mark, rates, privacy slide and sleep rules. The keep still
 starts afresh when a face comes back under another passing id after a
 short closing, so a window and timers kept for one face are not taken on
-by the next.
+by the next, unless that id is the one face in view, within 4 s, in the
+same place (below, "A short closing keeps the sitting"): a timer only,
+never anything kept about a person.
 
 **Whose sitting it is (the bound).** With no stranger check, the window
 and timers are the seat's, not a person's, and they can be carried from
@@ -782,6 +785,12 @@ the owner onto someone who takes the seat:
 - The eyes' tracker may also hand the owner's passing id to whoever sits
   down within about 1.5 s of them leaving, and that is the same id to the
   keep.
+- After a closing, a new passing id alone in view within 4 s, its box's
+  centre within its width of the kept one's, carries the window and
+  timers (`Step::Carried`), so someone else sitting down in the same spot
+  that fast is carried too. The first builder took that for a timer on
+  #6543; the keep holds timers only (`keep::Away::timer`), nothing about
+  a person.
 - **The bounds:** `room/stood_up` or a forget wipes both at once; nobody
   at the desk for 120 s wipes both (`keep::KEEP_US`); posture's samples
   age out of its ten-minute window, so after 10 minutes it holds only the
@@ -824,22 +833,48 @@ up to 120 s (`keep.rs`, `KEEP_US`):
   `humans/doing` or `humans/doing_seen`).
 - **Goes on** when the gate opens again within the 120 s, and only on the
   face it was kept for. The keep holds, in memory only and never said, the
-  passing id of the one face in view the last step it was open
-  (`keep::Away`); the gate opening on any other id, or with no id known
-  when it was kept, wipes both (`Why::OtherFace`), so a second person
-  within the 120 s never takes on the first one's window or timers (the
-  Reviewer-lead's P2 on #7251). A face back under a new id (as the eyes
-  give one coming back into view, `follows` included) starts a fresh
-  window and fresh timers. Past 120 s both are wiped, as any
-  closing wiped them before. The posture window's
-  samples older than its ten minutes still age out.
+  passing id and box of the one face in view the last step it was open
+  (`keep::Away`). The same id goes on. A new id goes on too
+  (`Step::Carried`) only when all of these hold; otherwise the gate
+  opening on it, or with no id known when it was kept, wipes both
+  (`Why::OtherFace`), so a second person within the 120 s never takes on
+  the first one's window or timers (the Reviewer-lead's P2 on #7251).
+  Past 120 s both are wiped, as any closing wiped them before. The
+  posture window's samples older than its ten minutes still age out.
+
+  | Carry rule | Value | Source |
+  |---|---|---|
+  | Faces in view | exactly one | `watch::Readings::on_track`, the gate's `faces` |
+  | Longest gap since the gate closed | 4 s (`keep::CARRY_GAP_US`) | the eyes' `KNOWN_HOLD` (`crates/eyes/src/who.rs`) |
+  | Same place | centres apart at most the new box's width | the eyes' follow rule (`crates/eyes/src/bus_out.rs`, #4885) |
+
+  Why: the eyes keep a passing id only 1.5 s (`SAME_WITHIN_US`), and the
+  gate reads nobody only after a 2 s stale face list
+  (`watch::FACES_LAST_US`), so after any closing the same face always
+  comes back under a new id. On lamp-06c1 (23 Nov) a slump gave `gate
+  nobody` at 15:51:06 and then `posture's window wiped: the gate opened
+  again on another face than the one it was kept for` at 15:51:08. It is
+  not face recognition: no name or print is compared.
+
+  **Timers only** (the first builder's condition on #6543): the keep
+  holds posture's window and the sitting's timers (break, drink, eating,
+  desk time and the counts), never a name, an identity, a memory or a
+  per-person record. Only a timer's keep (`keep::Away::timer`) carries;
+  `keep::Away::default`, the rule for anything kept about a person, goes
+  on only on the same id
+  (`a_keep_about_a_person_never_carries_onto_a_new_id`).
 - **The journal** says, once each: `posture's window kept unsaid for up to
   120 s: the gate closed (nobody)`, `posture's window goes on: the gate
-  opened again within 120 s`, `posture's window wiped: the gate stayed
-  closed 120 s (nobody)`, `posture's window wiped: the gate opened again
-  on another face than the one it was kept for` or `posture's window wiped at once
-  (privacy_closed)`, and the same for `the sitting's timers`. No id and no
-  box.
+  opened again within 120 s`, `posture's window goes on: the gate opened
+  again within 4 s on a new passing id in the same place (f1 to f3 after
+  2000 ms: centres 0.010 apart, within the new box's width 0.200)`,
+  `posture's window wiped: the gate stayed closed 120 s (nobody)`,
+  `posture's window wiped: the gate opened again on another face than the
+  one it was kept for (f1 to f3 after 5000 ms, over 4000 ms)` (or the
+  centres over the width, `2 faces in view`, or `no face known when it was
+  kept`) or `posture's window wiped at once (privacy_closed)`, and the
+  same for `the sitting's timers`. The ids are the eyes' passing ids, gone
+  with the face, never a name; the boxes are not written.
 
 No new switch: it is in memory only, sends nothing, and runs only with
 `LAMP_SEEN_ACTIVITY=on`.
