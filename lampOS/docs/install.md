@@ -2300,7 +2300,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      -/usr/local/lib/lampos` (since #5978; `-`, so a lamp without that
      folder still installs Harness), `ProtectSystem=full` (so `/var` is
      writable for Hermes's folder), `TimeoutStartSec=3600`, for Harness's
-     install as well. `/etc` is not writable. It runs at `Nice=10`,
+     install as well. Within it, a restart of OpenClaw's gateway may wait up
+     to 300 s, about 150 s whenever the gateway was just started (#8324,
+     "The Gateway" below). `/etc` is not writable. It runs at `Nice=10`,
      `IOSchedulingClass=idle` and `CPUWeight=20`, as lamp-update does, and
      is capped: `CPUQuota=100%`, writes 8 MB/s and 200 IOPS, reads 16 MB/s
      and 400 IOPS on `/var/lib`'s card, and `MemoryHigh=600M`: past it
@@ -2509,7 +2511,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      nothing ("already at ...: nothing installed") and writes the block
      again by the install's own code (`gateway_block`, then
      `gateway_config`), through the same OpenClaw check, then
-     `systemctl try-restart -- lamp-openclaw-gateway.service` restarts a
+     `systemctl try-restart -- lamp-openclaw-gateway.service`, past the
+     gateway's first start (#8324, "The Gateway" below), restarts a
      running gateway on it (one not running is started by the round's
      usual start). The ask waits for OpenClaw's window, as every ask
      does. One journal line, with no value of the config:
@@ -2634,12 +2637,17 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      counts toward `StartLimitBurst=5`, so five `gateway` key changes in
      ten minutes end it `failed`; a round that wants it starts a gateway
      it finds `inactive` or `failed` (a `failed` one after its
-     `reset-failed`, said once), which brings it back. The install's own
-     restart of the gateway (to run the new OpenClaw) waits while a running
+     `reset-failed`, said once), which brings it back. The one-shot's
+     restarts of the gateway (the install's, to run the new OpenClaw, and
+     the `gateway` block's `try-restart`, below) wait while a running
      gateway is still in its startup (#8324): until it listens on 18789,
-     150 s have passed since systemd started it (`ExecMainStartTimestamp`),
-     and 90 s past a listen the install saw begin, looking every 2 s, 300 s
-     at most, then restarted anyway. A stop at the moment it first listens
+     150 s have passed since systemd started its current process
+     (`ExecMainStartTimestampMonotonic` against `/proc/uptime`, both from
+     the boot, so a clock set by NTP after a boot with no RTC moves
+     neither; re-read at each look, so a process started again during the
+     wait is waited for anew), and 90 s past a listen the one-shot saw
+     begin (a look not listening forgets it), looking every 2 s, 300 s at
+     most, then restarted anyway. A stop at the moment it first listens
      drained 79.9 s against the 90 s stop timeout (kit-8306b on lamp-52e6,
      listen 46 s after the start; OpenClaw logs `drain=75000ms` at
      startup), and a second stop seconds after a start was SIGKILLed and
