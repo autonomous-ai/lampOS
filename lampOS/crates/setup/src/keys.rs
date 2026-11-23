@@ -1056,4 +1056,58 @@ mod tests {
             assert!(fit_voice(bad).is_err(), "{bad}");
         }
     }
+
+    /// #8362 step 1b: an OpenAI-compatible key's one check is
+    /// `GET <endpoint>/models` with the key as the bearer. It works only when
+    /// the endpoint lists the model asked for, so a typed name can't leave
+    /// the voice with no model; otherwise it is refused plainly as the
+    /// model, and the endpoint's list is never said back.
+    #[test]
+    fn an_openai_compatible_check_finds_the_model_in_the_endpoints_list() {
+        const LISTED: &str = r#"{"object":"list","data":[{"id":"grok-4","object":"model"},{"id":"grok-3-mini","object":"model"}]}"#;
+        struct Local(String);
+        impl Check for Local {
+            fn check(&mut self, given: &Given) -> Verdict {
+                let local = Given {
+                    base_url: Some(self.0.clone()),
+                    ..given.clone()
+                };
+                HttpCheck::local(String::new()).check(&local)
+            }
+        }
+        for (model, works) in [("grok-4", true), ("grok-9", false)] {
+            let (base, served) = answering_with(&format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{LISTED}",
+                LISTED.len()
+            ));
+            let folder = std::env::temp_dir().join(format!(
+                "lamp-setup-keys-compatible-{model}-{}",
+                std::process::id()
+            ));
+            let _ = fs::remove_dir_all(&folder);
+            let store = Store(folder.join("own"));
+            let line = json!({"set": "openai_compatible", "key": "sk-made-up-8362", "base_url": "https://api.compatible.invalid/v1", "model": model}).to_string();
+            let (reply, done) = answer(&line, &store, &mut Local(format!("{base}/v1")), true);
+            // Before the join, so a request refused before its check fails
+            // here instead of leaving the server waiting.
+            assert!(done.is_some(), "the check never ran: {reply}");
+            let asked = served.join().unwrap();
+            assert!(asked.starts_with("get /v1/models http/1.1"), "{asked}");
+            assert!(asked.contains("authorization: bearer sk-made-up-8362"));
+            assert!(!reply.to_string().contains("sk-made-up"), "{reply}");
+            assert!(!done.as_ref().unwrap().said.contains("sk-made-up"));
+            if works {
+                assert_eq!(reply["done"]["code"], "works", "{reply}");
+                assert!(store.0.join("openai_compatible.key").is_file());
+            } else {
+                assert_eq!(
+                    reply,
+                    json!({"refused": "that endpoint has no model by that name", "code": "bad_field"})
+                );
+                assert!(!reply.to_string().contains("grok-3-mini"), "{reply}");
+                assert!(!store.0.join("openai_compatible.key").exists());
+            }
+            let _ = fs::remove_dir_all(&folder);
+        }
+    }
 }

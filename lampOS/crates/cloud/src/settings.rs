@@ -1573,6 +1573,36 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
     }
 
+    /// #8362 step 1b: an OpenAI-compatible key goes to the helper with its
+    /// endpoint and model, which the helper checks. No refusal holds the
+    /// key.
+    #[test]
+    fn an_openai_compatible_key_goes_to_the_helper_with_its_endpoint_and_model() {
+        let (line, id) = keys_line(
+            "keys.set",
+            &json!({"service": "openai_compatible", "key": "sk-planted-8362", "base_url": "https://api.compatible.invalid/v1", "model": "grok-4", "request_id": "c1"}),
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&line).unwrap(),
+            json!({"set": "openai_compatible", "key": "sk-planted-8362", "base_url": "https://api.compatible.invalid/v1", "model": "grok-4"})
+        );
+        assert_eq!(id.as_deref(), Some("c1"));
+        assert_eq!(
+            keys_line("keys.remove", &json!({"service": "openai_compatible"}))
+                .unwrap()
+                .0,
+            r#"{"remove":"openai_compatible"}"#
+        );
+        for data in [
+            json!({"service": "openai_compatible", "key": "sk-planted-8362", "base_url": "https://api.compatible.invalid/v1", "model": 4}),
+            json!({"service": "openai_compatible", "key": "sk-planted-8362", "base_url": "https://api.compatible.invalid/v1", "model": "m".repeat(129)}),
+        ] {
+            let why = keys_line("keys.set", &data).unwrap_err();
+            assert_eq!(why, "model must be text", "{data}");
+        }
+    }
+
     /// #2094: the keys' kinds only with all three switches; their lines
     /// carry the key to the helper alone, and no refusal holds one.
     #[test]

@@ -647,6 +647,49 @@ async fn both_tries_refused_are_told_once() {
     assert_eq!(*told.lock().unwrap(), [401]);
 }
 
+/// #8362 step 1b: the person's own endpoint down (a 5xx) or out of use (429)
+/// mid-use, before any answer: the request goes to the lamp's own model at the
+/// relay, never a silent turn, and the status is told for the one line that
+/// says so. A 400 is the request's, not the endpoint's: no fallback.
+#[tokio::test]
+async fn the_persons_endpoint_down_or_spent_falls_back_to_the_lamps_own() {
+    for status in [503, 429] {
+        let server = Server::saying(
+            vec![
+                Says::Refuses(Duration::ZERO, status),
+                Says::Words(Duration::ZERO, "From the lamp's own."),
+            ],
+            None,
+        )
+        .await;
+        let told = Arc::new(Mutex::new(Vec::new()));
+        let telling = told.clone();
+        let relay = server.url.clone();
+        let mut lamp = Lamp::built(
+            &server,
+            &format!("own-down-{status}"),
+            None,
+            Vec::new(),
+            move |net| {
+                net.falling_back_to_the_relay(
+                    &relay,
+                    Arc::new(move |status| telling.lock().unwrap().push(status)),
+                )
+                .unwrap()
+            },
+            |engine| engine,
+        );
+        lamp.says(1).await;
+        assert_eq!(server.requests(), 2, "{status}");
+        assert_eq!(lamp.spoken(), ["From the lamp's own."], "{status}");
+        assert_eq!(*told.lock().unwrap(), [status]);
+    }
+    assert_eq!(
+        crate::second_provider::services::key_refused(&net::Error::Status(400)),
+        None
+    );
+}
+
 /// A round's two tries tell a fall and a refusal once between them; another
 /// round's try has its own to tell.
 #[test]
