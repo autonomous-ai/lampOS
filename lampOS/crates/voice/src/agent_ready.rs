@@ -194,10 +194,21 @@ pub fn refused(state: Readiness, why: Option<&str>) -> Value {
     note_refused();
     match state {
         Readiness::Installing => refusal_with(UPDATING_LINE),
+        // A normal start (a cold boot's Gateway takes minutes): the lamp's
+        // own getting-ready line, as a skill run hears (#7351), never "a
+        // problem". `tasks_restarting` and an unknown why stay a problem.
+        Readiness::Starting if why.is_some_and(|why| STARTING_WHYS.contains(&why)) => {
+            refusal_with(crate::skill_words::NOT_READY_LINE)
+        }
         Readiness::Error => refusal_with(LATER_LINE),
         _ => refusal(),
     }
 }
+
+/// The whys of a normal start (lamp-tasks' `agent::state_of`): the Gateway
+/// not answering yet since the boot, the one session opening, Harness's
+/// own start. Told [`crate::skill_words::NOT_READY_LINE`].
+const STARTING_WHYS: [&str; 3] = ["gateway_starting", "session_starting", "harness_starting"];
 
 /// [`refused`] for lamp-tasks' `agent_not_ready` `answer`: its `readiness`
 /// and `why`, the latest read's `why` when the answer has none and the
@@ -461,6 +472,17 @@ mod tests {
             assert!(
                 told.contains(PROBLEM_LINE) && noted,
                 "{state:?} {why:?}: {told}"
+            );
+        }
+        // A normal start is the getting-ready line, never "a problem"
+        // (the Reviewer-lead's P3 on #8162: a cold boot's minutes).
+        for why in STARTING_WHYS {
+            let (told, noted) = said(Readiness::Starting, Some(why));
+            assert!(
+                told.contains(crate::skill_words::NOT_READY_LINE)
+                    && !told.contains(PROBLEM_LINE)
+                    && noted,
+                "{why}: {told}"
             );
         }
         // lamp-tasks' answer: its readiness and why, else the latest's why.
