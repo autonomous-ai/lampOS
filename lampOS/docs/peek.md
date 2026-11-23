@@ -120,7 +120,10 @@ second.
 
 A request number seen again more than 60 s after its turn began is another
 turn: the voice counts again from its start. The newest 30 turns are kept,
-in memory only (`timeline::KEPT`). `light/command`, `skills/events`,
+in memory only (`timeline::KEPT`). A card's id on the page is its request and the
+time of the first step that came (`timeline::Entry::id`): a step timed
+earlier that comes later moves the turn's start, not the id, so an opened
+card stays open. `light/command`, `skills/events`,
 `voice/decision`, `tasks/step`, `tasks/status` and `skills/tasks` are read
 only for the timeline (`timeline::TOPICS`): `/bus` neither counts nor lists them. A
 topic nobody publishes (an older lamp) leaves its part of the card empty.
@@ -739,6 +742,8 @@ own, and asks for it over HTTP:
     held-back verdict; a number seen again 60 s later is another turn;
     words cut to 300 characters; a handed turn keeps its task's end past
     the kept tasks, and tasks no turn handed over never push its task out.
+  - `a_cards_id_stays_when_an_earlier_step_comes_late`: the words heard
+    after the line said keep the card's id.
   - #7267, on a real bus with a weather turn, a turn handed to OpenClaw
     whose task's steps come out of order and end in a reply, a turn with no
     decision, a steered follow-up, an error, a task of 59 calls ending in

@@ -793,10 +793,9 @@ fn card(
         let _ = write!(
             html,
             "<div class=\"io\"><span class=\"lbl\">OUT</span> {out}</div>\
-             <details id=\"turn-{}-{}\"><summary class=\"small\">{} events</summary>\
+             <details id=\"{}\"><summary class=\"small\">{} events</summary>\
              <div class=\"steps small\">",
-            entry.request,
-            entry.start(),
+            entry.id(),
             steps.len() + agent.map_or(0, |agent| agent.steps.len()),
         );
         // The slowest: the longest wait after the step before.
