@@ -219,9 +219,9 @@ struct Runs {
     main_pid: &'static str,
     /// How many of the next `ss` looks find the gateway not listening.
     not_listening: RefCell<u32>,
-    /// The gateway's start as `systemctl show --timestamp=unix` says it;
-    /// empty: not said.
-    began: RefCell<String>,
+    /// The gateway's start as `ExecMainStartTimestampMonotonic` says it at
+    /// each read, in order, the last one kept; none: not said.
+    began: RefCell<Vec<String>>,
 }
 
 impl Runs {
@@ -258,8 +258,13 @@ impl Runs {
                     /dev/mmcblk0p2 60000000 1000 20000000 3% /\n"
                         .to_owned(),
                 )
-            } else if line.contains("--property=ExecMainStartTimestamp") {
-                Ok(self.began.borrow().clone())
+            } else if line.contains("--property=ExecMainStartTimestampMonotonic") {
+                let mut began = self.began.borrow_mut();
+                let said = began.first().cloned().unwrap_or_default();
+                if began.len() > 1 {
+                    began.remove(0);
+                }
+                Ok(said)
             } else if argv[0] == "ss" {
                 // The gateway listening, unless a test says otherwise.
                 let mut quiet = self.not_listening.borrow_mut();
@@ -2148,6 +2153,8 @@ fn a_gateway_block_not_as_the_install_writes_it_is_written_again() {
         runs.position("config validate --json")
             < runs.position(&format!("systemctl try-restart -- {UNIT}"))
     );
+    // #8324: never in the gateway's first start: `settled` looks first.
+    assert!(runs.position("ss -Hltn") < runs.position(&format!("systemctl try-restart -- {UNIT}")));
 }
 
 /// #7868: OpenClaw's own check refusing the `gateway` block leaves
@@ -3803,22 +3810,21 @@ fn settle_looks(runs: &Runs) -> usize {
     looks.len()
 }
 
-/// The install run on a lamp the round asked it of, its gateway started
-/// `began` seconds ago (none: not said) and not listening for `quiet`
+/// The install run on a lamp the round asked it of, 1000 s after the boot,
+/// its gateway's process started at `began` (seconds since the boot, one
+/// per look, the last kept; none: not said) and not listening for `quiet`
 /// looks.
-fn install_settling(began: Option<u64>, quiet: u32) -> usize {
+fn install_settling(began: &[u64], quiet: u32) -> usize {
     let lamp = Lamp::new();
     lamp.harness_there();
     round(&lamp, &mut Fake::default(), true, 10);
+    fs::write(lamp.at(crate::reset_hold::UPTIME), "1000.00 3000.00\n").unwrap();
     let runs = Runs::new(&lamp);
     *runs.not_listening.borrow_mut() = quiet;
-    *runs.began.borrow_mut() = began.map_or_else(String::new, |ago| {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        format!("@{}\n", now - ago)
-    });
+    *runs.began.borrow_mut() = began
+        .iter()
+        .map(|s| format!("{}\n", s * 1_000_000))
+        .collect();
     let mut run = runs.runner();
     let said = install_with(
         lamp.root(),
@@ -3842,10 +3848,10 @@ fn install_settling(began: Option<u64>, quiet: u32) -> usize {
 /// past that listen): 71 looks 2 s apart, all before its one restart.
 #[test]
 fn the_install_never_restarts_a_gateway_at_its_first_listen() {
-    assert_eq!(install_settling(Some(10), 3), 71);
+    assert_eq!(install_settling(&[990], 3), 71);
     // Listening already, 10 s into its start (the stop right at first
     // listen): still waited out to 150 s from the start.
-    assert_eq!(install_settling(Some(10), 0), 71);
+    assert_eq!(install_settling(&[990], 0), 71);
 }
 
 /// #8324: a gateway started long ago and listening is restarted at once;
