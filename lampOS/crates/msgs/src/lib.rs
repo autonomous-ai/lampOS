@@ -60,6 +60,8 @@ mod ears;
 pub use ears::*;
 mod app_triggers;
 pub use app_triggers::*;
+mod app_tools;
+pub use app_tools::*;
 mod play_allow;
 pub use play_allow::*;
 mod body_sound;
@@ -2788,6 +2790,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(body_sound_topics())
         .chain(lamp_did_topics())
         .chain(app_trigger_topics())
+        .chain(app_tool_topics())
         .chain(app_fact::app_fact_topics())
         .chain(chat_topics())
         .chain(presence_topics())
