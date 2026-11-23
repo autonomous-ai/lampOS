@@ -1,7 +1,8 @@
 # lamp, root sh (row common first, then KEEP_SKILLS=0|1). The row's put-back, run after the legs and before the runner's own put-back (kit8157's
 # restore.lamp.sh without binds, units or gateway): leg E's runon and leg N's named drop-ins gone (lamp-voice restarted
-# once, only if one was there), the row's new skills removed with the installed lamp-skills (the grant-probe fixture among them), a
-# pre-existing skill the row changed put back from save's tar, made.json and long-make.json back to save's copies for
+# once, only if one was there), the row's pushed fixtures (grant-, slow-, fork-probe) removed by the manage helper's
+# remove_pushed (its ANY_ASKER drop-in gone, task-yes.json as found), the row's new skills removed with the installed
+# lamp-skills, a pre-existing skill the row changed put back from save's tar, made.json and long-make.json back to save's copies for
 # the row's entries, the row's /tmp files gone. Idempotent; with no save baseline it only does the drop-in and /tmp.
 # Never touches volume, lamp-cloud or a reset. Prints UNROW OK or UNROW NOT OK.
 set -u; ok=1
@@ -13,6 +14,24 @@ v=$(pid lamp-voice)
 for sw in LAMP_MAKE_MAY_RUN_ON LAMP_NAMED_AGENT_TAKES_LINE; do
   [ -z "$(envval $v $sw)" ] && echo "PASS $sw not set" || { echo "FAIL $sw still '$(envval $v $sw)'"; ok=0; }; done
 [ "$(envval $v LAMP_NAME_NEAR)" != off ] && echo "PASS LAMP_NAME_NEAR back to the product's ('$(envval $v LAMP_NAME_NEAR)')" || { echo "FAIL LAMP_NAME_NEAR still off"; ok=0; }
+# The row's pushed fixtures (probe.lamp.sh, legs C, H, P): each name in pushed.names taken off by the manage helper's
+# {"remove_pushed": {client, name}}, the one-request ANY_ASKER drop-in gone after it, task-yes.json back as found.
+for s in $(cat $PUSHED 2>/dev/null); do
+  [ -d $DEV/$s ] || { echo "PUSHED $s already gone from $DEV"; continue; }
+  r=$(mhelper "{\"remove_pushed\": {\"client\": \"$PCLIENT\", \"name\": \"$s\"}}")
+  echo "PUSHED by the row, removed: $s (helper: $(echo "$r" | cut -c1-140))"; n "remove_pushed $s by the manage helper"
+done
+any_off || { echo "FAIL $AD still there"; ok=0; }
+x=; for s in $(cat $PUSHED 2>/dev/null); do [ -d $DEV/$s ] && x="$x $s"; done
+if [ -n "$x" ]; then echo "FAIL pushed fixtures still in $DEV:$x"; ok=0
+else [ -f $PUSHED ] && { mv -f $PUSHED $PUSHED.used; n "the row's pushed fixtures gone ($PUSHED.used)"; }; echo "PASS pushed fixtures gone from $DEV, no ANY_ASKER drop-in"; fi
+if [ -f $R/task-yes.before ]; then
+  if [ "$(sha $YESF)" = "$(sha $R/task-yes.before)" ]; then echo "YES-FILE as found $(sha $YESF)"
+  else cp -p $R/task-yes.before $YESF; n "put $YESF back as found"; echo "YES-FILE put back $(sha $YESF)"; fi
+  [ "$(sha $YESF)" = "$(sha $R/task-yes.before)" ] && rm -f $R/task-yes.before || { echo "FAIL $YESF not as found"; ok=0; }
+elif [ -f $R/task-yes.none ]; then
+  [ -f $YESF ] && { rm -f $YESF; n "removed $YESF (none before the push)"; }; echo "YES-FILE none, as found"; rm -f $R/task-yes.none
+fi
 if [ "${KEEP_SKILLS:-0}" != 1 ] && [ -f $R/skills.before ]; then
   for s in $(skillnames | LC_ALL=C comm -13 $R/skills.before -); do
     out=$($SKBIN remove --dir $SK --state-dir $SKST "$s" 2>&1); rc=$?
@@ -52,5 +71,10 @@ elif [ "${KEEP_SKILLS:-0}" = 1 ]; then echo "NOTE KEEP_SKILLS=1: the row's skill
 else echo "NOTE no save baseline ($R/skills.before): skills untouched"; fi
 rm -rf /tmp/t8180-probe /tmp/t8180-mark* /tmp/t8180-stop*
 [ -f $R/active.before ] && for u in $(cat $R/active.before); do systemctl is-active -q $u || echo "NOTE $u was active before the legs, now $(systemctl is-active $u)"; done
+# The speaker's volume against save's (read only): a change is a leg's own volume call, never changed back by the kit
+# (the user decides), so it is UNROW NOT OK and the release waits for a person.
+if [ -f $R/volume.before ]; then vs=$(cat $R/volume.before); vn=$(volnow)
+  [ "$vn" = "$vs" ] && echo "PASS volume $vn = saved" || { echo "FAIL volume moved $vs -> $vn (a leg's own volume call; not changed back: the user decides)"; ok=0; }
+else echo "NOTE no saved volume ($R/volume.before): not compared"; fi
 systemctl is-active -q lamp-cloud && echo "PASS lamp-cloud active" || { echo "FAIL lamp-cloud $(systemctl is-active lamp-cloud)"; ok=0; }
 [ $ok = 1 ] && { for f in $R/*.before $R/*.before.tar; do [ -f $f ] && mv -f $f $f.used; done; echo "UNROW OK"; } || echo "UNROW NOT OK"

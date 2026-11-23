@@ -71,3 +71,50 @@ print("VOICE_MUTE muted=%s reason=%s muted_by=%s control=%s age_s=%s seq=%s" % (
 print("PRIVACY permitted=%s physical_muted=%s age_s=%s" % ((p or {}).get("permitted"), (p or {}).get("physical_muted"), "%.1f" % pa if pa is not None else "-"))
 PY
 }
+# The row's fixtures (legs C, H, P) go in by the product's push install, as lamp-control's door keeps a push it took,
+# with only the network door (the Mac's pairing) skipped (the #8237 kit's stage.lamp.sh, thirteen/kit-8237 5b5e8e4291):
+# /var/lib/lampos-control/push/{push.json, package.tar} (skills package.rs PUSH_DIR, read within 60 s), then
+# {"install_pushed": SHA} to root's manage helper; lamp-skills' install_pushed_at puts the skill in skills-dev
+# (lib.rs PUSHED_DIR), where the loader lets it carry a script (task.rs: pushed or from the Store). A hand install
+# (`lamp-skills install`) is refused that ("only a skill from the Skills Store or pushed by the owner's own computer
+# may carry a script"). Removed by {"remove_pushed": {client, name}} (probe.lamp.sh OP=remove, unrow).
+PUSHD=/var/lib/lampos-control/push; DEV=/var/lib/lampOS/skills-dev; YESF=/var/lib/lampos-control/task-yes.json
+MSOCK=/run/lampos-skills-manage/manage.sock
+PCLIENT=${PCLIENT:-c_row8180}                       # the stand-in computer's id (the helper's c_... shape)
+PUSHED=$R/pushed.names                              # the row's pushed fixtures, one name each, for unrow
+sha(){ sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
+mask(){ python3 -I - "$MSOCK" "$1" <<'PY'
+import socket, sys
+s = socket.socket(socket.AF_UNIX); s.settimeout(40); s.connect(sys.argv[1]); s.sendall(sys.argv[2].encode() + b"\n")
+b = b""
+while not b.endswith(b"\n"):
+    c = s.recv(65536)
+    if not c: break
+    b += c
+print(b.decode(errors="replace").strip())
+PY
+}
+okreply(){ python3 -I -c 'import json,sys; v=json.loads(sys.argv[1]); sys.exit(0 if "done" in v and "refused" not in v else 1)' "$1" 2>/dev/null; }
+# The helper takes pushed requests from lamp-control's cgroup only (package.rs asker_of). For the one request, its own
+# test switch LAMP_SKILLS_ANY_ASKER=on (main.rs "asked": said in the journal each time) by a /run drop-in on
+# lamp-skills-manage@ (socket-activated, so the next connection reads it), removed right after the answer.
+AD=/run/systemd/system/lamp-skills-manage@.service.d/zz-row-8180-anyasker.conf
+any_on(){ mkdir -p ${AD%/*}; printf '[Service]\nEnvironment=LAMP_SKILLS_ANY_ASKER=on\n' > $AD; systemctl daemon-reload; n "added $AD"; }
+any_off(){ [ -f $AD ] && { rm -f $AD; rmdir ${AD%/*} 2>/dev/null; systemctl daemon-reload; n "removed $AD"; }; [ ! -f $AD ]; }
+mhelper(){ any_on; r=$(mask "$1"); any_off || r="$r (ANY_ASKER drop-in NOT removed)"; echo "$r"; }
+# The speaker's volume, READ ONLY (save records it, unrow compares; the kit never sets a volume): lamp-actions' kept
+# level (actions kept_volume.rs FILE: one line, the raw level 1..100, written after each change the person asks for)
+# and its bus value (speaker/volume, msgs speaker_state.rs SpeakerVolume: volume 0..100 of the lamp's ceiling, muted).
+# One line: "kept=<n|none> bus=<n|none> muted=<true|false|none>".
+KVOL=/var/lib/lampos-output-caps/kept-volume; BVOL=/run/lampos-bus/speaker/volume/latest
+volnow(){ python3 -I - "$KVOL" "$BVOL" <<'PY'
+import json, sys
+try: k = open(sys.argv[1]).read().strip() or "none"
+except Exception: k = "none"
+try:
+    _, _, p = open(sys.argv[2], "rb").read().partition(b"\n"); v = json.loads(p)
+    b = str(v.get("volume")); m = str(v.get("muted")).lower()
+except Exception: b = m = "none"
+print("kept=%s bus=%s muted=%s" % (k, b, m))
+PY
+}

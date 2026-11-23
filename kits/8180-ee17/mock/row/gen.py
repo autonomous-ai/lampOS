@@ -152,6 +152,9 @@ case("D.pass-coldinfo", "D", over={"j/D.MAILASK": PASS["j/D.MAILASK"] + "@+22.5 
 case("A.pass-hush", "A", env={"GREP": "'HUSH the lamp.s say ends in'"})
 case("A.fail-notkept", "A", over={"j/A.DAYS": j([(1, V + "request 101: a skill to make: asked"), (30, V + "a skill made here wasn't kept in 30100 ms: its try failed")])})
 case("B.pass", "B")
+# ee17 rest1 (23 Nov): a second chat round's make_skill for the same ask while the first make runs; lamp-voice's
+# "wasn't made again" refusal comes before the first make's kept line and must not be read as B's make end.
+case("B.pass-again", "B", over={"j/B.PRICE": PASS["j/B.PRICE"].replace("@+32.0 ", "@+25.0 " + V + "a skill wasn't made again: the same ask is being made already\n@+32.0 ", 1)})
 case("B.fail-latency", "B", over={"j/B.PRICEASK": PASS["j/B.PRICEASK"].replace("@+1.8 ", "@+9.0 ")})
 case("B.fail-agent", "B", over={"j/B.PRICEASK": PASS["j/B.PRICEASK"] + "@+2.5 " + T + "skill task task-b9: started on the lamp's default agent\n"})
 case("B.fail-saidon-nouses", "B", over={"j/B.PRICE": PASS["j/B.PRICE"].replace("(118 chars, uses named)", "(96 chars, no uses named)")})
@@ -241,5 +244,5 @@ case("7170.void-muted", "D", boot=True, over={"out/boot.lamp.sh.after": PASS["ou
 case("7170.pass-muted-yes", "D", boot=True, env={"MIC_YES": "yes"}, over={"out/boot.lamp.sh.after": PASS["out/boot.lamp.sh.after"].replace("MUTEBOOT muted=False", "MUTEBOOT muted=True"), "out/micon.lamp.sh": "RECORD_KEPT the person's record from this ROW's first micon stays\nMUTE LIFTED OK after 4s\n"})
 # U: one kit helper alone (unit.sh), against a fake lamp tree: the engine without an app choice, an old-stamped
 # mute, a refused ssh login
-for u in ("engine-env", "engine-app", "engine-none", "mute-oldstamp", "mute-timed", "mute-live", "mute-liveoff", "ssh-retry", "ssh-giveup", "ssh-other", "fixtures", "clips-call", "linked-none", "linked-expired", "linked-ok", "vars-default", "keep-verdicts", "namenear", "idle-resting", "idle-turns", "idle-speaking", "idle-stale", "queue-clear", "queue-loop", "queue-stuck", "gateway-8320"):
+for u in ("engine-env", "engine-app", "engine-none", "mute-oldstamp", "mute-timed", "mute-live", "mute-liveoff", "ssh-retry", "ssh-giveup", "ssh-other", "fixtures", "clips-call", "linked-none", "linked-expired", "linked-ok", "vars-default", "keep-verdicts", "namenear", "idle-resting", "idle-turns", "idle-speaking", "idle-stale", "queue-clear", "queue-loop", "queue-stuck", "gateway-8320", "push-probe", "volume-same", "volume-moved"):
     case("U.pass-" + u, " ", env={"UNIT": u})

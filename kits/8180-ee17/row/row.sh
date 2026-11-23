@@ -10,7 +10,8 @@
 #      DAYSASK once: the made skill's own run (or task) starts, ends exit 0 having said >= 1, and its say is spoken.
 #   B  PRICE make (a `run` step), then PRICEASK: "skill run R: hand-over to script start N ms", ended exit 0
 #      said >= 1, NO agent session (no "skill task" start/Harness/gateway line), clip end -> first say <= LIMIT_B s.
-#   C  grant-probe fixture (grants speak) asks the camera: lamp-control "refused: no_grant".
+#   C  grant-probe fixture (grants speak) asks the camera: lamp-control "refused: no_grant". C, H and P's fixtures go
+#      in by the product's push install (FIXTURE, push.sh), the network door (the Mac's pairing) skipped.
 #   D  (needs a linked Google account; VOID without one) MAIL make (a `task` step), then MAILASK: the task's prompt names <folder>/SKILL.md first, the agent's
 #      session names no lamp file beyond its prompt's, clip end -> answer <= LIMIT_D s (about 30).
 #   E  LAMP_MAKE_MAY_RUN_ON=on by a /run drop-in: LONGMAKE runs on past its minute, READY is answered
@@ -62,11 +63,12 @@ POLL=${POLL:-1}; LIMIT_B=${LIMIT_B:-6}; LIMIT_D=${LIMIT_D:-45}; MAKEWAIT=${MAKEW
 # kept OpenClaw session (e82d, 22 Nov 14:38: "kept session new ... in 84883 ms"). A make has MAKEWAIT (660 s).
 RUNWAIT=${RUNWAIT:-180}; TASKWAIT=${TASKWAIT:-240}; IDLEWAIT=${IDLEWAIT:-600}; IDLEPOLL=${IDLEPOLL:-15}
 lines(){ wc -l < $J | tr -d ' '; }
-# first line number after line $2 matching ERE $1, waiting at most $3 s (lock renewed every 120 s)
-waitfor(){ local s=$(date +%s) r=$(date +%s) n lim=$3
+# first line number after line $2 matching ERE $1 and not ERE $4 (optional), waiting at most $3 s (lock renewed every
+# 120 s)
+waitfor(){ local s=$(date +%s) r=$(date +%s) n lim=$3 x=${4:-}
   [ -n "${WAITMAX:-}" ] && [ "$lim" -gt "$WAITMAX" ] && lim=$WAITMAX     # WAITMAX: mock runs only
   while [ $(( $(date +%s) - s )) -lt $lim ]; do
-    n=$(tail -n +$(( $2 + 1 )) $J | grep -nE -- "$1" | head -1 | cut -d: -f1); [ -n "$n" ] && { echo $(( n + $2 )); return 0; }
+    n=$(tail -n +$(( $2 + 1 )) $J | grep -nE -- "$1" | { if [ -n "$x" ]; then grep -vE -- "$x"; else cat; fi; } | head -1 | cut -d: -f1); [ -n "$n" ] && { echo $(( n + $2 )); return 0; }
     [ $(( $(date +%s) - r )) -ge 120 ] && { RENEW || return 2; r=$(date +%s); }
     sleep $POLL; done; return 1; }
 ACT='request [0-9]+|pieces began'
@@ -77,6 +79,10 @@ show(){ sed -n "${1}p" $J | cut -c1-240; }
 ep(){ sed -n "${1}p" $J | awk '{print $1}'; }                       # the lamp's epoch of line $1
 since(){ python3 -c "import sys;print('%.2f'%(float(sys.argv[1])-float(sys.argv[2])-float(sys.argv[3])))" $1 $2 $SK_; }  # lamp t - Mac t - skew
 KEPT="a skill made here was kept in [0-9]+ ms"
+# A later round's make_skill for the same ask while the first make runs (ee17 rest1, 23 Nov: a second chat round, 0
+# words heard): lamp-voice "a skill wasn't made again: the same ask is being made already". It is not the make's end:
+# MAKE skips it and waits for the first make's own kept / not-kept line.
+AGAIN="a skill wasn't made again: the same ask is being made already"
 NOTKEPT="a skill made here wasn't kept in|a skill wasn't made|the lamp's model said no made skill can do it|wasn't kept: |was not kept: |a long make made nothing"
 READBACK="read back: it waits for the person's yes|said back unasked waits for the [a-z]+'s yes|with no yes is said back unasked"
 YESOK="is on, on the person's yes|approved on the person's yes"
@@ -153,8 +159,9 @@ field(){ sed -n "s/.* $1=\([^ ]*\).*/\1/p"; }
 MAKE(){ local n0 w r y; MK=; MN=; ML=; RB=0; MADELINE=
   MAKEIDLE || { WHY="still in flight after $IDLEWAIT s, $1 not asked"; MKBUSY=1; return 1; }
   HUSH; n0=$(lines); MK0=$n0; WATCH $LEG; ASK $1
-  w=$(waitfor "$KEPT|$NOTKEPT|$BUSYRE" $n0 $MAKEWAIT) || { UNWATCH $LEG; WHY="no make end in $MAKEWAIT s"; tail -n +$(( n0 + 1 )) $J | grep -qE "$BUSYRE" && MKBUSY=1; return 1; }
+  w=$(waitfor "$KEPT|$NOTKEPT|$BUSYRE" $n0 $MAKEWAIT "$AGAIN") || { UNWATCH $LEG; WHY="no make end in $MAKEWAIT s"; tail -n +$(( n0 + 1 )) $J | grep -qE "$BUSYRE" && MKBUSY=1; return 1; }
   UNWATCH $LEG; echo "  make end: $(show $w)"
+  tail -n +$(( n0 + 1 )) $J | head -n $(( w - n0 )) | grep -E "$AGAIN" | head -1 | cut -c1-200 | sed 's/^/  NOTE a later make of the same ask, not this make'"'"'s end: /'
   sed -n "${w}p" $J | grep -qE "$BUSYRE" && { WHY="lamp-tasks refused $1: busy, one is being made"; MKBUSY=1; return 1; }
   sed -n "${w}p" $J | grep -qE "$KEPT" || { WHY="not kept: $(show $w | cut -c1-160)"; return 1; }; MK=$w
   echo "  make time: $(sed -n "${w}p" $J | grep -oE 'kept in [0-9]+ ms')"
@@ -225,8 +232,7 @@ legB(){ local n0 h e s a lat
 # ---- C: the grant-probe fixture asks the camera
 legC(){ local n0 e x
   BEGIN C || return 1; quiet
-  SSHR -n $H 'rm -rf /tmp/t8180-probe; mkdir -p /tmp/t8180-probe' && $SCP -qr $D/probe/grant-probe $H:/tmp/t8180-probe/ || { WHY="probe copy failed (VOID: kit, not the build)"; VC=VOID; END; return 0; }
-  LAMP "" $D/probe.lamp.sh 2>&1 | tee $LG/probe.txt | sed 's/^/  /'; grep -q '^PROBE INSTALLED' $LG/probe.txt || { WHY="probe not installed (VOID: kit, not the build)"; VC=VOID; END; return 0; }
+  FIXTURE grant-probe || { WHY="probe not pushed: $(grep -E '^PUSH REFUSED' $LG/probe-grant-probe.txt | tail -1 | cut -c1-160) (VOID: kit, not the build)"; VC=VOID; END; return 0; }
   sleep 5; for i in 1 2; do HUSH; n0=$(lines); ASK PROBE
     e=$(waitfor "refused: no_grant|of skill grant-probe: (no token made|its time is up)|skill run [^ ]+: ended in|$READBACK" $n0 $RUNWAIT)
     [ -n "$e" ] && echo "  $(show $e)"
@@ -267,7 +273,7 @@ legE(){ local n0 ro q m
   GATE lamp-voice || { WHY="start budget (VOID: not run)"; VE=VOID; return 0; }
   LAMP "MODE=on PR_VOICE_SHA=${PR_VOICE_SHA:-}" $D/runon.lamp.sh 2>&1 | tee $LG/runon-on.txt | sed 's/^/  /'; grep -q '^RUNON ON' $LG/runon-on.txt || { WHY="switch not on (VOID: not run; logs/runon-on.txt)"; VE=VOID; return 0; }
   BEGIN E || return 1; quiet; HUSH; n0=$(lines); ASK LONGMAKE
-  ro=$(waitfor "the make has no answer [0-9]+ s after its waiting line: it runs on|a long make's turn was cut before its minute: it runs on|$KEPT|$NOTKEPT" $n0 150)
+  ro=$(waitfor "the make has no answer [0-9]+ s after its waiting line: it runs on|a long make's turn was cut before its minute: it runs on|$KEPT|$NOTKEPT" $n0 150 "$AGAIN")
   [ -n "$ro" ] && echo "  $(show $ro)"
   if [ -n "$ro" ] && sed -n "${ro}p" $J | grep -qE "runs on"; then saydone $ro; sleep 8; ASK READY
     q=$(waitfor "made skills listed|a make asked while a long make runs on|long make" $ro 60) && echo "  $(show $q)"
@@ -368,9 +374,10 @@ legW(){ local b a
   echo "  workshop before '$b' after '$a' (legs between: ${LEGS:-A B C D E K H P})"
   [ -n "$b" ] && [ "$b" = "$a" ] && echo "CHECK (W3) a make plus a run leave workshop-skills/ unchanged: PASS" || echo "CHECK (W3) a make plus a run leave workshop-skills/ unchanged: FAIL ('$b' -> '$a')"
   grep -c ': PASS' $LG/wshop-config.txt | grep -qx 2 && [ -n "$b" ] && [ "$b" = "$a" ] && { VW=PASS; WHY="skill_workshop denied, gateway accepts it, workshop-skills unchanged ($a)"; } || WHY="$(grep -h '^CHECK (W[12])' $LG/wshop-config.txt | grep -v ': PASS' | cut -c1-90 | tr '\n' ';')$([ -n "$b" ] && [ "$b" = "$a" ] || echo " W3 workshop-skills '$b' -> '$a'")"; }
-# a row fixture copied and installed (NAME), for H and P
-FIXTURE(){ SSHR -n $H "mkdir -p /tmp/t8180-probe" && $SCP -qr $D/probe/$1 $H:/tmp/t8180-probe/ || return 1
-  LAMP "NAME=$1" $D/probe.lamp.sh 2>&1 | tee $LG/probe-$1.txt | sed 's/^/  /'; grep -q '^PROBE INSTALLED' $LG/probe-$1.txt; }
+# a row fixture (row/probe/<name>) for C, H and P, by the product's push install (push.sh: the SDK's package, staged as
+# lamp-control's door keeps a push, then the manage helper's install_pushed; the network door skipped). A hand install
+# is refused on the lamp: a script needs a Store or pushed skill (skills task.rs). unrow takes it off (remove_pushed).
+FIXTURE(){ bash $D/push.sh push $D/probe/$1 > $LG/probe-$1.txt 2>&1; sed 's/^/  /' $LG/probe-$1.txt; grep -q '^PROBE INSTALLED' $LG/probe-$1.txt; }
 # NOCG n0: the refusal for want of an own cgroup after line n0, if any (run_cgroup.rs NO_CGROUP / for_run_on)
 NOCG(){ local x; x=$(tail -n +$(( $1 + 1 )) $J | grep -oE "run [^ ]+: refused, no own cgroup: .*|the run's own memory and CPU bounds could not be set, so it was not run|runs have no own cgroup: [^;]*" | head -1 | cut -c1-160); [ -n "$x" ] && echo ": REFUSED, $x"; }
 RUNOK(){ sed -n "${1}p" $J | grep -qE "exited 0, said [1-9]"; }

@@ -64,3 +64,36 @@ a dead socket, and every skill-run leg would fail for a reason that isn't #8180.
   differ, it prints `VERIFY FAIL: control-sock-stale-in-gateway(#8320)`, and the run stops before any lift.
 
 The ROW line says the gateway was restarted after the swap.
+
+## Fixtures by the product's push install (legs C, H, P)
+
+On the lamp, a hand install (`lamp-skills install`) of grant-probe, slow-probe or fork-probe is refused: "do.task:
+only a skill from the Skills Store or pushed by the owner's own computer may carry a script" (skills `task.rs`). So the
+fixtures go in by the product's own push install, as the #8237 kit does (thirteen/kit-8237 `row/stage.sh`, ported as
+`row/push.sh` + `row/probe.lamp.sh`):
+- the Mac packs the fixture with the SDK's `lampos.push.pack` (this repo's `lampOS/sdk/python`, no pip, no pairing;
+  `PUSH_SDK` overrides the path), with a run mark in SKILL.md, and copies `package.tar` to the lamp;
+- the lamp body writes `/var/lib/lampos-control/push/{push.json, package.tar}` as lamp-control's door keeps a push
+  (client `c_row8180`), lays a one-request `LAMP_SKILLS_ANY_ASKER=on` drop-in on `lamp-skills-manage@`, sends
+  `{"install_pushed": SHA}` to `/run/lampos-skills-manage/manage.sock`, and removes the drop-in right after the answer.
+  The skill lands in `/var/lib/lampOS/skills-dev`. Its name goes into `~/t8180/pushed.names`.
+- **The network door (the Mac's pairing with lamp-control) is skipped**: say so on the ROW line. Everything from the
+  helper on is the product's path.
+- `unrow` sends `{"remove_pushed": {client, name}}` for every pushed name (drop-in laid and removed the same way),
+  puts `task-yes.json` back as found, and prints `PASS pushed fixtures gone from ..., no ANY_ASKER drop-in` or a FAIL.
+- Every lamp change goes into `~/changes.txt`.
+
+## Speaker volume (read only)
+
+`save` prints `VOLUME saved kept=<n> bus=<n> muted=<b>` (`/var/lib/lampos-output-caps/kept-volume` and the bus's
+`speaker/volume`). `unrow` reads both again: `PASS volume ... = saved`, or `FAIL volume moved <saved> -> <now> (a
+leg's own volume call; not changed back: the user decides)`, which makes `UNROW NOT OK`, so `release` waits for a
+person. The kit never sets a volume.
+
+## Leg B and a second make of the same ask
+
+A second chat round may call make_skill again while the first make runs; lamp-voice then logs "a skill wasn't made
+again: the same ask is being made already". MAKE skips that line (a NOTE) and waits for the first make's own kept or
+not-kept line (mock `B.pass-again`).
+
+New mocks: `U.pass-push-probe`, `U.pass-volume-same`, `U.pass-volume-moved`, `B.pass-again`.
