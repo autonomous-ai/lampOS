@@ -320,6 +320,8 @@ SPEAKER_EVENTS = ("speaker.stats", "speaker.ended")
 SPEAKER_RATES = (16_000, 24_000)
 SPEAKER_FRAME_MAX_BYTES = 9_600
 SPEAKER_FRAME_MS = 100
+# How far ahead of its play time `play_pcm` sends a frame, in ms: over the lamp's 120 ms prefill, under its 300 ms hold (#8373).
+SPEAKER_LEAD_MS = 200
 
 # `keep_connected`'s pauses before connecting again, in seconds: the first
 # after a closed connection, then longer while the lamp can't be reached (a
@@ -606,15 +608,22 @@ class SpeakerStream:
             pcm = clip.readframes(clip.getnframes())
         await self.play_pcm(pcm)
 
-    async def play_pcm(self, pcm: bytes) -> None:
+    async def play_pcm(self, pcm: bytes, lead_ms: int = SPEAKER_LEAD_MS) -> None:
         """`pcm` written in real time as `play_wav` does, in 20 ms frames,
-        returning when it has been played."""
+        returning when it has been played. Each frame goes `lead_ms` before its
+        play time (200 ms unless given, at most 250): the lamp starts a stream
+        only once it holds 120 ms and keeps at most 300 ms of it, so a lead
+        over 120 ms is what adds to what it holds, and a late send is caught
+        up rather than added to. 0 paces each frame at its own play time. On
+        lamp-75c9 (23 Nov, 6 streams of 30 s each, one laptop over Wi-Fi):
+        underruns 8 at a lead of 0, 9 at 100 and 4 at 200 (#8373)."""
+        lead = max(0, min(int(lead_ms), 250)) / 1000
         start = time.monotonic()
         step = self.sample_rate * 2 * 20 // 1000
         sent = 0
         for at in range(0, len(pcm), step):
-            # A frame goes at its own time, so a slow send is caught up, not added to.
-            wait = start + sent / (self.sample_rate * 2) - time.monotonic()
+            # A frame goes at its own time less the lead, so a slow send is caught up, not added to.
+            wait = start + sent / (self.sample_rate * 2) - lead - time.monotonic()
             if wait > 0:
                 await asyncio.sleep(wait)
             piece = pcm[at : at + step]
