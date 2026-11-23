@@ -20,6 +20,10 @@ pub const KEPT: usize = 20;
 /// read is on every push. A file first read when it is longer is read from
 /// this far before its end: only the newest turns are kept.
 const MOST_READ: u64 = 4 << 20;
+/// The most of a file's first line kept to tell it apart: the voice begins
+/// each segment it fills again with a `service_segment` line naming its
+/// generation, well under this.
+const HEAD_BYTES: usize = 256;
 
 /// Why the session records could not be read. Paths and OS error text
 /// stay out of the snapshot sent to the page.
@@ -188,6 +192,9 @@ pub struct Turns {
     read: BTreeMap<PathBuf, u64>,
     /// A line not yet ended, by file.
     partial: BTreeMap<PathBuf, Vec<u8>>,
+    /// Each events file's first line when it was last read: another one
+    /// means the voice emptied the file and filled it again.
+    heads: BTreeMap<PathBuf, Vec<u8>>,
     turns: BTreeMap<u64, Turn>,
 }
 
@@ -243,11 +250,14 @@ impl Turns {
                 && name.ends_with(".jsonl")
                 && entry.file_type()?.is_file()
             {
-                files.push(entry.path());
+                files.push((entry.metadata()?.modified()?, entry.path()));
             }
         }
+        // In the order they were written, so a newer record of a turn is
+        // taken after an older one: the voice fills its segments in turn,
+        // so a name says nothing of which is newest.
         files.sort();
-        for file in files {
+        for (_, file) in files {
             self.read_file(&file)?;
         }
         Ok(())
@@ -257,8 +267,15 @@ impl Turns {
         let previous = self.read.get(file).copied().unwrap_or_default();
         let mut opened = fs::File::open(file)?;
         let length = opened.metadata()?.len();
-        // A file shorter than was read is another file of the same name.
-        let from = if length < previous { 0 } else { previous };
+        let head = first_line(&mut opened)?;
+        // A file shorter than was read, or whose first line changed, was
+        // emptied and filled again: read from its start.
+        let refilled = length < previous
+            || head
+                .as_ref()
+                .zip(self.heads.get(file))
+                .is_some_and(|(head, kept)| head != kept);
+        let from = if refilled { 0 } else { previous };
         // First read, and long: its last part, from the first line begun
         // in it.
         let (from, mid_line) = if from == 0 && length > MOST_READ {
@@ -275,11 +292,14 @@ impl Turns {
         let mut added = Vec::new();
         let took = opened.take(MOST_READ).read_to_end(&mut added)?;
         let mut bytes = self.partial.remove(file).unwrap_or_default();
-        if from != previous || length < previous {
+        if from != previous || refilled {
             bytes.clear();
         };
         bytes.append(&mut added);
         self.read.insert(file.to_owned(), from + took as u64);
+        if let Some(head) = head {
+            self.heads.insert(file.to_owned(), head);
+        }
         if mid_line {
             let begun = bytes
                 .iter()
@@ -355,6 +375,19 @@ impl Turns {
             self.turns.pop_first();
         }
     }
+}
+
+/// The file's first line, ended, when it fits in [`HEAD_BYTES`].
+fn first_line(file: &mut fs::File) -> io::Result<Option<Vec<u8>>> {
+    file.seek(SeekFrom::Start(0))?;
+    let mut head = Vec::with_capacity(HEAD_BYTES);
+    file.by_ref()
+        .take(HEAD_BYTES as u64)
+        .read_to_end(&mut head)?;
+    Ok(head.iter().position(|byte| *byte == b'\n').map(|end| {
+        head.truncate(end + 1);
+        head
+    }))
 }
 
 /// The newest session's folder under `sessions`, by when it last changed.
@@ -591,6 +624,80 @@ mod tests {
         assert_eq!(five.held.as_deref(), Some("the busy room held the floor"));
         assert_eq!(five.slowest(), None);
         assert!(!format!("{newest:?}").contains("Ossifrage"));
+    }
+
+    fn set_modified(file: &Path, seconds: u64) {
+        fs::File::options()
+            .append(true)
+            .open(file)
+            .unwrap()
+            .set_times(
+                fs::FileTimes::new()
+                    .set_modified(SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(seconds)),
+            )
+            .unwrap();
+    }
+
+    /// The voice fills its segments in turn and empties one before filling
+    /// it again, beginning it with a new `service_segment` line. A segment
+    /// filled again past where the last read ended is read from its start,
+    /// and the half line left of the old one is not joined to it.
+    #[test]
+    fn a_segment_emptied_and_filled_again_is_read_from_its_start() {
+        let sessions = folder("refilled");
+        let metadata = sessions.join("s1/metadata");
+        fs::create_dir_all(&metadata).unwrap();
+        let file = metadata.join("events-0.jsonl");
+        append(
+            &file,
+            "{\"kind\":\"service_segment\",\"generation\":0}\n\
+             {\"kind\":\"answer_first_audio\",\"turn\":1,\"after_decision_ms\":900}\n\
+             {\"kind\":\"turn_finished\",\"turn\":1,",
+        );
+        let mut turns = Turns::default();
+        turns.read_on(&sessions);
+        assert_eq!(turns.newest()[0].after_decision_ms, Some(900));
+        // Emptied and filled again, longer than before.
+        fs::write(
+            &file,
+            "{\"kind\":\"service_segment\",\"generation\":4}\n\
+             {\"kind\":\"answer_first_audio\",\"turn\":7,\"after_decision_ms\":300}\n\
+             {\"kind\":\"answer_first_audio\",\"turn\":8,\"after_decision_ms\":400}\n\
+             {\"kind\":\"answer_first_audio\",\"turn\":9,\"after_decision_ms\":500}\n",
+        )
+        .unwrap();
+        turns.read_on(&sessions);
+        let newest = turns.newest();
+        let seven = newest.iter().find(|turn| turn.turn == 7);
+        assert_eq!(seven.and_then(|turn| turn.after_decision_ms), Some(300));
+        assert_eq!(newest[0].turn, 9);
+        assert!(
+            newest.iter().all(|turn| turn.outcome.is_none()),
+            "{newest:?}"
+        );
+        let _ = fs::remove_dir_all(&sessions);
+    }
+
+    /// Segments are read in the order they were written, not by name: what
+    /// held a turn's sound is its newest record's.
+    #[test]
+    fn segments_are_read_in_the_order_they_were_written() {
+        let sessions = folder("write-order");
+        let metadata = sessions.join("s1/metadata");
+        fs::create_dir_all(&metadata).unwrap();
+        let newer = metadata.join("events-0.jsonl");
+        let older = metadata.join("events-3.jsonl");
+        append(&older, "{\"kind\":\"floor_held\",\"turn\":3}\n");
+        append(&newer, "{\"kind\":\"answer_waits\",\"turn\":3}\n");
+        set_modified(&older, 1);
+        set_modified(&newer, 2);
+        let mut turns = Turns::default();
+        turns.read_on(&sessions);
+        assert_eq!(
+            turns.newest()[0].held.as_deref(),
+            Some("a sound waited for the answer")
+        );
+        let _ = fs::remove_dir_all(&sessions);
     }
 
     /// Read on from where the last read ended: only new lines, a line not
