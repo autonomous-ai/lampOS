@@ -150,7 +150,9 @@ pub struct Entry {
     /// When it ended: said, or held back.
     pub ended_at: Option<u64>,
     /// What the agent of the task it handed over did, as
-    /// [`Timeline::newest`] joins it by the task's number.
+    /// [`Timeline::newest`] joins it by the task's number. Inside the
+    /// timeline, the agent as it was when its task left the kept tasks, so
+    /// the turn still knows how its task ended.
     pub agent: Option<Agent>,
     /// The skill's `do.task` run it began (#7873), as [`Timeline::newest`]
     /// joins it ([`RUNS_A_SKILL`]).
@@ -175,6 +177,11 @@ impl Entry {
     /// Its newest decision: the latest of a request wins.
     pub fn decision(&self) -> Option<&VoiceDecision> {
         self.decisions().next_back()
+    }
+
+    /// The task its newest decision handed over.
+    pub fn task(&self) -> Option<u64> {
+        self.decision().and_then(|decision| decision.task)
     }
 
     /// ⚡: the newest decision's first reply, words heard to the answer's
@@ -245,11 +252,12 @@ impl Timeline {
             .rev()
             .map(|entry| {
                 let mut entry = entry.clone();
+                let kept = entry.agent.take();
                 entry.agent = entry
-                    .decision()
-                    .and_then(|decision| decision.task)
+                    .task()
                     .and_then(|task| self.tasks.get(&task))
-                    .cloned();
+                    .cloned()
+                    .or(kept);
                 entry.skill_run = self.run_begun_by(&entry);
                 entry
             })
@@ -335,14 +343,54 @@ impl Timeline {
         }
     }
 
-    /// The task's agent, within [`KEPT`] tasks: the lowest numbers go.
-    fn agent(&mut self, task: u64) -> &mut Agent {
+    /// Whether a kept turn handed `task` over.
+    fn claimed(&self, task: u64) -> bool {
+        self.entries.iter().any(|entry| entry.task() == Some(task))
+    }
+
+    /// The task's agent, within [`KEPT`] tasks. A task no kept turn handed
+    /// over goes first, the lowest number first; then the lowest number,
+    /// its agent kept with the turns that handed it over, so they still
+    /// know how it ended. Only `tasks/status` news of a task no turn
+    /// handed over (`listed`) is let go rather than push out one a turn
+    /// did. A task seen again takes back what its turn kept of it.
+    fn agent(&mut self, task: u64, listed: bool) -> Option<&mut Agent> {
         if !self.tasks.contains_key(&task) {
-            while self.tasks.len() >= KEPT {
-                self.tasks.pop_first();
+            let unclaimed = |timeline: &Self| {
+                timeline
+                    .tasks
+                    .keys()
+                    .copied()
+                    .find(|kept| !timeline.claimed(*kept))
+            };
+            if listed
+                && self.tasks.len() >= KEPT
+                && !self.claimed(task)
+                && unclaimed(self).is_none()
+            {
+                return None;
             }
+            while self.tasks.len() >= KEPT {
+                let Some(gone) = unclaimed(self).or_else(|| self.tasks.keys().next().copied())
+                else {
+                    break;
+                };
+                let agent = self.tasks.remove(&gone);
+                for entry in &mut self.entries {
+                    if entry.task() == Some(gone) {
+                        entry.agent.clone_from(&agent);
+                    }
+                }
+            }
+            let kept = self
+                .entries
+                .iter()
+                .rev()
+                .find(|entry| entry.task() == Some(task))
+                .and_then(|entry| entry.agent.clone());
+            self.tasks.insert(task, kept.unwrap_or_default());
         }
-        self.tasks.entry(task).or_default()
+        self.tasks.get_mut(&task)
     }
 
     /// A step of a task's agent: its words only with words on, each part
@@ -359,7 +407,9 @@ impl Timeline {
             step.args.clear();
             step.result.clear();
         }
-        let agent = self.agent(step.task);
+        let Some(agent) = self.agent(step.task, false) else {
+            return;
+        };
         match agent.steps.binary_search_by_key(&step.n, |kept| kept.n) {
             Ok(at) => agent.steps[at] = step,
             Err(at) if agent.steps.len() < MOST_STEPS => agent.steps.insert(at, step),
@@ -368,6 +418,23 @@ impl Timeline {
                 if agent.end.as_ref().is_none_or(|end| end.n <= step.n) {
                     agent.end = Some(step);
                 }
+            }
+        }
+    }
+
+    /// What `tasks/status` said at `at`, published once a second while the
+    /// tasks part runs: a task it lists is going, one it lets go has
+    /// settled.
+    pub fn task_status(&mut self, status: TaskStatus, at: u64) {
+        let going = status.tasks.iter().map(|progress| progress.task);
+        for task in going.chain(status.unread.iter().copied()) {
+            if let Some(agent) = self.agent(task, true) {
+                agent.seen_unix_ms = at;
+            }
+        }
+        for settled in status.settled {
+            if let Some(agent) = self.agent(settled.task, true) {
+                agent.settled = Some((settled.state, settled.at_unix_ms));
             }
         }
     }
@@ -405,16 +472,8 @@ impl Timeline {
                 self.step(step);
             }
         } else if topic == TaskStatus::TOPIC {
-            // Published once a second while the tasks part runs: a task it
-            // lists is going, one it lets go has settled.
             if let Ok(status) = message.parse::<TaskStatus>() {
-                let going = status.tasks.iter().map(|progress| progress.task);
-                for task in going.chain(status.unread.iter().copied()) {
-                    self.agent(task).seen_unix_ms = at;
-                }
-                for settled in status.settled {
-                    self.agent(settled.task).settled = Some((settled.state, settled.at_unix_ms));
-                }
+                self.task_status(status, at);
             }
         } else if topic == VoiceTurn::TOPIC {
             if let Ok(turn) = message.parse::<VoiceTurn>() {
@@ -479,7 +538,12 @@ impl Timeline {
                 self.entries.back_mut().expect("just pushed")
             }
         };
+        let task = entry.task();
         entry.steps.push((at, step));
+        if entry.task() != task {
+            // What it kept of another task's agent is not this one's.
+            entry.agent = None;
+        }
         if ends {
             entry.ended_at = Some(entry.ended_at.map_or(at, |ended| ended.max(at)));
         }
@@ -548,6 +612,88 @@ mod tests {
         timeline.add(1, 1_000, Step::Heard(None));
         timeline.add(1, 1_000 + TURN_LASTS_MS, Step::Heard(None));
         assert_eq!(timeline.newest().len(), 2);
+    }
+
+    fn settled(task: u64, at: u64) -> TaskStatus {
+        TaskStatus {
+            store_id: "0123456789abcdef0123456789abcdef".into(),
+            run: 1,
+            tasks: Vec::new(),
+            unread: Vec::new(),
+            settled: vec![lamp_msgs::TaskSettled {
+                task,
+                engine: "openclaw".into(),
+                state: AgentState::Idle,
+                settled: true,
+                at_unix_ms: at,
+            }],
+        }
+    }
+
+    /// A turn whose task settled keeps how it ended after the task leaves
+    /// the newest [`KEPT`] tasks, and tasks the tasks part lists that no
+    /// turn handed over never push out one a turn did.
+    #[test]
+    fn a_handed_turn_keeps_its_tasks_end_past_the_kept_tasks() {
+        let mut timeline = Timeline::new(false);
+        timeline.add(1, 1_000, Step::Heard(None));
+        timeline.add(
+            1,
+            1_100,
+            Step::Decided(VoiceDecision::handed(
+                1,
+                5,
+                Some("openclaw"),
+                lamp_msgs::HandStage::Started,
+            )),
+        );
+        timeline.add(1, 1_200, Step::Said(None));
+        timeline.task_status(settled(5, 9_000), 9_000);
+        // Tasks no turn handed over, listed by the tasks part: task 5
+        // stays.
+        for task in 100..100 + 2 * KEPT as u64 {
+            timeline.task_status(settled(task, 10_000), 10_000);
+        }
+        assert!(timeline.tasks.contains_key(&5));
+        let agent = timeline.newest()[0].agent.clone().expect("its agent");
+        assert_eq!(agent.settled, Some((AgentState::Idle, 9_000)));
+        // More turns' tasks than are kept, then an agent's steps of a task
+        // no kept turn handed over yet: task 5 goes, its turn keeps its end.
+        for request in 2..=KEPT as u64 {
+            let at = request * 2_000;
+            timeline.add(
+                request,
+                at,
+                Step::Decided(VoiceDecision::handed(
+                    request,
+                    request + 1_000,
+                    Some("openclaw"),
+                    lamp_msgs::HandStage::Started,
+                )),
+            );
+            timeline.task_status(settled(request + 1_000, at), at);
+        }
+        for task in 2_000..2_002 {
+            timeline.step(TaskStep {
+                task,
+                engine: "openclaw".into(),
+                n: 1,
+                at_unix_ms: 70_000,
+                kind: StepKind::Call,
+                tool: "look".into(),
+                args: String::new(),
+                result: String::new(),
+                ok: None,
+            });
+        }
+        assert!(!timeline.tasks.contains_key(&5));
+        let first = timeline
+            .newest()
+            .into_iter()
+            .find(|entry| entry.request == 1);
+        let agent = first.and_then(|entry| entry.agent).expect("its kept agent");
+        assert!(agent.ended());
+        assert_eq!(agent.ended_at(), Some(9_000));
     }
 
     #[test]

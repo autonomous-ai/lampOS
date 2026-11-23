@@ -174,8 +174,12 @@ lamp-peek, as the rest of the timeline.
   show, by number (`timeline::MOST_STEPS`); later calls are counted ("9
   more"), and a later reply or error is kept as the task's end and shown
   after them, so the card's status and ⏱ still know how it ended. A call
-  that says it failed (`ok: false`) is marked ✗. The newest 30 tasks are
-  kept, in memory only.
+  that says it failed (`ok: false`) is marked ✗. 30 tasks are kept, in
+  memory only: a task no kept turn handed over goes first, and
+  `tasks/status` news of such a task is let go rather than push out one a
+  turn handed over. A turn's task that still has to go leaves its agent
+  with the turn, so the card keeps its steps, how it ended and when (DONE,
+  not ACTIVE then STALE).
 - **Settled** and **going**, `tasks/status` (once a second while the tasks
   part runs): a task in its `settled` list keeps its state and time
   (`failed` reads ERROR, `needs_input` NEEDS INPUT, `stopped` STOPPED,
@@ -733,7 +737,8 @@ own, and asks for it over HTTP:
   - `timeline::tests`: the newest 30 kept; what the lamp did goes to the
     turn that holds its time, and not before it, after it ended or after a
     held-back verdict; a number seen again 60 s later is another turn;
-    words cut to 300 characters.
+    words cut to 300 characters; a handed turn keeps its task's end past
+    the kept tasks, and tasks no turn handed over never push its task out.
   - #7267, on a real bus with a weather turn, a turn handed to OpenClaw
     whose task's steps come out of order and end in a reply, a turn with no
     decision, a steered follow-up, an error, a task of 59 calls ending in
