@@ -217,6 +217,8 @@ struct Runs {
     error: &'static str,
     /// The gateway's `MainPID`: `""` or `"0"` when none runs.
     main_pid: &'static str,
+    /// How many of the next `ss` looks find the gateway not listening.
+    not_listening: RefCell<u32>,
 }
 
 impl Runs {
@@ -229,6 +231,7 @@ impl Runs {
             fail_on: None,
             error: "refused",
             main_pid: "",
+            not_listening: RefCell::new(0),
         }
     }
     fn runner(&self) -> impl FnMut(&[String]) -> Result<String, String> + '_ {
@@ -251,6 +254,14 @@ impl Runs {
                     /dev/mmcblk0p2 60000000 1000 20000000 3% /\n"
                         .to_owned(),
                 )
+            } else if argv[0] == "ss" {
+                // The gateway listening, unless a test says otherwise.
+                let mut quiet = self.not_listening.borrow_mut();
+                if *quiet > 0 {
+                    *quiet -= 1;
+                    return Ok(String::new());
+                }
+                Ok(format!("LISTEN 0 511 127.0.0.1:{PORT} 0.0.0.0:*\n"))
             } else if argv[0] == "install" && argv[1] == "-d" {
                 fs::create_dir_all(on(&self.root, argv.last().unwrap())).unwrap();
                 Ok(String::new())
@@ -2753,7 +2764,8 @@ fn the_one_path_lets_agent_main_run_the_launcher_alone() {
     assert!(
         made < restart
             && runs.position("systemctl try-restart lamp-tasks.service") < restart
-            && restart < runs.position(&format!("systemctl is-active --quiet {UNIT}"))
+            // The allow-list's look (#8324: `settled` looks before it too).
+            && runs.lines()[restart..].contains(&format!("systemctl is-active --quiet {UNIT}"))
             && restart < runs.position(" approvals allowlist add ")
     );
     assert!(
@@ -3763,6 +3775,58 @@ fn a_gateway_unit_loaded_as_written_is_left_alone() {
     assert_eq!(systemd.shown, 1, "checked once");
     assert!(systemd.asked.is_empty(), "{:?}", systemd.asked);
     assert!(not_loaded(&said).is_empty(), "{said:?}");
+}
+
+/// #8324 (lamp-52e6, gate G): the install's restart of a gateway still in
+/// its first start (running, not listening on its port yet, as just
+/// restarted by lamp-control's restart through `PartOf=` or a round's
+/// try-restart) waits until it listens, so its stop is not the ~80 s drain
+/// that was SIGKILLed; a listening one is restarted at once.
+#[test]
+fn the_install_restarts_a_gateway_in_its_first_start_only_once_it_listens() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    round(&lamp, &mut systemd, true, 10);
+    let runs = Runs::new(&lamp);
+    *runs.not_listening.borrow_mut() = 3;
+    assert_eq!(install(&lamp, &runs, 20).unwrap().install, "installed");
+    let lines = runs.lines();
+    let looks: Vec<usize> = lines
+        .iter()
+        .enumerate()
+        .filter(|(_, line)| line.starts_with("ss -Hltn"))
+        .map(|(at, _)| at)
+        .collect();
+    let restart = runs.position(&format!("systemctl restart {UNIT}"));
+    assert_eq!(
+        looks.len(),
+        4,
+        "3 not listening, then listening: {lines:#?}"
+    );
+    assert!(looks.iter().all(|&at| at < restart), "{lines:#?}");
+    assert_eq!(
+        lines
+            .iter()
+            .filter(|line| line.starts_with("systemctl restart"))
+            .count(),
+        1
+    );
+
+    // Listening already: one look, the restart at once.
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    round(&lamp, &mut systemd, true, 10);
+    let runs = Runs::new(&lamp);
+    install(&lamp, &runs, 20).unwrap();
+    let lines = runs.lines();
+    assert_eq!(
+        lines
+            .iter()
+            .filter(|line| line.starts_with("ss -Hltn"))
+            .count(),
+        1
+    );
 }
 
 /// #8105: lamp-tasks' answer read, and the rule: the switch off is always
