@@ -1,2 +1,3 @@
 1763849990.000000 lamp lamp-skills[1]: lamp-skills: desk-hello Triggered: the model called desk_hello with {}
 1763850001.000000 lamp lamp-skills[1]: lamp-skills: skill:desk-hello: do.task: lamp-tasks' answer carries 20 bytes of its agent's answer
+1763849990.000000 openclaw: 2026-11-23T00:00:00.000+07:00 [gateway] ready

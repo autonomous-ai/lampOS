@@ -4,7 +4,7 @@
 # product's own (see ../RUN-8237.md "Journal lines"). Each leg: CHECK lines, then LEG <x> PASS|FAIL|VOID.
 #   row.sh [legs]   default: P G A W  -> logs/row.txt, last line VERDICT PASS|FAIL|VOID
 set -u; D=$(cd "$(dirname "$0")" && pwd); . $D/kit.sh; L=$D/logs; O=$L/row.txt; : > $O
-POLL=${POLL:-1}; GWAIT=${GWAIT:-300}; WWAIT=${WWAIT:-120}; YESAFTER=${YESAFTER:-2}; YESWAIT=${YESWAIT:-180}; SETTLE=${SETTLE:-15}; RUNAFTER=${RUNAFTER:-12}
+GWREADY="[gateway] ready"; POLL=${POLL:-1}; GWAIT=${GWAIT:-300}; WWAIT=${WWAIT:-300}; WARMWAIT=${WARMWAIT:-300}; YESAFTER=${YESAFTER:-2}; YESWAIT=${YESWAIT:-180}; SETTLE=${SETTLE:-15}; RUNAFTER=${RUNAFTER:-12}
 o(){ echo "$*" | tee -a $O; }
 # RUN, played again once when the lamp called no skill within RUNHEARD s (a room's own talk can swallow a clip:
 # lamp-voice "its final words came back empty", #6840). Returns 1 when neither was heard: the leg is VOID, never FAIL.
@@ -92,7 +92,9 @@ PY
    v=$(grep '^LEG A ' $O | tail -1 | awk '{print $3}'); echo "A=$v" >> $L/verdicts.env;;
 W) o "== W: warm gateway: nothing said"
    grep -q '^P=PASS' $L/verdicts.env || { leg W VOID "no P PASS"; continue; }
-   jstart w; PLAYRUN $L/w.journal || { jstop; leg W VOID "RUN not heard twice (no skill call)"; continue; }; got=0; waitfor "$ANS" $L/w.journal $WWAIT && got=1; sleep $SETTLE; jstop
+   # W is the warm gateway: after G's restart, wait for the gateway's "ready" line (run 4 on lamp-ee17: 158 s cold), else VOID.
+   jstart w; grep -qF -- "$GWREADY" $L/g.journal 2>/dev/null || waitfor "$GWREADY" $L/w.journal $WARMWAIT || { jstop; leg W VOID "the gateway was not ready within ${WARMWAIT} s after G"; continue; }
+   PLAYRUN $L/w.journal || { jstop; leg W VOID "RUN not heard twice (no skill call)"; continue; }; got=0; waitfor "$ANS" $L/w.journal $WWAIT && got=1; sleep $SETTLE; jstop
    nt=$(c "$TOLD_T" $L/w.journal); ns=$(c "$TOLD_S" $L/w.journal)
    o "CHECK (W1) lamp-tasks told nothing: $nt line(s)"; o "CHECK (W2) lamp-skills asked no line: $ns ask(s)"
    o "CHECK (W3) the run's answer was read: $([ $got = 1 ] && echo yes || echo no)"

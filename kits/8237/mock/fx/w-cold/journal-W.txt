@@ -1,0 +1,1 @@
+1763849990.000000 lamp lamp-skills[1]: lamp-skills: desk-hello Triggered: the model called desk_hello with {}

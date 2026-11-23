@@ -2,3 +2,4 @@
 1763850001.000000 lamp lamp-tasks[2]: [lamp-tasks] skill task: the agent's start-up wait passed 5 s: told getting ready
 1763850001.000000 lamp lamp-skills[1]: lamp-skills: skill:desk-hello: do.task: told the lamp is getting ready: say: dropped (cancelled)
 1763850001.000000 lamp lamp-skills[1]: lamp-skills: skill:desk-hello: do.task: lamp-tasks' answer carries 20 bytes of its agent's answer
+1763849990.000000 openclaw: 2026-11-23T00:00:00.000+07:00 [gateway] ready
