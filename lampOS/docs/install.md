@@ -2709,9 +2709,30 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      lamp-control: its unit has `ConditionPathExists=/var/lib/lampos-setup/done`;
      a failed start would also hit the unit's start limit and keep the gateway
      down after setup), so the socket is not shown, as before. Install/version
-     calls and the switch-off path do not wait. This only handles initial
-     startup: a later control socket replacement still needs a gateway restart
-     to replace its bind. The first round after this update rewrites the
+     calls and the switch-off path do not wait. The bind is of the socket
+     file, made once at the gateway's start, and each lamp-control start
+     makes a new one (its `RuntimeDirectory`), so the unit is also
+     `PartOf=lamp-control.service` (#8320): a lamp-control restart (a round's
+     switch, `lamp-setup restart`, the keeper, its own `Restart=on-failure`)
+     restarts the gateway, and a stop stops it until it is started again (a
+     round's `gateway_on`). The cost is the gateway's start, about 60 s, after
+     each lamp-control restart. As each of those starts spends one of the
+     gateway's `StartLimitBurst=5` per 600 s, lamp-control's unit gives it back
+     first (`ExecStartPost=-+… systemctl reset-failed
+     lamp-openclaw-gateway.service`, before the gateway's start, a missing
+     gateway no error), so a lamp-control crash loop doesn't leave the gateway
+     at `start-limit-hit` once lamp-control is up again. The round that ships
+     a new unit text restarts lamp-control (when it changed) before it writes
+     the gateway's unit, so a round that writes that unit anew with
+     `PartOf=` over one without it, with lamp-control's socket shown, also
+     try-restarts a running gateway once (#8320); a round finding the same
+     bytes, or writing over a unit that had `PartOf=` already (whose switch's
+     lamp-control restart restarted the gateway seconds ago, #8324), restarts
+     nothing more. The folder `/run/lampos-control` is not bound instead: it is
+     removed and made anew at each lamp-control start (no
+     `RuntimeDirectoryPreserve`), so a folder bind keeps the old one too, and
+     it holds `admin.sock` (the owner's side, 0600 `lampos`'s, which the
+     gateway, also `lampos`, could connect to). The first round after this update rewrites the
      namespace script and the unit and restarts the gateway once. It also shows the start socket folder
      `/run/lampos-skill-start` read-only (lamp-tasks makes its
      `start.sock` there; a socket still connects on a read-only mount;
