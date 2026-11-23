@@ -73,24 +73,38 @@ A) o "== A: one approvals read in flight, with back-off (sampled during G, logs/
    [ -s $L/g.reads ] || { leg A VOID "no G samples"; continue; }
    python3 -I - $L/g.reads <<'PY' | tee -a $O
 import sys
-seen, mx = {}, 0
+# One approvals read is a process tree: lamp-update's wrapper and OpenClaw's Node children, 2-3 pids seen together
+# (lamp-ee17, run 7, 23 Nov). A pid first seen while a read's pids are still there, within JOIN s of that read's
+# start, is that read's; any other is a new read. Two reads with pids in one sample are two in flight.
+JOIN, SLACK = 1.5, 0.6
+reads, mx = [], 0          # each read: [start, end, set of pids]
 for l in open(sys.argv[1]):
     f = l.split()
     if len(f) != 3 or f[0] != "READS": continue
-    t = float(f[1]); ps = [] if f[2] == "-" else f[2].split(",")
-    mx = max(mx, len(ps))
-    for p in ps: seen.setdefault(p, [t, t])[1] = t
-r = sorted(seen.values())
-gaps = [round(b[0] - a[1], 1) for a, b in zip(r, r[1:])]
-print("CHECK (A1) reads in flight at once, at most: %d (samples every 0.5 s)" % mx)
-print("CHECK (A2) reads seen: %d, gaps between them (s): %s" % (len(r), gaps or "-"))
-ok_gaps = all(g >= 2.4 for g in gaps) and all(g <= 16.5 for g in gaps)
-grow = all(b >= a - 1.0 or b >= 14.0 for a, b in zip(gaps, gaps[1:]))
-print("CHECK (A3) back-off: every gap 3-15 s (+-0.6 s sampling) and not shrinking: %s" % ("yes" if ok_gaps and grow else "no"))
-if not r: print("LEG A VOID (no approvals read seen during G)")
+    t = float(f[1]); ps = set() if f[2] == "-" else set(f[2].split(","))
+    live = [r for r in reads if r[2] & ps]
+    for p in ps:
+        if any(p in r[2] for r in live): continue
+        home = next((r for r in live if t - r[0] <= JOIN), None)
+        if home: home[2].add(p)
+        else:
+            r = [t, t, {p}]; reads.append(r); live.append(r)
+    for r in live: r[1] = t
+    mx = max(mx, len(live))
+reads.sort()
+gaps = [round(b[0] - a[1], 1) for a, b in zip(reads, reads[1:])]
+# #8237's back-off (its commit 1, gateway.rs READ_EVERY/READ_MOST): after a failed read none for 3 s, then 6, 12, at
+# most 15, from the read's end. A floor, not a window: the next read comes only when a run asks.
+floors = [min(3 * 2 ** i, 15) for i in range(len(gaps))]
+print("CHECK (A1) reads in flight at once, at most: %d (samples every 0.5 s; a read's wrapper and children are one read)" % mx)
+print("CHECK (A2) reads seen: %d, each %s s long, %s processes; gaps from one read's end to the next's start (s): %s" % (
+    len(reads), [round(r[1] - r[0], 1) for r in reads] or "-", [len(r[2]) for r in reads] or "-", gaps or "-"))
+ok = all(g >= f - SLACK for g, f in zip(gaps, floors))
+print("CHECK (A3) back-off: each gap at least its floor %s s (-%.1f s sampling): %s" % (floors or "-", SLACK, "yes" if ok else "no"))
+if not reads: print("LEG A VOID (no approvals read seen during G)")
 elif mx > 1: print("LEG A FAIL")
-elif len(r) == 1: print("LEG A PASS (one read only: the back-off was not needed)")
-elif ok_gaps and grow: print("LEG A PASS")
+elif len(reads) == 1: print("LEG A PASS (one read only: the back-off was not needed)")
+elif ok: print("LEG A PASS")
 else: print("LEG A FAIL")
 PY
    v=$(grep '^LEG A ' $O | tail -1 | awk '{print $3}'); echo "A=$v" >> $L/verdicts.env;;
