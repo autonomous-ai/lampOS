@@ -7,3 +7,4 @@ export { posesToFrames } from './moves.js';
 export { fake } from './fake.js';
 export * as schema from './schema.js';
 export { hardware, model } from './model.js';
+export { PRODUCTION, STAGING, StoreError, endpoints, forgetToken, keptToken, requestPublic, saveToken, sendLoginCode, signIn, submissions, submitApp } from './store.js';

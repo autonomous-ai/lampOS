@@ -10,6 +10,16 @@ it all with no lamp.
     lamp skill list [LAMP_ID]
     lamp skill remove NAME [LAMP_ID]
     lamp speaker FILE.wav|- [--rate 16000|24000] [LAMP_ID]
+    lamp login [--email EMAIL] [--code CODE] [--token TOKEN] | lamp logout
+    lamp app check FOLDER|TAR...
+    lamp app pack FOLDER [-o TAR]
+    lamp app submit FOLDER|TAR [--icon PNG] [--cover PNG] [--title T] [--description D] [--category SLUG]
+    lamp app status [ID]
+    lamp app request-public ID
+    lamp app studio [--port N] [--no-open]
+
+The Store commands take --staging, or --store URL and --account URL, to
+use another Store than production's.
 """
 
 from __future__ import annotations
@@ -19,6 +29,7 @@ import asyncio
 import json
 import sys
 import warnings
+from pathlib import Path
 
 from . import schema
 from .client import Lamp
@@ -174,6 +185,152 @@ async def _hello(args) -> int:
     return 0
 
 
+def _where(args):
+    from .store import endpoints
+
+    return endpoints(staging=args.staging, store=args.store, account=args.account)
+
+
+def _report_lines(report) -> None:
+    name = report.folder.name
+    for line in report.errors:
+        print(f"{name}: error: {line}")
+    for line in report.warnings:
+        print(f"{name}: warning: {line}")
+
+
+async def _app_check(args) -> int:
+    from .app import check
+
+    failed = 0
+    for path in args.paths:
+        report = check(path)
+        _report_lines(report)
+        if report.ok:
+            print(f"{report.folder.name}: ok, an app (format 2)")
+        else:
+            failed += 1
+    return 1 if failed else 0
+
+
+async def _app_pack(args) -> int:
+    from .app import pack
+
+    package = pack(args.folder)
+    out = Path(args.output or f"{package.name}-{package.version}.tar")
+    out.write_bytes(package.data)
+    print(f"{out}: {package.name} {package.version}, {len(package.data)} bytes, sha256 {package.sha256} (unsigned: the Store signs it at approval)")
+    return 0
+
+
+def _package_for_upload(path: str):
+    """The bytes to upload and their file name: a folder packed, a tar as
+    it is; either refused here, before anything is sent, if the check
+    refuses it."""
+    from .app import check, pack
+
+    report = check(path)
+    _report_lines(report)
+    if not report.ok:
+        print(f"lamp: {report.folder.name}: refused by the check, so nothing was sent", file=sys.stderr)
+        return None
+    if Path(path).is_dir():
+        package = pack(path)
+        return package.data, f"{package.name}-{package.version}.tar"
+    return Path(path).read_bytes(), Path(path).name
+
+
+async def _app_submit(args) -> int:
+    from .store import Store, describe
+
+    store = Store.signed_in(where=_where(args))
+    upload = _package_for_upload(args.path)
+    if upload is None:
+        return 1
+    data, filename = upload
+    art = {key: Path(value).read_bytes() for key, value in (("icon", args.icon), ("cover", args.cover)) if value}
+    app = store.submit(data, filename=filename, title=args.title, description=args.description, category=args.category, **art)
+    print(describe(app))
+    print("submitted: a reviewer reads it next; `lamp app status` follows the review")
+    return 0
+
+
+async def _app_status(args) -> int:
+    from .store import Store, describe
+
+    store = Store.signed_in(where=_where(args))
+    if args.id:
+        print(describe(store.app(args.id)))
+        return 0
+    apps, total = store.apps()
+    for app in apps:
+        print(describe(app))
+    if not apps:
+        print("no apps yet: `lamp app submit` sends one")
+    elif total > len(apps):
+        print(f"({len(apps)} of {total})")
+    return 0
+
+
+async def _app_request_public(args) -> int:
+    from .store import Store
+
+    Store.signed_in(where=_where(args)).request_public(args.id)
+    print(f"{args.id}: asked to go public; the reviewers decide, and `lamp app status` shows it")
+    return 0
+
+
+async def _app_studio(args) -> int:
+    from .studio import Studio
+
+    studio = Studio(_where(args), port=args.port)
+    print(f"the app studio is at {studio.url} (this computer only); Ctrl-C ends it", flush=True)
+    if not args.no_open:
+        import webbrowser
+
+        webbrowser.open(studio.url)
+    try:
+        await asyncio.to_thread(studio.serve_forever)
+    finally:
+        studio.close()
+    return 0
+
+
+async def _login(args) -> int:
+    from .store import Store, save_token
+
+    where = _where(args)
+    if args.token:
+        path = save_token(args.token, where, args.email)
+        print(f"kept the token for {where.account} in {path}")
+        return 0
+    email = args.email or input("Your Autonomous account's email: ").strip()
+    store = Store(where=where)
+    if not args.code:
+        store.send_code(email)
+        print(f"a sign-in code is on its way to {email}")
+    code = args.code or input("The code from the email: ").strip()
+    token = store.sign_in(email, code)
+    path = save_token(token, where, email)
+    print(f"signed in as {email}; the token is kept in {path} (0600)")
+    return 0
+
+
+async def _logout(args) -> int:
+    from .store import forget_token
+
+    where = _where(args)
+    print(f"signed out of {where.account}" if forget_token(where) else f"no sign-in kept for {where.account}")
+    return 0
+
+
+def _store_options(command: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    command.add_argument("--staging", action="store_true", help="the staging Store and account, not production's")
+    command.add_argument("--store", help="the Store developer API's base URL (LAMP_STORE_URL)")
+    command.add_argument("--account", help="the account sign-in's base URL (LAMP_ACCOUNT_URL)")
+    return command
+
+
 def parser() -> argparse.ArgumentParser:
     """Every `lamp` command and option (the README's reference names each)."""
     parser = argparse.ArgumentParser(prog="lamp", description="lampOS control, v1")
@@ -226,6 +383,39 @@ def parser() -> argparse.ArgumentParser:
     speaker.add_argument("lamp", nargs="?")
     speaker.add_argument("--rate", type=int, choices=(16_000, 24_000), default=None, help="stdin's sample rate (16000)")
     speaker.set_defaults(run=_speaker)
+    login = _store_options(commands.add_parser("login", help="sign in to the Store with your Autonomous account's emailed code"))
+    login.add_argument("--email", help="the account's email (asked if left out)")
+    login.add_argument("--code", help="the emailed code, when you already have one (asked if left out)")
+    login.add_argument("--token", help="keep this account token instead of signing in (also LAMP_STORE_TOKEN)")
+    login.set_defaults(run=_login)
+    _store_options(commands.add_parser("logout", help="forget the Store sign-in kept here")).set_defaults(run=_logout)
+    app = commands.add_parser("app", help="apps for the Store: check, pack, submit, status, request-public, studio")
+    app_commands = app.add_subparsers(dest="app_command", required=True)
+    app_check = app_commands.add_parser("check", help="check app folders or packed tars as the Store's reader does")
+    app_check.add_argument("paths", nargs="+", help="each an app's folder (with app.json) or a packed .tar")
+    app_check.set_defaults(run=_app_check)
+    app_pack = app_commands.add_parser("pack", help="pack an app's folder as the Store's unsigned tar")
+    app_pack.add_argument("folder")
+    app_pack.add_argument("-o", "--output", help="the tar's path (NAME-VERSION.tar)")
+    app_pack.set_defaults(run=_app_pack)
+    app_submit = _store_options(app_commands.add_parser("submit", help="check, then upload an app for review (hidden until approved)"))
+    app_submit.add_argument("path", help="an app's folder (packed for you) or a packed .tar")
+    app_submit.add_argument("--icon", help="a PNG, exactly 1024x1024, 2 MB at most")
+    app_submit.add_argument("--cover", help="a PNG, exactly 1600x900, 2 MB at most")
+    app_submit.add_argument("--title", help="the Store's title, 100 characters at most")
+    app_submit.add_argument("--description", help="plain text, 1000 characters at most")
+    app_submit.add_argument("--category", help="a Store category slug")
+    app_submit.set_defaults(run=_app_submit)
+    app_status = _store_options(app_commands.add_parser("status", help="your apps' reviews, or one's"))
+    app_status.add_argument("id", nargs="?")
+    app_status.set_defaults(run=_app_status)
+    app_public = _store_options(app_commands.add_parser("request-public", help="ask the reviewers to make an approved app public"))
+    app_public.add_argument("id")
+    app_public.set_defaults(run=_app_request_public)
+    app_studio = _store_options(app_commands.add_parser("studio", help="a page on this computer to check, submit and follow an app"))
+    app_studio.add_argument("--port", type=int, default=0, help="the port on 127.0.0.1 (any free one)")
+    app_studio.add_argument("--no-open", action="store_true", help="print the page's address, don't open a browser")
+    app_studio.set_defaults(run=_app_studio)
     return parser
 
 

@@ -405,6 +405,64 @@ the owner says yes in the app, and the answer says so. In code:
 computer goes; revoking the computer, or taking back `skills`, turns its
 skills off.
 
+## Publish your app
+
+**Staged:** built against the Store's developer API as Backend3 specified it on
+20 Nov ([#7415](https://github.com/autonomous-ai/lampOS/issues/7415#issuecomment-7035102128)),
+live on production and checked there end to end on staging; this SDK has been
+run only against a fake Store so far. An app (format 2,
+[docs/apps.md](../../docs/apps.md)) goes to the Skills Store; a skill
+(format 1) goes on through the lamp (`lamp skill push`). Uploads are hidden
+until a reviewer approves them, and public only after a separate ask.
+
+An app's folder holds `app.json` (the manifest without `format`, `kind` and
+`files`), `src/` (its Python), `assets/` (WAV clips) and `skills/` (its
+companion skills). `name` defaults to the folder's; `skills` and `assets` to
+what is there.
+
+```sh
+lamp app check gym-coach            # as the Store's reader checks it, less the signature
+lamp app pack gym-coach             # gym-coach-1.0.0.tar, unsigned: the Store signs it at approval
+lamp login                          # your Autonomous account: an emailed code, never a password
+lamp app submit gym-coach --icon icon.png --cover cover.png --title "Gym coach" --category health
+lamp app status                     # pending, approved or rejected, with the reviewer's note
+lamp app request-public 42          # only for an approved app; the reviewers decide
+lamp app studio                     # the same, as a page on this computer
+```
+
+- **Sign-in:** `lamp login` asks the email, has the account send a code, and
+  asks the code. The token is kept in `~/.config/lampos/store.json`
+  (`$LAMPOS_HOME`), 0600, one per account host, so a staging token never
+  goes to production; codes are rate-limited, so it is kept rather than asked
+  each time. `LAMP_STORE_TOKEN` (or `lamp login --token`) gives one instead.
+  `lamp logout` forgets it.
+- **Submit** runs `lamp app check` first: a package it refuses, an icon not
+  exactly 1024x1024 PNG, a cover not 1600x900, art over 2 MB, a title over
+  100 or a description over 1000 characters is refused here, before anything
+  is sent. A folder is packed for you; a `.tar` goes as it is. The same bytes
+  again answer the same app.
+- **The Store's refusals** are said with what to do: `lampos_package_invalid`
+  with the Store's own reason; `skill_name_exists` (the name is another
+  account's); `developer_app_only` (a skill); `authentication_error` and
+  `device_key_refused` (sign in again); `app_not_found`, `app_not_approved`,
+  `app_already_public`; and the day's limits per account,
+  `developer_daily_limit` (10 accepted uploads), `developer_attempt_limit`
+  (30 attempts), `developer_public_limit` (3 public asks).
+- **The studio** serves one page on 127.0.0.1, under a random path: drop the
+  tar and art in, fill in the listing, read the check, sign in, submit and
+  follow the review. It calls the Store through `lamp`, so the token never
+  reaches the browser, and it answers no other site's page.
+- **Another Store:** `--staging` for the staging Store and account, or
+  `--store URL` and `--account URL` (`LAMP_STORE_URL`, `LAMP_ACCOUNT_URL`).
+  Every host, path and error code is in `lampos/store.py`'s constants.
+
+In code: `lampos.app.check(path)`, `lampos.app.pack(folder)`, and
+`lampos.store.Store`: `send_code(email)`, `sign_in(email, code)`,
+`submit(tar_bytes, icon=, cover=, title=, description=, category=)`,
+`apps()`, `app(id)`, `request_public(id)`; `Store.signed_in()` uses the kept
+token. A refusal is a `StoreError` (a `LampError`) with the Store's
+`error_code` as `code`.
+
 ## Everything you can read
 
 What the lamp tells a paired computer, read from lamp-control's `watch.rs`,
@@ -652,6 +710,18 @@ and send it again. Without `retry_ms`, it is a held part, as above.
 | `lamp skill list [LAMP_ID]` | this computer's own pushed skills |
 | `lamp skill remove NAME [LAMP_ID]` | takes one of them off the lamp |
 | `lamp skill check FOLDER...` | each a skill folder (`SKILL.md` and `skill.toml`), checked against the skill format |
+| `lamp login [--email EMAIL] [--code CODE] [--token TOKEN]` | signs in to the Store with your Autonomous account's emailed code ("Publish your app"): `--email` and `--code` are asked if left out; `--token` keeps a token instead. Never a password |
+| `lamp logout` | forgets the sign-in kept for that Store |
+| `lamp app check FOLDER\|TAR...` | each an app's folder (with `app.json`) or a packed `.tar`, checked as the Store's reader checks it, less the signature |
+| `lamp app pack FOLDER [-o TAR]` | the Store's unsigned tar; `-o`/`--output` names it (`NAME-VERSION.tar`) |
+| `lamp app submit FOLDER\|TAR [--icon PNG] [--cover PNG] [--title T] [--description D] [--category SLUG]` | checks it, then uploads it for review, hidden until approved. `--icon`: PNG, 1024x1024; `--cover`: PNG, 1600x900; each 2 MB at most. `--title` up to 100, `--description` up to 1000 characters |
+| `lamp app status [ID]` | your apps, or one: `review_status`, the reviewer's note, visibility |
+| `lamp app request-public ID` | asks the reviewers to make an approved app public |
+| `lamp app studio [--port N] [--no-open]` | the publishing page, on 127.0.0.1 only; `--port` (any free one), `--no-open` prints its address without opening a browser |
+
+The Store commands (`login`, `logout`, `app submit`, `app status`,
+`app request-public`, `app studio`) take `--staging`, or `--store URL` and
+`--account URL`, for another Store than production's.
 
 `LAMPOS_HOME` sets where the key and pairings are kept, for every command.
 `LAMPOS_LOG=debug` prints every frame to and from the lamp on stderr, secrets
