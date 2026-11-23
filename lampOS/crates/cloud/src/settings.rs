@@ -1516,7 +1516,7 @@ mod tests {
         let reply = changes.take()[0].reply(&identity, "t");
         assert_eq!(
             reply["error"],
-            "service must be deepseek, deepgram, elevenlabs, openai_compatible or openrouter"
+            "service must be deepseek, deepgram, elevenlabs, openai_compatible, openrouter or gemini"
         );
         assert_eq!(
             reply["data"],
@@ -1610,6 +1610,28 @@ mod tests {
                 .unwrap()
                 .0,
             r#"{"remove":"openrouter"}"#
+        );
+    }
+
+    /// #8420: a Gemini key goes to the helper with its model, as
+    /// OpenRouter's does; the helper alone decides what Gemini takes.
+    #[test]
+    fn a_gemini_key_goes_to_the_helper_with_its_model() {
+        let (line, id) = keys_line(
+            "keys.set",
+            &json!({"service": "gemini", "key": "AIza-planted-8420", "model": "gemini-2.5-flash", "request_id": "g1"}),
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&line).unwrap(),
+            json!({"set": "gemini", "key": "AIza-planted-8420", "model": "gemini-2.5-flash"})
+        );
+        assert_eq!(id.as_deref(), Some("g1"));
+        assert_eq!(
+            keys_line("keys.remove", &json!({"service": "gemini"}))
+                .unwrap()
+                .0,
+            r#"{"remove":"gemini"}"#
         );
     }
 

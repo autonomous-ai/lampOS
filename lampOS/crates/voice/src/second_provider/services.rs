@@ -1833,6 +1833,120 @@ pub(crate) mod tests {
         let _ = std::fs::remove_dir_all(&units);
     }
 
+    /// The person's own Gemini key and model, as `with_own_keys` reads them
+    /// from the keys' folder `name`, over [`config_at`]'s relay.
+    fn own_gemini(name: &str, relay: &str) -> SecondConfig {
+        use std::os::unix::fs::PermissionsExt;
+        let config = config_at(name, "relay-key-8420", relay, relay);
+        let units =
+            std::env::temp_dir().join(format!("lamp-voice-{name}-units-{}", std::process::id()));
+        std::fs::create_dir_all(&units).unwrap();
+        for (file, text) in [
+            ("own_gemini.key", "AIza-own-8420"),
+            ("own_gemini.model", "gemini-2.5-flash"),
+        ] {
+            std::fs::write(units.join(file), text).unwrap();
+            std::fs::set_permissions(units.join(file), std::fs::Permissions::from_mode(0o600))
+                .unwrap();
+        }
+        let (config, _) = config.with_own_keys(true, Some(units.as_os_str()));
+        let _ = std::fs::remove_dir_all(&units);
+        config
+    }
+
+    /// #8420: the person's own Gemini model is asked as Gemini's chat, at
+    /// Google's OpenAI-compatible endpoint with their key and model, with
+    /// the lamp's Gemini reasoning floor (`reasoning_effort: minimal`). A
+    /// 2.5-series model may refuse that floor: this pins the body the row
+    /// with the person's own model plays.
+    #[test]
+    fn the_persons_gemini_model_is_asked_as_geminis_chat() {
+        let config = own_gemini("own-gemini-body", "http://127.0.0.1:9");
+        let key = crate::second_provider::worker::deepseek_key(&config, None).unwrap();
+        assert_eq!(key.expose(), "AIza-own-8420");
+        let net = Net::new(config, Arc::new(Vec::new))
+            .unwrap()
+            .chatting_with_deepseek(key.expose())
+            .unwrap();
+        let (url, auth, body) = net.chat.wire(&[Message::user("What time is it?")]);
+        assert_eq!(
+            url,
+            "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        );
+        assert_eq!(auth, "Bearer AIza-own-8420");
+        assert_eq!(body["model"], "gemini-2.5-flash");
+        assert_eq!(body["reasoning_effort"], "minimal");
+        for field in ["provider", "reasoning", "plugins", "thinking"] {
+            assert!(body.get(field).is_none(), "{field}: {body}");
+        }
+    }
+
+    /// #8420: Gemini refuses a bad key with a 400, not a 401. The person's
+    /// own Gemini key refused so (the body seen live on 24 Nov, "Please pass
+    /// a valid API key", or the native API's `API_KEY_INVALID`) sends the
+    /// request to the lamp's own model at the relay, told as a refusal; any
+    /// other 400 stays the request's own, with no fallback.
+    #[tokio::test]
+    async fn the_persons_gemini_key_refused_by_its_400_falls_back_and_a_plain_400_does_not() {
+        const REFUSED: &str =
+            "HTTP/1.1 400 Bad Request\r\ncontent-type: application/json\r\nconnection: close\r\n\r\n";
+        for (name, body, falls) in [
+            (
+                "live",
+                r#"[{"error":{"code":400,"message":"Please pass a valid API key","status":"INVALID_ARGUMENT"}}]"#,
+                true,
+            ),
+            (
+                "native",
+                r#"{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID"}]}}"#,
+                true,
+            ),
+            (
+                "plain",
+                r#"[{"error":{"code":400,"message":"Invalid JSON payload received.","status":"INVALID_ARGUMENT"}}]"#,
+                false,
+            ),
+        ] {
+            let own = stub(
+                "AIza-own-8420",
+                vec![(CHAT, Some((REFUSED, body.as_bytes().to_vec())))],
+            )
+            .await;
+            let relay = stub("relay-key-8420", vec![(CHAT, answered("lamp's own"))]).await;
+            let mut config = own_gemini(&format!("own-gemini-400-{name}"), &relay.url);
+            config.hosted.deepseek_base_url = Some(format!("{}/v1beta", own.url));
+            let told = Arc::new(Mutex::new(Vec::new()));
+            let telling = told.clone();
+            let net = Net::new(config, Arc::new(Vec::new))
+                .unwrap()
+                .chatting_with_deepseek("AIza-own-8420")
+                .unwrap()
+                .falling_back_to_the_relay(
+                    &relay.url,
+                    Arc::new(move |status| telling.lock().unwrap().push(status)),
+                )
+                .unwrap();
+            let events: Vec<_> = net.chat(vec![Message::user("hello")]).collect().await;
+            assert_eq!(own.asked("/v1beta/openai/chat/completions"), 1, "{name}");
+            if falls {
+                let words: String = events
+                    .into_iter()
+                    .filter_map(|event| match event {
+                        Ok(ChatEvent::Text(text)) => Some(text),
+                        _ => None,
+                    })
+                    .collect();
+                assert_eq!(words, "lamp's own", "{name}");
+                assert_eq!(relay.asked(CHAT), 1, "{name}");
+                assert_eq!(*told.lock().unwrap(), [400], "{name}");
+            } else {
+                assert_eq!(events, [Err(net::Error::Status(400))], "{name}");
+                assert_eq!(relay.asked(CHAT), 0, "{name}");
+                assert!(told.lock().unwrap().is_empty(), "{name}");
+            }
+        }
+    }
+
     pub(crate) fn config_at(name: &str, key: &str, relay: &str, listening: &str) -> SecondConfig {
         use std::os::unix::fs::PermissionsExt;
         let directory =
