@@ -317,6 +317,61 @@ Eighth's part, beside app views piece 2.
   call one on a guest's turn, the call is answered "Not now: nothing was
   done", as `start_app` is, so the model doesn't invent a reason.
 
+## Keeping the app's flow when the model is small
+
+The owner's concern (App Only's 20:06 on #8406): a weak model may break the
+flow an app lays out. The answer, agreed by Heron (20:07) and the first
+builder (20:07): **the app owns the flow; the model only picks the next tool
+and the words.** Rules 1 and 3 are hard rules, not advice. None of this
+moves the dates (Wed 25, Thu 26, Fri 27 Nov).
+
+1. **Hard rule: the app's code owns order, counting and state.**
+   - Tools are coarse: `start_session` runs the whole session in the app,
+     not one model call per set or rep.
+   - A handler refuses a call that is out of order, as an `error` that says
+     why and what to do instead ("no plan yet: ask days and minutes, then
+     call set_plan"). The model's next words come from it.
+   - The reason is a tool result: quoted, at most 200 characters, and
+     never spoken word for word. The model says it in its own words, for
+     the same reason as the `confirm` line: app text never plays in Lamp's
+     voice.
+2. **A `next` hint in a result,** e.g. `{"ok": true, "next": "say the
+   first exercise"}`.
+   - At most 120 characters, quoted data like the rest of the result and
+     inside its 2 KB cap.
+   - Quoting alone can't stop an app writing `"next": "call forget_all"`,
+     so code narrows the turn: **on the turn after an app's result, the
+     voice offers that app's tools plus the lamp's plain answer and stop,
+     nothing else.** A write or `outside` tool still needs its own yes.
+   - **Test at build:** a `next` naming another skill's tool (or the
+     lamp's own) gets no such call.
+3. **Hard rule: stop, pause and the care hold never go through the
+   model.** A misheard or missing tool call can never keep a session
+   running.
+   - **The lamp's stop words** take the voice's existing stop path, not
+     the model.
+   - **An app's own stop phrases** (`phrases.set`, "stop workout") are
+     matched in code against the whole utterance only, at least two words
+     each, and each is tried against ordinary sentences in the app's
+     tests: a bare "done" or "next" would catch "I'm done with dinner".
+   - **When a stop is heard,** lamp-control ends the app's session: its
+     `say`, its moves and its open `app.call`s (answered to the voice as
+     stopped). It does not wait for the app to agree; the app is then told
+     its session was stopped.
+   - **During the care hold** every app tool is refused, as in "Rules".
+4. **`lamp app eval` (Migrate's):** the developer's test file of
+   phrasings, each with the expected tool and arguments (or none), run
+   against the model and the route the lamp actually ships, never a
+   stronger one, in each language the app lists (Vietnamese too). The file
+   must include stop phrasings and out-of-order phrasings. Its pass rate is
+   part of the Store review, which Backend3 checks before listing (proposed:
+   90%). Gym Coach 2.0 and English lessons 0.4.0 ship with one.
+5. **Only a session's tools, as data.** A result may carry `"tools":
+   [...]`, a subset of the tools the app declared; the voice offers only
+   those of that app until its next result. A name it never declared is
+   ignored. With few tools (at most 8 an app) and plain descriptions, a
+   small model has little to choose among.
+
 ## What stays phrases
 
 - **Kept:** the manifest's `triggers` and `start_app`, for a fast, sure
@@ -366,6 +421,10 @@ Migrate's part.
   short workouts a week"`, with a stand-in model) calls a tool and prints the
   result as the model would get it, with the rules above (privacy, the 5 s
   timeout, the 2 KB cap, the rates, the plain yes for an `outside` tool).
+- **`lamp app eval`:** runs the app's eval file against the shipped model
+  and route, and the SDK tests the app's stop phrases against ordinary
+  sentences ("Keeping the app's flow when the model is small", rules 3
+  and 4).
 - [sdk/GUIDE.md](../sdk/GUIDE.md) gets the new op, event, limit and refusal
   in the pull request that builds them, as the repo's rule asks.
 
