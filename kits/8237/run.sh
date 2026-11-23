@@ -1,11 +1,11 @@
 #!/bin/bash
 # Mac. #8237 ROW on one OpenClaw lamp from stable (settings: row/kit.sh; the runner's env file: KIT_ENV).
-#   ./run.sh [from-step [then-step]]   steps: lock render put check push legs unpush putback release
+#   ./run.sh [from-step [then-step]]   steps: lock render put check push queue legs unpush putback release
 #   UNTIL=<step> stops before that step. On ANY exit after PUT OK with no PUTBACK OK, the EXIT trap runs putback
 #   once (lock renewed and start budget checked first); the lock is kept until release.
 set -u; K=$(cd "$(dirname "$0")" && pwd); D=$K/row; . $D/kit.sh
 L=$D/logs; mkdir -p $L
-STEPS="lock render put check push legs unpush putback release"
+STEPS="lock render put check push queue legs unpush putback release"
 FROM=${1:-lock}; THEN=${2:-}
 for x in $FROM $THEN; do case " $STEPS " in *" $x "*) ;; *) echo "no step '$x' (steps: $STEPS)"; exit 2;; esac; done
 T(){ echo "$(date '+%T') $*" | tee -a $L/times.log; }
@@ -41,6 +41,8 @@ for st in $STEPS; do
            LAMP "PR_SKILLS_SHA=$PR_SKILLS_SHA PR_TASKS_SHA=$PR_TASKS_SHA" $D/put.lamp.sh > $L/put.txt 2>&1; cat $L/put.txt; need put '^PUT OK';;
   check)   LAMP "" $D/check.lamp.sh > $L/check.txt 2>&1; cat $L/check.txt; need check '^READY$';;
   push)    ${PUSHCMD:-python3 $D/push.py} push $D/fixtures/$SKILL ${LAMP_PAIRED:-} 2>&1 | tail -1 | tee $L/push.txt; need push '^PUSHED ';;
+  queue)   # A kept session lamp-tasks can't close queues every skill run: closed by Harness's own close --now (row/queue.lamp.sh).
+           sleep ${QUEUE_WAIT:-20}; LAMP "" $D/queue.lamp.sh > $L/queue.txt 2>&1; cat $L/queue.txt; need queue '^QUEUE (CLEAR|CLOSED)';;
   legs)    VOLOK || exit 2; bash $D/row.sh ${LEGS:-P G A W}; T "legs: $(grep '^VERDICT' $L/row.txt | cut -c1-90)";;
   unpush)  if grep -q '^PUSHED ' $L/push.txt 2>/dev/null; then ${PUSHCMD:-python3 $D/push.py} remove $SKILL ${LAMP_PAIRED:-} 2>&1 | tail -1 | tee $L/unpush.txt; need unpush '^REMOVED '
            else echo "REMOVED nothing pushed" | tee $L/unpush.txt; fi;;
