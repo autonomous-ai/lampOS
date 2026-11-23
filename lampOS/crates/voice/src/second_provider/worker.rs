@@ -29271,7 +29271,9 @@ mod tests {
             heeding.telling_the_name(true, false);
             heeding.attention.tie_the_second_sign(true);
             heeding.attention.need_a_face_or_words(on);
-            heeding.attention.near_not_the_name(19);
+            // Ruled under `attention::SURE_SCORE`: a sure start alone is
+            // #8119's, with its room and face rule.
+            heeding.attention.near_not_the_name(19, 0.99);
             let names = vec![(line.0 + 891_000, score)];
             heeding.heed_signs(
                 19,
