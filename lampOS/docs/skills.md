@@ -100,7 +100,10 @@ celebrating has begun for that yes ([seen.md](seen.md)), so nothing
 reaches them before the person heard it. The yes taken back, or a forget
 (which removes the file), takes it away at once, as a `seen_more` yes
 taken back does. Each keeps its own off and the shared `seen_remarks`
-stop. Any other skill, an installable or pushed one of those names
+stop, which stops only the spoken remarks and names `stop_looking_at_my_desk`
+for the looking itself; a "stop looking at my desk" sent to it as a snooze
+or off is that stop instead (#8404, [onboarding.md](onboarding.md), "Taken
+back by voice"). Any other skill, an installable or pushed one of those names
 included, still needs its own `seen_more` yes; nothing new is written or
 leaves the lamp (tests `the_desk_noticing_yes_covers_the_four_with_no_seen_more_line`,
 `a_skill_not_among_the_four_still_needs_its_own_seen_more_yes`).

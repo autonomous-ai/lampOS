@@ -82,7 +82,7 @@ drops_kept = true
 tool = "seen_remarks"
 group = "seen-remarks"
 about = "Remarks: snooze, off or on."
-when = "To snooze, stop or restart its remarks on what it sees."
+when = "Its remarks only; the looking: stop_looking_at_my_desk."
 
 [ask]
 policy = "nudge"

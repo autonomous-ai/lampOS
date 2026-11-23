@@ -2042,8 +2042,24 @@ fn run_spoken_call_inner(
         (crate::skill_about::WHOM, ToolAnswer::plain(told), true)
     } else if let Route::UseSkill(settings) = route {
         let skills = skill_tools(settings);
-        match crate::use_skill::translate(call, crate::use_skill::offered(&skills)) {
-            Ok(skill) => match self::route(settings, &skill.name) {
+        let translated = crate::use_skill::translate(call, crate::use_skill::offered(&skills));
+        // "Stop looking at my desk" sent as the remarks' off (#8404).
+        let stop = translated
+            .as_ref()
+            .ok()
+            .and_then(|skill| desk_stop_as_heard(settings, skill, request, heard));
+        match (translated, stop) {
+            (_, Some(stop)) => {
+                let (whom, (told, answered)) = run_call_with_scope(
+                    &self::route(settings, &stop.name),
+                    &stop,
+                    request,
+                    heard,
+                    lease,
+                );
+                (whom, ToolAnswer::plain(told), answered)
+            }
+            (Ok(skill), None) => match self::route(settings, &skill.name) {
                 found @ Route::Executive(_) if is_skills(settings, &found) => {
                     let (whom, mut answer, answered) = run_spoken_call_inner(
                         settings, &found, &skill, request, heard, context, lease,
@@ -2057,7 +2073,7 @@ fn run_spoken_call_inner(
             },
             // A made skill turned off, named by `use_skill`, which names
             // none (`LAMP_MADE_SKILL_OFF_SAID`, #7562): its run now.
-            Err(told) => match crate::made_run::use_skill_off_here(
+            (Err(told), None) => match crate::made_run::use_skill_off_here(
                 call,
                 request,
                 heard,
@@ -3032,10 +3048,23 @@ fn run_call_with_scope(
         ),
         Route::UseSkill(settings) => {
             let skills = skill_tools(settings);
-            match crate::use_skill::translate(call, crate::use_skill::offered(&skills)) {
+            let translated = crate::use_skill::translate(call, crate::use_skill::offered(&skills));
+            // "Stop looking at my desk" sent as the remarks' off (#8404).
+            let stop = translated
+                .as_ref()
+                .ok()
+                .and_then(|skill| desk_stop_as_heard(settings, skill, request, heard));
+            match (translated, stop) {
+                (_, Some(stop)) => run_call_with_scope(
+                    &crate::tools::route(settings, &stop.name),
+                    &stop,
+                    request,
+                    heard,
+                    lease,
+                ),
                 // Only ever a skills' socket, in either folder (the reviewer
                 // on #1696, #1656).
-                Ok(skill) => match crate::tools::route(settings, &skill.name) {
+                (Ok(skill), None) => match crate::tools::route(settings, &skill.name) {
                     found @ Route::Executive(_) if is_skills(settings, &found) => {
                         let (whom, (mut told, answered)) =
                             run_call_with_scope(&found, &skill, request, heard, lease);
@@ -3050,7 +3079,7 @@ fn run_call_with_scope(
                 // says so (the reviewer on #1706). A made skill turned off,
                 // which `use_skill` names none of, is its run now
                 // (`LAMP_MADE_SKILL_OFF_SAID`, #7562).
-                Err(told) => match crate::made_run::use_skill_off_here(
+                (Err(told), None) => match crate::made_run::use_skill_off_here(
                     call,
                     request,
                     heard,
@@ -3102,6 +3131,30 @@ fn run_call_with_scope(
 pub fn ask(directory: &Path, call: &ToolCall, deadline: Duration) -> (Value, bool) {
     let (answer, answered) = ask_with_context(directory, call, deadline, None);
     (answer.told, answered)
+}
+
+/// The desk noticing's stop ([`crate::seen_yes::STOP`]) for `skill`, a
+/// translated `use_skill` call of the seen reactions' remarks snooze or off,
+/// when the person's own line for `request` names the looking, not the
+/// remarks ([`crate::seen_yes::stop_instead`], #8404); only with seen
+/// activity on, where the stop is declared, and only for a line heard.
+/// `None`: the call as the model made it.
+fn desk_stop_as_heard(
+    settings: &Settings,
+    skill: &ToolCall,
+    request: u64,
+    heard: bool,
+) -> Option<ToolCall> {
+    if !settings.seen_activity || !heard || skill.name != crate::seen_yes::REMARKS {
+        return None;
+    }
+    let words = crate::stop_scope::heard_words(request, heard);
+    let stop = crate::seen_yes::stop_instead(skill, words.as_deref())?;
+    eprintln!(
+        "lamp-voice: {} for request {request}: the heard words stop the looking, so {} instead",
+        skill.name, stop.name
+    );
+    Some(stop)
 }
 
 /// `call` as the person's own words for `request` scope it, when it is a
@@ -4467,6 +4520,58 @@ mod tests {
             assert!(answered);
             assert_eq!(served.join().unwrap()["args"], sent, "heard {heard}");
             std::fs::remove_dir_all(dir).unwrap();
+        }
+    }
+
+    /// #8404, replayed from lamp-06c1's journal (23 Nov 17:30): the model
+    /// sent `use_skill` with `seen_remarks` off for "stop noticing what I'm
+    /// doing" and "stop looking at my desk". Translated, each is the desk
+    /// noticing's stop, routed to the seen activity yes; "stop the remarks"
+    /// and "don't comment on what I do" stay the remarks' off. With seen
+    /// activity off, or a line not heard, the call is the model's.
+    #[test]
+    fn a_remarks_off_for_stop_looking_is_the_desk_noticings_stop() {
+        let remarks = Tool {
+            name: crate::seen_yes::REMARKS.into(),
+            description: "Stop the lamp's remarks on what it sees them do.".into(),
+            parameters: Some(json!({"type":"object","properties":{
+                "all":{"type":"boolean"},
+                "how":{"type":"string","enum":["snooze","off","on"]}}})),
+            silent: false,
+        };
+        let sent = ToolCall {
+            id: "live-8404".into(),
+            name: crate::use_skill::NAME.into(),
+            args: json!({"skill": crate::seen_yes::REMARKS, "how": "off"}),
+        };
+        let skill = crate::use_skill::translate(&sent, std::slice::from_ref(&remarks)).unwrap();
+        assert_eq!(skill.name, crate::seen_yes::REMARKS);
+        let (on, _) = take(&crate::seen_yes::arguments(Some("on"), Some("on"), None)).unwrap();
+        let off = Settings::default();
+        for (heard, desk) in [
+            ("Stop noticing what I'm doing.", true),
+            ("Stop looking at my desk.", true),
+            ("Stop the remarks.", false),
+            ("Don't comment on what I do.", false),
+        ] {
+            crate::stop_scope::set_heard_here(Some(Some(heard)));
+            let stop = desk_stop_as_heard(&on, &skill, 8_404, true);
+            let unheard = desk_stop_as_heard(&on, &skill, 8_404, false);
+            let switched_off = desk_stop_as_heard(&off, &skill, 8_404, true);
+            crate::stop_scope::set_heard_here(None);
+            assert_eq!(
+                stop.as_ref().map(|stop| stop.name.as_str()),
+                desk.then_some(crate::seen_yes::STOP),
+                "{heard}"
+            );
+            if let Some(stop) = stop {
+                assert_eq!(
+                    route(&on, &stop.name),
+                    Route::SeenActivity(on.seen_posture, on.seen_voice_offer)
+                );
+            }
+            assert_eq!(unheard, None, "{heard}");
+            assert_eq!(switched_off, None, "{heard}");
         }
     }
 

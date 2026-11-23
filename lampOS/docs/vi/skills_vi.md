@@ -6368,7 +6368,10 @@ nêu mệt, việc ở bàn và ăn mừng đã bắt đầu được nói cho l
 ([seen.md](../seen.md)), nên không gì tới chúng trước khi người dùng nghe
 câu ấy. Rút lời đồng ý, hay một lần quên (xóa tệp), lấy lại ngay, như rút
 một lời đồng ý `seen_more`. Mỗi kỹ năng giữ lệnh tắt riêng và hàm dừng
-chung `seen_remarks`. Mọi kỹ năng khác, kể cả kỹ năng cài thêm hay được đẩy
+chung `seen_remarks`, hàm này chỉ dừng những lời nhận xét nói ra và chỉ sang
+`stop_looking_at_my_desk` để dừng chính việc nhìn; một câu "stop looking at
+my desk" gửi tới nó dưới dạng snooze hay off sẽ thành lệnh dừng đó (#8404,
+[onboarding.md](../onboarding.md), "Taken back by voice"). Mọi kỹ năng khác, kể cả kỹ năng cài thêm hay được đẩy
 mang một trong các tên đó, vẫn cần lời đồng ý `seen_more` riêng; không có gì
 mới được ghi hay rời khỏi đèn (test
 `the_desk_noticing_yes_covers_the_four_with_no_seen_more_line`,

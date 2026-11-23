@@ -160,9 +160,10 @@ const LOOK_AGAIN: &str = "Call this when the person asks you to start looking at
 
 /// The stop with `LAMP_NOTICING_BY_DEFAULT` on (#7767): face reads too.
 const STOP_ALL: &str = "Call this when someone asks you to stop looking at them, at their desk or at \
-                        what they are doing, or to stop sending pictures (\"stop looking\", \"don't \
-                        watch me\"). It stops noticing what they do at the desk and how their face \
-                        seems. Then say only what it tells you.";
+                        what they are doing, or to stop sending pictures (\"stop looking at my desk\", \
+                        \"stop noticing what I'm doing\", \"stop watching me\"). It stops noticing \
+                        what they do at the desk and how their face seems; seen_remarks stops only \
+                        what you say about it. Then say only what it tells you.";
 
 /// The three functions; with `by_default` (`LAMP_NOTICING_BY_DEFAULT` on,
 /// #7767) only the descriptions of [`LOOK`] and [`STOP`] change.
@@ -204,13 +205,113 @@ fn tools_as_today() -> [Tool; 3] {
         Tool {
             name: STOP.into(),
             description: "Call this when someone asks you to stop looking at their desk or at what they \
-                          are doing, or to stop sending pictures (\"stop looking\", \"don't watch me\"). \
-                          Then say only what it tells you."
+                          are doing, or to stop sending pictures (\"stop looking at my desk\", \"stop \
+                          noticing what I'm doing\", \"stop watching me\"). It stops the noticing \
+                          itself; seen_remarks stops only what you say about it. Then say only what it \
+                          tells you."
                 .into(),
             parameters: None,
             silent: false,
         },
     ]
+}
+
+/// The four seen reactions' shared stop (`skills/seen-*/skill.toml`,
+/// `[stop] tool`): their spoken remarks only.
+pub const REMARKS: &str = "seen_remarks";
+
+/// The words that stop something, directly before one of
+/// [`LOOKING_WORDS`] ("stop looking", "don't watch me", "quit noticing").
+pub const STOP_WORDS: [&str; 6] = ["stop", "don't", "dont", "do not", "quit", "no more"];
+/// The lamp's looking, named after one of [`STOP_WORDS`] (#8404).
+pub const LOOKING_WORDS: [&str; 6] = ["looking", "look", "watching", "watch", "noticing", "notice"];
+/// The yes's own name in the app, a stop of the looking wherever it is
+/// heard ("turn off desk noticing").
+pub const NOTICING_NAME: &str = "desk noticing";
+/// The remarks' words: with any of them, the line is about what the lamp
+/// says, and the model's remarks stop stands ("don't comment on what I
+/// do", "stop telling me what I'm doing").
+pub const REMARK_WORDS: [&str; 14] = [
+    "remark",
+    "remarks",
+    "comment",
+    "comments",
+    "commenting",
+    "say",
+    "saying",
+    "talk",
+    "talking",
+    "tell",
+    "telling",
+    "mention",
+    "mentioning",
+    "lines",
+];
+
+/// `heard`'s words: lowercase, a curly apostrophe as a straight one, split
+/// at anything but a letter, a digit or an apostrophe.
+fn words(heard: &str) -> Vec<String> {
+    heard
+        .to_lowercase()
+        .replace('\u{2019}', "'")
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+/// Whether `phrase`'s words come one after another in `words` at `start`.
+fn at(words: &[String], start: usize, phrase: &str) -> bool {
+    let phrase: Vec<&str> = phrase.split(' ').collect();
+    words
+        .get(start..start + phrase.len())
+        .is_some_and(|run| run.iter().zip(&phrase).all(|(word, said)| word == said))
+}
+
+/// Whether `heard` asks the lamp to stop looking, not to stop its remarks:
+/// one of [`STOP_WORDS`] directly before one of [`LOOKING_WORDS`], or
+/// [`NOTICING_NAME`], and none of [`REMARK_WORDS`]. Whole words, any case,
+/// English only for now, as `stop_scope`'s.
+pub fn names_the_looking(heard: &str) -> bool {
+    let words = words(heard);
+    if words
+        .iter()
+        .any(|word| REMARK_WORDS.contains(&word.as_str()))
+    {
+        return false;
+    }
+    let stop_looking = (0..words.len()).any(|start| {
+        STOP_WORDS.iter().any(|stop| {
+            at(&words, start, stop)
+                && LOOKING_WORDS
+                    .iter()
+                    .any(|looking| at(&words, start + stop.split(' ').count(), looking))
+        })
+    });
+    stop_looking || (0..words.len()).any(|start| at(&words, start, NOTICING_NAME))
+}
+
+/// The stop of the desk noticing itself ([`STOP`], with the call's id), for
+/// `call`, a snooze or off of the seen reactions' remarks ([`REMARKS`]),
+/// when the person's own line `heard` names the looking, not the remarks
+/// ([`names_the_looking`]); `None` otherwise, the model's call standing.
+/// On lamp-06c1 (23 Nov 17:30, #8404) the model sent the remarks' off for
+/// "stop noticing what I'm doing" and "stop looking at my desk", 2 of 2,
+/// and the desk noticing went on. The stop is the safe side: with the
+/// looking stopped, no remark comes either.
+pub fn stop_instead(call: &ToolCall, heard: Option<&str>) -> Option<ToolCall> {
+    let how = call
+        .args
+        .get(crate::use_skill::STOP_CHOICE)
+        .and_then(Value::as_str);
+    (call.name == REMARKS
+        && matches!(how, Some("off" | "snooze"))
+        && heard.is_some_and(names_the_looking))
+    .then(|| ToolCall {
+        id: call.id.clone(),
+        name: STOP.into(),
+        args: json!({}),
+    })
 }
 
 /// Where the yes is kept: beside room sounds' (`lamp_msgs::consent::FOLDER`).
@@ -702,6 +803,75 @@ mod tests {
             id: "seen-1".into(),
             name: name.into(),
             args: json!({}),
+        }
+    }
+
+    /// #8404, lamp-06c1 23 Nov 17:30: "stop noticing what I'm doing" and
+    /// "stop looking at my desk" came as the remarks' off; the person's
+    /// words name the looking, so the desk noticing stops. The remarks'
+    /// own words still stop only the remarks.
+    #[test]
+    fn a_stop_looking_said_as_the_remarks_off_stops_the_desk_noticing() {
+        let remarks = |how: &str| ToolCall {
+            id: "seen-8404".into(),
+            name: REMARKS.into(),
+            args: json!({"how": how}),
+        };
+        for heard in [
+            "Stop noticing what I'm doing.",
+            "Stop looking at my desk.",
+            "Lamp, stop watching me.",
+            "Please don\u{2019}t watch me.",
+            "Can you stop looking at what I do?",
+            "Turn off desk noticing.",
+        ] {
+            for how in ["off", "snooze"] {
+                let stop = stop_instead(&remarks(how), Some(heard));
+                assert_eq!(
+                    stop,
+                    Some(ToolCall {
+                        id: "seen-8404".into(),
+                        name: STOP.into(),
+                        args: json!({}),
+                    }),
+                    "{heard} ({how})"
+                );
+            }
+            // "On" is no stop, a line not heard is the model's, and
+            // another function is never one.
+            assert_eq!(stop_instead(&remarks("on"), Some(heard)), None, "{heard}");
+            assert_eq!(stop_instead(&remarks("off"), None), None);
+            let other = ToolCall {
+                name: "wellbeing_nudges".into(),
+                ..remarks("off")
+            };
+            assert_eq!(stop_instead(&other, Some(heard)), None, "{heard}");
+        }
+        for heard in [
+            "Stop the remarks.",
+            "Don't comment on what I do.",
+            "Stop commenting on what you notice.",
+            "Stop telling me what I'm doing.",
+            "Snooze the remarks till morning.",
+            "Stop that.",
+            "I'm looking at my desk, stop it.",
+        ] {
+            assert_eq!(stop_instead(&remarks("off"), Some(heard)), None, "{heard}");
+        }
+    }
+
+    #[test]
+    fn the_stop_names_the_looking_and_the_remarks_name_it() {
+        for by_default in [false, true] {
+            let stop = &tools_for(by_default)[2].description;
+            for said in [
+                "stop looking at my desk",
+                "stop noticing what I'm doing",
+                "stop watching me",
+                REMARKS,
+            ] {
+                assert!(stop.contains(said), "{by_default}: {said}: {stop}");
+            }
         }
     }
 
