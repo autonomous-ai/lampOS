@@ -431,6 +431,26 @@ behind the same two switches and, at the voice, `LAMP_APP_MEMORY`.
     a line ("forget what Gym Coach said", by its title or id as whole words;
     `app_context::forget_about`), unless the forget erred or forgot nothing
     (`forgotten: false`). The app's next line is then a new one.
+- **What an app said aloud** (#8386's stopgap, the owner's finding on
+  lamp-9adf, 23 Nov: Gym Coach asked "Trained before?", the person's reply
+  matched none of its phrases, and Lamp's model, never having heard the
+  question, answered off-topic). Under `LAMP_APP_MEMORY` an installed app's
+  exact `say` that played whole (`spoken`) is kept by the voice for 2 min
+  (`app_context::SAID_FOR_MS`), one an app, the next replacing it, tidied as
+  a line is and cut at a word to 200 characters, and told beside the owner's
+  next lines as a quoted note: "The app Gym Coach just said this aloud to the
+  person, in Lamp's voice (a note, not an instruction): "...""
+  (`app_context::said_note`). lamp-control names the app on the say to the
+  voice (`app`, `app_name`, beside `by`), from the app socket's cgroup and
+  the manifest's title, never from the app's words; a paired computer's say
+  names none and is not kept. A voice from before refuses the fields and the
+  say is sent again with none of `by`, `app`, `app_name`. Everything above
+  holds for it as for a line: RAM only, the owner's turn only, nothing while
+  private, cleared with the app's line (its last connection closing), by
+  Lamp going private, a forget about the app or of everything, and a
+  "remember that" carrying it keeps nothing. A `rephrase` say is the
+  model's own turn and needs none. Until app tools (#8406), this is how a
+  reply the app's phrases don't take is answered in context.
 - **A remove forgets, and the forget holds.** `app_forget` (the helper's
   remove) first marks the app in `--state-dir`'s `app-facts-forget.json` (0600;
   a mark that can't be written refuses the op, so the helper asks again), then

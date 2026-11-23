@@ -77,6 +77,10 @@ pub trait Parts {
     /// The connection the next `act` or `reply` is for, told just before
     /// it: a part that tells an action's end later sends it there alone.
     fn asking(&mut self, _connection: Option<u64>) {}
+    /// The installed app the request in hand came from, by the app
+    /// socket's cgroup (its id and title), or none: an app's exact `say`
+    /// names it to the voice (#8386's stopgap, `LAMP_APP_MEMORY`).
+    fn asking_app(&mut self, _app: Option<(&str, &str)>) {}
 }
 
 /// A part's answer: now, or what to run off the door's lock for it.
@@ -1781,6 +1785,11 @@ impl Door {
             op => op,
         };
         parts.asking(session.connection);
+        parts.asking_app(
+            session
+                .app_peer()
+                .map(|app| (app.name.as_str(), app.title.as_str())),
+        );
         match parts.reply(&client, re, &op, now_us) {
             Ok(reply) => {
                 // Counted only once the part took it.
