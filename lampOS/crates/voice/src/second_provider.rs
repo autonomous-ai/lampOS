@@ -1026,6 +1026,14 @@ pub const NAME_SAID_TO_A_PERSON_ENVIRONMENT: &str = "LAMP_NAME_SAID_TO_A_PERSON"
 /// conversation in a meeting (#8092).
 pub const NAME_SIGN_TIED_ENVIRONMENT: &str = "LAMP_NAME_SIGN_TIED";
 
+/// Where the worker reads whether a line `LAMP_SAID_TO_ME` held as not said
+/// to the lamp is kept from being the reply to the lamp's news (`on`, and
+/// nothing else; `attention::Attention::heed_held_in_news_reply`). On
+/// lamp-74ff on 23 Nov at 08:40:35 (request 22) a 2-word line in the
+/// window, 0 looks, 0 faces, its name heard at 0.929, was answered as the
+/// first thing said after the lamp's own news (#8383).
+pub const NEWS_REPLY_HEEDS_HELD_ENVIRONMENT: &str = "LAMP_NEWS_REPLY_HEEDS_HELD";
+
 /// Where the worker and the coordinator read whether a hearing of the
 /// lamp's name needs a face or its words (`on`, and nothing else): on the
 /// second route, a hearing only in the room's sound under

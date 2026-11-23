@@ -6446,6 +6446,22 @@ after a take-over, but now for every turn:
   speaks. Open (#7891, #7721): in the window a line whose looks are all lost
   marks or give no pitch still passes as `the speaker's pose unread`, until
   the head-down lines of the row are counted.
+- **A held line is no reply to the lamp's news**
+  (`LAMP_NEWS_REPLY_HEEDS_HELD=on`, #8383; off by default). The hold above
+  clears only the line's face and conversation signs, and the rule's
+  `AFTER_NEWS` (the first thing said within 180 s after the lamp's own
+  news, in a room not busy) reads neither: on lamp-74ff on 23 Nov at
+  08:40:35, request 22, 2 words in the window, 0 looks, 0 faces, its name
+  heard at 0.929 (held with #8103), was answered as the news's reply. With
+  the switch, a line `said_to_me` held (`Attention::said_held`) is not let
+  out as `AFTER_NEWS`: it is judged by the rules after it as any other line
+  (`ABOUT_ITS_WORK` still reads its words), and the news's one reply is
+  spent all the same. The journal says `request N: the first thing said
+  after the lamp's own news, but said_to_me held it: not a reply
+  (LAMP_NEWS_REPLY_HEEDS_HELD)`. Cost: a real reply to the news that
+  `said_to_me` holds (no name, no look, no question waiting) goes
+  unanswered. The replay (`crate::replay`) reads only `said_to_me`, so it
+  is the same either way.
 - **Who spoke a line, from the looks its mouth was read**
   (`LAMP_SPEAKING_READ_LOOKS=on`, #7442, #7419). A face is a line's speaker
   when it read `yes` in at least half of the line's looks
