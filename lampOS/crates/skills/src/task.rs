@@ -632,6 +632,19 @@ pub const ASK_RETRY_MS: u64 = 10 * 60_000;
 /// How long the voice may take to begin an ask: the trigger's moment, when
 /// the person is there, not later.
 pub const ASK_EXPIRES_MS: u64 = 60_000;
+
+/// The priority a run's yes is asked at (#8414). Asked aloud just now, the
+/// person waits for an answer: it is said as the lamp's next line, at the
+/// voice's first urgent priority, which waits only the urgent quiet after
+/// the last turn (1 s), not the 15 s a skill's own news waits. A trigger's
+/// or a schedule's run, which nobody waits on, asks at the usual priority.
+pub fn yes_ask_priority(by_words: bool) -> u8 {
+    if by_words {
+        lamp_voice::say::URGENT_FROM
+    } else {
+        lamp_voice::say::NORMAL_PRIORITY
+    }
+}
 /// The say service's outcome of an ask said whole.
 pub const SPOKEN: &str = "say: spoken";
 
@@ -2829,6 +2842,16 @@ mod tests {
     /// trigger fired, the lamp asks for the yes itself (the voice's say
     /// service, `task_yes`), once a folder's SHA-256: the next trigger of the
     /// same folder asks nothing, and a changed folder asks again.
+    /// #8414: a run the person asked for aloud asks its yes as the lamp's
+    /// next line (the urgent quiet, 1 s); a trigger's or a schedule's at the
+    /// usual priority, after the 15 s quiet.
+    #[test]
+    fn a_yes_for_a_run_asked_aloud_is_asked_at_once_and_a_triggers_waits() {
+        assert_eq!(yes_ask_priority(true), lamp_voice::say::URGENT_FROM);
+        assert_eq!(yes_ask_priority(false), lamp_voice::say::NORMAL_PRIORITY);
+        assert!(yes_ask_priority(true) <= crate::MOST_SAY_PRIORITY);
+    }
+
     #[test]
     fn a_task_with_no_yes_asks_for_it_aloud_once_a_folder() {
         let dir = tempfile::tempdir().unwrap();

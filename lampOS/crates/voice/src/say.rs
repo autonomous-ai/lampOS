@@ -1213,9 +1213,12 @@ fn parse_task_yes(skill: String, expires_in_ms: u64, wire: &Wire) -> Result<Requ
     {
         return Err("task_yes goes alone, with a priority and expires_in_ms".into());
     }
+    // Up to the first urgent one (#8414): a yes asked for a run the person
+    // just asked for aloud waits only the urgent quiet, so it comes as the
+    // lamp's next line; 9 stays the voice's own.
     let priority = wire.priority.unwrap_or(NORMAL_PRIORITY);
-    if priority >= URGENT_FROM {
-        return Err(format!("task_yes's priority is 0 to {}", URGENT_FROM - 1));
+    if priority > URGENT_FROM {
+        return Err(format!("task_yes's priority is 0 to {URGENT_FROM}"));
     }
     if !(1..=LONGEST_EXPIRY_MS).contains(&expires_in_ms) {
         return Err(format!("expires_in_ms is 1 to {LONGEST_EXPIRY_MS}"));
@@ -6553,6 +6556,24 @@ mod tests {
         ] {
             assert!(parse(refused).is_err(), "{refused}");
         }
+    }
+
+    /// #8414: a run's yes, asked for a skill the person asked for aloud just
+    /// now, goes at the first urgent priority, so it waits only the urgent
+    /// quiet (1 s) and not the 15 s a skill's own news waits; 9 stays the
+    /// voice's own.
+    #[test]
+    fn a_yes_asked_for_a_run_asked_aloud_waits_only_the_urgent_quiet() {
+        let asked =
+            parse(r#"{"skill":"slow-probe","task_yes":true,"priority":8,"expires_in_ms":60000}"#)
+                .unwrap();
+        assert_eq!(asked.words, Words::TaskYes);
+        assert_eq!(asked.priority, URGENT_FROM);
+        assert_eq!(quiet_for(asked.priority), URGENT_QUIET_US);
+        assert!(
+            parse(r#"{"skill":"slow-probe","task_yes":true,"priority":9,"expires_in_ms":60000}"#)
+                .is_err()
+        );
     }
 
     /// #2530 part 2: an add-on's line is `quoted`, alone, at most 300 bytes
