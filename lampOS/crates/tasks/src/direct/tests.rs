@@ -28,6 +28,10 @@ pub(crate) struct FakeState {
     allow_adds: u32,
     /// The next sends fail with this, one each.
     fail_sends: Vec<Error>,
+    /// The next sends are taken (the run registered, as the gateway's
+    /// `chat.send` that started it) and then fail with this, one each: a
+    /// reply that timed out or a link that broke after the gateway took it.
+    taken_then_fail: Vec<Error>,
     /// Called at each `send`, with the turn: the agent's side (the
     /// launcher's claim, a make's `answer.md`).
     on_send: Option<OnSend>,
@@ -114,6 +118,9 @@ impl AgentSession for Fake {
                 None,
             ),
         );
+        if !state.taken_then_fail.is_empty() {
+            return Err(state.taken_then_fail.remove(0));
+        }
         Ok(run)
     }
     fn wait(&mut self, run: &RunId, within: Duration) -> Result<Outcome, Error> {
@@ -938,6 +945,36 @@ fn a_stuck_run_is_ended_and_the_next_turn_goes_on() {
     until("next answered", || {
         lamp.direct.observe(&next).unwrap().answer == "Next answered."
     });
+}
+
+/// A send the gateway took but whose reply timed out: the retried turn
+/// adopts the run the gateway already has for it (by its task id), never
+/// sends it twice; one run, answered once.
+#[test]
+fn a_retried_send_adopts_the_run_the_gateway_already_took() {
+    let fake = Fake::default();
+    fake.state().taken_then_fail = vec![Error::TimedOut];
+    let lamp = started(fake);
+    until("ready", || lamp.direct.is_ready());
+    let agent = joined(
+        lamp.direct
+            .spoken_launch(&launch(EngineKind::Openclaw, "Hello")),
+    );
+    until("taken", || lamp.fake.state().sent.len() == 1);
+    until("adopted", || {
+        lamp.direct
+            .lock()
+            .find(&agent)
+            .is_some_and(|run| run.run.is_some())
+    });
+    std::thread::sleep(Duration::from_millis(100));
+    lamp.fake.answer(&lamp.fake.run_of(1), "Hi.");
+    until("answered", || {
+        lamp.direct.observe(&agent).unwrap().answer == "Hi."
+    });
+    let state = lamp.fake.state();
+    assert_eq!(state.sent.len(), 1, "never sent twice");
+    assert_eq!(state.runs.len(), 1, "one run");
 }
 
 /// Two sends failed in a row make the session broken: a fresh session,
