@@ -68,6 +68,8 @@ Environment=LAMP_FACE_STICKY=on
 Environment=LAMP_FACE_KNOWN_ON_ID=on
 # LAMP_FACE_FOLLOW_NEAR_NEW_ID: its why and rules are its row in docs/switches.md (#7933).
 Environment=LAMP_FACE_FOLLOW_NEAR_NEW_ID=on
+# LAMP_SESSION_PERSON: its why and rules are its row in docs/switches.md (the memory owner's "B with 5s", 23 Nov).
+Environment=LAMP_SESSION_PERSON=on
 # LAMP_FACE_TAKEOVER_SCORE: its why and rules are its row in docs/switches.md (#7933).
 Environment=LAMP_FACE_TAKEOVER_SCORE=on
 # The fast camera stream (#5894, #5956, #6027): a paired computer with the camera grant gets the camera's own frames

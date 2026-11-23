@@ -1,6 +1,9 @@
 //! Caller-owned face observations and immutable per-request memory scope.
-//! No global registry, polling, speaker inference, or session authorization;
-//! a lease is only ever narrowed to the room, never widened. The one late
+//! No global registry, polling or speaker inference. The one session is the
+//! second route's session person (`LAMP_SESSION_PERSON`,
+//! [`crate::session_person`]), which only spares a line the narrow for
+//! another face in view; a lease is only ever narrowed to the room, never
+//! widened. The one late
 //! look is for a keep or single-item forget ([`ScopeLease::keeper_within`]): a line admitted as the
 //! room's whose face cache was cold at its start, or went cold before its
 //! end plus [`KEEPER_WAIT`] ([`FaceCache::is_cold`]: within [`COLD_FOR`] of

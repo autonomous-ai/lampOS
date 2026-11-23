@@ -997,6 +997,30 @@ impl SpeakingFaces {
         })
     }
 
+    /// [`Self::face_seen_between`] with the eyes' links as of `to`
+    /// ([`Looks::links_at`], #4885), as [`Self::no_other_face_in_view`]
+    /// reads them: a look of a passing id the eyes say follows `face`, or
+    /// that `face` follows, is a look of `face`. For the session person
+    /// (`LAMP_SESSION_PERSON`) only; every other rule reads the raw ids.
+    pub fn face_followed_between(&self, face: Option<&str>, since: Instant, to: Instant) -> bool {
+        let Some(face) = face else {
+            return false;
+        };
+        self.looks.lock().is_ok_and(|looks| {
+            let links = looks.links_at(to);
+            let face = one_face(face.to_owned(), &links);
+            looks
+                .kept
+                .iter()
+                .filter(|look| look.at >= since && look.at <= to && !look.boot.is_empty())
+                .any(|look| {
+                    look.tracked
+                        .iter()
+                        .any(|id| one_face(format!("{}/{id}", look.boot), &links) == face)
+                })
+        })
+    }
+
     /// For the journal when no face was seen speaking a line: how many of
     /// the eyes' own looks it had, how many held one face only, and of
     /// `face`'s (the known one, `boot/f3`) how many read speaking, still or
@@ -2215,6 +2239,37 @@ mod tests {
         both.faces[1].follows = Some("f1".to_owned());
         eyes.look(from + EVERY, Some((("b", 1), &both)));
         assert!(!eyes.no_other_face_in_view(Some("b/f2"), from, from + EVERY * 2));
+    }
+
+    /// The session person's face seen under a linked id (Twelve's note 2 on
+    /// #8401): the known file still names `f1`, the line's looks show only
+    /// `f2`, which the eyes say follows `f1`. The raw ids miss it; the
+    /// linked read sees it. An unlinked `f2` is someone else.
+    #[test]
+    fn a_face_under_a_linked_id_is_seen_by_the_linked_read() {
+        let seen = |link: bool| {
+            let eyes = SpeakingFaces::default();
+            let before = Instant::now();
+            eyes.look(before, Some((("b", 0), &faces(&[("f1", No)]))));
+            let from = before + EVERY;
+            for index in 0..3u32 {
+                let mut look = faces(&[("f2", No)]);
+                if link {
+                    look.faces[0].follows = Some("f1".to_owned());
+                }
+                eyes.look(
+                    from + EVERY * index,
+                    Some((("b", u64::from(index) + 1), &look)),
+                );
+            }
+            let to = from + EVERY * 3;
+            (
+                eyes.face_seen_between(Some("b/f1"), from, to),
+                eyes.face_followed_between(Some("b/f1"), from, to),
+            )
+        };
+        assert_eq!(seen(true), (false, true), "linked: only the linked read");
+        assert_eq!(seen(false), (false, false), "unlinked: nobody's");
     }
 
     /// The looks of a line on `f15` re-found twice: `f15` speaking, then

@@ -231,6 +231,7 @@ pub mod service_records;
 pub mod services;
 pub mod services_told;
 pub mod session_fact;
+pub mod session_person;
 pub mod session_tools;
 pub mod short_turns;
 pub mod sight;
