@@ -2156,21 +2156,27 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        k=
        for p in "$H/.hermes/installs"/*/.install.lock; do
          [ -f "$p" ] && [ ! -L "$p" ] && [ ! -L "${p%/.install.lock}" ] || continue
-         s=$(stat -c %d:%i "$p") && mount -n --bind "$p" "$X/i/${p#"$H/.hermes/installs/"}" || fail "Hermes install lock not shown"
-         [ ! -L "$X/i/${p#"$H/.hermes/installs/"}" ] && [ "$(stat -c %d:%i "$X/i/${p#"$H/.hermes/installs/"}")" = "$s" ] || { umount -n "$X/i/${p#"$H/.hermes/installs/"}"; fail "Hermes install lock not shown"; }
+         command exec 9<"$p" || fail "Hermes install lock not shown"
+         s=$(stat -L -c %d:%i /proc/self/fd/9) && [ ! -L "$p" ] && [ "$(stat -c %d:%i "$p")" = "$s" ] && mount -n -c --bind /proc/self/fd/9 "$X/i/${p#"$H/.hermes/installs/"}" || { exec 9<&-; fail "Hermes install lock not shown"; }
+         [ ! -L "$X/i/${p#"$H/.hermes/installs/"}" ] && [ "$(stat -c %d:%i "$X/i/${p#"$H/.hermes/installs/"}")" = "$s" ] || { exec 9<&-; umount -n "$X/i/${p#"$H/.hermes/installs/"}"; fail "Hermes install lock not shown"; }
+         exec 9<&-
          k=1
        done
        [ -n "$k" ] || fail "no Hermes install lock: the lasting Hermes has not run"
        for p in "$H/.hermes/installs"/*/pm-runtime; do
          [ -d "$p" ] || continue
-         [ ! -L "$p" ] && [ ! -L "${p%/pm-runtime}" ] && [ -f "$p/.prepare.lock" ] && [ ! -L "$p/.prepare.lock" ] && s=$(stat -c %d:%i "$p/.prepare.lock") && mount -n --bind "$p/.prepare.lock" "$X/i/${p#"$H/.hermes/installs/"}/.prepare.lock" || fail "Hermes runtime lock not shown"
-         [ ! -L "$X/i/${p#"$H/.hermes/installs/"}/.prepare.lock" ] && [ "$(stat -c %d:%i "$X/i/${p#"$H/.hermes/installs/"}/.prepare.lock")" = "$s" ] || { umount -n "$X/i/${p#"$H/.hermes/installs/"}/.prepare.lock"; fail "Hermes runtime lock not shown"; }
+         [ ! -L "$p" ] && [ ! -L "${p%/pm-runtime}" ] && [ -f "$p/.prepare.lock" ] && [ ! -L "$p/.prepare.lock" ] && command exec 9<"$p/.prepare.lock" || fail "Hermes runtime lock not shown"
+         s=$(stat -L -c %d:%i /proc/self/fd/9) && [ ! -L "$p/.prepare.lock" ] && [ "$(stat -c %d:%i "$p/.prepare.lock")" = "$s" ] && mount -n -c --bind /proc/self/fd/9 "$X/i/${p#"$H/.hermes/installs/"}/.prepare.lock" || { exec 9<&-; fail "Hermes runtime lock not shown"; }
+         [ ! -L "$X/i/${p#"$H/.hermes/installs/"}/.prepare.lock" ] && [ "$(stat -c %d:%i "$X/i/${p#"$H/.hermes/installs/"}/.prepare.lock")" = "$s" ] || { exec 9<&-; umount -n "$X/i/${p#"$H/.hermes/installs/"}/.prepare.lock"; fail "Hermes runtime lock not shown"; }
+         exec 9<&-
        done
        for p in "$H/.hermes/installs"/*/environments/*/.lease-managed "$H/.hermes/installs"/*/pm-runtime/generations/*/.lease-managed; do
          [ -f "$p" ] || continue
          g=${p%/.lease-managed} r=${p#"$H/.hermes/installs/"}
-         [ ! -L "$g" ] && [ ! -L "${g%/*}" ] && [ ! -L "$H/.hermes/installs/${r%%/*}" ] && { [ -d "$g/.leases" ] || mkdir "$g/.leases"; } && [ ! -L "$g/.leases" ] && s=$(stat -c %d:%i "$g/.leases") && mount -n --bind "$g/.leases" "$X/i/${g#"$H/.hermes/installs/"}/.leases" || fail "Hermes leases not shown"
-         [ ! -L "$X/i/${g#"$H/.hermes/installs/"}/.leases" ] && [ "$(stat -c %d:%i "$X/i/${g#"$H/.hermes/installs/"}/.leases")" = "$s" ] || { umount -n "$X/i/${g#"$H/.hermes/installs/"}/.leases"; fail "Hermes leases not shown"; }
+         [ ! -L "$g" ] && [ ! -L "${g%/*}" ] && [ ! -L "$H/.hermes/installs/${r%%/*}" ] && { [ -d "$g/.leases" ] || mkdir "$g/.leases"; } && [ ! -L "$g/.leases" ] && command exec 9<"$g/.leases" || fail "Hermes leases not shown"
+         s=$(stat -L -c %d:%i /proc/self/fd/9) && [ ! -L "$g/.leases" ] && [ "$(stat -c %d:%i "$g/.leases")" = "$s" ] && mount -n -c --bind /proc/self/fd/9 "$X/i/${g#"$H/.hermes/installs/"}/.leases" || { exec 9<&-; fail "Hermes leases not shown"; }
+         [ ! -L "$X/i/${g#"$H/.hermes/installs/"}/.leases" ] && [ "$(stat -c %d:%i "$X/i/${g#"$H/.hermes/installs/"}/.leases")" = "$s" ] || { exec 9<&-; umount -n "$X/i/${g#"$H/.hermes/installs/"}/.leases"; fail "Hermes leases not shown"; }
+         exec 9<&-
        done
        mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none "$H/.hermes" || fail "$H/.hermes not hidden"
        mkdir "$H/.hermes/hermes-agent" && mount -n --move "$X/c" "$H/.hermes/hermes-agent" && ro "$H/.hermes/hermes-agent" || fail "Hermes checkout not shown"
@@ -2227,15 +2233,24 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `generations` folder holding it, or its key that is a link
      (only the lasting Hermes's own user could make one, and root would
      follow it) skips that lock or ends the make before Hermes runs.
-     The check and the bind are two steps, so each bound lock or
-     `.leases` is checked again after its mount: its `stat -c %d:%i`
-     taken before the bind must match the bind target's after it, and
-     the target must not be a link (a source swapped for a link before
-     its `stat` gives the link's own, which the target, the same entry
-     seen through the `installs` bind, matches), or the bind is
-     unmounted and the make ends the same
-     way ("Hermes install lock not shown", "Hermes runtime lock not
-     shown", "Hermes leases not shown").
+     The checks and the bind are separate steps, so each lock or
+     `.leases` is first opened on a descriptor (fd 9, `command exec`, so
+     a failed open still ends with its own message) and bound through it,
+     `mount -n -c --bind /proc/self/fd/9`: the bind is the very file the
+     descriptor holds, wherever the path points by then, so a link
+     swapped in after the checks cannot redirect it (#7051). `-c`
+     (`--no-canonicalize`) keeps util-linux from resolving
+     `/proc/self/fd/9` to the file's path first, which would bind by path
+     again. Before the
+     bind, the path is checked again: no link, and its `stat -c %d:%i`
+     the descriptor's (`stat -L` of `/proc/self/fd/9`), so a link swapped
+     in before the open, and put back since, ends the make. After the
+     mount, that `%d:%i` must match the bind target's, and the target
+     must not be a link (the target is the same entry seen through the
+     `installs` bind, so a link there is a swap on the target side), or
+     the bind is unmounted. Each way out closes the descriptor, and the
+     make ends the same way ("Hermes install lock not shown", "Hermes
+     runtime lock not shown", "Hermes leases not shown").
      Every mount these lines
      make is `mount -n`: they run after `/run` is read-only, where
      util-linux cannot write its utab, and a `--move` without `-n` ended
