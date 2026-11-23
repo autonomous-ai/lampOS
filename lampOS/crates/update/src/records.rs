@@ -138,6 +138,13 @@ pub struct State {
     /// back is not retried for ever. Absent from a state written before.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub held_retried: Vec<u64>,
+    /// The installed build whose product units the lamp lacks this updater
+    /// has looked at (#7018): by its own round that took the build, or by
+    /// an up-to-date round's pass for a build an older updater switched to.
+    /// Tried once per build, well or not, and never a reason to refuse it;
+    /// the next build tries again. Absent from a state written before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adds_tried: Option<u64>,
     /// Fields a later build wrote that this one does not know: kept as
     /// they were across a save, for that build to read again (#1505).
     #[serde(flatten)]
@@ -321,6 +328,12 @@ pub struct Journal {
     /// until the third in a row. Absent from a journal written before.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub refusing: Option<String>,
+    /// An up-to-date round's pass that only adds the product units the
+    /// lamp's running build carries and it lacks (#7018): put back, it
+    /// removes them and refuses nothing, the build being the lamp's
+    /// already. Absent from a journal written before.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub adds_only: bool,
 }
 
 impl Journal {
@@ -908,6 +921,7 @@ mod tests {
             exit_notes: vec!["/etc/systemd/system/lamp-tasks.service.d/exit-note.conf".into()],
             aside: Vec::new(),
             refusing: None,
+            adds_only: false,
         };
         records.save_journal(&journal).unwrap();
         assert_eq!(records.journal().unwrap(), Some(journal));
@@ -1036,6 +1050,7 @@ mod tests {
             .into(),
             cut_short: None,
             held_retried: Vec::new(),
+            adds_tried: Some(4576),
             later: Default::default(),
         };
         let journal = Journal {
@@ -1068,6 +1083,7 @@ mod tests {
             exit_notes: Vec::new(),
             aside: Vec::new(),
             refusing: None,
+            adds_only: false,
         };
         (state, journal)
     }

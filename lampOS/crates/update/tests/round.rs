@@ -85,6 +85,8 @@ mod self_cuts;
 mod self_recovery;
 #[path = "round/self_retry.rs"]
 mod self_retry;
+#[path = "round/up_to_date_adds.rs"]
+mod up_to_date_adds;
 #[path = "round/writer_refresh.rs"]
 mod writer_refresh;
 
