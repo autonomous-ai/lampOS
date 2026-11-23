@@ -2560,6 +2560,23 @@ fn an_active_card_with_no_event_for_five_minutes_reads_stale() {
     assert!(html.contains(stale), "{html}");
 }
 
+/// A step timed earlier that comes late (the words heard after the line
+/// said) keeps the card's id, so a card opened on the page stays open.
+#[test]
+fn a_cards_id_stays_when_an_earlier_step_comes_late() {
+    let id = |timeline: &Timeline| {
+        let html = page::timeline(&timeline.newest(), &current(Vec::new()), false);
+        let at = html.find("<details id=\"").expect("a card") + 13;
+        html[at..at + html[at..].find('"').expect("its end")].to_owned()
+    };
+    let mut timeline = Timeline::new(false);
+    timeline.add(4, 2_000, timeline::Step::Said(None));
+    let before = id(&timeline);
+    timeline.add(4, 1_000, timeline::Step::Heard(None));
+    assert_eq!(timeline.newest()[0].start(), 1_000);
+    assert_eq!(id(&timeline), before);
+}
+
 /// What `skills/tasks` says of mail-check's run (#7873).
 fn skill_run_news(stage: lamp_msgs::SkillTaskStage) -> lamp_msgs::SkillTask {
     lamp_msgs::SkillTask {
