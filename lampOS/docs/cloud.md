@@ -3004,9 +3004,9 @@ says `onboarding_page_supported: true` then, and `onboarding_page_version:
   cut and asked once more), the line and its push wait until lamp-voice
   tells that ask's `line` said or let go (`skills.made`'s `line` above,
   `make_skill::line_ended`, asked every 250 ms while it waits,
-  `onboarding_page::LOOK_EVERY`). It waits at most 240 s from the ask
+  `onboarding_page::LOOK_EVERY`). It waits at most 750 s from the ask
   (`onboarding_page::MADE_LINE_LONGEST`): lamp-voice's longest make, 120 s
-  (`make_skill_local::MAKE_WITHIN`) and 120 s more for the agent's part
+  (`make_skill_local::MAKE_WITHIN`) and 630 s more for the agent's part
   with `LAMP_MAKE_SKILL_AGENT` (`make_skill_agent::MAKE_WITHIN`), held
   equal by a test. A make that fails says why aloud and tells its line's
   end as any other, so the bound only covers a voice that never tells: an

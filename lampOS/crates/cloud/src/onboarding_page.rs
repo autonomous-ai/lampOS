@@ -105,12 +105,12 @@ const LAPSE: Duration = Duration::from_secs(10 * 60);
 
 /// The longest the last page's line waits for the line of a make asked on
 /// Create ([`Pages::made_asked`]), from the ask: lamp-voice's longest make,
-/// 240 s (`make_skill_local::MAKE_WITHIN`, 120 s, then with
+/// 750 s (`make_skill_local::MAKE_WITHIN`, 120 s, then with
 /// `LAMP_MAKE_SKILL_AGENT` the agent's own `make_skill_agent::MAKE_WITHIN`,
-/// 120 s; held equal by a test). The voice says why a make failed, and
+/// 630 s since #7245; held equal by a test). The voice says why a make failed, and
 /// tells its line's end, so this is only for a voice that never tells
 /// (an older build reading `making` past it, or one gone).
-pub const MADE_LINE_LONGEST: Duration = Duration::from_secs(240);
+pub const MADE_LINE_LONGEST: Duration = Duration::from_secs(750);
 
 /// How often lamp-voice is asked about that line while the last page's
 /// line waits for it: soon after it ends, never a busy loop on its socket.
