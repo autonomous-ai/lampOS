@@ -1273,8 +1273,9 @@ fn the_bus_status_follows_a_direct_run_without_ps(engine: Engine) {
 
 /// Per engine: OpenClaw's bounds are exactly the one session's (128k, no
 /// count of turns); Hermes's are its own context's, plus V1's backstop of
-/// 40 turns or 250k tokens handed over and read, since Hermes compacts on
-/// its own and its gateway's size is after that.
+/// 40 turns, since Hermes compacts on its own and its gateway's size is
+/// after that. A turn's tokens are no bound: one web search turn counts
+/// every model call's prompt (past 250k alone on ee17, 24 Nov).
 #[test]
 fn each_engine_has_its_own_context_limits() {
     use crate::harness::SessionSize;
@@ -1314,13 +1315,14 @@ fn each_engine_has_its_own_context_limits() {
         false
     ));
     assert!(near_limit(hermes, small, 0, (ROTATE_TURNS, 0), false));
-    assert!(near_limit(hermes, small, 0, (1, ROTATE_TOKENS), false));
+    assert!(!near_limit(hermes, small, 0, (1, ROTATE_TOKENS * 2), false));
 }
 
-/// Hermes is told to run `skill-start <run id>` (the launcher on its
-/// gateway's PATH), with its
-/// `terminal` tool in the foreground for as long as the run may take (at
-/// most Hermes's foreground bound); OpenClaw's words are as they were.
+/// Hermes is told to run the launcher by its full path (never a bare
+/// `skill-start`: its `terminal` tool's PATH is a login shell's, without
+/// the gateway's link, ee17 24 Nov), with its `terminal` tool in the
+/// foreground for as long as the run may take (at most Hermes's foreground
+/// bound); OpenClaw's words are as they were.
 #[test]
 fn hermes_is_told_to_run_the_skill_start_launcher_in_the_foreground() {
     let run = skill_run("run-7", Duration::from_secs(120));
@@ -1331,8 +1333,11 @@ fn hermes_is_told_to_run_the_skill_start_launcher_in_the_foreground() {
         prompt
     );
     let words = skill_words(EngineKind::Hermes, &prompt, run.deadline);
-    assert!(words.contains("Run `skill-start run-7` once"), "{words}");
-    assert!(!words.contains(crate::skill_start::LAUNCHER), "{words}");
+    assert!(
+        words.contains(&format!("{} run-7", crate::skill_start::LAUNCHER)),
+        "{words}"
+    );
+    assert!(!words.contains("`skill-start run-7`"), "{words}");
     assert!(words.contains("`terminal` tool"), "{words}");
     assert!(words.contains("`background` false"), "{words}");
     assert!(words.contains("`timeout` 120,"), "{words}");

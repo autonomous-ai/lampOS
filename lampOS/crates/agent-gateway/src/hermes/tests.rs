@@ -262,6 +262,27 @@ fn events_become_progress_and_the_answer() {
     assert_eq!((s.run_tokens(), kept(&f).tokens), (1200, 1200));
 }
 
+/// V1's 250k backstop compares one turn's usage: each ended run's
+/// `usage.input_tokens` replaces the last, never summed across turns (a sum
+/// rotated the kept session after one web search, ee17 24 Nov 02:55).
+#[test]
+fn the_kept_tokens_are_the_last_turns_never_a_sum() {
+    let f = Fake::start();
+    let mut s = ready(&f);
+    for (task, input) in [("a", 200_000u64), ("b", 300)] {
+        let run = s.send(&turn(task, "x")).unwrap();
+        following(&f, &run, 1);
+        f.push(
+            &run.0,
+            "run.completed",
+            json!({"output": "ok", "usage": {"input_tokens": input, "output_tokens": 5}}),
+        );
+        answered(s.wait(&run, 5 * SECOND).unwrap());
+    }
+    assert_eq!((s.run_tokens(), kept(&f).tokens), (300, 300));
+    assert_eq!(s.turns(), 2);
+}
+
 #[test]
 fn failed_and_cancelled_runs_end_as_such() {
     let f = Fake::start();

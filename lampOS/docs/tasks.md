@@ -6409,8 +6409,10 @@ same as OpenClaw's skills. What is Hermes's own:
   and hands it to the direct session (`direct::takes_runs`). Hermes's per-run
   wrapper, token file and namespace are not used, so they are not checked. The
   run's grant is made live for the launcher (`gateway::open_start`), and its
-  words name the launcher as `skill-start <run id>` (it is first on the
-  gateway's `PATH`), plus one line for Hermes (`direct::skill_words`): run it
+  words name the launcher by its full path, as OpenClaw's do (Hermes's
+  `terminal` tool takes its `PATH` from a login shell's snapshot, not the
+  gateway's, so a bare `skill-start` is not found there), plus one line for
+  Hermes (`direct::skill_words`): run it
   with the `terminal` tool, in the foreground
   (`background` false), with `timeout` the run's deadline (at most 600 s,
   Hermes's foreground bound), and wait for it to end. No per-run token file, no
@@ -6431,10 +6433,12 @@ same as OpenClaw's skills. What is Hermes's own:
   (`direct::HERMES_CONTEXT_TOKENS`, 128k: the model's own is not read, so the
   smaller is taken), on the gateway's own size of the kept session (its live,
   uncompacted messages and their tokens). Because Hermes compacts on its own
-  and its size is after that, V1's backstop also holds: 40 turns or 250k tokens
-  (`one_session::rotation_due`), counted by the session since it began (its
-  runs handed over, and the sum of their `usage.input_tokens`) and kept with
-  its id across restarts.
+  and its size is after that, V1's turn backstop also holds: 40 turns
+  (`one_session::rotation_due`), the runs handed over since the session
+  began, kept with its id across restarts. A turn's tokens are no bound here:
+  `usage.input_tokens` counts every model call's prompt in the run, so one web
+  search turn passed 250k on lamp-ee17; the size above judges the context, as
+  for OpenClaw.
 - **A drop.** The gateway restarted or gone mid-run (its stream broken and its
   status unreadable for 30 s) ends the run, and every turn queued behind it,
   with the same `lamp_agent_gateway::DROPPED` words. Nothing is run again: the
