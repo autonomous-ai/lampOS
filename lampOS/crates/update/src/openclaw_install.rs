@@ -2004,7 +2004,7 @@ fn steps(
     if let Err(why) = run(&["systemctl", "reset-failed", UNIT].map(str::to_owned)) {
         say(&format!("{UNIT} not reset-failed: {why}"));
     }
-    settled(run, say);
+    settled(run, now_unix_ms(), say);
     if let Err(why) = run(&["systemctl", "restart", UNIT].map(str::to_owned)) {
         return fail("gateway", format!("systemctl restart {UNIT}: {why}"), say);
     }
@@ -2169,54 +2169,100 @@ fn gateway_active(run: &mut Runner) -> bool {
     run(&["systemctl", "is-active", "--quiet", UNIT].map(str::to_owned)).is_ok()
 }
 
-/// How many times [`settled`] looks for the gateway listening, at most.
-pub const SETTLE_TRIES: u32 = 75;
-/// The wait between those looks: 75 × 2 s, 150 s at most (the gateway's
-/// first start is about 60 s; its stop budget at startup 85 s).
-pub const SETTLE_AGAIN: Duration = if cfg!(test) {
+/// How long after its start a listening gateway is past its startup drain
+/// (#8324): kit-8306b on lamp-52e6 saw :18789 first listen 46 s after the
+/// start and a stop at that first listen drain 79.9 s (OpenClaw logs a
+/// startup budget of `drain=75000ms`); a stop 60 s or more after the
+/// listen took under 10 s. 150 s from the start is that listen, those 60 s
+/// and a margin.
+pub const SETTLED_AFTER_START: Duration = Duration::from_secs(150);
+/// How long a listen [`settled`] saw begin is waited past, at least: the
+/// 60 s of kit-8306b's loaded stop and 30 s of margin. It also covers a
+/// gateway whose start systemd can't say.
+pub const SETTLED_AFTER_LISTEN: Duration = Duration::from_secs(90);
+/// The most [`settled`] waits: past it the restart is done anyway.
+pub const SETTLE_AT_MOST: Duration = Duration::from_secs(300);
+/// How often [`settled`] looks. Its waits are counted in these steps, not
+/// read off a clock (each look's own time only lengthens the wait).
+pub const SETTLE_EVERY: Duration = Duration::from_secs(2);
+/// The sleep of one step: [`SETTLE_EVERY`], shortened in tests.
+const SETTLE_SLEEP: Duration = if cfg!(test) {
     Duration::from_millis(1)
 } else {
-    Duration::from_secs(2)
+    SETTLE_EVERY
 };
 
-/// #8324: before the install's restart, a gateway running but not yet
-/// listening on [`PORT`] (in its first start, as just restarted by a
-/// lamp-control restart through `PartOf=`, a round's try-restart, or
-/// `Restart=always`) is waited for until it listens, [`SETTLE_TRIES`] ×
-/// [`SETTLE_AGAIN`] at most. A stop in that window drained for about 80 s,
-/// ran into the 90 s `TimeoutStopSec`, was SIGKILLed and left OpenClaw's
-/// state unreadable (gate G on lamp-52e6); a stop of one listening takes
-/// about 3 s. A gateway not running, or a listen not readable, waits for
-/// nothing.
-fn settled(run: &mut Runner, say: &mut dyn FnMut(&str)) {
+/// #8324: before the install's restart, a running gateway still in its
+/// first start is waited for until it is past its startup drain: it listens
+/// on [`PORT`], [`SETTLED_AFTER_START`] has passed since systemd started
+/// it, and [`SETTLED_AFTER_LISTEN`] since a listen seen to begin here.
+/// [`SETTLE_AT_MOST`] at most, looking every [`SETTLE_EVERY`]. A stop at
+/// the first listen drained 79.9 s against the 90 s `TimeoutStopSec`
+/// (kit-8306b); a second stop seconds after a start was SIGKILLed and
+/// left OpenClaw's state unreadable (gate G on lamp-52e6). The earlier
+/// start may be `gateway_config`'s supervisor restart, a round's
+/// `gateway_on`, a lamp-control restart or a boot. A gateway not running,
+/// or a listen not readable, waits for nothing; listening at the first look
+/// with its start not said, it is restarted at once.
+fn settled(run: &mut Runner, now_unix_ms: u64, say: &mut dyn FnMut(&str)) {
     if !gateway_active(run) {
         return;
     }
+    let started = run(&[
+        "systemctl",
+        "show",
+        "--timestamp=unix",
+        "--property=ExecMainStartTimestamp",
+        "--value",
+        "--",
+        UNIT,
+    ]
+    .map(str::to_owned))
+    .ok()
+    .and_then(|value| value.trim().strip_prefix('@')?.parse::<u64>().ok())
+    .map(|seconds| Duration::from_millis(now_unix_ms.saturating_sub(seconds * 1000)));
     let sport = format!("sport = :{PORT}");
-    for tries in 0..SETTLE_TRIES {
-        match run(&["ss", "-Hltn", &sport].map(str::to_owned)) {
+    let mut listen_seen: Option<Duration> = None;
+    let mut waited = Duration::ZERO;
+    loop {
+        let listening = match run(&["ss", "-Hltn", &sport].map(str::to_owned)) {
+            Ok(out) => !out.trim().is_empty(),
             Err(why) => {
                 say(&format!(
                     "{UNIT}: its listen on {PORT} not read: {why}; restarted now"
                 ));
                 return;
             }
-            Ok(out) if !out.trim().is_empty() => {
-                if tries > 0 {
-                    say(&format!("{UNIT} listens on {PORT} now: restarted (#8324)"));
-                }
-                return;
-            }
-            Ok(_) if tries == 0 => say(&format!(
-                "{UNIT} is starting, not listening on {PORT} yet: the restart waits for it (#8324)"
-            )),
-            Ok(_) => {}
+        };
+        if listening && listen_seen.is_none() && waited > Duration::ZERO {
+            listen_seen = Some(waited);
         }
-        std::thread::sleep(SETTLE_AGAIN);
+        let past_start = started.is_none_or(|age| age + waited >= SETTLED_AFTER_START);
+        let past_listen = listen_seen.is_none_or(|at| waited - at >= SETTLED_AFTER_LISTEN);
+        if listening && past_start && past_listen {
+            if waited > Duration::ZERO {
+                say(&format!(
+                    "{UNIT} past its startup after {} s more: restarted (#8324)",
+                    waited.as_secs()
+                ));
+            }
+            return;
+        }
+        if waited >= SETTLE_AT_MOST {
+            say(&format!(
+                "{UNIT} still in its startup after {} s: restarted anyway (#8324)",
+                waited.as_secs()
+            ));
+            return;
+        }
+        if waited == Duration::ZERO {
+            say(&format!(
+                "{UNIT} is in its startup (listening on {PORT}: {listening}): the restart waits until it is past it (#8324)"
+            ));
+        }
+        std::thread::sleep(SETTLE_SLEEP);
+        waited += SETTLE_EVERY;
     }
-    say(&format!(
-        "{UNIT} still not listening on {PORT}: restarted anyway (#8324)"
-    ));
 }
 
 /// An [`exec_allowlist_args`] edit as it is run: as `lampos`, through
