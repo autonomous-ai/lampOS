@@ -12170,11 +12170,19 @@ async fn spoken(
     // nothing here. Taken: the request ends as a normal end does, nothing of
     // it carried, with no chat round and no words from the lamp; the app
     // speaks for itself.
-    // `LAMP_CARE_LINE` (#7689 part 2): words of self-harm, or within the
-    // hold the person asking who to call, are never offered to an app's
-    // trigger: taken, the turn would end with no caring answer and no care
-    // line. Judged as the care turn below judges them.
+    // Words of self-harm (#7689 part 2) are never offered to an app's
+    // trigger: taken, the turn would end with no answer at all. With
+    // `LAMP_CARE_LINE` on, as the care turn below judges them, and within
+    // its hold the person asking who to call too; with it off too (App
+    // Only's 10:00 on #8341, Store apps going to users), by
+    // `care_line::said_harm` alone: the line then goes to the model as any
+    // other, nothing held or said.
     let care_turn = care_caught
+        || (shared.care.is_none()
+            && !empty
+            && !held
+            && !echoed
+            && crate::care_line::said_harm(&text))
         || shared.care.as_ref().is_some_and(|care| {
             care.holds(Instant::now()) && crate::care_line::asks_who_to_call(&text)
         });
