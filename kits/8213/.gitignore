@@ -1,0 +1,6 @@
+out/
+secret/
+src/
+stable/
+logs/
+*.wav

@@ -1,0 +1,19 @@
+# Clips for the split ROW kit (ElevenLabs only, the played-voice rule; no say, no Deepgram). The kit plays
+# $CLIPS/<ID>.wav from the Mac with afplay (Mac volume read only, <=70, never set). Render them before the slot; the
+# wavs are not part of the kit. One clip per line: ID<TAB>words.
+# Piece A (#8156 legs 3-6): T1, T2, T3 (played while T2 runs), T4. Piece B (#8213 Hermes legs 6-8): HMAKE, HTRY, HRUN,
+# HDEL, and YES only if a read-back still asks for a yes (LAMP_MAKE_NO_ASKS on: none expected). O* are the OpenClaw legs
+# (steps 2-5), not run by the pieces.
+T1	Hey Lamp, write a short poem about the sea and save it in a file called sea.md.
+T2	Hey Lamp, add one more line to the sea poem.
+T3	Hey Lamp, how is the sea poem going?
+T4	Hey Lamp, make a list of three fruits in fruits.md.
+OMAKE	Hey Lamp, make me a skill that, when I say lemon file, has an agent write three facts about lemons into a file.
+OTRY	Hey Lamp, try lemon file.
+ORUN	Hey Lamp, run lemon file.
+ODEL	Hey Lamp, remove the lemon file skill.
+HMAKE	Hey Lamp, make me a skill that, when I say plum file, has an agent write three facts about plums into a file.
+HTRY	Hey Lamp, try plum file.
+HRUN	Hey Lamp, run plum file.
+HDEL	Hey Lamp, remove the plum file skill.
+YES	Yes, go ahead.
