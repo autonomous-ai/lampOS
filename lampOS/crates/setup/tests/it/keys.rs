@@ -48,10 +48,13 @@ fn a_key_absent_present_and_removed() {
     let store = Store(folder("cycle"));
     let mut works = Told(Verdict::Works, vec![]);
     let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
-    // With #8367's fields beside today's (`offers` is pinned below).
+    // With #8367's and #8362's fields beside today's (`offers` is pinned
+    // below).
+    let none =
+        json!({"deepseek": null, "deepgram": null, "elevenlabs": null, "openai_compatible": null});
     assert_eq!(
         reply,
-        json!({"done": {"deepseek": "lamp", "deepgram": "lamp", "elevenlabs": "lamp", "since": {"deepseek": null, "deepgram": null, "elevenlabs": null}, "deepseek_host": null, "voice_id": {"elevenlabs": null}, "offers": reply["done"]["offers"]}})
+        json!({"done": {"deepseek": "lamp", "deepgram": "lamp", "elevenlabs": "lamp", "openai_compatible": "lamp", "since": none, "deepseek_host": null, "voice_id": {"elevenlabs": null}, "openai_compatible_host": null, "model": none, "checked": none, "in_use": {"model": null}, "offers": reply["done"]["offers"]}})
     );
     for service in ["deepseek", "deepgram"] {
         let (reply, done) = keys::answer(&set(service, ""), &store, &mut works, true);
@@ -465,6 +468,7 @@ fn elevenlabs_is_offered_beside_the_model_services() {
             {"service": "deepseek", "name": "DeepSeek", "kind": "model", "models": [], "base_url": true, "fields": []},
             {"service": "deepgram", "name": "Deepgram", "kind": "model", "models": [], "base_url": false, "fields": []},
             {"service": "elevenlabs", "name": "ElevenLabs", "kind": "voice", "models": [], "base_url": false, "fields": ["voice_id"]},
+            {"service": "openai_compatible", "name": "OpenAI-compatible", "kind": "model", "models": [], "base_url": true, "fields": ["model"]},
         ])
     );
     assert_eq!(which["elevenlabs"], "lamp");

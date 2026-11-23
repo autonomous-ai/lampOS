@@ -145,6 +145,10 @@ pub struct Hosted {
     /// voice speak in its place ([`OWN_KEYS_ENV`], #8367): a piece
     /// ElevenLabs refuses for theirs is said in this one.
     pub lamps_voice: Option<LampsVoice>,
+    /// With the person's own OpenAI-compatible model (#8362): the chats as
+    /// they were before it, the lamp's own, which the search, the memory's
+    /// passes and a refused or failed request keep using.
+    pub lamps_own: Option<Box<Hosted>>,
 }
 
 /// The lamp's own speech, as the route had it before the person's voice.
@@ -523,6 +527,7 @@ fn load_reporting(path: &Path) -> io::Result<(SecondConfig, Option<String>)> {
         own_deepseek: None,
         relay_deepseek_base_url: None,
         lamps_voice: None,
+        lamps_own: None,
     };
     let config = SecondConfig {
         search,
@@ -593,6 +598,42 @@ pub const OWN_DEEPSEEK_KEY: &str = "own_deepseek.key";
 /// The DeepSeek endpoint the person gave with their key, one https URL.
 pub const OWN_DEEPSEEK_URL: &str = "own_deepseek.url";
 pub const OWN_DEEPGRAM_KEY: &str = "own_deepgram.key";
+/// The person's own OpenAI-compatible model (#8362): its key, its https
+/// endpoint and its model's name, as root's helper keeps them.
+pub const OWN_COMPATIBLE_KEY: &str = "own_openai_compatible.key";
+pub const OWN_COMPATIBLE_URL: &str = "own_openai_compatible.url";
+pub const OWN_COMPATIBLE_MODEL: &str = "own_openai_compatible.model";
+
+/// A model's name as it goes in a request's body: 1 to 128 letters,
+/// digits, `-`, `.`, `_`, `/` and `:`.
+fn fits_model(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 128
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '.' | '_' | '/' | ':'))
+}
+
+impl SecondConfig {
+    /// The route as it is without the person's own OpenAI-compatible model:
+    /// the lamp's own chat, for the search and the memory's passes, which
+    /// only DeepSeek's own API and the relay serve (#8362). The voice stays
+    /// as it is.
+    pub fn lamps_own(&self) -> std::borrow::Cow<'_, Self> {
+        match &self.hosted.lamps_own {
+            Some(hosted) => {
+                let mut config = self.clone();
+                config.hosted = Hosted {
+                    lamps_voice: self.hosted.lamps_voice.clone(),
+                    lamps_own: None,
+                    ..(**hosted).clone()
+                };
+                std::borrow::Cow::Owned(config)
+            }
+            None => std::borrow::Cow::Borrowed(self),
+        }
+    }
+}
 /// The person's ElevenLabs key and voice ID (#8367), beside the others.
 pub const OWN_ELEVENLABS_KEY: &str = "own_elevenlabs.key";
 pub const OWN_ELEVENLABS_VOICE: &str = "own_elevenlabs.voice";
@@ -634,6 +675,43 @@ impl SecondConfig {
             Err(error) => Err(error.kind()),
         };
         let mut lines = Vec::new();
+        // The person's own OpenAI-compatible model (#8362), over DeepSeek's
+        // own key if both were somehow there; said only when it is there.
+        let compatible = own(OWN_COMPATIBLE_KEY).and_then(|key| {
+            let Some(key) = key else { return Ok(None) };
+            let read = |name: &str| -> Result<String, io::ErrorKind> {
+                Ok(own(name)?
+                    .ok_or(io::ErrorKind::NotFound)?
+                    .expose()
+                    .trim()
+                    .to_owned())
+            };
+            let url =
+                checked_url(read(OWN_COMPATIBLE_URL)?).map_err(|_| io::ErrorKind::InvalidData)?;
+            let model = read(OWN_COMPATIBLE_MODEL)?;
+            if !fits_model(&model) {
+                return Err(io::ErrorKind::InvalidData);
+            }
+            Ok(Some((key, url, model)))
+        });
+        let compatible_line = match compatible {
+            Ok(Some((key, url, model))) => {
+                let line = format!(
+                    "OpenAI-compatible: the person's own key, at {}, model {model} (LAMP_OWN_KEYS)",
+                    host(&url)
+                );
+                let lamps_own = self.hosted.clone();
+                self.hosted.relay_deepseek_base_url = self.hosted.deepseek_base_url.replace(url);
+                self.hosted.deepseek_model = model;
+                self.hosted.own_deepseek = Some(key);
+                self.hosted.lamps_own = Some(Box::new(lamps_own));
+                Some(line)
+            }
+            Ok(None) => None,
+            Err(kind) => Some(format!(
+                "OpenAI-compatible: the relay, the person's key could not be read ({kind}) (LAMP_OWN_KEYS)"
+            )),
+        };
         let deepseek = own(OWN_DEEPSEEK_KEY).and_then(|key| {
             let Some(key) = key else { return Ok(None) };
             let url = match own(OWN_DEEPSEEK_URL)? {
@@ -644,6 +722,10 @@ impl SecondConfig {
             Ok(Some((key, url)))
         });
         lines.push(match deepseek {
+            Ok(Some(_)) if self.hosted.lamps_own.is_some() => {
+                "DeepSeek: the person's OpenAI-compatible model in its place (LAMP_OWN_KEYS)"
+                    .to_owned()
+            }
             Ok(Some((key, url))) => {
                 let line = format!(
                     "DeepSeek: the person's own key, at {} (LAMP_OWN_KEYS)",
@@ -701,6 +783,7 @@ impl SecondConfig {
                 ),
             });
         }
+        lines.extend(compatible_line);
         lines.extend(switched_line);
         (self, lines)
     }
@@ -1359,6 +1442,7 @@ mod tests {
                 own_deepseek: None,
                 relay_deepseek_base_url: None,
                 lamps_voice: None,
+                lamps_own: None,
             }
         );
         let (_, config) = written(
