@@ -202,6 +202,15 @@ impl Entry {
             .unwrap_or_default()
     }
 
+    /// The card's id on the page, the same for the life of the turn: its
+    /// request and the time of the first step that came, which a step
+    /// timed earlier but come later does not move (the page keeps an
+    /// opened card open by it).
+    pub fn id(&self) -> String {
+        let first = self.steps.first().map_or(0, |(at, _)| *at);
+        format!("turn-{}-{first}", self.request)
+    }
+
     /// When the speech ended: the words heard, finished; or, for a turn the
     /// lamp began itself, its first step.
     pub fn speech_ended(&self) -> u64 {
