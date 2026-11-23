@@ -530,7 +530,7 @@ pub(crate) fn kept_args(name: &str, args: &serde_json::Value) -> Option<serde_js
     let bare = || serde_json::Value::Object(serde_json::Map::new());
     // An installed app's tool is kept by its name alone, never an argument
     // (`LAMP_APP_TOOLS`, #8406: "a bad knee" never rides a later turn).
-    if crate::app_tools::is_app_function(name) {
+    if crate::app_tools::is_app_function(name) || crate::app_tools::was_called(name) {
         return Some(bare());
     }
     if args.as_object().is_none_or(serde_json::Map::is_empty) {
@@ -673,7 +673,7 @@ pub(crate) fn failed_then_note(names: &[&str]) -> String {
 pub(crate) fn kept_result(name: &str, told: &serde_json::Value) -> Option<&'static str> {
     // An installed app's tool: its outcome alone, never a word of the
     // result (`LAMP_APP_TOOLS`, #8406).
-    if crate::app_tools::is_app_function(name) {
+    if crate::app_tools::is_app_function(name) || crate::app_tools::was_called(name) {
         return Some(crate::app_tools::outcome(told));
     }
     if name == crate::use_skill::NAME {
