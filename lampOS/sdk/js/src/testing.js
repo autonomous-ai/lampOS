@@ -444,7 +444,7 @@ export class FakeLamp {
   // no `done` follows them.
   // `refuses`: ops refused `refused` with this why, as a lamp that doesn't
   // route them yet does (LAMP_CONTROL_REFUSES); none by default.
-  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', language = 'en', build = null, autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null, appReach = false, local = false, app = false, appName = 'fake-app', appGrants = ['speak', 'hear', 'light'], appVersion = '1.0.0', appSettings = {}, panelRateS = 60 } = {}) {
+  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', language = 'en', build = null, autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null, appReach = false, local = false, app = false, appName = 'fake-app', appGrants = ['speak', 'hear', 'light'], appVersion = '1.0.0', appSettings = {}, panelRateS = 60, storeApps = true, appsHelper = true } = {}) {
     // `local`: also serve lamp-control's control socket (a unix socket, `localPath`) for a skill's run, where a
     // one-run token from `mintToken` is what lets a connection in (`Lamp.local`).
     this.local = local;
@@ -506,6 +506,14 @@ export class FakeLamp {
     // Pushed skills by name, and the one push in flight on the lamp.
     this.pushed = new Map();
     this.pushing = null;
+    // Pushed apps by name (`app.push`, docs/apps.md), and the one app push in flight. `storeApps` false is a lamp
+    // without LAMP_STORE_APPS, `appsHelper` false one without the apps helper: every app op is refused, in the lamp's
+    // words. `storeAppNames` are the Store apps installed here, whose names a push may not take.
+    this.storeApps = storeApps;
+    this.appsHelper = appsHelper;
+    this.pushedApps = new Map();
+    this.appPushing = null;
+    this.storeAppNames = new Set();
     this.subscribed = new Map();
     this.state = { presence: { count: 0, near: 0, facing: false }, light: null, mood: null, lamp: { talking: false, paused: false, private: false, asleep: false, muted_after_fault: false },
       // Made-up readings, as lamp-control answers them; `setAir` changes the
@@ -1071,6 +1079,70 @@ export class FakeLamp {
     });
   }
 
+  // `app.push`, `app.list` and `app.remove`, as lamp-control and the apps helper take them: only with LAMP_STORE_APPS
+  // and the helper, and only this computer's own apps.
+  appPushedOp(ws, client, id, request) {
+    if (!this.storeApps) return this.refuse(ws, id, 'refused', 'apps are off on this lamp');
+    if (!this.appsHelper) return this.refuse(ws, id, 'refused', 'app push is not on this lamp');
+    if (request.op === 'app.push') return this.pushApp(ws, client, id, request);
+    if (request.op === 'app.list') {
+      return this.ok(ws, id, { apps: [...this.pushedApps.values()].filter((a) => a.client === client).map(({ client: _, ...a }) => a) });
+    }
+    const kept = this.pushedApps.get(request.name);
+    if (!kept || kept.client !== client) return this.refuse(ws, id, 'refused', "not one of this computer's pushed apps");
+    this.pushedApps.delete(request.name);
+    return this.ok(ws, id, { removed: request.name });
+  }
+
+  // A part of an app push, as a skill's (`push`): in order from 0, one push at a time, the whole checked against its
+  // SHA-256, then its manifest (format 2, kind app, unsigned, grants within this pairing's, never `remember`), then
+  // kept as this computer's, replacing its app of that name.
+  pushApp(ws, client, id, request) {
+    let going = this.appPushing;
+    if (request.part === 0) {
+      if (going && going.client !== client) return this.refuse(ws, id, 'busy', "another computer's push is in flight");
+      going = this.appPushing = { client, part: -1, chunks: [] };
+    } else if (!going || going.client !== client || request.part !== going.part + 1) {
+      return this.refuse(ws, id, 'bad_request', 'parts out of order');
+    }
+    going.part = request.part;
+    going.chunks.push(Buffer.from(request.data, 'base64'));
+    if (request.part < request.parts - 1) return this.ok(ws, id, { got: request.part + 1 });
+    this.appPushing = null;
+    const data = Buffer.concat(going.chunks);
+    const sha = createHash('sha256').update(data).digest('hex');
+    if (data.length !== request.size || sha !== request.sha256.toLowerCase()) {
+      return this.refuse(ws, id, 'bad_request', "the package's SHA-256 doesn't match");
+    }
+    const files = new Map();
+    for (let at = 0; at + 512 <= data.length;) {
+      const name = data.subarray(at, at + 100).toString('utf8').replace(/\0.*$/s, '');
+      if (!name) break;
+      const size = parseInt(data.subarray(at + 124, at + 135).toString('ascii'), 8);
+      files.set(name, data.subarray(at + 512, at + 512 + size));
+      at += 512 + Math.ceil(size / 512) * 512;
+    }
+    if (files.has('lamp-skill.sig')) return this.refuse(ws, id, 'refused', 'it carries lamp-skill.sig: a pushed app is unsigned');
+    let manifest;
+    try { manifest = JSON.parse(files.get('lamp-skill.json')?.toString('utf8') ?? ''); } catch { manifest = null; }
+    if (manifest?.format !== 2 || manifest.kind !== 'app' || manifest.name !== request.name) {
+      return this.refuse(ws, id, 'refused', 'not a package of that app');
+    }
+    const grants = this.clients.get(client).grants;
+    for (const grant of manifest.grants ?? []) {
+      if (grant === 'remember' || !grants.includes(grant)) return this.refuse(ws, id, 'no_grant', `not granted: ${grant}`);
+    }
+    if (this.storeAppNames.has(request.name)) return this.refuse(ws, id, 'refused', 'a Store app has that name');
+    const kept = this.pushedApps.get(request.name);
+    if (kept && kept.client !== client) return this.refuse(ws, id, 'refused', "another computer's app has that name");
+    const app = {
+      name: manifest.name, title: manifest.title ?? manifest.name, version: manifest.version ?? '', sha256: sha,
+      grants: [...(manifest.grants ?? [])], net: Boolean(manifest.net), logs: Boolean(manifest.logs),
+    };
+    this.pushedApps.set(request.name, { ...app, stopped: false, client });
+    return this.ok(ws, id, { app: { ...app, updated: kept !== undefined, started: true, from: 'computer' } });
+  }
+
   ok(ws, re, fields = {}) { ws.send(JSON.stringify({ re, ok: true, ...fields })); }
 
   pair(ws, request, nonce) {
@@ -1163,7 +1235,7 @@ export class FakeLamp {
     if (['gesture', 'move', 'play', 'joints'].includes(op)) return ['body'];
     if (op === 'lease.take') return (request.parts ?? []).map((p) => ({ body: 'body', light: 'light', voice: 'speak' })[p]);
     const speak = ['say', 'sound', 'sound.upload', 'sound.list', 'sound.remove', 'turn.end', 'volume'];
-    if (op.startsWith('skill.')) return ['skills'];
+    if (op.startsWith('skill.') || ['app.push', 'app.list', 'app.remove'].includes(op)) return ['skills'];
     if (op.startsWith('notes.')) return ['notes'];
     if (speak.includes(op)) return ['speak'];
     // A turn speaks and hears what is said to the lamp.
@@ -1586,6 +1658,10 @@ export class FakeLamp {
         this.pushed.delete(request.name);
         return this.ok(ws, id);
       }
+      case 'app.push':
+      case 'app.list':
+      case 'app.remove':
+        return this.appPushedOp(ws, client, id, request);
       case 'notes.set':
       case 'notes.get':
       case 'notes.delete':

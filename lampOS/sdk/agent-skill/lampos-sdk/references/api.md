@@ -224,6 +224,26 @@ this lamp"; try it on `lamp fake`. To try it:
 From lamp-mcp, with the same grant: `lamp_skill_push(folder)`, `lamp_skills()`
 and `lamp_skill_remove(name)`.
 
+## Apps of your own, on your own lamp
+
+| what | Python | JavaScript | command line |
+|---|---|---|---|
+| put an app on the lamp | `await lamp.push_app(path)` (folder or tar) | `await lamp.pushApp(tar)` | `lamp app push DIR\|TAR` |
+| this computer's pushed apps | `await lamp.apps()` | `await lamp.apps()` | `lamp app list` |
+| take one off | `await lamp.remove_app(name)` | `await lamp.removeApp(name)` | `lamp app remove NAME` |
+
+An app (format 2, `lampOS/docs/apps.md`) can go on the developer's own paired
+lamp with no Store: the pairing, with its `skills` grant, is the owner's yes,
+with no yes at the lamp. It is **unsigned**: a tar carrying `lamp-skill.sig`
+is refused. Python checks it as `lamp app check` does and packs a folder; JS
+takes the tar only (`lamp app pack DIR` makes it). Every grant the manifest's
+`grants` asks must be one the pairing holds (`remember` never is; `net` and
+`logs` are booleans, not grants). 4 MiB at most, in parts of 36 KiB, checked
+before a byte goes; a re-push of the name replaces it. A lamp without
+`LAMP_STORE_APPS` refuses "apps are off on this lamp"; one without the apps
+helper, "app push is not on this lamp". From lamp-mcp: `lamp_app_push(package)`,
+`lamp_apps()` and `lamp_app_remove(name)`.
+
 ## Errors
 
 Every refusal is a `LampError` (Python `lampos.errors.BY_CODE[code]`, JS

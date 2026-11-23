@@ -463,6 +463,30 @@ In code: `lampos.app.check(path)`, `lampos.app.pack(folder)`, and
 token. A refusal is a `StoreError` (a `LampError`) with the Store's
 `error_code` as `code`.
 
+### Push it to your own lamp
+
+The same folder, or its packed tar, can go on your own paired lamp with no
+Store and no yes at the lamp: the pairing, with its `skills` grant, is the
+owner's yes. A pushed app is **unsigned**: a tar must not carry
+`lamp-skill.sig`.
+
+```sh
+lamp app push gym-coach             # checks it, packs it, sends it in parts: "gym-coach 1.0.0 pushed, running"
+lamp app push gym-coach-1.0.0.tar   # or the packed tar, as it is
+lamp app list
+lamp app remove gym-coach
+```
+
+`push` runs `lamp app check` first, and refuses on this computer, before a
+byte is sent: a check error, a signed tar, a package over 4 MiB (a pushed
+app's bound, below the Store's 18 MiB), a pairing without `skills`, and a
+manifest grant this pairing doesn't hold (`remember` never is; `net` and
+`logs` are booleans, not grants). A re-push of the name replaces your app of
+it, any version. The lamp checks it all again; without `LAMP_STORE_APPS` it
+answers `refused`, "apps are off on this lamp", and without its apps helper,
+"app push is not on this lamp". In code: `await lamp.push_app(path)`,
+`await lamp.apps()`, `await lamp.remove_app(name)`. Try it on `lamp fake`.
+
 ## Everything you can read
 
 What the lamp tells a paired computer, read from lamp-control's `watch.rs`,
@@ -696,6 +720,9 @@ and send it again. Without `retry_ms`, it is a held part, as above.
 | `await lamp.push_skill(folder)` | on customer lamps from stable 11091 on (11048 and older refuse it). A skill folder (`SKILL.md`, `skill.toml` with a `version`): checked as `lamp skill check` does, packed and sent in parts. A `moves/NAME.json` the skill's own rules don't play (a recorded move for `play`) that the body would refuse is a warning, not an error, since the lamp installs the skill and leaves it out; the answer's `moves` says `kept` and `left_out` with why (a lamp that doesn't say gets the check's own list, `kept` None) | `skills` |
 | `await lamp.skills()` | | `skills` |
 | `await lamp.remove_skill(name)` | one of this computer's own pushed skills | `skills` |
+| `await lamp.push_app(path)` | an app of your own: its folder (`app.json`, `src/`, ...), packed here, or its packed tar (unsigned, 4 MiB at most), checked as `lamp app check` does and sent in parts; the answer is the lamp's `app`: `name`, `title`, `version`, `sha256`, `grants`, `net`, `logs`, `updated`, `started` and `from`. Every manifest grant must be this pairing's (never `remember`) | `skills` |
+| `await lamp.apps()` | this computer's own pushed apps, each with `stopped` | `skills` |
+| `await lamp.remove_app(name)` | one of this computer's own pushed apps | `skills` |
 
 ### The `lamp` command
 
@@ -718,6 +745,9 @@ and send it again. Without `retry_ms`, it is a held part, as above.
 | `lamp app status [ID]` | your apps, or one: `review_status`, the reviewer's note, visibility |
 | `lamp app request-public ID` | asks the reviewers to make an approved app public |
 | `lamp app studio [--port N] [--no-open]` | the publishing page, on 127.0.0.1 only; `--port` (any free one), `--no-open` prints its address without opening a browser |
+| `lamp app push FOLDER\|TAR [LAMP_ID]` | an app of your own, its folder (packed here) or its tar, unsigned: checked as `lamp app check` does, then put on the paired lamp (`skills` grant) |
+| `lamp app list [LAMP_ID]` | this computer's own pushed apps |
+| `lamp app remove NAME [LAMP_ID]` | takes one of them off the lamp |
 
 The Store commands (`login`, `logout`, `app submit`, `app status`,
 `app request-public`, `app studio`) take `--staging`, or `--store URL` and
