@@ -71,6 +71,12 @@ pub trait PackageReader {
     /// Store's key and every file against the manifest. A format-1 package or
     /// any other thing is an `Err`.
     fn read(&self, bytes: &[u8]) -> Result<AppPackage, String>;
+    /// Reads a package pushed from a paired computer: every check [`Self::read`]
+    /// makes but the signature, which it must not carry. Only the door's
+    /// `install_pushed` reads with it.
+    fn read_pushed(&self, _bytes: &[u8]) -> Result<AppPackage, String> {
+        Err("this build cannot read a pushed app".into())
+    }
 }
 
 /// The SHA-256 of `bytes`, lowercase hex: what the owner's yes is keyed to.

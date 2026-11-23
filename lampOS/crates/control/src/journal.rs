@@ -233,6 +233,9 @@ pub fn op_name(op: &Op) -> &'static str {
         Op::SkillPush { .. } => "skill.push",
         Op::SkillList {} => "skill.list",
         Op::SkillRemove { .. } => "skill.remove",
+        Op::AppPush { .. } => "app.push",
+        Op::AppList {} => "app.list",
+        Op::AppRemove { .. } => "app.remove",
         Op::CameraSnapshot {} => "camera.snapshot",
         Op::CameraStream { .. } => "camera.stream",
         Op::Pose { .. } => "pose",
@@ -264,6 +267,7 @@ pub fn went(op: &Op) -> &'static str {
             "the lamp's clips folder"
         }
         Op::SkillPush { .. } | Op::SkillList {} | Op::SkillRemove { .. } => "the skill helper",
+        Op::AppPush { .. } | Op::AppList {} | Op::AppRemove { .. } => "the apps' helper",
         Op::CameraSnapshot {} => "the eyes' newest frame, by sight.jpg",
         Op::CameraStream { .. } => "the eyes, by sight.jpg or their frames socket",
         Op::MicrophoneStream { .. } => "the ears, by mic1/audio",

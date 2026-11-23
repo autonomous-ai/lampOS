@@ -9,6 +9,7 @@ mod launcher;
 mod lock;
 mod manage;
 mod name;
+mod pushed;
 mod remove;
 mod run;
 mod skills_reader;

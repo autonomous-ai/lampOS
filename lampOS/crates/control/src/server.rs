@@ -244,6 +244,9 @@ pub struct Shared {
     /// The manage helper's socket, root's, which installs, lists and
     /// removes pushed skills (`crate::push`).
     manage: Mutex<Option<PathBuf>>,
+    /// The apps' helper's socket, root's, which installs, lists and removes
+    /// the apps computers pushed (`crate::app_push`).
+    apps_manage: Mutex<Option<PathBuf>>,
     /// Where the owner's yeses to skills' tasks are kept (`--state-dir`,
     /// [`crate::task_yes`]): none, and the yes requests are refused.
     task_yes: Mutex<Option<PathBuf>>,
@@ -475,6 +478,7 @@ impl Shared {
             yes: Mutex::new(None),
             peers: Mutex::new(HashMap::new()),
             manage: Mutex::new(None),
+            apps_manage: Mutex::new(None),
             task_yes: Mutex::new(None),
             apps: Mutex::default(),
             apps_dir: Mutex::new(PathBuf::from(crate::app_yes::APPS_DIR)),
@@ -549,6 +553,11 @@ impl Shared {
         *self.manage.lock().expect("manage") = Some(socket);
     }
 
+    /// The apps' helper's socket, for `app.push`, `app.list` and `app.remove`.
+    pub fn set_apps_manage_socket(&self, socket: PathBuf) {
+        *self.apps_manage.lock().expect("apps_manage") = Some(socket);
+    }
+
     /// The folder the owner's yeses to skills' tasks are kept in
     /// ([`crate::task_yes`], lamp-control's `--state-dir`).
     pub fn set_task_yes_folder(&self, folder: PathBuf) {
@@ -564,6 +573,10 @@ impl Shared {
     ) {
         let shared = self.clone();
         tokio::task::spawn_blocking(move || {
+            if ask.kind.of_apps() {
+                shared.ask_apps_helper(ask, outbox);
+                return;
+            }
             let socket = shared.manage.lock().expect("manage").clone();
             let answer = match socket {
                 Some(socket) => crate::push::ask_helper(&socket, &ask.request, ask.wait()),
@@ -615,7 +628,7 @@ impl Shared {
                             store.remove_skill(&ask.client, name);
                         }
                     }
-                    crate::push::AskKind::List => {}
+                    _ => {}
                 }
             }
             // A pairing changed while the install was with the helper: its
@@ -639,6 +652,64 @@ impl Shared {
                 let _ = outbox.send(reply);
             }
         });
+    }
+
+    /// `ask` of the apps' helper, on a blocking thread: an `app.push`'s
+    /// staged file is removed once answered (the helper read it once), and
+    /// another push may begin; a pushed app that went on is said aloud in one
+    /// line, with its undo (the first builder on #7570).
+    fn ask_apps_helper(&self, ask: crate::push::Ask, outbox: mpsc::WeakUnboundedSender<Value>) {
+        let socket = self.apps_manage.lock().expect("apps_manage").clone();
+        let answer = match socket {
+            Some(socket) => crate::push::ask_helper(&socket, &ask.request, ask.wait()),
+            None => Err("no apps manage socket given".to_owned()),
+        };
+        let reply = ask.answer(answer);
+        {
+            let mut door = self.door.lock().expect("door");
+            match ask.kind {
+                crate::push::AskKind::AppInstall => door.app_push_installed(),
+                _ => door.helper_answered(&ask.client),
+            }
+        }
+        if ask.kind == crate::push::AskKind::AppInstall {
+            if let Some(path) = ask.request["install_pushed"]["path"].as_str() {
+                match std::fs::remove_file(path) {
+                    Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+                        eprintln!("lamp-control: app.push: removing the staged package: {error}");
+                    }
+                    _ => {}
+                }
+            }
+            if reply["ok"] == true {
+                let app = &reply["app"];
+                eprintln!(
+                    "lamp-control: app.push: {} {} installed from {}",
+                    app["name"].as_str().unwrap_or_default(),
+                    app["version"].as_str().unwrap_or_default(),
+                    ask.client
+                );
+                let title = app["title"].as_str().unwrap_or_default();
+                let said = self.parts.lock().expect("parts").act(
+                    PIN_SPEAKER,
+                    0,
+                    &Op::Say {
+                        text: crate::app_push::said_on(title),
+                        rephrase: None,
+                    },
+                    self.now_us(),
+                );
+                if let Err(error) = said {
+                    eprintln!(
+                        "lamp-control: app.push: the line was not said: {}",
+                        error.why
+                    );
+                }
+            }
+        }
+        if let Some(outbox) = outbox.upgrade() {
+            let _ = outbox.send(reply);
+        }
     }
 
     /// A reply the part gives later (the voice's to a `turn.end` or a
@@ -744,6 +815,7 @@ impl Shared {
                 yes: Mutex::new(None),
                 peers: Mutex::new(HashMap::new()),
                 manage: Mutex::new(None),
+                apps_manage: Mutex::new(None),
                 task_yes: Mutex::new(None),
                 apps: Mutex::default(),
                 apps_dir: Mutex::new(PathBuf::from(crate::app_yes::APPS_DIR)),

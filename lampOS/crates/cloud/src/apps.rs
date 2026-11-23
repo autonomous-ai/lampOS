@@ -132,6 +132,10 @@ pub struct Package {
     /// top-level `net` and `logs`): an update's yes carries these like grants.
     pub net: bool,
     pub logs: bool,
+    /// Pushed from the owner's own paired computer (the record's `pushed`,
+    /// docs/apps.md, "An app from your own computer"): the page says "From
+    /// your computer".
+    pub from_computer: bool,
 }
 
 /// What this part reads of and asks of the lamp: the files, systemd, and the
@@ -291,6 +295,12 @@ impl Apps {
         if let Some(package) = &package {
             row.insert("version".into(), json!(package.version));
         }
+        // Where it came from: the Store, or the owner's own computer.
+        let from_computer = package.as_ref().is_some_and(|package| package.from_computer);
+        row.insert(
+            "from".into(),
+            json!(if from_computer { "computer" } else { "store" }),
+        );
         row.insert("state".into(), json!(state_of(&marks, &unit)));
         // Values and panel are lamp-control's (`app_state`: `settings` are the
         // values now, `panel` the latest or null, `socket` whether the app is
@@ -798,6 +808,7 @@ fn install_run(backend: &dyn Backend, asked: &Asked) -> Result<Value, String> {
             grants: Vec::new(),
             net: false,
             logs: false,
+            from_computer: false,
         };
         refused(&backend.control(&Wire::yes(op, &asked.id, &package, &grants, net, logs))?)?;
         let answer = match backend.helper(&Wire::install(&path)) {
@@ -992,6 +1003,7 @@ impl Backend for Real {
             // The helper's record, as the helper reads it (an old record has
             // none: no logs), so the yes and the helper's key agree.
             logs: record["logs"].as_bool().unwrap_or(false),
+            from_computer: record["pushed"].is_object(),
         })
     }
 
@@ -1154,6 +1166,7 @@ pub mod tests {
                     grants: vec!["speak".into(), "hear".into()],
                     net: false,
                     logs: true,
+                    from_computer: false,
                 }),
             )
         }
@@ -1257,6 +1270,7 @@ pub mod tests {
         assert_eq!(row["panel"]["title"], "Level A1");
         assert_eq!(row["connected"], true);
         assert_eq!(row["version"], "1.2.0");
+        assert_eq!(row["from"], "store");
     }
 
     #[test]
@@ -1445,6 +1459,7 @@ pub mod tests {
             grants: Vec::new(),
             net: false,
             logs: false,
+            from_computer: false,
         };
         let line = Wire::yes(
             "install",
@@ -1490,6 +1505,7 @@ pub mod tests {
             grants: Vec::new(),
             net: false,
             logs: false,
+            from_computer: false,
         };
         let remove = Wire::yes("remove", "x1", &package, &[], false, false);
         let inner = &remove["app_yes_record"];
@@ -1637,6 +1653,7 @@ pub mod tests {
             grants: Vec::new(),
             net: false,
             logs: false,
+            from_computer: false,
         });
         fake.apps.push(app);
         fake.helper_late = true;

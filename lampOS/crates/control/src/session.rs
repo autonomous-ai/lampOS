@@ -335,6 +335,13 @@ pub struct Door {
     /// and skill push is off on this lamp.
     push_folder: Option<PathBuf>,
     pushes: Pushes,
+    /// Where a pushed app's package is staged for the apps' helper
+    /// (`--apps-manage-socket`, [`crate::app_push`]): none, and app push is
+    /// off on this lamp.
+    apps_staging: Option<PathBuf>,
+    /// Whether apps are on (`LAMP_STORE_APPS=on`, read once at the start).
+    apps_on: bool,
+    app_pushes: Pushes,
     /// The computers' own clips (`crate::sounds`): none, and `sound` plays
     /// the hum only.
     sounds: Option<crate::sounds::Sounds>,
@@ -485,6 +492,9 @@ impl Door {
             quiet_runs: false,
             push_folder: None,
             pushes: Pushes::default(),
+            apps_staging: None,
+            apps_on: false,
+            app_pushes: Pushes::apps(),
             sounds: None,
             notes: None,
             moves: None,
@@ -634,6 +644,21 @@ impl Door {
         ));
         self.push_folder = Some(folder);
         self
+    }
+
+    /// App push given its apps' helper, its packages staged in `staging`;
+    /// `on` is `LAMP_STORE_APPS` ([`crate::app_push::on`]): off, every app
+    /// op says apps are off.
+    pub fn with_app_push(mut self, staging: PathBuf, on: bool) -> Self {
+        self.apps_staging = Some(staging);
+        self.apps_on = on;
+        self
+    }
+
+    /// The apps' helper has answered `client`'s `app.push` (or failed to):
+    /// another may begin. The server removes the staged file.
+    pub fn app_push_installed(&mut self) {
+        self.app_pushes.installed(None);
     }
 
     /// The computers' own notes, if kept.
@@ -949,6 +974,7 @@ impl Door {
         if was {
             self.rates.forget(client);
             self.pushes.forget(client);
+            self.app_pushes.forget(client);
             changes = self.leases.client_gone(client, LeaseWhy::Revoked, now_us);
             self.unsaved_revokes.insert(client.to_owned());
             self.new_rev(client);
@@ -1368,6 +1394,105 @@ impl Door {
                         ..Outcome::default()
                     },
                     Err(error) => reply_refused(Some(re), error),
+                };
+            }
+            Op::AppPush { .. } | Op::AppList {} | Op::AppRemove { .. }
+                if self.apps_staging.is_none() =>
+            {
+                return refuse(ErrorCode::Refused, crate::app_push::NOT_HERE.to_owned());
+            }
+            Op::AppPush { .. } | Op::AppList {} | Op::AppRemove { .. } if !self.apps_on => {
+                return refuse(ErrorCode::Refused, crate::app_push::OFF.to_owned());
+            }
+            Op::AppPush {
+                name,
+                sha256,
+                size,
+                part,
+                parts: count,
+                data,
+            } => {
+                if *part == 0 {
+                    if let Err(retry_ms) = self.rates.check(&client, Class::AppPush, now_us) {
+                        let mut error = Error::new(ErrorCode::Rate, Class::AppPush.says());
+                        error.retry_ms = Some(retry_ms);
+                        return reply_refused(Some(re), error);
+                    }
+                    self.rates.count(&client, Class::AppPush, now_us);
+                }
+                let part = push::Part {
+                    name,
+                    sha256,
+                    size: *size,
+                    part: *part,
+                    parts: *count,
+                    data,
+                };
+                let (sha256, bytes) = match self.app_pushes.gather(&client, &part, now_us) {
+                    Ok(push::Gathered::Got(got)) => return ok(re, json!({"got": got})),
+                    Ok(push::Gathered::Whole { sha256, bytes }) => (sha256, bytes),
+                    Err(error) => return reply_refused(Some(re), error),
+                };
+                // Checked here, before a byte is staged: the package as a
+                // pushed app, and its grants against this pairing's now.
+                let told = match crate::app_push::checked(&bytes, &sha256, name, &grants) {
+                    Ok(told) => told,
+                    Err(error) => {
+                        self.app_pushes.not_installed();
+                        return reply_refused(Some(re), error);
+                    }
+                };
+                let staging = self.apps_staging.clone().expect("app push on");
+                let path = match push::stage_app(&staging, &sha256, &bytes) {
+                    Ok(path) => path,
+                    Err(error) => {
+                        self.app_pushes.not_installed();
+                        eprintln!("lamp-control: app.push: staging the package: {error}");
+                        return refuse(
+                            ErrorCode::Refused,
+                            "the lamp could not keep the package".to_owned(),
+                        );
+                    }
+                };
+                let client_name = self.clients.get(&client).map(|paired| paired.name.clone());
+                return Outcome {
+                    ask: Some(Ask::app_install(
+                        re,
+                        &client,
+                        client_name.as_deref(),
+                        &path,
+                        told,
+                    )),
+                    ..Outcome::default()
+                };
+            }
+            Op::AppList {} | Op::AppRemove { .. } => {
+                if self.asking.contains(&client) {
+                    return refuse(
+                        ErrorCode::Busy,
+                        "this computer's last request is still with the lamp's helper".to_owned(),
+                    );
+                }
+                if self.asking.len() >= ASKING_MOST {
+                    return refuse(
+                        ErrorCode::Busy,
+                        "the lamp's apps helper is busy: try again".to_owned(),
+                    );
+                }
+                if let Err(retry_ms) = self.rates.check(&client, Class::AppManage, now_us) {
+                    let mut error = Error::new(ErrorCode::Rate, Class::AppManage.says());
+                    error.retry_ms = Some(retry_ms);
+                    return reply_refused(Some(re), error);
+                }
+                self.rates.count(&client, Class::AppManage, now_us);
+                self.asking.insert(client.clone());
+                let ask = match &op {
+                    Op::AppRemove { name } => Ask::app_remove(re, &client, name),
+                    _ => Ask::app_list(re, &client),
+                };
+                return Outcome {
+                    ask: Some(ask),
+                    ..Outcome::default()
                 };
             }
             Op::NotesSet { .. }

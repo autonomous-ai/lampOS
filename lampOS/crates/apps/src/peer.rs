@@ -23,7 +23,8 @@ pub const VOICE: &str = "/lampos.slice/lampos-voice.slice/lamp-voice.service";
 pub const CONTROL: &str = "/lampos.slice/lampos-parts.slice/lamp-control.service";
 
 /// What a peer that is not one of them is told.
-pub const NOT_AN_ASKER: &str = "only lamp-cloud and the voice may ask for the apps";
+pub const NOT_AN_ASKER: &str =
+    "only lamp-cloud and the voice may ask for the apps, and lamp-control for pushed ones";
 
 /// Whether `/proc/<pid>/cgroup`'s text puts the process in exactly one of
 /// `units` (its own cgroup, not one below it).
@@ -37,6 +38,17 @@ pub fn in_one_of(cgroup: &str, units: &[&str]) -> bool {
         };
         (controllers.is_empty() || controllers == "name=systemd") && units.contains(&path)
     })
+}
+
+/// Whether the peer is lamp-control, which may ask only the door's verbs for a
+/// paired computer's pushed apps (`crate::ask::answer_door`), and nothing else.
+pub fn is_the_door(cgroup: &str) -> bool {
+    in_one_of(cgroup, &[CONTROL])
+}
+
+/// Whether lamp-control may ask: its cgroup AND its user, root or lampos.
+pub fn door_ok(uid: u32, owner: u32, cgroup: &str) -> bool {
+    (uid == 0 || uid == owner) && is_the_door(cgroup)
 }
 
 pub fn is_an_asker(cgroup: &str) -> bool {
