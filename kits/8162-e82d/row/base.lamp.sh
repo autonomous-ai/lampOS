@@ -1,7 +1,8 @@
 # lamp, root sh (common first; then STABLE_SEQ= STABLE_UPD_SHA= HV_STABLE=). READ ONLY. The start state: stable's bytes
 # (build STABLE_SEQ, or above it with stable's own lamp-update after an earlier put-back at a higher sequence), on its
 # product line, nothing staged, Harness at stable's pin, OpenClaw the lamp's agent, lamp-cloud active.
-# Prints SEQ installed=<n> max=<the highest seen>, FAILED0 <units already failed>, then BASE OK | BASE STOP <why>.
+# Prints SEQ installed=<n> max=<the highest seen>, FAILED0 <units already failed>, EXESHA (the running exes, as found),
+# SPEAKER <control> <n>% (read only, never set: at most SPK_MAX), then BASE OK | BASE STOP <why>.
 cd /
 why=""
 b=$(build); m=$(seqmax); echo "SEQ installed=$b max=$m busy='$(updbusy)'"
@@ -20,5 +21,7 @@ echo "UNITS $(for x in lamp-voice lamp-tasks lamp-skills lamp-openclaw-gateway l
 for x in lamp-voice lamp-tasks lamp-openclaw-gateway lamp-cloud lamp-update; do systemctl is-active -q $x || why="$why $x-not-active"; done
 agent_now
 echo "FAILED0 $(failed)"
+exeshas
+s=$(speaker); echo "$s"; p=$(echo "$s" | sed -n 's/^SPEAKER [^ ]* \([0-9]*\)%$/\1/p'); [ -n "$p" ] && [ "$p" -le "${SPK_MAX:-40}" ] || why="$why speaker-volume-over-${SPK_MAX:-40}-or-unread"
 echo "KEYPUB $(sha256sum /etc/lampOS/update/key.pub 2>/dev/null | cut -c1-16)"
 [ -z "$why" ] && echo "BASE OK" || echo "BASE STOP:$why"

@@ -22,6 +22,7 @@ K=$(journalctl -u lamp-tasks --since "$(systemctl show -p ActiveEnterTimestamp -
 echo "T J ${K:-no kept session line since lamp-tasks started}"; [ -n "$K" ] || why="$why kept-session-not-open"
 S=$(stopped_lampos); echo "STOPPED_PIDS ${S:-none}"; [ -z "$S" ] || why="$why stopped-pids"
 grep -q t8162 $OCW 2>/dev/null && { echo "WRAPPER the kit's line left"; why="$why wrapper"; } || echo "WRAPPER clean"
+exeshas
 echo "T $(agent_now) (stable's lamp-tasks keeps no tasks/agent: printed, not judged)"
 echo "T $(mute_live | head -1)"
 [ -z "$why" ] && echo "READ OK" || echo "READ FAIL:$why"

@@ -1,11 +1,11 @@
-# Mac helpers (bash 3.2), sourced by every Mac script of row/ and by ../run.sh (#8162 ROW kit, lamp-e82d by default).
+# Mac helpers (bash 3.2), sourced by every Mac script of row/ and by ../run.sh (#8162 ROW kit, lamp-ee17 by default).
 # Every lamp-specific value is a setting, read from the runner's env file (KIT_ENV) or the environment:
-#   LAMP          the lamp's name (default lamp-e82d); used for the lock, the logs and the ROW line
-#   LAMP_HOST     its address (required)
+#   LAMP          the lamp's name (default lamp-ee17); used for the lock (lamp-lock.sh <LAMP>), the logs and the ROW line
+#   LAMP_HOST     its address (default <LAMP>.local)
 #   LAMP_USER     its ssh user (default orangepi; its home keeps the row's records on the lamp: ~/t8162)
 #   KIT_ENV       the runner's env file (sourced, never copied or printed). It holds LAMP_SUDO_PASS (the lamp's sudo
-#                 password) and, for sshpass, LAMP_SSH_PASS (with none, ssh uses the runner's keys)
-#   LOCK_WHO      the lock's holder (default migrate); LOCK_SESSION its session (default row-8162)
+#                 password) and, optional, LAMP_SSH_PASS for sshpass (unset: ssh uses the runner's keys)
+#   LOCK_WHO      the lock's holder (default thirteen); LOCK_SESSION its session (default row-8162)
 #   KIT_LL        the lamp-lock script (optional). With none, NO lock is taken or renewed (RENEW always passes).
 #   ROUND1_SEQ, ROUND2_SEQ   the two rounds' sequences (required by round1/round2): the PR build, then stable's bytes
 #   ROUND1_CMD, ROUND2_CMD   the runner's own command that makes the lamp's lamp-update take that round (cmd mode)
@@ -15,11 +15,10 @@ D=${D:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}
 KIT=$(cd "$D/.." && pwd)                          # the kit (kits/8162-e82d)
 KIT_ENV=${KIT_ENV:-}
 [ -n "$KIT_ENV" ] && [ -f "$KIT_ENV" ] && . "$KIT_ENV"
-LAMP=${LAMP:-lamp-e82d}; LAMP_USER=${LAMP_USER:-orangepi}
-[ -n "${LAMP_HOST:-}" ] || { echo "LAMP_HOST is not set (KIT_ENV=$KIT_ENV): set it in the env file"; exit 2; }
+LAMP=${LAMP:-lamp-ee17}; LAMP_USER=${LAMP_USER:-orangepi}; LAMP_HOST=${LAMP_HOST:-$LAMP.local}
 H=$LAMP_USER@$LAMP_HOST
 LL=${KIT_LL:-}
-LOCK_LAMP=$LAMP; LOCK_WHO=${LOCK_WHO:-migrate}; LOCK_SESSION=${LOCK_SESSION:-row-8162}
+LOCK_LAMP=$LAMP; LOCK_WHO=${LOCK_WHO:-thirteen}; LOCK_SESSION=${LOCK_SESSION:-row-8162}
 # The PR and the start state (#8162's posts 7081048222 and 7081052398: stable 15543, updater e988ff0a4d27; Harness pin
 # 0.6.75 on stable, 0.6.78 in the PR build). The stable values were read from the stable feed's signed manifest.
 PR=8162
@@ -28,6 +27,7 @@ STABLE_SEQ=${STABLE_SEQ:-15543}
 STABLE_UPD_SHA=${STABLE_UPD_SHA:-e988ff0a4d275afcae5cff5062df59133c838efd673b0573384b5adcc162f7f4}
 STABLE_TASKS_SHA=${STABLE_TASKS_SHA:-b93a1471db20d0372a824ee004ac16abba37d0857ca60732b6657dc84914a175}
 HV_STABLE=${HV_STABLE:-0.6.75}; HV_PR=${HV_PR:-0.6.78}
+SPK_MAX=${SPK_MAX:-40}                            # the lamp's speaker volume, read only at base: at most this %
 A=${A:-$D/clips}                                  # pre-rendered clips (clips.txt, SHAS)
 L=${ROWLOGS:-$D/logs}; mkdir -p $L
 PWF=${PWF:-}

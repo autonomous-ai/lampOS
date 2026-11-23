@@ -54,7 +54,7 @@ case $(cat $FXD/expect) in
 PASS|FAILREPORT)
   w=PASS; [ "$(cat $FXD/expect)" = FAILREPORT ] && w=FAIL
   first=$(head -1 $L/row-report.md 2>/dev/null)
-  if [ $rc = 0 ] && [ "$first" = "ROW #8162 4c663af40fd1928ce5ebb8fc20cca2d08d1604e6 on lamp-e82d build 15600: $w" ] && back && [ -z "$(left)" ] \
+  if [ $rc = 0 ] && [ "$first" = "ROW #8162 4c663af40fd1928ce5ebb8fc20cca2d08d1604e6 on lamp-ee17 build 15600: $w" ] && back && [ -z "$(left)" ] \
      && grep -q '^LOCK RELEASED' $W/out.txt && grep -q '^READ TWICE same' $L/read.txt && grep -q '^HDOWN OK' $L/hdown.txt && grep -q '^PUTBACK OK' $L/putback.txt \
      && python3 -I -c 'import sys; s=open(sys.argv[1]).read(); b=s.split("```")[1]; sys.exit(0 if "15600" in b[:400] else 1)' $L/row-report.md; then
     if [ -z "$SPLIT" ] && [ "$steps" != "lock clips hfetch base round1 verify micon legs micoff round2 putback hdown read report release" ]; then got=BAD; why="step order: $steps"

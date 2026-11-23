@@ -26,7 +26,7 @@ def num(s):
 
 
 def report(build):
-    head = os.environ.get("HEAD_SHA", "?"); lamp = os.environ.get("LAMP", "lamp-e82d")
+    head = os.environ.get("HEAD_SHA", "?"); lamp = os.environ.get("LAMP", "lamp-ee17")
     legs = os.environ.get("ROW_LEGS", "L0 L1 L2 L3 L4 L5 L6 L7 L8 L9").split()
     must = os.environ.get("ROW_MUST", "L0 L1 L2 L3 L4 L5 L7 L8").split()
     v = {}

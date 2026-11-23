@@ -1,21 +1,21 @@
-# #8162 ROW on lamp-e82d
+# #8162 ROW on lamp-ee17
 
-This kit runs #8162's ROW (head `4c663af40fd1928ce5ebb8fc20cca2d08d1604e6`, issue #8138) from the runner's Mac. The
+This kit runs #8162's ROW (head `4c663af40fd1928ce5ebb8fc20cca2d08d1604e6`, issue #8138) from this Mac, on the in-house lamp lamp-ee17 (the kit folder keeps its first name, `kits/8162-e82d/`). The
 PR build goes on the lamp by a **real update round** of the lamp's own lamp-update, from stable to the CI build of the
 head. It is not a /run drop-in. After the legs, a second real round puts stable's bytes back at a higher sequence, and
 Harness goes back to stable's pin by hand. The kit holds no key and signs nothing: each round is either your own
 command, or two channels you made and signed.
 
-Its mocks: `mock/row/run-all.sh` runs 68 cases with stub ssh, scp, afplay, curl, osascript and lock, and recorded
+Its mocks: `mock/row/run-all.sh` runs 71 cases with stub ssh, scp, afplay, curl, osascript and lock, and recorded
 lamp outputs. They cover every leg's PASS, FAIL and VOID cases, and run.sh itself: the step order, resume and split
 runs, `UNTIL`, `SKIP` and then-step, the traps on a FAIL and on Ctrl-C, a lock renew that fails, a lock not taken,
 the volume refusal (at the start and mid-legs), sequences that are not higher, a round that never ends or is refused,
-and a put-back read that differs. `mock/row/mutate.sh` breaks six verdict rules and checks a FAIL case catches each
+a put-back read that differs, the lamp's speaker over 40% or unread, and a unit's exe not as found at base. `mock/row/mutate.sh` breaks six verdict rules and checks a FAIL case catches each
 one. The mocks are the dry run; there is no other Mac-only mode.
 
 ## Prerequisites
-1. **The stable of the moment.** lamp-e82d is on stable: build **15543**, lamp-update sha256 `e988ff0a4d27...`,
-   Harness pin **0.6.75** (until about 11:30 on 23 Nov). If stable moves before you start, pass the new one:
+1. **The stable of the moment.** lamp-ee17 is on stable: build **15543**, lamp-update sha256 `e988ff0a4d27...`,
+   Harness pin **0.6.75** (ee17 is on it now; stable may move at about 11:30 on 23 Nov). If stable moves before you start, pass the new one:
    `STABLE_SEQ`, `STABLE_UPD_SHA`, `STABLE_TASKS_SHA`, `HV_STABLE`, and `HMETA=<its cli-<v>.metadata.json>` (from
    `lampOS/deploy/harness/` at the new stable's commit). `base` stops when the lamp is not on that stable. A lamp
    above stable with stable's own lamp-update (after an earlier put-back at a higher sequence) is allowed.
@@ -32,16 +32,17 @@ one. The mocks are the dry run; there is no other Mac-only mode.
      has seen (installed, previous or refused), and ROUND2_SEQ is above ROUND1_SEQ.
    - Optional: `PR_UPDATE_SHA` and `PR_TASKS_SHA` (the CI artifact's sha256). With them, `verify` requires the
      running units to be exactly that build.
-3. lamp-e82d's default agent is OpenClaw, lamp-cloud is active, and the physical mic slide is open.
+3. lamp-ee17's default agent is OpenClaw, lamp-cloud is active, and the physical mic slide is open.
 4. Your env file holds these names. `KIT_ENV=<path>` points at it. It is sourced, and never copied or printed.
    ```
-   LAMP=lamp-e82d               # default
-   LAMP_HOST=<the lamp's address>
+   LAMP=lamp-ee17               # default
+   LAMP_HOST=lamp-ee17.local    # default: <LAMP>.local
    LAMP_USER=orangepi           # default
    LAMP_SUDO_PASS=...           # the lamp's sudo password
-   LAMP_SSH_PASS=...            # ssh password, used by sshpass -e; leave it out to use ssh keys
-   LOCK_WHO=migrate             # default; LOCK_SESSION=row-8162 is the default
-   KIT_LL=<path>/lamp-lock.sh   # optional. With none, no lock is taken or renewed.
+   LAMP_SSH_PASS=...            # optional; unset (the default) = ssh keys
+   LOCK_WHO=thirteen            # default; LOCK_SESSION=row-8162 is the default
+   KIT_LL=<path>/lamp-lock.sh   # called as `lamp-lock.sh lamp-ee17 try|renew|release ...`; with none, no lock
+   SPK_CTL=...                  # optional: the amixer control base reads (default: card 0's first playback control)
    ROUND1_SEQ=... ROUND2_SEQ=... and ROUND1_CMD/ROUND2_CMD, or CH1/CH2/TEST_PUB (above)
    ```
 5. The Mac needs bash, python3, curl, sshpass (only with LAMP_SSH_PASS), afplay and osascript. Its output volume must
@@ -63,7 +64,7 @@ step, then goes on at `<then>`. `UNTIL=<step>` stops before that step. `SKIP="<s
 | lock | lamp-lock try, then a 60 s renew loop (only with KIT_LL) | 0 | `LOCK TAKEN` or `LOCK none` |
 | clips | the clips' sha256 (`row/clips/SHAS`) | 0 | `CLIPS OK` |
 | hfetch | Harness `HV_STABLE`'s cli.js and notify.mjs, fetched on the Mac from the URLs in stable's pin file, sha256 and size checked | 1 | `HFETCH OK` |
-| base | `row/base.lamp.sh`: on stable, its updater, Harness 0.6.75, OpenClaw, the units; the sequences checked | 1 | `BASE OK` |
+| base | `row/base.lamp.sh`: on stable, its updater, Harness 0.6.75, OpenClaw, the units; each unit's running exe sha256 recorded (as found); the lamp's speaker volume read (amixer, never set): over 40% or unread stops; the sequences checked | 1 | `BASE OK` |
 | round1 | your round 1 (cmd or channel), then lamp-update's own end: `up to date: build <ROUND1_SEQ>` after `confirmed: lamp-update runs its new build` (a self-switch) | 3-15 | `ROUND 1 OK` |
 | verify | `row/verify.lamp.sh` every 30 s, up to 15 min: build ROUND1_SEQ, the PR's updater (not stable's), Harness 0.6.78 and its record, nothing newly failed, tasks/agent ready with engine openclaw | 1-15 | `VERIFY PASS` |
 | micon | `row/micon.lamp.sh`: the mute recorded and lifted, only with `MIC_YES=yes` (the lamp's person's yes for this ROW) | 1 | `MUTE LIFTED OK` or `MUTE NOT MUTED` |
@@ -72,7 +73,7 @@ step, then goes on at `<then>`. `UNTIL=<step>` stops before that step. `SKIP="<s
 | round2 | your round 2: stable's bytes at ROUND2_SEQ, from the PR build's own lamp-update; then stable's updater running again | 3-15 | `ROUND 2 OK` |
 | putback | `row/nostop.lamp.sh`, `row/l7back.lamp.sh`, `row/putback.lamp.sh` (channel mode: the drop-ins removed, the product line's own round) | 1-2 | `NOSTOP OK`, `L7BACK OK`, `PUTBACK OK` |
 | hdown | Harness back to 0.6.75 by hand (lamp-update never steps Harness down): the fetched files copied, installed, checked | 2 | `HDOWN OK` |
-| read | `row/read.lamp.sh` twice, 60 s apart: the installed sequence and commit, stable's updater, the product line, no drop-ins, Harness 0.6.75, nothing newly failed; both READ OK and the same | 2 | `READ TWICE same` |
+| read | `row/read.lamp.sh` twice, 60 s apart: the installed sequence and commit, stable's updater, the product line, no drop-ins, Harness 0.6.75, nothing newly failed; lamp-update, lamp-tasks and lamp-voice run the exes base recorded (the same stable bytes); both READ OK and the same | 2 | `READ TWICE same` |
 | report | `row/verdict.py --report`: `row/logs/row-report.md` (the kit posts nothing) | 0 | the ROW line |
 | release | the lock released, only after MUTE BACK OK, PUTBACK OK, HDOWN OK and READ TWICE same (`FORCE=1` releases anyway) | 0 | `LOCK RELEASED` |
 
@@ -100,7 +101,7 @@ A leg to rerun: `MIC_YES=yes KEEP_VERDICTS=1 LEGS="L3" UNTIL=round2 ./run.sh mic
 - The EXIT traps (run.sh and legs.sh), on any exit, a FAIL, a STOP or Ctrl-C, each once: SIGCONT to a pid leg L4
   stopped (by number), the OpenClaw wrapper and config copies of L7/L8 put back, `UNHOLD_CMD` after L9's hold, and
   the recorded mute put back. With the lock lost they only say what is left to do.
-- No volume is ever set. lamp-cloud is never stopped. No factory reset, no forget-all.
+- No volume is ever set. The lamp's speaker volume is only read, at `base`: over 40% stops the run. lamp-cloud is never stopped. No factory reset, no forget-all.
 - `GATE`: no unit starts more than 10 times in any 10 min (the lamp's own journal counts). A leg without the budget is
   VOID, a step without it stops.
 - Credentials come only from `KIT_ENV`; the sudo password goes only to sudo's stdin.
@@ -130,7 +131,7 @@ read) is done, or while a required leg has no PASS yet (VOID or not run: rerun i
 ## The ROW comment (bot form)
 `row/logs/row-report.md` is the comment. Post it yourself. Its first line is exactly:
 ```
-ROW #8162 4c663af40fd1928ce5ebb8fc20cca2d08d1604e6 on lamp-e82d build <ROUND1_SEQ>: PASS
+ROW #8162 4c663af40fd1928ce5ebb8fc20cca2d08d1604e6 on lamp-ee17 build <ROUND1_SEQ>: PASS
 ```
 (or `: FAIL`, then a line `Failed: <steps and legs>`). Then a fenced journal block: round 1's own end lines first (so
 its first 400 characters name `build <ROUND1_SEQ>`), each leg's key journal lines, round 2's end line. Then a table

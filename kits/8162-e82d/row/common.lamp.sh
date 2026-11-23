@@ -31,6 +31,14 @@ line(){ systemctl show -p ExecStart --value lamp-update.service | grep -oE 'lamp
 product_line(){ line | grep -qE -- '--channel-url https://(github.com/autonomous-ai/lampOS/releases/download/lampos-stable/|cdn.autonomous.ai/lampos/stable/) --channel lamp-voice --key-file /etc/lampOS/update/key.pub --apply on'; }
 dropins(){ for u in lamp-update lamp-update-apply lamp-update-writer lamp-update-back lamp-update-harness lamp-tasks; do d=$(systemctl show -p DropInPaths --value $u.service 2>/dev/null | tr " " "\n" | grep -v "/etc/systemd/system/$u.service.d/exit-note.conf$" | tr "\n" " " | sed "s/ *$//"); [ -n "$d" ] && echo "DROPIN $u: $d"; done; }
 failed(){ systemctl --failed --no-legend --plain 2>/dev/null | awk '{print $1}' | LC_ALL=C sort | tr '\n' ' '; }
+# The lamp's speaker volume, READ ONLY (amixer -c 0 sget; never set): SPK_CTL, else the card's first control with a
+# playback volume. Prints SPEAKER <control> <n>% | SPEAKER unread.
+speaker(){ c=${SPK_CTL:-}
+  [ -n "$c" ] || c=$(amixer -c 0 scontrols 2>/dev/null | sed -n "s/^Simple mixer control '\(.*\)',\([0-9]*\)$/\1,\2/p" | while IFS= read -r x; do amixer -c 0 sget "$x" 2>/dev/null | grep -q 'pvolume' && { echo "$x"; break; }; done)
+  p=$([ -n "$c" ] && amixer -c 0 sget "$c" 2>/dev/null | grep -E 'Playback.*\[[0-9]+%\]' | grep -oE '\[[0-9]+%\]' | head -1 | tr -d '[]%')
+  [ -n "$p" ] && echo "SPEAKER $(echo "$c" | tr ' ' _) $p%" || echo "SPEAKER unread"; }
+# The running exe's sha256 of the units the put-back must return to the same bytes.
+exeshas(){ echo "EXESHA lamp-update=$(exesha lamp-update) lamp-tasks=$(exesha lamp-tasks) lamp-voice=$(exesha lamp-voice)"; }
 # --- Harness (lamp-tasks' own; harness.rs Cli) and its install record (lamp-update harness_install)
 HHOME=/var/lib/lampos-tasks
 HBIN=$HHOME/.local/bin/harness

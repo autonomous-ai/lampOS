@@ -57,7 +57,7 @@ DEF = {
     "out/l7back.lamp.sh": "L7BACK OK\n",
     "out/l8back.lamp.sh": "ONESHOT_END @NOW-2@\nTASKS_BACK @NOW+1@\nCUTBACK_LINES 1\nRECORD gone\nGW health ok\nL8BACK OK\n",
     # run.sh's steps (cmd mode: ROUND*_CMD; round 1 = build 15600 with a self-switch, round 2 = stable's bytes at 15601)
-    "out/base.lamp.sh": "SEQ installed=15543 max=15543\nUPDATER e988ff0a4d27\nLINE product\nHARNESS 0.6.75\nENGINE openclaw\nAGENT state=ready why=-\nFAILED0 run-rpc_pipefs.mount smartmontools.service \nKEYPUB product\nBASE OK\n",
+    "out/base.lamp.sh": "SEQ installed=15543 max=15543\nUPDATER e988ff0a4d27\nLINE product\nHARNESS 0.6.75\nENGINE openclaw\nAGENT state=ready why=-\nFAILED0 run-rpc_pipefs.mount smartmontools.service \nEXESHA lamp-update=e988ff0a4d275afcae5cff5062df59133c838efd673b0573384b5adcc162f7f4 lamp-tasks=b93a1471db20d0372a824ee004ac16abba37d0857ca60732b6657dc84914a175 lamp-voice=c0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ff\nSPEAKER Speaker 35%\nKEYPUB product\nBASE OK\n",
     "out/round.lamp.sh.mark": "MARK round 1 at @NOW@ build=15543 max=15543\n",
     "out/round.lamp.sh.go.1": "GO round 1 at @NOW@\n",
     "out/round.lamp.sh.go.2": "GO round 2 at @NOW@\n",
@@ -69,7 +69,7 @@ DEF = {
     "out/stage.lamp.sh": "STAGED OK\n",
     "out/putback.lamp.sh": "STATE 15601\nPUTBACK OK\n",
     "out/hdown.lamp.sh": "HARNESS 0.6.75\nHDOWN OK\n",
-    "out/read.lamp.sh": "STATE 15601 busy=''\nINSTALLED 15601 e1f55d813a521d34c99d50e3535a01cb03b40644\nHARNESS 0.6.75\nT at @NOW@\nREAD OK\n",
+    "out/read.lamp.sh": "STATE 15601 busy=''\nINSTALLED 15601 e1f55d813a521d34c99d50e3535a01cb03b40644\nHARNESS 0.6.75\nEXESHA lamp-update=e988ff0a4d275afcae5cff5062df59133c838efd673b0573384b5adcc162f7f4 lamp-tasks=b93a1471db20d0372a824ee004ac16abba37d0857ca60732b6657dc84914a175 lamp-voice=c0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ff\nT at @NOW@\nREAD OK\n",
     # readiness at each follower's start; the legs' chunks
     "a/start": ch((0, "ready -")),
     "j/L0.play.20-ask-a": answered(1),
@@ -169,6 +169,9 @@ C = {
     "RUN.round-never-ends": ("STOP-round1", dict(RUN, ROUNDWAIT="3"), {"out/round.lamp.sh.read.1": "SEQ installed=15543 busy='journal.json'\nJ 1.0 lamp-update: switching to build 15600\nUPDATER running=e988\n"}),
     "RUN.round-refused": ("STOP-round1", RUN, {"out/round.lamp.sh.read.1": "SEQ installed=15543 busy=''\nJ 1.0 lamp-update: build 15600 is older than build 15601: refused, nothing switched\nUPDATER running=e988\n"}),
     "RUN.round2-not-stable-updater": ("STOP-round2", RUN, {"out/round.lamp.sh.read.2": DEF["out/round.lamp.sh.read.2"].replace("running=e988ff0a4d275afc", "running=bbbb")}),
+    "RUN.speaker-over-40": ("STOP-base", RUN, {"out/base.lamp.sh": DEF["out/base.lamp.sh"].replace("SPEAKER Speaker 35%", "SPEAKER Speaker 55%")}),
+    "RUN.speaker-unread": ("STOP-base", RUN, {"out/base.lamp.sh": DEF["out/base.lamp.sh"].replace("SPEAKER Speaker 35%", "SPEAKER unread")}),
+    "RUN.exesha-not-as-found": ("STOP-read", RUN, {"out/read.lamp.sh.2": DEF["out/read.lamp.sh"].replace("lamp-tasks=b93a", "lamp-tasks=dead")}),
     "RUN.no-mic-yes": ("STOP-micon", dict(RUN, MIC_YES=""), {}),
     "RUN.read-twice-differs": ("STOP-read", RUN, {"out/read.lamp.sh.2": DEF["out/read.lamp.sh"].replace("INSTALLED 15601", "INSTALLED 15602")}),
     "RUN.leg-fail-still-puts-back": ("FAILREPORT", dict(RUN, LEGS="L0 L1 L2 L3 L4 L5 L6 L7 L8 L9"), {"j/L1.play.21-ask-b": ch((0.1, REQ % 2), (0.3, TAKEN), (2, DONE))}),

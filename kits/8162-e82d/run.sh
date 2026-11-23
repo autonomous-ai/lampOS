@@ -99,8 +99,12 @@ open(os.path.join(out, "meta.env"), "w").write("HV=%s %s\n" % (v, " ".join(env))
 print("HFETCH OK (Harness %s)" % v)
 P
            ;;
-  base)    LAMP "STABLE_SEQ=$STABLE_SEQ STABLE_UPD_SHA=$STABLE_UPD_SHA HV_STABLE=$HV_STABLE" $D/base.lamp.sh > $L/base.txt 2>&1; cat $L/base.txt
+  base)    LAMP "STABLE_SEQ=$STABLE_SEQ STABLE_UPD_SHA=$STABLE_UPD_SHA HV_STABLE=$HV_STABLE SPK_MAX=$SPK_MAX${SPK_CTL:+ SPK_CTL='$SPK_CTL'}" $D/base.lamp.sh > $L/base.txt 2>&1; cat $L/base.txt
+           # The lamp's speaker volume, read only (never set): at most SPK_MAX %, else stop and ask.
+           sp=$(sed -n 's/^SPEAKER [^ ]* \([0-9]*\)%$/\1/p' $L/base.txt)
+           [ -n "$sp" ] && [ "$sp" -le "$SPK_MAX" ] || STOP "the lamp's speaker volume is ${sp:-unread}% (at most $SPK_MAX%): stop and ask; the kit never sets it"
            need base '^BASE OK'
+           grep '^EXESHA ' $L/base.txt > $L/exesha0.txt || STOP "no EXESHA line: the units' running exes not recorded"
            mx=$(sed -n "s/^SEQ installed=[0-9]* max=\([0-9]*\).*/\1/p" $L/base.txt)
            [ -n "${ROUND1_SEQ:-}" ] && [ "$ROUND1_SEQ" -gt "${mx:-0}" ] 2>/dev/null || STOP "ROUND1_SEQ '${ROUND1_SEQ:-}' is not above the highest sequence the lamp has seen (${mx:-unread}): a round takes only a higher one"
            [ -n "${ROUND2_SEQ:-}" ] && [ "$ROUND2_SEQ" -gt "$ROUND1_SEQ" ] 2>/dev/null || STOP "ROUND2_SEQ '${ROUND2_SEQ:-}' is not above ROUND1_SEQ $ROUND1_SEQ (a corrective build needs a higher sequence)"
@@ -150,9 +154,13 @@ P
            $SSH -n $H 'rm -rf /tmp/t8162h && mkdir -p /tmp/t8162h' && $SCP -q $HF/cli.js $HF/notify.mjs $H:/tmp/t8162h/ || STOP "the copy failed"
            LAMP "$(cat $HF/meta.env)" $D/hdown.lamp.sh > $L/hdown.txt 2>&1; cat $L/hdown.txt; need hdown '^HDOWN OK';;
   read)    V="SEQ2=${ROUND2_SEQ:-} STABLE_UPD_SHA=$STABLE_UPD_SHA HV=$HV_STABLE FAILED0='$(cat $L/failed0.txt 2>/dev/null)'"
-           LAMP "$V" $D/read.lamp.sh > $L/read1.txt 2>&1; sleep $READGAP; RENEW || exit 1; LAMP "$V" $D/read.lamp.sh > $L/read2.txt 2>&1
+           : > $L/read-diff.txt; LAMP "$V" $D/read.lamp.sh > $L/read1.txt 2>&1; sleep $READGAP; RENEW || exit 1; LAMP "$V" $D/read.lamp.sh > $L/read2.txt 2>&1
            cat $L/read2.txt
-           if grep -q '^READ OK' $L/read1.txt && grep -q '^READ OK' $L/read2.txt && diff <(grep -v '^T ' $L/read1.txt) <(grep -v '^T ' $L/read2.txt) > $L/read-diff.txt; then echo "READ TWICE same, READ OK" | tee $L/read.txt
+           # As found: lamp-update, lamp-tasks and lamp-voice run the exes base recorded (the same stable bytes back).
+           ex=ok; for r in read1 read2; do for u in lamp-update lamp-tasks lamp-voice; do
+             a=$(tr ' ' '\n' < $L/exesha0.txt | sed -n "s/^$u=//p"); b=$(grep '^EXESHA ' $L/$r.txt | tr ' ' '\n' | sed -n "s/^$u=//p")
+             [ -n "$a" ] && [ "$a" != none ] && [ "$a" = "$b" ] || { ex=no; echo "EXESHA $r $u: ${b:-unread}, base had ${a:-none}" >> $L/read-diff.txt; }; done; done
+           if [ $ex = ok ] && grep -q '^READ OK' $L/read1.txt && grep -q '^READ OK' $L/read2.txt && diff <(grep -v '^T ' $L/read1.txt) <(grep -v '^T ' $L/read2.txt) >> $L/read-diff.txt; then echo "READ TWICE same, READ OK, EXESHA as found at base" | tee $L/read.txt
            else { echo "READ TWICE: not both READ OK and the same"; cat $L/read-diff.txt; grep '^READ' $L/read1.txt $L/read2.txt; } | tee $L/read.txt; fi
            need read '^READ TWICE same';;
   report)  HEAD_SHA=$HEAD_SHA LAMP=$LAMP python3 -I $D/verdict.py $L --report "${ROUND1_SEQ:-?}" > $L/row-report.md; rc=$?; cat $L/row-report.md
