@@ -292,6 +292,33 @@ def test_play_wav_writes_in_real_time_and_the_whole_clip_arrives(tmp_path):
     run(go())
 
 
+def test_play_pcm_sends_each_frame_a_lead_before_its_play_time(tmp_path):
+    """#8373: written at its play time, a stream the lamp holds only ~100 ms of ran dry at a late write; the first frames go
+    at once, up to the lead (200 ms by default), the rest follow in real time, and `lead_ms=0` is the old pacing."""
+
+    async def go():
+        async with FakeLamp(grants=("speaker",)) as fake:
+            async with await connected(fake, tmp_path) as lamp:
+                pcm = pcm_of(8_000)  # 0.5 s: 25 frames of 20 ms
+                for lead, early in ((None, 11), (100, 6), (0, 1)):
+                    async with lamp.speaker_stream() as out:
+                        times = []
+                        real = out.speaker_write
+
+                        async def timed(piece, real=real, times=times):
+                            times.append(time.monotonic())
+                            await real(piece)
+
+                        out.speaker_write = timed
+                        await (out.play_pcm(pcm) if lead is None else out.play_pcm(pcm, lead_ms=lead))
+                        assert len(times) == 25
+                        # Frames 0..lead/20 are due at once; the next waits for its own time.
+                        assert times[early - 1] - times[0] < 0.03, (lead, [round(t - times[0], 3) for t in times[:8]])
+                        assert times[early + 1] - times[0] >= 0.02, (lead, [round(t - times[0], 3) for t in times[:8]])
+                        assert times[-1] - times[0] < 0.5 - (200 if lead is None else lead) / 1000 + 0.1
+    run(go())
+
+
 def test_play_wav_says_clearly_what_it_cannot_play(tmp_path):
     async def go():
         async with FakeLamp(grants=("speaker",)) as fake:
