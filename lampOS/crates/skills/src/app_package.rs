@@ -88,6 +88,14 @@ pub struct AppManifest {
     /// fetched at its install. Optional, and left out when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub npu: Vec<String>,
+    /// The names the app answers on its socket for its views (#7415, `docs/apps.md` "App views"): up to 16. Optional,
+    /// left out when empty; a lamp built before it refuses a manifest that names it, so an app that does sets
+    /// `min_build` to a build that reads it, as `npu` does.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ops: Vec<String>,
+    /// The screens the phone draws from an op's answer: up to 8 ([`super::app_views`]). Optional, as `ops`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub views: Vec<super::app_views::View>,
     #[serde(default)]
     pub phrases: Vec<String>,
     pub triggers: Vec<String>,
@@ -409,6 +417,8 @@ pub fn check_manifest(manifest: &AppManifest) -> Result<(), String> {
             ));
         }
     }
+    super::app_views::check(&manifest.ops, &manifest.views)
+        .map_err(|why| format!("{MANIFEST}: {why}"))?;
     phrases_ok("phrases", &manifest.phrases, MOST_PHRASES)?;
     phrases_ok("triggers", &manifest.triggers, MOST_TRIGGERS)?;
     if (!manifest.phrases.is_empty() || !manifest.triggers.is_empty()) && !grants.contains("hear") {
