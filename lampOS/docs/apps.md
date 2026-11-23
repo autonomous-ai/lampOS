@@ -18,6 +18,13 @@ format probe refuses an app package in words ("format 2 is not one this lamp
 reads (1)"); an older lamp refuses it with its parser's "unknown field". Either
 way nothing is installed.
 
+**App tools: designed, not built** ([app-tools.md](app-tools.md), #8386). An
+app's actions become functions Lamp's model calls, as it calls a skill's:
+a `tools` file in the skills' format in the manifest, listed by the voice
+beside the skills' while the app runs, and called through lamp-control's
+`app.call`. It retires `phrases.set` for answers and replaces `apps.ask`;
+phrases stay for a session's fast words.
+
 ## The package (format 2)
 
 A package is a tar, as a skill's (format 1, [skills.md](skills.md)): the
