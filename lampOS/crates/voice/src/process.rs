@@ -3233,6 +3233,8 @@ fn second_route_worker_environment(
         crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
         crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT,
         crate::second_provider::NAME_SIGN_TIED_ENVIRONMENT,
+        // A line said_to_me held is no reply to the lamp's news (#8383).
+        crate::second_provider::NEWS_REPLY_HEEDS_HELD_ENVIRONMENT,
         crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT,
         crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT,
         crate::second_provider::NAME_STAYS_ENVIRONMENT,
@@ -3723,6 +3725,7 @@ mod tests {
             crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
             crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT,
             crate::second_provider::NAME_SIGN_TIED_ENVIRONMENT,
+            crate::second_provider::NEWS_REPLY_HEEDS_HELD_ENVIRONMENT,
             crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT,
             crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT,
             crate::second_provider::NAME_STAYS_ENVIRONMENT,
@@ -4924,6 +4927,7 @@ mod tests {
                     || name == crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT
                     || name == crate::second_provider::NAME_SAID_TO_A_PERSON_ENVIRONMENT
                     || name == crate::second_provider::NAME_SIGN_TIED_ENVIRONMENT
+                    || name == crate::second_provider::NEWS_REPLY_HEEDS_HELD_ENVIRONMENT
                     || name == crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT
                     || name == crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT
                     || name == crate::second_provider::NAME_STAYS_ENVIRONMENT
@@ -5286,6 +5290,7 @@ mod tests {
                     "LAMP_NAME_START_USUAL=on",
                     "LAMP_NAME_STAYS_IN_ITS_LINE=on",
                     "LAMP_NAME_WORDLESS_BAR=on",
+                    "LAMP_NEWS_REPLY_HEEDS_HELD=on",
                     "LAMP_NOT_FOR_ME_WORDS=on",
                     "LAMP_NO_WORDS_AGAIN=on",
                     "LAMP_NUDGE_CLAIM_CHECKED=on",

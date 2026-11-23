@@ -5279,6 +5279,18 @@ pub fn serve(
                 heeding.attention.tie_the_second_sign(true);
             }
         }
+        // A line said_to_me held is no reply to the lamp's news
+        // (`LAMP_NEWS_REPLY_HEEDS_HELD=on`, #8383).
+        if std::env::var(crate::second_provider::NEWS_REPLY_HEEDS_HELD_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a line said_to_me held as not said to the lamp is not taken as the reply to the lamp's news (LAMP_NEWS_REPLY_HEEDS_HELD)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.attention.heed_held_in_news_reply(true);
+            }
+        }
         // Under a sure hearing, a face or the name in the words
         // (`LAMP_NAME_FACE_OR_WORDS=on`, #8136): the line's start, closeness
         // and a conversation going on no longer count alone.
@@ -12075,6 +12087,9 @@ impl Heeding {
         );
         signs.turned = Some(false);
         signs.going_on = false;
+        // Nor is it the reply to the lamp's news
+        // (`LAMP_NEWS_REPLY_HEEDS_HELD`, #8383).
+        self.attention.said_held(request);
         true
     }
 
@@ -13106,6 +13121,12 @@ impl Heeding {
             (seen.heard.as_str(), seen.busy, seen.lamp_asked, seen.turned);
         let mut verdict =
             attention.first_output_busy(request, seen.room, seen.going_on, self.strict, turned);
+        if attention.news_reply_held() {
+            eprintln!(
+                "lamp-voice second: request {request}: {}, but said_to_me held it: not a reply (LAMP_NEWS_REPLY_HEEDS_HELD)",
+                crate::attention::AFTER_NEWS
+            );
+        }
         let alone = attention.played_on_the_conversation_alone();
         // Or just after its answer ended (Sixth's item 6 on #4710).
         let stop_over_the_lamp = self.spoken_stops

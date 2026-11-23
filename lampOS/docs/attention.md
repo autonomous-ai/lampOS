@@ -1703,6 +1703,14 @@ Second's colleagues 120 s after the news, held with the switch and without;
 within 45 s a conversation going on either way; a reply about nothing held
 in a busy room and taken in a quiet one).
 
+With `LAMP_NEWS_REPLY_HEEDS_HELD=on` (#8383, off by default), on the second
+route a line `said_to_me` held as not said to the lamp is not taken as the
+news's reply (`AFTER_NEWS`) in a quiet room either: on lamp-74ff on 23 Nov
+at 08:40:35 a 2-word line, 0 looks, 0 faces, was answered so 13 s after
+the news. It is judged by the rules after it, `ABOUT_ITS_WORK` included
+([second-voice.md](second-voice.md)). Test:
+`a_line_said_to_me_held_is_no_reply_to_the_news_with_the_switch`.
+
 Without it the rule holds answers only in a busy room. In a room not known
 to be busy, and in a session it trusts, every answer is played, whatever
 was said and to whom. On lamp-4ace at 02:16 on 16 October, "Did you get my
