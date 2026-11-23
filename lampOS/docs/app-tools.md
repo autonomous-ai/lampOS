@@ -122,9 +122,9 @@ entry, for example:
 runs the same ones, and the voice runs the link's own again at each read):
 
 - **Count:** at most 8 tools an app, and the file at most 8 KiB.
-- **Name:** `^[a-z][a-z0-9_]{0,23}$`, unique in the file, and none of the
+- **Name:** `^[a-z][a-z0-9_]{0,29}$` (at most 30), unique in the file, and none of the
   voice's own names, the Schedule names, `use_skill` or `start_app`.
-- **Description:** 1 to 100 characters on one line, plain words: no quote,
+- **Description:** 1 to 150 characters on one line, plain words: no quote,
   backtick, markup, brace, link, control or bidi character (the rule
   `start_app` already holds trigger words to, `app_triggers::describable`).
   It says what the tool does and when to call it, never how Lamp should
@@ -168,7 +168,7 @@ into `docs/switches.md` and every census test when built).
 session opens, and an app's tools change as apps start and stop. The second
 route declares its functions at each request.
 
-- **Which app:** only the running app, the one with a session open, as
+- **Which apps:** only running apps, each with a session open, as
   lamp-control tells the voice on a new bus topic, `apps/tools`, at each
   change and every 5 s, as `apps/triggers` does: the app's checked name,
   its title and its tools file as checked. Once a result carries `tools`
@@ -180,13 +180,17 @@ route declares its functions at each request.
   section is at about 4,066 of its 4,096 bytes (`SECTION_MOST_BYTES`,
   measured on #8375): one more line cuts `wellbeing_nudges` again, as train
   1182 failed. So the app's tools get a section of their own in the
-  instruction, under its own bound, **`APP_SECTION_MOST_BYTES` = 1,024
-  bytes**, and nothing is added to `use_skill`'s section or to `use_skill`
-  itself. With no app running, there is no section at all.
-  - 1,024 bytes over 8 tools is about 120 bytes a line, so the Store's cap
-    on a tool's description is **100 characters** (above).
-  - A tool whose line doesn't fit whole is not offered, and the journal
-    names it, never its description.
+  instruction, under its own bound, **`APP_SECTION_MOST_BYTES` = 1,536
+  bytes** (the first builder's 20:41 and Heron's 20:42 on #8386, in place
+  of the 1,024 first written), and nothing is added to `use_skill`'s
+  section or to `use_skill` itself. With no app running, there is no section at all.
+  - **The Store's caps fit the bound,** so an approved app always fits: a
+    description of at most **150 characters** and a name of at most
+    **30** (above), about 180 bytes a line, so 8 tools at the caps come
+    to about 1,440 bytes.
+  - **An app is left out only when a second app's tools won't fit** beside
+    the first's: the one running longest keeps the section, and the
+    journal names the one left out, never a description.
   - Raising 4,096 instead was not chosen: it needs the prompt budget on
     the shipped route read first, and the dates don't need it.
 - **Each tool a declared function of its own,** `<app>_<tool>` (the app's
@@ -194,9 +198,9 @@ route declares its functions at each request.
   `parameters`, declared the way `use_skill` is. So the bound above is on
   the listed lines; each schema's size is held by the Store's 1,024-byte
   cap. The name is never one of a skill's by accident, and the journal
-  says whose it is. The longest would be 24 + 1 + 24 = 49 bytes, one past
-  the link's 48, so the Store holds an app's name and a tool's name to 47
-  bytes together. A call of one takes a new route, `Route::App`.
+  says whose it is. An app's name (at most 24) and a tool's (at most 30)
+  could come to 55 bytes joined, past the link's 48, so the Store also
+  holds the two to 47 bytes together. A call of one takes a new route, `Route::App`.
 - **The clash rules are the skills':** a name the voice, the executive or a
   skill already gave is the earlier one's, and the app's tool is left out
   with one journal line naming it. At the second route's function bound
@@ -205,8 +209,13 @@ route declares its functions at each request.
 - **Tests at build:** every product skill's line stays whole in
   `use_skill`'s section with a full 8-tool app section present (the
   current `every_product_skill_s_line_is_whole_in_use_skill_s_section`
-  plus an 8-tool app); a 9th tool, or one past the 1,024-byte bound, is not
-  offered.
+  plus an 8-tool app at the Store's caps, which fits whole); a 9th tool is
+  not offered; a second app whose tools won't fit beside the first's is
+  left out and named.
+- **Cost, in the voice row:** the time from the person's line to Lamp's
+  first word on the shipped route, with the app section and without it,
+  the same phrase, 10 turns each. A few hundred ms more is fine; more than
+  that needs a look before switch-on.
 - **Arguments checked in code** before anything is sent: against the tool's
   own schema subset (the link does not check them), every required field
   there, no other field, each value in its enum or range. A call that fails
