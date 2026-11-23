@@ -494,13 +494,13 @@ async fn a_line_name_near_rules_not_the_name_is_told_to_the_rule() {
     }
 }
 
-/// French (#8381): "Hey Lamp, …" and "Hé lampe, …" came back as "Et non,
-/// …" on lamp-e82d (#8387's check). With the owner's language French, a
-/// line that opens "Et non," ("Hé non,", "Eh non,") is the name only with
-/// lamp-name's near hearing and a face turned to the lamp, since "Et non,
-/// je ne viens pas." is everyday French; "Et lampe," with the near hearing
-/// alone. Never without the near hearing, never mid-line or with no comma,
-/// and never for another language.
+/// French (#8381): "Hey Lamp, …" came back as "Et non, …" on lamp-e82d
+/// (#8387's check). With the owner's language French, a line that opens
+/// "Et non," ("Hé non,", "Eh non,") is the name only with lamp-name's near
+/// hearing and a face turned to the lamp, since "Et non, je ne viens pas."
+/// is everyday French. Never without the near hearing, never mid-line or
+/// with no comma, never for another language, and "Et lampe," never: the
+/// French call is "Hey Lamp" (the owner, 23 Nov).
 #[tokio::test]
 async fn french_et_non_at_a_lines_start_is_the_name_only_with_its_signs() {
     let line = "Et non, quelle heure est-il ?";
@@ -516,18 +516,6 @@ async fn french_et_non_at_a_lines_start_is_the_name_only_with_its_signs() {
             .as_deref(),
         Some("Lamp, quel temps fait-il ?")
     );
-    assert_eq!(
-        asked_in_french(
-            "Et lampe, raconte-moi une blague.",
-            Some(Some(0.55)),
-            false,
-            true
-        )
-        .await
-        .as_deref(),
-        Some("Lamp, raconte-moi une blague."),
-        "\"Et lampe\" needs no face"
-    );
     for (heard, near, turned, french) in [
         (line, Some(Some(0.6)), false, true),
         (line, Some(Some(0.49)), true, true),
@@ -539,7 +527,7 @@ async fn french_et_non_at_a_lines_start_is_the_name_only_with_its_signs() {
         ("Et nonante, c'est belge.", Some(Some(0.9)), true, true),
         (
             "Et lampe, raconte-moi une blague.",
-            Some(Some(0.4)),
+            Some(Some(0.9)),
             true,
             true,
         ),
@@ -575,15 +563,12 @@ fn french_openings_heard_for_the_name() {
         opening("Eh non, attends"),
         Some(("Eh non", LikeTheName::Shape))
     );
-    assert_eq!(
-        opening("Et lampe, attends"),
-        Some(("Et lampe", LikeTheName::AsHeard))
-    );
     for not in [
         "Et non.",
         "Et non",
         "Et nonante, oui",
         "Alors et non, oui",
+        "Et lampe, attends",
         "Et",
         "",
     ] {
