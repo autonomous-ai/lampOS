@@ -5724,6 +5724,16 @@ pub fn serve(
                 heeding.hearing_only_said_to_me();
                 heeding.opening_the_eyes(files.bus_root.as_deref());
             }
+            // Only the first line soon after the lamp's question skips its
+            // look (`LAMP_ASKED_LOOKS=on`, #8395).
+            if crate::said_to_me::asked_looks_on() {
+                eprintln!(
+                    "lamp-voice second: in a conversation the lamp's question lets only the first line after its words, begun within 20 s of their end, skip its look; a later line is judged by its look (LAMP_ASKED_LOOKS)"
+                );
+                if let Ok(mut heeding) = heeding.lock() {
+                    heeding.letting_only_the_first_answer_skip_its_look();
+                }
+            }
         }
         // What the caller said before their face was known follows them
         // (`LAMP_MEMORY_FOLLOWS_FACE=on`, #2176): each line's voice and the
@@ -8457,6 +8467,12 @@ pub(crate) struct Heeding {
     face_not_speaking: Option<u64>,
     /// `LAMP_SAID_TO_ME=on` ([`Self::hearing_only_said_to_me`]).
     said_to_me: bool,
+    /// `LAMP_ASKED_LOOKS=on` ([`Self::letting_only_the_first_answer_skip_its_look`]),
+    /// and the end of the lamp's words ([`Self::said_until_us`]) after which
+    /// a line with words was last judged by `LAMP_SAID_TO_ME`: the next line
+    /// after the same words is not the first (#8395).
+    asked_looks: bool,
+    asked_line_after: Option<u64>,
     /// `LAMP_NAME_OR_FOLLOW_UP=on` ([`Self::needing_name_or_follow_up`]).
     name_or_follow_up: bool,
     /// `LAMP_TWO_FACES_HELD=on` ([`Self::holding_two_faces`]): the eyes'
@@ -9692,6 +9708,8 @@ impl Heeding {
             turned_speaking: false,
             turned_face_speaks: false,
             said_to_me: false,
+            asked_looks: false,
+            asked_line_after: None,
             face_not_speaking: None,
             name_or_follow_up: false,
             faces_held: None,
@@ -10153,6 +10171,14 @@ impl Heeding {
     /// [`Self::not_said_to_me`]).
     pub(crate) fn hearing_only_said_to_me(&mut self) {
         self.said_to_me = true;
+    }
+
+    /// With `LAMP_SAID_TO_ME`, the lamp's question lets a line in the window
+    /// skip its pose only when the line is the first after the lamp's words
+    /// and begun within `follows_on::WITHIN_US` of their end
+    /// (`LAMP_ASKED_LOOKS=on`, #8395).
+    pub(crate) fn letting_only_the_first_answer_skip_its_look(&mut self) {
+        self.asked_looks = true;
     }
 
     /// With people talking at a desk, a line is the lamp's by its name, a
@@ -11986,6 +12012,14 @@ impl Heeding {
                     .unwrap_or_default())
     }
 
+    /// [`crate::said_to_me::Line::first_after_asked`]: no line with words
+    /// judged since the lamp's words last ended, and this one begun at
+    /// `began_us` within `follows_on::WITHIN_US` of that end (#8395).
+    fn first_after_asked(&self, began_us: u64) -> bool {
+        self.said_until_us != self.asked_line_after
+            && crate::follows_on::due(true, false, self.said_until_us, began_us)
+    }
+
     /// `LAMP_SAID_TO_ME=on` ([`crate::said_to_me::judge`]): whether the line
     /// is held as not said to the lamp, its face and conversation then no
     /// sign. Out of a conversation the turned face's pitch and gaze are the
@@ -12045,6 +12079,8 @@ impl Heeding {
             look_free_answered: self.look_free_used,
             // Begun over the lamp's own answer, which it cut (#8205).
             cut_in: self.began_over == Some(request),
+            asked_looks: self.asked_looks,
+            first_after_asked: self.first_after_asked(said.0),
             ..Default::default()
         };
         // The eyes' signs as the replay of saved journals reads them
@@ -12064,6 +12100,10 @@ impl Heeding {
         }
         let going_on = signs.going_on;
         let decision = crate::said_to_me::judge(line);
+        // The next line after the same words of the lamp's is not the first.
+        if !heard.trim().is_empty() {
+            self.asked_line_after = self.said_until_us;
+        }
         self.no_look_answer = matches!(
             decision,
             crate::said_to_me::Said::AnswerNoLook | crate::said_to_me::Said::CutInNoLook
@@ -12087,6 +12127,13 @@ impl Heeding {
                 ", the lamp asked {:.1} s before",
                 ago.as_secs_f32()
             ));
+        }
+        // `LAMP_ASKED_LOOKS` (#8395): why the question let the line skip
+        // nothing.
+        if line.lamp_asked && line.asked_looks && !line.first_after_asked {
+            pose.push_str(
+                ", not the first line within 20 s of the lamp's words: its look counts (LAMP_ASKED_LOOKS)",
+            );
         }
         let words = heard.split_whitespace().count();
         // Every decision journaled with the pose, for a row to count
@@ -30151,6 +30198,74 @@ mod tests {
             None,
             "the lamp asked"
         );
+    }
+
+    /// #8395 (lamp-74ff, 23 Nov 16:09-16:21, a meeting): with
+    /// `LAMP_ASKED_LOOKS` the lamp's question lets only the first line after
+    /// its words, begun within 20 s of their end, skip its look; the second
+    /// line after the same question, a first line 25 s after it, or
+    /// request 132's shape (asked 423 s before) looking away is held. A line
+    /// looking at the lamp or naming it is let in; off, all as before.
+    #[test]
+    fn with_asked_looks_only_the_first_line_soon_after_the_question_skips_its_look() {
+        use lamp_msgs::SpeakingState::{No, Yes};
+        const S: u64 = 1_000_000;
+        let away = (None, Some(false));
+        let looking = (Some(0.05), Some(true));
+        let talk = "Then we ship it on Monday";
+        // One heeding through `lines`, the lamp's question having ended
+        // `ended_s` before the lines began; each line is (pose, words), said
+        // one after another. Whether each was let in.
+        type Pose = (Option<f32>, Option<bool>);
+        let run = |on: bool, ended_s: u64, lines: &[(Pose, &str)]| {
+            let mut heeding = super::Heeding::new(true, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.hearing_only_said_to_me();
+            if on {
+                heeding.letting_only_the_first_answer_skip_its_look();
+            }
+            heeding.said_until_us = Some(monotonic_us().saturating_sub(ended_s * S));
+            let verdicts: Vec<bool> = lines
+                .iter()
+                .enumerate()
+                .map(|(index, &(pose, words))| {
+                    let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+                    let now = Instant::now();
+                    turned_face_looks_posed(&eyes, now, 200, &[Some(Yes), Some(No)], &mut 0, pose);
+                    heeding.seeing_speaking_faces(eyes, None);
+                    let signs = super::Signs {
+                        going_on: true,
+                        lamp_asked: true,
+                        ..turned_signs(crate::room_told::Room::Unknown)
+                    };
+                    let began = monotonic_us();
+                    let said = (began, began + 2_200_000);
+                    heeding
+                        .heed_signs(10 + index as u64, said, words, signs)
+                        .is_none()
+                })
+                .collect();
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            verdicts
+        };
+        // (a), (b): the first line 5 s after the question's end, then a
+        // second, both looking away.
+        assert_eq!(run(true, 5, &[(away, talk), (away, talk)]), [true, false]);
+        // (c) The first line, 25 s after; (d) request 132's, 423 s after.
+        assert_eq!(run(true, 25, &[(away, talk)]), [false]);
+        assert_eq!(run(true, 423, &[(away, talk)]), [false]);
+        // (e) Looking at the lamp, (f) naming it: let in, first or not.
+        assert_eq!(
+            run(
+                true,
+                5,
+                &[(away, talk), (looking, talk), (away, "Lamp, ship it.")]
+            ),
+            [true, true, true]
+        );
+        // Off: every line the question waits on is let in, as before.
+        assert_eq!(run(false, 5, &[(away, talk), (away, talk)]), [true, true]);
+        assert_eq!(run(false, 423, &[(away, talk)]), [true]);
     }
 
     /// The Reviewer-lead's HOLD on #7726: Jay alone in view, head down, his

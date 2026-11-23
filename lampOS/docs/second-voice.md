@@ -6484,6 +6484,29 @@ after a take-over, but now for every turn:
   `said_to_me` holds (no name, no look, no question waiting) goes
   unanswered. The replay (`crate::replay`) reads only `said_to_me`, so it
   is the same either way.
+- **Only the first line after the lamp's question skips its look**
+  (`LAMP_ASKED_LOOKS=on`, #8395; inert without `LAMP_SAID_TO_ME`). On
+  lamp-74ff on 23 Nov 16:09-16:21, in a meeting, lines looking away were
+  let in as `said to the lamp, in a conversation` because the lamp's
+  newest kept line ended in `?`, asked 16.5 to 423.1 s before: the thread's
+  question has no clock, and the window is renewed by every answered line.
+  With the switch the question lets a line in the window skip the pitch
+  and look checks only when the line is the first with words judged after
+  the lamp's words ended (`Heeding::said_until_us`; `Heeding::asked_line_after`
+  remembers the end a line was last judged after) and it began within 20 s
+  of that end (`follows_on::WITHIN_US` by `follows_on::due`;
+  `said_to_me::Line::first_after_asked`, `Line::asked_lets_in`). Any later
+  line, or one answering an older question, is judged as a line with no
+  question waiting: looking away is `held: looking away in a conversation`
+  (#7726's rule), head down or up `held: not facing in a conversation
+  (pitch)`, and the journal's pose adds `, not the first line within 20 s
+  of the lamp's words: its look counts (LAMP_ASKED_LOOKS)`. The name, a yes
+  awaited, a look at the lamp, a pose unread and `LAMP_NAME_SIGN_TIED`'s one
+  no-look answer (fresh `question_waits`, 120 s from the question's start)
+  are as before. Off unless set; the product switch-on waits for a ROW on
+  lamp-52e6. Risk: a reply said looking away to a question more than 20 s
+  after the lamp's words ended, or a second reply looking away, needs a
+  look or the name. The 0-word wake that opened the 16:17 run is #8114's.
 - **Who spoke a line, from the looks its mouth was read**
   (`LAMP_SPEAKING_READ_LOOKS=on`, #7442, #7419). A face is a line's speaker
   when it read `yes` in at least half of the line's looks
