@@ -1155,6 +1155,10 @@ fn an_exact_line_waits_for_the_person_then_is_played_to_spoken() {
 /// spoken, the line is the lamp's own in the next chat request's history.
 #[test]
 fn an_exact_skill_line_said_is_in_the_next_chat_requests_history() {
+    // The voice's thread is one for the process: this test resets it and
+    // writes its line, so it holds it from the tests that read or reset it
+    // (`provider_worker::tests::one_thread`).
+    let _thread = crate::provider_worker::tests::one_thread();
     let line = "My arm is folded. Shall I turn myself off now? Say yes, and I will.";
     let (mut says, answered) = crate::say::Says::words_for_test(
         "unplug",

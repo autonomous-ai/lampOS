@@ -248,12 +248,18 @@ async fn review_sound_a_name_heard_as_a_request_began_lets_out_the_answer_the_ru
 }
 
 /// The name note on (`NAME_NOTE`, the worker's `--name-note`) for one
-/// test, and off again when dropped, a failed assertion included.
-struct NameNoteOn;
+/// test, and off again when dropped, a failed assertion included. It holds
+/// the worker's one-at-a-time lock (`super::one_thread`) from before the
+/// note is set until after it is cleared, so another test's rig never
+/// reads this test's note, nor has its own cleared under it.
+struct NameNoteOn {
+    _one: super::OneThread,
+}
 impl NameNoteOn {
     fn set() -> Self {
+        let one = super::one_thread();
         NAME_NOTE.store(true, std::sync::atomic::Ordering::Relaxed);
-        Self
+        Self { _one: one }
     }
 }
 impl Drop for NameNoteOn {

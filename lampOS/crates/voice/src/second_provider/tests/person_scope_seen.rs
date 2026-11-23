@@ -2754,6 +2754,9 @@ async fn a_line_not_carried_never_saves_into_their_scope() {
 /// `Thread::held_for`) and never given to the summary or a talk note.
 #[test]
 fn a_carried_line_is_kept_out_of_the_journal_whether_or_not_it_saves() {
+    // The voice's thread is one for the process: this test reads and
+    // marks it, so it holds it from the tests that read or reset it.
+    let _one = crate::provider_worker::tests::one_thread();
     use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
     // A person of this test's own: the thread is shared by the crate's tests.
     let a = crate::remember::person_id("Carried Saves A");
@@ -6139,6 +6142,9 @@ async fn with_carried_memory_a_one_face_line_is_as_before() {
 /// written; nothing said off camera is journalled as theirs.
 #[test]
 fn a_carried_line_read_as_theirs_is_still_kept_out_of_the_journal() {
+    // The voice's thread is one for the process: this test reads and
+    // marks it, so it holds it from the tests that read or reset it.
+    let _one = crate::provider_worker::tests::one_thread();
     use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
     let a = crate::remember::person_id("Carried Memory A");
     let request = 9_110_901_u64;

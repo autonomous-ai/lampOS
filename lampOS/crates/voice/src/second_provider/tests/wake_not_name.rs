@@ -76,6 +76,9 @@ fn the_name_itself_and_common_openers_are_not_taken() {
 /// the misheard name is left out.
 #[test]
 fn a_named_line_keeps_its_day_and_loses_only_the_misheard_name() {
+    // The voice's thread is one for the process: this test writes its
+    // lines, so it holds it from the tests that read or reset it.
+    let _one = crate::provider_worker::tests::one_thread();
     let now = Instant::now();
     const DAY: &str = "Tomorrow, I see the dentist at 3, remember that.";
     assert_eq!(wake_not_a_name(9_904_301, DAY, true, true), None);
@@ -107,6 +110,9 @@ fn the_model_is_told_the_word_is_no_name() {
 /// nothing is told or held.
 #[test]
 fn the_requests_line_is_held_without_the_word_only_with_the_switch_and_the_name() {
+    // The voice's thread is one for the process: this test writes its
+    // lines, so it holds it from the tests that read or reset it.
+    let _one = crate::provider_worker::tests::one_thread();
     const HEARD: &str = "Edeland, my dog is called Moe.";
     let now = Instant::now();
     for (request, named, keep_heard) in [(9_904_101, false, true), (9_904_102, true, false)] {
@@ -139,6 +145,9 @@ fn the_requests_line_is_held_without_the_word_only_with_the_switch_and_the_name(
 /// it, word for word; the same line heard with the name loses only it.
 #[test]
 fn an_unnamed_line_keeps_the_name_it_opens_with() {
+    // The voice's thread is one for the process: this test writes its
+    // lines, so it holds it from the tests that read or reset it.
+    let _one = crate::provider_worker::tests::one_thread();
     let now = Instant::now();
     for (request, heard) in [
         (9_904_201, "Ramon, my dog is called Moe."),
@@ -278,6 +287,9 @@ fn a_decomposed_greeting_is_passed_over_whole() {
 /// and the word go.
 #[test]
 fn a_greeting_and_a_real_name_stay_when_the_name_was_not_heard() {
+    // The voice's thread is one for the process: this test writes its
+    // lines, so it holds it from the tests that read or reset it.
+    let _one = crate::provider_worker::tests::one_thread();
     let now = Instant::now();
     const HEARD: &str = "Hello, Tom here. Remember my locker is 12.";
     assert_eq!(wake_not_a_name(9_904_401, HEARD, false, true), None);
@@ -314,6 +326,9 @@ fn keep_heard_keeps_the_line_without_the_wake() {
 /// off, is held as it was said.
 #[test]
 fn a_line_that_calls_the_lamp_by_name_is_held_without_the_call() {
+    // The voice's thread is one for the process: this test writes its
+    // lines, so it holds it from the tests that read or reset it.
+    let _one = crate::provider_worker::tests::one_thread();
     let now = Instant::now();
     for (request, heard, rest) in [
         (
