@@ -1,0 +1,6 @@
+#!/bin/sh
+# el-8400 rig: no systemd to run a transient unit. Logged and refused (lamp-update uses
+# it only for sysstat's kept files, which the rig has none of).
+echo "$(date +%s.%N) systemd-run $*" >> /var/tmp/el-8400/calls.log
+echo "systemd-run: not on the el-8400 rig" >&2
+exit 1

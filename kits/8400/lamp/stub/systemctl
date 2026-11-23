@@ -1,0 +1,320 @@
+#!/usr/bin/python3 -IS
+"""el-8400 rig: a logged `systemctl` that answers like an idle lamp.
+
+systemd as PID 1 segfaults under qemu (the first builder's 10:59 recipe on
+#8353), so the rig container has no systemd. lamp-update asks systemctl for
+unit states and starts a few one-shots; this answers from the unit files on
+disk and a small state folder, and logs every call to the kit's calls.log.
+
+- Every unit is loaded (when its file is there) and inactive, never run
+  (ConditionResult=no, Result=success), except lampos.target (active) and
+  lamp-update-back.timer (active, waiting, Unit=lamp-update-back.service).
+- `start`/`restart` of lamp-update-apply.service or lamp-update-writer*.service
+  runs its ExecStart lines, as systemd would. Any other start only marks the
+  unit active: no part ever runs here.
+- `enable`/`disable` write/remove the [Install] WantedBy=/RequiredBy= links,
+  as systemctl does. UnitFileState: masked, enabled (a link names it),
+  static (no [Install]) or disabled.
+"""
+import glob
+import os
+import shlex
+import subprocess
+import sys
+import time
+
+UNITS = "/etc/systemd/system"
+DIRS = [UNITS, "/run/systemd/system", "/usr/local/lib/systemd/system",
+        "/lib/systemd/system", "/usr/lib/systemd/system"]
+STATE = "/var/lib/el-8400-stub/active"
+LOG = "/var/tmp/el-8400/calls.log"
+PID_FILE = "/var/lib/el-8400-stub/next-pid"
+
+
+def log(words):
+    try:
+        with open(LOG, "a") as out:
+            out.write("%.3f systemctl %s\n" % (time.time(), " ".join(words)))
+    except OSError:
+        pass
+
+
+def fragment(unit):
+    names = [unit]
+    if "@" in unit:
+        base, rest = unit.split("@", 1)
+        if not rest.startswith("."):
+            names.append(base + "@" + rest[rest.rfind("."):])
+    for name in names:
+        for folder in DIRS:
+            path = os.path.join(folder, name)
+            if os.path.lexists(path):
+                return path
+    return None
+
+
+def masked(path):
+    return path is not None and os.path.islink(path) and os.readlink(path) == "/dev/null"
+
+
+def dropins(unit):
+    found = []
+    for folder in DIRS:
+        found.extend(sorted(glob.glob(os.path.join(folder, unit + ".d", "*.conf"))))
+    return found
+
+
+def texts(unit):
+    out = []
+    path = fragment(unit)
+    for item in ([path] if path and not masked(path) else []) + dropins(unit):
+        try:
+            with open(item) as source:
+                out.append(source.read())
+        except OSError:
+            pass
+    return out
+
+
+def section_lines(text, wanted):
+    within = False
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("[") and line.endswith("]"):
+            within = line[1:-1] == wanted
+            continue
+        if within and "=" in line and not line.startswith(("#", ";")):
+            key, value = line.split("=", 1)
+            yield key.strip(), value.strip()
+
+
+def install_links(unit):
+    links = []
+    for text in texts(unit):
+        for key, value in section_lines(text, "Install"):
+            kind = {"WantedBy": "wants", "RequiredBy": "requires"}.get(key)
+            if kind:
+                for target in value.split():
+                    links.append(os.path.join(UNITS, "%s.%s" % (target, kind), unit))
+    return links
+
+
+def file_state(unit):
+    path = fragment(unit)
+    if path is None:
+        return ""
+    if masked(path):
+        return "masked"
+    for kind in ("wants", "requires"):
+        if glob.glob(os.path.join(UNITS, "*." + kind, unit)):
+            return "enabled"
+    has_install = any(key in ("WantedBy", "RequiredBy", "Alias", "Also")
+                      for text in texts(unit) for key, _ in section_lines(text, "Install"))
+    return "disabled" if has_install else "static"
+
+
+def read_state(unit):
+    # active sub pid condition result
+    try:
+        with open(os.path.join(STATE, unit)) as source:
+            words = source.read().split()
+        if len(words) >= 5:
+            return words[0], words[1], words[2], words[3], words[4]
+    except OSError:
+        pass
+    return "inactive", "dead", "0", "no", "success"
+
+
+def write_state(unit, active, sub, pid="0", condition="yes", result="success"):
+    os.makedirs(STATE, exist_ok=True)
+    with open(os.path.join(STATE, unit), "w") as out:
+        out.write("%s %s %s %s %s\n" % (active, sub, pid, condition, result))
+
+
+def next_pid():
+    try:
+        with open(PID_FILE) as source:
+            pid = int(source.read().strip() or "40000")
+    except (OSError, ValueError):
+        pid = 40000
+    with open(PID_FILE, "w") as out:
+        out.write(str(pid + 1))
+    return str(pid)
+
+
+def prop(unit, name):
+    path = fragment(unit)
+    active, sub, pid, condition, result = read_state(unit)
+    if name in ("Id", "Names"):
+        return unit
+    if name == "LoadState":
+        return "masked" if masked(path) else ("loaded" if path else "not-found")
+    if name == "FragmentPath":
+        return path if path and not masked(path) else ""
+    if name == "DropInPaths":
+        return " ".join(dropins(unit))
+    if name == "UnitFileState":
+        return file_state(unit)
+    if name == "ActiveState":
+        return active
+    if name == "SubState":
+        return sub
+    if name == "MainPID":
+        return pid
+    if name == "ConditionResult":
+        return condition
+    if name == "Result":
+        return result
+    if name == "NRestarts":
+        return "0"
+    if name == "NeedDaemonReload":
+        return "no"
+    if name == "CPUQuotaPerSecUSec":
+        return "infinity"
+    if name == "Unit" and unit.endswith(".timer"):
+        return unit[: -len(".timer")] + ".service"
+    return ""
+
+
+def show(args):
+    props, value, units = [], False, []
+    for arg in args:
+        if arg.startswith("--property="):
+            props.extend(p for p in arg.split("=", 1)[1].split(",") if p)
+        elif arg in ("-p",):
+            continue
+        elif arg == "--value":
+            value = True
+        elif arg.startswith("-"):
+            continue
+        else:
+            units.append(arg)
+    if not props:
+        props = ["Id", "LoadState", "ActiveState", "SubState", "UnitFileState", "FragmentPath"]
+    blocks = []
+    for unit in units:
+        lines = [prop(unit, name) if value else "%s=%s" % (name, prop(unit, name)) for name in props]
+        blocks.append("\n".join(lines))
+    sys.stdout.write("\n\n".join(blocks) + "\n")
+    return 0
+
+
+def exec_starts(unit):
+    starts, env = [], dict(os.environ)
+    for text in texts(unit):
+        for key, value in section_lines(text, "Service"):
+            if key == "ExecStart":
+                if value == "":
+                    starts = []
+                else:
+                    starts.append(value.lstrip("-@+!:"))
+            elif key == "Environment":
+                for pair in shlex.split(value):
+                    if "=" in pair:
+                        name, val = pair.split("=", 1)
+                        env[name] = val
+    return starts, env
+
+
+RUNS = ("lamp-update-apply.service",)
+
+
+def runs_exec(unit):
+    return unit in RUNS or (unit.startswith("lamp-update-writer") and unit.endswith(".service"))
+
+
+def start(units):
+    status = 0
+    for unit in units:
+        path = fragment(unit)
+        if path is None or masked(path):
+            sys.stderr.write("Failed to start %s: Unit %s not found.\n" % (unit, unit))
+            status = 5
+            continue
+        if runs_exec(unit):
+            starts, env = exec_starts(unit)
+            code = 0
+            for line in starts:
+                log(["#", "runs", unit, ":", line])
+                code = subprocess.run(shlex.split(line), env=env).returncode
+                if code != 0:
+                    break
+            if code == 0:
+                write_state(unit, "inactive", "dead", "0", "yes", "success")
+            else:
+                write_state(unit, "failed", "failed", "0", "yes", "exit-code")
+                sys.stderr.write("Job for %s failed because the control process exited with error code.\n" % unit)
+                status = 1
+            continue
+        if unit.endswith(".target"):
+            write_state(unit, "active", "active")
+        elif unit.endswith(".socket"):
+            write_state(unit, "active", "listening")
+        elif unit.endswith(".timer"):
+            write_state(unit, "active", "waiting")
+        elif unit.endswith(".path"):
+            write_state(unit, "active", "waiting")
+        else:
+            write_state(unit, "active", "running", next_pid())
+    return status
+
+
+def stop(units):
+    status = 0
+    for unit in units:
+        if fragment(unit) is None:
+            sys.stderr.write("Failed to stop %s: Unit %s not loaded.\n" % (unit, unit))
+            status = 5
+            continue
+        write_state(unit, "inactive", "dead", "0", "yes", "success")
+    return status
+
+
+def enable(units, on):
+    for unit in units:
+        path = fragment(unit)
+        if path is None:
+            sys.stderr.write("Failed to enable unit: Unit file %s does not exist.\n" % unit)
+            return 1
+        for link in install_links(unit):
+            if on:
+                os.makedirs(os.path.dirname(link), exist_ok=True)
+                if not os.path.lexists(link):
+                    os.symlink(path, link)
+            elif os.path.islink(link):
+                os.remove(link)
+    return 0
+
+
+def main(argv):
+    log(argv)
+    words = [w for w in argv if w not in ("--no-block", "--no-pager", "--quiet", "-q", "--now", "--system")]
+    verb = next((w for w in words if not w.startswith("-")), "")
+    rest = words[words.index(verb) + 1:] if verb else []
+    units = [w for w in rest if not w.startswith("-")]
+    if verb == "show":
+        return show(rest)
+    if verb in ("start", "restart", "reload-or-restart", "try-restart"):
+        if verb == "try-restart":
+            units = [u for u in units if read_state(u)[0] == "active"]
+        return start(units)
+    if verb == "stop":
+        return stop(units)
+    if verb in ("enable", "reenable"):
+        return enable(units, True)
+    if verb == "disable":
+        return enable(units, False)
+    if verb == "is-active":
+        states = [read_state(u)[0] for u in units]
+        sys.stdout.write("".join(s + "\n" for s in states))
+        return 0 if states and all(s == "active" for s in states) else 3
+    if verb == "is-enabled":
+        states = [file_state(u) or "not-found" for u in units]
+        sys.stdout.write("".join(s + "\n" for s in states))
+        return 0 if states and all(s in ("enabled", "static") for s in states) else 1
+    # daemon-reload, reset-failed, kill, list-units and anything else: logged, done.
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

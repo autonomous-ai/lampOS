@@ -1,0 +1,5 @@
+#!/bin/sh
+# el-8400 rig: no journald under qemu. Logged; prints nothing (lamp-update reads a
+# unit's journal only when a watched part fails, and none runs here).
+echo "$(date +%s.%N) journalctl $*" >> /var/tmp/el-8400/calls.log
+exit 0

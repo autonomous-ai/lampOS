@@ -1,0 +1,16 @@
+#!/bin/sh
+# el-8400 rig: logged; makes the d/D folders of the named tmpfiles.d files (all of
+# /etc/tmpfiles.d when none is named), with their mode, user and group.
+echo "$(date +%s.%N) systemd-tmpfiles $*" >> /var/tmp/el-8400/calls.log
+files=""
+for a in "$@"; do case "$a" in -*) ;; *) files="$files $a";; esac; done
+[ -n "$files" ] || files=$(ls /etc/tmpfiles.d/*.conf 2>/dev/null)
+for f in $files; do
+  [ -f "$f" ] || f="/etc/tmpfiles.d/$f"
+  [ -f "$f" ] || continue
+  awk '($1=="d"||$1=="D"){print $2, $3, $4, $5}' "$f" | while read -r p m u g; do
+    [ "$m" = "-" ] && m=0755; [ "$u" = "-" ] && u=root; [ "$g" = "-" ] && g=root
+    install -d -m "$m" -o "$u" -g "$g" "$p" 2>/dev/null || mkdir -p "$p"
+  done
+done
+exit 0
