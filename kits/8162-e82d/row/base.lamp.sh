@@ -2,7 +2,7 @@
 # (build STABLE_SEQ, or above it with stable's own lamp-update after an earlier put-back at a higher sequence), on its
 # product line, nothing staged, Harness at stable's pin, OpenClaw the lamp's agent, lamp-cloud active.
 # Prints SEQ installed=<n> max=<the highest seen>, FAILED0 <units already failed>, EXESHA (the running exes, as found),
-# SPEAKER <control> <n>% (read only, never set: at most SPK_MAX), then BASE OK | BASE STOP <why>.
+# SPEAKER <control> <n>% (read only, never set: at most SPK_MAX), HAUTH (Harness signed in), PRIVACY (the mic slide), then BASE OK | BASE FAIL <why>.
 cd /
 why=""
 b=$(build); m=$(seqmax); echo "SEQ installed=$b max=$m busy='$(updbusy)'"
@@ -22,6 +22,10 @@ for x in lamp-voice lamp-tasks lamp-openclaw-gateway lamp-cloud lamp-update; do 
 agent_now
 echo "FAILED0 $(failed)"
 exeshas
+# Harness signed in (cli read, else no signed-out line in lamp-tasks' last 3 min).
+a=$(hauth); echo "$a"; case "$a" in *"via=cli logged_in=True offline=False"*|*"via=journal signed_out_lines=0 "*) ;; *) why="$why harness-not-signed-in";; esac
+# The physical mic slide (voice/privacy physical_muted): closed fails; unread is printed, not judged.
+pv=$(mute_live | grep '^PRIVACY'); echo "${pv:-PRIVACY unread}"; echo "$pv" | grep -q 'physical_muted=True' && why="$why mic-slide-closed"
 s=$(speaker); echo "$s"; p=$(echo "$s" | sed -n 's/^SPEAKER [^ ]* \([0-9]*\)%$/\1/p'); [ -n "$p" ] && [ "$p" -le "${SPK_MAX:-40}" ] || why="$why speaker-volume-over-${SPK_MAX:-40}-or-unread"
 echo "KEYPUB $(sha256sum /etc/lampOS/update/key.pub 2>/dev/null | cut -c1-16)"
-[ -z "$why" ] && echo "BASE OK" || echo "BASE STOP:$why"
+[ -z "$why" ] && echo "BASE OK" || echo "BASE FAIL$why"

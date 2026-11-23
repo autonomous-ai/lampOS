@@ -51,6 +51,16 @@ print("HREC", " ".join("%s=%s" % (k, r.get(k)) for k in ("install","version","fr
 hcli(){ ( cd $HHOME || cd /; u=$(id -u lampos); x=""
   [ -d /run/user/$u ] && x="XDG_RUNTIME_DIR=/run/user/$u"; [ -S /run/user/$u/bus ] && x="$x DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$u/bus"
   runuser -u lampos -- env -i HOME=$HHOME PATH=/usr/local/bin:/usr/bin:/bin $x /usr/local/bin/harness "$@" ); }
+# Harness's sign-in, READ ONLY, as lamp-tasks reads it (harness.rs Cli::signed_in_here: `harness auth status --json`,
+# parse_auth_here: loggedIn false = out, loggedIn + offline = offline, else in). If that read fails: lamp-tasks' own
+# journal of the last 3 min ("tasks: Harness signed in: no", runtime.rs:2682, or state=signed-out). Prints one HAUTH line.
+hauth(){ j=$(hcli auth status --json 2>/dev/null | python3 -I -c 'import json,sys
+try: d=json.load(sys.stdin); print("HAUTH via=cli logged_in=%s offline=%s" % (bool(d["loggedIn"]), bool(d.get("offline", False))))
+except Exception: pass')
+  [ -n "$j" ] && { echo "$j"; return; }
+  n=$(journalctl -u lamp-tasks --since -3min --no-pager -o cat 2>/dev/null | grep -cE 'Harness signed in: no|state=signed-out')
+  y=$(journalctl -u lamp-tasks --since -3min --no-pager -o cat 2>/dev/null | grep -c 'Harness signed in: yes')
+  echo "HAUTH via=journal signed_out_lines=$n signed_in_lines=$y"; }
 # --- #8138/#8162: the lamp's own agent's readiness, read only: the bus's kept value of tasks/agent (lamp_msgs
 # AgentReadiness::TOPIC; <root>/<topic>/latest, a header line then the JSON payload).
 AGENT_LATEST=/run/lampos-bus/tasks/agent/latest

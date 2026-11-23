@@ -6,11 +6,11 @@ head. It is not a /run drop-in. After the legs, a second real round puts stable'
 Harness goes back to stable's pin by hand. The kit holds no key and signs nothing: each round is either your own
 command, or two channels you made and signed.
 
-Its mocks: `mock/row/run-all.sh` runs 71 cases with stub ssh, scp, afplay, curl, osascript and lock, and recorded
+Its mocks: `mock/row/run-all.sh` runs 77 cases with stub ssh, scp, afplay, curl, osascript and lock, and recorded
 lamp outputs. They cover every leg's PASS, FAIL and VOID cases, and run.sh itself: the step order, resume and split
 runs, `UNTIL`, `SKIP` and then-step, the traps on a FAIL and on Ctrl-C, a lock renew that fails, a lock not taken,
 the volume refusal (at the start and mid-legs), sequences that are not higher, a round that never ends or is refused,
-a put-back read that differs, the lamp's speaker over 40% or unread, and a unit's exe not as found at base. `mock/row/mutate.sh` breaks six verdict rules and checks a FAIL case catches each
+a put-back read that differs, the lamp's speaker over 40% or unread, a unit's exe not as found at base, Harness signed out (cli or journal), another default agent, and the mic slide closed. `mock/row/mutate.sh` breaks six verdict rules and checks a FAIL case catches each
 one. The mocks are the dry run; there is no other Mac-only mode.
 
 ## Prerequisites
@@ -64,7 +64,7 @@ step, then goes on at `<then>`. `UNTIL=<step>` stops before that step. `SKIP="<s
 | lock | lamp-lock try, then a 60 s renew loop (only with KIT_LL) | 0 | `LOCK TAKEN` or `LOCK none` |
 | clips | the clips' sha256 (`row/clips/SHAS`) | 0 | `CLIPS OK` |
 | hfetch | Harness `HV_STABLE`'s cli.js and notify.mjs, fetched on the Mac from the URLs in stable's pin file, sha256 and size checked | 1 | `HFETCH OK` |
-| base | `row/base.lamp.sh`: on stable, its updater, Harness 0.6.75, OpenClaw, the units; each unit's running exe sha256 recorded (as found); the lamp's speaker volume read (amixer, never set): over 40% or unread stops; the sequences checked | 1 | `BASE OK` |
+| base | `row/base.lamp.sh`: on stable, its updater, Harness 0.6.75, OpenClaw, the units; each unit's running exe sha256 recorded (as found); the lamp's speaker volume read (amixer, never set): over 40% or unread stops; Harness signed in (`harness auth status --json` as lampos, else no signed-out line in lamp-tasks' last 3 min), OpenClaw the default agent, the physical mic slide open (unread: noted, not judged), else `BASE FAIL <why>` before any change; the sequences checked | 1 | `BASE OK` |
 | round1 | your round 1 (cmd or channel), then lamp-update's own end: `up to date: build <ROUND1_SEQ>` after `confirmed: lamp-update runs its new build` (a self-switch) | 3-15 | `ROUND 1 OK` |
 | verify | `row/verify.lamp.sh` every 30 s, up to 15 min: build ROUND1_SEQ, the PR's updater (not stable's), Harness 0.6.78 and its record, nothing newly failed, tasks/agent ready with engine openclaw | 1-15 | `VERIFY PASS` |
 | micon | `row/micon.lamp.sh`: the mute recorded and lifted, only with `MIC_YES=yes` (the lamp's person's yes for this ROW) | 1 | `MUTE LIFTED OK` or `MUTE NOT MUTED` |
