@@ -3115,8 +3115,17 @@ gives one fixed line with a real place to turn. Off unless
   still go, `Says::take_asked`), a computer's turn and the photo-face ask.
   Task news, the reminders the person set and the shutdown's last words
   still go. While it holds, the session's trace keeps no transcript text.
-- **Not yet:** the body's playful motion and light are not held, and a
-  skill's speech under way is not stopped.
+- **What nobody asked for stops, under way too** (#7689 part 2): while the
+  hold holds, a skill's exact line, sound or stream nobody asked for is
+  refused at once (`Says::refuse_unasked_sounds`, told `say::CARE_HELD`)
+  instead of played, and the reply in hand is cut if it is a say nobody
+  asked for (`say::Ticket::unasked`, set from `asked_for` as it is taken;
+  the coordinator's `care_cuts`), its asker told `dropped` with `held`
+  (`say::CARE_CUT`). Neither tells the skill or the computer why: never that
+  words of self-harm were heard. The person's own turn, a reminder, the
+  voice's own says (a computer's turn's prompt) and what a person asked for
+  are never cut by it.
+- **Not yet:** the body's playful motion and light are not held.
 
 ## What a person hears
 

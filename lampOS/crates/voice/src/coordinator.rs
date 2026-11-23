@@ -8620,6 +8620,19 @@ fn conversation_with_gate_inner(
             rig.publish(snapshot)?;
             last_publish = monotonic_us();
         }
+        // After words of self-harm (#7689): a skill's say, exact line, sound or
+        // stream nobody asked for that is under way is cut, so no skill's line
+        // plays on over them (none new is taken: `take_asked`, and
+        // `refuse_unasked_sounds` below). Its asker is told only `held`.
+        if care_cuts(care_holds, reply.as_ref()) {
+            eprintln!("lamp-voice: a say nobody asked for was cut: the care hold (LAMP_CARE_LINE)");
+            cancel_reply(owner, reply, trace, crate::say::CARE_CUT)?;
+            provider_queue.clear();
+            speaker_pending = None;
+            snapshot = owner.snapshot(now())?;
+            rig.publish(snapshot)?;
+            last_publish = monotonic_us();
+        }
         // The owner's Update now (#7517): a reply of the lamp's own being
         // spoken ends, so it says it is updating before lamp-update restarts
         // it. A person's line under way is answered with those words instead.
@@ -13697,6 +13710,16 @@ fn conversation_with_gate_inner(
         // otherwise refused now with why. It never waits, so it never comes
         // late. Its file was read on the asker's thread.
         if let Some(says) = says.as_mut() {
+            // After words of self-harm (#7689): an exact line, sound or
+            // stream nobody asked for is refused, not played.
+            if care_holds {
+                let refused = says.refuse_unasked_sounds(std::time::Instant::now());
+                if refused > 0 {
+                    eprintln!(
+                        "lamp-voice: {refused} line(s) or sound(s) nobody asked for refused: the care hold (LAMP_CARE_LINE)"
+                    );
+                }
+            }
             let at_us = monotonic_us();
             let now_is = skill_sound_now(
                 SoundGates {
@@ -15370,6 +15393,17 @@ fn tell_voice_of_turn(
             .filter(|_| !origin.is_some_and(SpeechOrigin::unshown)),
         at_us,
     );
+}
+
+/// Whether the reply in hand is cut by the care hold (`LAMP_CARE_LINE`,
+/// #7689): the hold holds, and the reply is a say nobody asked for
+/// ([`crate::say::Ticket::unasked`]). The person's own turn, a reminder, a
+/// say a person asked for and the lamp's own lines are never cut by it.
+fn care_cuts(care_holds: bool, reply: Option<&Reply>) -> bool {
+    care_holds
+        && reply
+            .and_then(|current| current.say.as_ref())
+            .is_some_and(crate::say::Ticket::unasked)
 }
 
 /// A computer's stream for the speaker, if one waits (`speaker.stream`,
