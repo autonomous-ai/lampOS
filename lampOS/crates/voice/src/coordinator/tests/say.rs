@@ -483,6 +483,7 @@ fn telling_news(test: &mut Test) {
         progress: None,
         finished: None,
         also: vec![NEWS[1].into()],
+        short: None,
     };
     news_on(
         told,
@@ -841,6 +842,7 @@ fn news_first_in_line_waits_from_when_it_came_in() {
         progress: None,
         finished: None,
         also: Vec::new(),
+        short: None,
     };
     let mut idle = Says::idle_for_test();
     let mut held = None;

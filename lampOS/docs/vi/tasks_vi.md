@@ -4664,6 +4664,46 @@ Test:
 ROW còn nợ: chạy lại C151 trên lamp-06c1, một lần bắt đầu tới muộn được tìm,
 theo dõi và đóng, từ cả hai nhật ký.
 
+### Tin đã chờ một phút, và nhật ký ghi gì (#8240)
+
+Một lần chạy trên đèn ở #8240 tìm thấy một lần bắt đầu muộn đang hỏi người
+dùng, được giữ và nợ một tin, vậy mà 311 s không có gì được nói: tin của
+việc chờ một căn phòng yên, và lời nói của bất kỳ ai hay một căn phòng bận
+(`room.busy()`, ba câu không được trả lời) giữ nó không có hồi kết. Nơi tin
+chờ không biết lời nói là của ai: giọng nói chỉ giữ lúc nghe thấy bất kỳ ai
+(`last_speech_us`), và luật người-hỏi-trước chỉ giữ mức âm của người hỏi
+trong một câu trả lời.
+
+Tin của một agent đã xong (không phải tiến độ, không phải tin kể lại) đã chờ
+`task_news::WAITS_AT_MOST` kể từ khi giọng nói có nó nay được kể ở quãng
+ngừng một giây kế tiếp trong lời nói của bất kỳ ai (`PAUSE_US`), không bao
+giờ đè lên lời của chính đèn (`AFTER_LAMP_US`, không có câu trả lời đang
+chạy); phòng bận không còn giữ nó. Trong một căn phòng vẫn đang nói (chưa
+yên như tin chờ, hoặc bận) nó là một câu ngắn cố định theo loại tin
+(`SHORT_DONE`, `SHORT_ASKING`, `SHORT_STOPPED`; bản ghi `task_news_short`),
+không bao giờ là câu trả lời của agent, và nó vẫn đứng đầu hàng: tin đầy đủ
+được kể khi người dùng trả lời hay hỏi đèn điều gì sau câu đó. Một câu trả
+lời vừa một câu ngắn được kể nguyên như vậy. Vào một căn phòng không ai được
+thấy hay nghe từ khi tin đến (`task_news::someone_since`), nó chờ như trước.
+Trước một phút, không có gì thay đổi.
+
+| Giới hạn | Giá trị | Ở đâu |
+|---|---|---|
+| Chờ phòng yên, tối đa | 60 s từ khi giọng nói có tin | `task_news::WAITS_AT_MOST` |
+| Quãng ngừng để kể sau đó | 1 s không ai được nghe nói, lượt đã xong cũng lâu như vậy | `task_news::PAUSE_US` (không đổi) |
+| Sau lời của chính đèn | 3 s không ai bắt đầu | `task_news::AFTER_LAMP_US` (không đổi) |
+| Câu trả lời đã là một câu ngắn | tối đa 80 ký tự, nguyên vẹn | `task_news::SHORT_FITS_CHARS` |
+| Số câu ngắn được nói | một cho mỗi tin, một lần | `TaskNews::short_told` |
+
+Nhật ký ghi, chỉ bằng số và lý do, không bao giờ lời của tin hay tên: mỗi
+lần đọc agent của một việc (`tasks: read of task N found it STATE in X ms`,
+hoặc `failed (KIND) after X ms`); tin bị giữ và vì sao, một lần cho mỗi lý
+do (`lamp-voice: task news held: task N, REASON, X ms since it landed`, lý
+do là cổng đầu tiên đóng: `reminder_waiting`, `agent_wording`,
+`speech_not_paused`, `nobody_there`, `room_busy`, `lamp_replying`,
+`turn_open`, `not_ready`); tin được kể (`task news told: task N, X ms after
+it landed`); và một câu ngắn được kể.
+
 ## Đóng harness của chính đèn khi việc xong, chờ kể tin tối đa một phút (#6530)
 
 Với `serve --close-told` (bật trong unit của sản phẩm), lamp-tasks đóng

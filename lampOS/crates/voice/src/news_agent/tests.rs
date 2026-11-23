@@ -31,6 +31,7 @@ fn news(task: u64) -> News {
         progress: None,
         finished: None,
         also: Vec::new(),
+        short: None,
     }
 }
 
