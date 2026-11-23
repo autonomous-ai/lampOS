@@ -19,7 +19,11 @@ Body, Health** (the lead's second step on #1711, 20 Oct, after V1's monitor;
 Timeline is #5883's second piece; Tasks is #7208's third step). One event
 stream (`GET /events`, server-sent events) keeps every section fresh: the
 camera's frame four times a second (`serve::PUSH_EVERY`), the others once a
-second. Each section is HTML made and escaped on the lamp (`crates/peek/src/page.rs`).
+second. The sections are built once a second however many pages are open
+(`serve::sections_now`), and each stream sends a section only when its
+text differs from the one it sent last, so a page open on a quiet lamp
+gets nothing new (a task's "ago" says "under a minute" rather than
+counting seconds, so it does not change every push). Each section is HTML made and escaped on the lamp (`crates/peek/src/page.rs`).
 The page's few lines of script only put it in its place, and read nothing
 from the address but which section is shown.
 
@@ -218,9 +222,10 @@ its `sessions` folder `root:root 0700` by design, and peek runs as
 `User=lampos` (#7208, seen on lamp-52e6 13309). No permission is added for
 peek. So when the sessions root, the newest session's metadata folder, or
 an event file refuses access, or the sessions are missing, and no row was
-read before, Turns shows the bus's turns instead, as the Timeline's cards
-under a dim **"Turns from the bus."**, words only in monitor mode; with no
-bus turn either, **"No turn heard yet."** The records stay a source only
+read before, the bus's turns are the Timeline's cards, and Turns says so
+with a link there (`page::TURNS_IN_TIMELINE`) instead of drawing the same
+cards again: that doubled each push and gave two cards one id, so a card
+opened in Turns closed within a second. The records stay a source only
 where readable, which is dev. Overview's first-audio summary then says
 **"not known from the bus"**: the bus has no timing peek joins to a turn.
 Neither ever shows the permission error on a product lamp. Another I/O
@@ -760,10 +765,14 @@ own, and asks for it over HTTP:
   and unread bytes appear once after recovery. It prints the first denied
   read and each permission-change-to-event duration and checks the host's
   under-2-second target with a fast synthetic unit-status reader. While
-  denied with no row read, Turns is the empty bus state and Overview's
-  first audio "not known from the bus", never the error.
+  denied with no row read, Turns points to Timeline, whose bus state is
+  empty, and Overview's first audio is "not known from the bus", never the
+  error.
 - `with_the_voices_sessions_private_turns_shows_the_bus_turns` (#7208): with
-  the sessions folder at mode 0, Turns says "No turn heard yet.", then, once
-  a turn is heard and said on the bus, shows its card "from the bus", with
-  no permission error and no words outside monitor mode; Overview's first
-  audio says "not known from the bus".
+  the sessions folder at mode 0, Turns points to Timeline, which says "No
+  turn heard yet.", then, once a turn is heard and said on the bus, shows
+  its card there, once, with no permission error and no words outside
+  monitor mode; Overview's first audio says "not known from the bus".
+- `a_quiet_section_is_sent_once_and_again_when_it_changes`: on a quiet lamp
+  an open stream gets Timeline, Turns and Tasks once and not again for
+  2.5 s, then the Timeline again when a turn is heard.

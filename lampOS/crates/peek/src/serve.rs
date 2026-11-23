@@ -32,7 +32,9 @@ use axum::{
 use futures_util::stream::{self, Stream, StreamExt};
 use lamp_bus::Bus;
 use std::{
+    collections::HashMap,
     convert::Infallible,
+    hash::{Hash, Hasher},
     path::PathBuf,
     sync::{Arc, Mutex, PoisonError},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -61,6 +63,10 @@ struct Served {
     /// Wait asynchronously for an in-flight read; never hold a blocking
     /// filesystem lock on the server's runtime thread.
     turns_read: Arc<tokio::sync::Mutex<Option<(Instant, Snapshot)>>>,
+    /// The sections as last built, built again once they are
+    /// [`SECTIONS_KEPT`] old: by one stream, while the others wait for it
+    /// and send the same text.
+    sections: tokio::sync::Mutex<Option<(Instant, Arc<Sections>)>>,
     /// True once peek is asked to stop: every open stream ends then (#6401).
     stopping: tokio::sync::watch::Receiver<bool>,
 }
@@ -120,6 +126,7 @@ fn routed(peek: Arc<Peek>, stopping: tokio::sync::watch::Receiver<bool>) -> Rout
         status: tokio::sync::Mutex::new(None),
         turns: Arc::default(),
         turns_read: Arc::default(),
+        sections: tokio::sync::Mutex::new(None),
         stopping,
     });
     Router::new()
@@ -548,17 +555,58 @@ fn frame(peek: &Peek) -> String {
 }
 
 /// One push of the stream: the camera's frame, and with every
-/// [`SECTIONS_EVERY`]th the other sections.
-async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
-    let peek = &served.peek;
-    let mut events = vec![
-        Event::default()
-            .event("camera")
-            .data(page::camera(&frame(peek))),
-    ];
-    if !count.is_multiple_of(SECTIONS_EVERY) {
-        return events;
+/// [`SECTIONS_EVERY`]th the other sections, each only when its text is not
+/// the one this stream sent last (`sent`), so an idle page sends nothing.
+async fn push(served: &Arc<Served>, count: u32, sent: &mut Sent) -> Vec<Event> {
+    let mut events = Vec::new();
+    let mut send = |name: &'static str, data: &str| {
+        let hash = text_hash(data);
+        if sent.insert(name, hash) != Some(hash) {
+            events.push(Event::default().event(name).data(data));
+        }
+    };
+    send("camera", &page::camera(&frame(&served.peek)));
+    if count.is_multiple_of(SECTIONS_EVERY) {
+        for (name, data) in sections_now(served).await.iter() {
+            send(name, data);
+        }
     }
+    events
+}
+
+/// What one stream sent last, by section: a hash of its text.
+type Sent = HashMap<&'static str, u64>;
+
+/// The sections but the camera, by event name, as one push sends them.
+type Sections = Vec<(&'static str, String)>;
+
+/// How long the sections, once built, serve every stream: under one
+/// sections push, so each stream's next one finds them built again.
+const SECTIONS_KEPT: Duration = Duration::from_millis(900);
+
+fn text_hash(text: &str) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    text.hash(&mut hasher);
+    hasher.finish()
+}
+
+/// The sections as last built, built again once they are [`SECTIONS_KEPT`]
+/// old: once a second however many pages are open.
+async fn sections_now(served: &Arc<Served>) -> Arc<Sections> {
+    let mut kept = served.sections.lock().await;
+    if let Some((at, sections)) = kept.as_ref()
+        && at.elapsed() < SECTIONS_KEPT
+    {
+        return Arc::clone(sections);
+    }
+    let sections = Arc::new(build_sections(served).await);
+    *kept = Some((Instant::now(), Arc::clone(&sections)));
+    sections
+}
+
+/// Every section but the camera, read and rendered once.
+async fn build_sections(served: &Arc<Served>) -> Sections {
+    let peek = &served.peek;
     let turns = turns_now(served).await;
     let (_, (units, _)) = status_now(served).await;
     let read = |topic| peek.bus.latest(topic).ok().flatten();
@@ -608,34 +656,25 @@ async fn push(served: &Arc<Served>, count: u32) -> Vec<Event> {
         units: &units,
         tasks: tasks.as_ref(),
     });
-    events.push(Event::default().event("overview").data(overview));
-    events.push(Event::default().event("timeline").data(page::timeline_at(
-        &entries,
-        &turns,
-        words,
-        Some(now_unix_ms()),
-    )));
-    events.push(
-        Event::default()
-            .event("turns")
-            .data(page::turns(&turns, &entries, words)),
-    );
+    let mut sections = vec![
+        ("overview", overview),
+        (
+            "timeline",
+            page::timeline_at(&entries, &turns, words, Some(now_unix_ms())),
+        ),
+        ("turns", page::turns(&turns)),
+    ];
     let tasks_html = match (&tasks_kept, &tasks) {
         (Some(_), None) => "<p class=\"warn\">The tasks' progress can't be read.</p>".to_owned(),
         _ => page::tasks_with(tasks.as_ref(), &skill_runs, now_unix_ms()),
     };
-    events.push(Event::default().event("tasks").data(tasks_html));
-    events.push(Event::default().event("body").data(page::body(
-        joints.as_ref(),
-        report.as_ref(),
-        now_unix_ms(),
-    )));
-    events.push(
-        Event::default()
-            .event("health")
-            .data(page::health(health.as_ref(), &units)),
-    );
-    events
+    sections.push(("tasks", tasks_html));
+    sections.push((
+        "body",
+        page::body(joints.as_ref(), report.as_ref(), now_unix_ms()),
+    ));
+    sections.push(("health", page::health(health.as_ref(), &units)));
+    sections
 }
 
 fn now_unix_ms() -> u64 {
@@ -662,20 +701,21 @@ async fn events(
         }
     };
     let pushes = stream::unfold(
-        (served, session, 0u32),
-        |(served, session, count)| async move {
+        (served, session, 0u32, Sent::new()),
+        |(served, session, count, mut sent)| async move {
             if count > 0 {
                 tokio::time::sleep(PUSH_EVERY).await;
             }
             let events = match &served.peek.monitor {
-                None => push(&served, count).await,
+                None => push(&served, count, &mut sent).await,
                 Some(monitor) => {
                     let until = monitor.gate().lasts_until(&session, Instant::now())?;
                     // Dropping the push is what closing the page does: the
                     // reads it waits on keep their cache as they do then.
-                    let events = tokio::time::timeout_at(until.into(), push(&served, count))
-                        .await
-                        .ok()?;
+                    let events =
+                        tokio::time::timeout_at(until.into(), push(&served, count, &mut sent))
+                            .await
+                            .ok()?;
                     if !monitor.gate().admits(&session, Instant::now()) {
                         return None;
                     }
@@ -684,7 +724,7 @@ async fn events(
             };
             Some((
                 stream::iter(events.into_iter().map(Ok)),
-                (served, session, count.wrapping_add(1)),
+                (served, session, count.wrapping_add(1), sent),
             ))
         },
     );
@@ -712,6 +752,7 @@ mod tests {
             status: tokio::sync::Mutex::new(None),
             turns: Arc::default(),
             turns_read: Arc::default(),
+            sections: tokio::sync::Mutex::new(None),
             stopping: tokio::sync::watch::channel(false).1,
         });
         let (held, locked) = std::sync::mpsc::channel();
