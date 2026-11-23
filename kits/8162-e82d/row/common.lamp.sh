@@ -51,7 +51,7 @@ print("HREC", " ".join("%s=%s" % (k, r.get(k)) for k in ("install","version","fr
 hcli(){ ( cd $HHOME || cd /; u=$(id -u lampos); x=""
   [ -d /run/user/$u ] && x="XDG_RUNTIME_DIR=/run/user/$u"; [ -S /run/user/$u/bus ] && x="$x DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$u/bus"
   runuser -u lampos -- env -i HOME=$HHOME PATH=/usr/local/bin:/usr/bin:/bin $x /usr/local/bin/harness "$@" ); }
-# Harness's sign-in, READ ONLY, as lamp-tasks reads it (harness.rs Cli::signed_in_here: `harness auth status --json`,
+# Harness's sign-in, READ ONLY (base prints it as a fact; never a stop), as lamp-tasks reads it (harness.rs Cli::signed_in_here: `harness auth status --json`,
 # parse_auth_here: loggedIn false = out, loggedIn + offline = offline, else in). If that read fails: lamp-tasks' own
 # journal of the last 3 min ("tasks: Harness signed in: no", runtime.rs:2682, or state=signed-out). Prints one HAUTH line.
 hauth(){ j=$(hcli auth status --json 2>/dev/null | python3 -I -c 'import json,sys

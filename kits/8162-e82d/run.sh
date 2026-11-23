@@ -103,8 +103,8 @@ P
            # The lamp's speaker volume, read only (never set): at most SPK_MAX %, else stop and ask.
            sp=$(sed -n 's/^SPEAKER [^ ]* \([0-9]*\)%$/\1/p' $L/base.txt)
            [ -n "$sp" ] && [ "$sp" -le "$SPK_MAX" ] || STOP "the lamp's speaker volume is ${sp:-unread}% (at most $SPK_MAX%): stop and ask; the kit never sets it"
-           # Before any change: Harness signed in, OpenClaw the default agent, the physical mic slide open (unread: noted).
-           grep -qE '^HAUTH (via=cli logged_in=True offline=False|via=journal signed_out_lines=0 )' $L/base.txt || STOP "BASE FAIL Harness is not signed in on the lamp ($(grep '^HAUTH' $L/base.txt || echo 'HAUTH unread'))"
+           # Before any change: OpenClaw the default agent, the physical mic slide open (unread: noted). Harness's sign-in
+           # is a fact line only (T HAUTH): the lamp's own OpenClaw runs while Harness is signed out (#6407).
            grep -q '^ENGINE openclaw$' $L/base.txt || STOP "BASE FAIL OpenClaw is not the default agent ($(grep '^ENGINE' $L/base.txt))"
            grep -q '^PRIVACY .*physical_muted=True' $L/base.txt && STOP "BASE FAIL the physical mic slide is closed (a hand only)"
            grep -q '^PRIVACY .*physical_muted=False' $L/base.txt || T "base: the physical slide not read apart from the mute: $(grep '^PRIVACY' $L/base.txt)"
