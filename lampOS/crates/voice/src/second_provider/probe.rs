@@ -913,6 +913,43 @@ mod tests {
         );
     }
 
+    /// #8367: with the person's own ElevenLabs voice the speech never goes
+    /// to the relay's near address, whatever the routes say, so their key
+    /// never leaves for anywhere but ElevenLabs' own API; even a key that
+    /// matched the relay's is not routed while the own voice is in place.
+    #[test]
+    fn an_own_voice_key_is_never_sent_to_the_relay() {
+        let mut config = config_at(
+            "probe-own-voice",
+            "k-relay",
+            "https://relay.invalid",
+            "https://relay.invalid",
+        );
+        let routes = Routes {
+            speech: Some("https://near.invalid/api/v1/ai".into()),
+            ..Routes::default()
+        };
+        assert!(
+            matches!(speech_relay(&config, &routes), Relay::Near(_)),
+            "the lamp's own voice is routed"
+        );
+        config.hosted.lamps_voice = Some(crate::second_config::LampsVoice {
+            base_url: config.tts_base_url.clone(),
+            key: config.tts_key.clone(),
+            voice: config.tts_voice.clone(),
+        });
+        config.tts_base_url = crate::second_config::ELEVENLABS_API.to_owned();
+        assert_eq!(
+            speech_relay(&config, &routes),
+            Relay::Normal(crate::second_config::ELEVENLABS_API.to_owned()),
+            "the same key: still not routed"
+        );
+        config.tts_key = crate::second_config::Key::for_test("sk-planted-8367-elevenlabs-fake");
+        let relay = speech_relay(&config, &routes);
+        assert_eq!(relay.url(), crate::second_config::ELEVENLABS_API);
+        assert!(!relay.told().contains("near"), "{}", relay.told());
+    }
+
     /// With the routes off the probe never asks for them, and its arms
     /// reach the normal address; an address the unit's environment gave is
     /// never routed, whatever the routes say.

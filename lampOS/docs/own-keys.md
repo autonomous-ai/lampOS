@@ -218,7 +218,9 @@ against ElevenLabs' own service.
 - **The speech:** at the voice's next start, `with_own_keys` puts the
   person's key and voice ID on the route's ElevenLabs speech, straight at
   `https://api.elevenlabs.io/v1` instead of the relay, over the language's
-  and the chosen voice (#5394), when the route speaks with ElevenLabs; one
+  and the chosen voice (#5394), when the route speaks with ElevenLabs. It
+  is never sent through the relay's near address (`relay_routable`), so the
+  person's key goes to ElevenLabs' own API alone, the probes' included. One
   journal line, "ElevenLabs: the person's
   own key and voice (LAMP_OWN_KEYS)", never the key or the ID. The helper
   restarts the voice only once the lamp is quiet ("The route at its next
@@ -247,7 +249,9 @@ against ElevenLabs' own service.
 `crates/voice/src/second_config.rs`
 (`the_persons_elevenlabs_key_and_voice_speak_in_place_of_the_lamps`) and
 `crates/voice/src/second_provider/net/tts.rs`
-(`a_refused_own_voice_falls_back_to_the_lamps_with_one_line`) and
+(`a_refused_own_voice_falls_back_to_the_lamps_with_one_line`),
+`crates/voice/src/second_provider/probe.rs`
+(`an_own_voice_key_is_never_sent_to_the_relay`) and
 `crates/voice/src/second_provider/worker.rs`
 (`a_refused_own_voice_is_warned_to_lamp_health`). The lamp
 test (#8367): a real key and voice ID entered from the app by that lamp's
