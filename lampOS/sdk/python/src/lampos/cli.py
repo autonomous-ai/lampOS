@@ -17,6 +17,9 @@ it all with no lamp.
     lamp app status [ID]
     lamp app request-public ID
     lamp app studio [--port N] [--no-open]
+    lamp app push FOLDER|TAR [LAMP_ID]
+    lamp app list [LAMP_ID]
+    lamp app remove NAME [LAMP_ID]
 
 The Store commands take --staging, or --store URL and --account URL, to
 use another Store than production's.
@@ -141,6 +144,32 @@ async def _skill_list(args) -> int:
 async def _skill_remove(args) -> int:
     async with await Lamp.connect(args.lamp) as lamp:
         await lamp.remove_skill(args.name)
+    print(f"{args.name} removed")
+    return 0
+
+
+def _running(app: dict) -> str:
+    return "stopped" if app.get("stopped") or app.get("started") is False else "running"
+
+
+async def _app_push(args) -> int:
+    async with await Lamp.connect(args.lamp) as lamp:
+        app = await lamp.push_app(args.package)
+    again = ", replacing the one before" if app.get("updated") else ""
+    print(f"{app.get('name')} {app.get('version')} pushed{again}, {_running(app)}")
+    return 0
+
+
+async def _app_list(args) -> int:
+    async with await Lamp.connect(args.lamp) as lamp:
+        for app in await lamp.apps():
+            print(f"{app.get('name')}\t{app.get('version')}\t{_running(app)}")
+    return 0
+
+
+async def _app_remove(args) -> int:
+    async with await Lamp.connect(args.lamp) as lamp:
+        await lamp.remove_app(args.name)
     print(f"{args.name} removed")
     return 0
 
@@ -389,7 +418,9 @@ def parser() -> argparse.ArgumentParser:
     login.add_argument("--token", help="keep this account token instead of signing in (also LAMP_STORE_TOKEN)")
     login.set_defaults(run=_login)
     _store_options(commands.add_parser("logout", help="forget the Store sign-in kept here")).set_defaults(run=_logout)
-    app = commands.add_parser("app", help="apps for the Store: check, pack, submit, status, request-public, studio")
+    app = commands.add_parser(
+        "app", help="apps: check, pack, submit, status, request-public, studio for the Store; push, list, remove on your own lamp"
+    )
     app_commands = app.add_subparsers(dest="app_command", required=True)
     app_check = app_commands.add_parser("check", help="check app folders or packed tars as the Store's reader does")
     app_check.add_argument("paths", nargs="+", help="each an app's folder (with app.json) or a packed .tar")
@@ -416,6 +447,17 @@ def parser() -> argparse.ArgumentParser:
     app_studio.add_argument("--port", type=int, default=0, help="the port on 127.0.0.1 (any free one)")
     app_studio.add_argument("--no-open", action="store_true", help="print the page's address, don't open a browser")
     app_studio.set_defaults(run=_app_studio)
+    app_push = app_commands.add_parser("push", help="check an app folder or packed tar, and put it on your paired lamp, unsigned (the skills grant)")
+    app_push.add_argument("package", help="the app's folder (app.json, src/, ...) or its packed tar")
+    app_push.add_argument("lamp", nargs="?")
+    app_push.set_defaults(run=_app_push)
+    app_list = app_commands.add_parser("list", help="the apps this computer has pushed")
+    app_list.add_argument("lamp", nargs="?")
+    app_list.set_defaults(run=_app_list)
+    app_remove = app_commands.add_parser("remove", help="take one of this computer's pushed apps off the lamp")
+    app_remove.add_argument("name")
+    app_remove.add_argument("lamp", nargs="?")
+    app_remove.set_defaults(run=_app_remove)
     return parser
 
 

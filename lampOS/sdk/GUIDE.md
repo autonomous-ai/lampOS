@@ -389,6 +389,17 @@ developer's Autonomous account, signed in with an emailed code.
 |---|---|---|---|---|---|---|---|---|
 | `lampos.app.check(path)`, `lampos.app.pack(folder)`; CLI `lamp app check DIR\|TAR`, `lamp app pack DIR`; `lampos.store.Store`: `send_code`, `sign_in`, `submit`, `apps`, `app`, `request_public`; CLI `lamp login`, `lamp app submit DIR\|TAR`, `lamp app status [ID]`, `lamp app request-public ID`, `lamp app studio` (a page on 127.0.0.1) | `sendLoginCode`, `signIn`, `submitApp(tar, {...})`, `submissions(id?)`, `requestPublic(id)` (check and pack with the Python CLI) | — | Checks the app as the Store's reader does (less the signature) and packs the unsigned tar; signs in (`POST apiv2 …/customers/send-login-verification`, then `…/sign-in` with `grant_type: "otp"`); uploads (`POST campaign-api …/skills-store/developer/apps`, multipart `file`, `icon`, `cover`, `title`, `description`, `category`); reads `GET /apps`, `GET /apps/:id`; `POST /apps/:id/request-public` | none (the account's bearer token, kept 0600) | tar ≤ 18 MiB; icon PNG exactly 1024x1024, cover PNG 1600x900, each ≤ 2 MB; title ≤ 100, description ≤ 1000; a day per account: 10 accepted uploads, 30 attempts, 3 public asks | the app: `id`, `name`, `version`, `review_status` (`pending`, `approved`, `rejected`), `review_note`, `visibility`, `public_requested` | refused here before any upload: a check error, wrong art, no sign-in. The Store's: `lampos_package_invalid` (its reason), `skill_name_exists`, `developer_app_only`, `authentication_error`, `device_key_refused`, `app_not_found`, `app_not_approved`, `app_already_public`, `developer_daily_limit`, `developer_attempt_limit`, `developer_public_limit` | staged (23 Nov 2026): the Store's API is Backend3's, live on production since 20 Nov (#7415); the SDK is tested against a fake Store only, and has not yet uploaded to the real one |
 
+### Pushing an app of your own to your own lamp
+
+The same app, unsigned, put on the developer's own paired lamp with no Store. The pairing, with its `skills` grant,
+is the owner's yes: there is no yes at the lamp. A re-push of the name replaces this computer's app of it, any version.
+
+| Python | JavaScript | MCP tool | What it does | Grant | Limits | Answer | Refusals | Status |
+|---|---|---|---|---|---|---|---|---|
+| `lamp.push_app(path)`; CLI `lamp app push DIR\|TAR` | `lamp.pushApp(tar)` (the tar only; pack it with the Python CLI) | `lamp_app_push(package)` | Op `app.push`, in parts as `skill.push`: checks the app on the computer (as `lamp app check`; a folder is packed), refuses a tar carrying `lamp-skill.sig`, and installs it | `skills`, and every grant the manifest asks; never `remember` (an installed Store app's alone); `net` and `logs` are the manifest's booleans, not grants | package ≤ 4 MiB; 1–128 parts of ≤ 49,152 base64 chars (36 KiB of the package); `name` `^[a-z][a-z0-9-]{0,23}$`; parts in order from 0, the whole push within 60 s, a broken push resent from 0; one push every 10 s and 20 an hour, as `skill.push` | `{got: N}` for each part; the last `{app: {name, title, version, sha256, grants, net, logs, updated, started, from: "computer"}}` | `refused` "apps are off on this lamp" (no `LAMP_STORE_APPS`), "app push is not on this lamp" (no apps helper), "a Store app has that name", "another computer's app has that name", "it carries lamp-skill.sig: a pushed app is unsigned"; `no_grant` "not granted: skills", "not granted: <grant>"; `bad_request` (sizes, parts, sha256); `busy`; `rate` | in development: fake-tested in both SDKs (23 Nov 2026), not yet on a lamp |
+| `lamp.apps()`; CLI `lamp app list` | `lamp.apps()` | `lamp_apps()` | Op `app.list`: this computer's own pushed apps | `skills` | as `skill.list` | `{apps: [{name, title, version, sha256, grants, net, logs, stopped}, ...]}` | the switch refusals of `app.push` | in development |
+| `lamp.remove_app(name)`; CLI `lamp app remove NAME` | `lamp.removeApp(name)` | `lamp_app_remove(name)` | Op `app.remove`: takes one of this computer's own pushed apps off the lamp | `skills` | as `skill.list` | `{removed: NAME}` | as `app.list`; `refused` for an app that is not this computer's | in development |
+
 ### A skill run's linked services (control socket only)
 
 A skill's task run on the lamp's own Hermes (#6432) holds a one-run token on the control
@@ -579,6 +590,7 @@ grant it needs. With every grant: 33 tools. With `light` alone: 6
 | Listening | `lamp_set_listening` | hear |
 | Camera | `lamp_camera_snapshot` (one picture; a stream is for a program, not a tool) | camera |
 | Skills | `lamp_skill_push`, `lamp_skills`, `lamp_skill_remove` | skills |
+| Apps of your own | `lamp_app_push`, `lamp_apps`, `lamp_app_remove` | skills |
 | Speaker | `lamp_play_audio` (a WAV file, 16-bit mono PCM at 16 or 24 kHz, at most 60 s, played in real time; the lamp must serve the speaker, `--speaker on`) | speaker (the app does not offer it: a pairing code made at the lamp itself, or `lamp-control grants` / `set_grants`, adds it; see the grants table above) |
 | Stop | `lamp_stop` | none |
 

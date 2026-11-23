@@ -71,6 +71,7 @@ test('every op has a call and every error code a class', () => {
   const named = {
     'sound.upload': 'uploadSound', 'sound.list': 'sounds', 'sound.remove': 'removeSound',
     'skill.push': 'pushSkill', 'skill.list': 'skills', 'skill.remove': 'removeSkill',
+    'app.push': 'pushApp', 'app.list': 'apps', 'app.remove': 'removeApp',
     'turn.start': 'startTurn', 'turn.end': 'endTurn', 'listen.set': 'setListening',
   };
   const call = (op) => named[op] ?? op.replace(/\.(\w)/g, (_, c) => c.toUpperCase());

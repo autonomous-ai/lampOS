@@ -79,6 +79,8 @@ export const SHOWN = new Set([
   'within_ms', 'x', 'y', 'yaw',
   // An installed app's `app.settings` event and `app.trigger` (#7415).
   'changed', 'trigger',
+  // A computer's own pushed apps (`app.push`'s last answer, `app.list`); an app's title is secret above.
+  'app', 'apps',
 ]);
 // Fields a lamp sends that the schema leaves open (`limits`, an `express`
 // answer, `mood`, `light`, a pushed skill's parts, Nine's `shows` and `hand`,

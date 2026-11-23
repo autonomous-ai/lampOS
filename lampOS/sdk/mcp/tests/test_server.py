@@ -1562,6 +1562,52 @@ def test_the_skill_tools_push_list_and_remove_with_the_skills_grant_only(tmp_pat
     run(go())
 
 
+def test_the_app_tools_push_list_and_remove_with_the_skills_grant_only(tmp_path):
+    import hashlib
+    import io
+    import tarfile
+
+    def package(signed: bool = False) -> Path:
+        # A small unsigned format 2 package (docs/apps.md): lamp-skill.json beside the app's folder.
+        source = b"print('hello')\n"
+        manifest = {
+            "format": 2, "kind": "app", "name": "desk-hello", "title": "Desk hello", "version": "0.1.0", "min_build": 1,
+            "runtime": {"name": "python3", "entry": "desk_hello"}, "grants": ["speak"], "net": False, "logs": False,
+            "phrases": [], "triggers": [], "settings": [], "skills": [], "assets": [],
+            "files": [{"path": "src/desk_hello.py", "size": len(source), "sha256": hashlib.sha256(source).hexdigest()}],
+        }
+        entries = {"lamp-skill.json": json.dumps(manifest).encode(), "desk-hello/src/desk_hello.py": source}
+        if signed:
+            entries["lamp-skill.sig"] = b"{}"
+        path = tmp_path / ("signed.tar" if signed else "app.tar")
+        with tarfile.open(path, "w", format=tarfile.USTAR_FORMAT) as tar:
+            for name, data in entries.items():
+                info = tarfile.TarInfo(name)
+                info.size = len(data)
+                tar.addfile(info, io.BytesIO(data))
+        return path
+
+    async def go():
+        async with connected(tmp_path / "keys", grants=("speak", "skills")) as (fake, _, session):
+            names = {tool.name for tool in (await session.list_tools()).tools}
+            assert {"lamp_app_push", "lamp_apps", "lamp_app_remove"} <= names
+            pushed = await session.call_tool("lamp_app_push", {"package": str(package())})
+            assert not pushed.isError and json.loads(text(pushed))["started"] is True
+            listed = await session.call_tool("lamp_apps", {})
+            assert not listed.isError and "desk-hello" in text(listed)
+            removed = await session.call_tool("lamp_app_remove", {"name": "desk-hello"})
+            assert text(removed) == "desk-hello removed"
+            sent = len(fake.asked("app.push"))
+            signed = await session.call_tool("lamp_app_push", {"package": str(package(signed=True))})
+            assert signed.isError and "refused: it carries lamp-skill.sig" in text(signed)
+            assert len(fake.asked("app.push")) == sent
+        async with connected(tmp_path / "plain", grants=("speak",)) as (_, _, session):
+            names = {tool.name for tool in (await session.list_tools()).tools}
+            assert not {"lamp_app_push", "lamp_apps", "lamp_app_remove"} & names
+
+    run(go())
+
+
 def test_turns_and_the_mute_send_their_ops_and_say_only_how_they_ended(tmp_path):
     async def go():
         async with connected(tmp_path, grants=("speak", "hear"), auto_done=False) as (fake, _, session):
