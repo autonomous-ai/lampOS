@@ -868,10 +868,13 @@ lamp's own machine (the one `current`; again after a look that failed),
 then `harness machines engines <that machine> --json`, within 35 s (lamp-
 tasks' bound; 30 s for the machines list). Each engine Harness says of that
 machine is `installed` (`installed: true`, with `version` when Harness
-gives a plain one), or `not_installed` (`installed: false`, or `null` with
-`installable: true`, Harness's "not found there"); one Harness cannot say
-this time (`null`, nothing installable) keeps what the last look said, or
-is left out. A computer's engines are never the lamp's. Hermes and
+gives a plain one), or `not_installed` (an explicit `installed: false`
+only); one Harness cannot say this time (`null`, with `installable: true`
+or not) keeps what the last look said, or is left out. Harness's CLI says
+`installed` only as `true` or `null`, and its `null` "is unknown, never
+'not there'" (openharness `machineEngines.ts`): a login shell slower than
+5 s an engine reads an installed one as `null` with `installable: true`,
+so that is never said `not_installed` (#8286, as #8283 in lamp-tasks). A computer's engines are never the lamp's. Hermes and
 OpenClaw stay read from their own records, whatever Harness says of them.
 A look that fails, runs out or is signed out keeps the last good one
 (none before the first), said once in the journal: the status then has
