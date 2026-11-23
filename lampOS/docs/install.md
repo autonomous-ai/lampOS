@@ -2456,9 +2456,14 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, set by lamp-tasks
      as `agents.defaults.workspace`); and an initial
      `<state>/openclaw.json` with only its `gateway` block
-     (`mode: "local"`, `bind: "loopback"`, token auth). The queue's mode
-     is not written: lamp-tasks' direct path sends `queueMode: "followup"`
-     with each `chat.send` (docs/tasks.md). lamp-tasks merges
+     (`mode: "local"`, `bind: "loopback"`, token auth) and
+     `messages.queue.mode: "followup"` (M8, `QUEUE_MODE`: OpenClaw
+     2026.11.2 steers a message that comes in during a run into that run
+     when the key is unset; `followup` gives it a turn of its own after
+     it). Each install sets the mode when the key is missing, in a config
+     that has the gateway block too; one there already (a person's own) is
+     kept, and a `messages` or `messages.queue` that is not an object is
+     left as it is, said in one line. lamp-tasks merges
      the rest in at its start (docs/tasks.md, "OpenClaw's settings on the
      lamp"). The block is checked by OpenClaw before it lands (#7868), as
      lamp-tasks' writes are (#7108): the new text goes to a new 0600 file
@@ -2811,7 +2816,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      byte. lamp-update never writes OpenClaw's shared
      `openclaw.json` for a skill's run and never changes `tools.exec` (lamp-tasks does, #7245): its
      one write of that file is the install's own `gateway` block (the
-     gateway's token, above), with any switch, written again by the
+     gateway's token, above) and queue mode, with any switch, written again by the
      one-shot a round asks when it is missing or different (#7868, above).
    - **Records:** `openclaw-install.json` (the record), `openclaw-ask.json`
      (the ask) and `openclaw.lock` (one install at a time), beside

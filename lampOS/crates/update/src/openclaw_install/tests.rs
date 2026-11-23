@@ -497,8 +497,9 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
                 "port": 18789,
                 "auth": {"mode": "token", "token": token},
             },
+            "messages": {"queue": {"mode": "followup"}},
         }),
-        "the gateway block only"
+        "the gateway block and the queue's mode only"
     );
     assert_eq!(mode(&lamp.at(CONFIG)), 0o600);
     assert!(present(lamp.root(), sk(true)));
@@ -1747,6 +1748,10 @@ fn the_gateway_block_is_set_in_a_config_that_lacks_it_and_other_keys_are_kept() 
         "a kept token is not given again"
     );
     runs.position(&format!("chown -h lampos:lampos {CONFIG}"));
+    assert_eq!(
+        config["messages"],
+        serde_json::json!({"queue": {"mode": "followup"}})
+    );
 
     // A config lamp-update cannot read as an object: left as it is.
     fs::write(lamp.at(CONFIG), "{ json5: 'not json', }").unwrap();
@@ -1929,6 +1934,80 @@ fn a_gateway_block_check_joins_the_running_gateway_and_runs_alone_with_none() {
         )),
         "{alone}"
     );
+}
+
+/// M8: OpenClaw's queue never steers a message into a run going on
+/// (`messages.queue.mode` = [`QUEUE_MODE`], `followup`; OpenClaw
+/// 2026.11.2's default with it unset is `steer`). Set in a config that
+/// has the gateway block already and no mode, beside its other
+/// `messages` keys; a mode already there (a person's own) kept; a
+/// `messages` or `messages.queue` that is not an object left as it is; a
+/// config already right not written again.
+#[test]
+fn the_queue_never_steers_a_message_into_a_run_and_a_set_mode_is_kept() {
+    assert_eq!(QUEUE_MODE, "followup");
+    let lamp = Lamp::new();
+    fs::create_dir_all(lamp.at(STATE)).unwrap();
+    fs::write(lamp.at(GATEWAY_TOKEN), "kept0123\n").unwrap();
+    let gateway = serde_json::json!({
+        "mode": "local",
+        "bind": "loopback",
+        "port": 18789,
+        "auth": {"mode": "token", "token": "kept0123"},
+    });
+    let read = || -> serde_json::Value {
+        serde_json::from_slice(&fs::read(lamp.at(CONFIG)).unwrap()).unwrap()
+    };
+    let runs = Runs::new(&lamp);
+
+    // The gateway block there, no mode: the mode set, the rest kept.
+    fs::write(
+        lamp.at(CONFIG),
+        serde_json::json!({
+            "gateway": gateway,
+            "messages": {"tts": {"auto": "off"}, "queue": {"cap": 5}},
+        })
+        .to_string(),
+    )
+    .unwrap();
+    gateway_config(lamp.root(), &mut runs.runner(), &mut quiet()).unwrap();
+    let config = read();
+    assert_eq!(config["gateway"], gateway);
+    assert_eq!(
+        config["messages"],
+        serde_json::json!({"tts": {"auto": "off"}, "queue": {"cap": 5, "mode": "followup"}})
+    );
+
+    // Right already: not written again.
+    let before = fs::read(lamp.at(CONFIG)).unwrap();
+    let chowns = runs.lines().len();
+    gateway_config(lamp.root(), &mut runs.runner(), &mut quiet()).unwrap();
+    assert_eq!(fs::read(lamp.at(CONFIG)).unwrap(), before);
+    assert_eq!(runs.lines().len(), chowns, "nothing run");
+
+    // A mode of a person's own: kept.
+    let own = serde_json::json!({"gateway": gateway, "messages": {"queue": {"mode": "collect"}}});
+    fs::write(lamp.at(CONFIG), own.to_string()).unwrap();
+    gateway_config(lamp.root(), &mut runs.runner(), &mut quiet()).unwrap();
+    assert_eq!(read(), own);
+
+    // Not objects: left as they are, and said.
+    for odd in [
+        serde_json::json!({"gateway": gateway, "messages": "loud"}),
+        serde_json::json!({"gateway": gateway, "messages": {"queue": "steer"}}),
+    ] {
+        fs::write(lamp.at(CONFIG), odd.to_string()).unwrap();
+        let mut said = Vec::new();
+        gateway_config(lamp.root(), &mut runs.runner(), &mut |line: &str| {
+            said.push(line.to_owned())
+        })
+        .unwrap();
+        assert_eq!(read(), odd);
+        assert!(
+            said.iter().any(|line| line.contains("is not an object")),
+            "{said:?}"
+        );
+    }
 }
 
 /// (the owner on #6226: every lamp has 6 GB) The gateway is always on with
@@ -2770,8 +2849,8 @@ fn the_one_path_lets_agent_main_run_the_launcher_alone() {
         serde_json::from_slice(&fs::read(lamp.at(CONFIG)).unwrap()).unwrap();
     assert_eq!(
         config.as_object().unwrap().keys().collect::<Vec<_>>(),
-        ["gateway"],
-        "the install's own key alone: the one path writes none"
+        ["gateway", "messages"],
+        "the install's own keys alone: the one path writes none"
     );
 
     // Done: a round asks nothing, and an install asked again runs no
