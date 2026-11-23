@@ -2641,3 +2641,46 @@ fn the_turn_that_ran_a_skill_carries_its_tasks_agent_badge() {
     let html = page::timeline(&late.newest(), &current(Vec::new()), false);
     assert!(html.contains("LOCAL · make_skill"), "{html}");
 }
+
+/// Two turns in one minute that each ran a skill (`use_skill`, then
+/// `make_skill`) never both take one run: the one run goes to the nearest
+/// turn begun before it, and the other turn keeps its own path.
+#[test]
+fn one_skill_run_is_taken_by_one_turn_only() {
+    use lamp_msgs::SkillTaskStage::Started;
+    let mut timeline = Timeline::new(false);
+    for (request, at, tool) in [(6, 1_000, "use_skill"), (7, 5_000, "make_skill")] {
+        timeline.add(request, at, timeline::Step::Heard(None));
+        timeline.add(
+            request,
+            at + 400,
+            timeline::Step::Decided(lamp_msgs::VoiceDecision::answered(request, [tool])),
+        );
+        timeline.add(request, at + 1_000, timeline::Step::Said(None));
+    }
+    timeline.skill_task(skill_run_news(Started), 7_000);
+    let newest = timeline.newest();
+    let run_of = |request| {
+        newest
+            .iter()
+            .find(|entry| entry.request == request)
+            .and_then(|entry| entry.skill_run.as_ref())
+            .is_some()
+    };
+    assert!(run_of(7) && !run_of(6), "{newest:?}");
+    let html = page::timeline(&newest, &current(Vec::new()), false);
+    assert_eq!(html.matches("AGENT · OpenClaw").count(), 1, "{html}");
+    assert!(html.contains("LOCAL · use_skill"), "{html}");
+    // A second run in that minute goes to the turn that has none.
+    let mut second = skill_run_news(Started);
+    second.run = Some("task-1795056147470-853891-1".into());
+    timeline.skill_task(second, 8_000);
+    let newest = timeline.newest();
+    assert!(
+        newest.iter().all(|entry| entry.skill_run.is_some()),
+        "{newest:?}"
+    );
+    let html = page::timeline(&newest, &current(Vec::new()), false);
+    assert!(html.contains("task 1795056147470-853891-1"), "{html}");
+    assert!(html.contains("task 1795056147468-853891-0"), "{html}");
+}

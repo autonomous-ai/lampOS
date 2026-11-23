@@ -142,9 +142,12 @@ on" while mail-check's run went on OpenClaw. `skills/tasks`
   <ms>-<pid>-<n>`, the engine, working (blue), done (green) or failed (red),
   the skill's name and when it began; while one works, Tasks no longer says
   nothing is being worked on.
-- **The turn that began it**: a turn whose decision called `make_skill` or
-  `use_skill` (`timeline::RUNS_A_SKILL`) takes the newest run begun within
-  its minute (`timeline::TURN_LASTS_MS` from its first step), and its path
+- **The turn that began it**: a run goes to the nearest turn begun before
+  it, within that turn's minute (`timeline::TURN_LASTS_MS` from its first
+  step), whose decision called `make_skill` or `use_skill`
+  (`timeline::RUNS_A_SKILL`) and that has no run yet, the newest run first:
+  a run goes to one turn at most, so two such turns in one minute never
+  both show one run. That turn's path
   reads **AGENT · <engine> · task <ms>-<pid>-<n> · started** (then `ran` or
   `failed`) instead of `LOCAL · make_skill`. No number joins them, so they
   are joined by time.
@@ -763,6 +766,9 @@ own, and asks for it over HTTP:
     to the agent's reply, ⚡ labelled first reply or first token) and
     `an_active_card_with_no_event_for_five_minutes_reads_stale` (a fake
     clock at 5 min and 5 min + 1 ms; a task still listed stays ACTIVE).
+  - `one_skill_run_is_taken_by_one_turn_only` (#7873): a `use_skill` and a
+    `make_skill` turn in one minute and one run: only the later turn shows
+    it; a second run goes to the other turn.
 - `units::tests::a_command_past_its_deadline_is_killed_and_tells_nothing`:
   a command that ends tells its output; `sleep 30` with a 200 ms deadline
   tells nothing, well within 5 s; past the deadline none is started.
