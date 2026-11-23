@@ -106,7 +106,7 @@ pub const WIFI_RESULT_ACK_WAIT: Duration = Duration::from_secs(5);
 /// person's own DeepSeek and Deepgram keys (#2094, `docs/own-keys.md`).
 pub const KEYS_ENVIRONMENT: &str = "LAMP_OWN_KEYS";
 
-/// A key checked and kept (`{"service", "key"[, "base_url"][, "request_id"]}`),
+/// A key checked and kept (`{"service", "key"[, "base_url"][, "model"][, "request_id"]}`),
 /// removed (`{"service"[, "request_id"]}`), or whose each service uses.
 pub const KEYS_KINDS: [&str; 3] = ["keys.set", "keys.remove", "keys.get"];
 
@@ -494,8 +494,13 @@ pub fn keys_line(kind: &str, data: &Value) -> Result<(String, Option<String>), S
     let service = || {
         data.get("service")
             .and_then(Value::as_str)
-            .filter(|service| matches!(*service, "deepseek" | "deepgram" | "elevenlabs"))
-            .ok_or("service must be deepseek, deepgram or elevenlabs")
+            .filter(|service| {
+                matches!(
+                    *service,
+                    "deepseek" | "deepgram" | "elevenlabs" | "openai_compatible"
+                )
+            })
+            .ok_or("service must be deepseek, deepgram, elevenlabs or openai_compatible")
     };
     let line = match kind {
         "keys.set" => {
@@ -525,6 +530,13 @@ pub fn keys_line(kind: &str, data: &Value) -> Result<(String, Option<String>), S
                 Some(Value::String(url)) if url.len() <= 2_048 => Some(url.as_str()),
                 Some(_) => return Err("base_url must be text".into()),
             };
+            // The model's name for an OpenAI-compatible key (#8362): the
+            // helper checks it against the endpoint's own list.
+            let model = match data.get("model") {
+                None | Some(Value::Null) => None,
+                Some(Value::String(model)) if model.len() <= 128 => Some(model.as_str()),
+                Some(_) => return Err("model must be text".into()),
+            };
             let mut line = json!({"set": service});
             if let Some(key) = key {
                 line["key"] = json!(key);
@@ -534,6 +546,9 @@ pub fn keys_line(kind: &str, data: &Value) -> Result<(String, Option<String>), S
             }
             if let Some(id) = voice_id {
                 line["voice_id"] = json!(id);
+            }
+            if let Some(model) = model {
+                line["model"] = json!(model);
             }
             line
         }
@@ -1499,7 +1514,7 @@ mod tests {
         let reply = changes.take()[0].reply(&identity, "t");
         assert_eq!(
             reply["error"],
-            "service must be deepseek, deepgram or elevenlabs"
+            "service must be deepseek, deepgram, elevenlabs or openai_compatible"
         );
         assert_eq!(
             reply["data"],
