@@ -91,6 +91,7 @@ PASS = {
  "out/mute.lamp.sh": "MUTE OFF OK\n", "out/save.lamp.sh": "ENGINE openclaw\nBASE build 15322\nLINKED google gmail-app (files: gmail-app)\nNAMENEAR off (row drop-in)\nSAVED OK\n",
  "out/unrow.lamp.sh": "PASS LAMP_MAKE_MAY_RUN_ON not set\nPASS LAMP_NAMED_AGENT_TAKES_LINE not set\nPASS LAMP_NAME_NEAR back to the product's ('on')\nPASS lamp-cloud active\nUNROW OK\n",
  "out/micoff.lamp.sh": "RECORD_BACK {\"muted\":true}\nMUTE BACK OK after 4s\n",
+ "out/idle.lamp.sh": "IDLE resting after 3.0s\n",
  # N (#7269): off (as on stable) the voice answers; on, the voice's hand-over line (second_provider.rs, #7269)
  "out/named.lamp.sh.read": "NAMED env='' dropin=absent\nENGINE default=openclaw engines=openclaw,hermes\nENGINEFILE {\"version\":1,\"engine\":\"openclaw\"} engine=openclaw\nMUTE muted=False\nTASKMAX 5\n",
  "out/named.lamp.sh.task": "TASKMAX 5\nTASK - id=6 engine=openclaw state=running alias=lamp weather=yes words=9\nTASKS - new=1 above 5\n",
@@ -229,5 +230,5 @@ case("7170.void-muted", "D", boot=True, over={"out/boot.lamp.sh.after": PASS["ou
 case("7170.pass-muted-yes", "D", boot=True, env={"MIC_YES": "yes"}, over={"out/boot.lamp.sh.after": PASS["out/boot.lamp.sh.after"].replace("MUTEBOOT muted=False", "MUTEBOOT muted=True"), "out/micon.lamp.sh": "RECORD_KEPT the person's record from this ROW's first micon stays\nMUTE LIFTED OK after 4s\n"})
 # U: one kit helper alone (unit.sh), against a fake lamp tree: the engine without an app choice, an old-stamped
 # mute, a refused ssh login
-for u in ("engine-env", "engine-app", "engine-none", "mute-oldstamp", "mute-timed", "mute-live", "mute-liveoff", "ssh-retry", "ssh-giveup", "ssh-other", "fixtures", "clips-call", "linked-none", "linked-expired", "linked-ok", "vars-default", "keep-verdicts", "namenear"):
+for u in ("engine-env", "engine-app", "engine-none", "mute-oldstamp", "mute-timed", "mute-live", "mute-liveoff", "ssh-retry", "ssh-giveup", "ssh-other", "fixtures", "clips-call", "linked-none", "linked-expired", "linked-ok", "vars-default", "keep-verdicts", "namenear", "idle-resting", "idle-turns", "idle-speaking", "idle-stale"):
     case("U.pass-" + u, " ", env={"UNIT": u})

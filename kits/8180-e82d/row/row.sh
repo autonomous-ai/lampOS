@@ -114,9 +114,12 @@ COLDRE="one session: kept session new .* in [0-9]+ ms|slow chat send [0-9]+ms.*s
 COLD(){ grep -E "$COLDRE" $J 2>/dev/null | cut -c1-220 | sed "s/^/INFO leg $LEG cold start (#8237, no verdict): /"; return 0; }
 # HUSH: wait for the lamp's last say in this leg's journal to end (its pieces line + chars/12 + 3 s, at most 45 s) before
 # a fresh-turn ask: a person does not talk over the lamp, and an ask played over its say is heard faintly.
-HUSH(){ local t w; t=$(grep -nE "[0-9]+ of [0-9]+ pieces began" $J 2>/dev/null | tail -1 | cut -d: -f1); [ -n "$t" ] || return 0
+HUSH(){ local t w; t=$(grep -nE "[0-9]+ of [0-9]+ pieces began" $J 2>/dev/null | tail -1 | cut -d: -f1); [ -n "$t" ] || { IDLE; return 0; }
   w=$(python3 -c "import sys,time;e=float(sys.argv[1])+int(sys.argv[2] or 0)/12+3;w=e-(time.time()+float(sys.argv[3]));print(int(min(max(w,0),45)+0.999))" "$(ep $t)" "$(sed -n "${t}p" $J | grep -oE '[0-9]+ chars' | tail -1 | grep -oE '[0-9]+')" "${SK_:-0}")
-  [ "${w:-0}" -gt 0 ] && { echo "  HUSH the lamp's say ends in ~$w s: waiting"; sleep $w; }; return 0; }
+  [ "${w:-0}" -gt 0 ] && { echo "  HUSH the lamp's say ends in ~$w s: waiting"; sleep $w; }; IDLE; return 0; }
+# IDLE: then the voice's own state, resting for 3 s (row/idle.lamp.sh); a say the journal's lines did not show (the
+# make's tried line, the made line) still holds the ask back (Migrate, 23 Nov 09:16). Never a verdict.
+IDLE(){ local o; o=$(LAMP "" $D/idle.lamp.sh 2>&1 | grep -E '^(NOT )?IDLE' | tail -1); echo "  HUSH ${o:-IDLE unread}"; return 0; }
 # ASK <clip>: a fresh turn, noted (its first journal line) for HELDOF, then played
 ASK(){ ASKN="$ASKN $(lines):$1"; PLAY $1; }
 # HELDOF: the first of this leg's asks the voice held back as said to nobody, with its line; else nothing (exit 1)
