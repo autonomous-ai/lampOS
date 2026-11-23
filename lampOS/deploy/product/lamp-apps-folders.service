@@ -10,7 +10,9 @@ Description=lampOS apps' folders
 After=local-fs.target
 # A round that adds the apps' part (#8131's first, by G2's lamp-update) can start this unit before it makes
 # /opt/lampOS/apps-manage/current, so it fails 203/EXEC: it tries again every 2 s, five times in a minute at most,
-# and lamp-control.service, which the round restarts after the links, Wants it as well.
+# and lamp-control.service, which the round restarts after the links, Wants it as well. Before the link the start is
+# skipped by the condition, not failed, so no start limit builds up on a slower lamp.
+ConditionPathExists=/opt/lampOS/apps-manage/current/lamp-apps-manage
 StartLimitIntervalSec=60
 StartLimitBurst=5
 
