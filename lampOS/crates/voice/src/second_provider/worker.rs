@@ -1044,6 +1044,23 @@ pub fn own_key_health(own: bool, refused: u16) -> lamp_msgs::Diagnostic {
     }
 }
 
+/// The warning lamp-health shows once the person's own ElevenLabs voice was
+/// refused (#8367).
+pub const OWN_VOICE_REFUSED_WORDS: &str = "your ElevenLabs key was refused, using the lamp's own";
+
+/// `voice-keys`' warning once ElevenLabs refused the person's own voice
+/// with `status` (#8367); none while it never was.
+pub fn own_voice_health(status: u16) -> Option<lamp_msgs::Diagnostic> {
+    (status != 0).then(|| {
+        lamp_msgs::Diagnostic::new(
+            lamp_msgs::Level::Warn,
+            OWN_KEY_HEALTH,
+            OWN_VOICE_REFUSED_WORDS,
+        )
+        .with("status", status)
+    })
+}
+
 /// `voice-keys`' report at this worker's start, if it reports at all:
 /// whenever the switch is on, with the person's DeepSeek key (`own`) or
 /// without it (the reviewer's P2 on #2167). Off, none.
@@ -1126,7 +1143,12 @@ fn report_own_key(bus_root: Option<&Path>, own: bool) {
     std::thread::spawn(move || {
         loop {
             let refused = OWN_KEY_REFUSED.load(std::sync::atomic::Ordering::Relaxed);
-            let _ = health.publish_json(lamp_ipc::monotonic_us(), &own_key_health(own, refused));
+            let voice = super::net::OWN_VOICE_REFUSED.load(std::sync::atomic::Ordering::Relaxed);
+            let report = match (refused, own_voice_health(voice)) {
+                (0, Some(voice)) => voice,
+                _ => own_key_health(own, refused),
+            };
+            let _ = health.publish_json(lamp_ipc::monotonic_us(), &report);
             std::thread::sleep(Duration::from_secs(1));
         }
     });
@@ -35082,6 +35104,18 @@ mod tests {
         let well = serde_json::to_string(&super::own_key_health(true, 0)).unwrap();
         assert!(well.contains("\"ok\""), "{well}");
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// #8367: once ElevenLabs refused the person's own voice, `voice-keys`
+    /// warns with the status, never a key; before, nothing of the voice.
+    #[test]
+    fn a_refused_own_voice_is_warned_to_lamp_health() {
+        assert!(super::own_voice_health(0).is_none());
+        let warned = super::own_voice_health(401).unwrap();
+        assert_eq!(warned.level, lamp_msgs::Level::Warn);
+        let said = serde_json::to_string(&warned).unwrap();
+        assert!(said.contains(super::OWN_VOICE_REFUSED_WORDS), "{said}");
+        assert!(said.contains("401") && !said.contains("sk-"), "{said}");
     }
 
     /// The reviewer's P2 on #2167: with the switch on, `voice-keys` reports

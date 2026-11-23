@@ -141,6 +141,18 @@ pub struct Hosted {
     /// The relay the person's key went over, if there was one: a request
     /// their endpoint refuses (401, 403) goes there, with the relay's key.
     pub relay_deepseek_base_url: Option<String>,
+    /// The lamp's own voice, kept when the person's own ElevenLabs key and
+    /// voice speak in its place ([`OWN_KEYS_ENV`], #8367): a piece
+    /// ElevenLabs refuses for theirs is said in this one.
+    pub lamps_voice: Option<LampsVoice>,
+}
+
+/// The lamp's own speech, as the route had it before the person's voice.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LampsVoice {
+    pub base_url: String,
+    pub key: Key,
+    pub voice: Option<String>,
 }
 
 /// A web search service the model may call, as `second.json` names it.
@@ -510,6 +522,7 @@ fn load_reporting(path: &Path) -> io::Result<(SecondConfig, Option<String>)> {
             .or_else(|| relay_deepseek(&llm_base_url)),
         own_deepseek: None,
         relay_deepseek_base_url: None,
+        lamps_voice: None,
     };
     let config = SecondConfig {
         search,
@@ -580,6 +593,11 @@ pub const OWN_DEEPSEEK_KEY: &str = "own_deepseek.key";
 /// The DeepSeek endpoint the person gave with their key, one https URL.
 pub const OWN_DEEPSEEK_URL: &str = "own_deepseek.url";
 pub const OWN_DEEPGRAM_KEY: &str = "own_deepgram.key";
+/// The person's ElevenLabs key and voice ID (#8367), beside the others.
+pub const OWN_ELEVENLABS_KEY: &str = "own_elevenlabs.key";
+pub const OWN_ELEVENLABS_VOICE: &str = "own_elevenlabs.voice";
+/// ElevenLabs' own API, where the person's voice is asked for.
+pub const ELEVENLABS_API: &str = "https://api.elevenlabs.io/v1";
 
 impl SecondConfig {
     /// With the person's own keys when `on` and the unit has them: DeepSeek's
@@ -636,6 +654,33 @@ impl SecondConfig {
                 "Deepgram: the relay, the person's key could not be read ({kind}) (LAMP_OWN_KEYS)"
             ),
         });
+        // The person's voice (#8367): their key and voice ID straight at
+        // ElevenLabs, over the language's and the chosen voice; the lamp's
+        // kept for the fallback. Only when the route speaks with ElevenLabs.
+        if self.tts_provider == TtsProvider::ElevenLabs {
+            let voice = own(OWN_ELEVENLABS_KEY).and_then(|key| {
+                let Some(key) = key else { return Ok(None) };
+                let id = own(OWN_ELEVENLABS_VOICE)?
+                    .map(|id| id.expose().trim().to_owned())
+                    .filter(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_alphanumeric()))
+                    .ok_or(io::ErrorKind::InvalidData)?;
+                Ok(Some((key, id)))
+            });
+            lines.push(match voice {
+                Ok(Some((key, id))) => {
+                    self.hosted.lamps_voice = Some(LampsVoice {
+                        base_url: std::mem::replace(&mut self.tts_base_url, ELEVENLABS_API.to_owned()),
+                        key: std::mem::replace(&mut self.tts_key, key),
+                        voice: self.tts_voice.replace(id),
+                    });
+                    "ElevenLabs: the person's own key and voice (LAMP_OWN_KEYS)".to_owned()
+                }
+                Ok(None) => "ElevenLabs: the lamp's own voice, no key of the person's (LAMP_OWN_KEYS)".to_owned(),
+                Err(kind) => format!(
+                    "ElevenLabs: the lamp's own voice, the person's key or voice could not be read ({kind}) (LAMP_OWN_KEYS)"
+                ),
+            });
+        }
         (self, lines)
     }
 }
@@ -1292,6 +1337,7 @@ mod tests {
                 deepseek_base_url: None,
                 own_deepseek: None,
                 relay_deepseek_base_url: None,
+                lamps_voice: None,
             }
         );
         let (_, config) = written(
