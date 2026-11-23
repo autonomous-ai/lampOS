@@ -27,6 +27,11 @@ fn package(signer: &Ed25519KeyPair) -> Vec<u8> {
 
 /// The same, with companion skills (each a folder with a skill.toml).
 fn package_with(signer: &Ed25519KeyPair, skills: &[&str]) -> Vec<u8> {
+    package_built(signer, skills, serde_json::json!({}))
+}
+
+/// The same, with more fields in the manifest (`ops`, `views`): `extra`'s keys are set over the sample's.
+fn package_built(signer: &Ed25519KeyPair, skills: &[&str], extra: serde_json::Value) -> Vec<u8> {
     let toml = b"name = \"tutor\"\n";
     let mut listed = vec![serde_json::json!(
         {"path": "src/store_test_app.py", "size": APP.len(), "sha256": sha256_hex(APP)}
@@ -37,7 +42,7 @@ fn package_with(signer: &Ed25519KeyPair, skills: &[&str]) -> Vec<u8> {
             "size": toml.len(), "sha256": sha256_hex(toml)}),
         );
     }
-    let manifest = serde_json::to_vec_pretty(&serde_json::json!({
+    let mut value = serde_json::json!({
         "format": 2, "kind": "app", "name": "store-test", "title": "Store test",
         "version": "0.1.0", "min_build": 1,
         "runtime": {"name": "python3", "entry": "store_test_app"},
@@ -45,8 +50,11 @@ fn package_with(signer: &Ed25519KeyPair, skills: &[&str]) -> Vec<u8> {
         "phrases": ["start the store test"], "triggers": [], "settings": [],
         "skills": skills, "assets": [],
         "files": listed,
-    }))
-    .unwrap();
+    });
+    for (key, field) in extra.as_object().unwrap() {
+        value[key] = field.clone();
+    }
+    let manifest = serde_json::to_vec_pretty(&value).unwrap();
     let signature = serde_json::to_vec(&serde_json::json!({
         "key": lamp_update::manifest::fingerprint(&public(signer)),
         "signature": STANDARD.encode(signer.sign(&manifest).as_ref()),
@@ -181,4 +189,57 @@ fn a_package_with_companion_skills_is_refused_before_any_yes_is_asked() {
 fn no_keys_refuses_every_package() {
     let none = SkillsReader { keys: vec![] };
     assert!(none.read(&package(&key(1))).is_err());
+}
+
+/// #7415's app views: the helper reads the manifest with nine's reader, so a package whose `ops` or `views` break a
+/// rule is refused here with the reader's own words, before any yes is asked, and a right one is read and installs
+/// as one without them does (the helper acts on no view).
+#[test]
+fn a_package_with_views_is_read_by_the_same_rules_as_the_reader_and_a_bad_one_is_refused() {
+    let views = serde_json::json!({
+        "ops": ["week", "plan"],
+        "views": [
+            {"id": "this_week", "kind": "chart", "title": "This week", "op": "week", "style": "bar", "unit": "min"},
+            {"id": "my_plan", "kind": "form", "title": "My plan", "op": "plan", "submit": "Save plan",
+             "fields": [{"key": "days", "type": "number", "label": "Days", "min": 1, "max": 7, "step": 1}]}
+        ],
+    });
+    let package = reader()
+        .read(&package_built(&key(1), &[], views.clone()))
+        .unwrap();
+    assert_eq!(package.app.name, "store-test");
+    lamp_apps::facts::check(&package.app, Some(200)).unwrap();
+    for (what, change, words) in [
+        (
+            "an op no view's own",
+            (
+                "views",
+                serde_json::json!([{"id": "a", "kind": "list", "title": "A", "op": "nope"}]),
+            ),
+            "not one of the app's ops",
+        ),
+        (
+            "a field of another kind",
+            (
+                "views",
+                serde_json::json!([{"id": "a", "kind": "list", "title": "A", "op": "week", "style": "bar"}]),
+            ),
+            "a list has only",
+        ),
+        (
+            "an unknown kind",
+            (
+                "views",
+                serde_json::json!([{"id": "a", "kind": "map", "title": "A", "op": "week"}]),
+            ),
+            "unknown variant",
+        ),
+    ] {
+        let mut bad = views.clone();
+        bad[change.0] = change.1;
+        let why = reader()
+            .read(&package_built(&key(1), &[], bad))
+            .expect_err(what);
+        assert!(why.contains(words), "{what}: {why}");
+    }
 }

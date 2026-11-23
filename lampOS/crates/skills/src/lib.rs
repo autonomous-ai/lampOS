@@ -21,6 +21,7 @@ use std::{
 
 pub mod addon;
 pub mod app_package;
+pub mod app_views;
 pub mod clock;
 pub mod core_agent;
 pub mod daily;
