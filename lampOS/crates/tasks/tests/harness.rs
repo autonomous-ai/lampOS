@@ -10516,7 +10516,7 @@ fn with_one_session_on_a_reply_off_sends_each_run_its_own_way() {
 
 /// #7245: the lamp's make runner with an OpenClaw gateway default, its
 /// gateway's namespace showing lamp-control's socket: the one run path's
-/// runner with `makes` on, as `MakeGateway::lamp` makes it.
+/// runner with `makes` on, as `MakeGateway::lamp_runner` makes it.
 fn make_gateway(
     rig: &Rig,
     default: EngineKind,

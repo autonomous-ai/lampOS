@@ -2440,6 +2440,41 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      target) and `--reply-named`, `LAMP_TASKS_REPLY_NAMED` (lamp-voice) and
      `LAMP_TASKS_RESUME_CLOSED` (lamp-tasks) come with the routing that
      reads them (#6094).
+   - **lamp-tasks, straight to Hermes's gateway** (`LAMP_TASKS_HERMES_DIRECT=on`
+     in lamp-tasks' own environment; off: no unit sets it yet, until a
+     Hermes lamp's row passes; docs/switches.md, its row; docs/tasks.md,
+     "The lamp's agent spoken to directly"). lamp-tasks hands every turn of
+     the lamp's own Hermes (a spoken task, a skill's `do.task`, a make) to
+     Hermes's own API server over HTTP itself, with no Harness pane, no
+     `hermes chat -q`, no tmux. What lamp-tasks needs from the install:
+     - Hermes's gateway (`lamp-hermes-gateway.service`, `hermes gateway`
+       with its API server only) running in Hermes's own namespace and user,
+       on loopback only (`127.0.0.1:8642`), with the internet (no `--net`).
+       lamp-update installs and starts it with its own switch,
+       `LAMP_HERMES_GATEWAY=on` (lamp-update's environment or
+       `/etc/lampOS/update.env`, off by default), and runs it only while
+       lamp-tasks names Hermes the lamp's default agent; with that switch on,
+       OpenClaw's gateway follows the default too, so only one agent gateway
+       runs (docs/switches.md, its row). Hermes's `approvals.mode` stays
+       `manual`. Not reachable (the switch off, or still starting), the
+       direct path fails as OpenClaw's does with its gateway down.
+     - Its API key in `/var/lib/lampos-hermes-gateway/api-key` (0600
+       `lampos`), which lamp-tasks reads as `lampos` at each check
+       (`direct::HERMES_KEY_PATH`).
+     - The skill-start launcher first on Hermes's `PATH` (as `skill-start`)
+       and its socket folder
+       shown to Hermes read-only, as for OpenClaw's gateway: a skill's run
+       reaches lamp-control only through `skill-start <run id>` and its
+       fence. On this path no per-run token file, no
+       `${LAMP_CONTROL_TOKEN}` in the MCP entry and no `shell_init_files`
+       reach Hermes, and its approvals are answered at once by policy
+       (once for the launcher alone, deny for the rest).
+     - lamp-tasks keeps the kept session's id, turns and tokens in its own
+       state folder (`/var/lib/lampos-tasks/hermes-direct.json`, 0600), so
+       the conversation survives a restart of lamp-tasks, of the gateway or
+       of the lamp.
+     Off, lamp-tasks uses Harness and `hermes chat -q` for the lamp's Hermes
+     as before.
    - **Shown only in tests** (`hermes_install::tests`,
      `hermes_schedule::tests`, the wrapper and the namespace script run by
      `sh` there too). Not run on a lamp yet: the whole install by
@@ -2732,7 +2767,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        lamp-tasks puts it back over its own socket (`exec.approvals.get` and
        `set`) before each skill run, so a Gateway whose approvals were wiped
        needs no CLI call from lamp-tasks.
-     - Off, lamp-tasks uses Harness as before; Hermes always does.
+     - Off, lamp-tasks uses Harness as before. Hermes has its own switch
+       for the same path (`LAMP_TASKS_HERMES_DIRECT`, "Hermes on the lamp"
+       above).
    - **The forwarder token:** the wrapper exports `LAMP_HERMES_TOKEN` from
      lamp-cloud's `/var/lib/lampos-cloud/hermes-token`, as Hermes's does,
      for the `lampos` provider's `apiKey` (`${LAMP_HERMES_TOKEN}`).

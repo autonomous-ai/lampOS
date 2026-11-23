@@ -426,10 +426,11 @@ impl Tracker {
         // For each machine: any task in its first ten minutes, any task
         // not yet asked for.
         let mut machines: BTreeMap<&str, (bool, bool)> = BTreeMap::new();
-        // A direct OpenClaw task (`LAMP_TASKS_OPENCLAW_DIRECT` on) is read
-        // from its gateway run (`direct::OpenclawDirect::refresh`), never
-        // by Harness's `ps`: it makes no machine due. Hermes and the
-        // switch off: as before.
+        // A direct task (`LAMP_TASKS_OPENCLAW_DIRECT` or
+        // `LAMP_TASKS_HERMES_DIRECT` on, that engine's) is read from its
+        // gateway run (`direct::Direct::refresh`), never by Harness's `ps`:
+        // it makes no machine due. Another engine and the switch off: as
+        // before.
         for task in watched
             .iter()
             .filter(|task| !crate::direct::lamp_path(&task.engine, &task.machine_id))

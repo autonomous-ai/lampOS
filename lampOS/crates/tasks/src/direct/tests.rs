@@ -1,5 +1,9 @@
 //! The direct path against a fake [`AgentSession`]: every turn, its
-//! progress and its end scripted by the test.
+//! progress and its end scripted by the test. Each scenario runs once per
+//! engine (`<scenario>::openclaw`, `<scenario>::hermes`, [`both_engines`]):
+//! the path is the same for both, only the fake's engine and its
+//! engine's own answers (Hermes: no allow-list, its own turn and token
+//! counts) differ.
 use super::*;
 use crate::harness::Target;
 use lamp_agent_gateway::{Engine, PlanItem, ToolStep};
@@ -12,6 +16,8 @@ type OnSend = Box<dyn Fn(&Turn) + Send>;
 
 #[derive(Default)]
 pub(crate) struct FakeState {
+    /// The fake's engine; `None` is OpenClaw.
+    engine: Option<Engine>,
     /// `ready()` answers NotReady this many more times.
     not_ready: u32,
     readies: u32,
@@ -39,12 +45,28 @@ pub(crate) struct FakeState {
     gateway_size: Option<(u64, u64)>,
     /// Size reads asked of the gateway.
     size_reads: u32,
+    /// Hermes's own count of its kept session: turns, tokens.
+    counts: (u64, u64),
 }
 
 #[derive(Clone, Default)]
 pub(crate) struct Fake(Arc<Mutex<FakeState>>);
 
+/// lamp-tasks' engine for the fake's.
+fn kind(engine: Engine) -> EngineKind {
+    engine_kind(engine)
+}
+
 impl Fake {
+    /// A fake of `engine`'s gateway.
+    pub(crate) fn of(engine: Engine) -> Self {
+        let fake = Fake::default();
+        fake.state().engine = Some(engine);
+        fake
+    }
+    fn hermes(&self) -> bool {
+        self.state().engine == Some(Engine::Hermes)
+    }
     fn state(&self) -> MutexGuard<'_, FakeState> {
         self.0.lock().unwrap()
     }
@@ -70,7 +92,7 @@ impl Fake {
 
 impl AgentSession for Fake {
     fn engine(&self) -> Engine {
-        Engine::Openclaw
+        self.state().engine.unwrap_or(Engine::Openclaw)
     }
     fn ready(&mut self, _within: Duration) -> Result<(), Error> {
         let mut state = self.state();
@@ -173,9 +195,13 @@ impl AgentSession for Fake {
 
 impl DirectSession for Fake {
     fn skill_start_allowed(&mut self) -> Result<bool, Error> {
-        Ok(self.state().allowlisted)
+        // Hermes has no allow-list: always allowed, as the real session.
+        Ok(self.hermes() || self.state().allowlisted)
     }
     fn allow_skill_start(&mut self) -> Result<(), Error> {
+        if self.hermes() {
+            return Ok(());
+        }
         let mut state = self.state();
         state.allow_adds += 1;
         state.allowlisted = true;
@@ -191,10 +217,60 @@ impl DirectSession for Fake {
                 bytes: tokens * 4,
             })
     }
+    fn rotation_counts(&self) -> Option<(u64, u64)> {
+        // Hermes counts its kept session's turns and tokens itself.
+        self.hermes().then(|| self.state().counts)
+    }
 }
 
+/// Each scenario `fn name(engine: Engine)` run as two tests,
+/// `name::openclaw` and `name::hermes`.
+macro_rules! both_engines {
+    ($($name:ident),* $(,)?) => {
+        $(
+            mod $name {
+                #[test]
+                fn openclaw() {
+                    super::$name(lamp_agent_gateway::Engine::Openclaw);
+                }
+                #[test]
+                fn hermes() {
+                    super::$name(lamp_agent_gateway::Engine::Hermes);
+                }
+            }
+        )*
+    };
+}
+
+both_engines!(
+    progress_maps_to_the_ps_and_show_rows,
+    ready_at_boot_with_backoff_and_no_wait_for_the_first_ask,
+    a_spoken_task_is_handed_over_and_answered,
+    how_far_along_mid_run_with_tool_progress,
+    a_skill_do_task_runs_through_the_skill_start_fence,
+    a_skill_do_task_whose_start_was_never_claimed_fails_closed,
+    a_make_goes_through_the_kept_session,
+    not_ready_then_ready_tells_getting_ready_once,
+    never_ready_is_not_sent_as_not_ready,
+    lost_then_the_next_task_after_reconnect,
+    lost_then_resynced_run_is_still_answered,
+    a_cancelled_run_is_aborted,
+    near_the_context_limit_the_session_is_reset,
+    the_gateways_own_size_near_the_context_limit_resets_the_session,
+    a_drop_fails_the_run_and_the_queued_turns_with_the_try_again_words,
+    other_engines_keep_the_harness_path,
+    a_stuck_run_is_ended_and_the_next_turn_goes_on,
+    a_retried_send_adopts_the_run_the_gateway_already_took,
+    a_broken_session_is_reset_and_the_turn_tried_again,
+    a_refused_session_is_reset_once_then_the_turn_fails,
+    gateway_down_then_up,
+    a_handed_over_run_reads_working_before_its_first_event,
+    a_make_with_no_run_id_still_has_a_task_id,
+    the_bus_status_follows_a_direct_run_without_ps,
+);
+
 struct Started {
-    direct: Arc<OpenclawDirect>,
+    direct: Arc<Direct>,
     fake: Fake,
     told: Arc<Mutex<Vec<String>>>,
     stop: Arc<AtomicBool>,
@@ -215,7 +291,7 @@ fn started_with(fake: Fake, stuck_after: Duration, queued_most: Duration) -> Sta
     let told = Arc::new(Mutex::new(Vec::new()));
     let heard = told.clone();
     let direct = Arc::new(
-        OpenclawDirect::new(Box::new(fake.clone()), stop.clone())
+        Direct::new(Box::new(fake.clone()), stop.clone())
             .with_bounds(
                 Duration::from_millis(5),
                 Duration::from_millis(5),
@@ -260,7 +336,22 @@ fn launch(engine: EngineKind, words: &str) -> Launch {
 
 /// A spoken launch as the tasks-harness worker makes it: the session's
 /// readiness waited for, at most `within`, by `gateway::launch_with`.
+/// As runtime.rs's launch job: OpenClaw waits on `gateway::launch_with`'s
+/// Gateway wait, any other engine on its own session ([`not_ready_for`]'s
+/// `ready_by`), not sent with the same code when not ready in `within`.
 fn spoken_within(lamp: &Started, launch: &Launch, within: Duration) -> Option<LaunchOutcome> {
+    if lamp.direct.engine != EngineKind::Openclaw {
+        if lamp
+            .direct
+            .ready_by(Instant::now() + within, &|| false)
+            .is_err()
+        {
+            return Some(LaunchOutcome::NotSent {
+                code: crate::gateway::NOT_READY.into(),
+            });
+        }
+        return Some(lamp.direct.spoken_launch(launch).unwrap());
+    }
     let mut gateway = lamp.direct.gateway(within);
     Some(crate::gateway::launch_with(
         Some(&mut gateway),
@@ -276,12 +367,12 @@ fn joined(outcome: Option<LaunchOutcome>) -> String {
     }
 }
 
-fn watched(task: u64, agent: &str) -> Watched {
+fn watched(engine: Engine, task: u64, agent: &str) -> Watched {
     Watched {
         task_id: task,
         machine_id: MACHINE.into(),
         agent_id: agent.into(),
-        engine: "openclaw".into(),
+        engine: kind(engine).bus_name(),
         accepted_ago_ms: Some(30_000),
     }
 }
@@ -356,16 +447,15 @@ fn mid_run(run: RunId) -> Progress {
 /// The progress mapping (fail-first): a run mid-tool reads `working`, with
 /// the plan's step, the tool and its brief made plain; tools counted; no
 /// answer and never idle while it runs; idle with its answer once answered.
-#[test]
-fn progress_maps_to_the_ps_and_show_rows() {
+fn progress_maps_to_the_ps_and_show_rows(engine: Engine) {
     let progress = mid_run(RunId("run-1".into()));
-    let row = listed_of("a", Some(&progress), None);
+    let row = listed_of(kind(engine), "a", Some(&progress), None);
     assert_eq!(row.state, "working");
     assert_eq!(
         row.about.as_deref(),
         Some("on step 2 of 3: compare prices; running web_search: cheapest flight Hanoi December")
     );
-    assert_eq!(row.agent.as_deref(), Some("openclaw"));
+    assert_eq!(row.agent.as_deref(), Some(kind(engine).argument()));
     assert!(row.last_active_unix_ms.is_some());
     let seen = observation_of("a", Some(&progress), None);
     assert_eq!((seen.state.as_str(), seen.tools), ("working", 2));
@@ -377,7 +467,9 @@ fn progress_maps_to_the_ps_and_show_rows() {
     writing.last_tool = None;
     writing.phase = Phase::Writing;
     writing.last_text = Some(format!("{}END", "x".repeat(300)));
-    let about = listed_of("a", Some(&writing), None).about.unwrap();
+    let about = listed_of(kind(engine), "a", Some(&writing), None)
+        .about
+        .unwrap();
     assert_eq!(about.chars().count(), ABOUT_MOST);
     assert!(about.ends_with("END"));
     // Answered: idle with the answer, cut to the store's bound, truncated.
@@ -419,9 +511,8 @@ fn about_leaves_out_paths_and_done_words() {
 /// U1: the pump connects at once, with no ask; a gateway not up at boot is
 /// looked at again with backoff until ready; the first ask then does not
 /// wait.
-#[test]
-fn ready_at_boot_with_backoff_and_no_wait_for_the_first_ask() {
-    let fake = Fake::default();
+fn ready_at_boot_with_backoff_and_no_wait_for_the_first_ask(engine: Engine) {
+    let fake = Fake::of(engine);
     fake.state().not_ready = 3;
     let lamp = started(fake);
     until("ready", || lamp.direct.is_ready());
@@ -431,7 +522,7 @@ fn ready_at_boot_with_backoff_and_no_wait_for_the_first_ask() {
     let began = Instant::now();
     joined(spoken_within(
         &lamp,
-        &launch(EngineKind::Openclaw, "What's the weather?"),
+        &launch(kind(engine), "What's the weather?"),
         crate::gateway::READY_WITHIN,
     ));
     assert!(began.elapsed() < Duration::from_millis(100));
@@ -440,13 +531,12 @@ fn ready_at_boot_with_backoff_and_no_wait_for_the_first_ask() {
 /// U2 + U4: a spoken ask handed into the kept session with its header and
 /// words; followed by its own agent id; idle with the answer at its end,
 /// which is what settles the store's task and fires the unasked news.
-#[test]
-fn a_spoken_task_is_handed_over_and_answered() {
-    let lamp = started(Fake::default());
+fn a_spoken_task_is_handed_over_and_answered(engine: Engine) {
+    let lamp = started(Fake::of(engine));
     until("ready", || lamp.direct.is_ready());
     let agent = joined(
         lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, "Plan my trip")),
+            .spoken_launch(&launch(kind(engine), "Plan my trip")),
     );
     assert!(crate::harness::agent_id(&agent), "{agent}");
     until("sent", || lamp.fake.state().sent.len() == 1);
@@ -474,13 +564,12 @@ fn a_spoken_task_is_handed_over_and_answered() {
 /// record (`work`/`work_list`) and "tasks now" read from the run's own
 /// progress at once: working, the plan's step and the tool, tools and step
 /// counted, elapsed time; never done while it runs.
-#[test]
-fn how_far_along_mid_run_with_tool_progress() {
-    let lamp = started(Fake::default());
+fn how_far_along_mid_run_with_tool_progress(engine: Engine) {
+    let lamp = started(Fake::of(engine));
     until("ready", || lamp.direct.is_ready());
     let agent = joined(
         lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, "Find a flight")),
+            .spoken_launch(&launch(kind(engine), "Find a flight")),
     );
     until("sent", || lamp.fake.state().sent.len() == 1);
     let run = lamp.fake.run_of(1);
@@ -498,7 +587,7 @@ fn how_far_along_mid_run_with_tool_progress() {
             .is_some_and(|a| a.contains("web_search"))
     });
     let task = 9_101;
-    let watch = [watched(task, &agent)];
+    let watch = [watched(engine, task, &agent)];
     let mut tracker = crate::progress::Tracker::started(1);
     tracker.watching(&watch);
     lamp.direct.refresh(Some(&mut tracker), &watch);
@@ -513,7 +602,7 @@ fn how_far_along_mid_run_with_tool_progress() {
     // The work record, as `work` answers it.
     let work = crate::works::TaskWork {
         task_id: task,
-        engine: EngineKind::Openclaw,
+        engine: kind(engine),
         words: "Find a flight".into(),
         state: None,
         tools: lamp.direct.observe(&agent).unwrap().tools,
@@ -551,9 +640,8 @@ fn how_far_along_mid_run_with_tool_progress() {
 /// U5: a skill's `do.task`: the fence's allow-list put back over the
 /// session first; the run handed over; its answer kept only once the
 /// launcher claimed the start and the fence said the script started.
-#[test]
-fn a_skill_do_task_runs_through_the_skill_start_fence() {
-    let fake = Fake::default();
+fn a_skill_do_task_runs_through_the_skill_start_fence(engine: Engine) {
+    let fake = Fake::of(engine);
     let starts = crate::skill_start::Starts::default();
     let claims = starts.clone();
     fake.state().on_send = Some(Box::new(move |turn| {
@@ -590,15 +678,16 @@ fn a_skill_do_task_runs_through_the_skill_start_fence() {
     );
     assert!(run.started.load(Ordering::Acquire));
     let state = lamp.fake.state();
-    assert_eq!(state.allow_adds, 1);
+    // OpenClaw's allow-list put back; Hermes has none to put back.
+    let adds = u32::from(engine == Engine::Openclaw);
+    assert_eq!(state.allow_adds, adds);
     assert_eq!(state.sent[0].kind, TurnKind::SkillTask);
 }
 
 /// The fence fails closed: an agent that answered without claiming the
 /// start never ran the skill's script, so no answer is kept.
-#[test]
-fn a_skill_do_task_whose_start_was_never_claimed_fails_closed() {
-    let fake = Fake::default();
+fn a_skill_do_task_whose_start_was_never_claimed_fails_closed(engine: Engine) {
+    let fake = Fake::of(engine);
     fake.state().allowlisted = true;
     let lamp = started(fake);
     until("ready", || lamp.direct.is_ready());
@@ -627,13 +716,12 @@ fn a_skill_do_task_whose_start_was_never_claimed_fails_closed() {
     assert_eq!(lamp.fake.state().allow_adds, 0);
 }
 
-/// U5: a make goes through OpenClaw as a make turn, no allow-list asked,
+/// U5: a make goes through the kept session as a make turn, no allow-list asked,
 /// and its answer is the make folder's `answer.md`.
-#[test]
-fn a_make_goes_through_the_kept_session() {
+fn a_make_goes_through_the_kept_session(engine: Engine) {
     let folder = tempfile::tempdir().unwrap();
     let answer = folder.path().join(crate::skill_make::ANSWER_FILE);
-    let fake = Fake::default();
+    let fake = Fake::of(engine);
     fake.state().on_send = Some(Box::new(move |turn| {
         if turn.kind == TurnKind::Make {
             std::fs::write(&answer, "I made the plant-watering skill.").unwrap();
@@ -671,9 +759,8 @@ fn a_make_goes_through_the_kept_session() {
 
 /// The gateway not ready: past the bound the getting-ready hook is told
 /// once; once ready, the waiting task goes over.
-#[test]
-fn not_ready_then_ready_tells_getting_ready_once() {
-    let fake = Fake::default();
+fn not_ready_then_ready_tells_getting_ready_once(engine: Engine) {
+    let fake = Fake::of(engine);
     fake.state().not_ready = 1_000;
     let lamp = started(fake);
     let gate = lamp.fake.clone();
@@ -683,7 +770,7 @@ fn not_ready_then_ready_tells_getting_ready_once() {
     });
     let agent = joined(spoken_within(
         &lamp,
-        &launch(EngineKind::Openclaw, "Hello"),
+        &launch(kind(engine), "Hello"),
         crate::gateway::READY_WITHIN,
     ));
     assert!(lamp.direct.observe(&agent).is_some());
@@ -697,14 +784,13 @@ fn not_ready_then_ready_tells_getting_ready_once() {
 
 /// Never ready within the spoken bound: not sent, `openclaw_gateway_not_ready`,
 /// which task news tells as "still getting ready".
-#[test]
-fn never_ready_is_not_sent_as_not_ready() {
-    let fake = Fake::default();
+fn never_ready_is_not_sent_as_not_ready(engine: Engine) {
+    let fake = Fake::of(engine);
     fake.state().not_ready = u32::MAX;
     let lamp = started(fake);
     let outcome = spoken_within(
         &lamp,
-        &launch(EngineKind::Openclaw, "Hello"),
+        &launch(kind(engine), "Hello"),
         Duration::from_millis(300),
     );
     assert_eq!(
@@ -720,14 +806,10 @@ fn never_ready_is_not_sent_as_not_ready() {
 /// Lost mid-run: the session reconnects; a run the restart lost ends
 /// failed (told as failed, never waited on for ever), and the next task
 /// goes over and is answered.
-#[test]
-fn lost_then_the_next_task_after_reconnect() {
-    let lamp = started(Fake::default());
+fn lost_then_the_next_task_after_reconnect(engine: Engine) {
+    let lamp = started(Fake::of(engine));
     until("ready", || lamp.direct.is_ready());
-    let first = joined(
-        lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, "First")),
-    );
+    let first = joined(lamp.direct.spoken_launch(&launch(kind(engine), "First")));
     until("sent", || lamp.fake.state().sent.len() == 1);
     {
         let mut state = lamp.fake.state();
@@ -738,10 +820,7 @@ fn lost_then_the_next_task_after_reconnect() {
     until("first failed", || {
         lamp.direct.observe(&first).unwrap().state == "failed"
     });
-    let second = joined(
-        lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, "Second")),
-    );
+    let second = joined(lamp.direct.spoken_launch(&launch(kind(engine), "Second")));
     until("second sent", || lamp.fake.state().sent.len() == 2);
     lamp.fake.answer(&lamp.fake.run_of(2), "Second done.");
     until("second answered", || {
@@ -751,14 +830,10 @@ fn lost_then_the_next_task_after_reconnect() {
 
 /// A run lost with the connection but kept by the gateway (resynced after
 /// the reconnect) is answered as it would have been.
-#[test]
-fn lost_then_resynced_run_is_still_answered() {
-    let lamp = started(Fake::default());
+fn lost_then_resynced_run_is_still_answered(engine: Engine) {
+    let lamp = started(Fake::of(engine));
     until("ready", || lamp.direct.is_ready());
-    let agent = joined(
-        lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, "Long one")),
-    );
+    let agent = joined(lamp.direct.spoken_launch(&launch(kind(engine), "Long one")));
     until("sent", || lamp.fake.state().sent.len() == 1);
     lamp.fake.state().lose_next_wait = true;
     until("lost seen", || !lamp.fake.state().lose_next_wait);
@@ -770,9 +845,8 @@ fn lost_then_resynced_run_is_still_answered() {
 }
 
 /// A cancelled skill run is aborted on the gateway.
-#[test]
-fn a_cancelled_run_is_aborted() {
-    let lamp = started(Fake::default());
+fn a_cancelled_run_is_aborted(engine: Engine) {
+    let lamp = started(Fake::of(engine));
     until("ready", || lamp.direct.is_ready());
     let run = skill_run("make-2", Duration::from_millis(300));
     let began = Instant::now();
@@ -793,25 +867,18 @@ fn a_cancelled_run_is_aborted() {
 
 /// Context hygiene: past the one session's bound, a fresh conversation
 /// (`reset()`) before the next turn.
-#[test]
-fn near_the_context_limit_the_session_is_reset() {
-    let lamp = started(Fake::default());
+fn near_the_context_limit_the_session_is_reset(engine: Engine) {
+    let lamp = started(Fake::of(engine));
     until("ready", || lamp.direct.is_ready());
     let big = "w".repeat(usize::try_from(crate::one_session::TASK_FRESH_TOKENS * 4).unwrap());
-    let first = joined(
-        lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, &big)),
-    );
+    let first = joined(lamp.direct.spoken_launch(&launch(kind(engine), &big)));
     until("sent", || lamp.fake.state().sent.len() == 1);
     lamp.fake.answer(&lamp.fake.run_of(1), "ok");
     until("answered", || {
         lamp.direct.observe(&first).unwrap().state == "idle"
     });
     assert_eq!(lamp.fake.state().resets, 0);
-    joined(
-        lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, "Next")),
-    );
+    joined(lamp.direct.spoken_launch(&launch(kind(engine), "Next")));
     until("second sent", || lamp.fake.state().sent.len() == 2);
     assert_eq!(lamp.fake.state().resets, 1);
     assert_eq!(lamp.direct.resets(), 1);
@@ -821,17 +888,13 @@ fn near_the_context_limit_the_session_is_reset() {
 /// turn, past the one session's bound for a task (85% of the 128k context,
 /// under the old 150k) or past its 150 messages: a fresh conversation
 /// before the next turn. Below both: none.
-#[test]
-fn the_gateways_own_size_near_the_context_limit_resets_the_session() {
+fn the_gateways_own_size_near_the_context_limit_resets_the_session(engine: Engine) {
     for (size, resets) in [((110_000, 10), 1), ((1_000, 151), 1), ((100_000, 150), 0)] {
-        let fake = Fake::default();
+        let fake = Fake::of(engine);
         fake.state().gateway_size = Some(size);
         let lamp = started(fake);
         until("ready", || lamp.direct.is_ready());
-        joined(
-            lamp.direct
-                .spoken_launch(&launch(EngineKind::Openclaw, "Next")),
-        );
+        joined(lamp.direct.spoken_launch(&launch(kind(engine), "Next")));
         until("sent", || lamp.fake.state().sent.len() == 1);
         assert_eq!(lamp.fake.state().resets, resets, "{size:?}");
         assert!(lamp.fake.state().size_reads >= 1, "read before the send");
@@ -842,20 +905,13 @@ fn the_gateways_own_size_near_the_context_limit_resets_the_session() {
 /// `DROPPED`) fails it at once with the person's "try again" words, as its
 /// observation's last words for the voice's news, and the turn queued
 /// behind it ends the same, never handed over.
-#[test]
-fn a_drop_fails_the_run_and_the_queued_turns_with_the_try_again_words() {
-    let dropped = lamp_agent_gateway::openclaw::DROPPED;
-    let lamp = started(Fake::default());
+fn a_drop_fails_the_run_and_the_queued_turns_with_the_try_again_words(engine: Engine) {
+    let dropped = lamp_agent_gateway::DROPPED;
+    let lamp = started(Fake::of(engine));
     until("ready", || lamp.direct.is_ready());
-    let first = joined(
-        lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, "First")),
-    );
+    let first = joined(lamp.direct.spoken_launch(&launch(kind(engine), "First")));
     until("sent", || lamp.fake.state().sent.len() == 1);
-    let second = joined(
-        lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, "Second")),
-    );
+    let second = joined(lamp.direct.spoken_launch(&launch(kind(engine), "Second")));
     {
         let mut state = lamp.fake.state();
         let (progress, outcome) = state.runs.get_mut(&RunId("run-1".into())).unwrap();
@@ -881,28 +937,39 @@ fn a_drop_fails_the_run_and_the_queued_turns_with_the_try_again_words() {
     assert_eq!(lamp.fake.state().sent.len(), 1, "never handed over");
 }
 
-/// Hermes, a named session or another machine is not the direct path's;
-/// and with the switch off (anything but `on`) nothing is set, so every
-/// seam leaves the Harness path untouched.
-#[test]
-fn switch_off_and_hermes_keep_the_harness_path() {
+/// The other engine, a named session or another machine is not this
+/// session's path; and with the switches off (anything but `on`) nothing is
+/// set, so every seam leaves the Harness path untouched.
+fn other_engines_keep_the_harness_path(engine: Engine) {
+    assert_eq!(SWITCH, "LAMP_TASKS_OPENCLAW_DIRECT");
+    assert_eq!(HERMES_SWITCH, "LAMP_TASKS_HERMES_DIRECT");
     assert!(!on(None));
     assert!(!on(Some("1")));
     assert!(!on(Some("ON")));
     assert!(on(Some("on")));
     // The crate's tests never set the lamp's: every seam is skipped.
     assert!(LAMP.get().is_none());
+    assert!(HERMES_LAMP.get().is_none());
+    assert!(lamps().is_empty());
+    assert!(!takes_runs(EngineKind::Openclaw, true));
+    assert!(!takes_runs(EngineKind::Hermes, false));
     assert!(lamp_owns("0b5b8c1e-5d8a-4c3e-9f1a-2b3c4d5e6f70").is_none());
-    let lamp = started(Fake::default());
+    let lamp = started(Fake::of(engine));
+    assert_eq!(lamp.direct.engine(), kind(engine));
+    let other = match engine {
+        Engine::Openclaw => EngineKind::Hermes,
+        Engine::Hermes => EngineKind::Openclaw,
+    };
+    assert!(lamp.direct.spoken_launch(&launch(other, "Hello")).is_none());
     assert!(
         lamp.direct
-            .spoken_launch(&launch(EngineKind::Hermes, "Hello"))
+            .spoken_launch(&launch(EngineKind::Codex, "Hello"))
             .is_none()
     );
-    let mut named = launch(EngineKind::Openclaw, "Hello");
+    let mut named = launch(kind(engine), "Hello");
     named.session = Some("docs".into());
     assert!(lamp.direct.spoken_launch(&named).is_none());
-    let mut elsewhere = launch(EngineKind::Openclaw, "Hello");
+    let mut elsewhere = launch(kind(engine), "Hello");
     elsewhere.target.machine_id = "0123456789abcdef0123456789abcdef".into();
     assert!(lamp.direct.spoken_launch(&elsewhere).is_none());
     assert!(lamp.fake.state().sent.is_empty());
@@ -910,22 +977,18 @@ fn switch_off_and_hermes_keep_the_harness_path() {
 
 /// A run with no event past the stuck bound is checked, aborted and ended
 /// failed with a short reason; the next turn goes on and is answered.
-#[test]
-fn a_stuck_run_is_ended_and_the_next_turn_goes_on() {
+fn a_stuck_run_is_ended_and_the_next_turn_goes_on(engine: Engine) {
     let lamp = started_with(
-        Fake::default(),
+        Fake::of(engine),
         Duration::from_millis(150),
         Duration::from_secs(600),
     );
     until("ready", || lamp.direct.is_ready());
     let stuck = joined(
         lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, "Stuck one")),
+            .spoken_launch(&launch(kind(engine), "Stuck one")),
     );
-    let next = joined(
-        lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, "Next one")),
-    );
+    let next = joined(lamp.direct.spoken_launch(&launch(kind(engine), "Next one")));
     // One at a time: the second waits, and says so.
     until("first sent", || lamp.fake.state().sent.len() == 1);
     let waiting = lamp
@@ -950,16 +1013,12 @@ fn a_stuck_run_is_ended_and_the_next_turn_goes_on() {
 /// A send the gateway took but whose reply timed out: the retried turn
 /// adopts the run the gateway already has for it (by its task id), never
 /// sends it twice; one run, answered once.
-#[test]
-fn a_retried_send_adopts_the_run_the_gateway_already_took() {
-    let fake = Fake::default();
+fn a_retried_send_adopts_the_run_the_gateway_already_took(engine: Engine) {
+    let fake = Fake::of(engine);
     fake.state().taken_then_fail = vec![Error::TimedOut];
     let lamp = started(fake);
     until("ready", || lamp.direct.is_ready());
-    let agent = joined(
-        lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, "Hello")),
-    );
+    let agent = joined(lamp.direct.spoken_launch(&launch(kind(engine), "Hello")));
     until("taken", || lamp.fake.state().sent.len() == 1);
     until("adopted", || {
         lamp.direct
@@ -979,16 +1038,12 @@ fn a_retried_send_adopts_the_run_the_gateway_already_took() {
 
 /// Two sends failed in a row make the session broken: a fresh session,
 /// and the waiting turn tried once more, answered.
-#[test]
-fn a_broken_session_is_reset_and_the_turn_tried_again() {
-    let fake = Fake::default();
+fn a_broken_session_is_reset_and_the_turn_tried_again(engine: Engine) {
+    let fake = Fake::of(engine);
     fake.state().fail_sends = vec![Error::TimedOut, Error::TimedOut];
     let lamp = started(fake);
     until("ready", || lamp.direct.is_ready());
-    let agent = joined(
-        lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, "Hello")),
-    );
+    let agent = joined(lamp.direct.spoken_launch(&launch(kind(engine), "Hello")));
     until("sent", || lamp.fake.state().sent.len() == 1);
     assert_eq!(lamp.fake.state().resets, 1);
     lamp.fake.answer(&lamp.fake.run_of(1), "Hi.");
@@ -998,19 +1053,15 @@ fn a_broken_session_is_reset_and_the_turn_tried_again() {
 }
 
 /// A refused session is reset at once; refused again, the turn fails.
-#[test]
-fn a_refused_session_is_reset_once_then_the_turn_fails() {
-    let fake = Fake::default();
+fn a_refused_session_is_reset_once_then_the_turn_fails(engine: Engine) {
+    let fake = Fake::of(engine);
     fake.state().fail_sends = vec![
         Error::Refused("scope".into()),
         Error::Refused("scope".into()),
     ];
     let lamp = started(fake);
     until("ready", || lamp.direct.is_ready());
-    let agent = joined(
-        lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, "Hello")),
-    );
+    let agent = joined(lamp.direct.spoken_launch(&launch(kind(engine), "Hello")));
     until("failed", || {
         lamp.direct.observe(&agent).unwrap().state == "failed"
     });
@@ -1021,19 +1072,15 @@ fn a_refused_session_is_reset_once_then_the_turn_fails() {
 /// The gateway down after it was ready: the queued turn waits, getting
 /// ready is said once, and past the queued bound it ends not ready; once
 /// the gateway is up again the next task goes over and is answered.
-#[test]
-fn gateway_down_then_up() {
+fn gateway_down_then_up(engine: Engine) {
     let lamp = started_with(
-        Fake::default(),
+        Fake::of(engine),
         Duration::from_secs(600),
         Duration::from_millis(400),
     );
     until("ready", || lamp.direct.is_ready());
     lamp.fake.state().not_ready = u32::MAX;
-    let first = joined(
-        lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, "First")),
-    );
+    let first = joined(lamp.direct.spoken_launch(&launch(kind(engine), "First")));
     until("first ended", || {
         lamp.direct.observe(&first).unwrap().state == "failed"
     });
@@ -1041,10 +1088,7 @@ fn gateway_down_then_up() {
     assert!(lamp.fake.state().sent.is_empty());
     lamp.fake.state().not_ready = 0;
     until("ready again", || lamp.direct.is_ready());
-    let second = joined(
-        lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, "Second")),
-    );
+    let second = joined(lamp.direct.spoken_launch(&launch(kind(engine), "Second")));
     until("second sent", || lamp.fake.state().sent.len() == 1);
     lamp.fake.answer(&lamp.fake.run_of(1), "Up again.");
     until("second answered", || {
@@ -1056,20 +1100,17 @@ fn gateway_down_then_up() {
 /// The lamp's session for a store test on this thread, owning `agent`
 /// with `answer`: no pump, nothing sent.
 /// The lamp's direct session with `agent`'s turn failed by a gateway drop.
-pub(crate) fn lamp_dropped(agent: &str) -> Arc<OpenclawDirect> {
-    let direct = Arc::new(OpenclawDirect::new(
+pub(crate) fn lamp_dropped(agent: &str) -> Arc<Direct> {
+    let direct = Arc::new(Direct::new(
         Box::new(Fake::default()),
         Arc::new(AtomicBool::new(true)),
     ));
-    direct.ended_for_tests(
-        agent,
-        End::Failed(lamp_agent_gateway::openclaw::DROPPED.into()),
-    );
+    direct.ended_for_tests(agent, End::Failed(lamp_agent_gateway::DROPPED.into()));
     direct
 }
 
-pub(crate) fn lamp_owning(agent: &str, answer: &str) -> Arc<OpenclawDirect> {
-    let direct = Arc::new(OpenclawDirect::new(
+pub(crate) fn lamp_owning(agent: &str, answer: &str) -> Arc<Direct> {
+    let direct = Arc::new(Direct::new(
         Box::new(Fake::default()),
         Arc::new(AtomicBool::new(true)),
     ));
@@ -1134,13 +1175,12 @@ fn the_stuck_limit_override_is_read() {
 /// status rows (the bus's `tasks/status`) and in its observation before
 /// the run's first event, as `get_progress` did; `starting` is only a turn
 /// not yet handed over.
-#[test]
-fn a_handed_over_run_reads_working_before_its_first_event() {
-    let lamp = started(Fake::default());
+fn a_handed_over_run_reads_working_before_its_first_event(engine: Engine) {
+    let lamp = started(Fake::of(engine));
     until("ready", || lamp.direct.is_ready());
     let agent = joined(
         lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, "Plan a trip")),
+            .spoken_launch(&launch(kind(engine), "Plan a trip")),
     );
     until("sent", || lamp.fake.state().sent.len() == 1);
     until("recorded", || {
@@ -1170,11 +1210,10 @@ fn a_handed_over_run_reads_working_before_its_first_event() {
 
 /// ee17 row, 14:04:35: a make whose folder name has no run id still hands
 /// over a turn with a task id, so its journal line names it.
-#[test]
-fn a_make_with_no_run_id_still_has_a_task_id() {
+fn a_make_with_no_run_id_still_has_a_task_id(engine: Engine) {
     let folder = tempfile::tempdir().unwrap();
     let answer = folder.path().join(crate::skill_make::ANSWER_FILE);
-    let fake = Fake::default();
+    let fake = Fake::of(engine);
     fake.state().on_send = Some(Box::new(move |_| {
         std::fs::write(&answer, "Made.").unwrap();
     }));
@@ -1208,13 +1247,12 @@ fn a_make_with_no_run_id_still_has_a_task_id() {
 /// The bus's `tasks/status` follows a direct run as its row changes, with
 /// no `ps` read: handed over, the tracker's status says working; read again
 /// unchanged, nothing new to publish.
-#[test]
-fn the_bus_status_follows_a_direct_run_without_ps() {
-    let lamp = started(Fake::default());
+fn the_bus_status_follows_a_direct_run_without_ps(engine: Engine) {
+    let lamp = started(Fake::of(engine));
     until("ready", || lamp.direct.is_ready());
     let agent = joined(
         lamp.direct
-            .spoken_launch(&launch(EngineKind::Openclaw, "Plan a trip")),
+            .spoken_launch(&launch(kind(engine), "Plan a trip")),
     );
     until("handed over", || {
         lamp.direct
@@ -1222,7 +1260,7 @@ fn the_bus_status_follows_a_direct_run_without_ps() {
             .find(&agent)
             .is_some_and(|run| run.run.is_some())
     });
-    let watch = vec![watched(5, &agent)];
+    let watch = vec![watched(engine, 5, &agent)];
     let mut tracker = crate::progress::Tracker::started(1);
     tracker.watching(&watch);
     lamp.direct.refresh_if_changed(Some(&mut tracker), &watch);
@@ -1231,4 +1269,121 @@ fn the_bus_status_follows_a_direct_run_without_ps() {
     assert_eq!(task.state, lamp_msgs::AgentState::Working);
     lamp.direct.refresh_if_changed(Some(&mut tracker), &watch);
     assert!(tracker.take("store").is_none());
+}
+
+/// Per engine: OpenClaw's bounds are exactly the one session's (128k, no
+/// count of turns); Hermes's are its own context's, plus V1's backstop of
+/// 40 turns or 250k tokens handed over and read, since Hermes compacts on
+/// its own and its gateway's size is after that.
+#[test]
+fn each_engine_has_its_own_context_limits() {
+    use crate::harness::SessionSize;
+    use crate::one_session::{ROTATE_TOKENS, ROTATE_TURNS, TASK_FRESH_TOKENS};
+    let (openclaw, hermes) = (EngineKind::Openclaw, EngineKind::Hermes);
+    assert_eq!(context_tokens(openclaw), crate::one_session::CONTEXT_TOKENS);
+    assert_eq!(context_tokens(hermes), HERMES_CONTEXT_TOKENS);
+    let small = Some(SessionSize {
+        messages: 10,
+        bytes: 4_000,
+    });
+    let big = Some(SessionSize {
+        messages: 10,
+        bytes: 110_000 * 4,
+    });
+    for (size, tokens, make) in [
+        (None, 0, false),
+        (None, TASK_FRESH_TOKENS, false),
+        (small, 0, true),
+        (big, 0, false),
+        (small, ROTATE_TOKENS, false),
+    ] {
+        let counts = (ROTATE_TURNS, ROTATE_TOKENS);
+        assert_eq!(
+            near_limit(openclaw, size, tokens, counts, make),
+            crate::one_session::near_context_limit(size, tokens, make),
+            "{size:?} {tokens} {make}"
+        );
+    }
+    assert!(near_limit(hermes, big, 0, (1, 0), false));
+    assert!(near_limit(hermes, None, TASK_FRESH_TOKENS, (1, 0), false));
+    assert!(!near_limit(
+        hermes,
+        small,
+        0,
+        (ROTATE_TURNS - 1, ROTATE_TOKENS - 1),
+        false
+    ));
+    assert!(near_limit(hermes, small, 0, (ROTATE_TURNS, 0), false));
+    assert!(near_limit(hermes, small, 0, (1, ROTATE_TOKENS), false));
+}
+
+/// Hermes is told to run `skill-start <run id>` (the launcher on its
+/// gateway's PATH), with its
+/// `terminal` tool in the foreground for as long as the run may take (at
+/// most Hermes's foreground bound); OpenClaw's words are as they were.
+#[test]
+fn hermes_is_told_to_run_the_skill_start_launcher_in_the_foreground() {
+    let run = skill_run("run-7", Duration::from_secs(120));
+    let prompt = crate::gateway::prompt(Path::new(crate::skill_start::LAUNCHER), &run);
+    assert!(prompt.contains(&format!("{} run-7", crate::skill_start::LAUNCHER)));
+    assert_eq!(
+        skill_words(EngineKind::Openclaw, &prompt, run.deadline),
+        prompt
+    );
+    let words = skill_words(EngineKind::Hermes, &prompt, run.deadline);
+    assert!(words.contains("Run `skill-start run-7` once"), "{words}");
+    assert!(!words.contains(crate::skill_start::LAUNCHER), "{words}");
+    assert!(words.contains("`terminal` tool"), "{words}");
+    assert!(words.contains("`background` false"), "{words}");
+    assert!(words.contains("`timeout` 120,"), "{words}");
+    let long = skill_words(EngineKind::Hermes, &prompt, Duration::from_secs(3_600));
+    assert!(long.contains("`timeout` 600,"), "{long}");
+}
+
+/// V1's backstop on Hermes: a kept session its own count says is at 40
+/// turns (kept across restarts by the session) is rotated before the next
+/// turn; one turn short, it is not. OpenClaw, counting none, never is.
+#[test]
+fn hermes_kept_session_is_rotated_at_forty_turns() {
+    use crate::one_session::ROTATE_TURNS;
+    for (engine, turns, resets) in [
+        (Engine::Hermes, ROTATE_TURNS, 1),
+        (Engine::Hermes, ROTATE_TURNS - 1, 0),
+        (Engine::Openclaw, ROTATE_TURNS, 0),
+    ] {
+        let fake = Fake::of(engine);
+        fake.state().counts = (turns, 1_000);
+        let lamp = started(fake);
+        until("ready", || lamp.direct.is_ready());
+        joined(lamp.direct.spoken_launch(&launch(kind(engine), "Next")));
+        until("sent", || lamp.fake.state().sent.len() == 1);
+        assert_eq!(lamp.fake.state().resets, resets, "{engine:?} {turns}");
+    }
+}
+
+/// A direct Hermes task waits on its own session's readiness before it is
+/// queued (never OpenClaw's Gateway wait), and is not sent when it is not
+/// ready in time; an OpenClaw launch is left to `gateway::launch_with`.
+#[test]
+fn a_hermes_launch_waits_on_its_own_session() {
+    let fake = Fake::of(Engine::Hermes);
+    fake.state().not_ready = u32::MAX;
+    let lamp = started(fake);
+    set_test_lamp(Some(lamp.direct.clone()));
+    let hermes = launch(EngineKind::Hermes, "Hello");
+    let openclaw = launch(EngineKind::Openclaw, "Hello");
+    let refused = not_ready_for(&hermes, Duration::from_millis(200));
+    let left = not_ready_for(&openclaw, Duration::from_millis(200));
+    lamp.fake.state().not_ready = 0;
+    until("ready", || lamp.direct.is_ready());
+    let ready = not_ready_for(&hermes, Duration::from_millis(200));
+    set_test_lamp(None);
+    assert_eq!(
+        refused,
+        Some(LaunchOutcome::NotSent {
+            code: crate::gateway::NOT_READY.into()
+        })
+    );
+    assert_eq!(left, None);
+    assert_eq!(ready, None);
 }

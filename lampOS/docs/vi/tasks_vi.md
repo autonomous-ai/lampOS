@@ -3137,7 +3137,12 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   `one_session_not_started` của #7919 qua Task news, không bao giờ cả hai.
   Câu này được nghe cùng câu trả lời, không phải ngay lúc thay phiên.
 
-### Nói thẳng với OpenClaw (`LAMP_TASKS_OPENCLAW_DIRECT=on` trong unit lamp-tasks của sản phẩm)
+### Nói thẳng với agent của đèn (`LAMP_TASKS_OPENCLAW_DIRECT=on` trong unit lamp-tasks của sản phẩm; `LAMP_TASKS_HERMES_DIRECT`, tắt)
+
+Đường này giống nhau cho cả hai engine, mỗi engine sau công tắc riêng, với
+phiên riêng (`direct::Direct`), luồng bơm riêng và trạng thái sẵn sàng riêng;
+phần khác của Hermes nằm ở mục "Nói thẳng với Hermes" cuối phần này. Mọi điều
+bên dưới nói về OpenClaw cũng đúng y như vậy cho Hermes.
 
 Khi môi trường riêng của lamp-tasks có `LAMP_TASKS_OPENCLAW_DIRECT=on` (đúng
 `on`; giá trị khác, hoặc không đặt, là tắt), lamp-tasks giao mọi lượt OpenClaw
@@ -3146,8 +3151,9 @@ thẳng cho gateway của OpenClaw qua `lamp_agent_gateway::AgentSession`
 Harness CLI cho OpenClaw (`harness new/reply/ensure/wait/show/close/ps`,
 `openclaw tui` trong tmux, nguồn của các phiên bị kẹt #7906, #8001, #6226) và
 các lệnh CLI `openclaw … --gateway` (`approvals get`, `approvals allowlist
-add`, `gateway call sessions.delete`). Hermes vẫn đi đường cũ. Mã nằm ở
-`crates/tasks/src/direct.rs`.
+add`, `gateway call sessions.delete`). Hermes của đèn có công tắc riêng cho
+cùng đường này (`LAMP_TASKS_HERMES_DIRECT`, bên dưới); tắt thì vẫn đi đường
+cũ. Mã nằm ở `crates/tasks/src/direct.rs`.
 
 Phiên là `lamp_agent_gateway::openclaw::Session` (`direct::lamp_session`):
 `Config` mặc định, với URL lấy từ `gateway::PORT` và hàng rào lấy từ
@@ -3159,7 +3165,8 @@ phẩm bật nó (M8; [switches.md](../switches.md)).
 
 Khi công tắc bật và đã có phiên:
 
-- **Lúc khởi động.** Một luồng bơm (`openclaw-direct`) kết nối ngay và mở hoặc
+- **Lúc khởi động.** Một luồng bơm (`openclaw-direct`; của Hermes là
+  `hermes-direct`) kết nối ngay và mở hoặc
   nhận lại phiên được giữ, không cần ai hỏi. Một lần nhìn thất bại được thử lại
   sau 0,5 s, mỗi lần gấp đôi, tối đa 30 s (2 s khi có việc đang chờ). Khi đã
   sẵn sàng và rảnh, nó nhìn lại mỗi 30 s. Pane của một phiên
@@ -3175,7 +3182,7 @@ Khi công tắc bật và đã có phiên:
   lượt OpenClaw của đèn đi vào phiên trực tiếp, mọi lời gọi khác đi vào backend
   Harness bên trong. Bước chờ của worker tasks-harness (`gateway::launch_with`)
   vẫn như cũ, nhưng probe của nó là trạng thái sẵn sàng của phiên
-  (`OpenclawDirect::gateway`, một `gateway::Probe`), không phải cổng. Việc giao
+  (`Direct::gateway`, một `gateway::Probe`), không phải cổng. Việc giao
   chờ phiên sẵn sàng, tối đa 60 s
   (`gateway::READY_WITHIN`). Quá hạn mà chưa sẵn sàng, việc là `not_sent`
   `openclaw_gateway_not_ready`, và Task news nói "I'm still getting ready".
@@ -3285,7 +3292,7 @@ Khi công tắc bật và đã có phiên:
 - **Gateway khởi động lại hoặc rớt kết nối.** Đây là quyết định của chủ sở
   hữu (2026-11-23). Với mọi lần rớt (đóng 1012 khi khởi động lại, crash, 1006,
   mất socket), mọi lượt đang chạy kết thúc `failed` ngay với
-  `openclaw::DROPPED`: "A small system error stopped this task. Please try
+  `lamp_agent_gateway::DROPPED` (một câu cho mọi engine): "A small system error stopped this task. Please try
   again in a few minutes." Các lượt xếp hàng sau nó cũng kết thúc như vậy,
   không bao giờ được giao. Lượt mà gateway không còn biết sau khi kết nối lại
   (`UnknownRun`) cũng vậy. Câu đó là `data.answer` của quan sát thất bại, do
@@ -3313,9 +3320,10 @@ Khi công tắc bật và đã có phiên:
     thấy lý do: gateway bão hòa vì khởi động cần lâu hơn mức cũ 2 s (lần nhìn
     sẵn sàng) và 10 s (giới hạn lời gọi), và lamp-tasks bỏ từng kết nối dở.
 - **Xoay vòng.** Xoay vòng ngữ cảnh là `reset()`, một cuộc trò chuyện mới,
-  trước một lượt, theo ngưỡng của một phiên (`one_session::near_context_limit`:
-  85 % của ngữ cảnh 128k hoặc hơn 150 tin nhắn cho một việc, 60 % hoặc hơn 100
-  cho một make). Nó cân kích thước phiên do chính gateway đếm
+  trước một lượt, theo ngưỡng của engine (`direct::near_limit`; với OpenClaw
+  đúng bằng ngưỡng của một phiên, `one_session::near_context_limit`: 85 % của
+  ngữ cảnh 128k hoặc hơn 150 tin nhắn cho một việc, 60 % hoặc hơn 100 cho một
+  make). Nó cân kích thước phiên do chính gateway đếm
   (`DirectSession::session_size`): giá trị lớn hơn giữa `sessionInfo.totalTokens`
   và `contextBudgetStatus.estimatedPromptTokens`, cùng `totalMessages`, từ một
   `chat.history` một tin nhắn. Lần đọc này diễn ra ở mỗi lần (kết nối lại),
@@ -3329,11 +3337,110 @@ Khi công tắc bật và đã có phiên:
 - **`ps` của Harness thất bại.** Các dòng trực tiếp vẫn được đưa ra, nên tracker
   vẫn đọc được.
 
-Journal: `tasks: direct: OpenClaw's gateway is ready, the kept session open`,
-`tasks: <id>: turn accepted in <ms> ms (<nth>)`, `tasks: direct: <why>` khi
-chưa sẵn sàng, `tasks: direct: run <run> had no event in <s> s and is stuck;
-ended, the next turn goes on`, và `tasks: direct: a fresh conversation for <id>
-(a full conversation | a broken session), about <n> tokens in the last`.
+Journal: `tasks: direct: OpenClaw's gateway is ready, the kept session open`
+(`Hermes's` với Hermes), `tasks: <id>: turn accepted in <ms> ms (<nth>)`,
+`tasks: direct: <why>` khi chưa sẵn sàng, `tasks: direct: run <run> had no
+event in <s> s and is stuck; ended, the next turn goes on`, và `tasks: direct:
+a fresh conversation for <id> (a full conversation | a broken session), about
+<n> tokens and <m> turns in the last`.
+
+#### Nói thẳng với Hermes (`LAMP_TASKS_HERMES_DIRECT=on`, tắt trong sản phẩm)
+
+Khi môi trường riêng của lamp-tasks có `LAMP_TASKS_HERMES_DIRECT=on` (đúng
+`on`; giá trị khác, hoặc không đặt, là tắt; chưa unit nào đặt nó cho tới khi
+một hàng kiểm tra trên đèn Hermes qua), Hermes của chính đèn đi đường ở trên
+thay cho Harness và `hermes chat -q`: một kết nối tới API server của chính
+Hermes và một phiên được giữ. Công tắc và đường của OpenClaw không đổi; mỗi
+engine có phiên riêng, và cả hai có thể cùng bật (`direct::lamps`).
+
+Hermes nói thẳng hoạt động giống hệt OpenClaw nói thẳng (tiêu chí nghiệm thu
+của chủ sở hữu, 23/11): việc của đèn chạy, và "tới đâu rồi?" cùng các dòng
+trạng thái được trả lời từ lượt chạy trong lúc nó chạy; kỹ năng được tạo và
+chạy; lượt bị kẹt được phát hiện và xử lý với cùng `STUCK_AFTER` và cùng logic
+(hủy, báo cho người dùng, việc tiếp theo vẫn chạy; phiên hỏng thì đặt lại);
+gateway rớt thì lượt đang chạy và các lượt xếp hàng kết thúc với cùng câu.
+Gateway của Hermes có internet (namespace của nó không có `--net`), và một kỹ
+năng chỉ tới được các dịch vụ của đèn (camera, micro, loa, servo, đèn) qua
+grant skill-start của nó, giống hệt kỹ năng của OpenClaw. Phần riêng của Hermes:
+
+- **Phiên.** `lamp_agent_gateway::hermes::Session` (`direct::lamp_session`):
+  API server của gateway Hermes trên loopback (`http://127.0.0.1:8642`), khóa
+  Bearer từ `/var/lib/lampos-hermes-gateway/api-key`, Runs API (`POST /v1/runs`
+  với `session_id` được giữ, sự kiện của mỗi lượt qua SSE), và yêu cầu phê
+  duyệt được trả lời ngay theo chính sách của hàng rào skill-start (`once` chỉ
+  cho đúng launcher, `deny` cho mọi thứ khác, không bao giờ `session` hay
+  `always`; `approvals.mode` của chính Hermes vẫn là `manual`). Gateway của
+  Hermes (`lamp-hermes-gateway.service`, `LAMP_HERMES_GATEWAY=on` của
+  lamp-update) chỉ chạy khi lamp-tasks nói Hermes là agent mặc định của đèn,
+  và khi đó gateway của OpenClaw cũng theo agent mặc định, nên chỉ một gateway
+  chạy (docs/install.md, docs/switches.md).
+- **Gateway không tới được.** Công tắc bật nhưng gateway chưa chạy (unit tắt,
+  đang khởi động, hoặc đã mất) được xử lý như khi gateway của OpenClaw mất: một
+  việc nói ra chờ tối đa 60 s rồi là `not_sent`, một lượt xếp hàng chờ tối đa
+  2 phút rồi kết thúc chưa sẵn sàng, một lượt kỹ năng chờ tới hạn của nó (tối
+  đa 240 s) rồi thất bại `openclaw_gateway_not_ready`; luồng bơm vẫn kết nối
+  lại.
+- **Phiên được giữ qua các lần khởi động lại.** Id của nó là của lamp-tasks
+  (`lamp-main-<ms>`), được giữ cùng số lượt và token trong
+  `/var/lib/lampos-tasks/hermes-direct.json` (0600, `direct::KEPT_FILE`). Khởi
+  động lại lamp-tasks, gateway của Hermes hay cả đèn đều nhận lại nó, nên cuộc
+  trò chuyện tiếp tục; phiên mà gateway không còn thì được thay bằng phiên mới.
+  Một lần xoay vòng đặt id mới và xóa id cũ.
+- **Việc nói ra.** Một việc Hermes cho chính máy của đèn, không nêu tên phiên,
+  được xếp hàng và trả lời `joined`, như trên. Worker tasks-harness chờ chính
+  phiên của Hermes sẵn sàng (`direct::not_ready_for`, tối đa 60 s,
+  `gateway::READY_WITHIN`), không bao giờ dùng bước chờ Gateway của OpenClaw,
+  nên việc Hermes không đánh dấu OpenClaw đang được dùng (#8105). Chưa sẵn
+  sàng khi đó thì là `not_sent` `openclaw_gateway_not_ready`, cùng mã mà Task
+  news nói là "I'm still getting ready".
+- **`do.task` của kỹ năng và make.** Khi Hermes của đèn là mặc định và công tắc
+  bật, `HarnessRunner::run` nhận lượt chạy trên đường chạy duy nhất như của một
+  gateway agent (`by_start`), bất kể công tắc default-agent của Harness, và giao
+  nó cho phiên trực tiếp (`direct::takes_runs`). Wrapper theo lượt, file token
+  và namespace theo lượt của Hermes không được dùng nên không được kiểm tra.
+  Grant của lượt được mở cho launcher (`gateway::open_start`), và lời giao nêu
+  launcher dưới dạng `skill-start <run id>` (nó đứng đầu `PATH` của gateway),
+  thêm một dòng cho Hermes (`direct::skill_words`):
+  chạy nó bằng công cụ `terminal`, ở tiền cảnh (`background` false), với
+  `timeout` bằng hạn của lượt (tối đa 600 s, giới hạn tiền cảnh của Hermes),
+  và chờ nó kết thúc. Trên đường này không có file token theo lượt, không có
+  `${LAMP_CONTROL_TOKEN}` cho mục MCP và không có `shell_init_files` tới
+  Hermes: lamp-control chỉ tới được qua hàng rào của launcher, và câu trả lời
+  chỉ được giữ khi hàng rào báo đã khởi động script (`Live::ran`), như với
+  OpenClaw. Lượt có khóa bị từ chối (các lượt của gateway dùng chung một môi
+  trường), và lượt được cấp `net` chỉ có lối ra tại hàng rào, như của gateway
+  agent (`LAMP_TASK_NET_GATEWAY`). Một make bằng giọng nói cũng đi vào phiên
+  được giữ (`skill_make::MakeGateway::of_direct`), với bước kiểm tra
+  `lamp-skills pack` của hướng dẫn như make riêng của Hermes. Một câu hỏi trực
+  tiếp (`voice_ask`), lượt của agent skill, và lượt có khóa hay `net` qua các
+  runner của make vẫn giữ đường cũ.
+- **Không có allow-list.** Hermes không có exec allow-list: lần đọc trước một
+  lượt kỹ năng luôn là được phép, và không có gì phải đặt lại. Chính sách phê
+  duyệt ở trên và hàng rào bảo vệ lượt chạy.
+- **Xoay vòng.** Theo các ngưỡng ở trên, trên ngữ cảnh của Hermes
+  (`direct::HERMES_CONTEXT_TOKENS`, 128k: ngữ cảnh thật của model không được
+  đọc, nên lấy mức nhỏ hơn), dựa trên kích thước phiên do chính gateway đếm
+  (các tin nhắn còn sống, chưa nén, và token của chúng). Vì Hermes tự nén và
+  kích thước của nó là sau khi nén, ngưỡng dự phòng của V1 cũng áp dụng: 40
+  lượt hoặc 250k token (`one_session::rotation_due`), do phiên đếm từ khi bắt
+  đầu (số lượt đã giao, và tổng `usage.input_tokens` của chúng) và giữ cùng id
+  qua các lần khởi động lại.
+- **Rớt.** Gateway khởi động lại hoặc mất giữa chừng (luồng sự kiện đứt và
+  không đọc được trạng thái trong 30 s) làm lượt đang chạy, và mọi lượt xếp
+  hàng sau nó, kết thúc với cùng câu `lamp_agent_gateway::DROPPED`. Không gì
+  được chạy lại: cùng lượt được giao lại trong 15 phút nhận lại lượt đã kết
+  thúc đó, và một yêu cầu mới là một việc mới.
+- **Vẫn ở Harness.** Phiên trên máy tính (mọi engine trên Mac),
+  `harness reply-named`, `LAMP_TASKS_RESUME_CLOSED`, đăng nhập, và việc tìm
+  target của `LAMP_HERMES_ON_LAMP`. Khối `hooks:` của Harness trong
+  `config.yaml` của Hermes được giữ nguyên.
+
+Kiểm thử: `direct::tests` chạy mỗi kịch bản ở trên một lần cho mỗi engine với
+một phiên giả (`<kịch bản>::openclaw`, `<kịch bản>::hermes`): giao việc, tiến
+độ, hàng đợi, kẹt, rớt, chạy kỹ năng, make; và thêm phần riêng của Hermes:
+ngưỡng ngữ cảnh và ngưỡng dự phòng theo lượt, lời giao launcher, bước chờ
+phiên của chính nó sẵn sàng. Chưa chạy trên đèn: toàn bộ đường này (chưa có
+hàng kiểm tra trên đèn Hermes).
 
 ### Giới hạn được chấp nhận cho thứ Hai: grant của kỹ năng đang chạy trong gateway
 
