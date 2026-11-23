@@ -124,7 +124,7 @@ runs the same ones, and the voice runs the link's own again at each read):
 - **Count:** at most 8 tools an app, and the file at most 8 KiB.
 - **Name:** `^[a-z][a-z0-9_]{0,23}$`, unique in the file, and none of the
   voice's own names, the Schedule names, `use_skill` or `start_app`.
-- **Description:** 1 to 300 characters on one line, plain words: no quote,
+- **Description:** 1 to 100 characters on one line, plain words: no quote,
   backtick, markup, brace, link, control or bidi character (the rule
   `start_app` already holds trigger words to, `app_triggers::describable`).
   It says what the tool does and when to call it, never how Lamp should
@@ -157,7 +157,7 @@ runs the same ones, and the voice runs the link's own again at each read):
   Shall I?"). It is the only app-written text Lamp ever speaks, and only as
   that read-back. See "Rules" below.
 
-## The voice: listed beside the skills', routed by `use_skill`
+## The voice: a section of their own, beside the skills'
 
 Heron's part. Behind a new switch, `LAMP_APP_TOOLS` (lamp-voice and
 lamp-control, `on` only, off unless set, inside `LAMP_STORE_APPS`; it goes
@@ -168,37 +168,45 @@ into `docs/switches.md` and every census test when built).
 session opens, and an app's tools change as apps start and stop. The second
 route declares its functions at each request.
 
-- **Which apps:** only an app that is installed and running now, with a
-  socket up. lamp-control tells the voice the running apps' tools on a new
-  bus topic, `apps/tools`, at each change and every 5 s, as `apps/triggers`
-  does: by app, its checked name, its title and its tools file as checked.
-  An app that stops is gone from the next session's functions and from the
-  next request on the second route; an expired `apps/tools` (declared to
-  last 30 s) reads as none.
-- **Listed beside the skills':** `skill_tools` (through `skills_after`)
-  adds each running app's tools after the skills', as their tools file says
-  them. Each goes by a name of its own, `<app>_<tool>` (the app's name with
-  `-` as `_`: `gym_coach_set_plan`), so it is never one of a skill's names
-  by accident and the journal says whose it is. With `use_skill` (the
-  product) it is the `skill` value, not a function name, so the link's
-  48-byte name bound matters only without it: there the longest would be
-  24 + 1 + 24 = 49 bytes, so the Store holds an app's name and a tool's
-  name to 47 bytes together.
+- **Which app:** only the running app, the one with a session open, as
+  lamp-control tells the voice on a new bus topic, `apps/tools`, at each
+  change and every 5 s, as `apps/triggers` does: the app's checked name,
+  its title and its tools file as checked. Once a result carries `tools`
+  (rule 5 below), only those are offered until the next result. An app
+  that stops is gone from the next request; an expired `apps/tools`
+  (declared to last 30 s) reads as none.
+- **A section of their own, never `use_skill`'s** (Heron's answer of 20:40
+  on #8386 to the first builder's 20:39). `use_skill`'s "Your skills"
+  section is at about 4,066 of its 4,096 bytes (`SECTION_MOST_BYTES`,
+  measured on #8375): one more line cuts `wellbeing_nudges` again, as train
+  1182 failed. So the app's tools get a section of their own in the
+  instruction, under its own bound, **`APP_SECTION_MOST_BYTES` = 1,024
+  bytes**, and nothing is added to `use_skill`'s section or to `use_skill`
+  itself. With no app running, there is no section at all.
+  - 1,024 bytes over 8 tools is about 120 bytes a line, so the Store's cap
+    on a tool's description is **100 characters** (above).
+  - A tool whose line doesn't fit whole is not offered, and the journal
+    names it, never its description.
+  - Raising 4,096 instead was not chosen: it needs the prompt budget on
+    the shipped route read first, and the dates don't need it.
+- **Each tool a declared function of its own,** `<app>_<tool>` (the app's
+  name with `-` as `_`: `gym_coach_set_plan`), with its JSON schema as its
+  `parameters`, declared the way `use_skill` is. So the bound above is on
+  the listed lines; each schema's size is held by the Store's 1,024-byte
+  cap. The name is never one of a skill's by accident, and the journal
+  says whose it is. The longest would be 24 + 1 + 24 = 49 bytes, one past
+  the link's 48, so the Store holds an app's name and a tool's name to 47
+  bytes together. A call of one takes a new route, `Route::App`.
 - **The clash rules are the skills':** a name the voice, the executive or a
   skill already gave is the earlier one's, and the app's tool is left out
-  of the session with one journal line naming it (`skills_after`'s own
-  order). At the 32-function bound an app's tools are never core and are
-  cut first, the last first (`fit`). Under "Your skills" an app's lines are
-  shortened before a core skill's (`use_skill::section`).
-- **Routed by `use_skill`:** with `LAMP_USE_SKILL=on`, an app's tool is one
-  of `use_skill`'s `skill` names. `use_skill` today carries only `choice`,
-  `flag`, `kind` and `about`, which a skill's tool needs; an app's tool
-  takes typed fields, so `use_skill` gains an `args` object, declared only
-  when an app's tool is offered (with none, the function is as before, byte
-  for byte, as `kind` was added). The line under "Your skills" names the
-  tool's fields and their ranges. `use_skill::translate` makes the call the
-  tool's own; a new route, `Route::App`, sends it on. Without
-  `LAMP_USE_SKILL`, each app tool is a function of its own, as a skill's is.
+  with one journal line naming it. At the second route's function bound
+  (`second_provider::MAX_TOOLS`, 64) an app's functions are never core and
+  are cut first, the last first.
+- **Tests at build:** every product skill's line stays whole in
+  `use_skill`'s section with a full 8-tool app section present (the
+  current `every_product_skill_s_line_is_whole_in_use_skill_s_section`
+  plus an 8-tool app); a 9th tool, or one past the 1,024-byte bound, is not
+  offered.
 - **Arguments checked in code** before anything is sent: against the tool's
   own schema subset (the link does not check them), every required field
   there, no other field, each value in its enum or range. A call that fails
@@ -473,8 +481,8 @@ From the first builder's 18:14 on #8386; P1, a multi-day piece.
 2. **Heron, in this order:** #7689's (b) first (care safety, small, P1); then
    tonight's stopgap (an app's spoken line in the turn history, behind
    `LAMP_APP_MEMORY`); then the voice's side once this design lands:
-   `skill_tools` listing a running app's tools beside the skills',
-   `use_skill` routing them, with Heron's four bounds of 18:12 (quoted,
+   the running app's tools as declared functions in a section of their
+   own (`APP_SECTION_MOST_BYTES`), with Heron's four bounds of 18:12 (quoted,
    never instruction; bounded text; never into memory or the summary;
    held in the care hold).
 3. **Eighth:** lamp-control's `apps/tools`, `app.call` and `app.answer`,
@@ -487,10 +495,11 @@ From the first builder's 18:14 on #8386; P1, a multi-day piece.
 
 Heron's six, **decided** in Heron's read (18:23 on #8406), and written
 into the sections above:
-- **The name:** `<app>_<tool>`, as `use_skill`'s `skill` value.
-- **`args` on `use_skill`:** yes, declared only when an app tool is
-  offered, each field checked in code. Functions of their own would use up
-  the 32 too fast.
+- **The name:** `<app>_<tool>`.
+- **How it is offered:** first an `args` object on `use_skill`; replaced at
+  20:40 on #8386 (Heron, on the first builder's 20:39) by a section of the
+  app's own, each tool a declared function, since `use_skill`'s section is
+  full.
 - **The route:** the second route only, in the first build.
 - **The care hold:** every app tool refused for the whole hold, reads too.
 - **The grant:** `hear`, plus the install page's "Lamp may pass what you say
