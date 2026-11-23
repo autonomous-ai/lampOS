@@ -234,6 +234,15 @@ against ElevenLabs' own service.
   right now, so I'm back to my own voice.", never silent; every piece after
   goes to the lamp's voice until the voice restarts, and `voice-keys` tells
   `lamp-health` "your ElevenLabs key was refused, using the lamp's own".
+  Once per process, whichever piece or voice sees the refusal first (one
+  shared state, `net::tts::OwnVoiceLost`; #8394's lamp row saw one 401
+  journalled three times in 11 ms): one journal line, "ElevenLabs refused
+  the person's own key or voice (HTTP <status>); the lamp's own voice from
+  now on", and the notice said once, with its own line, "the person's
+  ElevenLabs voice isn't working: told once, in the lamp's own voice", with
+  the first answer's piece after it, never a line rendered ahead with no
+  turn (the Start's, kept for later). A piece asked again over HTTP
+  (`speak_fresh`) takes the same path.
 - **Off:** the kinds are "not on this lamp", the helper refuses, and the
   voice reads neither file, so the route is as it was.
 - **Test lamps only, `LAMP_OWN_ELEVENLABS_URL` (#8394's lamp row):** an
@@ -269,7 +278,8 @@ against ElevenLabs' own service.
 (`the_persons_elevenlabs_key_and_voice_speak_in_place_of_the_lamps`,
 `a_test_lamps_switch_sends_the_persons_voice_to_its_address`) and
 `crates/voice/src/second_provider/net/tts.rs`
-(`a_refused_own_voice_falls_back_to_the_lamps_with_one_line`),
+(`a_refused_own_voice_falls_back_to_the_lamps_with_one_line`,
+`a_refusal_seen_by_many_pieces_and_voices_is_said_once`),
 `crates/voice/src/second_provider/probe.rs`
 (`an_own_voice_key_is_never_sent_to_the_relay`) and
 `crates/voice/src/second_provider/worker.rs`
