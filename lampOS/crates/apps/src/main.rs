@@ -3,14 +3,14 @@
 //! `lamp-apps-manage start-all`: the boot start. Both run only with `LAMP_STORE_APPS=on`
 //! in their own environment (a list excepted).
 use lamp_apps::{
-    ask::{MOST_LINE, Parts, answer, build_sequence},
+    ask::{MOST_LINE, Parts, answer, answer_door, build_sequence},
     client::AdminYes,
     effects::RealEffects,
     launcher,
     layout::Layout,
     lock::Running,
     manage::start_all,
-    peer::{NOT_AN_ASKER, READ_WITHIN, peer_of, peer_ok, set_read_timeout},
+    peer::{NOT_AN_ASKER, READ_WITHIN, door_ok, peer_of, peer_ok, set_read_timeout},
     real::{SkillsFolder, uid_in},
     skills_reader::SkillsReader,
     sweep::sweep,
@@ -35,15 +35,21 @@ fn main() -> ExitCode {
     };
     match args.first().map(String::as_str) {
         Some("asked") => {
-            // Only lamp-cloud and the voice, always: by their cgroup and their user, before a
-            // byte is read. There is no switch, flag or variable that skips this.
+            // Only lamp-cloud and the voice, always, and lamp-control for a paired computer's
+            // pushed apps alone: by their cgroup and their user, before a byte is read. There is
+            // no switch, flag or variable that skips this.
             let owner = std::fs::read_to_string("/etc/passwd")
                 .ok()
                 .and_then(|p| uid_in(&p, "lampos"))
                 .unwrap_or(u32::MAX);
-            let allowed =
-                peer_of(std::io::stdin()).is_ok_and(|peer| peer_ok(peer.uid, owner, &peer.cgroup));
-            if !allowed {
+            let peer = peer_of(std::io::stdin());
+            let asker = peer
+                .as_ref()
+                .is_ok_and(|peer| peer_ok(peer.uid, owner, &peer.cgroup));
+            let door = peer
+                .as_ref()
+                .is_ok_and(|peer| door_ok(peer.uid, owner, &peer.cgroup));
+            if !asker && !door {
                 println!("{}", json!({"refused": NOT_AN_ASKER}));
                 return ExitCode::FAILURE;
             }
@@ -94,7 +100,13 @@ fn main() -> ExitCode {
                 println!("{}", json!({"refused": format!("the launcher: {why}")}));
                 return ExitCode::FAILURE;
             }
-            println!("{}", answer(on(), &line, &mut parts));
+            // lamp-control asks only the door's verbs, and they are asked by nobody else.
+            let said = if door {
+                answer_door(on(), &line, &mut parts)
+            } else {
+                answer(on(), &line, &mut parts)
+            };
+            println!("{said}");
             ExitCode::SUCCESS
         }
         Some("folders") => {

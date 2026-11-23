@@ -218,6 +218,33 @@ fn an_unsigned_or_wrongly_signed_package_is_refused_before_the_manifest_is_read(
 }
 
 #[test]
+fn a_pushed_package_is_unsigned_and_otherwise_held_to_every_check() {
+    let files = good_files();
+    let manifest = good_manifest(&files);
+    let unsigned = tar("english-lessons", &manifest, &files, None);
+    let package = app_package::read_pushed_app_package_bytes(&unsigned).unwrap();
+    assert_eq!(package.signed_by, app_package::UNSIGNED);
+    assert_eq!(package.sha256, sha256_hex(&unsigned));
+    // A signed one, even the Store's, is never taken by the pushed path.
+    refused(
+        app_package::read_pushed_app_package_bytes(&good()),
+        "an app pushed from a computer is unsigned",
+    );
+    // Every other rule still holds: a file changed after its listing.
+    let mut changed_files = files.clone();
+    changed_files[1].1 = b"print('changed')\n".to_vec();
+    refused(
+        app_package::read_pushed_app_package_bytes(&tar(
+            "english-lessons",
+            &manifest,
+            &changed_files,
+            None,
+        )),
+        "its size or sha256",
+    );
+}
+
+#[test]
 fn a_format_one_lamp_says_what_it_always_said_of_a_format_two_package() {
     let why = package::read_package_bytes(&good(), None).unwrap_err();
     assert!(

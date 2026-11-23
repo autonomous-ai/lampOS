@@ -214,6 +214,10 @@ impl crate::package::PackageReader for StubReader {
     fn read(&self, _bytes: &[u8]) -> Result<AppPackage, String> {
         Ok(self.package.clone())
     }
+
+    fn read_pushed(&self, _bytes: &[u8]) -> Result<AppPackage, String> {
+        Ok(self.package.clone())
+    }
 }
 
 /// What nine's `AppManifest` will say, as plain fields.

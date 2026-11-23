@@ -4083,6 +4083,45 @@ mod tests {
         );
     }
 
+    /// #8351: app push in the product. The door passes `--apps-manage-socket`
+    /// at the very socket the apps' helper listens on, is ordered after it,
+    /// and may write the staging folder the helper reads pushed packages from.
+    #[test]
+    fn the_door_passes_the_apps_manage_socket_and_may_stage_a_pushed_app() {
+        let unit = |wanted: &str| {
+            PRODUCT
+                .iter()
+                .find(|(name, _)| *name == wanted)
+                .map(|(_, text)| *text)
+                .unwrap_or_else(|| panic!("{wanted} is not installed"))
+        };
+        let listen = unit("lamp-apps-manage.socket")
+            .lines()
+            .find_map(|line| line.strip_prefix("ListenStream="))
+            .expect("the apps' manage socket's ListenStream");
+        let control = unit("lamp-control.service");
+        let exec = control
+            .lines()
+            .find(|line| line.starts_with("ExecStart="))
+            .expect("lamp-control's ExecStart");
+        let words: Vec<&str> = exec.split_whitespace().collect();
+        let manage = words
+            .windows(2)
+            .find(|pair| pair[0] == "--apps-manage-socket")
+            .map(|pair| pair[1]);
+        assert_eq!(manage, Some(listen), "{exec}");
+        assert!(
+            control
+                .lines()
+                .find(|line| line.starts_with("After="))
+                .is_some_and(|after| after
+                    .split_whitespace()
+                    .any(|unit| unit == "lamp-apps-manage.socket")),
+            "lamp-control is ordered after the apps' manage socket"
+        );
+        assert!(control.contains("\nReadWritePaths=-/var/lib/lampos-apps-staging\n"));
+    }
+
     /// #2853: every unit in `deploy/product/` is in the install list, so a
     /// lamp gets it with an update and no hand step, or is named here with
     /// why it is not yet; every socket installed is enabled.

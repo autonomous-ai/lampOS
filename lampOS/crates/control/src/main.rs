@@ -271,6 +271,19 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     if manage.is_some() {
         door = door.with_push_folder(state.clone());
     }
+    // App push (docs/apps.md, "An app from your own computer"): on with the
+    // apps' helper's socket, the packages staged where lamp-cloud stages a
+    // Store one (`--apps-staging`, for a test), and only with LAMP_STORE_APPS=on.
+    let apps_manage = option(arguments, "--apps-manage-socket").map(PathBuf::from);
+    if apps_manage.is_some() {
+        door = door.with_app_push(
+            option(arguments, "--apps-staging").map_or_else(
+                || PathBuf::from(lamp_control::push::APPS_STAGING),
+                PathBuf::from,
+            ),
+            lamp_control::app_push::on(),
+        );
+    }
     let body = option(arguments, "--mood-socket").map(PathBuf::from);
     let say = option(arguments, "--say-socket").map(PathBuf::from);
     // A computer's own clips: kept in the state folder's `sounds`, which
@@ -561,6 +574,9 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     });
     if let Some(manage) = manage {
         shared.set_manage_socket(manage);
+    }
+    if let Some(apps_manage) = apps_manage {
+        shared.set_apps_manage_socket(apps_manage);
     }
     // The owner's yeses to skills' tasks (#6305), in its own state folder,
     // which lamp-skills can't write (`lamp_control::task_yes`).

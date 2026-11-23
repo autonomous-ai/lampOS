@@ -64,6 +64,12 @@ pub const SKILL_PART_MAX_CHARS: usize = 48 * 1024;
 pub const SKILL_PARTS_MAX: u32 = 32;
 /// The longest skill name, as the skill format has it.
 pub const SKILL_NAME_MAX_CHARS: usize = 64;
+/// A pushed app package's largest size, in bytes (docs/apps.md, "An app
+/// from your own computer"): 4 MiB, well under a Store package's 18 MiB,
+/// held in the door's memory while it is gathered.
+pub const APP_PACKAGE_MAX: usize = 4 << 20;
+/// The most parts one `app.push` is sent in: 4 MiB in parts of 36 KiB.
+pub const APP_PARTS_MAX: u32 = 128;
 
 /// The longest `pose` JPEG, in bytes: 150 KiB, the same bound as lamp-npu's
 /// `service::MOST_JPEG_BYTES`, so a 640x480 camera frame at high quality fits.
@@ -732,6 +738,25 @@ pub enum Op {
     /// One of the client's own pushed skills, taken off.
     #[serde(rename = "skill.remove")]
     SkillRemove { name: String },
+    /// One part of an app's package (format 2, unsigned), sent in order
+    /// from 0, as `skill.push`'s; the last part's answer comes once the
+    /// apps' helper installed it (docs/apps.md, "An app from your own
+    /// computer").
+    #[serde(rename = "app.push")]
+    AppPush {
+        name: String,
+        sha256: String,
+        size: usize,
+        part: u32,
+        parts: u32,
+        data: String,
+    },
+    /// The client's own pushed apps.
+    #[serde(rename = "app.list")]
+    AppList {},
+    /// One of the client's own pushed apps, removed.
+    #[serde(rename = "app.remove")]
+    AppRemove { name: String },
     /// The camera's newest picture, once: a JPEG, as the eyes keep it.
     #[serde(rename = "camera.snapshot")]
     CameraSnapshot {},
@@ -838,9 +863,14 @@ impl Op {
             // A turn speaks and hears what is said to the lamp.
             Self::TurnStart { .. } => vec![Grant::Speak, Grant::Hear],
             Self::ListenSet { .. } => vec![Grant::Hear],
-            Self::SkillPush { .. } | Self::SkillList {} | Self::SkillRemove { .. } => {
-                vec![Grant::Skills]
-            }
+            // A computer's own software on the lamp, running after it goes:
+            // a skill or an app, the one grant the owner ticks for it.
+            Self::SkillPush { .. }
+            | Self::SkillList {}
+            | Self::SkillRemove { .. }
+            | Self::AppPush { .. }
+            | Self::AppList {}
+            | Self::AppRemove { .. } => vec![Grant::Skills],
             // A pose is of a camera's picture: the camera's own grant.
             Self::CameraSnapshot {} | Self::CameraStream { .. } | Self::Pose { .. } => {
                 vec![Grant::Camera]
@@ -973,6 +1003,33 @@ impl Op {
                 }
             }
             Self::SkillRemove { name } => skill_name(name)?,
+            Self::AppPush {
+                name,
+                sha256,
+                size,
+                part,
+                parts,
+                data,
+            } => {
+                app_name(name)?;
+                if sha256.len() != 64 || !sha256.bytes().all(|b| b.is_ascii_hexdigit()) {
+                    return Err("sha256: the package's SHA-256, 64 hex".to_owned());
+                }
+                if *size == 0 || *size > APP_PACKAGE_MAX {
+                    return Err(format!("size: 1 to {APP_PACKAGE_MAX} bytes"));
+                }
+                if *parts == 0 || *parts > APP_PARTS_MAX || part >= parts {
+                    return Err(format!(
+                        "parts: 1 to {APP_PARTS_MAX}, and part from 0 to parts - 1"
+                    ));
+                }
+                if data.is_empty() || data.len() > SKILL_PART_MAX_CHARS {
+                    return Err(format!(
+                        "data: 1 to {SKILL_PART_MAX_CHARS} characters of base64"
+                    ));
+                }
+            }
+            Self::AppRemove { name } => app_name(name)?,
             Self::Pose { jpeg } => {
                 if jpeg.is_empty()
                     || jpeg.len() > POSE_JPEG_MAX_CHARS
@@ -1210,6 +1267,7 @@ impl Op {
             | Self::ListenSet { .. }
             | Self::Stop {}
             | Self::SkillList {}
+            | Self::AppList {}
             | Self::SoundList {}
             | Self::CameraSnapshot {}
             | Self::MicrophoneStream { .. }
@@ -1457,6 +1515,14 @@ pub fn lease_event(lease: &str, state: LeaseState, why: Option<LeaseWhy>) -> Val
 /// Whether `text` is standard base64 of exactly `bytes` bytes, padded.
 /// A skill's name as the skill format has it: 1 to 64 of `a-z`, `0-9`
 /// and `-`.
+/// An app's name, as the manifest has it (`^[a-z][a-z0-9-]{0,23}$`).
+fn app_name(name: &str) -> Result<(), String> {
+    if !lamp_skills::app_package::app_name_ok(name) {
+        return Err("name: an app's, a-z first, then up to 23 of a-z, 0-9 and -".to_owned());
+    }
+    Ok(())
+}
+
 fn skill_name(name: &str) -> Result<(), String> {
     if name.is_empty()
         || name.len() > SKILL_NAME_MAX_CHARS
