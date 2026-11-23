@@ -1988,7 +1988,10 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   runs only once you agree.", `skill_task_yes::asked_aloud`). It refuses,
   and nothing is said, in the lamp's quiet hours
   (`lamp_local_time::quiet_hours`; with `LAMP_TOLD_WHEN_ASKED=on`, not when
-  the owner asked for that skill by voice within five minutes, below),
+  the owner asked for that skill by voice within five minutes, below, the
+  ask found under the skill's name or its tool, as it is kept under the
+  function the call named, `skill_task_yes::asked_by_voice_in`; #8437's
+  row on lamp-ee17 found a skill whose tool is not its name refused),
   outside `LAMP_PRIVATE_ROOM` unless the
   owner is seen alone (as a run's write is read back,
   `run_write_yes::read_back_allowed_now`), with the switch off, or once

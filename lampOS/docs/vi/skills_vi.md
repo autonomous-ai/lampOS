@@ -6261,7 +6261,10 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   lamp-control, rồi dựng đúng câu nói lại như khi được hỏi
   (`skill_task_yes::asked_aloud`). Nó từ chối, không nói gì, trong giờ yên
   lặng của đèn (với `LAMP_TOLD_WHEN_ASKED=on` thì không, khi chủ đèn vừa
-  nhờ kỹ năng đó bằng giọng nói trong vòng năm phút, xem bên dưới), ngoài
+  nhờ kỹ năng đó bằng giọng nói trong vòng năm phút, xem bên dưới; lời nhờ
+  được tìm theo tên kỹ năng hoặc `tool` của nó, vì nó được ghi dưới tên hàm
+  mà lời gọi nêu, `skill_task_yes::asked_by_voice_in`; row của #8437 trên
+  lamp-ee17 thấy một kỹ năng có tool khác tên bị từ chối), ngoài
   `LAMP_PRIVATE_ROOM` khi không thấy chủ đèn ở một mình,
   khi công tắc tắt, hoặc khi đã đồng ý. Nếu không, câu nói đi qua mọi cổng
   của một say của kỹ năng, như lượt riêng của đèn mà không ai nói. Ghi chú
