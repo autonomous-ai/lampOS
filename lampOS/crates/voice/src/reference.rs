@@ -18,7 +18,7 @@
 //! [`ReferenceAssembly::recovering`]: see [`recovery`].
 pub mod hold;
 mod prime;
-pub use prime::PrimeBarrier;
+pub use prime::{PrimeBarrier, barrier_us};
 mod recovery;
 pub use recovery::Policy as RecoveryPolicy;
 
