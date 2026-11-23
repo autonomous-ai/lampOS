@@ -3803,22 +3803,28 @@ fn settle_looks(runs: &Runs) -> usize {
     looks.len()
 }
 
-/// The install run at `at_unix_ms` on a lamp the round asked it of, its
-/// gateway started at `began` (`@SECONDS`, or empty: not said) and not
-/// listening for `quiet` looks.
-fn install_settling(began: &str, quiet: u32, at_unix_ms: u64) -> usize {
+/// The install run on a lamp the round asked it of, its gateway started
+/// `began` seconds ago (none: not said) and not listening for `quiet`
+/// looks.
+fn install_settling(began: Option<u64>, quiet: u32) -> usize {
     let lamp = Lamp::new();
     lamp.harness_there();
     round(&lamp, &mut Fake::default(), true, 10);
     let runs = Runs::new(&lamp);
     *runs.not_listening.borrow_mut() = quiet;
-    *runs.began.borrow_mut() = began.to_owned();
+    *runs.began.borrow_mut() = began.map_or_else(String::new, |ago| {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        format!("@{}\n", now - ago)
+    });
     let mut run = runs.runner();
     let said = install_with(
         lamp.root(),
         &lamp.records(),
         &mut run,
-        &mut || at_unix_ms,
+        &mut || 20,
         &mut quiet(),
         &kit(),
     )
@@ -3836,12 +3842,10 @@ fn install_settling(began: &str, quiet: u32, at_unix_ms: u64) -> usize {
 /// past that listen): 71 looks 2 s apart, all before its one restart.
 #[test]
 fn the_install_never_restarts_a_gateway_at_its_first_listen() {
-    let now = 1_000_000_000_000;
-    let ten_s_ago = format!("@{}\n", now / 1000 - 10);
-    assert_eq!(install_settling(&ten_s_ago, 3, now), 71);
+    assert_eq!(install_settling(Some(10), 3), 71);
     // Listening already, 10 s into its start (the stop right at first
     // listen): still waited out to 150 s from the start.
-    assert_eq!(install_settling(&ten_s_ago, 0, now), 71);
+    assert_eq!(install_settling(Some(10), 0), 71);
 }
 
 /// #8324: a gateway started long ago and listening is restarted at once;

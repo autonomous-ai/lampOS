@@ -2004,7 +2004,7 @@ fn steps(
     if let Err(why) = run(&["systemctl", "reset-failed", UNIT].map(str::to_owned)) {
         say(&format!("{UNIT} not reset-failed: {why}"));
     }
-    settled(run, now_unix_ms(), say);
+    settled(run, say);
     if let Err(why) = run(&["systemctl", "restart", UNIT].map(str::to_owned)) {
         return fail("gateway", format!("systemctl restart {UNIT}: {why}"), say);
     }
@@ -2204,7 +2204,10 @@ const SETTLE_SLEEP: Duration = if cfg!(test) {
 /// `gateway_on`, a lamp-control restart or a boot. A gateway not running,
 /// or a listen not readable, waits for nothing; listening at the first look
 /// with its start not said, it is restarted at once.
-fn settled(run: &mut Runner, now_unix_ms: u64, say: &mut dyn FnMut(&str)) {
+fn settled(run: &mut Runner, say: &mut dyn FnMut(&str)) {
+    let now_unix_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64);
     if !gateway_active(run) {
         return;
     }
