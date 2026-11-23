@@ -1894,7 +1894,28 @@ fn current(turns: Vec<Turn>) -> Snapshot {
     Snapshot {
         turns,
         status: ReadStatus::Current,
+        since_unix_ms: None,
     }
+}
+
+/// After a voice restart the voice counts its turns from 1 again: the new
+/// session's record of turn 3 never lands on an older card of request 3,
+/// whose timings, outcome and status stay its own.
+#[test]
+fn a_record_joins_only_a_card_of_its_own_voice_session() {
+    let entries = [card_turn(3, 1_000, 900, false)];
+    let mut record = card_record(3, 400, "failed");
+    record.audio_ms = Some(1_234);
+    let mut records = current(vec![record]);
+    let joined = page::timeline(&entries, &records, false);
+    assert!(joined.contains("first audio 1234 ms"), "{joined}");
+    assert!(joined.contains("ERROR"), "{joined}");
+    records.since_unix_ms = Some(5_000);
+    let html = page::timeline(&entries, &records, false);
+    assert!(!html.contains("first audio 1234 ms"), "{html}");
+    assert!(!html.contains("ERROR"), "{html}");
+    assert!(!html.contains("⚡"), "{html}");
+    assert!(html.contains("DONE"), "{html}");
 }
 
 /// V1's thresholds (#7208 step 2, `docs/flow-monitor.md`): ⏱ green to
