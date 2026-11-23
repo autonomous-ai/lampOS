@@ -1649,4 +1649,98 @@ mod tests {
             let _ = fs::remove_dir_all(&folder);
         }
     }
+
+    /// #8420: Anthropic's check is one request to its fixed API, `GET
+    /// /models/<model>` with the key as `x-api-key` and `anthropic-version:
+    /// 2023-06-01`, never a bearer: its model read takes no bearer (seen
+    /// live on 24 Nov with a made-up key: 401, `authentication_error`,
+    /// "invalid x-api-key"). Any 2xx is the model, an alias answered by its
+    /// dated id; 404 is no such model; 401 and 403 refuse the key; anything
+    /// else is unreached. The key is never said back.
+    #[test]
+    fn an_anthropic_check_reads_the_one_model_with_its_own_headers() {
+        fn reply(status: u16, body: &str) -> String {
+            format!(
+                "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            )
+        }
+        /// The real check, sent to the local server in place of Anthropic.
+        struct Local(String);
+        impl Check for Local {
+            fn check(&mut self, given: &Given) -> Verdict {
+                assert_eq!(
+                    given.base_url.as_deref(),
+                    Some("https://api.anthropic.com/v1")
+                );
+                let local = Given {
+                    base_url: Some(self.0.clone()),
+                    ..given.clone()
+                };
+                HttpCheck::local(String::new()).check(&local)
+            }
+        }
+        let live_401 = r#"{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"},"request_id":"req_made_up"}"#;
+        let line =
+            json!({"set": "anthropic", "key": "sk-ant-made-up-8420", "model": "claude-sonnet-4-5"})
+                .to_string();
+        for (served, code) in [
+            (
+                reply(
+                    200,
+                    r#"{"type":"model","id":"claude-sonnet-4-5-20250929","display_name":"Claude Sonnet 4.5","created_at":"2025-09-29T00:00:00Z"}"#,
+                ),
+                "works",
+            ),
+            (
+                reply(
+                    404,
+                    r#"{"type":"error","error":{"type":"not_found_error","message":"model: claude-sonnet-4-5"}}"#,
+                ),
+                "bad_field",
+            ),
+            (reply(401, live_401), "refused"),
+            (
+                reply(
+                    403,
+                    r#"{"type":"error","error":{"type":"permission_error","message":"no"}}"#,
+                ),
+                "refused",
+            ),
+            (reply(400, r#"{"type":"error"}"#), "unreached"),
+            (reply(529, r#"{"type":"error"}"#), "unreached"),
+        ] {
+            let (base, served) = answering_with(&served);
+            let folder = std::env::temp_dir().join(format!(
+                "lamp-setup-keys-anthropic-{code}-{}",
+                std::process::id()
+            ));
+            let _ = fs::remove_dir_all(&folder);
+            let store = Store(folder.join("own"));
+            let (reply, done) = answer(&line, &store, &mut Local(format!("{base}/v1")), true);
+            assert!(done.is_some(), "the check never ran: {reply}");
+            let asked = served.join().unwrap();
+            assert!(
+                asked.starts_with("get /v1/models/claude-sonnet-4-5 http/1.1"),
+                "{asked}"
+            );
+            assert!(asked.contains("x-api-key: sk-ant-made-up-8420"), "{asked}");
+            assert!(asked.contains("anthropic-version: 2023-06-01"), "{asked}");
+            assert!(!asked.contains("authorization"), "{asked}");
+            let said = done.unwrap().said;
+            assert!(!reply.to_string().contains("made-up"), "{reply}");
+            assert!(!said.contains("made-up"), "{said}");
+            if code == "works" {
+                assert_eq!(reply["done"]["code"], "works", "{reply}");
+                assert!(store.0.join("anthropic.key").is_file());
+            } else {
+                assert_eq!(reply["code"], code, "{reply}");
+                assert!(!store.0.join("anthropic.key").exists());
+            }
+            if code == "bad_field" {
+                assert_eq!(reply["refused"], "Anthropic has no model by that name");
+            }
+            let _ = fs::remove_dir_all(&folder);
+        }
+    }
 }
