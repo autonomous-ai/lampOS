@@ -77,6 +77,43 @@ class Row(unittest.TestCase):
                 "lamp row for #8218 on lamp-52e6 build 12701: PASS") + J
         self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8218"), "row")
 
+    def test_a_quoted_earlier_lamp_row_does_not_clear_a_real_fail(self):
+        # SubDarren's P3 on #8293: a blockquoted old "lamp row … PASS" above a real "lamp row …: FAIL" is no row. This
+        # pins row_line's quoted() check: with it dropped, the quoted PASS line is taken as the row line.
+        body = ("Re-run notes.\n> lamp row for #8218 on lamp-52e6 build 12701: PASS (yesterday)\n\n"
+                "lamp row for #8218 on lamp-52e6 build 12701: FAIL on leg 2") + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8218"), "none")
+
+    def test_verdict_first_row_lines_count(self):
+        # 23 Nov: three passed PRs (#8306, #8314, #8302) missed gate A because the bot read none of these as a row.
+        for body in ("ROW PASS: #8306 %s (kit-8306b), lamp-52e6, build 15543 e1f55d813a, 03:21-03:26." % HEAD,
+                     "ROW PASS #8306 %s on lamp-52e6 build 15543" % HEAD[:10],
+                     "**ROW PASS**: #8306 on lamp-52e6 build 15543",
+                     "ROW #8294 via #8306 (head %s) on lamp-52e6 build 15543 (e1f55d813a): PASS" % HEAD[:10],
+                     "ROW PASS %s\nSeventh, 01:06 GMT+7 (lamp-52e6 on 15543 e1f55d813a)" % HEAD,
+                     "ROW PASS %s\nSeventh (lamp-52e6 on 15543)" % EARLIER):
+            self.assertEqual(rows([c("writer-a", body + J)], [HEAD, EARLIER], W, "8306"), "row", body)
+
+    def test_a_verdict_first_row_line_still_names_this_pr(self):
+        for body in ("ROW PASS: #8307 %s on lamp-52e6 build 15543" % HEAD,
+                     "ROW #8294 via #8307 on lamp-52e6 build 15543: PASS",
+                     "ROW PASS %s on lamp-52e6 build 15543" % OTHER,
+                     "ROW PASS on lamp-52e6 build 15543",
+                     "ROW %s on lamp-52e6 build 15543: PASS" % HEAD[:10]):
+            self.assertEqual(rows([c("writer-a", body + J)], HEAD, W, "8306"), "none", body)
+
+    def test_a_verdict_first_fail_or_void_is_no_row(self):
+        for body in ("ROW FAIL %s on lamp-52e6 build 15543" % HEAD,
+                     "ROW FAIL: #8306 %s on lamp-52e6 build 15543 (leg B)" % HEAD,
+                     "ROW VOID: #8306 on lamp-52e6 build 15543, nothing judged",
+                     "ROW FAILED #8306 on lamp-52e6 build 15543"):
+            self.assertEqual(rows([c("writer-a", body + J)], HEAD, W, "8306"), "none", body)
+
+    def test_a_verdict_first_switch_on_row_at_another_patch_is_stale(self):
+        body = "ROW PASS: #8306 %s on lamp-52e6 build 15543" % EARLIER + J
+        self.assertEqual(rows([c("writer-a", body)], HEAD, W, "8306", switch_on=True), "row-stale " + EARLIER[:10])
+        self.assertEqual(rows([c("writer-a", body)], [HEAD, EARLIER], W, "8306", switch_on=True), "row")
+
     def test_failed_voided_and_fails_are_no_row(self):
         # 14 Nov (the second reader's P2 on #7041).
         for body in ("ROW #7041 abc FAILED on build 5", "ROW #7041 abc VOIDED", "ROW #7041 abc: FAILS the timer line",
