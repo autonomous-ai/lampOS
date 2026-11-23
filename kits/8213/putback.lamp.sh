@@ -24,4 +24,14 @@ echo "LINE $(line)"; product_line || why="$why line-not-product"
 D=$(dropins); [ -n "$D" ] && { echo "$D"; why="$why drop-ins-left"; }
 [ -e $CH ] && why="$why $CH-left"
 echo "KEYPUB $(sha256sum /etc/lampOS/update/key.pub | cut -c1-16) (compare with logs/pre.txt's)"
+# 23 Nov ee17: a kept session the legs opened stayed WORKING, and lamp-tasks retried "harness close" every ~4 s,
+# blocking the next builder's queue. Close it for good (`--now`) and prove no close loop remains.
+closes(){ journalctl -u lamp-tasks --since "-${1}s" --no-pager -o cat | grep -cE 'harness close: exit=1'; }
+if [ "$(closes 30)" -gt 0 ]; then
+  for nm in $(runuser -u lampos -- env HOME=/var/lib/lampos-tasks /usr/local/bin/harness ps --json 2>/dev/null | python3 -I -c 'import json,sys
+d=json.load(sys.stdin); rows=d if isinstance(d,list) else d.get("sessions") or d.get("rows") or []
+print(" ".join(r.get("name","") for r in rows if "one-session" in (r.get("folder") or "")))' 2>/dev/null); do
+    echo "KEPT_CLOSE $nm: $(runuser -u lampos -- env HOME=/var/lib/lampos-tasks /usr/local/bin/harness close "$nm" --now 2>&1 | tail -1 | cut -c1-120)"; done
+  sleep 20; fi
+c=$(closes 15); echo "CLOSE_LOOP $c failed close(s) in the last 15 s"; [ "$c" -eq 0 ] || why="$why close-loop"
 [ -z "$why" ] && echo "PUTBACK OK" || echo "PUTBACK NOT CLEAN:$why"
