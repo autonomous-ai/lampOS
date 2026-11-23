@@ -3236,6 +3236,8 @@ fn second_route_worker_environment(
         crate::second_config::DEEPSEEK_BASE_URL_ENV,
         crate::second_config::SPEECH_BASE_URL_ENV,
         crate::second_config::LISTENING_BASE_URL_ENV,
+        // A test lamp's address for the person's own ElevenLabs voice (#8394).
+        lamp_msgs::own_voice::ENVIRONMENT,
         // A desktop-only switch (never in a product unit): plain loopback
         // addresses for the two addresses above, checked by the worker.
         crate::second_config::LOOPBACK_SERVICES_ENV,
@@ -4938,6 +4940,8 @@ mod tests {
                     || name == crate::second_config::LISTENING_BASE_URL_ENV
                 {
                     "https://near.example.invalid/ai"
+                } else if name == lamp_msgs::own_voice::ENVIRONMENT {
+                    "https://relay.example.invalid/api/v1/ai"
                 } else if name == crate::second_config::LOOPBACK_SERVICES_ENV {
                     "on"
                 } else if name == crate::second_config::SPEECH_MODEL_ENV {
@@ -5328,6 +5332,7 @@ mod tests {
                     "LAMP_OPENS_FURTHER=on",
                     "LAMP_OWNER_LINK=on",
                     "LAMP_OWNER_PLACE=on",
+                    "LAMP_OWN_ELEVENLABS_URL=https://relay.example.invalid/api/v1/ai",
                     "LAMP_OWN_KEYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PERSON_NAME_BY_DEFAULT=on",
