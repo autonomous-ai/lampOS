@@ -190,9 +190,9 @@ retirement as `turn_lost`. With no recording provisioned the turn is
 `Skipped` and the lamp is silent, as before.
 
 **In a long outage, the line every time (#8235, `LAMP_OUTAGE_LINE_AGAIN=on`,
-off in the product).** Seen on lamp-06c1 on 21 November: in one 48-minute
-outage the line played twice and 75 turns let through after the lamp's name
-ended in nothing. With the switch, every speech turn of an outage says the
+on in the product beside `LAMP_OFFLINE_VOICE=on`).** Seen on lamp-06c1 on 21
+November: in one 48-minute outage the line played twice and 75 turns let
+through after the lamp's name ended in nothing. With the switch, every speech turn of an outage says the
 existing line of its cause, not only the first: never silence (the owner's
 call on #8235, 22 November). No time limit is added and no words are new:
 
