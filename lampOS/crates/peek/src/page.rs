@@ -380,6 +380,11 @@ fn status(failed: bool, ended: bool, newest: bool) -> &'static str {
     }
 }
 
+/// Turns where the voice's records can't be read: the bus's turns are
+/// Timeline's cards, so they are shown there once.
+pub const TURNS_IN_TIMELINE: &str = "<p class=\"small\">This lamp's turns come from the bus: \
+     they are the cards in <a href=\"#timeline\">Timeline</a>.</p>";
+
 /// The type icon: someone's words, or the lamp's own.
 fn type_icon(spoken: bool) -> &'static str {
     if spoken { "🎙" } else { "✦" }
@@ -390,14 +395,12 @@ fn type_icon(spoken: bool) -> &'static str {
 /// slowest marked, and how it ended or what held it. Numbers and kinds
 /// only. Where the voice's records can't be read (a product lamp keeps
 /// them `root:root 0700` and peek runs as `lampos`) or are not there, the
-/// bus's turns instead, as the timeline's cards (#7208), words only with
-/// `words`.
-pub fn turns(snapshot: &Snapshot, entries: &[Entry], words: bool) -> String {
+/// bus's turns are the timeline's cards (#7208): Turns points there
+/// instead of drawing the same cards again, which doubled the push and
+/// gave two cards one id, so an opened card closed (`TURNS_IN_TIMELINE`).
+pub fn turns(snapshot: &Snapshot) -> String {
     if from_bus(snapshot.status) {
-        return format!(
-            "<p class=\"small\">Turns from the bus.</p>{}",
-            timeline(entries, snapshot, words)
-        );
+        return TURNS_IN_TIMELINE.to_owned();
     }
     let mut html = read_notice(snapshot.status);
     if snapshot.turns.is_empty() {
@@ -1126,7 +1129,9 @@ fn sign_name(sign: Sign) -> &'static str {
 /// `seconds` as a person reads it: `40 s`, `5 min`, `2 h 10 min`.
 fn span(seconds: u64) -> String {
     match seconds {
-        0..60 => format!("{seconds} s"),
+        // Under a minute says so, not the seconds: a count that changes
+        // every second would make the section new on every push.
+        0..60 => "under a minute".to_owned(),
         60..3600 => format!("{} min", seconds / 60),
         _ => format!("{} h {} min", seconds / 3600, seconds / 60 % 60),
     }
