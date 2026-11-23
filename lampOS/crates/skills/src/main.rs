@@ -6084,7 +6084,6 @@ fn hand_task(
     // the asking conversation only with `LAMP_SKILL_TASK_SURE` (#7363).
     // Asked aloud just now: its yes asked as the lamp's next line (#8414).
     let (asked_at, ask) = lamp_skills::task::take_yes_ask(skill);
-    let by_words = asked_at.is_some();
     let owners = lamp_skills::task::take_asked_by_owner(skill);
     let asked = asked_at.filter(|_| lamp_voice::told_when_asked::on());
     let Some((folder, grants)) = tasks.of.get(skill).cloned() else {
