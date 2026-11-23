@@ -2572,8 +2572,9 @@ fn removed_said(name: &str) -> String {
 
 /// The running program's state folder on a product lamp (its unit's
 /// `--state-dir`), where the skills turned off and the core skills turned
-/// on are kept ([`super::OFF_FILE`], [`super::ON_FILE`]), and the owner's
-/// yes to a skill's camera ([`super::CAMERA_FILE`]).
+/// on are kept ([`super::OFF_FILE`], [`super::ON_FILE`]), the owner's
+/// yes to a skill's camera ([`super::CAMERA_FILE`]), and the one-time
+/// carries made ([`super::CARRIED_FILE`]).
 pub const STATE_DIR: &str = "/var/lib/lampos-skills-state";
 
 /// The owner's yes to the skill `name` seeing the camera's picture kept,

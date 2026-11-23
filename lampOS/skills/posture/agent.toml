@@ -1,0 +1,54 @@
+# Posture's line through the lamp's agent: read only with
+# LAMP_CORE_VIA_AGENT=on (or naming nudges) in lamp-skills and its manage
+# helper (docs/skills.md, "A core skill's line through the lamp's agent");
+# off, nothing reads it. It stands in for skill.toml's grants and [[do]]
+# alone: the trigger, the guards and the timing are skill.toml's own, never
+# copied here. Every [[do]] but a task is skill.toml's, word for word
+# (lamp-skills checks it): the say is the fallback, said at once when the
+# agent's line has not come within 10 s.
+grants = []
+
+[[do]]
+on = "neck"
+task = { task = "One short, kind line, the way a friend would, suggesting they gently bring the head back over the shoulders; say only a while, never a number, name no condition or illness, and never mention a camera.", run = "scripts/agent.py" }
+
+[[do]]
+on = "neck"
+body = { look_at = "face" }
+say = "They have sat a while with their head forward of their shoulders. In one short, kind line, the way a friend would, suggest gently bringing the head back over the shoulders. Say only 'a while', never a number; name no condition or illness, and never mention a camera."
+
+[[do]]
+on = "trunk"
+task = { task = "One short, kind line, the way a friend would, suggesting they sit back and let the chair support the back; say only a while, never a number, name no condition or illness, and never mention a camera.", run = "scripts/agent.py" }
+
+[[do]]
+on = "trunk"
+body = { look_at = "face" }
+say = "They have sat a while leaning forward over the desk. In one short, kind line, the way a friend would, suggest sitting back and letting the chair support the back. Say only 'a while', never a number; name no condition or illness, and never mention a camera."
+
+[[do]]
+on = "upper_arm"
+task = { task = "One short, kind line, the way a friend would, suggesting they gently let the shoulders relax; say only a while, never a number, name no condition or illness, and never mention a camera.", run = "scripts/agent.py" }
+
+[[do]]
+on = "upper_arm"
+body = { look_at = "face" }
+say = "They have sat a while with their shoulders raised. In one short, kind line, the way a friend would, suggest gently letting the shoulders relax. Say only 'a while', never a number; name no condition or illness, and never mention a camera."
+
+[[do]]
+on = "lower_arm"
+task = { task = "One short, kind line, the way a friend would, suggesting they adjust the keyboard so the elbows rest comfortably; say only a while, never a number, name no condition or illness, and never mention a camera.", run = "scripts/agent.py" }
+
+[[do]]
+on = "lower_arm"
+body = { look_at = "face" }
+say = "They have sat a while with their forearms at an awkward angle. In one short, kind line, the way a friend would, suggest adjusting the keyboard so the elbows rest comfortably. Say only 'a while', never a number; name no condition or illness, and never mention a camera."
+
+[[do]]
+on = "mixed"
+task = { task = "One short, kind line, the way a friend would, suggesting they stand up for a short stretch; say only a while, never a number, name no condition or illness, and never mention a camera.", run = "scripts/agent.py" }
+
+[[do]]
+on = "mixed"
+body = { look_at = "face" }
+say = "They have sat a while in one tense position. In one short, kind line, the way a friend would, suggest standing up for a short stretch. Say only 'a while', never a number; name no condition or illness, and never mention a camera."

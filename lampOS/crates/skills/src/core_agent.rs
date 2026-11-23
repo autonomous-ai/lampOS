@@ -121,7 +121,7 @@ const THIS_TASKS_LINE: &str = "the line this run's task names, for this moment";
 /// whose fire is only light, a fixed sound or a move, a fixed line, a
 /// `do.read`, or a skill a conversation calls (its line is the
 /// conversation's reply) never does.
-pub const PILOTS: [Pilot; 10] = [
+pub const PILOTS: [Pilot; 11] = [
     Pilot {
         name: "sip-of-water",
         group: Group::Pilot,
@@ -189,6 +189,44 @@ pub const PILOTS: [Pilot; 10] = [
                 on: Some("sat_well"),
                 task: "They sat back after the lamp's word: a warm thanks or that's better, in \
                        two or three words; nothing about their body or looks.",
+            },
+        ],
+    },
+    Pilot {
+        name: "posture",
+        group: Group::Nudges,
+        fire: "the posture reading has read most of the last ten minutes at the desk as bad",
+        says: THIS_TASKS_LINE,
+        tasks: &[
+            Task {
+                on: Some("neck"),
+                task: "One short, kind line, the way a friend would, suggesting they gently bring the \
+                       head back over the shoulders; say only a while, never a number, name no \
+                       condition or illness, and never mention a camera.",
+            },
+            Task {
+                on: Some("trunk"),
+                task: "One short, kind line, the way a friend would, suggesting they sit back and let \
+                       the chair support the back; say only a while, never a number, name no \
+                       condition or illness, and never mention a camera.",
+            },
+            Task {
+                on: Some("upper_arm"),
+                task: "One short, kind line, the way a friend would, suggesting they gently let the \
+                       shoulders relax; say only a while, never a number, name no condition or \
+                       illness, and never mention a camera.",
+            },
+            Task {
+                on: Some("lower_arm"),
+                task: "One short, kind line, the way a friend would, suggesting they adjust the \
+                       keyboard so the elbows rest comfortably; say only a while, never a number, \
+                       name no condition or illness, and never mention a camera.",
+            },
+            Task {
+                on: Some("mixed"),
+                task: "One short, kind line, the way a friend would, suggesting they stand up for a \
+                       short stretch; say only a while, never a number, name no condition or \
+                       illness, and never mention a camera.",
             },
         ],
     },

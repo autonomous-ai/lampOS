@@ -801,10 +801,11 @@ either's). One frame and one blink can serve both.
   server busy or failing, no body found, the sitting just begun, or the
   window just wiped (the privacy, sleep, `room/stood_up`, or
   a closing longer than 120 s).
-  The topic runs out, so a skill holding on it with
-  `unknown = "holds_stale"` (Sit back) runs as it did, rather than reading
-  a fresh `bad_share` of 0 that would hold it quiet: a `bad_share` of 0 is
-  said only over at least 3 samples.
+  The topic runs out, and its one reader, Posture (`skills/posture`, V1's
+  posture reminder, split from Sit back by the owner's call of 23 Nov),
+  says nothing until a value says the window full (`window_s` above 599)
+  and at least 0.6 bad: a `bad_share` of 0 is said only over at least 3
+  samples. Sit back reads no `humans/posture`.
 - **Health.** `diagnostics` says `sends: activity+pose` (in place of
   `activity`), and adds `pose` (`idle`, `sending`
   or `backing_off`), the counts sent, answered, with no body, busy, failed

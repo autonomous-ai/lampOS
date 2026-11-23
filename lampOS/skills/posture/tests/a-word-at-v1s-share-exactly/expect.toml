@@ -1,0 +1,14 @@
+# 11:00, bad_share 0.6, V1's POSE_BAD_RATIO exactly (V1 nudges at >= 0.6): the word at 10.
+clock = "11:00"
+
+[[expect]]
+at = "10m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "10m"
+within = "1m"
+call = "say"
+args = { note = "They have sat a while with their head forward of their shoulders. In one short, kind line, the way a friend would, suggest gently bringing the head back over the shoulders. Say only 'a while', never a number; name no condition or illness, and never mention a camera." }

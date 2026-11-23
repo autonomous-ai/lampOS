@@ -1,0 +1,166 @@
+# Posture: V1's posture reminder, from the cloud's posture reading (#6543).
+# The owner's call (23 Nov): its own skill, apart from Sit back, which is
+# the face grown bigger and nothing else. When lamp-seen's window of
+# samples is full and reads mostly bad, the lamp turns to the person and
+# says one short line naming the region that was most often bad and one
+# concrete fix, as V1's wellbeing skill said it
+# (skills/wellbeing/reference/posture.md in V1). Written to lamp-skills'
+# schema (docs/skills.md, "The schema, as lamp-skills reads it").
+#
+# V1's rule (hal/drivers/sensing/perceptions/processors/motion.py, the
+# fold of `[posture_summary]`): the pose window complete, the user still
+# sedentary, at least POSE_WINDOW_MIN_SAMPLES (3) samples, and bad_ratio at
+# least POSE_BAD_RATIO (0.6). V2's `humans/posture` carries the window's
+# length (`window_s`, at most lamp-seen's ten minutes), its bad share (`bad_share`, by V1's rules) and the
+# region most often bad (`region`): said only while someone sits at the
+# desk and the window holds at least 3 samples (lamp-seen's
+# `pose::window::MIN_SAMPLES`, V1's). So: a value said is sitting and 3
+# samples; `window_s` above 599 is lamp-seen's window full; `bad_share` above
+# 0.5999 is V1's 0.6 or more (`above` is strict). One trigger a region, each
+# with its own line, as a note is fixed words with no slot for a reading.
+# The line never gives a number: no minutes, no share. No disease and no
+# condition, never a camera.
+needs = ["eyes", "body", "voice"]
+# Core, in the product's install (`install::PRODUCT_SKILLS`). Says nothing
+# without lamp-seen's posture (`LAMP_SEEN_POSTURE=on` beside
+# `LAMP_SEEN_ACTIVITY=on`, and the owner's desk-noticing yes): the topic is
+# never said, and no trigger holds.
+kind = "core"
+version = "1.0.0"
+
+# What it may read and use, and nothing more: lamp-seen's posture reading,
+# the faces, the voice's state, and a turn toward the face. One short line,
+# worded by the voice.
+[permissions]
+speak = true
+topics = ["humans/posture", "humans/faces/tracked", "voice/state"]
+body = true
+
+# One trigger for each region `humans/posture` names (lamp_msgs
+# PostureRegion: V1's regions, wrist left out since the server fixes it at
+# 1), and `none` for a bad window with no region standing out (V1's "empty /
+# mixed" row). No `rearm`: a window still bad is told again once the
+# cooldown is past. V1 judged a 60-min window; V2 judges lamp-seen's 10-min
+# window, and the 60m cooldown keeps it to one an hour (V1's production
+# POSE_WINDOW_DURATION_S, 3600 s: hal/config.py, "Debug values (30 s /
+# 600 s); production is 60 s / 3600 s").
+[[trigger]]
+name = "neck"
+topic = "humans/posture"
+field = "region"
+equals = "neck"
+cooldown = "60m"
+
+[[trigger]]
+name = "trunk"
+topic = "humans/posture"
+field = "region"
+equals = "trunk"
+cooldown = "60m"
+
+[[trigger]]
+name = "upper_arm"
+topic = "humans/posture"
+field = "region"
+equals = "upper_arm"
+cooldown = "60m"
+
+[[trigger]]
+name = "lower_arm"
+topic = "humans/posture"
+field = "region"
+equals = "lower_arm"
+cooldown = "60m"
+
+[[trigger]]
+name = "mixed"
+topic = "humans/posture"
+field = "region"
+equals = "none"
+cooldown = "60m"
+
+[[while]]                 # V1's POSE_BAD_RATIO: at least 0.6 of the window's samples bad
+topic = "humans/posture"
+field = "bad_share"
+above = 0.5999
+
+[[while]]                 # the window complete: lamp-seen's ten minutes all in (V1 judged its production hour)
+topic = "humans/posture"
+field = "window_s"
+above = 599
+
+[[while]]                 # nobody else in view: never said in front of others (Sit back's)
+topic = "humans/faces/tracked"
+faces_at_most = 1
+for = "1m"
+
+[[while]]                 # the lamp itself has not spoken for 30 s (Sit back's)
+topic = "voice/state"
+field = "state"
+not_equals = "speaking"
+for = "30s"
+
+[[while]]                 # never while they talk, or in the middle of a conversation (Sit back's)
+topic = "voice/state"
+field = "state"
+equals = "resting"
+for = "5s"
+
+[quiet]                   # never at night (Sit back's)
+from = "22:00"
+to = "08:00"
+
+# The wellbeing group's hour, which its one stop function needs (a `[stop]`
+# shared by skills of one `[budget]` group): one nudge an hour between them.
+[budget]
+group = "wellbeing"
+per_hour = 1
+
+# The wellbeing skills' one function (#1685): it stops the one that came
+# last, or with all, every one; with the kind `posture`, this one alone.
+# Its `about` is A sip of water's and Rest your eyes', word for word, and
+# its `when` every wellbeing skill's: of the product's live wellbeing skills
+# it is the first in folder order, so the function the model is told is as
+# before, whichever order the skills are read in.
+[stop]
+tool = "wellbeing_nudges"
+kind = "posture"
+about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. all = true for 'the nudges' with no kind named; leave both out for 'that one', the last. Never a reminder they set ('stop reminding me to drink water'): that is cancel_reminder."
+when = "When asked to snooze, turn off or on again the lamp's wellbeing nudges (water, eyes, stand up, a break, a meal, sit back, wind down), or told they just had a drink. Not for reminders: cancel_reminder."
+
+[ask]
+policy = "nudge"
+
+[[do]]
+on = "neck"
+body = { look_at = "face" }
+say = "They have sat a while with their head forward of their shoulders. In one short, kind line, the way a friend would, suggest gently bringing the head back over the shoulders. Say only 'a while', never a number; name no condition or illness, and never mention a camera."
+
+[[do]]
+on = "trunk"
+body = { look_at = "face" }
+say = "They have sat a while leaning forward over the desk. In one short, kind line, the way a friend would, suggest sitting back and letting the chair support the back. Say only 'a while', never a number; name no condition or illness, and never mention a camera."
+
+[[do]]
+on = "upper_arm"
+body = { look_at = "face" }
+say = "They have sat a while with their shoulders raised. In one short, kind line, the way a friend would, suggest gently letting the shoulders relax. Say only 'a while', never a number; name no condition or illness, and never mention a camera."
+
+[[do]]
+on = "lower_arm"
+body = { look_at = "face" }
+say = "They have sat a while with their forearms at an awkward angle. In one short, kind line, the way a friend would, suggest adjusting the keyboard so the elbows rest comfortably. Say only 'a while', never a number; name no condition or illness, and never mention a camera."
+
+[[do]]
+on = "mixed"
+body = { look_at = "face" }
+say = "They have sat a while in one tense position. In one short, kind line, the way a friend would, suggest standing up for a short stretch. Say only 'a while', never a number; name no condition or illness, and never mention a camera."
+
+# With LAMP_NUDGES_PRESENT=on (#5207, set in the product's units): the
+# wellbeing group's two an hour, never within 30 minutes of each other, as
+# every member names them (a group keeps its quietest).
+[present.budget]
+group = "wellbeing"
+per_hour = 2
+gap = "30m"
+give_back_unsaid = true   # a nudge that said nothing (expired unheard) gives its place back
