@@ -694,6 +694,11 @@ pub struct LineMeta {
     /// Another of the lamp's voices an exact `text` is said in, by name
     /// (`voice`, the app's voice preview, #7485): that line only.
     pub voice: Option<String>,
+    /// The installed app whose exact `text` it is, as lamp-control's app
+    /// socket named it (`app`, `app_name`): its line, once played whole, is
+    /// told to the model (`LAMP_APP_MEMORY`, [`crate::app_context::said`]).
+    /// Boxed: most lines have none, and every ticket carries the field.
+    pub app: Option<Box<(lamp_msgs::app_fact::Source, String)>>,
 }
 
 impl Request {
@@ -806,6 +811,12 @@ struct Wire {
     /// the voice in use stays. Empty is the voice in use.
     #[serde(default)]
     voice: Option<String>,
+    /// The installed app whose exact `text` it is (lamp-control's, with
+    /// `by`, from the app socket): its id, and `app_name` its title.
+    #[serde(default)]
+    app: Option<String>,
+    #[serde(default)]
+    app_name: Option<String>,
     /// A note to be told who is at the lamp (#2825): only with `note`.
     #[serde(default)]
     who: bool,
@@ -1116,6 +1127,20 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
             return Err("by: a name of 1 to 64 characters, no control characters".into());
         }
     }
+    // The app an exact line is from (#8386's stopgap): lamp-control's
+    // alone, with `by`, as the app socket named it.
+    let app = match (wire.app.as_deref(), wire.app_name.as_deref()) {
+        (None, None) => None,
+        (Some(_), Some(_)) if wire.by.is_none() => {
+            return Err("app goes only with by".into());
+        }
+        (Some(id), Some(title)) => {
+            let source = lamp_msgs::app_fact::Source::parse(&format!("app:{id}"))
+                .ok_or("app: an installed app's id")?;
+            Some(Box::new((source, lamp_msgs::app_fact::name(title))))
+        }
+        _ => return Err("app and app_name go together".into()),
+    };
     if wire.quiet && !matches!(words, Words::Exact(_)) {
         return Err("quiet goes only with exact".into());
     }
@@ -1154,6 +1179,7 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
             by: wire.by,
             said: None,
             voice,
+            app,
         },
         quiet: wire.quiet,
         answers: wire.answers,
@@ -1180,6 +1206,8 @@ fn parse_task_yes(skill: String, expires_in_ms: u64, wire: &Wire) -> Result<Requ
         || wire.answers
         || wire.unplug_request.is_some()
         || wire.by.is_some()
+        || wire.app.is_some()
+        || wire.app_name.is_some()
         || wire.who
         || wire.question
     {
@@ -1385,6 +1413,8 @@ fn asks_for_more(wire: &Wire) -> bool {
         || wire.who
         || wire.stream.is_some()
         || wire.task_yes
+        || wire.app.is_some()
+        || wire.app_name.is_some()
 }
 
 /// A request handed to the voice, with where its answer goes and when it
@@ -1656,8 +1686,22 @@ impl Ticket {
         }
     }
 
-    /// Answer it.
+    /// Answer it. An app's exact line answered `spoken`, played whole, is
+    /// kept for the model's next turns (`LAMP_APP_MEMORY`,
+    /// [`crate::app_context::said`]).
     pub fn answer(mut self, outcome: Outcome) {
+        if matches!(outcome, Outcome::Spoken)
+            && let (Some((source, name)), Some(words)) =
+                (self.line.app.as_deref(), self.said.as_deref())
+        {
+            crate::app_context::said(
+                source.clone(),
+                name,
+                words,
+                crate::app_context::now_ms(),
+                crate::app_context::private_now(),
+            );
+        }
         if let Some(answer) = self.answer.take() {
             let _ = answer.send(Answer::Done(outcome));
         }
@@ -2144,6 +2188,7 @@ impl Says {
             by: by.map(str::to_owned),
             said: Some((text.to_owned(), source)),
             voice: None,
+            app: None,
         };
         (says, answered)
     }
@@ -6557,6 +6602,97 @@ mod tests {
         ] {
             assert_eq!(parse(&line).unwrap_err(), why, "{line}");
         }
+    }
+
+    /// #8386's stopgap: lamp-control names the installed app an exact line
+    /// is from (`app`, `app_name`, beside `by`): kept on the line, its title
+    /// tidied; refused alone, without `by`, without exact words, or with an
+    /// id that is no app's.
+    #[test]
+    fn an_exact_text_may_name_the_app_it_is_from() {
+        let named = parse(
+            r#"{"skill":"control","text":"Trained before?","exact":true,"by":"coach","app":"gym-coach","app_name":"Gym \"Coach\"","expires_in_ms":30000}"#,
+        )
+        .unwrap();
+        let (source, name) = *named.line.app.unwrap();
+        assert_eq!(
+            (source.as_str(), name.as_str()),
+            ("app:gym-coach", "Gym Coach")
+        );
+        // A title of nothing but quotes is "an app", as an app's fact's is.
+        let unnamed = parse(
+            r#"{"skill":"control","text":"x","exact":true,"by":"c","app":"gym-coach","app_name":"\"\"","expires_in_ms":1}"#,
+        )
+        .unwrap();
+        assert_eq!(unnamed.line.app.unwrap().1, "an app");
+        for (line, why) in [
+            (
+                r#"{"skill":"control","text":"x","exact":true,"app":"gym-coach","app_name":"Gym Coach","expires_in_ms":1}"#,
+                "app goes only with by",
+            ),
+            (
+                r#"{"skill":"control","text":"x","exact":true,"by":"c","app":"gym-coach","expires_in_ms":1}"#,
+                "app and app_name go together",
+            ),
+            (
+                r#"{"skill":"control","text":"x","exact":true,"by":"c","app_name":"Gym Coach","expires_in_ms":1}"#,
+                "app and app_name go together",
+            ),
+            (
+                r#"{"skill":"control","text":"x","exact":true,"by":"c","app":"Gym Coach!","app_name":"Gym Coach","expires_in_ms":1}"#,
+                "app: an installed app's id",
+            ),
+            (
+                r#"{"skill":"control","text":"x","by":"c","app":"gym-coach","app_name":"Gym Coach","expires_in_ms":1}"#,
+                "by goes only with exact text",
+            ),
+        ] {
+            assert_eq!(parse(line).unwrap_err(), why, "{line}");
+        }
+    }
+
+    /// #8386's stopgap: an app's exact line answered `spoken` is kept for
+    /// the model's next turns; one dropped, or a computer's line with no
+    /// app, is not.
+    #[test]
+    fn an_apps_line_played_whole_is_kept_for_the_model() {
+        let _serial = crate::app_context::SERIAL
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        crate::app_context::set_on_for_test(true);
+        crate::app_context::set_private(false);
+        crate::app_context::clear_all();
+        let coach = || {
+            let (mut ticket, answered) = Ticket::own(TURN_SKILL);
+            ticket.said = Some("Trained before?".into());
+            ticket.line.app = Some(Box::new((
+                lamp_msgs::app_fact::Source::parse("app:gym-coach").unwrap(),
+                "Gym Coach".into(),
+            )));
+            (ticket, answered)
+        };
+        let now = crate::app_context::now_ms();
+        let (ticket, _answered) = coach();
+        ticket.answer(Outcome::Dropped("cut".into()));
+        assert!(
+            crate::app_context::notes(now, false).is_empty(),
+            "dropped: not kept"
+        );
+        let (mut ticket, _answered) = Ticket::own(TURN_SKILL);
+        ticket.said = Some("Build passed.".into());
+        ticket.answer(Outcome::Spoken);
+        assert!(
+            crate::app_context::notes(now, false).is_empty(),
+            "no app: not kept"
+        );
+        let (ticket, _answered) = coach();
+        ticket.answer(Outcome::Spoken);
+        let told = crate::app_context::notes(now, false);
+        crate::app_context::clear_all();
+        crate::app_context::set_private(true);
+        crate::app_context::set_on_for_test(false);
+        assert_eq!(told.len(), 1, "{told:?}");
+        assert!(told[0].ends_with("\"Trained before?\""), "{told:?}");
     }
 
     /// A long exact line of three sentences, each a piece of its own
