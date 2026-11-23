@@ -75,7 +75,8 @@ s_near_off(){ GATE near_off 1 || return 1
   NEAR_ON=0; T "LAMP_NAME_NEAR drop-in: $(grep -m1 '^NEAR ' $L/near_off.txt)"; }
 # The as-found record (piece A's start) and the end compare (piece B's end), by sha (readback.lamp.sh).
 s_asfound(){ LAMP "" $D/readback.lamp.sh > $LOGROOT/asfound.txt 2>&1; cp $LOGROOT/asfound.txt $L/asfound.txt; need asfound "^READBACK DONE" || return 3
-  FOUND_ENGINE=$(sed -n 's/^KEPT_ENGINE //p' $L/asfound.txt); FOUND_B64=$(sed -n 's/^ENGINE_B64 //p' $L/asfound.txt)
+  # The engine is engine-default.json's (absent: openclaw), not the kept record's (a lamp may have none).
+  FOUND_ENGINE=$(sed -n 's/^ENGINE //p' $L/asfound.txt); FOUND_B64=$(sed -n 's/^ENGINE_B64 //p' $L/asfound.txt)
   T "AS FOUND record: $(grep -E '^(BUILD|ENGINE|KEPT_ENGINE|FILE|UPD_DROPINS_KEEP)' $L/asfound.txt | awk '{print $1, $2, substr($3,1,16)}' | tr '\n' ';')"
   [[ $FOUND_ENGINE == (openclaw|hermes) ]] || { T "STOP: the engine at start is '$FOUND_ENGINE': the put-back can restore only openclaw or hermes"; return 3; }
   print -r -- "FOUND_ENGINE=$FOUND_ENGINE FOUND_B64=$FOUND_B64" > $LOGROOT/asfound.env; T "engine found: $FOUND_ENGINE (every put-back restores it)"; }

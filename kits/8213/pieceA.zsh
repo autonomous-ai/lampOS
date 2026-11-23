@@ -26,7 +26,7 @@ pbA(){ (( PBDONE )) && return 0; PBDONE=1
   if (( R1DONE )); then
     if [ -z "$STOPPED" ]; then T "PIECE A END: lamp on SEQ1, piece B must run next on this lamp"
     else T "PIECE A STOPPED at $STOPPED after r1: lamp on SEQ1 ($SEQ1) or between; piece B (or \`pieceB.zsh finish\`) must run next on this lamp"; fi
-  else T "PIECE A STOPPED at ${STOPPED:-?} before r1: the lamp was not moved to SEQ1 (read $L; stage leaves $CH only if it passed)"; fi; }
+  else T "PIECE A STOPPED at ${STOPPED:-?} before r1: the lamp was not moved to SEQ1 (read $L; stage leaves ${CH:-its channel folder} only if it passed)"; fi; }
 trap 'STOPPED=${STOPPED:-signal}; T "signal: piece A put-back runs"; exit 3' INT TERM HUP
 trap 'pbA' EXIT
 
