@@ -149,7 +149,9 @@ impl Worker {
         if profile.len() > 16_384 {
             return Err(io::Error::other("MPR121 profile exceeds 16 KiB"));
         }
-        let mut command = Command::new(std::env::current_exe()?);
+        let own = std::env::current_exe()
+            .map_err(|error| spawn_failed(Path::new("lamp-controls' own binary"), error))?;
+        let mut command = Command::new(own);
         command.arg("mpr-worker").arg("--profile-json").arg(profile);
         Self::spawn(command, root, clock, session, lamp_ipc::monotonic_us())
     }
@@ -182,6 +184,7 @@ impl Worker {
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
                 .spawn()
+                .map_err(|error| spawn_failed(Path::new(command.get_program()), error))
         })();
         let child = match prepare {
             Ok(child) => child,
@@ -365,6 +368,15 @@ impl Drop for Worker {
         let _ = self.observe_exit();
         let _ = fs::remove_file(&self.path);
     }
+}
+
+/// `spawn <program>: <error>`, with `error`'s kind kept (#7402): a bare
+/// `No such file or directory (os error 2)` did not say what was missing.
+fn spawn_failed(program: &Path, error: io::Error) -> io::Error {
+    io::Error::new(
+        error.kind(),
+        format!("spawn {}: {error}", program.display()),
+    )
 }
 
 fn bounded_detail(text: &str) -> String {
