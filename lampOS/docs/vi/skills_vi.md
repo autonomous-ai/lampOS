@@ -6247,7 +6247,16 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
 - **Tự hỏi thành tiếng khi tác vụ đến lượt** (V2 của #6071): lần chạy bị từ
   chối vì thiếu cái "có" thì lamp-skills nhờ say service của giọng nói
   (`{"skill": NAME, "task_yes": true, "priority": 5, "expires_in_ms":
-  60000}`, `task::ask_yes`). Yêu cầu không mang lời nào: trên luồng client
+  60000}`, `task::ask_yes`). Lần chạy mà người dùng vừa nhờ bằng giọng nói
+  thì hỏi ở priority 8 (`task::yes_ask_priority`, #8414): priority khẩn đầu
+  tiên của say service, chỉ chờ 1 s yên lặng sau lượt cuối, nên cái "có"
+  được hỏi ngay ở câu kế tiếp của đèn chứ không phải 15 s hoặc lâu hơn; lần
+  chạy của trigger hay lịch thì hỏi ở 5. Một `task_yes` nhận 0 đến 8; 9 vẫn
+  là của riêng giọng nói. Giọng nói chỉ giữ priority trên 5 khi ghi chép của
+  chính nó cho thấy người dùng đã nhờ kỹ năng đó bằng giọng nói trong vòng
+  năm phút (`say::task_yes_priority`, `skill_task_yes::asked_aloud_now`);
+  nếu không thì nói ở 5, nên không client nào của say socket làm một cái
+  "có" thành khẩn chỉ bằng con số. Yêu cầu không mang lời nào: trên luồng client
   của say service, giọng nói tự đọc kỹ năng trên đèn qua manage helper và
   lamp-control, rồi dựng đúng câu nói lại như khi được hỏi
   (`skill_task_yes::asked_aloud`). Nó từ chối, không nói gì, trong giờ yên
@@ -6328,7 +6337,21 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   một lần hỏi tới nó lúc này là một lần chạy mới, nên mô hình gọi kỹ năng đó
   (`skill_write_yes::waiting_note`; #6749 A: trên lamp-52e6 ngày 13/11, được
   bảo tác vụ "sẽ chạy ngay", mô hình nói ở lần "desk check" kế tiếp rằng nó
-  "đã được đồng ý và đang chạy" và không gọi gì). Trong phòng đông người, cái
+  "đã được đồng ý và đang chạy" và không gọi gì). Một ngoại lệ (#8415): khi
+  người dùng đã nhờ kỹ năng đó bằng giọng nói trong vòng năm phút
+  (`LAMP_TOLD_WHEN_ASKED`, bật trong sản phẩm) và nó có `tool` (`task_asks`
+  của manage helper giờ nêu tên nó), cái "có" chạy đúng việc họ nhờ: mô hình
+  được bảo gọi tool đó ngay, một lần (`skill_task_yes::approve_by_asked`,
+  `upload_agent::approved_next`), và lần chạy, với cái "có" đã ghi, được tiếp
+  tục. Lời nhờ bằng giọng nói được ghi dưới tên hàm mà mô hình gọi, thường
+  là `tool` của kỹ năng chứ không phải tên của nó (`wellbeing_nudges` của
+  `sit-back`), nên được tìm theo cả hai (`skill_task_yes::asked_aloud_in`).
+  Điều được kiểm là người dùng đã nhờ kỹ năng đó bằng giọng nói trong năm
+  phút đó, không phải cái "có" trả lời lần hỏi nào: lần hỏi "có" của một
+  trigger cho cùng kỹ năng trong khoảng đó cũng chạy khi có "có", vì người
+  dùng đã nhờ nó, và vẫn chỉ với cái "có" nói ra của họ cho đúng SHA-256 và
+  các grant đó. Trước đây, trên lamp-ee17 (row của #8180), cái "có" được ghi nhưng
+  không gì chạy cho tới khi người dùng nhờ lại. Trong phòng đông người, cái
   "có" được nghe trong 45 s của thread tính từ lúc kết thúc câu đọc lại như
   đã phát, không phải từ lúc bắt đầu (#6749 C, docs/second-voice.md). Với
   `LAMP_SKILL_YES_CARRY=on` (mặc định tắt, #7148), một cái "có" không thấy

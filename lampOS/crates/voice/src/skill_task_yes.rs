@@ -1010,17 +1010,40 @@ pub fn approve_by(manage: &Path, control: &Path, asks: &Asks) -> Result<Value, S
 
 /// Whether the owner asked for `skill` by voice within
 /// [`crate::told_when_asked::WITHIN_MS`] (`LAMP_TOLD_WHEN_ASKED`, on in the
-/// product): its run waits on this yes, so the yes runs it (#8415).
-fn asked_aloud_now(skill: &str) -> bool {
+/// product): its run waits on this yes, so the yes runs it (#8415). The ask
+/// is kept under the function the call named (`skill_named::function_of`):
+/// the skill's `tool` when the model called it by its tool, which is often
+/// not the skill's name (`sit-back`'s `wellbeing_nudges`; Thirteen's P2 on
+/// #8437), so both are looked for.
+pub fn asked_aloud_now(skill: &str, tool: Option<&str>) -> bool {
     let now_unix_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_millis() as u64);
     crate::told_when_asked::on()
-        && crate::told_when_asked::asked_within(
+        && asked_aloud_in(
             Path::new(crate::told_when_asked::SPOKEN_ASKS_FILE),
             skill,
+            tool,
             now_unix_ms,
         )
+}
+
+/// [`asked_aloud_now`] in the spoken asks kept at `path`, at `now_ms`.
+pub fn asked_aloud_in(path: &Path, skill: &str, tool: Option<&str>, now_ms: u64) -> bool {
+    crate::told_when_asked::asked_within(path, skill, now_ms)
+        || tool.is_some_and(|tool| crate::told_when_asked::asked_within(path, tool, now_ms))
+}
+
+/// [`asked_aloud_now`] for the skill `skill` on the lamp, its tool read by
+/// the manage helper only when its own name wasn't asked (the say
+/// service's `task_yes` priority, #8414).
+pub fn asked_aloud_on_lamp(skill: &str) -> bool {
+    asked_aloud_now(skill, None)
+        || read_by(Path::new(crate::made_skill::MANAGE_SOCKET), skill)
+            .ok()
+            .flatten()
+            .and_then(|asks| asks.tool)
+            .is_some_and(|tool| asked_aloud_now(skill, Some(&tool)))
 }
 
 /// [`approve_by`], with `asked_aloud` saying whether the person asked for
@@ -1033,7 +1056,7 @@ pub fn approve_by_asked(
     manage: &Path,
     control: &Path,
     asks: &Asks,
-    asked_aloud: impl Fn(&str) -> bool,
+    asked_aloud: impl Fn(&str, Option<&str>) -> bool,
 ) -> Result<Value, String> {
     let grants = asks.grants.as_ref().ok_or("not a skill's task")?;
     let set = |grants: &[String]| grants.iter().cloned().collect::<BTreeSet<String>>();
@@ -1054,9 +1077,11 @@ pub fn approve_by_asked(
         (Some(true), _) if crate::upload_agent::on() && read_from_file(manage, &asks.skill) => {
             Ok(json!({ "approved": 1, "call": asks.skill.replace('-', "_") }))
         }
-        (Some(true), _) => match tool.filter(|_| asked_aloud(&asks.skill)) {
-            Some(tool) => Ok(json!({ "approved": 1, "call": tool })),
-            None => Ok(json!({ "approved": 1 })),
+        (Some(true), _) => match tool {
+            Some(tool) if asked_aloud(&asks.skill, Some(&tool)) => {
+                Ok(json!({ "approved": 1, "call": tool }))
+            }
+            _ => Ok(json!({ "approved": 1 })),
         },
         (_, Some(why)) => Err(why.to_owned()),
         _ => Err("lamp-control said nothing".to_owned()),
@@ -1757,25 +1782,44 @@ mod tests {
                 "grants": ["light", "camera"], "task": "Take a photo",
                 "from": "your computer", "tool": tool}})
         };
+        // The spoken ask as the second route keeps it: under the function
+        // the model called, here the skill's tool, not its name (Thirteen's
+        // P2 on #8437: `sit-back`'s tool is `wellbeing_nudges`).
+        let spoken = dir.join("spoken-asks.json");
+        let now_ms = 1_800_000_000_000;
         for (tool, asked, told) in [
             (
                 Some("take_photo"),
-                true,
+                Some("take_photo"),
                 json!({"approved": 1, "call": "take_photo"}),
             ),
-            (Some("take_photo"), false, json!({"approved": 1})),
-            (None, true, json!({"approved": 1})),
+            (
+                Some("take_photo"),
+                Some("photo_booth"),
+                json!({"approved": 1, "call": "take_photo"}),
+            ),
+            (Some("take_photo"), None, json!({"approved": 1})),
+            (
+                Some("take_photo"),
+                Some("another_skill"),
+                json!({"approved": 1}),
+            ),
+            (None, Some("photo_booth"), json!({"approved": 1})),
         ] {
+            let _ = std::fs::remove_file(&spoken);
+            if let Some(function) = asked {
+                crate::told_when_asked::keep(&spoken, function, now_ms - 60_000).unwrap();
+            }
             let helper = answering(&manage, vec![read(tool)]);
             let lamp_control = answering(&control, vec![json!({"recorded": true})]);
             assert_eq!(
-                approve_by_asked(&manage, &control, &asks, |skill| {
+                approve_by_asked(&manage, &control, &asks, |skill, tool| {
                     assert_eq!(skill, "photo-booth");
-                    asked
+                    asked_aloud_in(&spoken, skill, tool, now_ms)
                 })
                 .unwrap(),
                 told,
-                "{tool:?} asked {asked}"
+                "{tool:?} asked as {asked:?}"
             );
             helper.join().unwrap();
             lamp_control.join().unwrap();
