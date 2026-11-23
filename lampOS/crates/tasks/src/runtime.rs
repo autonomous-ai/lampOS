@@ -1481,21 +1481,24 @@ impl Adapter for Cli {
 /// The production adapter: Harness's CLI, or, with `serve --set-up-later`
 /// and no program at `--harness`, nothing to hand over with. Harness put on
 /// later is used once the part starts again. With
-/// `LAMP_TASKS_OPENCLAW_DIRECT` on, [`Production::Direct`] routes the lamp's
-/// own OpenClaw turns to its gateway (`crate::direct`) and every other call
-/// to the Harness backend inside, so callers stay engine-neutral.
+/// `LAMP_TASKS_OPENCLAW_DIRECT` or `LAMP_TASKS_HERMES_DIRECT` on,
+/// [`Production::Direct`] routes the lamp's own turns of that engine to its
+/// gateway (`crate::direct`) and every other call to the backend inside
+/// (Harness, or the other engine's direct session around Harness), so
+/// callers stay engine-neutral.
 enum Production {
     Cli(Box<Cli>),
     Absent,
-    Direct(Arc<crate::direct::OpenclawDirect>, Box<Production>),
+    Direct(Arc<crate::direct::Direct>, Box<Production>),
 }
 impl Production {
-    /// Wrapped in [`Production::Direct`] when the lamp's direct session is on.
+    /// Wrapped in one [`Production::Direct`] per direct session on.
     fn routed(self) -> Self {
-        match crate::direct::lamp() {
-            Some(direct) => Self::Direct(direct, Box::new(self)),
-            None => self,
-        }
+        crate::direct::lamps()
+            .into_iter()
+            .fold(self, |inside, direct| {
+                Self::Direct(direct, Box::new(inside))
+            })
     }
 }
 impl Adapter for Production {
@@ -1526,7 +1529,10 @@ impl Adapter for Production {
             Self::Absent => None,
             // The lamp's OpenClaw is waited for as its kept session finds
             // it, never by a port probe.
-            Self::Direct(direct, _) => Some(direct.gateway(crate::gateway::READY_WITHIN)),
+            Self::Direct(direct, _) if direct.engine() == EngineKind::Openclaw => {
+                Some(direct.gateway(crate::gateway::READY_WITHIN))
+            }
+            Self::Direct(_, inside) => inside.openclaw_gateway(),
         }
     }
     fn session_lane(&self) -> Option<Arc<dyn SessionLane>> {
@@ -1547,7 +1553,7 @@ impl Adapter for Production {
             Self::Absent => LaunchOutcome::NotSent {
                 code: "no_harness".into(),
             },
-            // An OpenClaw task for the lamp straight into its gateway's
+            // A task for the lamp's own engine straight into its gateway's
             // kept session.
             Self::Direct(direct, harness) => direct
                 .spoken_launch(launch)
@@ -2971,7 +2977,8 @@ fn owner<C: Clock>(
             Ok(work) => {
                 // "How far along is it?": a direct task's progress read from
                 // its run at once, before the tracker or the records answer.
-                if let Some(direct) = crate::direct::lamp()
+                let lamps = crate::direct::lamps();
+                if !lamps.is_empty()
                     && matches!(
                         work.request,
                         Request::GetProgress { .. }
@@ -2981,7 +2988,10 @@ fn owner<C: Clock>(
                     )
                 {
                     let now = clock.sample()?;
-                    direct.refresh(tracker.as_mut(), &engine.watched(&now));
+                    let watched = engine.watched(&now);
+                    for direct in lamps {
+                        direct.refresh(tracker.as_mut(), &watched);
+                    }
                 }
                 if Instant::now() >= work.deadline {
                     let _ = work.response.try_send(Err(EngineError {
@@ -3546,9 +3556,13 @@ fn owner<C: Clock>(
         }
         // A direct task's row, as it changes, on the bus at once: its run
         // has no `ps` to wait for.
-        if let Some(direct) = crate::direct::lamp() {
+        let lamps = crate::direct::lamps();
+        if !lamps.is_empty() {
             let now = clock.sample()?;
-            direct.refresh_if_changed(tracker.as_mut(), &engine.watched(&now));
+            let watched = engine.watched(&now);
+            for direct in lamps {
+                direct.refresh_if_changed(tracker.as_mut(), &watched);
+            }
         }
         if let Some(tracker) = tracker.as_mut()
             && let Some(fresh) = tracker.take(engine.store_id())
@@ -4940,8 +4954,12 @@ fn works_refresh(
         board.tasks(&seen, |task| crate::works::line_of(tracker, task), at);
     });
     // A direct task's step, once its record is open.
-    if let Some(direct) = crate::direct::lamp() {
-        direct.record_steps(&engine.watched(now));
+    let lamps = crate::direct::lamps();
+    if !lamps.is_empty() {
+        let watched = engine.watched(now);
+        for direct in lamps {
+            direct.record_steps(&watched);
+        }
     }
 }
 
@@ -5306,25 +5324,47 @@ fn set_no_harness(
     }
 }
 
-/// The lamp's direct session ([`crate::direct`]), with
-/// [`crate::direct::SWITCH`] on: built, set as [`crate::direct::LAMP`] and
-/// its pump started, connecting at once. Whether it is in use.
+/// The lamp's direct sessions ([`crate::direct`]): for each engine whose
+/// switch is on ([`crate::direct::ENGINES`]), its session built, set in
+/// its slot ([`crate::direct::slot`]) and its pump started, connecting at
+/// once. Whether OpenClaw's is in use (the one session's pane is then not
+/// made).
 fn direct_start(config: &Config, stop: Arc<AtomicBool>) -> bool {
-    if !crate::direct::on(std::env::var(crate::direct::SWITCH).ok().as_deref()) {
-        return false;
+    let mut openclaw = false;
+    for (engine, switch) in crate::direct::ENGINES {
+        if crate::direct::on(std::env::var(switch).ok().as_deref())
+            && direct_start_one(config, stop.clone(), engine, switch)
+            && engine == EngineKind::Openclaw
+        {
+            openclaw = true;
+        }
     }
-    let Some(session) = crate::direct::lamp_session() else {
+    openclaw
+}
+
+/// [`direct_start`] for `engine`, its switch `switch` on: whether it is in
+/// use.
+fn direct_start_one(
+    config: &Config,
+    stop: Arc<AtomicBool>,
+    engine: EngineKind,
+    switch: &str,
+) -> bool {
+    let name = crate::direct::label(engine);
+    let (Some(slot), Some(session)) = (
+        crate::direct::slot(engine),
+        crate::direct::lamp_session(engine),
+    ) else {
         eprintln!(
-            "tasks: direct: {}=on, but no gateway session is built in yet; OpenClaw keeps the Harness path",
-            crate::direct::SWITCH
+            "tasks: direct: {switch}=on, but no gateway session is built in yet; {name} keeps the Harness path"
         );
         return false;
     };
-    let mut direct = crate::direct::OpenclawDirect::new(session, stop);
+    let mut direct = crate::direct::Direct::new(session, stop);
     let stuck = std::env::var(crate::direct::STUCK_SWITCH).ok();
     if let Some(after) = crate::direct::stuck_after_of(stuck.as_deref()) {
         eprintln!(
-            "tasks: direct: a quiet run is checked for stuck after {} s ({}), a running tool after {} s",
+            "tasks: direct: a quiet {name} run is checked for stuck after {} s ({}), a running tool after {} s",
             after.as_secs(),
             crate::direct::STUCK_SWITCH,
             after.as_secs() * u64::from(crate::direct::TOOL_QUIET_TIMES)
@@ -5334,19 +5374,16 @@ fn direct_start(config: &Config, stop: Arc<AtomicBool>) -> bool {
     let direct = Arc::new(direct);
     let lamp = lamp_target_of(config);
     direct.set_lamp_machine(Box::new(move || lamp().map(|target| target.machine_id)));
-    if crate::direct::LAMP.set(direct.clone()).is_err() {
+    if slot.set(direct.clone()).is_err() {
         return true;
     }
     match direct.start() {
         Ok(_) => {
-            eprintln!(
-                "tasks: direct: on ({}=on): OpenClaw's turns go straight to its gateway",
-                crate::direct::SWITCH
-            );
+            eprintln!("tasks: direct: on ({switch}=on): {name}'s turns go straight to its gateway");
             true
         }
         Err(error) => {
-            eprintln!("tasks: direct: its pump not started: {error}");
+            eprintln!("tasks: direct: {name}'s pump not started: {error}");
             false
         }
     }
@@ -5379,8 +5416,9 @@ pub fn serve<C: Clock>(
     let skill_stop = stop.clone();
     // `LAMP_TASKS_OPENCLAW_DIRECT` on: OpenClaw's gateway spoken to
     // directly (`crate::direct`), connected at once on its own thread, in
-    // place of the one session's pane for OpenClaw. Off, or no session
-    // built, nothing is made and the Harness path is as before.
+    // place of the one session's pane for OpenClaw; `LAMP_TASKS_HERMES_DIRECT`
+    // on, the same for the lamp's Hermes. Off, or no session built, nothing
+    // is made and the Harness path is as before.
     let direct = direct_start(&config, stop.clone());
     // `LAMP_TASKS_ONE_SESSION` on (#7246): the lamp's one standing pane,
     // opened as soon as it can be, on a thread of its own as the start's
@@ -5966,13 +6004,24 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                             Job::Launch(job) => Outcome::Launch(
                                 job.task_id,
                                 job.launch.name.clone(),
-                                crate::gateway::launch_with(gateway.as_mut(), &job.launch, || {
-                                    adapter.launch(&job.launch)
+                                // A direct Hermes task waits on its own
+                                // session's readiness; OpenClaw's on the
+                                // Gateway wait, as Harness's.
+                                crate::direct::not_ready_for(
+                                    &job.launch,
+                                    crate::gateway::READY_WITHIN,
+                                )
+                                .unwrap_or_else(|| {
+                                    crate::gateway::launch_with(
+                                        gateway.as_mut(),
+                                        &job.launch,
+                                        || adapter.launch(&job.launch),
+                                    )
                                 }),
                             ),
                             Job::Observe(job) => {
-                                // A direct OpenClaw task: its gateway run's
-                                // look, never Harness's `show`.
+                                // A direct task: its gateway run's look,
+                                // never Harness's `show`.
                                 let began = Instant::now();
                                 let result = crate::direct::lamp_observe(
                                     &job.engine.bus_name(),

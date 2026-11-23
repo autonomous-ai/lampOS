@@ -6,7 +6,8 @@ rust-version.workspace = true
 publish.workspace = true
 
 # A lamp agent's own gateway, spoken to directly (no Harness CLI, no TUI, no tmux):
-# OpenClaw's gateway WebSocket first; Hermes behind the same trait later.
+# OpenClaw's gateway WebSocket; Hermes' API server (plain HTTP/1.1 and SSE on
+# loopback, std only) behind the same trait.
 
 [dependencies]
 serde.workspace = true

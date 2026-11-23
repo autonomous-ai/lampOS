@@ -3686,11 +3686,13 @@ impl Runner for HarnessRunner {
         let began = std::time::Instant::now();
         // With the switch on and no Harness account (or no Harness), the
         // lamp's own agent with no Harness (#6685 PR 3), read as last
-        // known: nothing is asked here. A run that goes straight to
-        // OpenClaw's gateway (`crate::direct`, below) is checked first, so
-        // it never reads Harness's sign-in.
-        let direct = crate::direct::lamp().is_some()
-            && matches!(self.make_agent(), Ok(Some((EngineKind::Openclaw, true))));
+        // known: nothing is asked here. A run that goes straight to the
+        // lamp's agent's gateway (`crate::direct`, below: OpenClaw's, or
+        // Hermes's) is checked first, so it never reads Harness's sign-in.
+        let direct = matches!(
+            self.make_agent(),
+            Ok(Some((engine, gateway))) if crate::direct::takes_runs(engine, gateway)
+        );
         if !self.makes
             && !direct
             && let Some(local) = self.without_harness(Some(&run.run))
@@ -3716,8 +3718,18 @@ impl Runner for HarnessRunner {
         // 21:34). The person's own spoken tasks still go to the chosen or
         // named engine (#6506).
         // A make (#7245) is always on the one run path.
-        let one_path = if self.default_agent || self.makes {
-            let engine = (harness.default_engine)().unwrap_or(lamp.engine);
+        // `LAMP_TASKS_HERMES_DIRECT` on with the lamp's Hermes the default:
+        // the run (or make) goes into Hermes's kept session as a gateway
+        // agent's does, through the skill-start launcher (`by_start`); its
+        // per-run wrapper, token file and namespace are not used, so they
+        // are not checked.
+        let default_engine = (harness.default_engine)().unwrap_or(lamp.engine);
+        let hermes_direct = default_engine == EngineKind::Hermes
+            && crate::direct::takes_runs(default_engine, false);
+        let one_path = if hermes_direct {
+            Some((default_engine, true))
+        } else if self.default_agent || self.makes {
+            let engine = default_engine;
             let read = |path: &Path| std::fs::read_to_string(path).ok();
             let (wrapper, gateway_agent) = self.default_agent_data(engine);
             let checked = match &self.wrappers {
@@ -3905,7 +3917,8 @@ impl Runner for HarnessRunner {
                     _way_out.as_ref().map(crate::egress::Served::path),
                 )?;
                 started.live = Some(live);
-                prompt
+                // Hermes is told how to run the launcher; OpenClaw's as is.
+                crate::direct::skill_words(engine, &prompt, run.deadline)
             }
             Some(token) => {
                 started.token = Some(crate::run_token_file::RunTokenFile::write(
@@ -3932,13 +3945,13 @@ impl Runner for HarnessRunner {
             },
             session: None,
         };
-        // `LAMP_TASKS_OPENCLAW_DIRECT` on: a gateway agent's run or a make
-        // handed straight into OpenClaw's kept session (`crate::direct`):
-        // its folder, skill-start grant and token as above; no port probe,
-        // no Harness pane.
-        if engine == EngineKind::Openclaw
-            && (by_start || self.makes)
-            && let Some(direct) = crate::direct::lamp()
+        // `LAMP_TASKS_OPENCLAW_DIRECT` (or `LAMP_TASKS_HERMES_DIRECT`) on:
+        // a gateway agent's run or a make handed straight into the agent's
+        // kept session (`crate::direct`): its folder, skill-start grant and
+        // token as above; no port probe, no Harness pane.
+        if (by_start || self.makes)
+            && crate::direct::takes_runs(engine, by_start)
+            && let Some(direct) = crate::direct::lamp_for(engine)
         {
             let stopping = self.stopping.get().cloned();
             let stopped = || {

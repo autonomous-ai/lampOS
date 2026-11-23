@@ -6,8 +6,8 @@
 //! [`AgentSession`] is the engine-neutral contract (V1's `AgentGateway`,
 //! narrowed to what lamp-tasks needs). [`openclaw`] implements it over
 //! OpenClaw's gateway WebSocket (`ws://127.0.0.1:18789`, token auth, as V1's
-//! `runtimes/openclaw` does). Hermes implements it later; until then it
-//! answers [`Error::Unsupported`] and lamp-tasks keeps its current path.
+//! `runtimes/openclaw` does). [`hermes`] implements it over Hermes' own API
+//! server, its Runs API (`http://127.0.0.1:8642`, Bearer key).
 //!
 //! Fully non-interactive: nothing here ever waits on a person. The gateway
 //! is configured so no run asks (exec `security`/`ask` off, no ask tools),
@@ -16,7 +16,14 @@
 
 use std::time::{Duration, SystemTime};
 
+pub mod hermes;
 pub mod openclaw;
+
+/// Why a run ended by a drop (a gateway restart, a crash, a lost
+/// connection), for every engine: what the person hears, in their
+/// language, as the task's last words. Never a re-run: they ask again.
+pub const DROPPED: &str =
+    "A small system error stopped this task. Please try again in a few minutes.";
 
 /// Which agent engine a session speaks to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -139,7 +146,7 @@ pub enum Error {
     TimedOut,
     /// No such run in this session.
     UnknownRun(RunId),
-    /// This engine does not do this (Hermes, for now).
+    /// This engine does not do this.
     Unsupported(&'static str),
 }
 

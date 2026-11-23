@@ -1079,6 +1079,12 @@ struct Ask {
     /// Absent (an older round's ask) is off.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     one_path: bool,
+    /// Hermes's gateway namespace script ([`crate::hermes_gateway::NS`])
+    /// written too, once Hermes is there (`LAMP_HERMES_GATEWAY`). Absent
+    /// (an older round's ask, or any other) is off: nothing of the
+    /// gateway's is written or taken out.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    gateway: bool,
 }
 
 impl Ask {
@@ -1187,13 +1193,25 @@ pub fn ask_install(records: &Path, shown: Shown) -> io::Result<()> {
     ask(records, false, shown)
 }
 
+/// An install's ask for `shown` that also has Harness's one-shot write
+/// Hermes's gateway namespace script ([`crate::hermes_gateway::NS`]) once
+/// Hermes is there: a round's, with `LAMP_HERMES_GATEWAY` on.
+pub fn ask_gateway(records: &Path, shown: Shown) -> io::Result<()> {
+    write_ask(records, false, shown, true)
+}
+
 fn ask(records: &Path, remove: bool, shown: Shown) -> io::Result<()> {
+    write_ask(records, remove, shown, false)
+}
+
+fn write_ask(records: &Path, remove: bool, shown: Shown, gateway: bool) -> io::Result<()> {
     let text = serde_json::to_vec(&Ask {
         version: 1,
         remove,
         skills: shown.skills,
         tasks: shown.tasks,
         one_path: shown.one_path,
+        gateway,
     })
     .map_err(io::Error::other)?;
     write_whole(&records.join(ASK), &text, 0o600)
@@ -1617,6 +1635,14 @@ fn install_with(
         let said = steps(root, records, run, now_unix_ms, say, kit, asked.shown());
         if said.install == "failed" {
             remove_entry_points(root, say);
+        } else if asked.gateway {
+            match crate::hermes_gateway::write_ns(root, asked.shown()) {
+                Ok(()) => say(&format!(
+                    "{} written: Hermes's gateway runs in it",
+                    crate::hermes_gateway::NS
+                )),
+                Err(why) => say(&format!("Hermes's gateway namespace not written: {why}")),
+            }
         }
         Some(said)
     };
@@ -1637,6 +1663,7 @@ fn remove_entry_points(root: &Path, say: &mut dyn FnMut(&str)) {
             Err(error) => say(&format!("{path} not taken out: {error}")),
         }
     }
+    crate::hermes_gateway::remove_ns(root, say);
     agent_ns::remove_hook_shim(root, &NS_SCRIPTS, say);
 }
 

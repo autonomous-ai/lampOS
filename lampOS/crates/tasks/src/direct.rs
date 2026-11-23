@@ -1,32 +1,36 @@
-//! OpenClaw spoken to directly (`LAMP_TASKS_OPENCLAW_DIRECT`): every
-//! OpenClaw turn handed straight to OpenClaw's gateway through
-//! [`lamp_agent_gateway::AgentSession`], one connection and one kept
+//! The lamp's own agent spoken to directly: every turn of the lamp's
+//! OpenClaw (`LAMP_TASKS_OPENCLAW_DIRECT`) or the lamp's Hermes
+//! (`LAMP_TASKS_HERMES_DIRECT`) handed straight to that agent's gateway
+//! through [`lamp_agent_gateway::AgentSession`], one connection and one kept
 //! session, in place of the Harness CLI (`harness new/reply/ensure/wait/
-//! show/close/ps`, `openclaw tui` in tmux: the stuck sessions of #7906,
-//! #8001 and #6226) and the `openclaw … --gateway` CLI calls (`approvals
-//! get`, `allowlist add`, `gateway call sessions.delete`). Hermes keeps
-//! today's path.
+//! show/close/ps`, `openclaw tui` or `hermes chat -q` in tmux: the stuck
+//! sessions of #7906, #8001 and #6226) and, for OpenClaw, the `openclaw …
+//! --gateway` CLI calls (`approvals get`, `allowlist add`, `gateway call
+//! sessions.delete`). Each engine has its own switch, its own [`Direct`]
+//! and its own pump; everything below is the same for both, except where
+//! an engine is named. An engine whose switch is off keeps today's path.
 //!
 //! # The plan
 //!
-//! The seams, each one `if` on [`LAMP`] (set only with the switch on and a
-//! session built); with the switch off [`LAMP`] is never set and every
-//! line below is skipped, so the Harness path runs as before:
+//! The seams, each one `if` on [`lamps`] (set only with a switch on and a
+//! session built); with both switches off nothing is set and every line
+//! below is skipped, so the Harness path runs as before:
 //!
 //! 1. **Spoken task.** `runtime::Production::Direct` (the production
-//!    backend with this session beside Harness) asks
-//!    [`OpenclawDirect::spoken_launch`] before the one session's pane: an
-//!    OpenClaw task for the lamp's own machine with no session named is
-//!    queued here and answered `Joined` with an agent id of its own (a
+//!    backend with these sessions beside Harness) asks
+//!    [`Direct::spoken_launch`] before the one session's pane: a task for
+//!    the session's engine on the lamp's own machine with no session named
+//!    is queued here and answered `Joined` with an agent id of its own (a
 //!    UUID per turn, so the store's checks hold and each task is followed
 //!    by itself: no shared-pane caveat). The store then follows it as any
 //!    joined task, through `Production::observe` and `Production::status`,
-//!    which answer such ids from here ([`OpenclawDirect::observe`],
-//!    [`OpenclawDirect::listed`]). An idle observation with the answer is
+//!    which answer such ids from here ([`Direct::observe`],
+//!    [`Direct::listed`]). An idle observation with the answer is
 //!    what settles the task and fires the unasked news, as before.
-//!    The tasks-harness worker's gateway wait (`gateway::launch_with`) is
-//!    the same as Harness's, its probe this session's readiness in place of
-//!    the port's (the `gateway::Probe` impl below).
+//!    The tasks-harness worker's wait for OpenClaw (`gateway::launch_with`)
+//!    is the same as Harness's, its probe this session's readiness in place
+//!    of the port's (the `gateway::Probe` impl below); Hermes's is the same
+//!    wait on its own session ([`not_ready_for`]), never OpenClaw's mark.
 //! 2. **Skill `do.task` and make.** `skill_task::HarnessRunner::run` (both
 //!    a skill's run on the one run path and a make, which reaches it through
 //!    `skill_make::MakeTurn`, THE SEAM) calls [`skill_turn`] in place of its
@@ -35,36 +39,55 @@
 //!    they are; only the hand-over and the wait for the end are here. A
 //!    skill's answer is kept only when its launcher claimed the start and
 //!    the fence said it started the script (`skill_start::Live::ran`).
-//! 3. **Readiness.** One pump thread ([`OpenclawDirect::start`]) connects
-//!    at lamp-tasks' start, opens or adopts the kept session and keeps it
-//!    ready, with backoff (U1). A launch waits on that state through
-//!    `gateway::Gateway`'s own wait (`before_launch_until`), never on a
-//!    port probe or a CLI read. Past [`GETTING_READY_AFTER`] not ready the
-//!    getting-ready hook is told once (#8237's hook: not at this head, so
-//!    the production hook only journals; TODO(#8237) below).
-//! 4. **Allow-list.** Before each skill run is handed over, agent `main`'s
-//!    allow-list is read over the session and the skill-start entry put back
-//!    when missing ([`DirectSession`]).
+//!    Hermes is told to run the launcher with its `terminal` tool in the
+//!    foreground ([`skill_words`]); no per-run token file, MCP token or
+//!    `shell_init_files` reach it on this path, only the launcher's grant.
+//! 3. **Readiness.** One pump thread per engine ([`Direct::start`])
+//!    connects at lamp-tasks' start, opens or adopts the kept session and
+//!    keeps it ready, with backoff (U1). A launch waits on that state
+//!    (`gateway::Gateway`'s own wait for OpenClaw, `before_launch_until`;
+//!    [`Direct::ready_by`] for Hermes), never on a port probe or a CLI
+//!    read. Past [`GETTING_READY_AFTER`] not ready the getting-ready hook
+//!    is told once (#8237's hook: not at this head, so the production hook
+//!    only journals; TODO(#8237) below).
+//! 4. **Allow-list.** Before each skill run is handed over, OpenClaw's
+//!    agent `main`'s allow-list is read over the session and the
+//!    skill-start entry put back when missing ([`DirectSession`]). Hermes
+//!    has no exec allow-list: its approvals are answered by the same fence
+//!    policy (allow once only the launcher, deny the rest), so its read
+//!    always says allowed.
 //! 5. **Progress.** Each run's [`lamp_agent_gateway::Progress`] is kept here
 //!    and given as `harness ps`'s and `harness show`'s rows were
 //!    ([`listed_of`], [`observation_of`]), so `progress::Tracker`,
 //!    `works::Board` and `now` are fed with the same state enum and fields;
-//!    the board's step comes from the run's tools ([`OpenclawDirect::record_steps`],
+//!    the board's step comes from the run's tools ([`Direct::record_steps`],
 //!    once per refresh of the work records).
 //!    Before a "how far along" read is answered, the tracker is read from
-//!    here at once ([`OpenclawDirect::refresh`]): no `ps` and no wait.
+//!    here at once ([`Direct::refresh`]): no `ps` and no wait.
 //! 6. **Hygiene, V1's way.** One kept session, one turn at a time. A run
 //!    with no event for [`STUCK_AFTER`] (V1's busyTTL) is stuck: aborted and
 //!    ended failed, and the next turn goes on. A refused send, or [`BROKEN_SENDS`] failed in a row, is a
 //!    broken session: [`AgentSession::reset`] and the turn tried once more.
-//!    The context rotation is `reset()` too, at the one session's bounds
-//!    (`one_session::near_context_limit`: 85% of the context or 150
-//!    messages for a task, 60% or 100 for a make) on the gateway's own size
+//!    The context rotation is `reset()` too, at the engine's bounds
+//!    ([`near_limit`]: 85% of the engine's context ([`context_tokens`]) or
+//!    150 messages for a task, 60% or 100 for a make; for Hermes also V1's
+//!    40 turns or 250k tokens, `one_session::rotation_due`, since Hermes
+//!    compacts on its own and counts after it) on the gateway's own size
 //!    of the session ([`DirectSession::session_size`], read before the send
 //!    when not read since the last run), else on the words handed over and
 //!    read. A gateway down is reconnected to for ever;
-//!    a queued turn waits [`QUEUED_MOST`] of it, then ends not ready. No
-//!    resync or re-adopt after a reset or a lamp-tasks restart (later).
+//!    a queued turn waits [`QUEUED_MOST`] of it, then ends not ready.
+//!    A gateway drop under a run ends it, and every turn queued behind it,
+//!    with the shared [`lamp_agent_gateway::DROPPED`] words; nothing is
+//!    run again.
+//! 7. **The kept session across restarts (Hermes).** Hermes's kept
+//!    session's id is lamp-tasks' own (`lamp-main-<ms>`): the session keeps
+//!    it in [`KEPT_FILE`], in lamp-tasks' state folder (0600), with its turns
+//!    and counted tokens, so a restart of lamp-tasks, of the gateway or of
+//!    the lamp keeps the conversation, and the rotation's backstop counts
+//!    ([`DirectSession::rotation_counts`]) go on where they were. A
+//!    rotation names a new id. OpenClaw's kept session is its gateway's
+//!    fixed key (`agent:main:lamp`).
 use crate::engine::{MAX_ANSWER_BYTES, MAX_ASK_BYTES, Watched};
 use crate::harness::{EngineKind, Launch, LaunchOutcome, Listed, Observation};
 use lamp_agent_gateway::{AgentSession, Error, Outcome, Phase, Progress, RunId, Turn, TurnKind};
@@ -73,24 +96,63 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, PoisonError};
 use std::time::{Duration, Instant, SystemTime};
 
-/// The switch, in lamp-tasks' own environment: `on` exactly ([`on`]).
+/// OpenClaw's switch, in lamp-tasks' own environment: `on` exactly ([`on`]).
 pub const SWITCH: &str = "LAMP_TASKS_OPENCLAW_DIRECT";
+/// Hermes's switch, in lamp-tasks' own environment: `on` exactly ([`on`]).
+/// Set in no unit yet: off until a Hermes lamp's row passes.
+pub const HERMES_SWITCH: &str = "LAMP_TASKS_HERMES_DIRECT";
 
-/// [`SWITCH`]'s value: `on` exactly; anything else (unset too) is off.
+/// A switch's value: `on` exactly; anything else (unset too) is off.
 pub fn on(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
-/// The lamp's direct session: set once at `serve`'s start, only with
-/// [`SWITCH`] on and a session built ([`lamp_session`]). Never set in the
-/// crate's tests, which make their own.
-pub static LAMP: OnceLock<Arc<OpenclawDirect>> = OnceLock::new();
+/// The engines with a direct path, and each one's switch.
+pub const ENGINES: [(EngineKind, &str); 2] = [
+    (EngineKind::Openclaw, SWITCH),
+    (EngineKind::Hermes, HERMES_SWITCH),
+];
+
+/// The lamp's direct OpenClaw session: set once at `serve`'s start, only
+/// with [`SWITCH`] on and a session built ([`lamp_session`]). Never set in
+/// the crate's tests, which make their own.
+pub static LAMP: OnceLock<Arc<Direct>> = OnceLock::new();
+/// The lamp's direct Hermes session, the same with [`HERMES_SWITCH`].
+pub static HERMES_LAMP: OnceLock<Arc<Direct>> = OnceLock::new();
+
+/// Where `engine`'s direct session is set; `None` for an engine with no
+/// direct path.
+pub fn slot(engine: EngineKind) -> Option<&'static OnceLock<Arc<Direct>>> {
+    match engine {
+        EngineKind::Openclaw => Some(&LAMP),
+        EngineKind::Hermes => Some(&HERMES_LAMP),
+        _ => None,
+    }
+}
+
+/// lamp-tasks' engine for a gateway's.
+pub fn engine_kind(engine: lamp_agent_gateway::Engine) -> EngineKind {
+    match engine {
+        lamp_agent_gateway::Engine::Openclaw => EngineKind::Openclaw,
+        lamp_agent_gateway::Engine::Hermes => EngineKind::Hermes,
+    }
+}
+
+/// An engine's name as the journal says it.
+pub fn label(engine: EngineKind) -> &'static str {
+    match engine {
+        EngineKind::Openclaw => "OpenClaw",
+        EngineKind::Hermes => "Hermes",
+        _ => "the agent",
+    }
+}
 
 /// A session lamp-tasks can hand turns to, with what the engine-neutral
 /// [`AgentSession`] lacks: agent `main`'s exec allow-list over the
-/// session's own socket (`exec.approvals.get` / `set`, in place of the
-/// CLI's `approvals get` and `approvals allowlist add`), and the kept
-/// conversation's size.
+/// session's own socket (OpenClaw's `exec.approvals.get` / `set`, in place
+/// of the CLI's `approvals get` and `approvals allowlist add`), the kept
+/// conversation's size, and its turns and tokens when the session counts
+/// them.
 pub trait DirectSession: AgentSession {
     /// Whether agent `main` (or `*`) may exec the skill-start launcher.
     fn skill_start_allowed(&mut self) -> Result<bool, Error>;
@@ -101,6 +163,13 @@ pub trait DirectSession: AgentSession {
     /// messages, read now when not read since the last run; `None` when it
     /// can't be read, and lamp-tasks judges from the words handed over.
     fn session_size(&mut self) -> Option<crate::harness::SessionSize>;
+    /// The kept session's turns handed over and tokens counted since it
+    /// began, as the session keeps them across restarts ([`KEPT_FILE`],
+    /// Hermes), for V1's rotation backstop ([`near_limit`]); `None` when it
+    /// keeps none, and lamp-tasks counts since its own start.
+    fn rotation_counts(&self) -> Option<(u64, u64)> {
+        None
+    }
 }
 
 /// One approvals call's bound over the session.
@@ -127,18 +196,72 @@ impl DirectSession for lamp_agent_gateway::openclaw::Session {
     }
 }
 
-/// The lamp's real session: OpenClaw's gateway on loopback
-/// ([`crate::gateway::PORT`]), its token from the product's file, the one
-/// kept session `agent:main:lamp`, each task its own run (`followup`),
+/// Hermes has no exec allow-list: a command that asks is answered by the
+/// session's approval policy (allow once only the launcher, deny the rest,
+/// never left waiting), so the launcher is always "allowed" here and the
+/// fence guards the run's grant.
+impl DirectSession for lamp_agent_gateway::hermes::Session {
+    fn skill_start_allowed(&mut self) -> Result<bool, Error> {
+        Ok(true)
+    }
+    fn allow_skill_start(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+    fn session_size(&mut self) -> Option<crate::harness::SessionSize> {
+        // Tokens and messages of the kept session, as its gateway counts
+        // them (after Hermes's own compaction).
+        let (tokens, messages) = self.size_now()?;
+        Some(crate::harness::SessionSize {
+            messages,
+            bytes: tokens.saturating_mul(4),
+        })
+    }
+    fn rotation_counts(&self) -> Option<(u64, u64)> {
+        // Its runs handed over, and the sum of its ended runs'
+        // `usage.input_tokens`, both kept in its file with its id.
+        Some((self.turns(), self.run_tokens()))
+    }
+}
+
+/// The file in lamp-tasks' state folder where Hermes's session keeps its
+/// kept session's id, turns and tokens across restarts, 0600
+/// (`lamp_agent_gateway::hermes::Config::state_path`, its default).
+pub const KEPT_FILE: &str = lamp_agent_gateway::hermes::STATE_PATH;
+
+/// Hermes's gateway's API key, as lamp-update makes it (`hermes_gateway::KEY`),
+/// read by lamp-tasks at each check.
+pub const HERMES_KEY_PATH: &str = "/var/lib/lampos-hermes-gateway/api-key";
+
+/// The lamp's real session for `engine`:
+/// - OpenClaw: its gateway on loopback ([`crate::gateway::PORT`]), its
+///   token from the product's file, the one kept session `agent:main:lamp`,
+///   each task its own run (`followup`);
+/// - Hermes: its gateway's API server on loopback, its key from
+///   [`HERMES_KEY_PATH`], its kept session kept in [`KEPT_FILE`] (none kept:
+///   the session names a fresh one);
+///
 /// approvals answered by the skill-start fence's policy
-/// ([`crate::skill_start::LAUNCHER`]).
-pub fn lamp_session() -> Option<Box<dyn DirectSession>> {
-    let cfg = lamp_agent_gateway::openclaw::Config {
-        url: format!("ws://127.0.0.1:{}", crate::gateway::PORT),
-        fence: crate::skill_start::LAUNCHER.into(),
-        ..lamp_agent_gateway::openclaw::Config::default()
-    };
-    Some(Box::new(lamp_agent_gateway::openclaw::Session::new(cfg)))
+/// ([`crate::skill_start::LAUNCHER`]). `None` for any other engine.
+pub fn lamp_session(engine: EngineKind) -> Option<Box<dyn DirectSession>> {
+    match engine {
+        EngineKind::Openclaw => {
+            let cfg = lamp_agent_gateway::openclaw::Config {
+                url: format!("ws://127.0.0.1:{}", crate::gateway::PORT),
+                fence: crate::skill_start::LAUNCHER.into(),
+                ..lamp_agent_gateway::openclaw::Config::default()
+            };
+            Some(Box::new(lamp_agent_gateway::openclaw::Session::new(cfg)))
+        }
+        EngineKind::Hermes => {
+            let cfg = lamp_agent_gateway::hermes::Config {
+                fence: crate::skill_start::LAUNCHER.into(),
+                key_path: HERMES_KEY_PATH.into(),
+                ..lamp_agent_gateway::hermes::Config::default()
+            };
+            Some(Box::new(lamp_agent_gateway::hermes::Session::new(cfg)))
+        }
+        _ => None,
+    }
 }
 
 /// Not ready this long while something waits, the getting-ready hook is
@@ -212,6 +335,68 @@ pub const BROKEN_SENDS: u32 = 2;
 /// Sends of one turn before it ends failed.
 pub const SEND_TRIES_MOST: u32 = 4;
 
+/// The context of the lamp's Hermes model (`hermes_config::MODEL`, the
+/// voice's DeepSeek through lamp-cloud's forwarder), in tokens. Not read
+/// from the model: taken as OpenClaw's 128k, the smaller of what that
+/// model is said to take, so a rotation comes early rather than late.
+pub const HERMES_CONTEXT_TOKENS: u64 = 128_000;
+
+/// `engine`'s model context, in tokens, for [`near_limit`].
+pub fn context_tokens(engine: EngineKind) -> u64 {
+    match engine {
+        EngineKind::Hermes => HERMES_CONTEXT_TOKENS,
+        _ => crate::one_session::CONTEXT_TOKENS,
+    }
+}
+
+/// Whether `engine`'s kept session is due a fresh one before the next turn
+/// (a make's when `make`): its size (`size`, the gateway's own; `None`, the
+/// estimate `tokens` of the words handed over and read alone) near the
+/// engine's context (`one_session::near_context_limit_in` at
+/// [`context_tokens`]), or, for an engine that compacts on its own and
+/// reports after it (Hermes), V1's backstop (`one_session::rotation_due`,
+/// 40 turns or 250k tokens) on `counts`, the session's turns and tokens
+/// since it began. OpenClaw's bounds are exactly those of the one session.
+pub fn near_limit(
+    engine: EngineKind,
+    size: Option<crate::harness::SessionSize>,
+    tokens: u64,
+    counts: (u64, u64),
+    make: bool,
+) -> bool {
+    let (turns, counted) = counts;
+    crate::one_session::near_context_limit_in(context_tokens(engine), size, tokens, make)
+        || crate::one_session::rotation_due(engine, turns, counted)
+}
+
+/// The most a Hermes foreground command may run (Hermes's own
+/// `FOREGROUND_MAX_TIMEOUT`, 600 s): above it the terminal tool backgrounds
+/// it, and the run would end before its script.
+pub const HERMES_FOREGROUND_MOST_S: u64 = 600;
+
+/// The skill-start launcher as Hermes's gateway has it: first on its
+/// `PATH` (a link to [`crate::skill_start::LAUNCHER`], lamp-update's
+/// `hermes_gateway`). Its approval policy allows it by this bare name too.
+pub const HERMES_LAUNCHER: &str = "skill-start";
+
+/// A skill run's words for `engine` (`prompt`, the run's
+/// `gateway::open_start` prompt, which names the skill-start launcher and
+/// the run's id): Hermes is told to run `skill-start <run id>`
+/// ([`HERMES_LAUNCHER`]) with its `terminal` tool in the foreground with a
+/// timeout as long as the run's `deadline` (at most
+/// [`HERMES_FOREGROUND_MOST_S`]), so the launcher's end is the run's.
+/// OpenClaw's are `prompt` as it is.
+pub fn skill_words(engine: EngineKind, prompt: &str, deadline: Duration) -> String {
+    if engine != EngineKind::Hermes {
+        return prompt.to_owned();
+    }
+    let prompt = prompt.replace(crate::skill_start::LAUNCHER, HERMES_LAUNCHER);
+    let timeout = deadline.as_secs().clamp(1, HERMES_FOREGROUND_MOST_S);
+    format!(
+        "{prompt}\nRun it with your `terminal` tool, in the foreground (`background` false), with `timeout` {timeout}, and wait for it to end."
+    )
+}
+
 /// How a run ended, as lamp-tasks keeps it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum End {
@@ -222,6 +407,8 @@ pub enum End {
 
 #[derive(Clone, Debug)]
 struct Run {
+    /// The engine whose session it is handed to.
+    engine: EngineKind,
     /// The store's launch name, or the skill run's id: the turn's id.
     name: String,
     /// Its own agent id (a UUID), as the store follows it.
@@ -256,11 +443,15 @@ struct Inner {
     not_ready_since: Option<Instant>,
     not_ready_why: String,
     told_getting_ready: bool,
-    /// Waiters on readiness now (`OpenclawDirect::wait_ready`).
+    /// Waiters on readiness now (`Direct::wait_ready`).
     waiting_ready: u32,
     /// Estimated tokens in the kept conversation (4 characters a token).
     tokens: u64,
+    /// Turns handed over since lamp-tasks' start, for the journal.
     turns: u64,
+    /// Turns handed into the kept conversation since lamp-tasks' start or
+    /// its last reset: [`near_limit`]'s count for a session that keeps none.
+    session_turns: u64,
     resets: u64,
     /// Sends failed in a row ([`BROKEN_SENDS`]).
     failed_sends: u32,
@@ -293,8 +484,10 @@ pub type GettingReady = Box<dyn Fn(&str) + Send + Sync>;
 /// Reads the lamp's own machine id.
 type MachineOf = Box<dyn Fn() -> Option<String> + Send + Sync>;
 
-/// The lamp's one direct session and its turns.
-pub struct OpenclawDirect {
+/// The lamp's one direct session for one engine, and its turns.
+pub struct Direct {
+    /// The session's engine ([`AgentSession::engine`]).
+    engine: EngineKind,
     session: Mutex<Box<dyn DirectSession>>,
     inner: Mutex<Inner>,
     changed: Condvar,
@@ -312,9 +505,10 @@ pub struct OpenclawDirect {
     stop: Arc<AtomicBool>,
 }
 
-impl OpenclawDirect {
+impl Direct {
     pub fn new(session: Box<dyn DirectSession>, stop: Arc<AtomicBool>) -> Self {
         Self {
+            engine: engine_kind(session.engine()),
             session: Mutex::new(session),
             inner: Mutex::new(Inner::default()),
             changed: Condvar::new(),
@@ -333,6 +527,11 @@ impl OpenclawDirect {
             lamp_machine: Mutex::new(None),
             stop,
         }
+    }
+
+    /// The engine this session speaks to.
+    pub fn engine(&self) -> EngineKind {
+        self.engine
     }
 
     /// With `hook` told once a not-ready stretch passes `after`.
@@ -398,7 +597,7 @@ impl OpenclawDirect {
     pub fn start(self: &Arc<Self>) -> std::io::Result<std::thread::JoinHandle<()>> {
         let me = self.clone();
         std::thread::Builder::new()
-            .name("openclaw-direct".into())
+            .name(format!("{}-direct", self.engine.argument()))
             .spawn(move || me.pump())
     }
 
@@ -414,7 +613,7 @@ impl OpenclawDirect {
 
     /// [`lamp_path`] for this session.
     fn path(&self, engine: &str, machine: &str) -> bool {
-        engine == EngineKind::Openclaw.bus_name() && self.lamp_machine().as_deref() == Some(machine)
+        engine == self.engine.bus_name() && self.lamp_machine().as_deref() == Some(machine)
     }
 
     /// The agents of this session's turns whose run has ended (answered,
@@ -444,7 +643,9 @@ impl OpenclawDirect {
     /// A turn of `agent` ended `end`, for tests of the store.
     #[cfg(test)]
     pub(crate) fn ended_for_tests(&self, agent: &str, end: End) {
+        let engine = self.engine;
         self.lock().runs.push(Run {
+            engine,
             name: "lamp-test".into(),
             agent: agent.to_owned(),
             kind: TurnKind::Spoken,
@@ -571,7 +772,10 @@ impl OpenclawDirect {
     fn became_ready(&self) {
         let mut inner = self.lock();
         if !inner.ready {
-            eprintln!("tasks: direct: OpenClaw's gateway is ready, the kept session open");
+            eprintln!(
+                "tasks: direct: {}'s gateway is ready, the kept session open",
+                label(self.engine)
+            );
         }
         inner.ready = true;
         inner.not_ready_since = None;
@@ -685,8 +889,10 @@ impl OpenclawDirect {
     /// Queues one turn; its agent id. The pump hands it over in order.
     pub fn enqueue(&self, name: &str, kind: TurnKind, words: &str) -> Result<String, String> {
         let agent = new_agent_id()?;
+        let engine = self.engine;
         let mut inner = self.lock();
         inner.runs.push(Run {
+            engine,
             name: name.to_owned(),
             agent: agent.clone(),
             kind,
@@ -764,12 +970,17 @@ impl OpenclawDirect {
                 return;
             }
         }
-        // The context rotation as `reset()`, at the one session's bounds
-        // on the gateway's own size (tokens and messages; 128k context);
-        // where it can't be read, on the words handed over and read.
-        let estimate = self.lock().tokens;
+        // The context rotation as `reset()`, at the engine's bounds on the
+        // gateway's own size (tokens and messages, of the engine's context);
+        // where it can't be read, on the words handed over and read; for
+        // Hermes also V1's turns and tokens backstop.
+        let (estimate, turns) = {
+            let inner = self.lock();
+            (inner.tokens, inner.session_turns)
+        };
         let size = session.session_size();
-        let full = crate::one_session::near_context_limit(size, estimate, make);
+        let counts = session.rotation_counts().unwrap_or((turns, estimate));
+        let full = near_limit(self.engine, size, estimate, counts, make);
         if full {
             self.reset_session(
                 &mut **session,
@@ -805,6 +1016,7 @@ impl OpenclawDirect {
             Ok(run) => {
                 let mut inner = self.lock();
                 inner.tokens = inner.tokens.saturating_add(tokens_in(&turn.message));
+                inner.session_turns += 1;
                 inner.turns += 1;
                 inner.failed_sends = 0;
                 let turns = inner.turns;
@@ -887,10 +1099,11 @@ impl OpenclawDirect {
             Ok(()) => {
                 let mut inner = self.lock();
                 eprintln!(
-                    "tasks: direct: a fresh conversation for {why}, about {} tokens in the last",
-                    inner.tokens
+                    "tasks: direct: a fresh conversation for {why}, about {} tokens and {} turns in the last",
+                    inner.tokens, inner.session_turns
                 );
                 inner.tokens = 0;
+                inner.session_turns = 0;
                 inner.resets += 1;
             }
             Err(error) => eprintln!("tasks: direct: the kept session not reset: {error}"),
@@ -914,7 +1127,7 @@ impl OpenclawDirect {
                 // The gateway dropped under the run (a restart, a crash):
                 // the turns queued behind it end too, with the same "try
                 // again" words, not left waiting for a recovery.
-                if why == lamp_agent_gateway::openclaw::DROPPED {
+                if why == lamp_agent_gateway::DROPPED {
                     for queued in inner.runs.iter_mut().filter(|run| run.queued()) {
                         queued.end = Some(End::Failed(why.clone()));
                     }
@@ -932,10 +1145,9 @@ impl OpenclawDirect {
             }
             // The gateway's link no longer knows the run (lost in a
             // restart): the person hears the drop's "try again" words.
-            Err(Error::UnknownRun(_)) => Some((
-                End::Failed(lamp_agent_gateway::openclaw::DROPPED.into()),
-                None,
-            )),
+            Err(Error::UnknownRun(_)) => {
+                Some((End::Failed(lamp_agent_gateway::DROPPED.into()), None))
+            }
             Err(error) => Some((End::Failed(error.to_string()), None)),
         };
         if let Some(run) = inner.find_mut(agent) {
@@ -1012,10 +1224,10 @@ impl OpenclawDirect {
         }
     }
 
-    /// Whether `launch` is the direct path's: OpenClaw on the lamp's own
-    /// machine, no session named. Hermes and anything else: `false`.
+    /// Whether `launch` is this session's: its engine on the lamp's own
+    /// machine, no session named. Any other engine or machine: `false`.
     pub fn takes(&self, launch: &Launch) -> bool {
-        launch.target.engine == EngineKind::Openclaw
+        launch.target.engine == self.engine
             && launch.session.is_none()
             && self
                 .lamp_machine()
@@ -1149,7 +1361,7 @@ impl OpenclawDirect {
 /// The kept session's readiness as the Gateway's probe: a hand-over waits
 /// on it through [`crate::gateway::Gateway`]'s own wait, as Harness's does
 /// on the port.
-impl crate::gateway::Probe for Arc<OpenclawDirect> {
+impl crate::gateway::Probe for Arc<Direct> {
     fn ready(&mut self) -> bool {
         self.is_ready()
     }
@@ -1159,15 +1371,17 @@ impl crate::gateway::Probe for Arc<OpenclawDirect> {
     fn not_ready(&self) -> String {
         let why = self.lock().not_ready_why.clone();
         if why.is_empty() {
-            "OpenClaw's gateway is not ready yet".to_owned()
+            format!("{}'s gateway is not ready yet", label(self.engine))
         } else {
             why
         }
     }
 }
 
-impl OpenclawDirect {
-    /// The wait before a hand-over, ready at most `within`.
+impl Direct {
+    /// The wait before a hand-over, ready at most `within`: OpenClaw's
+    /// Gateway wait (which also marks OpenClaw in use, #8105), its probe
+    /// this session's readiness.
     pub fn gateway(self: &Arc<Self>, within: Duration) -> crate::gateway::Gateway {
         crate::gateway::Gateway::with_bounds(
             Box::new(self.clone()),
@@ -1175,6 +1389,58 @@ impl OpenclawDirect {
             crate::gateway::READY_EVERY,
         )
     }
+
+    /// Ready, or waited for until `until` or `cancelled`: the wait before
+    /// a hand-over for an engine that is not OpenClaw (never OpenClaw's
+    /// in-use mark); else why not, in words.
+    pub fn ready_by(&self, until: Instant, cancelled: &dyn Fn() -> bool) -> Result<(), String> {
+        if self.wait_ready(until, cancelled) {
+            return Ok(());
+        }
+        let why = self.lock().not_ready_why.clone();
+        Err(if why.is_empty() {
+            format!("{}'s gateway is not ready yet", label(self.engine))
+        } else {
+            why
+        })
+    }
+
+    /// The wait before a hand-over for this engine, to `until`: OpenClaw's
+    /// [`Self::gateway`], any other [`Self::ready_by`].
+    fn before_hand_over(
+        self: &Arc<Self>,
+        until: Instant,
+        stopped: &dyn Fn() -> bool,
+    ) -> Result<(), String> {
+        if self.engine == EngineKind::Openclaw {
+            self.gateway(crate::gateway::SERVING_WITHIN)
+                .before_launch_until(until, stopped)
+        } else {
+            self.ready_by(
+                until.min(Instant::now() + crate::gateway::SERVING_WITHIN),
+                stopped,
+            )
+        }
+    }
+}
+
+/// A spoken `launch` for a direct session that is not OpenClaw's (whose
+/// wait is `gateway::launch_with`'s): its session's readiness waited for,
+/// at most `within`; not ready by then, not sent, with the same
+/// [`crate::gateway::NOT_READY`] code task news tells as "still getting
+/// ready". `None`: no such session takes it, or it is ready.
+pub fn not_ready_for(launch: &Launch, within: Duration) -> Option<LaunchOutcome> {
+    let direct = lamps()
+        .into_iter()
+        .find(|direct| direct.engine != EngineKind::Openclaw && direct.takes(launch))?;
+    let why = direct.ready_by(Instant::now() + within, &|| false).err()?;
+    eprintln!(
+        "tasks: {why} within {} s; the hand-over is not sent",
+        within.as_secs()
+    );
+    Some(LaunchOutcome::NotSent {
+        code: crate::gateway::NOT_READY.into(),
+    })
 }
 
 /// A skill's `do.task` or a make (seam 2), in place of the gateway wait and
@@ -1184,7 +1450,7 @@ impl OpenclawDirect {
 /// make), `folder` the make's own folder.
 #[allow(clippy::too_many_arguments)]
 pub fn skill_turn(
-    direct: &Arc<OpenclawDirect>,
+    direct: &Arc<Direct>,
     run: &crate::skill_task::SkillRun,
     live: Option<&crate::skill_start::Live>,
     folder: &Path,
@@ -1194,8 +1460,7 @@ pub fn skill_turn(
     until: Instant,
     stopped: &dyn Fn() -> bool,
 ) -> Result<u64, String> {
-    let mut gateway = direct.gateway(crate::gateway::SERVING_WITHIN);
-    if let Err(why) = gateway.before_launch_until(until, stopped) {
+    if let Err(why) = direct.before_hand_over(until, stopped) {
         eprintln!("tasks: {}: {why}; the hand-over is not sent", run.run);
         return Err(format!(
             "the agent's gateway didn't take the run ({})",
@@ -1216,8 +1481,9 @@ pub fn skill_turn(
     let ended = direct.wait_end(&agent, until, stopped);
     let took = began.elapsed().as_secs();
     let line = format!(
-        "[lamp-tasks] skill task {}: ended, OpenClaw's gateway says idle, after {took} s; its agent: started (the lamp's default agent)",
-        run.run
+        "[lamp-tasks] skill task {}: ended, {}'s gateway says idle, after {took} s; its agent: started (the lamp's default agent)",
+        run.run,
+        label(direct.engine)
     );
     match ended {
         Some(End::Answered(answer)) if makes => {
@@ -1261,34 +1527,56 @@ pub fn skill_turn(
 
 #[cfg(test)]
 thread_local! {
-    /// A test's own lamp session, seen on its thread only ([`lamp`]).
-    static TEST_LAMP: std::cell::RefCell<Option<Arc<OpenclawDirect>>> =
+    /// A test's own lamp session, seen on its thread only ([`lamps`]).
+    static TEST_LAMP: std::cell::RefCell<Option<Arc<Direct>>> =
         const { std::cell::RefCell::new(None) };
 }
 
-/// The lamp's direct session: [`LAMP`]; in the crate's tests, the one the
-/// test set on its own thread ([`set_test_lamp`]), if any.
-pub fn lamp() -> Option<Arc<OpenclawDirect>> {
+/// The lamp's direct sessions, OpenClaw's first ([`LAMP`], [`HERMES_LAMP`]);
+/// in the crate's tests, the one the test set on its own thread
+/// ([`set_test_lamp`]), if any.
+pub fn lamps() -> Vec<Arc<Direct>> {
     #[cfg(test)]
     if let Some(direct) = TEST_LAMP.with(|lamp| lamp.borrow().clone()) {
-        return Some(direct);
+        return vec![direct];
     }
-    LAMP.get().cloned()
+    [&LAMP, &HERMES_LAMP]
+        .into_iter()
+        .filter_map(|slot| slot.get().cloned())
+        .collect()
+}
+
+/// The lamp's direct session for `engine`, when it is on.
+pub fn lamp_for(engine: EngineKind) -> Option<Arc<Direct>> {
+    lamps().into_iter().find(|direct| direct.engine == engine)
+}
+
+/// Whether a skill's run or a make on the lamp's default agent `engine`
+/// (`gateway`: a gateway agent by its wrapper's data) goes to its direct
+/// session ([`skill_turn`]): OpenClaw as a gateway agent with its switch
+/// on; the lamp's Hermes with its switch on, whatever its wrapper.
+pub fn takes_runs(engine: EngineKind, gateway: bool) -> bool {
+    match engine {
+        EngineKind::Openclaw => gateway && lamp_for(engine).is_some(),
+        EngineKind::Hermes => lamp_for(engine).is_some(),
+        _ => false,
+    }
 }
 
 /// A test's lamp session on its own thread.
 #[cfg(test)]
-pub(crate) fn set_test_lamp(direct: Option<Arc<OpenclawDirect>>) {
+pub(crate) fn set_test_lamp(direct: Option<Arc<Direct>>) {
     TEST_LAMP.with(|lamp| *lamp.borrow_mut() = direct);
 }
 
-/// Whether a task of `engine` (its bus name, `openclaw`) on `machine` is
-/// the direct path's: the switch on, OpenClaw, the lamp's own machine. Its
-/// progress and looks come from the gateway only, never from Harness's
-/// `ps` or `show` (each ~2 s on the lamp, on the one worker a hand-over
-/// waits behind). Hermes, other machines and the switch off: `false`.
+/// Whether a task of `engine` (its bus name, `openclaw`, `hermes`) on
+/// `machine` is the direct path's: that engine's switch on, the lamp's own
+/// machine. Its progress and looks come from the gateway only, never from
+/// Harness's `ps` or `show` (each ~2 s on the lamp, on the one worker a
+/// hand-over waits behind). Other engines, other machines and the switch
+/// off: `false`.
 pub fn lamp_path(engine: &str, machine: &str) -> bool {
-    lamp().is_some_and(|direct| direct.path(engine, machine))
+    lamps().iter().any(|direct| direct.path(engine, machine))
 }
 
 /// A direct-path task's look ([`lamp_path`]) in place of Harness's `show`:
@@ -1300,7 +1588,9 @@ pub fn lamp_observe(
     machine: &str,
     agent: &str,
 ) -> Option<Result<Observation, String>> {
-    let direct = lamp().filter(|direct| direct.path(engine, machine))?;
+    let direct = lamps()
+        .into_iter()
+        .find(|direct| direct.path(engine, machine))?;
     Some(
         direct
             .observe(agent)
@@ -1319,9 +1609,9 @@ pub fn harness_watched(watched: &[Watched]) -> Vec<Watched> {
         .collect()
 }
 
-/// The lamp's direct session, when `agent` is one of its turns.
-pub fn lamp_owns(agent: &str) -> Option<Arc<OpenclawDirect>> {
-    lamp().filter(|direct| direct.owns(agent))
+/// The lamp's direct session whose turn `agent` is.
+pub fn lamp_owns(agent: &str) -> Option<Arc<Direct>> {
+    lamps().into_iter().find(|direct| direct.owns(agent))
 }
 
 fn tokens_in(text: &str) -> u64 {
@@ -1481,14 +1771,20 @@ fn listed_of_run(run: &Run) -> Listed {
         } else {
             run.progress.as_ref().and_then(about)
         },
-        agent: Some(EngineKind::Openclaw.argument().to_owned()),
+        agent: Some(run.engine.argument().to_owned()),
     }
 }
 
 /// A run's row as `harness ps` gave it ([`listed_of_run`]), for tests and
-/// the docs: `progress` the gateway's, `end` lamp-tasks'.
-pub fn listed_of(agent: &str, progress: Option<&Progress>, end: Option<&End>) -> Listed {
+/// the docs: `engine`'s session, `progress` the gateway's, `end` lamp-tasks'.
+pub fn listed_of(
+    engine: EngineKind,
+    agent: &str,
+    progress: Option<&Progress>,
+    end: Option<&End>,
+) -> Listed {
     listed_of_run(&Run {
+        engine,
         name: String::new(),
         agent: agent.to_owned(),
         kind: TurnKind::Spoken,
@@ -1510,9 +1806,7 @@ fn observation_of_run(run: &Run) -> Observation {
         // A drop's failure carries the person's "try again" words as its
         // last words: the voice's news of a stopped task says them, in the
         // person's language.
-        Some(End::Failed(why)) if why == lamp_agent_gateway::openclaw::DROPPED => {
-            (why.clone(), false)
-        }
+        Some(End::Failed(why)) if why == lamp_agent_gateway::DROPPED => (why.clone(), false),
         _ => (String::new(), false),
     };
     Observation {
@@ -1533,6 +1827,7 @@ fn observation_of_run(run: &Run) -> Observation {
 /// A run's observation as `harness show` gave it ([`observation_of_run`]).
 pub fn observation_of(agent: &str, progress: Option<&Progress>, end: Option<&End>) -> Observation {
     observation_of_run(&Run {
+        engine: EngineKind::Openclaw,
         name: String::new(),
         agent: agent.to_owned(),
         kind: TurnKind::Spoken,

@@ -6155,7 +6155,12 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   news, never both. The line is heard with the answer, not at the moment
   of the replacement.
 
-### OpenClaw spoken to directly (`LAMP_TASKS_OPENCLAW_DIRECT=on` in the product's lamp-tasks unit)
+### The lamp's agent spoken to directly (`LAMP_TASKS_OPENCLAW_DIRECT=on` in the product's lamp-tasks unit; `LAMP_TASKS_HERMES_DIRECT`, off)
+
+The path is the same for both engines, each behind its own switch, with its
+own session (`direct::Direct`), its own pump and its own readiness; what
+differs for Hermes is under "Hermes spoken to directly" at the end of this
+section. Everything else below says OpenClaw and holds for Hermes the same.
 
 With `LAMP_TASKS_OPENCLAW_DIRECT=on` in lamp-tasks' own environment (`on`
 exactly; anything else, unset too, is off), lamp-tasks hands every OpenClaw
@@ -6164,8 +6169,9 @@ turn straight to OpenClaw's gateway through `lamp_agent_gateway::AgentSession`
 replaces the Harness CLI for OpenClaw (`harness new/reply/ensure/wait/show/
 close/ps`, `openclaw tui` in tmux, where the stuck sessions of #7906, #8001
 and #6226 came from) and the `openclaw … --gateway` CLI calls (`approvals get`,
-`approvals allowlist add`, `gateway call sessions.delete`). Hermes keeps its
-path as before. The code is `crates/tasks/src/direct.rs`.
+`approvals allowlist add`, `gateway call sessions.delete`). The lamp's Hermes
+has its own switch for the same path (`LAMP_TASKS_HERMES_DIRECT`, below); off,
+it keeps its path as before. The code is `crates/tasks/src/direct.rs`.
 
 The session is `lamp_agent_gateway::openclaw::Session` (`direct::lamp_session`):
 its default `Config` with the URL from `gateway::PORT` and the fence from
@@ -6177,7 +6183,8 @@ The product's `lamp-tasks.service` sets it on (M8; [switches.md](switches.md)).
 
 With the switch on and a session built:
 
-- **At the start.** A pump thread (`openclaw-direct`) connects at once and
+- **At the start.** A pump thread (`openclaw-direct`; Hermes's
+  `hermes-direct`) connects at once and
   opens or adopts the kept session, with no ask needed. A failed look is tried
   again after 0.5 s, doubled each time, at most 30 s (2 s while something
   waits). While ready and idle, it looks again every 30 s. The one session's
@@ -6193,7 +6200,7 @@ With the switch on and a session built:
   (`runtime::Production::Direct`): the lamp's OpenClaw turns go to the direct
   session, every other call to the Harness backend inside it. The
   tasks-harness worker's wait (`gateway::launch_with`) stays the same, but its
-  probe is the session's readiness (`OpenclawDirect::gateway`, a
+  probe is the session's readiness (`Direct::gateway`, a
   `gateway::Probe`), not the port. The launch waits for the session to be
   ready, at most 60 s (`gateway::READY_WITHIN`). Not ready by then, it is `not_sent`
   `openclaw_gateway_not_ready`, which Task news tells as "I'm still getting
@@ -6298,7 +6305,8 @@ With the switch on and a session built:
   restart", and the next task goes in once ready.
 - **Gateway restart or drop.** This is the owner's call (2026-11-23). On any
   drop (close 1012 at a restart, a crash, 1006, a lost socket), every run in
-  flight ends `failed` at once with `openclaw::DROPPED`: "A small system error
+  flight ends `failed` at once with `lamp_agent_gateway::DROPPED` (one text for
+  every engine): "A small system error
   stopped this task. Please try again in a few minutes." The turns queued
   behind it end the same, never handed over. So does a run the gateway no
   longer knows after the reconnect (`UnknownRun`). That line is the failed
@@ -6324,9 +6332,9 @@ With the switch on and a session built:
     gateway saturated by its startup took more than the old 2 s ready look
     and 10 s call bound, and lamp-tasks dropped each half-made connect.
 - **Rotation.** The context rotation is `reset()`, a fresh conversation, before
-  a turn, at the one session's bounds (`one_session::near_context_limit`: 85 %
-  of the 128k context or more than 150 messages for a task, 60 % or more than
-  100 for a make). It weighs the gateway's own size of the session
+  a turn, at the engine's bounds (`direct::near_limit`; for OpenClaw exactly the
+  one session's, `one_session::near_context_limit`: 85 % of the 128k context
+  or more than 150 messages for a task, 60 % or more than 100 for a make). It weighs the gateway's own size of the session
   (`DirectSession::session_size`): the larger of `sessionInfo.totalTokens`
   and `contextBudgetStatus.estimatedPromptTokens`, and `totalMessages`, from a
   one-message `chat.history`. That read is made at each (re)connect, after each
@@ -6340,11 +6348,108 @@ With the switch on and a session built:
 - **Harness's `ps` failing.** The direct rows are still given, so the tracker
   reads them.
 
-Journal: `tasks: direct: OpenClaw's gateway is ready, the kept session open`,
-`tasks: <id>: turn accepted in <ms> ms (<nth>)`, `tasks: direct: <why>` when
-not ready, `tasks: direct: run <run> had no event in <s> s and is stuck; ended,
-the next turn goes on`, and `tasks: direct: a fresh conversation for <id> (a
-full conversation | a broken session), about <n> tokens in the last`.
+Journal: `tasks: direct: OpenClaw's gateway is ready, the kept session open`
+(`Hermes's` for Hermes), `tasks: <id>: turn accepted in <ms> ms (<nth>)`,
+`tasks: direct: <why>` when not ready, `tasks: direct: run <run> had no event
+in <s> s and is stuck; ended, the next turn goes on`, and `tasks: direct: a
+fresh conversation for <id> (a full conversation | a broken session), about
+<n> tokens and <m> turns in the last`.
+
+#### Hermes spoken to directly (`LAMP_TASKS_HERMES_DIRECT=on`, off in the product)
+
+With `LAMP_TASKS_HERMES_DIRECT=on` in lamp-tasks' own environment (`on`
+exactly; anything else, unset too, is off; no unit sets it until a Hermes
+lamp's row passes), the lamp's own Hermes takes the path above in place of
+Harness and `hermes chat -q`: one connection to Hermes's own API server and one
+kept session. OpenClaw's switch and its path are unchanged; each engine has its
+own session, and both may be on (`direct::lamps`).
+
+Hermes direct behaves the same as OpenClaw direct (the owner's acceptance, 23
+Nov): lamp tasks run, and "how far along?" and the status rows are answered
+from the run while it goes; skills are made and run; a stuck run is found and
+recovered with the same `STUCK_AFTER` and logic (aborted, the person told, the
+next task goes on; a broken session reset); a gateway drop ends the run and
+the queued turns with the same words. Hermes's gateway has the internet (its
+namespace holds no `--net`), and a skill reaches the lamp's services (camera,
+microphone, speaker, servos, light) only through its skill-start grant, the
+same as OpenClaw's skills. What is Hermes's own:
+
+- **The session.** `lamp_agent_gateway::hermes::Session` (`direct::lamp_session`):
+  Hermes's gateway API server on loopback (`http://127.0.0.1:8642`), its Bearer
+  key from `/var/lib/lampos-hermes-gateway/api-key`, its Runs API (`POST
+  /v1/runs` with the kept `session_id`, each run's events over SSE), and
+  approval prompts answered at once by the skill-start fence's policy (`once`
+  for exactly the launcher, `deny` for anything else, never `session` or
+  `always`; Hermes's own `approvals.mode` stays `manual`). Hermes's gateway
+  (`lamp-hermes-gateway.service`, lamp-update's `LAMP_HERMES_GATEWAY=on`)
+  runs only while lamp-tasks names Hermes the lamp's default agent, and then
+  OpenClaw's gateway follows the default too, so only one runs
+  (docs/install.md, docs/switches.md).
+- **Gateway not reachable.** The switch on but the gateway not up (its unit
+  off, still starting, or gone) is handled as OpenClaw's gateway down: a
+  spoken task waits at most 60 s and is `not_sent`, a queued turn waits at
+  most 2 min and ends not ready, a skill run waits to its deadline (at most
+  240 s) and fails `openclaw_gateway_not_ready`; the pump keeps reconnecting.
+- **The kept session survives restarts.** Its id is lamp-tasks' own
+  (`lamp-main-<ms>`), kept with its turns and tokens in
+  `/var/lib/lampos-tasks/hermes-direct.json` (0600, `direct::KEPT_FILE`). A
+  restart of lamp-tasks, of Hermes's gateway or of the lamp adopts it, so the
+  conversation goes on; one the gateway no longer has is replaced by a fresh
+  one. A rotation names a new id and the old one is deleted.
+- **A spoken task.** A Hermes task for the lamp's own machine with no session
+  named is queued and answered `joined`, as above. The tasks-harness worker
+  waits for Hermes's own session to be ready (`direct::not_ready_for`, at most
+  60 s, `gateway::READY_WITHIN`), never OpenClaw's Gateway wait, so a Hermes
+  task never marks OpenClaw in use (#8105). Not ready by then, it is
+  `not_sent` `openclaw_gateway_not_ready`, the same code Task news tells as
+  "I'm still getting ready".
+- **A skill's `do.task` and a make.** With the lamp's Hermes the default and its
+  switch on, `HarnessRunner::run` takes the run on the one run path as a
+  gateway agent's (`by_start`), whatever the Harness default-agent switch says,
+  and hands it to the direct session (`direct::takes_runs`). Hermes's per-run
+  wrapper, token file and namespace are not used, so they are not checked. The
+  run's grant is made live for the launcher (`gateway::open_start`), and its
+  words name the launcher as `skill-start <run id>` (it is first on the
+  gateway's `PATH`), plus one line for Hermes (`direct::skill_words`): run it
+  with the `terminal` tool, in the foreground
+  (`background` false), with `timeout` the run's deadline (at most 600 s,
+  Hermes's foreground bound), and wait for it to end. No per-run token file, no
+  `${LAMP_CONTROL_TOKEN}` for the MCP entry and no `shell_init_files` reach
+  Hermes on this path: lamp-control is reached only through the launcher's
+  fence, and the answer is kept only when the fence said it started the script
+  (`Live::ran`), as for OpenClaw. A run with keys is refused (its gateway's
+  turns share one environment), and one granted `net` gets its way out only
+  at the fence, as a gateway agent's (`LAMP_TASK_NET_GATEWAY`). A voice make
+  goes into the kept session too (`skill_make::MakeGateway::of_direct`), with
+  the guide's `lamp-skills pack` check as Hermes's own make has it. A live ask
+  (`voice_ask`), an agent skill's run and a run with keys or `net` through the
+  make's runners keep their path.
+- **No allow-list.** Hermes has no exec allow-list: the read before a skill run
+  always says allowed, and nothing is put back. The approval policy above and
+  the fence guard the run.
+- **Rotation.** At the bounds above, of Hermes's context
+  (`direct::HERMES_CONTEXT_TOKENS`, 128k: the model's own is not read, so the
+  smaller is taken), on the gateway's own size of the kept session (its live,
+  uncompacted messages and their tokens). Because Hermes compacts on its own
+  and its size is after that, V1's backstop also holds: 40 turns or 250k tokens
+  (`one_session::rotation_due`), counted by the session since it began (its
+  runs handed over, and the sum of their `usage.input_tokens`) and kept with
+  its id across restarts.
+- **A drop.** The gateway restarted or gone mid-run (its stream broken and its
+  status unreadable for 30 s) ends the run, and every turn queued behind it,
+  with the same `lamp_agent_gateway::DROPPED` words. Nothing is run again: the
+  same turn handed over again within 15 min gets that ended run back, and a
+  new ask is a new task.
+- **Stays on Harness.** Computers' sessions (any engine on a Mac),
+  `harness reply-named`, `LAMP_TASKS_RESUME_CLOSED`, sign-in, and
+  `LAMP_HERMES_ON_LAMP`'s target discovery. Harness's `hooks:` block in
+  Hermes's `config.yaml` is left as it is.
+
+Tests: `direct::tests` runs each scenario above once per engine against a fake
+session (`<scenario>::openclaw`, `<scenario>::hermes`): hand-over, progress,
+queue, stuck, drop, skill run, make; and adds Hermes's own:
+its context bounds and turns backstop, its launcher words, its wait for its own
+session's readiness. Not yet on a lamp: the whole path (no Hermes lamp row).
 
 ### The limit accepted for Monday: a running skill's grants inside the gateway
 

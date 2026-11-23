@@ -103,6 +103,17 @@ pub trait Systemd {
     fn try_restart_gateway(&mut self) -> Result<(), String> {
         Err("this systemd cannot restart OpenClaw's gateway".to_owned())
     }
+    /// `systemctl show` of [`crate::openclaw_install::LOADED`] for Hermes's
+    /// gateway, [`crate::hermes_gateway::UNIT`], and only it (as #7879). A
+    /// systemd that cannot say refuses: the loaded unit is then not checked.
+    fn hermes_gateway_unit_properties(&mut self) -> Result<String, String> {
+        Err("this systemd cannot show Hermes's gateway unit".to_owned())
+    }
+    /// `systemctl try-restart` of [`crate::hermes_gateway::UNIT`], and only
+    /// it: restarted only if it runs. A systemd that cannot refuses.
+    fn try_restart_hermes_gateway(&mut self) -> Result<(), String> {
+        Err("this systemd cannot restart Hermes's gateway".to_owned())
+    }
     /// When [`crate::writer_swap::BACK_UNIT`]'s program last began, in Unix
     /// milliseconds to the second below (`ExecMainStartTimestamp`): none
     /// when it never began, or when systemd cannot say. A `failed` from a
@@ -283,6 +294,26 @@ impl Systemd for Systemctl {
     fn try_restart_gateway(&mut self) -> Result<(), String> {
         run(
             &["try-restart", "--", crate::openclaw_install::UNIT],
+            self.restart_within,
+        )
+    }
+
+    fn hermes_gateway_unit_properties(&mut self) -> Result<String, String> {
+        show_within(
+            Command::new("systemctl").args([
+                "show",
+                "--no-pager",
+                &format!("--property={}", crate::openclaw_install::LOADED),
+                "--",
+                crate::hermes_gateway::UNIT,
+            ]),
+            JOURNAL_WITHIN,
+        )
+    }
+
+    fn try_restart_hermes_gateway(&mut self) -> Result<(), String> {
+        run(
+            &["try-restart", "--", crate::hermes_gateway::UNIT],
             self.restart_within,
         )
     }

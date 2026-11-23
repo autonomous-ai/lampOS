@@ -288,10 +288,22 @@ pub const TASK_FRESH_MESSAGES: u64 = 150;
 /// ([`MAKE_FRESH_TOKENS`], [`MAKE_FRESH_MESSAGES`]) or another task's
 /// ([`TASK_FRESH_TOKENS`], [`TASK_FRESH_MESSAGES`]).
 pub fn near_context_limit(size: Option<SessionSize>, tokens: u64, make: bool) -> bool {
+    near_context_limit_in(CONTEXT_TOKENS, size, tokens, make)
+}
+
+/// [`near_context_limit`] for a model of `context` tokens: the same shares
+/// of it (60% for a make, 85% for another task) and the same message
+/// bounds; at [`CONTEXT_TOKENS`] exactly [`near_context_limit`]'s.
+pub fn near_context_limit_in(
+    context: u64,
+    size: Option<SessionSize>,
+    tokens: u64,
+    make: bool,
+) -> bool {
     let (most_tokens, most_messages) = if make {
-        (MAKE_FRESH_TOKENS, MAKE_FRESH_MESSAGES)
+        (context * 60 / 100, MAKE_FRESH_MESSAGES)
     } else {
-        (TASK_FRESH_TOKENS, TASK_FRESH_MESSAGES)
+        (context * 85 / 100, TASK_FRESH_MESSAGES)
     };
     match size {
         Some(size) => size.bytes / 4 >= most_tokens || size.messages > most_messages,

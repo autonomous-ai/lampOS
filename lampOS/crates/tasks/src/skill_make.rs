@@ -1371,8 +1371,10 @@ pub fn answer_with(
                 return refusal(NOT_READY, NOT_READY_LINE);
             }
             Ok(MakeAgent::Hermes) => hermes,
-            Ok(MakeAgent::Gateway(_)) => {
-                return answer_on_gateway(&make, work, gateway, started);
+            Ok(MakeAgent::Gateway(engine)) => {
+                // Hermes's direct make keeps the check its own make has.
+                let checked = gateway.checked || engine == crate::harness::EngineKind::Hermes;
+                return answer_on_gateway(&make, work, gateway, checked, started);
             }
             Err(why) => return refusal("run_failed", &why),
         },
@@ -1414,12 +1416,13 @@ fn answer_on_gateway(
     make: &MakeLine,
     work: &Path,
     gateway: &MakeGateway,
+    checked: bool,
     started: &mut dyn FnMut(),
 ) -> Value {
     if let Err(why) = gateway.ready() {
         return refusal(not_started(&why), &why);
     }
-    let folder = match put_for_gateway(work, &make.rules, make.guide, gateway.checked) {
+    let folder = match put_for_gateway(work, &make.rules, make.guide, checked) {
         Ok(folder) => folder,
         Err(error) => {
             return refusal(
@@ -1430,13 +1433,7 @@ fn answer_on_gateway(
     };
     started();
     let switches = make.switches.clone().unwrap_or_default();
-    let run = gateway_run_with(
-        &folder.path,
-        make.within(),
-        make.guide,
-        gateway.checked,
-        &switches,
-    );
+    let run = gateway_run_with(&folder.path, make.within(), make.guide, checked, &switches);
     let ran = gateway.run(&run, &|| {});
     // A make cut at its deadline (or its turn ended badly) that had written
     // its whole answer.md is still its answer (First's P3 on #7737), read
@@ -1552,22 +1549,43 @@ pub struct MakeGateway {
 }
 
 impl MakeGateway {
-    /// The lamp's: the one run path's runner ([`crate::skill_task::HarnessRunner::lamp`]
-    /// with `makes`) on lamp-tasks' Harness `harness`, its default agent a
-    /// gateway agent by [`crate::skill_task::HarnessRunner::make_agent`], the lamp's Hermes
+    /// The lamp's one run path's runner ([`crate::skill_task::HarnessRunner::lamp`]
+    /// with `makes`) on lamp-tasks' Harness `harness`, for [`Self::of`] and
+    /// [`Self::of_direct`]: its default agent a gateway agent by
+    /// [`crate::skill_task::HarnessRunner::make_agent`], the lamp's Hermes
     /// as its own, any other refused in words.
-    pub fn lamp(home: &Path, harness: crate::skill_task::SkillHarnessSlot) -> Self {
+    pub fn lamp_runner(
+        home: &Path,
+        harness: crate::skill_task::SkillHarnessSlot,
+    ) -> Arc<crate::skill_task::HarnessRunner> {
         let mut runner = crate::skill_task::HarnessRunner::lamp(home, harness);
         runner.makes = true;
-        Self::of(Arc::new(runner))
+        Arc::new(runner)
     }
 
     /// With `runner` (its `makes` on) as both the pick and the turn.
     pub fn of(runner: Arc<crate::skill_task::HarnessRunner>) -> Self {
+        Self::picking(runner, false)
+    }
+
+    /// [`Self::of`], with the lamp's Hermes picked as a gateway agent while
+    /// its direct session is on (`crate::direct::takes_runs`): a make goes
+    /// into its kept session. A live ask keeps [`Self::of`]: it is not on
+    /// the direct path.
+    pub fn of_direct(runner: Arc<crate::skill_task::HarnessRunner>) -> Self {
+        Self::picking(runner, true)
+    }
+
+    fn picking(runner: Arc<crate::skill_task::HarnessRunner>, hermes_direct: bool) -> Self {
         let looks = runner.clone();
         Self {
             pick: Box::new(move || match looks.make_agent()? {
                 Some((engine, true)) => Ok(MakeAgent::Gateway(engine)),
+                Some((engine @ crate::harness::EngineKind::Hermes, false))
+                    if hermes_direct && crate::direct::takes_runs(engine, false) =>
+                {
+                    Ok(MakeAgent::Gateway(engine))
+                }
                 // Hermes lamps unchanged (#7245's done-when): the lamp's
                 // Hermes, and with Harness not set up (no gateway agent
                 // can be reached), as without the field, with no Harness
@@ -1968,7 +1986,11 @@ impl MakeHandOvers {
             }
         );
         let runner: Arc<MakeHermes> = Arc::new(lamp_runner(home, held));
-        let gateway = Arc::new(MakeGateway::lamp(home, harness.clone()));
+        // One runner for a gateway agent's makes and asks; only a make goes
+        // to the lamp's Hermes's direct session (`LAMP_TASKS_HERMES_DIRECT`).
+        let make_runner = MakeGateway::lamp_runner(home, harness.clone());
+        let gateway = Arc::new(MakeGateway::of_direct(make_runner.clone()));
+        let ask_gateway = Arc::new(MakeGateway::of(make_runner));
         let switches = crate::voice_ask::Switches::of_env();
         // A live ask on the lamp's default agent, picked as a make on the
         // one run path picks it: the lamp's Hermes on the same runner as a
@@ -1983,7 +2005,7 @@ impl MakeHandOvers {
                 switches,
                 open: runner.clone(),
                 held: Arc::new(AskRunner::lamp(home, harness.clone())),
-                agent: Some(gateway.clone()),
+                agent: Some(ask_gateway),
                 default_engine: Box::new(move || {
                     default_engine.get().and_then(|engine| engine())
                 }),
@@ -2912,6 +2934,7 @@ mod tests {
             &make,
             work.path(),
             &gateway(Err("deadline".into())),
+            false,
             &mut || {},
         );
         assert_eq!(cut["ok"], true, "{cut}");
@@ -2920,6 +2943,7 @@ mod tests {
             &make,
             work.path(),
             &gateway(Err(crate::gateway::NOT_READY.into())),
+            false,
             &mut || {},
         );
         assert_eq!(not_ready["error"], NOT_READY, "{not_ready}");
