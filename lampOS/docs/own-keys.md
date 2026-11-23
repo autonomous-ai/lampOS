@@ -83,6 +83,7 @@ followed, and the only request setup or the helper makes with the key:
 |---|---|---|
 | DeepSeek | `GET <endpoint>/models` | `Authorization: Bearer <key>` |
 | Deepgram | `GET https://api.deepgram.com/v1/auth/token` | `Authorization: Token <key>` |
+| OpenRouter (#8420) | `GET https://openrouter.ai/api/v1/key`, then `GET https://openrouter.ai/api/v1/models/<model>/endpoints` | `Authorization: Bearer <key>` on the first alone |
 
 - **2xx:** kept. The answer names where the person's data goes now:
   "that key works: your conversations now go to api.deepseek.com with your
@@ -360,6 +361,69 @@ on the same `keys.*` path and the same switch, with the contract agreed on
   not the endpoint's: no fallback (the second try covers slowness). A link
   that fails to the person's endpoint is not yet a fallback.
 - **Off:** nothing new is read or said; today's behaviour as it is.
+
+## Named model providers: OpenRouter (#8420, built, off unless set)
+
+A person's own model by its provider's name, on the same `keys.*` path and
+switch as the OpenAI-compatible one, with the plan the first builder agreed
+on #8362 (22:02, 23 Nov). OpenRouter is the first; Gemini and Anthropic come
+in their own PRs. One rule for all three: **the endpoint is fixed** in the
+lamp, never taken from the app, so the person's key only ever goes to its
+own provider (#2094's rule). The tests that pin it:
+`setup/tests/it/keys.rs`
+(`an_openrouter_model_is_kept_with_its_model_at_openrouters_own_endpoint`),
+`setup/src/keys.rs`
+(`an_openrouter_check_asks_for_the_key_then_the_models_endpoints`),
+`cloud/src/settings.rs` (`an_openrouter_key_goes_to_the_helper_with_its_model`),
+`voice/src/second_config.rs`
+(`the_persons_openrouter_model_is_used_only_with_the_switch`) and
+`voice/src/second_provider/services.rs`
+(`the_persons_openrouter_model_is_asked_as_openrouters_chat_without_search`).
+
+- **`offers`:** `{"service": "openrouter", "name": "OpenRouter", "kind":
+  "model", "models": [], "base_url": false, "fields": ["model"],
+  "endpoint": "https://openrouter.ai/api/v1"}`, after the OpenAI-compatible
+  one. `endpoint` is new and only on a named provider: the app shows it
+  filled in and not editable. `base_url` stays `false`, so the app's bool
+  still holds.
+- **`keys.set`** `{"service": "openrouter", "key", "model"}`: the model is
+  needed ("an OpenRouter key needs its model") and is a slug as above
+  (`openai/gpt-4o-mini`). Any `base_url` sent with it is refused before any
+  check, "OpenRouter takes no endpoint" (`bad_field`), as Deepgram's is.
+- **The check** (the table above), both requests within the one 5 s bound,
+  no redirect followed. OpenRouter's model list is public and about 1 MiB,
+  so it proves nothing about a key: `GET /key` with the bearer tries the
+  key, 401 or 403 is "that key was refused" and nothing more is asked. Then
+  `GET /models/<model>/endpoints`, a public read sent without the key: 2xx
+  works, 404 is "OpenRouter has no model by that name" (`bad_field`),
+  anything else "the lamp couldn't reach OpenRouter to check that key;
+  nothing changed". Seen live on 24 Nov: a made-up key's `/key` is 401, a
+  made-up model's endpoints 404.
+- **Kept:** `openrouter.key`, `openrouter.model` and `openrouter.checked`,
+  0600, with no endpoint file. It is one of the model services
+  (`Service::MODELS`): keeping it takes DeepSeek's own and the
+  OpenAI-compatible key away, with their endpoint and model files, and
+  keeping either of those takes it away. `keys.get` adds `openrouter`
+  (`own` or `lamp`), `since.openrouter`, `model.openrouter`,
+  `checked.openrouter`, and `in_use.model` is `"openrouter"` while it is
+  kept. Never the key.
+- **The voice** (`with_own_keys`, `own_openrouter.key` and `.model`, read
+  only with the switch on): the spoken chat goes to OpenRouter's own API
+  with the person's key and model, asked as OpenRouter's chat
+  (`Chat::openrouter_at`: the fastest provider first and the route's
+  `openrouter_effort`), never with its web search, which stays the lamp's
+  own. `Hosted::own_chat` says which chat the person's model is asked as.
+  One journal line by name and model: `OpenRouter: the person's own key,
+  model <id> (LAMP_OWN_KEYS)`; the start's line says `the person's own <id>
+  with the person's own key, at openrouter.ai (LAMP_OWN_KEYS), through
+  OpenRouter`. An OpenAI-compatible key, if one were somehow there too, is
+  used over it. A model file missing or malformed is passed over for the
+  relay, said by its error's kind. The search, the memory's passes and the
+  fallback stay on the lamp's own, and a 401, 403, 429 or 5xx falls back to
+  it as the OpenAI-compatible model's does.
+- **Off:** nothing new is read or said.
+- **Not yet run on a lamp:** a real key and model from the app, a few
+  turns, a bad key and a made-up model told plainly, and a remove.
 
 ## Updates
 
