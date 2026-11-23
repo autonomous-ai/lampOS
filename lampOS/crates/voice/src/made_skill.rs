@@ -17565,25 +17565,179 @@ light = { colour = "green", level = 3, for = "20s" }
             "{said}"
         );
         set_scripts_here(None);
-        // Asks the lamp can't start it by: a repair with the form.
+        // Asks the lamp can't start it by: a repair naming them and why,
+        // the form set apart after (#8451).
         for asks in [
             "[\"yes please\"]",
             "[\"Send my note.\"]",
             "[\"what time is it\"]",
             "[\"note\"]",
             "[]",
-            "\"send my test note\"",
+            "\"send my note\"",
             "[\"one two\", \"three four\", \"five six\", \"seven eight\"]",
             "[\"send my note\", \"Send my note\"]",
         ] {
             let text = ASKS_WRITE_TOML.replace("[\"send my test note\"]", asks);
             let refused = capped_with(&text, false).unwrap_err();
-            assert_eq!(refused.0, MADE_ASKS_FORM, "{asks}");
-            assert!(refused.1.unwrap().contains(MADE_ASKS_FORM), "{asks}");
+            assert!(
+                refused
+                    .0
+                    .starts_with(&format!("its asks weren't kept: asks = {asks}: ")),
+                "{asks}: {}",
+                refused.0
+            );
+            assert!(!refused.0.contains("send my test note"), "{}", refused.0);
+            assert_eq!(
+                refused.1.unwrap(),
+                format!("The lamp refused it: {}. {MADE_ASKS_FORM}", refused.0),
+                "{asks}"
+            );
         }
         // Never one added from a file.
         let added = format!("{ASKS_WRITE_TOML}tool = \"x\"\n");
         assert!(capped_added(&added).is_err());
+        set_asks_here(None);
+        set_writes_here(None);
+    }
+
+    /// #8451, lamp-06c1, 24 Nov: a "pebble hello" make was refused three
+    /// times in 530 s and the journal held only the form's example, never
+    /// the skill's own asks. Each refusal names the asks as given, the one
+    /// ask that failed and its rule in plain words, never the example; the
+    /// repair gives that line first, then the form set apart; the person
+    /// hears the plain not-made line, never the asks.
+    #[test]
+    fn a_made_skills_refused_asks_name_the_ask_and_the_rule() {
+        set_writes_here(Some(true));
+        set_asks_here(Some(true));
+        let with = |asks: &str| ASKS_WRITE_TOML.replace("[\"send my test note\"]", asks);
+        let long = format!("{} garden", "pebble".repeat(10));
+        let long_asks = format!("[\"{long}\"]");
+        let refused_why = crate::skill_named::ask_refused("what time is it").unwrap();
+        let cases: Vec<(String, String)> = vec![
+            (
+                "[\"pebble hello!\"]".into(),
+                "\"pebble hello!\": a \"!\" in it".into(),
+            ),
+            ("\"pebble hello\"".into(), "not a list".into()),
+            ("[]".into(), "none".into()),
+            (
+                "[\"pebble one\", \"pebble two\", \"pebble three\", \"pebble four\"]".into(),
+                "more than 3".into(),
+            ),
+            ("[\"pebble garden tune\", 3]".into(), "3: not words".into()),
+            (
+                "[\"pebble\"]".into(),
+                "\"pebble\": 1 word, not 2 to 8".into(),
+            ),
+            (
+                "[\"pebble garden tune of the day in my room now\"]".into(),
+                "\"pebble garden tune of the day in my room now\": 10 words, not 2 to 8".into(),
+            ),
+            (
+                long_asks.clone(),
+                format!("\"{long}\": {} characters, over 60", long.chars().count()),
+            ),
+            (
+                "[\"pebble  garden\"]".into(),
+                "\"pebble  garden\": not one space between its words".into(),
+            ),
+            (
+                "[\"pebble, hello\"]".into(),
+                "\"pebble, hello\": a \",\" in it".into(),
+            ),
+            (
+                "[\"what time is it\"]".into(),
+                format!("\"what time is it\": {refused_why}"),
+            ),
+            (
+                "[\"pebble hello\"]".into(),
+                "\"pebble hello\": only 1 word of its own, \"pebble\"".into(),
+            ),
+            (
+                "[\"pebble garden tune\", \"Pebble garden tune\"]".into(),
+                "\"Pebble garden tune\": said twice".into(),
+            ),
+        ];
+        assert!(
+            MADE_ASKS_FORM.starts_with("The form, for example: asks = [\"send my test note\"]"),
+            "{MADE_ASKS_FORM}"
+        );
+        for (asks, rule) in &cases {
+            let refused = capped_with(&with(asks), false).unwrap_err();
+            assert_eq!(
+                refused.0,
+                format!("its asks weren't kept: asks = {asks}: {rule}"),
+                "{asks}"
+            );
+            assert!(!refused.0.contains("send my test note"), "{}", refused.0);
+            let repair = refused.1.clone().unwrap();
+            assert_eq!(
+                repair,
+                format!("The lamp refused it: {}. {MADE_ASKS_FORM}", refused.0),
+                "{asks}"
+            );
+            // The example only after the skill's own line, never beside it.
+            assert!(
+                repair.find("send my test note").unwrap() > repair.find(&refused.0).unwrap(),
+                "{repair}"
+            );
+            // What the person hears after the last repair: the plain line,
+            // once, never the asks or the rule.
+            let said = not_made_line(&plain_reason(&refused.0));
+            assert_eq!(said, NOT_MADE_TRY, "{asks}");
+        }
+        set_asks_here(None);
+        set_writes_here(None);
+    }
+
+    /// #8451: before the check, an ask's ends are tidied (the ends trimmed,
+    /// runs of spaces folded to one, a `.`, `!`, `?` or `,` at its start or
+    /// end dropped) when the rest is the same words; punctuation inside
+    /// still refuses, and asks already plain are byte for byte as they
+    /// came.
+    #[test]
+    fn a_made_skills_asks_are_tidied_at_their_ends_only() {
+        set_writes_here(Some(true));
+        set_asks_here(Some(true));
+        let with = |asks: &str| ASKS_WRITE_TOML.replace("[\"send my test note\"]", asks);
+        for (written, kept) in [
+            ("[\"pebble garden tune!\"]", "[\"pebble garden tune\"]"),
+            ("[\" Pebble   garden tune. \"]", "[\"Pebble garden tune\"]"),
+            ("[\"?pebble garden tune?!\"]", "[\"pebble garden tune\"]"),
+            (
+                "[\"pebble garden tune,\", \"my pebble song\"]",
+                "[\"pebble garden tune\", \"my pebble song\"]",
+            ),
+        ] {
+            let paced = paced(&with(written));
+            assert_eq!(paced, with(kept), "{written}");
+            assert!(capped_with(&paced, false).is_ok(), "{written}");
+        }
+        // Plain already, or nothing of words left: as it came.
+        for asks in [
+            "[\"pebble garden tune\"]",
+            "[\"!?\"]",
+            "[\"pebble, hello\"]",
+        ] {
+            assert_eq!(paced(&with(asks)), with(asks), "{asks}");
+        }
+        // Inside, still refused, with the rule.
+        assert_eq!(
+            capped_with(&paced(&with("[\"pebble, hello\"]")), false)
+                .unwrap_err()
+                .0,
+            "its asks weren't kept: asks = [\"pebble, hello\"]: \"pebble, hello\": a \",\" in it"
+        );
+        // The row's own asks: its "!" tidied, then refused on the rule it
+        // still breaks ("hello" is said around an ask), named.
+        let paced_hello = paced(&with("[\"pebble hello!\"]"));
+        assert_eq!(paced_hello, with("[\"pebble hello\"]"));
+        assert_eq!(
+            capped_with(&paced_hello, false).unwrap_err().0,
+            "its asks weren't kept: asks = [\"pebble hello\"]: \"pebble hello\": only 1 word of its \
+             own, \"pebble\""
+        );
         set_asks_here(None);
         set_writes_here(None);
     }
