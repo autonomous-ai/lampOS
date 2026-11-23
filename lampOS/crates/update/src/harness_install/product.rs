@@ -45,12 +45,12 @@ pub const PRODUCT_DEFAULT: bool = true;
 
 /// The Harness manifest this build pins for a product lamp: a byte-for-byte
 /// copy of Harness's CDN manifest ([`ORIGIN`]) when it named [`VERSION`].
-pub const MANIFEST: &[u8] = include_bytes!("../../../../deploy/harness/cli-0.6.75.metadata.json");
+pub const MANIFEST: &[u8] = include_bytes!("../../../../deploy/harness/cli-0.6.83.metadata.json");
 /// [`MANIFEST`]'s SHA-256, checked by a test and again before each install.
 pub const MANIFEST_SHA256: &str =
-    "ef267d1ca368d18a78434c22f230d62c26b574ec8e93cc7bb3c10a4fc5c50c67";
+    "f65b59e9c2dcb986580382d967faca6900c3243813a787c4a3a81450ec3d1458";
 /// The Harness version [`MANIFEST`] names (its `cli.version`).
-pub const VERSION: &str = "0.6.75";
+pub const VERSION: &str = "0.6.83";
 /// Where [`MANIFEST`] was copied from: said, never fetched.
 pub const ORIGIN: &str =
     "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/cli/metadata.json";
@@ -58,10 +58,10 @@ pub const ORIGIN: &str =
 /// Harness's installer, a byte-for-byte copy of [`INSTALLER_ORIGIN`] as it
 /// was when [`MANIFEST`] was copied. Every pinned install runs this copy,
 /// from a file, never the one at its URL (#5229).
-pub const INSTALLER: &[u8] = include_bytes!("../../../../deploy/harness/cli-install-eeb6da28.sh");
+pub const INSTALLER: &[u8] = include_bytes!("../../../../deploy/harness/cli-install-84c1ea00.sh");
 /// [`INSTALLER`]'s SHA-256, checked by a test and again before each run.
 pub const INSTALLER_SHA256: &str =
-    "eeb6da28f372d3a39a55e62b940f7b3c5f32e59ed3ca2181b46adfe3d1c1a6b5";
+    "84c1ea00d0888440313c84d6250865a47ef766b6bd22ee92c06fa7a35653cd0f";
 /// Where [`INSTALLER`] was copied from: said, never fetched.
 pub const INSTALLER_ORIGIN: &str = crate::install::HARNESS_INSTALLER;
 
