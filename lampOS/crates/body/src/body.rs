@@ -3880,6 +3880,11 @@ fn arm_part(joint: Joint) -> &'static str {
 /// turn by [`fold_joint`].
 #[derive(Clone, Debug, PartialEq)]
 struct Fold {
+    /// The wrist roll's and the base yaw's homes, where the start brings
+    /// them before the arm comes down (a factory lamp, 23 Nov: folded with
+    /// its head askew, the elbow met the head 61 counts above folded).
+    /// `None` leaves them where they were found, as `fold_plan` plans.
+    straight: Option<[u16; 2]>,
     head_to: Option<u16>,
     joints: Vec<Joint>,
     order: FoldOrder,
@@ -3926,6 +3931,9 @@ fn fold_said(fold: &Fold) -> String {
         .map(|pitch| format!("its head lifted to {pitch}"))
         .into_iter()
         .collect();
+    if fold.straight.is_some() {
+        moves.push("its head and base turned straight".to_string());
+    }
     match fold.order {
         FoldOrder::Together if fold.joints.len() > 1 => moves.push(format!(
             "its {} together",
@@ -4008,6 +4016,51 @@ fn fold_arm<P: PortIo, R: Runtime>(
         report.lowered = woke;
         now = lifted?;
         moved = true;
+    }
+    // The head's roll and the base's yaw home next, the arm still held
+    // where it was found: the head then lies straight under the arm as it
+    // comes down, and the lamp is seen to face front before it folds.
+    // More than half a turn off is across the seam and is left (the wake
+    // after the fold refuses it).
+    if let Some([roll, yaw]) = fold.straight {
+        let from = COMMANDED.map(|joint| now[joint.index()].position);
+        let near = |at: u16, home: u16| if at.abs_diff(home) <= 2_048 { home } else { at };
+        let to = [from[0], near(from[1], roll), near(from[2], yaw)];
+        if to != from {
+            if bus.runtime.recovery_inhibited() || !matches!(bus.runtime.cancelled(), Ok(false)) {
+                return Err(Stop::Cancelled);
+            }
+            let arm = ARM.map(|joint| now[joint.index()].position);
+            if unready {
+                extend_start(
+                    bus,
+                    FOLD_PAUSE + wake_seconds(from, to, limits.wake_speed()),
+                );
+            }
+            pause(bus, moved);
+            let watch = watching
+                .as_mut()
+                .map(|(watch, glimpse)| (&mut **watch as &mut dyn FnMut(&Glimpse), *glimpse));
+            let turned = wake(
+                bus,
+                report,
+                limits,
+                limits.wake_speed(),
+                (from, to),
+                Some(arm),
+                now,
+                watch,
+            );
+            // Part of the fold: `woke` is the wake's after it, and
+            // `lowered` the arm's (and the head's lift). A turn that
+            // stopped is all the fold did: it is what `lowered` says.
+            let woke = report.woke.take();
+            if turned.is_err() && report.lowered.is_none() {
+                report.lowered = woke;
+            }
+            now = turned?;
+            moved = true;
+        }
     }
     // Together: one move of every joint that folds. In turn: one each.
     let moves: Vec<Vec<Joint>> = match fold.order {
@@ -4395,6 +4448,7 @@ fn fold_plan(
     let worst = lean(&together);
     if worst <= bound {
         return Some(Ok(Fold {
+            straight: None,
             head_to,
             joints,
             order: FoldOrder::Together,
@@ -4414,6 +4468,7 @@ fn fold_plan(
         let worst = lean(&corners);
         if worst <= bound {
             return Some(Ok(Fold {
+                straight: None,
                 head_to,
                 joints: order,
                 order: FoldOrder::InTurn,
@@ -6257,7 +6312,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             report.stop = refused(format!("the arm is not folded: {why}"));
             return report;
         }
-        if let Some(Ok(fold)) = plan {
+        if let Some(Ok(mut fold)) = plan {
+            if may_wake {
+                fold.straight = Some([home[1], home[2]]);
+            }
             eprintln!(
                 "lamp-body: found shoulder {} elbow {} head pitch {}: {}, before it wakes",
                 found[Joint::BasePitch.index()].position,
@@ -10360,6 +10418,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         };
                         // The shoulder alone: the elbow fell folded.
                         let fold = Fold {
+                            straight: None,
                             head_to: None,
                             joints: vec![Joint::BasePitch],
                             order: FoldOrder::InTurn,

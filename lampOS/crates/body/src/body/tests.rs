@@ -21041,6 +21041,38 @@ fn a_fold_that_meets_its_rest_short_of_folded_stops_pushing_and_stands() {
     assert!(pressing <= Duration::from_secs(5), "pressed {pressing:?}");
 }
 
+/// The hardware lead at the bench, 23 Nov: found with its arm raised and
+/// its base and head turned away, the lamp turns its head and base
+/// straight first, the arm held where it is, and only then folds; so the
+/// head lies straight under the arm as it comes down.
+#[test]
+fn a_raised_lamp_turned_away_faces_front_before_its_arm_comes_down() {
+    let found = [1_700, 2_657, 2_900, 1_800, 1_771];
+    let powered = powered_up(found, |_| {});
+    let report = &powered.report;
+    assert!(report.stood && powered.stood_at_pose, "{report:?}");
+    let lamp = &powered.lamp;
+    // The first write that asks the shoulder or the elbow down.
+    let first_down = lamp
+        .goals
+        .iter()
+        .position(|goals| {
+            goals
+                .iter()
+                .any(|(id, goal)| (*id == 2 && *goal < 2_637) || (*id == 3 && *goal < 2_880))
+        })
+        .expect("the arm folds");
+    let at = lamp.goal_positions[first_down];
+    let home = LAMP_52E6.home;
+    assert!(at[YAW].abs_diff(home[2]) <= 15, "yaw at {}", at[YAW]);
+    assert!(at[ROLL].abs_diff(home[1]) <= 15, "roll at {}", at[ROLL]);
+    // And the arm had not moved while they turned.
+    assert!(
+        at[1].abs_diff(2_657) <= 30 && at[2].abs_diff(2_900) <= 30,
+        "{at:?}"
+    );
+}
+
 /// The run went on until it was asked to stop, 160 s in, standing. Folding
 /// down for the exit, an elbow that rests more than `ARM_GOAL_STEP` short
 /// of folded is let go rather than held there (the exit's own rule, #1722,
