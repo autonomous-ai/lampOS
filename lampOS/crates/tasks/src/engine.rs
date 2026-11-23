@@ -2931,7 +2931,8 @@ impl<P: Persistence> Engine<P> {
         Ok(true)
     }
 
-    /// `LAMP_TASKS_OPENCLAW_DIRECT` on: each watched task whose direct run
+    /// `LAMP_TASKS_OPENCLAW_DIRECT` or `LAMP_TASKS_HERMES_DIRECT` on: each
+    /// watched task whose direct run
     /// has ended is read at once ([`Engine::push`]), as Harness's `watch`
     /// and `wait` push theirs, not at the watch's next read up to
     /// [`WATCH_EARLY_MS`] later (ee17: 23 s from the run's end to its
@@ -2942,12 +2943,16 @@ impl<P: Persistence> Engine<P> {
         now: &Clock,
         pushed: &mut std::collections::BTreeSet<u64>,
     ) -> Result<(), Error> {
-        let Some(direct) = crate::direct::lamp() else {
+        let lamps = crate::direct::lamps();
+        if lamps.is_empty() {
             return Ok(());
-        };
+        }
         let watched = self.watched(now);
         pushed.retain(|id| watched.iter().any(|task| task.task_id == *id));
-        let ended = direct.ended_agents();
+        let ended: Vec<String> = lamps
+            .iter()
+            .flat_map(|direct| direct.ended_agents())
+            .collect();
         if ended.is_empty() {
             return Ok(());
         }
@@ -7618,7 +7623,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(got["data"]["state"], "failed");
-        assert_eq!(got["data"]["answer"], lamp_agent_gateway::openclaw::DROPPED);
+        assert_eq!(got["data"]["answer"], lamp_agent_gateway::DROPPED);
     }
 
     /// U4 on the direct path: a direct turn's idle answer is the run's

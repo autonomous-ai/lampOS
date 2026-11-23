@@ -21,10 +21,8 @@ use super::runs::Runs;
 use super::{ApprovalPolicy, Config, Decision, Logger};
 use crate::Error;
 
-/// Why a run ended by a drop (a gateway restart, a crash, a lost socket):
-/// what the person hears, in their language, as the task's last words.
-pub const DROPPED: &str =
-    "A small system error stopped this task. Please try again in a few minutes.";
+/// Why a run ended by a drop: the words shared by every engine.
+pub use crate::DROPPED;
 /// How long after a drop a run of the kept session that is not one of ours
 /// still going is aborted (OpenClaw's restart recovery re-runs the failed
 /// task by itself, ee17 2026-11-23: 76 s after the gateway was ready, under

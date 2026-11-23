@@ -478,7 +478,7 @@ pub fn shown(skills: bool, one_path: bool) -> Shown {
 /// unit's start limit, keeping the gateway down after setup too.
 /// The wrapper clears GATEWAY_ENV before exec, so use the unit's exact
 /// `gateway run` arguments. Install/version calls keep their old behaviour.
-const WAIT_FOR_CONTROL: &str = r#"# Wait before the gateway captures control's socket in its mount view.
+pub(crate) const WAIT_FOR_CONTROL: &str = r#"# Wait before the gateway captures control's socket in its mount view.
 if [ "${1-}" = gateway ] && [ "${2-}" = run ]; then
   control_wait=0
   while [ ! -S "$L" ]; do

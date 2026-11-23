@@ -520,6 +520,7 @@ impl Ask {
             skills: false,
             tasks: false,
             one_path: false,
+            gateway: false,
         }
     }
 }
@@ -1773,6 +1774,7 @@ fn the_switch_off_takes_the_wrapper_out() {
             skills: false,
             tasks: false,
             one_path: false,
+            gateway: false,
         })
     );
     let runs = Runs::new(&lamp);
@@ -2753,6 +2755,7 @@ fn turning_the_skills_switch_on_or_off_writes_the_namespace_script_again() {
             skills: true,
             tasks: false,
             one_path: false,
+            gateway: false,
         })
     );
     let text = fs::read_to_string(lamp.records().join(ASK)).unwrap();
@@ -4662,4 +4665,52 @@ fn a_net_run_sees_only_its_own_skills_folder() {
         assert!(text.contains("mount --bind \"${Z:-$W}\" \"$S/w\""));
     }
     assert!(!ns_text(true, false).contains(OWN_SKILL_LINES));
+}
+
+/// Hermes direct: an ask with the gateway (`ask_gateway`) has the one-shot
+/// write Hermes's gateway namespace script once Hermes is there, nothing
+/// installed again; a plain ask leaves it as it is; an ask to remove takes
+/// it out with Hermes's entry points.
+#[test]
+fn an_ask_with_the_gateway_writes_its_namespace_script_and_a_remove_takes_it_out() {
+    use crate::hermes_gateway;
+    let lamp = Lamp::new();
+    lamp.hermes_there();
+    ask_gateway(&lamp.records(), OFF).unwrap();
+    let text = fs::read_to_string(lamp.records().join(ASK)).unwrap();
+    assert!(text.contains("\"gateway\":true"), "{text}");
+    let runs = Runs::new(&lamp);
+    assert_eq!(install(&lamp, &runs, 5).unwrap().install, "installed");
+    assert!(
+        !runs
+            .lines()
+            .iter()
+            .any(|line| line.contains(INSTALLER_FILE)),
+        "{:?}",
+        runs.lines()
+    );
+    assert!(hermes_gateway::present(lamp.root(), OFF));
+    let mode = fs::metadata(lamp.at(hermes_gateway::NS))
+        .unwrap()
+        .permissions()
+        .mode()
+        & 0o7777;
+    assert_eq!(mode, 0o755);
+    assert!(!lamp.records().join(ASK).exists(), "the ask is spent");
+
+    // An ask without the gateway (an older round's, or Hermes's own) leaves it.
+    ask_install(&lamp.records(), OFF).unwrap();
+    assert!(
+        !fs::read_to_string(lamp.records().join(ASK))
+            .unwrap()
+            .contains("gateway")
+    );
+    install(&lamp, &Runs::new(&lamp), 6);
+    assert!(hermes_gateway::present(lamp.root(), OFF));
+
+    // Hermes off: taken out with the wrapper and Hermes's own script.
+    ask(&lamp.records(), true, OFF).unwrap();
+    install(&lamp, &Runs::new(&lamp), 7);
+    assert!(!lamp.at(hermes_gateway::NS).exists());
+    assert!(lamp.entry_points().is_empty());
 }

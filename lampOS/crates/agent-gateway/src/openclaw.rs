@@ -29,7 +29,9 @@ use serde_json::Value;
 
 use self::frames::method;
 pub use self::io::DROPPED;
+// Shared with the Hermes session: one tool summary and text tail rule.
 use self::io::Shared;
+pub(crate) use self::runs::{TAIL_MAX, brief, tail};
 use crate::{AgentSession, Engine, Error, Outcome, Progress, RunId, Turn};
 
 /// Where the product keeps the gateway's token.
