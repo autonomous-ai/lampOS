@@ -3156,6 +3156,10 @@ struct NameWait {
     /// window for the line said by it begins here, so the name heard in it
     /// counts for that line.
     said_from: u64,
+    /// Its words are the coordinator's call word put in for a line with no
+    /// words, not the person's (`LAMP_NAME_FACE_OR_WORDS`, #8114): the line
+    /// said by it is judged by its own words only.
+    put_in: bool,
 }
 
 /// The name a line is said by, once one person is shown to have said both
@@ -3164,6 +3168,10 @@ struct SaidBy {
     said_from: u64,
     words: String,
     called: bool,
+    /// `words` are put in, not the person's ([`NameWait::put_in`], or a
+    /// call whose words came back empty): with `LAMP_NAME_FACE_OR_WORDS`
+    /// the rule judges the line by its own words, never by them.
+    put_in: bool,
 }
 
 /// lamp-name's best near hearing (`name/near`, `LAMP_NAME_NEAR`) around a
@@ -9533,6 +9541,7 @@ impl Engine {
             words: NameWords::Coming(words),
             until,
             said_from: turn.said.lock().map_or(0, |said| said.0),
+            put_in: false,
         };
         if let Ok(mut waits) = self.shared.name_waits.lock() {
             *waits = Some(wait);
@@ -11445,6 +11454,19 @@ async fn spoken(
     if name_of.is_some() {
         marks.name_carried.store(true, Ordering::Release);
     }
+    // What the rule judges with `LAMP_NAME_FACE_OR_WORDS` (#8114): the
+    // line's own words, never a call word put in, neither this line's (a
+    // wordless call) nor one carried from the name before it. A name said
+    // by the person ("Hey Lamp", then the rest) is still judged with it.
+    let own_words = if wordless_call {
+        String::new()
+    } else {
+        text.clone()
+    };
+    let judged_by_own = match &name_of {
+        Some(name) => name.put_in,
+        None => wordless_call,
+    };
     let (text, called) = match &name_of {
         Some(name) if wordless && name_first(&name.words) => (
             name.words.clone(),
@@ -11510,6 +11532,7 @@ async fn spoken(
             words: NameWords::Known((text.clone(), called)),
             until: tokio::time::Instant::now() + left,
             said_from: window.0,
+            put_in: wordless_call,
         };
         if let Ok(mut waits) = shared.name_waits.lock() {
             *waits = Some(wait);
@@ -11761,7 +11784,7 @@ async fn spoken(
             // A reply to a yes or no the lamp waits for is said to it
             // (`LAMP_SAID_TO_ME`, #7442).
             crate::said_to_me::awaiting_yes(a_yes_held(&shared), || {
-                let judged: &str = if wordless_call { "" } else { &text };
+                let judged: &str = if judged_by_own { &own_words } else { &text };
                 heed(request, window, judged, continues_from, lead_us)
             })
         }
@@ -14229,10 +14252,13 @@ async fn said_by_the_name(
                 "lamp-voice second: request {request} is said by the name of request {}: {why} (LAMP_SECOND_NAME_CARRIES)",
                 name.request
             );
+            let put_in = shared.wordless_by_own_words
+                && (name.put_in || (called && words.trim().is_empty()));
             Some(SaidBy {
                 said_from: name.said_from,
                 words,
                 called,
+                put_in,
             })
         }
         Err(why) => {
