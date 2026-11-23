@@ -81,8 +81,11 @@ for f in sys.argv[1:]:
     gt=$(grep -c 'lamp-openclaw-gateway"$' $KIT/swap/swap.sh); ck=$(grep -c 'why="$why control-sock-stale-in-gateway(#8320)"' $KIT/row/check.lamp.sh)
     dl=$(grep -c 'Delegate=memory cpu pids.*> \$UD_TASKS' $KIT/swap/swap.lamp.sh); dm=$(grep -c 'LAMP_MADE_CODE_ON_AT_ONCE=on.*> \$UD_CONTROL' $KIT/swap/swap.lamp.sh)
     dr=$(grep -c 'for f in \$UD_TASKS \$UD_CONTROL; do \[ -f \$f \] && { rm -f' $KIT/swap/restore.lamp.sh)
-    o="swap restarts $sw, restore restarts $rs, swap gates $gt, check fails stale $ck, drop-ins $dl $dm removed $dr"
-    v "gateway restarted after lamp-control, stale socket fails VERIFY, #8180's unit lines laid and removed" '[ "$o" = "swap restarts 1, restore restarts 1, swap gates 1, check fails stale 1, drop-ins 1 1 removed 1" ]';;
+    # 23 Nov 11:15: a new gateway meeting the old lock's fresh heartbeat exits; one more start after 95 s from a reset
+    # start limit, and a failed gateway is brought back (not skipped as "not active").
+    lk=$(grep -c 'grep -q GatewayLockNamespaceError' $KIT/swap/swap-common.lamp.sh); rf=$(grep -c 'systemctl reset-failed \$GW' $KIT/swap/swap-common.lamp.sh)
+    o="swap restarts $sw, restore restarts $rs, swap gates $gt, check fails stale $ck, drop-ins $dl $dm removed $dr, lock retry $lk reset $rf"
+    v "gateway restarted after lamp-control, stale socket fails VERIFY, #8180's unit lines laid and removed, lock retry" '[ "$o" = "swap restarts 1, restore restarts 1, swap gates 1, check fails stale 1, drop-ins 1 1 removed 1, lock retry 1 reset 2" ]';;
   queue-*)
     # row/queue.lamp.sh (23 Nov batch 1): a kept session in lamp-tasks' close loop ("not closed: working; tried again
     # next") queues every make; it is closed with harness close --now and the loop must stop. No loop: QUEUE CLEAR.
