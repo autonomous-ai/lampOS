@@ -76,7 +76,7 @@ Reminders aren't in the app yet: you set them by voice.
 ## nudges
 After a long sitting I give one short nudge at a time, never more than a couple an hour:
 - a stretch after about 50 minutes (`stretch-break`).
-- a sip of water (`sip-of-water`), resting your eyes (`rest-your-eyes`), standing up (`stand-up`), a short break (`comfort-break`), sitting back when you lean in (`sit-back`), and winding down in the hour before bed (`wind-down`).
+- a sip of water (`sip-of-water`), resting your eyes (`rest-your-eyes`), standing up (`stand-up`), a short break (`comfort-break`), sitting back when you lean in (`sit-back`), a word on how you sit when the desk noticing reads most of ten minutes as sitting badly, at most once an hour (`posture`), and winding down in the hour before bed (`wind-down`).
 <!-- LAMP_NUDGES_PRESENT: on in the product -->
 To stop one, say "not today" or "stop the water reminders": I snooze it until tomorrow morning, or turn it off until you ask again. "Stop all the nudges" stops every one.
 If you've said yes to me noticing more at the desk, I may also say a word when I see you have a drink or something to eat (`seen-drink`, `seen-eat`), yawn or stretch (`seen-tired`), or celebrate (`seen-celebrate`): once a meal, a drink at most once in 15 minutes, a yawn, a stretch or a celebration at most once in 20 minutes, at night too, and never with the privacy slide closed. "Stop commenting on what you see" snoozes or turns them off.

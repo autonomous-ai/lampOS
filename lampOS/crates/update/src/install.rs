@@ -450,6 +450,11 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // skill since its played check with a person on lamp-9adf (4 Nov). It
     // shares the wellbeing nudges' function and their hour.
     "sit-back",
+    // Posture (#6543, the owner's call of 23 Nov, split from Sit back): V1's
+    // posture reminder from the cloud's posture reading (`humans/posture`,
+    // lamp-seen's with `LAMP_SEEN_POSTURE=on`), a word naming the region.
+    // It shares the wellbeing nudges' function and their hour.
+    "posture",
     // The seen reactions (#6543): a line at a drink, eating, tiredness or
     // celebrating that lamp-seen saw, product skills by the owner's call
     // (c6957458843). Silent without the owner's yes: they read only
@@ -734,6 +739,10 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("sit-back", "SKILL.md"),
     skill_file!("sit-back", "agent.toml"),
     core_brief!("sit-back"),
+    skill_file!("posture", "skill.toml"),
+    skill_file!("posture", "SKILL.md"),
+    skill_file!("posture", "agent.toml"),
+    core_brief!("posture"),
     skill_file!("seen-celebrate", "skill.toml"),
     skill_file!("seen-celebrate", "SKILL.md"),
     skill_file!("seen-drink", "skill.toml"),

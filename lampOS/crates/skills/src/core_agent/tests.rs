@@ -96,6 +96,7 @@ fn the_pilots_by_group_their_briefs_byte_for_byte() {
             "stand-up",
             "rest-your-eyes",
             "sit-back",
+            "posture",
             "wind-down",
             "comfort-break",
             "meal-check",
