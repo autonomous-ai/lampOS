@@ -194,6 +194,12 @@ pub(crate) fn socket_shape(model: &str) -> SocketShape {
 /// ElevenLabs takes up to 180.
 pub const SOCKET_INACTIVITY_S: u32 = 60;
 
+/// #8367: the one line the lamp says, in its own voice, when ElevenLabs
+/// refuses the person's own key or voice (a bad key, a voice gone, credits
+/// run out), before the piece it was to say, so it never falls silent.
+pub const OWN_VOICE_LOST_LINE: &str =
+    "Your ElevenLabs voice isn't working right now, so I'm back to my own voice.";
+
 pub(crate) fn socket_request(
     base_url: &str,
     key: &str,
@@ -598,6 +604,14 @@ impl Tts {
             refused: Mutex::new(None),
             paused_until: Mutex::new(None),
         })
+    }
+
+    /// #8367: the person's own voice (`LAMP_OWN_KEYS`), with `lamps`, the
+    /// lamp's own voice through the relay, to fall back to when ElevenLabs
+    /// refuses the person's key or voice. A stub with the red tests: it
+    /// keeps no fallback yet.
+    pub(crate) fn with_lamps_voice(self, _lamps: Tts) -> Self {
+        self
     }
 
     /// Whether a socket is opened for an answer: ElevenLabs only, not for a
@@ -2600,5 +2614,95 @@ mod tests {
         let mut packets = Packets::default();
         assert!(packets.push(&[1, 0, 9]).is_empty());
         assert_eq!(packets.finish(), Some(vec![1]));
+    }
+
+    /// A local HTTP server that answers every request with `status` and
+    /// `pcm`, then closes; each request's body, as text.
+    async fn bodies_answering(status: u16, pcm: Vec<u8>) -> (String, Arc<Mutex<Vec<String>>>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let seen = bodies.clone();
+        tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                let (seen, pcm) = (seen.clone(), pcm.clone());
+                tokio::spawn(async move {
+                    let mut buffer = Vec::new();
+                    let mut read = [0; 4096];
+                    let end = loop {
+                        if let Some(end) = buffer.windows(4).position(|w| w == b"\r\n\r\n") {
+                            break end;
+                        }
+                        match socket.read(&mut read).await {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => buffer.extend_from_slice(&read[..n]),
+                        }
+                    };
+                    let head = String::from_utf8_lossy(&buffer[..end]).to_lowercase();
+                    let length: usize = head
+                        .lines()
+                        .find_map(|line| line.strip_prefix("content-length:"))
+                        .map_or(0, |n| n.trim().parse().unwrap());
+                    while buffer.len() < end + 4 + length {
+                        match socket.read(&mut read).await {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => buffer.extend_from_slice(&read[..n]),
+                        }
+                    }
+                    seen.lock()
+                        .unwrap()
+                        .push(String::from_utf8_lossy(&buffer[end + 4..end + 4 + length]).into());
+                    let head = format!(
+                        "HTTP/1.1 {status} X\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+                        pcm.len()
+                    );
+                    let _ = socket.write_all(head.as_bytes()).await;
+                    let _ = socket.write_all(&pcm).await;
+                    let _ = socket.shutdown().await;
+                });
+            }
+        });
+        (format!("http://{address}"), bodies)
+    }
+
+    /// #8367: ElevenLabs refuses the person's own key (401, as a bad key or
+    /// credits run out are answered): the piece is said in the lamp's own
+    /// voice, never silent, after one line that says so; and every piece
+    /// after goes to the lamp's voice without asking the person's again.
+    #[tokio::test]
+    async fn a_refused_own_voice_falls_back_to_the_lamps_with_one_line() {
+        let (own_url, own_asked) =
+            bodies_answering(401, br#"{"detail":{"status":"quota_exceeded"}}"#.to_vec()).await;
+        let (lamps_url, lamps_asked) = bodies_answering(200, vec![5, 0, 6, 0]).await;
+        let lamps = Tts::with(TtsProvider::ElevenLabs, &lamps_url, "k", None).unwrap();
+        let own = Tts::with(
+            TtsProvider::ElevenLabs,
+            &own_url,
+            "sk-planted-8367-elevenlabs-fake",
+            Some("PersonVoice8367abcdef"),
+        )
+        .unwrap()
+        .with_lamps_voice(lamps);
+        assert_eq!(said(&own, "Hello there.", 3).await, [10, 12], "not silent");
+        assert_eq!(own_asked.lock().unwrap().len(), 1);
+        {
+            let asked = lamps_asked.lock().unwrap();
+            assert_eq!(asked.len(), 1);
+            let text: Value = serde_json::from_str(&asked[0]).unwrap();
+            assert_eq!(
+                text["text"],
+                format!("{OWN_VOICE_LOST_LINE} Hello there."),
+                "one line, then the piece"
+            );
+        }
+        assert_eq!(said(&own, "And again.", 4).await, [10, 12]);
+        assert_eq!(
+            own_asked.lock().unwrap().len(),
+            1,
+            "the person's not asked again"
+        );
+        let asked = lamps_asked.lock().unwrap();
+        let text: Value = serde_json::from_str(&asked[1]).unwrap();
+        assert_eq!(text["text"], "And again.", "said once");
     }
 }
