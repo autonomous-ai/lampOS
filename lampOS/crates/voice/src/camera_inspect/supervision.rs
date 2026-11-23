@@ -178,7 +178,7 @@ pub fn run(config_path: &Path, seconds: u64, output_path: &Path) -> io::Result<(
     let directory = SessionDirectory::create()?;
     let boot = new_boot()?;
     let mut authority = Authority::new(boot, monotonic_us());
-    let executable = std::env::current_exe()?;
+    let executable = crate::process::own_binary()?;
     let mut privacy: Option<Worker> = None;
     let mut camera: Option<Worker> = None;
     let result = (|| -> io::Result<()> {
