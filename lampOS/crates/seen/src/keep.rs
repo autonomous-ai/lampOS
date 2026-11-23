@@ -24,16 +24,33 @@
 //!   `humans/doing_seen` is said from what is kept.
 //! - **Goes on** only when the gate opens again, and only on the face it
 //!   was kept for: the passing
-//!   id of the one face in view the last step it was open is kept with it
-//!   ([`Away`]), and the gate opening on any other id wipes it
-//!   ([`Why::OtherFace`]), so a second remembered person within the 120 s
-//!   never takes on the first one's window or timers (the Reviewer-lead's
-//!   P2 on #7251). A face back under a new id (as the eyes give one coming
-//!   back into view, `follows` included) starts afresh. Past [`KEEP_US`]
-//!   closed, both are wiped as before.
+//!   id and box of the one face in view the last step it was open are kept
+//!   with it ([`Away`]). The same id goes on ([`Step::Resumed`]). A new id
+//!   goes on too ([`Step::Carried`]) only when all of these hold: exactly
+//!   one face is in view, the gate was closed at most [`CARRY_GAP_US`]
+//!   (4 s, the eyes' `KNOWN_HOLD`), and the two boxes' centres are apart
+//!   at most the new box's width (the eyes' own follow rule). The eyes
+//!   keep a passing id only 1.5 s and the gate reads nobody only after a
+//!   2 s stale list, so the same face always comes back under a new id
+//!   (lamp-06c1, 23 Nov: a slump wiped posture's window 2 s after "gate
+//!   nobody"). Any other id wipes it ([`Why::OtherFace`]), so a second
+//!   remembered person within the 120 s never takes on the first one's
+//!   window or timers (the Reviewer-lead's P2 on #7251); only someone in
+//!   the same place within 4 s, alone in view, is carried, which the first
+//!   builder took for a timer on #6543. Past [`KEEP_US`] closed, both are
+//!   wiped as before.
 //!   The posture window's samples older than its ten minutes still age out.
+//! - **Timers only.** The keep holds posture's window and the sitting's
+//!   timers (break, drink, eating, desk time and the counts), never a
+//!   name, an identity, a memory or a record about a person. Only an
+//!   [`Away::timer`] carries onto a new id; an [`Away::default`] (the rule
+//!   for anything kept about a person) goes on only on the same id (the
+//!   first builder's condition on #6543).
 //! - **The journal** says when each is kept, goes on, or is wiped, and why
-//!   (the gate's word): no id, no box.
+//!   (the gate's word). On a carry it adds the old and new passing ids, the
+//!   gap in ms and the centres' distance against the width; on a wipe for
+//!   another face, what failed (the gap, the place, or the faces in view).
+//!   Passing ids are the eyes', gone with the face, never a name.
 //! - **The next sitting** ([`Seat`]) counts from `room/activity`'s arrival,
 //!   as ever, but never from before the last time the chair emptied: 120 s
 //!   closed ([`Why::Expired`]), or a held sitting ended on another face
@@ -46,10 +63,17 @@
 use crate::gate::{Closed, Inputs};
 use crate::hold;
 use crate::sitting::Sitting;
-use crate::watch::OnTrack;
+use crate::watch::{OnTrack, Track};
 
 /// The longest a closing keeps the sitting's windows.
 pub const KEEP_US: u64 = 120_000_000;
+
+/// The longest closing a kept timer carries onto a new passing id in the
+/// same place ([`Away::timer`]): the eyes' `KNOWN_HOLD`
+/// (`crates/eyes/src/who.rs`, 4 s), the longest they hold a known person
+/// through checks that find nobody. lamp-eyes is not a dependency of
+/// lamp-seen, so it is named here. lamp-06c1's gaps were 2 s and 1 s.
+pub const CARRY_GAP_US: u64 = 4_000_000;
 
 /// A closing that wipes at once.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -122,7 +146,7 @@ pub enum Why {
     /// Closed for [`KEEP_US`].
     Expired,
     /// The gate opened again on another face than the one it was kept for
-    /// (another passing id, or none known when it was kept).
+    /// (another passing id not carried, or none known when it was kept).
     OtherFace,
 }
 
@@ -135,8 +159,11 @@ pub enum Step {
     Began,
     /// Still closed, still kept.
     Kept,
-    /// Open again within [`KEEP_US`]: goes on.
+    /// Open again within [`KEEP_US`] on the same passing id: goes on.
     Resumed,
+    /// Open again within [`CARRY_GAP_US`] on a new passing id, the one face
+    /// in view, in the same place: a timer goes on ([`Away::timer`]).
+    Carried,
     /// Wipe it now.
     Wiped(Why),
 }
@@ -154,6 +181,20 @@ impl Step {
     /// The journal's line for `what`, without the `lamp-seen: ` prefix,
     /// on a change only; `closed` is the gate's word.
     pub fn line(self, what: &str, closed: &str) -> Option<String> {
+        self.line_with(what, closed, None)
+    }
+
+    /// [`Step::line`], with the keep's `detail` of this step
+    /// ([`Plan::posture_detail`]) after it in brackets.
+    pub fn line_with(self, what: &str, closed: &str, detail: Option<&str>) -> Option<String> {
+        let line = self.bare_line(what, closed)?;
+        Some(match detail {
+            Some(detail) => format!("{line} ({detail})"),
+            None => line,
+        })
+    }
+
+    fn bare_line(self, what: &str, closed: &str) -> Option<String> {
         let keep_s = KEEP_US / 1_000_000;
         match self {
             Step::Open | Step::Kept => None,
@@ -162,6 +203,10 @@ impl Step {
             )),
             Step::Resumed => Some(format!(
                 "{what} goes on: the gate opened again within {keep_s} s"
+            )),
+            Step::Carried => Some(format!(
+                "{what} goes on: the gate opened again within {} s on a new passing id in the same place",
+                CARRY_GAP_US / 1_000_000
             )),
             Step::Wiped(Why::Expired) => Some(format!(
                 "{what} wiped: the gate stayed closed {keep_s} s ({closed})"
@@ -177,26 +222,54 @@ impl Step {
 }
 
 /// One thing kept through a closing: since when it is closed, and whose
-/// it is: the passing id of the one face in view the last step it was open
-/// (in memory only, never said).
+/// it is: the passing id and box of the one face in view the last step it
+/// was open (in memory only, never said).
+///
+/// [`Away::default`] goes on only on the same passing id: the rule for
+/// anything kept about a person. [`Away::timer`] also carries onto a new
+/// id in the same place after a short closing ([`Step::Carried`]): for
+/// timers only (the first builder's condition on #6543).
 #[derive(Clone, Debug, Default)]
 pub struct Away {
     since_us: Option<u64>,
-    face: Option<String>,
+    face: Option<Track>,
+    /// A timer: carried onto a new id in the same place.
+    carries: bool,
+    /// This step's journal detail: a carry, or why another face wiped it.
+    detail: Option<String>,
 }
 
 impl Away {
+    /// A timer's keep: carried onto a new passing id after a short closing
+    /// in the same place, with one face in view.
+    pub fn timer() -> Self {
+        Self {
+            carries: true,
+            ..Self::default()
+        }
+    }
+
+    /// This step's journal detail, if any: the old and new passing ids,
+    /// the gap and the centres' distance on a carry, or why another face
+    /// was not carried.
+    pub fn detail(&self) -> Option<&str> {
+        self.detail.as_deref()
+    }
+
     /// One step at `now_us`: whether its gate is `closed`, a closing that
-    /// wipes at once, whether there is anything to keep, and the passing id
-    /// of the one face in view, if one is.
+    /// wipes at once, whether there is anything to keep, the one face in
+    /// view (its passing id and box), if one is, and how many faces are in
+    /// view (the gate's `faces`).
     pub fn step(
         &mut self,
         now_us: u64,
         closed: bool,
         hard: Option<Hard>,
         holding: bool,
-        face: Option<&str>,
+        face: Option<&Track>,
+        faces: Option<usize>,
     ) -> Step {
+        self.detail = None;
         if !holding {
             self.since_us = None;
             self.face = None;
@@ -208,16 +281,33 @@ impl Away {
             return Step::Wiped(Why::Hard(hard));
         }
         if !closed {
-            if self.since_us.take().is_some() {
-                // Goes on only for the face it was kept for.
-                if face.is_some() && face == self.face.as_deref() {
+            if let Some(since) = self.since_us.take() {
+                let kept = self.face.take();
+                // Goes on for the face it was kept for.
+                if let (Some(new), Some(old)) = (face, kept.as_ref())
+                    && new.id == old.id
+                {
+                    self.face = kept;
                     return Step::Resumed;
                 }
-                self.face = None;
-                return Step::Wiped(Why::OtherFace);
+                if !self.carries {
+                    return Step::Wiped(Why::OtherFace);
+                }
+                let gap_us = now_us.saturating_sub(since);
+                return match carry(kept.as_ref(), face, faces, gap_us) {
+                    Ok(detail) => {
+                        self.face = face.cloned();
+                        self.detail = Some(detail);
+                        Step::Carried
+                    }
+                    Err(why) => {
+                        self.detail = Some(why);
+                        Step::Wiped(Why::OtherFace)
+                    }
+                };
             }
             if let Some(face) = face {
-                self.face = Some(face.to_owned());
+                self.face = Some(face.clone());
             }
             return Step::Open;
         }
@@ -235,30 +325,109 @@ impl Away {
     }
 }
 
+/// The centre of a box (xmin, ymin, xmax, ymax).
+fn centre(edges: &[f32; 4]) -> (f32, f32) {
+    ((edges[0] + edges[2]) / 2.0, (edges[1] + edges[3]) / 2.0)
+}
+
+/// Whether a timer kept for `kept` carries onto `new` after `gap_us`
+/// closed: one face in view (`faces`), the gap at most [`CARRY_GAP_US`],
+/// and the centres apart at most the new box's width (the eyes' follow
+/// rule, `crates/eyes/src/bus_out.rs`, #4885). `Ok` is the journal's
+/// detail of the carry; `Err` says what failed.
+fn carry(
+    kept: Option<&Track>,
+    new: Option<&Track>,
+    faces: Option<usize>,
+    gap_us: u64,
+) -> Result<String, String> {
+    let Some(old) = kept else {
+        return Err("no face known when it was kept".to_owned());
+    };
+    let new = match (faces, new) {
+        (Some(1), Some(new)) => new,
+        (Some(1), None) => return Err("the face in view has no passing id".to_owned()),
+        (Some(count), _) => return Err(format!("{count} faces in view")),
+        (None, _) => return Err("the faces in view not known".to_owned()),
+    };
+    let (old_id, new_id) = (&old.id, &new.id);
+    let gap_ms = gap_us / 1_000;
+    if gap_us > CARRY_GAP_US {
+        return Err(format!(
+            "{old_id} to {new_id} after {gap_ms} ms, over {} ms",
+            CARRY_GAP_US / 1_000
+        ));
+    }
+    let (old_x, old_y) = centre(&old.edges);
+    let (new_x, new_y) = centre(&new.edges);
+    let apart = (new_x - old_x).hypot(new_y - old_y);
+    let width = new.edges[2] - new.edges[0];
+    if apart > width {
+        return Err(format!(
+            "{old_id} to {new_id} after {gap_ms} ms: centres {apart:.3} apart, over the new box's width {width:.3}"
+        ));
+    }
+    Ok(format!(
+        "{old_id} to {new_id} after {gap_ms} ms: centres {apart:.3} apart, within the new box's width {width:.3}"
+    ))
+}
+
 impl Away {
     /// A held sitting ended on another face ([`Keep::step`]): wiped
     /// as [`Why::OtherFace`], and kept from now for `face`, the one in
     /// view.
-    fn other_face(&mut self, face: Option<&str>) -> Step {
+    fn other_face(&mut self, face: Option<&Track>) -> Step {
         self.since_us = None;
-        self.face = face.map(str::to_owned);
+        self.face = face.cloned();
+        self.detail = None;
         Step::Wiped(Why::OtherFace)
     }
 }
 
 /// What one step does with the posture window and the doing timers.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Plan {
     pub hard: Option<Hard>,
     pub posture: Step,
     pub sitting: Step,
+    /// The journal's detail of `posture`'s step ([`Away::detail`]).
+    pub posture_detail: Option<String>,
+    /// The journal's detail of `sitting`'s step ([`Away::detail`]).
+    pub sitting_detail: Option<String>,
 }
 
-/// The posture window's keep and the doing timers', as `serve` steps them.
-#[derive(Clone, Debug, Default)]
+impl Plan {
+    /// Posture's journal line ([`Step::line_with`]).
+    pub fn posture_line(&self, closed: &str) -> Option<String> {
+        self.posture
+            .line_with("posture's window", closed, self.posture_detail.as_deref())
+    }
+
+    /// The sitting's journal line ([`Step::line_with`]).
+    pub fn sitting_line(&self, closed: &str) -> Option<String> {
+        self.sitting.line_with(
+            "the sitting's timers",
+            closed,
+            self.sitting_detail.as_deref(),
+        )
+    }
+}
+
+/// The posture window's keep and the doing timers', as `serve` steps them:
+/// both timers ([`Away::timer`]).
+#[derive(Clone, Debug)]
 pub struct Keep {
     posture: Away,
     sitting: Away,
+}
+
+impl Default for Keep {
+    fn default() -> Self {
+        Self {
+            posture: Away::timer(),
+            sitting: Away::timer(),
+        }
+    }
 }
 
 impl Keep {
@@ -268,13 +437,14 @@ impl Keep {
     /// [`Why::OtherFace`].
     pub fn step(&mut self, now: &Now<'_>, sitting: bool, other_face: bool) -> Plan {
         let hard = hard(now);
-        let face = now.seen.track.as_ref().map(|track| track.id.as_str());
+        let face = now.seen.track.as_ref();
+        let faces = now.inputs.faces;
         let posture_closed = now.posture_gate.is_err();
         let posture = if other_face && now.watching {
             self.posture.other_face(face)
         } else {
             self.posture
-                .step(now.now_us, posture_closed, hard, now.watching, face)
+                .step(now.now_us, posture_closed, hard, now.watching, face, faces)
         };
         // The sitting ends, as before, only on the desk's own line (nobody).
         let sitting_closed = matches!(now.desk, Err(Closed::Nobody));
@@ -282,13 +452,21 @@ impl Keep {
         let sitting = if other_face && sitting {
             self.sitting.other_face(face)
         } else {
-            self.sitting
-                .step(now.now_us, sitting_closed, sitting_hard, sitting, face)
+            self.sitting.step(
+                now.now_us,
+                sitting_closed,
+                sitting_hard,
+                sitting,
+                face,
+                faces,
+            )
         };
         Plan {
             hard,
             posture,
             sitting,
+            posture_detail: self.posture.detail().map(str::to_owned),
+            sitting_detail: self.sitting.detail().map(str::to_owned),
         }
     }
 }
