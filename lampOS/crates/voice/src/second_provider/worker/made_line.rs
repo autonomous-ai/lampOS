@@ -124,6 +124,53 @@ async fn a_cut_code_makes_say_back_goes_to_the_say_service_whole() {
     );
 }
 
+/// #7418: a make counts as under way while its work runs, and no longer
+/// once the work has returned, though its line, its turn cut, is still
+/// being said: the lamp thinks for the work, never for the say service's
+/// wait, which may hold the line far longer.
+#[tokio::test]
+async fn a_cut_make_is_under_way_while_its_work_runs_not_while_its_line_is_said() {
+    const MADE_IN: u64 = 7_418_001;
+    let (go, wait) = mpsc::channel::<()>();
+    let (in_work, seen_in_work) = mpsc::channel::<bool>();
+    let (say, said) = mpsc::channel::<(String, bool)>();
+    let (free, freed) = mpsc::channel::<()>();
+    let running = made_running(
+        MADE_IN,
+        move || {
+            let _ = wait.recv();
+            in_work
+                .send(crate::make_skill_local::making(MADE_IN))
+                .unwrap();
+            crate::make_skill_local::set_said_line("I made evening dim.".into());
+            ToolAnswer::plain(crate::tools::unavailable())
+        },
+        move |line| {
+            say.send((line, crate::make_skill_local::making(MADE_IN)))
+                .unwrap();
+            // Held, as the say service may hold it.
+            let _ = freed.recv_timeout(Duration::from_secs(20));
+        },
+        |_| true,
+    );
+    // The cut: the turn's wait for the answer is dropped mid-make.
+    drop(running);
+    go.send(()).unwrap();
+    let (in_work, said) = tokio::task::spawn_blocking(move || {
+        let in_work = seen_in_work.recv_timeout(Duration::from_secs(20));
+        let said = said.recv_timeout(Duration::from_secs(20));
+        (in_work, said)
+    })
+    .await
+    .unwrap();
+    assert_eq!(in_work, Ok(true), "under way while its work runs");
+    let (line, making) = said.unwrap();
+    assert_eq!(line, "I made evening dim.");
+    assert!(!making, "no longer under way once the work returned");
+    assert!(!crate::make_skill_local::making(MADE_IN));
+    free.send(()).unwrap();
+}
+
 /// Its turn still waiting: the answer goes to the turn, whose model says
 /// the line, and nothing is said through the say service.
 #[tokio::test]

@@ -92,6 +92,8 @@ pub(super) fn cancelled_output(event: &ProviderOutput, through: Option<u64>) -> 
         | ProviderOutput::Ended { .. }
         // A run made: kept whatever became of its turn (#7363).
         | ProviderOutput::MadeRunNow { .. }
+        // The makes under way, tied to no turn (#7418).
+        | ProviderOutput::MakesUnderWay { .. }
         | ProviderOutput::Stages { .. } => None,
     };
     through

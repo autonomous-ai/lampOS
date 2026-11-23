@@ -529,6 +529,9 @@ pub fn let_go(request: u64, now_ms: u64) -> bool {
     });
     if marked {
         *phase = Phase::LetGo { directory };
+        drop(phases);
+        // No longer thought on with no turn (#7418).
+        crate::make_skill_local::let_go(request);
     }
     marked
 }

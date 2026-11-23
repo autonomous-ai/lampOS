@@ -872,6 +872,7 @@ fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::InputDiscarded { .. }
         | ProviderOutput::OwnershipAssumed { .. }
         | ProviderOutput::MadeRunNow { .. }
+        | ProviderOutput::MakesUnderWay { .. }
         | ProviderOutput::Ended { .. } => None,
         ProviderOutput::Started { request, .. }
         | ProviderOutput::Audio { request, .. }

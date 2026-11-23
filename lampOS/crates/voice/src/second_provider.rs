@@ -5411,6 +5411,10 @@ pub struct Engine {
     /// ([`Engine::forgetting_on_privacy`]).
     privacy: Option<(bool, u64, bool, u64)>,
     on_privacy: Option<Box<dyn FnMut() + Send>>,
+    /// The count of voice makes under way in this process, forwarded as
+    /// it changes (`ProviderOutput::MakesUnderWay`, #7418); none with the
+    /// make's one run path off ([`Engine::telling_makes_under_way`]).
+    makes_under_way: Option<tokio::sync::watch::Receiver<u32>>,
 }
 
 /// The busy room as this route hears it, in this process's one room
@@ -5693,6 +5697,7 @@ impl Engine {
             memory_camera_generation: None,
             privacy: None,
             on_privacy: None,
+            makes_under_way: None,
         }
     }
 
@@ -9707,12 +9712,39 @@ impl Engine {
         }
     }
 
+    /// `LAMP_MAKE_AGENT_ONE_PATH=on` (#7418): the count of voice makes
+    /// under way ([`crate::make_skill_local::MakeUnderWay`]) is sent as it
+    /// changes, with the bound [`crate::make_skill_agent::MAKE_WITHIN`].
+    /// Off: never.
+    pub fn telling_makes_under_way(mut self, on: bool) -> Self {
+        self.makes_under_way = on.then(crate::make_skill_local::under_way);
+        self
+    }
+
+    /// The makes under way, when their count changed since last told.
+    fn makes_changed(&mut self) -> Option<ProviderOutput> {
+        let makes = self.makes_under_way.as_mut()?;
+        if !makes.has_changed().unwrap_or(false) {
+            return None;
+        }
+        let count = *makes.borrow_and_update();
+        Some(ProviderOutput::MakesUnderWay {
+            count,
+            within_ms: crate::make_skill_agent::MAKE_WITHIN.as_millis() as u64,
+        })
+    }
+
     /// The next output ready now, if any.
     pub fn try_output(&mut self) -> Option<ProviderOutput> {
         loop {
             let event = match self.urgent.pop_front() {
                 Some(event) => event,
-                None => self.output.try_recv().ok()?,
+                None => match self.output.try_recv() {
+                    Ok(event) => event,
+                    // Nothing of a turn's waits: the makes' count, if it
+                    // changed (#7418).
+                    Err(_) => return self.makes_changed(),
+                },
             };
             if self.current_output(&event) {
                 return Some(event);
@@ -9777,6 +9809,8 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::InputDiscarded { .. }
         | ProviderOutput::OwnershipAssumed { .. }
         | ProviderOutput::MadeRunNow { .. }
+        // The makes under way, tied to no request (#7418).
+        | ProviderOutput::MakesUnderWay { .. }
         | ProviderOutput::Ended { .. } => None,
         ProviderOutput::Started { request, .. }
         | ProviderOutput::Audio { request, .. }
