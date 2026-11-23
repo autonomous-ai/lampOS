@@ -85,6 +85,12 @@ KEPT="a skill made here was kept in [0-9]+ ms"
 AGAIN="a skill wasn't made again: the same ask is being made already"
 NOTKEPT="a skill made here wasn't kept in|a skill wasn't made|the lamp's model said no made skill can do it|wasn't kept: |was not kept: |a long make made nothing"
 READBACK="read back: it waits for the person's yes|said back unasked waits for the [a-z]+'s yes|with no yes is said back unasked"
+# A pushed skill's run asks once (ee17 23 Nov): "do.run: not handed over: waiting for the owner's yes (the lamp says it
+# back and asks); asked aloud: say: spoken". ASKYES plays the clip, and on that line answers YES2, then waits on.
+RUNYES="do.run: not handed over: waiting for the [a-z]+'s yes .*asked aloud: say: spoken"
+ASKYES(){ local a y; a=$(lines); ASK $1; y=$(waitfor "$RUNYES|$STARTED" $a ${YESWAIT:-90}) || return 0
+  sed -n "${y}p" $J | grep -qE "$RUNYES" || return 0
+  echo "  run yes asked: $(show $y | cut -c1-160)"; sleep 2; PLAY YES2; echo "  YES2 played for the run's yes"; }
 YESOK="is on, on the person's yes|approved on the person's yes"
 TRY="\[lamp-tasks\] make try: "
 # The voice's journal of the made line (voice/src/made_skill.rs tried_journal, worktree 21 Nov): only its length and
@@ -237,14 +243,17 @@ legB(){ local n0 h e s a lat
 legC(){ local n0 e x
   BEGIN C || return 1; quiet
   FIXTURE grant-probe || { WHY="probe not pushed: $(grep -E '^PUSH REFUSED' $LG/probe-grant-probe.txt | tail -1 | cut -c1-160) (VOID: kit, not the build)"; VC=VOID; END; return 0; }
-  sleep 5; for i in 1 2; do HUSH; n0=$(lines); ASK PROBE
+  sleep 5; for i in 1 2; do HUSH; n0=$(lines); ASKYES PROBE
     e=$(waitfor "refused: no_grant|of skill grant-probe: (no token made|its time is up)|skill run [^ ]+: ended in|$READBACK" $n0 $RUNWAIT)
     [ -n "$e" ] && echo "  $(show $e)"
     sed -n "${e:-1}p" $J | grep -qE "$READBACK" && { saydone $e; PLAY YES2; sleep 15; continue; }
     break; done
   sleep 8; x=$(tail -n +$(( n0 + 1 )) $J | grep -E "lamp-control: .*refused: no_grant"); tail -n +$(( n0 + 1 )) $J | grep -E "of skill grant-probe" | cut -c1-200 | sed 's/^/  /'
   quiet; END
-  [ -n "$x" ] && { VC=PASS; WHY="$(echo "$x" | head -1 | cut -c1-200)"; } || WHY="no lamp-control 'refused: no_grant' line after the probe's ask"; }
+  # ee17 23 Nov: "grant probe" alone drew an answer with no call; a probe the model never ran tests no grant: VOID.
+  if [ -n "$x" ]; then VC=PASS; WHY="$(echo "$x" | head -1 | cut -c1-200)"
+  elif ! tail -n +$(( n0 + 1 )) $J | grep -qE "of skill grant-probe|skill (run|task) [^ ]+: hand-over"; then VC=VOID; WHY="the model never ran grant-probe ($(tail -n +$(( n0 + 1 )) $J | grep -oE 'tools: [^ ]+ calls=[^ ]+' | head -1)): no grant was tested (VOID: the ask, not the build)"
+  else WHY="no lamp-control 'refused: no_grant' line after the probe's ask"; fi; }
 # ---- D: the mail task step: SKILL.md first, no lamp files, ~30 s. An optional Google leg: its verdict says so.
 DNOTE="needs a linked Google account; VOID without one"
 legD(){ local n0 st e s t
@@ -398,7 +407,7 @@ legH(){ local n0 h rid e2 h2 rid2 x h1 h2c h3 h4 old
   BEGIN H || return 1; quiet
   FIXTURE slow-probe || { WHY="slow-probe fixture not installed (VOID: kit)"; VH=VOID; END; return 0; }
   GATE lamp-tasks || { WHY="start budget (lamp-tasks) (VOID: not run)"; VH=VOID; END; return 0; }
-  CGSECS=150 CGW H; HUSH; n0=$(lines); ASK SLOW
+  CGSECS=150 CGW H; HUSH; n0=$(lines); ASKYES SLOW
   h=$(waitfor "$STARTED" $n0 $RUNWAIT) || { UNCGW H; WHY="no run start (handed over) for slow-probe$(NOCG $n0)"; END; return 0; }
   rid=$(sed -n "${h}p" $J | sed -n 's/.*skill run \([^ :]*\): .*/\1/p'); echo "  $(show $h)"
   for x in $(seq 1 20); do grep -q '^RUNLEAF +run-' $LG/cg-H.txt && break; sleep 0.5; done
@@ -426,7 +435,7 @@ legP(){ local n0 h rid e n1 h2 rid2 e2 pe fp p1 p2 ov
   BEGIN P || return 1; quiet
   FIXTURE fork-probe || { WHY="fork-probe fixture not installed (VOID: kit)"; VP=VOID; END; return 0; }
   [ -n "$MNB" ] || { WHY="no price skill kept by leg B for the second task (run B first)"; VP=VOID; END; return 0; }
-  CGSECS=150 CGW P; HUSH; n0=$(lines); ASK FORK
+  CGSECS=150 CGW P; HUSH; n0=$(lines); ASKYES FORK
   h=$(waitfor "$STARTED" $n0 $RUNWAIT) || { UNCGW P; WHY="no run start (handed over) for fork-probe$(NOCG $n0)"; END; return 0; }
   rid=$(sed -n "${h}p" $J | sed -n 's/.*skill run \([^ :]*\): .*/\1/p'); echo "  fork run $rid: $(show $h)"
   sleep 2; n1=$(lines); ASK PRICEASK

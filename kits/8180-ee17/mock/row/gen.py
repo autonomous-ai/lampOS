@@ -193,6 +193,11 @@ case("H.pass", "H")
 case("H.fail-nocgroup", "H", over={"out/restart-tasks.lamp.sh": PASS["out/restart-tasks.lamp.sh"].replace("J " + SETUP.split(": ", 1)[1], "J [lamp-tasks] runs have no own cgroup: memory not handed down: Permission denied (lamp-tasks.service needs Delegate=memory cpu pids); every run step and make's try is refused")})
 case("H.fail-leafleft", "H", over={"out/cgwatch.lamp.sh.H": cg(["run-h1"], gone=False)})
 case("H.void", "H", over={"out/probe.lamp.sh": "PROBE NOT INSTALLED\n"})
+# ee17 23 Nov: a pushed probe's run asks the person's yes first; ASKYES answers it with YES2, then the run goes on
+RUNYES = lambda n: "lamp-skills[700]: skill:%s: do.run: not handed over: waiting for the owner's yes (the lamp says it back and asks); asked aloud: say: spoken (2140 ms)" % n
+case("C.pass-yes", "C", over={"j/C.PROBE": j([(1, RUNYES("grant-probe"))]), "j/C.YES2": PASS["j/C.PROBE"]}, env={"GREP": "YES2.played.for.the.run.s.yes"})
+case("C.void-nocall", "C", over={"j/C.PROBE": j([(1, V2 + "request 131 tools: none calls=none")])})
+case("H.pass-yes", "H", over={"j/H.SLOW.1": j([(1, RUNYES("slow-probe"))]), "j/H.YES2": PASS["j/H.SLOW.1"]}, env={"GREP": "YES2.played.for.the.run.s.yes"})
 case("P.pass", "B P")
 case("P.fail", "B P", over={"out/cgwatch.lamp.sh.P": cg(["run-p1", "run-p2"], pe="0"), "j/P.PRICEASK": PASS["j/P.PRICEASK"].replace("refused=56", "refused=0")})
 case("P.void", "P")
