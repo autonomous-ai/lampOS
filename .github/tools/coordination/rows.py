@@ -71,8 +71,12 @@ def row_line_re(pr):
 # row and three passed PRs missed gate A: "ROW PASS: #8306 <sha> (kit-8306b), lamp-52e6, …" (Fifth), "ROW PASS <sha>"
 # with no number (Seventh, #8314) and "ROW #8294 via #8302 (head …) on lamp-52e6 …: PASS" (Sixth, an issue's row
 # carried by this PR). A verdict-first line names this PR by its number, by "via #N", or, with no number, by a commit
-# that is one of its heads. The verdict word decides as before (failed()): "ROW FAIL …" or "ROW VOID …" is no row.
+# that is one of its heads. A verdict-first line's own verdict word decides (failed(), SubDarren's P2 on #8333):
+# "ROW FAIL: #N …, legs 1-3 PASS" is no row, whatever PASS the counts after it say. On PR #X's thread "ROW #X via #Y"
+# still counts for #X by row_line_re, the number right after ROW, as it did before.
 VERDICT = r"(?:PASS|FAIL(?:ED|S)?|VOID(?:ED|S)?)"
+# The verdict word of a verdict-first line, caught.
+VERDICT_FIRST = re.compile(r"\**ROW\b\**[ \t]+\**(PASS|FAIL(?:ED|S)?|VOID(?:ED|S)?)\b")
 # The commit a numberless verdict-first line names ("ROW PASS 0d7c0340e8…").
 VERDICT_SHA = re.compile(r"\**ROW\b\**[ \t]+\**%s\**:?[ \t]+[*`]*([0-9a-f]{7,40})(?![0-9A-Za-z])" % VERDICT)
 
@@ -94,27 +98,29 @@ def opens_row(body, pr, heads=()):
     return bool(m and heads and names_commit(m.group(1), heads))
 
 
-# The commit a ROW line names right after its PR's number (bold, a backtick or "at" allowed before it).
-NAMED_SHA = re.compile(r"\**[ \t]+(?:at[ \t]+)?[*`]*([0-9a-f]{7,40})(?![0-9A-Za-z])")
+# The commit a ROW line names right after its PR's number (bold, a backtick, "at", or "(head" as Sixth writes it,
+# allowed before it: the Reviewer-lead's P2 on #8333, so a switch-on's via row at another patch reads as stale).
+NAMED_SHA = re.compile(r"\**[ \t]+\(?(?:head[ \t]+|at[ \t]+)?[*`]*([0-9a-f]{7,40})(?![0-9A-Za-z])")
 
 
 def named_sha(body, pr):
     """The commit a ROW line names after its PR's number, or None when it names none. A numberless verdict-first
-    line ("ROW PASS <sha>") names its sha."""
+    line ("ROW PASS <sha>") needs no read here: it counts only when its sha is one of the heads, so it's never
+    stale."""
     for rx in (row_line_re(pr), verdict_row_re(pr)):
         m = rx.match(body)
         if m:
             s = NAMED_SHA.match(body, m.end())
             return s.group(1) if s else None
-    m = VERDICT_SHA.match(body)
-    return m.group(1) if m else None
+    return None
 
 
-def row_line(body, pr=None):
+def row_line(body, pr=None, heads=()):
     """The line of body that makes it a row of pr, as has_row matched it: line 1 when it opens with this PR's ROW
-    line, else the first line where "lamp row for #N" is said unquoted. Line 1 when neither, or without pr."""
+    line (opens_row, the heads deciding a numberless one), else the first line where "lamp row for #N" is said
+    unquoted. Line 1 when neither, or without pr."""
     lines = body.split("\n")
-    if pr and not (row_line_re(pr).match(body) or verdict_row_re(pr).match(body) or VERDICT_SHA.match(body)):
+    if pr and not opens_row(body, pr, heads):
         rx, offset = lamp_row_re(pr), 0
         for line in lines:
             m = rx.search(line)
@@ -124,7 +130,7 @@ def row_line(body, pr=None):
     return lines[0]
 
 
-def failed(body, pr=None):
+def failed(body, pr=None, heads=()):
     """A row whose first 300 characters say FAIL or VOID, and whose own row line doesn't say PASS.
 
     22 Nov (#8180, train 1162): the PASS that clears a FAIL is read from the row's own line only, the line has_row
@@ -132,11 +138,18 @@ def failed(body, pr=None):
     a check's "`VERIFY PASS`" in the next paragraph was counted as a row and cut into a train. A row line that says
     "PASS, the earlier FAIL was the kit" or "FAILED then PASS on a rerun" still counts. The Reviewer-lead's P2 on
     #8293: the line is the one has_row matched, so an earlier line naming a kit like "row-8053r DRY PASS" can't
-    clear a mid-post "lamp row for #N: FAIL"."""
+    clear a mid-post "lamp row for #N: FAIL".
+
+    23 Nov (SubDarren's P2 on #8333): when this PR's row line puts the verdict first, that word decides alone:
+    "ROW FAIL: #8306 …, legs 1-3 PASS, leg 4 timed out" is failed, and "ROW PASS: #8306 …, leg 4 FAIL then PASS on its
+    rerun" is not."""
     head = body[:300]
     if not FAILED.search(head):
         return False
-    return not PASSED.search(row_line(head, pr))
+    verdict = VERDICT_FIRST.match(head) if pr and opens_row(head, pr, heads) else None
+    if verdict:
+        return not verdict.group(1).startswith("PASS")
+    return not PASSED.search(row_line(head, pr, heads))
 
 
 def unquoted(rx, body, end=None):
@@ -177,7 +190,7 @@ def has_row(c, pr, heads=()):
         return None
     if not ((opens_row(body, pr, heads) and not quoted(body, 0)) or unquoted(lamp_row_re(pr), body, 300)):
         return None
-    return None if failed(body, pr) else missing(body)
+    return None if failed(body, pr, heads) else missing(body)
 
 
 def says_no_row(c, heads):
