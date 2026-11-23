@@ -44,12 +44,13 @@ use serde_json::{Value, json};
 /// on #7473), the only words read. A kind is read only when the function
 /// offers it (an enabled skill's `[stop] kind`), and only before one of
 /// [`NOUNS`].
-pub const KIND_WORDS: [(&str, &[&str]); 8] = [
+pub const KIND_WORDS: [(&str, &[&str]); 9] = [
     ("water", &["water", "drink", "drinking", "sip"]),
     ("eyes", &["eye", "eyes", "screen"]),
     ("stand-up", &["stand", "standing", "stand up"]),
     ("break", &["break", "breaks"]),
-    ("sit-back", &["posture", "sit back", "slouch"]),
+    ("sit-back", &["sit back", "lean"]),
+    ("posture", &["posture", "slouch"]),
     ("wind-down", &["wind down", "bedtime", "evening"]),
     ("meal", &["meal", "eat", "food", "lunch", "dinner"]),
     ("focus", &["focus"]),
@@ -332,11 +333,12 @@ mod tests {
         }
     }
 
-    const EVERY: [&str; 8] = [
+    const EVERY: [&str; 9] = [
         "break",
         "eyes",
         "focus",
         "meal",
+        "posture",
         "sit-back",
         "stand-up",
         "water",
@@ -515,7 +517,7 @@ mod tests {
     fn a_kind_the_nudges_are_about_counts() {
         for (heard, kind) in [
             ("stop the nudges about drinking water", json!("water")),
-            ("turn off the nudges for my posture", json!("sit-back")),
+            ("turn off the nudges for my posture", json!("posture")),
             ("snooze the reminders about my eyes", json!("eyes")),
             (
                 "stop the nudges about water and my eyes",
@@ -570,7 +572,7 @@ mod tests {
                 "stop the lunch nudges and the posture ones",
                 json!({"how":"off"})
             ),
-            json!({"how":"off","kind":["sit-back","meal"]})
+            json!({"how":"off","kind":["posture","meal"]})
         );
     }
 

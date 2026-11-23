@@ -5075,8 +5075,9 @@ fn the_installed_bedtime_skill_is_live_and_adds_no_function() {
     // The FAQ, How to use the lamp, since #5790.
     // Bedtime and Morning since its nights on lamp-06c1 (#5753).
     // Light show since #5745; Light scenes and Point the light since #5744.
-    // The four seen reactions since the owner's call (#6543).
-    assert_eq!(installed.len(), 35);
+    // The four seen reactions since the owner's call (#6543), and Posture
+    // since the owner's call of 23 Nov split it from Sit back.
+    assert_eq!(installed.len(), 36);
     // The four the desk-noticing yes covers (the owner's call, 23 Nov on
     // #7668) are installed, each core and on.
     for name in lamp_skills::SEEN_PRODUCT {
@@ -5114,17 +5115,17 @@ fn the_installed_bedtime_skill_is_live_and_adds_no_function() {
     );
     assert!(root.join("bedtime-morning/SKILL.md").is_file());
     // Inventory includes the disabled core and its grants; only live skills
-    // contribute functions. The thirty live skills (with Bedtime and
+    // contribute functions. The thirty-one live skills (with Bedtime and
     // Morning, which declares none, since #5753) (with music sway since
     // #5770 and watch you leave since #2834, Head pat and its wiggle, which declare
-    // none, and Sit back, which shares wellbeing_nudges) offer Dance,
+    // none, and Sit back and Posture, which share wellbeing_nudges) offer Dance,
     // prepare_to_unplug, hidden at run time unless LAMP_UNPLUG=on, the
     // wellbeing nudges' one wellbeing_nudges (since 25 Oct), Pose's set_pose (#4135),
     // the FAQ's lamp_help (#5790), Light show's light_show (#5745), and
     // Light scenes' light_scene and Point the light's point_light (#5744),
     // and the four seen reactions' one seen_remarks (#6543).
     let inventory = lamp_skills::load_each(&root);
-    assert_eq!(inventory.len(), 35);
+    assert_eq!(inventory.len(), 36);
     assert!(inventory.iter().all(|(_, skill)| skill.is_ok()));
     let listed = lamp_skills::package::list(&root).unwrap();
     let row = listed
@@ -5148,7 +5149,7 @@ fn the_installed_bedtime_skill_is_live_and_adds_no_function() {
     );
     let (live, errors) = lamp_skills::load_all(&root);
     assert!(errors.is_empty(), "{errors:?}");
-    assert_eq!(live.len(), 30);
+    assert_eq!(live.len(), 31);
     assert!(live.iter().any(|skill| skill.name == bedtime.name));
     // Each core skill installed off is disabled on the lamp and adds no
     // function, its tool or not: the 9 above are all a session is told.

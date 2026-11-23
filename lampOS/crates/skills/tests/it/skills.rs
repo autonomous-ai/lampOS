@@ -518,6 +518,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "onboarding",
             "point-light",
             "pose",
+            "posture",
             "prepare-unplug",
             "reminders",
             "rest-your-eyes",
@@ -3871,17 +3872,13 @@ fn sit_back_says_nothing_of_a_body_and_takes_no_picture() {
             );
         }
     }
-    // `humans/posture` (#6543) is lamp-seen's share of bad samples, never a
-    // picture or a keypoint: a better trigger, never words of the body.
+    // The eyes' leaning in alone: the cloud's posture reading
+    // (`humans/posture`) is Posture's, never Sit back's (the owner's call of
+    // 23 Nov, "split them").
     assert_eq!(
         toml["permissions"]["topics"].as_array().unwrap(),
-        &[
-            "room/activity",
-            "humans/faces/tracked",
-            "voice/state",
-            "humans/posture"
-        ]
-        .map(|topic| toml::Value::String(topic.to_owned()))
+        &["room/activity", "humans/faces/tracked", "voice/state"]
+            .map(|topic| toml::Value::String(topic.to_owned()))
     );
     // In the wellbeing group's hour, as the other nudges: another wellbeing
     // skill's run holds it back (`a_shared_budget_gives_its_group_its_runs_an_hour_between_them`);
@@ -3889,6 +3886,83 @@ fn sit_back_says_nothing_of_a_body_and_takes_no_picture() {
     assert_eq!(skill.budget, Some(("wellbeing".to_owned(), 1)));
     assert_eq!(skill.rest.map(|rest| rest.after_ignored), Some(2));
     // Core, in the product, since its played check with a person (#5208).
+    assert_eq!(skill.kind, SkillKind::Core);
+}
+
+/// Posture (#6543, the owner's call of 23 Nov: split from Sit back): V1's
+/// posture reminder from the cloud's posture reading alone, one trigger a
+/// region `humans/posture` names, each its own line with one concrete fix,
+/// and lamp-seen's window full (`window_s` past 599) and at least
+/// 0.6 bad (`above` 0.5999, as `above` is strict). It reads no picture and
+/// no leaning in; its lines give no number and name no condition, and it is
+/// a wellbeing nudge stopped by its own kind.
+#[test]
+fn posture_reads_the_posture_alone_and_names_a_region_never_a_condition() {
+    let folder = skills_root().join("posture");
+    let skill = load(&folder).unwrap();
+    let toml: toml::Value =
+        toml::from_str(&fs::read_to_string(folder.join("skill.toml")).unwrap()).unwrap();
+    assert_eq!(
+        toml["permissions"]["topics"].as_array().unwrap(),
+        &["humans/posture", "humans/faces/tracked", "voice/state"]
+            .map(|topic| toml::Value::String(topic.to_owned()))
+    );
+    let triggers = toml["trigger"].as_array().unwrap();
+    let regions: Vec<&str> = triggers
+        .iter()
+        .map(|trigger| {
+            assert_eq!(trigger["topic"].as_str(), Some("humans/posture"));
+            assert_eq!(trigger["field"].as_str(), Some("region"));
+            assert!(trigger.get("rearm").is_none(), "{trigger:?}");
+            assert_eq!(trigger["cooldown"].as_str(), Some("60m"));
+            trigger["equals"].as_str().unwrap()
+        })
+        .collect();
+    assert_eq!(regions, ["neck", "trunk", "upper_arm", "lower_arm", "none"]);
+    let whiles = toml["while"].as_array().unwrap();
+    let on_posture = |field: &str| {
+        whiles
+            .iter()
+            .find(|cond| {
+                cond["topic"].as_str() == Some("humans/posture")
+                    && cond["field"].as_str() == Some(field)
+            })
+            .and_then(|cond| {
+                cond["above"]
+                    .as_float()
+                    .or(cond["above"].as_integer().map(|n| n as f64))
+            })
+    };
+    assert_eq!(on_posture("bad_share"), Some(0.5999));
+    assert_eq!(on_posture("window_s"), Some(599.0));
+    let steps = toml["do"].as_array().unwrap();
+    assert_eq!(steps.len(), 5);
+    for step in steps {
+        let say = step["say"].as_str().unwrap();
+        assert!(say.contains("never a number"), "{say}");
+        assert!(say.contains("name no condition or illness"), "{say}");
+        assert!(say.contains("never mention a camera"), "{say}");
+        assert!(step.get("look").is_none(), "{step:?}");
+        let lower = say.to_lowercase();
+        for word in [
+            "slouch", "hunched", "disease", "syndrome", "spine", "posture",
+        ] {
+            assert!(
+                !lower
+                    .split(|c: char| !c.is_alphanumeric())
+                    .any(|token| token == word),
+                "{word} in {say:?}"
+            );
+        }
+    }
+    assert_eq!(skill.budget, Some(("wellbeing".to_owned(), 1)));
+    assert_eq!(skill.stop.as_ref().unwrap().tool, "wellbeing_nudges");
+    assert_eq!(
+        skill.stop.as_ref().unwrap().kind.as_deref(),
+        Some("posture")
+    );
+    assert_eq!(skill.most_a_day, None);
+    assert!(skill.rest.is_none());
     assert_eq!(skill.kind, SkillKind::Core);
 }
 
@@ -13579,6 +13653,7 @@ fn with_the_switch_the_wellbeing_skills_share_two_an_hour_never_within_30_minute
     let names = [
         "comfort-break",
         "meal-check",
+        "posture",
         "quiet-focus",
         "rest-your-eyes",
         "sip-of-water",
@@ -14102,6 +14177,7 @@ fn wellbeing_nudges_takes_just_drank_for_the_water_nudge_alone() {
     let names = [
         "comfort-break",
         "meal-check",
+        "posture",
         "quiet-focus",
         "rest-your-eyes",
         "sip-of-water",
@@ -17454,7 +17530,7 @@ fn every_when_in_the_repo_is_within_its_bound() {
             stops.insert(stop.when.clone());
         }
     }
-    // Each of the eight wellbeing skills loaded, and all say one when.
+    // Each of the nine wellbeing skills loaded, and all say one when.
     assert_eq!(
         loaded
             .iter()
@@ -17463,7 +17539,7 @@ fn every_when_in_the_repo_is_within_its_bound() {
                 .as_ref()
                 .is_some_and(|stop| stop.tool == "wellbeing_nudges"))
             .count(),
-        8
+        9
     );
     assert_eq!(stops.len(), 1, "{stops:?}");
     assert!(stops.iter().all(Option::is_some));

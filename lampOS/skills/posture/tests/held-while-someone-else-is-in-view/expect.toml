@@ -1,0 +1,15 @@
+# 11:00, bad neck all through, a second face in view from 9 to 12 minutes: held at 10,
+# said at 13 once they have been gone a minute.
+clock = "11:00"
+
+[[expect]]
+at = "13m"
+within = "30s"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "13m"
+within = "30s"
+call = "say"
+args = { note = "They have sat a while with their head forward of their shoulders. In one short, kind line, the way a friend would, suggest gently bringing the head back over the shoulders. Say only 'a while', never a number; name no condition or illness, and never mention a camera." }

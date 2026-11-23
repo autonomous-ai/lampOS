@@ -15,6 +15,7 @@ mod made;
 mod make_check;
 mod night_sleep;
 mod package;
+mod posture_carry;
 mod pushed;
 mod remind;
 mod routine_service;
