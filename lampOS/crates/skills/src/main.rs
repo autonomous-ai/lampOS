@@ -6082,7 +6082,8 @@ fn hand_task(
     // Its quiet lifted and its not-ready line only with
     // `LAMP_TOLD_WHEN_ASKED` (#7180), as before; its failure answered in
     // the asking conversation only with `LAMP_SKILL_TASK_SURE` (#7363).
-    let asked_at = lamp_skills::task::take_asked_by_voice(skill);
+    // Asked aloud just now: its yes asked as the lamp's next line (#8414).
+    let (asked_at, ask) = lamp_skills::task::take_yes_ask(skill);
     let by_words = asked_at.is_some();
     let owners = lamp_skills::task::take_asked_by_owner(skill);
     let asked = asked_at.filter(|_| lamp_voice::told_when_asked::on());
@@ -6101,12 +6102,6 @@ fn hand_task(
         };
         // The yes asked aloud: the voice builds the read-back itself from
         // the skill on the lamp; this asks only for it, by the skill's name.
-        // Asked aloud just now: asked as the lamp's next line (#8414).
-        let ask = json!({
-            "task_yes": true,
-            "priority": lamp_skills::task::yes_ask_priority(by_words),
-            "expires_in_ms": lamp_skills::task::ASK_EXPIRES_MS,
-        });
         let say_yes = || say(&say_socket, "say", &skill, ask.clone(), &[], || {});
         // With `LAMP_SKILL_TASK_SURE` on: a failed run's told line, and
         // whether lamp-tasks said `busy`, so it waits its turn
@@ -6278,7 +6273,10 @@ fn hand_task(
 /// socket line to lamp-control) and starts the fence (`unshare`, mounts,
 /// `python3`). No agent, no Harness, no network.
 fn hand_run(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
-    let by_words = lamp_skills::task::take_asked_by_voice(skill).is_some();
+    // Asked aloud just now, the yes is asked as the lamp's next line
+    // (#8414); a trigger's or a schedule's waits for the quiet as before.
+    let (asked_at, ask) = lamp_skills::task::take_yes_ask(skill);
+    let by_words = asked_at.is_some();
     let _ = lamp_skills::task::take_asked_by_owner(skill);
     let Some((folder, grants)) = tasks.of.get(skill).cloned() else {
         eprintln!("lamp-skills: skill:{skill}: do.run: not handed over: its folder is not known");
@@ -6293,13 +6291,6 @@ fn hand_run(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
             control: Path::new(lamp_voice::skill_task_yes::CONTROL_SOCKET),
             socket: socket.as_deref(),
         };
-        // Asked aloud just now, the yes is asked as the lamp's next line
-        // (#8414); a trigger's or a schedule's waits for the quiet as before.
-        let ask = json!({
-            "task_yes": true,
-            "priority": lamp_skills::task::yes_ask_priority(by_words),
-            "expires_in_ms": lamp_skills::task::ASK_EXPIRES_MS,
-        });
         let say_yes = || say(&say_socket, "say", &skill, ask.clone(), &[], || {});
         let outcome = std::cell::Cell::new(None);
         let send = |socket: &Path, line: &str| {

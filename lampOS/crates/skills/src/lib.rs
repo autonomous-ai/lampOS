@@ -14918,6 +14918,9 @@ mod tests {
         assert_eq!(asks["grants"], json!(["camera", "light"]));
         assert!(asks.get("approved").is_none(), "{asks}");
         assert_eq!(asks["task"], "Take a photo and send it to my phone");
+        // The function the model calls to run it (#8415): the voice calls it
+        // at the yes for a run asked aloud.
+        assert_eq!(asks["tool"], "photo_booth");
         assert_eq!(
             package::task_asks(&root, None, "no-such").unwrap(),
             json!({"task": null})

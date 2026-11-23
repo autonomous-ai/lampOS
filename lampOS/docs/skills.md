@@ -1977,7 +1977,11 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   urgent priority, which waits only 1 s of quiet after the last turn, so the
   yes comes as the lamp's next line and not 15 s or more later; a trigger's
   or a schedule's asks at 5. A `task_yes` takes 0 to 8; 9 stays the voice's
-  own. The ask carries no words: on the say
+  own. The voice keeps one above 5 only when its own record says the person
+  asked for that skill aloud within five minutes
+  (`say::task_yes_priority`, `skill_task_yes::asked_aloud_now`); otherwise it
+  says the ask at 5, so no say-socket client makes a yes urgent by its
+  number alone. The ask carries no words: on the say
   service's client thread the voice reads the skill on the lamp through the
   manage helper and lamp-control, as the read-back does, and builds the
   same say-back ("Photo booth hands one task to the lamp's agent: … It
@@ -2073,7 +2077,13 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   now names it), the yes runs what they asked for: the model is told to
   call that tool now, once (`skill_task_yes::approve_by_asked`,
   `upload_agent::approved_next`), and the run, its yes kept, goes ahead.
-  Before, on lamp-ee17 (#8180's row), the yes was kept and nothing ran
+  The spoken ask is kept under the function the model called, often the
+  skill's tool and not its name (`sit-back`'s `wellbeing_nudges`), so it
+  is looked for under both (`skill_task_yes::asked_aloud_in`). The check is
+  that the person asked for that skill aloud in those five minutes, not
+  which ask the yes answers: a trigger's yes-ask for the same skill inside
+  them runs at the yes too, as the person asked for it, still only on their
+  spoken yes for that SHA-256 and those grants. Before, on lamp-ee17 (#8180's row), the yes was kept and nothing ran
   until the person asked again. In a busy room the yes is heard within the
   thread's 45 s from the end of the say-back as played, not from its start
   (#6749 C, docs/second-voice.md). With `LAMP_SKILL_YES_CARRY=on` (off by
