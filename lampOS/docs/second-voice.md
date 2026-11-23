@@ -3092,6 +3092,13 @@ gives one fixed line with a real place to turn. Off unless
   no entry gets the default: someone you trust or the local emergency
   number. A known region's line is never replaced by the default; in a
   language it lacks, its English line.
+- **The body only nods** (#7689 part 2, `body_link::care_gesture`): while
+  the hold holds, an answer's gesture is a nod or nothing: no greeting,
+  laugh, surprise or headshake, and no lively fill. Nothing a skill or app
+  reads changes. Not yet held: the body's own idle play and an app's moves
+  (next: a `quiet` mark on the voice's private mood datagram to the body),
+  and skills' and apps' ring and light acts (#8405, e.g. Gym Coach's flash
+  on a rep).
 - **Not again within 5 minutes** (`care_line::AGAIN_AFTER`, `Said`): a
   later care turn in that time hears only the model, unless the person
   asks who they can call; a line owed longer than that is let go.
@@ -3103,13 +3110,6 @@ gives one fixed line with a real place to turn. Off unless
   still go, `Says::take_asked`), a computer's turn and the photo-face ask.
   Task news, the reminders the person set and the shutdown's last words
   still go. While it holds, the session's trace keeps no transcript text.
-- **The body only nods** (#7689 part 2, `body_link::care_gesture`): while
-  the hold holds, an answer's gesture is a nod or nothing: no greeting,
-  laugh, surprise or headshake, and no lively fill. Nothing a skill or app
-  reads changes. Not yet held: the body's own idle play and an app's moves
-  (next: a `quiet` mark on the voice's private mood datagram to the body),
-  and skills' and apps' ring and light acts (#8405, e.g. Gym Coach's flash
-  on a rep).
 - **Not yet:** the body's playful motion and light are not held, and a
   skill's speech under way is not stopped.
 
