@@ -4482,7 +4482,10 @@ từ chối ngay như mọi câu nói, và kỹ năng vẫn bật.
   character của giọng nói vốn đã nói ngôn ngữ của chủ; note vượt 900 byte
   của dịch vụ nói thì gửi dạng `text`, nguyên văn): "I made evening dim, and it's on: <what it does>, using its light.", hoặc "I
   made it but couldn't put it on: <lý do>.". Không hỏi gì, không chờ lời
-  "có".
+  "có". Kết quả của câu nói, kể cả lần hỏi lại sau khi bị bỏ, được ghi nhật
+  ký và giữ cùng lời nhờ (`app_make::line_said`, #7718 mục 2): là `line`
+  trong câu trả lời `made` bên dưới, và trong `app.json` cạnh lý do không
+  giữ được.
 - `{"made": {"request_id"}}`: trạng thái của lời nhờ từ ứng dụng: `making`
   (đang tạo, hoặc đã giữ và đang bật), `on`, hoặc `not_kept` kèm `why` (lời
   rõ ràng của người tạo, "it couldn't be put on: …" khi helper không bật,
@@ -4498,12 +4501,25 @@ từ chối ngay như mọi câu nói, và kỹ năng vẫn bật.
   `not_kept` kèm `"awaits_yes": true` bên cạnh `why` (#6307, "Tạo từ ứng
   dụng, đọc lại tại đèn" ở trên); ngoài ra không có trường này. Lời nhờ mới
   không bao giờ là `kept`, `asked` hay `left_off`; chỉ lời nhờ trước #5977
-  chưa được đồng ý mới còn là `left_off`.
+  chưa được đồng ý mới còn là `left_off`. Ở mọi trạng thái, `line` cho biết
+  câu đèn nói về lời nhờ (#7718 mục 2): `owed` từ lúc nhờ, qua lúc tạo và
+  lúc bật kỹ năng, cho tới khi dịch vụ nói đã nói xong hay bỏ qua nó, kể cả
+  lần hỏi lại sau khi bị bỏ; rồi `spoken`, hoặc `not_said` (bị bỏ hai lần,
+  không bắt đầu được trong thời gian chờ, bị từ chối, không có dịch vụ nói,
+  hoặc `lamp-voice` khởi động lại trước khi nói: `cut_by_restart` bỏ mọi
+  câu còn nợ). Lời nhờ đã giữ trước khi có trường này thì không có `line`.
+  `lamp-cloud` giữ câu Done của trang onboarding cuối của ứng dụng cho tới
+  khi câu này xong ([cloud.md](../cloud.md), "The app's onboarding pages,
+  done on the lamp"), và ứng dụng có thể chờ theo nó thay vì đoán câu nói
+  dài bao lâu.
 
 Kiểm thử: `app_make::tests`, kể cả `made_here_goes_on_at_once_with_no_ask_said`
 (trên đèn không có phần tasks: lời nhờ gõ được tạo, được giữ và được bật
-ngay, câu nói ra là câu "it's on") và
-`made_here_and_not_put_on_says_why_and_tells_the_app`.
+ngay, câu nói ra là câu "it's on"),
+`made_here_and_not_put_on_says_why_and_tells_the_app`; và cho `line`:
+`an_apps_ask_tells_its_line_owed_until_said_and_a_restart_lets_it_go`,
+`an_apps_ask_keeps_its_lines_end` và
+`through_the_socket_a_makes_line_is_told_owed_until_its_say_ends`.
 
 ## Kỹ năng viết trong ứng dụng (`LAMP_SKILL_WRITTEN=on`, tắt)
 
