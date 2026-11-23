@@ -9,6 +9,8 @@ for p in $PUTP; do part=${p%%:*}; r=${p#*:}; unit=${r%%:*}; bin=${r#*:}; s=$(sha
   [ -n "$t" ] && [ "$s" = "$t" ] && echo "RUNS $unit #8237 $s" || why="$why $unit-not-on-8237"; done
 L=$(mute_live); echo "$L"; echo "$L" | grep -q 'VOICE_MUTE muted=False' || why="$why mute:$(echo "$L" | head -1)"
 echo "$L" | grep -q 'physical_muted=True' && why="$why mic-slide-closed"
+# The lamp's speaker at most 40% (read only, never set): over it or unread stops the row before any leg.
+sp=$(speaker); echo "$sp"; pv=$(echo "$sp" | sed -n 's/^SPEAKER [^ ]* \([0-9]*\)%$/\1/p'); [ -n "$pv" ] && [ "$pv" -le "${SPK_MAX:-40}" ] || why="$why speaker-over-${SPK_MAX:-40}-or-unread"
 # The asks-aloud ledger, cleared by put for the row: it must be empty here (read only).
 [ -s /var/lib/lampos-skills-state/task-asks.json ] && grep -q '"said":true' /var/lib/lampos-skills-state/task-asks.json && why="$why asks-not-cleared"; echo "ASKS LEDGER at check: $(cat /var/lib/lampos-skills-state/task-asks.json 2>/dev/null | head -c 80 || echo none)"
 [ -z "$why" ] && echo READY || echo "NOT READY$why"

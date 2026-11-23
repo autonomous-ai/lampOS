@@ -33,4 +33,5 @@ if [ -e $R/task-asks.found ]; then cp -p $R/task-asks.found $AK; n "put $AK back
   [ "$(sha $AK)" = "$(sha $R/task-asks.found)" ] && { echo "ASKS LEDGER put back as found $(sha $AK)"; rm -f $R/task-asks.found; } || { echo "FAIL asks ledger not as found"; ok=0; }
 elif [ -e $R/task-asks.none ]; then rm -f $AK; n "removed the row's $AK (none before)"; echo "ASKS LEDGER none, as found"; rm -f $R/task-asks.none
 else echo "ASKS LEDGER not recorded by put: left as is"; fi
+sp=$(speaker); pv=$(echo "$sp" | sed -n 's/^SPEAKER [^ ]* \([0-9]*\)%$/\1/p'); echo "$sp at put-back"; [ -n "$pv" ] && [ "$pv" -gt "${SPK_MAX:-40}" ] && echo "NOTE the speaker is over ${SPK_MAX:-40}% at put-back: not set by the kit; ask the manager"
 [ $ok = 1 ] && { rm -f $R/*.stable; echo "PUTBACK OK"; } || echo "PUTBACK NOT OK"

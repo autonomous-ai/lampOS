@@ -45,3 +45,8 @@ print("VOICE_MUTE muted=%s reason=%s" % ((m or {}).get("muted"), (m or {}).get("
 print("PRIVACY physical_muted=%s" % (p or {}).get("physical_muted"))
 PY
 }
+# The lamp's speaker volume, read only, never set (amixer card 0's first playback control, or SPK_CTL).
+speaker(){ c=${SPK_CTL:-}
+  [ -n "$c" ] || c=$(amixer -c 0 scontrols 2>/dev/null | sed -n "s/^Simple mixer control '\(.*\)',\([0-9]*\)$/\1,\2/p" | while IFS= read -r x; do amixer -c 0 sget "$x" 2>/dev/null | grep -q 'pvolume' && { echo "$x"; break; }; done)
+  p=$([ -n "$c" ] && amixer -c 0 sget "$c" 2>/dev/null | grep -E 'Playback.*\[[0-9]+%\]' | grep -oE '\[[0-9]+%\]' | head -1 | tr -d '[]%')
+  [ -n "$p" ] && echo "SPEAKER $(echo "$c" | tr ' ' _) $p%" || echo "SPEAKER unread"; }

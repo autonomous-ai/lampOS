@@ -2,4 +2,5 @@ RUNS lamp-skills #8237 x
 RUNS lamp-tasks #8237 y
 VOICE_MUTE muted=False reason=none
 PRIVACY physical_muted=False
+SPEAKER Speaker,0 40%
 READY
