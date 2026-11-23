@@ -330,7 +330,8 @@ on the same `keys.*` path and the same switch, with the contract agreed on
 - **`keys.get`** adds `openai_compatible` (`own` | `lamp`),
   `openai_compatible_host`, `model` (`{"<service>": id | null}`), `checked`
   (`{"<service>": "works" | "refused" | "unreached" | null}`, the last
-  check's code) and `in_use` (`{"model": service | null}`). Never the key.
+  check's code, kept only once the keys' folder is there, so a refused
+  first key leaves nothing on the lamp) and `in_use` (`{"model": service | null}`). Never the key.
 - **The voice** (`with_own_keys`, `own_openai_compatible.key`, `.url`,
   `.model`): the spoken chat goes to the endpoint with the person's key and
   model, over the relay it falls back to, in one journal line by host and

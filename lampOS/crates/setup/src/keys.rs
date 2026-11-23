@@ -752,7 +752,8 @@ impl Store {
     }
 
     /// The last check's code for `service`, kept beside its key; best
-    /// effort, as it holds nothing a voice reads (#8362).
+    /// effort, as it holds nothing a voice reads (#8362). Only in a folder
+    /// already there: a refused first key leaves nothing on the lamp.
     pub fn checked(&self, service: Service, verdict: Verdict) {
         let code = match verdict {
             Verdict::Works => "works",
@@ -760,7 +761,7 @@ impl Store {
             Verdict::Unreached => "unreached",
             Verdict::NotKept => return,
         };
-        if self.folder().is_ok() {
+        if self.0.is_dir() {
             let _ = write_private(&self.0.join(service.checked_file()), code.as_bytes());
         }
     }
