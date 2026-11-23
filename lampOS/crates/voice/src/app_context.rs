@@ -121,11 +121,12 @@ pub fn said(source: Source, name: &str, words: &str, now: u64, private: bool) {
     if words.is_empty() {
         return;
     }
+    // The title is the installed manifest's, but outside the quotes: tidied
+    // as the words are, so that holds by code too (the first builder's P3 on
+    // #8422).
+    let name = lamp_msgs::app_fact::tidy(name, 64).unwrap_or_else(|_| "an app".into());
     if let Ok(mut said) = SAID.lock() {
-        said.insert(
-            source,
-            (name.to_owned(), words, now.saturating_add(SAID_FOR_MS)),
-        );
+        said.insert(source, (name, words, now.saturating_add(SAID_FOR_MS)));
     }
 }
 
@@ -393,15 +394,20 @@ pub fn notes_for(now: u64, private: bool, person: Option<&str>) -> Vec<String> {
 
 /// The words of the live lines, for [`keeps_a_line`].
 fn live_words(now: u64) -> Vec<String> {
-    let mut words = with_lines(|lines| lines.live_lines(now)).unwrap_or_default();
-    if let Ok(said) = SAID.lock() {
-        words.extend(
+    with_lines(|lines| lines.live_lines(now)).unwrap_or_default()
+}
+
+/// The words of the apps' spoken lines still told at `now`, for
+/// [`keeps_a_line`].
+fn said_words_now(now: u64) -> Vec<String> {
+    SAID.lock()
+        .map(|said| {
             said.values()
                 .filter(|(_, _, until)| *until > now)
-                .map(|(_, words, _)| words.clone()),
-        );
-    }
-    words
+                .map(|(_, words, _)| words.clone())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// What the model is told when a `remember` carried an app's live line.
@@ -423,7 +429,15 @@ pub fn keeps_a_line(call: &lamp_gemini::ToolCall, now: u64) -> Option<serde_json
     let carries = live_words(now)
         .iter()
         .map(|line| folded(line))
-        .any(|line| !line.is_empty() && text.contains(&line));
+        .any(|line| !line.is_empty() && text.contains(&line))
+        // An app's spoken line is often a question the person answers in
+        // its own words ("Trained before?", "I trained before, at
+        // school"): only a keep that is mostly the app's words, at least
+        // half of its words, is refused (App Only's note on #8422).
+        || said_words_now(now).iter().map(|line| folded(line)).any(|line| {
+            let words = line.split(' ').count();
+            !line.is_empty() && text.contains(&line) && words * 2 >= text.split(' ').count()
+        });
     carries.then(|| {
         eprintln!("{NOT_KEPT_LINE}");
         serde_json::json!({"remembered": false, "note": NOT_KEPT})
@@ -527,6 +541,13 @@ mod tests {
             let words = long.rsplit_once(": \"").unwrap().1;
             assert!(words.chars().count() <= SAID_MOST_CHARS + 1, "{words}");
             assert!(words.ends_with("word…\""), "{words}");
+            // A title is tidied too: it sits outside the quotes.
+            said(coach(), "Gym <b>Coach</b>", "Hi.", 2_500, false);
+            let told = notes(2_501, false);
+            assert!(
+                told[0].starts_with("The app Gym bCoach/b just said"),
+                "{told:?}"
+            );
             // The app's next line replaces it: one an app.
             said(coach(), "Gym Coach", "Next: squats.", 3_000, false);
             assert_eq!(notes(3_001, false).len(), 1);
@@ -548,7 +569,9 @@ mod tests {
             said(coach(), "Gym Coach", "Trained before?", 1_000, false);
             assert!(notes(1_001, true).is_empty(), "never told while private");
             assert!(keeps_a_line(&remember("trained before"), 1_001).is_some());
-            assert!(keeps_a_line(&remember("I trained before, at school"), 1_001).is_some());
+            assert!(keeps_a_line(&remember("They trained before."), 1_001).is_some());
+            // The person's own answer to it, in their words, is kept.
+            assert!(keeps_a_line(&remember("I trained before, at school"), 1_001).is_none());
             clear(&coach());
             assert!(notes(1_001, false).is_empty(), "the app's clear");
             said(coach(), "Gym Coach", "Trained before?", 1_000, false);
