@@ -132,7 +132,9 @@
 //!   ([`crate::control_mute`]).
 //!
 //! - **A skill's task's yes** (#6071's V2): `task_yes: true`, alone with a
-//!   priority under [`URGENT_FROM`] and an expiry, asks the voice to say the
+//!   priority of 0 to [`URGENT_FROM`] (one above [`NORMAL_PRIORITY`] kept
+//!   only for a skill the owner asked for aloud just now, #8414) and an
+//!   expiry, asks the voice to say the
 //!   read-back of the skill `skill`'s `do.task` and ask for the owner's yes.
 //!   The words are never the asker's: the client's thread reads the skill
 //!   on the lamp and builds the note
@@ -1186,8 +1188,23 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     })
 }
 
-/// A `task_yes` ask, checked: alone, with a priority under urgent and an
-/// expiry only.
+/// A `task_yes` ask's priority as said (#8414, the Reviewer-lead's P3 on
+/// #8437): one above [`NORMAL_PRIORITY`] stands only when the voice's own
+/// record says the person asked for the skill aloud just now
+/// (`skill_task_yes::asked_aloud_on_lamp`); otherwise it is the normal one, so
+/// no say-socket client makes a skill's yes urgent by its number alone.
+fn task_yes_priority(asked: u8, asked_aloud: impl FnOnce() -> bool) -> u8 {
+    if asked > NORMAL_PRIORITY && !asked_aloud() {
+        NORMAL_PRIORITY
+    } else {
+        asked
+    }
+}
+
+/// A `task_yes` ask, checked: alone, with a priority of 0 to
+/// [`URGENT_FROM`] and an expiry only. One above [`NORMAL_PRIORITY`] is
+/// kept only for a skill the voice's own record says was asked for aloud
+/// just now ([`task_yes_priority`]), whatever the client sent.
 fn parse_task_yes(skill: String, expires_in_ms: u64, wire: &Wire) -> Result<Request, String> {
     if wire.note.is_some()
         || wire.text.is_some()
@@ -3123,6 +3140,9 @@ fn serve_client(
                 Words::TaskYes => {
                     request.words =
                         Words::Note(crate::skill_task_yes::asked_aloud_here(&request.skill)?);
+                    request.priority = task_yes_priority(request.priority, || {
+                        crate::skill_task_yes::asked_aloud_on_lamp(&request.skill)
+                    });
                 }
                 Words::Quoted(_) if !ADDON_SAY.load(std::sync::atomic::Ordering::Relaxed) => {
                     return Err(format!("add-on says are off ({ADDON_SAY_ENVIRONMENT})"));
@@ -6574,6 +6594,15 @@ mod tests {
             parse(r#"{"skill":"slow-probe","task_yes":true,"priority":9,"expires_in_ms":60000}"#)
                 .is_err()
         );
+        // The voice keeps the urgent one only for a skill its own record says
+        // was asked for aloud; any other client's 8 is said at the normal one.
+        assert_eq!(task_yes_priority(asked.priority, || true), URGENT_FROM);
+        assert_eq!(task_yes_priority(asked.priority, || false), NORMAL_PRIORITY);
+        assert_eq!(
+            task_yes_priority(NORMAL_PRIORITY, || false),
+            NORMAL_PRIORITY
+        );
+        assert_eq!(task_yes_priority(3, || false), 3);
     }
 
     /// #2530 part 2: an add-on's line is `quoted`, alone, at most 300 bytes

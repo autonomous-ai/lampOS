@@ -645,6 +645,21 @@ pub fn yes_ask_priority(by_words: bool) -> u8 {
         lamp_voice::say::NORMAL_PRIORITY
     }
 }
+
+/// A run's own voice mark, taken ([`take_asked_by_voice`]: when the person
+/// asked for `skill` aloud, if this run is that ask's), and the `task_yes`
+/// line its yes is asked with, at [`yes_ask_priority`]: the one place
+/// `hand_task` and `hand_run` build it, so neither can ask a run asked
+/// aloud at the usual priority (Thirteen's ask on #8437).
+pub fn take_yes_ask(skill: &str) -> (Option<u64>, serde_json::Value) {
+    let asked_at = take_asked_by_voice(skill);
+    let ask = serde_json::json!({
+        "task_yes": true,
+        "priority": yes_ask_priority(asked_at.is_some()),
+        "expires_in_ms": ASK_EXPIRES_MS,
+    });
+    (asked_at, ask)
+}
 /// The say service's outcome of an ask said whole.
 pub const SPOKEN: &str = "say: spoken";
 
@@ -2850,6 +2865,16 @@ mod tests {
         assert_eq!(yes_ask_priority(true), lamp_voice::say::URGENT_FROM);
         assert_eq!(yes_ask_priority(false), lamp_voice::say::NORMAL_PRIORITY);
         assert!(yes_ask_priority(true) <= crate::MOST_SAY_PRIORITY);
+        // The line the run sends: its own voice mark taken, once.
+        asked_by_voice("yes-at-once", 1_000);
+        let (asked_at, ask) = take_yes_ask("yes-at-once");
+        assert_eq!(asked_at, Some(1_000));
+        assert_eq!(ask["task_yes"], true);
+        assert_eq!(ask["priority"], lamp_voice::say::URGENT_FROM);
+        assert_eq!(ask["expires_in_ms"], ASK_EXPIRES_MS);
+        let (asked_at, ask) = take_yes_ask("yes-at-once");
+        assert_eq!(asked_at, None);
+        assert_eq!(ask["priority"], lamp_voice::say::NORMAL_PRIORITY);
     }
 
     #[test]
