@@ -5939,6 +5939,16 @@ pub fn serve(
                 heeding.opening_the_eyes(files.bus_root.as_deref());
             }
         }
+        // Only a hearing of the name in the line's own sound names it for
+        // the said-to-me rule (`LAMP_SAID_TO_ME_NAME_IN_LINE=on`, #8384).
+        if std::env::var(crate::said_to_me::NAME_IN_LINE_ENVIRONMENT).is_ok_and(|v| v == "on") {
+            eprintln!(
+                "lamp-voice second: a line is named for the said-to-me rule only by a hearing of the name in its own sound, or for a line going on from another, any (LAMP_SAID_TO_ME_NAME_IN_LINE)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.naming_only_in_the_line();
+            }
+        }
         // What the caller said before their face was known follows them
         // (`LAMP_MEMORY_FOLLOWS_FACE=on`, #2176): each line's voice and the
         // faces seen speaking it tell whether it was theirs.
@@ -8676,6 +8686,8 @@ pub(crate) struct Heeding {
     face_not_speaking: Option<u64>,
     /// `LAMP_SAID_TO_ME=on` ([`Self::hearing_only_said_to_me`]).
     said_to_me: bool,
+    /// `LAMP_SAID_TO_ME_NAME_IN_LINE=on` ([`Self::naming_only_in_the_line`]).
+    said_to_me_name_in_line: bool,
     /// `LAMP_NAME_OR_FOLLOW_UP=on` ([`Self::needing_name_or_follow_up`]).
     name_or_follow_up: bool,
     /// `LAMP_TWO_FACES_HELD=on` ([`Self::holding_two_faces`]): the eyes'
@@ -9761,8 +9773,7 @@ fn near_at_a_hearing(
         .iter()
         .filter(|(at, score)| {
             *score >= crate::attention::NEAR_SCORE
-                && at.saturating_add(crate::attention::NAME_BEFORE_US) >= began
-                && *at <= ended
+                && crate::attention::hearing_counts_for_line(*at, began, ended)
         })
         .any(|(at, _)| {
             let from = at.saturating_sub(NEAR_BEFORE_THE_HEARING_US);
@@ -9911,6 +9922,7 @@ impl Heeding {
             turned_speaking: false,
             turned_face_speaks: false,
             said_to_me: false,
+            said_to_me_name_in_line: false,
             face_not_speaking: None,
             name_or_follow_up: false,
             faces_held: None,
@@ -10372,6 +10384,14 @@ impl Heeding {
     /// [`Self::not_said_to_me`]).
     pub(crate) fn hearing_only_said_to_me(&mut self) {
         self.said_to_me = true;
+    }
+
+    /// With [`Self::hearing_only_said_to_me`], a line is named for
+    /// [`crate::said_to_me::judge`] only by a hearing that counts for its own
+    /// sound ([`crate::attention::hearing_counts_for_line`]), never by an
+    /// older one drained with it (`LAMP_SAID_TO_ME_NAME_IN_LINE=on`, #8384).
+    pub(crate) fn naming_only_in_the_line(&mut self) {
+        self.said_to_me_name_in_line = true;
     }
 
     /// With people talking at a desk, a line is the lamp's by its name, a
@@ -12245,8 +12265,15 @@ impl Heeding {
             // read (Fifth's P3 on #8093: #7891 heard the name at 0.939 in
             // meeting talk); words calling the lamp still name it
             // (`said_to_me::named`).
-            name_heard: signs.names.iter().any(|(_, score)| {
-                !(looks_needed && signs.going_on) || *score >= crate::attention::NEAR_SCORE
+            // With `LAMP_SAID_TO_ME_NAME_IN_LINE`, only a hearing in the
+            // line's own sound: one drained with it from before empty lines
+            // is not (#8384: lamp-74ff, 23 Nov, request 156, a hearing 28 s
+            // before). A line going on from another keeps any, its name may
+            // be in its first half (`LAMP_CUT_KEEPS_NAME`).
+            name_heard: signs.names.iter().any(|(at, score)| {
+                (!(looks_needed && signs.going_on) || *score >= crate::attention::NEAR_SCORE)
+                    && (!(self.said_to_me_name_in_line && signs.continues_from.is_none())
+                        || crate::attention::hearing_counts_for_line(*at, said.0, said.1))
             }),
             going_on: signs.going_on,
             // A read-back asks for an answer, however its last sentence
@@ -12751,9 +12778,7 @@ impl Heeding {
         let name_first_ms = signs
             .names
             .iter()
-            .filter(|(at, _)| {
-                at.saturating_add(crate::attention::NAME_BEFORE_US) >= began_us && *at <= ended_us
-            })
+            .filter(|(at, _)| crate::attention::hearing_counts_for_line(*at, began_us, ended_us))
             .map(|(at, _)| (*at as i64 - began_us as i64) / 1_000)
             .min();
         // The soft start's lead, said beside both so a lamp run reads where
@@ -30285,6 +30310,74 @@ mod tests {
                 "{yes} to a stale question"
             );
         }
+    }
+
+    /// `LAMP_SAID_TO_ME_NAME_IN_LINE` (#8384: lamp-74ff, 23 Nov 14:23:40,
+    /// request 156, out of the window, turned, 7 words, 8 looks speaking
+    /// and facing in 0): a hearing of the name 28 s before at 0.977, left
+    /// queued by four empty lines, made the line named and it stood. On,
+    /// only a hearing that counts for the line's own sound names it: that
+    /// line is held, one 1 s before it stands, a stale one facing and seen
+    /// speaking is let through by its face, and a line going on from
+    /// another keeps its first half's name. Off, as before.
+    #[test]
+    fn with_said_to_me_name_in_line_only_a_hearing_in_the_line_names_it() {
+        use lamp_msgs::SpeakingState::Yes;
+        let judged = |on: bool,
+                      pose: (Option<f32>, Option<bool>),
+                      ago_us: u64,
+                      continues_from: Option<u64>| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let (now, now_us) = (Instant::now(), monotonic_us());
+            // Looks at 0.2 s to 3.8 s, the face speaking in each; the line's
+            // sound holds the first 8.
+            turned_face_looks_posed(&eyes, now, 200, &[Some(Yes)], &mut 0, pose);
+            turned_face_looks_posed(&eyes, now, 2_200, &[Some(Yes)], &mut 5, pose);
+            let mut heeding = super::Heeding::new(true, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.seeing_speaking_faces(eyes, None);
+            heeding.hearing_only_said_to_me();
+            if on {
+                heeding.naming_only_in_the_line();
+            }
+            let said = (now_us, now_us + 3_100_000);
+            let signs = super::Signs {
+                names: vec![(said.0.saturating_sub(ago_us), 0.977)],
+                continues_from,
+                ..turned_signs(crate::room_told::Room::Unknown)
+            };
+            let verdict =
+                heeding.heed_signs(156, said, "I think we should move the meeting.", signs);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            verdict
+        };
+        let not_facing = (Some(40f32.to_radians()), None);
+        let facing = (Some(0.05), Some(true));
+        let stale = 28_000_000;
+        assert!(
+            judged(true, not_facing, stale, None).is_some(),
+            "request 156: a hearing 28 s before names nothing"
+        );
+        assert_eq!(
+            judged(true, not_facing, 1_000_000, None),
+            None,
+            "a hearing 1 s before the line names it"
+        );
+        assert_eq!(
+            judged(true, facing, stale, None),
+            None,
+            "stale, but facing and seen speaking"
+        );
+        assert_eq!(
+            judged(true, not_facing, 5_000_000, Some(155)),
+            None,
+            "a line going on from another keeps its first half's name"
+        );
+        assert_eq!(
+            judged(false, not_facing, stale, None),
+            None,
+            "off: any hearing drained names it, as before"
+        );
     }
 
     /// `LAMP_SAID_TO_ME` with the eyes' pitch and gaze (#7442): a question
