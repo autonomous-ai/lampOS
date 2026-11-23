@@ -3095,10 +3095,15 @@ gives one fixed line with a real place to turn. Off unless
 - **The body only nods** (#7689 part 2, `body_link::care_gesture`): while
   the hold holds, an answer's gesture is a nod or nothing: no greeting,
   laugh, surprise or headshake, and no lively fill. Nothing a skill or app
-  reads changes. Not yet held: the body's own idle play and an app's moves
-  (next: a `quiet` mark on the voice's private mood datagram to the body),
-  and skills' and apps' ring and light acts (#8405, e.g. Gym Coach's flash
-  on a rep).
+  reads changes.
+- **The body keeps still** (#7689 part 2, `BodyLink::quiet`): the voice
+  tells the body `{"quiet":true}` on its own mood socket while the hold
+  holds, so it makes no shift at rest, plays a plain nod only (any other
+  gesture, a skill's, a paired computer's or an app's, is dropped and its
+  asker told only `held`) and lamp-control's lease stands back as in a
+  conversation ([body.md](body.md), "Kept still for someone"). `voice/state`
+  and every topic a skill or app reads are unchanged. Not yet held: skills'
+  and apps' ring and light acts (#8405, e.g. Gym Coach's flash on a rep).
 - **Not again within 5 minutes** (`care_line::AGAIN_AFTER`, `Said`): a
   later care turn in that time hears only the model, unless the person
   asks who they can call; a line owed longer than that is let go.

@@ -802,6 +802,23 @@ fn mood_message(datagram: &[u8]) -> Option<MoodMessage> {
     serde_json::from_slice(datagram).ok()
 }
 
+/// The voice's word that the lamp keeps still for someone
+/// (`{"quiet":true}`, its care hold, #7689), or that it no longer does
+/// (`{"quiet":false}`). A datagram of its own, so a body built before it
+/// drops it whole and keeps the mood.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct QuietMessage {
+    quiet: bool,
+}
+
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+fn quiet_of(datagram: &[u8]) -> Option<bool> {
+    serde_json::from_slice::<QuietMessage>(datagram)
+        .ok()
+        .map(|message| message.quiet)
+}
+
 /// Where a `reading` datagram turns the lamp, -1 to 1 across the picture:
 /// nothing for another mood, none given, or a place off the picture.
 #[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
@@ -1399,6 +1416,8 @@ enum Heard {
     /// The body's own clip, a `--moves` file's, or a skill's sent whole.
     Gesture(&'static lamp_body::clips::Clip),
     Mood(lamp_body::gesture::Mood, u8),
+    /// Kept still for someone, or no longer ([`quiet_of`]).
+    Quiet(bool),
     /// Not taken, and why, as the journal says it.
     Dropped(String),
 }
@@ -1457,6 +1476,7 @@ fn heard_asked(
         ),
         None => match mood_of(datagram) {
             Some((mood, level)) => (Heard::Mood(mood, level), Asker::default()),
+            None if let Some(quiet) = quiet_of(datagram) => (Heard::Quiet(quiet), Asker::default()),
             None => (
                 Heard::Dropped(format!(
                     "not a mood or a gesture this body has: {}",
@@ -1821,6 +1841,15 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     // Whether the gesture kept this step asked to replace the one playing.
     let gesture_replace = std::cell::Cell::new(false);
     let gesture_lively = std::cell::Cell::new(false);
+    // Kept still for someone until then (`{"quiet":true}`, #7689): renewed
+    // by each one the voice sends, so a voice gone lets it go in
+    // `MOOD_STALE`, as its mood does.
+    let quiet_until = std::cell::Cell::new(None::<std::time::Instant>);
+    let quiet_now = || {
+        quiet_until
+            .get()
+            .is_some_and(|until| std::time::Instant::now() < until)
+    };
     let asked_by: std::cell::RefCell<Option<(&'static str, String)>> = Default::default();
     // What was dropped as it was read, two asks in one step, to be told on
     // `body/gesture` with the step's news.
@@ -2001,6 +2030,13 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                                 gesture_replace.set(replace);
                                 gesture_lively.set(lively);
                             }
+                        }
+                        (Heard::Quiet(quiet), _) => {
+                            quiet_until.set(
+                                quiet.then(|| {
+                                    std::time::Instant::now() + lamp_body::body::MOOD_STALE
+                                }),
+                            );
                         }
                         (Heard::Mood(mood, level), _) => {
                             if mood == lamp_body::gesture::Mood::Reading {
@@ -2727,6 +2763,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 present: presence_in
                     .as_mut()
                     .is_some_and(|presence| presence.present()),
+                quiet: quiet_now(),
             };
             // Read all the same, so that nothing kept from before the pause
             // is acted on after it.
@@ -2798,10 +2835,12 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                         mute.private()
                     });
                     let around = lamp_body::lease::Around {
+                        // Kept still for someone (#7689): the lease stands
+                        // back as in a conversation.
                         conversation: matches!(
                             lease_mood.get(),
                             Mood::Listening | Mood::Thinking | Mood::Speaking
-                        ),
+                        ) || quiet_now(),
                         hand: lease_hand.get() || held,
                         slumped: lease_slumped.get(),
                         private,
@@ -4908,6 +4947,31 @@ mod tests {
             assert!(!heard(r#"{"gesture":"nod"}"#).lively, "{on}");
             let moved = r#"{"move":{"name":"lively","step_ms":500,"frames":[[0,0,0,0,0],[20,0,30,0,0],[20,0,30,0,0],[0,0,0,0,0]]},"lively":true,"source":"skill:music-sway","priority":"skill"}"#;
             assert!(heard(moved).lively, "{on}");
+        }
+    }
+
+    /// #7689 (b): the voice's `{"quiet":…}` is a datagram of its own, read
+    /// as such, and a mood beside it is a mood as before; with any other
+    /// field, or on a mood's own datagram (refused whole, as a body built
+    /// before it refuses it), it is no word at all.
+    #[test]
+    fn the_voices_quiet_is_a_datagram_of_its_own() {
+        let moves = lamp_body::moves::Loaded::default();
+        let mut sent = lamp_body::moves::Sent::default();
+        let mut heard =
+            |datagram: &str| heard_asked(datagram.as_bytes(), &moves, &mut sent, false).0;
+        assert!(matches!(heard(r#"{"quiet":true}"#), Heard::Quiet(true)));
+        assert!(matches!(heard(r#"{"quiet":false}"#), Heard::Quiet(false)));
+        assert!(matches!(
+            heard(r#"{"mood":"listening","level":3}"#),
+            Heard::Mood(lamp_body::gesture::Mood::Listening, 3)
+        ));
+        for refused in [
+            r#"{"quiet":true,"why":"x"}"#,
+            r#"{"mood":"listening","level":3,"quiet":true}"#,
+            r#"{"quiet":"yes"}"#,
+        ] {
+            assert!(matches!(heard(refused), Heard::Dropped(_)), "{refused}");
         }
     }
 
