@@ -1830,6 +1830,10 @@ fn worker_command(
             role,
             var(crate::second_provider::worker::CARRIED_JOURNAL_ENVIRONMENT).as_deref(),
         ))
+        .envs(session_person_worker_environment(
+            role,
+            var(crate::second_provider::worker::SESSION_PERSON_ENVIRONMENT).as_deref(),
+        ))
         .envs(quiet_evidence_worker_environment(
             role,
             var(crate::quiet_pace::EVIDENCE_ENVIRONMENT).as_deref(),
@@ -2977,6 +2981,18 @@ fn carried_journal_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on"))).then_some((
         crate::second_provider::worker::CARRIED_JOURNAL_ENVIRONMENT,
+        "on",
+    ))
+}
+
+// The session person (`LAMP_SESSION_PERSON`), to the second route only,
+// whose memory scope keeps it; the exact `on`.
+fn session_person_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on"))).then_some((
+        crate::second_provider::worker::SESSION_PERSON_ENVIRONMENT,
         "on",
     ))
 }
@@ -4764,6 +4780,7 @@ mod tests {
                     crate::memory_scope::NO_FACE_HOLD_ENVIRONMENT,
                     crate::known_faces::STICKY_ENVIRONMENT,
                     crate::second_provider::worker::CARRIED_JOURNAL_ENVIRONMENT,
+                    crate::second_provider::worker::SESSION_PERSON_ENVIRONMENT,
                     crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
                     lamp_body::unplug::ENVIRONMENT,
                     lamp_msgs::SHUTDOWN_SWITCH,
@@ -5262,6 +5279,7 @@ mod tests {
                     "LAMP_SERVICE_RECORDS_TASKS=on",
                     "LAMP_SERVICE_RECORDS_TOLD=on",
                     "LAMP_SERVICE_REDO=on",
+                    "LAMP_SESSION_PERSON=on",
                     "LAMP_SHORT_DONE=on",
                     "LAMP_SKILL_ASKED=on",
                     "LAMP_SKILL_CLAIM_CHECKED=on",

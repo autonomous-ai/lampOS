@@ -5559,6 +5559,74 @@ still kept out.
 
 Off, nothing reads the mark and every line is as before.
 
+### The session person
+
+Only with `LAMP_SESSION_PERSON=on` (off unless set, on in the product unit by
+the memory owner's decisions of 23 Nov on the session-user proposal; the
+second route, `process::session_person_worker_environment`,
+`Engine::keeping_session_person`, `session_person::SessionPerson`). It needs
+the eyes seeing who speaks (`LAMP_SECOND_SPEAKING_FACE`, `LAMP_EYES_SPEAKING`,
+`LAMP_SECOND_SCOPED_CONTEXT`); without them the journal says so once and
+nothing changes.
+
+One session person per conversation. It changes one thing:
+
+- **A passer-by doesn't take their line.** While the session person's own
+  face is in view through a line (in at least one of the eyes' looks, an id
+  the eyes say follows it counting as theirs, `face_followed_between`:
+  matched, or the face the eyes follow as them under `LAMP_FACE_STICKY`),
+  another face in view doesn't narrow the line to the room. It is read, kept
+  and journalled as theirs, as the one-face rule with reads does
+  (`ScopeLease::read_by_one_face`), and no other voice recorded in the
+  conversation narrows it afterwards.
+- **The one exception.** A face not theirs seen speaking the line
+  (`speaking_faces::someone_elses`): that line goes to the room. Later lines
+  stay theirs.
+
+Everything else is as before: who a line is admitted for (the face cache,
+the 30 s hold only while no face is in view, the eyes' held name, another
+enrolled person taken on their takeover looks); a misread on their followed
+face stays theirs; forgets, corrections, rules and yeses need their mouth
+seen saying the line, or the single-item yes (#5627), as on a one-face line;
+the private read-backs' "owner alone in view" never counts a session as
+alone.
+
+| Starts | Condition |
+|---|---|
+| A person's session | No session open, and a line admitted for them by a real match (not held, not sticky, so never a rematch) with their face in view. |
+| A room's session | No session open, a line admitted as the room's with a face in view, and the face cache not cold (`COLD_FOR`). |
+| A person's, in a room's session | Their real match in view, and either their own face seen saying the line or no other face in view (the guest gone). Until then their lines are judged as before. |
+
+| Ends, the first of | Read from |
+|---|---|
+| The conversation closed (a spoken stop, a paired computer's turn end) | `thread::Thread::closed_at`, past the session's start |
+| Privacy or the camera changed | the face cache's generation (`FaceCache::invalidate` from `memory_camera`) |
+| A line not admitted for them with a face in view: gone past today's hold, or another person taken | the line's admitted scope |
+| 2 min past the lamp's last answer in it | `memory_scope::NO_FACE_QUIET`, from `Engine::memory_answered` |
+
+No number of its own: the 3 looks, the 4 s freshness, the 30 s hold and the
+eyes' takeover are the ones above. The journal says, with the request and no
+name: `memory session: began for a known person`, `began for the room (a face
+not known in view)`, `theirs: another face in view, none not theirs seen
+speaking it`, `the room's: a face not theirs seen speaking it; later lines
+stay theirs`, and `ended:` with the reason.
+
+A look (#8019, `LAMP_LOOK_KEPT_WITH_ASK`) asked on a session line goes on in
+the asker's scope (`look_scope`, `look_hits_scope`: the line was read as
+theirs). As the look begins, `asker_still_alone` wants no other face in view;
+with the session, `look_in_session` keeps it theirs while
+`SessionPerson::looks_for` holds: the session still theirs, in the same
+generation, not closed or quiet. A passer-by doesn't take it; privacy does.
+
+**The seat swap.** With `LAMP_FACE_FOLLOW_NEAR_NEW_ID=on` the eyes' `follow_near`
+follows a new id in the held face's place, and the voice can't tell it from
+their own followed face. So lamp-eyes reads `LAMP_SESSION_PERSON` too: with
+it on, a new id follows only within `who::FOLLOW_GAP`, 5 s from the last
+look that saw the face (row 5 on lamp-06c1, 20 Nov: covered faces were lost
+0.2 to 3 s, plus a margin; the memory owner's choice "B with 5s", 23 Nov).
+A new face sitting down there later is not named, and its line is the
+room's. Off, any gap within the sticky hold follows, as before.
+
 ### Live route session scope
 
 With `LAMP_LIVE_SCOPED_SESSION=on` (off unless set), a spoken line on the Live

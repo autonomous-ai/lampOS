@@ -4191,6 +4191,28 @@ fn the_product_holds_a_known_name_sticky_with_the_plans_switches_on() {
     }
 }
 
+/// The session person (`LAMP_SESSION_PERSON`, the memory owner's decisions
+/// of 23 Nov): on in the voice's unit, which keeps the memory scope, and in
+/// the eyes', whose follow of a new id waits at most `FOLLOW_GAP` under it
+/// ("B with 5s"); in no other unit.
+#[test]
+fn the_product_keeps_one_session_person_in_the_voice_and_the_eyes_alone() {
+    for (name, text) in install::PRODUCT {
+        let has = text.contains("LAMP_SESSION_PERSON");
+        if ["lamp-voice.service", "lamp-eyes.service"].contains(name) {
+            assert!(
+                section(text, "Service").contains(&"Environment=LAMP_SESSION_PERSON=on"),
+                "{name} lacks LAMP_SESSION_PERSON=on"
+            );
+        } else {
+            assert!(
+                !has,
+                "{name} has LAMP_SESSION_PERSON, the voice's and eyes' switch"
+            );
+        }
+    }
+}
+
 /// #2176 row 3: a rename keeps the person's memory, so the eyes and the
 /// voice both set the stable id. The voice uses an id only when its own
 /// switch and the eyes' agree, so one without the other keys nobody on it

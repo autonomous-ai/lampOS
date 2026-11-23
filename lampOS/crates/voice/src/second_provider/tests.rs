@@ -9342,6 +9342,99 @@ fn a_looks_asker_is_alone_only_with_no_one_else_in_view() {
     assert!(!asker_still_alone(&a, &held, Some((&eyes, None)), from, to));
 }
 
+/// `LAMP_SESSION_PERSON` with `LAMP_LOOK_KEPT_WITH_ASK` (proposal §8): a
+/// look asked on a session line, a silent passer-by in view, is kept under
+/// the asker: the asking line, read as theirs by the session
+/// (`ScopeLease::read_by_one_face`), gives the asker's scope to
+/// `look_scope` and `look_hits_scope`, and as the look begins, the passer-by
+/// beside them, `asker_still_alone` says no but the open session keeps it
+/// theirs. Without a session, or once privacy ends it, the room's, as #8019
+/// has it.
+#[test]
+fn a_look_in_the_session_with_a_passerby_in_view_is_kept_under_the_asker() {
+    use crate::memory_scope::{FaceCache, RequestKey, RequestScope, ScopeSnapshot};
+    use crate::session_person::{Line, SessionPerson, Verdict};
+    use crate::speaking_faces::SpeakingFaces;
+    let a = ScopeSnapshot::of("A");
+    let person = a.person().unwrap().to_owned();
+    let cache = Arc::new(FaceCache::default());
+    cache.cold_since(Instant::now() - Duration::from_secs(60));
+    let session = SessionPerson::new(cache.clone());
+    let now = Instant::now();
+    let line = Line {
+        person: Some(&person),
+        matched: true,
+        in_view: true,
+        others_in_view: true,
+        any_face: true,
+        ..Line::default()
+    };
+    assert_eq!(session.line(&line, now, None).verdict, Verdict::Theirs);
+    // The asking line, a session line: read as theirs, not narrowed.
+    let asking = RequestScope::new(
+        RequestKey {
+            worker: lamp_turn_owner::BootId::new([83; 16]).unwrap(),
+            session: 1,
+            request: 8_401_001,
+        },
+        a.clone(),
+    );
+    let lease = asking.lease();
+    assert!(lease.read_by_one_face());
+    let kept = look_scope(&lease);
+    assert_eq!(
+        kept.person(),
+        Some(person.as_str()),
+        "the look goes on as A's"
+    );
+    assert_eq!(
+        look_hits_scope(&lease).and_then(|scope| scope.person().map(str::to_owned)),
+        Some(person.clone()),
+        "its hits are read in A's scope"
+    );
+    // As the look begins: A and a silent passer-by in view.
+    let face = |id: &str| lamp_msgs::Face {
+        pitch: None,
+        looking: None,
+        id: id.to_owned(),
+        xmin: 0.1,
+        ymin: 0.1,
+        xmax: 0.3,
+        ymax: 0.4,
+        confidence: 1.0,
+        yaw: None,
+        facing: None,
+        speaking: None,
+        follows: None,
+    };
+    let eyes = SpeakingFaces::default();
+    let from = Instant::now();
+    eyes.look(
+        Instant::now(),
+        Some((
+            ("b", 1),
+            &lamp_msgs::Faces {
+                faces: vec![face("f1"), face("f9")],
+            },
+        )),
+    );
+    let to = Instant::now();
+    let by_faces = asker_still_alone(&kept, &a, Some((&eyes, Some("b/f1"))), from, to);
+    assert!(!by_faces, "by #8019's faces alone, the room's");
+    assert!(
+        look_in_session(Some(&session), &kept, now),
+        "the session keeps the look A's"
+    );
+    assert!(!look_in_session(None, &kept, now), "no session: the room's");
+    assert!(
+        !look_in_session(Some(&session), &ScopeSnapshot::room(), now),
+        "a room's ask"
+    );
+    // Privacy changes: the session is over, the look the room's.
+    cache.invalidate();
+    assert!(!look_in_session(Some(&session), &kept, now));
+}
+
 /// The scope a look goes on in and the one its hits are read in, from the
 /// asker's lease (`LAMP_LOOK_KEPT_WITH_ASK`, `LAMP_LOOK_TOLD`): a known
 /// person's, theirs; the room's, the room's; a held asker's, the room's

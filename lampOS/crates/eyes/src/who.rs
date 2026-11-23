@@ -2151,7 +2151,9 @@ pub fn sticky_on() -> bool {
 /// the followed id ([`Held::follow_near`]). Row 5 on lamp-06c1 (20 Nov):
 /// the detector lost a covered face for 0.2 to 3 s at a time and each return
 /// was a new id, and T3's "a new id clears" let the held name go (legs E and
-/// H). Off in the product: it changes the owner's T3 and waits for their call.
+/// H). On in the product by the owner's call on #7933 (20 Nov). With
+/// [`SESSION_PERSON_ENVIRONMENT`] on, it follows only within [`FOLLOW_GAP`]
+/// of the held face's last sighting.
 pub const FOLLOW_NEAR_NEW_ID_ENVIRONMENT: &str = "LAMP_FACE_FOLLOW_NEAR_NEW_ID";
 
 pub fn follow_near_new_id_on() -> bool {
@@ -2160,6 +2162,26 @@ pub fn follow_near_new_id_on() -> bool {
         .as_deref()
         == Some("on")
 }
+
+/// Off unless `LAMP_SESSION_PERSON=on` on lamp-eyes (the voice reads the
+/// same switch for its session person): a new near id follows the held face
+/// ([`Held::follow_near`]) only within [`FOLLOW_GAP`] of its last sighting,
+/// so a new face sitting down in the held person's place later is not taken
+/// for them (the memory owner's choice "B with 5s", 23 Nov). Off, any gap
+/// within the sticky hold follows, as before.
+pub const SESSION_PERSON_ENVIRONMENT: &str = "LAMP_SESSION_PERSON";
+
+pub fn session_person_on() -> bool {
+    std::env::var(SESSION_PERSON_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// With [`SESSION_PERSON_ENVIRONMENT`], the longest gap since the last look
+/// that saw the held face ([`Held::saw_near_at`], or its last recognition,
+/// [`Held::seen_theirs`], if later) over which a new
+/// near id still follows it ([`Held::follow_near`]). Row 5 on lamp-06c1
+/// (20 Nov): the detector lost a covered face for 0.2 to 3 s at a time; 5 s
+/// is that and a margin (the memory owner's choice "B with 5s", 23 Nov).
+pub const FOLLOW_GAP: Duration = Duration::from_secs(5);
 
 /// Off unless `LAMP_FACE_TAKEOVER_SCORE=on` on lamp-eyes (and
 /// [`STICKY_ENVIRONMENT`] on): another enrolled person's look on the held
@@ -2276,10 +2298,15 @@ pub struct Held {
     kept_at: Option<Instant>,
     /// `LAMP_FACE_FOLLOW_NEAR_NEW_ID=on` ([`Held::follows_near`]).
     near_follow: bool,
+    /// [`Held::follows_within_gap`]: a follow only within [`FOLLOW_GAP`].
+    follow_gap: bool,
     /// The held face's last box on its own or followed id: its centre across
     /// and its width, in pixels ([`Held::saw_near`]). In memory only, gone
     /// with [`Held::let_go`].
     held_box: Option<(f32, f32)>,
+    /// When a look last saw the held face on its own or followed id
+    /// ([`Held::saw_near_at`]): [`FOLLOW_GAP`] counts from it.
+    box_seen_at: Option<Instant>,
 }
 
 /// What a check with no print does with the one known ([`Held::unprinted`]).
@@ -2321,7 +2348,9 @@ impl Held {
             sticky: false,
             kept_at: None,
             near_follow: false,
+            follow_gap: false,
             held_box: None,
+            box_seen_at: None,
         }
     }
 
@@ -2333,12 +2362,40 @@ impl Held {
         self
     }
 
+    /// With `on` (`LAMP_SESSION_PERSON`), [`Held::follow_near`] follows a new
+    /// id only within [`FOLLOW_GAP`] of the held face's last sighting.
+    pub fn follows_within_gap(mut self, on: bool) -> Self {
+        self.follow_gap = on;
+        self
+    }
+
     /// A look's near face, on passing id `id`, its box centre across `x` and
     /// width `width` in pixels: on the held face's own or followed id, kept
     /// as the held face's last box ([`Held::follow_near`]).
     pub fn saw_near(&mut self, id: Option<&str>, x: f32, width: f32) {
         if self.holding() && id.is_some() && self.on_held_face(id) {
             self.held_box = Some((x, width));
+        }
+    }
+
+    /// [`Held::saw_near`] by a look at `now` (every `LOOK_EVERY`, 250 ms):
+    /// a look that saw the held face on its own or followed id is also when
+    /// [`FOLLOW_GAP`] counts from (El's P2 on #8401: a recognition check,
+    /// every 2 s, is too seldom to count a 5 s gap from).
+    pub fn saw_near_at(&mut self, now: Instant, id: Option<&str>, x: f32, width: f32) {
+        if self.holding() && id.is_some() && self.on_held_face(id) {
+            self.held_box = Some((x, width));
+            self.box_seen_at = Some(self.box_seen_at.map_or(now, |at| at.max(now)));
+        }
+    }
+
+    /// When the held face was last seen: the later of its last recognition
+    /// ([`Held::seen_theirs`]) and the last look that saw it
+    /// ([`Held::saw_near_at`]).
+    fn last_seen(&self) -> Option<Instant> {
+        match (self.kept_at, self.box_seen_at) {
+            (Some(kept), Some(look)) => Some(kept.max(look)),
+            (kept, look) => kept.or(look),
         }
     }
 
@@ -2367,6 +2424,10 @@ impl Held {
             && near_faces == 1
             && not_standing_up
             && !self.on_held_face(Some(id))
+            && (!self.follow_gap
+                || self
+                    .last_seen()
+                    .is_some_and(|at| now.saturating_duration_since(at) <= FOLLOW_GAP))
             && self.held_box.is_some_and(|(held_x, held_width)| {
                 (x - held_x).abs() <= JUMP_SHARE * held_width.max(1.0)
             });
@@ -2738,6 +2799,7 @@ impl Held {
         self.pending = None;
         self.unsure = false;
         self.held_box = None;
+        self.box_seen_at = None;
     }
 
     /// Whether anyone is held now (a match not let go since).
@@ -8396,6 +8458,85 @@ mod tests {
             !followed.follow_near(at, Some(("f44", 305.0, 90.0)), 1, true),
             "let go: no box"
         );
+    }
+
+    /// `LAMP_SESSION_PERSON` (the memory owner's choice "B with 5s", 23 Nov):
+    /// a new near id follows only within [`FOLLOW_GAP`] of the held face's
+    /// last sighting: 0.2, 1, 3 and 5 s follow; 5.1 and 10 s don't. Off, any
+    /// gap within the sticky hold follows, as before.
+    #[test]
+    fn with_the_session_person_a_new_id_follows_only_within_the_follow_gap() {
+        let start = Instant::now();
+        let held = |gap: bool| {
+            let mut held = Held::new(true)
+                .sticky(true)
+                .follows_near(true)
+                .follows_within_gap(gap);
+            held.matched(start, Some("f42".to_owned()));
+            held.saw_near(Some("f42"), 300.0, 90.0);
+            held
+        };
+        let ms = Duration::from_millis;
+        for (after, follows) in [
+            (ms(200), true),
+            (ms(1_000), true),
+            (ms(3_000), true),
+            (ms(5_000), true),
+            (ms(5_100), false),
+            (ms(10_000), false),
+        ] {
+            assert_eq!(
+                held(true).follow_near(start + after, Some(("f43", 305.0, 90.0)), 1, true),
+                follows,
+                "on, {after:?}"
+            );
+            assert!(
+                held(false).follow_near(start + after, Some(("f43", 305.0, 90.0)), 1, true),
+                "off, {after:?}"
+            );
+        }
+        // Counted from the last sighting, not the match.
+        let mut seen = held(true);
+        seen.seen_theirs(start + ms(20_000));
+        assert!(seen.follow_near(start + ms(24_000), Some(("f43", 305.0, 90.0)), 1, true));
+    }
+
+    /// El's P2 on #8401: the gap counts from the last look that saw the held
+    /// face (every 250 ms), not the last recognition check (every 2 s).
+    /// Recognised at t0, seen by looks to t0+1.9 s, nothing until t0+6.5 s:
+    /// a 4.6 s gap follows. 5.1 s after the last look doesn't.
+    #[test]
+    fn the_follow_gap_counts_from_the_last_look_that_saw_the_face() {
+        let start = Instant::now();
+        let ms = Duration::from_millis;
+        let looked = || {
+            let mut held = Held::new(true)
+                .sticky(true)
+                .follows_near(true)
+                .follows_within_gap(true);
+            held.matched(start, Some("f42".to_owned()));
+            held.seen_theirs(start);
+            let mut at = ms(0);
+            while at <= ms(1_900) {
+                held.saw_near_at(start + at, Some("f42"), 300.0, 90.0);
+                at += ms(250);
+            }
+            // The last look at 1.75 s; one more at 1.9 s.
+            held.saw_near_at(start + ms(1_900), Some("f42"), 300.0, 90.0);
+            held
+        };
+        assert!(
+            looked().follow_near(start + ms(6_500), Some(("f43", 305.0, 90.0)), 1, true),
+            "a 4.6 s gap from the last look follows"
+        );
+        assert!(
+            !looked().follow_near(start + ms(7_000), Some(("f43", 305.0, 90.0)), 1, true),
+            "5.1 s after the last look doesn't"
+        );
+        // A look of another id is not a look of the held face.
+        let mut other = looked();
+        other.saw_near_at(start + ms(4_000), Some("f77"), 300.0, 90.0);
+        assert!(!other.follow_near(start + ms(7_000), Some(("f43", 305.0, 90.0)), 1, true));
     }
 
     /// The gap line says what the check did: "let go" when it let go,

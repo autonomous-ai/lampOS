@@ -1284,7 +1284,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 .unsure_holds(lamp_eyes::who::known_unsure_on())
                 .holds_on_id(lamp_eyes::who::known_on_id_on())
                 .sticky(lamp_eyes::who::sticky_on())
-                .follows_near(lamp_eyes::who::follow_near_new_id_on()),
+                .follows_near(lamp_eyes::who::follow_near_new_id_on())
+                .follows_within_gap(lamp_eyes::who::session_person_on()),
                 takeover: lamp_eyes::who::Takeover::default(),
                 recent: lamp_eyes::who::Recent::default(),
             })
@@ -2949,10 +2950,16 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 holding,
                             );
                             // The held face's last box, on its own or
-                            // followed id (`who::Held::saw_near`,
-                            // LAMP_FACE_FOLLOW_NEAR_NEW_ID).
+                            // followed id, and when this look saw it
+                            // (`who::Held::saw_near_at`,
+                            // LAMP_FACE_FOLLOW_NEAR_NEW_ID, LAMP_SESSION_PERSON).
                             if let Some((_, (face, _))) = near {
-                                who.held.saw_near(near_id.as_deref(), face.x + face.width / 2.0, face.width);
+                                who.held.saw_near_at(
+                                    Instant::now(),
+                                    near_id.as_deref(),
+                                    face.x + face.width / 2.0,
+                                    face.width,
+                                );
                             }
                         }
                         if let Some(who) = who.as_mut()

@@ -414,6 +414,13 @@ Built from it:
   A new id in the held face's place (within `JUMP_SHARE` of its last box),
   with the sitter check saying the sitter is not standing up, is followed.
   It changes T3.
+  **Follow gap (`LAMP_SESSION_PERSON`, on in the product, the memory
+  owner's choice "B with 5s", 23 Nov).** With it on, the new id follows only
+  within `who::FOLLOW_GAP`, 5 s from the last look that saw the face (every
+  250 ms, `Held::saw_near_at`, not the 2 s recognition check): the 0.2 to
+  3 s losses above, plus a margin. A new face sitting down in the place
+  later is not followed, so it is never named as the held person. Off, any
+  gap within the sticky hold follows, as before.
 - **Behind its own switch, on in the product by the owner's call (20 Nov): `LAMP_FACE_TAKEOVER_SCORE`.**
   A takeover look needs a detector score of at least `PERSON_SCORE` (0.8).
   It is a new cap with a thin margin: one covered print scored 0.81.

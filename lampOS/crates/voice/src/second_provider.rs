@@ -2569,6 +2569,10 @@ struct Shared {
     /// `LAMP_FACE_STICKY` ([`Engine::holding_sticky`]): the eyes hold the
     /// name themselves, so the own-track carry is inert.
     face_sticky: bool,
+    /// The session person (`LAMP_SESSION_PERSON`, [`Engine::keeping_session_person`]):
+    /// while their face is in view, another face in view does not narrow
+    /// their line to the room. None, off.
+    session_person: Option<Arc<crate::session_person::SessionPerson>>,
     /// A carried line may save into the conversation's scope
     /// (`LAMP_CONVERSATION_CARRIED_SAVES`, [`Engine::saving_carried`]).
     carried_saves: bool,
@@ -3032,6 +3036,26 @@ fn no_other_voice_known(another_voice: Option<&AtomicBool>) -> bool {
 fn no_other_voice_shown(shared: &Shared) -> bool {
     no_other_voice_known(shared.one_face.as_deref())
         && !shared.past_silent.as_ref().is_some_and(|another| another())
+}
+
+/// `LAMP_SESSION_PERSON`: the session's verdict on `request`'s `line`,
+/// heard by `now` (the route's clock), its journal lines said (counts and
+/// words, never a name), with the voice's thread's last close. `true` for the session person's line.
+fn session_judged(
+    session: &crate::session_person::SessionPerson,
+    request: u64,
+    line: &crate::session_person::Line<'_>,
+    now: Instant,
+) -> bool {
+    let closed_at = crate::thread::THREAD
+        .lock()
+        .ok()
+        .and_then(|thread| thread.closed_at());
+    let judged = session.line(line, now, closed_at);
+    for told in &judged.told {
+        eprintln!("lamp-voice second: request {request}: {told}");
+    }
+    judged.verdict == crate::session_person::Verdict::Theirs
 }
 
 fn one_face_theirs(
@@ -5545,6 +5569,7 @@ impl Engine {
                 skill_yes_carry: false,
                 carries_own_track: false,
                 face_sticky: false,
+                session_person: None,
                 carried_saves: false,
                 carried_memory: false,
                 held_words_seen: false,
@@ -5724,6 +5749,11 @@ impl Engine {
         {
             cache.answered(scope, at);
         }
+        // `LAMP_SESSION_PERSON`: the session's quiet runs from the lamp's
+        // last answer in it.
+        if spoken && let Some(session) = &self.shared.session_person {
+            session.answered(at);
+        }
     }
 
     /// Authority of the current admitted request, including its immutable scope.
@@ -5833,6 +5863,10 @@ impl Engine {
                         .map(|(eyes, face)| (eyes.as_ref(), face.as_deref())),
                     from,
                     now,
+                ) || look_in_session(
+                    self.shared.session_person.as_deref(),
+                    &asker.kept,
+                    (self.shared.clock)(),
                 );
                 if !alone {
                     eprintln!(
@@ -6048,6 +6082,37 @@ impl Engine {
     pub fn holding_sticky(mut self, on: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.face_sticky = on;
+        self
+    }
+
+    /// `LAMP_SESSION_PERSON` (the memory owner's decisions of 23 Nov,
+    /// [`crate::session_person`]): one session person per conversation, whose
+    /// line, their face in view, another face in view does not narrow to the
+    /// room unless a face not theirs is seen speaking it. Needs the memory
+    /// scope's face cache ([`Self::with_memory_scope`]) and the eyes seeing
+    /// who speaks ([`Self::seeing_who_speaks`]); without them it is said
+    /// once and not acted on. Off, as before.
+    pub fn keeping_session_person(mut self, on: bool) -> Self {
+        if !on {
+            return self;
+        }
+        let Some(cache) = self.memory.as_ref().map(|(_, cache)| cache.clone()) else {
+            eprintln!(
+                "lamp-voice second: LAMP_SESSION_PERSON is on, but not acted on: no memory scope"
+            );
+            return self;
+        };
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        if shared.speaking.is_none() {
+            eprintln!(
+                "lamp-voice second: LAMP_SESSION_PERSON is on, but not acted on: it needs LAMP_SECOND_SPEAKING_FACE, LAMP_EYES_SPEAKING and LAMP_SECOND_SCOPED_CONTEXT"
+            );
+            return self;
+        }
+        eprintln!(
+            "lamp-voice second: one session person per conversation: while their face is in view, another face in view does not take their line to the room; a face not theirs seen speaking a line does (LAMP_SESSION_PERSON)"
+        );
+        shared.session_person = Some(Arc::new(crate::session_person::SessionPerson::new(cache)));
         self
     }
 
@@ -10519,6 +10584,9 @@ async fn spoken(
     // Taken by the one-face rule and read as theirs
     // (`LAMP_PERSON_SCOPE_ONE_FACE_READS`, [`Engine::reading_by_one_face`]).
     let mut read_by_one_face = false;
+    // The session person's line (`LAMP_SESSION_PERSON`): not narrowed for
+    // another face in view, nor for another voice in the conversation.
+    let mut session_theirs = false;
     // Marked below only when their own face is seen saying it.
     crate::memory_scope::mark_seen_line(request, None);
     if let Some(scope) = scope.as_ref()
@@ -10608,7 +10676,36 @@ async fn spoken(
                     .then(|| own_track_face(&shared, eyes, &person, own_face, begun, finishing))
                     .flatten();
                 let carry_face = own_track.as_deref().or(own_face);
-                let carried = shared.scope_seen
+                // `LAMP_SESSION_PERSON`: the session person's line, their own
+                // face (or the face the eyes follow as them) in view and no
+                // face not theirs seen speaking it, is read and kept as
+                // theirs whatever other face is in view; no carry is needed.
+                session_theirs = shared.session_person.as_ref().is_some_and(|session| {
+                    let admitted = scope.scope();
+                    let looked = eyes.looked_between(begun, finishing);
+                    let line = crate::session_person::Line {
+                        person: Some(&person),
+                        matched: admitted
+                            .is_some_and(|admitted| !admitted.held() && !admitted.sticky()),
+                        in_view: eyes.face_followed_between(carry_face, begun, finishing),
+                        seen_saying: crate::speaking_faces::seen_saying(
+                            &speakers,
+                            &person,
+                            pair.clone(),
+                        ),
+                        someone_elses: crate::speaking_faces::someone_elses(
+                            &speakers,
+                            &person,
+                            pair.clone(),
+                        ),
+                        others_in_view: looked
+                            && !eyes.no_other_face_in_view(carry_face, begun, finishing),
+                        any_face: looked && !eyes.no_other_face_in_view(None, begun, finishing),
+                    };
+                    session_judged(session, request, &line, (shared.clock)())
+                });
+                let carried = !session_theirs
+                    && shared.scope_seen
                     && unseen_carry(
                         &shared,
                         eyes,
@@ -10773,7 +10870,12 @@ async fn spoken(
         // forgets refused; checked again once the line is judged, for its
         // own voice (below). The chat begun on its early words was told as
         // theirs, and stays.
-        if one_face && shared.one_face_reads && scope.read_by_one_face() {
+        if session_theirs && scope.read_by_one_face() {
+            read_by_one_face = true;
+            eprintln!(
+                "lamp-voice second: request {request}: the session person's face in view, no face not theirs seen speaking it: told, read and kept as theirs, no forget or yes runs on it unless their mouth is seen saying it (LAMP_SESSION_PERSON)"
+            );
+        } else if one_face && shared.one_face_reads && scope.read_by_one_face() {
             read_by_one_face = true;
             eprintln!(
                 "lamp-voice second: request {request}: no face was seen speaking it, the known person's face the one face in view and no other voice heard: told, read and kept as theirs, no forget or yes runs on it (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
@@ -10826,6 +10928,27 @@ async fn spoken(
                 );
             }
         }
+    }
+    // `LAMP_SESSION_PERSON`: a line admitted as the room's ends the session
+    // person's session with a face in view, or begins a room's with a guest.
+    if let (Some(session), Some(lease), Some((eyes, _))) = (
+        shared.session_person.as_ref(),
+        scope.as_ref(),
+        shared.speaking.as_ref(),
+    ) && lease.admitted_person().is_none()
+    {
+        let looked = eyes.looked_between(begun, finishing);
+        let any_face = looked && !eyes.no_other_face_in_view(None, begun, finishing);
+        session_judged(
+            session,
+            request,
+            &crate::session_person::Line {
+                any_face,
+                others_in_view: any_face,
+                ..crate::session_person::Line::default()
+            },
+            (shared.clock)(),
+        );
     }
     // A line admitted as the room's, no face named for it (lamp-06c1, 29 Oct:
     // 5 of 68 turns with the person in view throughout), in a known person's
@@ -11688,7 +11811,11 @@ async fn spoken(
     }
     // So too a carried line read as its person's
     // (`LAMP_CONVERSATION_CARRIED_MEMORY`) another voice shows in.
+    // Never the session person's line (`LAMP_SESSION_PERSON`): only a face
+    // not theirs seen speaking it takes it to the room (the memory owner,
+    // 23 Nov).
     if (one_face || hits_face || named_by_one_face || carried_memory)
+        && !session_theirs
         && another_voice_heard(shared.one_face.as_deref())
         && let Some(scope) = scope.as_ref()
         && (scope.by_one_face()
@@ -15441,6 +15568,26 @@ pub(crate) fn asker_still_alone(
         Some((eyes, _)) if now.held() => eyes.no_other_face_in_view(None, from, to),
         Some((eyes, face)) => face.is_some() && eyes.no_other_face_in_view(face, from, to),
     }
+}
+
+/// `LAMP_SESSION_PERSON` (proposal §8): a look asked by `asked`, the asking
+/// line's scope, stays theirs while their session is still open at `now`
+/// (`session_person::SessionPerson::looks_for`: the same face cache
+/// generation, not closed, not quiet), whatever other face is in view. A
+/// room's ask, or no session, is [`asker_still_alone`]'s alone.
+pub(crate) fn look_in_session(
+    session: Option<&crate::session_person::SessionPerson>,
+    asked: &crate::memory_scope::ScopeSnapshot,
+    now: Instant,
+) -> bool {
+    let (Some(session), Some(person)) = (session, asked.person()) else {
+        return false;
+    };
+    let closed_at = crate::thread::THREAD
+        .lock()
+        .ok()
+        .and_then(|thread| thread.closed_at());
+    session.looks_for(person, now, closed_at)
 }
 
 /// The route's own look, asked by its call in `request`'s spoken turn

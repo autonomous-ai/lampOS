@@ -618,6 +618,8 @@ Environment=LAMP_FACE_STICKY=on
 # call on #7933, 20 Nov 01:55).
 Environment=LAMP_FACE_NO_FACE_HOLD=on
 Environment=LAMP_CARRIED_JOURNAL=on
+# LAMP_SESSION_PERSON: its why and rules are its row in docs/switches.md (the memory owner's session-person call, 23 Nov).
+Environment=LAMP_SESSION_PERSON=on
 # LAMP_MEMORY_STABLE_ID: its why and rules are its row in docs/switches.md (#2176, #4710).
 Environment=LAMP_MEMORY_STABLE_ID=on
 # LAMP_MEMORY_KEEP_HEARD: its why and rules are its row in docs/switches.md (#2176, #5276).
