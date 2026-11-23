@@ -266,8 +266,12 @@ impl ReferenceAssembly {
             || prime.accepted_zero_frames != PRIME_FRAMES
             || prime.queued_frames != PRIME_FRAMES
             || prime.accepted_at_us > prime.queue_observed_at_us
-            || !fresh(prime.accepted_at_us, now, 100_000)
-            || !fresh(prime.queue_observed_at_us, now, 100_000)
+            || !fresh(prime.accepted_at_us, now, barrier_us(prime.playback_epoch))
+            || !fresh(
+                prime.queue_observed_at_us,
+                now,
+                barrier_us(prime.playback_epoch),
+            )
         {
             return Err(self.fault(Kind::InvalidPrime, now).into());
         }
