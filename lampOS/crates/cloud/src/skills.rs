@@ -561,8 +561,9 @@ pub struct Listed {
     pub pushed_by: Option<PushedBy>,
 }
 
-/// The computer that pushed a skill ([`Listed::pushed_by`]).
-#[derive(Clone, Debug, PartialEq, Serialize)]
+/// The computer that pushed a skill ([`Listed::pushed_by`]), or an app
+/// (`crate::apps`, the row's `pushed_by`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct PushedBy {
     /// Its name at pairing, at most 64 bytes.
     pub computer: String,
@@ -1119,7 +1120,7 @@ fn one_line(text: &str) -> String {
 }
 
 /// `text` cut to at most `most` bytes, at a character's edge.
-fn cut(text: &str, most: usize) -> String {
+pub(crate) fn cut(text: &str, most: usize) -> String {
     if text.len() <= most {
         return text.to_owned();
     }

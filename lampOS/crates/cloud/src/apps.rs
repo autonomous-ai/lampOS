@@ -22,6 +22,7 @@
 //! The wire to the helper and to lamp-control is in [`Wire`] alone, so a name
 //! the other side settles differently changes one place.
 use crate::settings::Outcome;
+use crate::skills::PushedBy;
 use serde_json::{Map, Value, json};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -136,6 +137,10 @@ pub struct Package {
     /// docs/apps.md, "An app from your own computer"): the page says "From
     /// your computer".
     pub from_computer: bool,
+    /// For a pushed app only: the paired computer that pushed it, from the
+    /// record's `pushed` (`client_name` as `computer`, `client`), the shape a
+    /// pushed skill's row says it in.
+    pub pushed_by: Option<PushedBy>,
 }
 
 /// What this part reads of and asks of the lamp: the files, systemd, and the
@@ -303,6 +308,12 @@ impl Apps {
             "from".into(),
             json!(if from_computer { "computer" } else { "store" }),
         );
+        if let Some(by) = package
+            .as_ref()
+            .and_then(|package| package.pushed_by.as_ref())
+        {
+            row.insert("pushed_by".into(), json!(by));
+        }
         row.insert("state".into(), json!(state_of(&marks, &unit)));
         // Values and panel are lamp-control's (`app_state`: `settings` are the
         // values now, `panel` the latest or null, `socket` whether the app is
@@ -811,6 +822,7 @@ fn install_run(backend: &dyn Backend, asked: &Asked) -> Result<Value, String> {
             net: false,
             logs: false,
             from_computer: false,
+            pushed_by: None,
         };
         refused(&backend.control(&Wire::yes(op, &asked.id, &package, &grants, net, logs))?)?;
         let answer = match backend.helper(&Wire::install(&path)) {
@@ -1006,6 +1018,18 @@ impl Backend for Real {
             // none: no logs), so the yes and the helper's key agree.
             logs: record["logs"].as_bool().unwrap_or(false),
             from_computer: record["pushed"].is_object(),
+            pushed_by: record["pushed"]["client"].as_str().map(|client| PushedBy {
+                computer: crate::skills::cut(
+                    &record["pushed"]["client_name"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .chars()
+                        .filter(|c| !c.is_control())
+                        .collect::<String>(),
+                    64,
+                ),
+                client: crate::skills::cut(client, 64),
+            }),
         })
     }
 
@@ -1169,6 +1193,7 @@ pub mod tests {
                     net: false,
                     logs: true,
                     from_computer: false,
+                    pushed_by: None,
                 }),
             )
         }
@@ -1273,6 +1298,27 @@ pub mod tests {
         assert_eq!(row["connected"], true);
         assert_eq!(row["version"], "1.2.0");
         assert_eq!(row["from"], "store");
+        assert!(row.get("pushed_by").is_none());
+    }
+
+    #[test]
+    fn a_pushed_apps_row_says_from_computer_and_the_computer_as_a_pushed_skills_does() {
+        let mut fake = Fake::default();
+        let mut app = Fake::app("gym-coach");
+        let package = app.4.as_mut().unwrap();
+        package.from_computer = true;
+        package.pushed_by = Some(PushedBy {
+            computer: "desk mac".into(),
+            client: "c_1".into(),
+        });
+        fake.apps.push(app);
+        let (apps, _) = apps(fake);
+        let row = &apps.list()["apps"][0];
+        assert_eq!(row["from"], "computer");
+        assert_eq!(
+            row["pushed_by"],
+            json!({"computer": "desk mac", "client": "c_1"})
+        );
     }
 
     #[test]
@@ -1462,6 +1508,7 @@ pub mod tests {
             net: false,
             logs: false,
             from_computer: false,
+            pushed_by: None,
         };
         let line = Wire::yes(
             "install",
@@ -1508,6 +1555,7 @@ pub mod tests {
             net: false,
             logs: false,
             from_computer: false,
+            pushed_by: None,
         };
         let remove = Wire::yes("remove", "x1", &package, &[], false, false);
         let inner = &remove["app_yes_record"];
@@ -1656,6 +1704,7 @@ pub mod tests {
             net: false,
             logs: false,
             from_computer: false,
+            pushed_by: None,
         });
         fake.apps.push(app);
         fake.helper_late = true;
@@ -2163,6 +2212,22 @@ pub mod tests {
         assert!(!real.package("x1").unwrap().logs);
         std::fs::write(current.join(RECORD_FILE), record(r#""logs":true,"#)).unwrap();
         assert!(real.package("x1").unwrap().logs);
+        assert_eq!(real.package("x1").unwrap().pushed_by, None);
+        // A pushed app's record names its computer: said as a pushed skill's.
+        std::fs::write(
+            current.join(RECORD_FILE),
+            record(r#""pushed":{"client":"c_1","client_name":"desk mac"},"#),
+        )
+        .unwrap();
+        let pushed = real.package("x1").unwrap();
+        assert!(pushed.from_computer);
+        assert_eq!(
+            pushed.pushed_by,
+            Some(PushedBy {
+                computer: "desk mac".into(),
+                client: "c_1".into(),
+            })
+        );
     }
 
     #[test]

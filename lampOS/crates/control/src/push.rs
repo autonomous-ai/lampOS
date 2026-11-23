@@ -504,7 +504,7 @@ impl Ask {
             (Some(done), None) => match self.kind {
                 AskKind::AppInstall => {
                     let mut app = self.told.clone();
-                    for field in ["version", "updated", "started"] {
+                    for field in ["version", "updated", "started", "pushed_by"] {
                         if let Some(value) = done.get(field) {
                             app[field] = value.clone();
                         }
@@ -519,12 +519,17 @@ impl Ask {
                         .unwrap_or_default()
                         .iter()
                         .map(|app| {
-                            json!({
+                            let mut row = json!({
                                 "name": app["name"], "title": app["title"],
                                 "version": app["version"], "sha256": app["sha256"],
                                 "grants": app["grants"], "net": app["net"],
                                 "logs": app["logs"], "stopped": app["stopped"],
-                            })
+                            });
+                            // The pushing computer, as a pushed skill's row says it.
+                            if let Some(by) = app.get("pushed_by") {
+                                row["pushed_by"] = by.clone();
+                            }
+                            row
                         })
                         .collect();
                     json!({"re": self.re, "ok": true, "apps": apps})
