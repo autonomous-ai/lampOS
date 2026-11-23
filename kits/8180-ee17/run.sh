@@ -2,7 +2,7 @@
 # Mac. #8180 legs ROW on one lamp (settings: row/kit.sh; the runner's env file: KIT_ENV). The runner installs #8180's
 # CI ARM64 artifact by their own /run drop-in before, and puts the lamp back to stable themselves after: this kit
 # never installs, rounds or puts back a build.
-#   ./run.sh [from-step [then-step]]   steps: lock render check micon save legs tails boot unrow micoff putback release
+#   ./run.sh [from-step [then-step]]   steps: lock render swap check queue micon save legs tails boot unrow micoff putback release
 #   LEGS="A B C D K H G P" picks the legs step's legs (default A B C D K H P N E); SKIP="tails boot" leaves steps out.
 #   putback is optional (PUTBACK_CMD unset: skipped): the runner's own command re-signs stable's bytes at PUTBACK_SEQ,
 #   which must be above the lamp's installed sequence (lamp-update refuses a lower or equal one), then the step waits
@@ -16,7 +16,7 @@
 set -u; K=$(cd "$(dirname "$0")" && pwd); D=$K/row; . $D/kit.sh
 L=$D/logs; mkdir -p $L
 # ee17 (23 Nov): the lamp stays on stable; `swap` binds #8180's four parts over it, `restore` takes them away.
-STEPS="lock render swap check micon save legs tails boot unrow restore micoff putback release"
+STEPS="lock render swap check queue micon save legs tails boot unrow restore micoff putback release"
 FROM=${1:-lock}; THEN=${2:-}
 for x in $FROM $THEN; do case " $STEPS " in *" $x "*) ;; *) echo "no step '$x' (steps: $STEPS)"; exit 2;; esac; done
 T(){ echo "$(date '+%T') $*" | tee -a $L/times.log; }
@@ -54,6 +54,8 @@ for st in $STEPS; do
   check)   LAMP "PR_TASKS_SHA=${PR_TASKS_SHA:-} PR_CONTROL_SHA=${PR_CONTROL_SHA:-} PR_SKILLS_SHA=${PR_SKILLS_SHA:-} PR_VOICE_SHA=${PR_VOICE_SHA:-} PR_UPDATE_SHA=${PR_UPDATE_SHA:-}" $D/check.lamp.sh > $L/check.txt 2>&1; cat $L/check.txt
            sed -n '1,/^VERIFY /p' $L/check.txt > $L/verify.txt; grep '^READY\|^NOT_READY' $L/check.txt > $L/ready.txt
            need verify '^VERIFY PASS'; need ready '^READY';;
+  queue)   # A kept session lamp-tasks can't close queues every make: closed by Harness's own close --now (row/queue.lamp.sh).
+           LAMP "" $D/queue.lamp.sh > $L/queue.txt 2>&1; cat $L/queue.txt; need queue '^QUEUE (CLEAR|CLOSED)';;
   micon)   # The lamp's person's yes for THIS ROW only: the privacy (software) mute recorded and lifted (lamp-voice
            # stopped, the record written unmuted, started: 1 start). A closed physical slide stops here.
            [ "${MIC_YES:-}" = yes ] || { T "STOP at micon: the mute is lifted only on the lamp's person's yes for this ROW: set MIC_YES=yes"; exit 3; }

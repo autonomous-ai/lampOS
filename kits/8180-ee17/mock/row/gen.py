@@ -92,6 +92,7 @@ PASS = {
  "out/unrow.lamp.sh": "PASS LAMP_MAKE_MAY_RUN_ON not set\nPASS LAMP_NAMED_AGENT_TAKES_LINE not set\nPASS LAMP_NAME_NEAR back to the product's ('on')\nPASS lamp-cloud active\nUNROW OK\n",
  "out/micoff.lamp.sh": "RECORD_BACK {\"muted\":true}\nMUTE BACK OK after 4s\n",
  "out/idle.lamp.sh": "IDLE resting after 3.0s\n",
+ "out/queue.lamp.sh": "QUEUE CLEAR (close loop lines in 20s: 0)\n",
  # ee17 (23 Nov): swap binds #8180's four parts over stable, restore takes them away (swap/*.lamp.sh)
  "out/swap.lamp.sh": "".join("INSTALLED %s 11aa (/opt/lampOS/%s/15543/%s)\n" % (b, b[5:], b) for b in ("lamp-tasks", "lamp-control", "lamp-skills", "lamp-voice"))
      + "".join("PASS %s runs %s 22bb\n" % (b, b) for b in ("lamp-tasks", "lamp-control", "lamp-skills", "lamp-voice")) + "GATEWAY restarted, listening after 6s\nSWAPPED OK\n",
@@ -240,5 +241,5 @@ case("7170.void-muted", "D", boot=True, over={"out/boot.lamp.sh.after": PASS["ou
 case("7170.pass-muted-yes", "D", boot=True, env={"MIC_YES": "yes"}, over={"out/boot.lamp.sh.after": PASS["out/boot.lamp.sh.after"].replace("MUTEBOOT muted=False", "MUTEBOOT muted=True"), "out/micon.lamp.sh": "RECORD_KEPT the person's record from this ROW's first micon stays\nMUTE LIFTED OK after 4s\n"})
 # U: one kit helper alone (unit.sh), against a fake lamp tree: the engine without an app choice, an old-stamped
 # mute, a refused ssh login
-for u in ("engine-env", "engine-app", "engine-none", "mute-oldstamp", "mute-timed", "mute-live", "mute-liveoff", "ssh-retry", "ssh-giveup", "ssh-other", "fixtures", "clips-call", "linked-none", "linked-expired", "linked-ok", "vars-default", "keep-verdicts", "namenear", "idle-resting", "idle-turns", "idle-speaking", "idle-stale", "gateway-8320"):
+for u in ("engine-env", "engine-app", "engine-none", "mute-oldstamp", "mute-timed", "mute-live", "mute-liveoff", "ssh-retry", "ssh-giveup", "ssh-other", "fixtures", "clips-call", "linked-none", "linked-expired", "linked-ok", "vars-default", "keep-verdicts", "namenear", "idle-resting", "idle-turns", "idle-speaking", "idle-stale", "queue-clear", "queue-loop", "queue-stuck", "gateway-8320"):
     case("U.pass-" + u, " ", env={"UNIT": u})

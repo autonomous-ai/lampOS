@@ -83,6 +83,24 @@ for f in sys.argv[1:]:
     dr=$(grep -c 'for f in \$UD_TASKS \$UD_CONTROL; do \[ -f \$f \] && { rm -f' $KIT/swap/restore.lamp.sh)
     o="swap restarts $sw, restore restarts $rs, swap gates $gt, check fails stale $ck, drop-ins $dl $dm removed $dr"
     v "gateway restarted after lamp-control, stale socket fails VERIFY, #8180's unit lines laid and removed" '[ "$o" = "swap restarts 1, restore restarts 1, swap gates 1, check fails stale 1, drop-ins 1 1 removed 1" ]';;
+  queue-*)
+    # row/queue.lamp.sh (23 Nov batch 1): a kept session in lamp-tasks' close loop ("not closed: working; tried again
+    # next") queues every make; it is closed with harness close --now and the loop must stop. No loop: QUEUE CLEAR.
+    k=${t#queue-}; LP='tasks: one session: the kept session 27023c29 not closed: working; tried again next'
+    printf '{"session": {"name": "lamp-one-hermes", "id": "27023c29"}}\n' > $RT/var/lib/lampos-tasks/store/one-session.json
+    touch $RT/var/lib/lampos-tasks/store/kept-session.token; : > $W/closed
+    case $k in clear) : > $W/jl;; *) printf '%s\n%s\n%s\n%s\n' "$LP" "$LP" "$LP" "$LP" > $W/jl;; esac
+    # journalctl: the loop lines, gone once harness closed it (unless k=stuck); harness records its call
+    printf '#!/bin/sh\nif [ -s %s ] && [ "%s" != stuck ]; then exit 0; fi; cat %s\n' $W/closed $k $W/jl > $RT/bin/journalctl
+    printf '#!/bin/sh\necho "$*" >> %s; echo "{\\"closed\\":true}"\n' $W/closed > $RT/bin/harness
+    printf '#!/bin/sh\nwhile [ "$1" != timeout ]; do shift; done; shift 2; exec "$@"\n' > $RT/bin/sudo
+    printf '#!/bin/sh\nexit 0\n' > $RT/bin/logger; chmod +x $RT/bin/journalctl $RT/bin/harness $RT/bin/sudo $RT/bin/logger
+    o=$(QUEUE_SETTLE=0 lampsh $KIT/row/queue.lamp.sh)
+    case $k in
+      clear) v "no close loop: QUEUE CLEAR, nothing closed" 'echo "$o" | grep -q "^QUEUE CLEAR" && [ ! -s $W/closed ]';;
+      loop)  v "a close loop: the session closed by name with --now, QUEUE CLOSED" 'echo "$o" | grep -q "^QUEUE CLOSED 27023c29 (lamp-one-hermes)" && grep -q "^close lamp-one-hermes --program-token-file .* --now --json$" $W/closed';;
+      stuck) v "the loop goes on after the close: QUEUE STUCK" 'echo "$o" | grep -q "^QUEUE STUCK"';;
+    esac;;
   namenear)
     # The Mac voice's "Hey Lamp" (#8318, e82d 22 Nov): save lays LAMP_NAME_NEAR=off as the row's /run drop-in and checks
     # it took; unrow removes that drop-in and checks lamp-voice is back to the product's value.
