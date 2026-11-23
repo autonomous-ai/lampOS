@@ -3268,10 +3268,7 @@ fn named_near(
                 "lamp-voice second: request {request}: its first word, set off, is another person's name, and no face is turned to the lamp: not the lamp's name, however near lamp-name heard it (LAMP_NAME_NOT_ANOTHERS, #8114)"
             );
         }
-        return (
-            text,
-            heard_near.is_some_and(|score| score >= NAME_NEAR_LEAST),
-        );
+        return (text, heard_near.filter(|score| *score >= NAME_NEAR_LEAST));
     }
     let like = like_the_name(word);
     let (heard, turned) = (heard_near, turned_near);
