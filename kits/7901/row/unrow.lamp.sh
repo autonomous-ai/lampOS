@@ -5,9 +5,9 @@
 # only does the drop-ins and /tmp. Never touches volume, lamp-cloud or a reset. Prints UNROW OK or UNROW NOT OK.
 set -u; ok=1
 ch=
-for x in voice:$ND_VOICE control:$ND_CONTROL; do f=${x#*:}; [ -f $f ] && { rm -f $f; rmdir ${f%/*} 2>/dev/null; n "removed $f"; ch="$ch lamp-${x%%:*}"; }; done
+for x in voice:$ND_VOICE control:$ND_CONTROL voice:$ND_NAMENEAR; do f=${x#*:}; [ -f $f ] && { rm -f $f; rmdir ${f%/*} 2>/dev/null; n "removed $f"; ch="$ch lamp-${x%%:*}"; }; done
 [ -n "$ch" ] && { systemctl daemon-reload; for u in $ch; do systemctl restart $u; n "restarted $u (notes drop-in gone)"; done; sleep 15; echo "DROPINS removed; restarted:$ch"; }
-for f in $ND_VOICE $ND_CONTROL; do [ -f $f ] && { echo "FAIL $f still there"; ok=0; }; done
+for f in $ND_VOICE $ND_CONTROL $ND_NAMENEAR; do [ -f $f ] && { echo "FAIL $f still there"; ok=0; }; done
 if [ "${KEEP_SKILLS:-0}" != 1 ] && [ -f $R/skills.before ]; then
   for s in $(skillnames | LC_ALL=C comm -13 $R/skills.before -); do
     out=$($SKBIN remove --dir $SK --state-dir $SKST "$s" 2>&1); rc=$?
@@ -46,5 +46,6 @@ elif [ "${KEEP_SKILLS:-0}" = 1 ]; then echo "NOTE KEEP_SKILLS=1: the row's skill
 else echo "NOTE no save baseline ($R/skills.before): skills untouched"; fi
 rm -f /tmp/t7901-stop.* $R/egress.ls.*
 [ -f $R/active.before ] && for u in $(cat $R/active.before); do systemctl is-active -q $u || echo "NOTE $u was active before the legs, now $(systemctl is-active $u)"; done
+v=$(pid lamp-voice); [ "$(envval $v LAMP_NAME_NEAR)" != off ] && echo "PASS LAMP_NAME_NEAR back to the product's ('$(envval $v LAMP_NAME_NEAR)')" || { echo "FAIL LAMP_NAME_NEAR still off"; ok=0; }
 systemctl is-active -q lamp-cloud && echo "PASS lamp-cloud active" || { echo "FAIL lamp-cloud $(systemctl is-active lamp-cloud)"; ok=0; }
 [ $ok = 1 ] && { for f in $R/*.before $R/*.before.tar; do [ -f $f ] && mv -f $f $f.used; done; echo "UNROW OK"; } || echo "UNROW NOT OK"

@@ -30,6 +30,14 @@ case $t in
   mute-recoff) rec $(( $(nowus) - 60000000 )) false; o=$(lampsh $KIT/row/mute.lamp.sh); v "live unread, record muted=false: off" 'echo "$o" | grep -q "^MUTE OFF OK (live voice/mute unread"';;
   mute-live)   rec $(( $(nowus) - 60000000 )) false; bus true; o=$(lampsh $KIT/row/mute.lamp.sh); v "live voice/mute muted wins over an unmuted record" 'echo "$o" | grep -q "^MUTE FAIL: live"';;
   mute-liveoff) rec $(( $(nowus) + 600000000 )); bus false; o=$(lampsh $KIT/row/mute.lamp.sh); v "live voice/mute unmuted wins over the record" 'echo "$o" | grep -q "^MUTE OFF OK (live"';;
+  namenear)
+    # The Mac voice's "Hey Lamp" (#8318, #8180's e82d run 22 Nov): save lays LAMP_NAME_NEAR=off as the row's /run drop-in
+    # and checks it took; unrow removes that drop-in and checks lamp-voice is back to the product's value.
+    sv=$(grep -c 'Environment=LAMP_NAME_NEAR=off.* > \$ND_NAMENEAR' $KIT/row/save.lamp.sh); ck=$(grep -c '\[ "\$nn" = off \] ||' $KIT/row/save.lamp.sh)
+    ur=$(grep -c 'for f in \$ND_VOICE \$ND_CONTROL \$ND_NAMENEAR; do' $KIT/row/unrow.lamp.sh); uc=$(grep -c 'FAIL LAMP_NAME_NEAR still off' $KIT/row/unrow.lamp.sh)
+    nd=$(grep -c '^ND_NAMENEAR=/run/systemd/system/lamp-voice.service.d/' $KIT/row/common.lamp.sh)
+    o="save lays $sv, checks $ck; unrow removes $ur, checks $uc; common defines $nd"
+    v "save lays NAME_NEAR=off and checks it; unrow removes it and checks it" '[ "$o" = "save lays 1, checks 1; unrow removes 1, checks 1; common defines 1" ]';;
   ssh-*)
     # fake ssh: the first $DENY tries print $ERR and exit $RC; then it prints the stdin it got. Calls in $W/sshn.
     cat > $W/fakessh <<'S'

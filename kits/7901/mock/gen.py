@@ -93,7 +93,7 @@ BASE = {
  "out/micon.lamp.sh": "VOICE_MUTE muted=True reason=person age_s=1.0 seq=4\nMUTE LIFTED OK after 4s\n",
  "out/micoff.lamp.sh": "VOICE_MUTE muted=True reason=person age_s=1.0 seq=9\nMUTE BACK OK after 4s\n",
  "out/mute.lamp.sh": "MUTE OFF OK\n",
- "out/save.lamp.sh": "ENGINE openclaw\nBASELINE made: / skills 3 / notes files 1\nCLASH none\nSAVED OK\n",
+ "out/save.lamp.sh": "ENGINE openclaw\nBASELINE made: / skills 3 / notes files 1\nCLASH none\nNAMENEAR off (row drop-in)\nSAVED OK\n",
  "out/unrow.lamp.sh": "DROPINS removed; restarted: lamp-voice lamp-control\nSKILL made by the row, removed: coffee-price (exit 0: removed)\nSKILL made by the row, removed: desk-search (exit 0: removed)\nPASS skills = save's list\nPASS lamp-cloud active\nUNROW OK\n",
 }
 n = 0
@@ -197,6 +197,6 @@ case("K.fail-token", "K", "FAIL", {"j/K.KEYRUN": j([(1, heard(153)), (1.4, token
 case("K.void-nopush", "K", "VOID", drop=["out/push.key-probe"])
 # ---- kit helpers alone (unit.sh), the fixes ported from the #8180 e82d kit: engine(), the mute check, SSHR; Mac volume
 for u in ("engine-env", "engine-voice", "engine-app", "engine-none", "mute-oldstamp", "mute-timed", "mute-recoff", "mute-live",
-          "mute-liveoff", "ssh-retry", "ssh-sshpass", "ssh-giveup", "ssh-other", "macvol", "fixtures"):
+          "mute-liveoff", "ssh-retry", "ssh-sshpass", "ssh-giveup", "ssh-other", "macvol", "fixtures", "namenear"):
     case("U." + u, "-", "PASS", env={"UNIT": u})
 print("gen: %d cases in %s" % (n, FX))

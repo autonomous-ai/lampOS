@@ -14,6 +14,10 @@ envval(){ tr '\0' '\n' < /proc/$1/environ 2>/dev/null | sed -n "s/^$2=//p"; }
 # reads run 1's). /run drop-ins (gone at reboot), laid by `notes` (MODE=on), removed by MODE=off and by unrow.
 ND_VOICE=/run/systemd/system/lamp-voice.service.d/zz-row-7901-notes.conf
 ND_CONTROL=/run/systemd/system/lamp-control.service.d/zz-row-7901-notes.conf
+# every leg (23 Nov): LAMP_NAME_NEAR=off, a /run drop-in laid by save and removed by unrow. The clips are the Mac's
+# ElevenLabs voice, which lamp-name may not take for the lamp's name, so an ask is held as "nobody spoke to the lamp"
+# (#8318; #8180's e82d run, 22 Nov). The first builder's fix for Mac-voice kits (#6449, 23 Nov 07:59).
+ND_NAMENEAR=/run/systemd/system/lamp-voice.service.d/zz-row-7901-namenear.conf
 # product switches the row rests on (lamp-voice's environment must have them =on)
 NEED="LAMP_TASK_NET LAMP_TASK_NET_GATEWAY LAMP_SKILL_TASKS LAMP_MADE_SCRIPTS"
 MS=/var/lib/lampOS/voice/made-skills

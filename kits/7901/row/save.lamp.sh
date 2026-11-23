@@ -16,4 +16,9 @@ echo "BASELINE made: $(madenames | tr '\n' ' ')/ skills $(wc -l < $R/skills.befo
 cl=$(skillnames | grep -iE '(coffee|price|desk|camera|look)' | tr '\n' ' ')
 [ -n "$cl" ] && echo "CLASH names a make may meet: $cl(a make may ask a clash question; a leftover in the baseline is not removed by unrow)" || echo "CLASH none"
 n "row baselines saved in $R (made.json, skills list + tar, notes files)"
+# LAMP_NAME_NEAR=off for the row (ND_NAMENEAR): 1 lamp-voice start; unrow removes it
+mkdir -p ${ND_NAMENEAR%/*}; printf '[Service]\n# #7901 row: Hey Lamp in the Mac voice, gone at reboot\nEnvironment=LAMP_NAME_NEAR=off\n' > $ND_NAMENEAR
+systemctl daemon-reload; systemctl restart lamp-voice; n "added $ND_NAMENEAR (LAMP_NAME_NEAR=off); lamp-voice restarted"; sleep 15
+nn=$(envval $(pid lamp-voice) LAMP_NAME_NEAR); [ "$nn" = off ] || { echo "SAVE STOP: LAMP_NAME_NEAR is '$nn' after the drop-in"; exit 3; }
+echo "NAMENEAR off (row drop-in)"
 echo "SAVED OK"
