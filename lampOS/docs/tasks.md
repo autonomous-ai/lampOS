@@ -5421,6 +5421,16 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     once, typed if the session takes input then and is free, else ended
     told. The replacement's own count in a row and back-off are not
     touched; nothing loops.
+  - **A close Harness keeps refusing ends.** A refused close of the kept
+    session (Harness answering an error such as `working`, which it does
+    while a session whose resume failed still reads working) is tried
+    again `--now` at the next look, and after `CLOSE_TRIES` (3) refusals
+    in a row its record is forgotten and the next open is fresh
+    (`refused_close`, `close_refused`). Before, the close was tried again
+    every look for as long as Harness refused it, and the queue waited
+    behind it (23 Nov, lamp-ee17, twice). Harness out of reach
+    (`daemon_unreachable`, a timeout, a run that failed) or lamp-tasks'
+    own lock (`busy`) is not a refusal: tried again as before.
 - **A failed launch, at once (#8062: Harness 0.6.74's openharness#4499, carried by the 0.6.75 pin).**
   `harness wait` exits 1 when a launch on this machine failed (for example
   `OPENCLAW_NO_TOKEN`, or `FIRST_TASK_NOT_TAKEN` after 3 min), its row

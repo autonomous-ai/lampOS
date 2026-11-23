@@ -2607,6 +2607,16 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     gõ nếu lúc đó phiên nhận lời và đang rảnh, nếu không thì kết thúc có
     báo. Số lần thay liên tiếp và back-off của phiên thay thế không đổi;
     không có vòng lặp nào.
+  - **Một lần đóng mà Harness cứ từ chối thì dừng lại.** Khi Harness từ
+    chối đóng phiên được giữ (trả lỗi như `working`, điều nó làm khi một
+    phiên resume thất bại vẫn đọc là đang làm), lần nhìn sau sẽ đóng lại
+    bằng `--now`, và sau `CLOSE_TRIES` (3) lần bị từ chối liên tiếp thì bản
+    ghi của nó bị quên và lần mở sau là phiên mới (`refused_close`,
+    `close_refused`). Trước đây lệnh đóng được thử lại mỗi lần nhìn, chừng
+    nào Harness còn từ chối, và hàng đợi phải chờ sau nó (23/11, lamp-ee17,
+    hai lần). Harness không liên lạc được (`daemon_unreachable`, hết giờ,
+    một lần chạy lỗi) hoặc khoá của chính lamp-tasks (`busy`) không tính là
+    từ chối: vẫn thử lại như trước.
 - **Khởi chạy thất bại, xử lý ngay (#8062: openharness#4499 của Harness 0.6.74, có trong bản ghim 0.6.75).**
   `harness wait` thoát mã 1 khi một lần khởi chạy trên máy này thất bại (ví
   dụ `OPENCLAW_NO_TOKEN`, hoặc `FIRST_TASK_NOT_TAKEN` sau 3 phút), dòng của

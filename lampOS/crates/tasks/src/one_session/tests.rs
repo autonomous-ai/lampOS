@@ -43,6 +43,9 @@ struct Fake {
     /// Kept closes refused as Harness refuses one whose Gateway
     /// conversation is already deleted (#7906, lamp-c0a4).
     conversation_gone_closes: Mutex<bool>,
+    /// This many kept-session closes refused `working` (23 Nov ee17: the
+    /// resume failed, Harness still reads the session working).
+    working_closes: Mutex<u32>,
     /// The code a failing close answers; none: `timed_out`.
     close_error: Mutex<Option<String>>,
     /// `harness capabilities` says program sessions (openharness#4393).
@@ -437,6 +440,12 @@ impl PaneHarness for Fake {
         if *self.conversation_gone_closes.lock().unwrap() {
             return Err(crate::harness::CLOSE_CONVERSATION_GONE.into());
         }
+        let mut working = self.working_closes.lock().unwrap();
+        if *working > 0 {
+            *working -= 1;
+            return Err("working".into());
+        }
+        drop(working);
         let mut failing = self.failing_closes.lock().unwrap();
         if *failing > 0 {
             *failing -= 1;
@@ -3764,6 +3773,47 @@ fn a_close_refused_for_a_missing_conversation_still_leads_to_a_fresh_session() {
     assert!(!one.drop_if_due(&fake), "no close tried again");
     one.open_if_due(&fake, &place());
     assert_eq!(one.agent(), Some(agent_of(3)), "{:?}", fake.calls());
+}
+
+/// 23 Nov, lamp-ee17: a kept session whose resume failed still read
+/// `working`, and Harness refused every close of it; lamp-tasks tried the
+/// close again every look for half an hour, the queue waiting behind it.
+/// A refused close is tried again `--now`, and after [`CLOSE_TRIES`]
+/// refusals the record is forgotten and the next open is fresh: never a
+/// close loop.
+#[test]
+fn a_close_harness_keeps_refusing_ends_after_its_tries_and_a_fresh_session_opens() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_on(dir.path());
+    one.open_if_due(&fake, &place());
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    *fake.working_closes.lock().unwrap() = 100;
+    one.replace_kept(&fake, MACHINE, &agent_of(1), "a test");
+    for _ in 0..10 {
+        one.drop_if_due(&fake);
+    }
+    assert_eq!(
+        fake.count("close-kept"),
+        CLOSE_TRIES as usize,
+        "{:?}",
+        fake.calls()
+    );
+    assert!(
+        fake.calls()
+            .iter()
+            .filter(|call| call.starts_with("close-kept"))
+            .all(|call| call.ends_with(" --now")),
+        "every retry --now: {:?}",
+        fake.calls()
+    );
+    assert_eq!(one.kept(), None, "its record forgotten");
+    assert!(!one.drop_if_due(&fake), "no close tried again");
+    one.open_if_due(&fake, &place());
+    assert_eq!(one.agent(), Some(agent_of(2)), "{:?}", fake.calls());
+    // Harness out of reach is not a refusal: tried again as before.
+    assert!(!refused_close("daemon_unreachable"));
+    assert!(!refused_close("busy"));
+    assert!(refused_close("working"));
 }
 
 /// #7906 sign 4b after a tool's result: the Gateway writes the assistant's

@@ -189,6 +189,18 @@ fn engine_named(name: &str) -> Option<EngineKind> {
         .find(|engine| engine.argument() == name)
 }
 
+/// How many refused closes of the kept session in a row before its record
+/// is forgotten and a fresh one opens.
+pub const CLOSE_TRIES: u32 = 3;
+
+/// Whether a failed close of the kept session was Harness refusing it
+/// (counted toward [`CLOSE_TRIES`]), not Harness out of reach (its daemon
+/// down or starting, a run that failed: tried again for as long as it
+/// takes, as before) nor lamp-tasks' own lock held.
+fn refused_close(code: &str) -> bool {
+    !matches!(code, "daemon_unreachable" | "busy" | "timeout") && !code.starts_with("close_")
+}
+
 /// The pane's folder in lamp-tasks' Harness project (beside each run's
 /// `skill-<run-id>`), the folder its `harness new` is started in.
 pub const FOLDER: &str = "one-session";
@@ -953,6 +965,12 @@ struct Inner {
     /// cancel's close that failed (#7906). A new token on the same name
     /// could be refused `NAME_TAKEN`; the next `ensure` is `--fresh`.
     drop_keeps_token: bool,
+    /// The kept session's closes refused in a row (not counting a daemon
+    /// that can't be reached or busy): at [`CLOSE_TRIES`] the record is
+    /// forgotten and a fresh one opens next, so a close Harness keeps
+    /// refusing (`working` while its resume failed, 23 Nov ee17) never
+    /// loops for ever and never holds the queue.
+    close_refused: u32,
     /// A removal under way ([`OneSession::drop_pane_as`]): the pane taken,
     /// its close, its OpenClaw session's delete and its token's removal
     /// not all done yet.
@@ -2864,18 +2882,46 @@ impl OneSession {
         {
             let now = std::mem::take(&mut self.lock().drop_now);
             if let Err(code) = self.close_kept(harness, &name_for(kind), file, now) {
-                eprintln!(
-                    "tasks: one session: the kept session {} not closed: {code}; tried again next",
-                    short(&agent)
-                );
                 let mut inner = self.lock();
+                let refused = refused_close(&code);
+                if refused {
+                    inner.close_refused += 1;
+                }
+                if inner.close_refused >= CLOSE_TRIES {
+                    // Harness refused the close every time, `--now` too:
+                    // taken as gone, its record forgotten, a fresh one
+                    // next. Never a close loop that holds the queue.
+                    inner.close_refused = 0;
+                    inner.drop_due = None;
+                    inner.drop_now = false;
+                    inner.drop_keeps_token = false;
+                    drop(inner);
+                    eprintln!(
+                        "tasks: one session: the kept session {} not closed after {CLOSE_TRIES} refusals ({code}); taken as gone, its record forgotten, a fresh one next",
+                        short(&agent)
+                    );
+                    self.kept_closed(&agent, kind);
+                    self.forget_record();
+                    if token {
+                        self.forget_token();
+                    }
+                    return;
+                }
+                eprintln!(
+                    "tasks: one session: the kept session {} not closed: {code}; tried again next{}",
+                    short(&agent),
+                    if refused { ", with --now" } else { "" }
+                );
                 inner.drop_due = Some(why.to_owned());
-                inner.drop_now |= now;
+                // A refused close is tried again `--now` (#7245's way): a
+                // plain close is refused while the session reads working.
+                inner.drop_now |= now || refused;
                 // An unanswered turn's close stays one (`take_due` cleared
                 // it): the close that succeeds keeps the token.
                 inner.drop_keeps_token |= !token;
                 return;
             }
+            self.lock().close_refused = 0;
             self.kept_closed(&agent, kind);
             if token {
                 self.forget_token();
@@ -5205,6 +5251,9 @@ impl OneSession {
                         short(agent)
                     );
                     let mut inner = self.lock();
+                    if refused_close(&code) {
+                        inner.close_refused += 1;
+                    }
                     inner.drop_due = Some(why.to_owned());
                     inner.drop_now = true;
                     inner.drop_keeps_token = true;
