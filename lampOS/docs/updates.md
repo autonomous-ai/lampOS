@@ -3277,14 +3277,26 @@ committed, never the owner's real key). `L` is the runbook's SSH alias.
    scp -r ~/lampos-channel LAMP:/var/tmp/      # with the runbook's key options
    H=$(shasum -a 256 ~/lampos-channel/lamp-update | cut -c1-64)
    L "sudo install -D -m 0755 /var/tmp/lampos-channel/lamp-update /opt/lampOS/update/$H/lamp-update"
-   L 'sudo mkdir -p /etc/lampOS/update && sudo tee /etc/lampOS/update/key.pub >/dev/null' < ~/lampos-update-test.pub
+   L 'sudo install -m 0644 /dev/stdin /var/tmp/lampos-channel/test.pub' < ~/lampos-update-test.pub
    L 'sudo sync'
    ```
+
+   **Never write the test key into `/etc/lampOS/update/key.pub`.** That file is
+   the lamp's trust root, put there at the factory and never written by
+   setup or a round; a lamp that keeps a test key there trusts nothing the
+   product signs, so no round can read stable's manifest and it never updates
+   (lamp-9adf, 23 Nov, #8353: refused every round with "signed with key
+   54213f8d3aa2f241, and this lamp trusts key acdeb27da34006fe"). The test
+   key rides beside the channel folder and is passed as `--key-file` to each
+   command below, as the row scripts do; the lamp's real key is never touched.
+   If one was written by hand, put the production one back (its fingerprint,
+   the first 16 hex of the SHA-256 of the base64-decoded line, is
+   `54213f8d3aa2f241`) and check it before and after.
 
 5. **The dry run** (writes nothing):
 
    ```sh
-   L "sudo /opt/lampOS/update/$H/lamp-update check --channel-url file:///var/tmp/lampos-channel/"
+   L "sudo /opt/lampOS/update/$H/lamp-update check --channel-url file:///var/tmp/lampos-channel/ --key-file /var/tmp/lampos-channel/test.pub"
    ```
 
    It names each unit that would change, old folder to new, and every line
@@ -3298,12 +3310,15 @@ committed, never the owner's real key). `L` is the runbook's SSH alias.
    `file:///var/tmp/lampos-channel/` and `@UPDATE_APPLY@` `off`; then
    `sudo systemctl start lamp-update`, a minute, and
    `journalctl -u lamp-update -o cat` says what it would do. Step 2's
-   commands again: the same.
+   commands again: the same. The unit keeps the lamp's own key; for this
+   minute a drop-in (`ExecStart=` emptied, then the same line with
+   `--key-file /var/tmp/lampos-channel/test.pub`) carries the test key,
+   removed after, as the row scripts' `serve_dropin` does.
 
 7. **One round, attended:**
 
    ```sh
-   L "sudo /opt/lampOS/update/$H/lamp-update once --channel-url file:///var/tmp/lampos-channel/ --apply on; echo status \$?"
+   L "sudo /opt/lampOS/update/$H/lamp-update once --channel-url file:///var/tmp/lampos-channel/ --key-file /var/tmp/lampos-channel/test.pub --apply on; echo status \$?"
    L 'sudo tail -n 5 /var/lib/lampos-update/log.jsonl; lamp-health; sudo sync'
    ```
 
