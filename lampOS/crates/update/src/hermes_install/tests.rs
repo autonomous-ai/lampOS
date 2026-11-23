@@ -3379,8 +3379,14 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
     let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
                 if [ -n \"$FAIL_ON\" ]; then case \"${0##*/} $*\" in *\"$FAIL_ON\"*) exit 1;; esac; fi\n\
                 case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; esac\n\
-                if [ \"${0##*/}\" = mount ] && [ -f \"$LINK\" ] && [ \"$4\" = \"$(cat \"$LINK\")\" ]; then /bin/mkdir -p \"${4%/*}\" && /bin/ln -s /elsewhere \"$4\" || exit 9; fi\n\
+                if [ \"${0##*/}\" = mkdir ]; then case $1 in */.leases) /bin/mkdir \"$1\" || exit 1;; esac; fi\n\
+                if [ \"${0##*/}\" = mount ]; then for t; do :; done; case \" $* \" in *\" /proc/self/fd/9 \"*) case \" $* \" in *\" -c \"*) ;; *) echo \"mount: no -c\" >&2; exit 8;; esac;; esac; fi\n\
+                if [ \"${0##*/}\" = mount ] && [ -f \"$LINK\" ] && [ \"$t\" = \"$(cat \"$LINK\")\" ]; then /bin/mkdir -p \"${t%/*}\" && /bin/ln -s /elsewhere \"$t\" || exit 9; fi\n\
                 if [ \"${0##*/}\" = mount ] && [ -f \"$REDIRECT\" ] && read -r rt rs < \"$REDIRECT\"; then for a; do src=$dst; dst=$a; done; if [ \"$dst\" = \"$rt\" ]; then /bin/mv \"$rs\" \"$rs.real\" && /bin/ln -s \"$SWAPPED_IN\" \"$rs\" && /usr/bin/stat -L -c %i \"$src\" > \"$BOUND\"; /bin/rm -f \"$rs\"; /bin/mv \"$rs.real\" \"$rs\" || exit 9; fi; fi\n";
+    // `mkdir` makes a `.leases` for real, since the lines open it on a
+    // descriptor before its bind (#7051). `mount` refuses a bind of the
+    // descriptor without `-c`: canonicalized, `/proc/self/fd/9` would be
+    // the file's path again, and the bind by path (#7051).
     // `mount`, for the path named in the `link` file, leaves a link at
     // that bind target: the target, seen through the `installs` bind, is
     // the source's directory entry swapped for a link after the `-L`
@@ -3402,10 +3408,16 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
     }
     // `stat` answers one device and inode for every path, but another for
     // the path named in the `swap` file: a bind target whose mount followed
-    // a link swapped in after the check.
+    // a link swapped in after the check, or a source whose path no longer
+    // names the file its descriptor holds. Asked for the descriptor's the
+    // n-th time, `n` and a path in the `relink` file, it swaps that path
+    // for a link to the file, moved aside: a link swapped in between the
+    // open and the check again (#7051).
     let swap = base.join("swap");
+    let relink = base.join("relink");
     let stat = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
                 if [ -n \"$FAIL_ON\" ]; then case \"${0##*/} $*\" in *\"$FAIL_ON\"*) exit 1;; esac; fi\n\
+                if [ \"$4\" = /proc/self/fd/9 ] && [ -f \"$RELINK\" ] && read -r n q < \"$RELINK\" && [ \"$(grep -c '^stat -L' \"$LOG\")\" = \"$n\" ]; then /bin/mv \"$q\" \"$q.real\" && /bin/ln -s \"$q.real\" \"$q\" || exit 9; fi\n\
                 if [ -f \"$SWAP\" ] && [ \"$3\" = \"$(cat \"$SWAP\")\" ]; then echo 2:2; else echo 1:1; fi\n";
     fs::write(stubs.join("stat"), stat).unwrap();
     fs::set_permissions(stubs.join("stat"), fs::Permissions::from_mode(0o755)).unwrap();
@@ -3416,8 +3428,10 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
     )
     .unwrap();
     let log = base.join("log");
+    let leases = base.join("h/.hermes/installs/k/environments/g1/.leases");
     let run = |home: Option<&Path>, fail_on: &str| {
         let _ = fs::remove_file(&log);
+        let _ = fs::remove_dir(&leases);
         let mut command = std::process::Command::new("/bin/sh");
         command
             .arg(&script)
@@ -3426,6 +3440,7 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
             .env("LOG", &log)
             .env("FAIL_ON", fail_on)
             .env("SWAP", &swap)
+            .env("RELINK", &relink)
             .env("LINK", &link)
             .env("REDIRECT", &redirect)
             .env("BOUND", &bound)
@@ -3469,25 +3484,25 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
         // before its read-only remount (`.leases` made first, as Hermes
         // would); `g2` has no leases, `old` no lock. Each is checked
         // again after its bind: the source's device and inode before it,
-        // the target's after (#7011 P3).
+        // the target's after (#7011 P3). Each is opened first and bound
+        // through that descriptor, its path checked again against the
+        // file the descriptor holds (#7051).
+        "stat -L -c %d:%i /proc/self/fd/9".to_owned(),
         format!("stat -c %d:%i {h}/.hermes/installs/k/.install.lock"),
-        format!("mount -n --bind {h}/.hermes/installs/k/.install.lock {x}/i/k/.install.lock"),
+        format!("mount -n -c --bind /proc/self/fd/9 {x}/i/k/.install.lock"),
         format!("stat -c %d:%i {x}/i/k/.install.lock"),
+        "stat -L -c %d:%i /proc/self/fd/9".to_owned(),
         format!("stat -c %d:%i {h}/.hermes/installs/k/pm-runtime/.prepare.lock"),
-        format!(
-            "mount -n --bind {h}/.hermes/installs/k/pm-runtime/.prepare.lock {x}/i/k/pm-runtime/.prepare.lock"
-        ),
+        format!("mount -n -c --bind /proc/self/fd/9 {x}/i/k/pm-runtime/.prepare.lock"),
         format!("stat -c %d:%i {x}/i/k/pm-runtime/.prepare.lock"),
         format!("mkdir {h}/.hermes/installs/k/environments/g1/.leases"),
+        "stat -L -c %d:%i /proc/self/fd/9".to_owned(),
         format!("stat -c %d:%i {h}/.hermes/installs/k/environments/g1/.leases"),
-        format!(
-            "mount -n --bind {h}/.hermes/installs/k/environments/g1/.leases {x}/i/k/environments/g1/.leases"
-        ),
+        format!("mount -n -c --bind /proc/self/fd/9 {x}/i/k/environments/g1/.leases"),
         format!("stat -c %d:%i {x}/i/k/environments/g1/.leases"),
+        "stat -L -c %d:%i /proc/self/fd/9".to_owned(),
         format!("stat -c %d:%i {h}/.hermes/installs/k/pm-runtime/generations/r1/.leases"),
-        format!(
-            "mount -n --bind {h}/.hermes/installs/k/pm-runtime/generations/r1/.leases {x}/i/k/pm-runtime/generations/r1/.leases"
-        ),
+        format!("mount -n -c --bind /proc/self/fd/9 {x}/i/k/pm-runtime/generations/r1/.leases"),
         format!("stat -c %d:%i {x}/i/k/pm-runtime/generations/r1/.leases"),
         format!("mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none {h}/.hermes"),
         format!("mkdir {h}/.hermes/hermes-agent"),
@@ -3517,11 +3532,12 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
         format!("--bind {h}/.hermes/hermes-agent "),
         format!("--bind {h}/.hermes/tools "),
         format!("--bind {h}/.hermes/installs "),
-        format!("--bind {h}/.hermes/installs/k/.install.lock "),
-        format!("--bind {h}/.hermes/installs/k/pm-runtime/.prepare.lock "),
-        format!("--bind {h}/.hermes/installs/k/pm-runtime/generations/r1/.leases "),
+        format!("--bind /proc/self/fd/9 {x}/i/k/.install.lock"),
+        format!("--bind /proc/self/fd/9 {x}/i/k/pm-runtime/.prepare.lock"),
+        format!("--bind /proc/self/fd/9 {x}/i/k/pm-runtime/generations/r1/.leases"),
         format!("mkdir {h}/.hermes/installs/k/environments/g1/.leases"),
-        format!("--bind {h}/.hermes/installs/k/environments/g1/.leases "),
+        format!("--bind /proc/self/fd/9 {x}/i/k/environments/g1/.leases"),
+        "stat -L -c %d:%i /proc/self/fd/9".to_owned(),
         format!("stat -c %d:%i {h}/.hermes/installs/k/.install.lock"),
         format!("stat -c %d:%i {x}/i/k/.install.lock"),
         format!("stat -c %d:%i {h}/.hermes/installs/k/pm-runtime/.prepare.lock"),
@@ -3674,7 +3690,8 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
         let bound = lines
             .iter()
             .position(|line| {
-                line.starts_with("mount -n --bind ") && line.ends_with(&format!(" {target}"))
+                line.starts_with("mount -n -c --bind /proc/self/fd/9 ")
+                    && line.ends_with(&format!(" {target}"))
             })
             .expect(&target);
         assert_eq!(
@@ -3723,7 +3740,8 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
         let bound = lines
             .iter()
             .position(|line| {
-                line.starts_with("mount -n --bind ") && line.ends_with(&format!(" {target}"))
+                line.starts_with("mount -n -c --bind /proc/self/fd/9 ")
+                    && line.ends_with(&format!(" {target}"))
             })
             .expect(&target);
         assert_eq!(
@@ -3774,6 +3792,70 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
             );
         }
         let _ = fs::remove_file(&bound);
+    }
+    // Thirteen's P3 on #7051: a link swapped in after the checks and put
+    // back before the check after the bind still redirected a bind made
+    // by path. Each source is now opened first and bound through that
+    // descriptor, so the bind is the file the descriptor holds. A path
+    // that, between the open and the bind, is a link or names another
+    // file than the descriptor's ends the make before anything is bound
+    // onto its target and before the lasting home is hidden.
+    for (n, source, target, refusal) in [
+        (
+            1,
+            format!("{h}/.hermes/installs/k/.install.lock"),
+            format!("{x}/i/k/.install.lock"),
+            "Hermes install lock not shown",
+        ),
+        (
+            2,
+            format!("{h}/.hermes/installs/k/pm-runtime/.prepare.lock"),
+            format!("{x}/i/k/pm-runtime/.prepare.lock"),
+            "Hermes runtime lock not shown",
+        ),
+        (
+            3,
+            format!("{h}/.hermes/installs/k/environments/g1/.leases"),
+            format!("{x}/i/k/environments/g1/.leases"),
+            "Hermes leases not shown",
+        ),
+        (
+            4,
+            format!("{h}/.hermes/installs/k/pm-runtime/generations/r1/.leases"),
+            format!("{x}/i/k/pm-runtime/generations/r1/.leases"),
+            "Hermes leases not shown",
+        ),
+    ] {
+        for (file, text, last) in [
+            (&swap, source.clone(), format!("stat -c %d:%i {source}")),
+            (
+                &relink,
+                format!("{n} {source}\n"),
+                "stat -L -c %d:%i /proc/self/fd/9".to_owned(),
+            ),
+        ] {
+            fs::write(file, text).unwrap();
+            let (out, lines) = run(Some(&home), "");
+            fs::remove_file(file).unwrap();
+            let moved = PathBuf::from(format!("{source}.real"));
+            if moved.exists() {
+                fs::remove_file(&source).unwrap();
+                fs::rename(&moved, &source).unwrap();
+            }
+            assert!(!out.status.success(), "{source}");
+            assert!(out.stdout.is_empty(), "Hermes never runs: {source}");
+            assert!(
+                String::from_utf8_lossy(&out.stderr).contains(refusal),
+                "{source} {out:?}"
+            );
+            assert_eq!(lines.last(), Some(&last), "{source} {lines:?}");
+            assert!(
+                !lines
+                    .iter()
+                    .any(|line| line.ends_with(&format!(" {target}")) || line.contains("tmpfs")),
+                "{source} {lines:?}"
+            );
+        }
     }
     // A home outside the work folder's `lamp`, or missing, is refused
     // before anything is mounted.
@@ -4016,6 +4098,31 @@ fn with_the_one_path_a_make_still_runs_in_its_own_home() {
             .replacen(" X ", " Y ", 1);
     assert!(!derived.contains("$X"));
     assert_eq!(ONE_PATH_NS_MAKE_LINES, derived);
+    // Both bind the install lock, the runtime lock and the leases through
+    // a descriptor opened on their source, never by its path (#7051).
+    for lines in [NS_HOME_LINE, ONE_PATH_NS_MAKE_LINES] {
+        for source in ["\"$p\"", "\"$p/.prepare.lock\"", "\"$g/.leases\""] {
+            assert_eq!(
+                lines
+                    .matches(&format!("command exec 9<{source} || fail "))
+                    .count(),
+                1,
+                "{source}"
+            );
+            assert!(!lines.contains(&format!("--bind {source}")), "{source}");
+        }
+        assert_eq!(
+            lines.matches("mount -n -c --bind /proc/self/fd/9 ").count(),
+            3
+        );
+        assert_eq!(
+            lines
+                .matches("s=$(stat -L -c %d:%i /proc/self/fd/9)")
+                .count(),
+            3
+        );
+        assert_eq!(lines.matches("    exec 9<&-\n").count(), 3);
+    }
     let wrapper = wrapper_for(one);
     assert_eq!(wrapper.matches(ONE_PATH_HOME_LINE).count(), 1);
     let at = |text: &str, line: &str| text.find(line).unwrap();
@@ -4075,8 +4182,10 @@ fn with_the_one_path_a_make_still_runs_in_its_own_home() {
     let base = fs::canonicalize(folder.path()).unwrap();
     let b = base.display().to_string();
     // Hermes's lasting home with its install lock, which the lines bind
-    // back read-write, and the make's folder.
+    // back read-write, and the make's folder; a generation's `.leases` made
+    // already (`mkdir` is a stand-in), for the lines to open (#7051).
     let made = a_lamp_with_a_make(&base).join("home");
+    fs::create_dir(base.join("h/.hermes/installs/k/environments/g1/.leases")).unwrap();
     let stubs = base.join("stubs");
     fs::create_dir_all(&stubs).unwrap();
     let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
@@ -4141,7 +4250,7 @@ fn with_the_one_path_a_make_still_runs_in_its_own_home() {
     assert!(mounted.contains(&format!("none {b}/w/lamp\n")), "{mounted}");
     assert!(
         mounted.contains(&format!(
-            "mount -n --bind {b}/h/.hermes/installs/k/.install.lock {b}/x/i/k/.install.lock\n"
+            "mount -n -c --bind /proc/self/fd/9 {b}/x/i/k/.install.lock\n"
         )),
         "{mounted}"
     );

@@ -4029,10 +4029,14 @@ as a Harness task with the agent's own tools
   ends it before Hermes runs, and none of these is reached through a
   link (a link at a key, `pm-runtime`, `environments`, `generations` or
   generation folder skips that
-  lock or ends the make; each bound lock or `.leases` is checked again
-  after its mount, its `stat -c %d:%i` before the bind against the bind
-  target's after it, and a target that is a link is refused too, so a
-  link swapped in between is unmounted and ends the make the same way). These lines mount with `mount -n`: they run
+  lock or ends the make; each lock or `.leases` is opened on a
+  descriptor first and bound through it (`mount -n -c --bind
+  /proc/self/fd/9`, `-c` so util-linux never resolves it back to a path), so a link
+  swapped in after the checks cannot redirect the bind (#7051), its path
+  checked again before the bind to be no link and the descriptor's file,
+  and its `stat -c %d:%i` checked against the bind target's after the
+  mount, a target that is a link refused too, so a link swapped in
+  between is unmounted and ends the make the same way). These lines mount with `mount -n`: they run
   after `/run` is read-only, where util-linux cannot write its utab. It leaves Hermes's folder and the work
   folder read-only, and hides the rest of the work folder's `lamp` under
   another tmpfs, the make's own folder alone moved back, read-write
