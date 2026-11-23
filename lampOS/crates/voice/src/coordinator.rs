@@ -9641,10 +9641,13 @@ fn conversation_with_gate_inner(
                     // with a yes, a shake with a no, when it has a body.
                     // Held words are not its own yet.
                     gesture_cue.level = energy.as_mut().map_or(1, |energy| energy.level());
+                    // During the care hold, only a nod (#7689).
                     if !held
                         && let (Some(turn), Some(body)) = (request, body_link.as_mut())
-                        && let Some((gesture, lively)) =
-                            gesture_cue.heard_lively(turn, &text, finished, monotonic_us())
+                        && let Some((gesture, lively)) = crate::body_link::care_gesture(
+                            care_holds,
+                            gesture_cue.heard_lively(turn, &text, finished, monotonic_us()),
+                        )
                     {
                         if lively {
                             body.lively_gesture(gesture);
@@ -11968,9 +11971,12 @@ fn conversation_with_gate_inner(
                                 bus.said(turn, &text, finished, monotonic_us());
                             }
                             gesture_cue.level = energy.as_mut().map_or(1, |energy| energy.level());
+                            // During the care hold, only a nod (#7689).
                             if let Some(body) = body_link.as_mut()
-                                && let Some((gesture, lively)) =
-                                    gesture_cue.heard_lively(turn, &text, finished, monotonic_us())
+                                && let Some((gesture, lively)) = crate::body_link::care_gesture(
+                                    care_holds,
+                                    gesture_cue.heard_lively(turn, &text, finished, monotonic_us()),
+                                )
                             {
                                 if lively {
                                     body.lively_gesture(gesture);
