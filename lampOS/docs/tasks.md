@@ -693,6 +693,45 @@ runs the watch (`--watch`, the default) and closes a told harness
 are routed. Each is below.
 A person can explicitly request a new observation of an accepted agent.
 
+### News that waited a minute, and what the journal says (#8240)
+
+A lamp run on #8240 found a late start asking the person, kept and owed as
+news, yet nothing was said in 311 s: task news waited for a quiet room, and
+anyone's speech or a busy room (`room.busy()`, three lines left unanswered)
+held it with no end. Whose speech it is is not known where news waits: the
+voice keeps only when anyone was heard (`last_speech_us`), and the
+asker-first rule only the asker's level inside one reply.
+
+A settled agent's news (not progress, not news told once more) that has
+waited `task_news::WAITS_AT_MOST` since the voice had it is now told at the
+next pause of a second in anyone's speech (`PAUSE_US`), never over the
+lamp's own words (`AFTER_LAMP_US`, no reply under way); a busy room no
+longer holds it. In a room still talking (not quiet as news waits for, or
+busy) it is one fixed short line for its kind (`SHORT_DONE`,
+`SHORT_ASKING`, `SHORT_STOPPED`; record `task_news_short`), never the
+agent's answer, and it stays first in line: the whole news is told once the
+person answers or asks something of the lamp after that line. An answer
+that fits one short line is told as it is. Into a room where nobody was
+seen or heard since it came in (`task_news::someone_since`), it waits as
+before. Before the minute, nothing changes.
+
+| Limit | Value | Where |
+|---|---|---|
+| Wait for a quiet room, at most | 60 s from when the voice had the news | `task_news::WAITS_AT_MOST` |
+| Pause it is told at after that | 1 s with nobody heard speaking, the turn over as long | `task_news::PAUSE_US` (unchanged) |
+| After the lamp's own words | 3 s with nobody starting | `task_news::AFTER_LAMP_US` (unchanged) |
+| An answer that is one short line already | at most 80 characters, whole | `task_news::SHORT_FITS_CHARS` |
+| Short lines said | one for each news, once | `TaskNews::short_told` |
+
+The journal says, with numbers and reasons only, never the news's words or
+names: each read of a task's agent (`tasks: read of task N found it STATE in
+X ms`, or `failed (KIND) after X ms`); news held and why, once for each
+reason (`lamp-voice: task news held: task N, REASON, X ms since it
+landed`, the reason the first gate shut: `reminder_waiting`,
+`agent_wording`, `speech_not_paused`, `nobody_there`, `room_busy`,
+`lamp_replying`, `turn_open`, `not_ready`); news told (`task news told:
+task N, X ms after it landed`); and a short line told.
+
 ## Wire interface
 
 Each Unix connection carries one UTF-8 JSON object followed by a newline and

@@ -1997,10 +1997,42 @@ enum Job {
     /// `harness start --restart` once, its env file changed (#5978).
     RestartDaemon,
 }
+/// The journal's line for one read of a task's agent (#8240): its task
+/// number, the agent's state or the error's kind, and how long `show` took.
+/// Only Harness's own words for a state or a code are said; anything else
+/// is `other`, so nothing the agent wrote reaches the journal.
+fn observe_line(job: &ObservationJob, result: Result<&str, &str>, took_ms: u128) -> String {
+    let word = |value: &str| {
+        if !value.is_empty()
+            && value.len() <= 40
+            && value
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-')
+        {
+            value.to_owned()
+        } else {
+            "other".to_owned()
+        }
+    };
+    match result {
+        Ok(state) => format!(
+            "tasks: read of task {} found it {} in {took_ms} ms",
+            job.task_id,
+            word(state)
+        ),
+        Err(code) => format!(
+            "tasks: read of task {} failed ({}) after {took_ms} ms",
+            job.task_id,
+            word(code)
+        ),
+    }
+}
+
 enum Outcome {
     /// A launch's task id, its label, and how it went.
     Launch(u64, String, LaunchOutcome),
-    Observe(ObservationJob, Result<Observation, String>),
+    /// A read, how it went, and how long `show` took in ms.
+    Observe(ObservationJob, Result<Observation, String>, u128),
     Status(String, Result<Vec<Listed>, String>),
     Close(CloseJob, Result<Closed, String>),
     Check(CheckJob, Result<Vec<Started>, String>),
@@ -2613,8 +2645,16 @@ fn owner<C: Clock>(
                         engine.finish_launch(id, result, &now)
                     }
                 },
-                Outcome::Observe(job, Ok(value)) => engine.finish_observation(&job, value, &now),
-                Outcome::Observe(job, Err(code)) => engine.observation_failed(&job, &code, &now),
+                Outcome::Observe(job, Ok(value), took) => {
+                    // One line a read: its task, what it found and how long
+                    // it took, never what the agent said (#8240).
+                    eprintln!("{}", observe_line(&job, Ok(&value.state), took));
+                    engine.finish_observation(&job, value, &now)
+                }
+                Outcome::Observe(job, Err(code), took) => {
+                    eprintln!("{}", observe_line(&job, Err(&code), took));
+                    engine.observation_failed(&job, &code, &now)
+                }
                 Outcome::Close(job, result) => {
                     // One line a close, so the journal says which harness
                     // the lamp closed and how it went ([`close_line`]).
@@ -5933,13 +5973,14 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                             Job::Observe(job) => {
                                 // A direct OpenClaw task: its gateway run's
                                 // look, never Harness's `show`.
+                                let began = Instant::now();
                                 let result = crate::direct::lamp_observe(
                                     &job.engine.bus_name(),
                                     &job.machine_id,
                                     &job.agent_id,
                                 )
                                 .unwrap_or_else(|| adapter.observe(&job.machine_id, &job.agent_id));
-                                Outcome::Observe(job, result)
+                                Outcome::Observe(job, result, began.elapsed().as_millis())
                             }
                             Job::Status(machine) => {
                                 let result = adapter.status(&machine);

@@ -1664,6 +1664,7 @@ mod tests {
                 progress: None,
                 finished: None,
                 also: Vec::new(),
+                short: None,
             }
         }
 
@@ -1741,6 +1742,7 @@ mod tests {
                             progress: None,
                             finished: None,
                             also: Vec::new(),
+                            short: None,
                         })
                         .collect();
                     notes.insert(0, ordinary_news("before"));
@@ -2004,6 +2006,7 @@ mod tests {
                         progress: None,
                         finished: None,
                         also: Vec::new(),
+                        short: None,
                     },
                     ordinary_news("after"),
                 ],

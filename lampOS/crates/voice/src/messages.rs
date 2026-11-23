@@ -678,6 +678,7 @@ mod tests {
             progress: None,
             finished: None,
             also: Vec::new(),
+            short: None,
         }
     }
 
