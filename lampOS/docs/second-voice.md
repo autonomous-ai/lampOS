@@ -6367,7 +6367,13 @@ after a take-over, but now for every turn:
   skill's yes: the engine's `a_yes_held`, told to the judging by
   `said_to_me::awaiting_yes`), so a bare "Yes." its mouth unread still
   reaches `held_rename::take` and the other holds; when its name is heard
-  or written in it;
+  or written in it (heard: any hearing drained with the line, however old;
+  with `LAMP_SAID_TO_ME_NAME_IN_LINE=on`, #8384, only one that counts for
+  the line's own sound, from 1.5 s before its first sound to its end,
+  `attention::hearing_counts_for_line`, or any for a line going on from
+  another, its name maybe in its first half: on lamp-74ff on 23 Nov,
+  request 156, a hearing 28 s old, left queued by four empty lines, made
+  talk out of the window, facing in 0 looks, stand as named);
   when it is in a live conversation (the window), unless it is 0 to 2 words
   no face was seen speaking while a face in view was read silent
   (`SpeakingFaces::read_silent_between`; no face, no eyes or a mouth never

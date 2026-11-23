@@ -1490,6 +1490,15 @@ pub enum Verdict {
 /// and the voice takes a moment to be sure someone is speaking.
 pub const NAME_BEFORE_US: u64 = 1_500_000;
 
+/// Whether a hearing of the name begun at `at_us` counts for the line whose
+/// sound runs `began_us..=ended_us`: it began no more than
+/// [`NAME_BEFORE_US`] before the line did, and before the line ended. The
+/// one rule [`Attention::name_heard_scored`] and the second route's worker
+/// read (#8384); a line whose end is not known yet passes `u64::MAX`.
+pub fn hearing_counts_for_line(at_us: u64, began_us: u64, ended_us: u64) -> bool {
+    at_us.saturating_add(NAME_BEFORE_US) >= began_us && at_us <= ended_us
+}
+
 /// How soon after the line before ended a line must begin for its opening
 /// words to be read as that line's last words repeated
 /// (`LAMP_NAME_REPEAT_NOT_A_CALL=on`, [`Attention::not_calling_on_a_repeat`],
@@ -2930,8 +2939,7 @@ impl Attention {
             self.named_sure_us = Some(self.named_sure_us.map_or(at_us, |b| b.max(at_us)));
         }
         if let Some(began) = self.began_us
-            && at_us.saturating_add(NAME_BEFORE_US) >= began
-            && self.ended_us.is_none_or(|ended| at_us <= ended)
+            && hearing_counts_for_line(at_us, began, self.ended_us.unwrap_or(u64::MAX))
         {
             self.named = true;
             self.named_sure |= sure;
@@ -3758,6 +3766,32 @@ mod tests {
     /// #7415: the line past the lamp's name, for a check of its words
     /// (`app_triggers::matched`): only a line that opens with the name, and
     /// only the name itself.
+    /// #8384: the one rule a hearing of the name counts for a line by:
+    /// from `NAME_BEFORE_US` before its first sound to its end, both
+    /// bounds in; an end not known yet bounds nothing.
+    #[test]
+    fn a_hearing_counts_for_a_line_from_just_before_it_to_its_end() {
+        let (began, ended) = (30_000_000, 33_000_000);
+        assert!(hearing_counts_for_line(
+            began - NAME_BEFORE_US,
+            began,
+            ended
+        ));
+        assert!(!hearing_counts_for_line(
+            began - NAME_BEFORE_US - 1,
+            began,
+            ended
+        ));
+        assert!(!hearing_counts_for_line(began - 28_000_000, began, ended));
+        assert!(hearing_counts_for_line(ended, began, ended));
+        assert!(!hearing_counts_for_line(ended + 1, began, ended));
+        assert!(hearing_counts_for_line(ended + 1, began, u64::MAX));
+        assert!(
+            hearing_counts_for_line(0, 1_000_000, ended),
+            "early in the clock"
+        );
+    }
+
     #[test]
     fn a_line_is_read_past_the_lamp_name_it_opens_with() {
         assert_eq!(
