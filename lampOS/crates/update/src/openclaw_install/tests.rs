@@ -3812,15 +3812,15 @@ fn settle_looks(runs: &Runs) -> usize {
 
 /// The install run on a lamp the round asked it of, 1000 s after the boot,
 /// its gateway's process started at `began` (seconds since the boot, one
-/// per look, the last kept; none: not said) and not listening for `quiet`
-/// looks.
-fn install_settling(began: &[u64], quiet: u32) -> usize {
+/// per look, the last kept; none: not said) and not listening for
+/// `quiet_looks` looks.
+fn install_settling(began: &[u64], quiet_looks: u32) -> usize {
     let lamp = Lamp::new();
     lamp.harness_there();
     round(&lamp, &mut Fake::default(), true, 10);
     fs::write(lamp.at(crate::reset_hold::UPTIME), "1000.00 3000.00\n").unwrap();
     let runs = Runs::new(&lamp);
-    *runs.not_listening.borrow_mut() = quiet;
+    *runs.not_listening.borrow_mut() = quiet_looks;
     *runs.began.borrow_mut() = began
         .iter()
         .map(|s| format!("{}\n", s * 1_000_000))
@@ -3860,14 +3860,22 @@ fn the_install_never_restarts_a_gateway_at_its_first_listen() {
 /// restarted anyway after 300 s.
 #[test]
 fn the_install_restarts_a_settled_gateway_at_once_and_waits_past_a_new_listen() {
-    let now = 1_000_000_000_000;
-    assert_eq!(
-        install_settling(&format!("@{}", now / 1000 - 600), 0, now),
-        1
-    );
-    assert_eq!(install_settling("", 0, now), 1);
-    assert_eq!(install_settling("", 3, now), 3 + 45 + 1);
-    assert_eq!(install_settling("", u32::MAX, now), 151);
+    assert_eq!(install_settling(&[400], 0), 1);
+    assert_eq!(install_settling(&[], 0), 1);
+    assert_eq!(install_settling(&[], 3), 3 + 45 + 1);
+    assert_eq!(install_settling(&[], u32::MAX), 151);
+}
+
+/// #8324 (the Reviewer-lead's P3 1 on 5ae65157cf): a gateway started again
+/// during the wait (`Restart=always` after a crash) is waited for from its
+/// new start, read again at each look: started 10 s before, then again
+/// 90 s into the wait (at the 51st look), it is restarted 150 s after that
+/// second start, never at the first start's 150 s.
+#[test]
+fn a_gateway_started_again_during_the_wait_is_waited_for_from_its_new_start() {
+    let mut began = vec![990; 50];
+    began.push(1090);
+    assert_eq!(install_settling(&began, 0), 121);
 }
 
 /// #8105: lamp-tasks' answer read, and the rule: the switch off is always
