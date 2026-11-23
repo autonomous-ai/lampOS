@@ -235,6 +235,9 @@ pub struct Lamp {
     /// The connection the request in hand came on (`Parts::asking`), for a
     /// motion's `done`.
     asking: Option<u64>,
+    /// The installed app the request in hand came from, its id and title
+    /// (`Parts::asking_app`), for an exact `say`'s `app`.
+    asking_app: Option<(String, String)>,
 }
 
 /// What each computer has going on the voice.
@@ -339,6 +342,7 @@ impl Lamp {
             speaker: None,
             motions: None,
             asking: None,
+            asking_app: None,
         }
     }
 
@@ -907,6 +911,13 @@ impl Lamp {
             // computer alone; a voice from before refuses it and the line
             // is said again without (`say_to_voice`).
             line["by"] = json!(client);
+            // An installed app's line names the app, as its socket's cgroup
+            // did, never its words: the voice tells it to the model once
+            // it played whole (#8386's stopgap, `LAMP_APP_MEMORY`).
+            if let Some((id, title)) = &self.asking_app {
+                line["app"] = json!(id);
+                line["app_name"] = json!(title);
+            }
         }
         self.say_to_voice(client, re, line)
     }
@@ -1205,7 +1216,11 @@ impl Lamp {
                 && result.1.as_deref() == Some(&format!("refused: {NOT_ITS_PROTOCOL}"))
             {
                 let mut plain = line.clone();
-                plain.as_object_mut().map(|fields| fields.remove("by"));
+                if let Some(fields) = plain.as_object_mut() {
+                    for field in ["by", "app", "app_name"] {
+                        fields.remove(field);
+                    }
+                }
                 result = attempt(&plain);
             }
             let (how, why) = result;
@@ -1651,6 +1666,10 @@ impl Parts for Lamp {
 
     fn asking(&mut self, connection: Option<u64>) {
         self.asking = connection;
+    }
+
+    fn asking_app(&mut self, app: Option<(&str, &str)>) {
+        self.asking_app = app.map(|(id, title)| (id.to_owned(), title.to_owned()));
     }
 
     fn state(&self, kind: StateKind) -> Value {
@@ -2543,6 +2562,67 @@ mod tests {
             told.lock().unwrap()[0].1,
             json!({"ev": "done", "re": 14, "how": "finished"})
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #8386's stopgap: an installed app's exact `say` names the app, as its
+    /// socket named it, to the voice; a voice from before is asked again
+    /// with none of `by`, `app` and `app_name`; the next request, not an
+    /// app's, names none.
+    #[test]
+    fn an_apps_say_names_the_app_and_a_voice_from_before_is_asked_without() {
+        let dir = dir("say-app");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let voice = std::thread::spawn(move || {
+            let mut asked = Vec::new();
+            for answer in [
+                r#"{"outcome":"refused","why":"not a say request"}"#,
+                r#"{"outcome":"spoken"}"#,
+                r#"{"outcome":"spoken"}"#,
+            ] {
+                let (stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                asked.push(serde_json::from_str::<Value>(&line).unwrap());
+                let mut out = &stream;
+                writeln!(out, "{answer}").unwrap();
+            }
+            asked
+        });
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), quiet());
+        lamp.asking_app(Some(("gym-coach", "Gym Coach")));
+        lamp.act(
+            "coach",
+            1,
+            &op(r#"{"id":1,"op":"say","text":"Trained before?"}"#),
+            0,
+        )
+        .unwrap();
+        // The retry's, before the next say, so the voice reads them in turn.
+        for _ in 0..200 {
+            if lamp.says.lock().unwrap().is_empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        lamp.asking_app(None);
+        lamp.act("c_1", 2, &op(r#"{"id":2,"op":"say","text":"Hi."}"#), 0)
+            .unwrap();
+        let asked = voice.join().unwrap();
+        assert_eq!(
+            (&asked[0]["by"], &asked[0]["app"], &asked[0]["app_name"]),
+            (&json!("coach"), &json!("gym-coach"), &json!("Gym Coach"))
+        );
+        for field in ["by", "app", "app_name"] {
+            assert!(asked[1].get(field).is_none(), "{field}: {:?}", asked[1]);
+            assert!(
+                field == "by" || asked[2].get(field).is_none(),
+                "{field}: {:?}",
+                asked[2]
+            );
+        }
+        assert_eq!(asked[1]["text"], "Trained before?");
         let _ = std::fs::remove_dir_all(&dir);
     }
 
