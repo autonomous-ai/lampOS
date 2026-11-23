@@ -1953,6 +1953,139 @@ pub(crate) mod tests {
         }
     }
 
+    /// The person's own Anthropic key and model, as `with_own_keys` reads
+    /// them from the keys' folder `name`, over [`config_at`]'s relay.
+    fn own_anthropic(name: &str, relay: &str) -> SecondConfig {
+        use std::os::unix::fs::PermissionsExt;
+        let config = config_at(name, "relay-key-8420", relay, relay);
+        let units =
+            std::env::temp_dir().join(format!("lamp-voice-{name}-units-{}", std::process::id()));
+        std::fs::create_dir_all(&units).unwrap();
+        for (file, text) in [
+            ("own_anthropic.key", "sk-ant-own-8420"),
+            ("own_anthropic.model", "claude-sonnet-4-5"),
+        ] {
+            std::fs::write(units.join(file), text).unwrap();
+            std::fs::set_permissions(units.join(file), std::fs::Permissions::from_mode(0o600))
+                .unwrap();
+        }
+        let (config, _) = config.with_own_keys(true, Some(units.as_os_str()));
+        let _ = std::fs::remove_dir_all(&units);
+        config
+    }
+
+    /// #8420: the person's own Anthropic model is asked at Anthropic's
+    /// OpenAI-compatible chat with their key as the bearer (a made-up one
+    /// answered there 401 "Invalid Anthropic API Key" on 24 Nov, so the
+    /// endpoint takes a bearer), with an explicit `max_tokens` and none of
+    /// DeepSeek's, OpenRouter's or Gemini's own fields.
+    #[test]
+    fn the_persons_anthropic_model_is_asked_with_its_max_tokens() {
+        let config = own_anthropic("own-anthropic-body", "http://127.0.0.1:9");
+        let key = crate::second_provider::worker::deepseek_key(&config, None).unwrap();
+        assert_eq!(key.expose(), "sk-ant-own-8420");
+        let net = Net::new(config, Arc::new(Vec::new))
+            .unwrap()
+            .chatting_with_deepseek(key.expose())
+            .unwrap();
+        let (url, auth, body) = net.chat.wire(&[Message::user("What time is it?")]);
+        assert_eq!(url, "https://api.anthropic.com/v1/chat/completions");
+        assert_eq!(auth, "Bearer sk-ant-own-8420");
+        assert_eq!(body["model"], "claude-sonnet-4-5");
+        assert_eq!(body["max_tokens"], 4096);
+        for field in [
+            "provider",
+            "reasoning",
+            "plugins",
+            "thinking",
+            "reasoning_effort",
+        ] {
+            assert!(body.get(field).is_none(), "{field}: {body}");
+        }
+    }
+
+    /// #8420: Anthropic's model list takes no bearer (a 401 to one, seen
+    /// live on 24 Nov), so the chat's warm asks it with the key as
+    /// `x-api-key` and `anthropic-version`, never an `authorization`: a
+    /// warm's 401 can't stand for a refused key.
+    #[tokio::test]
+    async fn the_persons_anthropic_chat_warms_with_its_own_headers() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut read = vec![0; 4096];
+            let n = socket.read(&mut read).await.unwrap();
+            let head = String::from_utf8_lossy(&read[..n]).to_lowercase();
+            let body = r#"{"data":[]}"#;
+            socket
+                .write_all(
+                    format!(
+                        "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{body}",
+                        body.len()
+                    )
+                    .as_bytes(),
+                )
+                .await
+                .unwrap();
+            head
+        });
+        let mut config = own_anthropic("own-anthropic-warm", "http://127.0.0.1:9");
+        config.hosted.deepseek_base_url = Some(format!("http://{address}/v1"));
+        let net = Net::new(config, Arc::new(Vec::new))
+            .unwrap()
+            .chatting_with_deepseek("sk-ant-own-8420")
+            .unwrap();
+        let (status, _) = net.chat.warm().await.expect("warmed");
+        assert_eq!(status, 200);
+        let head = server.await.unwrap();
+        assert!(head.starts_with("get /v1/models http/1.1"), "{head}");
+        assert!(head.contains("x-api-key: sk-ant-own-8420"), "{head}");
+        assert!(head.contains("anthropic-version: 2023-06-01"), "{head}");
+        assert!(!head.contains("authorization"), "{head}");
+    }
+
+    /// #8420: Anthropic's chat refuses a bad key with a 401 (its body as
+    /// seen live on 24 Nov): the request goes to the lamp's own model at
+    /// the relay, told as a refusal.
+    #[tokio::test]
+    async fn the_persons_anthropic_key_refused_falls_back_to_the_lamps_own() {
+        const REFUSED: &str = "HTTP/1.1 401 Unauthorized\r\ncontent-type: application/json\r\nconnection: close\r\n\r\n";
+        let body = r#"{"error":{"code":"authentication_error","message":"Invalid Anthropic API Key","type":"invalid_request_error","param":null}}"#;
+        let own = stub(
+            "sk-ant-own-8420",
+            vec![(CHAT, Some((REFUSED, body.as_bytes().to_vec())))],
+        )
+        .await;
+        let relay = stub("relay-key-8420", vec![(CHAT, answered("lamp's own"))]).await;
+        let mut config = own_anthropic("own-anthropic-401", &relay.url);
+        config.hosted.deepseek_base_url = Some(format!("{}/v1", own.url));
+        let told = Arc::new(Mutex::new(Vec::new()));
+        let telling = told.clone();
+        let net = Net::new(config, Arc::new(Vec::new))
+            .unwrap()
+            .chatting_with_deepseek("sk-ant-own-8420")
+            .unwrap()
+            .falling_back_to_the_relay(
+                &relay.url,
+                Arc::new(move |status| telling.lock().unwrap().push(status)),
+            )
+            .unwrap();
+        let events: Vec<_> = net.chat(vec![Message::user("hello")]).collect().await;
+        assert_eq!(own.asked("/v1/chat/completions"), 1);
+        let words: String = events
+            .into_iter()
+            .filter_map(|event| match event {
+                Ok(ChatEvent::Text(text)) => Some(text),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(words, "lamp's own");
+        assert_eq!(relay.asked(CHAT), 1);
+        assert_eq!(*told.lock().unwrap(), [401]);
+    }
+
     pub(crate) fn config_at(name: &str, key: &str, relay: &str, listening: &str) -> SecondConfig {
         use std::os::unix::fs::PermissionsExt;
         let directory =
