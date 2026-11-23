@@ -58,6 +58,12 @@ struct Lamp {
     register_times: Vec<Duration>,
     /// One servo cannot pass this position and presses on it instead.
     wall: Option<(usize, f32)>,
+    /// One servo cannot go under this position, as an arm that meets its
+    /// rest before its folded count (a factory lamp's elbow, 23 Nov, 61 counts up, its
+    /// head askew under it): it stops there and reads this load while its
+    /// goal is under it, 20 once the goal is where it rests. Servo,
+    /// position, load.
+    floor: Option<(usize, f32, u16)>,
     /// One servo stops this many counts short of any goal, as a real one
     /// does against its own friction.
     short: Option<(usize, f32)>,
@@ -209,6 +215,7 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             goal_positions: Vec::new(),
             register_times: Vec::new(),
             wall: None,
+            floor: None,
             short: None,
             heavy: None,
             climb: None,
@@ -408,6 +415,17 @@ impl Lamp {
             {
                 servo.position = at;
                 servo.load = 300;
+            }
+            if let Some((rests, at, load)) = self.floor
+                && rests == index
+                && servo.position <= at
+            {
+                servo.position = at;
+                servo.load = if f32::from(servo.goal) < at - 4.0 {
+                    load
+                } else {
+                    20
+                };
             }
         }
     }
@@ -19787,6 +19805,17 @@ fn powered_up_on(
     prepare: impl FnOnce(&mut Lamp),
     run_for: Duration,
 ) -> PoweredUp {
+    powered_up_tuned(flags, found, prepare, run_for, |_| {})
+}
+
+/// [`powered_up_on`] with the unit's limits `tune`d (its `--recover-load`).
+fn powered_up_tuned(
+    flags: &Flags,
+    found: [u16; 5],
+    prepare: impl FnOnce(&mut Lamp),
+    run_for: Duration,
+    tune: impl FnOnce(&mut Limits),
+) -> PoweredUp {
     let (mut lamp, mut clock) = folded(run_for);
     lamp.may_take_hold = true;
     lamp.arm_moves = true;
@@ -19795,7 +19824,7 @@ fn powered_up_on(
         (servo.position, servo.goal, servo.torque, servo.status) = (f32::from(at), 0, 0, 0);
     }
     prepare(&mut lamp);
-    let limits = Limits {
+    let mut limits = Limits {
         force: Some(600),
         torque_on: true,
         wake: true,
@@ -19812,6 +19841,7 @@ fn powered_up_on(
         })
         .unwrap()
     };
+    tune(&mut limits);
     let up = Standing::new(flags.folded, flags.stand, 100, 6, 90, flags.load)
         .unwrap()
         .idling(true);
@@ -20980,6 +21010,98 @@ fn a_found_folded_lamp_whose_wake_stops_ends_held_and_does_not_loop() {
     assert_eq!(report.refused_let_go, None, "{report:?}");
     assert!(!powered.said.iter().flatten().any(|say| *say == ARM_HELD));
     assert!(powered.lamp.servos.iter().all(|servo| servo.torque == 1));
+}
+
+/// A factory lamp on build 15146, 23 Nov: set up with its arm raised (shoulder
+/// 3162, elbow 3653), it folded for 27 s and its elbow met its rest 61
+/// counts above folded, its head askew under it, pressing there at a load
+/// of 252 against the unit's `--recover-load 250`. The fold ended on that
+/// load, the hold where it lay was refused (61 from its last goal, over
+/// `ARM_GOAL_STEP`), so the elbow went on pressing at 252 (52 C and
+/// rising), and lamp-body exited; systemd's three restarts each ended on
+/// `Window` and the unit failed for good. An arm that meets its rest within
+/// `ARM_LET_GO_NEAR` of folded is folded: it stops pushing, and the lamp
+/// wakes and stands.
+#[test]
+fn a_fold_that_meets_its_rest_short_of_folded_stops_pushing_and_stands() {
+    let rest = f32::from(LAMP_52E6.folded[1]) + 61.0;
+    let powered = powered_up_tuned(
+        &LAMP_52E6,
+        [2_035, 2_657, 2_900, 2_035, 1_771],
+        |lamp| lamp.floor = Some((2, rest, 252)),
+        Duration::from_secs(160),
+        |limits| limits.recover_load = Some(250),
+    );
+    let report = &powered.report;
+    assert!(report.stood && powered.stood_at_pose, "{report:?}");
+    assert_ended_as_asked(report);
+    // Its elbow is never left pressing on its rest: no goal under it stays
+    // written for more than a few seconds while it lies there.
+    let pressing = pressed_on_its_rest(&powered.lamp, rest);
+    assert!(pressing <= Duration::from_secs(5), "pressed {pressing:?}");
+}
+
+/// The run went on until it was asked to stop, 160 s in, standing. Folding
+/// down for the exit, an elbow that rests more than `ARM_GOAL_STEP` short
+/// of folded is let go rather than held there (the exit's own rule, #1722,
+/// unchanged here), which the report says as `Stop::Window`.
+fn assert_ended_as_asked(report: &BodyReport) {
+    assert!(
+        matches!(report.stop, Stop::Cancelled | Stop::Window { joint: 3, .. }),
+        "{report:?}"
+    );
+    assert!(report.steps > 6_000, "it ran to the end: {}", report.steps);
+}
+
+/// The longest the elbow lay on `rest` with a goal more than 4 under it.
+fn pressed_on_its_rest(lamp: &Lamp, rest: f32) -> Duration {
+    let (mut longest, mut since) = (Duration::ZERO, None::<Duration>);
+    for ((goals, at), positions) in lamp
+        .goals
+        .iter()
+        .zip(&lamp.goal_times)
+        .zip(&lamp.goal_positions)
+    {
+        let Some((_, goal)) = goals.iter().find(|(id, _)| *id == 3) else {
+            continue;
+        };
+        let presses = f32::from(*goal) < rest - 4.0 && f32::from(positions[2]) <= rest + 1.0;
+        match (presses, since) {
+            (true, None) => since = Some(*at),
+            (true, Some(from)) => longest = longest.max(at.saturating_sub(from)),
+            (false, _) => since = None,
+        }
+    }
+    longest
+}
+
+/// The same factory lamp's restarts: found folded with torque on, its elbow 61 counts
+/// above its folded goal and pressing on its rest (goal register 2000,
+/// position 2061, load 256). The goal the servo held was taken as written
+/// (within `FOUND_SLACK`, 80) and then refused as a goal (over
+/// `ARM_GOAL_STEP`, 50, from where it read): `Stop::Window` at once, three
+/// times, and the unit failed. Such an elbow is held where it lies, and
+/// the lamp stands when spoken to.
+#[test]
+fn found_folded_pressing_on_its_rest_short_of_folded_it_stops_pushing_and_stands() {
+    let rest = f32::from(LAMP_52E6.folded[1]) + 61.0;
+    let found = [2_035, LAMP_52E6.folded[0] + 12, rest as u16, 2_035, 1_771];
+    let powered = powered_up(found, |lamp| {
+        lamp.floor = Some((2, rest, 256));
+        for (index, servo) in lamp.servos.iter_mut().enumerate() {
+            servo.torque = 1;
+            servo.goal = match index {
+                1 => LAMP_52E6.folded[0],
+                2 => LAMP_52E6.folded[1],
+                _ => servo.position as u16,
+            };
+        }
+    });
+    let report = &powered.report;
+    assert!(report.stood && powered.stood_at_pose, "{report:?}");
+    assert_ended_as_asked(report);
+    let pressing = pressed_on_its_rest(&powered.lamp, rest);
+    assert!(pressing <= Duration::from_secs(5), "pressed {pressing:?}");
 }
 
 /// While a raised, wrapped arm is held for a hand, a push on the head (its
