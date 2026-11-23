@@ -201,6 +201,35 @@ pub const OWN_VOICE_LOST_LINE: &str =
 /// it never was in this run (#8367): what `voice-keys` tells lamp-health.
 pub static OWN_VOICE_REFUSED: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
 
+/// The person's own voice refused, once per process (#8394's lamp row: one
+/// 401 logged by three pieces at once): every [`Tts`] of the process routes
+/// through the one [`own_voice_lost`], so the refusal is journalled once and
+/// the notice said once, whichever piece or voice sees it first.
+#[derive(Debug, Default)]
+pub(crate) struct OwnVoiceLost {
+    /// ElevenLabs refused the person's key or voice.
+    lost: AtomicBool,
+    /// [`OWN_VOICE_LOST_LINE`] was given to the lamp's voice to say.
+    told: AtomicBool,
+    /// The journal lines said, in order (two at most).
+    said: Mutex<Vec<String>>,
+}
+
+impl OwnVoiceLost {
+    fn say(&self, line: String) {
+        eprintln!("{line}");
+        if let Ok(mut said) = self.said.lock() {
+            said.push(line);
+        }
+    }
+}
+
+/// The process's one [`OwnVoiceLost`].
+pub(crate) fn own_voice_lost() -> Arc<OwnVoiceLost> {
+    static ONE: std::sync::OnceLock<Arc<OwnVoiceLost>> = std::sync::OnceLock::new();
+    ONE.get_or_init(Arc::default).clone()
+}
+
 pub(crate) fn socket_request(
     base_url: &str,
     key: &str,
@@ -535,8 +564,8 @@ pub struct Tts {
     /// [`Tts::with_lamps_voice`]).
     lamps: Option<Box<Tts>>,
     /// ElevenLabs refused the person's voice: every piece goes to `lamps`
-    /// until the voice starts again.
-    lost: AtomicBool,
+    /// until the voice starts again; one for the process ([`own_voice_lost`]).
+    lost: Arc<OwnVoiceLost>,
 }
 
 /// A speech socket, ElevenLabs' `stream-input` or its dialogue one.
@@ -623,7 +652,7 @@ impl Tts {
             refused: Mutex::new(None),
             paused_until: Mutex::new(None),
             lamps: None,
-            lost: AtomicBool::new(false),
+            lost: own_voice_lost(),
         })
     }
 
@@ -639,7 +668,7 @@ impl Tts {
     fn fallen_back(&self) -> Option<&Tts> {
         self.lamps
             .as_deref()
-            .filter(|_| self.lost.load(Ordering::Relaxed))
+            .filter(|_| self.lost.lost.load(Ordering::Relaxed))
     }
 
     /// Whether a socket is opened for an answer: ElevenLabs only, not for a
@@ -1025,16 +1054,16 @@ impl Tts {
         let Some(lamps) = &self.lamps else {
             return self.speak_own(text, turn).await;
         };
-        if self.lost.load(Ordering::Relaxed) {
+        if self.lost.lost.load(Ordering::Relaxed) {
             return lamps.speak_own(text, turn).await;
         }
         match self.speak_own(text, turn).await {
             Err(Error::Status(status @ 401..=404)) => {
-                self.lost.store(true, Ordering::Relaxed);
+                self.lost.lost.store(true, Ordering::Relaxed);
                 OWN_VOICE_REFUSED.store(status, Ordering::Relaxed);
-                eprintln!(
+                self.lost.say(format!(
                     "lamp-voice second: ElevenLabs refused the person's own key or voice (HTTP {status}); the lamp's own voice from now on, said once (LAMP_OWN_KEYS)"
-                );
+                ));
                 lamps
                     .speak_own(&format!("{OWN_VOICE_LOST_LINE} {text}"), turn)
                     .await
@@ -2747,6 +2776,50 @@ mod tests {
         (format!("http://{address}"), bodies)
     }
 
+    /// #8394's lamp row: one 401 seen at once by three pieces of one voice
+    /// and by a second voice of the same process is journalled once, and the
+    /// notice is said once, in the lamp's own voice, with its own line.
+    #[tokio::test]
+    async fn a_refusal_seen_by_many_pieces_and_voices_is_said_once() {
+        let (own_url, _) = bodies_answering(401, b"{}".to_vec()).await;
+        let (lamps_url, lamps_asked) = bodies_answering(200, vec![5, 0, 6, 0]).await;
+        let state = Arc::new(OwnVoiceLost::default());
+        let voice = |state: &Arc<OwnVoiceLost>| {
+            let lamps = Tts::with(TtsProvider::ElevenLabs, &lamps_url, "k", None).unwrap();
+            let mut own = Tts::with(TtsProvider::ElevenLabs, &own_url, "sk-fake", Some("V8394"))
+                .unwrap()
+                .with_lamps_voice(lamps);
+            own.lost = state.clone();
+            own
+        };
+        let (one, two) = (voice(&state), voice(&state));
+        let pieces = futures_util::future::join_all([
+            said(&one, "A.", 1),
+            said(&one, "B.", 1),
+            said(&one, "C.", 1),
+            said(&two, "D.", 2),
+        ])
+        .await;
+        assert!(pieces.iter().all(|piece| piece == &[10, 12]), "none silent");
+        let said = state.said.lock().unwrap().clone();
+        assert_eq!(said.len(), 2, "{said:?}");
+        assert!(
+            said[0].contains("ElevenLabs refused the person's own key or voice (HTTP 401)"),
+            "{said:?}"
+        );
+        assert!(
+            said[1].contains("told once, in the lamp's own voice"),
+            "{said:?}"
+        );
+        let told = lamps_asked
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|body| body.contains(OWN_VOICE_LOST_LINE))
+            .count();
+        assert_eq!(told, 1, "the notice said once");
+    }
+
     /// #8367: ElevenLabs refuses the person's own key (401, as a bad key or
     /// credits run out are answered): the piece is said in the lamp's own
     /// voice, never silent, after one line that says so; and every piece
@@ -2765,6 +2838,8 @@ mod tests {
         )
         .unwrap()
         .with_lamps_voice(lamps);
+        let mut own = own;
+        own.lost = Arc::default();
         assert_eq!(said(&own, "Hello there.", 3).await, [10, 12], "not silent");
         assert_eq!(own_asked.lock().unwrap().len(), 1);
         {
