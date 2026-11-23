@@ -1536,6 +1536,10 @@ pub struct Ticket {
     /// A long exact line's pieces (#7892): held while it plays, let go
     /// with the ticket, which stops its renderer.
     pieces: Option<Arc<tts_cache::Pieces>>,
+    /// A skill's say, exact line, sound or stream nobody asked for
+    /// ([`asked_for`] false when it was taken): the care hold
+    /// (`LAMP_CARE_LINE`, #7689) cuts it if it is under way.
+    unasked: bool,
 }
 
 impl Ticket {
@@ -1603,6 +1607,12 @@ impl Ticket {
         }
     }
 
+    /// Whether it is a say nobody asked for, which the care hold cuts
+    /// under way ([`Self::unasked`]'s field; #7689).
+    pub fn unasked(&self) -> bool {
+        self.unasked
+    }
+
     /// Whether it is the shutdown's last words ([`is_last_words`]).
     pub fn last_words(&self) -> bool {
         self.skill == SHUTDOWN_SKILL
@@ -1635,6 +1645,7 @@ impl Ticket {
                 line: Default::default(),
                 said: None,
                 pieces: None,
+                unasked: false,
             },
             answered,
         )
@@ -1676,6 +1687,15 @@ impl Drop for Ticket {
 #[cfg(test)]
 pub(crate) fn ticket_for_test(skill: &str) -> (Ticket, mpsc::Receiver<Answer>) {
     Ticket::own(skill)
+}
+
+/// A ticket of a skill's say nobody asked for ([`Ticket::unasked`]), for a
+/// test of the care hold's cut (#7689).
+#[cfg(test)]
+pub(crate) fn unasked_ticket_for_test(skill: &str) -> (Ticket, mpsc::Receiver<Answer>) {
+    let (mut ticket, answered) = ticket_for_test(skill);
+    ticket.unasked = true;
+    (ticket, answered)
 }
 
 /// A ticket whose asker has cancelled it ([`CANCEL_LINE`]), for a test of
@@ -2325,12 +2345,47 @@ impl Says {
     fn next_asked(&self, now: std::time::Instant) -> Option<usize> {
         self.next_of(|request| taken_as_a_turn(request) && asked_for(request, now))
     }
+
+    /// While the care hold holds (`LAMP_CARE_LINE`, #7689): every waiting
+    /// exact line, sound and stream nobody asked for ([`asked_for`]) is
+    /// answered refused with [`CARE_HELD`] now, as their takers would play
+    /// them at once; what a person asked for (the shutdown's last words, a
+    /// line answering the owner) stays. How many were refused.
+    pub fn refuse_unasked_sounds(&mut self, now: std::time::Instant) -> usize {
+        let mut refused = 0;
+        let mut kept = Vec::with_capacity(self.waiting.len());
+        for waiting in std::mem::take(&mut self.waiting) {
+            let sounds = matches!(
+                waiting.request.words,
+                Words::Sound(_) | Words::ExactSound { .. } | Words::Stream { .. }
+            );
+            if sounds && !asked_for(&waiting.request, now) {
+                let _ = waiting
+                    .answer
+                    .send(Answer::Done(Outcome::Refused(CARE_HELD.into())));
+                refused += 1;
+            } else {
+                kept.push(waiting);
+            }
+        }
+        self.waiting = kept;
+        refused
+    }
 }
 
 /// Whether `request` is one a person asked for, which the care hold
 /// (`LAMP_CARE_LINE`, #7689) lets through: the shutdown's last words, the
 /// lamp's agent's answer to the owner's ask, a made skill's run the owner
 /// asked for now, or a line marked as answering the owner.
+/// What a say nobody asked for is told when the care hold
+/// (`LAMP_CARE_LINE`, #7689) refuses or cuts it. It says nothing of why: a
+/// skill or a computer is never told that words of self-harm were heard.
+pub const CARE_HELD: &str = "held: the lamp is not taking lines nobody asked for just now";
+
+/// Why a say nobody asked for, under way, is cut by the care hold: its
+/// asker is told `dropped` with it, and it too says nothing of why.
+pub const CARE_CUT: &str = "held";
+
 pub fn asked_for(request: &Request, now: std::time::Instant) -> bool {
     is_last_words(request)
         || request.answers
@@ -2413,6 +2468,7 @@ impl Says {
                 line: Default::default(),
                 said: None,
                 pieces: None,
+                unasked: false,
             },
         ))
     }
@@ -2423,6 +2479,7 @@ impl Says {
         self.expire(now_us);
         let index = self.next_of(|request| matches!(request.words, Words::Sound(_)))?;
         let waiting = self.waiting.remove(index);
+        let unasked = !asked_for(&waiting.request, std::time::Instant::now());
         let Words::Sound(samples) = waiting.request.words else {
             unreachable!("next_of chose a sound");
         };
@@ -2438,6 +2495,7 @@ impl Says {
                 line: waiting.request.line,
                 said: None,
                 pieces: None,
+                unasked,
             },
         ))
     }
@@ -2481,6 +2539,7 @@ impl Says {
         }
         let index = self.next_of(|request| matches!(request.words, Words::Stream { .. }))?;
         let waiting = self.waiting.remove(index);
+        let unasked = !asked_for(&waiting.request, std::time::Instant::now());
         let Words::Stream { by } = waiting.request.words else {
             unreachable!("next_of chose a stream");
         };
@@ -2494,6 +2553,7 @@ impl Says {
             line: Default::default(),
             said: None,
             pieces: None,
+            unasked,
         };
         let why = match may_play_exact(now) {
             ExactNow::Play => return Some(self.open_stream(by, ticket, at_us)),
@@ -2525,6 +2585,7 @@ impl Says {
         self.expire(now_us);
         let index = self.next_of(|request| matches!(request.words, Words::ExactSound { .. }))?;
         let waiting = self.waiting.remove(index);
+        let unasked = !asked_for(&waiting.request, std::time::Instant::now());
         let Words::ExactSound {
             samples,
             text,
@@ -2547,6 +2608,7 @@ impl Says {
                 line: waiting.request.line,
                 said: text,
                 pieces,
+                unasked,
             },
         ))
     }
@@ -2681,6 +2743,7 @@ impl Says {
             Words::Quoted(_) | Words::Agent { .. } | Words::Made(_)
         );
         let (who, question) = (waiting.request.who, waiting.request.question);
+        let unasked = !asked_for(&waiting.request, std::time::Instant::now());
         let turn = match &waiting.request.words {
             Words::Text(text) if matches!(taking, Taking::Refused | Taking::NearDayEnd) => {
                 crate::onboarding::said_as_is(text)
@@ -2700,6 +2763,7 @@ impl Says {
                 line: Default::default(),
                 said: None,
                 pieces: None,
+                unasked,
             },
             quoted,
         ))
@@ -2737,6 +2801,7 @@ impl Says {
             line: Default::default(),
             said: None,
             pieces: None,
+            unasked: false,
         })
     }
 
@@ -2763,6 +2828,7 @@ impl Says {
             line: Default::default(),
             said: None,
             pieces: None,
+            unasked: false,
         })
     }
 
@@ -7554,5 +7620,135 @@ mod tests {
         BufReader::new(stream).read_to_string(&mut answer).unwrap();
         assert_eq!(answer, "{\"outcome\":\"lifted\",\"why\":\"asked\"}\n");
         assert_eq!(mutes.count(), 0);
+    }
+
+    /// The care hold (`LAMP_CARE_LINE`, #7689) over waiting asks: one of
+    /// each kind, from a skill and from the shutdown, in one queue.
+    fn care_queue() -> (Says, Vec<(&'static str, mpsc::Receiver<Answer>)>) {
+        let (mut says, ask) = Says::by_hand();
+        let mut answers = Vec::new();
+        let kinds: [(&'static str, &str, Words); 5] = [
+            (
+                "skill's exact line",
+                "weather",
+                Words::ExactSound {
+                    samples: vec![1; 240],
+                    text: None,
+                    pieces: None,
+                },
+            ),
+            ("skill's sound", "weather", Words::Sound(vec![1; 240])),
+            (
+                "shutdown's last words",
+                SHUTDOWN_SKILL,
+                Words::Sound(vec![1; 240]),
+            ),
+            (
+                "skill's note",
+                "weather",
+                Words::Note("Tell them it's sunny.".into()),
+            ),
+            (
+                "agent's answer",
+                AGENT_SKILL,
+                Words::Note("Here is what I found.".into()),
+            ),
+        ];
+        for (what, skill, words) in kinds {
+            let (answer, answered) = mpsc::channel();
+            ask.send(Asked {
+                request: Request {
+                    may_end_unsaid: false,
+                    skill: skill.into(),
+                    words,
+                    priority: NORMAL_PRIORITY,
+                    expires_in_ms: 60_000,
+                    start_before_us: None,
+                    task: None,
+                    invitation: None,
+                    unplug_request: None,
+                    who: false,
+                    question: false,
+                    line: Default::default(),
+                    quiet: false,
+                    answers: false,
+                },
+                answer,
+                read_at_us: 0,
+                guard: None,
+                gone: None,
+                cancel: Default::default(),
+                expires_at_us: u64::MAX,
+            })
+            .unwrap();
+            answers.push((what, answered));
+        }
+        says.poll(0);
+        (says, answers)
+    }
+
+    /// #7689: while the care hold holds, a skill's exact line and sound are
+    /// refused at once with words that say nothing of why; the shutdown's
+    /// last words, a skill's note (it waits, as `take_asked` leaves it) and
+    /// the agent's answer stay.
+    #[test]
+    fn the_care_hold_refuses_a_skills_lines_and_sounds_and_keeps_what_was_asked() {
+        let (mut says, answers) = care_queue();
+        assert_eq!(says.refuse_unasked_sounds(std::time::Instant::now()), 2);
+        for (what, answered) in &answers {
+            let got = answered.try_recv();
+            if what.starts_with("skill's exact") || *what == "skill's sound" {
+                assert_eq!(
+                    got,
+                    Ok(Answer::Done(Outcome::Refused(CARE_HELD.into()))),
+                    "{what}"
+                );
+            } else {
+                assert!(got.is_err(), "{what} was answered: {got:?}");
+            }
+        }
+        assert!(!CARE_HELD.contains("harm") && !CARE_CUT.contains("harm"));
+        // Nothing more to refuse, and what stays is still taken as before.
+        assert_eq!(says.refuse_unasked_sounds(std::time::Instant::now()), 0);
+        let (_, last) = says.take_sound(0).expect("the last words stay");
+        assert!(last.last_words() && !last.unasked());
+    }
+
+    /// #7689: a ticket says whether nobody asked for it, as it was taken, so
+    /// the care hold cuts only that one under way.
+    #[test]
+    fn a_ticket_taken_says_whether_nobody_asked_for_it() {
+        let (mut says, _answers) = care_queue();
+        let (_, exact) = says.take_exact(0).unwrap();
+        assert!(exact.unasked(), "a skill's exact line");
+        // The last words go first (their priority): by skill, not order.
+        let mut sounds: Vec<(String, bool)> = std::iter::from_fn(|| says.take_sound(0))
+            .map(|(_, ticket)| (ticket.skill().to_owned(), ticket.unasked()))
+            .collect();
+        sounds.sort();
+        assert_eq!(
+            sounds,
+            [
+                (SHUTDOWN_SKILL.to_owned(), false),
+                ("weather".to_owned(), true)
+            ],
+            "the shutdown's last words, and a skill's sound"
+        );
+        let mut turns = Vec::new();
+        while let Some((_, _, ticket, _)) = says.take(0) {
+            turns.push((ticket.skill().to_owned(), ticket.unasked()));
+        }
+        assert_eq!(
+            turns,
+            [
+                ("weather".to_owned(), true),
+                (AGENT_SKILL.to_owned(), false)
+            ],
+        );
+        let (own, _) = ticket_for_test("control");
+        assert!(
+            !own.unasked(),
+            "the voice's own say is never the hold's to cut"
+        );
     }
 }
