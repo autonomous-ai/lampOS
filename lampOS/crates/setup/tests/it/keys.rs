@@ -48,9 +48,10 @@ fn a_key_absent_present_and_removed() {
     let store = Store(folder("cycle"));
     let mut works = Told(Verdict::Works, vec![]);
     let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
+    // With #8367's fields beside today's (`offers` is pinned below).
     assert_eq!(
         reply,
-        json!({"done": {"deepseek": "lamp", "deepgram": "lamp", "since": {"deepseek": null, "deepgram": null}, "deepseek_host": null}})
+        json!({"done": {"deepseek": "lamp", "deepgram": "lamp", "elevenlabs": "lamp", "since": {"deepseek": null, "deepgram": null, "elevenlabs": null}, "deepseek_host": null, "voice_id": {"elevenlabs": null}, "offers": reply["done"]["offers"]}})
     );
     for service in ["deepseek", "deepgram"] {
         let (reply, done) = keys::answer(&set(service, ""), &store, &mut works, true);

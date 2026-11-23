@@ -839,6 +839,8 @@ fn a_leftover_temporary_key_is_removed() {
             // share one temporary name, written one after the other.
             tmp(&config.own_keys.join("deepseek.key")),
             tmp(&config.own_keys.join("deepgram.key")),
+            // ElevenLabs' key and voice ID share one too (#8367).
+            tmp(&config.own_keys.join("elevenlabs.key")),
             tmp(&config.own_keys.join("deepseek.url")),
         ]
     );

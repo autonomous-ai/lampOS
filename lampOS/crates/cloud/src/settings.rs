@@ -390,6 +390,8 @@ pub const KEYS_WAIT: Duration = Duration::from_secs(15);
 
 /// The longest key passed on, in bytes: the helper's own bound.
 const KEY_MOST: usize = 512;
+/// The longest ElevenLabs voice ID `keys.set` passes on (#8367).
+const VOICE_ID_MOST: usize = 64;
 
 /// The longest `request_id` echoed back, in bytes.
 const REQUEST_ID_MOST: usize = 64;
@@ -492,24 +494,46 @@ pub fn keys_line(kind: &str, data: &Value) -> Result<(String, Option<String>), S
     let service = || {
         data.get("service")
             .and_then(Value::as_str)
-            .filter(|service| matches!(*service, "deepseek" | "deepgram"))
-            .ok_or("service must be deepseek or deepgram")
+            .filter(|service| matches!(*service, "deepseek" | "deepgram" | "elevenlabs"))
+            .ok_or("service must be deepseek, deepgram or elevenlabs")
     };
     let line = match kind {
         "keys.set" => {
+            let service = service()?;
+            // ElevenLabs' voice ID (#8367); with no key, the voice alone,
+            // which the helper changes only beside a kept key.
+            let voice_id = match data.get("voice_id") {
+                None | Some(Value::Null) => None,
+                Some(Value::String(id))
+                    if service == "elevenlabs"
+                        && (1..=VOICE_ID_MOST).contains(&id.len())
+                        && id.bytes().all(|b| b.is_ascii_alphanumeric()) =>
+                {
+                    Some(id.as_str())
+                }
+                Some(_) => return Err("voice_id must be 1 to 64 letters and digits".into()),
+            };
             let key = data
                 .get("key")
                 .and_then(Value::as_str)
-                .filter(|key| key.len() <= KEY_MOST)
-                .ok_or("key must be text")?;
+                .filter(|key| key.len() <= KEY_MOST);
+            if key.is_none() && !(data.get("key").is_none() && voice_id.is_some()) {
+                return Err("key must be text".into());
+            }
             let base_url = match data.get("base_url") {
                 None | Some(Value::Null) => None,
                 Some(Value::String(url)) if url.len() <= 2_048 => Some(url.as_str()),
                 Some(_) => return Err("base_url must be text".into()),
             };
-            let mut line = json!({"set": service()?, "key": key});
+            let mut line = json!({"set": service});
+            if let Some(key) = key {
+                line["key"] = json!(key);
+            }
             if let Some(url) = base_url {
                 line["base_url"] = json!(url);
+            }
+            if let Some(id) = voice_id {
+                line["voice_id"] = json!(id);
             }
             line
         }
@@ -1473,7 +1497,10 @@ mod tests {
             )
             .unwrap();
         let reply = changes.take()[0].reply(&identity, "t");
-        assert_eq!(reply["error"], "service must be deepseek or deepgram");
+        assert_eq!(
+            reply["error"],
+            "service must be deepseek, deepgram or elevenlabs"
+        );
         assert_eq!(
             reply["data"],
             json!({"request_id": "s-1", "code": "bad_field"})

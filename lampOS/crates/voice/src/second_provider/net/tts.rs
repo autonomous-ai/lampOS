@@ -200,6 +200,10 @@ pub const SOCKET_INACTIVITY_S: u32 = 60;
 pub const OWN_VOICE_LOST_LINE: &str =
     "Your ElevenLabs voice isn't working right now, so I'm back to my own voice.";
 
+/// The status ElevenLabs last refused the person's own voice with, 0 while
+/// it never was in this run (#8367): what `voice-keys` tells lamp-health.
+pub static OWN_VOICE_REFUSED: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
+
 pub(crate) fn socket_request(
     base_url: &str,
     key: &str,
@@ -530,6 +534,12 @@ pub struct Tts {
     /// Until when no socket is opened: the dialogue sessions were all held
     /// ([`TOO_MANY`], [`SOCKET_BUSY_PAUSE`]).
     paused_until: Mutex<Option<Instant>>,
+    /// The lamp's own voice, when this one is the person's (#8367,
+    /// [`Tts::with_lamps_voice`]).
+    lamps: Option<Box<Tts>>,
+    /// ElevenLabs refused the person's voice: every piece goes to `lamps`
+    /// until the voice starts again.
+    lost: AtomicBool,
 }
 
 /// A speech socket, ElevenLabs' `stream-input` or its dialogue one.
@@ -566,17 +576,29 @@ enum Ahead {
 
 impl Tts {
     pub fn new(config: &SecondConfig) -> Result<Self> {
-        Ok(Self {
-            model: config.tts_model.clone(),
-            socket_model: std::env::var(crate::second_provider::SPEECH_SOCKET_MODEL_ENVIRONMENT)
+        let at = |base_url: &str, key: &str, voice: Option<&str>| -> Result<Self> {
+            Ok(Self {
+                model: config.tts_model.clone(),
+                socket_model: std::env::var(
+                    crate::second_provider::SPEECH_SOCKET_MODEL_ENVIRONMENT,
+                )
                 .ok()
                 .filter(|model| !model.trim().is_empty()),
-            ..Self::with(
-                config.tts_provider,
-                &config.tts_base_url,
-                config.tts_key.expose(),
-                config.tts_voice.as_deref(),
-            )?
+                ..Self::with(config.tts_provider, base_url, key, voice)?
+            })
+        };
+        let tts = at(
+            &config.tts_base_url,
+            config.tts_key.expose(),
+            config.tts_voice.as_deref(),
+        )?;
+        Ok(match &config.hosted.lamps_voice {
+            Some(lamps) => tts.with_lamps_voice(at(
+                &lamps.base_url,
+                lamps.key.expose(),
+                lamps.voice.as_deref(),
+            )?),
+            None => tts,
         })
     }
 
@@ -603,15 +625,24 @@ impl Tts {
             socketed: Mutex::new(None),
             refused: Mutex::new(None),
             paused_until: Mutex::new(None),
+            lamps: None,
+            lost: AtomicBool::new(false),
         })
     }
 
     /// #8367: the person's own voice (`LAMP_OWN_KEYS`), with `lamps`, the
     /// lamp's own voice through the relay, to fall back to when ElevenLabs
-    /// refuses the person's key or voice. A stub with the red tests: it
-    /// keeps no fallback yet.
-    pub(crate) fn with_lamps_voice(self, _lamps: Tts) -> Self {
+    /// refuses the person's key or voice ([`Tts::speak_in`]).
+    pub(crate) fn with_lamps_voice(mut self, lamps: Tts) -> Self {
+        self.lamps = Some(Box::new(lamps));
         self
+    }
+
+    /// The lamp's own voice, once the person's was refused.
+    fn fallen_back(&self) -> Option<&Tts> {
+        self.lamps
+            .as_deref()
+            .filter(|_| self.lost.load(Ordering::Relaxed))
     }
 
     /// Whether a socket is opened for an answer: ElevenLabs only, not for a
@@ -697,6 +728,9 @@ impl Tts {
     /// opened before, for an older request, is closed. Nothing on failure:
     /// the pieces go over HTTP as before.
     pub async fn open_ahead(&self, request: u64) {
+        if let Some(lamps) = self.fallen_back() {
+            return Box::pin(lamps.open_ahead(request)).await;
+        }
         if !self.opens_ahead() {
             return;
         }
@@ -977,12 +1011,42 @@ impl Tts {
     /// never the speech socket or a pooled connection that may have held the
     /// first try. In the turn's model, so the answer keeps one voice.
     pub async fn speak_fresh(&self, text: &str, turn: Turn) -> Result<TtsStream> {
+        if let Some(lamps) = self.fallen_back() {
+            return Box::pin(lamps.speak_fresh(text, turn)).await;
+        }
         // Asked again, so counted again (#7347).
         crate::day_tally::spoken(text);
         self.speak_http(&self.fresh, text, Some(turn)).await
     }
 
+    /// With the person's own voice (#8367): a piece ElevenLabs refuses for
+    /// their key or voice (401, 402, 403 or 404: a bad key, credits run out,
+    /// a voice gone) is said in the lamp's own voice after
+    /// [`OWN_VOICE_LOST_LINE`], never silent, and every piece after goes to
+    /// the lamp's voice; one journal line, never the key or the voice ID.
     async fn speak_in(&self, text: &str, turn: Option<Turn>) -> Result<TtsStream> {
+        let Some(lamps) = &self.lamps else {
+            return self.speak_own(text, turn).await;
+        };
+        if self.lost.load(Ordering::Relaxed) {
+            return lamps.speak_own(text, turn).await;
+        }
+        match self.speak_own(text, turn).await {
+            Err(Error::Status(status @ 401..=404)) => {
+                self.lost.store(true, Ordering::Relaxed);
+                OWN_VOICE_REFUSED.store(status, Ordering::Relaxed);
+                eprintln!(
+                    "lamp-voice second: ElevenLabs refused the person's own key or voice (HTTP {status}); the lamp's own voice from now on, said once (LAMP_OWN_KEYS)"
+                );
+                lamps
+                    .speak_own(&format!("{OWN_VOICE_LOST_LINE} {text}"), turn)
+                    .await
+            }
+            spoken => spoken,
+        }
+    }
+
+    async fn speak_own(&self, text: &str, turn: Option<Turn>) -> Result<TtsStream> {
         // Counted for the day, with LAMP_VOICE_DAY_TALLY=on (#7347).
         crate::day_tally::spoken(text);
         if let Some(turn) = turn
@@ -1084,6 +1148,9 @@ impl Tts {
     /// The journal's line for `request`'s pieces, once its turn is over;
     /// `None` when it asked this voice for none.
     pub fn told(&self, request: u64) -> Option<String> {
+        if let Some(lamps) = self.fallen_back() {
+            return lamps.told(request);
+        }
         let mut tally = self.tally.lock().ok()?;
         if tally.request != request || tally.asked == 0 {
             return None;

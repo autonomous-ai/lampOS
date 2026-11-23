@@ -27,7 +27,8 @@ pub(crate) use public::{DOH_ENVIRONMENT, get_public_json_within};
 pub use sentences::Sentences;
 pub use stt::{Early, QUIET_HELD_ENVIRONMENT, Replies, SttStream, check as stt_check};
 pub use tts::{
-    PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream, Turn, default_model, voice_name, voice_told,
+    OWN_VOICE_REFUSED, PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream, Turn, default_model,
+    voice_name, voice_told,
 };
 /// A piece of speech's request as `Tts` makes it, for `probe-cascade --wire
 /// --speech`.

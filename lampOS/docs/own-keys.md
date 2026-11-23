@@ -59,13 +59,14 @@ The contract posted on #2094 (11:13, with its additions after), which
 
 | Kind | Asked | Success `data` |
 |---|---|---|
-| `keys.set` | `{"service": "deepseek" \| "deepgram", "key", "base_url"?, "request_id"?}` | `{"service", "uses": "own", "code": "works", "answer"}` |
+| `keys.set` | `{"service": "deepseek" \| "deepgram" \| "elevenlabs", "key"?, "base_url"?, "voice_id"?, "request_id"?}` (`key` only absent for ElevenLabs' voice alone) | `{"service", "uses": "own", "code": "works", "answer"}` |
 | `keys.remove` | `{"service", "request_id"?}` | `{"service", "uses": "lamp"}` |
-| `keys.get` | `{"request_id"?}` | `{"deepseek": "own" \| "lamp", "deepgram": "own" \| "lamp", "since": {"deepseek": RFC 3339 \| null, "deepgram": …}, "deepseek_host": host \| null}` |
+| `keys.get` | `{"request_id"?}` | `{"deepseek": "own" \| "lamp", "deepgram": "own" \| "lamp", "elevenlabs": "own" \| "lamp", "since": {"deepseek": RFC 3339 \| null, "deepgram": …, "elevenlabs": …}, "deepseek_host": host \| null, "voice_id": {"elevenlabs": id \| null}, "offers": [...]}` (#8367, below) |
 
 Each is `starting` at once, then one `success` or `failure` of the same kind
 within 15 s; `request_id` comes back in `data` on each. A `failure` has the
-person's words in `error` and `data.code`: `refused`, `unreached`,
+person's words in `error` and `data.code`: `refused`, `voice_refused`
+(ElevenLabs' voice ID not on that account), `unreached`,
 `not_kept` (the key worked but couldn't be written: the lamp uses its own),
 `bad_field` (the field named), `busy` (one key request at a time),
 `not_allowed` (a peer other than `lamp-cloud`) or `unavailable` (the helper
@@ -179,15 +180,14 @@ refused request goes through Autonomous's relay again. Only `lamp-health`'s
 `voice-keys` warning says so; the app could show it beside the keys screen
 (the reviewer's P3 5 on #2167).
 
-## Your own voice: ElevenLabs (#8367, designed, being built)
+## Your own voice: ElevenLabs (#8367, built, off unless set)
 
 The person's own ElevenLabs API key and voice ID, set from the app on the
 same `keys.*` path, speak the lamp's live speech in their voice. Agreed on
 #8367 (Mobile 12:02, the first builder 12:03 and 12:18) on #8362's
 contract (the first builder 11:44, Mobile 11:46). The same switch,
-`LAMP_OWN_KEYS`, and nothing new with it off. **Not built yet:** the red
-tests below pin it, and this section becomes the description once they
-pass.
+`LAMP_OWN_KEYS`, and nothing new with it off. Not yet run on a lamp, nor
+against ElevenLabs' own service.
 
 - **The messages:** `keys.get` gains `offers`, one entry per service the
   lamp takes a key for, `kind` `"model"` or `"voice"` and `fields` the
@@ -198,8 +198,11 @@ pass.
   `voice_id: {"elevenlabs": id | null}`. A voice ID isn't a secret and
   comes back; the key never does. `keys.set` takes
   `{"service": "elevenlabs", "key"?, "voice_id"?, "request_id"?}`: a key
-  needs a voice ID with it the first time; with no `key` only the voice
-  changes, beside a kept key, otherwise `bad_field`. A voice ID is 1 to 64
+  needs a voice ID with it the first time ("ElevenLabs needs a voice ID
+  with its key"), and later keeps the voice kept; with no `key` only the
+  voice changes, checked with the kept key, and only beside one, otherwise
+  `bad_field`, "a voice ID is changed beside a kept ElevenLabs key: give the
+  key too". A voice ID is 1 to 64
   letters and digits. `keys.remove` takes `elevenlabs`.
 - **Where it's kept:** beside the others, `elevenlabs.key` and
   `elevenlabs.voice` in `/etc/lampOS/voice/own/`, root's, 0600, so the
@@ -209,13 +212,14 @@ pass.
   with `xi-api-key: <key>`, which tries the key and the voice at once. 2xx:
   kept, "that key and voice work: the lamp now speaks in your ElevenLabs
   voice, and what it says goes to ElevenLabs under your account and its
-  terms". 401 or 403: "that key was refused". 400 or 404: the voice ID
-  isn't on that account, `voice_refused`. Anything else: unreached,
-  nothing changed. A voice alone is checked with the kept key.
+  terms". 401 or 403: "that key was refused". 400 or 404: "that key works,
+  but that voice ID isn't on its ElevenLabs account; nothing changed",
+  code `voice_refused`. Anything else: unreached, nothing changed.
 - **The speech:** at the voice's next start, `with_own_keys` puts the
   person's key and voice ID on the route's ElevenLabs speech, straight at
   `https://api.elevenlabs.io/v1` instead of the relay, over the language's
-  and the chosen voice (#5394); one journal line, "ElevenLabs: the person's
+  and the chosen voice (#5394), when the route speaks with ElevenLabs; one
+  journal line, "ElevenLabs: the person's
   own key and voice (LAMP_OWN_KEYS)", never the key or the ID. The helper
   restarts the voice only once the lamp is quiet ("The route at its next
   start"), so the change is heard from the next thing the lamp says, and a
@@ -231,7 +235,9 @@ pass.
 - **Off:** the kinds are "not on this lamp", the helper refuses, and the
   voice reads neither file, so the route is as it was.
 
-**Tests (red until built):** `crates/setup/tests/it/keys.rs`
+**Tests:** `crates/setup/src/keys.rs`
+(`the_elevenlabs_check_asks_for_the_voice_with_the_key_in_its_header`),
+`crates/setup/tests/it/keys.rs`
 (`elevenlabs_is_offered_beside_the_model_services`,
 `an_elevenlabs_key_and_voice_are_checked_kept_and_never_said`,
 `a_voice_alone_changes_only_the_voice_beside_a_kept_key`, and the pin
@@ -241,7 +247,9 @@ pass.
 `crates/voice/src/second_config.rs`
 (`the_persons_elevenlabs_key_and_voice_speak_in_place_of_the_lamps`) and
 `crates/voice/src/second_provider/net/tts.rs`
-(`a_refused_own_voice_falls_back_to_the_lamps_with_one_line`). The lamp
+(`a_refused_own_voice_falls_back_to_the_lamps_with_one_line`) and
+`crates/voice/src/second_provider/worker.rs`
+(`a_refused_own_voice_is_warned_to_lamp_health`). The lamp
 test (#8367): a real key and voice ID entered from the app by that lamp's
 person, a few turns in that voice, a bad key told plainly, and a remove
 giving the lamp's own voice back.

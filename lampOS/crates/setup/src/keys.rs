@@ -44,6 +44,12 @@ pub const CHECK_WITHIN: Duration = Duration::from_secs(5);
 pub const DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com";
 /// Deepgram's call that answers 200 for a key it takes, and nothing more.
 pub const DEEPGRAM_CHECK_URL: &str = "https://api.deepgram.com/v1/auth/token";
+/// ElevenLabs' API: the check asks `<it>/voices/<voice_id>` (#8367).
+pub const ELEVENLABS_API: &str = "https://api.elevenlabs.io/v1";
+/// The longest voice ID taken: ElevenLabs' are 20 letters and digits.
+pub const VOICE_ID_MOST: usize = 64;
+/// The person's ElevenLabs voice ID, kept beside its key.
+pub const ELEVENLABS_VOICE_FILE: &str = "elevenlabs.voice";
 /// The unit the helper restarts at a quiet moment, so the voice takes it.
 pub const VOICE_UNIT: &str = "lamp-voice.service";
 
@@ -144,16 +150,19 @@ pub fn socket_peer_refused() -> bool {
 pub enum Service {
     DeepSeek,
     Deepgram,
+    /// The lamp's voice (#8367): a key and a voice ID.
+    ElevenLabs,
 }
 
 impl Service {
-    pub const ALL: [Service; 2] = [Service::DeepSeek, Service::Deepgram];
+    pub const ALL: [Service; 3] = [Service::DeepSeek, Service::Deepgram, Service::ElevenLabs];
 
     /// The name the app and the reply use.
     pub fn id(self) -> &'static str {
         match self {
             Self::DeepSeek => "deepseek",
             Self::Deepgram => "deepgram",
+            Self::ElevenLabs => "elevenlabs",
         }
     }
 
@@ -162,6 +171,7 @@ impl Service {
         match self {
             Self::DeepSeek => "DeepSeek",
             Self::Deepgram => "Deepgram",
+            Self::ElevenLabs => "ElevenLabs",
         }
     }
 
@@ -174,7 +184,22 @@ impl Service {
         match self {
             Self::DeepSeek => "deepseek.key",
             Self::Deepgram => "deepgram.key",
+            Self::ElevenLabs => "elevenlabs.key",
         }
+    }
+
+    /// `keys.get`'s `offers` entry (#8362, #8367): `kind` sets the model
+    /// services and the voice apart, `fields` the plain fields beside the
+    /// key. No model list yet: the service's default.
+    pub fn offer(self) -> Value {
+        json!({
+            "service": self.id(),
+            "name": self.name(),
+            "kind": if self == Self::ElevenLabs { "voice" } else { "model" },
+            "models": [],
+            "base_url": self == Self::DeepSeek,
+            "fields": if self == Self::ElevenLabs { json!(["voice_id"]) } else { json!([]) },
+        })
     }
 }
 
@@ -188,6 +213,9 @@ pub struct Given {
     pub key: String,
     /// DeepSeek's endpoint; Deepgram has none.
     pub base_url: Option<String>,
+    /// ElevenLabs' voice ID (#8367), 1 to 64 letters and digits; the
+    /// others have none.
+    pub voice_id: Option<String>,
 }
 
 impl fmt::Debug for Given {
@@ -196,6 +224,7 @@ impl fmt::Debug for Given {
             .field("service", &self.service)
             .field("key", &"<hidden>")
             .field("base_url", &self.base_url)
+            .field("voice_id", &self.voice_id)
             .finish()
     }
 }
@@ -205,6 +234,8 @@ impl fmt::Debug for Given {
 pub enum Asked {
     /// Check the key and keep it if it works.
     Set(Given),
+    /// ElevenLabs' voice alone, beside the key kept (#8367).
+    Voice(String),
     /// "Use the lamp's own again": the key removed.
     Remove(Service),
     /// Whose key each service uses.
@@ -237,6 +268,16 @@ pub fn fit_url(url: &str) -> Result<String, &'static str> {
     Ok(url.to_owned())
 }
 
+/// A voice ID's shape: 1 to [`VOICE_ID_MOST`] ASCII letters and digits,
+/// trimmed, so it is a path segment of the check and the voice's request.
+pub fn fit_voice(id: &str) -> Result<String, &'static str> {
+    let id = id.trim();
+    if id.is_empty() || id.len() > VOICE_ID_MOST || !id.bytes().all(|b| b.is_ascii_alphanumeric()) {
+        return Err("a voice ID is 1 to 64 letters and digits");
+    }
+    Ok(id.to_owned())
+}
+
 /// A key as setup's request or the app gives it, checked for its shape.
 pub fn given(service: Service, key: &str, base_url: Option<&str>) -> Result<Given, &'static str> {
     let key = fit_key(key)?;
@@ -248,16 +289,21 @@ pub fn given(service: Service, key: &str, base_url: Option<&str>) -> Result<Give
         (Service::DeepSeek, None) => Some(DEEPSEEK_BASE_URL.to_owned()),
         (Service::Deepgram, None) => None,
         (Service::Deepgram, Some(_)) => return Err("Deepgram takes no endpoint"),
+        (Service::ElevenLabs, None) => None,
+        (Service::ElevenLabs, Some(_)) => return Err("ElevenLabs takes no endpoint"),
     };
     Ok(Given {
         service,
         key,
         base_url,
+        voice_id: None,
     })
 }
 
-/// The one line `lamp-cloud` sends: `{"set": service, "key", "base_url"?}`,
-/// `{"remove": service}` or `{"which": true}`. Never echoes a key.
+/// The one line `lamp-cloud` sends: `{"set": service, "key", "base_url"?,
+/// "voice_id"?}`, ElevenLabs' `{"set": "elevenlabs", "voice_id"}` alone,
+/// `{"remove": service}` or `{"which": true}`. Never echoes a key or a
+/// voice ID.
 pub fn parse(line: &str) -> Result<Asked, String> {
     if line.len() > LINE_MOST {
         return Err("the request is too long".into());
@@ -269,14 +315,28 @@ pub fn parse(line: &str) -> Result<Asked, String> {
             .get(field)
             .and_then(Value::as_str)
             .and_then(Service::from_id)
-            .ok_or_else(|| "the service is deepseek or deepgram".to_owned())
+            .ok_or_else(|| "the service is deepseek, deepgram or elevenlabs".to_owned())
     };
     if object.contains_key("set") {
         if object
             .keys()
-            .any(|field| !["set", "key", "base_url"].contains(&field.as_str()))
+            .any(|field| !["set", "key", "base_url", "voice_id"].contains(&field.as_str()))
         {
-            return Err("a key is set with set, key and base_url only".into());
+            return Err("a key is set with set, key, base_url and voice_id only".into());
+        }
+        let set = service("set")?;
+        let voice_id = match (set, object.get("voice_id")) {
+            (_, None | Some(Value::Null)) => None,
+            (Service::ElevenLabs, Some(Value::String(id))) => Some(fit_voice(id)?),
+            (Service::ElevenLabs, Some(_)) => {
+                return Err("a voice ID is 1 to 64 letters and digits".into());
+            }
+            (_, Some(_)) => return Err("only ElevenLabs takes a voice ID".into()),
+        };
+        if set == Service::ElevenLabs && !object.contains_key("key") {
+            return voice_id
+                .map(Asked::Voice)
+                .ok_or_else(|| "the key must be text".into());
         }
         let key = object
             .get("key")
@@ -287,7 +347,10 @@ pub fn parse(line: &str) -> Result<Asked, String> {
             Some(Value::String(url)) => Some(url.as_str()),
             Some(_) => return Err("the endpoint must be text".into()),
         };
-        return Ok(Asked::Set(given(service("set")?, key, base_url)?));
+        return Ok(Asked::Set(Given {
+            voice_id,
+            ..given(set, key, base_url)?
+        }));
     }
     if object.len() != 1 {
         return Err("the request holds one change".into());
@@ -308,6 +371,9 @@ pub enum Verdict {
     Works,
     /// The service refused it (401 or 403): it is not kept.
     Refused,
+    /// ElevenLabs took the key but has no such voice on its account (400
+    /// or 404, #8367): nothing is kept.
+    VoiceRefused,
     /// No answer that says either: it is not kept, and nothing changes.
     Unreached,
     /// The service took it but it could not be written (a full or failing
@@ -323,8 +389,15 @@ impl Verdict {
     pub fn words(self, given: &Given) -> String {
         let service = given.service;
         match self {
+            Self::Works if service == Service::ElevenLabs => {
+                format!("that key and voice work: {}", goes_where(given))
+            }
             Self::Works => format!("that key works: {}", goes_where(given)),
             Self::Refused => "that key was refused".into(),
+            Self::VoiceRefused => {
+                "that key works, but that voice ID isn't on its ElevenLabs account; nothing changed"
+                    .into()
+            }
             Self::Unreached => format!(
                 "the lamp couldn't reach {} to check that key; nothing changed",
                 service.name()
@@ -339,6 +412,7 @@ impl Verdict {
         match self {
             Self::Works => "works",
             Self::Refused => "refused",
+            Self::VoiceRefused => "voice_refused",
             Self::Unreached => "unreached",
             Self::NotKept => "not_kept",
         }
@@ -374,6 +448,7 @@ pub fn goes_where(given: &Given) -> String {
         Service::Deepgram => {
             "your speech now goes to Deepgram under your account and its retention terms".into()
         }
+        Service::ElevenLabs => "the lamp now speaks in your ElevenLabs voice, and what it says goes to ElevenLabs under your account and its terms".into(),
     }
 }
 
@@ -400,10 +475,14 @@ fn tls() -> Option<rustls::ClientConfig> {
 
 /// The real check: one request, [`CHECK_WITHIN`] at most, no redirect.
 /// DeepSeek: `GET <endpoint>/models` with the key as the bearer; Deepgram:
-/// `GET` [`DEEPGRAM_CHECK_URL`] with `Token <key>`.
+/// `GET` [`DEEPGRAM_CHECK_URL`] with `Token <key>`; ElevenLabs: `GET`
+/// [`ELEVENLABS_API`]`/voices/<voice_id>` with `xi-api-key`, which tries
+/// the key and the voice at once (#8367).
 pub struct HttpCheck {
     /// Deepgram's address, a test's local server in place of it.
     pub deepgram: String,
+    /// ElevenLabs' API root, a test's local server in place of it.
+    pub elevenlabs: String,
     https_only: bool,
 }
 
@@ -411,6 +490,7 @@ impl Default for HttpCheck {
     fn default() -> Self {
         Self {
             deepgram: DEEPGRAM_CHECK_URL.to_owned(),
+            elevenlabs: ELEVENLABS_API.to_owned(),
             https_only: true,
         }
     }
@@ -421,6 +501,7 @@ impl HttpCheck {
     #[cfg(test)]
     fn local(deepgram: String) -> Self {
         Self {
+            elevenlabs: deepgram.clone(),
             deepgram,
             https_only: false,
         }
@@ -444,6 +525,13 @@ impl HttpCheck {
             Service::Deepgram => client
                 .get(&self.deepgram)
                 .header("authorization", format!("Token {}", given.key)),
+            Service::ElevenLabs => client
+                .get(format!(
+                    "{}/voices/{}",
+                    self.elevenlabs,
+                    given.voice_id.as_deref().unwrap_or_default()
+                ))
+                .header("xi-api-key", &given.key),
         };
         // The error is dropped whole: reqwest's names the URL.
         let response = tokio::time::timeout(CHECK_WITHIN, request.send())
@@ -464,7 +552,10 @@ impl Check for HttpCheck {
         };
         runtime
             .block_on(self.ask(given))
-            .map_or(Verdict::Unreached, Verdict::of_status)
+            .map_or(Verdict::Unreached, |status| match (given.service, status) {
+                (Service::ElevenLabs, 400 | 404) => Verdict::VoiceRefused,
+                _ => Verdict::of_status(status),
+            })
     }
 }
 
@@ -493,15 +584,43 @@ impl Store {
                 format!("{url}\n").as_bytes(),
             )?;
         }
+        if let Some(id) = &given.voice_id {
+            write_private(
+                &self.0.join(ELEVENLABS_VOICE_FILE),
+                format!("{id}\n").as_bytes(),
+            )?;
+        }
         write_private(&self.0.join(given.service.key_file()), given.key.as_bytes())
+    }
+
+    /// ElevenLabs' kept key with `voice_id` in place of the kept voice, for
+    /// a voice changed alone; `None` with no key kept.
+    pub fn with_kept_key(&self, voice_id: String) -> Option<Given> {
+        let key = fs::read_to_string(self.0.join(Service::ElevenLabs.key_file())).ok()?;
+        Some(Given {
+            service: Service::ElevenLabs,
+            key,
+            base_url: None,
+            voice_id: Some(voice_id),
+        })
+    }
+
+    /// The kept ElevenLabs voice ID, if any.
+    pub fn voice_id(&self) -> Option<String> {
+        fs::read_to_string(self.0.join(ELEVENLABS_VOICE_FILE))
+            .ok()
+            .map(|id| id.trim().to_owned())
+            .filter(|id| !id.is_empty())
     }
 
     /// Remove a service's key, and DeepSeek's endpoint after it. One that is
     /// not there is removed already.
     pub fn remove(&self, service: Service) -> io::Result<()> {
         remove(&self.0.join(service.key_file()))?;
-        if service == Service::DeepSeek {
-            remove(&self.0.join(DEEPSEEK_URL_FILE))?;
+        match service {
+            Service::DeepSeek => remove(&self.0.join(DEEPSEEK_URL_FILE))?,
+            Service::ElevenLabs => remove(&self.0.join(ELEVENLABS_VOICE_FILE))?,
+            Service::Deepgram => {}
         }
         Ok(())
     }
@@ -542,6 +661,17 @@ impl Store {
             .filter(|host| !host.is_empty());
         which.insert("since".into(), Value::Object(since));
         which.insert("deepseek_host".into(), json!(host));
+        // #8367: the voice ID in use beside its key; a voice ID isn't a
+        // secret, the key never comes back.
+        let voice = self
+            .has(Service::ElevenLabs)
+            .then(|| self.voice_id())
+            .flatten();
+        which.insert("voice_id".into(), json!({"elevenlabs": voice}));
+        which.insert(
+            "offers".into(),
+            Value::Array(Service::ALL.into_iter().map(Service::offer).collect()),
+        );
         Value::Object(which)
     }
 }
@@ -626,32 +756,57 @@ pub fn answer(
                 None,
             ),
         },
-        Asked::Set(given) => {
-            let (verdict, changed) = check_and_keep(&given, store, check);
-            let service = given.service;
-            let said = format!(
-                "the person's {} key: {}",
-                service.name(),
-                match verdict {
-                    Verdict::Works => "it works, kept",
-                    Verdict::Refused => "refused by the service, not kept",
-                    Verdict::Unreached => "the check reached nothing, not kept",
-                    Verdict::NotKept => "it works but could not be written, the lamp's own used",
+        Asked::Voice(id) => match store.with_kept_key(id) {
+            Some(given) => set(given, store, check),
+            None => (
+                refused(
+                    "a voice ID is changed beside a kept ElevenLabs key: give the key too",
+                    "bad_field",
+                ),
+                None,
+            ),
+        },
+        Asked::Set(mut given) => {
+            if given.service == Service::ElevenLabs && given.voice_id.is_none() {
+                given.voice_id = store.voice_id();
+                if given.voice_id.is_none() {
+                    return (
+                        refused("ElevenLabs needs a voice ID with its key", "bad_field"),
+                        None,
+                    );
                 }
-            );
-            let done = Some(Done {
-                restart_voice: changed,
-                said,
-            });
-            if verdict == Verdict::Works {
-                (
-                    json!({"done": {"service": service.id(), "uses": "own", "code": verdict.code(), "answer": verdict.words(&given)}}),
-                    done,
-                )
-            } else {
-                (refused(&verdict.words(&given), verdict.code()), done)
             }
+            set(given, store, check)
         }
+    }
+}
+
+/// Check `given`, keep it if it works, and the reply and the journal's line.
+fn set(given: Given, store: &Store, check: &mut impl Check) -> (Value, Option<Done>) {
+    let (verdict, changed) = check_and_keep(&given, store, check);
+    let service = given.service;
+    let said = format!(
+        "the person's {} key: {}",
+        service.name(),
+        match verdict {
+            Verdict::Works => "it works, kept",
+            Verdict::Refused => "refused by the service, not kept",
+            Verdict::VoiceRefused => "the voice ID was not on its account, not kept",
+            Verdict::Unreached => "the check reached nothing, not kept",
+            Verdict::NotKept => "it works but could not be written, the lamp's own used",
+        }
+    );
+    let done = Some(Done {
+        restart_voice: changed,
+        said,
+    });
+    if verdict == Verdict::Works {
+        (
+            json!({"done": {"service": service.id(), "uses": "own", "code": verdict.code(), "answer": verdict.words(&given)}}),
+            done,
+        )
+    } else {
+        (refused(&verdict.words(&given), verdict.code()), done)
     }
 }
 
@@ -773,6 +928,7 @@ mod tests {
                 service: Service::DeepSeek,
                 key: "sk-planted-2094".into(),
                 base_url: Some(format!("{base}/v1")),
+                voice_id: None,
             };
             let mut check = HttpCheck::local(String::new());
             assert_eq!(check.check(&deepseek), verdict);
@@ -796,6 +952,7 @@ mod tests {
             service: Service::DeepSeek,
             key: "sk-planted-2094".into(),
             base_url: Some(base),
+            voice_id: None,
         };
         assert_eq!(
             HttpCheck::local(String::new()).check(&deepseek),
@@ -815,5 +972,44 @@ mod tests {
             ..HttpCheck::default()
         };
         assert_eq!(real.check(&deepgram), Verdict::Unreached);
+    }
+
+    /// #8367: ElevenLabs' check is one request for the voice, the key in
+    /// `xi-api-key` alone: 2xx works, 401 or 403 refuses the key, 400 or
+    /// 404 the voice ID, anything else is not reached.
+    #[test]
+    fn the_elevenlabs_check_asks_for_the_voice_with_the_key_in_its_header() {
+        for (status, verdict) in [
+            (200, Verdict::Works),
+            (401, Verdict::Refused),
+            (403, Verdict::Refused),
+            (400, Verdict::VoiceRefused),
+            (404, Verdict::VoiceRefused),
+            (500, Verdict::Unreached),
+        ] {
+            let (base, served) = answering(status);
+            let voice = Given {
+                voice_id: Some("Voice8367".into()),
+                ..given(Service::ElevenLabs, "sk-planted-8367", None).unwrap()
+            };
+            let mut check = HttpCheck::local(format!("{base}/v1"));
+            assert_eq!(check.check(&voice), verdict, "{status}");
+            let asked = served.join().unwrap();
+            assert!(
+                asked.starts_with("get /v1/voices/voice8367 http/1.1"),
+                "{asked}"
+            );
+            assert!(asked.contains("xi-api-key: sk-planted-8367"), "{asked}");
+        }
+        let voice = given(Service::ElevenLabs, "sk-planted-8367", None).unwrap();
+        assert_eq!(HttpCheck::default().elevenlabs, ELEVENLABS_API);
+        assert_eq!(
+            Verdict::VoiceRefused.words(&voice),
+            "that key works, but that voice ID isn't on its ElevenLabs account; nothing changed"
+        );
+        assert!(given(Service::ElevenLabs, "k", Some("https://x.invalid")).is_err());
+        for bad in ["", "../x", "a b", &"v".repeat(65)] {
+            assert!(fit_voice(bad).is_err(), "{bad}");
+        }
     }
 }
