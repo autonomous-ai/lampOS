@@ -25,6 +25,14 @@ def walk(v):
 walk(d); print(found[0] if len(set(found)) == 1 else "")
 P
 )
+# one-session.json may hold no name (ee17 15667, 23 Nov: agent/engine/session only): Harness's own list names it by id.
+[ -n "$name" ] || name=$(cd /var/lib/lampos-tasks && sudo -u lampos env HOME=/var/lib/lampos-tasks PATH=/usr/local/bin:/usr/bin:/bin timeout 30 harness ps --json 2>/dev/null |
+  python3 -I -c 'import json,sys
+i=sys.argv[1]
+try: h=json.load(sys.stdin).get("harnesses",[])
+except Exception: h=[]
+m=[x.get("name") for x in h if str(x.get("id","")).startswith(i) and str(x.get("name","")).startswith("lamp-one-")]
+print(m[0] if len(m)==1 else "")' "$id")
 echo "QUEUE loop: $c lines in ${WIN}s for kept session $id (name ${name:-unknown})"
 [ -n "$name" ] || { echo "QUEUE STUCK no-single-session-name-in-one-session.json"; exit 3; }
 [ -f $T ] || { echo "QUEUE STUCK no-program-token-file"; exit 3; }

@@ -92,16 +92,19 @@ for f in sys.argv[1:]:
     # next") queues every make; it is closed with harness close --now and the loop must stop. No loop: QUEUE CLEAR.
     k=${t#queue-}; LP='tasks: one session: the kept session 27023c29 not closed: working; tried again next'
     printf '{"session": {"name": "lamp-one-hermes", "id": "27023c29"}}\n' > $RT/var/lib/lampos-tasks/store/one-session.json
+    # queue-ps (ee17 15667): the record holds no name; Harness's list names the session by its id
+    [ $k = ps ] && printf '{"agent": "27023c29-aaaa", "engine": "openclaw", "kept": true}\n' > $RT/var/lib/lampos-tasks/store/one-session.json
     touch $RT/var/lib/lampos-tasks/store/kept-session.token; : > $W/closed
     case $k in clear) : > $W/jl;; *) printf '%s\n%s\n%s\n%s\n' "$LP" "$LP" "$LP" "$LP" > $W/jl;; esac
     # journalctl: the loop lines, gone once harness closed it (unless k=stuck); harness records its call
     printf '#!/bin/sh\nif [ -s %s ] && [ "%s" != stuck ]; then exit 0; fi; cat %s\n' $W/closed $k $W/jl > $RT/bin/journalctl
-    printf '#!/bin/sh\necho "$*" >> %s; echo "{\\"closed\\":true}"\n' $W/closed > $RT/bin/harness
+    printf '#!/bin/sh\nif [ "$1" = ps ]; then echo "{\\"harnesses\\": [{\\"name\\": \\"lamp-one-hermes\\", \\"id\\": \\"27023c29-aaaa\\", \\"state\\": \\"failed\\"}]}"; exit 0; fi\necho "$*" >> %s; echo "{\\"closed\\":true}"\n' $W/closed > $RT/bin/harness
     printf '#!/bin/sh\nwhile [ "$1" != timeout ]; do shift; done; shift 2; exec "$@"\n' > $RT/bin/sudo
     printf '#!/bin/sh\nexit 0\n' > $RT/bin/logger; chmod +x $RT/bin/journalctl $RT/bin/harness $RT/bin/sudo $RT/bin/logger
     o=$(QUEUE_SETTLE=0 lampsh $KIT/row/queue.lamp.sh)
     case $k in
       clear) v "no close loop: QUEUE CLEAR, nothing closed" 'echo "$o" | grep -q "^QUEUE CLEAR" && [ ! -s $W/closed ]';;
+      ps)    v "no name in the record: named by id from harness ps, closed, QUEUE CLOSED" 'echo "$o" | grep -q "^QUEUE CLOSED 27023c29 (lamp-one-hermes)" && grep -q "^close lamp-one-hermes " $W/closed';;
       loop)  v "a close loop: the session closed by name with --now, QUEUE CLOSED" 'echo "$o" | grep -q "^QUEUE CLOSED 27023c29 (lamp-one-hermes)" && grep -q "^close lamp-one-hermes --program-token-file .* --now --json$" $W/closed';;
       stuck) v "the loop goes on after the close: QUEUE STUCK" 'echo "$o" | grep -q "^QUEUE STUCK"';;
     esac;;
