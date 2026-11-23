@@ -971,6 +971,12 @@ pub struct Asked {
     /// (`room/presence`, `crate::presence_in`, #7301). Only with
     /// `LAMP_BODY_PRESENCE=on`; taken only under [`Limits::presence`].
     pub present: bool,
+    /// The lamp keeps still for someone (`{"quiet":true}` on the mood
+    /// socket, the voice's care hold, `LAMP_CARE_LINE`, #7689): no shift at
+    /// rest, and every gesture but a plain nod is dropped, said `held`, a
+    /// paired computer's or an app's too. lamp-control's lease is suspended
+    /// as in a conversation. Never why: the word is only "quiet".
+    pub quiet: bool,
 }
 
 /// A holder's aim counted from the found `home` (pitch, roll, yaw counts),
@@ -1015,6 +1021,7 @@ impl Asked {
         lively: false,
         energy: 0,
         present: false,
+        quiet: false,
     };
 
     /// What a lamp a hand put to sleep is asked (#1362): as paused, it sees
@@ -1048,8 +1055,13 @@ impl Asked {
         lively: false,
         energy: 0,
         present: false,
+        quiet: false,
     };
 }
+
+/// What a gesture dropped while the lamp keeps still ([`Asked::quiet`]) is
+/// said: nothing of why.
+pub const QUIET_HELD: &str = "held";
 
 /// The most that may be added to a pose for [`Asked::expression`], in
 /// counts, for the head's pitch, its roll and the base's turn: about five,
@@ -5517,6 +5529,7 @@ pub(crate) fn run_looking(
         lively: false,
         energy: 0,
         present: false,
+        quiet: false,
     };
     run_alive(
         io, runtime, limits, home, standing, looking, news, asked, watch,
@@ -8159,7 +8172,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             && easing == [0; 3]
             && in_hand == [0; 3]
             && !test_held
-            && !(limits.presence && asked_now.held);
+            && !(limits.presence && asked_now.held)
+            // Kept still for someone (#7689): no shift at rest.
+            && !asked_now.quiet;
         if !quiet {
             idle_due = None;
             if idling {
@@ -8211,6 +8226,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     },
                     None,
                 ))
+            } else if asked_now.quiet && (asked_now.lively || clip.name != "nod") {
+                // Kept still for someone (#7689): a plain nod only, whoever
+                // asks; the asker is told only `held`.
+                Some((QUIET_HELD, None))
             } else if asked_now.lively && asked_now.held {
                 Some(("dropped: lamp-control holds it", None))
             } else if asked_now.replace && (talking || paused.is_some()) {

@@ -104,6 +104,8 @@ pub struct BodyLink {
     socket: UnixDatagram,
     path: PathBuf,
     last: Option<(&'static str, u64)>,
+    /// When `{"quiet":true}` was last told, while the lamp keeps still.
+    quiet_at: Option<u64>,
 }
 
 impl BodyLink {
@@ -119,7 +121,32 @@ impl BodyLink {
             socket,
             path,
             last: None,
+            quiet_at: None,
         })
+    }
+
+    /// Whether the lamp keeps still for someone (the care hold,
+    /// `LAMP_CARE_LINE`, #7689): told `{"quiet":true}` as often as a mood,
+    /// so a body hearing none lets it go as it lets a mood go, and
+    /// `{"quiet":false}` once when it ends. A datagram of its own, so a body
+    /// built before it drops it and keeps the mood. It says nothing of why,
+    /// and the socket is the body's alone: nothing a skill or app reads.
+    pub fn quiet(&mut self, on: bool, now_us: u64) {
+        let message: &[u8] = if on {
+            if self
+                .quiet_at
+                .is_some_and(|at| now_us.saturating_sub(at) < REPEAT_US)
+            {
+                return;
+            }
+            self.quiet_at = Some(now_us);
+            br#"{"quiet":true}"#
+        } else if self.quiet_at.take().is_some() {
+            br#"{"quiet":false}"#
+        } else {
+            return;
+        };
+        let _ = self.socket.send_to(message, &self.path);
     }
 
     /// `phase` is the phase of the turn that owns the lamp, or none between
@@ -558,6 +585,28 @@ impl Drop for EyesLink {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #7689 (b): the care hold tells the body `{"quiet":true}` as often as
+    /// a mood and `{"quiet":false}` once as it ends; with no hold, nothing.
+    /// The datagram is that and nothing more: no word of why.
+    #[test]
+    fn the_care_hold_tells_the_body_quiet_and_its_end_once() {
+        let path = std::env::temp_dir().join(format!("lamp-body-quiet-{}", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        let body = UnixDatagram::bind(&path).unwrap();
+        body.set_nonblocking(true).unwrap();
+        let mut link = BodyLink::to(path.clone()).unwrap();
+        link.quiet(false, 0);
+        assert!(told(&body).is_empty(), "no hold, nothing told");
+        link.quiet(true, 1_000);
+        link.quiet(true, 1_000 + REPEAT_US / 2);
+        link.quiet(true, 1_000 + REPEAT_US);
+        assert_eq!(told(&body), [r#"{"quiet":true}"#; 2]);
+        link.quiet(false, 2 * REPEAT_US);
+        link.quiet(false, 3 * REPEAT_US);
+        assert_eq!(told(&body), [r#"{"quiet":false}"#]);
+        let _ = std::fs::remove_file(&path);
+    }
 
     /// #7689 (the first builder's go, 23 Nov): during the care hold an
     /// answer's gesture is a nod or nothing. No greeting, laugh, surprise

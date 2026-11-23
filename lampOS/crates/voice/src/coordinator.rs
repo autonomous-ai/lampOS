@@ -12608,6 +12608,9 @@ fn conversation_with_gate_inner(
                 voice_level,
                 clock,
             );
+            // After words of self-harm the body keeps still (#7689): no
+            // shift at rest, a plain nod only, an app's moves held.
+            body.quiet(care_holds, clock);
         }
         // A ridden gap tells the eyes no as it begins, and no yes follows
         // until it is over (#2602, the first builder's P1 on #2623).

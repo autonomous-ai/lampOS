@@ -4257,6 +4257,7 @@ fn gesture_run_full(
                 lively: false,
                 energy: 0,
                 present: false,
+                quiet: false,
             }
         },
         |glimpse| {
@@ -4392,6 +4393,7 @@ fn expression_run_with(
             lively: false,
             energy: 0,
             present: false,
+            quiet: false,
         },
         |glimpse| seen.push((seen_at.get(), glimpse.goals)),
     );
@@ -4568,6 +4570,7 @@ fn speaking_run_with(
             lively: false,
             energy: 0,
             present: false,
+            quiet: false,
         },
         |glimpse| seen.push((seen_at.get(), *glimpse)),
     );
@@ -5287,6 +5290,7 @@ fn rest_glances_watched(
             lively: false,
             energy: 0,
             present: false,
+            quiet: false,
         },
         |glimpse| {
             let at = seen_at.get();
@@ -6369,6 +6373,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             lively: false,
             energy: 0,
             present: false,
+            quiet: false,
         },
         |glimpse| steps.push((glimpse.goals, glimpse.arm_goals, glimpse.stand)),
     );
@@ -6446,6 +6451,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             lively: false,
             energy: 0,
             present: false,
+            quiet: false,
         },
         |_| {},
     );
@@ -6541,6 +6547,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 lively: false,
                 energy: 0,
                 present: false,
+                quiet: false,
             }
         },
         |glimpse| {
@@ -6852,6 +6859,7 @@ fn at_rest_with(
 fn someone_there(_: Duration) -> Asked {
     Asked {
         present: true,
+        quiet: false,
         ..Asked::default()
     }
 }
@@ -6967,6 +6975,7 @@ fn at_night_someone_there_does_not_keep_it_standing() {
         4,
         |at| Asked {
             present: true,
+            quiet: false,
             night: at >= Duration::from_secs(30),
             ..Asked::default()
         },
@@ -7041,6 +7050,7 @@ fn at_level_five_someone_there_sees_a_shift_every_ten_to_thirty_seconds() {
         8,
         |_| Asked {
             present: true,
+            quiet: false,
             energy: 5,
             ..Asked::default()
         },
@@ -7088,6 +7098,7 @@ fn held_by_a_lease_it_does_not_shift_only_with_presence_on() {
         |_| Asked {
             held: true,
             present: true,
+            quiet: false,
             ..Asked::default()
         },
         None,
@@ -7322,6 +7333,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     lively: false,
                     energy: 0,
                     present: false,
+                    quiet: false,
                 }
             },
             |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -7412,6 +7424,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 lively: false,
                 energy: 0,
                 present: false,
+                quiet: false,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -7507,6 +7520,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 lively: false,
                 energy: 0,
                 present: false,
+                quiet: false,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -10514,6 +10528,7 @@ fn called_run(
                 lively: false,
                 energy: 0,
                 present: false,
+                quiet: false,
             }
         },
         |glimpse| {
@@ -22466,6 +22481,7 @@ fn a_new_energy_level_ends_a_shift_at_rest_and_is_taken_within_five_seconds() {
         8,
         |at| Asked {
             present: true,
+            quiet: false,
             energy: level_every_seven(at),
             ..Asked::default()
         },
@@ -22626,4 +22642,79 @@ fn a_shift_eased_out_for_a_new_level_never_speeds_up() {
             assert_eq!(at, [0.0; 5]);
         }
     }
+}
+
+/// #7689 (b): kept still for someone (`quiet`, the voice's care hold), a
+/// standing lamp spoken to plays a plain nod and holds every other gesture,
+/// said only `held`: a laugh, a lively nod, and a paired computer's or an
+/// app's (`replace`, from lamp-control). Without it, each plays as before.
+#[test]
+fn kept_still_for_someone_it_only_nods_and_says_held() {
+    for (quiet, clip, lively, replace) in [
+        (true, &crate::clips::NOD, false, false),
+        (true, &crate::clips::LAUGH, false, false),
+        (true, &crate::clips::NOD, true, false),
+        (true, &crate::clips::GREETING, false, true),
+        (false, &crate::clips::LAUGH, false, false),
+        (false, &crate::clips::NOD, true, false),
+    ] {
+        let mut asked = false;
+        let (report, fates, _) = skill_run(
+            14,
+            standing(100, 5),
+            gesture_limits(),
+            |_| {},
+            || Some((Mood::Speaking, 60)),
+            move |now| {
+                let due = !asked && now >= Duration::from_secs(8);
+                asked |= due;
+                Asked {
+                    quiet,
+                    lively: due && lively,
+                    replace: due && replace,
+                    gesture: due.then_some(clip),
+                    ..Asked::default()
+                }
+            },
+        );
+        let held = quiet && (lively || clip.name != "nod");
+        if held {
+            assert_eq!(report.gestures, 0, "{} {report:?}", clip.name);
+            assert_eq!(fates, [(clip.name, crate::body::QUIET_HELD)]);
+            assert!(!QUIET_HELD.contains("harm") && !QUIET_HELD.contains("care"));
+        } else if !replace {
+            assert_eq!(report.gestures, 1, "{} {report:?} {fates:?}", clip.name);
+        }
+    }
+}
+
+/// #7689 (b): kept still for someone, a lamp at rest makes no shift at
+/// all; the same run without it shifts.
+#[test]
+fn kept_still_for_someone_it_does_not_shift_at_rest() {
+    let (free, free_shifts) = shifts_at_rest(
+        true,
+        10,
+        Mood::Resting,
+        100,
+        None,
+        Some(|_| Asked::default()),
+    );
+    assert!(free.idles > 0 && !free_shifts.is_empty(), "{free:?}");
+    let (still, still_shifts) = shifts_at_rest(
+        true,
+        10,
+        Mood::Resting,
+        100,
+        None,
+        Some(|_| Asked {
+            quiet: true,
+            ..Asked::default()
+        }),
+    );
+    assert_eq!(
+        (still.idles, still_shifts.len()),
+        (0, 0),
+        "{still_shifts:?}"
+    );
 }
