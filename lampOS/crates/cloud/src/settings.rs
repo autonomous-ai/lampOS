@@ -503,10 +503,11 @@ pub fn keys_line(kind: &str, data: &Value) -> Result<(String, Option<String>), S
                         | "openai_compatible"
                         | "openrouter"
                         | "gemini"
+                        | "anthropic"
                 )
             })
             .ok_or(
-                "service must be deepseek, deepgram, elevenlabs, openai_compatible, openrouter or gemini",
+                "service must be deepseek, deepgram, elevenlabs, openai_compatible, openrouter, gemini or anthropic",
             )
     };
     let line = match kind {
@@ -537,8 +538,8 @@ pub fn keys_line(kind: &str, data: &Value) -> Result<(String, Option<String>), S
                 Some(Value::String(url)) if url.len() <= 2_048 => Some(url.as_str()),
                 Some(_) => return Err("base_url must be text".into()),
             };
-            // The model's name for an OpenAI-compatible, OpenRouter or Gemini
-            // key (#8362, #8420): the helper checks it with the service.
+            // The model's name for an OpenAI-compatible, OpenRouter, Gemini or
+            // Anthropic key (#8362, #8420): the helper checks it with the service.
             let model = match data.get("model") {
                 None | Some(Value::Null) => None,
                 Some(Value::String(model)) if model.len() <= 128 => Some(model.as_str()),

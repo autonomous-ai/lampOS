@@ -557,7 +557,7 @@ pub(crate) async fn warm_get(
     used: &std::sync::Mutex<Option<std::time::Instant>>,
     after: Duration,
     url: &str,
-    auth: (&'static str, &str),
+    headers: &[(&'static str, &str)],
     max: usize,
 ) -> Option<(u16, Duration, Option<std::net::SocketAddr>, bool, bool)> {
     let began = std::time::Instant::now();
@@ -568,7 +568,11 @@ pub(crate) async fn warm_get(
         }
         *used = Some(began);
     }
-    let request = client.get(url).header(auth.0, auth.1);
+    let request = headers
+        .iter()
+        .fold(client.get(url), |request, (name, value)| {
+            request.header(*name, *value)
+        });
     let mut response = tokio::time::timeout(CONNECT + STALL, request.send())
         .await
         .ok()?
