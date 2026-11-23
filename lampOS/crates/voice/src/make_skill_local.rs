@@ -10827,6 +10827,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             package: Some(package.to_owned()),
             from: "the lamp's own model".to_owned(),
             approved: false,
+            tool: None,
         }
     }
 

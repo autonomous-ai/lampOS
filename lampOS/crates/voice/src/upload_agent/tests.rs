@@ -231,6 +231,7 @@ fn an_agent_skills_first_run_asks_the_yes_and_an_agreed_one_runs() {
         package: None,
         from: FROM.into(),
         approved,
+        tool: None,
     };
     let asking = crate::make_skill_local::Asking {
         request: 7,
