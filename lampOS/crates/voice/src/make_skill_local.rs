@@ -10167,6 +10167,74 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// #8451, lamp-06c1, 24 Nov: a make whose asks end in a "!" ("pebble
+    /// hello!" there) is kept on the model's first answer with the "!"
+    /// dropped, never sent back for a repair; asks refused by a rule every
+    /// time are said, once, plainly, as not made, never the asks or the
+    /// form's example.
+    #[test]
+    fn a_skill_whose_asks_end_in_punctuation_is_kept_first_and_one_refused_is_said_plainly() {
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        let (root, tidying) = keeping("asks-tidied");
+        let request = "when I say pebble garden tune, email me@example.com with the subject \
+                       Test note, saying This is my test note.";
+        let toml = |asks: &str| {
+            format!(
+                "asks = [\"{asks}\"]\n\
+                 kind = \"installable\"\nversion = \"1.0.0\"\n\
+                 [permissions]\nservices = {{ gmail = \"write\" }}\n[[do]]\n\
+                 write = {{ service = \"gmail\", action = \"send_mail\", to = [\"me@example.com\"], \
+                 subject = \"Test note\", text = \"This is my test note.\" }}\n"
+            )
+        };
+        let (url, served) = service(vec![(200, write_answer(&toml("pebble garden tune!")))]);
+        let asked = manage_helper(&tidying.manage);
+        let told = make_with(
+            7,
+            Some(request),
+            request,
+            &tidying,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1, "{told}");
+        assert_eq!(told["made"], "leaving-mail", "{told}");
+        asked.join().unwrap();
+        assert_eq!(
+            made_skill::entries(&tidying.directory)[0]["asks"],
+            serde_json::json!(["pebble garden tune"]),
+        );
+        let _ = std::fs::remove_dir_all(&root);
+        // Refused on its rule every time: one plain line.
+        let (root, keeping) = keeping("asks-refused");
+        let (url, served) = service(vec![
+            (200, write_answer(&toml("pebble, hello")));
+            1 + MOST_REPAIRS
+        ]);
+        let told = make_with(
+            7,
+            Some(request),
+            request,
+            &keeping,
+            chat_at(url),
+            NOW + 1,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS, "{told}");
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY)
+        );
+        let error = told["error"].as_str().unwrap();
+        assert!(!error.contains("pebble") && !error.contains("send my test note"));
+        made_skill::set_asks_here(None);
+        made_skill::set_writes_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// #6307, with `LAMP_MADE_SCRIPTS` off: the making model is never told
     /// a skill may carry code, nor the function that a yes may put one on;
     /// on, it is told the form, its bounds and its grants.
