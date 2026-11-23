@@ -4037,6 +4037,11 @@ async fn a_peer_in_no_apps_unit_or_for_an_app_not_installed_or_with_apps_off_is_
 /// An unsigned app package (format 2) named `name`, asking `grants`, with
 /// `tag` in its code so two pushes differ; `signed` adds a signature member.
 fn app_package(name: &str, grants: &[&str], tag: &str, signed: bool) -> Vec<u8> {
+    app_package_net(name, grants, tag, signed, false)
+}
+
+/// As [`app_package`], its manifest's `net` as given.
+fn app_package_net(name: &str, grants: &[&str], tag: &str, signed: bool, net: bool) -> Vec<u8> {
     use sha2::Digest as _;
     let code = format!("print('{tag}')\n").into_bytes();
     let sha: String = sha2::Sha256::digest(&code)
@@ -4046,7 +4051,7 @@ fn app_package(name: &str, grants: &[&str], tag: &str, signed: bool) -> Vec<u8> 
     let manifest = json!({
         "format": 2, "kind": "app", "name": name, "title": "Gym Coach", "version": "0.1.0",
         "min_build": 1, "runtime": {"name": "python3", "entry": "coach.app"},
-        "grants": grants, "net": false, "logs": false, "phrases": [], "triggers": [],
+        "grants": grants, "net": net, "logs": false, "phrases": [], "triggers": [],
         "settings": [], "skills": [], "assets": [],
         "files": [{"path": "src/coach/app.py", "size": code.len(), "sha256": sha}],
     })
@@ -4155,6 +4160,16 @@ fn apps_helper(socket: &std::path::Path) -> Arc<std::sync::Mutex<AppsHelper>> {
                         "pushed_by": {"computer": "test", "client": by}}))
                     .collect();
                 json!({"ok": {"apps": apps}})
+            } else if let Some(client) = request.get("off_pushed_by").and_then(Value::as_str) {
+                let stopped: Vec<&String> = helper
+                    .installed
+                    .iter()
+                    .filter(|(_, by, _)| by == client)
+                    .map(|(name, _, _)| name)
+                    .collect();
+                json!({"ok": {"stopped": stopped, "not_stopped": []}})
+            } else if request.get("grants_pushed_by").is_some() {
+                json!({"ok": {"stopped": [], "not_stopped": []}})
             } else if let Some(remove) = request.get("remove_pushed") {
                 let at = helper.installed.iter().position(|(name, by, _)| {
                     remove["name"] == json!(name) && remove["client"] == json!(by)
@@ -4186,6 +4201,29 @@ async fn app_lamp(name: &str, on: bool) -> (Lamp, Arc<std::sync::Mutex<AppsHelpe
     lamp.shared
         .set_apps_manage_socket(lamp.dir.join("apps-manage.sock"));
     (lamp, helper)
+}
+
+/// The lines the lamp said, by client.
+type Said = Arc<std::sync::Mutex<Vec<(String, String)>>>;
+
+/// As [`app_lamp`], with app push on, the lines it says kept, and the apps'
+/// helper's owed changes kept at `owed`.
+async fn app_lamp_owing(
+    name: &str,
+    owed: std::path::PathBuf,
+) -> (Lamp, Arc<std::sync::Mutex<AppsHelper>>, Said) {
+    let said: Said = Arc::default();
+    let lamp = lamp_built(name, Box::new(Says(said.clone())), move |door, dir| {
+        door.with_rates_off()
+            .with_app_push(dir.join("staging"), true)
+            .with_apps_owed(owed)
+    })
+    .await;
+    std::fs::create_dir_all(lamp.dir.join("staging")).unwrap();
+    let helper = apps_helper(&lamp.dir.join("apps-manage.sock"));
+    lamp.shared
+        .set_apps_manage_socket(lamp.dir.join("apps-manage.sock"));
+    (lamp, helper, said)
 }
 
 /// The last frame's answer of a push of `frames`, each before it `got`.
@@ -4269,6 +4307,143 @@ async fn a_paired_computer_pushes_its_own_app_which_installs_runs_is_replaced_an
     )
     .await;
     assert_eq!(gone["error"]["code"], "refused", "{gone}");
+}
+
+/// Waits until the fake apps' helper has been asked `request`, within 3 s.
+async fn until_apps_asked(helper: &std::sync::Mutex<AppsHelper>, request: &Value) {
+    for _ in 0..150 {
+        if helper.lock().unwrap().asked.contains(request) {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("never asked {request}: {:?}", helper.lock().unwrap().asked);
+}
+
+/// Waits until nothing is owed the apps' helper at `owed`, within 3 s.
+async fn until_owed_none(owed: &std::path::Path) {
+    for _ in 0..150 {
+        if lamp_control::apps_owed::owed(owed).is_empty() {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("still owed: {:?}", lamp_control::apps_owed::owed(owed));
+}
+
+/// An owed-changes file of its own for `name`, outside any lamp's folder, so
+/// a lamp made again (a restart) reads the same one.
+fn owed_file(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("lamp-control-owed-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir.join(lamp_control::apps_owed::OWED)
+}
+
+async fn first_client(lamp: &Lamp) -> String {
+    let clients = admin(lamp, json!({"clients": true})).await;
+    clients["clients"][0]["id"].as_str().unwrap().to_owned()
+}
+
+/// Heron's P1 on #8358, test 1 (lamp-control's half; the helper's stop and
+/// start-all are `lamp-apps`' `pushed` tests), and P2's last part: a pushed
+/// app with `net` is said on with the internet named; its computer revoked,
+/// the apps' helper is asked `off_pushed_by` for it alone, and once it
+/// answered nothing is owed.
+#[tokio::test]
+async fn a_revoked_computers_pushed_apps_are_stopped_by_the_apps_helper() {
+    let owed = owed_file("revoke");
+    let (lamp, helper, said) = app_lamp_owing("app-push-revoke", owed.clone()).await;
+    let mut socket = paired(&lamp, json!(["speak", "skills"]), 62).await;
+    let package = app_package_net("gym-coach", &["speak"], "one", false, true);
+    let installed = pushed(&mut socket, &app_frames("gym-coach", &package, 10)).await;
+    assert_eq!(installed["ok"], true, "{installed}");
+    assert_eq!(installed["app"]["net"], true, "{installed}");
+    let line = said.lock().unwrap().last().cloned().unwrap();
+    assert_eq!(
+        line.1,
+        "Gym Coach is on, from your computer, and can use the internet. To undo, remove it in the app."
+    );
+    let client = first_client(&lamp).await;
+    assert_eq!(
+        admin(&lamp, json!({"revoke": client})).await["revoked"],
+        true
+    );
+    let off = json!({"off_pushed_by": client});
+    until_apps_asked(&helper, &off).await;
+    until_owed_none(&owed).await;
+    let asked = helper.lock().unwrap().asked.clone();
+    assert_eq!(
+        asked
+            .iter()
+            .filter(|line| line.get("off_pushed_by").is_some())
+            .count(),
+        1,
+        "{asked:?}"
+    );
+    assert!(
+        asked
+            .iter()
+            .all(|line| line.get("grants_pushed_by").is_none()),
+        "no other computer's apps are touched: {asked:?}"
+    );
+}
+
+/// Heron's P1 on #8358, test 2: a revoke the apps' helper never answered
+/// (it was down, then lamp-control stopped) is kept, and told at the next
+/// start; then nothing is owed.
+#[tokio::test]
+async fn a_revoke_the_apps_helper_never_heard_is_told_after_a_restart() {
+    let owed = owed_file("restart");
+    let before = lamp_built("app-push-down", Box::new(session::Unrouted), {
+        let owed = owed.clone();
+        move |door, dir| {
+            door.with_rates_off()
+                .with_app_push(dir.join("staging"), true)
+                .with_apps_owed(owed)
+        }
+    })
+    .await;
+    // The helper is down: its socket is not there.
+    before
+        .shared
+        .set_apps_manage_socket(before.dir.join("gone.sock"));
+    let _socket = paired(&before, json!(["speak", "skills"]), 63).await;
+    let client = first_client(&before).await;
+    assert_eq!(
+        admin(&before, json!({"revoke": client})).await["revoked"],
+        true
+    );
+    let off = json!({"off_pushed_by": client});
+    assert_eq!(
+        lamp_control::apps_owed::owed(&owed),
+        std::slice::from_ref(&off)
+    );
+    // lamp-control again, the same state folder, the helper up.
+    let (after, helper, _) = app_lamp_owing("app-push-restarted", owed.clone()).await;
+    after.shared.tell_owed_app_changes();
+    until_apps_asked(&helper, &off).await;
+    until_owed_none(&owed).await;
+}
+
+/// Heron's P1 on #8358, test 3 (lamp-control's half; which app stops is
+/// `lamp-apps`' `pushed` test): the owner drops `camera` from a pairing, and
+/// the apps' helper is asked to hold its pushed apps to the grants left.
+#[tokio::test]
+async fn a_narrowed_pairing_holds_its_pushed_apps_to_the_grants_left() {
+    let owed = owed_file("narrowed");
+    let (lamp, helper, _) = app_lamp_owing("app-push-narrowed", owed.clone()).await;
+    let _socket = paired(&lamp, json!(["speak", "camera", "skills"]), 64).await;
+    let client = first_client(&lamp).await;
+    let set = admin(
+        &lamp,
+        json!({"set_grants": {"client": client, "grants": ["speak", "skills"]}}),
+    )
+    .await;
+    assert_eq!(set["removed"], json!(["camera"]), "{set}");
+    let held = json!({"grants_pushed_by": {"client": client, "grants": ["speak", "skills"]}});
+    until_apps_asked(&helper, &held).await;
+    until_owed_none(&owed).await;
 }
 
 /// #8351: only a computer this lamp's owner paired pushes: one never paired

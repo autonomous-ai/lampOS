@@ -15,15 +15,19 @@ use std::collections::BTreeMap;
 use std::os::unix::fs::MetadataExt;
 
 fn package(version: &str) -> AppPackage {
+    package_of("gym-coach", version, &["speak", "hear"])
+}
+
+fn package_of(name: &str, version: &str, grants: &[&str]) -> AppPackage {
     AppPackage {
         app: AppSpec {
-            name: "gym-coach".into(),
+            name: name.into(),
             title: "Gym Coach".into(),
             version: version.into(),
             min_build: 1,
             net: false,
             logs: false,
-            grants: vec!["speak".into(), "hear".into()],
+            grants: grants.iter().map(|grant| (*grant).to_owned()).collect(),
             entry: "app.main".into(),
         },
         files: BTreeMap::from([
@@ -140,6 +144,134 @@ fn a_paired_computers_push_installs_and_runs_with_no_yes_marked_with_the_compute
     );
     let other = door(&mut r, &reader, &json!({"list_pushed_by": "c_2"}));
     assert_eq!(other, json!({"ok": {"apps": []}}));
+}
+
+/// `name` pushed by `client`, asking `grants`.
+fn push_of(r: &mut Rig, name: &str, client: &str, grants: &[&str]) -> Value {
+    let path = staged(r, name);
+    door(
+        r,
+        &StubReader::new(package_of(name, "0.1.0", grants)),
+        &json!({"install_pushed": {"path": path, "client": client, "client_name": "desk mac"}}),
+    )
+}
+
+/// `name` installed from the Store with the owner's yes.
+fn store_install(r: &mut Rig, name: &str) {
+    let path = staged(r, &format!("store-{name}"));
+    let mut yes = FakeYes::granting(vec![YesKey {
+        op: Op::Install,
+        name: name.into(),
+        version: "1.0.0".into(),
+        sha256: sha256_hex(format!("store-{name}").as_bytes()),
+        grants: vec!["hear".into(), "speak".into()],
+        net: false,
+        logs: false,
+    }]);
+    let reader = StubReader::new(package_of(name, "1.0.0", &["speak", "hear"]));
+    let mut parts = Parts {
+        layout: &r.layout,
+        fx: &mut r.fx,
+        skills: &mut r.skills,
+        yes: &mut yes,
+        reader: &reader,
+        staged_owner: r.owner,
+        build: Some(200),
+    };
+    let said = answer(
+        true,
+        &json!({"install": {"path": path}}).to_string(),
+        &mut parts,
+    );
+    assert_eq!(said, json!({"ok": "installed"}));
+}
+
+/// Heron's P1 on #8358, test 1 (the helper's half): a revoked computer's
+/// pushed apps are stopped, not removed, and stay stopped across the boot's
+/// start-all; another computer's pushed app and a Store app run on.
+#[test]
+fn a_revoked_computers_pushed_apps_stop_and_stay_stopped_and_no_other_app_is_touched() {
+    let mut r = rig();
+    push_of(&mut r, "gym-coach", "c_1", &["speak"]);
+    push_of(&mut r, "desk-timer", "c_2", &["speak"]);
+    store_install(&mut r, "english");
+    let reader = StubReader::new(package("0.1.0"));
+    r.fx.calls.clear();
+    let off = door(&mut r, &reader, &json!({"off_pushed_by": "c_1"}));
+    assert_eq!(
+        off,
+        json!({"ok": {"stopped": ["gym-coach"], "not_stopped": []}})
+    );
+    assert!(
+        r.fx.calls
+            .iter()
+            .any(|call| call.contains("stop") && call.contains("lamp-app@gym-coach.service")),
+        "{:?}",
+        r.fx.calls
+    );
+    assert!(
+        r.fx.calls
+            .iter()
+            .all(|call| !call.contains("desk-timer") && !call.contains("english")),
+        "{:?}",
+        r.fx.calls
+    );
+    // Stopped, not removed: still installed and listed as stopped.
+    assert!(installed_record(&r.layout, "gym-coach").is_some());
+    let listed = door(&mut r, &reader, &json!({"list_pushed_by": "c_1"}));
+    assert_eq!(listed["ok"]["apps"][0]["stopped"], true, "{listed}");
+    // The boot's start-all leaves it stopped and starts the others.
+    r.fx.calls.clear();
+    let (started, errors) = lamp_apps::manage::start_all(&r.layout, &mut r.fx);
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(started, ["desk-timer", "english"]);
+    assert!(
+        r.fx.calls.iter().all(|call| !call.contains("gym-coach")),
+        "{:?}",
+        r.fx.calls
+    );
+    // Asked again (a retry, a restart's re-tell): the same, harmlessly.
+    let again = door(&mut r, &reader, &json!({"off_pushed_by": "c_1"}));
+    assert_eq!(again["ok"]["stopped"], json!(["gym-coach"]));
+    // None for a computer that pushed nothing, and a bad id is refused.
+    assert_eq!(
+        door(&mut r, &reader, &json!({"off_pushed_by": "c_9"})),
+        json!({"ok": {"stopped": [], "not_stopped": []}})
+    );
+    assert!(door(&mut r, &reader, &json!({"off_pushed_by": ""}))["refused"].is_string());
+}
+
+/// Heron's P1 on #8358, test 3 (the helper's half): `camera` dropped from a
+/// pairing stops its pushed app that asks it; one that doesn't runs on.
+#[test]
+fn a_pairing_narrowed_stops_only_its_pushed_apps_that_ask_a_grant_it_lost() {
+    let mut r = rig();
+    push_of(&mut r, "gym-coach", "c_1", &["speak", "camera"]);
+    push_of(&mut r, "desk-timer", "c_1", &["speak"]);
+    let reader = StubReader::new(package("0.1.0"));
+    r.fx.calls.clear();
+    let held = door(
+        &mut r,
+        &reader,
+        &json!({"grants_pushed_by": {"client": "c_1", "grants": ["speak", "skills"]}}),
+    );
+    assert_eq!(
+        held,
+        json!({"ok": {"stopped": ["gym-coach"], "not_stopped": []}})
+    );
+    assert!(
+        r.fx.calls.iter().all(|call| !call.contains("desk-timer")),
+        "{:?}",
+        r.fx.calls
+    );
+    let listed = door(&mut r, &reader, &json!({"list_pushed_by": "c_1"}));
+    let stopped: Vec<(&str, bool)> = listed["ok"]["apps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|app| (app["name"].as_str().unwrap(), app["stopped"] == true))
+        .collect();
+    assert_eq!(stopped, [("desk-timer", false), ("gym-coach", true)]);
 }
 
 #[test]
@@ -292,6 +424,8 @@ fn the_door_and_the_owners_verbs_are_never_crossed_and_off_refuses_all() {
         json!({"install_pushed": {"path": "/x", "client": "c_1"}}),
         json!({"list_pushed_by": "c_1"}),
         json!({"remove_pushed": {"client": "c_1", "name": "a"}}),
+        json!({"off_pushed_by": "c_1"}),
+        json!({"grants_pushed_by": {"client": "c_1", "grants": []}}),
     ] {
         assert!(
             answer(true, &line.to_string(), &mut parts)["refused"].is_string(),

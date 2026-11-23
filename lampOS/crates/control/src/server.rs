@@ -18,7 +18,7 @@
 
 use std::collections::BTreeSet;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -167,13 +167,13 @@ pub const RETRY_AFTER: [Duration; 2] = [Duration::from_secs(2), Duration::from_s
 /// [`RETRY_AFTER`] while it gives no answer; later changes wait, so the
 /// order holds. An answer of any kind, a refusal included, is the helper's
 /// word and is not asked again.
-fn tell_until_answered(socket: &std::path::Path, request: &Value) {
+fn tell_until_answered(socket: &std::path::Path, request: &Value) -> bool {
     let mut waits = RETRY_AFTER.iter();
     loop {
         match crate::push::ask_helper(socket, request, crate::push::ASK_WAIT) {
             Ok(answer) => {
                 eprintln!("lamp-control: told the helper {request}: {answer}");
-                return;
+                return true;
             }
             Err(error) => match waits.next() {
                 Some(wait) => {
@@ -192,7 +192,7 @@ fn tell_until_answered(socket: &std::path::Path, request: &Value) {
                         "lamp-control: gave up telling the helper {request} after {} tries: {error}; it may still be served",
                         RETRY_AFTER.len() + 1
                     );
-                    return;
+                    return false;
                 }
             },
         }
@@ -310,6 +310,8 @@ pub struct Shared {
     /// late wider grant change must never be served after a newer narrower
     /// one).
     changes: Mutex<Option<std::sync::mpsc::Sender<Value>>>,
+    /// The apps' helper's own queue of pairing changes, as `changes`.
+    app_changes: Mutex<Option<std::sync::mpsc::Sender<Value>>>,
 }
 
 /// An `apps.remember` waiting for the voice's word: the app, the frame's id
@@ -493,6 +495,7 @@ impl Shared {
             remember_next: AtomicU64::new(1),
             private: Mutex::new(None),
             changes: Mutex::new(None),
+            app_changes: Mutex::new(None),
             remote: std::sync::atomic::AtomicBool::new(false),
             pair_cue: std::sync::atomic::AtomicBool::new(false),
             poses: std::sync::atomic::AtomicBool::new(false),
@@ -668,7 +671,7 @@ impl Shared {
         {
             let mut door = self.door.lock().expect("door");
             match ask.kind {
-                crate::push::AskKind::AppInstall => door.app_push_installed(),
+                crate::push::AskKind::AppInstall => door.app_push_installed(&ask.client, ask.rev),
                 _ => door.helper_answered(&ask.client),
             }
         }
@@ -694,7 +697,7 @@ impl Shared {
                     PIN_SPEAKER,
                     0,
                     &Op::Say {
-                        text: crate::app_push::said_on(title),
+                        text: crate::app_push::said_on(title, app["net"] == true),
                         rephrase: None,
                     },
                     self.now_us(),
@@ -739,8 +742,68 @@ impl Shared {
 
     /// The door's pairing changes for the manage helper (a computer's
     /// pushed skills off, or held to new grants), sent in order by one
-    /// thread; each answer said in the journal, as nobody waits for it.
+    /// thread; each answer said in the journal, as nobody waits for it. The
+    /// apps' helper is told its own the same way ([`Shared::tell_apps_helper`]).
     fn tell_helper(&self) {
+        self.tell_skills_helper();
+        self.tell_apps_helper(Vec::new());
+    }
+
+    /// The changes the apps' helper is still owed from before this start
+    /// ([`crate::apps_owed`]: a revoke or a narrowed pairing it never
+    /// answered, a restart in between), told first, in order.
+    pub fn tell_owed_app_changes(&self) {
+        let owed = {
+            let door = self.door.lock().expect("door");
+            door.apps_owed().map(crate::apps_owed::owed)
+        };
+        if let Some(owed) = owed
+            && !owed.is_empty()
+        {
+            eprintln!(
+                "lamp-control: telling the apps' helper {} change(s) owed from before",
+                owed.len()
+            );
+            self.tell_apps_helper(owed);
+        }
+    }
+
+    /// `first`, then the door's pairing changes for the apps' helper (a
+    /// computer's pushed apps stopped, or held to new grants), sent in order
+    /// by one thread of their own; each let go of on disk once answered.
+    fn tell_apps_helper(&self, first: Vec<Value>) {
+        let mut queue = self.app_changes.lock().expect("app_changes");
+        let (changes, owed) = {
+            let mut door = self.door.lock().expect("door");
+            let mut changes = first;
+            changes.extend(door.take_app_changes());
+            (changes, door.apps_owed().map(Path::to_path_buf))
+        };
+        if changes.is_empty() {
+            return;
+        }
+        let Some(socket) = self.apps_manage.lock().expect("apps_manage").clone() else {
+            return;
+        };
+        let sender = queue.get_or_insert_with(|| {
+            let (sender, received) = std::sync::mpsc::channel::<Value>();
+            std::thread::spawn(move || {
+                for request in received {
+                    if tell_until_answered(&socket, &request)
+                        && let Some(owed) = &owed
+                    {
+                        crate::apps_owed::answered(owed, &request);
+                    }
+                }
+            });
+            sender
+        });
+        for change in changes {
+            let _ = sender.send(change);
+        }
+    }
+
+    fn tell_skills_helper(&self) {
         // The queue's lock first, then the door's: two threads (an install's
         // answer, a pair or a revoke) can't each take a batch and send them
         // reversed (Reviewer-two's P3 on #3910).
@@ -756,7 +819,7 @@ impl Shared {
             let (sender, received) = std::sync::mpsc::channel::<Value>();
             std::thread::spawn(move || {
                 for request in received {
-                    tell_until_answered(&socket, &request);
+                    let _ = tell_until_answered(&socket, &request);
                 }
             });
             sender
@@ -830,6 +893,7 @@ impl Shared {
                 remember_next: AtomicU64::new(1),
                 private: Mutex::new(None),
                 changes: Mutex::new(None),
+                app_changes: Mutex::new(None),
                 remote: std::sync::atomic::AtomicBool::new(false),
                 pair_cue: std::sync::atomic::AtomicBool::new(false),
                 poses: std::sync::atomic::AtomicBool::new(false),

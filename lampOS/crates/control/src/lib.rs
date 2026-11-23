@@ -21,6 +21,7 @@ pub mod app_remember;
 pub mod app_socket;
 pub mod app_triggers;
 pub mod app_yes;
+pub mod apps_owed;
 pub mod body_info;
 pub mod body_lease;
 pub mod body_state;

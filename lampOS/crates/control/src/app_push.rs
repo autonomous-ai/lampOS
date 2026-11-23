@@ -72,7 +72,32 @@ pub fn checked(
     }))
 }
 
-/// What the lamp says once a pushed app is on: one line, with its undo.
-pub fn said_on(title: &str) -> String {
-    format!("{title} is on, from your computer. To undo, remove it in the app.")
+/// What the lamp says once a pushed app is on: one line, with its undo. A
+/// pushed app takes no yes, so one whose manifest says `net` has that said
+/// here (Heron's P2 on #8358), as a Store app's yes names the internet.
+pub fn said_on(title: &str, net: bool) -> String {
+    if net {
+        format!(
+            "{title} is on, from your computer, and can use the internet. To undo, remove it in the app."
+        )
+    } else {
+        format!("{title} is on, from your computer. To undo, remove it in the app.")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_line_says_the_internet_only_for_an_app_that_can_use_it() {
+        assert_eq!(
+            said_on("Gym Coach", false),
+            "Gym Coach is on, from your computer. To undo, remove it in the app."
+        );
+        assert_eq!(
+            said_on("Gym Coach", true),
+            "Gym Coach is on, from your computer, and can use the internet. To undo, remove it in the app."
+        );
+    }
 }
