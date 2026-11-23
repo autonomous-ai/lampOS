@@ -2743,7 +2743,11 @@ user's own `systemd-run --user --unit=lamp-voice` is nobody's. Its
 per unit: `lamp-body: lamp-skills asked at person, held to skill`. The cap
 holds whatever `--arbitration`, since a skill's gesture asked at
 `conversation` would otherwise outlast a conversation beginning. Moods are
-taken as before. The gaze socket takes a sight only from `lamp-eyes` or
+taken as before, and so is `{"quiet":…}` (#7689), which only lamp-voice
+sends. **Owed at this switch's switch-on** (App Only's 20:27 on #8408): take
+`quiet` from lamp-voice or root only, since today any `lampos` writer's
+`{"quiet":false}` would end the care hold early; tested by a `quiet` from
+another unit's credentials being dropped. The gaze socket takes a sight only from `lamp-eyes` or
 `lamp-skills` run as `lampos`, or from root, and drops any other, said once
 a minute. A datagram too long for the body's buffer is refused whole. No
 product unit passes it yet.
