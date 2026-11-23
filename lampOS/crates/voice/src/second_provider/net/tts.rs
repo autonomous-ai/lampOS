@@ -1478,6 +1478,24 @@ impl Packets {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_own_voice_check_root_is_where_the_voice_speaks() {
+        // lamp_msgs::own_voice::root (the keys helper's check) and this
+        // file's service_base (the speech) name one address (#8394).
+        for base in [
+            "https://api.elevenlabs.io/v1",
+            "https://api.eu.elevenlabs.io/v1/",
+            "https://campaign-api.autonomous.ai/api/v1/ai",
+            "https://relay.example.invalid/tts",
+        ] {
+            assert_eq!(
+                lamp_msgs::own_voice::root(base),
+                service_base(TtsProvider::ElevenLabs, base).unwrap(),
+                "{base}"
+            );
+        }
+    }
     use std::sync::atomic::{AtomicUsize, Ordering};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
