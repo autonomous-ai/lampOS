@@ -2407,6 +2407,11 @@ struct Shared {
     /// With `name_near`, a first word said as a sentence of its own is the
     /// name by its near hearing alone ([`Engine::taking_the_name_as_a_sentence`]).
     name_as_a_sentence: bool,
+    /// With `name_near`, the owner's language is French: what French speech
+    /// to text writes for "Hey Lamp," at a line's start
+    /// ([`FRENCH_HEARD_FOR_THE_NAME`]) is read as [`named_near`] reads a
+    /// first word (#8381; [`Engine::hearing_french_calls`]).
+    french_calls: bool,
     /// A line of nothing but the lamp's own words heard back is held, and
     /// its own words at a line's start or end are taken out
     /// ([`Engine::holding_own_echo`]).
@@ -3201,7 +3206,7 @@ const NAMES_OF_ITS_SHAPE: [&str; 15] = [
 
 /// How a word sounds beside the lamp's name (`LAMP_NAME_NEAR`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum LikeTheName {
+pub(crate) enum LikeTheName {
     /// One of [`HEARD_FOR_THE_NAME`]: the name as the speech to text wrote
     /// it on lamp-4ace, no word a colleague is called by.
     AsHeard,
@@ -3269,6 +3274,44 @@ pub(crate) fn sounds_like_the_name(word: &str) -> bool {
     like_the_name(word) != LikeTheName::Not
 }
 
+/// What French speech to text (Deepgram, `language=fr`) writes for "Hey
+/// Lamp," or "Hé lampe," at a line's start, with how it counts in
+/// [`named_near`] (#8381). On lamp-e82d on 23 Nov (#8387's check, build
+/// 15677) "Hey Lamp, quelle heure est-il ?" and "Hé lampe, quel temps fait-il
+/// aujourd'hui ?" both came back as "Et non, …", so no call sign was
+/// written. "Et non", "Hé non" and "Eh non" are everyday French ("Et non,
+/// je ne viens pas."): like a name's shape, they count only with a face
+/// turned to the lamp as well as lamp-name's near hearing. "Et lampe" is
+/// said by nobody, so like the words heard for the name in English it needs
+/// the near hearing only. "Hey Lamp," and "Hé lampe," themselves are read
+/// as written already (`attention::written`), so they are not here.
+pub(crate) const FRENCH_HEARD_FOR_THE_NAME: [(&str, LikeTheName); 4] = [
+    ("et non", LikeTheName::Shape),
+    ("hé non", LikeTheName::Shape),
+    ("eh non", LikeTheName::Shape),
+    ("et lampe", LikeTheName::AsHeard),
+];
+
+/// Where a line's opening on [`FRENCH_HEARD_FOR_THE_NAME`] lies, with how
+/// it counts: at the very start, any case, followed straight by a comma
+/// ("Et non, quelle heure est-il ?"). Never mid-line, never with no comma
+/// ("Et non je reste"), never one word longer ("Et nonante, …").
+pub(crate) fn french_call_set_off(text: &str) -> Option<(usize, usize, LikeTheName)> {
+    let start = text.len() - text.trim_start().len();
+    FRENCH_HEARD_FOR_THE_NAME.iter().find_map(|(heard, like)| {
+        let chars = heard.chars().count();
+        let end = text[start..]
+            .char_indices()
+            .nth(chars)
+            .map_or(text.len(), |(at, _)| start + at);
+        let opening = unicode_normalization::UnicodeNormalization::nfc(&text[start..end])
+            .collect::<String>()
+            .to_lowercase();
+        (opening == *heard && text[end..].trim_start().starts_with(','))
+            .then_some((start, end, *like))
+    })
+}
+
 /// Where a line's first word lies, when it is set off as a name is: past
 /// a greeting at most ("Hey"), followed by a comma or a stop, or the whole
 /// line, its own piece. Its byte range in `text`.
@@ -3306,14 +3349,24 @@ pub(crate) fn first_word_set_off(text: &str) -> Option<(usize, usize)> {
 /// that doesn't sound like the name is the name too when it is said as a
 /// sentence of its own, with more said after it ([`a_sentence_of_its_own`]),
 /// and lamp-name heard it near by the line's start.
+///
+/// With `french` (the owner's language is French, #8381), a line that opens
+/// with what French speech to text writes for "Hey Lamp," set off by a
+/// comma ([`french_call_set_off`]) is read the same way, the whole opening
+/// as the first word.
 fn named_near(
     request: u64,
     text: String,
     window: (u64, u64),
     near: &NameNear,
     as_a_sentence: bool,
+    french: bool,
 ) -> (String, bool) {
-    let Some((start, end)) = first_word_set_off(&text) else {
+    let french_call = french.then(|| french_call_set_off(&text)).flatten();
+    let Some((start, end)) = french_call
+        .map(|(start, end, _)| (start, end))
+        .or_else(|| first_word_set_off(&text))
+    else {
         return (text, false);
     };
     let word = &text[start..end];
@@ -3334,7 +3387,7 @@ fn named_near(
             heard_near.is_some_and(|score| score >= NAME_NEAR_LEAST),
         );
     }
-    let like = like_the_name(word);
+    let like = french_call.map_or_else(|| like_the_name(word), |(_, _, like)| like);
     let (heard, turned) = (heard_near, turned_near);
     let near_enough = heard.filter(|score| *score >= NAME_NEAR_LEAST);
     let named = match (like, near_enough) {
@@ -5547,6 +5600,8 @@ impl Engine {
                 wordless_by_own_words: false,
                 name_in_line: None,
                 name_as_a_sentence: false,
+                french_calls: crate::language::at_start()
+                    == Some(crate::language::Language::French),
                 own_echo: false,
                 care: None,
                 spare: Mutex::new(None),
@@ -6752,6 +6807,18 @@ impl Engine {
     pub fn hearing_the_name_near(mut self, near: NameNear) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.name_near = Some(near);
+        }
+        self
+    }
+
+    /// With [`Self::hearing_the_name_near`]: whether the owner's language
+    /// is French, so what French speech to text writes for "Hey Lamp," at a
+    /// line's start is read as the name's first word ([`named_near`],
+    /// #8381). Set from the owner's language at start; for tests. Before
+    /// any turn only.
+    pub fn hearing_french_calls(mut self, french: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.french_calls = french;
         }
         self
     }
@@ -11428,6 +11495,7 @@ async fn spoken(
                 said.lock().map_or((0, 0), |said| *said),
                 near,
                 shared.name_as_a_sentence,
+                shared.french_calls,
             );
             // The rule counts no second sign for that hearing
             // (`LAMP_NAME_SIGN_TIED`, #8092).

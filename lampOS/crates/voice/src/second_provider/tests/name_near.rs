@@ -35,6 +35,28 @@ async fn asked_in(
     turned: bool,
     as_a_sentence: bool,
 ) -> (Option<String>, Vec<u64>) {
+    asked_in_language(heard, near, turned, as_a_sentence, false).await
+}
+
+/// [`asked_with`], the owner's language French (`french`, #8381) or not.
+async fn asked_in_french(
+    heard: &str,
+    near: Option<Option<f32>>,
+    turned: bool,
+    french: bool,
+) -> Option<String> {
+    asked_in_language(heard, near, turned, false, french)
+        .await
+        .0
+}
+
+async fn asked_in_language(
+    heard: &str,
+    near: Option<Option<f32>>,
+    turned: bool,
+    as_a_sentence: bool,
+    french: bool,
+) -> (Option<String>, Vec<u64>) {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new([vec![text("Sure."), Ok(ChatEvent::Done)]].into()),
@@ -52,6 +74,7 @@ async fn asked_in(
             (near, turned)
         }));
         engine = engine.taking_the_name_as_a_sentence(as_a_sentence);
+        engine = engine.hearing_french_calls(french);
     }
     engine.submit(start(1));
     engine.submit(ProviderInput::Audio {
@@ -468,5 +491,102 @@ async fn a_line_name_near_rules_not_the_name_is_told_to_the_rule() {
             told_not_the_name(heard, near, turned).await.is_empty(),
             "{heard}"
         );
+    }
+}
+
+/// French (#8381): "Hey Lamp, …" and "Hé lampe, …" came back as "Et non,
+/// …" on lamp-e82d (#8387's check). With the owner's language French, a
+/// line that opens "Et non," ("Hé non,", "Eh non,") is the name only with
+/// lamp-name's near hearing and a face turned to the lamp, since "Et non,
+/// je ne viens pas." is everyday French; "Et lampe," with the near hearing
+/// alone. Never without the near hearing, never mid-line or with no comma,
+/// and never for another language.
+#[tokio::test]
+async fn french_et_non_at_a_lines_start_is_the_name_only_with_its_signs() {
+    let line = "Et non, quelle heure est-il ?";
+    assert_eq!(
+        asked_in_french(line, Some(Some(0.6)), true, true)
+            .await
+            .as_deref(),
+        Some("Lamp, quelle heure est-il ?")
+    );
+    assert_eq!(
+        asked_in_french("hé non, quel temps fait-il ?", Some(Some(0.7)), true, true)
+            .await
+            .as_deref(),
+        Some("Lamp, quel temps fait-il ?")
+    );
+    assert_eq!(
+        asked_in_french(
+            "Et lampe, raconte-moi une blague.",
+            Some(Some(0.55)),
+            false,
+            true
+        )
+        .await
+        .as_deref(),
+        Some("Lamp, raconte-moi une blague."),
+        "\"Et lampe\" needs no face"
+    );
+    for (heard, near, turned, french) in [
+        (line, Some(Some(0.6)), false, true),
+        (line, Some(Some(0.49)), true, true),
+        (line, Some(None), true, true),
+        (line, None, true, true),
+        (line, Some(Some(0.9)), true, false),
+        ("Et non je reste ici.", Some(Some(0.9)), true, true),
+        ("Je dis et non, merci.", Some(Some(0.9)), true, true),
+        ("Et nonante, c'est belge.", Some(Some(0.9)), true, true),
+        (
+            "Et lampe, raconte-moi une blague.",
+            Some(Some(0.4)),
+            true,
+            true,
+        ),
+    ] {
+        assert_eq!(
+            asked_in_french(heard, near, turned, french).await,
+            None,
+            "{heard} {near:?} turned {turned} french {french}"
+        );
+    }
+}
+
+/// Where the French opening lies, and how it counts.
+#[test]
+fn french_openings_heard_for_the_name() {
+    use super::super::{LikeTheName, french_call_set_off};
+    fn opening(text: &str) -> Option<(&str, LikeTheName)> {
+        french_call_set_off(text).map(|(s, e, like)| (&text[s..e], like))
+    }
+    assert_eq!(
+        opening("Et non, quelle heure ?"),
+        Some(("Et non", LikeTheName::Shape))
+    );
+    assert_eq!(
+        opening("  ET NON , oui"),
+        Some(("ET NON", LikeTheName::Shape))
+    );
+    assert_eq!(
+        opening("Hé non, attends"),
+        Some(("Hé non", LikeTheName::Shape))
+    );
+    assert_eq!(
+        opening("Eh non, attends"),
+        Some(("Eh non", LikeTheName::Shape))
+    );
+    assert_eq!(
+        opening("Et lampe, attends"),
+        Some(("Et lampe", LikeTheName::AsHeard))
+    );
+    for not in [
+        "Et non.",
+        "Et non",
+        "Et nonante, oui",
+        "Alors et non, oui",
+        "Et",
+        "",
+    ] {
+        assert_eq!(opening(not), None, "{not}");
     }
 }

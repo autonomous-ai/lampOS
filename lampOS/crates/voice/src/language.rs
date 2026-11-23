@@ -964,15 +964,28 @@ pub fn instruction(character: String, language: Option<Language>) -> String {
     let Some(language) = language else {
         return character;
     };
-    if character.contains(ENGLISH_RULE) {
+    let told = if character.contains(ENGLISH_RULE) {
         character.replacen(ENGLISH_RULE, language.rule(), 1)
     } else {
         format!(
             "{character}\n\n{}, whatever language you hear.",
             language.rule()
         )
+    };
+    if language == Language::French {
+        format!("{told}\n\n{FRENCH_TIME}")
+    } else {
+        told
     }
 }
+
+/// How French says the time, told after the character (#8381). The clock
+/// line is English, a twelve-hour time and its words said aloud ("It is
+/// 3:40 in the afternoon, … Said aloud: twenty to four in the
+/// afternoon.", `local_time::said`); on lamp-e82d on 23 Nov (#8387's
+/// check) the model, asked "quelle heure est-il ?" at 15:40, said "Il est
+/// vingt heures moins vingt", the English words turned word by word.
+pub const FRENCH_TIME: &str = "Say a time as French speakers do, on the 24-hour clock, from the hour, minute and part of the day your clock gives, never by turning its English words said aloud: 3:40 in the afternoon is « quinze heures quarante », 9:05 in the morning « neuf heures cinq », 12:30 in the afternoon « midi et demi », 11:15 at night « vingt-trois heures quinze ».";
 
 /// The code and the words owed when `chosen` is not the language last
 /// announced (`said`, absent is English): none when they agree.
@@ -1183,11 +1196,16 @@ mod tests {
                 assert!(!told.contains(ENGLISH_RULE), "{language:?}");
                 assert!(told.starts_with("You are Lamp"), "{language:?}");
             }
-            // A character without the rule is told it at its end.
-            assert!(
-                instruction("Be kind.".into(), Some(language))
-                    .ends_with(&format!("{}, whatever language you hear.", language.rule()))
-            );
+            // A character without the rule is told it at its end (French
+            // then how it says the time).
+            let bare = instruction("Be kind.".into(), Some(language));
+            let rule_told = format!("{}, whatever language you hear.", language.rule());
+            if language == Language::French {
+                assert!(bare.ends_with(&format!("{rule_told}\n\n{FRENCH_TIME}")));
+            } else {
+                assert!(bare.ends_with(&rule_told), "{language:?}");
+                assert!(!bare.contains(FRENCH_TIME), "{language:?}");
+            }
         }
     }
 
