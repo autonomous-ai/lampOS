@@ -446,3 +446,134 @@ fn the_asker_cgroup_is_the_product_units_slice() {
     }
     assert_eq!(format!("{path}/lamp-cloud.service"), keys::ASKER_CGROUP);
 }
+
+const VOICE: &str = "PersonVoice8367abcdef";
+
+/// #8367: `keys.get` lists what the lamp takes a person's key for, the
+/// model services and the voice apart (`kind`), and the voice ID in use;
+/// the key itself never comes back.
+#[test]
+fn elevenlabs_is_offered_beside_the_model_services() {
+    let store = Store(folder("offers"));
+    let mut works = Told(Verdict::Works, vec![]);
+    let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
+    let which = &reply["done"];
+    assert_eq!(
+        which["offers"],
+        json!([
+            {"service": "deepseek", "name": "DeepSeek", "kind": "model", "models": [], "base_url": true, "fields": []},
+            {"service": "deepgram", "name": "Deepgram", "kind": "model", "models": [], "base_url": false, "fields": []},
+            {"service": "elevenlabs", "name": "ElevenLabs", "kind": "voice", "models": [], "base_url": false, "fields": ["voice_id"]},
+        ])
+    );
+    assert_eq!(which["elevenlabs"], "lamp");
+    assert_eq!(which["voice_id"], json!({"elevenlabs": null}));
+    // Today's fields stay as they are, for an older app.
+    assert_eq!(which["deepseek"], "lamp");
+    assert_eq!(which["deepgram"], "lamp");
+}
+
+/// #8367: a key and voice ID that ElevenLabs takes are kept beside the
+/// others, 0600, said in the lamp's own words, and the voice restarts to
+/// speak in it from the next thing it says; neither the reply nor the
+/// journal's line holds the key.
+#[test]
+fn an_elevenlabs_key_and_voice_are_checked_kept_and_never_said() {
+    let store = Store(folder("voice"));
+    let mut works = Told(Verdict::Works, vec![]);
+    let line = set("elevenlabs", &format!(r#","voice_id":"{VOICE}""#));
+    let (reply, done) = keys::answer(&line, &store, &mut works, true);
+    never_said(&reply, &done);
+    assert_eq!(
+        reply,
+        json!({"done": {"service": "elevenlabs", "uses": "own", "code": "works", "answer":
+            "that key and voice work: the lamp now speaks in your ElevenLabs voice, and what it says goes to ElevenLabs under your account and its terms"}})
+    );
+    let done = done.unwrap();
+    assert!(done.restart_voice);
+    assert_eq!(done.said, "the person's ElevenLabs key: it works, kept");
+    assert_eq!(works.1.len(), 1, "one check");
+    assert_eq!(
+        fs::read_to_string(store.0.join("elevenlabs.key")).unwrap(),
+        PLANTED
+    );
+    assert_eq!(
+        fs::read_to_string(store.0.join("elevenlabs.voice")).unwrap(),
+        format!("{VOICE}\n")
+    );
+    for file in ["elevenlabs.key", "elevenlabs.voice"] {
+        let mode = fs::metadata(store.0.join(file))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600, "{file}");
+    }
+    let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
+    never_said(&reply, &None);
+    assert_eq!(reply["done"]["elevenlabs"], "own");
+    assert_eq!(reply["done"]["voice_id"], json!({"elevenlabs": VOICE}));
+    // "Use the lamp's own again": both files gone, the lamp's voice back.
+    let (reply, done) = keys::answer(r#"{"remove":"elevenlabs"}"#, &store, &mut works, true);
+    assert_eq!(
+        reply,
+        json!({"done": {"service": "elevenlabs", "uses": "lamp"}})
+    );
+    assert!(done.unwrap().restart_voice);
+    assert!(!store.0.join("elevenlabs.key").exists());
+    assert!(!store.0.join("elevenlabs.voice").exists());
+}
+
+/// #8367: with no `key`, `keys.set` changes only the voice, checked with
+/// the kept key, and only when one is kept; a refused key leaves the one
+/// kept before.
+#[test]
+fn a_voice_alone_changes_only_the_voice_beside_a_kept_key() {
+    let store = Store(folder("voice-alone"));
+    let mut works = Told(Verdict::Works, vec![]);
+    let alone = format!(r#"{{"set":"elevenlabs","voice_id":"{VOICE}"}}"#);
+    let (reply, done) = keys::answer(&alone, &store, &mut works, true);
+    assert_eq!(
+        reply,
+        json!({"refused": "a voice ID is changed beside a kept ElevenLabs key: give the key too", "code": "bad_field"})
+    );
+    assert!(done.is_none());
+    assert!(works.1.is_empty(), "nothing checked");
+    let first = set("elevenlabs", r#","voice_id":"FirstVoice8367""#);
+    let (reply, _) = keys::answer(&first, &store, &mut works, true);
+    assert_eq!(reply["done"]["code"], "works", "{reply}");
+    let (reply, done) = keys::answer(&alone, &store, &mut works, true);
+    never_said(&reply, &done);
+    assert_eq!(reply["done"]["code"], "works", "{reply}");
+    assert!(done.unwrap().restart_voice);
+    assert_eq!(works.1.len(), 2, "the new voice checked with the kept key");
+    assert_eq!(
+        fs::read_to_string(store.0.join("elevenlabs.key")).unwrap(),
+        PLANTED
+    );
+    assert_eq!(
+        fs::read_to_string(store.0.join("elevenlabs.voice")).unwrap(),
+        format!("{VOICE}\n")
+    );
+    // A voice ID is letters and digits only, never quoted back.
+    let bad = format!(r#"{{"set":"elevenlabs","key":"{PLANTED}","voice_id":"../x"}}"#);
+    let (reply, _) = keys::answer(&bad, &store, &mut works, true);
+    assert_eq!(reply["code"], "bad_field");
+    assert!(!reply.to_string().contains("../x"), "{reply}");
+    never_said(&reply, &None);
+}
+
+/// #8367: off, an ElevenLabs line changes nothing, as every other.
+#[test]
+fn with_the_switch_off_an_elevenlabs_key_changes_nothing() {
+    let store = Store(folder("voice-off"));
+    let mut check = Told(Verdict::Works, vec![]);
+    let line = set("elevenlabs", &format!(r#","voice_id":"{VOICE}""#));
+    let (reply, done) = keys::answer(&line, &store, &mut check, false);
+    assert_eq!(
+        reply,
+        json!({"refused": "own keys are off on this lamp", "code": "unavailable"})
+    );
+    assert!(done.is_none());
+    assert!(check.1.is_empty());
+    assert!(!store.0.exists());
+}

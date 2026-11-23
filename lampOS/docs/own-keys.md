@@ -179,6 +179,73 @@ refused request goes through Autonomous's relay again. Only `lamp-health`'s
 `voice-keys` warning says so; the app could show it beside the keys screen
 (the reviewer's P3 5 on #2167).
 
+## Your own voice: ElevenLabs (#8367, designed, being built)
+
+The person's own ElevenLabs API key and voice ID, set from the app on the
+same `keys.*` path, speak the lamp's live speech in their voice. Agreed on
+#8367 (Mobile 12:02, the first builder 12:03 and 12:18) on #8362's
+contract (the first builder 11:44, Mobile 11:46). The same switch,
+`LAMP_OWN_KEYS`, and nothing new with it off. **Not built yet:** the red
+tests below pin it, and this section becomes the description once they
+pass.
+
+- **The messages:** `keys.get` gains `offers`, one entry per service the
+  lamp takes a key for, `kind` `"model"` or `"voice"` and `fields` the
+  plain fields beside the key:
+  `{"service": "elevenlabs", "name": "ElevenLabs", "kind": "voice", "models": [], "base_url": false, "fields": ["voice_id"]}`,
+  after DeepSeek's (`"kind": "model"`, `"base_url": true`) and Deepgram's.
+  It also gains `"elevenlabs": "own" | "lamp"`, `since.elevenlabs` and
+  `voice_id: {"elevenlabs": id | null}`. A voice ID isn't a secret and
+  comes back; the key never does. `keys.set` takes
+  `{"service": "elevenlabs", "key"?, "voice_id"?, "request_id"?}`: a key
+  needs a voice ID with it the first time; with no `key` only the voice
+  changes, beside a kept key, otherwise `bad_field`. A voice ID is 1 to 64
+  letters and digits. `keys.remove` takes `elevenlabs`.
+- **Where it's kept:** beside the others, `elevenlabs.key` and
+  `elevenlabs.voice` in `/etc/lampOS/voice/own/`, root's, 0600, so the
+  voice reads them as `own_elevenlabs.key` and `own_elevenlabs.voice`. Never
+  in a reply, an error, a journal line or a report.
+- **The check:** one request, `GET https://api.elevenlabs.io/v1/voices/<voice_id>`
+  with `xi-api-key: <key>`, which tries the key and the voice at once. 2xx:
+  kept, "that key and voice work: the lamp now speaks in your ElevenLabs
+  voice, and what it says goes to ElevenLabs under your account and its
+  terms". 401 or 403: "that key was refused". 400 or 404: the voice ID
+  isn't on that account, `voice_refused`. Anything else: unreached,
+  nothing changed. A voice alone is checked with the kept key.
+- **The speech:** at the voice's next start, `with_own_keys` puts the
+  person's key and voice ID on the route's ElevenLabs speech, straight at
+  `https://api.elevenlabs.io/v1` instead of the relay, over the language's
+  and the chosen voice (#5394); one journal line, "ElevenLabs: the person's
+  own key and voice (LAMP_OWN_KEYS)", never the key or the ID. The helper
+  restarts the voice only once the lamp is quiet ("The route at its next
+  start"), so the change is heard from the next thing the lamp says, and a
+  sentence being spoken is never cut. The lamp's fixed lines are cached by
+  voice, so they're rendered again in the person's.
+- **The fallback:** the relay's address, key and voice are kept beside the
+  person's. A piece ElevenLabs refuses for the person's key or voice (401,
+  402, 403 or 404, a bad key, a voice gone, credits run out) is said in the
+  lamp's own voice after one line, "Your ElevenLabs voice isn't working
+  right now, so I'm back to my own voice.", never silent; every piece after
+  goes to the lamp's voice until the voice restarts, and `voice-keys` tells
+  `lamp-health` "your ElevenLabs key was refused, using the lamp's own".
+- **Off:** the kinds are "not on this lamp", the helper refuses, and the
+  voice reads neither file, so the route is as it was.
+
+**Tests (red until built):** `crates/setup/tests/it/keys.rs`
+(`elevenlabs_is_offered_beside_the_model_services`,
+`an_elevenlabs_key_and_voice_are_checked_kept_and_never_said`,
+`a_voice_alone_changes_only_the_voice_beside_a_kept_key`, and the pin
+`with_the_switch_off_an_elevenlabs_key_changes_nothing`),
+`crates/cloud/src/settings.rs`
+(`keys_line_passes_an_elevenlabs_key_and_voice_or_a_voice_alone`),
+`crates/voice/src/second_config.rs`
+(`the_persons_elevenlabs_key_and_voice_speak_in_place_of_the_lamps`) and
+`crates/voice/src/second_provider/net/tts.rs`
+(`a_refused_own_voice_falls_back_to_the_lamps_with_one_line`). The lamp
+test (#8367): a real key and voice ID entered from the app by that lamp's
+person, a few turns in that voice, a bad key told plainly, and a remove
+giving the lamp's own voice back.
+
 ## Updates
 
 Read one version ahead (#1680): `serve.json`'s `own_keys` field (the
