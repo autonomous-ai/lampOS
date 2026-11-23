@@ -64,6 +64,23 @@ for f in sys.argv[1:]:
   for n,l in enumerate(open(f),1):
     if re.search(r"(^|[; ])([A-Z][A-Z0-9_]*)=\$\2(;|$)",l.rstrip("\n")): print("%s:%d:%s"%(f,n,l.strip()))' $KIT/row/*.sh $KIT/run.sh)
     v "every kit variable has a default (no bare NAME=\$NAME)" '[ -z "$o" ]';;
+  idle-*)
+    # row/idle.lamp.sh: voice/state on the bus (the voice says it each second): resting 3 s in a row is IDLE; speaking
+    # throughout, or a stale state, is NOT IDLE once IDLE_MAX ends. A writer keeps the file fresh while it waits.
+    st=${t#idle-}; mkdir -p $RT/run/lampos-bus/voice/state
+    ( for i in $(seq 1 16); do s=$st; [ "$st" = turns ] && { [ $i -le 3 ] && s=speaking || s=resting; }
+        ms=$(python3 -c 'import time;print(int(time.time()*1000))'); [ "$st" = stale ] && ms=$((ms - 10000)); s=${s%stale}; s=${s:-resting}
+        printf '{"at_unix_ms": %s, "seq": %s}\n{"state": "%s"}' $ms $i $s > $RT/run/lampos-bus/voice/state/latest.n; mv $RT/run/lampos-bus/voice/state/latest.n $RT/run/lampos-bus/voice/state/latest; sleep 0.5; done ) &
+    wp=$!; sleep 0.3; o=$(IDLE_FOR=2 IDLE_MAX=5 lampsh $KIT/row/idle.lamp.sh); wait $wp
+    case $st in resting|turns) v "voice/state $st: IDLE once resting held 2 s" 'echo "$o" | grep -q "^IDLE resting after"';;
+                *) v "voice/state $st: NOT IDLE at IDLE_MAX" 'echo "$o" | grep -q "^NOT IDLE"';; esac;;
+  gateway-8320)
+    # #8320 on stable (no #8323): swap and restore restart OpenClaw's gateway after lamp-control, and check (VERIFY)
+    # fails when the gateway's namespace holds an older lamp-control socket than the host's.
+    sw=$(grep -c '^gwrestart || ok=0$' $KIT/swap/swap.lamp.sh); rs=$(grep -c 'gwrestart || ok=0; }$' $KIT/swap/restore.lamp.sh)
+    gt=$(grep -c 'lamp-openclaw-gateway"$' $KIT/swap/swap.sh); ck=$(grep -c 'why="$why control-sock-stale-in-gateway(#8320)"' $KIT/row/check.lamp.sh)
+    o="swap restarts $sw, restore restarts $rs, swap gates $gt, check fails stale $ck"
+    v "gateway restarted after lamp-control, stale socket fails VERIFY" '[ "$o" = "swap restarts 1, restore restarts 1, swap gates 1, check fails stale 1" ]';;
   namenear)
     # The Mac voice's "Hey Lamp" (#8318, e82d 22 Nov): save lays LAMP_NAME_NEAR=off as the row's /run drop-in and checks
     # it took; unrow removes that drop-in and checks lamp-voice is back to the product's value.

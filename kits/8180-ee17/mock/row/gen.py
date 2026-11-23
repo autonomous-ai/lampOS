@@ -91,10 +91,11 @@ PASS = {
  "out/mute.lamp.sh": "MUTE OFF OK\n", "out/save.lamp.sh": "ENGINE openclaw\nBASE build 15322\nLINKED google gmail-app (files: gmail-app)\nNAMENEAR off (row drop-in)\nSAVED OK\n",
  "out/unrow.lamp.sh": "PASS LAMP_MAKE_MAY_RUN_ON not set\nPASS LAMP_NAMED_AGENT_TAKES_LINE not set\nPASS LAMP_NAME_NEAR back to the product's ('on')\nPASS lamp-cloud active\nUNROW OK\n",
  "out/micoff.lamp.sh": "RECORD_BACK {\"muted\":true}\nMUTE BACK OK after 4s\n",
+ "out/idle.lamp.sh": "IDLE resting after 3.0s\n",
  # ee17 (23 Nov): swap binds #8180's four parts over stable, restore takes them away (swap/*.lamp.sh)
  "out/swap.lamp.sh": "".join("INSTALLED %s 11aa (/opt/lampOS/%s/15543/%s)\n" % (b, b[5:], b) for b in ("lamp-tasks", "lamp-control", "lamp-skills", "lamp-voice"))
-     + "".join("PASS %s runs %s 22bb\n" % (b, b) for b in ("lamp-tasks", "lamp-control", "lamp-skills", "lamp-voice")) + "SWAPPED OK\n",
- "out/restore.lamp.sh": "".join("PASS %s back on installed 11aa\n" % b for b in ("lamp-tasks", "lamp-control", "lamp-skills", "lamp-voice")) + "RESTORED OK\n",
+     + "".join("PASS %s runs %s 22bb\n" % (b, b) for b in ("lamp-tasks", "lamp-control", "lamp-skills", "lamp-voice")) + "GATEWAY restarted, listening after 6s\nSWAPPED OK\n",
+ "out/restore.lamp.sh": "".join("PASS %s back on installed 11aa\n" % b for b in ("lamp-tasks", "lamp-control", "lamp-skills", "lamp-voice")) + "GATEWAY restarted, listening after 6s\nRESTORED OK\n",
  # N (#7269): off (as on stable) the voice answers; on, the voice's hand-over line (second_provider.rs, #7269)
  "out/named.lamp.sh.read": "NAMED env='' dropin=absent\nENGINE default=openclaw engines=openclaw,hermes\nENGINEFILE {\"version\":1,\"engine\":\"openclaw\"} engine=openclaw\nMUTE muted=False\nTASKMAX 5\n",
  "out/named.lamp.sh.task": "TASKMAX 5\nTASK - id=6 engine=openclaw state=running alias=lamp weather=yes words=9\nTASKS - new=1 above 5\n",
@@ -216,6 +217,7 @@ case("RUN.pass-swap", "A B D N", "F G", boot=True, env={"MIC_YES": "yes", "RUNSH
 case("RUN.void-badart", "A B D N", "F G", boot=True, env={"MIC_YES": "yes", "RUNSH": "1", "BADART": "lamp-skills", "GREP": "'lamp-skills sha [0-9a-f]+ is not SHA256SUMS'"})
 case("RUN.void-swapfail", "A B D N", "F G", boot=True, over={"out/swap.lamp.sh": "FAIL lamp-voice not on the test build (pid 0, )\nSWAP NOT OK\n"}, env={"MIC_YES": "yes", "RUNSH": "1", "GREP": "'STOP at swap'"})
 case("RUN.fail-restore", "A B D N", "F G", boot=True, over={"out/restore.lamp.sh": "NOT OURS: /opt/lampOS/voice/15543/lamp-voice bound from /x: left\nRESTORE NOT OK\n"}, env={"MIC_YES": "yes", "RUNSH": "1", "GREP": "'still bound over the installed ones'"})
+case("RUN.void-stalesock", "A B D N", "F G", boot=True, over={"out/check.lamp.sh": "CONTROLSOCK host=811 gateway=702 (gateway pid 990)\nVERIFY FAIL: control-sock-stale-in-gateway(#8320)\nREADY\n"}, env={"MIC_YES": "yes", "RUNSH": "1", "GREP": "'STOP at verify: no .\\^VERIFY PASS'"})
 case("RUN.pass-noputback", "A B D N", "F G", boot=True, env={"MIC_YES": "yes", "RUNSH": "1", "GREP": "'PUTBACK skipped'"})
 # run.sh's order: legs, then the tails in a second invocation
 case("ALL.pass-split", "A B C D E K H P N", "", env={"TAILS2": "'F G'"})
@@ -238,5 +240,5 @@ case("7170.void-muted", "D", boot=True, over={"out/boot.lamp.sh.after": PASS["ou
 case("7170.pass-muted-yes", "D", boot=True, env={"MIC_YES": "yes"}, over={"out/boot.lamp.sh.after": PASS["out/boot.lamp.sh.after"].replace("MUTEBOOT muted=False", "MUTEBOOT muted=True"), "out/micon.lamp.sh": "RECORD_KEPT the person's record from this ROW's first micon stays\nMUTE LIFTED OK after 4s\n"})
 # U: one kit helper alone (unit.sh), against a fake lamp tree: the engine without an app choice, an old-stamped
 # mute, a refused ssh login
-for u in ("engine-env", "engine-app", "engine-none", "mute-oldstamp", "mute-timed", "mute-live", "mute-liveoff", "ssh-retry", "ssh-giveup", "ssh-other", "fixtures", "clips-call", "linked-none", "linked-expired", "linked-ok", "vars-default", "keep-verdicts", "namenear"):
+for u in ("engine-env", "engine-app", "engine-none", "mute-oldstamp", "mute-timed", "mute-live", "mute-liveoff", "ssh-retry", "ssh-giveup", "ssh-other", "fixtures", "clips-call", "linked-none", "linked-expired", "linked-ok", "vars-default", "keep-verdicts", "namenear", "idle-resting", "idle-turns", "idle-speaking", "idle-stale", "gateway-8320"):
     case("U.pass-" + u, " ", env={"UNIT": u})

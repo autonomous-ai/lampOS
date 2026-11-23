@@ -43,8 +43,23 @@ starts twice more per run (once at swap, once at restore), well inside GATE's 10
 
 ## Mocks
 
-`mock/row/run-all.sh` runs the e82d cases plus four for the swap:
+`mock/row/run-all.sh` runs the e82d cases (with the voice-idle wait, `row/idle.lamp.sh`) plus these for ee17:
 - `RUN.pass-swap`: the whole run, ending `RESTORED OK`.
 - `RUN.void-badart`: one ART binary doesn't match its SHA256SUMS, so swap stops before any lift.
 - `RUN.void-swapfail`: a unit isn't on the test build after the binds, so the run stops at swap.
 - `RUN.fail-restore`: restore finds a bind it didn't make, so the run stops, puts the mute back and keeps the lock.
+- `RUN.void-stalesock`: the gateway's namespace holds an older lamp-control socket than the host's (#8320), so the
+  run stops at verify, before any lift.
+- `U.pass-gateway-8320`: swap and restore both restart lamp-openclaw-gateway after lamp-control, and check fails on a
+  stale socket.
+
+## #8320 on stable
+
+ee17's stable (15543) has no #8323. OpenClaw's gateway binds lamp-control's socket into its namespace once, when it
+starts, and a skill run's fence inherits that namespace. The swap restarts lamp-control, so the old gateway would keep
+a dead socket, and every skill-run leg would fail for a reason that isn't #8180. So:
+- `swap` and `restore` restart lamp-openclaw-gateway after the four units start, and wait for its port (at most 90 s).
+- `check` compares the socket's inode on the host with the one in the gateway's namespace (`nsenter -m`). If they
+  differ, it prints `VERIFY FAIL: control-sock-stale-in-gateway(#8320)`, and the run stops before any lift.
+
+The ROW line says the gateway was restarted after the swap.

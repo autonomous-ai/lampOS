@@ -29,6 +29,12 @@ JS=$(echo "$JA" | grep -F "each run gets its own cgroup under" | tail -1); JM=$(
 [ -n "$JM" ] && why="$why runs-have-no-own-cgroup"
 echo "UNITS $(for x in lamp-voice lamp-tasks lamp-skills lamp-openclaw-gateway lamp-cloud lamp-update lamp-control; do printf '%s=%s ' $x $(systemctl is-active $x); done)"
 for x in lamp-voice lamp-tasks lamp-skills lamp-cloud lamp-control; do systemctl is-active -q $x || why="$why $x-not-active"; done
+# #8320: a skill run reaches lamp-control only if the gateway's namespace holds lamp-control's current socket (the
+# same inode as the host's). A stale one means lamp-control restarted under the gateway: the legs would fail for that.
+CS=/run/lampos-control/control.sock; GP=$(pid lamp-openclaw-gateway)
+hi=$(stat -L -c %i $CS 2>/dev/null); gi=$( [ "${GP:-0}" != 0 ] && nsenter -t $GP -m stat -L -c %i $CS 2>/dev/null)
+echo "CONTROLSOCK host=${hi:-none} gateway=${gi:-none} (gateway pid ${GP:-0})"
+[ -n "$hi" ] && [ "$hi" = "$gi" ] && echo "CONTROLSOCK OK the gateway's namespace has lamp-control's socket" || why="$why control-sock-stale-in-gateway(#8320)"
 [ -z "$why" ] && echo "VERIFY PASS" || echo "VERIFY FAIL:$why"
 # Ready (the round kit's ready.lamp.sh): units up, OpenClaw among the lamp's engines, targets not starting.
 why=""

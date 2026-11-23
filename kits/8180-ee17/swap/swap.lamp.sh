@@ -21,6 +21,7 @@ for u in $UNITS; do [ "$(pid $u)" = 0 ] || { echo "SWAP STOP: $u still has a pid
 for p in $PARTS; do part=${p%%:*}; bin=${p##*:}; mount --bind -o ro $(tdir $part)/$bin "$(inst $part $bin)"; n "bind $(tdir $part)/$bin over $(inst $part $bin)"; done
 systemctl start $UNITS; n "started $UNITS on the #8180 build"; sleep 25
 set +e; ok=1
+gwrestart || ok=0
 for p in $PARTS; do part=${p%%:*}; r=${p#*:}; unit=${r%%:*}; bin=${r#*:}; pp=$(pid $unit)
   s=$(sha256sum /proc/$pp/exe 2>/dev/null | cut -d' ' -f1); t=$(sha256sum $(tdir $part)/$bin | cut -d' ' -f1)
   [ -n "$s" ] && [ "$s" = "$t" ] && echo "PASS $unit runs $bin $s" || { echo "FAIL $unit not on the test build (pid $pp, $s)"; ok=0; }

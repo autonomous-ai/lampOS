@@ -5,7 +5,7 @@
 # them to /tmp/t8180 on the lamp, runs swap.lamp.sh. Ends SWAPPED OK | SWAP NOT OK (then ./restore.sh at once). Run by ../run.sh `swap`.
 set -u; O=$(cd "$(dirname "$0")" && pwd); D=$O/../row; . $D/kit.sh
 ART=${ART:-$O/art}; BINS="lamp-tasks lamp-control lamp-skills lamp-voice"
-RENEW || exit 1; UNITS_MAC="lamp-voice lamp-skills lamp-control lamp-tasks"
+RENEW || exit 1; UNITS_MAC="lamp-voice lamp-skills lamp-control lamp-tasks lamp-openclaw-gateway"
 for b in $BINS; do
   [ -f $ART/$b ] || { echo "no $ART/$b"; exit 1; }
   want=$(awk -v b=$b '$2 == b || $2 == "*"b {print $1}' $ART/SHA256SUMS); got=$(shasum -a 256 $ART/$b | cut -d' ' -f1)
