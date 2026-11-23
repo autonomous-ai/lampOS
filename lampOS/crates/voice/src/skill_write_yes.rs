@@ -1736,7 +1736,8 @@ pub fn approve(
             eprintln!(
                 "lamp-voice: request {request}: a skill's task approved on the person's yes (#6305)"
             );
-            // An agent skill's first run asked it: run now, as asked.
+            // An agent skill's first run asked it, or a run the person
+            // asked for aloud just now (#8415): run now, as asked.
             let next = match result["call"].as_str() {
                 Some(tool) => crate::upload_agent::approved_next(tool),
                 None => crate::skill_task_yes::APPROVED_NEXT.to_owned(),

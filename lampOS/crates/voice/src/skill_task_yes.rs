@@ -309,6 +309,10 @@ pub struct TaskAsks {
     /// Whether lamp-control keeps the owner's yes for exactly this folder
     /// and grants ([`agreed_by`]); the manage helper never says.
     pub approved: bool,
+    /// The function the model calls to run it (its `tool`), when it has
+    /// one: called again at once when the person's yes comes for a run
+    /// they asked for aloud (#8415).
+    pub tool: Option<String>,
 }
 
 impl TaskAsks {
@@ -332,6 +336,7 @@ impl TaskAsks {
             package: text("package"),
             from: text("from")?,
             approved: false,
+            tool: text("tool"),
         })
     }
 
@@ -1000,12 +1005,42 @@ fn read_from_file(manage: &Path, name: &str) -> bool {
 /// has the SHA-256 and the grants said back; else [`NOT_SAID_BACK`] and
 /// nothing is recorded.
 pub fn approve_by(manage: &Path, control: &Path, asks: &Asks) -> Result<Value, String> {
+    approve_by_asked(manage, control, asks, asked_aloud_now)
+}
+
+/// Whether the owner asked for `skill` by voice within
+/// [`crate::told_when_asked::WITHIN_MS`] (`LAMP_TOLD_WHEN_ASKED`, on in the
+/// product): its run waits on this yes, so the yes runs it (#8415).
+fn asked_aloud_now(skill: &str) -> bool {
+    let now_unix_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64);
+    crate::told_when_asked::on()
+        && crate::told_when_asked::asked_within(
+            Path::new(crate::told_when_asked::SPOKEN_ASKS_FILE),
+            skill,
+            now_unix_ms,
+        )
+}
+
+/// [`approve_by`], with `asked_aloud` saying whether the person asked for
+/// the skill aloud just now. Then the yes runs what they asked for at once
+/// (#8415, lamp-ee17 on #8180: the yes was kept, and nothing ran until the
+/// person asked again): the model is told to call the skill's tool now,
+/// once. A yes with no such ask, or for a skill with no tool, is kept for
+/// its next ask or trigger, as before.
+pub fn approve_by_asked(
+    manage: &Path,
+    control: &Path,
+    asks: &Asks,
+    asked_aloud: impl Fn(&str) -> bool,
+) -> Result<Value, String> {
     let grants = asks.grants.as_ref().ok_or("not a skill's task")?;
     let set = |grants: &[String]| grants.iter().cloned().collect::<BTreeSet<String>>();
-    match read_by(manage, &asks.skill)? {
-        Some(now) if now.sha256 == asks.sha256 && set(&now.grants) == set(grants) => {}
+    let tool = match read_by(manage, &asks.skill)? {
+        Some(now) if now.sha256 == asks.sha256 && set(&now.grants) == set(grants) => now.tool,
         _ => return Err(NOT_SAID_BACK.to_owned()),
-    }
+    };
     let line = json!({ RECORD: {"name": asks.skill, "sha256": asks.sha256, "grants": grants} });
     let answer = crate::tools::reached(control, &line, HELPER_WAIT)
         .ok_or("lamp-control couldn't be reached")?
@@ -1019,7 +1054,10 @@ pub fn approve_by(manage: &Path, control: &Path, asks: &Asks) -> Result<Value, S
         (Some(true), _) if crate::upload_agent::on() && read_from_file(manage, &asks.skill) => {
             Ok(json!({ "approved": 1, "call": asks.skill.replace('-', "_") }))
         }
-        (Some(true), _) => Ok(json!({ "approved": 1 })),
+        (Some(true), _) => match tool.filter(|_| asked_aloud(&asks.skill)) {
+            Some(tool) => Ok(json!({ "approved": 1, "call": tool })),
+            None => Ok(json!({ "approved": 1 })),
+        },
         (_, Some(why)) => Err(why.to_owned()),
         _ => Err("lamp-control said nothing".to_owned()),
     }
@@ -1038,6 +1076,7 @@ mod tests {
             package: None,
             from: "the Skills Store".into(),
             approved,
+            tool: None,
         }
     }
 
@@ -1702,6 +1741,48 @@ mod tests {
         (note, kept)
     }
 
+    /// #8415 (lamp-ee17 on #8180): the person asked for a pushed skill
+    /// aloud, its run asked their yes, and they said yes. The yes runs it
+    /// at once: the model is told to call its tool. A yes with no spoken
+    /// ask just now, or for a skill with no tool, is only kept, as before.
+    #[test]
+    fn a_yes_for_a_run_asked_aloud_runs_it_and_one_not_asked_is_only_kept() {
+        let dir = std::env::temp_dir().join(format!("lamp-voice-yes-runs-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let (manage, control) = (dir.join("manage.sock"), dir.join("control.sock"));
+        let asks = booth(false).asks();
+        let read = |tool: Option<&str>| {
+            json!({"done": {"name": "photo-booth", "sha256": "ab".repeat(32),
+                "grants": ["light", "camera"], "task": "Take a photo",
+                "from": "your computer", "tool": tool}})
+        };
+        for (tool, asked, told) in [
+            (
+                Some("take_photo"),
+                true,
+                json!({"approved": 1, "call": "take_photo"}),
+            ),
+            (Some("take_photo"), false, json!({"approved": 1})),
+            (None, true, json!({"approved": 1})),
+        ] {
+            let helper = answering(&manage, vec![read(tool)]);
+            let lamp_control = answering(&control, vec![json!({"recorded": true})]);
+            assert_eq!(
+                approve_by_asked(&manage, &control, &asks, |skill| {
+                    assert_eq!(skill, "photo-booth");
+                    asked
+                })
+                .unwrap(),
+                told,
+                "{tool:?} asked {asked}"
+            );
+            helper.join().unwrap();
+            lamp_control.join().unwrap();
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// A `do.task` with no yes, its trigger fired: the lamp itself says the
     /// read-back `read_back` says (the task, where its script came from,
     /// each grant), and asks for the yes; the owner's yes in a later heard
@@ -1937,6 +2018,7 @@ mod tests {
             package: None,
             from: "the Skills Store".into(),
             approved: false,
+            tool: None,
         };
         let now = Instant::now();
         let ask = |task: TaskAsks, at: u64| {

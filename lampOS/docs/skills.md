@@ -1972,7 +1972,12 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   and was never told why). A run refused for want of the yes (either line
   above) asks the voice's say service for the yes itself:
   `{"skill": NAME, "task_yes": true, "priority": 5, "expires_in_ms":
-  60000}` (`task::ask_yes`). The ask carries no words: on the say
+  60000}` (`task::ask_yes`). A run the person asked for aloud just now asks
+  at priority 8 (`task::yes_ask_priority`, #8414): the say service's first
+  urgent priority, which waits only 1 s of quiet after the last turn, so the
+  yes comes as the lamp's next line and not 15 s or more later; a trigger's
+  or a schedule's asks at 5. A `task_yes` takes 0 to 8; 9 stays the voice's
+  own. The ask carries no words: on the say
   service's client thread the voice reads the skill on the lamp through the
   manage helper and lamp-control, as the read-back does, and builds the
   same say-back ("Photo booth hands one task to the lamp's agent: … It
@@ -2062,7 +2067,14 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   now is a new run, so it calls the skill (`skill_write_yes::waiting_note`;
   #6749 A: on lamp-52e6 on 13 Nov, told the task "will now" run, the model
   said on the next "desk check" that it was "already approved and is
-  running" and called nothing). In a busy room the yes is heard within the
+  running" and called nothing). One exception (#8415): when the person
+  asked for that skill aloud within five minutes (`LAMP_TOLD_WHEN_ASKED`,
+  on in the product) and it has a `tool` (the manage helper's `task_asks`
+  now names it), the yes runs what they asked for: the model is told to
+  call that tool now, once (`skill_task_yes::approve_by_asked`,
+  `upload_agent::approved_next`), and the run, its yes kept, goes ahead.
+  Before, on lamp-ee17 (#8180's row), the yes was kept and nothing ran
+  until the person asked again. In a busy room the yes is heard within the
   thread's 45 s from the end of the say-back as played, not from its start
   (#6749 C, docs/second-voice.md). With `LAMP_SKILL_YES_CARRY=on` (off by
   default, #7148), a yes no face was seen saying is carried as the known
