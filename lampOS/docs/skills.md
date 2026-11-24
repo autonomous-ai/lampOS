@@ -8665,12 +8665,16 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    person's trigger is put on as kept; a skill added from a file keeps two
    (`capped_added`). **Their whole phrase** (`skill_named::said_whole`,
    the first builder's required change on #8469) is the words of their
-   line after its last "say", "said", "hear" or "heard" before the ask, to
-   the end of that clause (a `,`, `.`, `;`, `:`, `!` or `?`), lowercased:
+   line after its last "say", "said", "hear" or "heard" before the ask
+   with "I" or "you" right before it ("whenever I say", "when you hear",
+   "I said"), to the end of that clause (a `,`, `.`, `;`, `:`, `!` or `?`), lowercased:
    "hello there pebble" in "whenever I say hello there pebble, email me…".
    "says" and "saying" are no such words: in a make's line they mostly
    tell what the skill says ("a skill that says good morning", Thirteen's
-   P2 on #8469). **An ask that passes is kept** (Thirteen's and Twelve's
+   P2 on #8469), and an order to the skill with no "I" or "you" before
+   its cue ("when I wake up, say good morning", "every night at ten, say
+   good night and dim the light") names what it says, never its start
+   (Thirteen's P2 at 77700b81fb). **An ask that passes is kept** (Thirteen's and Twelve's
    P1 on #8469), though their whole phrase runs on past it and breaks a
    rule: "movie night" from "whenever I say movie night dim the lights",
    and "pebble night" from "when I say pebble night turn off the lights",
@@ -8689,8 +8693,10 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    because a yes or a no is mine to answer." ("whenever I say yes
    please") (`plain_reason` and `not_made_line` say it as it is),
    journaled as `a made skill was not kept: its asks weren't kept: asks =
-   [<as given>]: "<the ask>": the person's own words, <made_ask_refused's
-   words>: told at once, no repair`. **A refused ask that is only part of
+   [<as given>]: "<the phrase named>": the person's own words,
+   <made_ask_refused's words for it>: told at once, no repair`, the phrase
+   named being the ask, or their whole phrase when the plain line names
+   that (below). **A refused ask that is only part of
    their longer phrase** ("hello there" from "hello there pebble") is the
    writer's mistake: when their whole phrase (2 to 8 words within 60
    characters) also breaks such a rule, the plain line is said at once
@@ -8701,10 +8707,13 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    it: <that line>. "<the ask>" is only part of the words the person said
    for its start; use the words they said: <their whole phrase>. <the
    form>`. **A refused ask where no whole phrase of theirs is found**
-   (no "say", "said", "hear" or "heard" before it in its clause: "good
-   morning" from "make a skill that says good morning and plays jazz when
-   I wake up") is the writer's pick and gets the ordinary repair below,
-   never the plain line. A count or a length of words is still repaired:
+   (no "say", "said", "hear" or "heard" after "I" or "you" before it in
+   its clause: "good morning" from "make a skill that says good morning
+   and plays jazz when I wake up" or "when I wake up, say good morning")
+   and a refused ask inside a phrase of theirs too long to be an ask
+   (over 8 words or 60 characters: "good morning" from "whenever I say
+   good morning to my little desk lamp friend pebble") are the writer's pick and get the
+   ordinary repair below, never the plain line. A count or a length of words is still repaired:
    the writer may mend it with more or fewer of the person's words. Otherwise it is refused naming its rule (#8451): the
    journal line (the repair's and the "wasn't kept" one) is `its asks
    weren't kept: asks = [<as given>]: "<the ask that failed>": <rule>`,

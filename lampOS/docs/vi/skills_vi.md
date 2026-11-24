@@ -4956,12 +4956,16 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    (`capped_added`). **Nguyên cụm của người dùng**
    (`skill_named::said_whole`, thay đổi bắt buộc của first builder trên
    #8469) là các từ trong câu của họ sau "say", "said", "hear" hoặc
-   "heard" cuối cùng đứng trước cụm đó, đến hết mệnh đề (một `,`, `.`,
+   "heard" cuối cùng đứng trước cụm đó mà ngay trước nó là "I" hoặc
+   "you" ("whenever I say", "when you hear", "I said"), đến hết mệnh đề (một `,`, `.`,
    `;`, `:`, `!` hoặc `?`), viết thường: "hello there pebble" trong
    "whenever I say hello there pebble, email me…". "says" và "saying"
    không phải từ như vậy: trong câu tạo kỹ năng chúng thường nói kỹ năng
    sẽ nói gì ("a skill that says good morning", P2 của Thirteen trên
-   #8469). **Một cụm qua được thì được giữ** (P1 của Thirteen và Twelve
+   #8469), và một lệnh cho kỹ năng mà trước từ đó không có "I" hoặc "you"
+   ("when I wake up, say good morning", "every night at ten, say good
+   night and dim the light") nói kỹ năng sẽ nói gì, không bao giờ là cách
+   khởi động nó (P2 của Thirteen tại 77700b81fb). **Một cụm qua được thì được giữ** (P1 của Thirteen và Twelve
    trên #8469), dù nguyên cụm của người dùng kéo dài sau nó và phạm một
    quy tắc: "movie night" từ "whenever I say movie night dim the lights",
    và "pebble night" từ "when I say pebble night turn off the lights", như
@@ -4980,8 +4984,10 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    because a yes or a no is mine to answer." ("whenever I say yes
    please") (`plain_reason` và `not_made_line` nói nguyên câu), ghi
    journal là `a made skill was not kept: its asks weren't kept: asks =
-   [<như đã viết>]: "<cụm đó>": the person's own words, <lời của
-   made_ask_refused>: told at once, no repair`. **Một cụm bị từ chối chỉ
+   [<như đã viết>]: "<cụm được nêu>": the person's own words, <lời của
+   made_ask_refused cho cụm đó>: told at once, no repair`, cụm được nêu là
+   chính cụm đó, hoặc nguyên cụm của người dùng khi câu nói thẳng nêu
+   nguyên cụm (bên dưới). **Một cụm bị từ chối chỉ
    là một phần của cụm dài hơn người dùng đã nói** ("hello there" từ
    "hello there pebble") là lỗi của người viết: khi nguyên cụm của người
    dùng (2 đến 8 từ trong 60 ký tự) cũng phạm một quy tắc như vậy, câu
@@ -4993,8 +4999,12 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    the words the person said for its start; use the words they said:
    <nguyên cụm của người dùng>. <mẫu form>`. **Một cụm bị từ chối mà không
    tìm thấy nguyên cụm nào của người dùng** (không có "say", "said",
-   "hear" hoặc "heard" đứng trước nó trong mệnh đề: "good morning" từ
-   "make a skill that says good morning and plays jazz when I wake up") là
+   "hear" hoặc "heard" ngay sau "I" hoặc "you" đứng trước nó trong mệnh
+   đề: "good morning" từ "make a skill that says good morning and plays
+   jazz when I wake up" hoặc "when I wake up, say good morning") và một
+   cụm bị từ chối nằm trong cụm của người dùng quá dài để làm một cụm khởi
+   động (hơn 8 từ hoặc 60 ký tự: "good morning" từ "whenever I say good
+   morning to my little desk lamp friend pebble") là
    lựa chọn của người viết và được sửa như thường lệ bên dưới, không bao
    giờ là câu nói thẳng. Số từ hay độ dài vẫn được sửa như trước: người
    viết có thể sửa bằng nhiều hơn hoặc ít hơn từ của người dùng. Nếu
