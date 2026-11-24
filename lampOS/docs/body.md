@@ -1826,8 +1826,8 @@ that is measured with a face, `lamp-body-measure` does not write it, and it
 is not a factory step. Such a lamp runs with gaze off, so a person who calls
 it from a side desk is in the picture and never turned to (#8343, #8344).
 
-With `LAMP_BODY_GAZE_DEFAULT=on` (off unless exactly `on`; off in the
-product unit until its row) a lamp started with `--gaze-socket` and no
+With `LAMP_BODY_GAZE_DEFAULT=on` (off unless exactly `on`; on in the
+product unit) a lamp started with `--gaze-socket` and no
 `--gaze` looks with the product camera's turn, `760,555`
 (`gaze::PRODUCT_TURN`), and says so in its first lines:
 
@@ -1843,8 +1843,8 @@ A `--gaze` in the lamp's `lamp.env` always wins. Nothing else changes: the
 same stillness, sights, reach and no search, so a called lamp with nobody in
 view still makes only the small glance of "Turning to a call" and lets it
 go. Test: `an_unmeasured_lamp_looks_with_the_products_gaze_when_switched_on`.
-Not yet run on a lamp; the row on lamp-52e6 runs it with its own `--gaze`
-taken out by a drop-in.
+Its row on lamp-52e6 runs it with the lamp's own `--gaze` taken out by a
+drop-in.
 
 ## Turning to a call
 
