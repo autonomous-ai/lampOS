@@ -8485,6 +8485,40 @@ Tests: `agent_tasks::tests::a_hand_over_answers_the_works_id_and_a_short_label`,
 The work-records ROW kit:
 [tools/played/README.md](../tools/played/README.md#the-work-records-row-7930-part-1).
 
+### A line while a hand-over waits on a cold session (#8445, `hand_wait`)
+
+After the person's yes, `confirm_agent_task` is answered at once and the
+model says it is handing the work over (in the same breath with the
+lead-in). The work then waits in lamp-tasks, `queued`, until its agent
+takes it up. On lamp-52e6 on 24 Nov (04:3x, #8043's kit-8022) a cold
+session made that wait 76 s: the Harness pane not running, the session
+reopened, `ENGINE_NOT_READY` once, the turn accepted in 29,099 ms. The
+person heard nothing after the first line.
+
+Now, 20 s after a hand-over asked by voice (`hand_wait::AFTER`), the voice
+reads the work's record once (`{"op":"work"}` on the request socket, as
+[the voice's own look at its work](#the-voice-asks-about-its-work-7930)
+does). If it is still `queued`, and it is still the work handed over last,
+one line is asked of the say service as the voice's own, at the normal
+priority, let go if not begun within 15 s:
+
+- "Your computer is waking up; it'll start in a moment.";
+- for the lamp's own engine, "I'm still getting ready; I'll start in a
+  moment."
+
+It is said at most once per hand-over, and never a third line: nothing
+more is read or said for that work. Taken up, finished, failed, gone, or
+another hand-over since: nothing is said. A hand-over that then fails is
+still told as the task news tells one: this line marks nothing told.
+A wait already told at the hand-over gets no line at 20 s
+(`hand_wait::told_at_hand_over`): when the lamp knows the computer's
+pane is stopped, the waking line is said from the start, and only that
+one (the first builder on #8445, 14:51: one line about the wait, never
+two). Work asked by text gets no line, and without the say service
+(`LAMP_SAY` off) nothing is read or said. The journal says
+`lamp-voice: tasks: work N still waits for its agent after 20 s: said it is
+starting`.
+
 ### How the lamp's Harness is (#6061 part B, off unless `LAMP_TASKS_HARNESS_STATUS=on`)
 
 The voice could not say whether the lamp's Harness is signed in, or which
