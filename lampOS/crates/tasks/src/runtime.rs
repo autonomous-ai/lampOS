@@ -2325,6 +2325,11 @@ fn owner<C: Clock>(
     let mut forgotten = crate::works::Forgotten::load(&forgotten_file);
     // The app's choice of the lamp's default engine (#6492), as kept.
     let lamp = set_up_later.as_ref().and_then(|later| later.lamp.clone());
+    // A direct session other than OpenClaw's takes work only while its
+    // engine is the lamp's default, read live (#8431).
+    if let Some(side) = lamp.clone() {
+        crate::direct::set_lamp_default(move || lamp_order(&side).first().copied());
+    }
     if let Some(side) = lamp.as_ref()
         && let Some(chosen) = read_engine_default(&engine_default)
         && let Ok(mut app) = side.app.lock()

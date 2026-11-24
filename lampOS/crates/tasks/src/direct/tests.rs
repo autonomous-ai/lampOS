@@ -1392,3 +1392,44 @@ fn a_hermes_launch_waits_on_its_own_session() {
     assert_eq!(left, None);
     assert_eq!(ready, None);
 }
+
+/// #8431 HOLD (P2): a task named for Hermes while OpenClaw is the lamp's
+/// default is not the direct path's (lamp-update runs Hermes's gateway only
+/// while Hermes is the default): no 60 s wait and "still getting ready",
+/// Harness's path and its progress keep it. Hermes the default, or none
+/// read (no lamp side), the direct session takes it as before.
+#[test]
+fn a_hermes_task_on_an_openclaw_default_lamp_keeps_harnesss_path() {
+    let fake = Fake::of(Engine::Hermes);
+    fake.state().not_ready = u32::MAX;
+    let lamp = started(fake);
+    set_test_lamp(Some(lamp.direct.clone()));
+    let hermes = launch(EngineKind::Hermes, "Ask Hermes the time");
+    let mut seen = Vec::new();
+    for default in [
+        Some(Some(EngineKind::Openclaw)),
+        Some(Some(EngineKind::Hermes)),
+        None,
+    ] {
+        set_test_default(default);
+        let started_at = Instant::now();
+        let waited = not_ready_for(&hermes, Duration::from_millis(200));
+        seen.push((
+            default,
+            lamp.direct.takes(&hermes),
+            lamp_path("hermes", MACHINE),
+            waited.is_some(),
+            started_at.elapsed() < Duration::from_millis(150),
+        ));
+    }
+    set_test_default(None);
+    set_test_lamp(None);
+    assert_eq!(
+        seen,
+        vec![
+            (Some(Some(EngineKind::Openclaw)), false, false, false, true),
+            (Some(Some(EngineKind::Hermes)), true, true, true, false),
+            (None, true, true, true, false),
+        ]
+    );
+}
