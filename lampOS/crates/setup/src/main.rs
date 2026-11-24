@@ -443,6 +443,12 @@ impl Recovering {
         self.status.lock().unwrap().phase == lamp_setup::serve::Phase::Connecting
     }
 
+    /// Setup runs on its page since it opened: one more is a setup step
+    /// (#8484).
+    fn runs(&self) -> u64 {
+        self.status.lock().unwrap().run
+    }
+
     fn close(self) {
         let _ = self.stop.send(true);
         let _ = self.serving.join();
@@ -548,6 +554,7 @@ fn recover(config: lamp_setup::serve::Config) -> Result<bool, Box<dyn std::error
                 || lamp_setup::wifi_change::ImageRejoin::new()
                     .previous
                     .exists(),
+            run: open.as_ref().map_or(0, Recovering::runs),
             phones: if open.is_some() {
                 lamp_setup::serve::phones(&config.interface)
             } else {
@@ -557,6 +564,15 @@ fn recover(config: lamp_setup::serve::Config) -> Result<bool, Box<dyn std::error
         let was = policy.recovering();
         let now_ms = u64::try_from(begun.elapsed().as_millis()).unwrap_or(u64::MAX);
         let act = policy.step(now_ms, seen);
+        // Counts only (#8484): never a network's name or a phone's address.
+        if policy.dropped_stale() {
+            eprintln!(
+                "lamp-setup: recover: a setup run took no step for {} min: it holds the saved network's retry no more ({} phone(s) on the hotspot)",
+                lamp_setup::recover::PHONE_HOLDS_MS / 60_000,
+                seen.phones
+                    .map_or_else(|| "uncounted".to_owned(), |phones| phones.to_string())
+            );
+        }
         let say_line = policy.says_line(act, now_ms);
         // Neither open nor retried from: its line no longer stands (#5550).
         if !policy.recovering() {

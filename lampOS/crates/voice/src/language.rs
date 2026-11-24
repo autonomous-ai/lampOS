@@ -150,8 +150,7 @@ pub const BACK_ONLINE: &str = "I'm back online.";
 pub const VOICE_SERVICE_UNREACHABLE: &str =
     "Sorry, I'm having trouble thinking right now. Give me a moment.";
 pub const WIFI_LOST: &str = "I can't reach any Wi-Fi. If you changed your Wi-Fi's name or password, push a paperclip into the hole marked reset on the back of my base and hold it for five seconds. That erases me and starts setup again.";
-pub const WIFI_RECOVERING: &str =
-    "I can't reach my Wi-Fi, so I've opened setup. Set my Wi-Fi again in the app.";
+pub const WIFI_RECOVERING: &str = "I can't reach my Wi-Fi, so I've opened setup. I'll keep trying it, or set my Wi-Fi again in the app.";
 
 pub const SIGNED_OUT: &str = "I've been signed out. Please set me up again in the app.";
 /// The failed turn's line (`turn_lost`, #4883): the key of its words in the
@@ -283,10 +282,10 @@ const FIXED_LINES: &[(&str, [&str; 4])] = &[
     (
         WIFI_RECOVERING,
         [
-            "Mình không kết nối được Wi-Fi nên đã mở chế độ cài đặt. Bạn cài lại Wi-Fi cho mình trong ứng dụng nhé.",
-            "Wi-Fiにつながらないから、設定モードにしたよ。アプリでWi-Fiをもう一度設定してね。",
-            "我连不上Wi-Fi，已经打开了设置。请在App里重新帮我设置Wi-Fi。",
-            "와이파이에 연결할 수 없어서 설정 모드를 열었어요. 앱에서 와이파이를 다시 설정해 주세요.",
+            "Mình không kết nối được Wi-Fi nên đã mở chế độ cài đặt. Mình sẽ tự thử lại, hoặc bạn cài lại Wi-Fi cho mình trong ứng dụng nhé.",
+            "Wi-Fiにつながらないから、設定モードにしたよ。自分でもつなぎ直してみるけど、アプリでWi-Fiをもう一度設定してもいいよ。",
+            "我连不上Wi-Fi，已经打开了设置。我会自己继续尝试，你也可以在App里重新帮我设置Wi-Fi。",
+            "와이파이에 연결할 수 없어서 설정 모드를 열었어요. 계속 다시 연결해 볼게요. 앱에서 와이파이를 다시 설정해 주셔도 돼요.",
         ],
     ),
     (

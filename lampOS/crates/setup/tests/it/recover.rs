@@ -9,6 +9,7 @@ const GONE: Seen = Seen {
     online: false,
     associated: false,
     busy: false,
+    run: 0,
     phones: Some(0),
 };
 const BACK: Seen = Seen {
@@ -69,7 +70,7 @@ fn the_hotspots_line_is_said_once_a_loss() {
     assert_eq!(RECORDING_OPENED, "wifi_recovering");
     assert_eq!(
         SAY_OPENED,
-        "I can't reach my Wi-Fi, so I've opened setup. Set my Wi-Fi again in the app."
+        "I can't reach my Wi-Fi, so I've opened setup. I'll keep trying it, or set my Wi-Fi again in the app."
     );
     assert!(!SAY_OPENED.contains("reset") && !SAY_OPENED.contains("erase"));
 }
@@ -236,19 +237,71 @@ fn setup_or_a_wifi_change_running_holds_it() {
     assert_eq!(policy.step(690_000, GONE), Some(Act::OpenHotspot));
 }
 
+/// #8484: a setup run on the hotspot's page that takes steps (a new run
+/// every 4 min, each inside the bound) holds the retry for as long as it
+/// goes on, a phone on the hotspot.
 #[test]
-fn a_setup_run_is_never_cut_by_a_retry() {
+fn a_live_setup_run_with_a_phone_holds_the_retry() {
     let mut policy = Recovery::default();
     looks(&mut policy, 0, LOSS_GRACE_MS, GONE);
-    let setting_up = Seen {
-        busy: true,
-        phones: Some(1),
-        ..GONE
-    };
-    assert!(looks(&mut policy, LOSS_GRACE_MS + 5_000, 3_000_000, setting_up).is_empty());
+    let mut acts = Vec::new();
+    for at in (LOSS_GRACE_MS + 5_000..=3_000_000).step_by(5_000) {
+        let setting_up = Seen {
+            busy: true,
+            run: 1 + (at - LOSS_GRACE_MS) / 240_000,
+            phones: Some(1),
+            ..GONE
+        };
+        acts.extend(policy.step(at, setting_up));
+        assert!(!policy.dropped_stale(), "{at}");
+    }
+    assert!(acts.is_empty(), "{acts:?}");
     assert!(policy.recovering());
     // The run over, nobody on: the retry, long due.
     assert_eq!(policy.step(3_005_000, GONE), Some(Act::Rejoin));
+}
+
+/// #8484: a setup run that took no step for 10 min (an app closed halfway,
+/// a run that never ended) holds the retry no more: it goes on as for a
+/// lost network, from under a phone after its own 10 min past due, and the
+/// journal's line is asked once.
+#[test]
+fn a_setup_run_gone_quiet_holds_the_retry_no_longer() {
+    for (phones, first) in [
+        (Some(0), LOSS_GRACE_MS + 5_000 + PHONE_HOLDS_MS),
+        (Some(1), LOSS_GRACE_MS + RETRY_EVERY_MS + PHONE_HOLDS_MS),
+    ] {
+        let mut policy = Recovery::default();
+        looks(&mut policy, 0, LOSS_GRACE_MS, GONE);
+        let quiet = Seen {
+            busy: true,
+            run: 1,
+            phones,
+            ..GONE
+        };
+        let mut acts = Vec::new();
+        let mut dropped = Vec::new();
+        for at in (LOSS_GRACE_MS + 5_000..=3_000_000).step_by(5_000) {
+            acts.extend(policy.step(at, quiet).map(|act| (at, act)));
+            if policy.dropped_stale() {
+                dropped.push(at);
+            }
+        }
+        assert_eq!(acts.first(), Some(&(first, Act::Rejoin)), "{phones:?}");
+        // The try runs out and the hotspot opens again, then again every
+        // 2 min (a phone on it holds each 10 min), not taken by the run.
+        assert_eq!(
+            acts.get(1),
+            Some(&(first + JOIN_WAIT_MS, Act::OpenHotspot)),
+            "{phones:?}"
+        );
+        assert!(acts.len() > 3, "{phones:?}: {acts:?}");
+        assert_eq!(
+            dropped,
+            [LOSS_GRACE_MS + 5_000 + PHONE_HOLDS_MS],
+            "{phones:?}"
+        );
+    }
 }
 
 /// El's P2 on #3024: a phone that joined the open hotspot by itself (it
