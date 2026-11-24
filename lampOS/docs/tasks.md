@@ -6370,7 +6370,10 @@ engine (`direct::serves_now`, the first of `lamp_order`, read live so the app's
 choice counts at once), because lamp-update runs Hermes's gateway only then.
 On a lamp whose default is OpenClaw, a task named for Hermes ("Ask Hermes
 to ...", `LAMP_TASKS_NAMED_ONLY`) keeps Harness's path and its progress, as
-before this switch, with no wait for a gateway that never starts.
+before this switch, with no wait for a gateway that never starts. A task keeps
+the path it started on: a direct Hermes turn still running when the app's
+default moves to OpenClaw stays on its run (`Direct::path` counts its own turns
+whatever the default), never asked of Harness, which never had it.
 
 Hermes direct behaves the same as OpenClaw direct (the owner's acceptance, 23
 Nov): lamp tasks run, and "how far along?" and the status rows are answered

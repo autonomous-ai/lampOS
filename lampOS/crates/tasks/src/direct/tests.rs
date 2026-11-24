@@ -1417,7 +1417,7 @@ fn a_hermes_task_on_an_openclaw_default_lamp_keeps_harnesss_path() {
         seen.push((
             default,
             lamp.direct.takes(&hermes),
-            lamp_path("hermes", MACHINE),
+            lamp_path("hermes", MACHINE, "no-such-agent"),
             waited.is_some(),
             started_at.elapsed() < Duration::from_millis(150),
         ));
@@ -1432,4 +1432,27 @@ fn a_hermes_task_on_an_openclaw_default_lamp_keeps_harnesss_path() {
             (None, true, true, true, false),
         ]
     );
+}
+
+/// #8431 read (P3): a direct Hermes turn keeps the direct path when the
+/// app's default moves to OpenClaw while it runs (its looks and close stay
+/// on its run, never Harness's, which never had it); a task of another
+/// agent then is Harness's.
+#[test]
+fn a_direct_hermes_turn_keeps_its_path_when_the_default_moves_under_it() {
+    let lamp = started(Fake::of(Engine::Hermes));
+    set_test_lamp(Some(lamp.direct.clone()));
+    set_test_default(Some(Some(EngineKind::Hermes)));
+    until("ready", || lamp.direct.is_ready());
+    let agent = joined(
+        lamp.direct
+            .spoken_launch(&launch(EngineKind::Hermes, "Next")),
+    );
+    set_test_default(Some(Some(EngineKind::Openclaw)));
+    let own = lamp_path("hermes", MACHINE, &agent);
+    let other = lamp_path("hermes", MACHINE, "a-harness-agent");
+    let looked = lamp_observe("hermes", MACHINE, &agent).is_some();
+    set_test_default(None);
+    set_test_lamp(None);
+    assert_eq!((own, other, looked), (true, false, true));
 }
