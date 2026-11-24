@@ -11,6 +11,11 @@ dữ liệu múi giờ cục bộ. Trong lần thiết lập đầu, `run_config
 là `/etc/timezone`). Thiết lập khôi phục và helper `wifi.set` của app chỉ dùng
 múi giờ đã lưu: một yêu cầu khôi phục không thể đổi quốc gia bằng cách gửi múi
 giờ mới.
+Thao tác đặt lại bằng cách giữ 5 giây vẫn giữ `/etc/timezone`. Nếu yêu cầu
+thiết lập đầu sau đó gửi múi giờ không được nhận biết, bước kiểm tra bỏ múi
+giờ đó và tiếp tục chọn quốc gia theo múi giờ đã lưu. Chỉ dùng giá trị dự
+phòng khi múi giờ đã lưu được chọn cũng không có ánh xạ; riêng múi giờ điện
+thoại không được nhận biết không bảo đảm kết quả là `US`.
 
 Bộ tra cứu đọc `zone.tab` dưới `Config.zoneinfo`, chỉ nhận mã quốc gia gồm
 đúng hai chữ cái ASCII viết hoa. Thử tên múi giờ được chọn trực tiếp trước,

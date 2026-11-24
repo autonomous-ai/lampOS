@@ -543,6 +543,10 @@ zone is absent, it reads the saved `Config.timezone_file` (normally
 `/etc/timezone`). Recovery setup and the app's `wifi.set` helper use only the
 saved time zone: a recovery request cannot change the country by supplying a
 new zone.
+The 5-second reset keeps `/etc/timezone`. If a later first-setup request has
+an unknown zone, validation drops it and the saved zone still selects the
+country. The configured fallback applies only if the selected saved zone
+also cannot be mapped; an unknown phone zone alone does not guarantee `US`.
 
 The resolver reads `zone.tab` under `Config.zoneinfo` and accepts a country
 only when it is exactly two uppercase ASCII letters. It tries the selected
