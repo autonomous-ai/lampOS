@@ -3950,7 +3950,7 @@ pub fn serve(
             );
             crate::services::Linked::new(folder)
         });
-    let has_tasks = tools.tasks.is_some();
+    let waiting_place = tools.tasks.clone();
     // The tasks part, for a heard plain no to a task read back (#6582), and
     // a heard plain yes to it (#7027).
     let tasks_declined = tools.tasks.clone();
@@ -4934,9 +4934,11 @@ pub fn serve(
     // A hand-over waiting for its yes, with the tasks part (#1712). A made
     // skill waits for nothing: it goes on as soon as it is kept (the owner,
     // 10 Nov), so it is never noted.
-    if has_tasks {
+    if let Some(place) = waiting_place {
+        // A task whose yes window is over is let go there, and said once
+        // (#8462).
         engine = engine.noting_a_task_waiting(Arc::new(move |request, words: &str| {
-            crate::agent_tasks::pending_note(request, words, Instant::now())
+            crate::agent_tasks::waiting_note(&place, request, words)
         }));
     }
     // A heard plain no to a task read back drops it, in the tasks part too
