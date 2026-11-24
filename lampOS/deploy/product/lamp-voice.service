@@ -377,6 +377,9 @@ Environment=LAMP_SAID_TO_ME=on
 # LAMP_NEWS_REPLY_HEEDS_HELD: its why and rules are its row in docs/switches.md (#8383). DEFAULT-ON asked of the first builder
 # on #8383.
 Environment=LAMP_NEWS_REPLY_HEEDS_HELD=on
+# LAMP_SAID_TO_ME_NAME_IN_LINE: its why and rules are its row in docs/switches.md (#8384). DEFAULT-ON asked of the first builder
+# on #8384.
+Environment=LAMP_SAID_TO_ME_NAME_IN_LINE=on
 # LAMP_SPEAKING_READ_LOOKS: its why and rules are its row in docs/switches.md (#7442, #7419).
 Environment=LAMP_SPEAKING_READ_LOOKS=on
 # LAMP_ONE_AS_LAMP: its why and rules are its row in docs/switches.md (#4710).
