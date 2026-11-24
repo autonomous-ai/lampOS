@@ -1140,6 +1140,9 @@ impl Lexicon {
             .flatten();
         // A Korean put-off starts its word, so it is never in a name
         // ("잠시만요"); in Japanese and Chinese one can sit inside one (かな).
+        // The words that are no name are looked for after the mark, since
+        // a mark can hold one: "Appelez-moi Camille" (#8516).
+        let (unmarked, _) = self.without(&line, self.name_marks);
         let names_someone = !asks
             && !greets
             && !again
@@ -1147,7 +1150,7 @@ impl Lexicon {
             && (!puts_off || self.found != Found::WordStart)
             && !self.any_yes(&ungreeted, self.yes)
             && !self.any_yes(&ungreeted, self.strict_yes)
-            && !self.any(&line, self.not_a_name)
+            && !self.any(&unmarked, self.not_a_name)
             && (self.any(&line, self.name_marks) || (1..=self.short_name).contains(&size));
         Reading {
             agrees,
@@ -2546,6 +2549,23 @@ mod tests {
                 // A no answers the quiet hours: none.
                 assert!(read.quiet_hours, "{language:?}: {line}");
             }
+        }
+    }
+
+    #[test]
+    fn a_french_mark_with_moi_still_names_someone() {
+        for line in [
+            "Appelez-moi Camille.",
+            "Appelle-moi Camille.",
+            "Moi c'est Camille.",
+            "Moi, c'est Camille.",
+            "Je m'appelle Camille.",
+        ] {
+            assert!(read(Language::French, line).names_someone, "{line}");
+        }
+        // "moi" alone, or a word that is no name after the mark, still isn't.
+        for line in ["Moi.", "C'est moi.", "Je suis prêt.", "Moi c'est bien."] {
+            assert!(!read(Language::French, line).names_someone, "{line}");
         }
     }
 
