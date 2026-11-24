@@ -98,7 +98,8 @@ pub fn main_page(words: bool, name: &str, build: &str) -> String {
          var open=[].map.call(el.querySelectorAll('details[open]'),function(d){{return d.id;}});\
          el.innerHTML=e.data;open.forEach(function(o){{var d=document.getElementById(o);\
          if(d){{d.open=true;}}}});}});}});\
-         es.onerror=function(){{last=0;}};\
+         es.addEventListener('alive',function(){{last=Date.now();}});\
+         es.onopen=function(){{last=Date.now();}};es.onerror=function(){{last=0;}};\
          setInterval(function(){{dot.className=Date.now()-last<3000?'dot live':'dot';}},500);\
          function show(){{var at=(location.hash||'#overview').slice(1);\
          if(ids.indexOf(at)<0){{at='overview';}}\
