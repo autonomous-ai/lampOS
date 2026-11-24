@@ -487,6 +487,8 @@ fn a_voice_made_one_word_ask_goes_on_through_install_made() {
 /// short answer, "yes please", is refused by the voice's install of a made
 /// skill with the short-answer rule
 /// (`lamp_voice::skill_named::REFUSED_ANSWER`), and nothing goes on.
+/// Asked as the voice asks it, through the helper's one line, as
+/// [`a_voice_made_one_word_ask_goes_on_through_install_made`] is.
 #[test]
 fn a_voice_made_short_answer_ask_is_refused_by_install_made() {
     lamp_voice::made_skill::set_asks_here(Some(true));
@@ -501,14 +503,23 @@ fn a_voice_made_short_answer_ask_is_refused_by_install_made() {
         "yes-glow",
         &asked_toml("[\"yes please\"]"),
     );
-    let refused = install_made(
+    let mut answer = Vec::new();
+    let asked = format!("{{\"install_made\": \"{sha256}\"}}\n");
+    let ok = asked_helper(
         &skills,
-        None,
         &keeping.directory,
-        &sha256,
+        &skills.join("no-state"),
         std::time::Duration::from_millis(500),
+        None,
+        None,
+        asked.as_bytes(),
+        &mut answer,
     )
-    .unwrap_err();
+    .unwrap();
+    let answer: serde_json::Value = serde_json::from_slice(&answer).unwrap();
+    assert!(!ok, "{answer}");
+    assert!(answer.get("done").is_none(), "{answer}");
+    let refused = answer["refused"].as_str().unwrap();
     assert!(
         refused.contains(lamp_voice::skill_named::REFUSED_ANSWER),
         "{refused}"
