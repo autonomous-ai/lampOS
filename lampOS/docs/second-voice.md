@@ -6834,7 +6834,16 @@ after a take-over, but now for every turn:
   nothing: the owner is not named while they know nobody, but the mark
   stays in the walk's file, through a restart too (#8471's lamp run, the
   first builder's call of 24 Nov, a deliberate narrowing of #4290 to a list
-  the owner is not in). A rename of the owner's own face is no forget: a `remember_my_face`
+  the owner is not in). From then until the owner's face is seen again, the
+  walk's file keeps `owner_face_unseen` (posted once as `{"owner_face":
+  {"owner": …, "unseen": true}}`, and held in the voice's memory until the
+  walk takes it), and a list without the owner, as after learn later's
+  first save of someone else, is not the owner gone either (the first
+  builder's 17:50 call, 06c1 at `c374700486`). A face kept under the
+  owner's own name is the owner again (named by default as before) and
+  clears it (`"unseen": false`); from then a list without them ends the
+  mark as #4290 has it. A redo, a reset, a new owner or the owner dropped
+  clears it too. A rename of the owner's own face is no forget: a `remember_my_face`
   with `replace` while an owner is kept (`known_faces::OwnerRename`) is
   counted in flight before the eyes are asked, and the owner moves to B
   only when the eyes answer that they kept the face under B and that the

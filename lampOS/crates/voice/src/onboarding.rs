@@ -527,6 +527,13 @@ pub struct Progress {
     /// An older voice ignores it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub owner: Option<String>,
+    /// The eyes knew nobody since [`Self::owner`] was kept (the prints
+    /// lost, #8471, the first builder's 17:50 call): until the owner's face
+    /// is seen again (`known_faces::refresh_owner`), a list without them is
+    /// not the owner gone. Gone with the owner and with a redo or a reset.
+    /// An older voice ignores it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub owner_face_unseen: bool,
     /// Giving-way invitations committed this setup/redo, before each is
     /// published (#1800): at most two, so a rebuilt walk cannot ask again.
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -3795,6 +3802,7 @@ impl Onboarding {
             self.face_saved_unasked = false;
             if let Some(name) = self.face_saved_name.take() {
                 self.desired.owner = Some(name);
+                self.desired.owner_face_unseen = false;
             }
             self.records
                 .push(json!({"kind":"onboarding_face_saved","step":step.name(),
@@ -5104,6 +5112,24 @@ impl Onboarding {
                 }
                 continue;
             }
+            // The owner's face unknown since the prints went, or seen
+            // again ([`owner_face`]): only while that owner is kept.
+            if let Some(face) = told.get("owner_face") {
+                let unseen = face.get("unseen").and_then(Value::as_bool);
+                let whose = face.get("owner").and_then(Value::as_str);
+                if let (Some(unseen), Some(whose)) = (unseen, whose)
+                    && self
+                        .desired
+                        .owner
+                        .as_ref()
+                        .is_some_and(|owner| same_owner(owner, whose))
+                    && self.desired.owner_face_unseen != unseen
+                {
+                    self.desired.owner_face_unseen = unseen;
+                    self.save();
+                }
+                continue;
+            }
             if told.get("face_forgotten").and_then(Value::as_bool) == Some(true) {
                 if let Some(gone) = told.get("owner").and_then(Value::as_str)
                     && !self
@@ -5116,6 +5142,7 @@ impl Onboarding {
                 }
                 self.face_saved_unasked = false;
                 self.face_saved_name = None;
+                self.desired.owner_face_unseen = false;
                 if self.desired.owner.take().is_some() {
                     self.save();
                 }
@@ -5139,6 +5166,7 @@ impl Onboarding {
                         .is_some_and(|owner| same_owner(owner, from))
                 {
                     self.desired.owner = Some(to.to_owned());
+                    self.desired.owner_face_unseen = false;
                     self.save();
                 }
                 continue;
@@ -5155,6 +5183,7 @@ impl Onboarding {
                     && self.desired.owner.is_none()
                 {
                     self.desired.owner = Some(name.to_owned());
+                    self.desired.owner_face_unseen = false;
                     self.save();
                     eprintln!(
                         "lamp-voice: onboarding: the owner's face linked to the typed name, kept as the owner"
@@ -5320,6 +5349,7 @@ impl Onboarding {
                         });
                         if same {
                             self.desired.owner = saved_name.clone();
+                            self.desired.owner_face_unseen = false;
                         }
                         eprintln!(
                             "lamp-voice: onboarding: who_you_are: the face asked for once more was saved: {}",
@@ -5334,6 +5364,7 @@ impl Onboarding {
                         && saved_name.is_some()
                     {
                         self.desired.owner = saved_name.clone();
+                        self.desired.owner_face_unseen = false;
                     }
                 }
                 if step == Step::Privacy {
@@ -6709,6 +6740,27 @@ pub fn owner_gone(file: &Path, owner: &str) {
     if let Err(error) = post(file, &json!({"face_forgotten": true, "owner": owner})) {
         eprintln!("lamp-voice: onboarding: a face forgotten, not noted: {error}");
     }
+}
+
+/// The owner `owner`'s face unknown to the eyes since they knew nobody
+/// (`unseen`), or seen again (`known_faces::refresh_owner`, #8471): kept in
+/// the walk's file ([`Progress::owner_face_unseen`]) while that owner is.
+pub fn owner_face(file: &Path, owner: &str, unseen: bool) {
+    if let Err(error) = post(
+        file,
+        &json!({"owner_face": {"owner": owner, "unseen": unseen}}),
+    ) {
+        eprintln!("lamp-voice: onboarding: the owner's face unseen or seen, not noted: {error}");
+    }
+}
+
+/// Whether the walk's file at `file` keeps the owner's face unknown since
+/// the prints went ([`Progress::owner_face_unseen`]).
+pub fn owner_face_unseen(file: &Path) -> bool {
+    std::fs::read(file)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Progress>(&bytes).ok())
+        .is_some_and(|progress| progress.owner.is_some() && progress.owner_face_unseen)
 }
 
 /// The owner's face renamed by the person, from name `from` to name `to`

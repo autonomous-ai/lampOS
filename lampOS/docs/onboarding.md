@@ -632,7 +632,11 @@ was not kept and never to say it will know them
 now." with nothing kept. "I don't mind, call me Sam" is a name. On a name,
 names checked, the model calls `remember_my_face`, and the speaker-bound
 route (`known_faces::run_speaker`)
-proves the face in view said its own name, unchanged (#7787). Only when the
+proves the face in view said its own name, unchanged (#7787). On a lamp whose prints were lost with an owner kept, the owner mark stays
+while the eyes know nobody and, after that, while the owner's face is not
+yet seen again (`Progress::owner_face_unseen`, [second-voice.md](second-voice.md)):
+learn later's first save under another name never drops it, and the owner
+answering with their own name is the owner again. Only when the
 eyes answer `remembered` is the model told to say "I'll know you next time.
 Say 'forget my face' to undo." (`KEPT_NO_ASK`); the eyes refusing (two
 faces, none, too far), nothing is kept and nothing said of it. The setup
