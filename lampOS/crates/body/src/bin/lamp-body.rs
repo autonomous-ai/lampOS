@@ -4650,12 +4650,13 @@ mod tests {
         }
     }
 
-    /// #2188: the product unit's own `ExecStart`, with the poses a freshly
-    /// measured lamp has (lamp-body-measure writes no `--gaze`), starts with
-    /// gaze off; with this lamp's `--gaze` added once measured, gaze is on.
-    /// Read from the unit file, so a unit and this rule cannot drift apart.
+    /// #2188, #8344: the product unit's own `ExecStart` and `Environment=`
+    /// switch, with the poses a freshly measured lamp has (lamp-body-measure
+    /// writes no `--gaze`), starts looking with the product's turn; with this
+    /// lamp's `--gaze` added once measured, its own turn wins. Read from the
+    /// unit file, so a unit and this rule cannot drift apart.
     #[test]
-    fn the_product_unit_starts_a_fresh_lamp_with_gaze_off_and_on_once_measured() {
+    fn the_product_unit_starts_a_fresh_lamp_with_the_products_gaze_and_its_own_once_measured() {
         const UNIT: &str = include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../deploy/product/lamp-body.service"
@@ -4664,6 +4665,15 @@ mod tests {
             .lines()
             .find_map(|line| line.strip_prefix("ExecStart="))
             .expect("the product unit has an ExecStart");
+        let gaze_default = lamp_body::gaze::product_default_from(UNIT.lines().find_map(|line| {
+            line.strip_prefix("Environment=")?
+                .strip_prefix(lamp_body::gaze::PRODUCT_DEFAULT)?
+                .strip_prefix('=')
+        }));
+        assert!(
+            gaze_default,
+            "the product unit switches the product's gaze on"
+        );
         // lamp-a63e's lamp.env as lamp-body-measure wrote it (19 Oct): no --gaze.
         let measured = "--home 1772,2052,2038 --folded-arm 2047,2046 --stand 1772,2052,2038,2657,2602 --pitch-window 1740,2030 --torque on";
         assert!(!measured.contains("--gaze "), "{measured}");
@@ -4678,21 +4688,20 @@ mod tests {
                     word => vec![word.to_owned()],
                 })
                 .collect();
-            parse(words.iter().map(OsString::from))
+            parse_with(words.iter().map(OsString::from), None, gaze_default)
         };
         let fresh = start(measured)
             .expect("a freshly measured lamp's body starts")
             .unwrap();
-        assert!(fresh.gaze.is_none());
-        assert_eq!(
-            fresh.unmeasured_gaze_socket,
-            Some(PathBuf::from("/run/lampos-body/gaze.sock"))
-        );
+        let product = fresh.gaze.expect("an unmeasured product lamp looks");
+        assert_eq!((product.turn, product.product), ([760, 555], true));
+        assert_eq!(product.reach, [480, 120], "the unit's own --gaze-reach");
+        assert!(fresh.unmeasured_gaze_socket.is_none());
         let looked = start(&format!("{measured} --gaze 755,555"))
             .expect("a lamp with its gaze measured starts")
             .unwrap();
         let gaze = looked.gaze.expect("gaze is on once measured");
-        assert_eq!(gaze.turn, [755, 555]);
+        assert_eq!((gaze.turn, gaze.product), ([755, 555], false));
         assert_eq!(gaze.reach, [480, 120], "the unit's own --gaze-reach");
         assert!(looked.unmeasured_gaze_socket.is_none());
     }
