@@ -459,11 +459,89 @@ impl AppContext {
     }
 }
 
+/// The most characters of an app's spoken line told to the model (#8386's
+/// stopgap); a longer one is cut at a word by [`said_words`].
+pub const SAID_MOST_CHARS: usize = 200;
+
+/// An app's spoken `words` tidied as a line is ([`tidy`]: no quote, link or
+/// markup, so they can never close the note's quote), then cut to
+/// [`SAID_MOST_CHARS`] at a word, "…" ending a cut one. Empty when nothing
+/// is left.
+pub fn said_words(words: &str) -> String {
+    let Ok(words) = tidy(words, usize::MAX) else {
+        return String::new();
+    };
+    if words.chars().count() <= SAID_MOST_CHARS {
+        return words;
+    }
+    let mut cut: String = words.chars().take(SAID_MOST_CHARS - 1).collect();
+    if let Some(space) = cut.rfind(' ') {
+        cut.truncate(space);
+    }
+    cut.push('…');
+    cut
+}
+
+/// An app's title as told outside the quotes of its spoken note: [`name`],
+/// then [`tidy`] as the words are, `an app` when nothing is left.
+pub fn said_name(title: &str) -> String {
+    tidy(&name(title), NAME_BYTES).unwrap_or_else(|_| "an app".into())
+}
+
+/// An installed app's exact `say` that played whole (`apps/said`, #8422):
+/// the voice's coordinator, where the line plays, to its second-route
+/// worker, which tells it to the model as a quoted note for 2 minutes. `app`
+/// is the app's checked name (its source `app:<app>`), as lamp-control's app
+/// socket named it on the say, never from the app's words; `name` its title
+/// as [`said_name`]; `words` as [`said_words`], at most [`SAID_MOST_CHARS`].
+/// A say cut short is never sent. Never kept: the worker holds it in RAM
+/// only, under its own privacy reading and only with `LAMP_APP_MEMORY` on.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AppSaid {
+    pub app: String,
+    pub name: String,
+    pub words: String,
+}
+
+impl AppSaid {
+    pub const TYPE: &str = "lamp_msgs/AppSaid";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "apps/said";
+
+    pub fn declaration() -> lamp_bus::Declaration {
+        lamp_bus::Declaration::new(Self::TYPE, Self::VERSION, lamp_bus::Kind::Event)
+    }
+
+    /// The source it is told under: `app:<app>`.
+    pub fn source(&self) -> Option<Source> {
+        Source::parse(&format!("app:{}", self.app))
+    }
+
+    pub fn check(&self) -> Result<(), crate::Invalid> {
+        if !crate::app_triggers::name_ok(&self.app) || self.source().is_none() {
+            return Err(crate::Invalid("an app's spoken line names an app".into()));
+        }
+        if self.name.is_empty() || said_name(&self.name) != self.name {
+            return Err(crate::Invalid(
+                "an app's spoken line has a fitting name".into(),
+            ));
+        }
+        if self.words.is_empty() || said_words(&self.words) != self.words {
+            return Err(crate::Invalid(
+                "an app's spoken line is tidied words, at most 200 characters".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 pub fn app_fact_topics() -> Vec<(&'static str, lamp_bus::Declaration)> {
     vec![
         (AppRemember::TOPIC, AppRemember::declaration()),
         (AppRemembered::TOPIC, AppRemembered::declaration()),
         (AppContext::TOPIC, AppContext::declaration()),
+        (AppSaid::TOPIC, AppSaid::declaration()),
     ]
 }
 
@@ -657,7 +735,7 @@ mod tests {
         };
         assert!(went(KEPT).check().is_ok() && went("not_known").check().is_ok());
         assert!(went("").check().is_err() && went("Not known").check().is_err());
-        assert_eq!(app_fact_topics().len(), 3);
+        assert_eq!(app_fact_topics().len(), 4);
     }
 
     /// A context line on the bus: tidied, at most 120, told 1 ms to 10
@@ -690,6 +768,42 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&ok).unwrap(),
             serde_json::json!({"app": "gym-coach", "name": "Gym Coach", "line": "set 2 of 3, 7 squats", "for_ms": 60_000})
+        );
+    }
+
+    /// An app's spoken line on the bus: a checked app, a tidied title, and
+    /// tidied words at most 200 characters; anything else is refused.
+    #[test]
+    fn an_apps_spoken_line_on_the_bus_holds_only_checked_words() {
+        let said = |name: &str, words: &str| AppSaid {
+            app: "gym-coach".into(),
+            name: name.into(),
+            words: words.into(),
+        };
+        let ok = said("Gym Coach", "Trained before?");
+        assert!(ok.check().is_ok());
+        assert_eq!(ok.source().unwrap().as_str(), "app:gym-coach");
+        assert!(said("Gym Coach", "Trained \"before\"?").check().is_err());
+        assert!(said("Gym <b>Coach</b>", "Hi.").check().is_err());
+        assert!(said("", "Hi.").check().is_err());
+        assert!(said("Gym Coach", "").check().is_err());
+        let long = said_words(&"word ".repeat(100));
+        assert!(long.chars().count() <= SAID_MOST_CHARS && long.ends_with("word…"));
+        assert!(said("Gym Coach", &long).check().is_ok());
+        assert!(said("Gym Coach", &["a"; 101].join(" ")).check().is_err());
+        assert!(
+            AppSaid {
+                app: "Gym".into(),
+                ..ok.clone()
+            }
+            .check()
+            .is_err()
+        );
+        assert_eq!(said_name("Gym <b>Coach</b>"), "Gym bCoach/b");
+        assert_eq!(said_name("\"\""), "an app");
+        assert_eq!(
+            serde_json::to_value(&ok).unwrap(),
+            serde_json::json!({"app": "gym-coach", "name": "Gym Coach", "words": "Trained before?"})
         );
     }
 }
