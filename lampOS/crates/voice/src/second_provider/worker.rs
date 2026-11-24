@@ -1020,18 +1020,23 @@ pub const OWN_KEY_PUBLISHER: &str = "voice_keys";
 
 /// The warning lamp-health shows once the person's key was refused.
 pub const OWN_KEY_REFUSED_WORDS: &str = "your DeepSeek key was refused, using the lamp's own";
-/// The warning once the person's own endpoint was down or out of use (a
-/// 429 or a 5xx, #8362): the lamp's own model answers.
+/// The warning once the person's own model failed a request for any reason
+/// but a refused key (a 5xx, 402, 404, 429, another 400, or no answer:
+/// `services::gives_way`, #8362): the lamp's own model answers.
 pub const OWN_MODEL_DOWN_WORDS: &str = "your own model couldn't answer, using the lamp's own";
 
-/// A request the person's own key was refused for, or their endpoint
-/// couldn't answer (#8362): one journal line, and the health warning from
-/// then on. Never the key.
+/// A request the person's own key was refused for, or their model couldn't
+/// answer for any reason (#8362, `services::gives_way`): one journal line,
+/// and the health warning from then on. Never the key.
 fn own_key_refused(status: u16) {
     OWN_KEY_REFUSED.store(status, std::sync::atomic::Ordering::Relaxed);
     if matches!(status, 401 | 403) {
         eprintln!(
             "lamp-voice second: DeepSeek: the person's own key was refused (HTTP {status}); this request goes through the relay (LAMP_OWN_KEYS)"
+        );
+    } else if status == crate::second_provider::services::NO_HTTP_ANSWER {
+        eprintln!(
+            "lamp-voice second: the person's own model gave no answer; this request goes to the lamp's own (LAMP_OWN_KEYS)"
         );
     } else {
         eprintln!(

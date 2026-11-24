@@ -650,10 +650,12 @@ async fn both_tries_refused_are_told_once() {
 /// #8362 step 1b: the person's own endpoint down (a 5xx) or out of use (429)
 /// mid-use, before any answer: the request goes to the lamp's own model at the
 /// relay, never a silent turn, and the status is told for the one line that
-/// says so. A 400 is the request's, not the endpoint's: no fallback.
+/// says so. So does any other failure before the first word (the first
+/// builder's gate on #8393): 402 for no credit, 404 for a model gone, and a 400
+/// for a request the person's model can't take.
 #[tokio::test]
 async fn the_persons_endpoint_down_or_spent_falls_back_to_the_lamps_own() {
-    for status in [503, 429] {
+    for status in [503, 429, 402, 404, 400] {
         let server = Server::saying(
             vec![
                 Says::Refuses(Duration::ZERO, status),
@@ -684,10 +686,19 @@ async fn the_persons_endpoint_down_or_spent_falls_back_to_the_lamps_own() {
         assert_eq!(lamp.spoken(), ["From the lamp's own."], "{status}");
         assert_eq!(*told.lock().unwrap(), [status]);
     }
-    assert_eq!(
-        crate::second_provider::services::key_refused(&net::Error::Status(400)),
-        None
-    );
+    // With no HTTP status, it's told as no answer, never as 0 (never refused).
+    use crate::second_provider::services::{NO_HTTP_ANSWER, gives_way};
+    for error in [
+        net::Error::Transport("connect"),
+        net::Error::Timeout("the first event"),
+        net::Error::Protocol("event"),
+        net::Error::Url,
+    ] {
+        assert_eq!(gives_way(&error), NO_HTTP_ANSWER, "{error}");
+    }
+    assert_ne!(NO_HTTP_ANSWER, 0);
+    assert_eq!(gives_way(&net::Error::KeyInvalid), 400);
+    assert_eq!(gives_way(&net::Error::UsageLimit(None)), 429);
 }
 
 /// A round's two tries tell a fall and a refusal once between them; another
