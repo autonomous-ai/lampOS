@@ -10235,6 +10235,140 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// #8451, the first builder's call (b) at 08:12: lamp-06c1, 24 Nov, a
+    /// "pebble hello" make the person named ("whenever I say pebble
+    /// hello") was refused three times in 530 s, "hello" being said around
+    /// an ask. A trigger that is a run of the person's own words is kept
+    /// with one word of its own, on the model's first answer, no repair;
+    /// the same asks the model chose itself, never said in the line, are
+    /// still refused on the two-word floor, named, and repaired.
+    #[test]
+    fn a_trigger_the_person_named_with_one_word_of_its_own_is_kept_on_the_first_answer() {
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        let toml = |asks: &str| {
+            format!(
+                "asks = [\"{asks}\"]\n\
+                 kind = \"installable\"\nversion = \"1.0.0\"\n\
+                 [permissions]\nservices = {{ gmail = \"write\" }}\n[[do]]\n\
+                 write = {{ service = \"gmail\", action = \"send_mail\", to = [\"me@example.com\"], \
+                 subject = \"Test note\", text = \"This is my test note.\" }}\n"
+            )
+        };
+        let theirs = "whenever I say pebble hello, email me@example.com with the subject Test \
+                      note, saying This is my test note.";
+        let (root, keeping) = keeping("asks-named");
+        let (url, served) = service(vec![(200, write_answer(&toml("pebble hello")))]);
+        let asked = manage_helper(&keeping.manage);
+        let told = make_with(7, Some(theirs), theirs, &keeping, chat_at(url), NOW, || {
+            None
+        });
+        assert_eq!(served.join().unwrap(), 1, "no repair: {told}");
+        assert_eq!(told["made"], "leaving-mail", "{told}");
+        asked.join().unwrap();
+        assert_eq!(
+            made_skill::entries(&keeping.directory)[0]["asks"],
+            serde_json::json!(["pebble hello"]),
+        );
+        let _ = std::fs::remove_dir_all(&root);
+        // The model's own "pebble hello", never in the person's line:
+        // refused on the floor, its rule named, with a repair.
+        let chosen = "when I say pebble garden tune, email me@example.com with the subject \
+                      Test note, saying This is my test note.";
+        let (root, keeping) = keeping("asks-chosen");
+        let refused = made_skill::keep_asked(
+            &write_answer(&toml("pebble hello")),
+            false,
+            FROM,
+            &keeping,
+            &made_skill::Asked {
+                request: chosen,
+                heard: Some(chosen),
+                ..made_skill::Asked::default()
+            },
+        )
+        .unwrap_err();
+        assert_eq!(
+            refused.0,
+            "its asks weren't kept: asks = [\"pebble hello\"]: \"pebble hello\": only 1 word of its \
+             own, \"pebble\""
+        );
+        assert!(refused.1.is_some(), "repaired");
+        let _ = std::fs::remove_dir_all(&root);
+        let (root, keeping) = keeping("asks-chosen-made");
+        let (url, served) = service(vec![
+            (200, write_answer(&toml("pebble hello")));
+            1 + MOST_REPAIRS
+        ]);
+        let told = make_with(
+            7,
+            Some(chosen),
+            chosen,
+            &keeping,
+            chat_at(url),
+            NOW + 1,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS, "{told}");
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY)
+        );
+        made_skill::set_asks_here(None);
+        made_skill::set_writes_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #8451, the first builder's (a) for what still fails: the person's
+    /// own words for a skill's start that break a rule no writer can change
+    /// ("stop the music", a stop) are said at once, plainly, in one line
+    /// for that rule, with no repair spent on them and never the form's
+    /// example.
+    #[test]
+    fn the_persons_own_words_that_break_a_rule_are_said_at_once_with_no_repair() {
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        let request = "whenever I say stop the music, email me@example.com with the subject \
+                       Test note, saying This is my test note.";
+        let toml = "asks = [\"stop the music\"]\n\
+            kind = \"installable\"\nversion = \"1.0.0\"\n\
+            [permissions]\nservices = { gmail = \"write\" }\n[[do]]\n\
+            write = { service = \"gmail\", action = \"send_mail\", to = [\"me@example.com\"], \
+            subject = \"Test note\", text = \"This is my test note.\" }\n";
+        let (root, keeping) = keeping("asks-theirs-refused");
+        let (url, served) = service(vec![(200, write_answer(toml))]);
+        let told = make_with(
+            7,
+            Some(request),
+            request,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1, "no repair: {told}");
+        assert!(told.get("made").is_none(), "{told}");
+        let line = "I can't start a skill with ‘stop the music’, because that's how you stop me.";
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {line}"),
+            "{told}"
+        );
+        assert!(
+            !told["error"]
+                .as_str()
+                .unwrap()
+                .contains("send my test note")
+        );
+        // Said as it is, whole, once.
+        assert_eq!(made_skill::plain_reason(line), line);
+        assert_eq!(made_skill::not_made_line(line), line);
+        made_skill::set_asks_here(None);
+        made_skill::set_writes_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// #6307, with `LAMP_MADE_SCRIPTS` off: the making model is never told
     /// a skill may carry code, nor the function that a yes may put one on;
     /// on, it is told the form, its bounds and its grants.
