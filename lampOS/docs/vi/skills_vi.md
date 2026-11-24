@@ -4972,8 +4972,8 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    bắt đầu bằng cụm khởi động là của họ (#8451, P3 của first builder trên
    #8469): "pebble hello" trong "make a skill that waves when I say hi
    pebble hello, and also when I say pebble hello", không bao giờ là "hi
-   pebble hello"; khi không cụm nào bắt đầu bằng nó, lấy cụm tìm thấy đầu
-   tiên (test
+   pebble hello"; khi dài bằng nhau, lấy chỗ sớm nhất; khi không cụm nào
+   bắt đầu bằng nó, lấy cụm tìm thấy đầu tiên (test
    `the_persons_own_phrase_is_the_shortest_that_starts_with_the_ask`).
    Khi không có câu nghe được (`line = request.heard.unwrap_or(request.request)`
    của `made_skill`), câu của họ là `request` mà model viết cho lần tạo,
