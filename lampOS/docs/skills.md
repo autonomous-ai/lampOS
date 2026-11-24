@@ -8696,7 +8696,20 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    [<as given>]: "<the phrase named>": the person's own words,
    <made_ask_refused's words for it>: told at once, no repair`, the phrase
    named being the ask, or their whole phrase when the plain line names
-   that (below). **A refused ask that is only part of
+   that (below). **The person spoke once** (#8469, on lamp-06c1 round 2
+   of "make a skill called pebble yes that turns the light green whenever
+   I say yes please" made one started by "go pebble", words they never
+   said): within the same request, a later `make_skill` call (a change
+   too, `make_skill_local::makes_a_skill`) after that plain line makes
+   nothing and is given the same answer, word for word, journaled as
+   `lamp-voice second: request <n> chat round <r>: make_skill not run: a
+   make in this request was refused for the person's own words for its
+   start: told the same`, so they choose a new start in their own words
+   next time; no "I'll make it now" opens it. The next request makes as
+   before. When that request ends, what the lamp said after the plain
+   line is journaled: `lamp-voice second: request <n>: a make was refused
+   for the person's own words for its start; said after it: "<words>"`.
+   **A refused ask that is only part of
    their longer phrase** ("hello there" from "hello there pebble") is the
    writer's mistake: when their whole phrase (2 to 8 words within 60
    characters) also breaks such a rule, the plain line is said at once

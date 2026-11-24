@@ -908,6 +908,138 @@ async fn a_makes_waiting_line_is_said_in_its_own_turn_as_its_agent_begins() {
     assert_eq!(said(false).await, ["said:I'll make it now.", "said:Made."]);
 }
 
+/// lamp-06c1 on #8469: "make a skill called pebble yes that turns the
+/// light green whenever I say yes please" was refused at once for the
+/// person's own words ("a yes or a no is mine to answer"), then round 2 of
+/// the same request called `make_skill` again with "go pebble", words the
+/// person never said, and the skill was made and kept. Within one request
+/// the person spoke once: a later make makes nothing and is given the same
+/// answer; the next request makes as before.
+#[tokio::test]
+async fn a_make_after_one_refused_for_the_persons_own_words_makes_nothing_in_that_request() {
+    let line = format!(
+        "{}yes please’, because a yes or a no is mine to answer.",
+        crate::made_skill::THEIR_ASK_HEAD
+    );
+    let refused = json!({
+        "error": format!("the skill couldn't be made: {line}"),
+        "next": "Say why it couldn't be made, in their language.",
+    });
+    assert!(crate::make_skill_local::their_ask_told(&refused));
+    assert!(!crate::make_skill_local::their_ask_told(&json!({
+        "error": "the skill couldn't be made: a skill can't hear what is said."
+    })));
+    let theirs = call(
+        "c1",
+        crate::made_skill::MAKE,
+        json!({"request": "a skill called pebble yes that turns the light green whenever I say yes please"}),
+    );
+    let own = call(
+        "c2",
+        crate::made_skill::MAKE,
+        json!({"request": "a skill called pebble yes that turns the light green whenever I say go pebble"}),
+    );
+    let next = call(
+        "c3",
+        crate::made_skill::MAKE,
+        json!({"request": "a skill that turns the light blue whenever I say pebble blue"}),
+    );
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [
+                vec![Ok(ChatEvent::ToolCalls(vec![theirs])), Ok(ChatEvent::Done)],
+                vec![Ok(ChatEvent::ToolCalls(vec![own])), Ok(ChatEvent::Done)],
+                vec![
+                    text("I can't start it with yes please."),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![Ok(ChatEvent::ToolCalls(vec![next])), Ok(ChatEvent::Done)],
+                vec![text("Made pebble blue."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let makes: Calls = Arc::default();
+    let seen = makes.clone();
+    let answer = refused.clone();
+    let tools: ToolRunner = Arc::new(move |_, heard, name, args| {
+        let first = {
+            let mut seen = seen.lock().unwrap();
+            seen.push((name.clone(), args, heard));
+            seen.len() == 1
+        };
+        let answer = answer.clone();
+        Box::pin(async move {
+            if name == crate::made_skill::MAKE && first {
+                answer
+            } else {
+                json!({"made": "pebble-blue", "on": true})
+            }
+        })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        tools,
+        Arc::new(Instant::now),
+    );
+    engine.submit(written(8_469_001, "Make a skill called pebble yes."));
+    let said = turn(&mut engine).await;
+    assert!(
+        said.iter()
+            .any(|label| label.ends_with("I can't start it with yes please.")),
+        "{said:?}"
+    );
+    // Round 2's make never ran: one make asked of the tools.
+    assert_eq!(
+        makes.lock().unwrap().len(),
+        1,
+        "{:?}",
+        makes.lock().unwrap()
+    );
+    // Round 2's make was given round 1's answer, word for word.
+    {
+        let asked = script.asked.lock().unwrap();
+        assert_eq!(asked.len(), 3);
+        let first = asked[1]
+            .iter()
+            .find(|message| message.tool_call_id.as_deref() == Some("c1"))
+            .and_then(Message::words)
+            .expect("round 1's make answered");
+        assert!(first.contains(&line), "{first}");
+        let again = asked[2]
+            .iter()
+            .find(|message| message.tool_call_id.as_deref() == Some("c2"))
+            .expect("round 2's make answered");
+        assert_eq!(again.words(), Some(first));
+    }
+    // The next request makes as before: nothing of the refusal is kept.
+    engine.submit(written(8_469_002, "Make a skill for pebble blue."));
+    let said = turn(&mut engine).await;
+    assert!(
+        said.iter()
+            .any(|label| label.ends_with("Made pebble blue.")),
+        "{said:?}"
+    );
+    let makes = makes.lock().unwrap();
+    assert_eq!(makes.len(), 2, "{makes:?}");
+    assert_eq!(
+        makes[1].1["request"],
+        "a skill that turns the light blue whenever I say pebble blue"
+    );
+    let asked = script.asked.lock().unwrap();
+    let made = asked[4]
+        .iter()
+        .find(|message| message.tool_call_id.as_deref() == Some("c3"))
+        .expect("the next request's make answered");
+    assert!(
+        made.words()
+            .is_some_and(|words| words.contains("pebble-blue")),
+        "{made:?}"
+    );
+}
+
 /// lamp-c0a4, 16 Nov (#7371): a make on the one run path waited about 63 s
 /// after its waiting line in silence. With the one run path the waiting
 /// line says how long, and a make still with no answer past its wait says
