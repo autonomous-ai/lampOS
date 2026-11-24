@@ -953,6 +953,30 @@ pub fn asks_a_new_make(args: &Value) -> bool {
     args.get(REQUEST).is_some()
 }
 
+/// Whether a call (`name`, `args`) makes a skill: a new make of
+/// `make_skill` ([`asks_a_new_make`]), or a change read as one
+/// ([`crate::made_change::as_make`]).
+pub fn makes_a_skill(name: &str, args: &Value) -> bool {
+    (name == made_skill::MAKE && asks_a_new_make(args))
+        || crate::made_change::as_make(name, args).is_some()
+}
+
+/// How a make's answer begins when nothing was made ([`told`]).
+const NOT_MADE_HEAD: &str = "the skill couldn't be made: ";
+
+/// Whether a make's answer `told` is the lamp's plain line for the
+/// person's own words for its start breaking a rule no writer can change
+/// ([`made_skill::their_ask`], #8451). The person spoke once: within the
+/// same request, a later make is given this answer and makes nothing
+/// (lamp-06c1 on #8469: round 2 made "pebble-yes" started by "go pebble",
+/// words the person never said).
+pub fn their_ask_told(told: &Value) -> bool {
+    told["error"]
+        .as_str()
+        .and_then(|error| error.strip_prefix(NOT_MADE_HEAD))
+        .is_some_and(made_skill::their_ask)
+}
+
 /// What a streamed `make_skill` call's first argument, `name`, decides:
 /// a new make for its [`REQUEST`], none for any other, and nothing yet
 /// (`None`) for its [`GIVEN_NAME`]. The schema's keys sort, so that one
@@ -4828,7 +4852,7 @@ fn told_with(
         // sao không được"): the model's `cannot:` sentence with what to ask
         // instead, or the lamp's own plain reason.
         Err(Refused(why, _)) => json!({
-            "error": format!("the skill couldn't be made: {why}"),
+            "error": format!("{NOT_MADE_HEAD}{why}"),
             "next": made_skill::not_made_in_their_language(&line)
         }),
     }

@@ -4987,7 +4987,21 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    [<như đã viết>]: "<cụm được nêu>": the person's own words, <lời của
    made_ask_refused cho cụm đó>: told at once, no repair`, cụm được nêu là
    chính cụm đó, hoặc nguyên cụm của người dùng khi câu nói thẳng nêu
-   nguyên cụm (bên dưới). **Một cụm bị từ chối chỉ
+   nguyên cụm (bên dưới). **Người dùng chỉ nói một lần** (#8469, trên
+   lamp-06c1 vòng 2 của "make a skill called pebble yes that turns the
+   light green whenever I say yes please" đã tạo một kỹ năng khởi động
+   bằng "go pebble", lời họ chưa từng nói): trong cùng request, một lời
+   gọi `make_skill` sau đó (cả một thay đổi,
+   `make_skill_local::makes_a_skill`) sau câu nói thẳng đó không tạo gì
+   và nhận đúng câu trả lời ấy, từng chữ, ghi journal là `lamp-voice
+   second: request <n> chat round <r>: make_skill not run: a make in this
+   request was refused for the person's own words for its start: told
+   the same`, để lần sau họ chọn cách khởi động mới bằng lời của chính
+   họ; không có "I'll make it now" mở đầu. Request kế tiếp tạo như cũ.
+   Khi request đó kết thúc, những gì đèn nói sau câu nói thẳng được ghi
+   journal: `lamp-voice second: request <n>: a make was refused for the
+   person's own words for its start; said after it: "<lời>"`.
+   **Một cụm bị từ chối chỉ
    là một phần của cụm dài hơn người dùng đã nói** ("hello there" từ
    "hello there pebble") là lỗi của người viết: khi nguyên cụm của người
    dùng (2 đến 8 từ trong 60 ký tự) cũng phạm một quy tắc như vậy, câu

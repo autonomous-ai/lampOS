@@ -18839,6 +18839,12 @@ async fn answer(
     // Whether a tool ran for this line: one declined after is the lamp's.
     let ran = AtomicBool::new(false);
     let ran_tool = &ran;
+    // A make refused for the person's own words for its start (#8469,
+    // [`crate::make_skill_local::their_ask_told`]): how much of the lamp's
+    // words for this request were given to the voice by then, so its end
+    // journals what was said after it. This request's alone.
+    let their_ask_said = Mutex::new(None::<usize>);
+    let their_ask_at = &their_ask_said;
     // The words of the answer's sentences begun so far, for a call the
     // Policy holds after them.
     let words_begun = AtomicUsize::new(0);
@@ -19763,6 +19769,12 @@ async fn answer(
             });
         let named_by_words = named_call.is_some();
         let mut skill_ran: Option<((String, Value), Value)> = None;
+        // A make refused for the person's own words for its start (#8469,
+        // [`crate::make_skill_local::their_ask_told`]), and what the model
+        // was told: the person spoke once, so a later make in this request
+        // makes nothing and is given this answer, never one of the model's
+        // own words for its start (lamp-06c1: round 2 kept "go pebble").
+        let mut their_ask_told: Option<Value> = None;
         // The skill turned off the lamp turned on for the ask and ran
         // (`LAMP_MADE_SKILL_OFF_SAID`), and what the model was told of it: a
         // model's call of it after is given this answer, never run again.
@@ -20709,8 +20721,11 @@ async fn answer(
                 // (`LAMP_MAKE_QUEUE`, #7679; never with it off): this one
                 // waits its turn, and its one line is "I'll make it next",
                 // never "I'll make it now" before it. One lock, no I/O.
+                // Nor after a make refused for the person's own words for
+                // its start (#8469): a later one makes nothing.
                 if new_make
                     && (round == 1 || begun_again_at.is_some())
+                    && their_ask_told.is_none()
                     && !queue.started
                     && !text.chars().any(char::is_alphanumeric)
                     && !crate::make_queue::busy()
@@ -22872,6 +22887,18 @@ async fn answer(
                     ));
                     continue;
                 }
+                // A make after one refused for the person's own words for
+                // its start (#8469): nothing made, the same answer given.
+                if let Some(told) = &their_ask_told
+                    && crate::make_skill_local::makes_a_skill(&call.name, &call.args)
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: a make in this request was refused for the person's own words for its start: told the same",
+                        call.name
+                    );
+                    messages.push(Message::tool(call.id.clone(), told.to_string()));
+                    continue;
+                }
                 // The skill the heard words ran by its name already: never
                 // run twice (#6772).
                 if let Some((named, told)) = &skill_ran
@@ -23551,6 +23578,21 @@ async fn answer(
                         Some(FAILED_THEN),
                     );
                 }
+                if their_ask_told.is_none()
+                    && crate::make_skill_local::makes_a_skill(&call.name, &call.args)
+                    && crate::make_skill_local::their_ask_told(&answer.told)
+                {
+                    their_ask_told = Some(answer.told.clone());
+                    let given = shared
+                        .lamp_said
+                        .lock()
+                        .ok()
+                        .filter(|said| said.0 == request)
+                        .map_or(0, |said| said.1.len());
+                    if let Ok(mut at) = their_ask_at.lock() {
+                        *at = Some(given);
+                    }
+                }
                 messages.push(Message::tool(call.id.clone(), answer.told.to_string()));
                 if let Some(offer) = answer.requested_audio {
                     if !shared
@@ -24039,6 +24081,21 @@ async fn answer(
         wrote
     };
     let ended = tokio::try_join!(writing, saying);
+    // A request with a make refused for the person's own words for its
+    // start (#8469): what the lamp said after it, for a lamp row to show
+    // what the person heard.
+    if let Some(given) = their_ask_said.lock().ok().and_then(|at| *at) {
+        let after = shared
+            .lamp_said
+            .lock()
+            .ok()
+            .filter(|said| said.0 == request)
+            .and_then(|said| said.1.get(given..).map(|words| words.trim().to_owned()))
+            .unwrap_or_default();
+        eprintln!(
+            "lamp-voice second: request {request}: a make was refused for the person's own words for its start; said after it: {after:?}"
+        );
+    }
     // `LAMP_CARE_LINE` (#7689): the care line owed, after whatever the
     // model said or failed to say: this care turn's, or one an earlier
     // turn owed when a cut, a stop or a newer line ended it (the P1s on
