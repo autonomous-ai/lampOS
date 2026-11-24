@@ -216,6 +216,9 @@ impl CloudRequest {
         // A line handed on stops the memory's night (`LAMP_MEMORY_TIERS`).
         crate::tiers_night::stir();
         match command {
+            ProviderInput::PlayedFixedLine { .. } => {
+                return Err(io::Error::other("history receipt is not submitted input"));
+            }
             ProviderInput::Start { .. } => self.start_submitted = true,
             ProviderInput::End { .. } => self.input_end_submitted = true,
             ProviderInput::Audio { .. }
@@ -583,6 +586,7 @@ mod tests {
             .unwrap();
         let reply = super::super::Reply {
             reminder: None,
+            fixed_line_receipt: None,
             say: None,
             news: Vec::new(),
             news_not_heard: None,

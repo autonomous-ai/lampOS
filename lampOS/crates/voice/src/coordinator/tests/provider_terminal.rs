@@ -566,6 +566,11 @@ fn run_with_notice_policy(
                     "provider" => {
                         for _ in 0..8 {
                             match peer.channels.data.receive::<ProviderInput>().unwrap() {
+                                Some(ProviderInput::PlayedFixedLine { .. }) => {
+                                    panic!(
+                                        "fixed-line history receipts must not reach the Live terminal fixture"
+                                    )
+                                }
                                 Some(ProviderInput::Start {
                                     request,
                                     over_the_lamp,

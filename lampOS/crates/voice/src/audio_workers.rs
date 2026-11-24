@@ -851,6 +851,9 @@ fn capture_loop<D: CaptureDevice>(
                 Control::ProviderOutputCapacity { .. } => {
                     return Err(io::Error::other("provider capacity sent to capture").into());
                 }
+                Control::HistoryRoute { .. } => {
+                    return Err(io::Error::other("history route sent to capture").into());
+                }
                 // The sleep's grant is its own worker's, never the capture's.
                 Control::NameGrant { .. } => {
                     return Err(io::Error::other("a name grant sent to capture").into());
@@ -2311,6 +2314,7 @@ fn wait_for_speaker(
                 }
                 Control::StartCapture
                 | Control::ProviderOutputCapacity { .. }
+                | Control::HistoryRoute { .. }
                 | Control::NameGrant { .. } => {
                     return Err(io::Error::other("invalid speaker command").into());
                 }
@@ -2497,6 +2501,7 @@ fn speaker_passes(
                 }
                 Control::StartCapture
                 | Control::ProviderOutputCapacity { .. }
+                | Control::HistoryRoute { .. }
                 | Control::NameGrant { .. } => {
                     return Err(io::Error::other("invalid speaker command").into());
                 }

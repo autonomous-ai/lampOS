@@ -479,6 +479,67 @@ wants the answer asks again. Off, nothing is marked and the thread is told
 as before. See [second-voice.md](second-voice.md), "Words cut short by the
 next line".
 
+## Fixed lines in Second's history (#8546)
+
+A fixed Skills line such as the unplug ask can finish in the parent after the
+Second tool-dispatch turn has ended. The parent's local `Thread` entry does not
+share a transcript with the worker. This path sends only a completed built-in
+line back to the original Second worker, as transient assistant history; it
+does not inject it into Live's current session. Live's existing current-session
+limitation is unchanged. [Unplug](unplug.md#completed-fixed-lines-in-seconds-next-chat-8546)
+describes the speech and older-build fallback; a
+[Vietnamese note](vi/conversation-thread_vi.md) covers this section.
+
+- **Origin and words.** Second captures worker boot, provider session, request,
+  call ID, route epoch, microphone/camera generations and monotonic issue time
+  at admitted spoken-tool dispatch. It retains that call's effective scope
+  locally. Skills attaches the origin from its verified Voice call context,
+  never model arguments; Voice accepts it only from the verified Skills caller
+  on an exact built-in canonical line. It checks the canonical text, language
+  and actual rendered text together. Canonical and rendered text are each at
+  most 4,096 bytes; the boot string is at most 128 bytes and call ID 256 bytes.
+  Arbitrary computer text, pairing pins and service reads are excluded.
+- **Completion and ordering.** Only full playback settled as `spoken` yields a
+  receipt with its playback owner and original completion time. The parent's
+  separate queue holds at most four pending receipts and flushes them before
+  later ordinary provider input. Delivery must still be within 100 ms of
+  completion; a blocked data socket or busy worker thread lock does not let
+  later input overtake the receipt while it remains current. Capture and
+  priority control continue. Full queues, expired or mismatched receipts are
+  dropped; 100 ms is an acceptance bound, not a measured latency claim.
+- **Scope and lifetime.** The worker retains at most 16 origins and 12 played
+  lines, with a 600 s cap from the origin's issue time. It checks the exact
+  registered origin and the original room/person scope, never a later face or
+  session owner. Ordinary request retirement does not erase unchanged past
+  attribution; later narrowing or a carried/seen scope-source change does.
+  Room lines are not adopted into a person's history by the room-lines switch.
+  Route deactivation/replacement and camera or microphone privacy changes
+  invalidate proofs, including across close/reopen. Provider unavailability or
+  a new provider session on the same worker also invalidates them; initial
+  history admission requires a matching Ready session. Repeating unchanged
+  readiness preserves the current proofs. An explicit parent stop
+  clears pending receipts and advances the active Second route epoch, even
+  while idle; ordinary completion does not. A worker conversation close revokes
+  origins issued at or before its cutoff, preserving origins newer than a
+  delayed close. A pending forget invalidates copied history immediately by
+  revision, before the Thread lock can be taken; clearing the pending state
+  cannot revive those copies. Thread reload revokes them too. Every chat
+  service boundary rechecks scope, route/privacy, forget revision and a fresh
+  installed control-authority deadline. An expired authority blocks history;
+  renewing the same unchanged binding does not renew the 600 s origin cap.
+  Copying a message into a later round or retry grants no additional lifetime.
+  The default unplug timeout occurs ten minutes after Ready, beyond this
+  origin window, so its later spoken line is not transferred to worker history.
+- **Projection only.** Lines merge by original playback time with the selected
+  recent exchanges, within the existing 12-entry history limit. A retry of the
+  same playback owner is idempotent only with the same origin, text and time;
+  evicted playback owners cannot re-enter. One origin may produce more than
+  one separately completed fixed line. These entries consume no pending heard
+  words, open no conversation, and enter no thread file, memory journal,
+  running summary or recall. They do not survive a worker restart or carry
+  across routes. The existing `exact_line` event and parent-local transcript
+  remain separate from this worker-only projection.
+
 ## What it keeps to itself
 
 By itself the thread lives in the provider worker's memory and nowhere

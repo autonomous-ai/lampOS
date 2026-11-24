@@ -566,6 +566,7 @@ impl<P: InspectPort, C: Clock> CameraLoop<P, C> {
                 },
                 Control::ConnectReference { .. }
                 | Control::ProviderOutputCapacity { .. }
+                | Control::HistoryRoute { .. }
                 | Control::NameGrant { .. } => {
                     return Err(io::Error::other(
                         "camera worker rejects audio reference control",

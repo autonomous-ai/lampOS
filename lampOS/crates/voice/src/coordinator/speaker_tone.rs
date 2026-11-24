@@ -226,6 +226,7 @@ pub(super) fn commit_sound_turn(
         media: Default::default(),
         local_only: None,
         reminder: None,
+        fixed_line_receipt: None,
         say: None,
         news: Vec::new(),
         news_not_heard: None,

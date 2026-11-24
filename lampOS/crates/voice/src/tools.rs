@@ -1680,6 +1680,51 @@ fn answer_inner(
     lease: Option<&crate::memory_scope::ScopeLease>,
     keep_news: bool,
 ) -> ToolAnswer {
+    answer_inner_with_fixed_line(
+        settings,
+        call,
+        request,
+        heard,
+        (context, None),
+        lease,
+        keep_news,
+    )
+}
+
+/// History correlation is independent of the requested-audio feature. It never
+/// changes tool authorization or enters the model's arguments or answer.
+pub(crate) fn answer_scoped_keeping_news_with_fixed_line(
+    settings: &Settings,
+    call: &ToolCall,
+    request: u64,
+    heard: bool,
+    audio: Option<&lamp_msgs::RequestedAudioContext>,
+    lease: &crate::memory_scope::ScopeLease,
+    origin: Option<&lamp_msgs::FixedLineOrigin>,
+) -> ToolAnswer {
+    answer_inner_with_fixed_line(
+        settings,
+        call,
+        request,
+        heard,
+        (audio, origin),
+        Some(lease),
+        true,
+    )
+}
+
+fn answer_inner_with_fixed_line(
+    settings: &Settings,
+    call: &ToolCall,
+    request: u64,
+    heard: bool,
+    (context, origin): (
+        Option<&lamp_msgs::RequestedAudioContext>,
+        Option<&lamp_msgs::FixedLineOrigin>,
+    ),
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    keep_news: bool,
+) -> ToolAnswer {
     if !spoken_scope_current(lease, request, context) {
         return ToolAnswer::plain(unavailable());
     }
@@ -1702,8 +1747,15 @@ fn answer_inner(
         route => {
             let marked = keeps_out(&route, &call.name) && crate::remember::keep_out(request);
             let began = std::time::Instant::now();
-            let (whom, mut answer, answered) =
-                run_spoken_call_inner(settings, &route, call, request, heard, context, lease);
+            let (whom, mut answer, answered) = run_spoken_call_inner_with_fixed_line(
+                settings,
+                &route,
+                call,
+                request,
+                heard,
+                (context, origin),
+                lease,
+            );
             keep_back_if_kept_nothing(
                 call,
                 request,
@@ -2022,9 +2074,34 @@ fn run_spoken_call_inner(
     context: Option<&lamp_msgs::RequestedAudioContext>,
     lease: Option<&crate::memory_scope::ScopeLease>,
 ) -> (&'static str, ToolAnswer, bool) {
+    run_spoken_call_inner_with_fixed_line(
+        settings,
+        route,
+        call,
+        request,
+        heard,
+        (context, None),
+        lease,
+    )
+}
+
+fn run_spoken_call_inner_with_fixed_line(
+    settings: &Settings,
+    route: &Route,
+    call: &ToolCall,
+    request: u64,
+    heard: bool,
+    (context, origin): (
+        Option<&lamp_msgs::RequestedAudioContext>,
+        Option<&lamp_msgs::FixedLineOrigin>,
+    ),
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> (&'static str, ToolAnswer, bool) {
     if !spoken_scope_current(lease, request, context) {
         return ("nobody", ToolAnswer::plain(unavailable()), false);
     }
+    let origin =
+        origin.filter(|origin| heard && fixed_line_origin_current(origin, call, request, lease));
     let context = context.filter(|context| {
         settings.requested_audio
             && heard
@@ -2061,8 +2138,14 @@ fn run_spoken_call_inner(
             }
             (Ok(skill), None) => match self::route(settings, &skill.name) {
                 found @ Route::Executive(_) if is_skills(settings, &found) => {
-                    let (whom, mut answer, answered) = run_spoken_call_inner(
-                        settings, &found, &skill, request, heard, context, lease,
+                    let (whom, mut answer, answered) = run_spoken_call_inner_with_fixed_line(
+                        settings,
+                        &found,
+                        &skill,
+                        request,
+                        heard,
+                        (context, origin),
+                        lease,
                     );
                     if answered {
                         told_ran(settings, &skills, &skill.name, &mut answer.told);
@@ -2099,7 +2182,8 @@ fn run_spoken_call_inner(
             return ("the agent skill's yes", ToolAnswer::plain(told), true);
         }
         let call = stop_as_heard(directory, call, request, heard);
-        let (answer, answered) = ask_with_context(directory, &call, ASK_DEADLINE, context);
+        let (answer, answered) =
+            ask_with_fixed_line_context(directory, &call, ASK_DEADLINE, context, origin);
         ("the executive", answer, answered)
     } else {
         let (whom, (mut told, answered)) = run_call_with_scope(route, call, request, heard, lease);
@@ -2205,6 +2289,24 @@ pub fn run_call_scoped(
 
 fn scope_current(lease: Option<&crate::memory_scope::ScopeLease>, request: u64) -> bool {
     lease.is_none_or(|lease| lease.key().request == request && lease.is_current())
+}
+
+fn fixed_line_origin_current(
+    origin: &lamp_msgs::FixedLineOrigin,
+    call: &ToolCall,
+    request: u64,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> bool {
+    origin.check().is_ok()
+        && origin.request == request
+        && origin.call_id == call.id
+        && lease.is_some_and(|lease| {
+            let key = lease.key();
+            lease.is_current()
+                && key.request == request
+                && key.session == origin.provider_session
+                && crate::process::boot_text(key.worker) == origin.worker_boot
+        })
 }
 
 fn spoken_scope_current(
@@ -3185,9 +3287,22 @@ fn ask_with_context(
     deadline: Duration,
     context: Option<&lamp_msgs::RequestedAudioContext>,
 ) -> (ToolAnswer, bool) {
+    ask_with_fixed_line_context(directory, call, deadline, context, None)
+}
+
+fn ask_with_fixed_line_context(
+    directory: &Path,
+    call: &ToolCall,
+    deadline: Duration,
+    context: Option<&lamp_msgs::RequestedAudioContext>,
+    origin: Option<&lamp_msgs::FixedLineOrigin>,
+) -> (ToolAnswer, bool) {
     let mut line = json!({"op":"call","name":call.name,"args":call.args});
     if let Some(context) = context {
         line["requested_audio_context"] = json!(context);
+    }
+    if let Some(origin) = origin {
+        line["fixed_line_origin"] = json!(origin);
     }
     let told = exchange(&directory.join(CALL_SOCKET), &line, deadline).and_then(|answer| {
         match answer.get("ok").and_then(Value::as_bool)? {
@@ -5061,6 +5176,72 @@ mod tests {
             snapshot,
         );
         (std::sync::Arc::new(owner), context)
+    }
+
+    #[test]
+    fn fixed_line_origin_survives_skills_translation_with_audio_on_or_off() {
+        for wrapped in [false, true] {
+            for audio_on in [false, true] {
+                let (dir, mut settings, call) = scoped_audio_setup(wrapped);
+                settings.requested_audio = audio_on;
+                let (owner, audio) = audio_scope(crate::memory_scope::ScopeSnapshot::room());
+                let origin = lamp_msgs::FixedLineOrigin {
+                    worker_boot: audio.worker_boot.clone(),
+                    provider_session: audio.provider_session,
+                    request: audio.request,
+                    call_id: audio.call_id.clone(),
+                    route_epoch: 1,
+                    microphone_generation: audio.privacy_generation,
+                    camera_generation: 0,
+                    issued_us: audio.issued_us,
+                };
+                let served = scoped_reply(
+                    &dir.join(CALL_SOCKET),
+                    owner.clone(),
+                    false,
+                    json!({"ok":true,"result":{"next":"Say nothing."}}),
+                );
+                let answer = answer_scoped_keeping_news_with_fixed_line(
+                    &settings,
+                    &call,
+                    audio.request,
+                    true,
+                    Some(&audio),
+                    &owner.lease(),
+                    Some(&origin),
+                );
+                assert!(answer.requested_audio.is_none());
+                let sent = served.join().unwrap();
+                assert_eq!(sent["fixed_line_origin"], json!(origin));
+                assert_eq!(sent.get("requested_audio_context").is_some(), audio_on);
+                assert_eq!(sent["args"], json!({}));
+                assert!(answer.told.get("fixed_line_origin").is_none());
+                let mut bad = origin.clone();
+                bad.request += 1;
+                assert!(!fixed_line_origin_current(
+                    &bad,
+                    &call,
+                    audio.request,
+                    Some(&owner.lease())
+                ));
+                bad = origin.clone();
+                bad.call_id.push('x');
+                assert!(!fixed_line_origin_current(
+                    &bad,
+                    &call,
+                    audio.request,
+                    Some(&owner.lease())
+                ));
+                owner.revoke();
+                assert!(!fixed_line_origin_current(
+                    &origin,
+                    &call,
+                    audio.request,
+                    Some(&owner.lease())
+                ));
+                std::fs::remove_dir_all(dir).unwrap();
+            }
+        }
     }
 
     fn scoped_audio_setup(wrapped: bool) -> (PathBuf, Settings, ToolCall) {

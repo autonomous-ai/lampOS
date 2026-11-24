@@ -186,6 +186,7 @@ pub struct FinishedExchange {
 }
 
 pub struct Thread {
+    pub(crate) fixed_lines: crate::fixed_line_history::History,
     exchanges: VecDeque<Exchange>,
     /// What has been heard since the last answer, and when.
     heard: String,
@@ -310,6 +311,7 @@ struct Kept {
 /// One exchange as [`Thread::recent`] gives it.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Recent {
+    pub(crate) fixed_line: Option<std::sync::Arc<crate::fixed_line_history::Proof>>,
     /// The note of a request the lamp was given in writing, if it was one.
     pub written: Option<String>,
     /// What the person said; empty for none.
@@ -419,6 +421,7 @@ fn keep_end(to: &mut String, text: &str, most: usize) {
 impl Thread {
     pub const fn new() -> Self {
         Self {
+            fixed_lines: crate::fixed_line_history::History::new(),
             exchanges: VecDeque::new(),
             heard: String::new(),
             heard_at: None,
@@ -1445,6 +1448,7 @@ impl Thread {
     /// Drop everything: a person has had something forgotten, and what was
     /// said about it is not to be told to the next session.
     pub fn forget(&mut self) {
+        self.fixed_lines.clear();
         crate::conversation_summary::forget_all();
         // The write waiting for its send goes with what was said of it
         // (Thirteen's P2 on #5968).
@@ -1616,6 +1620,8 @@ impl Thread {
     /// [`Self::said_last_ago_but`]: the next room line needs a name, a turn
     /// or a tap. An exchange opened after it counts as before.
     pub fn close_conversation(&mut self, now: Instant) {
+        // A stale close must not revoke a newer request's provenance.
+        self.fixed_lines.close_at(now);
         // The events a calendar read kept expire with it
         // (`LAMP_SERVICE_READ_IDS_KEPT`).
         crate::service_read_ids::conversation_ended();
@@ -2207,6 +2213,65 @@ impl Thread {
         )
     }
 
+    /// Merge transient played lines by their original playback time. They use
+    /// exact scope equality, never the room-line widening or summary lineage.
+    #[cfg(test)]
+    pub(crate) fn recent_with_fixed_lines(
+        &self,
+        scope: Option<&str>,
+        now: Instant,
+        within: Duration,
+        most: usize,
+        lineage: Option<NoteVersion>,
+        room_lines: bool,
+    ) -> Vec<Recent> {
+        self.recent_with_fixed_selection(scope, now, within, most, lineage, room_lines)
+            .0
+    }
+
+    /// Also returns precisely the ordinary indexes represented in the merged
+    /// messages, so said-once recall never hides an exchange displaced by a line.
+    pub(crate) fn recent_with_fixed_selection(
+        &self,
+        scope: Option<&str>,
+        now: Instant,
+        within: Duration,
+        most: usize,
+        lineage: Option<NoteVersion>,
+        room_lines: bool,
+    ) -> (Vec<Recent>, Vec<usize>) {
+        let picks = match scope {
+            Some(person) if room_lines => {
+                self.recent_picks_with_room_lines(person, now, within, most, lineage)
+            }
+            _ => self.recent_picks_for(scope, now, within, most, lineage),
+        };
+        let mut timed: Vec<_> = picks
+            .iter()
+            .rev()
+            .zip(self.recent_of(&picks, room_lines && scope.is_some()))
+            .map(|(i, recent)| (self.exchanges[*i].at, Some(*i), recent))
+            .collect();
+        timed.extend(
+            self.fixed_lines
+                .recent(scope, now)
+                .into_iter()
+                .map(|(at, line)| (at, None, line)),
+        );
+        timed.sort_by_key(|(at, _, _)| *at);
+        let leave = timed.len().saturating_sub(most);
+        let selected: Vec<_> = timed.into_iter().skip(leave).collect();
+        let ordinary = selected
+            .iter()
+            .rev()
+            .filter_map(|(_, index, _)| *index)
+            .collect();
+        (
+            selected.into_iter().map(|(_, _, recent)| recent).collect(),
+            ordinary,
+        )
+    }
+
     /// The indexes in the thread of the exchanges [`Self::recent_after_note`]
     /// gives, newest first: what a turn's history tells as messages, so
     /// its thread text can leave them out
@@ -2244,6 +2309,7 @@ impl Thread {
             .map(|&index| {
                 let exchange = &self.exchanges[index];
                 Recent {
+                    fixed_line: None,
                     written: exchange.written.clone(),
                     person: exchange.person.trim().to_owned(),
                     lamp: exchange.lamp.trim().to_owned(),
@@ -3745,6 +3811,7 @@ mod tests {
         // A's memory id as the file holds it, not worked out again here.
         let a = "p-ca978112ca1bbdca";
         let said = |written: Option<&str>, person: &str, lamp: &str| Recent {
+            fixed_line: None,
             written: written.map(str::to_owned),
             person: person.to_owned(),
             lamp: lamp.to_owned(),
@@ -5300,6 +5367,7 @@ mod tests {
         assert_eq!(
             recent,
             [Recent {
+                fixed_line: None,
                 written: Some("Tell them the code word is ORCHID.".into()),
                 person: String::new(),
                 lamp: "The code word is ORCHID.".into(),

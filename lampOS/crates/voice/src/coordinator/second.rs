@@ -76,6 +76,9 @@ pub(super) struct Line {
 
 impl Line {
     fn keep(&mut self, command: &ProviderInput) {
+        if matches!(command, ProviderInput::PlayedFixedLine { .. }) {
+            return;
+        }
         let request = request_of(command);
         if matches!(
             command,
@@ -111,6 +114,7 @@ impl Line {
 
 pub(super) fn request_of(command: &ProviderInput) -> u64 {
     match command {
+        ProviderInput::PlayedFixedLine { .. } => 0,
         ProviderInput::Start { request, .. }
         | ProviderInput::Audio { request, .. }
         | ProviderInput::End { request, .. }
@@ -472,6 +476,7 @@ impl Route {
     /// goes the moment an authority without that owner, or with the
     /// microphone closed, is published.
     pub(super) fn publish(&mut self, snapshot: Snapshot) -> io::Result<()> {
+        self.worker.set_history_active(false)?;
         if snapshot.microphone_permission() != Permission::Allowed
             || snapshot.owner().map(|owner| owner.turn()) != Some(self.line.request)
         {
@@ -627,7 +632,9 @@ pub(super) fn dropped_if_gone(
     };
     let active = route.second_active;
     if active {
-        swap(provider, cloud, flow, route);
+        // Second is verified exited. Its receipt state died with the process;
+        // no control send to that dead peer may block restoring Live.
+        swap_slots(provider, cloud, flow, route);
     }
     eprintln!("lamp-voice: the second voice route's worker exited ({status}); going on without it");
     record(
@@ -643,6 +650,19 @@ pub(super) fn dropped_if_gone(
 }
 
 fn swap(
+    provider: &mut Worker,
+    cloud: &mut CloudAvailability,
+    flow: &mut OutputReceiver,
+    route: &mut Route,
+) -> io::Result<()> {
+    provider.set_history_active(false)?;
+    route.worker.set_history_active(true)?;
+    swap_slots(provider, cloud, flow, route);
+    Ok(())
+}
+
+/// Only normal swaps after their history controls, or verified-dead fallback.
+fn swap_slots(
     provider: &mut Worker,
     cloud: &mut CloudAvailability,
     flow: &mut OutputReceiver,
@@ -669,7 +689,7 @@ fn take_over(
             "a session-bound request cannot change voice route",
         ));
     }
-    swap(provider, cloud, flow, route);
+    swap(provider, cloud, flow, route)?;
     let turn = current.owner.turn();
     let sent = if route.line.covers(turn) {
         std::mem::take(&mut route.line.commands)
@@ -751,7 +771,7 @@ fn resolve_hold(
     route.stand_in = false;
     route.replay.extend(queue.drain(..));
     if to == "live" {
-        swap(provider, cloud, flow, route);
+        swap(provider, cloud, flow, route)?;
         rebind(cloud, current, &mut route.replay)?;
     }
     record(
@@ -820,7 +840,7 @@ pub(super) fn service(
         && !cloud.output_ended()
         && route.cloud.available()
     {
-        swap(provider, cloud, flow, route);
+        swap(provider, cloud, flow, route)?;
         // While Gemini's link is not Ready (before its first Ready, or
         // reconnecting: a GoAway or renewal takes about 2 s on lamp-4ace,
         // #960) the second route only stands in: a request is held for
@@ -832,7 +852,7 @@ pub(super) fn service(
         && reply.is_none()
         && (route.cloud.available() || route.cloud.terminal() || route.cloud.output_ended())
     {
-        swap(provider, cloud, flow, route);
+        swap(provider, cloud, flow, route)?;
         if !std::mem::take(&mut route.stand_in) {
             record(
                 trace,
@@ -939,7 +959,7 @@ pub(super) fn flush(
                 && current.reminder.is_none()
         })
     {
-        swap(provider, cloud, flow, route);
+        swap(provider, cloud, flow, route)?;
         route.stand_in = false;
         rebind(cloud, current, queue)?;
         record(
@@ -991,6 +1011,274 @@ pub(super) fn flush(
 mod tests {
     use super::*;
     use crate::provider_worker::{FailedStage, Fault};
+
+    fn pending_history_for_idle_stop(
+        bench: &mut Bench,
+        owner: &mut Controller,
+    ) -> super::super::fixed_lines::Pending {
+        let first = owner.snapshot(now()).unwrap().owner().unwrap();
+        owner.complete_turn(now(), first).unwrap();
+        let playback = owner.admit(now(), AdmittedInput::NewTurn).unwrap();
+        owner.complete_turn(now(), playback).unwrap();
+        let snapshot = owner.snapshot(now()).unwrap();
+        assert!(snapshot.owner().is_none(), "the regression is an idle Stop");
+        let at = monotonic_us();
+        let mut pending = super::super::fixed_lines::Pending::default();
+        pending.push(crate::fixed_line_history::Receipt {
+            line: crate::say::FixedLine {
+                origin: lamp_msgs::FixedLineOrigin {
+                    worker_boot: boot_text(bench.rig.provider.boot),
+                    provider_session: 1,
+                    request: first.turn(),
+                    call_id: "idle-stop-fixture".into(),
+                    route_epoch: 1,
+                    microphone_generation: snapshot.microphone_generation(),
+                    camera_generation: snapshot.camera_generation(),
+                    issued_us: at,
+                },
+                canonical: crate::language::UNPLUG_STAY.into(),
+                language: "en".into(),
+                text: crate::language::UNPLUG_STAY.into(),
+            },
+            owner: playback,
+            played_at_us: at,
+        });
+        assert!(!pending.is_empty());
+        pending
+    }
+
+    #[test]
+    fn history_route_idle_stop_clears_pending_and_rotates_before_authority() {
+        let mut bench = Bench::standing_in();
+        bench.rig.provider.set_history_active(true).unwrap();
+        assert!(matches!(
+            bench.second.control.receive::<Control>().unwrap(),
+            Some(Control::HistoryRoute {
+                epoch: 1,
+                active: true
+            })
+        ));
+        let (mut owner, _, _) = super::super::tests::active_reply();
+        let mut pending = pending_history_for_idle_stop(&mut bench, &mut owner);
+        let snapshot = owner.snapshot(now()).unwrap();
+        bench
+            .rig
+            .publish_hand_revocation(snapshot, true, &mut pending)
+            .unwrap();
+        assert!(pending.is_empty());
+        assert_eq!(bench.rig.provider.history_epoch(), Some(2));
+        assert!(matches!(
+            bench.second.control.receive::<Control>().unwrap(),
+            Some(Control::HistoryRoute {
+                epoch: 1,
+                active: false
+            })
+        ));
+        assert!(matches!(
+            bench.second.control.receive::<Control>().unwrap(),
+            Some(Control::HistoryRoute {
+                epoch: 2,
+                active: true
+            })
+        ));
+        assert!(
+            matches!(bench.second.control.receive::<Control>().unwrap(), Some(Control::Authority { snapshot }) if snapshot.owner().is_none())
+        );
+        assert!(
+            pending
+                .flush(&mut bench.rig.provider, &bench.cloud, snapshot)
+                .unwrap()
+        );
+        assert!(
+            bench
+                .second
+                .data
+                .receive::<ProviderInput>()
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn history_route_stop_failure_still_revokes_every_other_child() {
+        let mut bench = Bench::standing_in();
+        bench.rig.provider.set_history_active(true).unwrap();
+        let (mut owner, _, _) = super::super::tests::active_reply();
+        let mut pending = pending_history_for_idle_stop(&mut bench, &mut owner);
+        // The active Second control cannot take its revocation, but capture,
+        // privacy and the Live standby still must receive the idle snapshot.
+        drop(bench.second);
+        let snapshot = owner.snapshot(now()).unwrap();
+        assert!(
+            bench
+                .rig
+                .publish_hand_revocation(snapshot, true, &mut pending)
+                .is_err()
+        );
+        assert!(pending.is_empty());
+        for peer in [&mut bench._rest[0], &mut bench.gemini] {
+            assert!(
+                matches!(peer.control.receive::<Control>().unwrap(), Some(Control::Authority { snapshot }) if snapshot.owner().is_none())
+            );
+        }
+        assert!(
+            matches!(bench._rest[2].control.receive::<Control>().unwrap(), Some(Control::Authority { snapshot }) if snapshot.owner().is_none())
+        );
+    }
+
+    #[test]
+    fn history_route_initial_publish_activates_second_before_authority() {
+        let mut bench = Bench::standing_in();
+        let (mut owner, _, _) = super::super::tests::active_reply();
+        bench.rig.publish(owner.snapshot(now()).unwrap()).unwrap();
+        assert!(matches!(
+            bench.second.control.receive::<Control>().unwrap(),
+            Some(Control::HistoryRoute {
+                epoch: 1,
+                active: true
+            })
+        ));
+        assert!(matches!(
+            bench.second.control.receive::<Control>().unwrap(),
+            Some(Control::Authority { .. })
+        ));
+        assert!(matches!(
+            bench.gemini.control.receive::<Control>().unwrap(),
+            Some(Control::Authority { .. })
+        ));
+        assert!(bench.gemini.control.receive::<Control>().unwrap().is_none());
+        bench.rig.publish(owner.snapshot(now()).unwrap()).unwrap();
+        assert!(
+            matches!(
+                bench.second.control.receive::<Control>().unwrap(),
+                Some(Control::Authority { .. })
+            ),
+            "renewal does not restart the route epoch"
+        );
+        assert_eq!(bench.rig.provider.history_epoch(), Some(1));
+    }
+
+    #[test]
+    fn history_route_failed_revocation_does_not_swap_slots() {
+        let directory = SessionDirectory::create().unwrap();
+        let (mut provider, second_peer) = Worker::sleeping_fixture(&directory.path, "second");
+        let (live, _live_peer) = Worker::sleeping_fixture(&directory.path, "provider");
+        provider.set_history_active(true).unwrap();
+        let mut route = Route::new(live);
+        route.second_active = true;
+        drop(second_peer);
+        assert!(
+            swap(
+                &mut provider,
+                &mut CloudAvailability::default(),
+                &mut OutputReceiver::default(),
+                &mut route
+            )
+            .is_err()
+        );
+        assert_eq!(provider.role, "second");
+        assert!(route.second_active);
+    }
+
+    #[test]
+    fn history_route_swap_revokes_before_reactivation() {
+        let directory = SessionDirectory::create().unwrap();
+        let (mut provider, mut live_peer) = Worker::sleeping_fixture(&directory.path, "provider");
+        let (second, mut second_peer) = Worker::sleeping_fixture(&directory.path, "second");
+        let mut route = Route::new(second);
+        let mut cloud = CloudAvailability::default();
+        let mut flow = OutputReceiver::default();
+        swap(&mut provider, &mut cloud, &mut flow, &mut route).unwrap();
+        assert!(route.second_active);
+        assert_eq!(provider.history_epoch(), Some(1));
+        assert!(matches!(
+            second_peer.control.receive::<Control>().unwrap(),
+            Some(Control::HistoryRoute {
+                epoch: 1,
+                active: true
+            })
+        ));
+        swap(&mut provider, &mut cloud, &mut flow, &mut route).unwrap();
+        assert!(!route.second_active);
+        assert_eq!(route.worker.history_epoch(), None);
+        assert!(matches!(
+            second_peer.control.receive::<Control>().unwrap(),
+            Some(Control::HistoryRoute {
+                epoch: 1,
+                active: false
+            })
+        ));
+        swap(&mut provider, &mut cloud, &mut flow, &mut route).unwrap();
+        assert_eq!(provider.history_epoch(), Some(2));
+        assert!(matches!(
+            second_peer.control.receive::<Control>().unwrap(),
+            Some(Control::HistoryRoute {
+                epoch: 2,
+                active: true
+            })
+        ));
+        assert!(
+            live_peer.control.receive::<Control>().unwrap().is_none(),
+            "Live receives no history control"
+        );
+    }
+
+    #[test]
+    fn history_route_failed_activation_does_not_swap_slots() {
+        let directory = SessionDirectory::create().unwrap();
+        let (mut provider, _live_peer) = Worker::sleeping_fixture(&directory.path, "provider");
+        let (second, second_peer) = Worker::sleeping_fixture(&directory.path, "second");
+        let mut route = Route::new(second);
+        drop(second_peer);
+        assert!(
+            swap(
+                &mut provider,
+                &mut CloudAvailability::default(),
+                &mut OutputReceiver::default(),
+                &mut route
+            )
+            .is_err()
+        );
+        assert_eq!(provider.role, "provider");
+        assert!(!route.second_active);
+        assert_eq!(route.worker.history_epoch(), None);
+    }
+
+    #[test]
+    fn history_route_dead_second_fallback_does_not_send_revocation() {
+        let mut bench = Bench::standing_in();
+        bench.rig.provider.set_history_active(true).unwrap();
+        assert!(matches!(
+            bench.second.control.receive::<Control>().unwrap(),
+            Some(Control::HistoryRoute {
+                epoch: 1,
+                active: true
+            })
+        ));
+        assert!(
+            bench
+                .rig
+                .provider
+                .kill_and_reap(io::ErrorKind::Other, "history fixture exit".into())
+                .0
+        );
+        assert!(
+            dropped_if_gone(
+                &mut bench.rig,
+                &mut bench.cloud,
+                &mut bench.flow,
+                &mut bench.trace
+            )
+            .unwrap()
+        );
+        assert_eq!(bench.rig.provider.role, "provider");
+        assert!(bench.rig.second.is_none());
+        match bench.second.control.receive::<Control>() {
+            Ok(None) => {}
+            Err(error) if error.kind() == io::ErrorKind::ConnectionReset => {}
+            other => panic!("control was sent to the verified dead Second worker: {other:?}"),
+        }
+    }
 
     /// #1673: texts are answered where a second route's worker runs at all:
     /// standing by or as the only voice, and not with Gemini alone.

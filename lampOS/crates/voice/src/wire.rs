@@ -31,6 +31,12 @@ pub enum Control {
         peer: BootId,
     },
     StartCapture,
+    /// Second's history receipt lifetime, independent of turn authority.
+    /// A new activation has a strictly newer epoch; standby revokes it.
+    HistoryRoute {
+        epoch: u64,
+        active: bool,
+    },
     /// Boot-scoped provider packet capacity, independent of interaction authority.
     ProviderOutputCapacity {
         through: u64,
@@ -62,6 +68,7 @@ impl<'de> Deserialize<'de> for Control {
             Authority { snapshot: Snapshot },
             ConnectReference { peer: BootId },
             StartCapture {},
+            HistoryRoute { epoch: u64, active: bool },
             ProviderOutputCapacity { through: u64 },
             NameGrant { grant: NameGrant },
             Stop {},
@@ -70,6 +77,7 @@ impl<'de> Deserialize<'de> for Control {
             StrictControl::Authority { snapshot } => Self::Authority { snapshot },
             StrictControl::ConnectReference { peer } => Self::ConnectReference { peer },
             StrictControl::StartCapture {} => Self::StartCapture,
+            StrictControl::HistoryRoute { epoch, active } => Self::HistoryRoute { epoch, active },
             StrictControl::ProviderOutputCapacity { through } => {
                 Self::ProviderOutputCapacity { through }
             }

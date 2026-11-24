@@ -6613,7 +6613,7 @@ fn run_for_guarded(
             crate::attachments::forget();
             // A timed-out removal can still commit. Invalidate the local
             // recap without waiting on its mutex in this tool's deadline.
-            FORGET_THREAD.store(true, Ordering::Release);
+            mark_thread_forgotten();
         }
         let result = DAYS
             .get()
@@ -6624,7 +6624,7 @@ fn run_for_guarded(
                 |client| client.run_for_request(call, deadline, person, (lease, asked_in)),
             );
         if forgets {
-            FORGET_THREAD.store(true, Ordering::Release);
+            mark_thread_forgotten();
             if let Ok(mut thread) = crate::thread::THREAD.try_lock() {
                 clear_forgotten_thread(&mut thread);
             }
@@ -7115,7 +7115,7 @@ pub fn start(socket: PathBuf, known: Option<PathBuf>) {
             // The optional thread file contains no source IDs. A new Days
             // process must discard that restored recap before its first
             // provider session rather than journal it as unlinked history.
-            FORGET_THREAD.store(true, Ordering::Release);
+            mark_thread_forgotten();
             DaysClient::new(socket)
                 .map_err(|_| {
                     eprintln!("lamp-voice provider: no Days memory worker; memory unavailable");
@@ -8538,7 +8538,32 @@ pub fn days_from_environment() -> bool {
 
 static DAYS_MODE: OnceLock<bool> = OnceLock::new();
 static DAYS: OnceLock<Option<DaysClient>> = OnceLock::new();
-static FORGET_THREAD: AtomicBool = AtomicBool::new(false);
+/// Process-local recap invalidation: memory startup/forget writers advance the
+/// revision and set its low pending bit. The Thread-lock owner clears that bit
+/// only after clearing history; copied fixed-line proofs read the revision.
+/// The terminal maximum stays pending forever rather than reviving old proofs.
+static FORGET_THREAD: AtomicU64 = AtomicU64::new(0);
+
+fn mark_thread_forgotten() {
+    mark_thread_forgotten_in(&FORGET_THREAD);
+}
+
+fn mark_thread_forgotten_in(state: &AtomicU64) {
+    let _ = state.fetch_update(Ordering::AcqRel, Ordering::Acquire, |was| {
+        Some(was.checked_add(2).map_or(u64::MAX, |next| next | 1))
+    });
+}
+
+/// A history-only generation, never memory or tool authority. A pending forget
+/// already invalidates copies, even if the recap mutex is still held elsewhere.
+pub(crate) fn fixed_history_revision() -> Option<u64> {
+    fixed_history_revision_in(&FORGET_THREAD)
+}
+
+fn fixed_history_revision_in(state: &AtomicU64) -> Option<u64> {
+    let value = state.load(Ordering::Acquire);
+    (value & 1 == 0).then_some(value >> 1)
+}
 /// The requests whose forget was done ([`forgetting_reply`]): at most
 /// [`FORGOTTEN_REPLIES`], the oldest let go first.
 static FORGOTTEN_REPLY_REQUESTS: OnceLock<Mutex<BTreeSet<u64>>> = OnceLock::new();
@@ -8596,8 +8621,83 @@ pub(crate) fn finished_forgetting_reply(request: u64) -> bool {
 /// The session-note call site already owns the recap lock. Complete any
 /// invalidation that could not take that lock during a bounded tool call.
 pub fn clear_forgotten_thread(thread: &mut crate::thread::Thread) {
-    if FORGET_THREAD.swap(false, Ordering::AcqRel) {
-        thread.forget();
+    clear_forgotten_thread_in(&FORGET_THREAD, || thread.forget());
+}
+
+fn clear_forgotten_thread_in(state: &AtomicU64, forget: impl FnOnce()) {
+    let pending = state.load(Ordering::Acquire);
+    if pending & 1 == 0 {
+        return;
+    }
+    // Keep copies invalid throughout clearing. A concurrent newer forget must
+    // remain pending for the next Thread-lock owner, not be consumed here.
+    forget();
+    if pending != u64::MAX {
+        let _ = state.compare_exchange(pending, pending & !1, Ordering::AcqRel, Ordering::Acquire);
+    }
+}
+
+#[cfg(test)]
+mod fixed_history_forget_tests {
+    use super::*;
+
+    #[test]
+    fn fixed_history_revision_is_invalid_until_forget_finishes_and_never_restored() {
+        let state = AtomicU64::new(0);
+        let copied_revision = fixed_history_revision_in(&state).unwrap();
+        mark_thread_forgotten_in(&state);
+        assert_eq!(fixed_history_revision_in(&state), None);
+        clear_forgotten_thread_in(&state, || {
+            assert_eq!(
+                fixed_history_revision_in(&state),
+                None,
+                "copied history stays invalid while its thread is being cleared"
+            );
+        });
+        let after = fixed_history_revision_in(&state).unwrap();
+        assert_ne!(
+            after, copied_revision,
+            "consuming the pending flag cannot revive copied history"
+        );
+        mark_thread_forgotten_in(&state);
+        clear_forgotten_thread_in(&state, || {});
+        assert!(fixed_history_revision_in(&state).unwrap() > after);
+    }
+
+    #[test]
+    fn fixed_history_new_forget_during_clear_stays_pending() {
+        let state = AtomicU64::new(0);
+        mark_thread_forgotten_in(&state);
+        clear_forgotten_thread_in(&state, || mark_thread_forgotten_in(&state));
+        assert_eq!(
+            fixed_history_revision_in(&state),
+            None,
+            "a completed clear cannot consume a newer forget"
+        );
+        clear_forgotten_thread_in(&state, || {});
+        assert_eq!(fixed_history_revision_in(&state), Some(2));
+    }
+
+    #[test]
+    fn fixed_history_forget_exhaustion_stays_closed_after_every_clear() {
+        let state = AtomicU64::new(u64::MAX - 3);
+        let old = fixed_history_revision_in(&state).unwrap();
+        mark_thread_forgotten_in(&state);
+        assert_eq!(state.load(Ordering::Acquire), u64::MAX);
+        for _ in 0..3 {
+            clear_forgotten_thread_in(&state, || {});
+            assert_eq!(fixed_history_revision_in(&state), None);
+            assert_ne!(fixed_history_revision_in(&state), Some(old));
+            mark_thread_forgotten_in(&state);
+        }
+        assert_eq!(state.load(Ordering::Acquire), u64::MAX);
+    }
+
+    #[test]
+    fn fixed_history_without_pending_forget_does_not_clear_thread() {
+        let state = AtomicU64::new(4);
+        clear_forgotten_thread_in(&state, || panic!("no forget requested"));
+        assert_eq!(fixed_history_revision_in(&state), Some(2));
     }
 }
 
@@ -13882,7 +13982,7 @@ impl DaysClient {
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
                     .inhibit(Stopped::RuleForgotten);
                 say(said);
-                FORGET_THREAD.store(true, Ordering::Release);
+                mark_thread_forgotten();
                 if let Ok(mut thread) = crate::thread::THREAD.try_lock() {
                     clear_forgotten_thread(&mut thread);
                 }
@@ -13985,7 +14085,7 @@ impl DaysClient {
         let said = context.inhibit(why);
         drop(context);
         say(said);
-        FORGET_THREAD.store(true, Ordering::Release);
+        mark_thread_forgotten();
         if let Ok(mut thread) = crate::thread::THREAD.try_lock() {
             clear_forgotten_thread(&mut thread);
         }

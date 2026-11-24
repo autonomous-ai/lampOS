@@ -232,6 +232,10 @@ pub struct Worker {
     pub boot: BootId,
     pub role: String,
     pub diagnostic_start: Option<DiagnosticStarted>,
+    /// Serve's successful history route activations for this worker boot.
+    /// Only the Second process receives these controls; Live has no receipt path.
+    history_epoch: u64,
+    history_active: bool,
     // Only the optional ring owns a separate startup namespace. Channels drop
     // before this directory; peer paths are removed only after verified exit.
     ring_resources: Option<RingResources>,
@@ -343,6 +347,56 @@ pub fn listed(role: &str) -> io::Result<lamp_voice_processes::WorkerRole> {
 }
 
 impl Worker {
+    /// A real child owned and reaped by the normal Worker lifecycle.
+    #[cfg(test)]
+    pub(crate) fn fixture_with_child(
+        channels: WorkerChannels,
+        child: Child,
+        boot: BootId,
+        role: &str,
+    ) -> Self {
+        Self {
+            channels,
+            child,
+            boot,
+            role: role.into(),
+            diagnostic_start: None,
+            ring_resources: None,
+            history_epoch: 0,
+            history_active: false,
+            renewal_stall: RenewalStall::default(),
+            on_stop: None,
+            after_terminate: None,
+        }
+    }
+
+    /// The active Second history epoch, never an authority lease or Live state.
+    pub(crate) fn history_epoch(&self) -> Option<u64> {
+        (self.role == "second" && self.history_active).then_some(self.history_epoch)
+    }
+
+    /// Publish a critical route transition before dependent provider data.
+    /// Unlike replaceable authority renewals, a full socket is an error: the
+    /// caller must stop the transition rather than skip a history revocation.
+    pub(crate) fn set_history_active(&mut self, active: bool) -> io::Result<()> {
+        if self.role != "second" || active == self.history_active {
+            return Ok(());
+        }
+        let epoch = if active {
+            self.history_epoch
+                .checked_add(1)
+                .ok_or_else(|| io::Error::other("history route epoch exhausted"))?
+        } else {
+            self.history_epoch
+        };
+        self.channels
+            .control
+            .send(Control::HistoryRoute { epoch, active })?;
+        self.history_epoch = epoch;
+        self.history_active = active;
+        Ok(())
+    }
+
     /// The worker's process id, for a test that reads how it runs (#1608).
     pub fn process_id(&self) -> u32 {
         self.child.id()
@@ -389,6 +443,8 @@ impl Worker {
                 role: role.into(),
                 diagnostic_start: None,
                 ring_resources: None,
+                history_epoch: 0,
+                history_active: false,
                 renewal_stall: RenewalStall::default(),
                 #[cfg(test)]
                 on_stop: None,
@@ -533,6 +589,8 @@ impl Worker {
                 role: role.into(),
                 diagnostic_start: None,
                 ring_resources: None,
+                history_epoch: 0,
+                history_active: false,
                 renewal_stall: RenewalStall::default(),
                 #[cfg(test)]
                 on_stop: None,
@@ -625,6 +683,8 @@ impl Worker {
             role: role.into(),
             diagnostic_start: None,
             ring_resources: None,
+            history_epoch: 0,
+            history_active: false,
             renewal_stall: RenewalStall::default(),
             #[cfg(test)]
             on_stop: None,
@@ -1015,6 +1075,8 @@ mod fixture_tests {
                 role: role.into(),
                 diagnostic_start: None,
                 ring_resources: None,
+                history_epoch: 0,
+                history_active: false,
                 renewal_stall: RenewalStall::default(),
                 on_stop: None,
                 after_terminate: None,
@@ -1076,6 +1138,8 @@ mod fixture_tests {
             role: "capture".into(),
             diagnostic_start: None,
             ring_resources: None,
+            history_epoch: 0,
+            history_active: false,
             renewal_stall: RenewalStall::default(),
             on_stop: None,
             after_terminate: None,
@@ -1125,6 +1189,8 @@ mod fixture_tests {
             role: role.into(),
             diagnostic_start: None,
             ring_resources: None,
+            history_epoch: 0,
+            history_active: false,
             renewal_stall: RenewalStall::default(),
             on_stop: None,
             after_terminate: None,
@@ -3592,6 +3658,117 @@ fn rest_through_sounds_worker_environment(
 mod tests {
     use super::*;
 
+    #[test]
+    fn history_route_full_control_socket_is_not_a_skipped_renewal() {
+        let directory = SessionDirectory::create().unwrap();
+        let (mut worker, _peer) = Worker::sleeping_fixture(&directory.path, "second");
+        let mut full = false;
+        for _ in 0..4096 {
+            match worker.channels.control.send(Control::Stop) {
+                Ok(()) => {}
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    full = true;
+                    break;
+                }
+                Err(error) => panic!("unexpected fixture fill failure: {error}"),
+            }
+        }
+        assert!(full, "the bounded fixture must fill the control socket");
+        assert_eq!(
+            worker.set_history_active(true).unwrap_err().kind(),
+            io::ErrorKind::WouldBlock
+        );
+        assert_eq!(worker.history_epoch(), None);
+        assert_eq!(
+            worker.renewal_stall.skipped(),
+            0,
+            "critical transition was not treated as a replaceable renewal"
+        );
+    }
+
+    #[test]
+    fn history_route_wire_requires_exact_fields() {
+        for text in [
+            r#"{"kind":"history_route","epoch":1}"#,
+            r#"{"kind":"history_route","active":true}"#,
+            r#"{"kind":"history_route","epoch":1,"active":true,"text":"untrusted"}"#,
+        ] {
+            assert!(serde_json::from_str::<Control>(text).is_err(), "{text}");
+        }
+        let encoded = serde_json::to_string(&Control::HistoryRoute {
+            epoch: 4,
+            active: false,
+        })
+        .unwrap();
+        assert!(matches!(
+            serde_json::from_str::<Control>(&encoded).unwrap(),
+            Control::HistoryRoute {
+                epoch: 4,
+                active: false
+            }
+        ));
+    }
+
+    #[test]
+    fn history_route_activation_is_second_only_and_gets_a_fresh_epoch() {
+        let directory = SessionDirectory::create().unwrap();
+        let (mut worker, mut peer) = Worker::sleeping_fixture(&directory.path, "second");
+        assert_eq!(worker.history_epoch(), None);
+        worker.set_history_active(false).unwrap();
+        assert!(peer.control.receive::<Control>().unwrap().is_none());
+        worker.set_history_active(true).unwrap();
+        assert_eq!(worker.history_epoch(), Some(1));
+        assert!(matches!(
+            peer.control.receive::<Control>().unwrap(),
+            Some(Control::HistoryRoute {
+                epoch: 1,
+                active: true
+            })
+        ));
+        worker.set_history_active(true).unwrap();
+        assert!(peer.control.receive::<Control>().unwrap().is_none());
+        worker.set_history_active(false).unwrap();
+        assert_eq!(worker.history_epoch(), None);
+        assert!(matches!(
+            peer.control.receive::<Control>().unwrap(),
+            Some(Control::HistoryRoute {
+                epoch: 1,
+                active: false
+            })
+        ));
+        worker.set_history_active(true).unwrap();
+        assert_eq!(worker.history_epoch(), Some(2));
+        assert!(matches!(
+            peer.control.receive::<Control>().unwrap(),
+            Some(Control::HistoryRoute {
+                epoch: 2,
+                active: true
+            })
+        ));
+        let (mut live, mut live_peer) = Worker::sleeping_fixture(&directory.path, "provider");
+        live.set_history_active(true).unwrap();
+        live.set_history_active(false).unwrap();
+        assert_eq!(live.history_epoch(), None);
+        assert!(live_peer.control.receive::<Control>().unwrap().is_none());
+    }
+
+    #[test]
+    fn history_route_overflow_and_transport_failure_never_activate() {
+        let directory = SessionDirectory::create().unwrap();
+        let (mut worker, mut peer) = Worker::sleeping_fixture(&directory.path, "second");
+        worker.history_epoch = u64::MAX;
+        assert!(worker.set_history_active(true).is_err());
+        assert_eq!(worker.history_epoch(), None);
+        assert!(peer.control.receive::<Control>().unwrap().is_none());
+        worker.history_epoch = 0;
+        drop(peer);
+        assert!(worker.set_history_active(true).is_err());
+        assert_eq!(worker.history_epoch(), None);
+        assert_eq!(
+            worker.history_epoch, 0,
+            "a failed send did not consume an epoch"
+        );
+    }
     /// #7402: a serve whose own binary was removed under it reads
     /// `current_exe()` as `<path> (deleted)` (the same rule as lamp-update's
     /// `own.rs`) and refuses to start, naming the path; a binary that is
@@ -5748,6 +5925,8 @@ mod tests {
             role: "probe".into(),
             diagnostic_start: None,
             ring_resources: None,
+            history_epoch: 0,
+            history_active: false,
             renewal_stall: RenewalStall::default(),
             #[cfg(test)]
             on_stop: None,

@@ -290,6 +290,7 @@ pub mod audio_workers;
 pub mod bus_speaker;
 pub mod coordinator;
 
+mod fixed_line_history;
 mod receipt_history;
 mod service_trace;
 mod session_lifetime;

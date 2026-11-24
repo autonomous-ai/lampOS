@@ -648,6 +648,9 @@ fn provider_peer(
             };
             let mut seen = seen.lock().unwrap();
             match input {
+                ProviderInput::PlayedFixedLine { .. } => {
+                    panic!("fixed-line history receipts are unexpected in the endpoint fixture")
+                }
                 ProviderInput::Start {
                     request,
                     session,

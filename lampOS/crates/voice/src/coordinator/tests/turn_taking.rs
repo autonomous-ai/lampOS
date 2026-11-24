@@ -144,6 +144,7 @@ impl Harness {
             local_only: None,
             reminder: None,
             say: None,
+            fixed_line_receipt: None,
             news: Vec::new(),
             news_not_heard: None,
             down_line_said: false,

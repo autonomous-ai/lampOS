@@ -748,6 +748,10 @@ fn no_soft_lead(lead_us: &u64) -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ProviderInput {
+    /// A completed local fixed line. History metadata only; never model input.
+    PlayedFixedLine {
+        receipt: Box<crate::fixed_line_history::Receipt>,
+    },
     Start {
         request: u64,
         /// The connection selected at admission, never replaced at dequeue.
@@ -996,6 +1000,7 @@ pub enum ProviderInput {
 impl ProviderInput {
     fn request(&self) -> u64 {
         match self {
+            Self::PlayedFixedLine { receipt } => receipt.owner.turn(),
             Self::Start { request, .. }
             | Self::Audio { request, .. }
             | Self::End { request, .. }
@@ -1015,6 +1020,7 @@ impl ProviderInput {
     }
     fn privacy_generation(&self) -> u64 {
         match self {
+            Self::PlayedFixedLine { receipt } => receipt.line.origin.microphone_generation,
             Self::Start {
                 privacy_generation, ..
             }
@@ -5488,7 +5494,8 @@ impl ProviderIntake {
                 Control::ProviderOutputCapacity { through } => {
                     self.output_flow.grant(through)?;
                 }
-                Control::StartCapture
+                Control::HistoryRoute { .. }
+                | Control::StartCapture
                 | Control::ConnectReference { .. }
                 | Control::NameGrant { .. } => {
                     return Err(io::Error::other("invalid provider command").into());
@@ -6463,6 +6470,9 @@ impl InputHandoff {
         }
         let cuts_read_back = start_cuts_read_back(&command);
         match command {
+            ProviderInput::PlayedFixedLine { .. } => {
+                return Err(io::Error::other("history receipt is not Live input").into());
+            }
             ProviderInput::Reminder {
                 session,
                 text,

@@ -160,6 +160,8 @@
 //! Nothing of what is said is logged: the skill's name, the priority and
 //! the outcome only.
 mod alone_guard;
+#[cfg(test)]
+mod fixed_line_tests;
 pub mod tts_cache;
 mod unplug_guard;
 
@@ -689,9 +691,45 @@ pub struct Request {
     pub line: LineMeta,
 }
 
+/// A rendered built-in line correlated with a verified Skills tool origin.
+/// This is history metadata only; completion is checked by the parent reply.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FixedLine {
+    pub origin: lamp_msgs::FixedLineOrigin,
+    pub canonical: String,
+    pub language: String,
+    pub text: String,
+}
+
+impl FixedLine {
+    pub(crate) fn check(&self) -> bool {
+        if self.origin.check().is_err()
+            || self.canonical.len() > 4096
+            || self.text.len() > 4096
+            || !crate::language::is_fixed(&self.canonical)
+        {
+            return false;
+        }
+        let Ok(language) = crate::language::Language::parse(&self.language) else {
+            return false;
+        };
+        let expected: &str = match language.and_then(|language| language.fixed(&self.canonical)) {
+            Some(text) => text,
+            None => &self.canonical,
+        };
+        self.language == language.map_or("en", crate::language::Language::code)
+            && self.text == expected
+    }
+}
+
 /// What `voice/line` needs of a request that plays without the model.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct LineMeta {
+    /// Verified Skills provenance, consumed when the canonical line renders.
+    fixed_origin: Option<Box<lamp_msgs::FixedLineOrigin>>,
+    /// The exact canonical/rendered pair, never an arbitrary computer line.
+    fixed_line: Option<Box<FixedLine>>,
     /// The paired computer that asked it (an exact `text`'s `by`).
     pub by: Option<String>,
     /// Its words and where they came from, kept as they are rendered.
@@ -738,6 +776,8 @@ struct StreamWire {
 #[serde(deny_unknown_fields)]
 struct Wire {
     skill: String,
+    #[serde(default)]
+    fixed_line_origin: Option<lamp_msgs::FixedLineOrigin>,
     #[serde(default)]
     note: Option<String>,
     #[serde(default)]
@@ -861,23 +901,47 @@ pub enum Caller {
     /// that may ask for a [`RECORDINGS`] line, and the shutdown
     /// (`lamp-setup shutdown-now`, #3697), for a cached `text`.
     WifiHelper,
-    /// Any other: a skill, a part, or a peer whose credentials are unknown.
+    /// The Skills unit, verified from this socket's peer credentials/cgroup.
+    Skills,
+    /// Any other part, or a peer whose credentials are unknown.
     Other,
 }
 
-/// The caller at `stream`'s other end: the Wi-Fi helper when its user is
-/// `helper_uid` (root in the product). Peer credentials are read on Linux
-/// only; elsewhere every caller is [`Caller::Other`].
+/// The caller at `stream`'s other end: the Skills unit by peer cgroup, or
+/// the Wi-Fi helper when its user is `helper_uid` (root in the product).
+/// Peer credentials are read on Linux only; elsewhere callers are Other.
 fn caller_of(stream: &UnixStream, helper_uid: u32) -> Caller {
     #[cfg(target_os = "linux")]
-    if rustix::net::sockopt::socket_peercred(stream)
-        .is_ok_and(|peer| peer.uid.as_raw() == helper_uid)
-    {
-        return Caller::WifiHelper;
+    if let Ok(peer) = rustix::net::sockopt::socket_peercred(stream) {
+        if std::fs::read_to_string(format!("/proc/{}/cgroup", peer.pid.as_raw_nonzero()))
+            .is_ok_and(|cgroup| skills_cgroup(&cgroup))
+        {
+            return Caller::Skills;
+        }
+        if peer.uid.as_raw() == helper_uid {
+            return Caller::WifiHelper;
+        }
     }
     #[cfg(not(target_os = "linux"))]
     let _ = (stream, helper_uid);
     Caller::Other
+}
+
+/// A systemd unit boundary, including delegated descendants, never a prefix.
+#[cfg(any(test, target_os = "linux"))]
+fn skills_cgroup(cgroup: &str) -> bool {
+    cgroup.lines().any(|line| {
+        let mut fields = line.splitn(3, ':');
+        let (Some(_), Some(controllers), Some(path)) =
+            (fields.next(), fields.next(), fields.next())
+        else {
+            return false;
+        };
+        (controllers.is_empty() || controllers == "name=systemd")
+            && path
+                .strip_prefix("/system.slice/lamp-skills.service")
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+    })
 }
 
 /// Read and check one request line from a caller that is not the Wi-Fi
@@ -1176,6 +1240,16 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     if !(1..=LONGEST_EXPIRY_MS).contains(&expires_in_ms) {
         return Err(format!("expires_in_ms is 1 to {LONGEST_EXPIRY_MS}"));
     }
+    let fixed_origin = wire
+        .fixed_line_origin
+        .take()
+        .filter(|origin| {
+            caller == Caller::Skills
+                && origin.check().is_ok()
+                && matches!(&words, Words::Exact(text) if crate::language::is_fixed(text))
+                && voice.is_none()
+        })
+        .map(Box::new);
     Ok(Request {
         skill,
         words,
@@ -1189,6 +1263,8 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
         question: wire.question,
         may_end_unsaid: wire.may_end_unsaid,
         line: LineMeta {
+            fixed_origin,
+            fixed_line: None,
             by: wire.by,
             said: None,
             voice,
@@ -1277,7 +1353,8 @@ fn parse_turn(skill: String, turn: TurnWire, wire: Wire) -> Result<Request, Stri
     if skill != TURN_SKILL {
         return Err("turn is lamp-control's only".into());
     }
-    if wire.note.is_some()
+    if wire.fixed_line_origin.is_some()
+        || wire.note.is_some()
         || wire.quoted.is_some()
         || wire.from.is_some()
         || wire.sound.is_some()
@@ -1431,7 +1508,8 @@ fn parse_stream(skill: String, stream: StreamWire, wire: &Wire) -> Result<Reques
 /// Whether `wire` asks for anything besides a `listen` or a `stream`
 /// (which both go alone, `expires_in_ms` aside).
 fn asks_for_more(wire: &Wire) -> bool {
-    wire.note.is_some()
+    wire.fixed_line_origin.is_some()
+        || wire.note.is_some()
         || wire.text.is_some()
         || wire.quoted.is_some()
         || wire.from.is_some()
@@ -1623,6 +1701,14 @@ pub struct Ticket {
 }
 
 impl Ticket {
+    /// Only the canonical fixed line that actually rendered for this ticket.
+    pub(crate) fn fixed_line(&self) -> Option<&FixedLine> {
+        self.line
+            .fixed_line
+            .as_deref()
+            .filter(|line| line.check() && self.said.as_deref() == Some(line.text.as_str()))
+    }
+
     /// A long exact line's feed, its pieces played as they come (#7892);
     /// none for any other say.
     pub(crate) fn pieces(&self) -> Option<Arc<crate::speaker_stream::Feed>> {
@@ -2265,6 +2351,7 @@ impl Says {
             said: Some((text.to_owned(), source)),
             voice: None,
             app: None,
+            ..Default::default()
         };
         (says, answered)
     }
@@ -2338,6 +2425,33 @@ impl Says {
         .unwrap();
         says.poll(0);
         (says, answered)
+    }
+
+    /// A test's already-rendered built-in line, with an origin captured from
+    /// its real worker/tool dispatch. Production metadata comes from the socket.
+    #[cfg(test)]
+    pub(crate) fn set_fixed_origin_for_test(
+        &mut self,
+        origin: lamp_msgs::FixedLineOrigin,
+        canonical: &str,
+        language: &str,
+    ) {
+        assert_eq!(self.waiting.len(), 1);
+        let request = &mut self.waiting[0].request;
+        let Words::ExactSound {
+            text: Some(text), ..
+        } = &request.words
+        else {
+            panic!("fixed-line fixture needs rendered exact words");
+        };
+        let line = FixedLine {
+            origin,
+            canonical: canonical.to_owned(),
+            language: language.to_owned(),
+            text: text.clone(),
+        };
+        assert!(line.check());
+        request.line.fixed_line = Some(Box::new(line));
     }
 
     /// For a test: asks are put in by hand.
@@ -3145,6 +3259,8 @@ fn serve_client(
                 }
                 Words::Exact(text) => {
                     let (played, said) = recordings.played(text, request.line.voice.as_deref())?;
+                    request.line.fixed_line =
+                        recordings.fixed_line(request.line.fixed_origin.take(), text, said);
                     let (samples, pieces) = match played {
                         tts_cache::Played::Whole(samples) => (samples, None),
                         tts_cache::Played::Pieces(pieces) => (Vec::new(), Some(pieces)),
@@ -3588,6 +3704,27 @@ impl Recordings {
     pub fn with_cache(mut self, cache: Option<Arc<tts_cache::TtsCache>>) -> Self {
         self.cache = cache;
         self
+    }
+
+    fn fixed_line(
+        &self,
+        origin: Option<Box<lamp_msgs::FixedLineOrigin>>,
+        canonical: &str,
+        said: &str,
+    ) -> Option<Box<FixedLine>> {
+        let origin = origin?;
+        let language = self
+            .cache
+            .as_ref()
+            .and_then(|cache| cache.owners_words(canonical))
+            .map_or("en", |(language, _)| language.code());
+        let line = FixedLine {
+            origin: *origin,
+            canonical: canonical.to_owned(),
+            language: language.to_owned(),
+            text: said.to_owned(),
+        };
+        line.check().then(|| Box::new(line))
     }
 
     /// A paired computer's exact `text` rendered now, never kept, or why not.

@@ -83,6 +83,7 @@ mod open_name;
 mod requested_media;
 mod signed_out;
 use requested_media::RequestedMedia;
+mod fixed_lines;
 mod second;
 mod service;
 mod speaker_tone;
@@ -1288,6 +1289,7 @@ struct HeardAtCut {
 }
 
 struct Reply {
+    fixed_line_receipt: Option<crate::fixed_line_history::Receipt>,
     owner: TurnOwner,
     cloud: CloudRequest,
     local_input_ended: bool,
@@ -1609,6 +1611,23 @@ impl Reply {
             && let Ok(mut thread) = crate::thread::THREAD.lock()
         {
             thread.lamp(self.owner.turn(), text, std::time::Instant::now());
+        }
+        if spoken
+            && self.notice.origin() == SpeechOrigin::ExactLine
+            && let Some(line) = say.fixed_line().filter(|line| line.check())
+            && line.origin.microphone_generation == snapshot.microphone_generation()
+            && line.origin.camera_generation == snapshot.camera_generation()
+            && snapshot.microphone_permission() == Permission::Allowed
+            && let NoticeDelivery::Selected {
+                retired_at_us: Some(played_at_us),
+                ..
+            } = &self.notice
+        {
+            self.fixed_line_receipt = Some(crate::fixed_line_history::Receipt {
+                line: line.clone(),
+                owner: self.owner,
+                played_at_us: *played_at_us,
+            });
         }
         say.answer(if spoken {
             crate::say::Outcome::Spoken
@@ -2571,8 +2590,31 @@ impl Rig {
 
     /// A hand cancellation has already reached the speaker. Deliver revocation
     /// to every remaining child even if one local channel has gone away.
-    fn publish_hand_revocation(&mut self, snapshot: Snapshot) -> io::Result<()> {
-        let mut failure = None;
+    fn publish_hand_revocation(
+        &mut self,
+        snapshot: Snapshot,
+        reset_history: bool,
+        fixed_lines: &mut fixed_lines::Pending,
+    ) -> io::Result<()> {
+        // hand::cancel clears ordinary input even when no Reply is active.
+        // Its independent history queue must also be cancelled on idle Stop.
+        fixed_lines.clear();
+        // An explicit stop also fences late skill lines and already-copied
+        // history. Ordinary completion and input supersession do not come here.
+        // Collect failure so every other child still receives its revocation.
+        let history = if reset_history {
+            self.provider
+                .set_history_active(false)
+                .and_then(|()| self.provider.set_history_active(true))
+        } else {
+            self.provider.set_history_active(true)
+        };
+        let mut failure = history.err();
+        if let Some(route) = &mut self.second
+            && let Err(error) = route.worker_mut().set_history_active(false)
+        {
+            failure.get_or_insert(error);
+        }
         let standby = self.second.is_some();
         let held = self.capture_held;
         let privacy_controls = self.privacy_controls;
@@ -2614,6 +2656,12 @@ impl Rig {
         // Motor revocation precedes mandatory audio sends, including their failure.
         if let Some(motor) = &mut self.motor {
             motor.publish(snapshot);
+        }
+        // A history transition is critical even for an optional standby.
+        // Never hide its failure behind the authority renewal exception.
+        self.provider.set_history_active(true)?;
+        if let Some(route) = &mut self.second {
+            route.worker_mut().set_history_active(false)?;
         }
         let standby = self.second.is_some();
         let held = self.capture_held;
@@ -4565,6 +4613,11 @@ fn flush_provider_input_with(
             break;
         }
         let request = match command {
+            ProviderInput::PlayedFixedLine { .. } => {
+                return Err(io::Error::other(
+                    "history receipt reached normal input queue",
+                ));
+            }
             ProviderInput::Start { request, .. }
             | ProviderInput::Audio { request, .. }
             | ProviderInput::End { request, .. }
@@ -7754,6 +7807,7 @@ fn conversation_with_gate_inner(
     let mut capture_lineage: Option<CaptureLineage> = None;
     let provider_queue_bound = provider_queue_bound(hold);
     let mut provider_queue = VecDeque::with_capacity(provider_queue_bound);
+    let mut fixed_lines = fixed_lines::Pending::default();
     let mut submission_draining = false;
     let mut speaker_pending: Option<PendingSpeaker> = None;
     // The answer whose speech the speaker dropped as its authority lapsed
@@ -7803,6 +7857,7 @@ fn conversation_with_gate_inner(
                 .is_some_and(|current| !current.local_input_ended);
             cancel_reply(owner, reply, trace, "second_route_failed")?;
             provider_queue.clear();
+            fixed_lines.clear();
             speaker_pending = None;
             if input_active {
                 admission.discard_stream_until_end(monotonic_us())?;
@@ -8475,7 +8530,11 @@ fn conversation_with_gate_inner(
                 last_publish = monotonic_us();
                 // No provider, optional presentation, filesystem or trace call
                 // precedes speaker revocation. Capture is next for mute.
-                let publish = rig.publish_hand_revocation(snapshot);
+                let publish = rig.publish_hand_revocation(
+                    snapshot,
+                    stop || head_stop || spoken_stop || body_pushed || control_ended,
+                    &mut fixed_lines,
+                );
                 // The camera is next after the speaker and before any
                 // record (#1802).
                 if muted {
@@ -8620,6 +8679,7 @@ fn conversation_with_gate_inner(
         {
             cancel_reply(owner, reply, trace, why)?;
             provider_queue.clear();
+            fixed_lines.clear();
             speaker_pending = None;
             snapshot = owner.snapshot(now())?;
             rig.publish(snapshot)?;
@@ -8633,6 +8693,7 @@ fn conversation_with_gate_inner(
             eprintln!("lamp-voice: a say nobody asked for was cut: the care hold (LAMP_CARE_LINE)");
             cut_for_care(owner, reply, trace)?;
             provider_queue.clear();
+            fixed_lines.clear();
             speaker_pending = None;
             snapshot = owner.snapshot(now())?;
             rig.publish(snapshot)?;
@@ -8648,6 +8709,7 @@ fn conversation_with_gate_inner(
         {
             cancel_reply(owner, reply, trace, "update_give_way")?;
             provider_queue.clear();
+            fixed_lines.clear();
             speaker_pending = None;
             snapshot = owner.snapshot(now())?;
             rig.publish(snapshot)?;
@@ -8669,6 +8731,7 @@ fn conversation_with_gate_inner(
             }) {
                 cancel_reply(owner, reply, trace, "reminder_authority_lost")?;
                 provider_queue.clear();
+                fixed_lines.clear();
                 speaker_pending = None;
                 snapshot = owner.snapshot(now())?;
                 rig.publish(snapshot)?;
@@ -8715,6 +8778,7 @@ fn conversation_with_gate_inner(
                     cancel_reply(owner, reply, trace, "privacy_gap")?;
                 }
                 provider_queue.clear();
+                fixed_lines.clear();
                 speaker_pending = None;
                 gap_cut_utterance = true;
                 // The speaker hears of the cut at once, not at the next
@@ -8982,6 +9046,7 @@ fn conversation_with_gate_inner(
                             reply.as_mut().and_then(|current| current.reminder.take());
                         cancel_reply(owner, reply, trace, "reminder_deferred")?;
                         provider_queue.clear();
+                        fixed_lines.clear();
                         speaker_pending = None;
                         snapshot = owner.snapshot(now())?;
                         rig.publish(snapshot)?;
@@ -9035,6 +9100,7 @@ fn conversation_with_gate_inner(
                         cancel_reply(owner, reply, trace, "onboarding_sentence")?;
                         speaker_pending = None;
                         provider_queue.clear();
+                        fixed_lines.clear();
                         snapshot = owner.snapshot(now())?;
                         rig.publish(snapshot)?;
                         last_publish = monotonic_us();
@@ -9048,6 +9114,7 @@ fn conversation_with_gate_inner(
                     {
                         cancel_reply(owner, reply, trace, why)?;
                         provider_queue.clear();
+                        fixed_lines.clear();
                         speaker_pending = None;
                         snapshot = owner.snapshot(now())?;
                         rig.publish(snapshot)?;
@@ -9423,6 +9490,7 @@ fn conversation_with_gate_inner(
                         cancel_reply(owner, reply, trace, "onboarding_sentence")?;
                         speaker_pending = None;
                         provider_queue.clear();
+                        fixed_lines.clear();
                         snapshot = owner.snapshot(now())?;
                         rig.publish(snapshot)?;
                         last_publish = monotonic_us();
@@ -9647,6 +9715,7 @@ fn conversation_with_gate_inner(
                             }
                             speaker_pending = None;
                             provider_queue.clear();
+                            fixed_lines.clear();
                             snapshot = owner.snapshot(now())?;
                             rig.publish(snapshot)?;
                             last_publish = monotonic_us();
@@ -9721,6 +9790,7 @@ fn conversation_with_gate_inner(
                         cancel_reply(owner, reply, trace, "provider_interrupted")?;
                         speaker_pending = None;
                         provider_queue.clear();
+                        fixed_lines.clear();
                         // Keep the detector's utterance boundary. Reconnecting or
                         // cancellation must never reinterpret its tail as a new input.
                         if input_active {
@@ -11206,6 +11276,7 @@ fn conversation_with_gate_inner(
                         let (state, draining) =
                             accepted_without_cloud(accepted, owner, reply, &mut admission, trace)?;
                         provider_queue.clear();
+                        fixed_lines.clear();
                         speaker_pending = None;
                         submission_draining = draining;
                         snapshot = state;
@@ -11597,6 +11668,7 @@ fn conversation_with_gate_inner(
                                 admission.discard_stream_until_end(monotonic_us())?;
                                 submission_draining = true;
                                 provider_queue.clear();
+                                fixed_lines.clear();
                                 speaker_pending = None;
                                 record(
                                     trace,
@@ -11716,6 +11788,7 @@ fn conversation_with_gate_inner(
                     )?;
                     speaker_pending = None;
                     provider_queue.clear();
+                    fixed_lines.clear();
                     snapshot = owner.snapshot(now())?;
                     rig.publish(snapshot)?;
                     last_publish = monotonic_us();
@@ -12073,6 +12146,7 @@ fn conversation_with_gate_inner(
                             }
                             speaker_pending = None;
                             provider_queue.clear();
+                            fixed_lines.clear();
                             snapshot = owner.snapshot(now())?;
                             rig.publish(snapshot)?;
                             last_publish = monotonic_us();
@@ -12149,6 +12223,7 @@ fn conversation_with_gate_inner(
         {
             cancel_reply(owner, reply, trace, "reminder_lease_expired")?;
             provider_queue.clear();
+            fixed_lines.clear();
             speaker_pending = None;
             snapshot = owner.snapshot(now())?;
             rig.publish(snapshot)?;
@@ -12165,7 +12240,7 @@ fn conversation_with_gate_inner(
             &mut provider_queue,
             &mut held_cut_in_end,
         );
-        if provider_control_empty {
+        if provider_control_empty && fixed_lines.flush(&mut rig.provider, &cloud, snapshot)? {
             second::flush(
                 rig,
                 &mut cloud,
@@ -12186,6 +12261,7 @@ fn conversation_with_gate_inner(
             eprintln!("lamp-voice: request {request}: requested audio revoked: {why}");
             cancel_reply(owner, reply, trace, "requested_audio_revoked")?;
             provider_queue.clear();
+            fixed_lines.clear();
             speaker_pending = None;
             snapshot = owner.snapshot(now())?;
             rig.publish(snapshot)?;
@@ -12239,6 +12315,7 @@ fn conversation_with_gate_inner(
         {
             cancel_reply(owner, reply, trace, why)?;
             provider_queue.clear();
+            fixed_lines.clear();
             speaker_pending = None;
             snapshot = owner.snapshot(now())?;
             rig.publish(snapshot)?;
@@ -12313,6 +12390,9 @@ fn conversation_with_gate_inner(
             last_publish = monotonic_us();
             current.complete_reminder(&speaker_pending, snapshot);
             current.answer_say(&speaker_pending, snapshot);
+            if let Some(receipt) = current.fixed_line_receipt.take() {
+                fixed_lines.push(receipt);
+            }
             sleep_owed.turn_ended(current, &speaker_pending, snapshot);
             if onboarding_invitation_turn == Some((current.owner.boot(), turn)) {
                 if let Some(walk) = onboarding.as_mut() {
@@ -12842,6 +12922,7 @@ fn conversation_with_gate_inner(
                     // socket would otherwise reach the flush with no owner.
                     speaker_pending = None;
                     provider_queue.clear();
+                    fixed_lines.clear();
                     snapshot = owner.snapshot(now())?;
                     rig.publish(snapshot)?;
                     last_publish = monotonic_us();
@@ -13362,6 +13443,7 @@ fn conversation_with_gate_inner(
             // turn stays queued or pending, so the reminder's own gates see
             // the new authority this pass.
             provider_queue.clear();
+            fixed_lines.clear();
             speaker_pending = None;
             snapshot = owner.snapshot(now())?;
             last_publish = monotonic_us();
@@ -13797,6 +13879,7 @@ fn conversation_with_gate_inner(
                 // A stream that replaced another leaves nothing of it
                 // pending (at rest both were empty already).
                 provider_queue.clear();
+                fixed_lines.clear();
                 speaker_pending = None;
                 snapshot = now_state;
                 last_publish = monotonic_us();
@@ -16663,6 +16746,7 @@ fn commit_written_turn(
         media: Default::default(),
         local_only: None,
         reminder: None,
+        fixed_line_receipt: None,
         say: None,
         news: Vec::new(),
         news_not_heard: None,
@@ -16913,6 +16997,7 @@ fn commit_admitted_input(
         media: RequestedMedia::spoken(),
         local_only: None,
         reminder: None,
+        fixed_line_receipt: None,
         say: None,
         news: Vec::new(),
         news_not_heard: None,
@@ -17027,6 +17112,7 @@ fn commit_offline_input(
         media: Default::default(),
         local_only: Some(local),
         reminder: None,
+        fixed_line_receipt: None,
         say: None,
         news: Vec::new(),
         news_not_heard: None,
@@ -17206,6 +17292,7 @@ fn commit_own_line(
             signed_out,
         }),
         reminder: None,
+        fixed_line_receipt: None,
         say: None,
         news: Vec::new(),
         news_not_heard: None,
@@ -17324,6 +17411,7 @@ fn continue_after_early_end(
         media: RequestedMedia::spoken(),
         local_only: None,
         reminder: None,
+        fixed_line_receipt: None,
         say: None,
         news: Vec::new(),
         news_not_heard: None,
@@ -19886,6 +19974,7 @@ mod tests {
                 media: Default::default(),
                 local_only: None,
                 reminder: None,
+                fixed_line_receipt: None,
                 say: None,
                 news: Vec::new(),
                 news_not_heard: None,
@@ -21283,6 +21372,7 @@ mod tests {
             media: Default::default(),
             local_only: None,
             reminder: None,
+            fixed_line_receipt: None,
             say: None,
             news: Vec::new(),
             news_not_heard: None,
@@ -21635,6 +21725,7 @@ mod tests {
             media: Default::default(),
             local_only: None,
             reminder: None,
+            fixed_line_receipt: None,
             say: None,
             news: Vec::new(),
             news_not_heard: None,
