@@ -877,17 +877,21 @@ impl Run<'_, '_> {
     /// lamp and holds about the last 40 minutes, and is empty after a reboot.
     /// A round that did nothing (up to date, unreachable, nothing published,
     /// not quiet, a refusal said again) keeps only its end, as before: they
-    /// come every round and say the same.
+    /// come every round and say the same. An up-to-date round's pass that
+    /// adds units (#7018) keeps its lines whatever its end: it changed the
+    /// lamp, or took back what it changed, though it ends up to date.
     fn keep_lines(&self, outcome: &Outcome) {
-        if matches!(
-            outcome,
-            Outcome::Switched(_)
-                | Outcome::Held { .. }
-                | Outcome::SelfSwitched { .. }
-                | Outcome::Climbs { .. }
-                | Outcome::RolledBack { .. }
-                | Outcome::Failed(_)
-        ) && !self.lines.is_empty()
+        if (self.adds_only
+            || matches!(
+                outcome,
+                Outcome::Switched(_)
+                    | Outcome::Held { .. }
+                    | Outcome::SelfSwitched { .. }
+                    | Outcome::Climbs { .. }
+                    | Outcome::RolledBack { .. }
+                    | Outcome::Failed(_)
+            ))
+            && !self.lines.is_empty()
         {
             // A failure that comes every round the same way (15 minutes
             // apart) is kept once: the lines only when they differ from the

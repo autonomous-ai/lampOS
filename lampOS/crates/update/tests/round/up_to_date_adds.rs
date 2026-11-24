@@ -29,6 +29,22 @@ fn taken_by_an_older_updater(lamp: &mut Lamp, mood: &str) {
     fs::write(lamp.root.join(STATE), state.to_string()).unwrap();
 }
 
+/// A product lamp whose lamp-mood was started by something else already:
+/// an added unit, restarted and watched as any running part.
+fn running_mood() -> Lamp {
+    let mut lamp = product_lamp();
+    lamp.systemd.units.insert(
+        MOOD.into(),
+        Running {
+            active: "active".into(),
+            sub: "running".into(),
+            pid: 7,
+            ..Running::default()
+        },
+    );
+    lamp
+}
+
 fn said(lamp: &Lamp, line: &str) -> bool {
     lamp.said.iter().any(|said| said == line)
 }
@@ -168,18 +184,7 @@ fn an_up_to_date_round_adds_no_companion_of_an_absent_part_nor_a_unit_install_le
 /// build.
 #[test]
 fn an_up_to_date_rounds_addition_that_fails_its_watch_is_taken_away_and_not_tried_again() {
-    let mut lamp = product_lamp();
-    // Started by something else already: restarted and watched as any
-    // running part.
-    lamp.systemd.units.insert(
-        MOOD.into(),
-        Running {
-            active: "active".into(),
-            sub: "running".into(),
-            pid: 7,
-            ..Running::default()
-        },
-    );
+    let mut lamp = running_mood();
     taken_by_an_older_updater(&mut lamp, "mood 1 which crashes");
     let files = lamp.lamp_files();
     let before = lamp.state();
@@ -335,4 +340,65 @@ fn the_switched_builds_own_updater_looks_once_though_the_switching_updater_set_a
     let calls = lamp.calls().len();
     assert_eq!(lamp.round(), Outcome::UpToDate(2));
     assert_eq!(lamp.calls().len(), calls, "{:?}", lamp.calls());
+}
+
+/// The lines `log.jsonl` keeps for rounds ending `event`, one list a round.
+fn kept_lines(lamp: &Lamp, event: &str) -> Vec<Vec<String>> {
+    fs::read_to_string(lamp.root.join("var/lib/lampos-update/log.jsonl"))
+        .unwrap_or_default()
+        .lines()
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).unwrap())
+        .filter(|entry| entry["event"] == event)
+        .filter_map(|entry| {
+            let lines = entry["lines"].as_array()?;
+            Some(
+                lines
+                    .iter()
+                    .map(|line| line.as_str().unwrap().to_owned())
+                    .collect(),
+            )
+        })
+        .collect()
+}
+
+/// A pass ends up to date, yet it changed the lamp: what it said is kept in
+/// `log.jsonl`, the units it added and started, or what it took away.
+#[test]
+fn an_up_to_date_rounds_pass_keeps_what_it_said_in_the_log() {
+    let mut lamp = product_lamp();
+    taken_by_an_older_updater(&mut lamp, "mood 1");
+    assert!(kept_lines(&lamp, "up-to-date").is_empty());
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    let kept = kept_lines(&lamp, "up-to-date");
+    assert_eq!(kept.len(), 1, "{kept:?}");
+    assert!(
+        kept[0].iter().any(
+            |line| line.starts_with("build 2, which the lamp runs, adds ") && line.contains(MOOD)
+        ),
+        "{kept:?}"
+    );
+    assert!(
+        kept[0]
+            .iter()
+            .any(|line| line == &format!("started {MOOD}, added by build 2")),
+        "{kept:?}"
+    );
+    // Its next round has no pass, and keeps nothing more.
+    assert_eq!(lamp.round(), Outcome::UpToDate(2));
+    assert_eq!(kept_lines(&lamp, "up-to-date").len(), 1);
+
+    // A pass whose part fails its watch keeps the line of what it took away.
+    let mut lamp = running_mood();
+    taken_by_an_older_updater(&mut lamp, "mood 1 which crashes");
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1 which crashes");
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    let kept = kept_lines(&lamp, "up-to-date");
+    assert_eq!(kept.len(), 1, "{kept:?}");
+    assert!(
+        kept[0]
+            .iter()
+            .any(|line| line.contains(", added to build 2, was taken away: ")),
+        "{kept:?}"
+    );
 }
