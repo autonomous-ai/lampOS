@@ -4782,6 +4782,64 @@ fn an_idle_kept_session_working_with_its_record_unmoved_is_reopened_after_two_lo
     assert!(one.free());
 }
 
+/// #8445: the idle look keeps what it read of the kept session's pane. A
+/// `stopped` read is known stopped for [`STOPPED_FRESH`] (two idle looks),
+/// never after; another state read at the next look ends it, and so do a
+/// turn typed into the pane (the hand-over's reopen) and a reopen. Never
+/// looked at, it is unknown. The look reopens nothing itself (the first
+/// builder's Q1 on #8445: only the hand-over, after the yes).
+#[test]
+fn an_idle_look_that_reads_the_pane_stopped_keeps_it_until_stale_or_reopened() {
+    let dir = tempfile::tempdir().unwrap();
+    let (one, fake) = kept_idle(dir.path());
+    let now = Instant::now();
+    assert!(!one.known_stopped(now), "never looked at: unknown");
+    let stopped = |fake: &Fake| {
+        fake.states
+            .lock()
+            .unwrap()
+            .insert(agent_of(1), "stopped".into());
+    };
+    stopped(&fake);
+    let mut looks = Looks::default();
+    let opens = fake.count("ensure");
+    one.idle_look(&mut looks, now, &|| Some(&fake));
+    assert!(one.known_stopped(now));
+    assert!(one.known_stopped(now + STOPPED_FRESH));
+    assert!(
+        !one.known_stopped(now + STOPPED_FRESH + Duration::from_secs(1)),
+        "an older read is not what the pane is now"
+    );
+    assert_eq!(fake.count("ensure"), opens, "the look reopens nothing");
+    assert_eq!(fake.count("close-kept"), 0, "{:?}", fake.calls());
+    assert_eq!(one.agent(), Some(agent_of(1)));
+    // Read idle at the next look: no longer stopped.
+    fake.states.lock().unwrap().remove(&agent_of(1));
+    let next = now + Duration::from_secs(1);
+    one.idle_look(&mut looks, next, &|| Some(&fake));
+    assert!(!one.known_stopped(next));
+    // Stopped again, then a turn typed into it: cleared.
+    stopped(&fake);
+    let next = now + Duration::from_secs(2);
+    one.idle_look(&mut looks, next, &|| Some(&fake));
+    assert!(one.known_stopped(next));
+    fake.states.lock().unwrap().remove(&agent_of(1));
+    one_turn(&one, &fake, "task-1");
+    assert!(!one.known_stopped(next), "a turn was typed since");
+    // Stopped again, then reopened: cleared.
+    stopped(&fake);
+    let next = now + Duration::from_secs(3);
+    one.idle_look(&mut looks, next, &|| Some(&fake));
+    assert!(one.known_stopped(next));
+    one.forget("its reopen");
+    assert!(!one.known_stopped(next), "no pane: unknown");
+    fake.states.lock().unwrap().remove(&agent_of(1));
+    one.lock().next_open = None;
+    one.open_if_due(&fake, &place());
+    assert!(one.agent().is_some(), "{:?}", fake.calls());
+    assert!(!one.known_stopped(next), "reopened since");
+}
+
 /// A spoken kept session past its start window (1 s here), Harness
 /// reading it `idle` and its Gateway record at seq 7, its last row `role`.
 fn spoken_idle(dir: &std::path::Path, role: &str) -> (OneSession, Fake) {

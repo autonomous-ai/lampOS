@@ -510,6 +510,12 @@ pub const KEEP_OPEN_WHILE_OPEN: Duration = Duration::from_secs(30);
 /// long thinking, 429 retries or an engine still finishing after its
 /// answer was told (the hold is let go then) is never a lost link.
 pub const IDLE_UNMOVED_LOOKS: u32 = 2;
+/// #8445: how long the idle look's `stopped` read of the kept session's
+/// pane stays known ([`OneSession::known_stopped`], `status`'s
+/// `"computer":"stopped"`): two idle looks ([`KEEP_OPEN_WHILE_OPEN`],
+/// 30 s), so one look skipped (a turn held, a slow `show`) still keeps it,
+/// and a read older than that is not taken as what the pane is now.
+pub const STOPPED_FRESH: Duration = Duration::from_secs(60);
 /// How often [`OneSession::keep_open`] looks whether the pane can be opened.
 pub const KEEP_OPEN_EVERY: Duration = Duration::from_secs(2);
 /// With no agent ready (a fresh or signed-out lamp, OpenClaw not set up),
@@ -779,6 +785,10 @@ struct Pane {
     /// D is never read within `open_idle_within` of this, its start
     /// window.
     opened: Instant,
+    /// #8445: the state the idle look last read of it, and when
+    /// ([`OneSession::known_stopped`]); `None` unread, or a turn typed
+    /// into it since. A reopen is a new pane, with none.
+    idle_seen: Option<(String, Instant)>,
 }
 impl Pane {
     fn new(agent: &str, place: &Place, kept: bool) -> Self {
@@ -796,6 +806,7 @@ impl Pane {
             handed: None,
             made_new: None,
             opened: Instant::now(),
+            idle_seen: None,
         }
     }
 
@@ -2367,10 +2378,15 @@ impl OneSession {
         }
         let mut why = None;
         {
-            let working = matches!(
-                harness.observe(&machine, &agent),
-                Ok(seen) if seen.seen.state == "working"
+            let seen = harness.observe(&machine, &agent);
+            // #8445: kept for `status`, whatever it is; never reopened here
+            // (the first builder's Q1: only the hand-over, after the yes).
+            self.idle_seen(
+                &agent,
+                seen.as_ref().ok().map(|seen| seen.seen.state.as_str()),
+                now,
             );
+            let working = matches!(&seen, Ok(seen) if seen.seen.state == "working");
             let record = working
                 .then(|| self.records(&harness, &agent).and_then(|read| read()))
                 .flatten();
@@ -2422,6 +2438,30 @@ impl OneSession {
             }
         }
         self.turned.notify_all();
+    }
+
+    /// #8445: the idle look read the kept session `agent`'s pane in
+    /// `state` (`None`: its `show` failed, unknown) at `now`: kept on the
+    /// pane while it is still that agent's.
+    fn idle_seen(&self, agent: &str, state: Option<&str>, now: Instant) {
+        if let Some(pane) = self.lock().pane.as_mut().filter(|pane| pane.agent == agent) {
+            pane.idle_seen = state.map(|state| (state.to_owned(), now));
+        }
+    }
+
+    /// #8445: whether the kept session's pane is known stopped at `now`:
+    /// the idle look's last read of it says `stopped`, it is at most
+    /// [`STOPPED_FRESH`] old, and the pane was not reopened nor a turn
+    /// typed into it since. `false` is unknown, not running: `status`
+    /// then says nothing of it.
+    pub fn known_stopped(&self, now: Instant) -> bool {
+        self.lock()
+            .pane
+            .as_ref()
+            .and_then(|pane| pane.idle_seen.as_ref())
+            .is_some_and(|(state, at)| {
+                state == "stopped" && now.saturating_duration_since(*at) <= STOPPED_FRESH
+            })
     }
 
     /// The kept OpenClaw session open with nothing holding or removing it,
@@ -4308,6 +4348,8 @@ impl Turn<'_> {
             pane.used = Instant::now();
             pane.tokens += tokens_in(text);
             pane.input = input;
+            // #8445: it took a turn, so the idle look's read is old.
+            pane.idle_seen = None;
             pane.turns
         });
         drop(inner);

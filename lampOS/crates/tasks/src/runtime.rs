@@ -2895,6 +2895,7 @@ fn owner<C: Clock>(
                         answer,
                         set_up.and_then(|found| found.sign_in),
                     );
+                    let answer = with_computer(&work.request, answer, computer_known_stopped());
                     requests = requests.saturating_add(1);
                     let _ = work.response.try_send(answer);
                 } else if let (Some(starter), true) = (
@@ -3067,6 +3068,7 @@ fn owner<C: Clock>(
                         answer,
                         set_up.and_then(|found| found.sign_in),
                     );
+                    let answer = with_computer(&work.request, answer, computer_known_stopped());
                     // The voice told this task's news: kept for "tasks now",
                     // also when nothing is written (without `--close-told`).
                     if let (Request::Told { id, .. }, Ok(_), Some(record)) =
@@ -6122,6 +6124,37 @@ fn with_sign_in(
     })
 }
 
+/// #8445: whether the one session's idle look knows the lamp's kept pane
+/// stopped now ([`crate::one_session::OneSession::known_stopped`]); no one
+/// session, never.
+fn computer_known_stopped() -> bool {
+    crate::one_session::LAMP
+        .get()
+        .is_some_and(|one| one.known_stopped(Instant::now()))
+}
+
+/// #8445: `status` answered with `"computer":"stopped"` beside `signed_in`
+/// when the lamp's kept pane on its computer is known stopped (`stopped`:
+/// the idle look read it so within
+/// [`crate::one_session::STOPPED_FRESH`], with no reopen since), so the
+/// voice can say at the hand-over that the computer is being woken. Absent
+/// is unknown, and the answer is as it was; so is every other answer.
+fn with_computer(
+    request: &Request,
+    answer: Result<Value, EngineError>,
+    stopped: bool,
+) -> Result<Value, EngineError> {
+    if !stopped || !matches!(request, Request::Status {}) {
+        return answer;
+    }
+    answer.map(|mut body| {
+        if body.is_object() {
+            body["computer"] = "stopped".into();
+        }
+        body
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::code_handed;
@@ -6155,6 +6188,33 @@ mod tests {
         assert_eq!(unread, serde_json::json!({"summary": {}}));
         let targets = with_sign_in(&Request::Targets {}, body(), Some(SignIn::Out)).unwrap();
         assert_eq!(targets, serde_json::json!({"summary": {}}));
+    }
+
+    /// #8445: `status` says `"computer":"stopped"` beside `signed_in` only
+    /// when the one session's idle look knows the pane stopped
+    /// (`OneSession::known_stopped`: read `stopped`, fresh, no reopen
+    /// since). Unknown, stale or reopened: absent, the answer as it was;
+    /// and every other answer is as it was.
+    #[test]
+    fn status_says_the_computer_stopped_only_when_known() {
+        use super::{Request, SignIn, with_computer, with_sign_in};
+        let body = || Ok(serde_json::json!({"summary": {}}));
+        let known = with_computer(
+            &Request::Status {},
+            with_sign_in(&Request::Status {}, body(), Some(SignIn::In)),
+            true,
+        )
+        .unwrap();
+        assert_eq!(
+            known,
+            serde_json::json!({"summary": {}, "signed_in": "yes", "computer": "stopped"})
+        );
+        let unknown = with_computer(&Request::Status {}, body(), false).unwrap();
+        assert_eq!(unknown, serde_json::json!({"summary": {}}));
+        let targets = with_computer(&Request::Targets {}, body(), true).unwrap();
+        assert_eq!(targets, serde_json::json!({"summary": {}}));
+        let app = with_computer(&Request::AppSignInState {}, body(), true).unwrap();
+        assert_eq!(app, serde_json::json!({"summary": {}}));
     }
 
     /// #5524: the app's state says Harness's sign-in once it was read,
