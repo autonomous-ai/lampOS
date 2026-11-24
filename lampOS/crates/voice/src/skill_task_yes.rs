@@ -39,8 +39,9 @@
 //!   kept in [`ASKED_FILE`] for the second route's worker, which starts the
 //!   wait only for that very note ([`asked_in`], with
 //!   [`skill_write_yes::wait_for_yes_noted`]: every guard, its id noted on
-//!   later heard lines, the owner's yes only). The Live route never begins
-//!   it ([`route_refuses`]). Agreed, the task runs at its next trigger.
+//!   later heard lines, the owner's yes only), and only while no other yes
+//!   is awaited in that worker, which alone admits it ([`ANOTHER_WAITS`]).
+//!   The Live route never begins it ([`route_refuses`]). Agreed, the task runs at its next trigger.
 //! - **No identity check** (the owner, 10 Nov): whoever is at the lamp is
 //!   its owner, as for a write's yes.
 use crate::make_skill_local::{Asking, READ_BACK_NOT_ASKED};
@@ -626,9 +627,15 @@ pub const SECOND_ROUTE_ONLY: &str = "a task's yes is taken on the second route o
 /// wait (App Only's P2 on #6581); refused, it is not counted as said and
 /// lamp-skills tries it at a later trigger.
 pub const ANOTHER_ASKED: &str = "another skill's ask waits for its turn: kept for later";
-/// Why not: a yes is awaited (a task's, a make's writes or an app's code),
-/// and a new wait would replace it.
+/// Why a task's kept ask is not waited for in its turn: a yes is awaited
+/// in the second route's worker (a task's, a make's writes or an app's
+/// code), and a new wait would replace it ([`asked_in`], #6000, #8475).
 pub const ANOTHER_WAITS: &str = "another yes is awaited: kept for later";
+/// The turn a task's ask is given in place of its note while another yes
+/// is awaited ([`ANOTHER_WAITS`]): nothing said, nothing called, as a long
+/// make's news waits (`long_make::told_here`); a silent turn is never heard
+/// through, so the live wait's next line answers it alone.
+pub const ASKED_WAITS_TURN: &str = "(Nobody has spoken. Say nothing, and call nothing.)";
 
 /// Held while [`ASKED_FILE`] is checked and written ([`keep_one`]) or read
 /// and taken ([`take_kept`]): the say service's client threads ask at once.
@@ -644,17 +651,17 @@ fn kept_fresh(kept: &Value, now_unix_ms: u64) -> bool {
 }
 
 /// The ask `kept` written to `path` at `now_unix_ms`, one task ask on the
-/// lamp at a time: refused while a yes is `awaited` ([`ANOTHER_WAITS`]) or
-/// another ask is kept, fresh, for its turn ([`ANOTHER_ASKED`]), so each
-/// ask said gets the wait for its yes, and one refused is not counted as
-/// said. Written whole (`thread::write_file`).
-pub fn keep_one(path: &Path, kept: &Value, now_unix_ms: u64, awaited: bool) -> Result<(), String> {
+/// lamp at a time: refused while another ask is kept, fresh, for its turn
+/// ([`ANOTHER_ASKED`]), so one refused is not counted as said. Written
+/// whole (`thread::write_file`). Whether a yes is awaited is never asked
+/// here: this runs in the say service's process, whose own wait never holds
+/// a task's, a make's or an app's yes (they live in the second route's
+/// worker), so the worker alone admits the ask's wait in its turn
+/// ([`asked_in`], [`ANOTHER_WAITS`]; Second's audit on #6000, #8475).
+pub fn keep_one(path: &Path, kept: &Value, now_unix_ms: u64) -> Result<(), String> {
     let _held = ASKED_LOCK
         .lock()
         .unwrap_or_else(|poison| poison.into_inner());
-    if awaited {
-        return Err(ANOTHER_WAITS.into());
-    }
     let other = std::fs::read_to_string(path)
         .ok()
         .and_then(|text| serde_json::from_str::<Value>(&text).ok());
@@ -665,27 +672,72 @@ pub fn keep_one(path: &Path, kept: &Value, now_unix_ms: u64, awaited: bool) -> R
         .map_err(|error| format!("its ask can't be kept: {error}"))
 }
 
+/// Gives each claim of a kept ask ([`take_kept`]) a name of its own in
+/// this process.
+static CLAIMS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+#[cfg(test)]
+thread_local! {
+    /// Tests: run between a take's claim and what it does with the claimed
+    /// note ([`take_kept`]), as another process's [`keep_one`] would.
+    static AFTER_CLAIM: std::cell::RefCell<Option<Box<dyn FnOnce()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
 /// The ask kept at `path` for the turn `text` at `now_unix_ms`, taken
-/// (removed) only when its note is that very text. Another text (a skill's
-/// own note copying the opening) leaves it for its own turn; one past
-/// [`ASKED_WITHIN_MS`], or unreadable, is removed and none.
+/// (removed) only when its note is that very text. Claimed first: `path`
+/// renamed, at once, to a name of its own beside it
+/// (`task-asked.json.<pid>-<n>`), then that claimed file read and removed,
+/// never `path` itself, so an ask the say service keeps there meanwhile
+/// ([`keep_one`], another process, which [`ASKED_LOCK`] doesn't hold) is
+/// never removed with it (Second's audit on #6000, #8475). Another text (a
+/// skill's own note copying the opening) puts it back for its own turn,
+/// unless a newer ask was kept there since, which wins ([`put_back`]); one
+/// past [`ASKED_WITHIN_MS`], or unreadable, is removed and none. None kept,
+/// none.
 pub fn take_kept(path: &Path, text: &str, now_unix_ms: u64) -> Option<Value> {
     let _held = ASKED_LOCK
         .lock()
         .unwrap_or_else(|poison| poison.into_inner());
-    let kept = std::fs::read_to_string(path).ok()?;
-    let kept = serde_json::from_str::<Value>(&kept)
+    let mut claimed = path.as_os_str().to_owned();
+    claimed.push(format!(
+        ".{}-{}",
+        std::process::id(),
+        CLAIMS.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
+    let claimed = std::path::PathBuf::from(claimed);
+    std::fs::rename(path, &claimed).ok()?;
+    #[cfg(test)]
+    if let Some(after) = AFTER_CLAIM.with(|after| after.borrow_mut().take()) {
+        after();
+    }
+    let kept = std::fs::read_to_string(&claimed)
         .ok()
+        .and_then(|kept| serde_json::from_str::<Value>(&kept).ok())
         .filter(|kept| kept_fresh(kept, now_unix_ms));
     let Some(kept) = kept else {
-        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_file(&claimed);
         return None;
     };
     if kept.get("note").and_then(Value::as_str) != Some(text) {
+        put_back(path, &claimed);
         return None;
     }
-    let _ = std::fs::remove_file(path);
+    let _ = std::fs::remove_file(&claimed);
     Some(kept)
+}
+
+/// The ask claimed at `claimed` ([`take_kept`]) put back at `path`, never
+/// over an ask kept there since: a hard link is refused where `path` is
+/// (`rename` would replace it), so the newer one stays and the claimed one
+/// goes.
+fn put_back(path: &Path, claimed: &Path) {
+    if let Err(error) = std::fs::hard_link(claimed, path)
+        && error.kind() != std::io::ErrorKind::AlreadyExists
+    {
+        eprintln!("lamp-voice: a skill's kept task ask can't be put back for its turn: {error}");
+    }
+    let _ = std::fs::remove_file(claimed);
 }
 
 /// Where the lamp is when a task's ask would be said unasked.
@@ -798,14 +850,7 @@ pub fn asked_aloud_here(skill: &str) -> Result<String, String> {
                 name,
             )
         },
-        |kept| {
-            keep_one(
-                Path::new(ASKED_FILE),
-                kept,
-                now_unix_ms,
-                skill_write_yes::awaited(Instant::now()),
-            )
-        },
+        |kept| keep_one(Path::new(ASKED_FILE), kept, now_unix_ms),
         now_unix_ms,
     )
 }
@@ -819,7 +864,12 @@ pub fn asked_aloud_here(skill: &str) -> Result<String, String> {
 /// told to each later heard line ([`skill_write_yes::waiting_note`]), and
 /// the turn ends as a read-back's does ([`then_wait`]). Any other text, or
 /// a note no ask kept (a skill's own note copying its opening), as it is:
-/// nothing waits.
+/// nothing waits. The one place a task's yes is admitted (Second's audit on
+/// #6000, #8475): while another yes is awaited here, in this worker
+/// ([`skill_write_yes::awaited`]), a new wait would replace it, so a text
+/// that opens as an ask does is given [`ASKED_WAITS_TURN`] instead, its kept
+/// ask never read (`kept` not called, so it stays in its file), and nothing
+/// new waits.
 pub fn asked_in(
     request: u64,
     text: String,
@@ -829,6 +879,10 @@ pub fn asked_in(
 ) -> String {
     if !text.starts_with(ASKED_OPENS) {
         return text;
+    }
+    if skill_write_yes::awaited(now) {
+        eprintln!("lamp-voice: request {request}: a skill's task ask not said: {ANOTHER_WAITS}");
+        return ASKED_WAITS_TURN.to_owned();
     }
     let Some(kept) = kept() else {
         return text;
@@ -881,16 +935,41 @@ pub fn asked_in(
 
 /// [`asked_in`] on the lamp, with a skill's tasks on: [`ASKED_FILE`], taken
 /// only for its own note ([`take_kept`]), only for a text that opens as an
-/// ask does.
+/// ask does ([`asked_in_from`]).
 pub fn asked_in_here(request: u64, text: String) -> String {
-    if !on() || !text.starts_with(ASKED_OPENS) {
-        return text;
-    }
     let now_unix_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_millis() as u64);
-    let kept = take_kept(Path::new(ASKED_FILE), &text, now_unix_ms);
-    asked_in(request, text, || kept, Instant::now(), now_unix_ms)
+    asked_in_from(
+        Path::new(ASKED_FILE),
+        request,
+        text,
+        Instant::now(),
+        now_unix_ms,
+    )
+}
+
+/// [`asked_in_here`] with the kept ask at `path`, at `now` and
+/// `now_unix_ms`: taken ([`take_kept`]) only once [`asked_in`] admits a new
+/// wait, so one refused for another yes awaited stays kept.
+fn asked_in_from(
+    path: &Path,
+    request: u64,
+    text: String,
+    now: Instant,
+    now_unix_ms: u64,
+) -> String {
+    if !on() || !text.starts_with(ASKED_OPENS) {
+        return text;
+    }
+    let note = text.clone();
+    asked_in(
+        request,
+        text,
+        || take_kept(path, &note, now_unix_ms),
+        now,
+        now_unix_ms,
+    )
 }
 
 /// Why a say's written `turn` is not begun on the route `role`: a task's
@@ -2231,10 +2310,11 @@ mod tests {
 
     /// Two skills' tasks asked at once (App Only's P2 on #6581): one task
     /// ask on the lamp at a time. The second is refused, so it is neither
-    /// said nor counted as said, while the first is kept for its turn and
-    /// while its yes is awaited; another turn's text never takes the
-    /// first's note; once the first's wait is over, the second is asked
-    /// and waited for in its turn.
+    /// said nor counted as said, while the first is kept for its turn;
+    /// another turn's text never takes the first's note. While the first's
+    /// yes is awaited, the second's turn is silent in the worker, never
+    /// replacing it, and its ask stays kept (#8475); once its time is past,
+    /// the second is asked again and waited for in its turn.
     #[test]
     fn two_skills_asked_at_once_each_get_their_wait_or_are_kept_for_later() {
         let dir = std::env::temp_dir().join(format!(
@@ -2262,7 +2342,7 @@ mod tests {
                 &task.name.clone(),
                 alone(),
                 |_| Ok(Some(task)),
-                |kept| keep_one(&path, kept, at, skill_write_yes::awaited(now)),
+                |kept| keep_one(&path, kept, at),
                 at,
             );
             set_on_here(None);
@@ -2284,28 +2364,41 @@ mod tests {
             .unwrap()
             .to_owned();
         assert!(skill_write_yes::waits(&id));
-        // While it waits, the second is still refused, never replacing it.
-        assert_eq!(ask(timer(), 2_000).unwrap_err(), ANOTHER_WAITS);
+        // While it waits, the second is kept by the say service, which
+        // doesn't know of the worker's wait; its turn in the worker is
+        // silent, never replacing the first's wait, and its ask stays kept.
+        let second = ask(timer(), 2_000).unwrap();
+        set_on_here(Some(true));
+        let told = asked_in_from(&path, 6, second, now, 2_010);
+        assert_eq!(told, ASKED_WAITS_TURN);
         assert!(skill_write_yes::waits(&id));
+        assert!(
+            std::fs::read_to_string(&path)
+                .unwrap()
+                .contains("desk-timer")
+        );
         // The first's yes: approved, the wait over.
         skill_write_yes::lamp_said(5, &line(&booth(false)));
-        let approved = skill_write_yes::approve(&id, 6, true, true, now, |asks| {
+        let approved = skill_write_yes::approve(&id, 7, true, true, now, |asks| {
             assert_eq!(asks.skill, "photo-booth");
             Ok(json!({"approved": 1}))
         });
         assert_eq!(approved["approved"], true, "{approved}");
-        // At a later trigger the second is asked, and waited for.
-        let second = ask(timer(), 3_000).unwrap();
+        // At a later trigger, the kept one's time past, the second is asked
+        // again, and waited for.
+        let later = 2_000 + ASKED_WITHIN_MS + 1;
+        let second = ask(timer(), later).unwrap();
         assert!(second.contains(&line(&timer())), "{second}");
-        let kept = take_kept(&path, &second, 3_010);
-        let told = asked_in(8, second, || kept, now, 3_010);
+        set_on_here(Some(true));
+        let told = asked_in_from(&path, 8, second, now, later + 10);
         assert!(told.contains("approve_id"), "{told}");
         assert!(skill_write_yes::awaited(now));
         // A kept ask past its time, or dated after now, blocks nothing.
         let stale = json!({"note": "x", "at_unix_ms": 10_000});
         crate::thread::write_file(&path, &stale.to_string()).unwrap();
-        assert!(keep_one(&path, &stale, 10_000 + ASKED_WITHIN_MS + 1, false).is_ok());
-        assert!(keep_one(&path, &stale, 5_000, false).is_ok());
+        assert!(keep_one(&path, &stale, 10_000 + ASKED_WITHIN_MS + 1).is_ok());
+        assert!(keep_one(&path, &stale, 5_000).is_ok());
+        set_on_here(None);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -2354,5 +2447,242 @@ mod tests {
         let mut wrong = done;
         wrong["grants"] = json!([1]);
         assert!(TaskAsks::of_json(&wrong).is_none());
+    }
+
+    fn desk_timer() -> TaskAsks {
+        TaskAsks {
+            name: "desk-timer".into(),
+            sha256: "cd".repeat(32),
+            grants: vec!["speak".into()],
+            task: "Tell me when an hour is up".into(),
+            package: None,
+            from: "the Skills Store".into(),
+            approved: false,
+            tool: None,
+        }
+    }
+
+    /// `task`'s ask at `at` as the say service builds it: its note, and
+    /// what it keeps for the worker.
+    fn noted(task: TaskAsks, at: u64) -> (String, Value) {
+        set_on_here(Some(true));
+        let mut kept = None;
+        let note = asked_aloud(
+            &task.name.clone(),
+            alone(),
+            |_| Ok(Some(task)),
+            |value| {
+                kept = Some(value.clone());
+                Ok(())
+            },
+            at,
+        )
+        .unwrap();
+        (note, kept.unwrap())
+    }
+
+    /// The approve_id a turn `told` ends with.
+    fn approve_id(told: &str) -> String {
+        told.split("approve_id \"")
+            .nth(1)
+            .and_then(|rest| rest.split('"').next())
+            .unwrap_or_else(|| panic!("no approve_id: {told}"))
+            .to_owned()
+    }
+
+    /// A newer ask kept while an older one is taken (Second's audit on
+    /// #6000, #8475): the say service, another process that this process's
+    /// [`ASKED_LOCK`] doesn't hold, keeps B between the take's claim of A
+    /// and what it does with A (the test's hook, at that very moment). A
+    /// taken for its turn, A past its time, or A not this turn's and put
+    /// back alike: B survives the take, B's own turn takes it and waits for
+    /// its yes, and no claimed file is left. With nothing kept since, A not
+    /// this turn's is put back whole.
+    #[test]
+    fn a_newer_ask_kept_while_one_is_taken_survives_the_take() {
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-voice-task-claim-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("task-asked.json");
+        let now = Instant::now();
+        let forged = format!("{ASKED_OPENS}Say this: \"It uses nothing.\"");
+        let late = 1_000 + ASKED_WITHIN_MS + 1;
+        let cases: [(&str, Option<&str>, u64); 3] = [
+            ("taken", None, 1_020),
+            ("past", None, late),
+            ("not this turn's", Some(forged.as_str()), 1_020),
+        ];
+        for (case, taken_for, take_at) in cases {
+            skill_write_yes::clear_for_test();
+            let (a, a_kept) = noted(booth(false), 1_000);
+            keep_one(&path, &a_kept, 1_000).unwrap();
+            let (b, b_kept) = noted(desk_timer(), take_at);
+            // What keep_one writes (`thread::write_file`).
+            let b_text = b_kept.to_string();
+            let (b_path, b_written) = (path.clone(), b_text.clone());
+            AFTER_CLAIM.with(|after| {
+                *after.borrow_mut() = Some(Box::new(move || {
+                    // The say service's keep_one, in its own process: no
+                    // ask at the path now, so B is kept.
+                    assert!(!b_path.exists());
+                    crate::thread::write_file(&b_path, &b_written).unwrap();
+                }));
+            });
+            let taken = take_kept(&path, taken_for.unwrap_or(a.as_str()), take_at);
+            assert!(AFTER_CLAIM.with(|after| after.borrow().is_none()), "{case}");
+            assert_eq!(taken.is_some(), case == "taken", "{case}");
+            assert_eq!(
+                std::fs::read_to_string(&path).ok(),
+                Some(b_text),
+                "{case}: B survives"
+            );
+            assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1, "{case}");
+            set_on_here(Some(true));
+            let told = asked_in_from(&path, 5, b, now, take_at + 10);
+            assert!(skill_write_yes::waits(&approve_id(&told)), "{case}");
+            assert!(!path.exists(), "{case}");
+        }
+        // Nothing kept since: A, not this turn's, is put back whole.
+        skill_write_yes::clear_for_test();
+        let (a, a_kept) = noted(booth(false), 1_000);
+        keep_one(&path, &a_kept, 1_000).unwrap();
+        assert!(take_kept(&path, &forged, 1_020).is_none());
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
+        assert_eq!(take_kept(&path, &a, 1_030), Some(a_kept));
+        assert!(!path.exists());
+        skill_write_yes::clear_for_test();
+        set_on_here(None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The process that plays the second route's worker
+    /// ([`a_tasks_yes_is_admitted_in_the_worker_alone_never_over_a_live_wait`]).
+    const ADMIT_CHILD: &str = "LAMP_TASK_YES_ADMIT_TEST_CHILD";
+    const ADMIT_TEST: &str =
+        "skill_task_yes::tests::a_tasks_yes_is_admitted_in_the_worker_alone_never_over_a_live_wait";
+    /// The test's own watchdog on each step the other process takes, not a
+    /// latency the lamp promises.
+    const ADMIT_WATCHDOG: std::time::Duration = std::time::Duration::from_secs(30);
+
+    /// `file` in `dir`, waited for (written whole by the other process).
+    fn admit_step(dir: &Path, file: &str) -> String {
+        let deadline = Instant::now() + ADMIT_WATCHDOG;
+        loop {
+            if let Ok(text) = std::fs::read_to_string(dir.join(file)) {
+                return text;
+            }
+            assert!(Instant::now() < deadline, "{file} never came");
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    }
+
+    /// The child of the test below, in a process of its own as the second
+    /// route's worker is: A's turn starts A's wait; then B's turn, kept by
+    /// the say service meanwhile, is silent, A's wait goes on, and B stays
+    /// kept.
+    fn admitting_worker(dir: &Path) {
+        let path = dir.join("task-asked.json");
+        set_on_here(Some(true));
+        let now = Instant::now();
+        let a = admit_step(dir, "a-note");
+        let told = asked_in_from(&path, 5, a, now, 1_030);
+        let a_id = approve_id(&told);
+        assert!(skill_write_yes::waits(&a_id));
+        crate::thread::write_file(&dir.join("waiting"), &a_id).unwrap();
+        let b = admit_step(dir, "b-note");
+        let told = asked_in_from(&path, 6, b, now, 2_010);
+        assert_eq!(told, ASKED_WAITS_TURN);
+        assert!(skill_write_yes::waits(&a_id), "B's ask replaced A's wait");
+        assert!(
+            std::fs::read_to_string(&path)
+                .unwrap()
+                .contains("desk-timer")
+        );
+        set_on_here(None);
+    }
+
+    /// One admission point for a task's yes (Second's audit on #6000,
+    /// #8475), across the two processes it spans on a lamp. This process
+    /// plays the say service: its own wait (one is made live here) is never
+    /// asked, so B is kept while the worker, a child process, waits for A's
+    /// yes. The worker alone decides: B's turn there is silent and never
+    /// replaces A's live wait, and B stays kept.
+    #[test]
+    fn a_tasks_yes_is_admitted_in_the_worker_alone_never_over_a_live_wait() {
+        if let Some(dir) = std::env::var_os(ADMIT_CHILD) {
+            admitting_worker(Path::new(&dir));
+            return;
+        }
+        struct Child(std::process::Child);
+        impl Drop for Child {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-voice-task-admit-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("task-asked.json");
+        let ask = |task: TaskAsks, at: u64| {
+            set_on_here(Some(true));
+            asked_aloud(
+                &task.name.clone(),
+                alone(),
+                |_| Ok(Some(task)),
+                |kept| keep_one(&path, kept, at),
+                at,
+            )
+        };
+        let a = ask(booth(false), 1_000).unwrap();
+        let mut child = Child(
+            std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", ADMIT_TEST, "--test-threads=1", "--nocapture"])
+                .env(ADMIT_CHILD, &dir)
+                .stdin(std::process::Stdio::null())
+                .stdout(std::fs::File::create(dir.join("stdout")).unwrap())
+                .stderr(std::fs::File::create(dir.join("stderr")).unwrap())
+                .spawn()
+                .unwrap(),
+        );
+        crate::thread::write_file(&dir.join("a-note"), &a).unwrap();
+        admit_step(&dir, "waiting");
+        // A yes awaited in this process too: never asked by the say service.
+        skill_write_yes::wait_for_yes_noted(booth(false).asks(), 1, Instant::now());
+        let b = ask(desk_timer(), 2_000).unwrap();
+        skill_write_yes::clear_for_test();
+        crate::thread::write_file(&dir.join("b-note"), &b).unwrap();
+        let deadline = Instant::now() + ADMIT_WATCHDOG;
+        let status = loop {
+            if let Some(status) = child.0.try_wait().unwrap() {
+                break status;
+            }
+            assert!(Instant::now() < deadline, "the worker never finished");
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        };
+        let stdout = std::fs::read_to_string(dir.join("stdout")).unwrap_or_default();
+        let stderr = std::fs::read_to_string(dir.join("stderr")).unwrap_or_default();
+        assert!(status.success(), "{status}\n{stdout}\n{stderr}");
+        assert!(
+            stdout
+                .lines()
+                .any(|line| line == format!("test {ADMIT_TEST} ... ok")),
+            "{stdout}"
+        );
+        assert!(
+            std::fs::read_to_string(&path)
+                .unwrap()
+                .contains("desk-timer")
+        );
+        set_on_here(None);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
