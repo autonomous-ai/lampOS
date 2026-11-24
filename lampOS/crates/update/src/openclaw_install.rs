@@ -1807,7 +1807,7 @@ fn steps(
         // Never a failure of the install: an add not done is retried. No
         // gateway running, nothing was run: the record stays as it was, so
         // a switch-off's removes are retried until they run.
-        let ran = exec_allowlist(run, shown, say);
+        let ran = exec_allowlist(root, run, shown, say);
         let mut said = before.unwrap_or_else(|| OpenclawInstall::installed(now_unix_ms()));
         said.exec_allowlist = ran.unwrap_or(had);
         return write(records, said);
@@ -2058,14 +2058,14 @@ fn steps(
     if let Err(why) = run(&["systemctl", "reset-failed", UNIT].map(str::to_owned)) {
         say(&format!("{UNIT} not reset-failed: {why}"));
     }
-    settled(root, run, say);
+    settled(root, run, say, false);
     if let Err(why) = run(&["systemctl", "restart", UNIT].map(str::to_owned)) {
         return fail("gateway", format!("systemctl restart {UNIT}: {why}"), say);
     }
     remove_aside(root, say);
     // Through the gateway just (re)started; an add not done is retried by
     // the next round, never a failure of the install.
-    let exec_allowlist = exec_allowlist(run, shown, say).unwrap_or(had);
+    let exec_allowlist = exec_allowlist(root, run, shown, say).unwrap_or(had);
     let shown = match (shown.skills, shown.tasks) {
         (true, true) => {
             "its own folder, its work folder, the skills, lamp-skills' socket and lamp-control's socket"
@@ -2129,10 +2129,19 @@ pub fn exec_allowlist_args(shown: Shown) -> Vec<[&'static str; 7]> {
 /// and not done. [`OLD_FENCE_AGENT`]'s remove fails on a lamp once that
 /// agent is gone from OpenClaw's config ("Config unavailable; cannot
 /// validate --agent"): expected, said in one line as harmless, and
-/// nothing depends on it. Whether agent [`RUN_AGENT`]'s [`SKILL_START`]
+/// nothing depends on it. Any other edit that fails (#8444: lamp-control
+/// restarted during it, and `PartOf=` restarted the gateway under it)
+/// waits, once per run, until the gateway is active, listens and is past
+/// its first start ([`settled`]), and is run once more; failing again it
+/// is said in its own line. Whether agent [`RUN_AGENT`]'s [`SKILL_START`]
 /// entry was added: never with the one run path off. OpenClaw's config
 /// and its `tools.exec` are never touched.
-fn exec_allowlist(run: &mut Runner, shown: Shown, say: &mut dyn FnMut(&str)) -> Option<bool> {
+fn exec_allowlist(
+    root: &Path,
+    run: &mut Runner,
+    shown: Shown,
+    say: &mut dyn FnMut(&str),
+) -> Option<bool> {
     if !gateway_active(run) {
         say(&format!(
             "OpenClaw's exec allow-list left as it is: {UNIT} is not running; the next round tries again"
@@ -2140,6 +2149,7 @@ fn exec_allowlist(run: &mut Runner, shown: Shown, say: &mut dyn FnMut(&str)) -> 
         return None;
     }
     let mut added = false;
+    let mut waited = false;
     for args in exec_allowlist_args(shown) {
         let mut ran = run(&allowlist_argv(args));
         // A gateway just (re)started is not ready for the add at first: its
@@ -2156,17 +2166,26 @@ fn exec_allowlist(run: &mut Runner, shown: Shown, say: &mut dyn FnMut(&str)) -> 
                 _ => break,
             }
         }
+        // #8444: a gateway restarted under the edit; the old fence agent's
+        // remove fails on every lamp and is never run again.
+        if ran.is_err() && args[5] != OLD_FENCE_AGENT {
+            if !waited {
+                settled(root, run, say, true);
+                waited = true;
+            }
+            ran = run(&allowlist_argv(args));
+        }
         match ran {
             Ok(_) => added |= args[2] == "add",
             Err(why) if args[2] == "add" => say(&format!(
-                "OpenClaw's exec allow-list does not let agent {} run {} yet: {why}; the next round tries again",
+                "OpenClaw's exec allow-list still does not let agent {} run {} after the gateway settled and the add ran again: {why}; the next round tries again (#8444)",
                 args[5], args[6]
             )),
             Err(_) if args[5] == OLD_FENCE_AGENT => say(&format!(
                 "OpenClaw's exec allow-list: agent {OLD_FENCE_AGENT}'s old entry, if any, stays (harmless: the CLI cannot remove it once that agent is gone)"
             )),
             Err(why) => say(&format!(
-                "OpenClaw's exec allow-list: {} {} not taken out: {why}",
+                "OpenClaw's exec allow-list: {} {} still not taken out after the gateway settled and the remove ran again: {why} (#8444)",
                 args[5], args[6]
             )),
         }
@@ -2268,10 +2287,23 @@ const SETTLE_SLEEP: Duration = if cfg!(test) {
 /// gateway not running, or a listen not readable, waits for nothing;
 /// listening at the first look with its start or the uptime not read, it
 /// is restarted at once.
-fn settled(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
-    if !gateway_active(run) {
+///
+/// With `retry` (#8444, [`exec_allowlist`]'s edit that failed), it waits
+/// the same before that edit runs again, and a gateway not active (being
+/// stopped or started by a `PartOf=` restart) counts as not listening, so
+/// it is waited for too, [`SETTLE_AT_MOST`] at most.
+fn settled(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str), retry: bool) {
+    if !retry && !gateway_active(run) {
         return;
     }
+    let (then, waits) = if retry {
+        (
+            "the allow-list edit run again",
+            "the allow-list edit's retry",
+        )
+    } else {
+        ("restarted", "the restart")
+    };
     let uptime = fs::read_to_string(on(root, crate::reset_hold::UPTIME))
         .ok()
         .and_then(|text| text.split_whitespace().next()?.parse::<f64>().ok())
@@ -2285,13 +2317,17 @@ fn settled(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
         let age = uptime
             .zip(gateway_start(run))
             .map(|(uptime, start)| (uptime + waited).saturating_sub(start));
-        let listening = match run(&["ss", "-Hltn", &sport].map(str::to_owned)) {
-            Ok(out) => !out.trim().is_empty(),
-            Err(why) => {
-                say(&format!(
-                    "{UNIT}: its listen on {PORT} not read: {why}; restarted now"
-                ));
-                return;
+        let listening = if retry && !gateway_active(run) {
+            false
+        } else {
+            match run(&["ss", "-Hltn", &sport].map(str::to_owned)) {
+                Ok(out) => !out.trim().is_empty(),
+                Err(why) => {
+                    say(&format!(
+                        "{UNIT}: its listen on {PORT} not read: {why}; {then} now"
+                    ));
+                    return;
+                }
             }
         };
         if !listening {
@@ -2305,7 +2341,7 @@ fn settled(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
         if listening && past_start && past_listen {
             if waited > Duration::ZERO {
                 say(&format!(
-                    "{UNIT} past its startup after {} s more: restarted (#8324)",
+                    "{UNIT} past its startup after {} s more: {then} (#8324)",
                     waited.as_secs()
                 ));
             }
@@ -2313,14 +2349,14 @@ fn settled(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
         }
         if waited >= SETTLE_AT_MOST {
             say(&format!(
-                "{UNIT} still in its startup after {} s: restarted anyway (#8324)",
+                "{UNIT} still in its startup after {} s: {then} anyway (#8324)",
                 waited.as_secs()
             ));
             return;
         }
         if waited == Duration::ZERO {
             say(&format!(
-                "{UNIT} is in its startup (listening on {PORT}: {listening}): the restart waits until it is past it (#8324)"
+                "{UNIT} is in its startup (listening on {PORT}: {listening}): {waits} waits until it is past it (#8324)"
             ));
         }
         std::thread::sleep(SETTLE_SLEEP);
@@ -2754,7 +2790,7 @@ fn gateway_block(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
         Ok(false) => {}
         Ok(true) => {
             // #8324: as the install's restart, never in a first start.
-            settled(root, run, say);
+            settled(root, run, say, false);
             match run(&["systemctl", "try-restart", "--", UNIT].map(str::to_owned)) {
                 Ok(_) => say(&format!(
                     "{CONFIG}'s gateway block was not as lamp-update writes it: written again, checked by OpenClaw, and the gateway restarted if it ran"
