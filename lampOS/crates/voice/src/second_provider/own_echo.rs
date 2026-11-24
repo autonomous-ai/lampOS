@@ -393,11 +393,18 @@ fn own_in_order(heard: &[&str], answer: &[(String, bool)]) -> Vec<bool> {
         let longest = (0..answer.len())
             .filter(|from| answer[*from].1)
             .map(|from| {
-                pieces[i..]
+                let run = pieces[i..]
                     .iter()
                     .zip(&answer[from..])
                     .take_while(|((key, _, _), (said, _))| !key.is_empty() && key == said)
-                    .count()
+                    .count();
+                // And it ends where a word of the answer ends: "No, for 7."
+                // after "set for 7:30" is the person's correction, not "for
+                // 7" of the lamp's "for 7:30" (#8486).
+                (0..=run)
+                    .rev()
+                    .find(|len| answer.get(from + len).is_none_or(|(_, starts)| *starts))
+                    .unwrap_or(0)
             })
             .max()
             .unwrap_or(0);
@@ -1476,6 +1483,31 @@ mod number_tests {
                 matches!(judge(&line(heard), Some(&said(answer))), Echo::Answered(_)),
                 "{heard}"
             );
+        }
+    }
+
+    /// The first builder's P1 on #8486: a person's number that spells the
+    /// start of the lamp's ("for 7" of "for 7:30") is their correction. A run
+    /// ends where a word of the answer ends, so it is sent whole, over the
+    /// lamp's voice and in its tail.
+    #[test]
+    fn a_number_that_begins_the_lamps_is_the_persons_whole() {
+        for (heard, answer) in [
+            ("No, for 7.", "Your alarm is set for 7:30 tomorrow."),
+            ("No, at 3.", "The next train is at 3:30, so you have time."),
+            ("No, in 20.", "The timer will ring in 25 minutes."),
+        ] {
+            for over in [true, false] {
+                let line = Line {
+                    over_the_lamps_voice: over,
+                    ..line(heard)
+                };
+                assert!(
+                    matches!(judge(&line, Some(&said(answer))), Echo::Answered(_)),
+                    "{heard} over {answer} (over the lamp's voice: {over}): {:?}",
+                    judge(&line, Some(&said(answer)))
+                );
+            }
         }
     }
 
