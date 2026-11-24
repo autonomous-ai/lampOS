@@ -303,7 +303,9 @@ on the same `keys.*` path and the same switch, with the contract agreed on
 `voice/src/second_config.rs`
 (`the_persons_openai_compatible_model_is_used_only_with_the_switch`) and
 `voice/src/second_provider/tests/chat_second_try.rs`
-(`the_persons_endpoint_down_or_spent_falls_back_to_the_lamps_own`).
+(`the_persons_endpoint_down_or_spent_falls_back_to_the_lamps_own`),
+`voice/src/second_provider/net/chat.rs`
+(`an_own_compatible_deepseek_model_is_asked_with_thinking_off_and_no_other`).
 
 - **`offers`** in `keys.get`, #8367's shape: `{"service":
   "openai_compatible", "name": "OpenAI-compatible", "kind": "model",
@@ -337,7 +339,13 @@ on the same `keys.*` path and the same switch, with the contract agreed on
   model, over the relay it falls back to, in one journal line by host and
   model: `OpenAI-compatible: the person's own key, at <host>, model <id>
   (LAMP_OWN_KEYS)`, said only when its key is there. It is asked plainly,
-  with none of DeepSeek's own fields (`thinking`, `stream_options`). The
+  with none of DeepSeek's own fields (`thinking`, `stream_options`), as
+  another service may refuse a field it does not know, unless it is
+  DeepSeek's (the model named `deepseek...`, the host `api.deepseek.com` or
+  the relay's DeepSeek address, `Chat::own_compatible`): that one is asked
+  as DeepSeek's own chat, thinking off, as DeepSeek thinks by default and
+  refuses a forced `tool_choice` while thinking (a 400, kit-8420 on 24
+  Nov). The
   lamp's own chat is kept as `Hosted::lamps_own`: DeepSeek's web search, the
   memory's observation pass and the conversation's summary stay on it, as
   only DeepSeek's API and the relay serve them, and so does the relay a
