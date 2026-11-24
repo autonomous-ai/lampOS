@@ -4922,65 +4922,82 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
 2. **Cap giữ** (`made_skill::made_asks`, trong `held`): một mảng 1 đến 3
    chuỗi, mỗi chuỗi tối đa 60 ký tự, 2 đến 8 từ gồm chữ, số và dấu nháy
    đơn, cách nhau một dấu cách (như lamp-skills nhận asks của mọi kỹ năng),
-   không bị `skill_named::ask_refused` từ chối, **không cụm nào có từ của
-   riêng nó duy nhất là một câu trả lời ngắn** (`skill_named::made_ask_refused`,
+   không bị `skill_named::ask_refused` từ chối, **không cụm nào có các từ
+   của riêng nó đều là câu trả lời ngắn** (`skill_named::made_ask_refused`,
    `ANSWER_WORDS`: yes, yeah, yep, ok, okay, sure, alright, no, nope, fine,
-   good, great, cool, right, maybe; #8451, quyết định của first builder:
-   "yes please", "fine thanks" và "cool thanks" bị từ chối với `it is only
-   a short answer, and a yes or a no is the lamp's to answer`, còn "great
-   job pebble" và "yes indeed" vẫn qua vì có từ khác của riêng chúng; chỉ
-   áp dụng cho kỹ năng tự tạo, nên "yes please" của kỹ năng được push hoặc
-   từ Store vẫn được nạp, theo quyết định của owner trên #6842), mỗi cụm có
-   ít nhất một từ của riêng nó ngoài những từ nói quanh một yêu cầu
+   good, great, cool, right, maybe; #8451, quyết định của first builder, và
+   P2 của Twelve trên #8469: "yes please", "fine thanks", "cool thanks",
+   "yeah sure", "yes yes" và "fine fine" bị từ chối với `it is only a short
+   answer, and a yes or a no is the lamp's to answer`, còn "great job
+   pebble" và "yes indeed" vẫn qua vì có từ khác của riêng chúng;
+   `ask_refused` được đọc trước, nên "ok" và "okay", cũng là từ nói quanh
+   một yêu cầu, làm "okay please" bị từ chối vì chỉ có những từ như vậy,
+   còn "no" và "nope" bị từ chối như một lời từ chối; chỉ áp dụng cho kỹ
+   năng tự tạo, nên "yes please" của kỹ năng được push hoặc từ Store vẫn
+   được nạp, theo quyết định của owner trên #6842), mỗi cụm có ít nhất một
+   từ của riêng nó ngoài những từ nói quanh một yêu cầu
    (`skill_named::own_words_in`), không lặp lại. **Ngưỡng hai từ được giữ
    lúc tạo** (`made_skill::asks_heard`, trong `keep_asked`, #8451, quyết
-   định (b) của first builder): một cụm do model tạo kỹ năng tự chọn cần
-   hai từ của riêng nó ("yes please" không có từ nào, "pebble hello" có
-   một, vì "hello" là từ nói quanh một yêu cầu); một cụm là một chuỗi từ
-   liền nhau trong chính câu của người dùng cho lần tạo đó
-   (`skill_named::said_in`: câu giọng nói nghe được, hoặc yêu cầu gõ trong
-   app, không phân biệt hoa thường và dấu câu) chỉ cần một, nên "whenever
-   I say pebble hello" giữ "pebble hello" ngay ở câu trả lời đầu, không
-   lần sửa nào. Cụm của một kỹ năng chỉ được khớp nguyên cả cụm
-   (`named_among` của `skill_named`), nên chỉ "pebble" không bao giờ khởi
-   động nó. Cap, bước kiểm tra khi bật (`put_on_cap`), câu nói lại và bước
-   kiểm tra trùng (`asks_taken`) đọc asks của kỹ năng tự tạo với ngưỡng
-   một từ, nên kỹ năng giữ trigger của người dùng được bật đúng như đã
-   giữ; kỹ năng thêm từ file vẫn cần hai (`capped_added`). **Chính lời của
-   người dùng phạm một quy tắc mà không người viết nào đổi được**
-   (`made_skill::their_ask_refused`, trước cap, phần (a) của first
-   builder): một cụm là nguyên cụm từ người dùng nói để khởi động kỹ năng,
-   2 đến 8 từ và trong 60 ký tự, bị `skill_named::made_ask_refused` từ chối, được nói ngay,
-   rõ ràng, mỗi quy tắc một câu, không tốn lần sửa nào và không giao cho
-   agent của đèn: "I can't start a skill with ‘stop the music’, because
-   that's how you stop me." (một lệnh dừng), "…, because a no or a
-   question is mine to answer.", "…, because those are my own words for
-   something I do myself.", "…, because those are only words like hello or
-   please, said to me all the time.", "…, because it only names things
-   of mine, like the light or the music." và "…, because a yes or a no is
-   mine to answer." ("whenever I say yes please") (`plain_reason` và
-   `not_made_line` nói nguyên câu), ghi journal là `a made skill was not
-   kept: its asks weren't kept: asks = [<như đã viết>]: "<cụm đó>": the
-   person's own words, <lời của ask_refused>: told at once, no repair`.
-   **Nguyên cụm của người dùng** (`skill_named::said_whole`, `made_skill::
-   their_whole`, thay đổi bắt buộc của first builder trên #8469) là các từ
-   trong câu của họ sau "say", "says", "said", "saying", "hear", "hears"
-   hoặc "heard" cuối cùng đứng trước cụm đó, đến hết mệnh đề (một `,`,
-   `.`, `;`, `:`, `!` hoặc `?`), viết thường: "hello there pebble" trong
-   "whenever I say hello there pebble, email me…". Câu không có cụm như
-   vậy, hoặc cụm không phải 2 đến 8 từ trong 60 ký tự, thì lấy chính cụm
-   đó làm nguyên cụm của người dùng. **Một cụm chỉ là một phần của cụm dài
-   hơn người dùng đã nói** ("hello there" từ "hello there pebble") và bị
-   từ chối như vậy là lỗi của người viết, người viết sửa được: nó tốn một
-   lần sửa, không bao giờ là câu nói thẳng. Nó bị từ chối như cap từ chối
-   (`its asks weren't kept: asks = [<như đã viết>]: "<cụm đó>": <lời của
-   ask_refused>`), và lần sửa nêu nguyên cụm của người dùng: `The lamp
-   refused it: <dòng đó>. "<cụm đó>" is only part of the words the person
-   said for its start; use the words they said: <nguyên cụm của người
-   dùng>. <mẫu form>`. Khi chính nguyên cụm của người dùng phạm một quy
-   tắc như vậy, câu nói thẳng được nói ngay cho nguyên cụm đó, như trên.
-   Số từ hay độ dài vẫn được sửa như trước: người viết có thể sửa bằng
-   nhiều hơn hoặc ít hơn từ của người dùng. Nếu
+   định (b) của first builder): một cụm cần hai từ của riêng nó ("yes
+   please" không có từ nào, "pebble hello" có một, vì "hello" là từ nói
+   quanh một yêu cầu), trừ cụm mở đầu chính cụm của người dùng ngay sau
+   "say", "said", "hear" hoặc "heard" của họ (`skill_named::said_whole`,
+   bên dưới: câu giọng nói nghe được, hoặc yêu cầu gõ trong app, không
+   phân biệt hoa thường và dấu câu), cụm đó chỉ cần một, nên "whenever I
+   say pebble hello" giữ "pebble hello" ngay ở câu trả lời đầu, không lần
+   sửa nào. Một chuỗi từ ở chỗ khác trong câu của họ vẫn cần hai (P3 của
+   Thirteen trên #8469): "jazz please" từ "make a skill that plays jazz
+   please when I get home" bị từ chối, như trước. Cụm của một kỹ năng chỉ
+   được khớp nguyên cả cụm (`named_among` của `skill_named`), nên chỉ
+   "pebble" không bao giờ khởi động nó. Cap, bước kiểm tra khi bật
+   (`put_on_cap`), câu nói lại và bước kiểm tra trùng (`asks_taken`) đọc
+   asks của kỹ năng tự tạo với ngưỡng một từ, nên kỹ năng giữ trigger của
+   người dùng được bật đúng như đã giữ; kỹ năng thêm từ file vẫn cần hai
+   (`capped_added`). **Nguyên cụm của người dùng**
+   (`skill_named::said_whole`, thay đổi bắt buộc của first builder trên
+   #8469) là các từ trong câu của họ sau "say", "said", "hear" hoặc
+   "heard" cuối cùng đứng trước cụm đó, đến hết mệnh đề (một `,`, `.`,
+   `;`, `:`, `!` hoặc `?`), viết thường: "hello there pebble" trong
+   "whenever I say hello there pebble, email me…". "says" và "saying"
+   không phải từ như vậy: trong câu tạo kỹ năng chúng thường nói kỹ năng
+   sẽ nói gì ("a skill that says good morning", P2 của Thirteen trên
+   #8469). **Một cụm qua được thì được giữ** (P1 của Thirteen và Twelve
+   trên #8469), dù nguyên cụm của người dùng kéo dài sau nó và phạm một
+   quy tắc: "movie night" từ "whenever I say movie night dim the lights",
+   và "pebble night" từ "when I say pebble night turn off the lights", như
+   trên lamp-voice. **Chính lời của người dùng phạm một quy tắc mà không
+   người viết nào đổi được** (`made_skill::their_ask_refused`, trước cap,
+   phần (a) của first builder) chỉ áp dụng cho cụm tự nó bị
+   `skill_named::made_ask_refused` từ chối, 2 đến 8 từ và trong 60 ký tự,
+   và là một chuỗi từ trong câu của họ. Khi cụm đó là nguyên cụm của người
+   dùng, nó được nói ngay, rõ ràng, mỗi quy tắc một câu, không tốn lần sửa
+   nào và không giao cho agent của đèn: "I can't start a skill with ‘stop
+   the music’, because that's how you stop me." (một lệnh dừng), "…,
+   because a no or a question is mine to answer.", "…, because those are
+   my own words for something I do myself.", "…, because those are only
+   words like hello or please, said to me all the time.", "…, because it
+   only names things of mine, like the light or the music." và "…,
+   because a yes or a no is mine to answer." ("whenever I say yes
+   please") (`plain_reason` và `not_made_line` nói nguyên câu), ghi
+   journal là `a made skill was not kept: its asks weren't kept: asks =
+   [<như đã viết>]: "<cụm đó>": the person's own words, <lời của
+   made_ask_refused>: told at once, no repair`. **Một cụm bị từ chối chỉ
+   là một phần của cụm dài hơn người dùng đã nói** ("hello there" từ
+   "hello there pebble") là lỗi của người viết: khi nguyên cụm của người
+   dùng (2 đến 8 từ trong 60 ký tự) cũng phạm một quy tắc như vậy, câu
+   nói thẳng được nói ngay cho nguyên cụm đó, như trên; khi nó qua được,
+   cụm đó tốn một lần sửa, không bao giờ là câu nói thẳng. Nó bị từ chối
+   như cap từ chối (`its asks weren't kept: asks = [<như đã viết>]: "<cụm
+   đó>": <lời của made_ask_refused>`), và lần sửa nêu nguyên cụm của
+   người dùng: `The lamp refused it: <dòng đó>. "<cụm đó>" is only part of
+   the words the person said for its start; use the words they said:
+   <nguyên cụm của người dùng>. <mẫu form>`. **Một cụm bị từ chối mà không
+   tìm thấy nguyên cụm nào của người dùng** (không có "say", "said",
+   "hear" hoặc "heard" đứng trước nó trong mệnh đề: "good morning" từ
+   "make a skill that says good morning and plays jazz when I wake up") là
+   lựa chọn của người viết và được sửa như thường lệ bên dưới, không bao
+   giờ là câu nói thẳng. Số từ hay độ dài vẫn được sửa như trước: người
+   viết có thể sửa bằng nhiều hơn hoặc ít hơn từ của người dùng. Nếu
    không, nó bị từ chối và nêu đúng quy tắc (#8451): dòng journal (dòng
    sửa lại và dòng "wasn't kept") là `its asks weren't kept: asks = [<như
    đã viết>]: "<cụm bị từ chối>": <quy tắc>`, quy tắc bằng lời thường:
