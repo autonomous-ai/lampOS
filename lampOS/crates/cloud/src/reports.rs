@@ -2142,7 +2142,16 @@ pub fn write_exit_note(exits: &Path, note: &ExitNote) -> io::Result<PathBuf> {
             "unlisted exit-note unit",
         ));
     }
-    repair_unit_exit_notes(exits, &note.unit, &note.boot)?;
+    if let Err(error) = repair_unit_exit_notes(exits, &note.unit, &note.boot) {
+        // Repair is best-effort: an older unreadable note must not discard
+        // this stop's record. The reader's barrier preserves older-first
+        // delivery until repair succeeds or ordinary retention prunes it.
+        // One line per recorder invocation, with no old note's contents.
+        eprintln!(
+            "lamp-cloud: earlier exit notes could not be made readable ({}); keeping the new exit note",
+            error.kind()
+        );
+    }
     let path = exits.join(format!("{}@{}.json", note.unit, note.at_us));
     write_whole(&path, &serde_json::to_vec(note)?, 0o644)?;
     let prefix = format!("{}@", note.unit);
@@ -4846,6 +4855,34 @@ pub(crate) mod tests {
         assert!(repair_exit_notes(&alias, "lamp-voice.service", "boot-1").is_err());
         fs::set_permissions(&exits, fs::Permissions::from_mode(0o777)).unwrap();
         assert!(repair_exit_notes(&exits, "lamp-voice.service", "boot-1").is_err());
+    }
+
+    #[test]
+    fn a_refused_old_note_repair_does_not_discard_the_current_exit_note() {
+        let root = tempfile::tempdir().unwrap();
+        let exits = root.path().join("exits");
+        fs::create_dir(&exits).unwrap();
+        let older = planted_note("lamp-voice.service", 1);
+        let older_path = exits.join("lamp-voice.service@1.json");
+        let older_bytes = serde_json::to_vec(&older).unwrap();
+        fs::write(&older_path, &older_bytes).unwrap();
+        fs::set_permissions(&older_path, fs::Permissions::from_mode(0o600)).unwrap();
+        // Permission repair refuses to widen old files in a folder writable
+        // by another identity. That refusal must not lose today's new note.
+        fs::set_permissions(&exits, fs::Permissions::from_mode(0o775)).unwrap();
+        assert!(repair_exit_notes(&exits, "lamp-voice.service", "boot-1").is_err());
+        let current = planted_note("lamp-voice.service", 2);
+        let path = write_exit_note(&exits, &current).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<ExitNote>(&fs::read(path).unwrap()).unwrap(),
+            current
+        );
+        assert_eq!(fs::read(&older_path).unwrap(), older_bytes);
+        assert_eq!(
+            fs::metadata(&older_path).unwrap().permissions().mode() & 0o777,
+            0o600,
+            "best-effort repair must not relax its eligibility checks"
+        );
     }
 
     #[test]

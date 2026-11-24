@@ -2342,8 +2342,13 @@ by the recorder, with canonical filenames and matching unit/boot/time and
 known fields, are eligible. It never follows symlinks or changes the bytes;
 permissions change on the validated descriptor. Another unit/boot, malformed
 content or unknown added fields are not widened. Ordinary reads still accept
-added fields. A symlinked or non-owner-controlled directory is refused; an old
-0700 directory becomes readable only after eligible notes are repaired.
+added fields. Permission repair refuses a symlinked or non-owner-controlled directory; an
+old 0700 directory becomes readable only after eligible notes are repaired.
+Repair is best-effort: a failure is journaled once per recorder invocation,
+by error kind, and the new exit note is still written through the normal
+atomic writer. An old note cannot discard the current stop's record. Ordinary
+write failures can still prevent the new note. A remaining unreadable older
+note can hold delivery until it is repaired or pruned; it does not block storage.
 
 Cloud distinguishes open/read errors from malformed JSON without logging
 contents. An access failure on an earlier unconsumed canonical note holds
