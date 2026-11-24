@@ -25,6 +25,9 @@ ExecStart=/opt/lampOS/setup/current/lamp-setup serve --config /etc/lampOS/setup/
 # A new or reset lamp's first words at 70 %, not the 100 % a new speaker control starts at; a level
 # the person chooses later is never touched (#5551, lampOS/docs/setup.md, "A new lamp's first volume").
 Environment=LAMP_FIRST_VOLUME=on
+# LAMP_OWN_KEYS: #2094, #8367, a person's own model, hearing and voice keys from the app; on in the product by the first
+# builder's DEFAULT-ON (#8367); its rules are its row in docs/switches.md and docs/own-keys.md.
+Environment=LAMP_OWN_KEYS=on
 # However it ends, V1's nginx does not stay on.
 ExecStopPost=/usr/bin/systemctl stop nginx
 Restart=on-failure
