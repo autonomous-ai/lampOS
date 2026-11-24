@@ -1040,6 +1040,127 @@ async fn a_make_after_one_refused_for_the_persons_own_words_makes_nothing_in_tha
     );
 }
 
+/// A request whose first make was refused for the person's own words for
+/// its start (#8469): the tools answer that make with the plain line, any
+/// later one as made. Round 1 is `first`, round 2 a make the person never
+/// asked for, round 3 the lamp's reply.
+fn their_ask_refused_engine(first: Vec<net::Result<ChatEvent>>) -> (Engine, Calls) {
+    let refused = json!({
+        "error": format!(
+            "the skill couldn't be made: {}yes please’, because a yes or a no is mine to answer.",
+            crate::made_skill::THEIR_ASK_HEAD
+        ),
+    });
+    let own = call(
+        "c2",
+        crate::made_skill::MAKE,
+        json!({"request": "a skill called pebble yes that turns the light green whenever I say go pebble"}),
+    );
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [
+                first,
+                vec![Ok(ChatEvent::ToolCalls(vec![own])), Ok(ChatEvent::Done)],
+                vec![
+                    text("I can't start it with yes please."),
+                    Ok(ChatEvent::Done),
+                ],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let makes: Calls = Arc::default();
+    let seen = makes.clone();
+    let tools: ToolRunner = Arc::new(move |_, heard, name, args| {
+        let first = {
+            let mut seen = seen.lock().unwrap();
+            seen.push((name.clone(), args, heard));
+            seen.len() == 1
+        };
+        let answer = refused.clone();
+        Box::pin(async move {
+            if name == crate::made_skill::MAKE && first {
+                answer
+            } else {
+                json!({"made": "pebble-yes", "on": true})
+            }
+        })
+    });
+    let engine = Engine::with_clock(
+        script,
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        tools,
+        Arc::new(Instant::now),
+    );
+    (engine, makes)
+}
+
+/// The refused make asked in round 1, with no words before it.
+fn their_ask_first_make() -> net::Result<ChatEvent> {
+    Ok(ChatEvent::ToolCalls(vec![call(
+        "c1",
+        crate::made_skill::MAKE,
+        json!({"request": "a skill called pebble yes that turns the light green whenever I say yes please"}),
+    )]))
+}
+
+/// #8451, the first builder's P3 on #8469: the request's end journals what
+/// the lamp said after a make refused for the person's own words, once,
+/// with the request's number and those words.
+#[tokio::test]
+async fn a_request_with_a_make_refused_for_their_words_journals_what_was_said_after_it() {
+    let (engine, makes) =
+        their_ask_refused_engine(vec![their_ask_first_make(), Ok(ChatEvent::Done)]);
+    let journal: Arc<Mutex<Vec<String>>> = Arc::default();
+    let mut engine = engine.keeping_their_ask_journal(journal.clone());
+    engine.submit(written(8_451_001, "Make a skill called pebble yes."));
+    turn(&mut engine).await;
+    assert_eq!(
+        makes.lock().unwrap().len(),
+        1,
+        "{:?}",
+        makes.lock().unwrap()
+    );
+    assert_eq!(
+        *journal.lock().unwrap(),
+        [
+            "lamp-voice second: request 8451001: a make was refused for the person's own words for its start; said after it: \"I can't start it with yes please.\""
+        ]
+    );
+}
+
+/// #8451, the first builder's P3 on #8469: after a make refused for the
+/// person's own words, a later make in that request opens with no "I'll
+/// make it now": nothing is made, so nothing is promised.
+#[tokio::test]
+async fn a_make_after_one_refused_for_their_words_says_no_opening() {
+    let (mut engine, makes) = their_ask_refused_engine(vec![
+        text("Let me try that."),
+        their_ask_first_make(),
+        Ok(ChatEvent::Done),
+    ]);
+    engine.submit(written(8_451_002, "Make a skill called pebble yes."));
+    let said = turn(&mut engine).await;
+    assert_eq!(
+        makes.lock().unwrap().len(),
+        1,
+        "{:?}",
+        makes.lock().unwrap()
+    );
+    assert!(
+        !said
+            .iter()
+            .any(|label| label.contains(crate::make_skill_agent::MAKE_OPENING)),
+        "{said:?}"
+    );
+    assert!(
+        said.iter()
+            .any(|label| label.ends_with("I can't start it with yes please.")),
+        "{said:?}"
+    );
+}
+
 /// lamp-c0a4, 16 Nov (#7371): a make on the one run path waited about 63 s
 /// after its waiting line in silence. With the one run path the waiting
 /// line says how long, and a make still with no answer past its wait says
