@@ -1,6 +1,6 @@
-# OPTIONAL PATH ONLY. lamp, root sh (row common, swap-common, then SHAS='lamp-voice=<sha> ...'). Stops the four units,
-# binds each test binary read-only over the installed file, holds lamp-update's apply, starts them (1 start each),
-# restarts OpenClaw's gateway (its own mount namespace). Every change -> changes.txt. Ends SWAPPED OK | SWAP NOT OK.
+# lamp, root sh (row common, swap-common, then SHAS="lamp-tasks=<sha> lamp-control=<sha> lamp-skills=<sha> lamp-voice=<sha>"). Stops the four units, binds each test binary
+# read-only over the installed file, holds lamp-update's apply, starts it (1 start). Every change -> changes.txt.
+# Ends SWAPPED OK | SWAP NOT OK.
 set -e
 u=$(updbusy); [ -z "$u" ] || { echo "lamp-update round under way ($u): wait"; exit 3; }
 [ "$(engine)" = openclaw ] || { echo "engine is '$(engine)', not openclaw: stop"; exit 3; }
@@ -15,6 +15,10 @@ if echo "$X" | grep -q -- '--apply on'; then mkdir -p ${HD%/*}
   printf '[Service]\nExecStart=\nExecStart=%s\n' "$(echo "$X" | sed 's/--apply on/--apply off/')" > $HD; n "added $HD (lamp-update --apply off)"
 fi
 for p in $PARTS; do part=${p%%:*}; bin=${p##*:}; install -d $(tdir $part); install -m 0755 -o root -g root /tmp/t7901/$bin $(tdir $part)/$bin; n "placed $(tdir $part)/$bin"; done
+mkdir -p ${UD_TASKS%/*} ${UD_CONTROL%/*} ${UD_VOICE%/*}
+printf '[Service]\n# #7901 row (on stable without #8180): #8180'"'"'s unit line (deploy/product/lamp-tasks.service), gone at reboot\nDelegate=memory cpu pids\n' > $UD_TASKS; n "added $UD_TASKS"
+printf '[Service]\n# #7901 row (on stable without #8180): #8180'"'"'s unit line (deploy/product/lamp-voice.service), gone at reboot\nEnvironment=LAMP_MADE_CODE_ON_AT_ONCE=on\n' > $UD_VOICE; n "added $UD_VOICE"
+printf '[Service]\n# #7901 row (on stable without #8180): #8180'"'"'s unit line (deploy/product/lamp-control.service), gone at reboot\nEnvironment=LAMP_MADE_CODE_ON_AT_ONCE=on\n# a row at night: a run'"'"'s say is held in the quiet hours (22:00-07:00, #7625); the legs need it said. Test only.\nEnvironment=LAMP_CONTROL_QUIET_RUNS=off\n' > $UD_CONTROL; n "added $UD_CONTROL"
 rm -rf /tmp/t7901; systemctl daemon-reload
 [ -f $HD ] && { systemctl restart lamp-update; n "lamp-update restarted apply off"; }
 systemctl stop $UNITS; n "stopped $UNITS for the binds"
@@ -22,9 +26,9 @@ for u in $UNITS; do [ "$(pid $u)" = 0 ] || { echo "SWAP STOP: $u still has a pid
 for p in $PARTS; do part=${p%%:*}; bin=${p##*:}; mount --bind -o ro $(tdir $part)/$bin "$(inst $part $bin)"; n "bind $(tdir $part)/$bin over $(inst $part $bin)"; done
 systemctl start $UNITS; n "started $UNITS on the #7901 build"; sleep 25
 set +e; ok=1
+gwrestart || ok=0
 for p in $PARTS; do part=${p%%:*}; r=${p#*:}; unit=${r%%:*}; bin=${r#*:}; pp=$(pid $unit)
   s=$(sha256sum /proc/$pp/exe 2>/dev/null | cut -d' ' -f1); t=$(sha256sum $(tdir $part)/$bin | cut -d' ' -f1)
   [ -n "$s" ] && [ "$s" = "$t" ] && echo "PASS $unit runs $bin $s" || { echo "FAIL $unit not on the test build (pid $pp, $s)"; ok=0; }
 done
-systemctl restart lamp-openclaw-gateway; n "restarted lamp-openclaw-gateway"; sleep 20
 [ $ok = 1 ] && echo "SWAPPED OK" || echo "SWAP NOT OK"

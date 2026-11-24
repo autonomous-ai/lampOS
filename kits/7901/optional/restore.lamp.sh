@@ -1,6 +1,6 @@
-# OPTIONAL PATH ONLY. lamp, root sh (row common, swap-common). Idempotent put-back of swap.lamp.sh: units stopped only
-# if one of our binds is there, binds unmounted, the hold gone, test dirs removed, units started on the installed
-# build, shas checked. The row's skills, notes and drop-ins are unrow's (../run.sh unrow first). RESTORED OK | NOT OK.
+# lamp, root sh (row common, swap-common). Idempotent put-back of swap.lamp.sh: the four units stopped only if a bind of ours is
+# there, the bind unmounted, the hold gone, the test dirs removed, the units started on the installed build, shas
+# checked. The row's drop-in and snapshot are unrow's (../run.sh unrow first). RESTORED OK | RESTORE NOT OK.
 set -u; ok=1; W=0
 for p in $PARTS; do part=${p%%:*}; bin=${p##*:}; [ "$(mounted "$(inst $part $bin)")" != 0 ] && W=1; done
 if [ $W = 1 ]; then
@@ -13,9 +13,10 @@ if [ $W = 1 ]; then
   done
 fi
 [ -f $HD ] && { rm -f $HD; rmdir ${HD%/*} 2>/dev/null; n "removed $HD"; }
+for f in $UD_TASKS $UD_CONTROL $UD_VOICE; do [ -f $f ] && { rm -f $f; rmdir ${f%/*} 2>/dev/null; n "removed $f"; W=1; }; done
 for p in $PARTS; do part=${p%%:*}; [ -d $(tdir $part) ] && { rm -rf $(tdir $part); n "removed $(tdir $part)"; }; done
 rm -rf /tmp/t7901; systemctl daemon-reload
-[ $W = 1 ] && { systemctl start $UNITS; n "started $UNITS on the installed build"; }
+[ $W = 1 ] && { systemctl restart $UNITS; n "restarted $UNITS on the installed build"; sleep 25; gwrestart || ok=0; }
 systemctl restart lamp-update 2>/dev/null; sleep 20
 for p in $PARTS; do part=${p%%:*}; r=${p#*:}; unit=${r%%:*}; bin=${r#*:}; f=$(inst $part $bin); pp=$(pid $unit)
   want=$(cat $R/$bin.installed 2>/dev/null); fs=$(sha256sum "$f" | cut -d' ' -f1); rs=$(sha256sum /proc/$pp/exe 2>/dev/null | cut -d' ' -f1)
@@ -25,5 +26,5 @@ for p in $PARTS; do part=${p%%:*}; r=${p#*:}; unit=${r%%:*}; bin=${r#*:}; f=$(in
   [ "$(mounted "$f")" = 0 ] || { echo "FAIL mount left over $f"; ok=0; }
 done
 [ -f $HD ] && { echo "FAIL hold left: $HD"; ok=0; }
-systemctl restart lamp-openclaw-gateway; n "restarted lamp-openclaw-gateway on the installed build"
+for f in $UD_TASKS $UD_CONTROL $UD_VOICE; do [ -f $f ] && { echo "FAIL drop-in left: $f"; ok=0; }; done
 [ $ok = 1 ] && { rm -f $R/*.installed; echo "RESTORED OK"; } || echo "RESTORE NOT OK"
