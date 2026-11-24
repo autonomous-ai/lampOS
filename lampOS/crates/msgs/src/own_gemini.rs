@@ -28,8 +28,8 @@ pub fn switched_from_environment() -> Option<String> {
 
 /// The Gemini root the person's chat is asked at: the switch's address, else
 /// [`GEMINI_ROOT`].
-pub fn root(_switched: Option<&str>) -> &str {
-    GEMINI_ROOT // red: the switch not yet followed
+pub fn root(switched: Option<&str>) -> &str {
+    switched.unwrap_or(GEMINI_ROOT)
 }
 
 /// How a key and model are checked at `switched` (`None`: Google's own API):
@@ -41,7 +41,7 @@ pub fn root(_switched: Option<&str>) -> &str {
 pub fn check(switched: Option<&str>, model: &str) -> (bool, String) {
     match switched {
         None => (false, format!("{GEMINI_ROOT}/openai/models/{model}")),
-        Some(_) => (false, format!("{GEMINI_ROOT}/openai/models/{model}")), // red
+        Some(base) => (true, format!("{base}/openai/chat/completions")),
     }
 }
 

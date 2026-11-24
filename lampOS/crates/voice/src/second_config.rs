@@ -785,7 +785,7 @@ impl SecondConfig {
         let compatible_line = match found {
             Ok(Some((key, url, model))) => {
                 if chat == OwnChat::Gemini
-                    && let Some(at) = gemini_at.filter(|_| false)
+                    && let Some(at) = gemini_at
                 {
                     gemini_line = Some(format!(
                         "Gemini: the person's own model goes to {}, not Google's own API (LAMP_OWN_GEMINI_URL, test lamps only)",

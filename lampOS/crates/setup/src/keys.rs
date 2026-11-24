@@ -749,7 +749,7 @@ impl HttpCheck {
             // Gemini's one model, read with the key (#8420); at a test
             // lamp's address (lamp_msgs::own_gemini), one token asked of
             // the model, as the voice's chat will ask it.
-            Service::Gemini => match None::<&String> {
+            Service::Gemini => match &self.gemini_switched {
                 None => client.get(format!(
                     "{}/models/{}",
                     given.base_url.as_deref().unwrap_or(GEMINI_API),
@@ -815,7 +815,6 @@ impl HttpCheck {
         // both work there; its answer isn't a model to match.
         if given.service == Service::Gemini
             && self.gemini_switched.is_some()
-            && false
             && (200..=299).contains(&status)
         {
             return Some(Verdict::Works);
