@@ -204,9 +204,9 @@ no `lampos-notes`, so promoting one again (a put-back to it, say) leaves
 this part unfilled, said only in the step's log; every build from 8678 on
 has it, 8674 not (Third on #4792).
 Only files `lamp-update install` places are read, matched by name and text: a
-file there that install never places is on no lamp. So `LAMP_OWN_KEYS`,
-set only in `own-keys-voice.conf`, which a test lamp gets by hand, is
-listed.
+file there that install never places is on no lamp. So
+`own-keys-voice.conf`, which a test lamp got by hand, is never read:
+`LAMP_OWN_KEYS` counts as on from the product's own units (#8367).
 The one exception is a cell of exactly `on (unset)`: a switch on by its
 code's default that no file sets, such as `LAMP_FORGET_ASKED`, which is not
 listed.
@@ -2458,8 +2458,10 @@ for at least level 8 (9 since second-P1, above), so an updater of level 7 climbs
   `current` link. A lamp of its own pinned units, as lamp-4ace is, is never
   given the product's.
 - **What `install` puts on a lamp** (`install::PRODUCT`) and the build
-  carries under `product`. So the keeper's helper and the own keys' helper,
-  which `install` leaves out until their lamp checks, are not added either.
+  carries under `product`. So the keeper's helper, which `install` leaves
+  out until its lamp check, is not added either. The own keys' helper is
+  added since #8367: its socket gets its `lampos.target` link and listens
+  from the lamp's next start, as an added socket isn't started.
   A unit the lamp has as a link (a masked one) or anything but nothing is
   left as it is. Only `/etc/systemd/system` is looked in: a unit of the same
   name in `/lib/systemd/system` or `/run/systemd/system` would be shadowed by

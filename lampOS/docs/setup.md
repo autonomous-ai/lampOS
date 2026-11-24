@@ -1461,7 +1461,7 @@ readlink /etc/localtime
 | `/etc/lampOS/setup/wifi-setup.json` (Wi-Fi joins counted, #6256 F8) | 644 root, after each join, only with `LAMP_REPORT_COUNTERS=on` | wiped |
 | `/etc/lampOS/setup/display-name` (the lamp's name in the app, #1959) | not written by setup; 644 root after a `device.rename` from the app | wiped |
 | `/etc/lampOS/setup/voice`, `/etc/lampOS/setup/character` and `/etc/lampOS/setup/energy` (the owner's chosen voice, character words and their energy, #5394, #6893) | not written by setup; 644 root after the app's `voice.set` or `character.set` with `LAMP_CHOSEN_VOICE=on` | wiped: the default voice and no character words again ([chosen-voice.md](chosen-voice.md)) |
-| `/etc/lampOS/voice/own` (the person's own keys, #2094) | absent; with `LAMP_OWN_KEYS=on` (off in the product), a 700 root folder with each key that worked when checked, 600 | wiped |
+| `/etc/lampOS/voice/own` (the person's own keys, #2094) | absent; with `LAMP_OWN_KEYS=on` (on in the product, #8367), a 700 root folder with each key that worked when checked, 600 | wiped |
 | `/etc/systemd/system/lamp-control.service.d/developer.conf` (the owner's developer setting, `control.set`, docs/control.md) | absent; 644 root while developer access is on in the app | wiped |
 | `/etc/systemd/system/lamp-control.service.d/agent.conf` (the owner's local agent switch, `control.set_agent`, docs/control.md) | absent; 644 root while the local agent is on in the app | wiped |
 | `/etc/systemd/system/lamp-peek.service.d/monitor.conf` (the owner's dev monitor, `monitor.set`, #5883, docs/peek.md) | absent; 644 root while the dev monitor is on in the app | wiped |
