@@ -849,6 +849,23 @@ fn a_quiet_section_is_sent_once_and_again_when_it_changes() {
     assert_eq!(sections["turns"], page::TURNS_IN_TIMELINE);
 }
 
+/// A quiet stream still says it is open: with nothing changed it sends
+/// the empty `alive` event within 2 s, so the page's dot stays green.
+/// A page opened late, beside one already open, gets every section once.
+#[test]
+fn a_quiet_stream_stays_alive_and_a_late_page_gets_every_section() {
+    let rig = Rig::new("alive-late", Some(TOKEN));
+    let mut first = EventStream::open(&rig);
+    first.until(|sections| sections["timeline"].contains("No turn heard yet."));
+    let names = first.names_for(Duration::from_millis(2_500));
+    assert!(names.iter().any(|name| name == serve::ALIVE), "{names:?}");
+    let mut late = EventStream::open(&rig);
+    let sections = late.until(|sections| sections["timeline"].contains("No turn heard yet."));
+    for (id, _) in page::SECTIONS {
+        assert!(sections.contains_key(id as &str), "{id}");
+    }
+}
+
 struct Unreadable(PathBuf, fs::Permissions);
 
 impl Unreadable {
