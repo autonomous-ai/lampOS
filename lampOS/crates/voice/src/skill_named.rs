@@ -327,6 +327,21 @@ pub const REFUSED_ONLY_AROUND: &str =
     "it is only words said around an ask, a greeting or a request";
 /// [`ask_refused`]'s: nothing of the skill's own, only the lamp's.
 pub const REFUSED_NOTHING_OWN: &str = "it names nothing of the skill's own, only the lamp's";
+/// [`made_ask_refused`]'s: its only word of its own is a short answer
+/// ([`ANSWER_WORDS`]), a yes or a no being the lamp's to answer (#8451):
+/// a made skill's alone ([`made_ask_refused`]).
+pub const REFUSED_ANSWER: &str =
+    "it is only a short answer, and a yes or a no is the lamp's to answer";
+
+/// The short answers an ask may not have as its only word of its own past
+/// those said around an ask ([`made_ask_refused`]): "yes please", "fine
+/// thanks", "cool thanks" are answers said to the lamp, never a skill's
+/// start (#8451, the first builder's call). Beside another word of its own
+/// one passes ("great job pebble", "yes indeed").
+const ANSWER_WORDS: &[&str] = &[
+    "yes", "yeah", "yep", "ok", "okay", "sure", "alright", "no", "nope", "fine", "good", "great",
+    "cool", "right", "maybe",
+];
 
 /// Why `ask`, one of a skill's `asks` (#6772), is never matched, if it is
 /// refused: lamp-skills refuses such a skill as it loads
@@ -337,7 +352,8 @@ pub const REFUSED_NOTHING_OWN: &str = "it names nothing of the skill's own, only
 /// skill at all, `second_provider`'s `lamp_awaits_answer`): never a no or a
 /// question; never a stop; never the lamp's own words for what it does
 /// itself, which its first-round rules force (Thirteen's P2s); and never
-/// only the words said around an ask (the Reviewer-lead's P2).
+/// only the words said around an ask (the Reviewer-lead's P2). A made
+/// skill's asks are held to [`made_ask_refused`] too.
 pub fn ask_refused(ask: &str) -> Option<&'static str> {
     let words = lower_words(ask);
     let any = |list: &[&str]| words.iter().any(|word| list.contains(&word.as_str()));
@@ -384,6 +400,21 @@ pub fn ask_refused(ask: &str) -> Option<&'static str> {
     None
 }
 
+/// Why `ask`, one of a skill's asks made here (`crate::made_skill`: its
+/// cap, its keep and the person's own words at the make), is refused:
+/// [`ask_refused`]'s, or a short answer as its only word of its own
+/// ([`ANSWER_WORDS`], [`REFUSED_ANSWER`], #8451: "yes please", "fine
+/// thanks"). Only a made skill's: a pushed or Store skill's "yes please"
+/// still loads, a yes heard judged by the model in context (the owner's
+/// ruling on #6842, lamp-skills' `it::asks`).
+pub fn made_ask_refused(ask: &str) -> Option<&'static str> {
+    ask_refused(ask).or_else(|| {
+        let words = lower_words(ask);
+        let own = own_words(&words);
+        (own.len() == 1 && ANSWER_WORDS.contains(&own[0])).then_some(REFUSED_ANSWER)
+    })
+}
+
 /// What is left of a line's `words` past those said around an ask (a
 /// greeting, the lamp's name, a "please", a request before it, a word that
 /// asks to run it), as [`named_among`] skips them.
@@ -406,9 +437,11 @@ fn own_words(words: &[String]) -> Vec<&str> {
 }
 
 /// How many words of its own an ask phrase has past those said around an
-/// ask ([`own_words`]): a made skill's needs two (`crate::made_skill::
-/// made_asks`, #7233), so one ordinary word with a "please" ("yes please",
-/// "play please") never starts one, by no list of what words mean.
+/// ask ([`own_words`]): a made skill's the making model chose needs two
+/// (`crate::made_skill::made_asks`, #7233), so one ordinary word with a
+/// "please" ("play please") never starts one; the person's own words may
+/// have one (#8451), never a short answer alone ([`made_ask_refused`]:
+/// "yes please" is refused for a made skill on every path).
 pub fn own_words_of(ask: &str) -> usize {
     own_words(&lower_words(ask)).len()
 }
@@ -1374,7 +1407,9 @@ mod tests {
     /// skill's ask and then heard: refused as an ask, and the line heard
     /// runs nothing. A yes is not among them: no word list judges it (the
     /// owner's ruling); while the lamp waits for an answer no line is read
-    /// for a skill (`second_provider::tests::skill_named_words`).
+    /// for a skill (`second_provider::tests::skill_named_words`). Only a
+    /// made skill's ask that is a short answer alone is refused
+    /// ([`made_ask_refused`], #8451).
     #[test]
     fn an_ask_that_is_ordinary_speech_is_refused_and_runs_nothing() {
         for (ask, heard) in [
@@ -1409,8 +1444,29 @@ mod tests {
             "snap a pic",
             "relaxing music",
             "play me something to relax",
+            "great job pebble",
+            "yes indeed",
+            "pebble hello",
         ] {
             assert_eq!(ask_refused(ask), None, "{ask}");
+        }
+        // #8451: a made skill's ask whose only word of its own is a short
+        // answer is the lamp's to answer; a no and a greeting keep their own
+        // rules; any other skill's "yes please" passes (the owner's ruling).
+        for ask in [
+            "yes please",
+            "fine thanks",
+            "cool thanks",
+            "maybe please",
+            "Sure.",
+        ] {
+            assert_eq!(made_ask_refused(ask), Some(REFUSED_ANSWER), "{ask}");
+        }
+        assert_eq!(ask_refused("yes please"), None);
+        assert_eq!(made_ask_refused("no thanks"), Some(REFUSED_NO_OR_QUESTION));
+        assert_eq!(made_ask_refused("good morning"), Some(REFUSED_LAMPS_OWN));
+        for ask in ["great job pebble", "yes indeed", "pebble hello"] {
+            assert_eq!(made_ask_refused(ask), None, "{ask}");
         }
     }
 

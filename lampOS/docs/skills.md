@@ -8634,7 +8634,15 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    to 3 strings, each at most 60 characters, 2 to 8 words of letters,
    digits and apostrophes with one space between (as lamp-skills takes any
    skill's), none refused by `skill_named::ask_refused` (a no, a question,
-   a stop, the lamp's own words), each with at least one word of its own
+   a stop, the lamp's own words), **none whose only word of its own is a
+   short answer** (`skill_named::made_ask_refused`, `ANSWER_WORDS`: yes,
+   yeah, yep, ok, okay, sure, alright, no, nope, fine, good, great, cool,
+   right, maybe; #8451, the first builder's call: "yes please", "fine
+   thanks" and "cool thanks" are refused with `it is only a short answer,
+   and a yes or a no is the lamp's to answer`, while "great job pebble"
+   and "yes indeed" pass with other words of their own; a made skill's
+   alone, so a pushed or Store skill's "yes please" still loads, the
+   owner's ruling on #6842), each with at least one word of its own
    past those said around an ask (`skill_named::own_words_in`), none
    twice. **The two-word floor is held at the make** (`made_skill::
    asks_heard`, in `keep_asked`, #8451, the first builder's call (b)): an
@@ -8653,14 +8661,15 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    that break a rule no writer can change** (`made_skill::
    their_ask_refused`, before the cap, the first builder's (a)): an ask
    that is the person's whole phrase for its start, 2 to 8 words and
-   within 60 characters, refused by `skill_named::ask_refused`, is said at once,
+   within 60 characters, refused by `skill_named::made_ask_refused`, is said at once,
    plainly, one line a rule, and no repair is spent on it, nor is it
    handed to the lamp's agent: "I can't start a skill with ‘stop the
    music’, because that's how you stop me." (a stop), "…, because a no or
    a question is mine to answer.", "…, because those are my own words for
    something I do myself.", "…, because those are only words like hello
-   or please, said to me all the time." and "…, because it only names
-   things of mine, like the light or the music." (`plain_reason` and
+   or please, said to me all the time.", "…, because it only names
+   things of mine, like the light or the music." and "…, because a yes
+   or a no is mine to answer." ("whenever I say yes please") (`plain_reason` and
    `not_made_line` say it as it is), journaled as `a made skill was not
    kept: its asks weren't kept: asks = [<as given>]: "<the ask>": the
    person's own words, <ask_refused's words>: told at once, no repair`.

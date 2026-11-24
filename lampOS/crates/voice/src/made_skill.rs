@@ -1328,7 +1328,7 @@ fn their_rule(words: &[String]) -> &'static str {
     if !MADE_ASK_WORDS.contains(&words.len()) || said.chars().count() > MOST_MADE_ASK_CHARS {
         return "";
     }
-    match named::ask_refused(&said) {
+    match named::made_ask_refused(&said) {
         Some(named::REFUSED_STOP) => "that's how you stop me",
         Some(named::REFUSED_NO_OR_QUESTION) => "a no or a question is mine to answer",
         Some(named::REFUSED_LAMPS_OWN) => "those are my own words for something I do myself",
@@ -1338,6 +1338,7 @@ fn their_rule(words: &[String]) -> &'static str {
         Some(named::REFUSED_NOTHING_OWN) => {
             "it only names things of mine, like the light or the music"
         }
+        Some(named::REFUSED_ANSWER) => "a yes or a no is mine to answer",
         Some(_) => "I can't listen for those words",
         None => "",
     }
@@ -1380,7 +1381,7 @@ fn their_ask_refused(toml: &str, line: &str) -> Option<Refused> {
             "lamp-voice: a made skill was not kept: {ASKS_NOT_KEPT}: asks = {}: {shown:?}: \
              the person's own words, {}: told at once, no repair",
             asks_given(given),
-            crate::skill_named::ask_refused(&said).unwrap_or_default()
+            crate::skill_named::made_ask_refused(&said).unwrap_or_default()
         );
         Refused::new(format!("{THEIR_ASK_HEAD}{said}’, because {because}."))
     };
@@ -1409,7 +1410,7 @@ fn their_ask_refused(toml: &str, line: &str) -> Option<Refused> {
         // A part refused where their whole phrase passes: a repair.
         if !because.is_empty() {
             let said = words.join(" ");
-            let rule = crate::skill_named::ask_refused(&said).unwrap_or_default();
+            let rule = crate::skill_named::made_ask_refused(&said).unwrap_or_default();
             let journal = format!(
                 "{ASKS_NOT_KEPT}: asks = {}: {ask:?}: {rule}",
                 asks_given(given)
@@ -1517,7 +1518,7 @@ fn ask_broken(ask: &str, kept: &[String], own_least: usize) -> Option<String> {
     if chars > MOST_MADE_ASK_CHARS {
         return Some(format!("{chars} characters, over {MOST_MADE_ASK_CHARS}"));
     }
-    if let Some(why) = crate::skill_named::ask_refused(ask) {
+    if let Some(why) = crate::skill_named::made_ask_refused(ask) {
         return Some(why.to_owned());
     }
     let own = crate::skill_named::own_words_in(ask);
@@ -18036,6 +18037,32 @@ light = { colour = "green", level = 3, for = "20s" }
                 "its asks weren't kept: asks = [\"hello please\"]: \"hello please\": {}",
                 crate::skill_named::ask_refused("hello please").unwrap()
             )
+        );
+        // #8451: a short answer as the only word of its own is refused at
+        // the cap with its own rule; beside another word of its own, kept.
+        for answer in ["yes please", "fine thanks", "cool thanks"] {
+            let asks = format!("[\"{answer}\"]");
+            assert_eq!(
+                capped_with(&with(&asks), false).unwrap_err().0,
+                format!(
+                    "its asks weren't kept: asks = {asks}: \"{answer}\": {}",
+                    crate::skill_named::REFUSED_ANSWER
+                ),
+                "{answer}"
+            );
+        }
+        for kept in ["pebble hello", "great job pebble"] {
+            let text = with(&format!("[\"{kept}\"]"));
+            assert!(capped_with(&text, false).is_ok(), "{kept}");
+            assert_eq!(
+                made_asks(&toml::from_str(&text).unwrap()).unwrap(),
+                [kept],
+                "{kept}"
+            );
+        }
+        assert_eq!(
+            their_rule(&["fine".to_owned(), "thanks".to_owned()]),
+            "a yes or a no is mine to answer"
         );
         // A skill added from a file keeps the two-word floor: no person's
         // line is there to hold it to.

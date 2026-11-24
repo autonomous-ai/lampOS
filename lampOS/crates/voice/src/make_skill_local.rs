@@ -10431,6 +10431,61 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// #8451, the first builder's call on #8469: the person naming a short
+    /// answer as their whole phrase ("whenever I say yes please") is told
+    /// at once that a yes or a no is the lamp's to answer, with no repair.
+    #[test]
+    fn a_short_answer_the_person_names_is_said_at_once_with_no_repair() {
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        let request = "make a skill that mails me whenever I say yes please, to me@example.com \
+                       with the subject Test note, saying This is my test note.";
+        let toml = asks_mail_toml("yes please");
+        let (root, keeping) = keeping("asks-answer-refused");
+        let refused = made_skill::keep_asked(
+            &write_answer(&toml),
+            false,
+            FROM,
+            &keeping,
+            &made_skill::Asked {
+                request,
+                heard: Some(request),
+                ..made_skill::Asked::default()
+            },
+        )
+        .unwrap_err();
+        assert!(made_skill::their_ask(&refused.0), "{refused:?}");
+        assert!(
+            refused
+                .0
+                .contains("‘yes please’, because a yes or a no is mine to answer."),
+            "{refused:?}"
+        );
+        assert!(refused.1.is_none(), "no repair: {refused:?}");
+        let _ = std::fs::remove_dir_all(&root);
+        let (root, keeping) = self::keeping("asks-answer-refused-made");
+        let (url, served) = service(vec![(200, write_answer(&toml))]);
+        let told = make_with(
+            7,
+            Some(request),
+            request,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1, "no repair: {told}");
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", refused.0),
+            "{told}"
+        );
+        made_skill::set_asks_here(None);
+        made_skill::set_writes_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// #8451, the first builder's required change on #8469: an ask that is
     /// only part of a longer phrase the person named ("hello there" from
     /// "whenever I say hello there pebble") and is refused is the writer's
