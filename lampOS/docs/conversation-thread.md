@@ -479,6 +479,41 @@ wants the answer asks again. Off, nothing is marked and the thread is told
 as before. See [second-voice.md](second-voice.md), "Words cut short by the
 next line".
 
+## Conversation state in the coordinator
+
+The provider worker and the serve coordinator are separate processes. Each
+has its own `thread::THREAD`; a Rust static does not share updates between
+them. For the coordinator's computer-start and skill-sound conversation gates,
+the worker sends `ConversationState` on the existing ordered, credited
+provider-output channel. It carries an observation timestamp and an optional
+monotonic deadline, never transcript text or person names.
+
+The deadline is inclusive: the latest qualifying lamp answer's exchange start
+plus the existing 45-second `GOING_ON_FOR` window, after the thread's last
+conversation close. The receiver validates the timestamp and bounded deadline,
+then expires its mirror locally without waiting for an inactive packet. Each
+worker boot owns its mirror, including while on standby; only the active
+worker's mirror contributes to these gates. A route swap uses that route's
+mirror. A new model session in the same worker retains it; a replacement
+worker starts with an empty mirror. Request cancellation does not discard this
+worker-scoped state. After ordered `Ended`, no further state is accepted, but
+a previously validated deadline still expires at its original time.
+
+The gates also preserve the coordinator's own conversation contribution:
+`parent_conversation_going_on` is true when either the active-worker mirror or
+the parent-local `THREAD.going_on(now)` is true. A successfully spoken
+`ExactLine` in `Reply::answer_say` adds to that parent-local history and keeps
+its existing local expiry semantics. A dropped line adds nothing. Closing or
+expiring one source does not erase a still-live contribution from the other.
+
+This parent-local transcript is not the provider worker's transcript.
+`Thread::lamp` changes memory only; `answer_say` does not save the shared
+thread file or send those words to a provider worker. The metadata transfer
+therefore does not put an exact skill line into the next model request's
+history. Worker transcript propagation remains the separate file/reload path
+described below. See [the state transport bounds](memory-days.md#state-across-the-provider-process-boundary)
+for publication, names and lifecycle limits.
+
 ## What it keeps to itself
 
 By itself the thread lives in the provider worker's memory and nowhere

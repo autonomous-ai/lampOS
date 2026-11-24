@@ -42,6 +42,8 @@ const YOUNG_BOOT_GRACE: &str = "LAMP_VOICE_YOUNG_BOOT_GRACE";
 /// The roles that have said ready once in this process with the grace's
 /// switch on, each once: a worker of one of them started again is given no
 /// young-boot grace. With the switch off it is never touched.
+// The serve supervisor records ready worker roles and reads them on subsequent
+// spawns; this is not a child-owned readiness flag.
 static READY_ONCE: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
 /// How long a worker whose peer went during startup is waited for to end
 /// ([`Worker::ended_or`]).
@@ -67,6 +69,8 @@ pub(crate) mod startup_clock {
     use std::{cell::Cell, time::Duration};
 
     thread_local! {
+        // Test move_on updates this thread's elapsed time; moved reads it on the same
+        // thread.
         static MOVED: Cell<Duration> = const { Cell::new(Duration::ZERO) };
     }
 
@@ -1560,6 +1564,8 @@ fn sound_session_worker_environment(
         .collect()
 }
 
+// Serve configuration sets this flag; its child-command builder reads it when
+// constructing worker arguments.
 static DEVICES_NAMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Said once at start by the coordinator: the options named a speaker or a microphone device, so the audio workers are

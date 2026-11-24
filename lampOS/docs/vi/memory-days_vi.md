@@ -2463,3 +2463,78 @@ Cùng lúc, với `LAMP_LOOK_TOLD`, hàm nhìn nhận hai đối số tuỳ ch�
 trước ghi chú, kèm các mục bộ nhớ (`LAMP_SECOND_MEMORY_HITS`) cho câu hỏi trong
 phạm vi người hỏi; người được giữ nhờ khoảng trống không nhận mục nào. Model tự
 phán đoán ý nghĩa, không có danh sách từ.
+
+## Trạng thái qua ranh giới tiến trình provider
+
+Worker provider và bộ điều phối serve là các tiến trình riêng; mỗi tiến trình
+có `thread::THREAD` và bộ nhớ đệm tên máy tính riêng. Trạng thái được truyền
+qua kênh đầu ra provider hiện có, có thứ tự và cấp hạn mức
+([provider-flow-control.md](../provider-flow-control.md)), không thêm kết nối
+mạng hay công tắc tính năng.
+
+`ConversationState` chỉ mang thời điểm quan sát và hạn chót đơn điệu tùy chọn,
+không mang lời hội thoại hay tên người. Hạn chót tính từ lúc bắt đầu trao đổi
+mới nhất có lời đáp hợp lệ của đèn, sau lần đóng hội thoại gần nhất, cộng cửa
+sổ `GOING_ON_FOR` 45 giây; đúng tại hạn chót vẫn được tính là đang hội thoại.
+Bên nhận kiểm tra thời điểm và giới hạn rồi tự hết hạn, không cần gói báo hết
+hoạt động sau đó.
+
+Hai nơi quyết định hội thoại ở serve, khi bắt đầu tác vụ máy tính và xét âm
+thanh của skill, dùng `parent_conversation_going_on`: đúng nếu bản sao của
+worker đang hoạt động **hoặc** `THREAD.going_on(now)` riêng của tiến trình cha
+còn hiệu lực. Một `ExactLine` được nói thành công qua `Reply::answer_say` thêm
+vào lịch sử riêng của cha, giữ cách hết hạn cục bộ hiện có; dòng bị bỏ không
+thêm gì. Đóng hoặc hết hạn một nguồn không xóa nguồn còn hiệu lực kia.
+`Thread::lamp` chỉ sửa bộ nhớ; `answer_say` không ghi tệp hội thoại dùng chung
+và không gửi lời này sang worker. Vì vậy thay đổi này không đưa dòng của skill
+vào lịch sử yêu cầu model kế tiếp. Truyền bản chép hội thoại giữa các worker
+vẫn là đường ghi và đọc lại tệp riêng, như
+[conversation-thread.md](../conversation-thread.md#conversation-state-in-the-coordinator).
+
+`MachineNames` chuyển cờ bật và tên máy tính thành một phiên bản nhất quán.
+Mỗi mảnh đã tuần tự hóa tối đa 6.000 byte, tối đa 16 mảnh và toàn bộ bản chụp
+tối đa 65.536 byte. Bên nhận kiểm tra thứ tự mảnh, phiên bản, giới hạn và tên
+trước khi thay bản chụp hoàn chỉnh gần nhất. Bản truyền dở dang hay không hợp
+lệ không công bố bản đồ tên trộn lẫn. Kiểu riêng đã kiểm tra hợp lệ giúp bước
+cài đặt ở serve không nhận bản đồ thô hay tuần tự hóa lại toàn bộ bản chụp.
+Tắt tên cài bản đồ rỗng. Debug chỉ ghi số đếm và siêu dữ liệu, không ghi tên
+riêng tư.
+
+Cả worker Live và tuyến thứ hai công bố tối đa một gói trạng thái mỗi nhịp
+worker hiện có, dùng chung hạn mức đầu ra với âm thanh và sự kiện vòng đời.
+Khóa nguồn được thử mà không chờ, và không giữ khóa qua I/O truyền tải.
+Tranh chấp khóa hoặc thiếu hạn mức làm hoãn công bố; giới hạn công việc mỗi
+nhịp này không bảo đảm độ trễ đầu cuối.
+
+Mỗi worker dự phòng giữ bản sao hội thoại và phần ghép tên riêng. Chỉ trạng
+thái của worker đang hoạt động góp vào quyết định hội thoại và tên cho tin tác
+vụ ở serve. Đổi tuyến áp dụng trạng thái của worker được chọn. Worker thay thế
+bắt đầu rỗng; khi đồng bộ, tên cũ ở cha được xóa. Đổi phiên model trong cùng
+lần khởi động giữ trạng thái; hủy yêu cầu không xóa bản chụp thuộc worker.
+Chỉ sau khi gửi `Ended` thành công thì nguồn mới ngừng công bố; cha từ chối
+trạng thái đến sau `Ended` trên kênh có thứ tự. Riêng sự kiện đó không xóa
+trạng thái đã hợp lệ: hạn hội thoại vẫn tự hết, còn tên giữ đến khi bản chụp
+đang hoạt động hoặc lần khởi động worker được thay thế.
+
+Trên macOS, bản sửa sau khi khôi phục vượt qua 8.284 kiểm thử Voice (34 bỏ
+qua), Clippy nghiêm ngặt cho Voice và kiểm tra định dạng. Nhóm 244 kiểm thử
+bao gồm bốn ca hồi quy đã thất bại đúng tại các khẳng định dự kiến khi bỏ công
+bố trạng thái hoặc đóng góp cục bộ của cha; mã thử đối chứng đã được khôi phục
+chính xác. Bản dựng toàn workspace đầu tiên thất bại ở lời gọi Linux-only
+`socket_peercred` sẵn có của Play. Rebase lên `798ae9dd41`, chỉ thay đổi Play
+và giữ nguyên từng byte mã Voice đã kiểm thử, giải quyết lỗi đó: định dạng,
+Clippy nghiêm ngặt cho Voice và bản dựng toàn workspace đều đạt khi chạy lại.
+
+Ba kiểm thử thời gian tùy chọn trên máy phát triển đều đạt khi chạy riêng,
+với 200 mẫu lặp và đo lần gọi đầu. p95 của xử lý phía nhận tối đa 0,313 ms;
+p95 của truyền cục bộ tổng hợp đến lúc quan sát tối đa 5,788 ms, đạt mục tiêu
+1 ms và 10 ms tương ứng. Mức tối đa của xử lý là 1,243 ms; mục tiêu theo phân
+vị không bảo đảm trường hợp xấu nhất. p95 cài đặt tại cha là 0,102 ms với 798
+tên / 65.462 byte. p95 chuẩn bị tại nguồn là 0,023 ms với bốn tên, nhưng
+3,715 ms gần giới hạn bản chụp; số sau được báo riêng, không khẳng định dưới
+1 ms. Lần gọi đầu tối đa 5,575 ms cho truyền và 3,656 ms cho chuẩn bị. Phép đo
+nguồn gồm tạo chunk và tuần tự hóa để kiểm tra kích thước, nhưng không gồm
+tuần tự hóa sự kiện cuối, truyền hay nhận; các fixture không đo toàn bộ vòng
+worker có tín dụng dưới phụ thuộc chậm. Lần thử socket trong sandbox bị từ
+chối quyền bind; chạy lại cục bộ có quyền vượt qua cả ba kiểm thử. Các số này
+không xác nhận độ trễ âm thanh hay trên thiết bị.

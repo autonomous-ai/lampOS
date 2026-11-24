@@ -28,6 +28,8 @@ pub const ENVIRONMENT: &str = "LAMP_SECOND_UNFINISHED_WAIT";
 
 /// Whether the switch is on for this process; read once.
 pub fn on() -> bool {
+    // Serve and the second worker independently cache this switch from their
+    // environments; their local admission paths read their own copies.
     static ON: OnceLock<bool> = OnceLock::new();
     *ON.get_or_init(|| std::env::var(ENVIRONMENT).ok().as_deref() == Some("on"))
 }

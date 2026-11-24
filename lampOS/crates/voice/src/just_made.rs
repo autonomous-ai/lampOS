@@ -166,6 +166,8 @@ impl Conversations {
     }
 }
 
+// Conversations shared across threads of this Second worker; parent app creation does
+// not populate this memory directly.
 static CONVERSATIONS: std::sync::Mutex<Conversations> =
     std::sync::Mutex::new(Conversations { talks: Vec::new() });
 

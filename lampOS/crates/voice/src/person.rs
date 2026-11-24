@@ -121,8 +121,12 @@ pub fn from_environment() -> Option<String> {
 
 #[cfg(test)]
 thread_local! {
+    // Test set_for_test writes this thread's path; path_from_environment reads it on
+    // that thread.
     static FILE_FOR_TEST: std::cell::RefCell<Option<std::path::PathBuf>> =
         const { std::cell::RefCell::new(None) };
+    // Test set_owner_only_for_test writes this thread's override; owner_only reads it
+    // on that thread.
     static OWNER_ONLY_FOR_TEST: std::cell::Cell<Option<bool>> =
         const { std::cell::Cell::new(None) };
 }
@@ -141,6 +145,8 @@ pub const PRIVATE_ROOM_ENVIRONMENT: &str = "LAMP_PRIVATE_ROOM";
 
 #[cfg(test)]
 thread_local! {
+    // Test set_private_room_for_test writes this thread's override; private_room reads
+    // it on that thread.
     static PRIVATE_ROOM_FOR_TEST: std::cell::Cell<Option<bool>> =
         const { std::cell::Cell::new(None) };
 }
@@ -281,6 +287,8 @@ pub fn may_tell_now(name: &str, bus: Option<&lamp_bus::Bus>, person: Option<&str
     )
 }
 
+// Each provider's face-name checks update this local count to rate-limit the
+// diagnostic about a different known face.
 static OTHER_KNOWN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// A lone known face whose name isn't the typed one (the reviewer-lead's
@@ -328,9 +336,13 @@ struct LiveName {
 }
 
 thread_local! {
+    // The Live provider thread records name offers, completed lines, and
+    // connections here; later checks on that same thread read the state.
     static LIVE: std::cell::Cell<LiveName> = const {
         std::cell::Cell::new(LiveName { open: None, ended: None, told: None, held: None })
     };
+    // The Live provider thread requests a fresh connection here; connection
+    // opening on that same thread consumes the flag.
     static FRESH_LIVE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
@@ -444,6 +456,8 @@ pub fn bus_root(product: Option<&Path>) -> Option<std::path::PathBuf> {
 
 #[cfg(test)]
 thread_local! {
+    // Test set_bus_for_test writes this thread's path; bus_root reads it on that
+    // thread.
     static BUS_FOR_TEST: std::cell::RefCell<Option<std::path::PathBuf>> =
         const { std::cell::RefCell::new(None) };
 }

@@ -629,6 +629,7 @@ const DOING_WORDS: usize = 6;
 /// what it does, read from its functions, not a list of the model's
 /// phrasings.
 fn light_acts() -> &'static [String] {
+    // Immutable action vocabulary cached independently in each calling process.
     static ACTS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
     ACTS.get_or_init(|| {
         let mut acts = Vec::new();

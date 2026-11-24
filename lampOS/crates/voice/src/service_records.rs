@@ -167,7 +167,11 @@ mod kept {
     use super::{Ledger, Outbox};
     use std::sync::{Condvar, LazyLock, Mutex};
 
+    // Service operations update this worker's ledger; its record readers and
+    // saver share that local ledger.
     static LEDGER: LazyLock<Mutex<Ledger>> = LazyLock::new(Mutex::default);
+    // Service operations queue changes in this worker's outbox and wake its
+    // saver thread; the saver sends them to memory over IPC.
     pub static OUTBOX: LazyLock<(Mutex<Outbox>, Condvar)> =
         LazyLock::new(|| (Mutex::default(), Condvar::new()));
 
@@ -187,6 +191,8 @@ mod kept {
     }
 
     pub fn on() -> bool {
+        // Each process reads the service-record feature switch once from its
+        // own environment; record operations use that local cache.
         static ON: LazyLock<bool> =
             LazyLock::new(|| std::env::var(super::ENVIRONMENT).as_deref() == Ok("on"));
         *ON
@@ -200,8 +206,14 @@ mod kept {
     use std::cell::{Cell, RefCell};
 
     thread_local! {
+        // Test callers read and update this thread's ledger through kept::ledger;
+        // other test threads have separate values.
         static LEDGER: RefCell<Ledger> = RefCell::default();
+        // Test callers read and update this thread's outbox through kept::outbox;
+        // other test threads have separate values.
         static OUTBOX: RefCell<Outbox> = RefCell::default();
+        // Test on_for_test writes this thread's switch; kept::on reads it on the same
+        // thread.
         pub static ON: Cell<bool> = const { Cell::new(false) };
     }
 
@@ -1133,6 +1145,8 @@ pub fn save_next(send: impl FnOnce(&Value) -> Option<Value>) -> Saved {
 /// [`RETRY_MOST`].
 #[cfg(not(test))]
 fn start_saver() {
+    // Starts the service-record saver once in this worker; the thread consumes
+    // this worker's outbox.
     static STARTED: std::sync::Once = std::sync::Once::new();
     STARTED.call_once(|| {
         let spawned = std::thread::Builder::new()

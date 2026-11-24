@@ -901,6 +901,8 @@ fn event_times(today: Option<&(String, String)>) -> String {
 /// The person's linked services' codes and accounts, for a write's own
 /// address (#6066): asked of `lamp-services` once a make begins, only with
 /// a made skill's writes on ([`own_accounts_now`]).
+// Make state is local to its executing process; parent app makes and child voice makes
+// have separate copies.
 static OWN: std::sync::Mutex<Vec<(String, String)>> = std::sync::Mutex::new(Vec::new());
 
 fn own_accounts() -> Vec<(String, String)> {
@@ -1512,10 +1514,14 @@ pub fn make_in(
 std::thread_local! {
     /// The line heard for a make that waited its turn, kept when it was
     /// asked ([`with_asker_kept`]); none for any other make.
+    // with_heard_kept sets and clears this execution thread's value; kept_heard reads
+    // it on that thread. Other threads and processes have independent copies.
     static KEPT_HEARD: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
     /// The owner read at the ask of a make that waited its turn: `Some`
     /// while one runs ([`with_asker_kept`]), holding none for an ask not
     /// the owner's; `None` for any other make, whose lease is read.
+    // with_asker_kept sets and clears this execution thread's value; owner_for_make
+    // reads it on that thread. Other threads and processes have independent copies.
     static KEPT_OWNER: std::cell::RefCell<Option<Option<String>>> = const { std::cell::RefCell::new(None) };
 }
 
@@ -1966,6 +1972,8 @@ fn words_refused(keeping: &Keeping, made: &Made, why: &str) -> Value {
 type OwnerAsk = Box<dyn FnOnce() -> bool>;
 
 thread_local! {
+    // answer installs and clears this execution thread's owner check; owners_make
+    // takes it on that thread. Other threads and processes have independent copies.
     static MAKE_OWNER: std::cell::RefCell<Option<OwnerAsk>> =
         const { std::cell::RefCell::new(None) };
 }
@@ -2034,7 +2042,11 @@ struct HeldAsk {
 }
 
 /// The voice's asks under way or made within [`ONE_ASK_WITHIN`].
+// Make state is local to its executing process; parent app makes and child voice makes
+// have separate copies.
 static ASKS: std::sync::Mutex<Vec<HeldAsk>> = std::sync::Mutex::new(Vec::new());
+// Make state is local to its executing process; parent app makes and child voice makes
+// have separate copies.
 static ASK_IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 /// A line's words for [`same_ask`]: lower case, each run of letters and
@@ -3291,6 +3303,8 @@ fn waits_for_yes(mut told: Value, line: &str, id: &str) -> Value {
 std::thread_local! {
     /// The line of the make [`make_with`] last finished on this thread
     /// ([`said_line`]), until [`take_said_line`] takes it.
+    // Make completion helpers write this execution thread's result; take_said_outcome
+    // takes it on that thread. Other threads and processes have independent copies.
     static MADE_LINE: std::cell::RefCell<Option<(String, Outcome)>> =
         const { std::cell::RefCell::new(None) };
 }
@@ -3390,6 +3404,8 @@ fn said_line(
 
 /// How many voice makes are under way in this process, or have a line
 /// still being said for a turn that was cut ([`Pending`]).
+// Make state is local to its executing process; parent app makes and child voice makes
+// have separate copies.
 static PENDING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// One voice make under way, from its call until its line was given to
@@ -3420,6 +3436,8 @@ pub fn pending() -> bool {
 
 /// The newest request whose line the person said with words and the
 /// lamp answered ([`person_went_on`]).
+// Make state is local to its executing process; parent app makes and child voice makes
+// have separate copies.
 static WENT_ON: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// The second route answers `request`, a line heard with words: the
@@ -4469,6 +4487,8 @@ fn cannot_asked_again(
 std::thread_local! {
     /// The voice turn waiting on this thread's make, while it waits: gone
     /// once the turn was cut (`second_provider::worker::made_running`).
+    // The Second worker calls set_turn on the make execution thread; turn_cut reads
+    // that thread's value. Other threads and processes have independent copies.
     static TURN: std::cell::RefCell<Option<std::sync::Weak<()>>> =
         const { std::cell::RefCell::new(None) };
 }
@@ -4669,6 +4689,8 @@ fn judge_once(
 thread_local! {
     /// The name the person gave the skill, as the voice's model read it
     /// ([`GIVEN_NAME`], [`GivenName`]), for the make on this thread.
+    // GivenName sets and clears this execution thread's value; made_and_journaled_by
+    // takes it on that thread. Other threads and processes have independent copies.
     static GIVEN: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
 }
 
@@ -4715,6 +4737,8 @@ fn named_make<T>(given: Option<String>, make: impl FnOnce() -> T) -> T {
 thread_local! {
     /// The person's own line for the voice's make on this thread
     /// ([`OwnLine`]): `Some(None)` when it isn't known.
+    // OwnLine sets and clears this execution thread's value; made_and_journaled_by
+    // takes it on that thread. Other threads and processes have independent copies.
     static OWN_LINE: std::cell::RefCell<Option<Option<String>>> =
         const { std::cell::RefCell::new(None) };
 }

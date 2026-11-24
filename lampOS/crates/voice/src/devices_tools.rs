@@ -215,6 +215,8 @@ impl Link for Bus {
 
 /// A `req_id` no other call of this process has.
 fn req_id() -> String {
+    // Tool-execution process-local device request/cache state; device effects travel
+    // through the explicit device command path.
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
     format!(
         "v{}-{}",
@@ -239,6 +241,8 @@ impl Cache {
 }
 
 /// The lamp's own cache, one per process.
+// Tool-execution process-local device request/cache state; device effects travel
+// through the explicit device command path.
 pub static CACHE: std::sync::Mutex<Cache> = std::sync::Mutex::new(Cache { rows: None });
 
 /// One call: the list (kept a while), then the state of the device or
@@ -424,6 +428,8 @@ pub struct Moving {
     pub until: Instant,
 }
 
+// Tool-execution process-local device request/cache state; device effects travel
+// through the explicit device command path.
 static MOVING: std::sync::Mutex<Option<Moving>> = std::sync::Mutex::new(None);
 
 /// The move in flight, if any and not past its time.

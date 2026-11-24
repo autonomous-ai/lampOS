@@ -2346,6 +2346,65 @@ or a cancel never gives a checkpoint. The clock, the observation pass and the
 summary thread are the process's, so a probe is one view to a process: a
 private view is a separate process loaded before its workers start.
 
+## State across the provider process boundary
+
+The provider's conversation thread and computer-name cache are process-local.
+Serve receives explicit state on the existing ordered, credited provider-output
+channel ([provider-flow-control.md](provider-flow-control.md)); this adds no
+network connection or feature switch and does not transfer transcript content.
+The conversation deadline and the coordinator's separate local contribution
+are described in [conversation-thread.md](conversation-thread.md#conversation-state-in-the-coordinator).
+
+`MachineNames` transfers the enabled flag and computer labels together as one
+revision. Each serialized chunk is at most 6,000 bytes, with at most 16 chunks
+and a 65,536-byte limit on the complete snapshot. The receiver validates chunk
+order, revision, bounds and labels before replacing its last complete
+snapshot. Partial or invalid transfers do not publish a mixed map. A completed
+snapshot has a private validated type, so installation in serve cannot accept
+a raw map or serialize the whole snapshot again. Disabling names installs an
+empty map. Debug output reports counts and metadata, not private labels.
+
+Both Live and second-route workers publish at most one state packet per
+existing worker tick, using the same output credits as audio and lifecycle
+events. Source locks are tried without waiting; no source lock is held across
+transport I/O. Contention or unavailable credits defer publication. This is a
+bound on work per tick, not an end-to-end latency guarantee.
+
+Each standby worker retains its own conversation mirror and name assembly.
+Only the active worker's complete names are installed for serve's task-news
+consumer. Switching routes applies the selected worker's state; replacing a
+worker boot starts empty and clears the old parent-side names when synchronized.
+A model-session change within the same boot retains its state. Request
+cancellation does not clear worker-scoped snapshots. Publication stops only
+after `Ended` is successfully sent, and the parent rejects state following
+ordered `Ended`. That event alone does not erase already validated names or
+conversation state: the conversation deadline expires locally, and names stay
+until the active snapshot or boot is replaced.
+
+On macOS, the restored repair passes 8,284 Voice tests (34 ignored), strict
+Voice Clippy and formatting. Its selected 244-test run includes four regressions
+that first failed at the intended assertions with publication or the parent's
+local contribution removed; those temporary controls were restored exactly.
+The initial workspace build failed on Play's existing Linux-only
+`socket_peercred` call. Rebasing onto `798ae9dd41`, which changes only Play
+and leaves the tested Voice source byte-identical, resolves that failure:
+formatting, strict Voice Clippy and the full workspace build pass again.
+
+Three opt-in host timing tests pass separately, with 200 repeated samples and
+first invocation measured. Receiver-handler p95 is at most 0.313 ms and
+synthetic local transport through observation p95 is at most 5.788 ms, within
+the respective 1 ms and 10 ms targets. The largest handler maximum is 1.243 ms;
+the target is a percentile, not a worst-case guarantee. Parent installation
+p95 is 0.102 ms at 798 names / 65,462 bytes. Publisher preparation p95 is
+0.023 ms for four names, but 3.715 ms near the snapshot limit; the latter is
+reported separately, not claimed below 1 ms. First invocation takes up to
+5.575 ms for transport and 3.656 ms for publisher preparation. Publisher timing
+includes chunk construction and its size-validation serialization, but excludes
+final event serialization, transport and receiving. These fixtures do not measure
+the full credited worker loop under slow dependencies. The first sandboxed
+socket timing attempt was denied permission to bind; the permitted local rerun
+passes all three tests. None of this establishes acoustic or device latency.
+
 ## Not shown
 
 Task 29's Mac client timings are recorded in

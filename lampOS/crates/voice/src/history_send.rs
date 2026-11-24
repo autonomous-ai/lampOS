@@ -1244,6 +1244,8 @@ fn parse_turn(turn: &str) -> Option<(&str, &str, u64)> {
 }
 
 /// The voice's one sender, once started.
+// Second worker-local history sender and its background thread; it is not inherited by
+// the coordinator.
 static SENDER: OnceLock<Sender> = OnceLock::new();
 
 #[cfg(test)]
@@ -1256,8 +1258,12 @@ thread_local! {
 /// Tests: the sender a fake memory looks at when it answers a forget, and
 /// whether it was holding its sends then.
 #[cfg(test)]
+// Tests install and clear this process-wide probe; the fake-memory callback reads the
+// same mutex-protected sender slot.
 pub(crate) static FORGET_PROBE: Mutex<Option<Sender>> = Mutex::new(None);
 #[cfg(test)]
+// Tests reset and inspect this process-wide flag; probe_forget records the fake-memory
+// callback's observation in the same atomic.
 pub(crate) static HELD_AT_FORGET: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 

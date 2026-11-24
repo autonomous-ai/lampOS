@@ -216,6 +216,8 @@ pub const LOOSE_ENVIRONMENT: &str = "LAMP_MADE_SKILL_LOOSE";
 
 thread_local! {
     /// [`LOOSE_ENVIRONMENT`] as a test of this thread sets it.
+    // Per-thread test override; production falls back to the environment when none is
+    // set.
     static LOOSE_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
@@ -237,6 +239,8 @@ pub fn set_loose_here(on: Option<bool>) {
 
 thread_local! {
     /// [`remind_told`] as a test of this thread sets it.
+    // Per-thread test override; production falls back to the environment when none is
+    // set.
     static REMIND_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
@@ -291,6 +295,8 @@ pub const SAID_ENVIRONMENT: &str = "LAMP_MADE_SKILL_SAID";
 
 thread_local! {
     /// [`SAID_ENVIRONMENT`] as a test of this thread sets it.
+    // Per-thread test override; production falls back to the environment when none is
+    // set.
     static SAID_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
@@ -333,6 +339,8 @@ pub const ASKS_ENVIRONMENT: &str = "LAMP_MADE_SKILL_ASKS";
 
 thread_local! {
     /// [`ASKS_ENVIRONMENT`] as a test of this thread sets it.
+    // Per-thread test override; production falls back to the environment when none is
+    // set.
     static ASKS_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
@@ -367,6 +375,8 @@ pub const OFF_SAID_ENVIRONMENT: &str = "LAMP_MADE_SKILL_OFF_SAID";
 
 thread_local! {
     /// [`OFF_SAID_ENVIRONMENT`] as a test of this thread sets it.
+    // Per-thread test override; production falls back to the environment when none is
+    // set.
     static OFF_SAID_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
@@ -403,6 +413,8 @@ pub const UNRELATED_ENVIRONMENT: &str = "LAMP_MADE_UNRELATED_REFUSED";
 
 thread_local! {
     /// [`UNRELATED_ENVIRONMENT`] as a test of this thread sets it.
+    // Per-thread test override; production falls back to the environment when none is
+    // set.
     static UNRELATED_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
@@ -424,6 +436,8 @@ pub fn set_unrelated_here(on: Option<bool>) {
 thread_local! {
     /// The lamp's language as a test of this thread sets it: `Some(true)`
     /// for English.
+    // Tests set this thread-local language override; unrelated_held reads it on the
+    // same thread and otherwise reads language::at_start.
     static ENGLISH_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
@@ -455,6 +469,8 @@ pub const REACTIONS_ENVIRONMENT: &str = "LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK";
 
 thread_local! {
     /// [`REACTIONS_ENVIRONMENT`] as a test of this thread sets it.
+    // Per-thread test override; production falls back to the environment when none is
+    // set.
     static REACTIONS_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
@@ -3402,6 +3418,8 @@ thread_local! {
     /// While [`keep_asked`] keeps a model's answer: whether its code is the
     /// lamp's own agent script alone ([`agent_script_only`]). None outside
     /// it, where a table alone is read as before.
+    // AgentScript sets and restores this execution thread's value; agent_task reads it
+    // on that thread. Other threads and processes have independent copies.
     static AGENT_SCRIPT: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
@@ -3424,6 +3442,8 @@ thread_local! {
     /// `skill_task_yes::gateway_net_on`): whether its own code may be
     /// granted `net`, as its script then reaches the public web from its
     /// own skill-start fence. Off everywhere else.
+    // NetCode sets and restores this execution thread's value; net_code_here reads it
+    // on that thread. Other threads and processes have independent copies.
     static NET_CODE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
@@ -10622,6 +10642,8 @@ fn loosened(
 ) -> Option<(String, Vec<String>)> {
     let began = Instant::now();
     let (name, marked) = card(card_text, "A skill made here.", Maker::of(from)).ok()?;
+    // Process-local sequence combined with the PID for temporary folder names; no
+    // cross-process counter is required.
     static LOOSENING: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let work = keeping.directory.join(format!(
         ".loosening-{}-{}",
@@ -10827,6 +10849,8 @@ pub(crate) struct ChangeOf {
 
 std::thread_local! {
     /// [`ChangeAs`]'s skill, while its make runs on this thread.
+    // ChangeAs sets and clears this execution thread's value; change_as reads it on
+    // that thread. Other threads and processes have independent copies.
     static CHANGE_AS: std::cell::RefCell<Option<ChangeOf>> = const { std::cell::RefCell::new(None) };
 }
 
@@ -11232,6 +11256,8 @@ fn packed_and_kept(
     // A folder of this call's own: two keeps at once in one process (two
     // readers of the same news, as #3662's test runs them) never share
     // its check's words.
+    // Process-local sequence combined with the PID for temporary folder names; no
+    // cross-process counter is required.
     static MAKING: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let work = keeping.directory.join(format!(
         ".making-{}-{}",
@@ -11436,6 +11462,10 @@ pub const TRIED_SAID: &str = "I tried it once and it worked.";
 /// What each made skill's passed try said first, by its package's
 /// SHA-256 (#8180): `Some` its words, `None` a try that said nothing
 /// usable. A made skill with nothing tried has no entry.
+// Ephemeral passed-trial words by package digest in this process. Immediate make
+// replies and same-worker deferred replies may use them; a new worker or evicted entry
+// uses the caller's explicit fallback. Raw trial words are not persisted or
+// transported by this map.
 static TRIED_FIRST: std::sync::Mutex<std::collections::BTreeMap<String, Option<String>>> =
     std::sync::Mutex::new(std::collections::BTreeMap::new());
 
@@ -12277,6 +12307,9 @@ const INDEX_LOCK: &str = ".made.lock";
 
 std::thread_local! {
     /// How deep this thread is in [`index_locked`].
+    // Each thread tracks its own index_locked nesting here. The parent and worker
+    // coordinate index writes through the file lock, not by sharing or copying this
+    // slot.
     static INDEX_HELD: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
 }
 

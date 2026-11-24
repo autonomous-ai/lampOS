@@ -153,6 +153,8 @@ impl Places {
 /// The voice's skills folder (`--skills-dir`, the voice's `settings.skills`),
 /// noted as the worker reads its flags: a route with no settings (the
 /// schedule's) still reads the same records ([`Places::product`]).
+// This worker records its tools directory while parsing its flags; its skill-
+// about lookup reads the local fallback path.
 static NOTED_TOOLS_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
 /// Note the voice's skills folder, once.

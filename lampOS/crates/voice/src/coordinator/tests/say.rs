@@ -882,6 +882,7 @@ fn sound_now(
     let snapshot = owner.snapshot(now()).unwrap();
     skill_sound_now(
         SoundGates {
+            cloud: &CloudAvailability::default(),
             at_us: monotonic_us(),
             paused: false,
             snapshot: &snapshot,
@@ -1181,12 +1182,20 @@ fn an_exact_line_waits_for_the_person_then_is_played_to_spoken() {
     assert_eq!(answered.try_recv(), Ok(Answer::Done(Outcome::Spoken)));
 }
 
-/// lamp-52e6, 10 Nov: a skill's exact ask played to `spoken` never reached
-/// the chat's history, so the next ask to unplug was answered from the
-/// model's own last words ("I'm preparing to fold") with no call. Once
-/// spoken, the line is the lamp's own in the next chat request's history.
+/// A spoken exact line contributes to the coordinator's conversation gates,
+/// independently of the worker mirror. This is not a worker-history assertion.
 #[test]
-fn an_exact_skill_line_said_is_in_the_next_chat_requests_history() {
+fn an_exact_skill_line_said_keeps_the_parent_conversation() {
+    if !parent_conversation_child(
+        "coordinator::tests::say::an_exact_skill_line_said_keeps_the_parent_conversation",
+    ) {
+        return;
+    }
+    exact_line_parent_conversation(false);
+    exact_line_parent_conversation(true);
+}
+
+fn exact_line_parent_conversation(retire_whole: bool) {
     let line = "My arm is folded. Shall I turn myself off now? Say yes, and I will.";
     let (mut says, answered) = crate::say::Says::words_for_test(
         "unplug",
@@ -1209,45 +1218,179 @@ fn an_exact_skill_line_said_is_in_the_next_chat_requests_history() {
     ));
     assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
     let mut played = play_sound(&mut owner, &mut reply, &mut pending, &mut trace, 2);
-    played
-        .peer
-        .control
-        .send(WorkerEvent::SpeechRetired {
-            owner: played.last.permit.owner(),
-            sequence: played.last.chunk_sequence,
-            final_sample: PlaybackCursor {
-                epoch: 1,
-                frame: played.cursor,
-            },
-            observed_at_us: monotonic_us(),
-        })
+    if retire_whole {
+        played
+            .peer
+            .control
+            .send(WorkerEvent::SpeechRetired {
+                owner: played.last.permit.owner(),
+                sequence: played.last.chunk_sequence,
+                final_sample: PlaybackCursor {
+                    epoch: 1,
+                    frame: played.cursor,
+                },
+                observed_at_us: monotonic_us(),
+            })
+            .unwrap();
+        service_speaker_control(
+            &mut played.speaker,
+            &mut owner,
+            &mut reply,
+            &mut pending,
+            &mut played.mask,
+            &mut played.snapshot,
+            &mut 0,
+            &mut 16,
+            &mut trace,
+            &mut None,
+        )
         .unwrap();
-    service_speaker_control(
-        &mut played.speaker,
-        &mut owner,
-        &mut reply,
-        &mut pending,
-        &mut played.mask,
-        &mut played.snapshot,
-        &mut 0,
-        &mut 16,
-        &mut trace,
-        &mut None,
-    )
-    .unwrap();
+    }
     let current = reply.as_mut().unwrap();
-    owner.complete_turn(now(), current.owner).unwrap();
+    if retire_whole {
+        owner.complete_turn(now(), current.owner).unwrap();
+    }
     let snapshot = owner.snapshot(now()).unwrap();
-    // The voice's thread is a global other tests write to, and their turns
-    // are numbered as this one is: a fresh thread just before, and the line
-    // looked for among the room's history, not as the whole of it.
     *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    let cloud = CloudAvailability::default();
+    assert!(!parent_conversation_going_on(
+        &cloud,
+        monotonic_us(),
+        Instant::now()
+    ));
     current.answer_say(&pending, snapshot);
-    let (_, history) = crate::second_provider::worker::thread_and_history(0, None, None, None);
+    if !retire_whole {
+        assert!(matches!(
+            answered.try_recv(),
+            Ok(Answer::Done(Outcome::Dropped(_)))
+        ));
+        assert!(!parent_conversation_going_on(
+            &cloud,
+            monotonic_us(),
+            Instant::now()
+        ));
+        assert!(!sound_now(&mut owner, &reply, &admission, &says).conversing);
+        return;
+    }
     assert_eq!(answered.try_recv(), Ok(Answer::Done(Outcome::Spoken)));
+    // Both production parent consumers use this helper; the sound consumer is
+    // exercised as well. An empty worker mirror cannot supply this evidence.
+    assert!(!conversation_going_on(&cloud, monotonic_us()));
+    assert!(parent_conversation_going_on(
+        &cloud,
+        monotonic_us(),
+        Instant::now()
+    ));
+    assert!(sound_now(&mut owner, &reply, &admission, &says).conversing);
+    let until = crate::thread::THREAD
+        .lock()
+        .unwrap()
+        .conversation_deadline()
+        .unwrap();
+    assert!(parent_conversation_going_on(&cloud, monotonic_us(), until));
+    assert!(!parent_conversation_going_on(
+        &cloud,
+        monotonic_us(),
+        until + Duration::from_nanos(1),
+    ));
+}
+
+/// These regressions need a fresh process, not a mutex other existing tests
+/// may bypass: production THREAD is shared by the whole test executable.
+fn parent_conversation_child(test: &str) -> bool {
+    const MODE: &str = "LAMP_TEST_PARENT_CONVERSATION";
+    if std::env::var(MODE).as_deref() == Ok(test) {
+        return true;
+    }
+    struct Reap(std::process::Child);
+    impl Drop for Reap {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+    let mut child = Reap(
+        std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", test, "--nocapture", "--test-threads=1"])
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin")
+            .env("TMPDIR", "/tmp")
+            .env(MODE, test)
+            .stdin(std::process::Stdio::null())
+            .spawn()
+            .unwrap(),
+    );
+    let until = Instant::now() + Duration::from_secs(10);
+    loop {
+        if let Some(status) = child.0.try_wait().unwrap() {
+            assert!(
+                status.success(),
+                "isolated parent conversation test failed: {status}"
+            );
+            return false;
+        }
+        assert!(
+            Instant::now() < until,
+            "isolated parent conversation test timed out"
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+#[test]
+fn parent_conversation_keeps_each_source_and_expires_them_independently() {
+    if !parent_conversation_child(
+        "coordinator::tests::say::parent_conversation_keeps_each_source_and_expires_them_independently",
+    ) {
+        return;
+    }
+    let now = Instant::now();
+    let local_until = now + crate::thread::GOING_ON_FOR;
+    let after_local = local_until + Duration::from_nanos(1);
+    let mut cloud = CloudAvailability::default();
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    assert!(!parent_conversation_going_on(&cloud, 100, now));
+    crate::thread::THREAD
+        .lock()
+        .unwrap()
+        .lamp(1, "Local exact line.", now);
+    assert!(parent_conversation_going_on(&cloud, 100, now));
+    assert!(parent_conversation_going_on(&cloud, 100, local_until));
+    assert!(!parent_conversation_going_on(&cloud, 100, after_local));
+    cloud
+        .conversation
+        .observe(
+            crate::provider_state::conversation::Snapshot {
+                observed_at_us: 100,
+                until_us: Some(200),
+            },
+            100,
+        )
+        .unwrap();
     assert!(
-        history.contains(&crate::second_provider::net::Message::assistant(line)),
-        "{history:?}"
+        parent_conversation_going_on(&cloud, 100, now),
+        "both active"
+    );
+    assert!(parent_conversation_going_on(&cloud, 201, now), "local only");
+    assert!(
+        parent_conversation_going_on(&cloud, 200, after_local),
+        "mirror deadline inclusive"
+    );
+    assert!(
+        !parent_conversation_going_on(&cloud, 201, after_local),
+        "both expired"
+    );
+    crate::thread::THREAD
+        .lock()
+        .unwrap()
+        .close_conversation(now);
+    assert!(
+        !parent_conversation_going_on(&cloud, 201, now),
+        "local close respected"
+    );
+    assert!(
+        parent_conversation_going_on(&cloud, 100, now),
+        "mirror independent of local close"
     );
 }
 

@@ -179,7 +179,11 @@ struct NoneFound {
 mod kept {
     use super::NoneFound;
     use std::sync::Mutex;
+    // Second worker-local recent make choice state, shared with its tool threads;
+    // parent app make state is separate.
     static NONE_FOUND: Mutex<Option<NoneFound>> = Mutex::new(None);
+    // Second worker-local recent make choice state, shared with its tool threads;
+    // parent app make state is separate.
     static LINE: Mutex<Option<(u64, String)>> = Mutex::new(None);
     pub fn none_found<R>(f: impl FnOnce(&mut Option<NoneFound>) -> R) -> R {
         f(&mut NONE_FOUND
@@ -197,7 +201,11 @@ mod kept {
     use super::NoneFound;
     use std::cell::RefCell;
     thread_local! {
+        // In tests, none_found gives its callback mutable access to this thread's
+        // result; the production mutex is a separate cfg branch.
         static NONE_FOUND: RefCell<Option<NoneFound>> = const { RefCell::new(None) };
+        // In tests, line gives its callback mutable access to this thread's line; the
+        // production mutex is a separate cfg branch.
         static LINE: RefCell<Option<(u64, String)>> = const { RefCell::new(None) };
     }
     pub fn none_found<R>(f: impl FnOnce(&mut Option<NoneFound>) -> R) -> R {

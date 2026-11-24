@@ -542,6 +542,8 @@ mod tests {
     #[test]
     fn a_face_added_again_under_the_same_name_is_asked_again() {
         use std::sync::atomic::{AtomicBool, Ordering};
+        // The test resets this process-global flag; its fake-eyes callbacks read and
+        // update the same value across threads.
         static ASKED_IN_EYES: AtomicBool = AtomicBool::new(false);
         let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
         ASKED_IN_EYES.store(false, Ordering::SeqCst);

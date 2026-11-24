@@ -502,18 +502,24 @@ pub const SESSION_PERSON_ENVIRONMENT: &str = "LAMP_SESSION_PERSON";
 /// Whether the service's environment says `LAMP_CARRIED_JOURNAL=on`, read
 /// once.
 pub fn carried_journal_on() -> bool {
+    // This worker's cached journal policy, read by its scoped output-retention
+    // path; another process initializes its own copy.
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| std::env::var(CARRIED_JOURNAL_ENVIRONMENT).ok().as_deref() == Some("on"))
 }
 
 /// Requests whose carried line was journalled as their person's since the
 /// worker started ([`keep_out_scoped`]), for the journal's count.
+// Diagnostic count for this worker's retained carried lines; only its
+// output-retention path updates and journals it.
 static CARRIED_JOURNALLED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// The last request whose carried line was journalled as its person's
 /// ([`keep_out_scoped`]), so its journal line prints once per request, not
 /// once per output event (#7814: one carried answer printed it 49 times in
 /// 0.75 s). `u64::MAX` before the first.
+// Last request counted by this worker's output-retention path; deduplicates
+// that worker's journal line only.
 static CARRIED_JOURNALLED_LAST: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(u64::MAX);
 
@@ -1005,6 +1011,9 @@ async fn ask_summary(chat: &crate::second_provider::net::Chat, input: &str) -> O
 
 /// The status the person's own DeepSeek key was last refused with, 0 while
 /// it never was in this run (#2094): what `voice-keys` tells lamp-health.
+// The second worker's fallback callback writes this status and its health
+// thread reads it. The parent publishes stopping separately; probes have
+// their own copy.
 static OWN_KEY_REFUSED: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
 
 /// The health part that says whether the person's own key still works.
@@ -7222,9 +7231,13 @@ pub(crate) fn policy_verdicts(
 }
 
 /// Whether spoken turns are offered `heard_my_name` (`LAMP_NAME_SIGNAL=on`).
+// Enabled when this worker adds the name-signal tool; its first-answer-audio
+// callback reads the flag for local timing logs.
 static NAME_SIGNAL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// The request whose model said last that it heard its name, and when, by
 /// this process's clock.
+// This worker's name-tool call records the request and time; its first-audio
+// callback reads the matching pair.
 static NAMED: Mutex<Option<(u64, u64)>> = Mutex::new(None);
 
 /// `declare`'s functions and `heard_my_name` (`LAMP_NAME_SIGNAL=on`), whose
@@ -7770,6 +7783,8 @@ pub(crate) mod two_faces_diagnostic {
     // Only a weak lookup lives in TLS. The log belongs to the non-Send Scope,
     // not to a global collector, and other threads cannot see that observer.
     thread_local! {
+        // Test begin installs this thread's observer and Drop restores it; observer
+        // reads only the calling thread's slot.
         static OBSERVER: RefCell<Option<Weak<RefCell<Records>>>> = const { RefCell::new(None) };
     }
 
@@ -15071,6 +15086,8 @@ pub(crate) fn thread_and_history(
 /// thread text of the same request
 /// ([`crate::thread::Thread::recall_for_leaving_out`]), so each recent
 /// exchange reaches the model once, not twice.
+// Set from this worker's environment during startup and read by its history
+// builders; it is not initialized by coordinator state.
 pub(crate) static HISTORY_SAID_ONCE: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
@@ -15081,6 +15098,8 @@ pub(crate) static HISTORY_SAID_ONCE: std::sync::atomic::AtomicBool =
 /// with them) of a turn told that note, so the same talk is not told
 /// twice. A turn told no note, or a note of another lineage, is told
 /// every exchange as before.
+// This worker initializes the flag at startup; its history builders read it
+// when excluding exchanges already held by the running note.
 pub(crate) static HISTORY_AFTER_NOTE: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
@@ -15088,6 +15107,8 @@ pub(crate) static HISTORY_AFTER_NOTE: std::sync::atomic::AtomicBool =
 /// starts ([`serve`]): a person's turn is also given the room's exchanges of
 /// the same conversation, marked as the room's
 /// ([`crate::thread::Thread::recent_with_room_lines`]).
+// This worker initializes the room-history flag; its scoped history builders
+// consume the local value.
 pub(crate) static ROOM_LINES_TOLD: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
@@ -15406,6 +15427,8 @@ fn messages_told(exchange: crate::thread::Recent, keeps_calls: bool) -> Vec<Mess
 /// `volume_down` call, 4 of 14 action lines, and nothing changed; the
 /// history the model copied showed every earlier action as an ask answered
 /// in words only.
+// Set during this worker's startup and read when its saved exchanges become
+// chat messages; other processes have independent history configuration.
 pub(crate) static HISTORY_KEEPS_CALLS: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
@@ -15804,6 +15827,7 @@ pub async fn run(
     // for credit or a full socket.
     let mut retained: Option<ProviderInput> = None;
     let mut pending: Option<ProviderOutput> = None;
+    let mut state = crate::provider_state::Source::default();
     // The answer's sound as it goes out, for when the lamp has finished
     // saying it (`AnswerSound::ends`).
     let mut answer_sound = AnswerSound::default();
@@ -15986,9 +16010,19 @@ pub async fn run(
         if gate.holds(monotonic_us(), &mut engine) {
             continue;
         }
+        // Shared-clock sampling first keeps cross-clock skew conservative.
+        let observed_at_us = monotonic_us();
+        state.publish(
+            &mut gate.flow,
+            &mut channels.data,
+            Instant::now(),
+            observed_at_us,
+        )?;
         if let Some(event) = pending.take()
             && !gate.send_or_discard(&engine, monotonic_us(), &event, |event| {
-                channels.data.send(event)
+                channels.data.send(event)?;
+                state.output_sent(event);
+                Ok(())
             })?
         {
             pending = Some(event);

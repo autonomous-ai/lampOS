@@ -84,6 +84,8 @@ mod kept {
     use super::Plans;
     use std::sync::{LazyLock, Mutex};
 
+    // This service-tool worker keeps its contact selection plans; later
+    // fill/send calls in the same worker consult them.
     static PLANS: LazyLock<Mutex<Plans>> = LazyLock::new(Mutex::default);
 
     pub fn plans<R>(f: impl FnOnce(&mut Plans) -> R) -> R {
@@ -93,6 +95,8 @@ mod kept {
     }
 
     pub fn on() -> bool {
+        // Each process initializes this feature cache from its own
+        // environment; contact-tool guards read the local value.
         static ON: LazyLock<bool> =
             LazyLock::new(|| std::env::var(super::ENVIRONMENT).as_deref() == Ok("on"));
         *ON
@@ -118,11 +122,19 @@ mod kept {
     };
 
     thread_local! {
+        // Test callers read and update this thread's plans through kept::plans; other
+        // test threads have separate values.
         static PLANS: RefCell<Plans> = RefCell::default();
+        // Test on_for_test writes this thread's switch; kept::on reads it on the same
+        // thread.
         pub static ON: Cell<bool> = const { Cell::new(false) };
         /// The memory's contacts: (person, folded name) to (name, address).
+        // The contact test fixtures and kept::exchange read and update this thread's
+        // fake memory; other test threads have separate values.
         pub static MEMORY: RefCell<BTreeMap<(String, String), (String, String)>> =
             const { RefCell::new(BTreeMap::new()) };
+        // Contact tests set this thread's failure flag; kept::exchange reads it on the
+        // same thread.
         pub static DOWN: Cell<bool> = const { Cell::new(false) };
     }
 

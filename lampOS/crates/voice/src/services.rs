@@ -491,8 +491,12 @@ mod kept {
     use super::Pending;
     use std::{collections::VecDeque, sync::Mutex};
     /// The one write waiting for its "send", for both voice routes.
+    // This service-tool worker owns its pending write; its read-back,
+    // confirmation and cancellation paths share the local wait.
     static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
     /// The newest requests a read answered in.
+    // This worker records the requests answered by a service read; its later
+    // service checks consult the same local request history.
     static READ_IN: Mutex<VecDeque<u64>> = Mutex::new(VecDeque::new());
     pub fn pending<R>(f: impl FnOnce(&mut Option<Pending>) -> R) -> R {
         f(&mut PENDING
@@ -513,7 +517,11 @@ mod kept {
     use super::Pending;
     use std::{cell::RefCell, collections::VecDeque};
     thread_local! {
+        // Test callers read and update this thread's pending requests through
+        // kept::pending; other test threads have separate values.
         static PENDING: RefCell<Option<Pending>> = const { RefCell::new(None) };
+        // Test callers read and update this thread's reads through kept::read_in;
+        // other test threads have separate values.
         static READ_IN: RefCell<VecDeque<u64>> = const { RefCell::new(VecDeque::new()) };
     }
     pub fn pending<R>(f: impl FnOnce(&mut Option<Pending>) -> R) -> R {
@@ -1805,6 +1813,8 @@ pub(crate) fn alone_in(faces: Option<usize>, held: bool) -> bool {
 
 #[cfg(test)]
 thread_local! {
+    // Test set_alone_for_test and test cases write this thread's override; owner_alone
+    // reads it on the same thread.
     static ALONE_FOR_TEST: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
@@ -2085,10 +2095,13 @@ pub enum VoiceAsk {
 pub type VoiceJudge = std::sync::Arc<dyn Fn(VoiceAsk) -> Option<f32> + Send + Sync>;
 
 #[cfg(not(test))]
+// The second worker installs its voice judge once; its service admission reads
+// that callback. Live has its own unset copy.
 static JUDGE: std::sync::OnceLock<VoiceJudge> = std::sync::OnceLock::new();
 
 #[cfg(test)]
 thread_local! {
+    // In tests, judging_voices installs and judge reads this thread's own judge.
     static JUDGE: std::cell::RefCell<Option<VoiceJudge>> = const { std::cell::RefCell::new(None) };
 }
 

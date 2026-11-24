@@ -82,6 +82,8 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicBool, Ordering};
 
+    // The owner-alone test writes this process-global flag; its alone callback reads
+    // the same value.
     static ALONE: AtomicBool = AtomicBool::new(true);
 
     fn alone() -> bool {

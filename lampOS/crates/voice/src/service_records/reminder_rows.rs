@@ -107,6 +107,8 @@ mod kept {
     use std::collections::VecDeque;
     use std::sync::{LazyLock, Mutex};
 
+    // This worker tracks reminder hand-overs and updates them from received
+    // reminder receipts; serve delivers receipts as worker input.
     static FOLLOWED: Mutex<VecDeque<Followed>> = Mutex::new(VecDeque::new());
 
     pub fn followed<R>(f: impl FnOnce(&mut VecDeque<Followed>) -> R) -> R {
@@ -116,6 +118,8 @@ mod kept {
     }
 
     pub fn on() -> bool {
+        // Each process initializes the reminder-record switch from its own
+        // environment; serve and worker callers read independent copies.
         static ON: LazyLock<bool> =
             LazyLock::new(|| std::env::var(super::ENVIRONMENT).as_deref() == Ok("on"));
         *ON
@@ -130,7 +134,11 @@ mod kept {
     use std::collections::VecDeque;
 
     thread_local! {
+        // Test callers read and update this thread's rows through kept::followed;
+        // other test threads have separate values.
         static FOLLOWED: RefCell<VecDeque<Followed>> = RefCell::default();
+        // Test on_for_test writes this thread's switch; kept::on reads it on the same
+        // thread.
         pub static ON: Cell<bool> = const { Cell::new(false) };
     }
 

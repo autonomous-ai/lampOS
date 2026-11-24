@@ -110,6 +110,8 @@ pub struct Turned {
 }
 
 /// The newest turn-on in place of a make.
+// Second worker-local recent make choice state, shared with its tool threads; parent
+// app make state is separate.
 static TURNED: Mutex<Option<Turned>> = Mutex::new(None);
 
 fn slot(turned: &Mutex<Option<Turned>>) -> std::sync::MutexGuard<'_, Option<Turned>> {

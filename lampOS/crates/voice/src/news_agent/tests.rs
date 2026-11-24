@@ -76,6 +76,8 @@ impl Drop for Dir {
 }
 
 fn dir() -> Dir {
+    // Test dir reads and increments this shared test-process counter; calls on
+    // different threads use the same value.
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let path = PathBuf::from(format!(
         "/tmp/na{}-{}",

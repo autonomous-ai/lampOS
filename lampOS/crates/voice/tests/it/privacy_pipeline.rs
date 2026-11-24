@@ -33,6 +33,8 @@ const START: u64 = 1_000_000;
 const FRESH_US: u64 = lamp_msgs::MICROPHONE_PRIVACY_FRESH_US;
 
 thread_local! {
+    // The scenario thread sets this clock through advance; its simulated
+    // controls, capture, and privacy checks read it through now or clock.
     static TIME: Cell<u64> = const { Cell::new(START) };
 }
 

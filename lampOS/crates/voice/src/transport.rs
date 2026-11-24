@@ -551,6 +551,8 @@ fn say(line: String) {
 
 #[cfg(test)]
 thread_local! {
+    // Test say appends to and said takes this thread's lines; other test threads have
+    // separate values.
     static SAID: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 

@@ -68,6 +68,8 @@ pub fn armed() -> bool {
 }
 
 #[cfg(test)]
+// The serialized coordinator test writes this shared test-process override through
+// force_for_test; armed reads it on the coordinator loop thread.
 static FORCED: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
 /// The loop reads the switch as `on` (`Some`) until it is called again with
@@ -85,6 +87,8 @@ pub(crate) fn force_for_test(on: Option<bool>) {
     );
 }
 
+// The parent coordinator allowed path reads and sets this process-local once-only
+// journal flag; other processes have independent copies.
 static SAID_OFF: AtomicBool = AtomicBool::new(false);
 
 /// The language a turn's start asked for, if the switch lets it through:

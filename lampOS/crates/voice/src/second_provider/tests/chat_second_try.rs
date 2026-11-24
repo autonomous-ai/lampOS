@@ -54,6 +54,8 @@ impl Server {
         let connections: Arc<AtomicUsize> = Arc::default();
         let let_go: Arc<AtomicUsize> = Arc::default();
         let plan = Arc::new(plan);
+        // Test saying reads and increments this shared test-process counter; calls on
+        // different threads use the same value.
         static NEXT_KEY: AtomicUsize = AtomicUsize::new(0);
         let key = format!(
             "second-try-{}-{}",

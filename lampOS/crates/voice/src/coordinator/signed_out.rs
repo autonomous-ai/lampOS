@@ -45,6 +45,8 @@ type ForTest = Option<fn(u64) -> AccountState>;
 
 #[cfg(test)]
 thread_local! {
+    // Test-thread sign-in fixture: set_for_test writes it; switched_on and read
+    // consult the calling thread's state.
     static FOR_TEST: std::cell::Cell<ForTest> = const { std::cell::Cell::new(None) };
 }
 

@@ -14,6 +14,8 @@ pub const FACE_BYTES: usize = 128;
 pub const NOT_SEEN: &str = "I could not be sure which face said that request, so I have not remembered anyone. They should look at me and say their name again.";
 
 worker_global! {
+    // This worker advances the epoch on forget; request guards retain its atomic for
+    // checks by that worker's transport threads.
     fn epoch() -> AtomicU64 = AtomicU64::new(0);
 }
 

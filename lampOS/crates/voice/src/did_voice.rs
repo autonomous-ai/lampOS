@@ -79,7 +79,11 @@ pub fn did(moment: Moment, at_us: u64) -> LampDid {
     }
 }
 
+// Coordinator-local voice moment publisher state; consumers receive lamp/did bus
+// messages.
 static LET_GO: AtomicU64 = AtomicU64::new(0);
+// Coordinator-local voice moment publisher state; consumers receive lamp/did bus
+// messages.
 static OUT: OnceLock<Option<mpsc::SyncSender<Moment>>> = OnceLock::new();
 
 /// How many dids were let go: no room, or more than one in [`EVERY`].

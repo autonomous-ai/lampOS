@@ -123,6 +123,8 @@ pub struct LineSeen {
 /// before its call reads it (El on #3038).
 const MOST_LINES_SEEN: usize = 64;
 
+// The second worker records line/enrollment evidence here; its enrollment
+// checks and cancellation paths share the same local queue.
 static LINES_SEEN: Mutex<VecDeque<LineSeen>> = Mutex::new(VecDeque::new());
 
 /// Keeps what the eyes saw saying a line, for its calls ([`line_seen`]).

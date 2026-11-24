@@ -59,6 +59,8 @@ const LOOK: Duration = Duration::from_millis(20);
 const WRITE_WITHIN: Duration = Duration::from_millis(200);
 
 /// Whether [`ENVIRONMENT`] was `on` when the service started.
+// Serve sets this flag when starting the say service; its client admission
+// reads the local stream switch.
 static ON: AtomicBool = AtomicBool::new(false);
 
 /// The service started with the switch `on` or not.
@@ -75,6 +77,8 @@ pub fn on() -> bool {
 pub const LONG_FORM_ENVIRONMENT: &str = "LAMP_STREAM_SPEECH_LEVEL";
 
 /// Whether [`LONG_FORM_ENVIRONMENT`] was `on` when the service started.
+// Serve initializes this flag for the say service; stream handling in that
+// process reads the long-form bound switch.
 static LONG_FORM: AtomicBool = AtomicBool::new(false);
 
 /// The service started with the long-form switch `on` or not.
@@ -92,6 +96,8 @@ pub fn long_form_on() -> bool {
 pub const GAIN_ENVIRONMENT: &str = "LAMP_LONG_FORM_GAIN";
 
 /// Whether [`GAIN_ENVIRONMENT`] was `on` when the service started.
+// Serve initializes this flag for the say service; stream handling in that
+// process reads the long-form gain switch.
 static GAIN: AtomicBool = AtomicBool::new(false);
 
 /// The service started with the gain switch `on` or not.
@@ -322,8 +328,12 @@ fn bus() -> io::Result<Bus> {
 /// A test's bus for [`bus`], and the lock that gives the one stream the lamp
 /// takes to one test at a time.
 #[cfg(test)]
+// The say test installs and clears this shared test-process bus; speaker_stream::bus
+// reads the same value for its stream.
 pub(crate) static TEST_BUS: std::sync::Mutex<Option<Bus>> = std::sync::Mutex::new(None);
 #[cfg(test)]
+// Stream tests acquire and release this shared test-process mutex around their stream
+// fixtures.
 pub(crate) static ONE_AT_A_TIME: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// [`hold`], with the way to the bus given and how often the counts are said.

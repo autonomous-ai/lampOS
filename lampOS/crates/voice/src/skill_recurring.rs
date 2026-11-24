@@ -21,6 +21,7 @@ pub const ENVIRONMENT: &str = "LAMP_SKILL_RECURRING_TOLD";
 
 #[cfg(test)]
 thread_local! {
+    // Test set_on_here writes this thread's override; on reads it on the same thread.
     static HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 

@@ -606,6 +606,8 @@ fn minute_words(minute: i64) -> String {
 /// or the zone `/etc/timezone` names. Opened at its first use, and at each
 /// later one until it opens; nothing while neither can be read.
 pub fn system() -> Option<&'static lamp_local_time::LocalTime> {
+    // Serve and worker callers independently cache the system time zone after
+    // a successful read; local time formatting uses that copy.
     static SYSTEM: std::sync::OnceLock<lamp_local_time::LocalTime> = std::sync::OnceLock::new();
     if let Some(zone) = SYSTEM.get() {
         return Some(zone);

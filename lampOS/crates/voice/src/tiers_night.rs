@@ -100,10 +100,18 @@ pub const MOST_REPLY_BYTES: usize = 32 * 1024;
 /// How often a call in flight looks whether it must stop.
 const STOP_CHECK: Duration = Duration::from_millis(20);
 
+// Serve startup enables this flag; its activity/privacy callbacks and night
+// thread read the local value.
 static ON: AtomicBool = AtomicBool::new(false);
 /// Speech, a line, or the slide closing: each moves it on.
+// Serve activity/privacy callbacks advance this counter; the night thread
+// checks it to stop work after an interruption.
 static STIRS: AtomicU64 = AtomicU64::new(0);
+// Serve activity callbacks update the timestamp; its night thread reads it to
+// measure the current quiet interval.
 static LAST_STIR_US: AtomicU64 = AtomicU64::new(0);
+// Serve privacy callbacks record when access opened; its night thread reads
+// the timestamp before taking work.
 static OPEN_AT_US: AtomicU64 = AtomicU64::new(0);
 
 /// Someone spoke, or a line was handed on: the night stops at once and

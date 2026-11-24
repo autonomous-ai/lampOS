@@ -31,6 +31,8 @@ use std::{
 
 /// Only the exact value `on`, with the Days memory.
 pub const ENVIRONMENT: &str = "LAMP_MEMORY_EARLY_WORDS";
+// Each provider caches its own switch; Live face tracking and each provider's
+// Days startup read their process's value.
 static ON: OnceLock<bool> = OnceLock::new();
 
 /// Whether the room's early words may follow a lone face once known.

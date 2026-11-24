@@ -576,6 +576,12 @@ impl Route {
                 break;
             };
             self.flow.received()?;
+            if matches!(
+                event,
+                ProviderOutput::ConversationState { .. } | ProviderOutput::MachineNames { .. }
+            ) {
+                self.cloud.observe_state(&event, monotonic_us())?;
+            }
             if let ProviderOutput::Ended {
                 reason,
                 fault,

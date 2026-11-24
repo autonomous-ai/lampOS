@@ -96,6 +96,8 @@ pub struct Bus(pub Option<lamp_bus::Bus>);
 /// A bus of a test's own, in place of the lamp's, for the worker's tests
 /// that run the call through its loop.
 #[cfg(test)]
+// Held-consent tests install and clear this shared test-process path; of_the_lamp
+// reads it for their worker fixture.
 pub(crate) static TEST_ROOT: std::sync::Mutex<Option<std::path::PathBuf>> =
     std::sync::Mutex::new(None);
 

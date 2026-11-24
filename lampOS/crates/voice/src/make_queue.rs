@@ -178,6 +178,8 @@ impl Queue {
 mod kept {
     use super::Queue;
     use std::sync::Mutex;
+    // Second worker-local make queue and start guard; persisted queue records are an
+    // explicit restart boundary.
     static QUEUE: Mutex<Queue> = Mutex::new(Queue::EMPTY);
     pub fn queue<R>(f: impl FnOnce(&mut Queue) -> R) -> R {
         f(&mut QUEUE
@@ -192,6 +194,8 @@ mod kept {
     use super::Queue;
     use std::cell::RefCell;
     thread_local! {
+        // In tests, queue gives its callback mutable access to this thread's queue;
+        // the production mutex is a separate cfg branch.
         static QUEUE: RefCell<Queue> = const { RefCell::new(Queue::EMPTY) };
     }
     pub fn queue<R>(f: impl FnOnce(&mut Queue) -> R) -> R {
@@ -695,6 +699,8 @@ pub fn ready_within(ready: impl Fn() -> bool, within: Duration, every: Duration)
 /// [`step`], the dropped told by `say`, the labels kept, and the next make
 /// given to `run`. Started once.
 pub fn start(run: fn(Entry), say: fn(String)) {
+    // Second worker-local make queue and start guard; persisted queue records are an
+    // explicit restart boundary.
     static STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
     if !on() || STARTED.swap(true, std::sync::atomic::Ordering::AcqRel) {
         return;

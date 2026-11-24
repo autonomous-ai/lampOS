@@ -240,6 +240,8 @@ pub fn ask_sentence(said: &str, named: bool) -> Option<usize> {
 /// `second_provider::answer` knows it), newest last, at most
 /// [`NAMED_KEPT`], by their words: [`force`] sees only the messages
 /// (#8022 case 2).
+// The Second worker records lines through heard_named; its named and force checks read
+// the same process-local collection.
 static NAMED: std::sync::Mutex<std::collections::VecDeque<String>> =
     std::sync::Mutex::new(std::collections::VecDeque::new());
 const NAMED_KEPT: usize = 16;

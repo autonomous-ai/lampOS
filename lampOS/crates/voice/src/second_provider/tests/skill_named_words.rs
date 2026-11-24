@@ -424,6 +424,8 @@ fn asks_folder() -> std::path::PathBuf {
 
 /// [`asks_folder`]'s two skills with `asks` as their ask phrases.
 fn asks_folder_with(asks: Value) -> std::path::PathBuf {
+    // Test asks_folder_with reads and increments this shared test-process counter;
+    // calls on different threads use the same value.
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let base = if std::path::Path::new("/private/tmp").is_dir() {
         std::path::PathBuf::from("/private/tmp")
@@ -658,6 +660,8 @@ fn ordinary_speech_given_as_asks_goes_to_the_model() {
         "remind me in ten minutes",
         "stop it",
     ];
+    // Test ordinary_speech_given_as_asks_goes_to_the_model reads and increments this
+    // shared test-process counter; calls on different threads use the same value.
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let base = if std::path::Path::new("/private/tmp").is_dir() {
         std::path::PathBuf::from("/private/tmp")

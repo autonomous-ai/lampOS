@@ -53,7 +53,11 @@ pub fn on() -> bool {
 
 #[cfg(test)]
 thread_local! {
+    // The alone fixture sets and clears this test-thread switch; on reads that
+    // thread's override.
     static ON_FOR_TEST: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+    // The alone fixture sets and clears this test-thread owner list; owners reads that
+    // thread's override.
     static OWNERS_FOR_TEST: std::cell::RefCell<Option<Vec<String>>> = const { std::cell::RefCell::new(None) };
 }
 
@@ -178,6 +182,8 @@ impl Apps for AppCaller {
 }
 
 /// The apps the second route asks, set once by its worker.
+// The Second worker installs this app caller once in start; its tool-answer paths
+// retrieve the same process-local caller.
 static APPS: OnceLock<Arc<dyn Apps>> = OnceLock::new();
 
 /// The worker's apps, with the switch on and a bus: set once a process.
@@ -204,6 +210,8 @@ fn apps() -> Option<Arc<dyn Apps>> {
 
 #[cfg(test)]
 thread_local! {
+    // The alone fixture installs and clears this test-thread caller slot; apps
+    // retrieves its stored Arc on the calling thread.
     static APPS_FOR_TEST: std::cell::RefCell<Option<Arc<dyn Apps>>> = const { std::cell::RefCell::new(None) };
 }
 
@@ -249,8 +257,12 @@ const CALLED_KEPT: usize = 4_096;
 /// This process's start, in ms: the first part of each call's id. Taken
 /// when the worker starts the app tools ([`start`]), not at the first call
 /// (the Reviewer-lead's P3 2 on #8449).
+// The Second worker forces this process-local clock value in start; its app calls read
+// it when forming their identifiers.
 static BOOT_MS: std::sync::LazyLock<u64> = std::sync::LazyLock::new(now_ms);
 
+// Second worker declaration and answer paths update this state through with_state;
+// later checks read the same process-local state.
 static STATE: std::sync::LazyLock<Mutex<State>> = std::sync::LazyLock::new(Mutex::default);
 
 fn with_state<T>(f: impl FnOnce(&mut State) -> T) -> Option<T> {
@@ -263,6 +275,8 @@ fn with_state<T>(f: impl FnOnce(&mut State) -> T) -> Option<T> {
 
 #[cfg(test)]
 thread_local! {
+    // The alone fixture installs and clears this test-thread state slot; with_state
+    // retrieves its Arc and locks the referenced state.
     static STATE_FOR_TEST: std::cell::RefCell<Option<Arc<Mutex<State>>>> = const { std::cell::RefCell::new(None) };
 }
 

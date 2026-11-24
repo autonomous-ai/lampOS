@@ -76,6 +76,8 @@ mod switch {
     use std::sync::LazyLock;
 
     pub fn on() -> bool {
+        // Each process caches the source-tool switch from its own environment;
+        // local tool declaration and admission read it.
         static ON: LazyLock<bool> =
             LazyLock::new(|| std::env::var(super::ENVIRONMENT).as_deref() == Ok("on"));
         *ON
@@ -87,6 +89,8 @@ mod switch {
     use std::cell::Cell;
 
     thread_local! {
+        // Test on_for_test writes this thread's switch; switch::on reads it on the
+        // same thread.
         pub static ON: Cell<bool> = const { Cell::new(false) };
     }
 
@@ -191,6 +195,8 @@ impl Turn {
 #[cfg(not(test))]
 fn with_turn<R>(f: impl FnOnce(&mut Turn) -> R) -> R {
     use std::sync::{LazyLock, Mutex};
+    // Source-tool calls in this worker share the per-request call budget; a
+    // new request ID resets the local counter.
     static TURN: LazyLock<Mutex<Turn>> = LazyLock::new(Mutex::default);
     f(&mut TURN.lock().unwrap_or_else(|poisoned| poisoned.into_inner()))
 }
@@ -199,6 +205,8 @@ fn with_turn<R>(f: impl FnOnce(&mut Turn) -> R) -> R {
 fn with_turn<R>(f: impl FnOnce(&mut Turn) -> R) -> R {
     use std::cell::RefCell;
     thread_local! {
+        // Test with_turn callers read and update this thread's turn; other test
+        // threads have separate values.
         static TURN: RefCell<Turn> = RefCell::default();
     }
     TURN.with(|turn| f(&mut turn.borrow_mut()))

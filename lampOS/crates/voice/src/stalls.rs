@@ -53,6 +53,8 @@ const SAMPLES: usize = 100;
 /// Recorders whose loop has ended, still writing: waited for once, at the
 /// end of `main` ([`finish_all`]), after every device is closed, never in a
 /// loop's own way out.
+// Each process's stall recorders enqueue their writer handles here on drop;
+// finish_all joins only that process's queued threads.
 static ENDED: std::sync::Mutex<Vec<JoinHandle<()>>> = std::sync::Mutex::new(Vec::new());
 
 /// Wait, at most `longest`, for every ended loop's recorder to write what it

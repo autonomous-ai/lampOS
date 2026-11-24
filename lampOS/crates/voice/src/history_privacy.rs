@@ -16,6 +16,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 /// Open until this monotonic time (µs); 0: closed.
+// The Second worker process owns this deadline: its history-privacy thread updates it
+// from privacy bus leases, and its history send/forget paths read it.
 static OPEN_UNTIL_US: AtomicU64 = AtomicU64::new(0);
 /// The lease's bus subscriber name.
 const SUBSCRIBER: &str = "history_privacy";
@@ -51,6 +53,8 @@ pub fn close() {
 
 /// The lease read from the bus at `root` on a thread of its own, once.
 pub fn start(root: &Path) {
+    // The Second worker uses this process-local guard for one privacy-reader start
+    // attempt; later start calls return without spawning again.
     static STARTED: OnceLock<()> = OnceLock::new();
     if STARTED.set(()).is_err() {
         return;

@@ -1480,20 +1480,26 @@ pub fn own_words(note: &str) -> Option<&str> {
 /// Whether the walk is under way, as the coordinator last read it
 /// ([`Onboarding::under_way`]).
 #[cfg(not(test))]
+// Serve updates the walk state; the second worker receives WalkUnderWay and
+// updates its separate local copy.
 static UNDER_WAY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 // Per test thread, so a test's walk never reaches another test's replies.
 #[cfg(test)]
 thread_local! {
+    // In tests, set_under_way writes and under_way_now reads this thread's own value.
     static UNDER_WAY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// The first update's waiting line, in the owner's language, while it
 /// holds the walk ([`FIRST_UPDATE_WAIT_LINE`]); none otherwise.
 #[cfg(not(test))]
+// Serve keeps the update-wait line and sends it in WalkUnderWay; the second
+// worker uses its received copy for replies.
 static UPDATING: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 // Per test thread, as `UNDER_WAY`.
 #[cfg(test)]
 thread_local! {
+    // In tests, set_updating writes and updating_line reads this thread's own value.
     static UPDATING: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
 }
 
@@ -6439,6 +6445,8 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
 /// while the runner keeps the order it loaded; pass the runner's order to the
 /// worker if that drift matters.
 pub(crate) fn installed_order() -> Option<&'static [Step]> {
+    // This worker loads its installed onboarding order once; its tool and onboarding
+    // paths read the cached order.
     static ORDER: std::sync::OnceLock<Option<Vec<Step>>> = std::sync::OnceLock::new();
     ORDER
         .get_or_init(|| {

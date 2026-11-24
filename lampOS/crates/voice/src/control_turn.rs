@@ -68,6 +68,8 @@ pub const NEWER_TURN: &str = "a newer turn of its computer's";
 
 /// Turn ids, unique for the voice's life, so an id from an earlier
 /// conversation never names a later turn.
+// Serve allocates IDs here when opening or prompting control turns; the
+// sequence is local to that process lifetime.
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 #[cfg(test)]

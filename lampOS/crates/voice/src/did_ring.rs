@@ -98,7 +98,11 @@ impl Episode {
     }
 }
 
+// Local publisher queue and drop count for this rendering process; lamp/did is the
+// cross-process boundary.
 static LET_GO: AtomicU64 = AtomicU64::new(0);
+// Local publisher queue and drop count for this rendering process; lamp/did is the
+// cross-process boundary.
 static OUT: OnceLock<Option<mpsc::SyncSender<Face>>> = OnceLock::new();
 
 /// How many dids were let go: no room, or more than one in [`EVERY`].

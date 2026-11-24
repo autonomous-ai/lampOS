@@ -190,6 +190,8 @@ pub const ENVIRONMENT: &str = "LAMP_SAY";
 /// refused with why otherwise.
 pub const ADDON_SAY_ENVIRONMENT: &str = "LAMP_ADDON_SAY";
 /// Whether [`ADDON_SAY_ENVIRONMENT`] was `on` when the service started.
+// Serve reads this switch when starting its say service; that service's client
+// threads check it when admitting quoted speech.
 static ADDON_SAY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// A dev lamp's switch, off unless `on`: a skill's sound is not held to
 /// one in [`SOUND_EVERY_US`], so a demo can sound as often as it asks; every
@@ -197,6 +199,8 @@ static ADDON_SAY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool:
 /// rarely.
 pub const EVERY_SOUND_ENVIRONMENT: &str = "LAMP_VOICE_EVERY_SOUND";
 /// Whether [`EVERY_SOUND_ENVIRONMENT`] was `on` when the service started.
+// Serve initializes this sound-admission switch; may_play_sound reads it in
+// the same say-service process.
 static EVERY_SOUND: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// An add-on's quoted line, at most, as its folder holds it.
 pub const MOST_QUOTED_BYTES: usize = 300;
@@ -1872,6 +1876,8 @@ pub struct Says {
 /// The say service bound at the voice's start, while no run holds it: the
 /// socket stays through the privacy wait, and each ask is refused there at
 /// once ([`Says::refuse_parked`]), never left unanswered (#3697).
+// Serve startup and ending runs park the service here; serve's next run takes
+// it, and its privacy wait rejects queued asks locally.
 static PARKED: std::sync::Mutex<Option<Says>> = std::sync::Mutex::new(None);
 
 fn parked() -> std::sync::MutexGuard<'static, Option<Says>> {

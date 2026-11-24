@@ -39,7 +39,11 @@ struct State {
 }
 
 thread_local! {
+    // The test thread's Scope and clock helpers update this state; its clock readers
+    // use the same thread-local slot.
     static ACTIVE: RefCell<Option<State>> = const { RefCell::new(None) };
+    // Test Scope::enter_at reads and increments this thread's scope ID counter; other
+    // threads have independent counters.
     static NEXT_ID: Cell<u64> = const { Cell::new(1) };
 }
 

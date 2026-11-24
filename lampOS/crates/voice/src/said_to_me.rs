@@ -102,6 +102,8 @@ pub fn on() -> bool {
 }
 
 thread_local! {
+    // The judging thread sets and restores this value around awaiting_yes;
+    // synchronous judge calls on that same thread read it.
     static YES_AWAITED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 

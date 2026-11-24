@@ -115,6 +115,9 @@ mod linked_switch {
     use std::sync::LazyLock;
 
     pub fn on() -> bool {
+        // Each worker caches the linked-record switch from its own
+        // environment; its note and recall builders combine it with the main
+        // record switches.
         static ON: LazyLock<bool> =
             LazyLock::new(|| std::env::var(super::LINKED_ENVIRONMENT).as_deref() == Ok("on"));
         *ON
@@ -126,6 +129,8 @@ mod linked_switch {
     use std::cell::Cell;
 
     thread_local! {
+        // Test linked_on_for_test writes this thread's switch; linked_switch::on reads
+        // it on the same thread.
         pub static ON: Cell<bool> = const { Cell::new(false) };
     }
 
@@ -195,6 +200,9 @@ mod switch {
     use std::sync::LazyLock;
 
     pub fn on() -> bool {
+        // Each worker caches the main records-told switch from its own
+        // environment; its service-record notes and memory recall use the
+        // local value.
         static ON: LazyLock<bool> =
             LazyLock::new(|| std::env::var(super::ENVIRONMENT).as_deref() == Ok("on"));
         *ON
@@ -206,6 +214,8 @@ mod switch {
     use std::cell::Cell;
 
     thread_local! {
+        // Test on_for_test writes this thread's switch; switch::on reads it on the
+        // same thread.
         pub static ON: Cell<bool> = const { Cell::new(false) };
     }
 
@@ -885,6 +895,8 @@ pub fn load_ahead(person: &str) {
         collections::HashSet,
         sync::{LazyLock, Mutex},
     };
+    // This worker deduplicates record load-ahead requests by person; its
+    // loader threads remove failed requests so local callers can retry.
     static ASKED: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Mutex::default);
     let Ok(mut asked) = ASKED.lock() else {
         return;

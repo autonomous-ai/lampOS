@@ -12,6 +12,8 @@ use std::{
 };
 
 const AT: u64 = 10_000_000;
+// Test new reads and increments this shared test-process counter; calls on different
+// threads use the same value.
 static NEXT: AtomicU64 = AtomicU64::new(0);
 
 struct Test {

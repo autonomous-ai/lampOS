@@ -186,6 +186,8 @@ mod kept {
     use super::Kept;
     use std::sync::{LazyLock, Mutex};
 
+    // Service-call process-local pending rows/outbox; background threads persist or
+    // pull through explicit service calls.
     static KEPT: LazyLock<Mutex<Kept>> = LazyLock::new(Mutex::default);
 
     pub fn kept<R>(f: impl FnOnce(&mut Kept) -> R) -> R {
@@ -193,6 +195,7 @@ mod kept {
     }
 
     pub fn on() -> bool {
+        // Immutable configuration cached independently per process.
         static ON: LazyLock<bool> =
             LazyLock::new(|| std::env::var(super::ENVIRONMENT).as_deref() == Ok("on"));
         *ON
@@ -206,7 +209,11 @@ mod kept {
     use std::cell::{Cell, RefCell};
 
     thread_local! {
+        // Test callers read and update this thread's rows through kept::kept; other
+        // test threads have separate values.
         static KEPT: RefCell<Kept> = RefCell::default();
+        // Test on_for_test writes this thread's switch; kept::on reads it on the same
+        // thread.
         pub static ON: Cell<bool> = const { Cell::new(false) };
     }
 
@@ -593,6 +600,8 @@ fn put_all(changes: Vec<Linked>) {
 /// pulling every [`PULL_EVERY`] while one is [`wanted`].
 #[cfg(not(test))]
 fn start_puller() {
+    // read_back attempts to start the puller once in its calling process; this guard
+    // is independent in other processes.
     static STARTED: std::sync::Once = std::sync::Once::new();
     STARTED.call_once(|| {
         let spawned = std::thread::Builder::new()

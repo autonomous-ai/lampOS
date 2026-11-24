@@ -3,6 +3,8 @@ use std::fs as stdfs;
 
 #[cfg(target_os = "linux")]
 thread_local! {
+    // Test enter installs this thread's fixture root and Drop clears it; fixture_root
+    // reads the same thread-local slot.
     static FIXTURE_ROOT: std::cell::RefCell<Option<(PathBuf, File)>> = const {
         std::cell::RefCell::new(None)
     };
@@ -186,6 +188,8 @@ mod linux {
     use std::fs::{OpenOptions, Permissions};
     use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
     use std::sync::atomic::{AtomicU64, Ordering};
+    // Test under reads and increments this shared test-process counter; calls on
+    // different threads use the same value.
     static NEXT: AtomicU64 = AtomicU64::new(0);
     struct Fixture {
         root: PathBuf,

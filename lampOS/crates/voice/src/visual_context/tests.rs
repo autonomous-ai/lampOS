@@ -8,6 +8,8 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
+// Test new reads and increments this shared test-process counter; calls on different
+// threads use the same value.
 static NEXT: AtomicU64 = AtomicU64::new(0);
 fn boot(n: u8) -> BootId {
     BootId::new([n; 16]).unwrap()

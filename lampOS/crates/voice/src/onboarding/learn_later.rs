@@ -94,6 +94,8 @@ pub const DECLINED: &str = "not_telling_their_name";
 /// The second route's note on the turn after the ask ([`answering`]).
 pub(crate) const ANSWER_NOTE: &str = "You just asked them \"What should I call you?\" Judge what they meant. If they told you their name, call remember_my_face with it. If they made clear they would rather not say, or not be asked, call not_telling_their_name and say only that that's fine, in a few words. Otherwise answer what they said as usual.";
 
+// Second worker-local pending learn-later ask, consumed by its answer; tests use a
+// separate value per thread.
 worker_global! {
     /// What the second route was told of the ask: when its turn began,
     /// taken by the first answer to it. The process's own; a test thread's

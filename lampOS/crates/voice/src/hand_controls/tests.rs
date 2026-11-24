@@ -11,6 +11,8 @@ const START: u64 = 1_000_000;
 struct Directory(PathBuf);
 impl Directory {
     fn new() -> Self {
+        // Fixture constructors increment this process-wide counter for their names;
+        // parallel test threads share the sequence.
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let path = PathBuf::from(format!(
             "/tmp/lamp-hand-{}-{}",

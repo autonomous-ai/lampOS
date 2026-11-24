@@ -346,6 +346,8 @@ impl Watches {
 }
 
 /// The process's watches: the tool takes them, the watcher thread reads them.
+// This worker's watch tools and watcher thread share the registry; restart
+// recovery loads watches from the saved file.
 pub static WATCHES: Mutex<Watches> = Mutex::new(Watches {
     list: Vec::new(),
     present: false,
@@ -360,6 +362,8 @@ pub const FILE: &str = "/run/lampos-voice/watches.json";
 
 /// A test's own file: a test never writes under `/run`.
 #[cfg(test)]
+// Watch tests install and clear this shared test-process path; file reads that same
+// value.
 static FILE_AT: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 #[cfg(not(test))]
@@ -374,6 +378,9 @@ fn file() -> Option<PathBuf> {
 
 /// Writes happen one at a time, each from the list as it is when its turn
 /// comes: the file is never older than a later write.
+// Serializes this worker's watch-file writes and forget removal. Other worker
+// processes have separate mutexes; persistence crosses restarts through the
+// file.
 static SAVING: Mutex<()> = Mutex::new(());
 
 /// Writes the watches as they are now. A failure is one journal line: the
@@ -664,6 +671,8 @@ fn started() -> bool {
 /// person (`watch` answers an error) rather than taking a watch nothing
 /// would tell.
 pub fn ensure_started() -> bool {
+    // Records whether this process started its watcher; later local calls
+    // reuse that result, and restored watches come from the file.
     static STARTED: OnceLock<bool> = OnceLock::new();
     *STARTED.get_or_init(|| {
         let started = Bus::from_environment().and_then(|bus| {

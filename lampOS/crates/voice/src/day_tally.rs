@@ -240,11 +240,17 @@ impl Pending {
     }
 }
 
+// Counters are local to each process; flush adds them to the shared tally under the
+// file lock.
 static PENDING: OnceLock<Mutex<Pending>> = OnceLock::new();
 /// Whether counting has begun, for [`heard`]: read where sound is sent to
 /// be heard, so that path takes no lock.
+// Each process updates this flag while starting its tally worker; that process's heard
+// path reads it before counting samples.
 static COUNTING: AtomicBool = AtomicBool::new(false);
 /// Samples of sound sent to be heard and not yet in [`Pending`].
+// Counters are local to each process; flush adds them to the shared tally under the
+// file lock.
 static HEARD_SAMPLES: AtomicU64 = AtomicU64::new(0);
 /// The sound sent to be heard is 16 kHz: this many samples a millisecond.
 const SAMPLES_A_MS: u64 = 16;

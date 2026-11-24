@@ -25,6 +25,8 @@ pub(crate) const FINISH_WAIT: Duration = Duration::from_millis(500);
 
 #[cfg(test)]
 thread_local! {
+    // Test small_segments sets and restores this thread's limit; open reads it on the
+    // same thread.
     static TEST_SEGMENT_BYTES: std::cell::Cell<u64> = const { std::cell::Cell::new(SEGMENT_BYTES) };
 }
 /// Exercise the actual startup and writer with small rolling files. This

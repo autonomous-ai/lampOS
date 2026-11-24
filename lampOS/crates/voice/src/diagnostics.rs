@@ -1286,6 +1286,8 @@ mod tests {
         sync::{Condvar, Mutex},
         time::Instant,
     };
+    // Fixture constructors increment this process-wide counter for their names;
+    // parallel test threads share the sequence.
     static NEXT: AtomicU64 = AtomicU64::new(0);
     struct Private(PathBuf);
     impl Private {

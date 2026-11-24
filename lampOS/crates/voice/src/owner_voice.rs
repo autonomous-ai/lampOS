@@ -693,6 +693,8 @@ fn mean(lines: &[Line]) -> Option<Vec<f32>> {
 mod kept {
     use super::State;
     use std::sync::Mutex;
+    // The second worker owns this enrollment state; its confirmation callbacks
+    // and sign-out watcher share the same process-local holder.
     static STATE: Mutex<Option<State>> = Mutex::new(None);
     pub fn state<R>(f: impl FnOnce(&mut Option<State>) -> R) -> R {
         f(&mut STATE
@@ -707,6 +709,8 @@ mod kept {
     use super::State;
     use std::cell::RefCell;
     thread_local! {
+        // Test callers read and update this thread's state through kept::state; other
+        // test threads have separate values.
         static STATE: RefCell<Option<State>> = const { RefCell::new(None) };
     }
     pub fn state<R>(f: impl FnOnce(&mut Option<State>) -> R) -> R {

@@ -79,6 +79,8 @@ async fn run_all(
     cut_ask: Option<(usize, bool)>,
     heed: Option<Heed>,
 ) -> Ran {
+    // Test run_all reads and increments this shared test-process counter; calls on
+    // different threads use the same value.
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     // Request numbers of their own: lines seen are the process's.
     let first = 19_000 + 100 * NEXT.fetch_add(1, Ordering::Relaxed);

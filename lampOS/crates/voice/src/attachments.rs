@@ -67,11 +67,15 @@ pub(crate) struct Inbox {
     pub(crate) last_line: Option<Instant>,
 }
 
+// Second worker listener and carried share this process-local inbox; memory-tool
+// forget clears the inbox in its calling process.
 static INBOX: Mutex<Inbox> = Mutex::new(Inbox {
     arrived: None,
     last_line: None,
 });
 /// The listener's bus, for the faces in view as a line begins.
+// The Second worker attachment listener installs this bus; carried reads it in the
+// same process to inspect faces.
 static BUS: Mutex<Option<lamp_bus::Bus>> = Mutex::new(None);
 
 fn inbox() -> MutexGuard<'static, Inbox> {
@@ -242,6 +246,8 @@ pub fn start(bus_root: &Path) {
     if !on() {
         return;
     }
+    // The Second worker uses this process-local guard for one attachment-listener
+    // start attempt; later calls do not spawn another listener.
     static STARTED: std::sync::Once = std::sync::Once::new();
     let root = bus_root.to_owned();
     STARTED.call_once(move || {

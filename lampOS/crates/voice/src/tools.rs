@@ -133,6 +133,8 @@ const MAX_ANSWER_BYTES: u64 = 8_192;
 /// mouth seen speaking (the memory owner, 16:49 on #5385: "tạm thời chưa
 /// cho xóa nếu ko detect đc mở miệng"), so nothing is forgotten and the
 /// lamp asks them to look at it ([`ONE_FACE_JUST_KEPT`]).
+// This worker's tool calls keep and consume request/session-scoped face-keep
+// evidence; another worker has a separate bounded list.
 static ONE_FACE_KEPT: std::sync::Mutex<Vec<(crate::memory_scope::RequestKey, String, Instant)>> =
     std::sync::Mutex::new(Vec::new());
 const ONE_FACE_KEPT_SESSIONS: usize = 4;
@@ -856,6 +858,8 @@ pub fn fit_within(
 // ponytail: one process-wide last cut; a cut that changes and changes
 // back is said again, which is then a start of its own.
 fn said_cut(left: &[String], bound: usize) -> Option<String> {
+    // This worker's tool-fitting path reads and replaces its last reported cut; other
+    // workers keep independent lists.
     static LAST: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
     let mut last = LAST.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     if left.is_empty() || *last == left {
@@ -1491,6 +1495,8 @@ pub fn keeps_out(route: &Route, name: &str) -> bool {
 /// the second route, a `remember` that kept nothing gives its line back to
 /// the journal ([`keep_back_if_kept_nothing`]).
 pub const REFUSED_KEEP_ENVIRONMENT: &str = "LAMP_REFUSED_KEEP_KEEPS_EXCHANGE";
+// Each worker caches this switch from its own environment; its memory tool
+// handling reads the local value.
 static REFUSED_KEEP_ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 
 #[cfg(test)]

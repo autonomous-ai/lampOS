@@ -12,21 +12,20 @@
 compile_error!(
     "the memory probe (--cfg lamp_memory_probe) is for tests and the memory benchmark only, never an optimised build"
 );
-/// A process-wide value the provider worker keeps, read through `$name()`.
+/// Storage for each `worker_global!` expansion, read through `$name()`.
 ///
-/// In the service it is one static: the provider worker is one process.
-/// Under test it is one per test thread (#882): many workers run in one
-/// test process, each numbering its requests from 1, and one shared value
-/// let one test's worker change what another test's worker reads. Each
-/// worker test runs on its own thread (`#[tokio::test]` is current-thread)
-/// and the worker reads and writes these only on its task.
-// ponytail: keyed by thread, not by worker; a test that drives a worker
-// from a multi-thread runtime needs the value passed to the worker instead.
+/// Non-test builds use one static per expansion in each process. Test
+/// builds select one leaked value per calling thread (#882); repeated
+/// accessor calls on that thread return the same reference. Worker instances
+/// driven on one thread use the same slot. Each invocation's own note
+/// identifies its runtime writers and readers.
 macro_rules! worker_global {
     ($(#[$meta:meta])* $vis:vis fn $name:ident() -> $ty:ty = $init:expr;) => {
         $(#[$meta])*
         #[cfg(not(test))]
         $vis fn $name() -> &'static $ty {
+            // This template expands to one process-local value; its accessor
+            // returns the same reference to callers in that process.
             static VALUE: $ty = $init;
             &VALUE
         }
@@ -34,6 +33,9 @@ macro_rules! worker_global {
         #[cfg(test)]
         $vis fn $name() -> &'static $ty {
             thread_local! {
+                // This template gives each calling thread one leaked value per
+                // expansion; repeated accessor calls on that thread return the
+                // same reference.
                 static VALUE: &'static $ty = Box::leak(Box::new($init));
             }
             VALUE.with(|value| *value)
@@ -187,6 +189,7 @@ pub mod privacy_indicator;
 pub mod process;
 pub(crate) mod provider_flow;
 pub mod provider_link;
+pub mod provider_state;
 pub mod provider_worker;
 pub mod quiet_pace;
 pub mod reference;

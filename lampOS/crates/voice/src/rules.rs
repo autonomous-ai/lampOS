@@ -56,7 +56,11 @@ const QUIET_MORNINGS: &str = "[quiet_mornings] ";
 /// after any of the two above: `[unprompted <about> <limit>...] `.
 const TYPED: &str = "[unprompted ";
 
+// Memory startup sets this provider's switch; its local rule tools and
+// publication guards read it.
 static ON: OnceLock<bool> = OnceLock::new();
+// Provider startup records its bus root here; its local rule publisher reads
+// the path before writing facts to the bus.
 static BUS: OnceLock<PathBuf> = OnceLock::new();
 
 pub fn from_environment() -> bool {
@@ -865,7 +869,11 @@ pub fn publish_first(facts: &lamp_msgs::Rules) {
 }
 
 /// The newest fact not yet said, and the publisher thread's wake-up.
+// Rule calls in this provider replace the queued fact; its local publisher
+// thread takes the latest fact from this slot.
 static WAITING: Mutex<Option<lamp_msgs::Rules>> = Mutex::new(None);
+// This provider's first rule publication creates the sender and local
+// publisher thread; later publications wake that same thread.
 static WAKE: OnceLock<SyncSender<()>> = OnceLock::new();
 
 fn publisher(root: &Path, woken: &Receiver<()>) {
@@ -909,6 +917,8 @@ fn publisher(root: &Path, woken: &Receiver<()>) {
 
 /// How many facts the publisher thread has handled, published or not: what
 /// a test waits on instead of the clock.
+// This provider's publisher thread advances the count and notifies waiters;
+// only test helpers read or wait on the count.
 static HANDLED: (Mutex<u64>, Condvar) = (Mutex::new(0), Condvar::new());
 
 #[cfg(test)]
@@ -1449,6 +1459,8 @@ mod tests {
 
     /// What the publisher thread waits on while a test stands for a bus
     /// whose file work hangs (a declaration FIFO nobody writes, on the lamp).
+    // The test holds this shared test-process mutex; the publisher thread reads it by
+    // waiting for the lock.
     pub(super) static STALL: Mutex<()> = Mutex::new(());
 
     /// The only test that names a bus: [`BUS`] is set once per process.

@@ -40,6 +40,8 @@ pub fn on_from_environment() -> bool {
 
 #[cfg(test)]
 thread_local! {
+    // Test-thread override: set_for_test writes it and on_from_environment reads the
+    // calling thread's value.
     static ON_FOR_TEST: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 

@@ -958,6 +958,8 @@ mod tests {
                 })
             }
         }
+        // This test increments its process-local counter for fixture names; the static
+        // persists for the test executable's lifetime.
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let root = std::env::temp_dir().join(format!(
             "lvm-phone-{}-{}",

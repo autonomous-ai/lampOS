@@ -49,6 +49,8 @@ pub(crate) fn start_offline() -> bool {
 
 #[cfg(test)]
 thread_local! {
+    // Test set_start_offline_for_test writes this thread's override; start_offline
+    // reads it on the same thread.
     static START_OFFLINE_FOR_TEST: std::cell::Cell<Option<bool>> =
         const { std::cell::Cell::new(None) };
 }

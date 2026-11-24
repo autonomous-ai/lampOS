@@ -209,19 +209,33 @@ impl Default for Summaries {
 }
 
 /// This process's notes.
+// Process-local summaries and summary result counters; a parent copy is not the
+// worker's history or summary store.
 static SUMMARIES: Mutex<Summaries> = Mutex::new(Summaries::new());
 /// The summary's own thread, once it has a model ([`summarize_with`]).
+// The second worker installs this queue for its local summary thread; turn
+// completion and its memory writer enqueue work through it.
 static QUEUE_TO: OnceLock<Queue> = OnceLock::new();
 /// Notes the model gave nothing for, or nothing in time.
+// Process-local summaries and summary result counters; a parent copy is not the
+// worker's history or summary store.
 pub static FAILED: AtomicU64 = AtomicU64::new(0);
 /// Notes the model gave empty.
+// Process-local summaries and summary result counters; a parent copy is not the
+// worker's history or summary store.
 pub static EMPTY: AtomicU64 = AtomicU64::new(0);
 /// Jobs dropped with the queue full.
+// Summary producers in this worker increment this local count when its turn,
+// end, or fold queue rejects work.
 pub static DROPPED: AtomicU64 = AtomicU64::new(0);
 
 /// Talk notes kept at a conversation's end, and those not kept: the store
 /// refused, or a forget came first.
+// This worker's summary thread increments the local total after keeping a
+// conversation-end note.
 pub static TALK_KEPT: AtomicU64 = AtomicU64::new(0);
+// This worker's summary producers and writer count end notes rejected by the
+// queue, invalidated, or not kept by the store.
 pub static TALK_NOT_KEPT: AtomicU64 = AtomicU64::new(0);
 
 struct Job {

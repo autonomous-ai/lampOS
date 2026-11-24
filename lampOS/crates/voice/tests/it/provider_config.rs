@@ -10,6 +10,8 @@ use std::{
 };
 
 const MARKER: &str = "TEST-ONLY-PROVIDER-CONFIG-CREDENTIAL";
+// Configuration fixtures share this test-process counter; Private::new
+// consumes each increment in its directory name.
 static NEXT: AtomicU64 = AtomicU64::new(0);
 struct Private {
     root: PathBuf,

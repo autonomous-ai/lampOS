@@ -87,8 +87,10 @@ pub(super) fn cancelled_output(event: &ProviderOutput, through: Option<u64>) -> 
         | ProviderOutput::InputDiscarded { request, .. } => Some(*request),
         ProviderOutput::Transcript { request, .. }
         | ProviderOutput::OwnershipAssumed { request, .. } => *request,
-        // Times only, for the records: never anything to schedule.
-        ProviderOutput::Ready { .. }
+        // Worker state and times: never request-owned output to schedule.
+        ProviderOutput::ConversationState { .. }
+        | ProviderOutput::MachineNames { .. }
+        | ProviderOutput::Ready { .. }
         | ProviderOutput::Ended { .. }
         // A run made: kept whatever became of its turn (#7363).
         | ProviderOutput::MadeRunNow { .. }

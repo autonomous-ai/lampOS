@@ -25,6 +25,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+// Fixture constructors share this test-process counter; Private::new uses each
+// increment in its directory name before any worker is started.
 static NEXT: AtomicU64 = AtomicU64::new(0);
 const AT: u64 = 10_000_000;
 fn time(at: u64) -> MonoTime {

@@ -30,6 +30,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// How many times this process has made its publishers. A mute ends the
 /// conversation and the next one makes them again, with every sequence
 /// counting from 1 once more (#7955).
+// Local sequence for expression outputs created in this process; it is not a worker
+// lifecycle counter.
 static STARTS: AtomicU64 = AtomicU64::new(0);
 
 /// The session the `n`th publishers of this process say: the first the

@@ -38,6 +38,8 @@ use std::{
 
 /// Only the exact value `on`, with the Days memory.
 pub const ENVIRONMENT: &str = "LAMP_MEMORY_FOLLOWS_FACE";
+// Each provider initializes its own switch; second-worker line tracking and
+// each local Days writer read their own process's value.
 static ON: OnceLock<bool> = OnceLock::new();
 
 /// Whether the caller's own early lines may follow their face once known.
@@ -151,6 +153,8 @@ pub fn mark(request: u64, print: Option<Vec<f32>>, faces: Vec<String>) {
 pub static FORGETS: AtomicU64 = AtomicU64::new(0);
 
 /// The eyes' known file, read for whose face is known now.
+// Worker-local location of the known-face file; current face data is read through that
+// file.
 static KNOWN: OnceLock<std::path::PathBuf> = OnceLock::new();
 
 /// Read the eyes' known file at `known`, with its face beside it; the first
@@ -235,6 +239,8 @@ pub const PRINT_WAIT: Duration = Duration::from_secs(3);
 pub const PRINT_POLL: Duration = Duration::from_millis(100);
 
 type Fill = Box<dyn Fn(u64) -> bool + Send + Sync>;
+// The second worker installs this callback; its local Days writer calls it to
+// fill the worker's retained line prints.
 static FILL: OnceLock<Fill> = OnceLock::new();
 
 /// The second route's `fill`: puts the prints come since into
