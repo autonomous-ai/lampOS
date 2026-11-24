@@ -47,7 +47,7 @@ says otherwise, this is what runs.
 - **The voice's route is the second one** (`lamp-voice.service`,
   `LAMP_VOICE_ROUTE=second`): `lamp-voice serve` starts `lamp-voice worker
   second`, which hears with Deepgram, replies with DeepSeek through the
-  relay (a person's own key only with `LAMP_OWN_KEYS`, off in the product,
+  relay (a person's own key only with `LAMP_OWN_KEYS`, on in the product since #8367,
   [own-keys.md](own-keys.md)) and speaks with
   ElevenLabs `eleven_v4_turbo`. Gemini Live is the other route
   (`LAMP_VOICE_ROUTE=gemini`), not the product's.
