@@ -24,6 +24,13 @@ lệ, khi Controls được bật và đầu vào GPIO hợp lệ.
 | Vẫn giữ ở mốc 10 giây | Chưa thực hiện khi còn giữ; tắt tiếng khi thả | Một yêu cầu tắt đèn tại mẫu GPIO đang nhấn, mới và hợp lệ đầu tiên ở hoặc sau mốc 10 giây |
 | Giữ lâu hơn hoặc thả sau khi đã yêu cầu | Tắt tiếng khi thả | Không gửi lần hai; giữ tiếp không hủy yêu cầu đã gửi |
 
+Sau khi một lần nhấn mới hợp lệ đạt 5 giây, nút chính không còn thao tác hủy:
+thả trước 10 giây sẽ yêu cầu tắt đèn, còn giữ đến 10 giây sẽ yêu cầu ngay khi
+vẫn giữ. Giữ quá 15 giây không còn hủy yêu cầu. Vì vậy, một vật đè nút sau
+khởi động, khi nút đã được cho phép, có thể tắt đèn ở 10 giây, một lần cho
+lần nhấn đó. Nếu vật vẫn đè khi khởi động lại, quy tắc từ chối nút bị giữ từ
+lúc khởi động ngăn yêu cầu mới cho đến khi nút được thả để cho phép lại.
+
 Một nhịp bộ định thời không thể kéo dài tuổi của mẫu cũ để kích hoạt tắt đèn.
 Controls kiểm tra đồng hồ, phiên, số thứ tự, độ mới và toàn bộ mẫu GPIO trước
 khi hành động. Hàng đợi yêu cầu có giới hạn 64 mục (`MAX_PENDING_EVENTS`).
@@ -39,7 +46,9 @@ không làm lần nhấn đó thử lại. Muốn thử lại phải thả và n
 Một lần nhấn reset hợp lệ, đã được cho phép sau khi quan sát mức thả, được
 ưu tiên khi trùng với nút chính. Nó chặn toàn bộ lần nhấn nút chính đó và
 xóa cả yêu cầu còn trong hàng đợi, chưa được gửi. Thả reset trước không cho
-phép lại lần giữ nút chính đang chồng lấp. Đầu vào reset bị kẹt ở mức nhấn
+phép lại lần giữ nút chính đang chồng lấp. Controls ghi nhật ký hủy một lần
+cho mỗi lần nhấn và bỏ `held_us` của lần nhấn đó; hổ phách tắt và không bật
+lại sau khi thả reset. Đầu vào reset bị kẹt ở mức nhấn
 từ lúc khởi động và bị từ chối vì chưa được cho phép không vô hiệu hóa nút
 chính đang hoạt động tốt. Reset xuất hiện sau đó không thu hồi được yêu cầu
 đã gửi lên bus.
@@ -64,8 +73,10 @@ Từ 5 giây, vòng đèn hiển thị màu hổ phách liên tục (`SetupLook:
 không kênh màu nào vượt 24) khi nút chính còn được giữ, kể cả sau 10 hoặc
 15 giây. Cảnh báo dùng `held_us` còn mới từ `controls/touch_state` và vẫn
 chịu quyền điều khiển đầu ra hiện có của vòng đèn; cảnh báo reset màu đỏ được
-ưu tiên. Thả nút, trạng thái thiếu hoặc quá cũ, hay mất quyền điều khiển đầu
-ra sẽ bỏ cảnh báo tương ứng.
+ưu tiên. Lần nhấn nút chính đã bị reset hủy không còn cảnh báo theo thời gian
+giữ. Khi đóng thanh trượt riêng tư vật lý, không có hổ phách: khung đèn lúc
+nghỉ yêu cầu micrô được cho phép. Thả nút, trạng thái thiếu hoặc quá cũ, hay
+mất quyền điều khiển đầu ra sẽ bỏ cảnh báo tương ứng.
 
 Màu hổ phách chỉ báo đang giữ nút, không xác nhận Setup đã nhận tắt đèn.
 Màu xanh lá không phải tín hiệu xác nhận nút: chỉ sau khi trình tự tắt xác
@@ -150,8 +161,13 @@ nghỉ và dừng dịch vụ vẫn là các phần riêng của quá trình t�
 Kiểm tra thiết bị được cho phép còn phải ghi nhận chuyển mức GPIO99 thật,
 hổ phách khi còn giữ, một yêu cầu khoảng 10 giây trước khi thả và không có
 yêu cầu thứ hai từ cùng lần nhấn sau khi thả hoặc bị từ chối. Phải kiểm tra
-các thao tác ngắn, reset chồng lấp, lần nhấn mới sau đó, và từ chối khi khóa
-cập nhật vẫn bị giữ mà không dừng dịch vụ hay nhả mô-men. Cần xác nhận thứ
+các thao tác ngắn, reset chồng lấp, hổ phách đã hủy không bật lại sau khi thả
+reset, và lần nhấn mới sau đó. Kiểm tra khi đóng thanh trượt riêng tư (không
+có hổ phách). Khi khóa cập nhật vẫn bị giữ, hổ phách có thể còn sáng lúc giữ
+nút nhưng runner phải từ chối mà không gây tác động tắt đèn. Đo từ mốc 10
+giây đến tiếng nói hoặc chuyển động đầu tiên; vòng đèn không đổi ở 10 giây,
+nên đó là dấu hiệu đầu tiên cho người dùng biết quá trình tắt đã bắt đầu.
+Cần xác nhận thứ
 tự nghỉ/dừng/nhả mô-men, chỉ xanh sau khi nhả thành công, và lần khởi động
 tiếp theo không sửa hệ thống tệp. Việc LED hoặc servo còn điện sau khi bo
 mạch tắt phải được quan sát trực tiếp. Chưa khẳng định kết quả thiết bị,

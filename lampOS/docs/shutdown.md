@@ -121,6 +121,13 @@ acquisition, with Controls enabled and its GPIO input valid:
 | Still held at 10 s | no held action; software mute on release | one shutdown request on the first fresh accepted active GPIO sample at or after 10 s |
 | Held longer or released after that request | software mute on release | no second request; continuing to hold does not cancel a request already sent |
 
+There is no primary-button cancellation gesture once a fresh contact reaches
+5 s: releasing before 10 s asks for shutdown, and holding to 10 s asks while
+held. Holding past 15 s no longer cancels it. An object that presses the button
+after startup, once the button has armed, can therefore turn the lamp off at
+10 s, once for that contact. If it is still pressed at the next boot, the
+startup-held refusal prevents another request until a release re-arms it.
+
 The timer alone cannot extend an old sample into a shutdown. Controls checks
 clock, session, sequence, freshness and the complete GPIO acquisition before
 acting. The pending shutdown queue is bounded to 64 entries
@@ -135,7 +142,8 @@ A valid, armed reset contact takes precedence over an overlapping primary
 contact. It inhibits that entire primary contact and removes any still-queued
 shutdown request for it, including one queued at the threshold but not yet
 published. Releasing reset first does not re-enable the overlapping primary
-hold. A reset input stuck active at boot and refused as unarmed does not
+hold. Controls logs the cancellation once per contact and omits that contact's
+`held_us`, so amber stops and stays off after reset is released. A reset input stuck active at boot and refused as unarmed does not
 disable an otherwise healthy primary button. An already published request
 cannot be recalled by a later reset overlap.
 
@@ -159,8 +167,11 @@ output field, not a new field on `controls/touch` or a new bus message type.
 From 5 s, the ring shows steady amber (`SetupLook::Failed`, no channel over
 24) while the primary remains held, including after 10 s and beyond 15 s.
 It reads fresh `held_us` from `controls/touch_state` under the ring's existing
-authority; reset red has priority. Release, stale/missing state or revoked
-output authority removes the corresponding warning. Amber is a hold warning,
+authority; reset red has priority. A reset-cancelled primary contact has no
+held-duration warning. With the physical privacy slide closed, there is no
+amber: the ring's resting frame requires the microphone to be permitted.
+Release, stale/missing state or revoked output authority removes the
+corresponding warning. Amber is a hold warning,
 not confirmation that Setup accepted shutdown. Green is never a button
 acknowledgement: only the runner's successful measured let-go permits the
 safe-to-unplug green frame.
@@ -234,8 +245,12 @@ speech bound, rest and service-stop work remain separate parts of shutdown.
 An authorized lamp row must show the actual GPIO99 transition, amber while
 held, one request at about 10 s before release, and no second attempt from
 that contact after release or refusal. Verify the ordinary shorter gestures,
-reset overlap and a fresh subsequent press; under an update, the shared runner
-must refuse while its lock remains held, with no shutdown effects. Verify the
+reset overlap and a fresh subsequent press, including cancelled amber staying
+off after reset release. Include the privacy slide closed (no amber). Under an
+update, amber can remain while the primary stays held, but the shared runner
+must refuse while its lock remains held, with no shutdown effects. Measure
+10 s threshold → first sound or movement; the ring does not change at 10 s,
+so this is the person's first sign that shutdown began. Verify the
 rest/stop/torque-off order, green only after confirmed let-go, and a clean next
 boot with no filesystem repair. Whether LEDs or servos retain power after the
 board powers off must be observed, not inferred. No current lamp, acoustic,

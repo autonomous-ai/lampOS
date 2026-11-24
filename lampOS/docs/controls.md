@@ -111,6 +111,8 @@ of the lamp's current state or of an action applied.
 For the primary button, a released level must first arm a new contact. A valid
 armed reset overlap inhibits that primary contact, including a queued but
 undelivered shutdown request, and stays inhibited after reset is released.
+The cancellation is journalled once per contact; its primary `held_us` is
+omitted so amber stops and does not return when reset is released.
 A boot-stuck refused reset input does not inhibit a healthy primary contact.
 GPIO faults or stale input clear the bounded shutdown queue (64 entries); a
 strip-only fault leaves healthy GPIO independent. A timer tick alone cannot

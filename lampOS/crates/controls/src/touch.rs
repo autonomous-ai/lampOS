@@ -1345,6 +1345,12 @@ impl TouchEngine {
     }
     fn inhibit_primary_shutdown(&mut self) {
         if let Some(contact) = self.primary.contact {
+            if self.shutdown && self.shutdown_inhibited_contact != Some(contact.id) {
+                eprintln!(
+                    "lamp-controls: primary contact {} shutdown hold cancelled by reset overlap",
+                    contact.id
+                );
+            }
             self.shutdown_inhibited_contact = Some(contact.id);
             // Several acquisitions can be drained before tick publishes. A
             // later reset overlap must remove an undelivered threshold ask.
@@ -1494,6 +1500,15 @@ impl TouchEngine {
             if state.armed && state.active == Some(true) {
                 state.held_us = state.observed_us.map(|at| at - contact.began);
             }
+        }
+        if source == TouchSource::Primary
+            && self.shutdown
+            && state.contact_id.is_some()
+            && state.contact_id == self.shutdown_inhibited_contact
+        {
+            // The contact remains physically held, but cannot request shutdown;
+            // its duration must not keep the ring's amber warning alive.
+            state.held_us = None;
         }
         if source == TouchSource::Head {
             // Through a pulse's short gap too; nothing for a pushed head.

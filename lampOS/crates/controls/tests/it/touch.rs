@@ -1478,6 +1478,85 @@ fn reset_overlap_inhibits_the_whole_primary_contact_but_not_the_next_one() {
 }
 
 #[test]
+fn cancelled_primary_contact_clears_held_state_until_next_press() {
+    for reset_start in [2_000_000, 6_500_000] {
+        let mut rig = Rig::new(buttons());
+        rig.engine.set_shutdown(true);
+        let mut saw_warning = false;
+        for at in (0..=12_500_000).step_by(50_000) {
+            let output = acquired(
+                &mut rig,
+                at,
+                (1_100_000..12_000_000).contains(&at),
+                (reset_start..reset_start + 100_000).contains(&at),
+            );
+            let primary = output
+                .state
+                .sources
+                .iter()
+                .find(|state| state.source == TouchSource::Primary)
+                .unwrap();
+            if at >= reset_start && at < 12_000_000 {
+                assert_eq!(primary.active, Some(true));
+                assert_eq!(
+                    primary.held_us, None,
+                    "a reset-cancelled primary contact must not drive amber, even after reset release at {at}"
+                );
+            } else {
+                saw_warning |= primary
+                    .held_us
+                    .is_some_and(|held| held >= lamp_msgs::SHUTDOWN_HOLD_US);
+            }
+            assert!(output.shutdown_requests.is_empty());
+        }
+        assert_eq!(saw_warning, reset_start > 6_100_000);
+        let mut next_warning = false;
+        let mut requests = Vec::new();
+        for at in (12_550_000..=23_500_000).step_by(50_000) {
+            let output = acquired(&mut rig, at, (13_000_000..23_200_000).contains(&at), false);
+            let primary = output
+                .state
+                .sources
+                .iter()
+                .find(|state| state.source == TouchSource::Primary)
+                .unwrap();
+            next_warning |= primary
+                .held_us
+                .is_some_and(|held| held >= lamp_msgs::SHUTDOWN_HOLD_US);
+            requests.extend(output.shutdown_requests);
+        }
+        assert!(next_warning, "an independent new press can warn again");
+        assert_eq!(requests.len(), 1);
+    }
+}
+
+#[test]
+fn reset_overlap_preserves_primary_hold_state_when_shutdown_is_off() {
+    let mut rig = Rig::new(buttons());
+    rig.engine.set_shutdown(false);
+    acquired(&mut rig, 0, false, false);
+    for at in (50_000..=7_000_000).step_by(50_000) {
+        let output = acquired(&mut rig, at, true, (2_000_000..2_100_000).contains(&at));
+        let primary = output
+            .state
+            .sources
+            .iter()
+            .find(|state| state.source == TouchSource::Primary)
+            .unwrap();
+        assert_eq!(primary.held_us, Some(at - 50_000));
+        assert!(output.shutdown_requests.is_empty());
+    }
+    let output = acquired(&mut rig, 7_000_001, false, false);
+    assert!(
+        output
+            .events
+            .iter()
+            .any(|event| event.source == TouchSource::Primary
+                && event.when_quiet == TouchIntent::SoftwareMute)
+    );
+}
+
+#[test]
 fn a_boot_stuck_refused_reset_line_does_not_disable_primary_shutdown() {
     let mut rig = Rig::new(buttons());
     rig.engine.set_shutdown(true);

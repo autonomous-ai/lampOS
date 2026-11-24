@@ -25,8 +25,10 @@ pub fn shutdown_switched_on() -> bool {
     std::env::var(SHUTDOWN_SWITCH).as_deref() == Ok("on")
 }
 
-/// Whether a primary-button hold of `held_us` asks to turn the lamp off:
-/// from [`SHUTDOWN_HOLD_US`] to [`SHUTDOWN_HOLD_MOST_US`], both included.
+/// The legacy released TouchEvent's window, from [`SHUTDOWN_HOLD_US`] to
+/// [`SHUTDOWN_HOLD_MOST_US`], both included. Controls separately queues one
+/// ShutdownRequest at ten seconds held or on release from five to under ten;
+/// this compatibility predicate does not decide whether another request sends.
 pub fn shutdown_hold(held_us: u64) -> bool {
     (SHUTDOWN_HOLD_US..=SHUTDOWN_HOLD_MOST_US).contains(&held_us)
 }
