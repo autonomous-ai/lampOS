@@ -3729,8 +3729,10 @@ mod tests {
             .unwrap()
         };
         let keep = |skill: &str, at: u64| {
+            // Kept under its key, as the voice's `told_when_asked::keep`
+            // writes it (`mail_count` is kept as `mail-count`).
             let mut kept = serde_json::Map::new();
-            kept.insert(skill.to_owned(), json!(at));
+            kept.insert(crate::task_no_yes::key(skill), json!(at));
             std::fs::write(&asks, Value::Object(kept).to_string()).unwrap();
         };
         let mut on = services(dir.path(), "[]", true)
