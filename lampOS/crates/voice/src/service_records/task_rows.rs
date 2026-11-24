@@ -98,8 +98,8 @@ mod kept {
     use std::collections::VecDeque;
     use std::sync::{LazyLock, Mutex};
 
-    // Task hand-over calls add rows in this worker; its follower thread polls
-    // lamp-tasks over IPC and updates the same local rows.
+    // This worker's hand-over calls add rows; its follower reads, expires and
+    // updates them from lamp-tasks IPC. Local forget paths also remove rows.
     static FOLLOWED: Mutex<VecDeque<Followed>> = Mutex::new(VecDeque::new());
 
     pub fn followed<R>(f: impl FnOnce(&mut VecDeque<Followed>) -> R) -> R {

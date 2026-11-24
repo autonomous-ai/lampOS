@@ -108,11 +108,17 @@ below). An ordinary bedtime request belongs to the bedtime skill.
    gone"). An owner's language other than English hears them in
    its own words: each is a fixed line (`language::FIXED_LINES`, second-voice.md,
    "The fixed lines"; #5777's P3). Once one is played to `spoken`, Voice keeps
-   it in the thread as the lamp's own line, so the chat model's next turn has it
-   in its history (lamp-52e6, 10 Nov: with the ask and the stay left out, the
-   model's last word was its own "I'm preparing to fold", and it answered three
-   asks to unplug "I'm still folding" with no call); its `exact_line` event
-   carries the words. An exact line that is not a fixed line (a computer's, the
+   it as the lamp's own line in the serve coordinator's local thread, retaining
+   its local conversation contribution. It is not sent to the provider worker
+   or saved through this path to the shared transcript, so the chat model's
+   next request does not receive it in history. Its `exact_line` event carries
+   the words, but that event is not worker-history transport. This limitation
+   is tracked in [#8546](https://github.com/autonomous-ai/lampOS/issues/8546):
+   hearing "Okay, I'll stay." does not establish that the next chat request
+   knows it. The earlier lamp-52e6 observation on 10 Nov, when missing ask/stay
+   lines led to repeated "I'm still folding" answers without a call, remains
+   the motivating failure, not evidence that this path now carries the lines.
+   An exact line that is not a fixed line (a computer's, the
    pairing pin, a service's read) is never kept nor journalled. A file from before `[unplug]` says the words lamp-skills kept
    before, for this release only, and the journal says so. The request carries
    `unplug_request`; Voice keeps that completion guard while the reply is

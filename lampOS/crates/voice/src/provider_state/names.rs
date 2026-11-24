@@ -174,21 +174,19 @@ impl NamesReceiver {
             if chunk.index != 0 {
                 return Err(invalid());
             }
-            if chunk.index == 0 {
-                self.pending = Some(Assembly {
-                    revision: chunk.revision,
-                    count: chunk.count,
-                    next: 0,
+            self.pending = Some(Assembly {
+                revision: chunk.revision,
+                count: chunk.count,
+                next: 0,
+                enabled: chunk.enabled,
+                names: BTreeMap::new(),
+                serialized_bytes: serde_json::to_vec(&MachineNames {
                     enabled: chunk.enabled,
                     names: BTreeMap::new(),
-                    serialized_bytes: serde_json::to_vec(&MachineNames {
-                        enabled: chunk.enabled,
-                        names: BTreeMap::new(),
-                    })
-                    .map_err(|_| invalid())?
-                    .len(),
-                });
-            }
+                })
+                .map_err(|_| invalid())?
+                .len(),
+            });
         }
         let valid_chunk = chunk.count > 0
             && usize::from(chunk.count) <= MAX_CHUNKS

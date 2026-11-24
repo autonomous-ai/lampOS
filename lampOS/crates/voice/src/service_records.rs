@@ -170,8 +170,9 @@ mod kept {
     // Service operations update this worker's ledger; its record readers and
     // saver share that local ledger.
     static LEDGER: LazyLock<Mutex<Ledger>> = LazyLock::new(Mutex::default);
-    // Service operations queue changes in this worker's outbox and wake its
-    // saver thread; the saver sends them to memory over IPC.
+    // Service operations queue changes in this worker; local forget/unsent
+    // paths remove them. Its saver reads and removes rows, updates retry state,
+    // and sends records to memory over IPC.
     pub static OUTBOX: LazyLock<(Mutex<Outbox>, Condvar)> =
         LazyLock::new(|| (Mutex::default(), Condvar::new()));
 

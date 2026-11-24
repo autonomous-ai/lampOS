@@ -879,10 +879,20 @@ fn sound_now(
     admission: &InputAdmission,
     says: &crate::say::Says,
 ) -> crate::say::SoundNow {
+    sound_now_with_cloud(owner, reply, admission, says, &CloudAvailability::default())
+}
+
+fn sound_now_with_cloud(
+    owner: &mut Controller,
+    reply: &Option<Reply>,
+    admission: &InputAdmission,
+    says: &crate::say::Says,
+    cloud: &CloudAvailability,
+) -> crate::say::SoundNow {
     let snapshot = owner.snapshot(now()).unwrap();
     skill_sound_now(
         SoundGates {
-            cloud: &CloudAvailability::default(),
+            cloud,
             at_us: monotonic_us(),
             paused: false,
             snapshot: &snapshot,
@@ -1195,6 +1205,24 @@ fn an_exact_skill_line_said_keeps_the_parent_conversation() {
     exact_line_parent_conversation(true);
 }
 
+/// #8546 parks the original assertion rather than claiming worker transport.
+/// This fixture settles the exact line as Spoken, then reads the production
+/// history builder in the SAME process. It does not prove that the provider
+/// child receives the line. Replace this with a real-child chat-capture test
+/// when the parent-to-worker settlement path is implemented.
+/// Run this ignored fixture alone: it writes the process-wide THREAD.
+#[test]
+#[ignore = "#8546: parent exact-line transcript is not transferred to the provider worker; this legacy assertion is same-process only"]
+fn an_exact_skill_line_said_is_in_the_next_chat_requests_history() {
+    exact_line_parent_conversation(true);
+    let line = "My arm is folded. Shall I turn myself off now? Say yes, and I will.";
+    let (_, history) = crate::second_provider::worker::thread_and_history(0, None, None, None);
+    assert!(
+        history.contains(&crate::second_provider::net::Message::assistant(line)),
+        "the settled exact line must remain in this process's production history view: {history:?}"
+    );
+}
+
 fn exact_line_parent_conversation(retire_whole: bool) {
     let line = "My arm is folded. Shall I turn myself off now? Say yes, and I will.";
     let (mut says, answered) = crate::say::Says::words_for_test(
@@ -1389,9 +1417,139 @@ fn parent_conversation_keeps_each_source_and_expires_them_independently() {
         "local close respected"
     );
     assert!(
-        parent_conversation_going_on(&cloud, 100, now),
-        "mirror independent of local close"
+        !parent_conversation_going_on(&cloud, 100, now),
+        "parent close also ends older worker conversation"
     );
+}
+
+/// A parent's stop/turn.end closes old worker conversation even when an old
+/// deadline arrives later. A genuinely later exchange can open it again.
+#[test]
+fn parent_close_fences_delayed_worker_conversation_but_allows_new_exchanges() {
+    if !parent_conversation_child(
+        "coordinator::tests::say::parent_close_fences_delayed_worker_conversation_but_allows_new_exchanges",
+    ) {
+        return;
+    }
+    let _closes = crate::thread::closes_for_test();
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    let now = Instant::now();
+    let at = monotonic_us();
+    let window = crate::thread::GOING_ON_FOR.as_micros() as u64;
+    let mut cloud = CloudAvailability::default();
+    let old = crate::provider_state::conversation::Snapshot {
+        observed_at_us: at,
+        until_us: Some(at + window),
+    };
+    cloud.conversation.observe(old, at).unwrap();
+    assert!(parent_conversation_going_on(&cloud, at, now));
+    crate::thread::close_now(None);
+    let closed = crate::thread::THREAD.lock().unwrap().closed_at().unwrap();
+    assert!(
+        !parent_conversation_now(&cloud),
+        "turn.end or stop must not leave the old 45-second worker gate active"
+    );
+    // Source observation is later, but this is the same old exchange.
+    cloud
+        .conversation
+        .observe(
+            crate::provider_state::conversation::Snapshot {
+                observed_at_us: at + 1_000_000,
+                until_us: old.until_us,
+            },
+            at + 1_000_000,
+        )
+        .unwrap();
+    assert!(
+        !parent_conversation_going_on(&cloud, at + 1_000_000, now + Duration::from_secs(1)),
+        "a delayed old deadline cannot resurrect a closed conversation"
+    );
+    cloud
+        .conversation
+        .observe(
+            crate::provider_state::conversation::Snapshot {
+                observed_at_us: at + 2_000_000,
+                until_us: Some(at + 2_000_000 + window),
+            },
+            at + 2_000_000,
+        )
+        .unwrap();
+    assert!(parent_conversation_going_on(
+        &cloud,
+        at + 2_000_000,
+        now + Duration::from_secs(2)
+    ));
+    assert!(parent_conversation_going_on(
+        &cloud,
+        at + 2_000_000 + window,
+        now + Duration::from_secs(2) + crate::thread::GOING_ON_FOR
+    ));
+    assert!(!parent_conversation_going_on(
+        &cloud,
+        at + 2_000_001 + window,
+        now + Duration::from_secs(2) + crate::thread::GOING_ON_FOR + Duration::from_micros(1)
+    ));
+    // A newly played parent exact line remains its own valid conversation.
+    crate::thread::THREAD.lock().unwrap().lamp(
+        2,
+        "A later fixed line.",
+        closed + Duration::from_secs(3),
+    );
+    assert!(parent_conversation_going_on(
+        &cloud,
+        at + window + 3_000_000,
+        closed + Duration::from_secs(3)
+    ));
+}
+
+#[test]
+fn a_parent_stop_allows_an_exact_line_despite_the_old_worker_deadline() {
+    if !parent_conversation_child(
+        "coordinator::tests::say::a_parent_stop_allows_an_exact_line_despite_the_old_worker_deadline",
+    ) {
+        return;
+    }
+    let _closes = crate::thread::closes_for_test();
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    let (mut says, _answered) = crate::say::Says::words_for_test(
+        "unplug",
+        crate::say::Words::ExactSound {
+            samples: vec![400; 480],
+            text: Some("Okay, I'll stay.".into()),
+            pieces: None,
+        },
+        crate::say::NORMAL_PRIORITY,
+    );
+    let mut owner = resting_owner();
+    let mut reply = None;
+    let admission = InputAdmission::default();
+    let mut trace = SessionState::default();
+    let mut cloud = CloudAvailability::default();
+    let at = monotonic_us();
+    cloud
+        .conversation
+        .observe(
+            crate::provider_state::conversation::Snapshot {
+                observed_at_us: at,
+                until_us: Some(at + crate::thread::GOING_ON_FOR.as_micros() as u64),
+            },
+            at,
+        )
+        .unwrap();
+    let before = sound_now_with_cloud(&mut owner, &reply, &admission, &says, &cloud);
+    assert!(before.conversing);
+    assert!(!take_exact(
+        &mut says, &before, &mut owner, &mut reply, &mut trace
+    ));
+    crate::thread::close_now(None);
+    let after = sound_now_with_cloud(&mut owner, &reply, &admission, &says, &cloud);
+    assert!(
+        !after.conversing,
+        "stop releases the actual say gate immediately"
+    );
+    assert!(take_exact(
+        &mut says, &after, &mut owner, &mut reply, &mut trace
+    ));
 }
 
 /// Waits up to 2 s for `what`.

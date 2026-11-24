@@ -500,18 +500,43 @@ worker-scoped state. After ordered `Ended`, no further state is accepted, but
 a previously validated deadline still expires at its original time.
 
 The gates also preserve the coordinator's own conversation contribution:
-`parent_conversation_going_on` is true when either the active-worker mirror or
-the parent-local `THREAD.going_on(now)` is true. A successfully spoken
+`parent_conversation_going_on` is true when the active-worker mirror remains
+live past the close cutoff below, or the parent-local `THREAD.going_on(now)`
+is true. A successfully spoken
 `ExactLine` in `Reply::answer_say` adds to that parent-local history and keeps
-its existing local expiry semantics. A dropped line adds nothing. Closing or
-expiring one source does not erase a still-live contribution from the other.
+its existing local expiry semantics. A dropped line adds nothing.
+
+A parent close, including a computer's `turn.end` or the person's stop, uses
+its existing `Thread.closed_at` to fence worker exchanges too. The worker's
+exchange start is derived from `until_us - 45 seconds` with saturating
+subtraction. An exchange begun at or before the close cannot keep either
+route's mirror active for these gates, even if the same snapshot arrives
+later with a newer observation timestamp. A genuinely newer exchange past
+the cutoff can count again, through its inclusive deadline. This adds no
+protocol field and does not send a close command to the worker.
+
+Admission samples `Instant` first, then the monotonic microsecond clock,
+fresh for this decision rather than pairing a fresh `Instant` with an old
+loop timestamp. Mapping `closed_at` rounds elapsed time down to whole
+microseconds and saturates near boot or for a future close. The cutoff can
+therefore move later by the clock-read gap and rounding, conservatively
+excluding an exchange at that boundary; it cannot make a pre-close exchange
+look new. There is no fixed wall-time bound on that sampling gap.
+
+During standby startup, the second route accepts initial `ConversationState`
+and `MachineNames` metadata before input, including the empty conversation
+snapshot. It validates and observes them while counting and replenishing
+output credits, as during normal draining. Other provider data before input
+remains an error; accepting metadata does not grant output authority.
 
 This parent-local transcript is not the provider worker's transcript.
 `Thread::lamp` changes memory only; `answer_say` does not save the shared
 thread file or send those words to a provider worker. The metadata transfer
 therefore does not put an exact skill line into the next model request's
-history. Worker transcript propagation remains the separate file/reload path
-described below. See [the state transport bounds](memory-days.md#state-across-the-provider-process-boundary)
+history. Carrying played fixed lines to the active worker is tracked in
+[#8546](https://github.com/autonomous-ai/lampOS/issues/8546). Worker transcript
+propagation remains the separate file/reload path described below. See
+[the state transport bounds](memory-days.md#state-across-the-provider-process-boundary)
 for publication, names and lifecycle limits.
 
 ## What it keeps to itself

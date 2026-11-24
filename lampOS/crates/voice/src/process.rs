@@ -347,6 +347,28 @@ pub fn listed(role: &str) -> io::Result<lamp_voice_processes::WorkerRole> {
 }
 
 impl Worker {
+    /// A real child with already-bound channels, owned and reaped by the normal
+    /// Worker lifecycle. Used by isolated worker-loop process tests.
+    #[cfg(test)]
+    pub(crate) fn fixture_with_child(
+        channels: WorkerChannels,
+        child: Child,
+        boot: BootId,
+        role: &str,
+    ) -> Self {
+        Self {
+            channels,
+            child,
+            boot,
+            role: role.into(),
+            diagnostic_start: None,
+            ring_resources: None,
+            renewal_stall: RenewalStall::default(),
+            on_stop: None,
+            after_terminate: None,
+        }
+    }
+
     /// The worker's process id, for a test that reads how it runs (#1608).
     pub fn process_id(&self) -> u32 {
         self.child.id()
@@ -1565,7 +1587,7 @@ fn sound_session_worker_environment(
 }
 
 // Serve configuration sets this flag; its child-command builder reads it when
-// constructing worker arguments.
+// constructing the audio workers' sound-session environment.
 static DEVICES_NAMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Said once at start by the coordinator: the options named a speaker or a microphone device, so the audio workers are

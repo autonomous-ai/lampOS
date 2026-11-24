@@ -2480,16 +2480,37 @@ Bên nhận kiểm tra thời điểm và giới hạn rồi tự hết hạn, k
 hoạt động sau đó.
 
 Hai nơi quyết định hội thoại ở serve, khi bắt đầu tác vụ máy tính và xét âm
-thanh của skill, dùng `parent_conversation_going_on`: đúng nếu bản sao của
-worker đang hoạt động **hoặc** `THREAD.going_on(now)` riêng của tiến trình cha
-còn hiệu lực. Một `ExactLine` được nói thành công qua `Reply::answer_say` thêm
-vào lịch sử riêng của cha, giữ cách hết hạn cục bộ hiện có; dòng bị bỏ không
-thêm gì. Đóng hoặc hết hạn một nguồn không xóa nguồn còn hiệu lực kia.
+thanh của skill, kết hợp bản sao của worker đang hoạt động với
+`THREAD.going_on(now)` riêng của tiến trình cha. Lần đóng ở cha ghi vào
+`Thread.closed_at` hiện có: thời điểm bắt đầu trao đổi ở worker, suy ra từ
+`until_us - 45 giây` bằng phép trừ bão hòa, phải nằm sau thời điểm đóng mới
+được tính. Trao đổi bắt đầu trước hoặc đúng lúc đóng vẫn bị đóng, dù bản chụp
+của nó đến sau với thời điểm quan sát mới hơn. Một trao đổi thực sự mới hơn
+ở worker có thể được tính lại đến hết hạn riêng, kể cả đúng tại hạn đó.
+Cách này dùng các trường hạn chót hiện có, không thêm trường đóng vào wire.
+Quyết định lấy `Instant` trước rồi mới đọc đồng hồ đơn điệu theo micro giây;
+khi quy đổi mốc đóng, thời gian đã trôi qua được làm tròn xuống và phép trừ
+bão hòa tránh tràn. Khoảng cách giữa hai lần đọc cùng phần làm tròn có thể
+đẩy mốc đóng về sau, nên trao đổi ngay tại ranh giới đó có thể vẫn bị loại
+một cách bảo thủ. Không dùng lại thời điểm cũ của vòng lặp. Khoảng cách giữa
+hai lần đọc không có giới hạn thời gian thực cố định.
+
+Một `ExactLine` được nói thành công qua `Reply::answer_say` chỉ thêm vào lịch
+sử riêng của cha và giữ đóng góp hội thoại cục bộ; dòng bị bỏ không thêm gì.
 `Thread::lamp` chỉ sửa bộ nhớ; `answer_say` không ghi tệp hội thoại dùng chung
-và không gửi lời này sang worker. Vì vậy thay đổi này không đưa dòng của skill
-vào lịch sử yêu cầu model kế tiếp. Truyền bản chép hội thoại giữa các worker
-vẫn là đường ghi và đọc lại tệp riêng, như
+và không gửi lời này sang worker. Vì vậy dòng đó vẫn không có trong lịch sử
+yêu cầu model kế tiếp của worker. Cụ thể, nghe kỹ năng rút điện nói
+"Okay, I'll stay." không chứng minh yêu cầu chat tiếp theo biết câu đó.
+Việc truyền các câu cố định đã phát sang worker đang hoạt động được theo dõi
+ở [#8546](https://github.com/autonomous-ai/lampOS/issues/8546). Đường ghi và
+đọc lại bản chép hội thoại riêng được mô tả tại
 [conversation-thread.md](../conversation-thread.md#conversation-state-in-the-coordinator).
+
+Trong lúc khởi động ở trạng thái dự phòng, tuyến thứ hai chấp nhận metadata
+`ConversationState` và `MachineNames` ban đầu trước đầu vào, kể cả bản chụp
+hội thoại rỗng, với kiểm tra hợp lệ và kế toán hạn mức đầu ra như bình thường.
+Dữ liệu provider khác đến trước đầu vào vẫn là lỗi. Chỉ nhận metadata không
+cấp quyền phát đầu ra.
 
 `MachineNames` chuyển cờ bật và tên máy tính thành một phiên bản nhất quán.
 Mỗi mảnh đã tuần tự hóa tối đa 6.000 byte, tối đa 16 mảnh và toàn bộ bản chụp
@@ -2508,33 +2529,11 @@ nhịp này không bảo đảm độ trễ đầu cuối.
 
 Mỗi worker dự phòng giữ bản sao hội thoại và phần ghép tên riêng. Chỉ trạng
 thái của worker đang hoạt động góp vào quyết định hội thoại và tên cho tin tác
-vụ ở serve. Đổi tuyến áp dụng trạng thái của worker được chọn. Worker thay thế
-bắt đầu rỗng; khi đồng bộ, tên cũ ở cha được xóa. Đổi phiên model trong cùng
-lần khởi động giữ trạng thái; hủy yêu cầu không xóa bản chụp thuộc worker.
+vụ ở serve. Đổi tuyến áp dụng trạng thái của worker được chọn, vẫn chịu mốc
+đóng của cha. Worker thay thế bắt đầu rỗng; khi đồng bộ, tên cũ ở cha được
+xóa. Đổi phiên model trong cùng lần khởi động giữ trạng thái; hủy yêu cầu
+không xóa bản chụp thuộc worker.
 Chỉ sau khi gửi `Ended` thành công thì nguồn mới ngừng công bố; cha từ chối
 trạng thái đến sau `Ended` trên kênh có thứ tự. Riêng sự kiện đó không xóa
 trạng thái đã hợp lệ: hạn hội thoại vẫn tự hết, còn tên giữ đến khi bản chụp
 đang hoạt động hoặc lần khởi động worker được thay thế.
-
-Trên macOS, bản sửa sau khi khôi phục vượt qua 8.284 kiểm thử Voice (34 bỏ
-qua), Clippy nghiêm ngặt cho Voice và kiểm tra định dạng. Nhóm 244 kiểm thử
-bao gồm bốn ca hồi quy đã thất bại đúng tại các khẳng định dự kiến khi bỏ công
-bố trạng thái hoặc đóng góp cục bộ của cha; mã thử đối chứng đã được khôi phục
-chính xác. Bản dựng toàn workspace đầu tiên thất bại ở lời gọi Linux-only
-`socket_peercred` sẵn có của Play. Rebase lên `798ae9dd41`, chỉ thay đổi Play
-và giữ nguyên từng byte mã Voice đã kiểm thử, giải quyết lỗi đó: định dạng,
-Clippy nghiêm ngặt cho Voice và bản dựng toàn workspace đều đạt khi chạy lại.
-
-Ba kiểm thử thời gian tùy chọn trên máy phát triển đều đạt khi chạy riêng,
-với 200 mẫu lặp và đo lần gọi đầu. p95 của xử lý phía nhận tối đa 0,313 ms;
-p95 của truyền cục bộ tổng hợp đến lúc quan sát tối đa 5,788 ms, đạt mục tiêu
-1 ms và 10 ms tương ứng. Mức tối đa của xử lý là 1,243 ms; mục tiêu theo phân
-vị không bảo đảm trường hợp xấu nhất. p95 cài đặt tại cha là 0,102 ms với 798
-tên / 65.462 byte. p95 chuẩn bị tại nguồn là 0,023 ms với bốn tên, nhưng
-3,715 ms gần giới hạn bản chụp; số sau được báo riêng, không khẳng định dưới
-1 ms. Lần gọi đầu tối đa 5,575 ms cho truyền và 3,656 ms cho chuẩn bị. Phép đo
-nguồn gồm tạo chunk và tuần tự hóa để kiểm tra kích thước, nhưng không gồm
-tuần tự hóa sự kiện cuối, truyền hay nhận; các fixture không đo toàn bộ vòng
-worker có tín dụng dưới phụ thuộc chậm. Lần thử socket trong sandbox bị từ
-chối quyền bind; chạy lại cục bộ có quyền vượt qua cả ba kiểm thử. Các số này
-không xác nhận độ trễ âm thanh hay trên thiết bị.

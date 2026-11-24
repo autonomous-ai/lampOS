@@ -193,8 +193,9 @@ pub fn clear(source: &Source) {
 /// Whether Lamp is private now, as the engine last read the camera's and the
 /// microphone's permission (`Engine::privacy`), for the bus writer: none
 /// read yet counts as private.
-// Second worker Engine::privacy updates its own copy. The parent say-settlement path
-// reads a separate copy that remains at the initial true value in production.
+// Second worker Engine::privacy writes its copy; its app-context reader reads it.
+// Parent say settlement reads a separate copy, initially true and unwritten in
+// production. Say tests also write this process-wide flag through set_private.
 static PRIVATE: AtomicBool = AtomicBool::new(true);
 
 /// The engine's reading of the privacy switch (or a mute), for [`start`].

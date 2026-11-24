@@ -13659,15 +13659,7 @@ fn conversation_with_gate_inner(
             let own_turn = control_turns.continues(says.turn_start_after(control_now_us));
             let signs = [
                 ("a computer's turn", control_turns.going_on() && !own_turn),
-                (
-                    "the thread",
-                    !own_turn
-                        && parent_conversation_going_on(
-                            &cloud,
-                            monotonic_us(),
-                            std::time::Instant::now(),
-                        ),
-                ),
+                ("the thread", !own_turn && parent_conversation_now(&cloud)),
                 (
                     "a person's answer",
                     !undecided
@@ -15378,18 +15370,38 @@ fn conversation_going_on(cloud: &CloudAvailability, now_us: u64) -> bool {
     cloud.conversation.going_on(now_us)
 }
 
+/// Sample Instant first so cross-clock sampling can only move a close cutoff
+/// later, never let a pre-close exchange count as newer. Do not pair an old
+/// tick's timestamp with a fresh Instant after slow work.
+fn parent_conversation_now(cloud: &CloudAvailability) -> bool {
+    let now = std::time::Instant::now();
+    let now_us = monotonic_us();
+    parent_conversation_going_on(cloud, now_us, now)
+}
+
 /// Parent admission also retains its own spoken exact lines. Those exchanges
-/// are local to serve; the worker mirror cannot contain them. Keep both inputs
-/// and their existing inclusive expiry, without transferring transcript content.
+/// are local to serve; the worker mirror cannot contain them. A parent close
+/// fences either route's pre-close exchanges, including delayed snapshots;
+/// genuinely newer exchanges retain the existing inclusive expiry.
 fn parent_conversation_going_on(
     cloud: &CloudAvailability,
     now_us: u64,
     now: std::time::Instant,
 ) -> bool {
-    conversation_going_on(cloud, now_us)
-        || crate::thread::THREAD
-            .lock()
-            .is_ok_and(|thread| thread.going_on(now))
+    let Ok(thread) = crate::thread::THREAD.lock() else {
+        return conversation_going_on(cloud, now_us);
+    };
+    // Pair the parent's Instant close with this monotonic observation. Round
+    // the elapsed duration down, conservatively closing the submicrosecond
+    // boundary too; future/near-boot cutoffs saturate instead of wrapping.
+    let closed_at_us = thread.closed_at().map(|closed| {
+        now_us.saturating_sub(
+            now.saturating_duration_since(closed)
+                .as_micros()
+                .min(u128::from(u64::MAX)) as u64,
+        )
+    });
+    thread.going_on(now) || cloud.conversation.going_on_after(now_us, closed_at_us)
 }
 
 /// What the say service's gates read for a skill's sound (#938).
@@ -15437,11 +15449,7 @@ fn skill_sound_now(gates: SoundGates<'_>, says: &crate::say::Says) -> crate::say
         playing: gates.reply.is_some()
             || gates.speaker_pending.is_some()
             || !gates.playback_mask.available(gates.at_us),
-        conversing: parent_conversation_going_on(
-            gates.cloud,
-            gates.at_us,
-            std::time::Instant::now(),
-        ),
+        conversing: parent_conversation_now(gates.cloud),
     }
 }
 
@@ -22606,38 +22614,41 @@ mod second_thread_process_boundary {
     use std::sync::Arc;
     use std::time::{Duration, Instant};
 
-    const TEST: &str = "coordinator::second_thread_process_boundary::worker_thread_reaches_the_real_conversation_consumer";
-    const MODE: &str = "SECOND_THREAD_BOUNDARY_MODE";
-    const ROOT: &str = "SECOND_THREAD_BOUNDARY_ROOT";
-    struct Reap(Child);
+    pub(super) const TEST: &str = "coordinator::second_thread_process_boundary::worker_thread_reaches_the_real_conversation_consumer";
+    pub(super) const STANDBY_TEST: &str =
+        "coordinator::second::tests::real_standby_startup_accepts_initial_empty_conversation";
+    pub(super) const MODE: &str = "SECOND_THREAD_BOUNDARY_MODE";
+    pub(super) const ROOT: &str = "SECOND_THREAD_BOUNDARY_ROOT";
+    pub(super) struct Reap(pub(super) Child);
     impl Drop for Reap {
         fn drop(&mut self) {
             let _ = self.0.kill();
             let _ = self.0.wait();
         }
     }
-    struct Directory(std::path::PathBuf);
+    pub(super) struct Directory(pub(super) std::path::PathBuf);
     impl Drop for Directory {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
         }
     }
-    fn spawn(mode: &str, root: &std::path::Path) -> Reap {
-        Reap(
-            Command::new(std::env::current_exe().unwrap())
-                .args(["--exact", TEST, "--nocapture", "--test-threads=1"])
-                .env_clear()
-                .env("PATH", "/usr/bin:/bin")
-                .env(MODE, mode)
-                .env(ROOT, root)
-                .stdin(Stdio::null())
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit())
-                .spawn()
-                .unwrap(),
-        )
+    pub(super) fn spawn_child(test: &str, mode: &str, root: &std::path::Path) -> Child {
+        Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", test, "--nocapture", "--test-threads=1"])
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin")
+            .env(MODE, mode)
+            .env(ROOT, root)
+            .stdin(Stdio::null())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .unwrap()
     }
-    fn wait(child: &mut Reap, within: Duration) {
+    fn spawn(mode: &str, root: &std::path::Path) -> Reap {
+        Reap(spawn_child(TEST, mode, root))
+    }
+    pub(super) fn wait(child: &mut Reap, within: Duration) {
         let end = Instant::now() + within;
         loop {
             if let Some(status) = child.0.try_wait().unwrap() {
@@ -22683,14 +22694,21 @@ mod second_thread_process_boundary {
         let root = std::path::PathBuf::from(std::env::var_os(ROOT).unwrap());
         let parent_boot = lamp_turn_owner::BootId::new([71; 16]).unwrap();
         let worker_boot = lamp_turn_owner::BootId::new([72; 16]).unwrap();
-        if mode == "worker" {
+        if mode == "worker" || mode == "standby-worker" {
             let mut worker =
                 WorkerChannels::bind(&root, "second", parent_boot, worker_boot, true).unwrap();
             worker.connect(&root, "second", true).unwrap();
-            {
+            if mode == "worker" {
                 let mut thread = crate::thread::THREAD.lock().unwrap();
                 thread.lamp_for(1, "Synthetic answer.", Instant::now(), None);
                 assert!(thread.going_on(Instant::now()));
+            } else {
+                assert!(
+                    !crate::thread::THREAD
+                        .lock()
+                        .unwrap()
+                        .going_on(Instant::now())
+                );
             }
             std::fs::write(root.join("seeded"), b"ready").unwrap();
             let engine = Engine::new(

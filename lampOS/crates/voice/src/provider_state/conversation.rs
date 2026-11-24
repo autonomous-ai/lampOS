@@ -106,12 +106,70 @@ impl Mirror {
     pub fn going_on(&self, now_us: u64) -> bool {
         self.until_us.is_some_and(|until| now_us <= until)
     }
+
+    /// A parent stop closes exchanges at or before its cutoff, even when their
+    /// snapshots arrive later. Source deadlines are exchange start + WINDOW_US;
+    /// the snapshot's publication time cannot reopen that old exchange.
+    pub fn going_on_after(&self, now_us: u64, closed_at_us: Option<u64>) -> bool {
+        self.until_us.is_some_and(|until| {
+            now_us <= until
+                && closed_at_us.is_none_or(|closed| until.saturating_sub(WINDOW_US) > closed)
+        })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn parent_close_fences_exchange_start_not_later_snapshot_time() {
+        let mut mirror = Mirror::default();
+        mirror
+            .observe(
+                Snapshot {
+                    observed_at_us: 200,
+                    until_us: Some(100 + WINDOW_US),
+                },
+                200,
+            )
+            .unwrap();
+        assert!(mirror.going_on_after(200, Some(99)));
+        assert!(!mirror.going_on_after(200, Some(100)), "equal is closed");
+        assert!(
+            !mirror.going_on_after(200, Some(150)),
+            "publication after close is not a new exchange"
+        );
+        mirror
+            .observe(
+                Snapshot {
+                    observed_at_us: 300,
+                    until_us: Some(300 + WINDOW_US),
+                },
+                300,
+            )
+            .unwrap();
+        assert!(
+            mirror.going_on_after(300 + WINDOW_US, Some(200)),
+            "new exchange, inclusive expiry"
+        );
+        assert!(!mirror.going_on_after(301 + WINDOW_US, Some(200)));
+        let mut boot = Mirror::default();
+        boot.observe(
+            Snapshot {
+                observed_at_us: 0,
+                until_us: Some(100),
+            },
+            0,
+        )
+        .unwrap();
+        assert!(boot.going_on_after(0, None));
+        assert!(
+            !boot.going_on_after(0, Some(0)),
+            "near-boot subtraction cannot wrap"
+        );
+    }
 
     #[test]
     fn initial_empty_state_is_sent_once_and_retries_do_not_move_deadlines() {
