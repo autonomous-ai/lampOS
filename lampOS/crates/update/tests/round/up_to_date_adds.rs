@@ -5,8 +5,8 @@
 //! adds them, leaving the build, `previous` and every unit the lamp has as
 //! they are.
 use super::product_adds::{
-    LEFT_OUT, MOOD, RECORDS_TIMER, SOCKET, all, link, mood, product_lamp, publish, publish_all,
-    records_timer,
+    CONTROL, LEFT_OUT, MOOD, RECORDS_TIMER, SOCKET, all, control_starts, ended, link, mood,
+    product_lamp, publish, publish_all, records_timer, with_control,
 };
 use super::*;
 
@@ -449,4 +449,42 @@ fn an_up_to_date_rounds_addition_not_all_taken_away_fails_and_rolls_nothing_back
     assert!(fs::symlink_metadata(wants.join(MOOD)).is_err());
     assert!(!lamp.exists(&format!("/etc/systemd/system/{MOOD}")));
     assert_eq!(lamp.state()["adds_tried"], 2);
+}
+
+/// A pass held before it writes anything (here by a reset of the lamp that
+/// may be under way) ends not quiet, on the build the lamp runs: a
+/// lamp-control that ended cleanly with its switch on is still started, as
+/// any up-to-date round starts it (#6699).
+#[test]
+fn an_up_to_date_rounds_pass_held_still_starts_a_lamp_control_that_ended_cleanly() {
+    let mut lamp = with_control(product_lamp(), "LAMP_SKILL_TASKS=on", ended("success"));
+    taken_by_an_older_updater(&mut lamp, "mood 1");
+    lamp.systemd.units.insert(CONTROL.into(), ended("success"));
+    let starts = control_starts(&lamp);
+    let reset = lamp.root.join("var/lib/lampos-setup/reset.json");
+    fs::create_dir_all(reset.parent().unwrap()).unwrap();
+    fs::write(&reset, "{}").unwrap();
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::NotQuiet(why) if why.contains("reset of the lamp")),
+        "{outcome:?}"
+    );
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.starts_with("build 2, which the lamp runs, adds ")),
+        "{:?}",
+        lamp.said
+    );
+    assert!(!lamp.exists(&format!("/etc/systemd/system/{MOOD}")));
+    assert_eq!(control_starts(&lamp), starts + 1, "{:?}", lamp.calls());
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line
+                == &format!("started {CONTROL}, ended cleanly with LAMP_SKILL_TASKS on")),
+        "{:?}",
+        lamp.said
+    );
 }

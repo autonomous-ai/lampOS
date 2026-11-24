@@ -440,7 +440,7 @@ fn with_mood(mut lamp: Lamp, text: &str, running: Running) -> Lamp {
     lamp
 }
 
-fn ended(result: &str) -> Running {
+pub(super) fn ended(result: &str) -> Running {
     Running {
         active: if result == "success" {
             "inactive"
@@ -527,11 +527,11 @@ fn a_changed_part_failed_unchanged_or_on_a_lamp_not_running_is_not_started() {
     );
 }
 
-const CONTROL: &str = "lamp-control.service";
+pub(super) const CONTROL: &str = "lamp-control.service";
 
 /// lamp-control's unit as the product enables it, `switch` in its own
 /// environment (none for `""`), its last run in `running`.
-fn with_control(mut lamp: Lamp, switch: &str, running: Running) -> Lamp {
+pub(super) fn with_control(mut lamp: Lamp, switch: &str, running: Running) -> Lamp {
     let environment = if switch.is_empty() {
         String::new()
     } else {
@@ -560,7 +560,7 @@ fn with_control(mut lamp: Lamp, switch: &str, running: Running) -> Lamp {
     lamp
 }
 
-fn control_starts(lamp: &Lamp) -> usize {
+pub(super) fn control_starts(lamp: &Lamp) -> usize {
     lamp.calls()
         .iter()
         .filter(|call| *call == &format!("start --no-block {CONTROL}"))

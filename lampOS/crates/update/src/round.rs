@@ -472,6 +472,7 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         asked_now: false,
         gave_way: false,
         adds_only: false,
+        adds_sequence: None,
         started_added: false,
         lines: Vec::new(),
     };
@@ -564,8 +565,15 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
     // its own switch, finds the lamp up to date. A switching round starts
     // it with the parts it added (`start_added`).
     // An up-to-date round's pass that added units (#7018) started them and
-    // looked at lamp-control already.
-    if let Outcome::UpToDate(sequence) = outcome
+    // looked at lamp-control already. One that found no quiet moment, or was
+    // held, changed nothing and ran on the build the lamp runs: lamp-control
+    // is looked at as in any up-to-date round.
+    let up_to_date = match outcome {
+        Outcome::UpToDate(sequence) => Some(sequence),
+        Outcome::NotQuiet(_) if run.adds_only => run.adds_sequence,
+        _ => None,
+    };
+    if let Some(sequence) = up_to_date
         && !run.started_added
     {
         run.start_added(&[], sequence);
@@ -656,6 +664,9 @@ struct Run<'r, 'w> {
     /// [`Self::installed_adds`]): the build stays the lamp's, `installed`
     /// and `previous` as they are, and a pass put back refuses nothing.
     adds_only: bool,
+    /// The build whose units this round's pass adds ([`Self::adds_only`]),
+    /// the one the lamp runs.
+    adds_sequence: Option<u64>,
     /// [`Self::start_added`] ran this round.
     started_added: bool,
     /// What this round said, kept for [`Self::keep_lines`] (#6266 5b): at most
@@ -1346,6 +1357,7 @@ impl Run<'_, '_> {
             }
         };
         self.adds_only = true;
+        self.adds_sequence = Some(sequence);
         self.rollback_order = Some(rollback_order);
         self.fetching = to_fetch(self.config, &changes, &self.placings);
         if let Err(outcome) = self.room(&changes) {
