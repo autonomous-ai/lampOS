@@ -592,6 +592,31 @@ one is chosen) and kept in the thread as the lamp's:
   lamp-29e7's case (Sixth's item 6 on #4710): a stop said as the story's
   last words played out went to the model, or was held as a word of the
   room's (`Heeding::began_just_after`).
+- **A stop said to the lamp while it is quiet, with a run under way**
+  (#8475 part 2, no switch: its journal tag is `#8475`, not
+  `LAMP_SPOKEN_STOP_ENDS`): when the second route's worker asked a skill
+  run within `made_run::UNDER_WAY_FOR` (15 min, `made_run::ran_here`), a
+  line heard neither over the lamp's voice nor just after it, not its echo,
+  not empty, is a stop only when said to the lamp
+  (`made_run::quiet_stop_said_to_lamp`). No question mark ever counts. A
+  short stop line on its own counts: the whole line, the lamp's name and
+  soft words ("okay", "ok", "please", "hey", "oh", "alright", "right",
+  "just", "so", "now") aside, is "stop" (once or more), or "stop" then "it",
+  "that", "this" or "there" ("Stop.", "Okay, stop.", "Please stop.", "Stop
+  it.", "Lamp, stop.", "Stop, Lamp!"). A longer ask counts only named (its
+  name heard, or "Lamp" in its words) or said facing it (the said-to-me
+  rule let it out): at most six words, "stop" first past the name and soft
+  words, and a stop request as above ("Lamp, stop the photo booth.").
+  Never a "stop" inside a longer sentence ("Don't stop now.", "I can't stop
+  laughing.", "Tom, stop it.", "Why did it stop?"). Such a stop takes the
+  run as stopped, once, is answered "Okay, I'll stop there." and ends the
+  conversation as the stop above does (rendered ahead only with
+  `LAMP_SPOKEN_STOP_ENDS` on), and its `StopAnswered` has the coordinator
+  ask lamp-skills to end the run (skills.md, "Run now by voice"). The
+  journal says "a stop said to the lamp while it is quiet, the run of
+  SKILL under way: it ends the run (#8475)", then "a stop said to the lamp
+  while a run is under way: answered …, the model not asked (#8475)". With
+  no run under way, nothing changes.
 - **A wordless cut-in** (`LAMP_CUT_IN_WORDLESS_ASKS=on`,
   `crate::cut_in_wordless`): a cough, a beep or a knock over the lamp's
   answer that made it yield and then commit, ending the answer

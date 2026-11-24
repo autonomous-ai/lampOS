@@ -35,6 +35,10 @@
 //! - **The socket** ([`HandOvers`]): with the switch on, `serve` binds
 //!   [`HAND_OVER_SOCKET`] for lamp-skills alone, one line a connection,
 //!   one run at a time (another is refused `busy`).
+//! - **A cancel** (#8475, [`CANCEL_OP`]): `{"op":"cancel"}` on the same
+//!   socket, from lamp-skills alone, is answered at once with the runs it
+//!   stopped; each has its token ended at lamp-control first, then is
+//!   killed, and its own hand-over is answered [`stopped_answer`].
 //! - **A run that never reached its agent** (#6835 gap 1): Harness keeps a
 //!   pane whose engine exited before it was ready as a shell (agent
 //!   "Terminal", the same id), and `wait` reads it idle. After the end,
@@ -993,10 +997,13 @@ pub struct SkillRun {
     /// make's runner reads it back from the run's own folder
     /// ([`Runner::tell_words`]). Never a make's or a fixed write's.
     pub tells: bool,
-    /// Set to end the run at once, as at its deadline: only the lamp's own
+    /// Set to end the run at once, as at its deadline: by the lamp's own
     /// ask for task news's line (`crate::voice_ask`, `news`), by a person's
     /// ask that comes while it runs (#7765's follow-up's make cancel,
-    /// #7789, for an ask). Never set for any other run.
+    /// #7789, for an ask); and by a `{"op":"cancel"}` line on
+    /// [`HAND_OVER_SOCKET`] for the skill's task or `run` step running
+    /// there (#8475, [`CANCEL_OP`]), which ends its token first. A run so
+    /// stopped is answered [`stopped_answer`].
     pub cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
@@ -1029,6 +1036,20 @@ pub fn tell_file_line(answer: &Path) -> String {
          the lamp, leave that file empty.",
         answer.display()
     )
+}
+
+/// The field a hand-over's answer carries, `true`, for a run a cancel
+/// stopped (#8475, [`CANCEL_OP`]): [`stopped_answer`].
+pub const STOPPED: &str = "stopped";
+
+/// A hand-over's answer for a run a cancel stopped (#8475): the failure's
+/// shape with [`STOPPED`] `true`,
+/// `{"ok":false,"error":"run_failed","message":why,"stopped":true}`, so
+/// lamp-skills tells it from a run that failed of itself.
+pub fn stopped_answer(why: &str) -> Value {
+    let mut answer = refusal("run_failed", why);
+    answer[STOPPED] = json!(true);
+    answer
 }
 
 /// The code of a fixed write's run refused before its agent began
@@ -1783,6 +1804,8 @@ fn run_on_token(
         );
     }
     let not_made = run.not_made.load(Ordering::Acquire);
+    // Stopped by a cancel (#8475): told so, whatever else it ended with.
+    let stopped = run.cancelled();
     // Its keys' file, whatever the runner did with it, then its folder.
     if let Some(file) = &run.env_file {
         let _ = std::fs::remove_file(file);
@@ -1796,6 +1819,8 @@ fn run_on_token(
             Some(answer) => json!({"ok": true, "id": id, "answer": answer}),
             None => json!({"ok": true, "id": id}),
         },
+        // A cancel stopped it (#8475): never sent again, never `busy`.
+        Err(why) if stopped => stopped_answer(&why),
         // The one session's queue full (#7246): `busy`, as a second run
         // is, so lamp-skills' retry (#7239) still applies.
         Err(why) if !began && why == crate::one_session::BUSY => refusal("busy", &why),
@@ -4811,6 +4836,8 @@ impl HandOvers {
         let running = Arc::new(AtomicBool::new(false));
         // A `run` step's own place (#8158): one at a time, beside a task's.
         let running_direct = Arc::new(AtomicBool::new(false));
+        // What runs in each place now, for a cancel line (#8475).
+        let lanes = Arc::new(Lanes::default());
         let open = Arc::new(AtomicUsize::new(0));
         while !stop.load(Ordering::Acquire) {
             let stream = match listener.accept() {
@@ -4848,14 +4875,18 @@ impl HandOvers {
                 continue;
             }
             let held = Counted(open.clone());
-            let (served, running, running_direct) =
-                (this.clone(), running.clone(), running_direct.clone());
+            let (served, running, running_direct, lanes) = (
+                this.clone(),
+                running.clone(),
+                running_direct.clone(),
+                lanes.clone(),
+            );
             // A thread not started drops `held`, so its place is let go.
             let _ = std::thread::Builder::new()
                 .name("tasks-skill-task-run".into())
                 .spawn(move || {
                     let _held = held;
-                    served.one(&stream, &running, &running_direct);
+                    served.one(&stream, &running, &running_direct, &lanes);
                 });
         }
         // lamp-tasks stops: a run still going is ended through its runner
@@ -4870,12 +4901,14 @@ impl HandOvers {
     }
 
     /// One connection: its line read, the one run's place taken or `busy`,
-    /// the answer written.
+    /// the answer written. A cancel line (#8475, [`CANCEL_OP`]) takes no
+    /// place and is answered at once ([`HandOvers::cancel`]).
     fn one(
         &self,
         stream: &UnixStream,
         running: &std::sync::atomic::AtomicBool,
         running_direct: &std::sync::atomic::AtomicBool,
+        lanes: &Lanes,
     ) {
         let line = match read_line(stream) {
             Ok(line) => line,
@@ -4884,10 +4917,19 @@ impl HandOvers {
                 return;
             }
         };
+        let parsed = serde_json::from_slice::<Value>(&line).ok();
+        if parsed.as_ref().is_some_and(|line| line["op"] == CANCEL_OP) {
+            let answered = match parsed.as_ref().and_then(Value::as_object) {
+                Some(fields) if fields.len() == 1 => self.cancel(lanes),
+                _ => refusal("bad_request", "a cancel line is {\"op\":\"cancel\"} alone"),
+            };
+            write_answer(stream, &answered);
+            return;
+        }
         // A `run` step's line takes its own place (#8158): it is never held
         // behind an agent's task, which may run for minutes.
-        let direct = serde_json::from_slice::<Value>(&line)
-            .is_ok_and(|line| line["op"] == crate::skill_run::OP);
+        let direct = parsed.is_some_and(|line| line["op"] == crate::skill_run::OP);
+        let lane = if direct { &lanes.direct } else { &lanes.task };
         let running = if direct { running_direct } else { running };
         if running
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
@@ -4899,38 +4941,228 @@ impl HandOvers {
         }
         let place = Place(running);
         let (line, notice) = getting_ready_asked(line, stream);
+        // Each runner kept in this place's lane while it runs (#8475), so a
+        // cancel line finds the run, whichever runner it goes through.
+        let main = Laned {
+            runner: &*self.runner,
+            lane,
+        };
+        let net = self.net.as_deref().map(|net| Laned {
+            runner: net as &dyn Runner,
+            lane,
+        });
+        let held = self.held.as_deref().map(|held| Laned {
+            runner: held as &dyn Runner,
+            lane,
+        });
+        let direct_runner = self.direct.as_deref().map(|direct| Laned {
+            runner: direct as &dyn Runner,
+            lane,
+        });
         let agent = Agent {
-            net: self.net.as_deref().map(|net| net as &dyn Runner),
-            held: self.held.as_deref().map(|held| held as &dyn Runner),
+            net: net.as_ref().map(|net| net as &dyn Runner),
+            held: held.as_ref().map(|held| held as &dyn Runner),
             work: self.work.as_deref(),
             services: crate::hermes_config::agent_services_on(),
             keys: self
                 .keys
                 .as_deref()
                 .map(|keys| keys as &dyn crate::skill_keys::Keys),
-            direct: self.direct.as_deref().map(|direct| direct as &dyn Runner),
+            direct: direct_runner.as_ref().map(|direct| direct as &dyn Runner),
         };
         let answered = with_getting_ready(notice, || {
-            answer_agent(
-                &line,
-                true,
-                &self.skills,
-                &*self.tokens,
-                &*self.runner,
-                &agent,
-            )
+            answer_agent(&line, true, &self.skills, &*self.tokens, &main, &agent)
         });
         drop(place);
         // The outcome's code only: never the line, the task's words or the
         // token.
         match answered["ok"].as_bool() {
             Some(true) => eprintln!("[lamp-tasks] skill task: the run ended"),
+            _ if answered[STOPPED] == true => {
+                eprintln!("[lamp-tasks] skill task: the run was stopped by a cancel")
+            }
             _ => eprintln!(
                 "[lamp-tasks] skill task: refused {}",
                 answered["error"].as_str().unwrap_or("?")
             ),
         }
         write_answer(stream, &answered);
+    }
+
+    /// A cancel line's answer (#8475), at once: every run in `lanes` is
+    /// stopped ([`stop_run`]: its token ended at lamp-control, then its
+    /// cancel set, on a thread of its own), and named with its skill and
+    /// how long it had run:
+    /// `{"stopped":[{"run","skill","ms"}]}`, empty with nothing running.
+    fn cancel(&self, lanes: &Lanes) -> Value {
+        let mut stopped = Vec::new();
+        for lane in [&lanes.task, &lanes.direct] {
+            let Some((run, skill, ms, first)) = lane.stop() else {
+                continue;
+            };
+            eprintln!(
+                "lamp-tasks: run {run} of {skill} stopped by a cancel {ms} ms after start (#8475)"
+            );
+            if let Some(cancel) = first {
+                stop_run(self.tokens.clone(), run.clone(), cancel);
+            }
+            stopped.push(json!({"run": run, "skill": skill, "ms": ms}));
+        }
+        json!({"stopped": stopped})
+    }
+}
+
+/// The `op` of a cancel line on [`HAND_OVER_SOCKET`] (#8475):
+/// `{"op":"cancel"}` alone, from lamp-skills as any hand-over is
+/// ([`caller_is_lamp_skills`]). It stops the skill's task and the `run`
+/// step running there, and is answered at once:
+/// `{"stopped":[{"run":"<run id>","skill":"<name>","ms":<ms since its start>}]}`,
+/// `{"stopped":[]}` with nothing running. Each run stopped is answered on
+/// its own hand-over [`stopped_answer`].
+pub const CANCEL_OP: &str = "cancel";
+
+/// How long a cancel's stop waits for lamp-control's `end` of the run
+/// before its cancel is set anyway (#8475, `stop_run`): its token is
+/// ended, so a `say` or motion its script still asks is refused, before
+/// its process group is killed; an `end` that hangs never holds the kill
+/// past this.
+pub const END_FIRST_WAIT: Duration = Duration::from_millis(500);
+
+/// A run a cancel stops (#8475), off the answering thread: `run`'s token
+/// ended through `tokens` (lamp-control's admin `end`: the token refused,
+/// what it queued gone, its connections closed), then `cancel` set, which
+/// its runner reads and kills it by, after at most [`END_FIRST_WAIT`]. The
+/// run's own end after its exit asks `end` once more, which lamp-control
+/// answers for a run already ended (`"ended": false`), quietly.
+fn stop_run(
+    tokens: std::sync::Arc<dyn Tokens + Send + Sync>,
+    run: String,
+    cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) {
+    let set = cancel.clone();
+    let spawned = std::thread::Builder::new()
+        .name("tasks-skill-stop".into())
+        .spawn(move || {
+            let (ended, end_waited) = std::sync::mpsc::channel::<()>();
+            let _ = std::thread::Builder::new()
+                .name("tasks-skill-stop-end".into())
+                .spawn(move || {
+                    tokens.end(&run);
+                    let _ = ended.send(());
+                });
+            // Not started: the sender is dropped with it, so this returns
+            // at once and the run is still killed.
+            let _ = end_waited.recv_timeout(END_FIRST_WAIT);
+            set.store(true, Ordering::Release);
+        });
+    if spawned.is_err() {
+        // No thread: killed at once; its own end still ends its token.
+        cancel.store(true, Ordering::Release);
+    }
+}
+
+/// The two places a hand-over runs in (#8158), each with what runs there
+/// now, for a cancel line (#8475).
+#[derive(Default)]
+struct Lanes {
+    /// A skill's task, through its agent.
+    task: Lane,
+    /// A `run` step's script, with no agent ([`crate::skill_run`]).
+    direct: Lane,
+}
+
+/// What runs in one place now: none between runs.
+#[derive(Default)]
+struct Lane(std::sync::Mutex<Option<Running>>);
+
+/// A run kept in its [`Lane`] while its runner runs it.
+struct Running {
+    run: String,
+    skill: String,
+    began: std::time::Instant,
+    /// The run's own [`SkillRun::cancel`].
+    cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// A cancel already stopped it: a second one names it again but
+    /// doesn't end it twice.
+    stopping: bool,
+}
+
+impl Lane {
+    /// `run` kept here until the returned guard drops.
+    fn hold(&self, run: &SkillRun) -> LaneHeld<'_> {
+        *self.0.lock().unwrap_or_else(|p| p.into_inner()) = Some(Running {
+            run: run.run.clone(),
+            skill: run.skill.clone(),
+            began: std::time::Instant::now(),
+            cancel: run.cancel.clone(),
+            stopping: false,
+        });
+        LaneHeld(self)
+    }
+
+    /// The run here, marked stopping: its id, skill, milliseconds since its
+    /// start, and its cancel for the first cancel only. None: nothing runs.
+    #[allow(clippy::type_complexity)]
+    fn stop(
+        &self,
+    ) -> Option<(
+        String,
+        String,
+        u64,
+        Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    )> {
+        let mut now = self.0.lock().unwrap_or_else(|p| p.into_inner());
+        let running = now.as_mut()?;
+        let first = !std::mem::replace(&mut running.stopping, true);
+        Some((
+            running.run.clone(),
+            running.skill.clone(),
+            u64::try_from(running.began.elapsed().as_millis()).unwrap_or(u64::MAX),
+            first.then(|| running.cancel.clone()),
+        ))
+    }
+}
+
+/// A run's place in its [`Lane`], let go however its runner ends.
+struct LaneHeld<'a>(&'a Lane);
+
+impl Drop for LaneHeld<'_> {
+    fn drop(&mut self) {
+        *self.0.0.lock().unwrap_or_else(|p| p.into_inner()) = None;
+    }
+}
+
+/// A runner whose runs are kept in `lane` while they run (#8475): the
+/// rest is `runner`'s own.
+struct Laned<'a> {
+    runner: &'a dyn Runner,
+    lane: &'a Lane,
+}
+
+impl Runner for Laned<'_> {
+    fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
+        let _held = self.lane.hold(run);
+        self.runner.run(run, end_token)
+    }
+
+    fn stop_on(&self, stop: std::sync::Arc<std::sync::atomic::AtomicBool>) {
+        self.runner.stop_on(stop);
+    }
+
+    fn prepare(&self) {
+        self.runner.prepare();
+    }
+
+    fn ready(&self) -> Result<(), String> {
+        self.runner.ready()
+    }
+
+    fn answers(&self) -> bool {
+        self.runner.answers()
+    }
+
+    fn tell_words(&self, start_in: Option<&Path>) -> String {
+        self.runner.tell_words(start_in)
     }
 }
 

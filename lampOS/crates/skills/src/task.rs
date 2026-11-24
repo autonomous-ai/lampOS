@@ -1566,6 +1566,88 @@ pub fn not_ready_line(
     .then_some(lamp_voice::skill_words::NOT_READY_LINE)
 }
 
+/// The call socket's op by which the voice stops the skill run under way
+/// (#8475 part 2): the voice's alone, as a run now is.
+pub const CANCEL_OP: &str = "cancel";
+
+/// What a peer that is not the voice is answered when it asks [`CANCEL_OP`].
+pub const CANCEL_NOT_THE_VOICE: &str = "only the voice may stop a skill's run";
+
+/// The one line lamp-skills writes to lamp-tasks' hand-over socket to stop
+/// the skill run under way (#8475 part 2).
+pub fn cancel_line() -> String {
+    serde_json::json!({"op": "cancel"}).to_string()
+}
+
+/// The voice's answer to [`CANCEL_OP`] from lamp-tasks' `answer` to
+/// [`cancel_line`] (`{"stopped":[{"run","skill","ms"}]}`): the first run
+/// stopped, `{"stopped": "<skill>", "ms": <n>}`, or
+/// `{"stopped": null, "ms": null}` when nothing ran or the answer can't be
+/// read.
+pub fn cancel_answer(answer: &str) -> serde_json::Value {
+    let first = serde_json::from_str::<serde_json::Value>(answer.trim())
+        .ok()
+        .and_then(|answer| answer["stopped"].as_array()?.first().cloned());
+    let skill = first
+        .as_ref()
+        .and_then(|first| first["skill"].as_str().map(str::to_owned));
+    let ms = first
+        .as_ref()
+        .filter(|_| skill.is_some())
+        .and_then(|first| first["ms"].as_u64());
+    serde_json::json!({"stopped": skill, "ms": ms})
+}
+
+/// How long after a stop its skill's hand-over may still return as
+/// stopped by the person ([`stopped_by_person`]): lamp-tasks answers the
+/// stopped run's hand-over at once, so a mark older than this is a stop
+/// that came after its run had ended, and never quiets a later run.
+pub const STOPPED_FOR_MS: u64 = 30_000;
+
+/// The skills whose run the person just stopped (#8475 part 2), each with
+/// when: its hand-over's failure answer is then a quiet stop.
+static STOPPED_BY_PERSON: Mutex<BTreeMap<String, u64>> = Mutex::new(BTreeMap::new());
+
+/// `skill`'s run stopped by the person at `at_ms` ([`CANCEL_OP`]).
+pub fn mark_stopped(skill: &str, at_ms: u64) {
+    STOPPED_BY_PERSON
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .insert(skill.to_owned(), at_ms);
+}
+
+/// Whether lamp-tasks' answer `sent` to `skill`'s hand-over, read at
+/// `now_ms`, is its run stopped by the person (#8475 part 2): an answer
+/// that says `"stopped": true`, or any answer short of a run that ended
+/// well for a skill marked stopped ([`mark_stopped`]) within
+/// [`STOPPED_FOR_MS`]. Its mark is cleared either way, as its hand-over
+/// returned. Then no failure line is said and no failed run is told.
+pub fn stopped_by_person(
+    skill: &str,
+    sent: &Result<String, crate::service_write::Unrun>,
+    now_ms: u64,
+) -> bool {
+    let marked = STOPPED_BY_PERSON
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .remove(skill)
+        .is_some_and(|at| now_ms.saturating_sub(at) <= STOPPED_FOR_MS);
+    let answer = sent
+        .as_ref()
+        .ok()
+        .and_then(|answer| serde_json::from_str::<serde_json::Value>(answer.trim()).ok());
+    if answer
+        .as_ref()
+        .is_some_and(|answer| answer["stopped"] == serde_json::Value::Bool(true))
+    {
+        return true;
+    }
+    let ended_well = answer
+        .as_ref()
+        .is_some_and(|answer| answer["ok"] == serde_json::Value::Bool(true));
+    marked && !ended_well
+}
+
 #[cfg(test)]
 mod tests {
     /// #7354: only a run asked by voice asks lamp-tasks for the
