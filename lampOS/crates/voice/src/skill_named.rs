@@ -327,17 +327,20 @@ pub const REFUSED_ONLY_AROUND: &str =
     "it is only words said around an ask, a greeting or a request";
 /// [`ask_refused`]'s: nothing of the skill's own, only the lamp's.
 pub const REFUSED_NOTHING_OWN: &str = "it names nothing of the skill's own, only the lamp's";
-/// [`made_ask_refused`]'s: its only word of its own is a short answer
+/// [`made_ask_refused`]'s: every word of its own is a short answer
 /// ([`ANSWER_WORDS`]), a yes or a no being the lamp's to answer (#8451):
 /// a made skill's alone ([`made_ask_refused`]).
 pub const REFUSED_ANSWER: &str =
     "it is only a short answer, and a yes or a no is the lamp's to answer";
 
-/// The short answers an ask may not have as its only word of its own past
+/// The short answers an ask may not have as all its words of its own past
 /// those said around an ask ([`made_ask_refused`]): "yes please", "fine
-/// thanks", "cool thanks" are answers said to the lamp, never a skill's
-/// start (#8451, the first builder's call). Beside another word of its own
-/// one passes ("great job pebble", "yes indeed").
+/// thanks", "yeah sure", "yes yes" are answers said to the lamp, never a
+/// skill's start (#8451, the first builder's call; Twelve's P2 on #8469).
+/// Beside another word of its own one passes ("great job pebble", "yes
+/// indeed"). "ok" and "okay" are also said around an ask, so "okay please"
+/// is refused as only such words ([`REFUSED_ONLY_AROUND`]), and "no" and
+/// "nope" as a no ([`REFUSED_NO_OR_QUESTION`]), [`ask_refused`] first.
 const ANSWER_WORDS: &[&str] = &[
     "yes", "yeah", "yep", "ok", "okay", "sure", "alright", "no", "nope", "fine", "good", "great",
     "cool", "right", "maybe",
@@ -402,16 +405,17 @@ pub fn ask_refused(ask: &str) -> Option<&'static str> {
 
 /// Why `ask`, one of a skill's asks made here (`crate::made_skill`: its
 /// cap, its keep and the person's own words at the make), is refused:
-/// [`ask_refused`]'s, or a short answer as its only word of its own
+/// [`ask_refused`]'s, or only short answers as its words of its own
 /// ([`ANSWER_WORDS`], [`REFUSED_ANSWER`], #8451: "yes please", "fine
-/// thanks"). Only a made skill's: a pushed or Store skill's "yes please"
+/// thanks", "yeah sure"). Only a made skill's: a pushed or Store skill's "yes please"
 /// still loads, a yes heard judged by the model in context (the owner's
 /// ruling on #6842, lamp-skills' `it::asks`).
 pub fn made_ask_refused(ask: &str) -> Option<&'static str> {
     ask_refused(ask).or_else(|| {
         let words = lower_words(ask);
         let own = own_words(&words);
-        (own.len() == 1 && ANSWER_WORDS.contains(&own[0])).then_some(REFUSED_ANSWER)
+        (!own.is_empty() && own.iter().all(|word| ANSWER_WORDS.contains(word)))
+            .then_some(REFUSED_ANSWER)
     })
 }
 
@@ -468,7 +472,9 @@ pub fn said_in(ask: &str, line: &str) -> bool {
 const CLAUSE_ENDS: &[char] = &[',', '.', ';', ':', '!', '?'];
 
 /// The words a person names a skill's start after ("whenever I say ...").
-const SAY_CUES: &[&str] = &["say", "says", "said", "saying", "hear", "hears", "heard"];
+/// Never "says" or "saying", which in a make's line mostly tell what the
+/// skill says ("a skill that says good morning", Thirteen's P2 on #8469).
+const SAY_CUES: &[&str] = &["say", "said", "hear", "heard"];
 
 /// The person's whole phrase in `line` that holds `ask` as words in a row
 /// ([`said_in`]), lowercased (#8451, the first builder's required change
@@ -1377,6 +1383,22 @@ mod tests {
         assert_eq!(said_whole("email me", line), None);
         assert_eq!(said_whole("pebble hello", line), None);
         assert_eq!(said_whole("hello there", "hello there pebble"), None);
+        // Thirteen's P2 on #8469: only say, said, hear and heard name a
+        // start; "says" and "saying" tell what the skill says.
+        let morning = "make a skill that says good morning and plays jazz when I wake up";
+        assert_eq!(said_whole("good morning", morning), None);
+        assert_eq!(said_whole("good morning", "one saying good morning"), None);
+        assert_eq!(
+            said_whole(
+                "pebble night",
+                "when I heard pebble night turn off the lights"
+            ),
+            Some(
+                ["pebble", "night", "turn", "off", "the", "lights"]
+                    .map(str::to_owned)
+                    .to_vec()
+            )
+        );
     }
 
     /// The functions kept are read again once the tools file changes: a
@@ -1459,12 +1481,18 @@ mod tests {
             "cool thanks",
             "maybe please",
             "Sure.",
+            // Twelve's P2 on #8469: every word of its own an answer.
+            "yeah sure",
+            "yes yes",
+            "fine fine",
         ] {
             assert_eq!(made_ask_refused(ask), Some(REFUSED_ANSWER), "{ask}");
         }
         assert_eq!(ask_refused("yes please"), None);
         assert_eq!(made_ask_refused("no thanks"), Some(REFUSED_NO_OR_QUESTION));
         assert_eq!(made_ask_refused("good morning"), Some(REFUSED_LAMPS_OWN));
+        // "okay" is said around an ask too: refused as only such words.
+        assert_eq!(made_ask_refused("okay please"), Some(REFUSED_ONLY_AROUND));
         for ask in ["great job pebble", "yes indeed", "pebble hello"] {
             assert_eq!(made_ask_refused(ask), None, "{ask}");
         }

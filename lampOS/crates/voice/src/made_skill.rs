@@ -1273,20 +1273,24 @@ pub fn made_asks(table: &toml::Table) -> Result<Vec<String>, Refused> {
 /// word with a "please" ("yes please", "play please") never starts one.
 const OWN_WORDS: usize = 2;
 
-/// The fewest an ask that is a run of the person's own words for the make
-/// needs (#8451, the first builder's call (b) at 08:12: "whenever I say
-/// pebble hello" is kept as "pebble hello", "hello" being said around an
-/// ask), as long as `crate::skill_named::ask_refused` passes it: a skill's
+/// The fewest an ask that starts the person's own phrase for the make,
+/// right after their say or hear ([`asks_heard`]), needs (#8451, the first
+/// builder's call (b) at 08:12: "whenever I say pebble hello" is kept as
+/// "pebble hello", "hello" being said around an ask), as long as
+/// `crate::skill_named::made_ask_refused` passes it: a skill's
 /// ask is matched only as the whole phrase (`crate::skill_named`'s
 /// `named_among`), so its one word alone never starts it.
 const HEARD_OWN_WORDS: usize = 1;
 
 /// A made skill's `asks` held at the make to `line`, the person's own line
 /// for it (the voice's heard line, or the app's typed ask): each one
-/// that is no run of its words ([`crate::skill_named::said_in`]) needs
-/// [`OWN_WORDS`] of its own, one that is [`HEARD_OWN_WORDS`] (#8451). Its
-/// refusal names the ask and its rule, with a repair, as [`made_asks`]'s.
-/// None to hold with the switch off, or no `asks`.
+/// that starts the phrase they named right after a say or a hear
+/// ([`crate::skill_named::said_whole`]: "pebble hello" in "whenever I say
+/// pebble hello") needs [`HEARD_OWN_WORDS`] of its own, any other
+/// [`OWN_WORDS`], a run of their line elsewhere ("jazz please" in "plays
+/// jazz please when I get home") among them (#8451, Thirteen's P3 on
+/// #8469). Its refusal names the ask and its rule, with a repair, as
+/// [`made_asks`]'s. None to hold with the switch off, or no `asks`.
 fn asks_heard(toml: &str, line: &str) -> Result<(), Refused> {
     if !asks_on() {
         return Ok(());
@@ -1294,14 +1298,13 @@ fn asks_heard(toml: &str, line: &str) -> Result<(), Refused> {
     let Ok(table) = toml::from_str::<toml::Table>(toml) else {
         return Ok(());
     };
-    made_asks_of(
-        &table,
-        MOST_MADE_ASKS,
-        &|ask| match crate::skill_named::said_in(ask, line) {
-            true => HEARD_OWN_WORDS,
-            false => OWN_WORDS,
-        },
-    )
+    made_asks_of(&table, MOST_MADE_ASKS, &|ask| {
+        let words = crate::known_faces::lower_words(ask);
+        match crate::skill_named::said_whole(ask, line) {
+            Some(whole) if whole.starts_with(&words) => HEARD_OWN_WORDS,
+            _ => OWN_WORDS,
+        }
+    })
     .map(|_| ())
 }
 
@@ -1344,31 +1347,32 @@ fn their_rule(words: &[String]) -> &'static str {
     }
 }
 
-/// The person's whole phrase in `line` that holds `ask`, one of a made
-/// skill's asks ([`crate::skill_named::said_whole`]), when it could be an
-/// ask's: [`MADE_ASK_WORDS`] words within [`MOST_MADE_ASK_CHARS`]. None
-/// when the line names none so: the ask, a run of it, is then taken as
-/// their whole phrase.
-fn their_whole(ask: &str, line: &str) -> Option<Vec<String>> {
-    crate::skill_named::said_whole(ask, line).filter(|whole| {
-        MADE_ASK_WORDS.contains(&whole.len())
-            && whole.join(" ").chars().count() <= MOST_MADE_ASK_CHARS
-    })
+/// Whether `whole`, the person's whole phrase for a skill's start
+/// ([`crate::skill_named::said_whole`]), could be an ask:
+/// [`MADE_ASK_WORDS`] words within [`MOST_MADE_ASK_CHARS`].
+fn ask_shaped(whole: &[String]) -> bool {
+    MADE_ASK_WORDS.contains(&whole.len()) && whole.join(" ").chars().count() <= MOST_MADE_ASK_CHARS
 }
 
-/// The lamp's line when one of a made skill's `asks` is a run of `line`,
-/// the person's own line for the make ([`crate::skill_named::said_in`]),
-/// and their whole phrase ([`their_whole`]) breaks a rule no writer can
-/// change ([`their_rule`]): "I can't start a skill with ‘stop the music’,
-/// because that's how you stop me." (#8451, the first builder's (a): said
-/// at once, plainly, with no repair spent on the person's own words).
-/// Journaled with the asks and the rule as [`made_asks`] names them.
-/// An ask that is only part of a longer phrase they named ("hello there"
-/// from "whenever I say hello there pebble") and is refused so is the
-/// writer's mistake, the writer's to mend (the first builder's required
-/// change on #8469): refused as [`made_asks`] refuses it, its repair
-/// naming their whole phrase ("use the words they said: hello there
-/// pebble"). None with the switch off, no line, or none.
+/// The lamp's line when one of a made skill's `asks` is itself refused by
+/// a rule no writer can change ([`their_rule`]) and is the person's whole
+/// phrase, the words they named after a say or a hear
+/// ([`crate::skill_named::said_whole`]): "I can't start a skill with ‘stop
+/// the music’, because that's how you stop me." (#8451, the first
+/// builder's (a): said at once, plainly, with no repair spent on the
+/// person's own words). Journaled with the asks and the rule as
+/// [`made_asks`] names them. A refused ask that is only part of a longer
+/// phrase they named ("hello there" from "whenever I say hello there
+/// pebble") is the writer's mistake (the first builder's required change
+/// on #8469): when their whole phrase breaks such a rule too, it is said
+/// plainly; when it passes, the ask is refused as [`made_asks`] refuses
+/// it, its repair naming their whole phrase ("use the words they said:
+/// hello there pebble"). An ask that passes is kept here ("movie night"
+/// from "whenever I say movie night dim the lights", Thirteen's and
+/// Twelve's P1 on #8469), and one refused where no whole phrase of theirs
+/// is found ("good morning" from "a skill that says good morning", their
+/// P2) costs the ordinary repair. None with the switch off, no line, or
+/// none.
 fn their_ask_refused(toml: &str, line: &str) -> Option<Refused> {
     if !asks_on() || line.trim().is_empty() {
         return None;
@@ -1391,37 +1395,42 @@ fn their_ask_refused(toml: &str, line: &str) -> Option<Refused> {
         }
         let words = crate::known_faces::lower_words(ask);
         let because = their_rule(&words);
-        // Their whole phrase, as the writer wrote it: said at once if it
-        // breaks such a rule.
-        let Some(whole) = their_whole(ask, line).filter(|whole| *whole != words) else {
-            if !because.is_empty() {
-                return Some(plain(ask, words.as_slice(), because));
-            }
+        // An ask that passes is kept, as any part of their phrase the
+        // writer gave that passes; the rest of the make holds it
+        // ([`capped`], [`asks_heard`]).
+        if because.is_empty() {
+            continue;
+        }
+        // No whole phrase of theirs found after a say or a hear: the
+        // writer's pick, refused with the ordinary repair.
+        let Some(whole) = crate::skill_named::said_whole(ask, line) else {
             continue;
         };
-        // Only part of it: their whole phrase breaking such a rule is said
-        // at once all the same, for no part or whole the writer may give
-        // can start the skill.
+        // The ask is their whole phrase: said at once.
+        if whole == words {
+            return Some(plain(ask, words.as_slice(), because));
+        }
+        if !ask_shaped(&whole) {
+            continue;
+        }
+        // Only part of it, refused: their whole phrase breaking such a
+        // rule too is said at once; one that passes is named in a repair.
         let whole_because = their_rule(&whole);
         if !whole_because.is_empty() {
             let named = whole.join(" ");
             return Some(plain(named.as_str(), whole.as_slice(), whole_because));
         }
-        // A part refused where their whole phrase passes: a repair.
-        if !because.is_empty() {
-            let said = words.join(" ");
-            let rule = crate::skill_named::made_ask_refused(&said).unwrap_or_default();
-            let journal = format!(
-                "{ASKS_NOT_KEPT}: asks = {}: {ask:?}: {rule}",
-                asks_given(given)
-            );
-            let repair = format!(
-                "The lamp refused it: {journal}. {ask:?} is only part of the words the person \
-                 said for its start; use the words they said: {}. {MADE_ASKS_FORM}",
-                whole.join(" ")
-            );
-            return Some(Refused(journal, Some(repair)));
-        }
+        let rule = crate::skill_named::made_ask_refused(&words.join(" ")).unwrap_or_default();
+        let journal = format!(
+            "{ASKS_NOT_KEPT}: asks = {}: {ask:?}: {rule}",
+            asks_given(given)
+        );
+        let repair = format!(
+            "The lamp refused it: {journal}. {ask:?} is only part of the words the person \
+             said for its start; use the words they said: {}. {MADE_ASKS_FORM}",
+            whole.join(" ")
+        );
+        return Some(Refused(journal, Some(repair)));
     }
     None
 }
@@ -10113,9 +10122,10 @@ pub fn keep_asked(
             None => "blinking".to_owned(),
         });
     }
-    // The person's own words for its start (#8451): one that breaks a rule
-    // no writer can change is said at once, with no repair; the rest held
-    // to their line, an ask the model chose needing two words of its own.
+    // The person's own words for its start (#8451): their whole phrase,
+    // found after a say or a hear, that breaks a rule no writer can change
+    // is said at once, with no repair; the rest held to their line, an ask
+    // that doesn't start their phrase needing two words of its own.
     let line = request.heard.unwrap_or(request.request);
     if let Some(refused) = their_ask_refused(&files.toml, line) {
         return Err(refused);
