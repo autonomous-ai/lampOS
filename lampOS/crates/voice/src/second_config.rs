@@ -2123,8 +2123,8 @@ mod tests {
         );
     }
 
-    /// #2094: the voice's drop-in turns the switch on and loads the keys'
-    /// folder as `own`, so each file is the `own_<file>` read here, the
+    /// #2094: the voice's drop-in (and, #8367, the product's unit) turns
+    /// the switch on and loads the keys' folder as `own`, so each file is the `own_<file>` read here, the
     /// files root's helper writes.
     #[test]
     fn the_own_keys_drop_in_loads_the_folder_the_names_here_read() {
@@ -2139,9 +2139,17 @@ mod tests {
         ] {
             assert_eq!(name, format!("own_{file}"));
         }
-        // The product's own unit never loads it: off unless the drop-in is there.
+        // #8367: on in the product, the product's own unit carries the same
+        // lines, never the test lamps' own voice address.
         let product = include_str!("../../../deploy/product/lamp-voice.service");
-        assert!(!product.contains(OWN_KEYS_ENV) && !product.contains("LoadCredential=own"));
+        for line in [
+            format!("Environment={OWN_KEYS_ENV}=on\n"),
+            "LoadCredential=own:/etc/lampOS/voice/own\n".to_owned(),
+            "ConfigurationDirectory=lampOS/voice/own\n".to_owned(),
+        ] {
+            assert!(product.contains(&line), "{line}");
+        }
+        assert!(!product.contains("Environment=LAMP_OWN_ELEVENLABS_URL"));
     }
 
     /// A unit's credential is read from its `CREDENTIALS_DIRECTORY`, as the

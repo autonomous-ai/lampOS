@@ -9,7 +9,7 @@ const RECORDS: &str = "lamp-records.service";
 const RECORDS_TIMER: &str = "lamp-records.timer";
 const TEMPLATE: &str = "lamp-eyes-camera@.service";
 const SOCKET: &str = "lamp-eyes-camera.socket";
-const KEYS: &str = "lamp-setup-keys.socket";
+const LEFT_OUT: &str = "lamp-keeper-restart.socket";
 
 fn mood() -> String {
     "[Service]\nUser=lampos\nGroup=lampos\nExecStart=/opt/lampOS/mood/current/lamp-mood\n[Install]\nWantedBy=lampos.target\n".into()
@@ -399,18 +399,18 @@ fn a_lamp_of_its_own_units_an_older_build_or_a_unit_install_leaves_out_gets_noth
     publish_all(&mut lamp, manifest::COMPANIONS_UPDATER, "mood 1");
     assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
     assert!(!lamp.exists(&format!("/etc/systemd/system/{MOOD}")));
-    // The own keys' helper, left out of install until its lamp check.
+    // The keeper's restart helper, left out of install until its lamp check.
     let mut lamp = product_lamp();
-    let keys = "[Socket]\nListenStream=/run/lampos-setup-keys/keys.sock\nAccept=yes\n[Install]\nWantedBy=lampos.target\n";
+    let keeper = "[Socket]\nListenStream=/run/lampos-keeper-restart/restart.sock\nAccept=yes\n[Install]\nWantedBy=lampos.target\n";
     publish(
         &mut lamp,
         manifest::ADDS_UPDATER,
         &[("lamp-eyes", "eyes 1")],
-        &[(KEYS, keys.into())],
+        &[(LEFT_OUT, keeper.into())],
     );
     assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
-    assert!(!lamp.exists(&format!("/etc/systemd/system/{KEYS}")));
-    assert!(!lamp.channel.fetched.iter().any(|url| url.ends_with(KEYS)));
+    assert!(!lamp.exists(&format!("/etc/systemd/system/{LEFT_OUT}")));
+    assert!(!lamp.channel.fetched.iter().any(|url| url.ends_with(LEFT_OUT)));
 }
 
 /// A lamp already given lamp-mood at build `text`, enabled into
