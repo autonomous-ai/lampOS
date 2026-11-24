@@ -2200,6 +2200,37 @@ pub fn handing_over_next(lead_in: bool, who: &str) -> String {
     }
 }
 
+/// What the person hears at the hand-over when lamp-tasks knows the lamp's
+/// pane on its computer is stopped (`status`'s `"computer":"stopped"`,
+/// #8445): said once, at the hand-over, never a second line about the wait
+/// (the first builder's Q3 on #8445, word for word). The 20 s line
+/// ([`crate::hand_wait`]) stays for the wait nobody knew of in advance.
+pub const WAKING_LINE: &str =
+    "Your computer's asleep, so I'm waking it up. It'll take about a minute.";
+
+/// Whether lamp-tasks' `status` answer says the lamp's pane on its computer
+/// is known stopped (#8445). Absent, or anything else, is unknown.
+fn computer_stopped(status: &Value) -> bool {
+    status.get("computer").and_then(Value::as_str) == Some("stopped")
+}
+
+/// [`handing_over_next`] for the lamp's own work ([`OWN_ENGINE`]) whose
+/// pane is known stopped (#8445): [`WAKING_LINE`] said once, in the
+/// hand-over. With the lead-in, round 1's lead-in was already heard before
+/// the status was read, so it comes in round 2; without it, or for a yes
+/// taken in code, in the one round.
+pub fn waking_next(lead_in: bool) -> String {
+    if lead_in {
+        format!(
+            "They have heard you say you will work on it. Now say once, in these words: \"{WAKING_LINE}\" Then add only, in a few words, that you will tell them when it is done, unless you said that already. Say nothing else about the wait. It has not been started yet: do not say it has."
+        )
+    } else {
+        format!(
+            "Tell them in a few natural words that you will work on it now, then say once, in these words, \"{WAKING_LINE}\", and that you will let them know when it is done (\"Sure, I'll work on that. {WAKING_LINE} I'll tell you when it's done.\"). Say nothing else about the wait. It has not been started yet: do not say it has."
+        )
+    }
+}
+
 /// What the model is told after `confirm_agent_task` handed a question task
 /// over ([`QUESTIONS_FLAG`]): that it asked, that the answer takes a few
 /// minutes, and that it is told when it comes, never guessed now.
@@ -3561,6 +3592,10 @@ pub fn yes_taken(place: &Place, request: u64, words: &str, person: Option<&str>)
     let who = pending.who;
     let next = if place.questions && is_question(&pending.text) {
         asked_next(false, who)
+    } else if told.get("waking") == Some(&json!(true)) {
+        // #8445: known stopped, the waking line in the one round; the
+        // confirm marked its wait told (`hand_wait::told_at_hand_over`).
+        waking_next(false)
     } else {
         handing_over_next(false, who)
     };
@@ -5072,8 +5107,20 @@ fn run_for_asked(
                         crate::task_news::keep_typed(store, pending.id);
                     }
                     let who = pending.who;
-                    let next = if place.questions && is_question(&pending.text) {
+                    let question = place.questions && is_question(&pending.text);
+                    // #8445: the lamp's own work, asked by voice, whose pane
+                    // on the computer lamp-tasks knows is stopped: the
+                    // waking line at the hand-over, and no 20 s line after.
+                    // A question's wait keeps the 20 s line.
+                    let waking = !question
+                        && who == OWN_ENGINE
+                        && computer_stopped(&status)
+                        && !crate::messages::is_text(pending.request)
+                        && !crate::made_skill::is_brief(&pending.text);
+                    let next = if question {
                         asked_next(place.lead_in, who)
+                    } else if waking {
+                        waking_next(place.lead_in)
                     } else {
                         handing_over_next(place.lead_in, who)
                     };
@@ -5083,6 +5130,10 @@ fn run_for_asked(
                     // ([`open_work_note`]).
                     // A made skill's brief is the lamp's own make: no note.
                     if !crate::made_skill::is_brief(&pending.text) {
+                        // Its wait told now (#8445): no 20 s line after.
+                        if waking {
+                            crate::hand_wait::told_at_hand_over(&pending.id.to_string());
+                        }
                         handed_over(&pending.id.to_string(), &label_of(&pending.text));
                         // One line if it still waits for its agent after
                         // 20 s, on a cold session (#8445); asked by voice only.
@@ -5094,16 +5145,18 @@ fn run_for_asked(
                             );
                         }
                     }
-                    (
-                        json!({
-                            "handing_over": true,
-                            "who": who,
-                            "work_id": pending.id.to_string(),
-                            "label": label_of(&pending.text),
-                            "next": next
-                        }),
-                        true,
-                    )
+                    let mut told = json!({
+                        "handing_over": true,
+                        "who": who,
+                        "work_id": pending.id.to_string(),
+                        "label": label_of(&pending.text),
+                        "next": next
+                    });
+                    // Only when waking: otherwise the answer is as before.
+                    if waking {
+                        told["waking"] = true.into();
+                    }
+                    (told, true)
                 }
                 Some(_) => (json!({"error": "It could not be started just now."}), true),
                 None => (unreached(place), false),
@@ -10169,6 +10222,191 @@ pub(crate) mod tests {
                 .unwrap()
                 .starts_with("Codex isn't set up")
         );
+    }
+
+    /// #8445 (the first builder's Q3): the waking line is the ruling's words,
+    /// said once in what the model is told, with the lead-in or without,
+    /// in the first person for the lamp's own work.
+    #[test]
+    fn the_waking_line_is_said_once_in_the_first_person() {
+        assert_eq!(
+            WAKING_LINE,
+            "Your computer's asleep, so I'm waking it up. It'll take about a minute."
+        );
+        let with = waking_next(true);
+        assert_eq!(with.matches(WAKING_LINE).count(), 1, "{with}");
+        assert!(with.starts_with("They have heard you say you will work on it."));
+        // Without the lead-in: in the one round, its example says it once.
+        let without = waking_next(false);
+        assert!(without.contains("\"Sure, I'll work on that. Your computer's asleep"));
+        for next in [&with, &without] {
+            assert!(next.contains("Say nothing else about the wait."), "{next}");
+            assert!(
+                !next.contains(OWN_ENGINE) && !next.contains("giving"),
+                "{next}"
+            );
+        }
+    }
+
+    /// #8445: the lamp's own task prepared in request 8 for work `id`, and
+    /// a tasks part whose `status` says `computer` as given (absent: `None`)
+    /// and whose `confirm` takes it.
+    fn waking_case(
+        name: &str,
+        id: u64,
+        who: &'static str,
+        computer: Option<&str>,
+    ) -> (PathBuf, mpsc::Receiver<Value>) {
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-waking-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let mut status = json!({"ok":true,"store_id":"s1","revision":0,"signed_in":"yes","summary":{"session_id":"sess"}});
+        if let Some(computer) = computer {
+            status["computer"] = computer.into();
+        }
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status),
+                (
+                    "voice.sock",
+                    json!({"ok":true,"id":id,"queued":true,"revision":2}),
+                ),
+            ],
+        );
+        *PENDING.lock().unwrap() = Some(Pending {
+            id,
+            request: 8,
+            who,
+            engine: None,
+            ..moon(Instant::now())
+        });
+        (directory, seen)
+    }
+
+    fn confirming() -> ToolCall {
+        ToolCall {
+            id: "c".into(),
+            name: CONFIRM.into(),
+            args: json!({}),
+        }
+    }
+
+    /// #8445: the model's confirm of the lamp's own work, `status` saying
+    /// its computer's pane is stopped: the hand-over says the waking line
+    /// (round 2 with the lead-in, the one round without), its answer says
+    /// `waking`, and its wait is marked told, so the 20 s line is not said
+    /// too (`hand_wait::a_wait_told_at_the_hand_over_gets_no_line_at_20_s`).
+    #[test]
+    fn a_confirm_with_the_computer_known_stopped_says_the_waking_line_once() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        for (n, lead_in) in [(84451, false), (84452, true)] {
+            let (directory, seen) =
+                waking_case(&format!("stopped-{n}"), n, OWN_ENGINE, Some("stopped"));
+            let mut place = correcting(&directory, false);
+            place.lead_in = lead_in;
+            assert!(!crate::hand_wait::was_told(&n.to_string()));
+            let (told, answered) = run(&place, &confirming(), 9, true, PEER_WAIT);
+            assert!(answered && told["handing_over"] == json!(true), "{told}");
+            assert_eq!(told["waking"], json!(true), "{told}");
+            assert_eq!(told["next"], waking_next(lead_in), "{told}");
+            assert!(
+                crate::hand_wait::was_told(&n.to_string()),
+                "no 20 s line too"
+            );
+            let ops: Vec<String> = seen
+                .try_iter()
+                .map(|line| line["op"].as_str().unwrap().to_owned())
+                .collect();
+            assert_eq!(ops, ["status", "confirm"]);
+            let _ = std::fs::remove_dir_all(&directory);
+        }
+        *PENDING.lock().unwrap() = None;
+    }
+
+    /// #8445: `computer` absent (unknown), or a computer's named agent
+    /// (the lamp knows only its own pane), or a question: the confirm's
+    /// answer is as before, byte for byte, and the 20 s line stays.
+    #[test]
+    fn without_the_computer_known_stopped_the_confirm_is_as_before() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        for (n, who, computer) in [
+            (84453, OWN_ENGINE, None),
+            (84454, OWN_ENGINE, Some("idle")),
+            (84455, CLAUDE_CODE, Some("stopped")),
+        ] {
+            let (directory, _seen) = waking_case(&format!("as-before-{n}"), n, who, computer);
+            let place = correcting(&directory, false);
+            let (told, _) = run(&place, &confirming(), 9, true, PEER_WAIT);
+            assert_eq!(
+                told,
+                json!({
+                    "handing_over": true,
+                    "who": who,
+                    "work_id": n.to_string(),
+                    "label": label_of(&moon(Instant::now()).text),
+                    "next": handing_over_next(false, who)
+                }),
+                "{n}"
+            );
+            assert!(!crate::hand_wait::was_told(&n.to_string()), "{n}");
+            let _ = std::fs::remove_dir_all(&directory);
+        }
+        // A question's wait keeps the 20 s line.
+        let (directory, _seen) = waking_case("question", 84456, OWN_ENGINE, Some("stopped"));
+        if let Some(pending) = PENDING.lock().unwrap().as_mut() {
+            pending.text = "Answer this question: what is the tallest mountain in Vietnam?".into();
+        }
+        let mut place = correcting(&directory, false);
+        place.questions = true;
+        let (told, _) = run(&place, &confirming(), 9, true, PEER_WAIT);
+        assert!(told["handing_over"] == json!(true), "{told}");
+        assert!(told.get("waking").is_none(), "{told}");
+        assert!(!crate::hand_wait::was_told("84456"));
+        let _ = std::fs::remove_dir_all(&directory);
+        *PENDING.lock().unwrap() = None;
+    }
+
+    /// #8445: a plain yes taken in code (#7027) to the lamp's own work,
+    /// its computer's pane known stopped: the line given to the model says
+    /// the waking line once, in the one round, and the wait is marked told.
+    #[test]
+    fn a_yes_taken_in_code_with_the_computer_known_stopped_says_the_waking_line_once() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _thread = crate::provider_worker::tests::one_thread();
+        decided_here();
+        let (directory, _seen) = waking_case("yes-in-code", 84457, OWN_ENGINE, Some("stopped"));
+        {
+            let now = Instant::now();
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            *thread = crate::thread::Thread::new();
+            thread.person("Write a two-line poem about the moon", true, now);
+            thread.lamp(
+                8,
+                "The lamp will write a two-line poem about the moon. Shall I start it?",
+                now,
+            );
+            thread.line_of(9, "Yes.");
+        }
+        let place = correcting(&directory, false);
+        let note = yes_taken(&place, 9, "Yes.", None).expect("the yes is taken in code");
+        assert_eq!(
+            note.matches(WAKING_LINE).count(),
+            2,
+            "the line and its example: {note}"
+        );
+        assert!(note.contains(&waking_next(false)), "{note}");
+        assert!(crate::hand_wait::was_told("84457"));
+        *PENDING.lock().unwrap() = None;
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        let _ = std::fs::remove_dir_all(&directory);
     }
 
     /// #7930: with a work id, check_agent_task asks lamp-tasks for that one

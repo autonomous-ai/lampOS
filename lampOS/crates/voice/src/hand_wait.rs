@@ -80,6 +80,13 @@ pub fn told_at_hand_over(id: &str) {
     }
 }
 
+/// Whether work `id`'s wait was told, at its hand-over or at [`AFTER`]
+/// (for the hand-over's tests, #8445).
+#[cfg(test)]
+pub(crate) fn was_told(id: &str) -> bool {
+    said().iter().any(|said| said == id)
+}
+
 /// Work `id` was just handed over through lamp-tasks at `directory`: one
 /// line [`AFTER`] from now while it still waits ([`check_once`]), on a
 /// thread of its own, never the turn's. Nothing without the say service.
