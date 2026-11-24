@@ -696,8 +696,9 @@ pub struct HttpCheck {
     pub deepgram: String,
     /// ElevenLabs' API root, a test's local server in place of it.
     pub elevenlabs: String,
-    /// A test lamp's `LAMP_OWN_ELEVENLABS_URL` (`lamp_msgs::own_voice`):
-    /// the check goes there, as the voice's speech will.
+    /// A test lamp's `LAMP_OWN_ELEVENLABS_URL`, read only under its gate
+    /// (`lamp_msgs::own_voice`, #8394's P2): the check goes there, as the
+    /// voice's speech will.
     pub switched: Option<String>,
     https_only: bool,
 }
