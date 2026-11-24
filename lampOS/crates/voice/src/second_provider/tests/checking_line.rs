@@ -174,13 +174,17 @@ async fn a_slow_answer_is_said_over_once_and_a_quick_one_never() {
         tokio::time::sleep(Duration::from_millis(2_500)).await;
         "slow"
     };
-    let (answer, was) = said_if_slow(APP_WAIT_LINE_AFTER, slow, say).await.unwrap();
+    let Ok((answer, was)) = said_if_slow(APP_WAIT_LINE_AFTER, slow, say).await else {
+        panic!("stopped");
+    };
     assert_eq!((answer, was, said.get()), ("slow", true, 1));
     let quick = async {
         tokio::time::sleep(Duration::from_millis(1_400)).await;
         "quick"
     };
-    let (answer, was) = said_if_slow(APP_WAIT_LINE_AFTER, quick, say).await.unwrap();
+    let Ok((answer, was)) = said_if_slow(APP_WAIT_LINE_AFTER, quick, say).await else {
+        panic!("stopped");
+    };
     assert_eq!((answer, was, said.get()), ("quick", false, 1));
     // A stop while saying it ends the wait at once.
     let stopped = said_if_slow(
