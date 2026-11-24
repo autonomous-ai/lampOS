@@ -534,6 +534,59 @@ stop, since a router can refuse a right password's first handshake: the join
 keeps waiting, a join at 20 s is kept, and one that never joins gets the whole
 minute, then `wrong_password` (#4348).
 
+### Wi-Fi country from the time zone (#7707)
+
+The join writes wpa_supplicant's country from local time-zone data. For first
+setup, `run_configured` passes the accepted request's `timezone` to
+`Config::wifi_country` only when `Save::keeps_settings()` is true. When that
+zone is absent, it reads the saved `Config.timezone_file` (normally
+`/etc/timezone`). Recovery setup and the app's `wifi.set` helper use only the
+saved time zone: a recovery request cannot change the country by supplying a
+new zone.
+
+The resolver reads `zone.tab` under `Config.zoneinfo` and accepts a country
+only when it is exactly two uppercase ASCII letters. It tries the selected
+zone name directly first, then resolves symlink aliases through a valid
+`TZif` file whose canonical path remains inside that zoneinfo directory.
+Copied or hard-linked aliases without their own table row fall back: this
+lookup does not compare file contents or inode identity. `posix/` and `right/`
+prefixes are normalized for the table lookup. Missing, invalid or
+unmapped zone data falls back to `Config.country`, which is `US` in the
+product configuration. A malformed configured fallback is still refused by
+configuration validation; deriving a country does not bypass that check.
+There is no network geolocation and no new request or response field.
+
+For setup and recovery HTTP requests, this lookup runs in the existing join
+background thread after the existing 2-second pause that lets the response
+reach the phone before the hotspot goes away. App Wi-Fi changes perform it
+in the existing Wi-Fi helper using the saved zone. SSID/password and
+wpa_supplicant validation, join timeouts, app confirmation and rollback retain
+their existing behavior. The local lookup latency target is **under 10 ms**
+from selecting the zone through returning the country, including local file
+reads. On 24 November 2026, an unoptimized native macOS integration run
+measured request, symlink-alias, saved-zone and unknown-zone lookups, with
+1,000 repeated calls per case. Each first call was under 0.5 ms and each
+case's p95 under 1.3 ms, but the maximum was 93.3 ms: **the 10 ms target was
+not fully met**. The test copied the installed `zone.tab` into a temporary
+fixture TZif tree; fixture creation and that copy warm filesystem caches, so
+these first calls are not cold-filesystem measurements. Command from `lampOS`:
+`cargo test -q -p lamp-setup wifi_country_local_lookup_timing -- --ignored --nocapture`.
+This measures local lookup only, not device scan or association latency.
+A second run measured first calls of 13.4 ms for the request zone, 2.1 ms
+for the alias and 1.2 ms for the saved zone; repeated-call p95 was under
+0.4 ms and the maximum 4.1 ms. The earlier 93.3 ms maximum still stands,
+and the 10 ms target remains not fully met; neither run establishes
+cold-filesystem performance or the cause of the timing difference.
+
+The initial network scan happens before the phone supplies its setup zone.
+Selecting a country for the later join does not establish which channels that
+scan can discover. These hardware checks remain separate and unverified:
+
+| Target-hardware check | Status |
+|---|---|
+| Discover a channel-13 network during the initial setup scan | Not measured |
+| Associate with that network after the join selects its country | Not measured |
+
 **The TLS reach.** A TCP connection alone is not the Internet: anything that
 accepts and stays silent, or answers in plain text, would pass. So, as V1, the
 handshake must complete, and the name's lookup, the connection and the

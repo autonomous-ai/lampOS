@@ -7,7 +7,7 @@ use lamp_setup::{
     scan,
     serve::{
         Accepted, Backend, Config, Files, Phase, Save, SetupRequest, Status, backend_link, check,
-        run, start, start_unless_stopped, zone_env, zone_known,
+        run, run_configured, start, start_unless_stopped, zone_env, zone_known,
     },
     wifi::Host,
 };
@@ -96,6 +96,195 @@ fn good() -> Value {
            "device_id": "d1", "name": " Lan ", "timezone": "Asia/Ho_Chi_Minh",
            // V1's page sends these too; they are accepted and ignored.
            "channel": "telegram", "mqtt_port": 1883})
+}
+
+// The product fallback is US; using this file's usual VN fixture would hide
+// a join that still ignores the home zone.
+#[test]
+fn wifi_country_comes_from_the_request_before_the_zone_is_saved() {
+    let root = Root::new();
+    let mut config = root.config(false);
+    config.country = "US".into();
+    fs::write(
+        config.zoneinfo.join("zone.tab"),
+        "VN\t+1045+10640\tAsia/Ho_Chi_Minh\nUS\t+404251-0740023\tAmerica/New_York\n",
+    )
+    .unwrap();
+    let accepted = check(&request(good()), &config).unwrap();
+    assert!(!config.timezone_file.exists());
+    let status = Arc::new(Mutex::new(Status::new("lamp-test".into())));
+    let mut lamp = Lamp::new(true);
+    let mut saved = Saved::default();
+    run_configured(&status, &accepted, &config, &mut lamp, &mut saved, || None);
+    let conf = String::from_utf8(lamp.conf.unwrap()).unwrap();
+    assert!(conf.lines().any(|line| line == "country=VN"), "{conf}");
+    assert_eq!(status.lock().unwrap().phase, Phase::Connected);
+    assert!(saved.calls.contains(&"timezone=Asia/Ho_Chi_Minh".into()));
+}
+
+#[test]
+fn wifi_country_uses_the_saved_home_and_safe_aliases() {
+    let root = Root::new();
+    let mut config = root.config(false);
+    config.country = "CA".into();
+    fs::write(config.zoneinfo.join("zone.tab"), "# Country coordinates zone\nVN\t+1045+10640\tAsia/Ho_Chi_Minh\nUS\t+404251-0740023\tAmerica/New_York\n").unwrap();
+    fs::write(&config.timezone_file, "America/New_York\n").unwrap();
+    assert_eq!(config.wifi_country(Some("Asia/Ho_Chi_Minh")), "VN");
+    // Recovery and a later Wi-Fi change pass no request zone.
+    assert_eq!(config.wifi_country(None), "US");
+    std::os::unix::fs::symlink("Ho_Chi_Minh", config.zoneinfo.join("Asia/Saigon")).unwrap();
+    for zone in ["Asia/Saigon", "posix/Asia/Saigon", "right/Asia/Saigon"] {
+        assert_eq!(config.wifi_country(Some(zone)), "VN", "{zone}");
+    }
+    // Exact rows take precedence even when two countries share a TZif link.
+    fs::remove_file(config.zoneinfo.join("Asia/Ho_Chi_Minh")).unwrap();
+    std::os::unix::fs::symlink(
+        "../America/New_York",
+        config.zoneinfo.join("Asia/Ho_Chi_Minh"),
+    )
+    .unwrap();
+    assert_eq!(config.wifi_country(Some("Asia/Ho_Chi_Minh")), "VN");
+}
+
+#[test]
+fn wifi_country_falls_back_without_accepting_untrusted_or_ambiguous_data() {
+    let root = Root::new();
+    let mut config = root.config(false);
+    config.country = "US".into();
+    fs::write(
+        config.zoneinfo.join("zone.tab"),
+        "VN\tcoords\tAsia/Ho_Chi_Minh\n",
+    )
+    .unwrap();
+    for zone in [
+        "../etc/real-localtime",
+        "localtime",
+        "leapseconds",
+        "Asia/Nowhere",
+        "",
+        "Asia/./Ho_Chi_Minh",
+    ] {
+        assert_eq!(config.wifi_country(Some(zone)), "US", "{zone}");
+    }
+    fs::create_dir_all(config.zoneinfo.join("Etc")).unwrap();
+    fs::write(config.zoneinfo.join("Etc/UTC"), b"TZif").unwrap();
+    assert_eq!(config.wifi_country(Some("Etc/UTC")), "US");
+    for code in ["vn", "V", "VNM", "VN,US", "V1", "Vé", ""] {
+        fs::write(
+            config.zoneinfo.join("zone.tab"),
+            format!("{code}\tcoords\tAsia/Ho_Chi_Minh\n"),
+        )
+        .unwrap();
+        assert_eq!(
+            config.wifi_country(Some("Asia/Ho_Chi_Minh")),
+            "US",
+            "{code}"
+        );
+    }
+    fs::remove_file(config.zoneinfo.join("zone.tab")).unwrap();
+    assert_eq!(config.wifi_country(Some("Asia/Ho_Chi_Minh")), "US");
+    assert_eq!(config.wifi_country(None), "US");
+    fs::write(&config.timezone_file, "../etc/real-localtime\n").unwrap();
+    assert_eq!(config.wifi_country(None), "US");
+    config.country = "bad".into();
+    assert_eq!(config.check().unwrap_err(), "country is two capitals");
+}
+
+#[test]
+fn wifi_country_join_failure_keeps_the_previous_network() {
+    let root = Root::new();
+    let mut config = root.config(false);
+    config.country = "US".into();
+    fs::write(
+        config.zoneinfo.join("zone.tab"),
+        "VN\tcoords\tAsia/Ho_Chi_Minh\n",
+    )
+    .unwrap();
+    let accepted = check(&request(good()), &config).unwrap();
+    let status = Arc::new(Mutex::new(Status::new("lamp-test".into())));
+    let mut lamp = Lamp::new(false);
+    let previous = b"country=US\n# previous network\n".to_vec();
+    lamp.conf = Some(previous.clone());
+    let mut saved = Saved::default();
+    run_configured(&status, &accepted, &config, &mut lamp, &mut saved, || None);
+    assert_eq!(lamp.conf, Some(previous));
+    assert_eq!(status.lock().unwrap().phase, Phase::Failed);
+    assert!(saved.calls.is_empty());
+}
+
+#[test]
+fn wifi_country_recovery_keeps_the_home_despite_a_different_request_zone() {
+    let root = Root::new();
+    let mut config = root.config(false);
+    config.country = "CA".into();
+    fs::write(
+        config.zoneinfo.join("zone.tab"),
+        "VN\tcoords\tAsia/Ho_Chi_Minh\nUS\tcoords\tAmerica/New_York\n",
+    )
+    .unwrap();
+    fs::write(&config.timezone_file, "America/New_York\n").unwrap();
+    let accepted = check(&request(good()), &config).unwrap();
+    assert_eq!(accepted.timezone.as_deref(), Some("Asia/Ho_Chi_Minh"));
+    let status = Arc::new(Mutex::new(Status::new("lamp-test".into())));
+    let mut lamp = Lamp::new(true);
+    let mut saved = Saved::default();
+    run_configured(
+        &status,
+        &accepted,
+        &config,
+        &mut lamp,
+        &mut lamp_setup::serve::NetworkOnly(&mut saved),
+        || None,
+    );
+    let conf = String::from_utf8(lamp.conf.unwrap()).unwrap();
+    assert!(conf.lines().any(|line| line == "country=US"), "{conf}");
+    assert!(saved.calls.is_empty());
+    assert_eq!(
+        fs::read_to_string(&config.timezone_file).unwrap(),
+        "America/New_York\n"
+    );
+}
+
+/// Local filesystem lookup only: not the Wi-Fi association, HTTP delay or
+/// target hardware. Run explicitly with --ignored --nocapture.
+#[test]
+#[ignore]
+fn wifi_country_local_lookup_timing() {
+    let root = Root::new();
+    let mut config = root.config(false);
+    config.country = "US".into();
+    // Real installed table size, with fixture TZif names for portability.
+    fs::copy(
+        "/usr/share/zoneinfo/zone.tab",
+        config.zoneinfo.join("zone.tab"),
+    )
+    .unwrap();
+    std::os::unix::fs::symlink("Ho_Chi_Minh", config.zoneinfo.join("Asia/Saigon")).unwrap();
+    fs::write(&config.timezone_file, "Asia/Ho_Chi_Minh\n").unwrap();
+    for (name, zone, expected) in [
+        ("request", Some("Asia/Ho_Chi_Minh"), "VN"),
+        ("alias", Some("Asia/Saigon"), "VN"),
+        ("saved", None, "VN"),
+        ("unknown", Some("Asia/Nowhere"), "US"),
+    ] {
+        let first = Instant::now();
+        let country = config.wifi_country(zone);
+        let first = first.elapsed();
+        assert_eq!(country, expected);
+        let mut samples = Vec::with_capacity(1000);
+        for _ in 0..1000 {
+            let began = Instant::now();
+            let country = config.wifi_country(std::hint::black_box(zone));
+            let elapsed = began.elapsed();
+            assert_eq!(country, expected);
+            samples.push(elapsed);
+        }
+        samples.sort();
+        println!(
+            "{name}: first={first:?} p50={:?} p95={:?} max={:?}",
+            samples[500], samples[950], samples[999]
+        );
+    }
 }
 
 #[test]

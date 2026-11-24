@@ -946,7 +946,7 @@ fn wifi_change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std:
         .take(wifi_change::LINE_MOST as u64 + 1)
         .read_line(&mut line)?;
     let mut host = wifi_change::ImageRejoin::new();
-    let answered = wifi_change::answer(&line, &config.country, enabled, &mut host);
+    let answered = wifi_change::answer(&line, &config.wifi_country(None), enabled, &mut host);
     // Never the password, and never the network's name: `said` holds neither.
     eprintln!("lamp-setup: wifi: {}", answered.said);
     {
@@ -1530,19 +1530,19 @@ fn answer(
                     if recovering {
                         // A set-up lamp's: the network only, every other
                         // field ignored (El's P1 on #3024).
-                        lamp_setup::serve::run(
+                        lamp_setup::serve::run_configured(
                             &status,
                             &accepted,
-                            &config.country,
+                            &config,
                             &mut host,
                             &mut lamp_setup::serve::NetworkOnly(Files(&config)),
                             station,
                         );
                     } else {
-                        lamp_setup::serve::run(
+                        lamp_setup::serve::run_configured(
                             &status,
                             &accepted,
-                            &config.country,
+                            &config,
                             &mut host,
                             // The ring let go just before the marker starts the lamp.
                             &mut ReleasingSave {
