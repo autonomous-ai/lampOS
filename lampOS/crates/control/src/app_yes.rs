@@ -335,6 +335,11 @@ pub struct Live {
     /// The calls ended (answered, timed out, or their app gone) and not yet
     /// told to the voice (`apps/called`).
     called_out: Vec<lamp_msgs::AppCalled>,
+    /// The calls ended as `timeout` and not yet told to their app
+    /// (`app.call.stopped`): by app and call, whichever path ended them
+    /// (Twelve's P3 on #8496: an expiry inside an answer or a new call was
+    /// told to the voice but never to the app).
+    stopped_out: Vec<(String, String)>,
 }
 
 impl Live {
@@ -596,7 +601,8 @@ impl Live {
     }
 
     /// The calls past [`CALL_FOR`] at `now`, ended as `timeout` for the
-    /// voice: each app and call, so the app can be told.
+    /// voice and kept for their app's `app.call.stopped`
+    /// ([`Live::drain_stopped`]): each app and call.
     pub fn expire_calls(&mut self, now: Instant) -> Vec<(String, String)> {
         let late: Vec<String> = self
             .calls
@@ -613,6 +619,7 @@ impl Live {
                     result: None,
                     error: Some("timeout".to_owned()),
                 });
+                self.stopped_out.push((name.clone(), call.clone()));
                 ended.push((name, call));
             }
         }
@@ -622,6 +629,11 @@ impl Live {
     /// The calls ended since the last drain, for the voice.
     pub fn drain_called(&mut self) -> Vec<lamp_msgs::AppCalled> {
         std::mem::take(&mut self.called_out)
+    }
+
+    /// The calls timed out since the last drain, for their apps.
+    pub fn drain_stopped(&mut self) -> Vec<(String, String)> {
+        std::mem::take(&mut self.stopped_out)
     }
 
     /// The turns taken since the last call, for the voice.
