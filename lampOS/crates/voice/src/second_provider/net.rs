@@ -99,6 +99,17 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+/// The status told for a request that never reached the person's own
+/// endpoint (#8362): no HTTP status is 1, and 0 is "never failed".
+pub const UNREACHED: u16 = 1;
+
+/// Whether `error` says a request never reached its service before any
+/// answer (#8362): no connection (a name that doesn't resolve, the
+/// connection refused, TLS) or none in time.
+pub(crate) fn unreached(_error: &Error) -> bool {
+    false
+}
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// V1's `_ensure_openai_v1`: the Autonomous proxy's base URL ending in

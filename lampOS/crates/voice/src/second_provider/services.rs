@@ -1804,15 +1804,25 @@ pub(crate) mod tests {
     /// The person's own Gemini key and model, as `with_own_keys` reads them
     /// from the keys' folder `name`, over [`config_at`]'s relay.
     fn own_gemini(name: &str, relay: &str) -> SecondConfig {
+        own_model(
+            name,
+            relay,
+            &[
+                ("own_gemini.key", "AIza-own-8420"),
+                ("own_gemini.model", "gemini-2.5-flash"),
+            ],
+        )
+    }
+
+    /// The person's own model as `with_own_keys` reads its `files` from the
+    /// keys' folder `name`, over [`config_at`]'s relay.
+    fn own_model(name: &str, relay: &str, files: &[(&str, &str)]) -> SecondConfig {
         use std::os::unix::fs::PermissionsExt;
         let config = config_at(name, "relay-key-8420", relay, relay);
         let units =
             std::env::temp_dir().join(format!("lamp-voice-{name}-units-{}", std::process::id()));
         std::fs::create_dir_all(&units).unwrap();
-        for (file, text) in [
-            ("own_gemini.key", "AIza-own-8420"),
-            ("own_gemini.model", "gemini-2.5-flash"),
-        ] {
+        for (file, text) in files {
             std::fs::write(units.join(file), text).unwrap();
             std::fs::set_permissions(units.join(file), std::fs::Permissions::from_mode(0o600))
                 .unwrap();
@@ -1917,23 +1927,13 @@ pub(crate) mod tests {
     /// The person's own Anthropic key and model, as `with_own_keys` reads
     /// them from the keys' folder `name`, over [`config_at`]'s relay.
     fn own_anthropic(name: &str, relay: &str) -> SecondConfig {
-        use std::os::unix::fs::PermissionsExt;
-        let config = config_at(name, "relay-key-8420", relay, relay);
-        let units =
-            std::env::temp_dir().join(format!("lamp-voice-{name}-units-{}", std::process::id()));
-        std::fs::create_dir_all(&units).unwrap();
-        for (file, text) in [
-            ("own_anthropic.key", "sk-ant-own-8420"),
-            ("own_anthropic.model", "claude-sonnet-4-5"),
-        ] {
-            std::fs::write(units.join(file), text).unwrap();
-            std::fs::set_permissions(units.join(file), std::fs::Permissions::from_mode(0o600))
-                .unwrap();
-        }
-        let (config, _) = config.with_own_keys(true, Some(units.as_os_str()));
-        let _ = std::fs::remove_dir_all(&units);
-        config
+        own_model(name, relay, ANTHROPIC)
     }
+
+    const ANTHROPIC: &[(&str, &str)] = &[
+        ("own_anthropic.key", "sk-ant-own-8420"),
+        ("own_anthropic.model", "claude-sonnet-4-5"),
+    ];
 
     /// #8420: the person's own Anthropic model is asked at Anthropic's
     /// OpenAI-compatible chat with their key as the bearer (a made-up one
@@ -2045,6 +2045,65 @@ pub(crate) mod tests {
         assert_eq!(words, "lamp's own");
         assert_eq!(relay.asked(CHAT), 1);
         assert_eq!(*told.lock().unwrap(), [401]);
+    }
+
+    /// #8362: the person's own model at an endpoint that can't be reached
+    /// at all before any answer (the connection refused, a name that doesn't
+    /// resolve), OpenAI-compatible or a named provider's: the request goes
+    /// to the lamp's own model at the relay, told once as unreached, never a
+    /// failed turn. A timeout before any answer is the same.
+    #[tokio::test]
+    async fn the_persons_endpoint_unreached_falls_back_to_the_lamps_own() {
+        const COMPATIBLE: &[(&str, &str)] = &[
+            ("own_openai_compatible.key", "sk-own-8362"),
+            ("own_openai_compatible.url", "https://own.example/v1"),
+            ("own_openai_compatible.model", "grok-4"),
+        ];
+        // Nothing listens there once the listener is dropped.
+        let refused = {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            format!("http://{}/v1", listener.local_addr().unwrap())
+        };
+        let nowhere = "http://own-8362.invalid/v1".to_owned();
+        for (name, files, base) in [
+            ("compatible-refused", COMPATIBLE, refused.clone()),
+            ("compatible-dns", COMPATIBLE, nowhere.clone()),
+            ("anthropic-refused", ANTHROPIC, refused),
+            ("anthropic-dns", ANTHROPIC, nowhere),
+        ] {
+            let relay = stub("relay-key-8420", vec![(CHAT, answered("lamp's own"))]).await;
+            let mut config = own_model(&format!("own-unreached-{name}"), &relay.url, files);
+            assert!(config.hosted.own_chat.is_some(), "{name}");
+            config.hosted.deepseek_base_url = Some(base);
+            let told = Arc::new(Mutex::new(Vec::new()));
+            let telling = told.clone();
+            let net = Net::new(config, Arc::new(Vec::new))
+                .unwrap()
+                .chatting_with_deepseek("sk-own-8362")
+                .unwrap()
+                .falling_back_to_the_relay(
+                    &relay.url,
+                    Arc::new(move |status| telling.lock().unwrap().push(status)),
+                )
+                .unwrap();
+            let events: Vec<_> = net.chat(vec![Message::user("hello")]).collect().await;
+            let words: String = events
+                .into_iter()
+                .filter_map(|event| match event {
+                    Ok(ChatEvent::Text(text)) => Some(text),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(words, "lamp's own", "{name}");
+            assert_eq!(relay.asked(CHAT), 1, "{name}");
+            assert_eq!(*told.lock().unwrap(), [net::UNREACHED], "{name}");
+        }
+        for error in [
+            net::Error::Timeout("request"),
+            net::Error::Transport("request"),
+        ] {
+            assert_eq!(key_refused(&error), Some(net::UNREACHED), "{error}");
+        }
     }
 
     pub(crate) fn config_at(name: &str, key: &str, relay: &str, listening: &str) -> SecondConfig {

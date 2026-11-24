@@ -2858,6 +2858,49 @@ mod tests {
         assert_eq!(told, 1, "the notice said once, with an answer: {asked:?}");
     }
 
+    /// #8362: ElevenLabs can't be reached at all for the person's own voice
+    /// (the connection refused, a name that doesn't resolve): the piece is
+    /// said in the lamp's own voice after the one notice, never silent, with
+    /// one journal line saying so; the person's isn't asked again. A timeout
+    /// before any answer is the same.
+    #[tokio::test]
+    async fn an_unreached_own_voice_falls_back_to_the_lamps_with_one_line() {
+        // Nothing listens there once the listener is dropped.
+        let refused = {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            format!("http://{}", listener.local_addr().unwrap())
+        };
+        for own_url in [refused, "http://own-8362.invalid".to_owned()] {
+            let (lamps_url, lamps_asked) = bodies_answering(200, vec![5, 0, 6, 0]).await;
+            let lamps = Tts::with(TtsProvider::ElevenLabs, &lamps_url, "k", None).unwrap();
+            let mut own = Tts::with(
+                TtsProvider::ElevenLabs,
+                &own_url,
+                "sk-planted-8362-elevenlabs-fake",
+                Some("PersonVoice8362abcdef"),
+            )
+            .unwrap()
+            .with_lamps_voice(lamps);
+            own.lost = Arc::default();
+            assert_eq!(said(&own, "Hello there.", 3).await, [10, 12], "{own_url}");
+            assert_eq!(said(&own, "And again.", 4).await, [10, 12], "{own_url}");
+            let lines = own.lost.said.lock().unwrap().clone();
+            assert_eq!(lines.len(), 2, "{lines:?}");
+            assert!(
+                lines[0].contains("couldn't reach ElevenLabs for the person's own voice"),
+                "{lines:?}"
+            );
+            assert!(!lines[0].contains("sk-planted") && !lines[0].contains("PersonVoice"));
+            let asked = lamps_asked.lock().unwrap();
+            let text = |at: usize| serde_json::from_str::<Value>(&asked[at]).unwrap()["text"].clone();
+            assert_eq!(text(0), format!("{OWN_VOICE_LOST_LINE} Hello there."));
+            assert_eq!(text(1), "And again.", "said once");
+        }
+        assert!(super::super::unreached(&Error::Timeout("request")));
+        assert!(super::super::unreached(&Error::Transport("request")));
+        assert!(!super::super::unreached(&Error::Status(503)));
+    }
+
     /// #8367: ElevenLabs refuses the person's own key (401, as a bad key or
     /// credits run out are answered): the piece is said in the lamp's own
     /// voice, never silent, after one line that says so; and every piece

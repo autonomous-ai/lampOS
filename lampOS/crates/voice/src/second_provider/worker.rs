@@ -1065,6 +1065,10 @@ pub fn own_key_health(own: bool, refused: u16) -> lamp_msgs::Diagnostic {
 /// The warning lamp-health shows once the person's own ElevenLabs voice was
 /// refused (#8367).
 pub const OWN_VOICE_REFUSED_WORDS: &str = "your ElevenLabs key was refused, using the lamp's own";
+/// The warning once ElevenLabs couldn't be reached for the person's own
+/// voice (#8362).
+pub const OWN_VOICE_UNREACHED_WORDS: &str =
+    "your ElevenLabs voice couldn't be reached, using the lamp's own";
 
 /// `voice-keys`' warning once ElevenLabs refused the person's own voice
 /// with `status` (#8367); none while it never was.
@@ -35084,6 +35088,19 @@ mod tests {
         let said = serde_json::to_string(&warned).unwrap();
         assert!(said.contains(super::OWN_VOICE_REFUSED_WORDS), "{said}");
         assert!(said.contains("401") && !said.contains("sk-"), "{said}");
+    }
+
+    /// #8362: the person's own model or voice unreached is warned as
+    /// unreached, never as a refused key, and never with a made-up status.
+    #[test]
+    fn an_unreached_own_model_or_voice_is_warned_as_unreached() {
+        let unreached = super::super::net::UNREACHED;
+        let model = serde_json::to_string(&super::own_key_health(true, unreached)).unwrap();
+        assert!(model.contains(super::OWN_MODEL_DOWN_WORDS), "{model}");
+        assert!(model.contains("unreached") && !model.contains("\"1\""), "{model}");
+        let voice = serde_json::to_string(&super::own_voice_health(unreached).unwrap()).unwrap();
+        assert!(voice.contains(super::OWN_VOICE_UNREACHED_WORDS), "{voice}");
+        assert!(voice.contains("unreached") && !voice.contains("\"1\""), "{voice}");
     }
 
     /// The reviewer's P2 on #2167: with the switch on, `voice-keys` reports
