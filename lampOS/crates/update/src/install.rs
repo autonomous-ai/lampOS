@@ -4126,6 +4126,44 @@ mod tests {
         assert!(control.contains("\nReadWritePaths=-/var/lib/lampos-apps-staging\n"));
     }
 
+    /// #8367: `LAMP_OWN_KEYS` is on in the product on its three units, the
+    /// voice with the keys' folder as its credential; and the test lamps'
+    /// `LAMP_OWN_ELEVENLABS_URL`, which sends a person's key to another
+    /// address, is in no product unit.
+    #[test]
+    fn own_keys_are_on_in_the_product_and_the_test_lamps_voice_address_never() {
+        let unit = |name: &str| {
+            PRODUCT
+                .iter()
+                .find(|(unit, _)| *unit == name)
+                .map(|(_, text)| *text)
+                .unwrap()
+        };
+        for name in ["lamp-setup.service", "lamp-cloud.service", "lamp-voice.service"] {
+            assert!(
+                unit(name).lines().any(|line| line == "Environment=LAMP_OWN_KEYS=on"),
+                "{name}"
+            );
+        }
+        let voice = unit("lamp-voice.service");
+        for line in [
+            "ConfigurationDirectory=lampOS/voice/own",
+            "ConfigurationDirectoryMode=0700",
+            "LoadCredential=own:/etc/lampOS/voice/own",
+        ] {
+            assert!(voice.lines().any(|have| have == line), "{line}");
+        }
+        assert!(enabled().iter().any(|name| name == "lamp-setup-keys.socket"));
+        for (name, text) in PRODUCT {
+            assert!(
+                !text
+                    .lines()
+                    .any(|line| !line.starts_with('#') && line.contains("LAMP_OWN_ELEVENLABS_URL")),
+                "{name} sets the test lamps' own voice address"
+            );
+        }
+    }
+
     /// #2853: every unit in `deploy/product/` is in the install list, so a
     /// lamp gets it with an update and no hand step, or is named here with
     /// why it is not yet; every socket installed is enabled.

@@ -302,26 +302,25 @@ fn on_this_repository_a_switch_on_by_default_is_not_listed() {
 }
 
 /// The real page and units: a file in `deploy/product` that install never
-/// places turns nothing on, so `LAMP_OWN_KEYS`, set only in the own-keys
-/// drop-in a test lamp gets by hand, is listed as not on yet.
+/// places is never read (the own-keys drop-in a test lamp got by hand, the
+/// keeper's restart helper). `LAMP_OWN_KEYS` counts as on only from the
+/// product's own units (#8367), with the keys helper they place.
 #[test]
 fn on_this_repository_a_file_install_never_places_turns_nothing_on() {
     let lamp_os = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../lampOS");
     let page = std::fs::read_to_string(lamp_os.join("docs/switches.md")).unwrap();
     assert!(lamp_os.join("deploy/product/own-keys-voice.conf").is_file());
     let files = notes::product_files(&lamp_os).unwrap();
-    for left_out in [
-        "own-keys-voice.conf",
-        "lamp-keeper-restart.socket",
-        "lamp-setup-keys@.service",
-    ] {
+    for left_out in ["own-keys-voice.conf", "lamp-keeper-restart.socket"] {
         assert!(!files.contains_key(left_out), "{left_out} is read");
     }
+    assert!(files.contains_key("lamp-setup-keys@.service"));
     assert!(files.contains_key("exit-note.conf") && files.contains_key("store.conf"));
     let on = turned_on(&files);
-    assert!(!on.contains_key("LAMP_OWN_KEYS"));
+    assert!(on.contains_key("LAMP_OWN_KEYS"));
+    assert!(!on.contains_key("LAMP_OWN_ELEVENLABS_URL"));
     assert!(
-        waiting(&page, &on)
+        !waiting(&page, &on)
             .iter()
             .any(|w| w.switch == "LAMP_OWN_KEYS")
     );
