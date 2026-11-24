@@ -1249,6 +1249,14 @@ impl Shared {
         crate::app_triggers::list_of(&apps_dir, &running)
     }
 
+    /// The apps running now, each with when its session began
+    /// ([`crate::app_tools`]), and where the installed apps are.
+    pub fn running_since(&self) -> (Vec<(String, u64)>, std::path::PathBuf) {
+        let running = self.apps.lock().expect("apps").1.running_since();
+        let apps_dir = self.apps_dir.lock().expect("apps_dir").clone();
+        (running, apps_dir)
+    }
+
     /// The voice holds a line that says `trigger` of app `app`
     /// (`apps/trigger`): offered to the app's sockets, as `app.trigger`, only
     /// when apps are on, the app is running and the manifest's triggers
@@ -3662,6 +3670,76 @@ mod tests {
             .expect("apps/took said");
         let took: AppTook = said.parse().unwrap();
         assert_eq!((took.app.as_str(), took.turn), ("demo", 5));
+    }
+
+    /// #8386 on a real bus: a running app whose manifest names `tools` has
+    /// its checked tools said on `apps/tools`, the voice's own topic and
+    /// type, with its session's start; once it stops, they are gone.
+    #[test]
+    fn a_running_apps_tools_file_is_said_on_apps_tools_and_gone_when_it_stops() {
+        use lamp_msgs::AppTools;
+        let base = std::env::temp_dir().join(format!("lampos-tools-bus-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let apps_dir = base.join("apps");
+        let dir = apps_dir.join("gym-coach").join("current");
+        std::fs::create_dir_all(&dir).unwrap();
+        let manifest = json!({
+            "format": 2, "kind": "app", "name": "gym-coach", "title": "Gym Coach", "version": "2.0.0",
+            "min_build": 1, "runtime": {"name": "python3", "entry": "coach"},
+            "grants": ["hear", "speak"], "triggers": [], "settings": [], "files": [],
+            "tools": "tools.json"
+        });
+        std::fs::write(dir.join("lamp-skill.json"), manifest.to_string()).unwrap();
+        std::fs::write(
+            dir.join("tools.json"),
+            json!({"tools": [{
+                "name": "set_plan",
+                "description": "Set the weekly training plan.",
+                "parameters": {"type": "object",
+                    "properties": {"days": {"type": "integer", "minimum": 1, "maximum": 7}},
+                    "required": ["days"]}
+            }]})
+            .to_string(),
+        )
+        .unwrap();
+        let bus = lamp_bus::Bus::new(base.join("bus")).unwrap();
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
+        *shared.apps_dir.lock().unwrap() = apps_dir;
+        shared.apps.lock().unwrap().1.connection("gym-coach", true);
+        crate::app_tools::start(&bus, shared.clone());
+        let reader = lamp_bus::Bus::new(base.join("bus")).unwrap();
+        let latest = || {
+            reader
+                .latest(AppTools::TOPIC)
+                .ok()
+                .flatten()
+                .and_then(|m| m.parse::<AppTools>().ok())
+        };
+        let until = |what: &str, ready: &dyn Fn() -> bool| {
+            let start = std::time::Instant::now();
+            while !ready() {
+                assert!(start.elapsed() < Duration::from_secs(5), "{what}");
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        };
+        until("apps/tools said", &|| {
+            latest().is_some_and(|list| list.apps.len() == 1)
+        });
+        let list = latest().unwrap();
+        assert_eq!(list.check(), Ok(()));
+        let app = &list.apps[0];
+        assert_eq!(
+            (app.app.as_str(), app.title.as_str()),
+            ("gym-coach", "Gym Coach")
+        );
+        assert!(app.since_ms > 0);
+        assert_eq!(app.tools.len(), 1);
+        assert_eq!(app.tools[0].name, "set_plan");
+        assert!(!app.tools[0].outside);
+        shared.apps.lock().unwrap().1.connection("gym-coach", false);
+        until("apps/tools empty once it stops", &|| {
+            latest().is_some_and(|list| list.apps.is_empty())
+        });
     }
 
     /// The admin op `{"app_forget": NAME}`: the helper's alone, with the switch

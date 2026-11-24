@@ -100,10 +100,13 @@ fn parts_ok(path: &str) -> Option<Vec<&str>> {
     (parts.len() <= MOST_DEPTH && parts.iter().all(plain)).then_some(parts)
 }
 
-/// A path in an app's own files: the manifest itself, or a file under `src/`
-/// or `assets/`. Nothing else, and never a name the helper writes itself.
+/// A path in an app's own files: the manifest itself, its tools file at the
+/// top (`tools.json`, which the package reader lets in only when the
+/// manifest names it with `LAMP_APP_TOOLS` on, #8386), or a file under
+/// `src/` or `assets/`. Nothing else, and never a name the helper writes
+/// itself.
 pub fn app_path_ok(path: &str) -> bool {
-    if path == "lamp-skill.json" {
+    if path == "lamp-skill.json" || path == "tools.json" {
         return true;
     }
     matches!(parts_ok(path), Some(parts) if parts.len() >= 2 && matches!(parts[0], "src" | "assets"))

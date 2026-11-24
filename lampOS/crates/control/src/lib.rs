@@ -19,6 +19,7 @@ pub mod app_facts_forget;
 pub mod app_push;
 pub mod app_remember;
 pub mod app_socket;
+pub mod app_tools;
 pub mod app_triggers;
 pub mod app_yes;
 pub mod apps_owed;
