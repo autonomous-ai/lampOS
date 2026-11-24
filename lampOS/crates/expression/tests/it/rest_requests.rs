@@ -8,8 +8,11 @@ use lamp_msgs::{
 };
 use std::{
     fs,
-    path::PathBuf,
-    sync::atomic::{AtomicU64, Ordering},
+    path::{Path, PathBuf},
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
     time::Duration,
 };
 
@@ -746,6 +749,51 @@ fn publish_claim(bus: &Bus, now: u64) {
     .unwrap();
 }
 
+/// The test's own clocks on the bus (`Bus::clocks`, as `tests/runtime.rs`
+/// has them for #3315): a wall, in ms since 1970, that stands at the host's
+/// when the bus is made and moves only with the test's steady time
+/// ([`TestClock::at`]), and that wall in microseconds as the monotonic
+/// clock. The service is stepped with the same wall, so an input's age is
+/// the steps' time, never how long the runner took between a publish and a
+/// step. Train 1197 (#8464): with the host's wall, a stall of over 100 ms
+/// before a step put a joint state's stamp (the steady time less its wall
+/// age) before the one a step earlier, and it was refused as out of order.
+struct TestClock {
+    wall_ms: Arc<AtomicU64>,
+    wall_at_start_ms: u64,
+}
+
+impl TestClock {
+    /// Moves the wall to the steady `now_us` and says it, for the step.
+    fn at(&self, now_us: u64) -> u64 {
+        let wall_ms = self.wall_at_start_ms + now_us.saturating_sub(START) / 1_000;
+        self.wall_ms.store(wall_ms, Ordering::Relaxed);
+        wall_ms
+    }
+}
+
+fn bus_on_test_clock(root: &Path) -> (Bus, TestClock) {
+    let wall_at_start_ms = runtime::unix_ms();
+    let wall_ms = Arc::new(AtomicU64::new(wall_at_start_ms));
+    let bus = Bus::new(root).unwrap().clocks(
+        {
+            let wall_ms = wall_ms.clone();
+            move || wall_ms.load(Ordering::Relaxed)
+        },
+        {
+            let wall_ms = wall_ms.clone();
+            move || wall_ms.load(Ordering::Relaxed) * 1_000
+        },
+    );
+    (
+        bus,
+        TestClock {
+            wall_ms,
+            wall_at_start_ms,
+        },
+    )
+}
+
 fn publish_context(bus: &Bus, now: u64) {
     publish_claim(bus, now);
     bus.publisher_declared(VoiceProgress::TOPIC, &VoiceProgress::declaration(), "voice")
@@ -761,13 +809,14 @@ fn publish_context(bus: &Bus, now: u64) {
 #[test]
 fn live_bus_request_uses_the_existing_writer_and_publishes_only_a_planning_receipt() {
     let root = Root::new();
-    let bus = Bus::new(&root.0).unwrap().rescan_every(Duration::ZERO);
+    let (bus, clock) = bus_on_test_clock(&root.0);
+    let bus = bus.rescan_every(Duration::ZERO);
     let mut service = runtime::Service::new(&bus, catalogue(), true, CLOCK)
         .unwrap()
         .with_rest_requests(&bus)
         .unwrap();
     publish_context(&bus, START);
-    service.step(|| START, runtime::unix_ms());
+    service.step(|| START, clock.at(START));
     let state = bus.latest(ExpressionState::TOPIC).unwrap().unwrap();
     let idle: Receipt = bus
         .latest(Receipt::TOPIC)
@@ -784,7 +833,7 @@ fn live_bus_request_uses_the_existing_writer_and_publishes_only_a_planning_recei
     rest.skill_session_id = publisher.boot().to_owned();
     rest.expression_session_id = state.header.boot;
     publisher.publish_json(99, &rest).unwrap();
-    let output = service.step(|| START + 200_000, runtime::unix_ms());
+    let output = service.step(|| START + 200_000, clock.at(START + 200_000));
     assert!(output.body.is_some());
     let receipt: Receipt = bus
         .latest(Receipt::TOPIC)
@@ -804,7 +853,8 @@ fn live_privacy_read_error_refuses_rest_until_a_valid_open_lease() {
     use lamp_msgs::MicrophonePrivacy;
 
     let root = Root::new();
-    let bus = Bus::new(&root.0).unwrap().rescan_every(Duration::ZERO);
+    let (bus, clock) = bus_on_test_clock(&root.0);
+    let bus = bus.rescan_every(Duration::ZERO);
     let mut service = runtime::Service::new(&bus, catalogue(), true, CLOCK)
         .unwrap()
         .with_rest_requests(&bus)
@@ -863,7 +913,7 @@ fn live_privacy_read_error_refuses_rest_until_a_valid_open_lease() {
         assert_eq!(message.parse::<MicrophonePrivacy>().unwrap(), lease);
     };
     context(START, 1);
-    service.step(|| START, runtime::unix_ms());
+    service.step(|| START, clock.at(START));
     let target = receipt().expression_session_id;
 
     // sample-routine is not the night-sleep claimant: ordinary skill rest
@@ -872,6 +922,7 @@ fn live_privacy_read_error_refuses_rest_until_a_valid_open_lease() {
     // read this decision rather than the initial retained Idle receipt.
     for sequence in 1..=3 {
         let now = START + sequence * 200_000;
+        clock.at(now);
         match sequence {
             1 => switch(now, true),
             2 => {
@@ -888,7 +939,7 @@ fn live_privacy_read_error_refuses_rest_until_a_valid_open_lease() {
         rest.skill_session_id = publisher.boot().to_owned();
         rest.expression_session_id = target.clone();
         assert_eq!(publisher.publish_json(now, &rest).unwrap().delivered, 1);
-        let output = service.step(|| now, runtime::unix_ms());
+        let output = service.step(|| now, clock.at(now));
         let kept = receipt();
         assert_eq!(kept.stamp.at_us, now);
         assert_eq!(kept.request.as_ref(), Some(&rest));
@@ -919,8 +970,9 @@ fn live_privacy_read_error_refuses_rest_until_a_valid_open_lease() {
         std::io::ErrorKind::InvalidData
     );
     let now = START + 800_000;
+    clock.at(now);
     context(now, 5);
-    service.step(|| now, runtime::unix_ms());
+    service.step(|| now, clock.at(now));
     let cancelled = receipt();
     assert_eq!(cancelled.stamp.at_us, now);
     assert_eq!(cancelled.phase, Phase::Cancelled);
@@ -930,9 +982,10 @@ fn live_privacy_read_error_refuses_rest_until_a_valid_open_lease() {
 
     // Reopening is not a new episode and cannot resume the cancelled one.
     let now = START + 1_000_000;
+    clock.at(now);
     switch(now, false);
     context(now, 6);
-    service.step(|| now, runtime::unix_ms());
+    service.step(|| now, clock.at(now));
     let reopened = receipt();
     assert_eq!(reopened.stamp.at_us, now);
     assert_eq!(reopened.phase, Phase::Cancelled);
@@ -942,7 +995,8 @@ fn live_privacy_read_error_refuses_rest_until_a_valid_open_lease() {
 #[test]
 fn live_bus_keeps_the_original_receipt_after_a_stale_renewal_error() {
     let root = Root::new();
-    let bus = Bus::new(&root.0).unwrap().rescan_every(Duration::ZERO);
+    let (bus, clock) = bus_on_test_clock(&root.0);
+    let bus = bus.rescan_every(Duration::ZERO);
     let mut service = runtime::Service::new(&bus, catalogue(), true, CLOCK)
         .unwrap()
         .with_rest_requests(&bus)
@@ -971,7 +1025,7 @@ fn live_bus_keeps_the_original_receipt_after_a_stale_renewal_error() {
         receipt
     };
     context(START, 1);
-    service.step(|| START, runtime::unix_ms());
+    service.step(|| START, clock.at(START));
     let mut publisher = bus
         .publisher_declared(Request::TOPIC, &Request::declaration(), "skills")
         .unwrap();
@@ -982,6 +1036,7 @@ fn live_bus_keeps_the_original_receipt_after_a_stale_renewal_error() {
 
     for step in 1..=6 {
         let now = START + step * 100_000;
+        clock.at(now);
         context(now, step + 1);
         if step == 6 {
             let mut late = original.clone();
@@ -991,7 +1046,7 @@ fn live_bus_keeps_the_original_receipt_after_a_stale_renewal_error() {
             // already 500 ms old. Intake must keep that original age.
             publisher.publish_json(now, &late).unwrap();
         }
-        service.step(|| now, runtime::unix_ms());
+        service.step(|| now, clock.at(now));
         if step == 2 {
             assert_eq!(receipt().phase, Phase::Resting);
             assert_eq!(receipt().request.as_ref(), Some(&original));
@@ -1004,12 +1059,14 @@ fn live_bus_keeps_the_original_receipt_after_a_stale_renewal_error() {
     assert_eq!(kept.request.as_ref(), Some(&original));
 
     let now = START + 800_000;
+
+    clock.at(now);
     context(now, 8);
     let mut fresh = original;
     fresh.stamp = stamp(now, 3);
     fresh.valid_until_us = now + 3_000_000;
     publisher.publish_json(now, &fresh).unwrap();
-    service.step(|| now, runtime::unix_ms());
+    service.step(|| now, clock.at(now));
     assert_eq!(service.counts.refused, 1);
     assert_eq!(receipt().phase, Phase::Resting);
     assert_eq!(receipt().request, Some(fresh));
@@ -1019,7 +1076,7 @@ fn live_bus_keeps_the_original_receipt_after_a_stale_renewal_error() {
 fn live_pause_is_checked_before_a_request_and_shadow_never_claims_rest() {
     for (enabled, paused) in [(true, true), (false, false)] {
         let root = Root::new();
-        let bus = Bus::new(&root.0).unwrap();
+        let (bus, clock) = bus_on_test_clock(&root.0);
         bus.publisher_declared(Pause::TOPIC, &Pause::declaration(), "keeper")
             .unwrap()
             .publish_json(1, &Pause { paused })
@@ -1029,7 +1086,7 @@ fn live_pause_is_checked_before_a_request_and_shadow_never_claims_rest() {
             .with_rest_requests(&bus)
             .unwrap();
         publish_context(&bus, START);
-        service.step(|| START, runtime::unix_ms());
+        service.step(|| START, clock.at(START));
         let state = bus.latest(ExpressionState::TOPIC).unwrap().unwrap();
         let mut publisher = bus
             .publisher_declared(Request::TOPIC, &Request::declaration(), "skills")
@@ -1038,7 +1095,7 @@ fn live_pause_is_checked_before_a_request_and_shadow_never_claims_rest() {
         rest.skill_session_id = publisher.boot().to_owned();
         rest.expression_session_id = state.header.boot;
         publisher.publish_json(1, &rest).unwrap();
-        let output = service.step(|| START + 200_000, runtime::unix_ms());
+        let output = service.step(|| START + 200_000, clock.at(START + 200_000));
         assert!(output.body.is_none() && output.light.is_none());
         let receipt: Receipt = bus
             .latest(Receipt::TOPIC)
@@ -1053,9 +1110,9 @@ fn live_pause_is_checked_before_a_request_and_shadow_never_claims_rest() {
 #[test]
 fn default_service_declares_no_new_rest_transport() {
     let root = Root::new();
-    let bus = Bus::new(&root.0).unwrap();
+    let (bus, clock) = bus_on_test_clock(&root.0);
     let mut service = runtime::Service::new(&bus, catalogue(), true, CLOCK).unwrap();
-    service.step(|| START, runtime::unix_ms());
+    service.step(|| START, clock.at(START));
     assert!(
         bus.subscribers(Request::TOPIC)
             .unwrap_or_default()
