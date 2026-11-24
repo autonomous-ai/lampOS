@@ -4959,7 +4959,13 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    "heard" cuối cùng đứng trước cụm đó mà ngay trước nó là "I" hoặc
    "you" ("whenever I say", "when you hear", "I said"), đến hết mệnh đề (một `,`, `.`,
    `;`, `:`, `!` hoặc `?`), viết thường: "hello there pebble" trong
-   "whenever I say hello there pebble, email me…". "says" và "saying"
+   "whenever I say hello there pebble, email me…". Một dấu `,` hoặc `:`
+   ngay sau từ đó không lấy mất cụm của họ: khi mệnh đề sau nó bắt đầu
+   bằng cụm khởi động, mệnh đề ấy là cụm của họ ("pebble hello" trong
+   "whenever I say, pebble hello", như chuyển giọng nói thành chữ hay viết;
+   lần chạy run-1843 trên lamp-06c1 mất cụm này vì dấu phẩy đó, và first
+   builder duyệt bản sửa lúc 19:01, 24/11). "I say, and then pebble hello"
+   vẫn không nêu cụm nào. "says" và "saying"
    không phải từ như vậy: trong câu tạo kỹ năng chúng thường nói kỹ năng
    sẽ nói gì ("a skill that says good morning", P2 của Thirteen trên
    #8469), và một lệnh cho kỹ năng mà trước từ đó không có "I" hoặc "you"

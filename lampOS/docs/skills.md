@@ -8669,7 +8669,12 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    with "I" or "you" right before it ("whenever I say", "when you hear",
    "I said"), to the end of that clause (a `,`, `.`, `;`, `:`, `!` or `?`), lowercased:
    "hello there pebble" in "whenever I say hello there pebble, email me…".
-   "says" and "saying" are no such words: in a make's line they mostly
+   A `,` or `:` right after the cue doesn't take their phrase from them:
+   when the clause after it starts with the ask, that clause is their
+   phrase ("pebble hello" in "whenever I say, pebble hello", as speech to
+   text often writes it; lamp-06c1's run-1843 lost it to that comma, and the
+   first builder approved the fix at 19:01, 24 Nov). "I say, and then pebble
+   hello" still names nothing. "says" and "saying" are no such words: in a make's line they mostly
    tell what the skill says ("a skill that says good morning", Thirteen's
    P2 on #8469), and an order to the skill with no "I" or "you" before
    its cue ("when I wake up, say good morning", "every night at ten, say
