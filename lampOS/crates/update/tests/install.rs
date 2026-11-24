@@ -9920,3 +9920,46 @@ fn the_apps_folders_unit_is_binary_backed_so_a_round_can_carry_and_add_it() {
         "{text}"
     );
 }
+
+/// An installed app's tools are on in the product (#8386's switch-on,
+/// #8406): `LAMP_APP_TOOLS=on` once in each of the three units that read
+/// it, `lamp-voice` (offers the tools to the model and sends its calls),
+/// `lamp-control` (says each running app's tools on `apps/tools` and sends
+/// `app.call` to its socket) and the apps helper's `lamp-apps-manage@`
+/// (its package reader takes a manifest's `tools`), and in no other product
+/// unit. With it on in the voice alone, no app would have a tool to offer;
+/// in lamp-control alone, an app naming `tools` would be refused at install.
+/// lamp-control and the helper read it only beside `LAMP_STORE_APPS`.
+#[test]
+fn the_product_offers_an_apps_tools_in_its_three_units() {
+    let name = lamp_voice::app_tools::ENVIRONMENT;
+    assert_eq!(name, "LAMP_APP_TOOLS");
+    let owners = [
+        "lamp-voice.service",
+        "lamp-control.service",
+        "lamp-apps-manage@.service",
+    ];
+    let line = format!("Environment={name}=on");
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service.iter().filter(|set| **set == line).count();
+        let mentioned = text
+            .lines()
+            .filter(|set| !set.starts_with('#') && set.contains(name))
+            .count();
+        assert_eq!(on, usize::from(owners.contains(unit)), "{unit}: {line}");
+        assert_eq!(mentioned, on, "{unit}: {name}");
+        if on == 1 && *unit != "lamp-voice.service" {
+            assert!(
+                service.contains(&"Environment=LAMP_STORE_APPS=on"),
+                "{unit} lacks LAMP_STORE_APPS"
+            );
+        }
+    }
+    for owner in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner} is not a product unit"
+        );
+    }
+}

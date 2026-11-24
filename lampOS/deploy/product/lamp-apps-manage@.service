@@ -21,6 +21,9 @@ Group=root
 Slice=lampos-parts.slice
 # LAMP_STORE_APPS: #7415, the Store apps; on in the product by the first builder's DEFAULT-ON of 20 Nov; its rules are its rows in docs/switches.md.
 Environment=LAMP_STORE_APPS=on
+# LAMP_APP_TOOLS: #8386's switch-on; the package reader takes a manifest's `tools` file. The same line in lamp-voice and
+# lamp-control; its rules are its row in docs/switches.md.
+Environment=LAMP_APP_TOOLS=on
 ExecStart=/opt/lampOS/apps-manage/current/lamp-apps-manage asked
 StandardInput=socket
 StandardOutput=socket
