@@ -1,0 +1,84 @@
+{"lang": "en", "state": "no_plan", "say": "Two short workouts a week, I'm new to this", "expect": {"tool": "set_plan", "args": {"days": 2, "minutes": 20, "experience": "new"}}}
+{"lang": "en", "state": "no_plan", "say": "Make me a plan: three days a week, thirty minutes each", "expect": {"tool": "set_plan", "args": {"days": 3, "minutes": 30}}}
+{"lang": "en", "state": "no_plan", "say": "I want to get stronger, four times a week, about 45 minutes", "expect": {"tool": "set_plan", "args": {"days": 4, "minutes": 45, "goal": "strength"}}}
+{"lang": "en", "state": "no_plan", "say": "Set up a plan to lose weight, five days, twenty minutes a day", "expect": {"tool": "set_plan", "args": {"days": 5, "minutes": 20, "goal": "weight"}}}
+{"lang": "en", "state": "no_plan", "say": "I train regularly, give me 3 days of 40 minutes", "expect": {"tool": "set_plan", "args": {"days": 3, "minutes": 40, "experience": "regular"}}}
+{"lang": "en", "state": "no_plan", "say": "Three 20 minute sessions a week, go easy on my bad knee", "expect": {"tool": "set_plan", "args": {"days": 3, "minutes": 20, "limits": "knees"}}}
+{"lang": "en", "state": "no_plan", "say": "Plan me two half-hour workouts a week, my lower back hurts", "expect": {"tool": "set_plan", "args": {"days": 2, "minutes": 30, "limits": "back"}}}
+{"lang": "en", "state": "no_plan", "say": "I'd like to tone up, twice a week for 25 minutes, I work out sometimes", "expect": {"tool": "set_plan", "args": {"days": 2, "minutes": 25, "goal": "tone", "experience": "sometimes"}}}
+{"lang": "en", "state": "plan", "say": "Change my plan to four days a week, same 20 minutes", "expect": {"tool": "set_plan", "args": {"days": 4, "minutes": 20}}}
+{"lang": "en", "state": "plan", "say": "Make my sessions shorter, three days of fifteen minutes", "expect": {"tool": "set_plan", "args": {"days": 3, "minutes": 15}}}
+{"lang": "en", "state": "plan", "say": "What's my plan?", "expect": {"tool": "get_plan", "args": {}}}
+{"lang": "en", "state": "plan", "say": "Which days am I training this week?", "expect": {"tool": "get_plan", "args": {}}}
+{"lang": "en", "state": "plan", "say": "What's my workout today?", "expect": {"tool": "get_plan", "args": {}}}
+{"lang": "en", "state": "plan", "say": "Remind me of my training plan", "expect": {"tool": "get_plan", "args": {}}}
+{"lang": "en", "state": "plan", "say": "What am I training next?", "expect": {"tool": "get_plan", "args": {}}}
+{"lang": "en", "state": "plan", "say": "Let's train", "expect": {"tool": "start_session", "args": {}}}
+{"lang": "en", "state": "plan", "say": "Start today's session", "expect": {"tool": "start_session", "args": {}}}
+{"lang": "en", "state": "plan", "say": "I want to do some squats now", "expect": {"tool": "start_session", "args": {"exercise": "squat"}}}
+{"lang": "en", "state": "no_plan", "say": "Let's do push-ups", "expect": {"tool": "start_session", "args": {"exercise": "pushup"}}}
+{"lang": "en", "state": "plan", "say": "Give me a plank", "expect": {"tool": "start_session", "args": {"exercise": "plank"}}}
+{"lang": "en", "state": "no_plan", "say": "Can we do a quick workout?", "expect": {"tool": "start_session", "args": {}}}
+{"lang": "en", "state": "plan", "say": "Time for some lunges", "expect": {"tool": "start_session", "args": {"exercise": "lunge"}}}
+{"lang": "en", "state": "running", "say": "I'm tired, let's finish here", "expect": {"tool": "end_session", "args": {}}}
+{"lang": "en", "state": "running", "say": "That's enough for today", "expect": {"tool": "end_session", "args": {}}}
+{"lang": "en", "state": "running", "say": "Let's wrap up the workout", "expect": {"tool": "end_session", "args": {}}}
+{"lang": "en", "state": "running", "say": "I can't do any more, end it", "expect": {"tool": "end_session", "args": {}}}
+{"lang": "en", "state": "running", "say": "Okay, call it a day for the training", "expect": {"tool": "end_session", "args": {}}}
+{"lang": "en", "state": "plan", "say": "How many workouts did I do this week?", "expect": {"tool": "get_progress", "args": {"range": "week"}}}
+{"lang": "en", "state": "plan", "say": "How am I doing this month?", "expect": {"tool": "get_progress", "args": {"range": "month"}}}
+{"lang": "en", "state": "no_plan", "say": "How many sessions have I done in total?", "expect": {"tool": "get_progress", "args": {"range": "all"}}}
+{"lang": "en", "state": "plan", "say": "How many minutes did I train this week?", "expect": {"tool": "get_progress", "args": {"range": "week"}}}
+{"lang": "en", "state": "plan", "say": "Show me my progress since I started", "expect": {"tool": "get_progress", "args": {"range": "all"}}}
+{"lang": "vi", "state": "no_plan", "say": "Lập lịch tập cho mình, ba buổi một tuần, mỗi buổi hai mươi phút", "expect": {"tool": "set_plan", "args": {"days": 3, "minutes": 20}}}
+{"lang": "vi", "state": "no_plan", "say": "Mình mới tập, hai buổi một tuần, ba mươi phút", "expect": {"tool": "set_plan", "args": {"days": 2, "minutes": 30, "experience": "new"}}}
+{"lang": "vi", "state": "no_plan", "say": "Muốn giảm cân, bốn buổi mỗi tuần, hai mươi phút, mình bị đau gối", "expect": {"tool": "set_plan", "args": {"days": 4, "minutes": 20, "goal": "weight", "limits": "knees"}}}
+{"lang": "vi", "state": "no_plan", "say": "Mình muốn khỏe hơn, tập năm buổi một tuần, mỗi buổi bốn mươi lăm phút", "expect": {"tool": "set_plan", "args": {"days": 5, "minutes": 45, "goal": "strength"}}}
+{"lang": "vi", "state": "plan", "say": "Đổi lịch thành hai buổi một tuần, mười lăm phút thôi, mình hay bị đau lưng", "expect": {"tool": "set_plan", "args": {"days": 2, "minutes": 15, "limits": "back"}}}
+{"lang": "en", "state": "no_plan", "say": "Three days of 30 minutes, no injuries", "expect": {"tool": "set_plan", "args": {"days": 3, "minutes": 30, "limits": "none"}}}
+{"lang": "en", "state": "no_plan", "say": "Twice a week, 20 minutes, my wrists are sore", "expect": {"tool": "set_plan", "args": {"days": 2, "minutes": 20, "limits": "wrists"}}}
+{"lang": "vi", "state": "no_plan", "say": "Ba buổi một tuần, hai mươi phút, mình hay đau vai", "expect": {"tool": "set_plan", "args": {"days": 3, "minutes": 20, "limits": "shoulders"}}}
+{"lang": "vi", "state": "plan", "say": "Kế hoạch tập của mình thế nào?", "expect": {"tool": "get_plan", "args": {}}}
+{"lang": "vi", "state": "plan", "say": "Hôm nay tập gì?", "expect": {"tool": "get_plan", "args": {}}}
+{"lang": "vi", "state": "plan", "say": "Tuần này mình tập những ngày nào?", "expect": {"tool": "get_plan", "args": {}}}
+{"lang": "vi", "state": "plan", "say": "Nhắc lại lịch tập cho mình", "expect": {"tool": "get_plan", "args": {}}}
+{"lang": "vi", "state": "plan", "say": "Buổi tập tới là bài gì?", "expect": {"tool": "get_plan", "args": {}}}
+{"lang": "vi", "state": "plan", "say": "Bắt đầu buổi tập hôm nay đi", "expect": {"tool": "start_session", "args": {}}}
+{"lang": "vi", "state": "no_plan", "say": "Tập squat đi", "expect": {"tool": "start_session", "args": {"exercise": "squat"}}}
+{"lang": "vi", "state": "plan", "say": "Cho mình tập chống đẩy", "expect": {"tool": "start_session", "args": {"exercise": "pushup"}}}
+{"lang": "vi", "state": "plan", "say": "Mình muốn tập plank một lát", "expect": {"tool": "start_session", "args": {"exercise": "plank"}}}
+{"lang": "vi", "state": "no_plan", "say": "Tập nhanh một chút nhé", "expect": {"tool": "start_session", "args": {}}}
+{"lang": "vi", "state": "running", "say": "Mệt rồi, nghỉ thôi", "expect": {"tool": "end_session", "args": {}}}
+{"lang": "vi", "state": "running", "say": "Hôm nay tập vậy đủ rồi", "expect": {"tool": "end_session", "args": {}}}
+{"lang": "vi", "state": "running", "say": "Thôi kết thúc ở đây nhé", "expect": {"tool": "end_session", "args": {}}}
+{"lang": "vi", "state": "running", "say": "Mình không tập nổi nữa, dừng thôi", "expect": {"tool": "end_session", "args": {}}}
+{"lang": "vi", "state": "running", "say": "Cho mình nghỉ, hết buổi nhé", "expect": {"tool": "end_session", "args": {}}}
+{"lang": "vi", "state": "plan", "say": "Tuần này mình tập mấy buổi rồi?", "expect": {"tool": "get_progress", "args": {"range": "week"}}}
+{"lang": "vi", "state": "plan", "say": "Tháng này mình tập được bao nhiêu?", "expect": {"tool": "get_progress", "args": {"range": "month"}}}
+{"lang": "vi", "state": "no_plan", "say": "Từ trước tới giờ mình tập tổng cộng bao nhiêu buổi?", "expect": {"tool": "get_progress", "args": {"range": "all"}}}
+{"lang": "vi", "state": "plan", "say": "Tuần này mình tập được bao nhiêu phút?", "expect": {"tool": "get_progress", "args": {"range": "week"}}}
+{"lang": "vi", "state": "plan", "say": "Mình tập liên tục mấy ngày rồi?", "expect": {"tool": "get_progress", "args": {"range": "week"}}}
+{"lang": "en", "state": "running", "say": "stop workout", "expect": "none", "rule": 3, "note": "stop: the app's exact stop phrase ends it"}
+{"lang": "en", "state": "running", "say": "end workout", "expect": "none", "rule": 3, "note": "stop: the app's exact stop phrase ends it"}
+{"lang": "en", "state": "running", "say": "finish workout", "expect": "none", "rule": 3, "note": "stop: the app's exact stop phrase ends it"}
+{"lang": "vi", "state": "running", "say": "dừng buổi tập", "expect": "none", "rule": 3, "note": "stop: the app's exact stop phrase ends it"}
+{"lang": "vi", "state": "running", "say": "kết thúc buổi tập", "expect": "none", "rule": 3, "note": "stop: the app's exact stop phrase ends it"}
+{"lang": "vi", "state": "running", "say": "lamp dừng tập", "expect": "none", "rule": 3, "note": "stop: the app's exact stop phrase ends it"}
+{"lang": "en", "state": "running", "say": "Stop", "expect": "none", "rule": 3, "note": "stop: the lamp's own stop word stills Lamp (a pause); the session goes on"}
+{"lang": "vi", "state": "running", "say": "dừng lại", "expect": "none", "rule": 3, "note": "stop: the lamp's own stop word stills Lamp (a pause); the session goes on"}
+{"lang": "en", "state": "idle", "say": "I'm done with dinner", "expect": "none", "rule": 3, "note": "stop: an ordinary sentence ends nothing"}
+{"lang": "en", "state": "idle", "say": "Stop the music", "expect": "none", "rule": 3, "note": "stop: an ordinary sentence ends nothing"}
+{"lang": "vi", "state": "idle", "say": "Xong bữa tối rồi", "expect": "none", "rule": 3, "note": "stop: an ordinary sentence ends nothing"}
+{"lang": "en", "state": "no_plan", "say": "What's my plan?", "expect": {"tool": "get_plan", "args": {}}, "also_ok": ["none"], "rule": 1, "note": "out of order: no plan; the tool refuses with what to ask"}
+{"lang": "en", "state": "idle", "say": "End my workout", "expect": {"tool": "end_session", "args": {}}, "also_ok": ["none"], "rule": 1, "note": "out of order: nothing runs; the tool refuses"}
+{"lang": "en", "state": "running", "say": "Let's start a workout", "expect": {"tool": "start_session", "args": {}}, "also_ok": ["none"], "rule": 1, "note": "out of order: one runs; the tool refuses"}
+{"lang": "vi", "state": "idle", "say": "Kết thúc buổi tập đi", "expect": {"tool": "end_session", "args": {}}, "also_ok": ["none"], "rule": 1, "note": "out of order: nothing runs; the tool refuses"}
+{"lang": "vi", "state": "no_plan", "say": "Lịch tập của mình là gì?", "expect": {"tool": "get_plan", "args": {}}, "also_ok": ["none"], "rule": 1, "note": "out of order: no plan; the tool refuses with what to ask"}
+{"lang": "en", "state": "no_plan", "say": "Can you make me a training plan?", "expect": "none", "rule": 1, "note": "out of order: ask days and minutes before set_plan"}
+{"lang": "en", "state": "no_plan", "say": "I want a plan, I'm a beginner", "expect": "none", "rule": 1, "note": "out of order: ask days and minutes before set_plan"}
+{"lang": "vi", "state": "no_plan", "say": "Lập kế hoạch tập cho mình đi", "expect": "none", "rule": 1, "note": "out of order: ask days and minutes before set_plan"}
+{"lang": "en", "state": "running", "say": "How many sets are left?", "expect": "none"}
+{"lang": "en", "state": "idle", "say": "What's the weather like?", "expect": "none"}
+{"lang": "en", "state": "idle", "say": "Turn the light on", "expect": "none"}
+{"lang": "vi", "state": "idle", "say": "Bật đèn lên", "expect": "none"}
+{"lang": "vi", "state": "idle", "say": "Hôm nay trời thế nào?", "expect": "none"}
