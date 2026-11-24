@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+# Mock ssh for the ee17 gate kit: never connects. A LAMP body -> the fixture out/<script>.<key>.<n> (the n-th call with
+# that key), else out/<script>.<key>, else out/<script>; key: the pre line's MODE=, LABEL=, RTAG= values joined by "-".
+# `journalctl -f` -> journal chunks j/<CLIP>[.<k>] appended as each clip is played (the afplay stub's trigger file),
+# "@+<s> <unit>[pid]: <line>" offsets from the play; `journalctl -u` -> MOCK_STARTS "Started" lines; else nothing.
+import glob, os, re, sys, time
+FX = os.environ["MOCK_FX"]; ROW = os.environ["MOCK_ROW"]; LOG = os.environ["MOCK_LOG"]; ST = os.environ["MOCK_STATE"]
+a = sys.argv[1:]; i = 0
+while i < len(a) and a[i].startswith("-"):
+    i += 2 if a[i] in ("-o", "-p", "-i", "-l") else 1
+host = a[i] if i < len(a) else ""; cmd = " ".join(a[i + 1:])
+def log(m):
+    with open(LOG, "a") as f: f.write("%.3f ssh %s: %s\n" % (time.time(), host, m))
+def fx(*names):
+    for nm in names:
+        p = os.path.join(FX, nm)
+        if os.path.exists(p): return open(p).read()
+    return None
+if "sudo sh -s" in cmd:
+    body = sys.stdin.read(); names = {}
+    for f in glob.glob(os.path.join(ROW, "*.lamp.sh")):
+        c = open(f).read()
+        if os.path.basename(f) != "common.lamp.sh" and body.endswith(c): names[os.path.basename(f)] = c
+    nm = max(names, key=lambda k: len(names[k])) if names else "unknown"
+    pre = body[: len(body) - len(names.get(nm, ""))].rstrip("\n").split("\n")[-1]
+    key = "-".join(m.group(1) for m in (re.search(r"\b%s=(\S+)" % k, pre) for k in ("MODE", "LABEL", "RTAG")) if m)
+    cf = os.path.join(ST, "count.%s.%s" % (nm, key)); k = int(open(cf).read()) + 1 if os.path.exists(cf) else 1
+    open(cf, "w").write(str(k))
+    log("LAMP %s key=%s n=%d pre=%r sudo_line=%s" % (nm, key, k, pre[:100], "given" if body.split("\n", 1)[0] else "empty"))
+    out = fx("out/%s.%s.%d" % (nm, key, k), "out/%s.%s" % (nm, key), "out/%s" % nm)
+    if out is None: log("NO FIXTURE out/%s.%s.%d" % (nm, key, k)); sys.exit(0)
+    sys.stdout.write(out); sys.exit(0)
+log("CMD " + cmd)
+if "journalctl -f" in cmd:
+    trig = os.path.join(ST, "played"); count = {}
+    try: seen = len(open(trig).read().splitlines())
+    except FileNotFoundError: seen = 0
+    while True:
+        try: ts = open(trig).read().splitlines()
+        except FileNotFoundError: ts = []
+        for t in ts[seen:]:
+            at, leg, clip = t.split()
+            count[clip] = count.get(clip, 0) + 1; n = count[clip]
+            for line in (fx("j/%s.%d" % (clip, n), "j/%s" % clip) or "").splitlines():
+                mm = re.match(r"@\+([0-9.]+) (.*)", line)
+                if mm: sys.stdout.write("%.6f mock-lamp %s\n" % (float(at) + float(mm.group(1)), mm.group(2)))
+            sys.stdout.flush()
+        seen = len(ts); time.sleep(0.05)
+if cmd.startswith("journalctl -u"):
+    sys.stdout.write("Started x.\n" * int(os.environ.get("MOCK_STARTS", "0"))); sys.exit(0)
+sys.exit(0)

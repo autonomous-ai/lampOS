@@ -1,0 +1,6 @@
+gate/logs/
+gate/clips/*.wav
+gate/clips/*-el.txt
+mock/fx/
+mock/work/
+mock/results.txt

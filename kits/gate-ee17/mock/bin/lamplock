@@ -1,0 +1,3 @@
+#!/bin/sh
+# Mock lamp-lock: never touches a lamp; logs the call. MOCK_LOCK_RC / MOCK_RENEW_RC set its exit.
+echo "$(date +%s) lock $*" >> "$MOCK_LOG"; [ "$2" = renew ] && exit ${MOCK_RENEW_RC:-0}; exit ${MOCK_LOCK_RC:-0}

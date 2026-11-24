@@ -1,0 +1,3 @@
+#!/bin/sh
+# Mock scp: never connects; logs the call.
+echo "$(date +%s) scp $*" >> "$MOCK_LOG"; exit ${MOCK_SCP_RC:-0}
