@@ -18265,6 +18265,62 @@ async fn cue(shared: &Shared, request: u64, clip: Vec<i16>) -> Result<(), Stop> 
     Ok(())
 }
 
+/// How long an installed app's tool call (`LAMP_APP_TOOLS`, #8406) may go
+/// unanswered, with nothing said in the turn, before the lamp says
+/// [`CHECKING`] once: the person hears something within about 2 s of their
+/// line, never a silence the length of the app's 5 s wait (the first
+/// builder's ruling on #8386, 24 Nov 09:27).
+const APP_WAIT_LINE_AFTER: Duration = Duration::from_millis(1_500);
+
+/// `answering`, with `say` run once if it is still unanswered after
+/// `after`; whether it was. An answer before then says nothing.
+async fn said_if_slow<T, F>(
+    after: Duration,
+    answering: impl std::future::Future<Output = T>,
+    say: impl FnOnce() -> F,
+) -> Result<(T, bool), Stop>
+where
+    F: std::future::Future<Output = Result<(), Stop>>,
+{
+    tokio::pin!(answering);
+    tokio::select! {
+        answer = &mut answering => return Ok((answer, false)),
+        () = tokio::time::sleep(after) => {}
+    }
+    say().await?;
+    Ok((answering.await, true))
+}
+
+/// An app tool's call (`sent`: checked and told to the app, not refused):
+/// with nothing said in the turn and no line of this kind said yet
+/// (`waited`), [`CHECKING`] is said once if the app has not answered within
+/// [`APP_WAIT_LINE_AFTER`], and `waited` set so the next round is told it
+/// was said. It cannot be taken back: an answer just after it comes after
+/// it.
+async fn said_while_app_answers<T>(
+    queue: &mut Queue<'_>,
+    request: u64,
+    sent: bool,
+    waited: &mut bool,
+    answering: impl std::future::Future<Output = T>,
+) -> Result<T, Stop> {
+    if !sent || queue.started || *waited {
+        return Ok(answering.await);
+    }
+    let line = queue.shared.fixed(CHECKING).to_owned();
+    let (answer, said) = said_if_slow(APP_WAIT_LINE_AFTER, answering, move || async move {
+        eprintln!(
+            "lamp-voice second: request {request}: an app tool's call is unanswered at {} ms with nothing said; said \"{line}\" ({})",
+            APP_WAIT_LINE_AFTER.as_millis(),
+            crate::app_tools::ENVIRONMENT
+        );
+        queue.push(line).await
+    })
+    .await?;
+    *waited |= said;
+    Ok(answer)
+}
+
 /// A call's answer, `answering`; for a voice make (`made`, #6749) the
 /// make's waiting line ([`crate::make_skill_agent::WAITING_LINE`]) is said
 /// in this turn once its agent begins ([`crate::make_skill_agent::waiting_due`]),
@@ -22517,6 +22573,9 @@ async fn answer(
                 && calls
                     .iter()
                     .any(|call| call.name == net::search::NAME || call.name == net::search::FETCH);
+            // An app tool's slow call said [`CHECKING`] in this round
+            // ([`said_while_app_answers`]).
+            let mut app_waited = false;
             if checking {
                 eprintln!(
                     "lamp-voice second: request {request} chat round {round} searches with nothing said; said \"{}\" (LAMP_SECOND_CHECKING_LINE)",
@@ -23147,10 +23206,21 @@ async fn answer(
                         ),
                     }
                 };
-                let mut answer = said_while_made(&mut queue, request, made_call, answering, || {
-                    crate::tools::ToolAnswer::plain(crate::long_make::let_go_told())
-                })
-                .await?;
+                let mut answer = if app_tool {
+                    said_while_app_answers(
+                        &mut queue,
+                        request,
+                        !app_tool_blocked,
+                        &mut app_waited,
+                        answering,
+                    )
+                    .await?
+                } else {
+                    said_while_made(&mut queue, request, made_call, answering, || {
+                        crate::tools::ToolAnswer::plain(crate::long_make::let_go_told())
+                    })
+                    .await?
+                };
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
                 }
@@ -23794,7 +23864,7 @@ async fn answer(
                 );
                 messages.push(Message::system(note));
             }
-            if checking {
+            if checking || app_waited {
                 messages.push(Message::system(said_once_note(shared.fixed(CHECKING))));
             }
         }

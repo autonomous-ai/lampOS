@@ -159,3 +159,35 @@ fn a_search_begun_with_nothing_said_is_begun_in_the_owners_language() {
         );
     }
 }
+
+/// An app tool's slow call (`said_while_app_answers`, the first builder's
+/// ruling on #8386): unanswered at `APP_WAIT_LINE_AFTER`, the line is said
+/// once and the answer still comes after it; answered before, nothing.
+#[tokio::test(start_paused = true)]
+async fn a_slow_answer_is_said_over_once_and_a_quick_one_never() {
+    let said = std::cell::Cell::new(0);
+    let say = || async {
+        said.set(said.get() + 1);
+        Ok(())
+    };
+    let slow = async {
+        tokio::time::sleep(Duration::from_millis(2_500)).await;
+        "slow"
+    };
+    let (answer, was) = said_if_slow(APP_WAIT_LINE_AFTER, slow, say).await.unwrap();
+    assert_eq!((answer, was, said.get()), ("slow", true, 1));
+    let quick = async {
+        tokio::time::sleep(Duration::from_millis(1_400)).await;
+        "quick"
+    };
+    let (answer, was) = said_if_slow(APP_WAIT_LINE_AFTER, quick, say).await.unwrap();
+    assert_eq!((answer, was, said.get()), ("quick", false, 1));
+    // A stop while saying it ends the wait at once.
+    let stopped = said_if_slow(
+        APP_WAIT_LINE_AFTER,
+        std::future::pending::<()>(),
+        || async { Err(Stop::Gone) },
+    )
+    .await;
+    assert!(matches!(stopped, Err(Stop::Gone)));
+}
