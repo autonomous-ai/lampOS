@@ -2664,6 +2664,67 @@ async fn a_phrase_heard_on_the_bus_reaches_its_subscriber() {
     );
 }
 
+/// #8126 (lamp-0c89, 20 Nov): a computer's client subscribed to `phrase.heard`
+/// with 16 phrases, as the SDK sends them (its sorted set, in one `subscribe`),
+/// and every finished line logged "0 listening for 0 phrases". Each of the 16
+/// is heard in a line, through the real bus, and counted as an installed app's
+/// `phrases.set` is.
+#[tokio::test]
+async fn a_computers_sixteen_phrases_are_each_heard_on_the_bus() {
+    let lamp = lamp("phrase-sixteen").await;
+    let bus = lamp_bus::Bus::new(lamp.dir.join("bus")).unwrap();
+    let watch = Arc::new(std::sync::Mutex::new(lamp_control::watch::Watch::new()));
+    server::watch_bus(&bus, watch, lamp.shared.clone()).unwrap();
+    let mut socket = paired(&lamp, json!(["body", "light", "look", "hear"]), 44).await;
+    let mut phrases: Vec<String> = [
+        "start workout",
+        "stop workout",
+        "next exercise",
+        "previous exercise",
+        "pause workout",
+        "resume workout",
+        "how many reps",
+        "how many sets",
+        "skip this set",
+        "repeat that please",
+        "add five minutes",
+        "i am finished",
+        "give me a minute",
+        "show my progress",
+        "change the plan",
+        "what is next",
+    ]
+    .iter()
+    .map(|phrase| phrase.to_string())
+    .collect();
+    phrases.sort();
+    assert_eq!(phrases.len(), 16);
+    let subscribed = send(
+        &mut socket,
+        json!({"id": 3, "op": "subscribe", "events": ["phrase.heard"], "phrases": phrases}),
+    )
+    .await;
+    assert_eq!(subscribed["ok"], true, "{subscribed}");
+    let mut heard = bus
+        .publisher_declared("voice/heard", &lamp_msgs::Speech::declaration(), "voice")
+        .unwrap();
+    for (n, phrase) in phrases.iter().enumerate() {
+        let line = lamp_msgs::Speech {
+            text: format!("Lamp. {phrase}."),
+            finished: true,
+            locale: None,
+            request: Some(200 + n as u64),
+        };
+        heard.publish_json(1 + n as u64, &line).unwrap();
+        let told = next(&mut socket).await;
+        assert_eq!(
+            (&told["ev"], &told["phrase"]),
+            (&json!("phrase.heard"), &json!(phrase)),
+            "{told}"
+        );
+    }
+}
+
 // The local agent (docs/control.md, "The local agent"): a unix socket for one
 // named user, no pairing, the grants the owner left it.
 
