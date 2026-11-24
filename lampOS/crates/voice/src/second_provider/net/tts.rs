@@ -207,7 +207,8 @@ pub static OWN_VOICE_REFUSED: std::sync::atomic::AtomicU16 = std::sync::atomic::
 /// the notice said once, whichever piece or voice sees it first.
 #[derive(Debug, Default)]
 pub(crate) struct OwnVoiceLost {
-    /// ElevenLabs refused the person's key or voice.
+    /// ElevenLabs refused the person's key or voice, or their voice failed
+    /// a piece twice and gave way ([`OwnVoiceLost::failed`]).
     lost: AtomicBool,
     /// [`OWN_VOICE_LOST_LINE`] was given to the lamp's voice to say.
     told: AtomicBool,
@@ -234,6 +235,19 @@ impl OwnVoiceLost {
         }
     }
 
+    /// The person's voice failed a piece twice for another reason than a
+    /// refusal, `why` (#8394's P2: a 400 or 422, a 429, a 5xx, a first
+    /// sound later than the services' bound): the lamp's own voice from now
+    /// on, as after a refusal, journalled by the first piece to see it only.
+    /// `voice-keys` warns for a refusal alone.
+    fn failed(&self, why: &Error) {
+        if !self.lost.swap(true, Ordering::AcqRel) {
+            self.say(format!(
+                "lamp-voice second: the person's own ElevenLabs voice failed a sentence twice ({why}); the lamp's own voice from now on (LAMP_OWN_KEYS)"
+            ));
+        }
+    }
+
     /// `text` as the lamp's own voice says it: after [`OWN_VOICE_LOST_LINE`]
     /// for the first piece of the process only, with its own journal line.
     fn told(&self, text: &str) -> String {
@@ -245,6 +259,15 @@ impl OwnVoiceLost {
                 .to_owned(),
         );
         format!("{OWN_VOICE_LOST_LINE} {text}")
+    }
+
+    /// The journal lines said, in order: tests only.
+    #[cfg(test)]
+    pub(crate) fn said(&self) -> Vec<String> {
+        self.said
+            .lock()
+            .map(|said| said.clone())
+            .unwrap_or_default()
     }
 }
 
@@ -587,8 +610,9 @@ pub struct Tts {
     /// The lamp's own voice, when this one is the person's (#8367,
     /// [`Tts::with_lamps_voice`]).
     lamps: Option<Box<Tts>>,
-    /// ElevenLabs refused the person's voice: every piece goes to `lamps`
-    /// until the voice starts again; one for the process ([`own_voice_lost`]).
+    /// ElevenLabs refused the person's voice, or it failed a piece twice
+    /// ([`Tts::give_way`]): every piece goes to `lamps` until the voice
+    /// starts again; one for the process ([`own_voice_lost`]).
     lost: Arc<OwnVoiceLost>,
 }
 
@@ -688,11 +712,37 @@ impl Tts {
         self
     }
 
+    /// This voice with `lost` in place of the process's one: tests only, so
+    /// none shares another's refusal.
+    #[cfg(test)]
+    pub(crate) fn with_lost(mut self, lost: Arc<OwnVoiceLost>) -> Self {
+        self.lost = lost;
+        self
+    }
+
     /// The lamp's own voice, once the person's was refused.
     fn fallen_back(&self) -> Option<&Tts> {
         self.lamps
             .as_deref()
             .filter(|_| self.lost.lost.load(Ordering::Relaxed))
+    }
+
+    /// Whether a piece asked now goes to the person's own voice (#8367): it
+    /// is theirs, neither refused nor given way yet.
+    pub(crate) fn speaks_the_persons(&self) -> bool {
+        self.lamps.is_some() && !self.lost.lost.load(Ordering::Acquire)
+    }
+
+    /// #8394's P2: the person's own voice failed a piece on its second
+    /// asking too, for any reason, `why` (a 400 or 422, a 429, a 5xx, a
+    /// first sound too slow): it gives way to the lamp's own, as a refusal
+    /// does ([`Tts::speak_in`]), so that piece, asked again, and every one
+    /// after are said in the lamp's voice, after the one notice. Nothing for
+    /// a voice that isn't the person's.
+    pub(crate) fn give_way(&self, why: &Error) {
+        if self.lamps.is_some() {
+            self.lost.failed(why);
+        }
     }
 
     /// Whether a socket is opened for an answer: ElevenLabs only, not for a
@@ -1087,6 +1137,9 @@ impl Tts {
     /// a voice gone) is said in the lamp's own voice after
     /// [`OWN_VOICE_LOST_LINE`], never silent, and every piece after goes to
     /// the lamp's voice; one journal line, never the key or the voice ID.
+    /// A piece it fails to start for another reason goes back to the
+    /// services, which ask once more and then give way ([`Tts::give_way`],
+    /// #8394's P2).
     async fn speak_in(&self, text: &str, turn: Option<Turn>) -> Result<TtsStream> {
         let Some(lamps) = &self.lamps else {
             return self.speak_own(text, turn).await;
