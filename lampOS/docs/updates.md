@@ -2460,8 +2460,8 @@ for at least level 8 (9 since second-P1, above), so an updater of level 7 climbs
 - **What `install` puts on a lamp** (`install::PRODUCT`) and the build
   carries under `product`. So the keeper's helper, which `install` leaves
   out until its lamp check, is not added either. The own keys' helper is
-  added since #8367: its socket gets its `lampos.target` link and listens
-  from the lamp's next start, as an added socket isn't started.
+  added since #8367: its socket gets its `lampos.target` link and is
+  started with the round ("The other exception" below).
   A unit the lamp has as a link (a masked one) or anything but nothing is
   left as it is. Only `/etc/systemd/system` is looked in: a unit of the same
   name in `/lib/systemd/system` or `/run/systemd/system` would be shadowed by
@@ -2524,7 +2524,9 @@ with `lamp-services`: the app showed an account linked, and the link went
 nowhere. So, at the same moment as recovery's start (the watch passed, the
 build kept, outside the watch), the round starts each unit it added that is:
 
-- a service, not a template, whose `Type=` is not `oneshot`;
+- a service, not a template, whose `Type=` is not `oneshot`, or a socket
+  (#8367: the own keys' helper's, so the app's keys reach it before the next
+  boot);
 - enabled into `lampos.target` (its `[Install]` says `WantedBy=lampos.target`
   and the link `lampos.target.wants/<unit>` is there);
 - inactive, while `lampos.target` itself is active.
@@ -2532,9 +2534,9 @@ build kept, outside the watch), the round starts each unit it added that is:
 `lamp-services.service` goes first, then the others in the switch's order.
 Each is started once with `systemctl start --no-block`, which returns once
 systemd has the job, and each start writes one journal line. A running part
-is never restarted. A failed part, a timer, a socket, a timed service, and a
-unit wanted only by another target (the waking face, the Wi-Fi restore,
-recovery) are left for the next start, as `install` leaves them. A lamp whose
+is never restarted. A failed part, a timer, a timed service, and a unit
+wanted only by another target (the waking face, the Wi-Fi restore,
+recovery, the eyes' camera socket by `sockets.target`) are left for the next start, as `install` leaves them. A lamp whose
 `lampos.target` is not running (not set up) starts none: the target starts
 them. A start that fails is said, and the round stays switched.
 
