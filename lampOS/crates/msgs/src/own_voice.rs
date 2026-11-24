@@ -1,14 +1,24 @@
 //! Where a person's own ElevenLabs key and voice ID go (#8367): ElevenLabs'
 //! own API, or, on a test lamp only, the address `LAMP_OWN_ELEVENLABS_URL`
 //! names (#8394's lamp row, the lead: the relay's address with its key and
-//! voice). Read here for both its users, root's keys helper (`lamp-setup
-//! keys`, the check) and the voice (the speech), so they never disagree.
-//! Unset, both use [`ELEVENLABS_API`] exactly as before.
+//! voice), read only under its gate, the voice's switch for test addresses
+//! (#8394's P2, the first builder). Read here for both its users, root's
+//! keys helper (`lamp-setup keys`, the check) and the voice (the speech),
+//! so they never disagree. Unset, or without the gate, both use
+//! [`ELEVENLABS_API`] exactly as before.
 
 /// The test lamps' switch: an https address the person's own ElevenLabs key
-/// and voice ID are sent to in place of ElevenLabs' own API. It sends the
-/// person's key there: never set on a customer's lamp.
+/// and voice ID are sent to in place of ElevenLabs' own API, under [`GATE`].
+/// It sends the person's key there: never set on a customer's lamp.
 pub const ENVIRONMENT: &str = "LAMP_OWN_ELEVENLABS_URL";
+
+/// The switch's gate (#8394's P2, the first builder: the switch alone could
+/// send a person's key to any https host): the voice's switch for test
+/// addresses, lamp-voice's `second_config::LOOPBACK_SERVICES_ENV`, `on`
+/// exactly. No product unit sets it or [`ENVIRONMENT`] (lamp-voice's tests
+/// read every unit for both), and without it the switch is ignored, so the
+/// person's key and voice go to [`ELEVENLABS_API`] alone.
+pub const GATE: &str = "LAMP_VOICE_LOOPBACK_SERVICES";
 
 /// ElevenLabs' own API.
 pub const ELEVENLABS_API: &str = "https://api.elevenlabs.io/v1";
@@ -17,16 +27,21 @@ pub const ELEVENLABS_API: &str = "https://api.elevenlabs.io/v1";
 /// voice's ElevenLabs default (`net::tts::ELEVENLABS_MODEL`).
 pub const CHECK_MODEL: &str = "eleven_flash_v2_5";
 
-/// The address `var` (the switch's value) names, when it is an https URL;
-/// `None` unset, empty or anything else.
-pub fn switched(var: Option<&str>) -> Option<String> {
-    var.filter(|url| url.starts_with("https://") && url.len() > "https://".len())
+/// The address the switch names, `var` giving each variable of the unit's
+/// environment: an https URL, with [`GATE`] `on` exactly; `None` unset,
+/// empty, anything else, or without the gate.
+pub fn switched(var: impl Fn(&str) -> Option<String>) -> Option<String> {
+    if var(GATE).as_deref() != Some("on") {
+        return None;
+    }
+    var(ENVIRONMENT)
+        .filter(|url| url.starts_with("https://") && url.len() > "https://".len())
         .map(|url| url.trim_end_matches('/').to_owned())
 }
 
 /// The switch from this process's environment ([`switched`]).
 pub fn switched_from_environment() -> Option<String> {
-    switched(std::env::var(ENVIRONMENT).ok().as_deref())
+    switched(|name| std::env::var(name).ok())
 }
 
 /// How a key and voice ID are checked at `switched` (`None`: ElevenLabs'
@@ -81,19 +96,61 @@ pub const ELEVENLABS_HOSTS: &[&str] = &[
 mod tests {
     use super::*;
 
+    /// The environment of a unit that sets `set` alone.
+    fn unit(set: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> + use<> {
+        let set: Vec<(String, String)> = set
+            .iter()
+            .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
+            .collect();
+        move |name| {
+            set.iter()
+                .find(|(set, _)| set == name)
+                .map(|(_, value)| value.clone())
+        }
+    }
+
     #[test]
     fn the_switch_names_an_https_address_or_nothing() {
-        assert_eq!(switched(None), None);
-        assert_eq!(switched(Some("")), None);
+        let gated = |url: &str| switched(unit(&[(GATE, "on"), (ENVIRONMENT, url)]));
+        assert_eq!(switched(unit(&[(GATE, "on")])), None);
+        assert_eq!(gated(""), None);
+        assert_eq!(gated("http://relay.example.invalid/api/v1/ai"), None);
+        assert_eq!(gated("relay.example.invalid"), None);
         assert_eq!(
-            switched(Some("http://relay.example.invalid/api/v1/ai")),
-            None
-        );
-        assert_eq!(switched(Some("relay.example.invalid")), None);
-        assert_eq!(
-            switched(Some("https://relay.example.invalid/api/v1/ai/")).as_deref(),
+            gated("https://relay.example.invalid/api/v1/ai/").as_deref(),
             Some("https://relay.example.invalid/api/v1/ai")
         );
+    }
+
+    /// #8394's P2 (the first builder): without its gate `on` exactly, the
+    /// switch is ignored whatever it names, and the person's key and voice
+    /// are checked at ElevenLabs' own API, where the speech goes too.
+    #[test]
+    fn without_its_gate_the_switch_is_ignored() {
+        let at = "https://relay.example.invalid/api/v1/ai";
+        for gate in [
+            None,
+            Some(""),
+            Some("ON"),
+            Some("On"),
+            Some("1"),
+            Some("true"),
+            Some(" on"),
+            Some("on "),
+        ] {
+            let mut set = vec![(ENVIRONMENT, at)];
+            set.extend(gate.map(|gate| (GATE, gate)));
+            let named = switched(unit(&set));
+            assert_eq!(named, None, "{gate:?}");
+            assert_eq!(
+                check(named.as_deref(), "Voice8394"),
+                (
+                    false,
+                    "https://api.elevenlabs.io/v1/voices/Voice8394".to_owned()
+                ),
+                "{gate:?}"
+            );
+        }
     }
 
     #[test]
