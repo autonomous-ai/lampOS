@@ -6522,14 +6522,16 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   đúng đường gửi của cái "có" nói ra khi cả hai khớp: dấu nêu đúng lần chạy
   đó và bản ghi nêu kỹ năng của nó trong vòng 5 phút theo đồng hồ khởi động
   (`task_no_yes::boot_ms`). Lời của lamp-skills một mình chỉ có thể giữ lần
-  gửi lại (docs/tasks.md). Bản ghi bị xoá khi quên, khi đổi chế độ riêng tư
-  và khi dừng. (4) Khớp một nửa thì không chạy gì: lời gọi của model giọng
+  gửi lại (docs/tasks.md). Khi công tắc bật, bản ghi bị xoá khi quên, khi
+  đổi chế độ riêng tư và khi dừng; khi tắt, nó được giữ như trước (P2 của
+  Heron trên #8550). (4) Khớp một nửa thì không chạy gì: lời gọi của model giọng
   nói tới kỹ năng có giao tác vụ, và lần chạy ngay một kỹ năng được tạo
   (`run` của `make_skill`, op `run`), chỉ chạy khi giọng nói nói chủ đèn đã
   gọi tên nó. Giọng nói đặt `spoken_ask` trên mỗi dòng như vậy tới
   lamp-skills (`lamp_voice::tools::SPOKEN_ASK`, `tools::spoken_ask`): true
-  cho chính lời gọi của câu nghe được (`skill_named::CALL_ID`), hoặc khi
-  bản ghi nêu kỹ năng đó (tên hoặc tool của nó) trong vòng 5 phút.
+  cho chính lời gọi của câu nghe được (`skill_named::CALL_ID`) và không lời
+  gọi nào khác: lời gọi của model thì không, kể cả với kỹ năng bản ghi vừa
+  nêu (P1 của Heron trên #8550).
   lamp-skills chạy với `lampos` và không đọc được thư mục chỉ root của
   giọng nói, nên nó nhận lời đó chỉ từ cgroup của giọng nói, không bao giờ
   từ đối số của lời gọi. Nếu không, cả lời gọi bị từ chối trước khi làm gì

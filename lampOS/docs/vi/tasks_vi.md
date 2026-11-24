@@ -2815,8 +2815,11 @@ nếu không, nó bị giữ chờ lời đồng ý. Lời của lamp-skills m�
 thể giữ lần gửi lại. Lần chạy không ai vừa yêu cầu bằng giọng nói (của
 trigger, của lịch, `skill call` của agent trên đèn) chạy với các quyền khai
 báo, mọi lần gửi bị giữ chờ lời đồng ý như trước, kể cả khi chủ đèn vừa gọi
-tên kỹ năng đó trong 5 phút. Giọng nói xoá bản ghi khi quên, khi đổi chế độ
-riêng tư và khi dừng hay đóng cuộc trò chuyện.
+tên kỹ năng đó trong 5 phút. Chỉ chính lời gọi của câu nghe được mới được
+đánh dấu: lời gọi của model thì không, kể cả với kỹ năng chủ đèn vừa gọi tên
+(`tools::spoken_ask`, P1 của Heron trên #8550). Khi công tắc bật, giọng nói
+xoá bản ghi khi quên, khi đổi chế độ riêng tư và khi dừng hay đóng cuộc trò
+chuyện; khi tắt, bản ghi được giữ như trước (P2 của Heron trên #8550).
 
 Việc tiếp theo: #7260 (proposal: in the one session, a skill's run keeps the reach of its grants).
 
