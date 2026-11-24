@@ -1388,8 +1388,10 @@ impl Shared {
     pub fn sweep_calls(&self, now: std::time::Instant) {
         let (late, called) = {
             let mut apps = self.apps.lock().expect("apps");
-            let late = apps.1.expire_calls(now);
-            (late, apps.1.drain_called())
+            apps.1.expire_calls(now);
+            // Every timeout since the last sweep, an answer's or a new
+            // call's expiry included, is told to its app here.
+            (apps.1.drain_stopped(), apps.1.drain_called())
         };
         for (app, call) in late {
             self.tell_client(
@@ -3551,6 +3553,87 @@ mod tests {
         };
         assert_eq!(called.len(), 1);
         assert_eq!(called[0].error.as_deref(), Some("timeout"));
+    }
+
+    /// Twelve's P3 on #8496: a call that times out inside a late answer (or a
+    /// new call), before any sweep, is still told to its app as
+    /// `app.call.stopped` by the next sweep, and to the voice once.
+    #[test]
+    fn a_call_timed_out_by_a_late_answer_is_still_told_to_its_app() {
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
+        *shared.apps_on.lock().unwrap() = || true;
+        let told = Arc::new(Mutex::new(Vec::<lamp_msgs::AppCalled>::new()));
+        let into = told.clone();
+        shared.set_called_sink(Arc::new(move |called: &lamp_msgs::AppCalled| {
+            into.lock().unwrap().push(called.clone());
+        }));
+        let (outbox, mut app_inbox) = mpsc::unbounded_channel();
+        let (frames, _) = mpsc::channel(FRAMES_QUEUED);
+        let (body_state, _) = watch::channel(None);
+        shared.open.lock().unwrap().insert(
+            9,
+            Open {
+                client: Some(crate::app_socket::app_client("gym-coach")),
+                outbox,
+                frames,
+                events: Default::default(),
+                phrases: Vec::new(),
+                grants: Default::default(),
+                body_state,
+            },
+        );
+        shared.apps.lock().unwrap().1.connection("gym-coach", true);
+        let call = |n: u64| lamp_msgs::AppCall {
+            call: format!("app-1-2-{n}"),
+            app: "gym-coach".into(),
+            name: "set_plan".into(),
+            args: json!({}),
+        };
+        let t0 = std::time::Instant::now();
+        let late = t0 + crate::app_yes::CALL_FOR + std::time::Duration::from_millis(1);
+        for (n, by_answer) in [(1, true), (2, false)] {
+            let at = t0 + std::time::Duration::from_secs(10 * n);
+            let past = late + std::time::Duration::from_secs(10 * n);
+            assert_eq!(shared.send_call(&call(n), true, at), Ok(()));
+            assert_eq!(app_inbox.try_recv().unwrap()["ev"], "app.call");
+            if by_answer {
+                // The answer comes just past the wait, with no sweep first.
+                let frame = json!({"id": 7, "op": "app.answer", "call": format!("app-1-2-{n}"), "result": {}});
+                let mut apps = shared.apps.lock().unwrap();
+                let reply = crate::app_calls::answer_op(
+                    &mut apps.1,
+                    "gym-coach",
+                    frame.as_object().unwrap(),
+                    7,
+                    true,
+                    past,
+                );
+                assert_eq!(reply["taken"], false);
+            } else {
+                // A new call comes just past the wait: the old one ends, and
+                // the new one is sent.
+                assert_eq!(shared.send_call(&call(n + 10), true, past), Ok(()));
+                assert_eq!(
+                    app_inbox.try_recv().unwrap()["call"],
+                    format!("app-1-2-{}", n + 10)
+                );
+            }
+            assert!(app_inbox.try_recv().is_err(), "not told before the sweep");
+            shared.sweep_calls(past);
+            assert_eq!(
+                app_inbox.try_recv().unwrap(),
+                json!({"ev": "app.call.stopped", "call": format!("app-1-2-{n}"), "why": "timeout"})
+            );
+            let ended = std::mem::take(&mut *told.lock().unwrap());
+            assert_eq!(ended.len(), 1, "{ended:?}");
+            assert_eq!(ended[0].error.as_deref(), Some("timeout"));
+            shared.sweep_calls(past);
+            assert!(app_inbox.try_recv().is_err(), "told once");
+            // The new call of the second case is ended, out of the way.
+            shared.sweep_calls(past + crate::app_yes::CALL_FOR);
+            let _ = app_inbox.try_recv();
+            told.lock().unwrap().clear();
+        }
     }
 
     /// #7415 piece 3b-2b: a trigger the voice holds is offered to an app only
