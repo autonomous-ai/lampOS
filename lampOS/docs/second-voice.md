@@ -8930,7 +8930,9 @@ declares each tool as `<app>_<tool>` with its schema. A call is checked
 against the schema in code, sent as `AppCall` on `apps/call` and answered
 from `AppCalled` on `apps/called` within 5 s, off the runtime's thread; the
 result goes back tidied, inside the app's frame, as data. The turn after a
-result declares that app's functions alone. A guest's or the room's turn, a
+result declares, of the apps, that app's functions alone, beside the lamp's
+own (no `use_skill`), so "set a timer" then still sets one. A call still
+unanswered at 1.5 s, with nothing said yet, says "Let me check." once. A guest's or the room's turn, a
 private lamp, the care hold or a care turn, a line let in only as the
 conversation going on, or an answer awaited: nothing offered or sent, and
 the call is told `not now: nothing was done`. The thread keeps the call by
