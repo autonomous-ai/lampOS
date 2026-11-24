@@ -1367,17 +1367,23 @@ impl Shared {
                 &crate::app_socket::app_client(&call.app),
                 &crate::app_calls::call_event(call),
             ),
-            Err(word) => self.tell_called(vec![lamp_msgs::AppCalled {
-                call: call.call.clone(),
-                app: call.app.clone(),
-                result: None,
-                error: Some(word.to_owned()),
-            }]),
+            Err(word) => self.end_call(call, word),
         }
         begun
     }
 
-    /// The calls past their 5 s at `now` ended as `timeout`, each app told
+    /// The voice's call `call` ended at once with the lamp's `word`, never
+    /// sent to the app.
+    pub fn end_call(&self, call: &lamp_msgs::AppCall, word: &str) {
+        self.tell_called(vec![lamp_msgs::AppCalled {
+            call: call.call.clone(),
+            app: call.app.clone(),
+            result: None,
+            error: Some(word.to_owned()),
+        }]);
+    }
+
+    /// The calls past their wait (4.5 s) at `now` ended as `timeout`, each app told
     /// `app.call.stopped`, and every call ended since told to the voice.
     pub fn sweep_calls(&self, now: std::time::Instant) {
         let (late, called) = {
@@ -3450,7 +3456,7 @@ mod tests {
 
     /// #8406: the voice's call goes to a running app whose tools list it,
     /// one in flight, as `app.call`; every end is told to the voice once:
-    /// the lamp's word, the app's answer, a `timeout` after 5 s (the app
+    /// the lamp's word, the app's answer, a `timeout` after 4.5 s (the app
     /// told `app.call.stopped`), and its app's last connection closing.
     #[test]
     fn a_call_goes_to_a_running_app_and_each_end_is_told_to_the_voice_once() {
@@ -3504,8 +3510,8 @@ mod tests {
         assert!(taken().is_empty());
         assert_eq!(shared.send_call(&call(4), true, t0), Err("busy"));
         assert_eq!(word(taken()).as_deref(), Some("busy"));
-        // Nothing past its 5 s yet; then a timeout, the app told it.
-        shared.sweep_calls(t0 + std::time::Duration::from_millis(4_900));
+        // Nothing past its 4.5 s yet; then a timeout, the app told it.
+        shared.sweep_calls(t0 + std::time::Duration::from_millis(4_400));
         assert!(taken().is_empty());
         shared.sweep_calls(t0 + crate::app_yes::CALL_FOR);
         assert_eq!(word(taken()).as_deref(), Some("timeout"));
