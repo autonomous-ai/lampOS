@@ -1,4 +1,4 @@
 TIME	Lamp, what time is it?	1.0
 TASK	Hey Lamp, OpenClaw, look up the weather in Hanoi this weekend.	1.0
-MAKE	Hey Lamp, make a skill that tells me how many days are left in the year when I ask.	1.0
+MAKE	Hey Lamp, make a skill that tells me a fun fact about the moon when I say moon fact.	1.0
 YES	Yes, go ahead.	1.0

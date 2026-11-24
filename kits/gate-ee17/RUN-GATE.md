@@ -105,7 +105,7 @@ are lower. That line is #8417's own verdict, not a condition of 15860's gate. `P
 |-----|------|--------------------------------------------|
 | TIME | "Lamp, what time is it?" | `request N heard`, then a `pieces began` line (its answer said) |
 | TASK | "Hey Lamp, OpenClaw, look up the weather in Hanoi this weekend." | a handed line (`TASK_HANDED_RE`), then `[lamp-tasks] skill start: run <id>'s script started` (`SKILLSTART_RE`), and no refusal. lamp-control's token and end lines are quoted |
-| MAKE | "Hey Lamp, make a skill that tells me how many days are left in the year when I ask." | `a skill made here was kept in N ms`, then `a made skill is on the lamp: <name>`, at once or on the played YES. The skill stays. Its name is in `gate/logs/core-made.name` |
+| MAKE | "Hey Lamp, make a skill that tells me a fun fact about the moon when I say moon fact." (a skill ee17 lacks: the days-left ask collided with its own `days-left`) | `a skill made here was kept in N ms`, then `a made skill is on the lamp: <name>`, at once or on the played YES. The skill stays. Its name is in `gate/logs/core-made.name` |
 
 ## DOWN: back to stable (restore and putback)
 1. It reads the lamp's state. It stops if a round is under way, if a mount over `/opt/lampOS` is on, or if 15860 or

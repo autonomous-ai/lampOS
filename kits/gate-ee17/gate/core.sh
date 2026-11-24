@@ -14,6 +14,7 @@ POLL=${POLL:-1}; HEARWAIT=${HEARWAIT:-60}; ANSWERWAIT=${ANSWERWAIT:-60}; TASKWAI
 TASK_HANDED_RE=${TASK_HANDED_RE:-"handed to the lamp's agent|skill task [^ ]+: started on the lamp's default agent|the heard words named [^ ]+ for the work"}
 SKILLSTART_RE=${SKILLSTART_RE:-"\\[lamp-tasks\\] skill start: run [^ ]+'s script started"}
 HEARD="lamp-voice.*request [0-9]+"
+PROPOSED=${PROPOSED:-"asked for start_agent_task; the tasks part answered"}
 PIECES="[0-9]+ of [0-9]+ pieces began"
 REFUSE="no token made|skill start: refused|was refused already|fence never said it started|not run: "
 KEPT="a skill made here was kept in [0-9]+ ms"
@@ -21,7 +22,7 @@ NOTKEPT="a skill made here wasn't kept in|a skill wasn't made|the lamp's model s
 ATONCE="is on at once \\(LAMP_MADE_CODE_ON_AT_ONCE\\)"
 READBACK="read back: it waits for the person's yes"
 ON="a made skill is on the lamp: "
-for c in $ROWS; do [ -f $A/$c-el.wav ] || { echo "no clip $A/$c-el.wav: ../run.sh render"; exit 1; }; done
+for c in $ROWS YES; do [ -f $A/$c-el.wav ] || { echo "no clip $A/$c-el.wav: ../run.sh render"; exit 1; }; done
 JP=; trap '[ -n "$JP" ] && kill $JP 2>/dev/null' EXIT; trap 'exit 130' INT TERM HUP
 lines(){ wc -l < $J | tr -d ' '; }
 waitfor(){ local s=$(date +%s) r=$(date +%s) n lim=$3
@@ -40,9 +41,13 @@ rowTIME(){ local n0 h a; BEGIN TIME || return 1; n0=$(lines); PLAY TIME || { END
   h=$(waitfor "$HEARD" $n0 $HEARWAIT) || { END; echo "ROW TIME FAIL the ask was not heard in $HEARWAIT s (mute, Mac volume, speaker placement)"; return 0; }
   a=$(waitfor "$PIECES" $h $ANSWERWAIT) || { END; echo "ROW TIME FAIL heard, no answer said in $ANSWERWAIT s"; Q $h; return 0; }
   END; VT=PASS; echo "ROW TIME PASS heard, and its answer said"; Q $h; Q $a; }
-rowTASK(){ local n0 h k s r; BEGIN TASK || return 1; quiet; n0=$(lines); PLAY TASK || { END; echo "ROW TASK FAIL the clip was not played"; return 0; }
+rowTASK(){ local n0 h p k s r; BEGIN TASK || return 1; quiet; n0=$(lines); PLAY TASK || { END; echo "ROW TASK FAIL the clip was not played"; return 0; }
   h=$(waitfor "$HEARD" $n0 $HEARWAIT) || { END; echo "ROW TASK FAIL the ask was not heard in $HEARWAIT s"; return 0; }
-  k=$(waitfor "$TASK_HANDED_RE" $n0 $TASKWAIT) || { END; echo "ROW TASK FAIL heard, not handed to OpenClaw in $TASKWAIT s"; Q $h; return 0; }
+  # The lamp proposes the task and asks "shall I start it?" (lamp-tasks answers the proposal): once it has said
+  # so, the person's yes is played (the YES clip), as a person at the lamp answers it.
+  p=$(waitfor "$PROPOSED" $n0 $HEARWAIT) || { END; echo "ROW TASK FAIL heard, no task proposed in $HEARWAIT s"; Q $h; return 0; }
+  quiet; PLAY YES || { END; echo "ROW TASK FAIL the yes was not played"; Q $h; Q $p; return 0; }
+  k=$(waitfor "$TASK_HANDED_RE" $p $TASKWAIT) || { END; echo "ROW TASK FAIL proposed and yes said, not handed to OpenClaw in $TASKWAIT s"; Q $h; Q $p; return 0; }
   s=$(waitfor "$SKILLSTART_RE" $k $TASKWAIT) || { END; echo "ROW TASK FAIL handed, but no skill-start run reached the lamp in $TASKWAIT s"; Q $h; Q $k; return 0; }
   END; r=$(tail -n +$(( n0 + 1 )) $J | grep -nE "$REFUSE" | head -1 | cut -d: -f1)
   [ -n "$r" ] && { echo "ROW TASK FAIL a refusal in the task"; Q $h; Q $k; Q $s; Q $(( r + n0 )); return 0; }

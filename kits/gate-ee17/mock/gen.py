@@ -109,7 +109,7 @@ PEEKOK = {"out/peek.lamp.sh.on": "PEEK ON OK monitor (drop-in was absent, lamp-p
 V = "lamp-voice[812]: lamp-voice: "; V2 = "lamp-voice[812]: lamp-voice second: "
 def pieces(req, n): return V2 + "request %d tts: 1 of 1 pieces began, 0 on a reused connection, %d chars" % (req, n)
 JRN = {"j/TIME": "@+1 %srequest 201 heard 5 words\n@+2 %s\n" % (V2, pieces(201, 30)),
-       "j/TASK": "@+1 %srequest 202 heard 9 words\n@+2 %srequest 202: a read of weather handed to the lamp's agent\n@+20 lamp-tasks[905]: [lamp-tasks] skill start: run task-w1's script started\n@+21 lamp-control[640]: lamp-control: run task-w1 of skill weather: a token for [speak], 300 s\n@+30 lamp-control[640]: lamp-control: run task-w1 of skill weather: ended\n" % (V2, V),
+       "j/TASK": "@+1 %srequest 202 heard 9 words\n@+2 %srequest 202 asked for start_agent_task; the tasks part answered in 40 ms; the answer was sent\n@+3 %srequest 202: a read of weather handed to the lamp's agent\n@+20 lamp-tasks[905]: [lamp-tasks] skill start: run task-w1's script started\n@+21 lamp-control[640]: lamp-control: run task-w1 of skill weather: a token for [speak], 300 s\n@+30 lamp-control[640]: lamp-control: run task-w1 of skill weather: ended\n" % (V2, V2, V),
        "j/MAKE": "@+1 %srequest 203 heard 14 words\n@+40 %sa made skill with code of its own is on at once (LAMP_MADE_CODE_ON_AT_ONCE); its task kept\n@+40.2 %sa skill made here was kept in 39012 ms\n@+41 %sa made skill is on the lamp: days-left, sha256 ab12cd34\n" % (V2, V, V, V)}
 def base(**over):
     f = dict(REL); f.update(PEEKOK); f.update(JRN)
@@ -129,7 +129,7 @@ case("R.pass-exit4-retry", base(**{"out/round.lamp.sh.round1.1": rnd(CAND, SUPD,
 case("R.pass-finding", base(**{"out/after.lamp.sh.round2": facts(NEXT, CAND, NUPD, gwj=["%d.04 %s" % (T0 + 98, EXIT1)], gww=["%d LISTEN" % T0, "%d DOWN" % (T0 + 85), "%d LISTEN" % (T0 + 140)])}), "PASS",
      RE + "MUST_OUT='FINDING \\(#8429\\) after round 2: gw-exit1'\n")
 case("R.pass-peek8417-fail", base(**{"out/peek.lamp.sh.measure-idle.2": ms("idle", 95000, 100, 250)}), "PASS", RE + "MUST_OUT='PEEK 8417 FAIL'\n")
-case("R.fail-core-task", base(**{"j/TASK": "@+1 %srequest 202 heard 9 words\n@+2 %srequest 202: a read of weather handed to the lamp's agent\n" % (V2, V)}), "STOP:core", RE + "TASKWAIT=3\n")
+case("R.fail-core-task", base(**{"j/TASK": "@+1 %srequest 202 heard 9 words\n@+2 %srequest 202 asked for start_agent_task; the tasks part answered in 40 ms; the answer was sent\n@+3 %srequest 202: a read of weather handed to the lamp's agent\n" % (V2, V2, V)}), "STOP:core", RE + "TASKWAIT=3\n")
 case("R.stop-vol-high", base(**{"out/vol.lamp.sh": "VOL kept=40 bus=40 muted=false\nMUTE live muted=False reason=user\n"}), "STOP:restore", RE + "MUST_NOCALL='restore.lamp.sh'\n")
 case("R.stop-vol-unread", base(**{"out/vol.lamp.sh": "VOL kept=none bus=none muted=none\nMUTE live muted=None reason=None\n"}), "STOP:restore", RE)
 case("R.stop-binds", base(**{"out/" + R + "1": rd(STABLE, SUPD, binds=["/opt/lampOS/voice/abc/lamp-voice"])}), "STOP:restore", RE + "MUST_NOCALL='key=clean'\n")
