@@ -267,6 +267,16 @@ against ElevenLabs' own service.
   the first answer's piece after it, never a line rendered ahead with no
   turn (the Start's, kept for later). A piece asked again over HTTP
   (`speak_fresh`) takes the same path.
+- **Unreached** (#8362): ElevenLabs never reached for a piece before any
+  answer (a name that doesn't resolve, the connection refused, TLS, or no
+  answer within the request's bounds) is the same fallback, the same one
+  spoken line, with its own journal line, "couldn't reach ElevenLabs for
+  the person's own voice (<the step> failed or timed out); the lamp's own
+  voice from now on", never the key or the voice ID; `voice-keys` warns
+  "your ElevenLabs voice couldn't be reached, using the lamp's own" with
+  `status` `unreached`. As with a refusal, the lamp's voice stays until the
+  voice restarts. Test: `net/tts.rs`
+  (`an_unreached_own_voice_falls_back_to_the_lamps_with_one_line`).
 - **Off:** the kinds are "not on this lamp", the helper refuses, and the
   voice reads neither file, so the route is as it was.
 - **Test lamps only, `LAMP_OWN_ELEVENLABS_URL` (#8394's lamp row):** an
@@ -378,8 +388,21 @@ on the same `keys.*` path and the same switch, with the contract agreed on
   down or spent), for DeepSeek's own key too, told once to `lamp-health`'s
   `voice-keys` part, "your own model couldn't answer, using the lamp's own",
   and one journal line, never a silent turn. A 400 and a slow answer are
-  not the endpoint's: no fallback (the second try covers slowness). A link
-  that fails to the person's endpoint is not yet a fallback.
+  not the endpoint's: no fallback (the second try covers slowness).
+- **Unreached** (#8362): an endpoint the request never reaches before any
+  answer (a name that doesn't resolve, the connection refused, TLS, or no
+  answer within the request's bounds, 10 s to connect and 40 s in all)
+  goes to the lamp's own model at the relay the same way, for every own
+  model (DeepSeek's, OpenAI-compatible, OpenRouter, Gemini, Anthropic):
+  one journal line, "the person's own model couldn't be reached (no
+  connection, or none in time); this request goes to the lamp's own", told
+  once a round, and `voice-keys` warns "your own model couldn't answer,
+  using the lamp's own" with `status` `unreached`. Each request tries the
+  person's endpoint first, so it's back on its own once it answers. An
+  answer that began and then broke is not a fallback. Tests:
+  `voice/src/second_provider/services.rs`
+  (`the_persons_endpoint_unreached_falls_back_to_the_lamps_own`) and
+  `worker.rs` (`an_unreached_own_model_or_voice_is_warned_as_unreached`).
 - **Off:** nothing new is read or said; today's behaviour as it is.
 
 ## Named model providers: OpenRouter, Gemini and Anthropic (#8420, built, off unless set)
@@ -553,8 +576,8 @@ tests that pin it: `setup/tests/it/keys.rs`
   Any other own model's key, if one were somehow there too, is used over
   it.
 - **The fallback:** as the other own models': 401, 403, 429 and 5xx (529,
-  overloaded, among them) go to the lamp's own model through the relay
-  with one line.
+  overloaded, among them), and an endpoint unreached, go to the lamp's own
+  model through the relay with one line.
 - **Limits of the OpenAI-compatible endpoint** (Anthropic's docs call it a
   way to test, not for production): no prompt caching, so every turn pays
   for its whole prompt; `system` messages anywhere in the conversation are
