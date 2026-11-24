@@ -963,7 +963,7 @@ impl Run<'_, '_> {
                 record_skills(&mut state, &placing.steps);
             }
             // This updater has looked at the units the build adds (#7018).
-            state.adds_tried = Some(build.sequence);
+            state.adds_looked(build.sequence, self.config.running.as_deref());
             if !self.adds_only {
                 state.installed = Some(build);
                 state.cut_short = None;
@@ -1082,7 +1082,7 @@ impl Run<'_, '_> {
         record_skills(state, &steps);
         state.installed = Some(build.clone());
         state.cut_short = None;
-        state.adds_tried = Some(build.sequence);
+        state.adds_looked(build.sequence, self.config.running.as_deref());
         match self.records.save_state(state) {
             Ok(()) => Outcome::UpToDate(build.sequence),
             Err(error) => Outcome::Failed(format!("the state cannot be written: {error}")),
@@ -1272,7 +1272,9 @@ impl Run<'_, '_> {
     /// the lamp runs carries and the lamp lacks, which the updater that
     /// switched to it did not add (an older one, before `own` switched to
     /// this one). Under a round's adding rules ([`Self::adding_units`]),
-    /// once per installed build ([`State::adds_tried`]), and never for a
+    /// once per installed build and updater folder ([`State::adds_seen`]:
+    /// the build's own updater looks once though the one that switched to
+    /// it looked, #8400), and never for a
     /// build refused here. Nothing the lamp has is rewritten: only units
     /// are added, with a part new to the lamp, and the build stays the
     /// lamp's. `UpToDate` when there is nothing to add, or when what would
@@ -1284,7 +1286,9 @@ impl Run<'_, '_> {
     ) -> Result<(Manifest, Vec<Change>, Option<Placing>), Outcome> {
         let sequence = manifest.sequence;
         let up_to_date = Outcome::UpToDate(sequence);
-        if state.refusal(sequence).is_some() || state.adds_tried == Some(sequence) {
+        if state.refusal(sequence).is_some()
+            || state.adds_seen(sequence, self.config.running.as_deref())
+        {
             return Err(up_to_date);
         }
         let read = installed_units(self.config).and_then(|installed| {
@@ -1329,7 +1333,7 @@ impl Run<'_, '_> {
                     "the units build {sequence} adds are not added: {why}; they are tried again with the next build"
                 ));
                 if self.config.apply {
-                    state.adds_tried = Some(sequence);
+                    state.adds_looked(sequence, self.config.running.as_deref());
                     if let Err(error) = self.records.save_state(state) {
                         self.say(&format!("the state cannot be written: {error}"));
                     }
@@ -3269,7 +3273,7 @@ impl Run<'_, '_> {
         record_skills(state, &steps);
         // This updater has looked at the units the build adds (#7018). An
         // up-to-date round's additions leave the build the lamp's.
-        state.adds_tried = Some(build.sequence);
+        state.adds_looked(build.sequence, self.config.running.as_deref());
         if !self.adds_only {
             state.previous = state.installed.replace(build.clone());
             // A finished switch ends any count of cut-shorts (#6266).
@@ -3664,7 +3668,7 @@ impl Run<'_, '_> {
         if self.adds_only {
             // Tried once for this build, well or not; the next build tries
             // again (#7018).
-            state.adds_tried = Some(build.sequence);
+            state.adds_looked(build.sequence, self.config.running.as_deref());
         } else if !cut_short {
             let kind = refusal_kind(&why, failed);
             state.refuse_as(

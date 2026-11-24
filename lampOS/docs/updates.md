@@ -2616,10 +2616,16 @@ sequences), the round makes one pass that only adds (`installed_adds`):
 - **Once per installed build:** `adds_tried` records the build after the
   pass, well or not. A unit the owner deleted, or one that fails its watch,
   is not added again every round; the next build tries again, as a switch
-  does. A round of this updater that takes a build records it too, since
-  it looked at the same units, so an owner's deleted unit is not added
-  back by its next up-to-date round. A pass the channel, the disk or the
-  fetch stop is not counted: the next round looks again.
+  does. A round of this updater that takes a build records it too, so an
+  owner's deleted unit is not added back by its next up-to-date round.
+- **Whose look:** `adds_tried_by` keeps the folder the updater that looked
+  runs from (`Config::running`). The updater that switched to a build
+  added only the units its own `install::PRODUCT` names; the build's own
+  updater, which `own` then runs from another folder, may carry more, so
+  its first up-to-date round makes the one pass too, and records its own
+  folder (the first builder's P2 on #8400). A state written before, with
+  no folder, counts as another updater's look. A pass the channel, the
+  disk or the fetch stop is not counted: the next round looks again.
 - **A dry round** (`--apply` off) lists the additions as a switch's: it
   ends `would update`.
 

@@ -302,3 +302,37 @@ fn a_dry_up_to_date_round_lists_the_additions() {
     assert_eq!(lamp.files(), before);
     assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
 }
+
+/// The second hop (the first builder's P2 on #8400): build 2 was taken by an
+/// updater with this pass, which set `adds_tried` for 2 but did not carry
+/// the units build 2 adds. Build 2's own updater, run from another folder,
+/// still looks once; its own next round does not.
+#[test]
+fn the_switched_builds_own_updater_looks_once_though_the_switching_updater_set_adds_tried() {
+    let mut lamp = product_lamp();
+    lamp.config.running = Some("/opt/lampOS/update/switching/".into());
+    publish_all(&mut lamp, manifest::COMPANIONS_UPDATER, "mood 1");
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    assert!(!lamp.exists(&format!("/etc/systemd/system/{MOOD}")));
+    let state = lamp.state();
+    assert_eq!(state["adds_tried"], 2);
+    assert_eq!(state["adds_tried_by"], "/opt/lampOS/update/switching/");
+    // Build 2's own updater, from its own folder, carries the units.
+    lamp.config.running = Some("/opt/lampOS/update/own/".into());
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    for (name, text) in all().into_iter().take(5) {
+        assert_eq!(
+            lamp.read(&format!("/etc/systemd/system/{name}")),
+            text,
+            "{name}"
+        );
+    }
+    let state = lamp.state();
+    assert_eq!(state["adds_tried"], 2);
+    assert_eq!(state["adds_tried_by"], "/opt/lampOS/update/own/");
+    // Looked once: its next round makes no call.
+    let calls = lamp.calls().len();
+    assert_eq!(lamp.round(), Outcome::UpToDate(2));
+    assert_eq!(lamp.calls().len(), calls, "{:?}", lamp.calls());
+}
