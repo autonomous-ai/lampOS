@@ -12512,7 +12512,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             .replace("take a photo", "fetch the Bitcoin price from the web");
         let main = net_code_main();
         let answer = format!(
-            "```skill.toml\n{toml}```\n\n```SKILL.md\n{CODE_CARD}```\n\n```scripts/main.py\n{main}```\n"
+            "```skill.toml\n{toml}```\n\n```SKILL.md\n{AGENT_CODE_CARD}```\n\n```scripts/main.py\n{main}```\n"
         );
         let tasks = crate::make_skill_agent::tests::stub(
             Some("openclaw"),
