@@ -238,10 +238,28 @@ service.
   own key and voice (LAMP_OWN_KEYS)", never the key or the ID. The helper
   restarts the voice only once the lamp is quiet ("The route at its next
   start"), so the change is heard from the next thing the lamp says, and a
-  sentence being spoken is never cut. Not the lamp's cached fixed lines:
-  the speech cache (`say/tts_cache.rs`) is made from the configuration
-  without the person's keys, so those lines stay in the lamp's own voice
-  (a follow-up, #8367).
+  sentence being spoken is never cut.
+- **The cached fixed lines (`say/tts_cache.rs`, the Reviewer-lead's P2 on
+  #8394):** the speech cache, in the voice's main process, reads the
+  person's key and voice ID the same way (`with_own_keys`, `LAMP_OWN_KEYS`
+  and the unit's credentials), so the lamp's fixed lines are warmed and
+  played in the person's voice, one journal line, "the speech cache keeps
+  its lines in the person's own voice, apart from the lamp's". Their key
+  names the voice that rendered them: `own:<voice_id>@<address>`, the
+  address the person's voice is asked at (ElevenLabs' own API, or a test
+  lamp's `LAMP_OWN_ELEVENLABS_URL`), so they are never the lamp's lines,
+  another voice ID's or another address's; the lamp's own lines keep their
+  key as before. A new key with the same voice ID plays the lines kept, the
+  same voice. The person's render has no fallback of its own: a refusal
+  (401 to 404) is a render that failed, never kept under the person's key.
+  The line is said again in the lamp's own voice and kept under the
+  lamp's key, and every later line is the lamp's, kept or rendered, until
+  the voice starts again; one journal line, "the speech cache: ElevenLabs
+  refused the person's own key or voice (HTTP <status>)". A line not kept
+  in the person's voice yet plays the lamp's kept one. With the key
+  removed, the voice starts again in the lamp's voice and plays the lamp's
+  kept lines. The app's voice preview (#7485) always uses the lamp's own
+  key, never the person's.
 - **The fallback:** the relay's address, key and voice are kept beside the
   person's. A piece ElevenLabs refuses for the person's key or voice (401,
   402, 403 or 404, a bad key, a voice gone, credits run out) is said in the
