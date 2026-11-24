@@ -1281,10 +1281,10 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_MADE_SCRIPTS` | A skill the lamp makes for you can run its own code, once it tells you what it may use and you agree. |
 | `LAMP_MAKE_SKILL_ASKED` | Ask the lamp to make a skill, even one that needs a script, and it makes it instead of saying it can't. |
 | `LAMP_MADE_CODE_ON_AT_ONCE` | A skill you make goes on at once and uses what it says it needs (camera, mic, the web, ...) with no yes asked; off, it asks first. |
-| `LAMP_TASK_NO_YES` | Any skill, wherever it came from, runs its job with what it says it needs and no yes; only a send you asked for aloud just now goes at once, any other still waits for your yes, and a half-heard ask runs nothing. |
+| `LAMP_TASK_NO_YES` | Skills run with no yes; only a send you just asked for aloud skips its yes; a half-heard ask runs nothing. |
 | `LAMP_MADE_NOT_ON_TOLD` | The lamp never says a skill it made is on when your yes to it never ran; it asks for the yes again. |
 | `LAMP_UPLOAD_TO_AGENT` | A skill file you add in the app runs through the lamp's agent, using only what it tells you. |
-| `LAMP_TASK_NET` | Once you agree (a skill the lamp made for you needs no yes, and with `LAMP_TASK_NO_YES` on no skill does), a skill's job reaches only the public web, never beside your mail, camera, mic, notes or whether someone is home. |
+| `LAMP_TASK_NET` | Once you agree (a skill the lamp made for you needs no yes), a skill's job reaches only the public web, never beside your mail, camera, mic, notes or whether someone is home. |
 | `LAMP_TASK_NET_GATEWAY` | On an OpenClaw lamp, a skill you agree to can fetch from the public web through its own guarded way out. |
 | `LAMP_SKILL_SECRETS` | An uploaded skill's keys are added in the app, never by voice, and reach only its run. |
 | `LAMP_MADE_SKILL_LOOSE` | A skill you make keeps what it can do and runs as often as you asked, with no daily cap you didn't set. |
