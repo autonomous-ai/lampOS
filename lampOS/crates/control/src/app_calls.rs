@@ -6,7 +6,7 @@
 //! `app.answer` `{call, result | error}`, and lamp-control tells the voice
 //! on `apps/called`, once a call: the app's answer, or the lamp's word
 //! (`not running`, `unknown tool`, `busy`, `too_long`, `timeout`). A call
-//! unanswered after 5 s is ended as `timeout`, and the app is told
+//! unanswered after 4.5 s (under the voice's 5 s) is ended as `timeout`, and the app is told
 //! `app.call.stopped` `{call, why}` so it knows a later answer is not taken.
 //!
 //! Nothing here starts with the switch off: no topic is read or published,
@@ -23,7 +23,7 @@ use std::time::{Duration, Instant};
 pub const ENVIRONMENT: &str = "LAMP_APP_TOOLS";
 /// What an app is told of `app.answer` with the switch off.
 pub const OFF: &str = "app tools are off on this lamp";
-/// How often the calls in flight are looked at for their 5 s.
+/// How often the calls in flight are looked at for their wait.
 const SWEEP_EVERY: Duration = Duration::from_millis(100);
 /// An `apps/tools` reading older than this is a dead publisher's
 /// (`AppTools::declaration`'s 30 s): no tool is known.
@@ -68,7 +68,7 @@ fn refuse(re: u64, code: ErrorCode, why: &str) -> Value {
 /// app's own words (never one of the lamp's, which the voice says as the
 /// lamp's). A result over 2,048 bytes or an error over 200 characters ends
 /// the call as `too_long`. Answered `{"taken": bool}`: true once, for the
-/// app's call in flight within 5 s.
+/// app's call in flight within 4.5 s.
 pub fn answer_op(
     live: &mut Live,
     name: &str,
@@ -133,7 +133,7 @@ pub fn lists(tools: Option<&(AppTools, Instant)>, app: &str, name: &str, now: In
 }
 
 /// Starts the bus side, only with the switch on: the newest `apps/tools`
-/// kept, `apps/call` sent on to the app, the calls' 5 s looked at, and every
+/// kept, `apps/call` sent on to the app, the calls' wait looked at, and every
 /// end told on `apps/called`. Each part that can't start is said.
 pub fn start(bus: &lamp_bus::Bus, shared: Arc<Shared>) {
     if !on() {
@@ -221,6 +221,14 @@ pub fn start(bus: &lamp_bus::Bus, shared: Arc<Shared>) {
                                         sent.err().unwrap_or("sent")
                                     );
                                 }
+                                // Unfit but naming its call and app: ended
+                                // at once, not left to the voice's 5 s.
+                                Ok(call)
+                                    if lamp_msgs::call_id_ok(&call.call)
+                                        && lamp_skills::app_package::app_name_ok(&call.app) =>
+                                {
+                                    shared.end_call(&call, "unknown tool");
+                                }
                                 Ok(_) => {}
                                 Err(error) => {
                                     if !unread_said {
@@ -254,7 +262,7 @@ pub fn start(bus: &lamp_bus::Bus, shared: Arc<Shared>) {
             }
         });
     if let Err(error) = spawned {
-        eprintln!("lamp-control: no app call's 5 s is kept: {error}");
+        eprintln!("lamp-control: no app call's wait is kept: {error}");
     }
 }
 
