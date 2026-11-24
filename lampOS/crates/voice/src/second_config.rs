@@ -2510,10 +2510,15 @@ mod loopback_tests {
         }
     }
 
-    /// Whether a unit's text sets `name` (RED: the whole text, comments
-    /// included, as the product test read it before #8481's HOLD).
+    /// Whether a unit's text sets `name`: an `Environment=` line (trimmed,
+    /// never a `#` or `;` comment) whose assignments, quoted or not, give
+    /// `name=` a value. A comment naming it sets nothing (#8481's HOLD).
     fn unit_sets(text: &str, name: &str) -> bool {
-        text.contains(name)
+        let given = format!("{name}=");
+        text.lines()
+            .filter_map(|line| line.trim().strip_prefix("Environment="))
+            .flat_map(str::split_whitespace)
+            .any(|assignment| assignment.trim_matches('"').starts_with(&given))
     }
 
     /// A comment naming a switch is not setting it (#8476's lamp-voice.service
