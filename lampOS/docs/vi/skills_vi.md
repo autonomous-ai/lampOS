@@ -4924,8 +4924,26 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    đơn, cách nhau một dấu cách (như lamp-skills nhận asks của mọi kỹ năng),
    không bị `skill_named::ask_refused` từ chối, mỗi cụm có ít nhất hai từ
    của riêng nó ngoài những từ nói quanh một yêu cầu
-   (`skill_named::own_words_of`: "yes please" chỉ có một), không lặp lại;
-   nếu không, model sửa lại với `made_skill::MADE_ASKS_FORM`. Kỹ năng
+   (`skill_named::own_words_of`: "yes please" chỉ có một, "pebble hello"
+   cũng vậy vì "hello" là từ nói quanh một yêu cầu), không lặp lại. Nếu
+   không, nó bị từ chối và nêu đúng quy tắc (#8451): dòng journal (dòng
+   sửa lại và dòng "wasn't kept") là `its asks weren't kept: asks = [<như
+   đã viết>]: "<cụm bị từ chối>": <quy tắc>`, quy tắc bằng lời thường:
+   `not a list`, `none`, `more than 3`, `3: not words`, `not one space
+   between its words`, `a "!" in it`, `10 words, not 2 to 8`, `67
+   characters, over 60`, lời của chính `ask_refused`, `only 1 word of its
+   own, "pebble"`, hoặc `said twice`. Lời sửa lại gửi model là dòng đó,
+   rồi mới đến dạng mẫu tách riêng, `made_skill::MADE_ASKS_FORM` ("The
+   form, for example: asks = ["send my test note"], …"), để ví dụ không
+   bao giờ nằm cạnh asks của kỹ năng. Người dùng chỉ nghe một lần câu
+   không tạo được (`plain_reason`: "I couldn't make that one. Try asking
+   for one thing, …"), không bao giờ nghe asks hay quy tắc. Trước bước
+   kiểm tra, hai đầu mỗi cụm được dọn (`made_skill::asks_tidied`, trong
+   `paced`, sau `asks_lifted`): cắt khoảng trắng hai đầu, gộp nhiều dấu
+   cách thành một, bỏ `.`, `!`, `?` hoặc `,` ở đầu hay cuối, chỉ khi phần
+   còn lại vẫn là từ và kỹ năng vẫn đọc như cũ khi chỉ cụm đó thay đổi
+   (một dòng journal, `its ask "pebble garden tune!" kept as "pebble
+   garden tune"`); dấu câu ở giữa ("pebble, hello") vẫn bị từ chối. Kỹ năng
    thêm từ file (`capped_added`) chỉ có thể có chúng bên cạnh tool của nó,
    tối đa 8 (`made_skill::MOST_ADDED_ASKS`, các trigger phrase của nó, mục
    7), giữ cùng hình dạng; không có tool, hoặc khi công tắc tắt, chúng bị

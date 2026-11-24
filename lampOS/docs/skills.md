@@ -8611,8 +8611,26 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    skill's), none refused by `skill_named::ask_refused` (a no, a question,
    a stop, the lamp's own words), each with at least two words of its own
    past those said around an ask (`skill_named::own_words_of`: "yes
-   please" is one), none twice; otherwise a repair with
-   `made_skill::MADE_ASKS_FORM`. A skill added from a file
+   please" is one, and so is "pebble hello", "hello" being said around
+   an ask), none twice. Otherwise it is refused naming its rule (#8451): the
+   journal line (the repair's and the "wasn't kept" one) is `its asks
+   weren't kept: asks = [<as given>]: "<the ask that failed>": <rule>`,
+   the rule in plain words: `not a list`, `none`, `more than 3`, `3: not
+   words`, `not one space between its words`, `a "!" in it`, `10 words,
+   not 2 to 8`, `67 characters, over 60`, `ask_refused`'s own words, `only
+   1 word of its own, "pebble"`, or `said twice`. The repair is that line,
+   then the form set apart, `made_skill::MADE_ASKS_FORM` ("The form, for
+   example: asks = ["send my test note"], …"), so the example never sits
+   beside the skill's own asks. The person hears only the plain not-made
+   line (`plain_reason`: "I couldn't make that one. Try asking for one
+   thing, …"), once, never the asks or the rule. Before the check, each
+   ask's ends are tidied (`made_skill::asks_tidied`, in `paced`, after
+   `asks_lifted`): the ends trimmed, runs of spaces folded to one, a `.`,
+   `!`, `?` or `,` at its start or end dropped, only when the rest is
+   still words and the skill then reads the same with that ask alone
+   changed (one journal line, `its ask "pebble garden tune!" kept as
+   "pebble garden tune"`); punctuation inside ("pebble, hello") is still
+   refused. A skill added from a file
    (`capped_added`) may give them only beside its tool, at most 8
    (`made_skill::MOST_ADDED_ASKS`, its trigger phrases, item 7), held to
    the same shape; without a tool, or with the switch off, they are
