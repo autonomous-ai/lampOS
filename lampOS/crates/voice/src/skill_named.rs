@@ -494,8 +494,11 @@ const AFTER_CUE: &[char] = &[',', ':'];
 /// clause ([`CLAUSE_ENDS`]): "hello there pebble" for "hello there" in
 /// "whenever I say hello there pebble, email me". After a `,` or `:`
 /// right after the cue ([`AFTER_CUE`]), the next clause when it starts
-/// with `ask`: "pebble hello" in "whenever I say, pebble hello". None when
-/// no clause holds it after such words ("say good morning" alone).
+/// with `ask`: "pebble hello" in "whenever I say, pebble hello". Of the
+/// places a line holds it so, the shortest phrase that starts with `ask`
+/// is theirs ("pebble hello" in "when I say hi pebble hello, and also
+/// when I say pebble hello", #8451), else the first. None when no clause
+/// holds it after such words ("say good morning" alone).
 pub fn said_whole(ask: &str, line: &str) -> Option<Vec<String>> {
     let phrase = lower_words(ask);
     if phrase.is_empty() {
@@ -521,32 +524,46 @@ pub fn said_whole(ask: &str, line: &str) -> Option<Vec<String>> {
     // named with its own trigger ("make a skill called pebble hello …
     // whenever I say pebble hello") holds it first in its name, with no
     // cue before it (lamp-06c1 on #8469, run-1843).
-    clauses.iter().enumerate().find_map(|(index, (words, _))| {
-        words
-            .windows(phrase.len())
-            .enumerate()
-            .filter(|(_, window)| *window == phrase.as_slice())
-            .find_map(|(at, _)| {
-                let cue = (1..at).rev().find(|&cue| {
-                    SAY_CUES.contains(&words[cue].as_str())
-                        && CUE_SAYERS.contains(&words[cue - 1].as_str())
-                });
-                if let Some(cue) = cue {
-                    return Some(words[cue + 1..].to_vec());
-                }
-                // A comma or a colon speech to text put right after the
-                // cue ([`AFTER_CUE`], the first builder, 19:01, 24 Nov):
-                // the phrase starting the next clause is still theirs.
-                // Only then: "I say, and then pebble hello" names nothing.
-                let (before, ended) = clauses.get(index.checked_sub(1)?)?;
-                (at == 0
-                    && ended.is_some_and(|end| AFTER_CUE.contains(&end))
-                    && before.len() >= 2
-                    && SAY_CUES.contains(&before[before.len() - 1].as_str())
-                    && CUE_SAYERS.contains(&before[before.len() - 2].as_str()))
-                .then(|| words.clone())
-            })
-    })
+    let (all, wanted) = (&clauses, phrase.as_slice());
+    let found: Vec<Vec<String>> = all
+        .iter()
+        .enumerate()
+        .flat_map(move |(index, (words, _))| {
+            words
+                .windows(wanted.len())
+                .enumerate()
+                .filter(move |(_, window)| *window == wanted)
+                .filter_map(move |(at, _)| {
+                    let cue = (1..at).rev().find(|&cue| {
+                        SAY_CUES.contains(&words[cue].as_str())
+                            && CUE_SAYERS.contains(&words[cue - 1].as_str())
+                    });
+                    if let Some(cue) = cue {
+                        return Some(words[cue + 1..].to_vec());
+                    }
+                    // A comma or a colon speech to text put right after the
+                    // cue ([`AFTER_CUE`], the first builder, 19:01, 24 Nov):
+                    // the phrase starting the next clause is still theirs.
+                    // Only then: "I say, and then pebble hello" names nothing.
+                    let (before, ended) = all.get(index.checked_sub(1)?)?;
+                    (at == 0
+                        && ended.is_some_and(|end| AFTER_CUE.contains(&end))
+                        && before.len() >= 2
+                        && SAY_CUES.contains(&before[before.len() - 1].as_str())
+                        && CUE_SAYERS.contains(&before[before.len() - 2].as_str()))
+                    .then(|| words.clone())
+                })
+        })
+        .collect();
+    // The shortest that starts with the ask is the person's own phrase
+    // (#8451, the first builder's P3 on #8469): one place said with more
+    // before it ("hi pebble hello") never hides the ask said alone.
+    found
+        .iter()
+        .filter(|whole| whole.starts_with(&phrase))
+        .min_by_key(|whole| whole.len())
+        .or_else(|| found.first())
+        .cloned()
 }
 
 /// Whether two ask phrases are matched as the same ([`loose_ask`]): "Take
@@ -1495,6 +1512,42 @@ mod tests {
                     .map(str::to_owned)
                     .to_vec()
             )
+        );
+    }
+
+    /// #8451, the first builder's P3 on #8469: with the ask said more than
+    /// once after a cue, the shortest phrase that starts with it is the
+    /// person's own; with none that starts with it, the first found.
+    #[test]
+    fn the_persons_own_phrase_is_the_shortest_that_starts_with_the_ask() {
+        let hello = Some(vec!["pebble".to_owned(), "hello".to_owned()]);
+        assert_eq!(
+            said_whole(
+                "pebble hello",
+                "make a skill that waves when I say hi pebble hello, and also when I say pebble hello"
+            ),
+            hello
+        );
+        assert_eq!(
+            said_whole(
+                "pebble hello",
+                "when I say hi pebble hello and when I say pebble hello"
+            ),
+            hello
+        );
+        assert_eq!(
+            said_whole(
+                "pebble hello",
+                "when I say pebble hello there, or when I say pebble hello"
+            ),
+            hello
+        );
+        assert_eq!(
+            said_whole(
+                "pebble hello",
+                "when I say hi pebble hello, or when you hear oh pebble hello"
+            ),
+            Some(["hi", "pebble", "hello"].map(str::to_owned).to_vec())
         );
     }
 
