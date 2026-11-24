@@ -3615,17 +3615,17 @@ impl Run<'_, '_> {
     ) -> Outcome {
         // `told` carries a unit's own last journal line: it is said, never
         // kept in the log (the log keeps `why` alone, as the refusal does).
+        let added: Vec<&str> = backs
+            .iter()
+            .filter(|back| back.added.is_some())
+            .map(|back| back.unit.as_str())
+            .collect();
+        let added = if added.is_empty() {
+            "what it added".to_owned()
+        } else {
+            added.join(", ")
+        };
         if self.adds_only {
-            let added: Vec<&str> = backs
-                .iter()
-                .filter(|back| back.added.is_some())
-                .map(|back| back.unit.as_str())
-                .collect();
-            let added = if added.is_empty() {
-                "what it added".to_owned()
-            } else {
-                added.join(", ")
-            };
             let line = |why: &str| {
                 format!(
                     "{added}, added to build {sequence}, was taken away: {why}; build {sequence} is kept, and its units are tried again with the next build",
@@ -3658,6 +3658,17 @@ impl Run<'_, '_> {
         }
         let (after, old, files_back) = self.restore(backs, failed);
         self.settings_now(state);
+        if !files_back && self.adds_only {
+            // An up-to-date round's additions (#7018) not all taken away: no
+            // build was being brought, so none is rolled back. The journal
+            // stays for the next start to take them away again, and
+            // `adds_tried` is not set until it has.
+            let why = after.as_ref().err().unwrap_or(&why);
+            return Outcome::Failed(format!(
+                "{added} could not all be taken away: {why}; build {} is kept",
+                build.sequence
+            ));
+        }
         if !files_back {
             // Not all is as it was: the journal stays, marked as above, for
             // the next start to try again, and nothing is pruned that a path

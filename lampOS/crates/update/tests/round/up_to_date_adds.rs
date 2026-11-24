@@ -402,3 +402,51 @@ fn an_up_to_date_rounds_pass_keeps_what_it_said_in_the_log() {
         "{kept:?}"
     );
 }
+
+/// A pass whose part fails its watch, and whose added link cannot be
+/// removed: no build was being brought, so none is rolled back. The round
+/// fails, the build stays the lamp's, and the journal stays for the next
+/// round to take the rest away.
+#[test]
+fn an_up_to_date_rounds_addition_not_all_taken_away_fails_and_rolls_nothing_back() {
+    use std::os::unix::fs::PermissionsExt;
+    let mut lamp = running_mood();
+    taken_by_an_older_updater(&mut lamp, "mood 1 which crashes");
+    let before = lamp.state();
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1 which crashes");
+    // Once the pass has written its links, the folder of lamp-mood's link
+    // can no longer be changed.
+    let wants = lamp.root.join("etc/systemd/system/lampos.target.wants");
+    let locked = wants.clone();
+    let restart = format!("restart {MOOD}");
+    lamp.systemd.at_call = Some(Box::new(move |call| {
+        if call == restart {
+            fs::set_permissions(&locked, fs::Permissions::from_mode(0o555)).unwrap();
+        }
+        false
+    }));
+    let outcome = lamp.round();
+    fs::set_permissions(&wants, fs::Permissions::from_mode(0o755)).unwrap();
+    lamp.systemd.at_call = None;
+    assert!(
+        matches!(&outcome, Outcome::Failed(why)
+            if why.contains(MOOD)
+                && why.contains(" could not all be taken away: ")
+                && why.contains(&format!("lampos.target.wants/{MOOD} cannot be removed"))
+                && why.ends_with("; build 2 is kept")),
+        "{outcome:?}"
+    );
+    assert!(lamp.exists("/var/lib/lampos-update/journal.json"));
+    let state = lamp.state();
+    assert_eq!(state["installed"], before["installed"]);
+    assert_eq!(state["previous"], before["previous"]);
+    assert_eq!(state["refused"], serde_json::json!([]));
+    assert_ne!(state["adds_tried"], 2);
+    // The next round takes the rest away from the journal, and the pass is
+    // not made again at this build.
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+    assert!(fs::symlink_metadata(wants.join(MOOD)).is_err());
+    assert!(!lamp.exists(&format!("/etc/systemd/system/{MOOD}")));
+    assert_eq!(lamp.state()["adds_tried"], 2);
+}
