@@ -517,28 +517,35 @@ pub fn said_whole(ask: &str, line: &str) -> Option<Vec<String>> {
             }
         }
     }
+    // Every place the clause holds the ask, never only its first: a skill
+    // named with its own trigger ("make a skill called pebble hello …
+    // whenever I say pebble hello") holds it first in its name, with no
+    // cue before it (lamp-06c1 on #8469, run-1843).
     clauses.iter().enumerate().find_map(|(index, (words, _))| {
-        let at = words
+        words
             .windows(phrase.len())
-            .position(|window| window == phrase.as_slice())?;
-        let cue = (1..at).rev().find(|&cue| {
-            SAY_CUES.contains(&words[cue].as_str()) && CUE_SAYERS.contains(&words[cue - 1].as_str())
-        });
-        if let Some(cue) = cue {
-            return Some(words[cue + 1..].to_vec());
-        }
-        // A comma or a colon speech to text put right after the cue
-        // ([`AFTER_CUE`], lamp-06c1 on #8469: run-1843 lost "pebble hello"
-        // to "whenever I say, pebble hello"; the first builder, 19:01, 24
-        // Nov): the phrase starting the next clause is still theirs. Only
-        // then: "I say, and then pebble hello" names nothing.
-        let (before, ended) = clauses.get(index.checked_sub(1)?)?;
-        (at == 0
-            && ended.is_some_and(|end| AFTER_CUE.contains(&end))
-            && before.len() >= 2
-            && SAY_CUES.contains(&before[before.len() - 1].as_str())
-            && CUE_SAYERS.contains(&before[before.len() - 2].as_str()))
-        .then(|| words.clone())
+            .enumerate()
+            .filter(|(_, window)| *window == phrase.as_slice())
+            .find_map(|(at, _)| {
+                let cue = (1..at).rev().find(|&cue| {
+                    SAY_CUES.contains(&words[cue].as_str())
+                        && CUE_SAYERS.contains(&words[cue - 1].as_str())
+                });
+                if let Some(cue) = cue {
+                    return Some(words[cue + 1..].to_vec());
+                }
+                // A comma or a colon speech to text put right after the
+                // cue ([`AFTER_CUE`], the first builder, 19:01, 24 Nov):
+                // the phrase starting the next clause is still theirs.
+                // Only then: "I say, and then pebble hello" names nothing.
+                let (before, ended) = clauses.get(index.checked_sub(1)?)?;
+                (at == 0
+                    && ended.is_some_and(|end| AFTER_CUE.contains(&end))
+                    && before.len() >= 2
+                    && SAY_CUES.contains(&before[before.len() - 1].as_str())
+                    && CUE_SAYERS.contains(&before[before.len() - 2].as_str()))
+                .then(|| words.clone())
+            })
     })
 }
 
@@ -1455,6 +1462,22 @@ mod tests {
         }
         assert_eq!(
             said_whole("pebble hello", "when I say, and then pebble hello"),
+            None
+        );
+        // Named with its own trigger: its first place, the name, has no
+        // cue; the one after "I say" is the person's (run-1843).
+        assert_eq!(
+            said_whole(
+                "Pebble Hello",
+                "Lamp, make a skill called pebble hello that says hello little pebble whenever I say pebble hello."
+            ),
+            hello
+        );
+        assert_eq!(
+            said_whole(
+                "pebble hello",
+                "make a skill called pebble hello that waves"
+            ),
             None
         );
         assert_eq!(said_whole("pebble hello", "when I say. Pebble hello"), None);
