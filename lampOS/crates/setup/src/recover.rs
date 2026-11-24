@@ -261,8 +261,11 @@ impl Recovery {
             _ if seen.online => (State::Online, None),
             State::Online => (State::Lost { since_ms: now_ms }, None),
             // Slow, or someone else at the radio: the 90 s start again, so
-            // only a whole 90 s off every known network opens it.
-            State::Lost { .. } if seen.associated || seen.busy => {
+            // only a whole 90 s off every known network opens it. A setup
+            // run holds them only while it takes steps, as it holds the
+            // retry (#8484): a run that never ended would otherwise keep a
+            // lamp off its network and off the hotspot for good.
+            State::Lost { .. } if seen.associated || holds => {
                 (State::Lost { since_ms: now_ms }, None)
             }
             State::Lost { since_ms } if now_ms.saturating_sub(since_ms) >= LOSS_GRACE_MS => (
