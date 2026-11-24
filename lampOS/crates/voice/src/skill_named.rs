@@ -482,27 +482,63 @@ const SAY_CUES: &[&str] = &["say", "said", "hear", "heard"];
 /// #8469, at 77700b81fb).
 const CUE_SAYERS: &[&str] = &["i", "you"];
 
+/// What speech to text puts right after a cue without ending the clause
+/// ([`said_whole`]): "whenever I say, pebble hello", "when you hear:
+/// pebble hello".
+const AFTER_CUE: &[char] = &[',', ':'];
+
 /// The person's whole phrase in `line` that holds `ask` as words in a row
 /// ([`said_in`]), lowercased (#8451, the first builder's required change
 /// on #8469): the words after the last of [`SAY_CUES`] before it with
 /// "I" or "you" right before that ([`CUE_SAYERS`]), to the end of its
 /// clause ([`CLAUSE_ENDS`]): "hello there pebble" for "hello there" in
-/// "whenever I say hello there pebble, email me". None when no clause
-/// holds it after such words ("say good morning" alone).
+/// "whenever I say hello there pebble, email me". After a `,` or `:`
+/// right after the cue ([`AFTER_CUE`]), the next clause when it starts
+/// with `ask`: "pebble hello" in "whenever I say, pebble hello". None when
+/// no clause holds it after such words ("say good morning" alone).
 pub fn said_whole(ask: &str, line: &str) -> Option<Vec<String>> {
     let phrase = lower_words(ask);
     if phrase.is_empty() {
         return None;
     }
-    line.split(CLAUSE_ENDS).find_map(|clause| {
-        let words = lower_words(clause);
+    // Each clause's words and what ended it.
+    let mut clauses: Vec<(Vec<String>, Option<char>)> = Vec::new();
+    let mut rest = line;
+    while !rest.is_empty() {
+        match rest.find(CLAUSE_ENDS) {
+            Some(at) => {
+                let end = rest[at..].chars().next();
+                clauses.push((lower_words(&rest[..at]), end));
+                rest = &rest[at + end.map_or(1, char::len_utf8)..];
+            }
+            None => {
+                clauses.push((lower_words(rest), None));
+                rest = "";
+            }
+        }
+    }
+    clauses.iter().enumerate().find_map(|(index, (words, _))| {
         let at = words
             .windows(phrase.len())
             .position(|window| window == phrase.as_slice())?;
         let cue = (1..at).rev().find(|&cue| {
             SAY_CUES.contains(&words[cue].as_str()) && CUE_SAYERS.contains(&words[cue - 1].as_str())
-        })?;
-        Some(words[cue + 1..].to_vec())
+        });
+        if let Some(cue) = cue {
+            return Some(words[cue + 1..].to_vec());
+        }
+        // A comma or a colon speech to text put right after the cue
+        // ([`AFTER_CUE`], lamp-06c1 on #8469: run-1843 lost "pebble hello"
+        // to "whenever I say, pebble hello"; the first builder, 19:01, 24
+        // Nov): the phrase starting the next clause is still theirs. Only
+        // then: "I say, and then pebble hello" names nothing.
+        let (before, ended) = clauses.get(index.checked_sub(1)?)?;
+        (at == 0
+            && ended.is_some_and(|end| AFTER_CUE.contains(&end))
+            && before.len() >= 2
+            && SAY_CUES.contains(&before[before.len() - 1].as_str())
+            && CUE_SAYERS.contains(&before[before.len() - 2].as_str()))
+        .then(|| words.clone())
     })
 }
 
@@ -1405,6 +1441,26 @@ mod tests {
         assert_eq!(
             said_whole("pebble chime", "when you hear pebble chime"),
             Some(vec!["pebble".to_owned(), "chime".to_owned()])
+        );
+        // lamp-06c1 on #8469 (run-1843): speech to text often puts a
+        // comma or a colon right after the cue; it never costs the person
+        // their phrase. Any other clause end still splits.
+        let hello = Some(vec!["pebble".to_owned(), "hello".to_owned()]);
+        for line in [
+            "Lamp, make a skill that says hello whenever I say, pebble hello.",
+            "when you hear: pebble hello",
+            "whenever I say , pebble hello",
+        ] {
+            assert_eq!(said_whole("Pebble Hello", line), hello, "{line}");
+        }
+        assert_eq!(
+            said_whole("pebble hello", "when I say, and then pebble hello"),
+            None
+        );
+        assert_eq!(said_whole("pebble hello", "when I say. Pebble hello"), None);
+        assert_eq!(
+            said_whole("pebble hello", "when I wake up, pebble hello"),
+            None
         );
         assert_eq!(
             said_whole(
