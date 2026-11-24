@@ -4922,8 +4922,16 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
 2. **Cap giữ** (`made_skill::made_asks`, trong `held`): một mảng 1 đến 3
    chuỗi, mỗi chuỗi tối đa 60 ký tự, 2 đến 8 từ gồm chữ, số và dấu nháy
    đơn, cách nhau một dấu cách (như lamp-skills nhận asks của mọi kỹ năng),
-   không bị `skill_named::ask_refused` từ chối, mỗi cụm có ít nhất một từ
-   của riêng nó ngoài những từ nói quanh một yêu cầu
+   không bị `skill_named::ask_refused` từ chối, **không cụm nào có từ của
+   riêng nó duy nhất là một câu trả lời ngắn** (`skill_named::made_ask_refused`,
+   `ANSWER_WORDS`: yes, yeah, yep, ok, okay, sure, alright, no, nope, fine,
+   good, great, cool, right, maybe; #8451, quyết định của first builder:
+   "yes please", "fine thanks" và "cool thanks" bị từ chối với `it is only
+   a short answer, and a yes or a no is the lamp's to answer`, còn "great
+   job pebble" và "yes indeed" vẫn qua vì có từ khác của riêng chúng; chỉ
+   áp dụng cho kỹ năng tự tạo, nên "yes please" của kỹ năng được push hoặc
+   từ Store vẫn được nạp, theo quyết định của owner trên #6842), mỗi cụm có
+   ít nhất một từ của riêng nó ngoài những từ nói quanh một yêu cầu
    (`skill_named::own_words_in`), không lặp lại. **Ngưỡng hai từ được giữ
    lúc tạo** (`made_skill::asks_heard`, trong `keep_asked`, #8451, quyết
    định (b) của first builder): một cụm do model tạo kỹ năng tự chọn cần
@@ -4942,14 +4950,15 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    người dùng phạm một quy tắc mà không người viết nào đổi được**
    (`made_skill::their_ask_refused`, trước cap, phần (a) của first
    builder): một cụm là nguyên cụm từ người dùng nói để khởi động kỹ năng,
-   2 đến 8 từ và trong 60 ký tự, bị `skill_named::ask_refused` từ chối, được nói ngay,
+   2 đến 8 từ và trong 60 ký tự, bị `skill_named::made_ask_refused` từ chối, được nói ngay,
    rõ ràng, mỗi quy tắc một câu, không tốn lần sửa nào và không giao cho
    agent của đèn: "I can't start a skill with ‘stop the music’, because
    that's how you stop me." (một lệnh dừng), "…, because a no or a
    question is mine to answer.", "…, because those are my own words for
    something I do myself.", "…, because those are only words like hello or
-   please, said to me all the time." và "…, because it only names things
-   of mine, like the light or the music." (`plain_reason` và
+   please, said to me all the time.", "…, because it only names things
+   of mine, like the light or the music." và "…, because a yes or a no is
+   mine to answer." ("whenever I say yes please") (`plain_reason` và
    `not_made_line` nói nguyên câu), ghi journal là `a made skill was not
    kept: its asks weren't kept: asks = [<như đã viết>]: "<cụm đó>": the
    person's own words, <lời của ask_refused>: told at once, no repair`.
