@@ -116,19 +116,20 @@ pub fn missing(root: &Path, text: &str) -> Vec<String> {
 
 /// The units a kept switch added that it starts at once (docs/updates.md,
 /// "A part added over the air"), each `(name, text)` as written: a service
-/// that is a part of [`LAMP`], enabled into it (`enabled`: its link
-/// `lampos.target.wants/<name>` is there), no template and no one-shot.
-/// [`SERVICES`] first, then in the order given. A unit wanted by anything
-/// else (the waking face by `sysinit.target`, recovery and the Wi-Fi
-/// restore by `multi-user.target`), a socket, a timer and a timed service
-/// are left for the lamp's next start, as `install` leaves them.
+/// that is a part of [`LAMP`], or a socket of it (#8367: the own keys'
+/// helper, so the app's keys reach it before the next boot), enabled into
+/// it (`enabled`: its link `lampos.target.wants/<name>` is there), no
+/// template and no one-shot. [`SERVICES`] first, then in the order given.
+/// A unit wanted by anything else (the waking face by `sysinit.target`,
+/// recovery and the Wi-Fi restore by `multi-user.target`, the eyes' camera
+/// socket by `sockets.target`), a timer and a timed service are left for
+/// the lamp's next start, as `install` leaves them.
 pub fn to_start(added: &[(String, String)], enabled: impl Fn(&str) -> bool) -> Vec<String> {
     let mut picked: Vec<String> = added
         .iter()
         .filter(|(name, text)| {
-            name.ends_with(".service")
+            (name.ends_with(".service") && !oneshot(text) || name.ends_with(".socket"))
                 && !name.contains('@')
-                && !oneshot(text)
                 && wants(name, text)
                     .is_ok_and(|links| links.iter().any(|link| target(link) == Some(LAMP)))
                 && enabled(name)
