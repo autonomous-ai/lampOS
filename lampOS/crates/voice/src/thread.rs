@@ -2585,6 +2585,9 @@ pub fn close_now(request: Option<u64>) {
     if !test_closes::ON.with(std::cell::Cell::get) {
         return;
     }
+    // A stop or a close ends what the owner asked just now (#8475, the
+    // first builder's P3 on #8550): their spoken asks go with it.
+    crate::told_when_asked::forget_here();
     let waited = THREAD.lock().ok().and_then(|mut thread| {
         let waited = thread.look.map(|(asking, _)| asking);
         match request {

@@ -562,6 +562,7 @@ fn the_first_fire_asks_nothing() {
                 state: Some(&state),
                 control: &control,
                 socket: Some(&tasks),
+                asked_aloud: false,
             };
             let mut sent = None;
             let said = task::hand(

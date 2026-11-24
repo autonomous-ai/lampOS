@@ -20224,20 +20224,27 @@ async fn answer(
         // call runs as soon as it would without the switch; the say
         // service's ask waits a little for it instead
         // (`told_when_asked::ASKED_WAIT`).
-        if crate::told_when_asked::on()
+        // And with `LAMP_TASK_NO_YES` (#8475), for lamp-services' send of
+        // the asked run and the voice's word to lamp-skills on a named ask.
+        if (crate::told_when_asked::on() || lamp_services::task_no_yes::on())
             && let Some(call) = &named_call
         {
             let skill = crate::skill_named::function_of(&call.name, &call.args).to_owned();
             let lease = scope.clone();
-            let now_ms = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map_or(0, |since| since.as_millis() as u64);
+            // On the boot clock (#8475): a wall clock set never makes an
+            // old ask new.
+            let now_ms = lamp_services::task_no_yes::boot_ms();
             drop(tokio::task::spawn_blocking(move || {
                 if !crate::services::owner_hears(request, heard, lease.as_ref()) {
                     return;
                 }
-                if let Err(error) = crate::told_when_asked::keep(
+                // Under the function the call named and under its skill's
+                // own name, which lamp-services looks a run's send up by
+                // (#8475, the first builder's P2 on #8550).
+                let folders = crate::told_when_asked::SKILLS_FOLDERS.map(std::path::Path::new);
+                if let Err(error) = crate::told_when_asked::keep_asked(
                     std::path::Path::new(crate::told_when_asked::SPOKEN_ASKS_FILE),
+                    &folders,
                     &skill,
                     now_ms,
                 ) {

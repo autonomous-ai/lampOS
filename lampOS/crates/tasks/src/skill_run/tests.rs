@@ -68,6 +68,7 @@ impl Place {
             folder: self.dir.path().join("skills/tide"),
             sha256: "a".repeat(64),
             grants: vec!["speak".into()],
+            asked_aloud: false,
         }
     }
 }

@@ -175,6 +175,15 @@ pub struct Run {
     /// draft's own grants before it is kept. Its ops are done live within
     /// those grants, as its real run's (#8180).
     pub tried: bool,
+    /// Minted for the owner's named ask (#8475, `LAMP_TASK_NO_YES`,
+    /// [`Runs::mark_asked_aloud`]): lamp-tasks' word at the mint, from
+    /// lamp-skills' hand-over of the voice's named call, never the run's.
+    /// Each `service.*` line this run's calls send `lamp-services` names
+    /// the run as [`lamp_skills::TASK_ASKED_ALOUD_RUN`], so its
+    /// write may go with no yes when the voice's record names its skill;
+    /// any other run's write is held for its yes (the first builder's P1
+    /// on #8550).
+    pub asked_aloud: bool,
 }
 
 /// A skill's fixed write as lamp-control read it from the skill's own file
@@ -261,6 +270,7 @@ impl Runs {
             serial: self.serial,
             fixed_write: None,
             tried: false,
+            asked_aloud: false,
         };
         self.by_token.insert(token_key(token), live.clone());
         Ok(live)
@@ -272,6 +282,16 @@ impl Runs {
         for live in self.by_token.values_mut() {
             if live.run == run {
                 live.fixed_write = Some(write.clone());
+            }
+        }
+    }
+
+    /// Marks live run `run` as minted for the owner's named ask
+    /// ([`Run::asked_aloud`], #8475).
+    pub fn mark_asked_aloud(&mut self, run: &str) {
+        for live in self.by_token.values_mut() {
+            if live.run == run {
+                live.asked_aloud = true;
             }
         }
     }

@@ -1036,6 +1036,46 @@ pub struct Place<'a> {
     pub state: Option<&'a Path>,
     pub control: &'a Path,
     pub socket: Option<&'a Path>,
+    /// The run was started for the voice's named call (#8475,
+    /// [`take_named_ask`]): its hand-over line says so
+    /// ([`ASKED_ALOUD`]), so lamp-tasks asks its token of lamp-control so
+    /// marked. Every other run (a trigger's, a schedule's, another asker's
+    /// call): false, and each of its writes keeps its yes.
+    pub asked_aloud: bool,
+}
+
+/// The hand-over line's key for a run started for the voice's named call
+/// (#8475, [`Place::asked_aloud`]): `true`, or absent.
+pub const ASKED_ALOUD: &str = "asked_aloud";
+
+/// The skills whose run is being started now for the voice's named call
+/// (#8475, the first builder's P1 on #8550): marked by `lamp-skills`' call
+/// handling just before it starts that run ([`named_ask`]), taken by its
+/// task's hand-over as it begins ([`take_named_ask`]), on the main loop,
+/// so no trigger's run comes between; what the start left untaken is let
+/// go at once ([`forget_named_ask`]).
+static NAMED_ASKS: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
+
+/// `skill`'s run about to start is the voice's named call's (#8475).
+pub fn named_ask(skill: &str) {
+    NAMED_ASKS
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .insert(skill.to_owned());
+}
+
+/// Whether `skill`'s run handed over now is the voice's named call's,
+/// taken once: a later run of it, whoever starts it, is not.
+pub fn take_named_ask(skill: &str) -> bool {
+    NAMED_ASKS
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .remove(skill)
+}
+
+/// `skill`'s mark let go, taken or not: its run started, or never did.
+pub fn forget_named_ask(skill: &str) {
+    let _ = take_named_ask(skill);
 }
 
 /// The folder a skill's task is handed over from: `name` under the lamp's
@@ -1139,7 +1179,7 @@ pub fn hand(
         Ok(runs) => runs,
         Err(why) => return why,
     };
-    let line = HandOver {
+    let mut line = HandOver {
         skill,
         step,
         folder,
@@ -1147,6 +1187,14 @@ pub fn hand(
         grants,
     }
     .line();
+    // Started for the voice's named call (#8475): said so, and only then,
+    // so every other run's line is as before.
+    if place.asked_aloud
+        && let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&line)
+    {
+        value[ASKED_ALOUD] = serde_json::json!(true);
+        line = value.to_string();
+    }
     match send(socket, &line) {
         Ok(said) => format!("do.task: handed to lamp-tasks: {said}"),
         Err(crate::service_write::Unrun::NotTaken(why)) => match uncount(skill, state, now_ms) {
@@ -1462,8 +1510,10 @@ pub const NOT_A_TASK_LINE: &str = "not a skill's task line";
 /// ([`NOT_A_TASK_LINE`], Twelve's HOLD on #8237): an update round restarts
 /// lamp-skills and lamp-tasks in no fixed order, and a lamp-tasks put back
 /// alone is earlier too. That refusal comes before anything is minted or
-/// run, so the line sent again once can never run the task twice. `None`
-/// for any other answer, or a line that never asked.
+/// run, so the line sent again once can never run the task twice. Its
+/// named-ask mark ([`ASKED_ALOUD`], #8475) is taken off with it: sent
+/// again unmarked, each of the run's writes keeps its yes, never lost.
+/// `None` for any other answer, or a line that asked neither.
 pub fn without_getting_ready_if_refused(line: &str, answer: &str) -> Option<String> {
     let refused = serde_json::from_str::<serde_json::Value>(answer.trim()).is_ok_and(|said| {
         said["ok"] == false && said["error"] == "bad_request" && said["message"] == NOT_A_TASK_LINE
@@ -1474,9 +1524,9 @@ pub fn without_getting_ready_if_refused(line: &str, answer: &str) -> Option<Stri
     let Ok(serde_json::Value::Object(mut fields)) = serde_json::from_str(line) else {
         return None;
     };
-    fields
-        .remove("tell_getting_ready")
-        .map(|_| serde_json::Value::Object(fields).to_string())
+    let asked = fields.remove("tell_getting_ready").is_some();
+    let named = fields.remove(ASKED_ALOUD).is_some();
+    (asked || named).then(|| serde_json::Value::Object(fields).to_string())
 }
 
 /// Whether one line from lamp-tasks is its getting-ready notice
@@ -1557,6 +1607,13 @@ mod tests {
         assert_eq!(again, json!({"op": "skill_task", "skill": "melon"}));
         let plain = json!({"op": "skill_task", "skill": "melon"}).to_string();
         assert_eq!(without_getting_ready_if_refused(&plain, &refused), None);
+        // #8475: the named-ask mark is taken off too, so the run goes
+        // unmarked, its writes holding for their yes, never lost.
+        let named = json!({"op": "skill_run", "skill": "melon", ASKED_ALOUD: true}).to_string();
+        let again: serde_json::Value =
+            serde_json::from_str(&without_getting_ready_if_refused(&named, &refused).unwrap())
+                .unwrap();
+        assert_eq!(again, json!({"op": "skill_run", "skill": "melon"}));
         for answer in [
             json!({"ok": true, "answer": "done"}).to_string(),
             json!({"ok": false, "error": "bad_request", "message": "the task's words are empty or too long"}).to_string(),
@@ -1912,6 +1969,7 @@ mod tests {
             state: Some(&state),
             control: &control_socket,
             socket: Some(&socket),
+            asked_aloud: false,
         };
         let lamp_control = control(&control_socket, vec![serde_json::json!({"agreed": true})]);
         set_on_here(Some(true));
@@ -2001,6 +2059,7 @@ mod tests {
             state: Some(&state),
             control: &control_socket,
             socket: Some(&socket),
+            asked_aloud: false,
         };
         let agreed = serde_json::json!({"agreed": true});
         let lamp_control = control(
@@ -2625,6 +2684,7 @@ mod tests {
             state: Some(&state),
             control: &control_socket,
             socket: Some(&socket),
+            asked_aloud: false,
         };
         let agreed = serde_json::json!({"agreed": true});
         let lamp_control = control(
@@ -2747,6 +2807,7 @@ mod tests {
             state: Some(&state),
             control: &control_socket,
             socket: None,
+            asked_aloud: false,
         };
         assert!(
             hand(
@@ -2802,6 +2863,7 @@ mod tests {
             state: Some(&state),
             control: &control_socket,
             socket: Some(&socket),
+            asked_aloud: false,
         };
         let lamp_control = control(
             &control_socket,
@@ -2895,6 +2957,7 @@ mod tests {
             state: Some(&state),
             control: &no_control,
             socket: Some(&socket),
+            asked_aloud: false,
         };
         let never = |_: &Path, _: &str| -> Result<String, crate::service_write::Unrun> {
             panic!("handed over")
@@ -2920,6 +2983,37 @@ mod tests {
         assert_eq!(line["sha256"], folder_sha256(&folder).unwrap().as_str());
         assert_eq!(line["grants"], serde_json::json!(["camera"]));
         assert!(read_asks(&state).unwrap().is_empty());
+        // A run nobody named just now (a trigger's, a schedule's, another
+        // asker's call): handed over on its declared grants all the same,
+        // its line with no mark, so each of its writes keeps its yes (the
+        // first builder's P1 on #8550). The voice's named call's run: its
+        // line says so. Fails on the old `hand`, whose line never did.
+        assert!(line.get(ASKED_ALOUD).is_none(), "{line}");
+        let mut named = None;
+        let said = hand(
+            "no-yes-booth",
+            &step,
+            &folder,
+            &grants,
+            Place {
+                asked_aloud: true,
+                ..place
+            },
+            1_500,
+            |_, line| {
+                named = Some(line.to_owned());
+                crate::service_write::agent_answered("{\"ok\":true,\"id\":8}")
+            },
+            || panic!("asked aloud"),
+        );
+        assert_eq!(said, "do.task: handed to lamp-tasks: its run ended, task 8");
+        let named: serde_json::Value = serde_json::from_str(&named.unwrap()).unwrap();
+        assert_eq!(named[ASKED_ALOUD], true, "{named}");
+        assert_eq!(named["grants"], line["grants"]);
+        // The mark is taken once: a later run of the skill is not the ask's.
+        named_ask("no-yes-booth");
+        assert!(take_named_ask("no-yes-booth"));
+        assert!(!take_named_ask("no-yes-booth"));
         // Off: as before.
         crate::set_task_no_yes_here(Some(false));
         assert_eq!(
@@ -2953,6 +3047,7 @@ mod tests {
             state: Some(&state),
             control: &control_socket,
             socket: Some(&tasks),
+            asked_aloud: false,
         };
         let waiting = serde_json::json!({"agreed": false, "why": "waiting"});
         let changed = serde_json::json!({"agreed": false, "why": "changed"});

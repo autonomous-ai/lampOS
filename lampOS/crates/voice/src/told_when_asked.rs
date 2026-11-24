@@ -38,7 +38,8 @@ pub fn on() -> bool {
 /// named ask (#8475): in the voice's own runtime folder
 /// (`RuntimeDirectory=lampos-voice`, 0700), so no skill or add-on can stand
 /// for an ask. One reader of it, `lamp-services`' (`task_no_yes`), for the
-/// voice and `lamp-services` alike.
+/// voice and `lamp-services` alike; its times on the boot clock
+/// (`task_no_yes::boot_ms`, #8475), never the wall clock.
 pub use lamp_services::task_no_yes::{SPOKEN_ASKS_FILE, WITHIN_MS, asked_within};
 
 /// Until when a told answer ready at `ready_ms`, of a run the owner asked
@@ -71,6 +72,85 @@ pub fn keep(path: &Path, skill: &str, at_ms: u64) -> Result<(), String> {
     asks.insert(key(skill), Value::from(at_ms));
     crate::thread::write_file(path, &Value::Object(asks).to_string())
         .map_err(|error| format!("the owner's spoken asks: {error}"))
+}
+
+/// The owner's spoken ask of the skill whose function the heard words
+/// named (`function`: its tool, or a made skill's own name), at `at_ms` on
+/// the boot clock (`lamp_services::task_no_yes::boot_ms`), kept in `path`
+/// under the function and under the skill's own name beside it, the skill
+/// the lamp's skills folders `skills` name for that tool ([`skill_of`]):
+/// `lamp-services` looks the record up by the run's skill, which is often
+/// not its tool (#8437 again, the first builder's P2 on #8550: ee17's
+/// `pear-probe`, tool `fruit_check`), and the quiet hours' readers by
+/// either (`skill_task_yes::asked_aloud_in`). One no skill names is kept
+/// under the function alone, as before.
+pub fn keep_asked(path: &Path, skills: &[&Path], function: &str, at_ms: u64) -> Result<(), String> {
+    keep(path, function, at_ms)?;
+    match skill_of(skills, function) {
+        Some(skill) if key(&skill) != key(function) => keep(path, &skill, at_ms),
+        _ => Ok(()),
+    }
+}
+
+/// The skill whose tool is `function`, by its folder's name, in the first
+/// of the skills folders `skills` that has one (each `<skill>/skill.toml`'s
+/// `tool`, as lamp-skills loads it); or a folder named `function` itself
+/// (a made skill, which a heard line names by its own name). None for no
+/// such skill, or one whose file can't be read. At most [`SKILLS_READ`]
+/// folders a place, each file at most 64 KiB: read on the keep's own
+/// thread, never a turn's.
+pub fn skill_of(skills: &[&Path], function: &str) -> Option<String> {
+    let plain =
+        |name: &str| !name.is_empty() && !name.starts_with('.') && !name.contains(['/', '\\']);
+    for place in skills {
+        if plain(function) && place.join(function).join("skill.toml").is_file() {
+            return Some(function.to_owned());
+        }
+        let Ok(entries) = std::fs::read_dir(place) else {
+            continue;
+        };
+        for entry in entries.flatten().take(SKILLS_READ) {
+            let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+                continue;
+            };
+            if !plain(&name) {
+                continue;
+            }
+            let tool = std::fs::read(entry.path().join("skill.toml"))
+                .ok()
+                .filter(|bytes| bytes.len() <= 64 * 1024)
+                .and_then(|bytes| String::from_utf8(bytes).ok())
+                .and_then(|text| toml::from_str::<toml::Table>(&text).ok())
+                .and_then(|table| {
+                    table
+                        .get("tool")
+                        .and_then(|tool| tool.as_str().map(str::to_owned))
+                });
+            if tool.as_deref() == Some(function) {
+                return Some(name);
+            }
+        }
+    }
+    None
+}
+
+/// The most skill folders [`skill_of`] reads in one place.
+pub const SKILLS_READ: usize = 512;
+
+/// The lamp's skills folders [`skill_of`] reads: the installed skills
+/// ([`crate::skill_words::INSTALLED`]) and those the owner's computer
+/// pushed ([`crate::upload_skill::PUSHED_FOLDER`]), as lamp-skills loads
+/// them, its own first.
+pub const SKILLS_FOLDERS: [&str; 2] = [
+    crate::skill_words::INSTALLED,
+    crate::upload_skill::PUSHED_FOLDER,
+];
+
+/// The owner's spoken asks let go whole (#8475, the first builder's P3 on
+/// #8550): a forget, a stop or a privacy close ends what the owner asked
+/// just now, so no run is sent with no yes on an ask made before it.
+pub fn forget_here() {
+    lamp_services::task_no_yes::forget(Path::new(SPOKEN_ASKS_FILE));
 }
 
 /// How long the say service's ask of a task's first yes, in quiet hours,
@@ -153,6 +233,58 @@ mod tests {
         assert!(!asked_within(&path, "desk-check", 10_000 + WITHIN_MS));
         keep(&path, "photo-booth", 20_000).unwrap();
         assert!(asked_within(&path, "photo-booth", 20_000));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #8475 (the first builder's P2 on #8550): an ask of a skill by its
+    /// tool is kept under the tool and under the skill's own name, so
+    /// lamp-services finds it by the run's skill (ee17's `pear-probe`, tool
+    /// `fruit_check`) and the quiet hours' readers by either; a made
+    /// skill's own name is kept once; a function no skill names, under
+    /// itself alone. Fails on the old keep, which kept the tool alone.
+    #[test]
+    fn an_ask_by_a_skills_tool_is_kept_under_the_skill_too() {
+        let dir =
+            std::env::temp_dir().join(format!("lamp-voice-told-skill-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let skills = dir.join("skills");
+        let pushed = dir.join("skills-dev");
+        for (place, name, tool) in [
+            (&skills, "pear-probe", Some("fruit_check")),
+            (&skills, "mail-made", None),
+            (&pushed, "desk-booth", Some("booth_now")),
+        ] {
+            std::fs::create_dir_all(place.join(name)).unwrap();
+            let toml = tool.map_or_else(String::new, |tool| format!("tool = \"{tool}\"\n"));
+            std::fs::write(place.join(name).join("skill.toml"), toml).unwrap();
+        }
+        let places = [skills.as_path(), pushed.as_path()];
+        assert_eq!(
+            skill_of(&places, "fruit_check").as_deref(),
+            Some("pear-probe")
+        );
+        assert_eq!(
+            skill_of(&places, "booth_now").as_deref(),
+            Some("desk-booth")
+        );
+        assert_eq!(skill_of(&places, "mail-made").as_deref(), Some("mail-made"));
+        assert_eq!(skill_of(&places, "no_such_tool"), None);
+        assert_eq!(skill_of(&places, "../skills"), None);
+        let path = dir.join("spoken-asks.json");
+        keep_asked(&path, &places, "fruit_check", 1_000).unwrap();
+        assert!(asked_within(&path, "pear-probe", 2_000));
+        assert!(asked_within(&path, "fruit_check", 2_000));
+        assert!(!asked_within(&path, "desk-booth", 2_000));
+        keep_asked(&path, &places, "mail-made", 3_000).unwrap();
+        keep_asked(&path, &places, "unknown_tool", 3_000).unwrap();
+        let kept: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let mut keys: Vec<&String> = kept.as_object().unwrap().keys().collect();
+        keys.sort();
+        assert_eq!(
+            keys,
+            ["fruit-check", "mail-made", "pear-probe", "unknown-tool"]
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
