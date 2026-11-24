@@ -111,7 +111,11 @@ fn a_kept_switch_starts_its_added_long_running_parts_of_the_lamp_lamp_services_f
         to_start(&added, |name| name != "lamp-off.service"),
         // #8367: a socket of lampos.target too, so a helper a round adds
         // (the own keys' one) listens before the lamp's next start.
-        ["lamp-services.service", "lamp-mood.service", "lamp-a.socket"]
+        [
+            "lamp-services.service",
+            "lamp-mood.service",
+            "lamp-a.socket"
+        ]
     );
     assert!(to_start(&added, |_| false).is_empty());
 }
