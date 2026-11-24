@@ -20,7 +20,13 @@ pub const RETRY_EVERY_MS: u64 = 120_000;
 /// How long past its due time a phone on the hotspot may hold a retry
 /// (El's P2 on #3024): a phone that remembers the open hotspot from setup
 /// may join it by itself while the router reboots, and would otherwise
-/// keep the lamp off its network all night. A setup run holds it always.
+/// keep the lamp off its network all night. A setup run holds it while it
+/// takes steps: one that took none for this long holds it no more (#8484),
+/// as an app closed halfway, or a run that never ended, would otherwise
+/// keep the lamp on its hotspot for good. A live run's longest step is well
+/// inside it: the join's 60 s, `device-sta-mode`'s 45 s and
+/// `device-ap-mode`'s 4 min ([`crate::wifi::JOIN_WAIT`],
+/// [`crate::wifi::RADIO_TIMEOUT`], [`crate::wifi::HOTSPOT_TIMEOUT`]).
 pub const PHONE_HOLDS_MS: u64 = 600_000;
 /// How long a try of the saved network has to join: V1's.
 pub const JOIN_WAIT_MS: u64 = 45_000;
@@ -35,12 +41,12 @@ pub const RECOVERING: &str = "recovering";
 pub const SWITCH: &str = "LAMP_WIFI_RECOVERY";
 /// What the lamp says as the hotspot first opens for a loss (#3743, agreed
 /// with Sixth on #3020): what happened and what to do, with no control named
-/// and nothing erased. With no network the voice's model can't be reached,
+/// and nothing erased; and that it keeps trying its saved network by itself
+/// (#8484), which it does every [`RETRY_EVERY_MS`]. With no network the voice's model can't be reached,
 /// so it is only ever [`RECORDING_OPENED`], recorded at build time in the
 /// lamp's own voice; this is its transcript. Under 10 s, so any loader
 /// takes the clip.
-pub const SAY_OPENED: &str =
-    "I can't reach my Wi-Fi, so I've opened setup. Set my Wi-Fi again in the app.";
+pub const SAY_OPENED: &str = "I can't reach my Wi-Fi, so I've opened setup. I'll keep trying it, or set my Wi-Fi again in the app.";
 /// [`SAY_OPENED`]'s recording, by the name the say service takes, the
 /// failure notice `wifi_recovering` (`docs/failure-notices.md`).
 pub const RECORDING_OPENED: &str = "wifi_recovering";
@@ -72,6 +78,10 @@ pub struct Seen {
     pub associated: bool,
     /// Setup itself, or a Wi-Fi change from the app, is running.
     pub busy: bool,
+    /// Setup runs on the open hotspot's page since it opened
+    /// (`serve::Status::run`), 0 with none open: one more is a setup
+    /// step, as is `busy` coming on (#8484).
+    pub run: u64,
     /// Phones on the hotspot; None when they can't be counted, which counts
     /// as some.
     pub phones: Option<u16>,
@@ -119,6 +129,14 @@ pub struct Recovery {
     /// The last look's `busy`: a line asked again waits while setup or a
     /// Wi-Fi change runs, the person already setting the network (#5550).
     busy: bool,
+    /// The last look's `run`.
+    run: u64,
+    /// While `busy`: when its last setup step was seen (#8484).
+    stepped_ms: Option<u64>,
+    /// The step whose hold has ended, once ended: said once a step.
+    dropped_for: Option<u64>,
+    /// This look ended it: [`Recovery::dropped_stale`].
+    dropped: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -135,6 +153,10 @@ impl Default for Recovery {
             told: false,
             again: None,
             busy: false,
+            run: 0,
+            stepped_ms: None,
+            dropped_for: None,
+            dropped: false,
         }
     }
 }
@@ -205,9 +227,36 @@ impl Recovery {
         self.says_opened(act) || self.says_again(now_ms)
     }
 
+    /// Whether this look ended a setup run's hold on the retry, as it took
+    /// no step for [`PHONE_HOLDS_MS`] (#8484): true once a run, for its one
+    /// journal line.
+    pub fn dropped_stale(&self) -> bool {
+        self.dropped
+    }
+
     /// What `seen` at `now_ms` asks for.
     pub fn step(&mut self, now_ms: u64, seen: Seen) -> Option<Act> {
         self.busy = seen.busy;
+        // A setup run holds the hotspot's retry only while it takes steps
+        // (#8484): busy coming on, or a new run on the page (a page
+        // closed, its count back to 0, is none).
+        let stepped = seen.run > self.run;
+        self.run = seen.run;
+        self.stepped_ms = match self.stepped_ms {
+            Some(at) if seen.busy && !stepped => Some(at),
+            _ if seen.busy => Some(now_ms),
+            _ => None,
+        };
+        let holds = self
+            .stepped_ms
+            .is_some_and(|at| now_ms.saturating_sub(at) < PHONE_HOLDS_MS);
+        // Ended with the hotspot open or tried from, where it held the
+        // retry; said once for the step it outlived.
+        self.dropped =
+            seen.busy && !holds && self.recovering() && self.dropped_for != self.stepped_ms;
+        if self.dropped {
+            self.dropped_for = self.stepped_ms;
+        }
         let (state, act) = match self.state {
             _ if seen.online => (State::Online, None),
             State::Online => (State::Lost { since_ms: now_ms }, None),
@@ -223,12 +272,13 @@ impl Recovery {
                 Some(Act::OpenHotspot),
             ),
             State::Lost { since_ms } => (State::Lost { since_ms }, None),
-            // Every 2 min, never during a setup run, and from under a
-            // phone only once it has held the retry 10 min. Not sooner
-            // when the saved network shows in a scan: with a changed
-            // password it always does, and the hotspot would never stay up.
+            // Every 2 min, never during a setup run that takes steps (one
+            // quiet 10 min holds it no more, #8484), and from under a phone
+            // only once it has held the retry 10 min. Not sooner when the
+            // saved network shows in a scan: with a changed password it
+            // always does, and the hotspot would never stay up.
             State::Hotspot { retry_ms }
-                if !seen.busy
+                if !holds
                     && now_ms >= retry_ms
                     && (seen.phones == Some(0)
                         || now_ms.saturating_sub(retry_ms) >= PHONE_HOLDS_MS) =>
@@ -245,8 +295,10 @@ impl Recovery {
             // else at the radio (a Wi-Fi change): never cut back to the
             // hotspot, as it is never opened from Lost for those. It is
             // lost afresh, so once that clears the whole 90 s run again
-            // before the hotspot (reviewer-two on #3024).
-            State::Rejoining { .. } if seen.associated || seen.busy => {
+            // before the hotspot (reviewer-two on #3024). A setup run that
+            // no longer holds the retry (#8484) does not take the try
+            // either: it runs out as for a lost network, the hotspot again.
+            State::Rejoining { .. } if seen.associated || holds => {
                 (State::Lost { since_ms: now_ms }, None)
             }
             State::Rejoining { until_ms } if now_ms >= until_ms => (

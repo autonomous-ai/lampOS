@@ -1277,13 +1277,27 @@ its only way back once its package carries the unit.
   not busy, opens the hotspot. Only slow or busy, the 90 s start again. The
   saved network in reach but never joining (a changed password) is gone. From
   the hotspot the saved network is tried every 2 min, 45 s each, never during
-  a setup run, and from under a phone only once it has held the retry 10 min
-  (a phone that remembers the open hotspot may join it by itself while the
-  router reboots); not sooner when it shows in a scan, since with a changed
-  password it always would. A try that joins the radio and waits for an
-  address, or that a Wi-Fi change takes, is never cut back to the hotspot:
-  it counts as lost afresh, the 90 s again once that clears (reviewer-two
-  on #3024). Online at any time ends recovery, and a 5 s reset
+  a setup run that takes steps, and from under a phone only once it has held
+  the retry 10 min (a phone that remembers the open hotspot may join it by
+  itself while the router reboots); not sooner when it shows in a scan,
+  since with a changed password it always would. A try that joins the radio
+  and waits for an address, or that a Wi-Fi change takes, is never cut back
+  to the hotspot: it counts as lost afresh, the 90 s again once that clears
+  (reviewer-two on #3024).
+  **A setup run holds the retry only while it goes on** (#8484): a step is
+  the run coming on (`busy`, above) or one more run on the hotspot's page
+  (`serve::Status::run`, `Seen::run`), and a run that took no step for
+  10 min (`recover::PHONE_HOLDS_MS`, the phone's bound reused) holds it no
+  more: an app closed halfway, or a run that never ended, would otherwise
+  leave the lamp on its hotspot for good. The retry then goes on as for a
+  lost network, a phone on the hotspot holding it its own 10 min past due,
+  and the try is not taken by the run, so it runs out and the hotspot opens
+  again. A live run's longest step is well inside the bound (the join's
+  60 s, `device-sta-mode`'s 45 s, `device-ap-mode`'s 4 min), and a person
+  setting it up starts a new run at each try, so a phone really setting it
+  up keeps the hold. The phone count is not part of it: during a run's join
+  the radio is a station, so the count can read none under a live run. Only
+  from the hotspot: off it, a run holds the 90 s as before. Online at any time ends recovery, and a 5 s reset
   (the marker gone) ends the watcher, setup's own then serving.
 - **The hotspot** is setup's own (`device-ap-mode`), with its page and API,
   the marker and the person's data kept, and no setup light (the ring is the
@@ -1354,14 +1368,23 @@ its only way back once its package carries the unit.
   settings can't write a drop-in, but since #5758 the product unit itself
   sets the switch on, so a round that writes that unit turns it on.
 - **Said:** the journal (`lamp-setup-recover`) says when it opens and why,
-  each retry, and when recovery ends; lamp-cloud's `system.info` says
+  each retry, and when recovery ends; once a run, when a setup run that
+  went quiet holds the retry no more, `a setup run took no step for 10 min:
+  it holds the saved network's retry no more (N phone(s) on the hotspot)`,
+  counts only, never a network's name or a phone's address (#8484); lamp-cloud's `system.info` says
   `"recovery": true` while it runs with its switch on, so the app names the
   hotspot only to a lamp that will open one (Fourteen's ecm-sds-mobile#50).
 - **Spoken** (#3743, the words agreed with Sixth): as the hotspot first opens
   for a loss, `recover` asks the voice's say service for the recording
-  `wifi_recovering`, "I can't reach my Wi-Fi, so I've opened setup. Set my
-  Wi-Fi again in the app." (`recover::SAY_OPENED`). It names no control and
-  sends nobody to the reset. Once a loss (`Recovery::says_opened`): not at a
+  `wifi_recovering`, "I can't reach my Wi-Fi, so I've opened setup. I'll
+  keep trying it, or set my Wi-Fi again in the app." (`recover::SAY_OPENED`).
+  It names no control and sends nobody to the reset, and says that the lamp
+  keeps trying its saved network by itself (#8484), as it does every 2 min
+  from the hotspot. The English recording in `notices-2026-11-03` still has
+  the words before #8484 ("Set my Wi-Fi again in the app." after the first
+  sentence) until a release rendered from the new words is pinned
+  ([failure-notices.md](failure-notices.md)); a lamp in another language
+  says the new words from its speech cache. Once a loss (`Recovery::says_opened`): not at a
   reopening after a failed try of the saved network, nor after a try that
   went back to lost (only slow, or busy; Second's P3 on #4157), and again
   only after the lamp was back online. The voice stays up while the hotspot is open, as
