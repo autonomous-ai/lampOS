@@ -4922,10 +4922,39 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
 2. **Cap giữ** (`made_skill::made_asks`, trong `held`): một mảng 1 đến 3
    chuỗi, mỗi chuỗi tối đa 60 ký tự, 2 đến 8 từ gồm chữ, số và dấu nháy
    đơn, cách nhau một dấu cách (như lamp-skills nhận asks của mọi kỹ năng),
-   không bị `skill_named::ask_refused` từ chối, mỗi cụm có ít nhất hai từ
+   không bị `skill_named::ask_refused` từ chối, mỗi cụm có ít nhất một từ
    của riêng nó ngoài những từ nói quanh một yêu cầu
-   (`skill_named::own_words_of`: "yes please" chỉ có một, "pebble hello"
-   cũng vậy vì "hello" là từ nói quanh một yêu cầu), không lặp lại. Nếu
+   (`skill_named::own_words_in`), không lặp lại. **Ngưỡng hai từ được giữ
+   lúc tạo** (`made_skill::asks_heard`, trong `keep_asked`, #8451, quyết
+   định (b) của first builder): một cụm do model tạo kỹ năng tự chọn cần
+   hai từ của riêng nó ("yes please" không có từ nào, "pebble hello" có
+   một, vì "hello" là từ nói quanh một yêu cầu); một cụm là một chuỗi từ
+   liền nhau trong chính câu của người dùng cho lần tạo đó
+   (`skill_named::said_in`: câu giọng nói nghe được, hoặc yêu cầu gõ trong
+   app, không phân biệt hoa thường và dấu câu) chỉ cần một, nên "whenever
+   I say pebble hello" giữ "pebble hello" ngay ở câu trả lời đầu, không
+   lần sửa nào. Cụm của một kỹ năng chỉ được khớp nguyên cả cụm
+   (`named_among` của `skill_named`), nên chỉ "pebble" không bao giờ khởi
+   động nó. Cap, bước kiểm tra khi bật (`put_on_cap`), câu nói lại và bước
+   kiểm tra trùng (`asks_taken`) đọc asks của kỹ năng tự tạo với ngưỡng
+   một từ, nên kỹ năng giữ trigger của người dùng được bật đúng như đã
+   giữ; kỹ năng thêm từ file vẫn cần hai (`capped_added`). **Chính lời của
+   người dùng phạm một quy tắc mà không người viết nào đổi được**
+   (`made_skill::their_ask_refused`, trước cap, phần (a) của first
+   builder): một cụm là chuỗi từ trong câu của người dùng, 2 đến 8 từ và
+   trong 60 ký tự, bị `skill_named::ask_refused` từ chối, được nói ngay,
+   rõ ràng, mỗi quy tắc một câu, không tốn lần sửa nào và không giao cho
+   agent của đèn: "I can't start a skill with ‘stop the music’, because
+   that's how you stop me." (một lệnh dừng), "…, because a no or a
+   question is mine to answer.", "…, because those are my own words for
+   something I do myself.", "…, because those are only words like hello or
+   please, said to me all the time." và "…, because it only names things
+   of mine, like the light or the music." (`plain_reason` và
+   `not_made_line` nói nguyên câu), ghi journal là `a made skill was not
+   kept: its asks weren't kept: asks = [<như đã viết>]: "<cụm đó>": the
+   person's own words, <lời của ask_refused>: told at once, no repair`. Số
+   từ hay độ dài vẫn được sửa như trước: người viết có thể sửa bằng nhiều
+   hơn hoặc ít hơn từ của người dùng. Nếu
    không, nó bị từ chối và nêu đúng quy tắc (#8451): dòng journal (dòng
    sửa lại và dòng "wasn't kept") là `its asks weren't kept: asks = [<như
    đã viết>]: "<cụm bị từ chối>": <quy tắc>`, quy tắc bằng lời thường:

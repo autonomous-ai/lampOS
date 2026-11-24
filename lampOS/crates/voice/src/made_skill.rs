@@ -1259,17 +1259,136 @@ pub const MADE_ASKS_FORM: &str = "The form, for example: asks = [\"send my test 
 /// each whatever their case. None when it gives no `asks`; why not, for
 /// the journal and a repair: the asks as given, the one that failed and
 /// the rule it broke, in plain words (#8451, [`ASKS_NOT_KEPT`]), the
-/// repair then giving the form ([`MADE_ASKS_FORM`]).
+/// repair then giving the form ([`MADE_ASKS_FORM`]). An ask needs
+/// [`HEARD_OWN_WORDS`] of its own here: the make held each to the
+/// person's line first ([`asks_heard`]), so a skill made with the
+/// person's own one-word trigger is read and put on as it was kept.
 pub fn made_asks(table: &toml::Table) -> Result<Vec<String>, Refused> {
-    made_asks_of(table, MOST_MADE_ASKS)
+    made_asks_of(table, MOST_MADE_ASKS, &|_| HEARD_OWN_WORDS)
+}
+
+/// The fewest words of its own past those said around an ask
+/// (`crate::skill_named::own_words_in`) an ask the making model chose
+/// needs, or one of a skill added from a file (#7233): so one ordinary
+/// word with a "please" ("yes please", "play please") never starts one.
+const OWN_WORDS: usize = 2;
+
+/// The fewest an ask that is a run of the person's own words for the make
+/// needs (#8451, the first builder's call (b) at 08:12: "whenever I say
+/// pebble hello" is kept as "pebble hello", "hello" being said around an
+/// ask), as long as `crate::skill_named::ask_refused` passes it: a skill's
+/// ask is matched only as the whole phrase (`crate::skill_named`'s
+/// `named_among`), so its one word alone never starts it.
+const HEARD_OWN_WORDS: usize = 1;
+
+/// A made skill's `asks` held at the make to `line`, the person's own line
+/// for it (the voice's heard line, or the app's typed ask): each one
+/// that is no run of its words ([`crate::skill_named::said_in`]) needs
+/// [`OWN_WORDS`] of its own, one that is [`HEARD_OWN_WORDS`] (#8451). Its
+/// refusal names the ask and its rule, with a repair, as [`made_asks`]'s.
+/// None to hold with the switch off, or no `asks`.
+fn asks_heard(toml: &str, line: &str) -> Result<(), Refused> {
+    if !asks_on() {
+        return Ok(());
+    }
+    let Ok(table) = toml::from_str::<toml::Table>(toml) else {
+        return Ok(());
+    };
+    made_asks_of(
+        &table,
+        MOST_MADE_ASKS,
+        &|ask| match crate::skill_named::said_in(ask, line) {
+            true => HEARD_OWN_WORDS,
+            false => OWN_WORDS,
+        },
+    )
+    .map(|_| ())
+}
+
+/// How the lamp's line begins when the person's own words for a skill's
+/// start break a rule no writer can change ([`their_ask_refused`]).
+pub const THEIR_ASK_HEAD: &str = "I can't start a skill with ‘";
+
+/// Whether `why` is [`their_ask_refused`]'s line: said as it is, never
+/// repaired nor handed to the lamp's agent to write again.
+pub fn their_ask(why: &str) -> bool {
+    why.starts_with(THEIR_ASK_HEAD)
+}
+
+/// Why the person's own words for a skill's start can't start one, in the
+/// lamp's words, for each rule no writer can change (#8451, the first
+/// builder's (a) at 08:12): one line a rule, never the form's example.
+/// Only `crate::skill_named::ask_refused`'s, which holds for any longer
+/// run of the same words too; a count or a length of words the writer
+/// may still mend with more or fewer of the person's words, so it is
+/// repaired as before (empty here).
+fn their_rule(words: &[String]) -> &'static str {
+    use crate::skill_named as named;
+    let said = words.join(" ");
+    if !MADE_ASK_WORDS.contains(&words.len()) || said.chars().count() > MOST_MADE_ASK_CHARS {
+        return "";
+    }
+    match named::ask_refused(&said) {
+        Some(named::REFUSED_STOP) => "that's how you stop me",
+        Some(named::REFUSED_NO_OR_QUESTION) => "a no or a question is mine to answer",
+        Some(named::REFUSED_LAMPS_OWN) => "those are my own words for something I do myself",
+        Some(named::REFUSED_ONLY_AROUND) => {
+            "those are only words like hello or please, said to me all the time"
+        }
+        Some(named::REFUSED_NOTHING_OWN) => {
+            "it only names things of mine, like the light or the music"
+        }
+        Some(_) => "I can't listen for those words",
+        None => "",
+    }
+}
+
+/// The lamp's line when one of a made skill's `asks` is a run of `line`,
+/// the person's own line for the make ([`crate::skill_named::said_in`]),
+/// and breaks a rule no writer can change ([`their_rule`]): "I can't start
+/// a skill with ‘stop the music’, because that's how you stop me." (#8451,
+/// the first builder's (a): said at once, plainly, with no repair spent
+/// on the person's own words). Journaled with the asks and the rule as
+/// [`made_asks`] names them. None with the switch off, no line, or none.
+fn their_ask_refused(toml: &str, line: &str) -> Option<Refused> {
+    if !asks_on() || line.trim().is_empty() {
+        return None;
+    }
+    let table = toml::from_str::<toml::Table>(toml).ok()?;
+    let given = table.get("asks")?;
+    given
+        .as_array()?
+        .iter()
+        .filter_map(toml::Value::as_str)
+        .filter(|ask| crate::skill_named::said_in(ask, line))
+        .find_map(|ask| {
+            let words = crate::known_faces::lower_words(ask);
+            let because = their_rule(&words);
+            (!because.is_empty()).then(|| {
+                eprintln!(
+                    "lamp-voice: a made skill was not kept: {ASKS_NOT_KEPT}: asks = {}: {ask:?}: \
+                     the person's own words, {}: told at once, no repair",
+                    asks_given(given),
+                    crate::skill_named::ask_refused(&words.join(" ")).unwrap_or_default()
+                );
+                Refused::new(format!(
+                    "{THEIR_ASK_HEAD}{}’, because {because}.",
+                    words.join(" ")
+                ))
+            })
+        })
 }
 
 /// The most phrases of a skill added from a file (its trigger phrases,
 /// `crate::upload_agent::MOST_TRIGGERS`), as lamp-skills takes any skill's.
 pub const MOST_ADDED_ASKS: usize = 8;
 
-/// [`made_asks`], at most `most`.
-fn made_asks_of(table: &toml::Table, most: usize) -> Result<Vec<String>, Refused> {
+/// [`made_asks`], at most `most`, each ask needing `own` words of its own.
+fn made_asks_of(
+    table: &toml::Table,
+    most: usize,
+    own: &dyn Fn(&str) -> usize,
+) -> Result<Vec<String>, Refused> {
     let Some(given) = table.get("asks") else {
         return Ok(Vec::new());
     };
@@ -1294,7 +1413,7 @@ fn made_asks_of(table: &toml::Table, most: usize) -> Result<Vec<String>, Refused
         let Some(ask) = value.as_str() else {
             return Err(refused(format!("{}: not words", asks_given(value))));
         };
-        if let Some(rule) = ask_broken(ask, &kept) {
+        if let Some(rule) = ask_broken(ask, &kept, own(ask)) {
             return Err(refused(format!("{ask:?}: {rule}")));
         }
         kept.push(ask.to_owned());
@@ -1322,10 +1441,10 @@ fn asks_given(value: &toml::Value) -> String {
 /// The rule one of a made skill's asks breaks, in plain words, the first
 /// of: one space between its words, only letters, digits and apostrophes,
 /// [`MADE_ASK_WORDS`] words, [`MOST_MADE_ASK_CHARS`] characters,
-/// `crate::skill_named::ask_refused`, two words of its own
+/// `crate::skill_named::ask_refused`, `own` words of its own
 /// (`crate::skill_named::own_words_in`), once among those `kept` whatever
 /// their case. None when it breaks none.
-fn ask_broken(ask: &str, kept: &[String]) -> Option<String> {
+fn ask_broken(ask: &str, kept: &[String], own_least: usize) -> Option<String> {
     let words: Vec<&str> = ask.split(' ').collect();
     if words.iter().any(|word| word.is_empty()) {
         return Some("not one space between its words".to_owned());
@@ -1356,7 +1475,7 @@ fn ask_broken(ask: &str, kept: &[String]) -> Option<String> {
         return Some(why.to_owned());
     }
     let own = crate::skill_named::own_words_in(ask);
-    if own.len() < 2 {
+    if own.len() < own_least {
         let listed: Vec<String> = own.iter().map(|word| format!("{word:?}")).collect();
         return Some(match own.len() {
             0 => "no word of its own".to_owned(),
@@ -1458,7 +1577,13 @@ pub fn asks_tidied(text: &str) -> String {
 /// (the first builder's answer 2 on #7249). None when it gives no asks,
 /// or the switch is off.
 pub fn asks_taken(installed: &Path, kept: &Path, name: &str, toml: &str) -> Option<String> {
-    asks_taken_of(installed, kept, name, toml, MOST_MADE_ASKS)
+    asks_taken_of(
+        installed,
+        kept,
+        name,
+        toml,
+        (MOST_MADE_ASKS, HEARD_OWN_WORDS),
+    )
 }
 
 /// [`asks_taken`] for a skill added from a file with its own `skill.toml`
@@ -1466,22 +1591,23 @@ pub fn asks_taken(installed: &Path, kept: &Path, name: &str, toml: &str) -> Opti
 /// [`MOST_ADDED_ASKS`], never another skill's on the lamp. Asks of a
 /// wrong shape are not read here; the cap ([`capped_added`]) refuses them.
 pub fn added_asks_taken(installed: &Path, kept: &Path, name: &str, toml: &str) -> Option<String> {
-    asks_taken_of(installed, kept, name, toml, MOST_ADDED_ASKS)
+    asks_taken_of(installed, kept, name, toml, (MOST_ADDED_ASKS, OWN_WORDS))
 }
 
-/// [`asks_taken`], with at most `most` asks read.
+/// [`asks_taken`], with at most `most` asks read, each with `own` words of
+/// its own.
 fn asks_taken_of(
     installed: &Path,
     kept: &Path,
     name: &str,
     toml: &str,
-    most: usize,
+    (most, own): (usize, usize),
 ) -> Option<String> {
     if !asks_on() {
         return None;
     }
     let table = toml::from_str::<toml::Table>(toml).ok()?;
-    let asks = made_asks_of(&table, most).ok()?;
+    let asks = made_asks_of(&table, most, &|_| own).ok()?;
     if asks.is_empty() {
         return None;
     }
@@ -1508,7 +1634,7 @@ pub fn asks_taken_sparing(
     }
     let Some(asks) = toml::from_str::<toml::Table>(toml)
         .ok()
-        .and_then(|table| made_asks_of(&table, MOST_MADE_ASKS).ok())
+        .and_then(|table| made_asks_of(&table, MOST_MADE_ASKS, &|_| HEARD_OWN_WORDS).ok())
     else {
         return Ok(Vec::new());
     };
@@ -2553,6 +2679,7 @@ pub fn plain_reason(why: &str) -> String {
     if why.starts_with(CANT_YET)
         || why.starts_with(ALREADY_HAVE)
         || why.starts_with(NAME_TAKEN_HEAD)
+        || their_ask(why)
         || [NOT_MADE_TRY, NOT_KEPT_TRY].contains(&why)
         || AGENT_TRIES.contains(&why)
         || PLAIN_REASONS.contains(&why)
@@ -2585,6 +2712,7 @@ pub fn not_made_line(why: &str) -> String {
     // whole already.
     if why.starts_with(CANT_YET)
         || why.starts_with(ALREADY_HAVE)
+        || their_ask(why)
         || [NOT_MADE_TRY, NOT_KEPT_TRY, NOT_READY_LINE, NOT_TRIED_LINE].contains(&why)
         || AGENT_TRIES.contains(&why)
         || crate::make_no_cannot::said_as_is(why)
@@ -5582,19 +5710,18 @@ fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses),
     // from a file) may give the words the person named to start it, held
     // to [`made_asks`].
     // A skill added from a file (`crate::upload_skill::written`) only with
-    // a tool, its trigger phrases, at most a Store skill's eight.
+    // a tool, its trigger phrases, at most a Store skill's eight, each with
+    // two words of its own. A made one's with one, its make holding the
+    // rest to the person's line ([`asks_heard`], #8451).
     if table.contains_key("asks") {
         if !asks_on() || (added && !table.contains_key("tool")) {
             return Err(Refused::new(MADE_ASKS));
         }
-        made_asks_of(
-            table,
-            if added {
-                MOST_ADDED_ASKS
-            } else {
-                MOST_MADE_ASKS
-            },
-        )?;
+        let (most, own) = match added {
+            true => (MOST_ADDED_ASKS, OWN_WORDS),
+            false => (MOST_MADE_ASKS, HEARD_OWN_WORDS),
+        };
+        made_asks_of(table, most, &|_| own)?;
     }
     match table.get("kind").map(|kind| kind.as_str()) {
         None | Some(Some("installable")) => {}
@@ -9939,7 +10066,15 @@ pub fn keep_asked(
             None => "blinking".to_owned(),
         });
     }
+    // The person's own words for its start (#8451): one that breaks a rule
+    // no writer can change is said at once, with no repair; the rest held
+    // to their line, an ask the model chose needing two words of its own.
+    let line = request.heard.unwrap_or(request.request);
+    if let Some(refused) = their_ask_refused(&files.toml, line) {
+        return Err(refused);
+    }
     let (_, uses) = capped(&files.toml)?;
+    asks_heard(&files.toml, line)?;
     // A say that only tells the person to do what they asked the lamp to
     // do is no skill of it (lamp-9adf, 12 Nov 18:10): refused with its
     // lines, so it is repaired or goes to the lamp's agent.

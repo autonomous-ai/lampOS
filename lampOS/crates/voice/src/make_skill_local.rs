@@ -3844,6 +3844,16 @@ fn made_and_journaled_by(
             );
             made
         }
+        // The person's own words for its start breaking a rule no writer
+        // can change (#8451): told at once, never handed to the agent to
+        // write again.
+        Some((_, engine)) if matches!(&made, Err(Refused(why, _)) if made_skill::their_ask(why)) => {
+            eprintln!(
+                "lamp-voice: a skill made here: its start is the person's own words, which break \
+                 a rule: told so, not handed to the agent ({engine})"
+            );
+            made
+        }
         // A `cannot:` the system prompt itself asks for (the brief's own
         // refusals, [`made_skill::BRIEFS_OWN_REFUSALS`]) is said as it is,
         // never handed over (the Reviewer-lead on #6439); one of a send
@@ -3894,7 +3904,8 @@ fn made_and_journaled_by(
         // stayed DeepSeek's with one.
         None if missing
             && made.is_err()
-            && !stays_deepseeks(&made, models_cannot.get(), agent_services, true) =>
+            && !stays_deepseeks(&made, models_cannot.get(), agent_services, true)
+            && !matches!(&made, Err(Refused(why, _)) if made_skill::their_ask(why)) =>
         {
             eprintln!(
                 "lamp-voice: a skill made here: DeepSeek failed and there is no agent on the \
