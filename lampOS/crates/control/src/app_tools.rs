@@ -80,22 +80,7 @@ pub fn read(folder: &Path, app: &str, title: &str, path: &str) -> Result<AppsToo
             "its path is not tools.json or a .json file under src/ in the app's folder".into(),
         );
     }
-    let at = folder.join(path);
-    // Never through a link: the file the helper laid, or none.
-    let kind = std::fs::symlink_metadata(&at).map_err(|error| format!("not read: {error}"))?;
-    if !kind.is_file() {
-        return Err("not a plain file".into());
-    }
-    if kind.len() > FILE_MOST_BYTES {
-        return Err(format!("over {FILE_MOST_BYTES} bytes"));
-    }
-    let mut bytes = Vec::new();
-    std::fs::File::open(&at)
-        .and_then(|file| file.take(FILE_MOST_BYTES + 1).read_to_end(&mut bytes))
-        .map_err(|error| format!("not read: {error}"))?;
-    if bytes.len() as u64 > FILE_MOST_BYTES {
-        return Err(format!("over {FILE_MOST_BYTES} bytes"));
-    }
+    let bytes = read_plain(&folder.join(path))?;
     let file: File =
         serde_json::from_slice(&bytes).map_err(|error| format!("not a tools file: {error}"))?;
     let named = |name: &String| file.tools.iter().any(|tool| &tool.name == name);
@@ -128,12 +113,59 @@ pub fn read(folder: &Path, app: &str, title: &str, path: &str) -> Result<AppsToo
     Ok(tools)
 }
 
+/// The file at `path`, opened as lamp-skills opens a skill's files
+/// (`package::open_plain`): never through a link at its end (`O_NOFOLLOW`),
+/// without blocking (`O_NONBLOCK`, so a fifo in its place never hangs the
+/// thread), and checked as opened: a regular file, the one listed before
+/// the open (its device and inode), at most [`FILE_MOST_BYTES`].
+fn read_plain(path: &Path) -> Result<Vec<u8>, String> {
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+    let listed = std::fs::symlink_metadata(path).map_err(|error| format!("not read: {error}"))?;
+    if !listed.is_file() {
+        return Err("not a plain file".into());
+    }
+    if listed.len() > FILE_MOST_BYTES {
+        return Err(format!("over {FILE_MOST_BYTES} bytes"));
+    }
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(path)
+        .map_err(|error| {
+            if error.raw_os_error() == Some(libc::ELOOP) {
+                "not a plain file".to_owned()
+            } else {
+                format!("not read: {error}")
+            }
+        })?;
+    let opened = file
+        .metadata()
+        .map_err(|error| format!("not read: {error}"))?;
+    if !opened.is_file() {
+        return Err("not a plain file".into());
+    }
+    if (opened.dev(), opened.ino()) != (listed.dev(), listed.ino()) {
+        return Err("changed while it was read".into());
+    }
+    let mut bytes = Vec::new();
+    file.take(FILE_MOST_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("not read: {error}"))?;
+    if bytes.len() as u64 > FILE_MOST_BYTES {
+        return Err(format!("over {FILE_MOST_BYTES} bytes"));
+    }
+    Ok(bytes)
+}
+
 /// The running apps' tools, each app's file read once a session (its
 /// `since_ms`) and journalled once: a file is laid by an install or an
 /// update, which starts the app's session again.
 #[derive(Default)]
 pub struct Lister {
     read: BTreeMap<String, (u64, Option<AppsTools>)>,
+    /// The apps with tools left out by the cap ([`AppTools::MAX_APPS`]),
+    /// journalled once each time one is newly left out.
+    capped: std::collections::BTreeSet<String>,
 }
 
 impl Lister {
@@ -148,22 +180,32 @@ impl Lister {
         });
         let mut list = AppTools { apps: Vec::new() };
         if !tools {
+            self.capped.clear();
             return list;
         }
+        let mut capped = std::collections::BTreeSet::new();
         for (name, since) in running {
             let (_, kept) = self
                 .read
                 .entry(name.clone())
                 .or_insert_with(|| (*since, read_installed(apps, name)));
-            if let Some(app) = kept
-                && list.apps.len() < AppTools::MAX_APPS
-            {
+            let Some(app) = kept else { continue };
+            if list.apps.len() < AppTools::MAX_APPS {
                 list.apps.push(AppsTools {
                     since_ms: *since,
                     ..app.clone()
                 });
+            } else {
+                if !self.capped.contains(name) {
+                    eprintln!(
+                        "lamp-control: app {name}: its tools are left out: {} apps' tools are told at most",
+                        AppTools::MAX_APPS
+                    );
+                }
+                capped.insert(name.clone());
             }
         }
+        self.capped = capped;
         list
     }
 }
@@ -341,6 +383,48 @@ mod tests {
         // A missing file is no tools.
         std::fs::remove_file(folder.join("tools.json")).unwrap();
         assert!(read(&folder, "gym-coach", "Gym Coach", "tools.json").is_err());
+    }
+
+    #[test]
+    fn a_fifo_in_the_files_place_is_refused_and_never_hangs() {
+        let apps = installed("fifo", Some("tools.json"), None);
+        let folder = apps.join("gym-coach/current");
+        let fifo = folder.join("tools.json");
+        let made = std::process::Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .unwrap();
+        assert!(made.success());
+        let why = read(&folder, "gym-coach", "Gym Coach", "tools.json").unwrap_err();
+        assert_eq!(why, "not a plain file");
+    }
+
+    #[test]
+    fn a_ninth_app_is_left_out_by_the_cap() {
+        let mut running = Vec::new();
+        let base = installed("cap", None, None);
+        for n in 0..=AppTools::MAX_APPS {
+            let name = format!("app-{n}");
+            let dir = base.join(&name).join("current");
+            std::fs::create_dir_all(&dir).unwrap();
+            let manifest = json!({
+                "format": 2, "kind": "app", "name": name, "title": "A", "version": "1.0.0",
+                "min_build": 1, "runtime": {"name": "python3", "entry": "a"},
+                "grants": ["hear"], "triggers": [], "files": [], "tools": "tools.json"
+            });
+            std::fs::write(dir.join("lamp-skill.json"), manifest.to_string()).unwrap();
+            std::fs::write(dir.join("tools.json"), coach_file().to_string()).unwrap();
+            running.push((name, n as u64 + 1));
+        }
+        let mut lister = Lister::default();
+        let list = lister.list(&base, &running, true);
+        assert_eq!(list.apps.len(), AppTools::MAX_APPS);
+        assert!(lister.capped.contains("app-8"));
+        assert_eq!(list.check(), Ok(()));
+        // One fewer running: none is left out, and the mark goes.
+        running.pop();
+        assert_eq!(lister.list(&base, &running, true).apps.len(), 8);
+        assert!(lister.capped.is_empty());
     }
 
     #[test]
