@@ -66,6 +66,10 @@ Environment=LAMP_MADE_CODE_ON_AT_ONCE=on
 Environment=LAMP_CONTROL_RUN_SOCKET_USER=lampos
 # LAMP_STORE_APPS: #7415, the Store apps; on in the product by the first builder's DEFAULT-ON of 20 Nov; its rules are its rows in docs/switches.md.
 Environment=LAMP_STORE_APPS=on
+# LAMP_APP_TOOLS: #8386's switch-on; with LAMP_STORE_APPS, each running app's tools file read and said on apps/tools,
+# and the voice's app.call sent to the app's socket. The same line in lamp-voice and lamp-apps-manage@; its rules are
+# its rows in docs/switches.md.
+Environment=LAMP_APP_TOOLS=on
 # Its certificate and paired computers in --state-dir, the owner's side on --admin-socket (0600),
 # the body's mood and lease sockets, the voice's say socket, lamp-actions' call socket (`volume`),
 # root's skills manage helper (skill push) and the ring's light requests on the bus.

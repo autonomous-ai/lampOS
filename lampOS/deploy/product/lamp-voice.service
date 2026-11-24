@@ -740,6 +740,9 @@ Environment=LAMP_LOOK_FULL=on
 Environment=LAMP_EYES_FULL_LOOK_FILE=/run/lampos-eyes/look.jpg
 # LAMP_APP_TRIGGERS: #7415 piece 3b-2b; a line that spells a running app's trigger starts it with no chat round. Its rules are its row in docs/switches.md.
 Environment=LAMP_APP_TRIGGERS=on
+# LAMP_APP_TOOLS: #8406, #8386's switch-on; a running app's tools offered to the model on the owner's turn (the second
+# route's worker alone), the same line in lamp-control and lamp-apps-manage@. Its rules are its row in docs/switches.md.
+Environment=LAMP_APP_TOOLS=on
 # LAMP_LOOK_TOLD and LAMP_LOOK_KEPT_WITH_ASK: their why and rules are their rows in docs/switches.md
 # (a look named the person's toy motorcycle a camera, and was kept under the room without its question).
 Environment=LAMP_LOOK_TOLD=on
