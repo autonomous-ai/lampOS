@@ -3389,6 +3389,14 @@ grant skill-start của nó, giống hệt kỹ năng của OpenClaw. Phần ri�
   từ chối một bản dựng); vòng nào cài lại Hermes thì ghi luôn nó trong cùng lần
   chạy, nên chuyển sang Hermes được phục vụ giữa các vòng, trong vòng 10 s,
   không phải đợi tới vòng sau.
+  Khi công tắc tasks bật, unit của nó còn có `PartOf=lamp-control.service`,
+  như của OpenClaw (#8320): namespace của nó bind file socket của lamp-control
+  một lần, lúc khởi động, và mỗi lần lamp-control khởi động lại tạo socket đó
+  mới, nên lamp-control restart (switch của một vòng cập nhật, keeper) cũng
+  restart gateway, và lamp-control dừng thì gateway dừng cho tới khi `serve`
+  khởi động lại nó trong vòng 10 s. Vòng ghi `PartOf=` đè lên unit chưa có nó
+  của bản dựng trước sẽ try-restart gateway đang chạy một lần; vòng sau thấy
+  cùng bytes thì không restart gì.
 - **Gateway không tới được.** Công tắc bật nhưng gateway chưa chạy (unit tắt,
   đang khởi động, hoặc đã mất) được xử lý như khi gateway của OpenClaw mất: một
   việc nói ra chờ tối đa 60 s rồi là `not_sent`, một lượt xếp hàng chờ tối đa
