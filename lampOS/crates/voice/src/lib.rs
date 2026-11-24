@@ -101,6 +101,7 @@ pub mod follows_on;
 pub mod going_on_asks;
 pub mod going_on_same_one;
 pub mod hand_controls;
+pub mod hand_wait;
 pub mod head_qualification;
 pub mod health_told;
 pub mod history_send;

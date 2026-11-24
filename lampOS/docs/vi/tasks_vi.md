@@ -3524,6 +3524,40 @@ Kiểm thử: `agent_tasks::tests::a_hand_over_answers_the_works_id_and_a_short_
 Bộ kit ROW bản ghi công việc:
 [tools/played/README.md](../../tools/played/README.md#the-work-records-row-7930-part-1).
 
+## Một câu nói khi việc giao còn chờ một phiên khởi động lạnh (#8445, `hand_wait`)
+
+Sau câu "có" của người dùng, `confirm_agent_task` được trả lời ngay và
+model nói là đang giao việc (cùng một hơi với lời dẫn). Sau đó việc chờ
+trong lamp-tasks ở trạng thái `queued` cho đến khi agent nhận. Trên
+lamp-52e6 ngày 24/11 (04:3x, kit-8022 của #8043), một phiên khởi động lạnh
+làm khoảng chờ này kéo dài 76 s: ô Harness không chạy, phiên được mở lại,
+gặp `ENGINE_NOT_READY` một lần, lượt được nhận sau 29.099 ms. Sau câu đầu,
+người dùng không nghe thấy gì nữa.
+
+Bây giờ, 20 s sau một lần giao việc được nhờ bằng giọng nói
+(`hand_wait::AFTER`), giọng nói đọc bản ghi của việc đó một lần
+(`{"op":"work"}` trên socket request, như khi giọng nói tự xem việc của
+mình, #7930). Nếu việc vẫn `queued` và vẫn là việc được giao gần nhất,
+giọng nói nhờ dịch vụ say nói một câu, như câu của chính nó, ở mức ưu tiên
+thường; nếu không bắt đầu nói được trong 15 s thì bỏ:
+
+- "Your computer is waking up; it'll start in a moment.";
+- với engine của chính đèn, "I'm still getting ready; I'll start in a
+  moment."
+
+Mỗi lần giao việc chỉ nói tối đa một lần, và không bao giờ có câu thứ ba:
+sau đó không đọc hay nói gì thêm cho việc đó. Nếu việc đã được nhận, đã
+xong, đã lỗi, không còn, hoặc đã có lần giao khác sau đó, thì không nói gì.
+Một lần giao sau đó bị lỗi vẫn được kể như tin về việc vẫn kể: câu này
+không đánh dấu gì là đã kể. Khoảng chờ đã được nói ngay lúc giao việc thì
+không có câu ở giây thứ 20 (`hand_wait::told_at_hand_over`): khi đèn biết
+ô của máy tính đang dừng, câu báo máy tính đang khởi động được nói ngay từ
+đầu, và chỉ câu đó (first builder trên #8445, 14:51: chỉ một câu về khoảng
+chờ, không bao giờ hai). Việc được nhờ bằng tin nhắn chữ thì không có
+câu này, và khi không có dịch vụ say (`LAMP_SAY` tắt) thì không đọc hay
+nói gì. Journal ghi `lamp-voice: tasks: work N still waits for its agent
+after 20 s: said it is starting`.
+
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
 Trước đây giọng nói không nói được Harness của đèn đã đăng nhập chưa, hay giao
