@@ -1318,8 +1318,8 @@ pub fn their_ask(why: &str) -> bool {
 /// Why the person's own words for a skill's start can't start one, in the
 /// lamp's words, for each rule no writer can change (#8451, the first
 /// builder's (a) at 08:12): one line a rule, never the form's example.
-/// Only `crate::skill_named::ask_refused`'s, which holds for any longer
-/// run of the same words too; a count or a length of words the writer
+/// Only `crate::skill_named::ask_refused`'s, for the person's whole
+/// phrase ([`their_ask_refused`]); a count or a length of words the writer
 /// may still mend with more or fewer of the person's words, so it is
 /// repaired as before (empty here).
 fn their_rule(words: &[String]) -> &'static str {
@@ -1343,40 +1343,86 @@ fn their_rule(words: &[String]) -> &'static str {
     }
 }
 
+/// The person's whole phrase in `line` that holds `ask`, one of a made
+/// skill's asks ([`crate::skill_named::said_whole`]), when it could be an
+/// ask's: [`MADE_ASK_WORDS`] words within [`MOST_MADE_ASK_CHARS`]. None
+/// when the line names none so: the ask, a run of it, is then taken as
+/// their whole phrase.
+fn their_whole(ask: &str, line: &str) -> Option<Vec<String>> {
+    crate::skill_named::said_whole(ask, line).filter(|whole| {
+        MADE_ASK_WORDS.contains(&whole.len())
+            && whole.join(" ").chars().count() <= MOST_MADE_ASK_CHARS
+    })
+}
+
 /// The lamp's line when one of a made skill's `asks` is a run of `line`,
 /// the person's own line for the make ([`crate::skill_named::said_in`]),
-/// and breaks a rule no writer can change ([`their_rule`]): "I can't start
-/// a skill with ‘stop the music’, because that's how you stop me." (#8451,
-/// the first builder's (a): said at once, plainly, with no repair spent
-/// on the person's own words). Journaled with the asks and the rule as
-/// [`made_asks`] names them. None with the switch off, no line, or none.
+/// and their whole phrase ([`their_whole`]) breaks a rule no writer can
+/// change ([`their_rule`]): "I can't start a skill with ‘stop the music’,
+/// because that's how you stop me." (#8451, the first builder's (a): said
+/// at once, plainly, with no repair spent on the person's own words).
+/// Journaled with the asks and the rule as [`made_asks`] names them.
+/// An ask that is only part of a longer phrase they named ("hello there"
+/// from "whenever I say hello there pebble") and is refused so is the
+/// writer's mistake, the writer's to mend (the first builder's required
+/// change on #8469): refused as [`made_asks`] refuses it, its repair
+/// naming their whole phrase ("use the words they said: hello there
+/// pebble"). None with the switch off, no line, or none.
 fn their_ask_refused(toml: &str, line: &str) -> Option<Refused> {
     if !asks_on() || line.trim().is_empty() {
         return None;
     }
     let table = toml::from_str::<toml::Table>(toml).ok()?;
     let given = table.get("asks")?;
-    given
-        .as_array()?
-        .iter()
-        .filter_map(toml::Value::as_str)
-        .filter(|ask| crate::skill_named::said_in(ask, line))
-        .find_map(|ask| {
-            let words = crate::known_faces::lower_words(ask);
-            let because = their_rule(&words);
-            (!because.is_empty()).then(|| {
-                eprintln!(
-                    "lamp-voice: a made skill was not kept: {ASKS_NOT_KEPT}: asks = {}: {ask:?}: \
-                     the person's own words, {}: told at once, no repair",
-                    asks_given(given),
-                    crate::skill_named::ask_refused(&words.join(" ")).unwrap_or_default()
-                );
-                Refused::new(format!(
-                    "{THEIR_ASK_HEAD}{}’, because {because}.",
-                    words.join(" ")
-                ))
-            })
-        })
+    let plain = |shown: &str, words: &[String], because: &str| {
+        let said = words.join(" ");
+        eprintln!(
+            "lamp-voice: a made skill was not kept: {ASKS_NOT_KEPT}: asks = {}: {shown:?}: \
+             the person's own words, {}: told at once, no repair",
+            asks_given(given),
+            crate::skill_named::ask_refused(&said).unwrap_or_default()
+        );
+        Refused::new(format!("{THEIR_ASK_HEAD}{said}’, because {because}."))
+    };
+    for ask in given.as_array()?.iter().filter_map(toml::Value::as_str) {
+        if !crate::skill_named::said_in(ask, line) {
+            continue;
+        }
+        let words = crate::known_faces::lower_words(ask);
+        let because = their_rule(&words);
+        // Their whole phrase, as the writer wrote it: said at once if it
+        // breaks such a rule.
+        let Some(whole) = their_whole(ask, line).filter(|whole| *whole != words) else {
+            if !because.is_empty() {
+                return Some(plain(ask, words.as_slice(), because));
+            }
+            continue;
+        };
+        // Only part of it: their whole phrase breaking such a rule is said
+        // at once all the same, for no part or whole the writer may give
+        // can start the skill.
+        let whole_because = their_rule(&whole);
+        if !whole_because.is_empty() {
+            let named = whole.join(" ");
+            return Some(plain(named.as_str(), whole.as_slice(), whole_because));
+        }
+        // A part refused where their whole phrase passes: a repair.
+        if !because.is_empty() {
+            let said = words.join(" ");
+            let rule = crate::skill_named::ask_refused(&said).unwrap_or_default();
+            let journal = format!(
+                "{ASKS_NOT_KEPT}: asks = {}: {ask:?}: {rule}",
+                asks_given(given)
+            );
+            let repair = format!(
+                "The lamp refused it: {journal}. {ask:?} is only part of the words the person \
+                 said for its start; use the words they said: {}. {MADE_ASKS_FORM}",
+                whole.join(" ")
+            );
+            return Some(Refused(journal, Some(repair)));
+        }
+    }
+    None
 }
 
 /// The most phrases of a skill added from a file (its trigger phrases,
