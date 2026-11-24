@@ -3572,6 +3572,16 @@ pub fn yes_taken(place: &Place, request: u64, words: &str, person: Option<&str>)
     ))
 }
 
+/// Whether `task` is the work `waiting` was prepared with (#8022 case 2):
+/// the same words, or, for a task of at least [`WHOLE_ASK_FEWEST`] ask
+/// words, one that keeps at least [`WHOLE_ASK_SHARE`] of them
+/// ([`dropped_from_ask`]), as a model's reworded start on a yes has it.
+fn same_work(waiting: &str, task: &str) -> bool {
+    waiting.trim().eq_ignore_ascii_case(task.trim())
+        || (ask_words(waiting, true).len() >= WHOLE_ASK_FEWEST
+            && dropped_from_ask(waiting, task).is_none())
+}
+
 /// Lower-case words of letters and digits; an apostrophe stays inside one.
 fn plain_words(text: &str) -> Vec<String> {
     text.split(|c: char| !(c.is_alphanumeric() || c == '\'' || c == '’'))
@@ -4613,6 +4623,42 @@ fn run_for_asked(
             )
         }
         START => {
+            // A start on the person's plain yes (#8022 case 2, lamp-52e6's
+            // ROW on #8043: request 4's one-word yes called start_agent_task
+            // again, and the task waiting for it never reached the tasks
+            // part): its yes already taken in code, it is that hand-over;
+            // with the same work waiting for its yes, it is that task's
+            // confirm, never a new task that leaves it behind.
+            if taken_in_code(request) == Some(true) {
+                return (
+                    json!({"already_handed_over": true, "next": YES_TAKEN_CONFIRM}),
+                    true,
+                );
+            }
+            if let Some(waiting) = PENDING.lock().ok().and_then(|pending| pending.clone())
+                && may_confirm(&waiting, request, heard, Instant::now())
+                && heard_ask(request, heard).is_some_and(|words| plain_yes(&words))
+                && call
+                    .args
+                    .get("task")
+                    .and_then(Value::as_str)
+                    .is_none_or(|task| same_work(&waiting.text, task))
+            {
+                eprintln!(
+                    "lamp-voice: tasks: request {request}: start_agent_task on a plain yes while task {} waits for it: confirmed instead (#8022)",
+                    waiting.id
+                );
+                let confirm = ToolCall {
+                    name: CONFIRM.into(),
+                    args: json!({}),
+                    ..call.clone()
+                };
+                let (told, sure) = run_for_asked(place, staff, &confirm, request, asker, left());
+                if told.get("handing_over") == Some(&json!(true)) {
+                    take_in_code(request, true);
+                }
+                return (told, sure);
+            }
             // A named agent or place goes by the person's heard words, not
             // by the model alone (#6492, the lead's V2): only while the lamp
             // has its own target, where `where` and `engine` are declared.
@@ -4823,23 +4869,20 @@ fn run_for_asked(
                     };
                     let mut replaced = None;
                     if let Ok(mut pending) = PENDING.lock() {
-                        // With the switch, one still waiting for its yes is
-                        // replaced by this corrected ask (#2838): only from
-                        // a later request than the one that prepared it (one
-                        // line asking two agents makes two in the same
-                        // request, reviewers' P2 on #3009), and only from one
-                        // that may say yes to it ([`may_confirm`]: a line the
-                        // lamp wrote itself never replaces the person's).
-                        // Switch or not, a START in a new ask's own request
-                        // replaces it too (#6547 B, [`pending_note`],
-                        // [`new_ask`]): only then, never a line before it.
+                        // One still waiting for its yes is replaced by this
+                        // different task (#2838, #6547 B): only from a later
+                        // request than the one that prepared it (one line
+                        // asking two agents makes two in the same request,
+                        // reviewers' P2 on #3009), and only from one that may
+                        // say yes to it ([`may_confirm`]: a line the lamp
+                        // wrote itself never replaces the person's). Switch
+                        // or not, and new ask heard or not (#8022 case 2):
+                        // the one it overwrites is cancelled and said as
+                        // declined, never dropped silently.
                         replaced = pending
                             .as_ref()
                             .filter(|waiting| {
-                                (place.correct
-                                    || heard_words(request, heard)
-                                        .is_some_and(|words| new_ask(&words)))
-                                    && waiting.id != id
+                                waiting.id != id
                                     && (waiting.text != task
                                         || waiting.who != who
                                         || waiting.session.as_deref() != session)
@@ -7960,6 +8003,7 @@ pub(crate) mod tests {
                 ("request.sock", prepared(7)),
                 ("request.sock", status(1)),
                 ("request.sock", prepared(8)),
+                ("request.sock", json!({"ok":true})),
                 ("request.sock", status(2)),
                 ("request.sock", prepared(9)),
             ],
@@ -8004,6 +8048,13 @@ pub(crate) mod tests {
         assert!(!told["where"].as_str().unwrap().contains("session"));
         assert_eq!(seen.recv().unwrap()["op"], "status");
         assert!(seen.recv().unwrap().get("session").is_none());
+        // Another session for the same work replaces task 7 waiting, which
+        // is cancelled, never dropped silently (#8022 case 2).
+        let cancel = seen.recv().unwrap();
+        assert_eq!(
+            (cancel["op"].clone(), cancel["id"].clone()),
+            (json!("cancel"), json!(7))
+        );
         // On, with none named or only spaces: as before.
         let (told, _) = run(
             &on,
@@ -16222,6 +16273,165 @@ pub(crate) mod tests {
         assert!(yes_taken(&place, 10, "Yes.", None).is_none());
         assert!(seen.try_recv().is_err(), "nothing more asked");
         *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #8022 case 2, from lamp-52e6's ROW on #8043 (24 Nov 05:12): task 39
+    /// handed over and queued; request 3, a new ask spoken over its yes,
+    /// prepared task 40 and read it back; request 4, the person's one-word
+    /// yes, called `start_agent_task` again, not `confirm_agent_task`, and
+    /// task 40 never reached the tasks part. A start on a plain yes while a
+    /// task waits for it is that task's confirm: the tasks part is asked to
+    /// confirm 40, never to prepare again, and the model's own confirm or
+    /// start after it in the same request asks nothing.
+    #[test]
+    fn a_start_called_on_a_plain_yes_while_a_task_waits_confirms_that_task() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _thread = crate::provider_worker::tests::one_thread();
+        *PENDING.lock().unwrap() = None;
+        decided_here();
+        super::handed_over("39", "look up the tallest mountains in America");
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-yes-start-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status.clone()),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":40,"prepared_digest":"museum","revision":1}),
+                ),
+                ("request.sock", status),
+                (
+                    "voice.sock",
+                    json!({"ok":true,"id":40,"queued":true,"revision":2}),
+                ),
+            ],
+        );
+        let place = correcting(&directory, false);
+        let museum = "Look up the museum opening hours in Paris";
+        let call = |name: &str, args: Value| ToolCall {
+            id: "c".into(),
+            name: name.into(),
+            args,
+        };
+        let (told, _) = run(
+            &place,
+            &call(START, json!({"task": museum})),
+            3,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        HEARD_IN_TEST.with(|words| *words.borrow_mut() = Some("Yes.".to_owned()));
+        let (told, _) = run(
+            &place,
+            &call(START, json!({"task": museum})),
+            4,
+            true,
+            PEER_WAIT,
+        );
+        assert_eq!(told["handing_over"], json!(true), "{told}");
+        assert_eq!(told["work_id"], json!("40"), "{told}");
+        assert!(PENDING.lock().unwrap().is_none(), "nothing waits after it");
+        let ops: Vec<String> = std::iter::from_fn(|| seen.recv_timeout(PEER_WAIT).ok())
+            .take(4)
+            .map(|line| line["op"].as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(ops, ["status", "prepare", "status", "confirm"]);
+        assert_eq!(
+            decided_here()
+                .iter()
+                .map(|decided| decided.stage)
+                .collect::<Vec<_>>(),
+            [
+                Some(lamp_msgs::HandStage::Prepared),
+                Some(lamp_msgs::HandStage::Started)
+            ]
+        );
+        // The model's own confirm, or start, after it in that request.
+        let (told, _) = run(&place, &call(CONFIRM, json!({})), 4, true, PEER_WAIT);
+        assert_eq!(told["already_handed_over"], json!(true), "{told}");
+        let (told, _) = run(
+            &place,
+            &call(START, json!({"task": museum})),
+            4,
+            true,
+            PEER_WAIT,
+        );
+        assert_eq!(told["already_handed_over"], json!(true), "{told}");
+        HEARD_IN_TEST.with(|words| *words.borrow_mut() = None);
+        assert!(seen.try_recv().is_err(), "nothing more asked");
+        set_handed(None);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #8022 case 2 (V2 on #8043): a second, different start in a later
+    /// request while task 40 waits never drops 40 silently: it is
+    /// cancelled in the tasks part and said as declined, as a corrected
+    /// ask's is, even with no correcting switch and no new ask heard.
+    #[test]
+    fn a_different_start_while_a_task_waits_cancels_it_never_drops_it_silently() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _thread = crate::provider_worker::tests::one_thread();
+        *PENDING.lock().unwrap() = None;
+        decided_here();
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-second-start-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status.clone()),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":40,"prepared_digest":"museum","revision":1}),
+                ),
+                ("request.sock", status),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":41,"prepared_digest":"rome","revision":2}),
+                ),
+                ("request.sock", json!({"ok":true,"id":40,"revision":3})),
+            ],
+        );
+        let place = correcting(&directory, false);
+        let call = |task: &str| ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({ "task": task }),
+        };
+        let paris = call("Look up the museum opening hours in Paris");
+        let (told, _) = run(&place, &paris, 3, true, PEER_WAIT);
+        assert!(told["prepared"] == json!(true), "{told}");
+        let rome = call("Look up the museum opening hours in Rome");
+        let (told, _) = run(&place, &rome, 4, true, PEER_WAIT);
+        assert!(told["prepared"] == json!(true), "{told}");
+        assert_eq!(PENDING.lock().unwrap().as_ref().map(|p| p.id), Some(41));
+        let sent: Vec<Value> = std::iter::from_fn(|| seen.recv_timeout(PEER_WAIT).ok())
+            .take(5)
+            .collect();
+        assert_eq!(sent.len(), 5, "{sent:?}");
+        assert_eq!(sent[4]["op"], json!("cancel"), "{sent:?}");
+        assert_eq!(sent[4]["id"], json!(40), "{sent:?}");
+        assert!(
+            decided_here()
+                .iter()
+                .any(|decided| decided.stage == Some(lamp_msgs::HandStage::Declined)),
+            "task 40 is said as declined"
+        );
+        *PENDING.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
     }
 
