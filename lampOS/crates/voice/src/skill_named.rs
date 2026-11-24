@@ -497,7 +497,8 @@ const AFTER_CUE: &[char] = &[',', ':'];
 /// with `ask`: "pebble hello" in "whenever I say, pebble hello". Of the
 /// places a line holds it so, the shortest phrase that starts with `ask`
 /// is theirs ("pebble hello" in "when I say hi pebble hello, and also
-/// when I say pebble hello", #8451), else the first. None when no clause
+/// when I say pebble hello", #8451), of equal lengths the earliest, else
+/// the first. None when no clause
 /// holds it after such words ("say good morning" alone).
 pub fn said_whole(ask: &str, line: &str) -> Option<Vec<String>> {
     let phrase = lower_words(ask);
@@ -557,7 +558,8 @@ pub fn said_whole(ask: &str, line: &str) -> Option<Vec<String>> {
         .collect();
     // The shortest that starts with the ask is the person's own phrase
     // (#8451, the first builder's P3 on #8469): one place said with more
-    // before it ("hi pebble hello") never hides the ask said alone.
+    // before it ("hi pebble hello") never hides the ask said alone. Of
+    // equal lengths the earliest: `min_by_key` keeps the first.
     found
         .iter()
         .filter(|whole| whole.starts_with(&phrase))
