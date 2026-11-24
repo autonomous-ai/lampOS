@@ -80,6 +80,7 @@ pub struct Peer {
     pub cgroup: String,
 }
 
+#[cfg(target_os = "linux")]
 fn start_of(pid: i32) -> Result<u64, String> {
     std::fs::read_to_string(format!("/proc/{pid}/stat"))
         .ok()
