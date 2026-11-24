@@ -350,7 +350,7 @@ fn the_turn_after_a_result_offers_only_that_apps_tools() {
         // The same request's next round: narrowed too.
         assert_eq!(
             names(&declared(lamps(), 64, 1_100)),
-            ["gym_coach_set_plan", "gym_coach_get_progress"]
+            ["set_volume", "gym_coach_set_plan", "gym_coach_get_progress"]
         );
         let notes = owners_turn(2, 2_000);
         assert_eq!(notes.len(), 2, "{notes:?}");
@@ -358,7 +358,7 @@ fn the_turn_after_a_result_offers_only_that_apps_tools() {
         assert!(notes[1].starts_with("The app Gym bCoach/b just answered a call."));
         assert_eq!(
             names(&declared(lamps(), 64, 2_000)),
-            ["gym_coach_set_plan", "gym_coach_get_progress"]
+            ["set_volume", "gym_coach_set_plan", "gym_coach_get_progress"]
         );
         // Another app's tool, called anyway: refused, nothing sent.
         assert_eq!(
@@ -388,6 +388,31 @@ fn the_turn_after_a_result_offers_only_that_apps_tools() {
             names(&declared(lamps(), 64, 1_000 + NARROWED_FOR_MS)).len(),
             4
         );
+    });
+}
+
+/// App Only's P1 on #8386 (the first builder's ruling, 24 Nov 09:27): the
+/// turn after an app's result keeps the lamp's own functions, so "set a
+/// timer" after a workout's answer still sets a timer; only the other apps'
+/// tools and `use_skill` are left out, and the note says so. The lamp's own
+/// is still the lamp's: never routed to the app.
+#[test]
+fn the_turn_after_a_result_keeps_the_lamps_own_functions() {
+    alone(vec![coach(), lessons(20)], |fake| {
+        owners_turn(1, 1_000);
+        *fake.answer.lock().unwrap() = Ok(json!({"ok": true}));
+        answer(1, "gym_coach_get_progress", &json!({}), false, 1_000);
+        let notes = owners_turn(2, 2_000);
+        assert!(notes[1].contains("beside the lamp's own"), "{}", notes[1]);
+        let offered = names(&declared(lamps(), 64, 2_000));
+        assert!(offered.contains(&"set_volume".to_owned()), "{offered:?}");
+        assert!(!offered.contains(&"use_skill".to_owned()), "{offered:?}");
+        assert!(
+            !offered.contains(&"english_lessons_next_word".to_owned()),
+            "{offered:?}"
+        );
+        assert!(!is_app_function("set_volume"));
+        assert!(is_app_function("gym_coach_set_plan"));
     });
 }
 

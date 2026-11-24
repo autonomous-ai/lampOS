@@ -439,6 +439,10 @@ fn current() -> (Vec<Offered>, Vec<String>) {
     offered(&apps.running(), &subsets)
 }
 
+/// The lamp's own functions a narrowed turn leaves out: a skill, which
+/// would answer for the app.
+const NARROWED_DROPS: [&str; 1] = ["use_skill"];
+
 /// The narrowed app now, if the turn is the one after its result.
 fn narrowed_now(now_ms: u64) -> Option<String> {
     with_state(|state| {
@@ -471,13 +475,17 @@ pub fn declared(
     if offered.is_empty() {
         return declared;
     }
-    // The lamp's own names, before a narrowed turn clears them: an app's
-    // function by one of them is never declared or routed, narrowed or not.
+    // The lamp's own names: an app's function by one of them is never
+    // declared or routed, narrowed or not.
     let lamps: Vec<String> = declared.iter().map(|tool| tool.name.clone()).collect();
     let narrowed = narrowed_now(now_ms);
     let offered: Vec<Offered> = match &narrowed {
+        // The turn after an app's result keeps the lamp's own functions
+        // ("set a timer" after a workout's answer sets a timer: App Only's
+        // P1 on #8386, the first builder's ruling at 09:27) and drops only
+        // the other apps' tools and the skills ([`NARROWED_DROPS`]).
         Some(app) => {
-            declared.clear();
+            declared.retain(|tool| !NARROWED_DROPS.contains(&tool.name.as_str()));
             offered.into_iter().filter(|one| &one.app == app).collect()
         }
         None => offered,
@@ -564,7 +572,7 @@ pub fn notes_for(
     let mut notes: Vec<String> = section(&offered).into_iter().collect();
     if let (Some(_), Some(first)) = (&narrowed, offered.first()) {
         notes.push(format!(
-            "The app {} just answered a call. On this turn, only its functions are offered: call one of them, or answer the person plainly.",
+            "The app {} just answered a call. On this turn, of the apps only its functions are offered, beside the lamp's own: call one of them, or answer the person plainly.",
             first.title
         ));
     }
