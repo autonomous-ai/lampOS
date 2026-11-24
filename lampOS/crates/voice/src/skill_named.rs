@@ -476,12 +476,19 @@ const CLAUSE_ENDS: &[char] = &[',', '.', ';', ':', '!', '?'];
 /// skill says ("a skill that says good morning", Thirteen's P2 on #8469).
 const SAY_CUES: &[&str] = &["say", "said", "hear", "heard"];
 
+/// The words one of [`SAY_CUES`] counts only right after: "whenever I say",
+/// "when you hear", "I said". An order to the skill ("when I wake up, say
+/// good morning") names what it says, never its start (Thirteen's P2 on
+/// #8469, at 77700b81fb).
+const CUE_SAYERS: &[&str] = &["i", "you"];
+
 /// The person's whole phrase in `line` that holds `ask` as words in a row
 /// ([`said_in`]), lowercased (#8451, the first builder's required change
-/// on #8469): the words after the last of [`SAY_CUES`] before it, to the
-/// end of its clause ([`CLAUSE_ENDS`]): "hello there pebble" for "hello
-/// there" in "whenever I say hello there pebble, email me". None when no
-/// clause holds it after such a word.
+/// on #8469): the words after the last of [`SAY_CUES`] before it with
+/// "I" or "you" right before that ([`CUE_SAYERS`]), to the end of its
+/// clause ([`CLAUSE_ENDS`]): "hello there pebble" for "hello there" in
+/// "whenever I say hello there pebble, email me". None when no clause
+/// holds it after such words ("say good morning" alone).
 pub fn said_whole(ask: &str, line: &str) -> Option<Vec<String>> {
     let phrase = lower_words(ask);
     if phrase.is_empty() {
@@ -492,9 +499,9 @@ pub fn said_whole(ask: &str, line: &str) -> Option<Vec<String>> {
         let at = words
             .windows(phrase.len())
             .position(|window| window == phrase.as_slice())?;
-        let cue = words[..at]
-            .iter()
-            .rposition(|word| SAY_CUES.contains(&word.as_str()))?;
+        let cue = (1..at).rev().find(|&cue| {
+            SAY_CUES.contains(&words[cue].as_str()) && CUE_SAYERS.contains(&words[cue - 1].as_str())
+        })?;
         Some(words[cue + 1..].to_vec())
     })
 }
@@ -1388,6 +1395,17 @@ mod tests {
         let morning = "make a skill that says good morning and plays jazz when I wake up";
         assert_eq!(said_whole("good morning", morning), None);
         assert_eq!(said_whole("good morning", "one saying good morning"), None);
+        // Thirteen's P2 at 77700b81fb: a cue counts only after "I" or
+        // "you"; an order to say something names no start.
+        assert_eq!(said_whole("good morning", "say good morning"), None);
+        assert_eq!(
+            said_whole("good morning", "when I wake up, say good morning"),
+            None
+        );
+        assert_eq!(
+            said_whole("pebble chime", "when you hear pebble chime"),
+            Some(vec!["pebble".to_owned(), "chime".to_owned()])
+        );
         assert_eq!(
             said_whole(
                 "pebble night",

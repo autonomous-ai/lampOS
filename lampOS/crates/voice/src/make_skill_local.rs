@@ -10701,6 +10701,124 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// Thirteen's P2 at 77700b81fb: a say or a hear counts as naming a
+    /// start only after "I" or "you". An order to the skill ("say good
+    /// morning") names what it says, so a refused ask there is the writer's
+    /// and spends the ordinary repair; "whenever I say good morning" is
+    /// still told plainly at once.
+    #[test]
+    fn an_order_to_say_names_no_start_and_spends_a_repair() {
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        for (name, line, ask) in [
+            (
+                "asks-order-morning",
+                "when I wake up, say good morning",
+                "good morning",
+            ),
+            (
+                "asks-order-night",
+                "every night at ten, say good night and dim the light",
+                "good night",
+            ),
+        ] {
+            let refused = keep_refused(name, ask, line);
+            assert!(!made_skill::their_ask(&refused.0), "{line}: {refused:?}");
+            assert_eq!(
+                refused.0,
+                format!(
+                    "its asks weren't kept: asks = [\"{ask}\"]: \"{ask}\": {}",
+                    crate::skill_named::REFUSED_LAMPS_OWN
+                ),
+                "{line}"
+            );
+            assert!(refused.1.is_some(), "repaired: {line}");
+        }
+        let refused = keep_refused(
+            "asks-said-morning",
+            "good morning",
+            "whenever I say good morning",
+        );
+        assert!(made_skill::their_ask(&refused.0), "{refused:?}");
+        assert!(
+            refused.0.contains(
+                "‘good morning’, because those are my own words for something I do myself."
+            ),
+            "{refused:?}"
+        );
+        assert!(refused.1.is_none(), "no repair: {refused:?}");
+        made_skill::set_asks_here(None);
+        made_skill::set_writes_here(None);
+    }
+
+    /// Thirteen's P3 at 77700b81fb: an ask inside the person's phrase that
+    /// doesn't start it ("night please" in "whenever I say movie night
+    /// please") keeps the two-word floor.
+    #[test]
+    fn a_part_inside_the_persons_phrase_keeps_the_two_word_floor() {
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        let refused = keep_refused(
+            "asks-inside-floor",
+            "night please",
+            "whenever I say movie night please",
+        );
+        assert_eq!(
+            refused.0,
+            "its asks weren't kept: asks = [\"night please\"]: \"night please\": only 1 word of its \
+             own, \"night\""
+        );
+        assert!(refused.1.is_some(), "repaired");
+        made_skill::set_asks_here(None);
+        made_skill::set_writes_here(None);
+    }
+
+    /// Thirteen's P3 at 77700b81fb: a refused ask inside a phrase of the
+    /// person's too long to be an ask (9 words) is neither told plainly nor
+    /// named in a repair as their phrase: the ordinary repair.
+    #[test]
+    fn a_refused_ask_in_a_phrase_too_long_for_an_ask_spends_the_ordinary_repair() {
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        let refused = keep_refused(
+            "asks-too-long",
+            "good morning",
+            "whenever I say good morning to my little desk lamp friend pebble, email me",
+        );
+        assert!(!made_skill::their_ask(&refused.0), "{refused:?}");
+        assert_eq!(
+            refused.0,
+            format!(
+                "its asks weren't kept: asks = [\"good morning\"]: \"good morning\": {}",
+                crate::skill_named::REFUSED_LAMPS_OWN
+            )
+        );
+        let repair = refused.1.as_deref().expect("repaired");
+        assert!(!repair.contains("use the words they said"), "{repair}");
+        made_skill::set_asks_here(None);
+        made_skill::set_writes_here(None);
+    }
+
+    /// [`made_skill::keep_asked`]'s refusal of the test-note skill started
+    /// by `ask`, made for `line`, in a fresh folder named `name` (#8451).
+    fn keep_refused(name: &str, ask: &str, line: &str) -> Refused {
+        let (root, keeping) = keeping(name);
+        let refused = made_skill::keep_asked(
+            &write_answer(&asks_mail_toml(ask)),
+            false,
+            FROM,
+            &keeping,
+            &made_skill::Asked {
+                request: line,
+                heard: Some(line),
+                ..made_skill::Asked::default()
+            },
+        )
+        .unwrap_err();
+        let _ = std::fs::remove_dir_all(&root);
+        refused
+    }
+
     /// A made skill sending the test note, started by `asks` (#8451).
     fn asks_mail_toml(asks: &str) -> String {
         format!(
