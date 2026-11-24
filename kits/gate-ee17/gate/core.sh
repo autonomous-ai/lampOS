@@ -11,8 +11,10 @@
 set -u; D=$(cd "$(dirname "$0")" && pwd); . $D/kit.sh
 LG=$D/logs; ROWS=${ROWS:-TIME TASK MAKE}
 POLL=${POLL:-1}; HEARWAIT=${HEARWAIT:-60}; ANSWERWAIT=${ANSWERWAIT:-60}; TASKWAIT=${TASKWAIT:-300}; MAKEWAIT=${MAKEWAIT:-660}
-TASK_HANDED_RE=${TASK_HANDED_RE:-"handed to the lamp's agent|skill task [^ ]+: started on the lamp's default agent|the heard words named [^ ]+ for the work"}
-SKILLSTART_RE=${SKILLSTART_RE:-"\\[lamp-tasks\\] skill start: run [^ ]+'s script started"}
+TASK_HANDED_RE=${TASK_HANDED_RE:-"openclaw gateway: task [^ ]+ handed over as |handed to the lamp's agent|skill task [^ ]+: started on the lamp's default agent|the heard words named [^ ]+ for the work"}
+# What reaches the lamp from the handed work: a skill-start run on the lamp, or its news told back on the lamp
+# (lamp-voice "telling news from the work handed over", ee17 13:19: a lookup needs no lamp run).
+SKILLSTART_RE=${SKILLSTART_RE:-"\\[lamp-tasks\\] skill start: run [^ ]+'s script started|telling news from the work handed over"}
 HEARD="lamp-voice.*request [0-9]+"
 PROPOSED=${PROPOSED:-"asked for start_agent_task; the tasks part answered"}
 PIECES="[0-9]+ of [0-9]+ pieces began"
@@ -48,10 +50,10 @@ rowTASK(){ local n0 h p k s r; BEGIN TASK || return 1; quiet; n0=$(lines); PLAY 
   p=$(waitfor "$PROPOSED" $n0 $HEARWAIT) || { END; echo "ROW TASK FAIL heard, no task proposed in $HEARWAIT s"; Q $h; return 0; }
   quiet; PLAY YES || { END; echo "ROW TASK FAIL the yes was not played"; Q $h; Q $p; return 0; }
   k=$(waitfor "$TASK_HANDED_RE" $p $TASKWAIT) || { END; echo "ROW TASK FAIL proposed and yes said, not handed to OpenClaw in $TASKWAIT s"; Q $h; Q $p; return 0; }
-  s=$(waitfor "$SKILLSTART_RE" $k $TASKWAIT) || { END; echo "ROW TASK FAIL handed, but no skill-start run reached the lamp in $TASKWAIT s"; Q $h; Q $k; return 0; }
+  s=$(waitfor "$SKILLSTART_RE" $k $TASKWAIT) || { END; echo "ROW TASK FAIL handed, but nothing of it reached the lamp (no skill-start run, no news told) in $TASKWAIT s"; Q $h; Q $k; return 0; }
   END; r=$(tail -n +$(( n0 + 1 )) $J | grep -nE "$REFUSE" | head -1 | cut -d: -f1)
   [ -n "$r" ] && { echo "ROW TASK FAIL a refusal in the task"; Q $h; Q $k; Q $s; Q $(( r + n0 )); return 0; }
-  VK=PASS; echo "ROW TASK PASS handed to OpenClaw, and its skill-start run reached the lamp"; Q $h; Q $k; Q $s
+  VK=PASS; echo "ROW TASK PASS handed to OpenClaw, and its work reached the lamp"; Q $h; Q $k; Q $s
   tail -n +$(( s + 1 )) $J | grep -E "lamp-control: run [^ ]+ of skill [^ ]+: (a token for|ended)" | head -2 | cut -c1-240 | sed 's/^/  QUOTE /'; }
 rowMAKE(){ local n0 h w at rb o nm; BEGIN MAKE || return 1; quiet; n0=$(lines); PLAY MAKE || { END; echo "ROW MAKE FAIL the clip was not played"; return 0; }
   h=$(waitfor "$HEARD" $n0 $HEARWAIT) || { END; echo "ROW MAKE FAIL the ask was not heard in $HEARWAIT s"; return 0; }
