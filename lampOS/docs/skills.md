@@ -8687,8 +8687,9 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    the line holds the ask after such a cue, the shortest phrase that
    starts with the ask is theirs (#8451, the first builder's P3 on
    #8469): "pebble hello" in "make a skill that waves when I say hi pebble
-   hello, and also when I say pebble hello", never "hi pebble hello"; with
-   none that starts with it, the first found (test
+   hello, and also when I say pebble hello", never "hi pebble hello"; of
+   equal lengths, the earliest place; with none that starts with it, the
+   first found (test
    `the_persons_own_phrase_is_the_shortest_that_starts_with_the_ask`).
    With no heard line (`made_skill`'s `line = request.heard.unwrap_or(request.request)`),
    their line is the model's `request` for the make, so a paraphrase
