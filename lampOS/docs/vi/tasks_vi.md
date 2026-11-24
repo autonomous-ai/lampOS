@@ -3359,7 +3359,10 @@ Phiên nói thẳng của Hermes chỉ nhận việc khi Hermes là engine mặc
 chọn trong app có hiệu lực ngay), vì lamp-update chỉ chạy gateway của Hermes
 khi đó. Trên đèn có mặc định là OpenClaw, việc gọi tên Hermes ("Hỏi Hermes
 ...", `LAMP_TASKS_NAMED_ONLY`) vẫn đi đường Harness và tiến độ của Harness như
-trước công tắc này, không chờ một gateway không bao giờ khởi động.
+trước công tắc này, không chờ một gateway không bao giờ khởi động. Một việc giữ
+đường nó đã bắt đầu: lượt Hermes nói thẳng còn đang chạy khi mặc định trong app
+đổi sang OpenClaw vẫn đọc từ lượt chạy của nó (`Direct::path` tính các lượt của
+chính nó bất kể mặc định), không hỏi Harness, nơi chưa từng có nó.
 
 Hermes nói thẳng hoạt động giống hệt OpenClaw nói thẳng (tiêu chí nghiệm thu
 của chủ sở hữu, 23/11): việc của đèn chạy, và "tới đâu rồi?" cùng các dòng

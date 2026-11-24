@@ -431,10 +431,9 @@ impl Tracker {
         // gateway run (`direct::Direct::refresh`), never by Harness's `ps`:
         // it makes no machine due. Another engine and the switch off: as
         // before.
-        for task in watched
-            .iter()
-            .filter(|task| !crate::direct::lamp_path(&task.engine, &task.machine_id))
-        {
+        for task in watched.iter().filter(|task| {
+            !crate::direct::lamp_path(&task.engine, &task.machine_id, &task.agent_id)
+        }) {
             let entry = machines
                 .entry(task.machine_id.as_str())
                 .or_insert((false, false));

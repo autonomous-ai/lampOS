@@ -612,10 +612,13 @@ impl Direct {
         self.lock().resets
     }
 
-    /// [`lamp_path`] for this session.
-    fn path(&self, engine: &str, machine: &str) -> bool {
+    /// [`lamp_path`] for this session: a task of its engine on the lamp's
+    /// machine while it serves ([`serves_now`]), or one of its own turns
+    /// whatever the default now, so a task keeps the path it started on
+    /// when the app's default changes under it.
+    fn path(&self, engine: &str, machine: &str, agent: &str) -> bool {
         engine == self.engine.bus_name()
-            && serves_now(self.engine)
+            && (serves_now(self.engine) || self.owns(agent))
             && self.lamp_machine().as_deref() == Some(machine)
     }
 
@@ -1338,7 +1341,10 @@ impl Direct {
         // would have: it is never asked of Harness ([`lamp_path`]).
         let ours: Vec<Watched> = watched
             .iter()
-            .filter(|task| self.owns(&task.agent_id) || self.path(&task.engine, &task.machine_id))
+            .filter(|task| {
+                self.owns(&task.agent_id)
+                    || self.path(&task.engine, &task.machine_id, &task.agent_id)
+            })
             .cloned()
             .collect();
         if ours.is_empty() {
@@ -1623,13 +1629,15 @@ pub(crate) fn set_test_lamp(direct: Option<Arc<Direct>>) {
 }
 
 /// Whether a task of `engine` (its bus name, `openclaw`, `hermes`) on
-/// `machine` is the direct path's: that engine's switch on, the lamp's own
-/// machine. Its progress and looks come from the gateway only, never from
+/// `machine`, agent `agent`, is the direct path's: that engine's switch on,
+/// the lamp's own machine, and the session serving now or the turn its own. Its progress and looks come from the gateway only, never from
 /// Harness's `ps` or `show` (each ~2 s on the lamp, on the one worker a
 /// hand-over waits behind). Other engines, other machines and the switch
 /// off: `false`.
-pub fn lamp_path(engine: &str, machine: &str) -> bool {
-    lamps().iter().any(|direct| direct.path(engine, machine))
+pub fn lamp_path(engine: &str, machine: &str, agent: &str) -> bool {
+    lamps()
+        .iter()
+        .any(|direct| direct.path(engine, machine, agent))
 }
 
 /// A direct-path task's look ([`lamp_path`]) in place of Harness's `show`:
@@ -1643,7 +1651,7 @@ pub fn lamp_observe(
 ) -> Option<Result<Observation, String>> {
     let direct = lamps()
         .into_iter()
-        .find(|direct| direct.path(engine, machine))?;
+        .find(|direct| direct.path(engine, machine, agent))?;
     Some(
         direct
             .observe(agent)
@@ -1657,7 +1665,7 @@ pub fn lamp_observe(
 pub fn harness_watched(watched: &[Watched]) -> Vec<Watched> {
     watched
         .iter()
-        .filter(|task| !lamp_path(&task.engine, &task.machine_id))
+        .filter(|task| !lamp_path(&task.engine, &task.machine_id, &task.agent_id))
         .cloned()
         .collect()
 }
