@@ -1,3 +1,15 @@
+## 25 November 2026, 00:08 +07: exit-note repair offered; primary hold taken
+
+Second offered #8542 for #8413 at `56b4870b2`, on `798ae9dd41`. The recorder now sets its promised public modes independently of Voice's 0077 umask, repairs eligible earlier notes on the same unit's next stop (including success), and prevents Cloud's per-unit watermark from passing an unreadable earlier note during repair. Private reporting files remain 0600 and consent is unchanged.
+
+- Native gate: `cargo fmt --all --check`, `cargo clippy -q -p lamp-cloud --all-targets -- -D warnings`, five focused regressions, `cargo test -q -p lamp-cloud -- --test-threads=1` (572 passed, five ignored), and `cargo build -q --workspace --keep-going` pass. The first sandboxed full run failed because local test sockets could not bind; the permitted rerun passes. The docs checker passes nine tests / 200 top-level documents / 2,260 links; the Vietnamese companion's backlink/anchor was checked separately because the checker scans top-level docs only. Initial docs tooling lacked its pinned node_modules; the copied matching dependencies fixed that check.
+- Failure-first evidence: the original writer under a separate child's 0077 umask leaves the directory 0700 instead of 0755; removing the watermark barrier admits a newer note while an earlier note is unreadable. The temporary control was restored exactly. Initial positive-test mistakes used SEGV instead of canonical SIGSEGV and checked an unwritten choice file; assertions were corrected to the real queue path and wire value.
+- Isolated host recorder timing: first 19.315 ms; 200 repeats across 45 units retaining 8 notes each give p50 12.781 ms, p95 16.957 ms, max 19.735 ms, within 50 ms p95. Boundary: local directory/legacy readability, serialization, write/chmod/sync/rename/prune; excludes systemctl, 10 s poll, MQTT and device latency.
+- Backend3 confirms the original incident file was never saved and is gone (issue #8413 comment 7138253681). The tracked October 21 format and real writer under 0077 replace it for host regression, not incident attribution. Actual root-to-lampos access, systemd execution and broker acknowledgement remain owed. Two reads and Linux CI are requested; no row or device claim.
+- #8538 at 7f06dc4b36 now has all required Linux CI green (ARM64 run 45435400514), with First builder+Heron reads. Its played row remains required before train. A local Play-only rebase to 7b9b31f8e8 preserves the tested Voice tree; refreshed native gates are running before updating that PR. #8533 still owes its Wi-Fi row before train; #8539 awaits reads/remaining CI and its row.
+
+Next: #7943 taken in the first builder's order. Current source acts only on release in a 5–15 s window, cancels beyond 15 s, and has no held 10 s action. Investigating shared shutdown/update refusal, shorter gestures and one-build-apart event compatibility before implementation. No lamp access.
+
 ## 24 November 2026, 23:42 +07: three repairs offered; exit-report fix taken
 
 Second has offered Wi-Fi country #8533, camera-aware character #8538 and provider-state transfer #8539. Their unplayed lamp rows remain owed.
