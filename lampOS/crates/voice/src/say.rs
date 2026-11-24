@@ -698,7 +698,7 @@ pub struct LineMeta {
     pub voice: Option<String>,
     /// The installed app whose exact `text` it is, as lamp-control's app
     /// socket named it (`app`, `app_name`): its line, once played whole, is
-    /// told to the model (`LAMP_APP_MEMORY`, [`crate::app_context::said`]).
+    /// told to the model (`LAMP_APP_MEMORY`, [`crate::app_context::played`]).
     /// Boxed: most lines have none, and every ticket carries the field.
     pub app: Option<Box<(lamp_msgs::app_fact::Source, String)>>,
 }
@@ -1717,21 +1717,16 @@ impl Ticket {
         }
     }
 
-    /// Answer it. An app's exact line answered `spoken`, played whole, is
-    /// kept for the model's next turns (`LAMP_APP_MEMORY`,
-    /// [`crate::app_context::said`]).
+    /// Answer it. An app's exact line answered `spoken`, played whole, goes
+    /// to the second-route worker on `apps/said`, which tells it to the
+    /// model's next turns (`LAMP_APP_MEMORY`, [`crate::app_context::played`],
+    /// #8422); one cut short goes nowhere.
     pub fn answer(mut self, outcome: Outcome) {
         if matches!(outcome, Outcome::Spoken)
             && let (Some((source, name)), Some(words)) =
                 (self.line.app.as_deref(), self.said.as_deref())
         {
-            crate::app_context::said(
-                source.clone(),
-                name,
-                words,
-                crate::app_context::now_ms(),
-                crate::app_context::private_now(),
-            );
+            crate::app_context::played(source, name, words);
         }
         if let Some(answer) = self.answer.take() {
             let _ = answer.send(Answer::Done(outcome));
@@ -1751,6 +1746,19 @@ impl Drop for Ticket {
 #[cfg(test)]
 pub(crate) fn ticket_for_test(skill: &str) -> (Ticket, mpsc::Receiver<Answer>) {
     Ticket::own(skill)
+}
+
+/// A ticket of an installed app's exact line, `words` from Gym Coach, as
+/// lamp-control's app socket names it (#8386, #8422).
+#[cfg(test)]
+pub(crate) fn app_ticket_for_test(words: &str) -> Ticket {
+    let (mut ticket, _answered) = Ticket::own(TURN_SKILL);
+    ticket.said = Some(words.into());
+    ticket.line.app = Some(Box::new((
+        lamp_msgs::app_fact::Source::parse("app:gym-coach").unwrap(),
+        "Gym Coach".into(),
+    )));
+    ticket
 }
 
 /// A ticket of a skill's say nobody asked for ([`Ticket::unasked`]), for a
@@ -6773,48 +6781,63 @@ mod tests {
         }
     }
 
-    /// #8386's stopgap: an app's exact line answered `spoken` is kept for
-    /// the model's next turns; one dropped, or a computer's line with no
-    /// app, is not.
+    /// #8386's stopgap, across the process boundary (#8422): an app's exact
+    /// line answered `spoken` goes to the worker on `apps/said` and nothing
+    /// is kept in this process; one dropped (cut short), a computer's line
+    /// with no app, or any with `LAMP_APP_MEMORY` off is not published.
     #[test]
-    fn an_apps_line_played_whole_is_kept_for_the_model() {
+    fn an_apps_line_played_whole_is_published_for_the_worker() {
         let _serial = crate::app_context::SERIAL
             .lock()
             .unwrap_or_else(|e| e.into_inner());
+        let root = std::path::PathBuf::from(format!("/tmp/lvsay-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut worker = bus
+            .subscribe(lamp_msgs::app_fact::AppSaid::TOPIC, "test")
+            .unwrap();
+        crate::app_context::set_out_for_test(Some(root.clone()));
         crate::app_context::set_on_for_test(true);
         crate::app_context::set_private(false);
         crate::app_context::clear_all();
-        let coach = || {
-            let (mut ticket, answered) = Ticket::own(TURN_SKILL);
-            ticket.said = Some("Trained before?".into());
-            ticket.line.app = Some(Box::new((
-                lamp_msgs::app_fact::Source::parse("app:gym-coach").unwrap(),
-                "Gym Coach".into(),
-            )));
-            (ticket, answered)
+        let heard = |worker: &mut lamp_bus::Subscriber| {
+            let mut heard = Vec::new();
+            while let Ok(Some(message)) = worker.recv(std::time::Duration::from_millis(300)) {
+                heard.push(message.parse::<lamp_msgs::app_fact::AppSaid>().unwrap());
+            }
+            heard
         };
         let now = crate::app_context::now_ms();
-        let (ticket, _answered) = coach();
-        ticket.answer(Outcome::Dropped("cut".into()));
-        assert!(
-            crate::app_context::notes(now, false).is_empty(),
-            "dropped: not kept"
-        );
+        app_ticket_for_test("Trained before?").answer(Outcome::Dropped("cut".into()));
         let (mut ticket, _answered) = Ticket::own(TURN_SKILL);
         ticket.said = Some("Build passed.".into());
         ticket.answer(Outcome::Spoken);
-        assert!(
-            crate::app_context::notes(now, false).is_empty(),
-            "no app: not kept"
-        );
-        let (ticket, _answered) = coach();
-        ticket.answer(Outcome::Spoken);
-        let told = crate::app_context::notes(now, false);
+        assert!(heard(&mut worker).is_empty(), "cut, or no app: not sent");
+        app_ticket_for_test("Trained before?").answer(Outcome::Spoken);
+        let sent = heard(&mut worker);
+        let kept_here = crate::app_context::notes(now, false);
+        crate::app_context::set_on_for_test(false);
+        app_ticket_for_test("Trained before?").answer(Outcome::Spoken);
+        let off = heard(&mut worker);
+        crate::app_context::set_out_for_test(None);
+        crate::app_context::set_on_for_test(true);
         crate::app_context::clear_all();
         crate::app_context::set_private(true);
         crate::app_context::set_on_for_test(false);
-        assert_eq!(told.len(), 1, "{told:?}");
-        assert!(told[0].ends_with("\"Trained before?\""), "{told:?}");
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(
+            sent,
+            [lamp_msgs::app_fact::AppSaid {
+                app: "gym-coach".into(),
+                name: "Gym Coach".into(),
+                words: "Trained before?".into(),
+            }]
+        );
+        assert!(
+            kept_here.is_empty(),
+            "the parent keeps nothing: {kept_here:?}"
+        );
+        assert!(off.is_empty(), "switch off: nothing published");
     }
 
     /// A long exact line of three sentences, each a piece of its own

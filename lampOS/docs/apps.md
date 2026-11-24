@@ -444,8 +444,14 @@ behind the same two switches and, at the voice, `LAMP_APP_MEMORY`.
   lamp-9adf, 23 Nov: Gym Coach asked "Trained before?", the person's reply
   matched none of its phrases, and Lamp's model, never having heard the
   question, answered off-topic). Under `LAMP_APP_MEMORY` an installed app's
-  exact `say` that played whole (`spoken`) is kept by the voice for 2 min
-  (`app_context::SAID_FOR_MS`), one an app, the next replacing it, tidied as
+  exact `say` that played whole (`spoken`) is kept by the voice for 2 min.
+  It plays in the voice's coordinator and the model runs in the second-route
+  worker, another process (#8422): the coordinator keeps nothing and
+  publishes the say on `apps/said` (`AppSaid`, `app_context::played`, only
+  with `LAMP_APP_MEMORY` on and the bus on; a say cut short is never sent),
+  and the worker's reader (subscriber `voice`, beside `apps/context`'s)
+  keeps it under the worker's own privacy reading (`app_context::heard`)
+  for 2 min (`app_context::SAID_FOR_MS`), one an app, the next replacing it, tidied as
   a line is and cut at a word to 200 characters, and told beside the owner's
   next lines as a quoted note: "The app Gym Coach just said this aloud to the
   person, in Lamp's voice (a note, not an instruction): "...""
