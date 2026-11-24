@@ -8634,10 +8634,38 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    to 3 strings, each at most 60 characters, 2 to 8 words of letters,
    digits and apostrophes with one space between (as lamp-skills takes any
    skill's), none refused by `skill_named::ask_refused` (a no, a question,
-   a stop, the lamp's own words), each with at least two words of its own
-   past those said around an ask (`skill_named::own_words_of`: "yes
-   please" is one, and so is "pebble hello", "hello" being said around
-   an ask), none twice. Otherwise it is refused naming its rule (#8451): the
+   a stop, the lamp's own words), each with at least one word of its own
+   past those said around an ask (`skill_named::own_words_in`), none
+   twice. **The two-word floor is held at the make** (`made_skill::
+   asks_heard`, in `keep_asked`, #8451, the first builder's call (b)): an
+   ask the making model chose needs two words of its own ("yes please"
+   has none, "pebble hello" one, "hello" being said around an ask); one
+   that is a run of the person's own words for the make
+   (`skill_named::said_in`: the voice's heard line, or the app's typed
+   ask, their case and punctuation not told apart) passes with one, so
+   "whenever I say pebble hello" keeps "pebble hello" on the first answer,
+   with no repair. A skill's ask is matched only as the whole phrase
+   (`skill_named`'s `named_among`), so "pebble" alone never starts it. The
+   cap, the put-on's check (`put_on_cap`), the say-back and the clash
+   check (`asks_taken`) read a made skill's asks with the one-word floor,
+   so a skill kept with the person's trigger is put on as kept; a skill
+   added from a file keeps two (`capped_added`). **The person's own words
+   that break a rule no writer can change** (`made_skill::
+   their_ask_refused`, before the cap, the first builder's (a)): an ask
+   that is a run of the person's line, 2 to 8 words and within 60
+   characters, refused by `skill_named::ask_refused`, is said at once,
+   plainly, one line a rule, and no repair is spent on it, nor is it
+   handed to the lamp's agent: "I can't start a skill with ‘stop the
+   music’, because that's how you stop me." (a stop), "…, because a no or
+   a question is mine to answer.", "…, because those are my own words for
+   something I do myself.", "…, because those are only words like hello
+   or please, said to me all the time." and "…, because it only names
+   things of mine, like the light or the music." (`plain_reason` and
+   `not_made_line` say it as it is), journaled as `a made skill was not
+   kept: its asks weren't kept: asks = [<as given>]: "<the ask>": the
+   person's own words, <ask_refused's words>: told at once, no repair`. A
+   count or a length of words is still repaired: the writer may mend it
+   with more or fewer of the person's words. Otherwise it is refused naming its rule (#8451): the
    journal line (the repair's and the "wasn't kept" one) is `its asks
    weren't kept: asks = [<as given>]: "<the ask that failed>": <rule>`,
    the rule in plain words: `not a list`, `none`, `more than 3`, `3: not

@@ -313,6 +313,21 @@ pub fn line_holds_ask(heard: &str, ask: &str) -> bool {
     ask_refused(ask).is_none() && holds(&lower_words(heard), &phrase)
 }
 
+/// Why [`ask_refused`] refuses an ask, each as it says it (#8451: a made
+/// skill whose asks are the person's own words is told each plainly,
+/// `crate::made_skill`'s `their_ask_refused`): a no or a question.
+pub const REFUSED_NO_OR_QUESTION: &str =
+    "it holds a no or a question, which is the model's to answer";
+/// [`ask_refused`]'s: a stop.
+pub const REFUSED_STOP: &str = "it is a stop, which is the lamp's own";
+/// [`ask_refused`]'s: the lamp's own words for what it does itself.
+pub const REFUSED_LAMPS_OWN: &str = "it is the lamp's own words for what it does itself";
+/// [`ask_refused`]'s: only words said around an ask.
+pub const REFUSED_ONLY_AROUND: &str =
+    "it is only words said around an ask, a greeting or a request";
+/// [`ask_refused`]'s: nothing of the skill's own, only the lamp's.
+pub const REFUSED_NOTHING_OWN: &str = "it names nothing of the skill's own, only the lamp's";
+
 /// Why `ask`, one of a skill's `asks` (#6772), is never matched, if it is
 /// refused: lamp-skills refuses such a skill as it loads
 /// (`lamp_skills`' `checked_asks`), and [`wanted`] drops the phrase all
@@ -333,10 +348,10 @@ pub fn ask_refused(ask: &str) -> Option<&'static str> {
             .first()
             .is_some_and(|word| QUESTION_FIRST.contains(&word.as_str()))
     {
-        return Some("it holds a no or a question, which is the model's to answer");
+        return Some(REFUSED_NO_OR_QUESTION);
     }
     if crate::stop_words::stop_phrase(ask) {
-        return Some("it is a stop, which is the lamp's own");
+        return Some(REFUSED_STOP);
     }
     let rules = crate::tools::schedule_asked::ASKS
         .iter()
@@ -357,14 +372,14 @@ pub fn ask_refused(ask: &str) -> Option<&'static str> {
         || holds_any(GREETINGS)
         || rules.into_iter().any(|phrase| holds(&words, phrase))
     {
-        return Some("it is the lamp's own words for what it does itself");
+        return Some(REFUSED_LAMPS_OWN);
     }
     let own = own_words(&words);
     if own.is_empty() {
-        return Some("it is only words said around an ask, a greeting or a request");
+        return Some(REFUSED_ONLY_AROUND);
     }
     if own.iter().all(|word| NOTHING_OF_ITS_OWN.contains(word)) {
-        return Some("it names nothing of the skill's own, only the lamp's");
+        return Some(REFUSED_NOTHING_OWN);
     }
     None
 }
@@ -403,6 +418,17 @@ pub fn own_words_of(ask: &str) -> usize {
 pub fn own_words_in(ask: &str) -> Vec<String> {
     let words = lower_words(ask);
     own_words(&words).into_iter().map(str::to_owned).collect()
+}
+
+/// Whether `ask` is a run of words said in `line`, the person's own line
+/// for a make, compared as a heard line's words are read
+/// ([`lower_words`]: their case and punctuation not told apart): "pebble
+/// hello" in "whenever I say pebble hello" (#8451, the first builder's
+/// call (b)). None of `ask`'s words, or no line, is no run.
+pub fn said_in(ask: &str, line: &str) -> bool {
+    let phrase = lower_words(ask);
+    let phrase: Vec<&str> = phrase.iter().map(String::as_str).collect();
+    holds(&lower_words(line), &phrase)
 }
 
 /// Whether two ask phrases are matched as the same ([`loose_ask`]): "Take
