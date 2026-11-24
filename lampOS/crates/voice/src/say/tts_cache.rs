@@ -1376,6 +1376,39 @@ mod tests {
         names
     }
 
+    /// #8362: the person's own voice unreached (nothing listens at its
+    /// address) is told as unreached, as a refusal is told its status, so
+    /// the cache falls back to the lamp's and keeps nothing under theirs.
+    #[test]
+    fn an_unreached_own_voice_is_told_so_the_cache_falls_back() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = scratch("own_unreached");
+        let private = |path: &Path, text: &str| {
+            fs::write(path, text).unwrap();
+            fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+        };
+        private(&dir.join("llm.key"), "relay-key-8362\n");
+        private(
+            &dir.join("second.json"),
+            &format!(
+                r#"{{"llm_base_url":"https://llm.example.invalid/v1","llm_model":"m","llm_credential_file":"{}","tts_provider":"elevenlabs","tts_voice":"V8362"}}"#,
+                dir.join("llm.key").display()
+            ),
+        );
+        let mut config = crate::second_config::load_from_path(&dir.join("second.json")).unwrap();
+        // Nothing listens there once the listener is dropped.
+        config.tts_base_url = {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            format!("http://{}", listener.local_addr().unwrap())
+        };
+        let told = std::sync::Mutex::new(Vec::new());
+        assert!(render_with(&config, "Hello.", &|status| told.lock().unwrap().push(status)).is_err());
+        assert_eq!(
+            *told.lock().unwrap(),
+            [crate::second_provider::net::UNREACHED]
+        );
+    }
+
     /// The Reviewer-lead's P2 on #8394: a line the person's voice is
     /// refused for is said in the lamp's own voice and kept under the
     /// lamp's key only, never theirs; the person's is not asked again in
