@@ -4700,7 +4700,8 @@ mod tests {
             let hello =
                 json!({"id": 1, "op": "hello", "client": "c_0", "sig": crate::runs::hello_sig()})
                     .to_string();
-            let said = reply(&door.handle(&mut session, &hello, &mut fake, S, 2));
+            let outcome = door.handle(&mut session, &hello, &mut fake, S, 2);
+            let said = reply(&outcome).clone();
             crate::app_calls::set_on_for_test(None);
             assert_eq!(said["ok"], true, "{said}");
             said.get("tools").cloned()
