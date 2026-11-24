@@ -271,22 +271,31 @@ against ElevenLabs' own service.
   https address that takes the place of ElevenLabs' own API for the
   person's key and voice, read in one place (`lamp_msgs::own_voice`) by
   both the keys helper's unit and the voice's. It sends the person's key
-  to that address: never set on a customer's lamp. Set, the check is one
-  word said in that voice, `POST <root>/text-to-speech/<voice_id>/stream`
+  to that address: never set on a customer's lamp. It is read only under
+  its gate, `LAMP_VOICE_LOOPBACK_SERVICES=on`, the voice's switch for test
+  addresses (#8394's P2, the first builder: alone, it could send a
+  person's key to any https host, and "what it says goes to ElevenLabs"
+  would no longer be true). No product unit or drop-in sets either, which
+  the voice's tests read every unit for, and without the gate the switch
+  is ignored, so the person's key goes to ElevenLabs' own API alone; a
+  test lamp's row sets both, in the voice's and the keys helper's units.
+  Set with its gate, the check is one word said in that voice,
+  `POST <root>/text-to-speech/<voice_id>/stream`
   (the relay has no `/voices`: a 404 on 23 Nov), where `<root>` is the
   address as the voice speaks to it (`/elevenlabs` added off ElevenLabs'
   own hosts, after the `/v1` the company relay's `/ai` takes), and the
   speech goes to the same address. The voice says one more line, "the
   person's own voice goes to <host>, not ElevenLabs' own API
   (LAMP_OWN_ELEVENLABS_URL, test lamps only)", the host alone. Unset,
-  empty or not https: ElevenLabs' own API, as above, byte for byte. With
-  the relay's address, key and voice it lets the lamp row run the person's
-  path through the relay with no key of anyone's.
+  empty, not https, or without the gate: ElevenLabs' own API, as above,
+  byte for byte. With the relay's address, key and voice it lets the lamp
+  row run the person's path through the relay with no key of anyone's.
 
 **Tests:** `crates/setup/src/keys.rs`
 (`the_elevenlabs_check_asks_for_the_voice_with_the_key_in_its_header`,
 `a_switched_check_asks_the_given_address_for_one_word_with_the_key`),
-`crates/msgs/src/own_voice.rs` (the switch, its check and its root),
+`crates/msgs/src/own_voice.rs` (the switch, its gate,
+`without_its_gate_the_switch_is_ignored`, its check and its root),
 `crates/voice/src/second_provider/net/tts.rs`
 (`the_own_voice_check_root_is_where_the_voice_speaks`),
 `crates/setup/tests/it/keys.rs`
@@ -298,7 +307,9 @@ against ElevenLabs' own service.
 (`keys_line_passes_an_elevenlabs_key_and_voice_or_a_voice_alone`),
 `crates/voice/src/second_config.rs`
 (`the_persons_elevenlabs_key_and_voice_speak_in_place_of_the_lamps`,
-`a_test_lamps_switch_sends_the_persons_voice_to_its_address`) and
+`a_test_lamps_switch_sends_the_persons_voice_to_its_address`, and the
+pins `without_its_gate_the_switch_leaves_the_persons_voice_at_elevenlabs`
+and `no_product_unit_sets_the_own_elevenlabs_url`) and
 `crates/voice/src/second_provider/net/tts.rs`
 (`a_refused_own_voice_falls_back_to_the_lamps_with_one_line`,
 `a_refusal_seen_by_many_pieces_and_voices_is_said_once`),
