@@ -4965,7 +4965,10 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    "whenever I say, pebble hello", như chuyển giọng nói thành chữ hay viết;
    lần chạy run-1843 trên lamp-06c1 mất cụm này vì dấu phẩy đó, và first
    builder duyệt bản sửa lúc 19:01, 24/11). "I say, and then pebble hello"
-   vẫn không nêu cụm nào. "says" và "saying"
+   vẫn không nêu cụm nào. Mọi chỗ câu chứa cụm khởi động đều được xét,
+   không chỉ chỗ đầu tiên: "make a skill called pebble hello … whenever I
+   say pebble hello" chứa nó trước tiên trong tên kỹ năng, không có từ báo
+   nào trước đó, và chỗ sau "I say" mới là cụm của họ (run-1843). "says" và "saying"
    không phải từ như vậy: trong câu tạo kỹ năng chúng thường nói kỹ năng
    sẽ nói gì ("a skill that says good morning", P2 của Thirteen trên
    #8469), và một lệnh cho kỹ năng mà trước từ đó không có "I" hoặc "you"

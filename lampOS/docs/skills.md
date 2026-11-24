@@ -8674,7 +8674,10 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    phrase ("pebble hello" in "whenever I say, pebble hello", as speech to
    text often writes it; lamp-06c1's run-1843 lost it to that comma, and the
    first builder approved the fix at 19:01, 24 Nov). "I say, and then pebble
-   hello" still names nothing. "says" and "saying" are no such words: in a make's line they mostly
+   hello" still names nothing. Every place the line holds the ask counts,
+   not only its first: "make a skill called pebble hello … whenever I say
+   pebble hello" holds it first in the skill's name, with no cue before it,
+   and the place after "I say" is their phrase (run-1843). "says" and "saying" are no such words: in a make's line they mostly
    tell what the skill says ("a skill that says good morning", Thirteen's
    P2 on #8469), and an order to the skill with no "I" or "you" before
    its cue ("when I wake up, say good morning", "every night at ten, say
