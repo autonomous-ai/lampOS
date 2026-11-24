@@ -80,8 +80,10 @@ pub const TRIGGER_FOR: Duration = Duration::from_secs(3);
 /// The triggers offered and not yet taken, at most.
 pub const MOST_OFFERED: usize = 16;
 /// How long an app's tool call (`app.call`, `LAMP_APP_TOOLS`) waits for its
-/// `app.answer`: the voice's own wait ([`crate::app_calls`]).
-pub const CALL_FOR: Duration = Duration::from_secs(5);
+/// `app.answer`: under the voice's own 5 s from its publish, so an answer
+/// taken here always reaches the voice in time, the bus hop included (the
+/// Reviewer-lead's P3 on #8496).
+pub const CALL_FOR: Duration = Duration::from_millis(4_500);
 
 /// Who is asking, by cgroup.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

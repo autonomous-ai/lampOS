@@ -118,7 +118,7 @@ fn an_answer_over_its_bound_ends_the_call_as_too_long() {
 }
 
 #[test]
-fn one_call_an_app_in_flight_for_five_seconds_then_timeout_and_a_late_answer_is_not_taken() {
+fn one_call_an_app_in_flight_for_its_wait_then_timeout_and_a_late_answer_is_not_taken() {
     let t0 = Instant::now();
     let mut live = Live::default();
     assert_eq!(
@@ -132,7 +132,7 @@ fn one_call_an_app_in_flight_for_five_seconds_then_timeout_and_a_late_answer_is_
     live.connection("timer-app", true);
     live.begin_call("timer-app", "app-1-2-5", t0).unwrap();
     assert!(
-        live.expire_calls(t0 + Duration::from_millis(4_999))
+        live.expire_calls(t0 + Duration::from_millis(4_499))
             .is_empty()
     );
     let late = live.expire_calls(t0 + crate::app_yes::CALL_FOR);
