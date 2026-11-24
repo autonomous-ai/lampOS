@@ -1852,6 +1852,17 @@ build could carry it units or settings.
    checked its signature, and it has read `state.json` under the lock; then
    `self.json` goes. A binary that cannot reach the channel or refuses the
    manifest waits and tries again every 30 s, and doesn't confirm.
+   Once the signature has checked, it confirms even when the dry round then
+   refuses the build (too little disk, a part's unit it can't place, a
+   build put back on this lamp) or can't fetch a file of it, saying
+   `lamp-update read the channel's signed manifest; its dry round: …`
+   (#8472). Lamps that left the factory on 8474, 9528 or 9980 climb in one
+   hop to stable's updater; before this, any refusal in that updater's own
+   dry round left it unconfirmed, `lamp-update-back` put it back after the
+   10 min, and that binary was refused for good, so those lamps never
+   reached stable. Its rounds after the confirmation say why the build
+   waits and try again. A round that fails on the lamp itself
+   (`Failed`) still doesn't confirm.
    Phase 1's `exec` replaces only the process whose round moved the link: a
    `lamp-update once` run by hand beside `serve` (lamp-52e6, 13 Nov, #6898)
    switched and confirmed while `serve` went on in the old build, whose

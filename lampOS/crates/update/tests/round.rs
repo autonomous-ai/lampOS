@@ -4045,6 +4045,54 @@ fn a_new_updater_that_refuses_every_manifest_is_put_back() {
     assert_eq!(lamp.own_build(), old);
 }
 
+/// #8472: lamps that leave the factory on old images (8474, 9528, 9980)
+/// climb to the new lamp-update, whose own dry round then reads today's
+/// build and refuses it for a reason of the lamp's (here, too little room
+/// on the disk). It fetched the channel's manifest and checked its
+/// signature, so it confirms itself and keeps its switch; the rounds after
+/// it go on to say why and try again. A manifest whose signature does not
+/// check never confirms one, whatever follows.
+#[test]
+fn a_new_updater_whose_dry_round_refuses_a_signed_build_confirms_itself() {
+    let mut lamp = Lamp::installed_switching_itself();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    product_build_with_updater(&mut lamp, 3, "lamp-update 2");
+    lamp.free = lamp.config.keep_free + 1;
+    let key = lamp.config.key;
+    lamp.config.key = throwaway().public_key().as_ref().try_into().unwrap();
+    let confirm = lamp.confirm(&new);
+    assert!(matches!(confirm, own::Confirm::NotProven(_)), "{confirm:?}");
+    lamp.config.key = key;
+    lamp.config.apply = false;
+    let dry = lamp.round();
+    assert!(
+        matches!(&dry, Outcome::Refused(why) if why.starts_with("the disk has")),
+        "{dry:?}"
+    );
+    lamp.config.apply = true;
+    assert_eq!(
+        lamp.confirm(&new),
+        own::Confirm::Confirmed,
+        "{:?}",
+        lamp.said
+    );
+    assert!(lamp.pending().is_none());
+    let late = records_now() + own::DEADLINE.as_millis() as u64 + 1;
+    assert_eq!(
+        lamp.back(update_unit("failed", "failed"), late),
+        own::Back::Nothing
+    );
+    assert_eq!(lamp.own_build(), new);
+    // The next round says why, and waits for room.
+    let next = lamp.round();
+    assert!(
+        matches!(&next, Outcome::Refused(why) if why.starts_with("the disk has")),
+        "{next:?}"
+    );
+}
+
 /// #1680, the first builder at 11:40: `self.json` is a contract for good.
 /// lamp-update-back is written once, by install, so the one a lamp has
 /// reads what any later lamp-update writes: a newer version, with fields it

@@ -447,6 +447,19 @@ impl Placing {
 
 /// One round. What goes wrong in the world is the outcome, never a panic.
 pub fn round(config: &Config, world: &mut World) -> Outcome {
+    round_signed(config, world).0
+}
+
+/// [`round`], and whether it read the channel's manifest with its signature
+/// checked: what a new lamp-update's own switch confirms on (crate::own,
+/// #8472), even when the round then refuses the build.
+pub fn round_signed(config: &Config, world: &mut World) -> (Outcome, bool) {
+    let signed = std::cell::Cell::new(false);
+    let outcome = round_noting(config, world, &signed);
+    (outcome, signed.get())
+}
+
+fn round_noting(config: &Config, world: &mut World, signed: &std::cell::Cell<bool>) -> Outcome {
     let records = Records::new(config.on(&config.records));
     let quiet = Quiet::new(world.clock.now_ms());
     let mut run = Run {
@@ -456,6 +469,7 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         quiet,
         skills_back: Vec::new(),
         seen: None,
+        signed,
         climb: None,
         placings: Vec::new(),
         fetching: Vec::new(),
@@ -609,6 +623,9 @@ struct Run<'r, 'w> {
     skills_back: Vec<SkillBack>,
     /// The manifest the round read, checked.
     seen: Option<Manifest>,
+    /// Set once the channel's manifest was read and its signature checked
+    /// ([`round_signed`]).
+    signed: &'r std::cell::Cell<bool>,
     /// A build for a newer updater whose lamp-update this round may take.
     climb: Option<TooOld>,
     /// The models at paths of their own the build switches, and every
@@ -1101,13 +1118,18 @@ impl Run<'_, '_> {
             Err(Fetch::Missing) => return Err(Outcome::NothingPublished),
             Err(error) => return Err(Outcome::Unreachable(error.to_string())),
         }
-        let manifest =
-            match manifest::open_or_too_old(&envelope, &self.config.key, self.config.updater)
-                .map_err(|why| Outcome::Refused(why.to_string()))?
-            {
-                Opened::Manifest(manifest, _) => manifest,
-                Opened::TooOld(too_old) => return Err(self.too_old(state, too_old)),
-            };
+        let bytes = manifest::signed(&envelope, &self.config.key)
+            .map_err(|why| Outcome::Refused(why.to_string()))?;
+        // The channel's manifest, read with its signature checked: a new
+        // lamp-update's own switch confirms on it, whatever this round then
+        // says of the build (#8472).
+        self.signed.set(true);
+        let manifest = match manifest::opened_or_too_old(bytes, self.config.updater)
+            .map_err(|why| Outcome::Refused(why.to_string()))?
+        {
+            Opened::Manifest(manifest, _) => manifest,
+            Opened::TooOld(too_old) => return Err(self.too_old(state, too_old)),
+        };
         if manifest.channel != self.config.channel {
             return Err(Outcome::Refused(format!(
                 "the build is of channel {}, and this lamp follows {}",

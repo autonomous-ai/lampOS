@@ -827,7 +827,12 @@ pub fn signed(envelope: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, Refused> {
 /// [`open_as`], with a build for a newer updater told apart: a round may
 /// still take the newer `lamp-update` it carries, and only that (#1680).
 pub fn open_or_too_old(envelope: &[u8], key: &[u8; 32], updater: u64) -> Result<Opened, Refused> {
-    let manifest = signed(envelope, key)?;
+    opened_or_too_old(signed(envelope, key)?, updater)
+}
+
+/// [`open_or_too_old`] for a manifest's bytes whose signature [`signed`]
+/// has already checked.
+pub fn opened_or_too_old(manifest: Vec<u8>, updater: u64) -> Result<Opened, Refused> {
     if let Some(too_old) = too_old(&manifest, updater) {
         return Ok(Opened::TooOld(too_old));
     }

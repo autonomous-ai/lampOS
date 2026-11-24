@@ -35,7 +35,7 @@
 use crate::{
     judge::UnitState,
     records::{Records, replace_link, sync_folder, unix_ms, write_whole},
-    round::{Config, Outcome, World, round},
+    round::{Config, Outcome, World, round_signed},
     world::Systemd,
 };
 use serde::{Deserialize, Serialize};
@@ -436,12 +436,22 @@ pub fn confirm(
         apply: false,
         ..config.clone()
     };
-    // Only what this updater is switched to apply counts: a build that
-    // waits for the models switch was read and checked all the same.
-    let checked = match round(&dry, world) {
-        Outcome::UpToDate(sequence) => Some(sequence),
-        Outcome::Would(_) | Outcome::WaitsForModels(_) => None,
-        other => return Ok(Confirm::NotProven(other.to_string())),
+    let checked = match round_signed(&dry, world) {
+        (Outcome::UpToDate(sequence), _) => Some(sequence),
+        (Outcome::Would(_) | Outcome::WaitsForModels(_), _) => None,
+        // The channel's manifest was read and its signature checked, and
+        // the round then refused the build, or could not fetch a file of it
+        // (#8472): this updater works, so it keeps its switch; the rounds
+        // after it say why and try again. Lamps that left the factory on old
+        // images climb to it and could otherwise never confirm one, every
+        // climb put back and refused for good.
+        (other @ (Outcome::Refused(_) | Outcome::Unreachable(_)), true) => {
+            (world.say)(&format!(
+                "lamp-update read the channel's signed manifest; its dry round: {other}"
+            ));
+            None
+        }
+        (other, _) => return Ok(Confirm::NotProven(other.to_string())),
     };
     let records = Records::new(folder.clone());
     let _lock = match records.lock() {
@@ -477,9 +487,11 @@ fn confirm_unreadable(config: &Config, world: &mut World) -> Result<Confirm, Str
             apply: false,
             ..config.clone()
         };
-        match round(&dry, world) {
-            Outcome::UpToDate(_) | Outcome::Would(_) | Outcome::WaitsForModels(_) => {}
-            other => return Ok(Confirm::NotProven(other.to_string())),
+        match round_signed(&dry, world) {
+            (Outcome::UpToDate(_) | Outcome::Would(_) | Outcome::WaitsForModels(_), _) => {}
+            // As in `confirm` (#8472).
+            (Outcome::Refused(_) | Outcome::Unreachable(_), true) => {}
+            (other, _) => return Ok(Confirm::NotProven(other.to_string())),
         }
     }
     let records = Records::new(folder.clone());
