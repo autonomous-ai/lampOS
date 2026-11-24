@@ -379,7 +379,7 @@ pub fn check_manifest(manifest: &AppManifest) -> Result<(), String> {
 }
 
 /// [`check_manifest`] with the tools switch given: off, a manifest naming
-/// `tools` is refused in the words serde gives any unknown field.
+/// `tools` is refused as an unknown field ([`TOOLS_OFF`]).
 pub fn check_manifest_switched(manifest: &AppManifest, tools: bool) -> Result<(), String> {
     match (&manifest.tools, tools) {
         (None, _) => {}
@@ -529,8 +529,8 @@ pub fn read_app_package_switched(
     read_app_package(bytes, keys, tools)
 }
 
-/// What a manifest naming `tools` is told with the switch off: serde's
-/// words for any unknown field, as a lamp built before the field said.
+/// What a manifest naming `tools` is told with the switch off: an unknown
+/// field, refused as a lamp built before the field refused it.
 pub const TOOLS_OFF: &str = "unknown field `tools`: this lamp does not read an app's tools";
 
 /// What a pushed app's `signed_by` says: it carries no signature.
