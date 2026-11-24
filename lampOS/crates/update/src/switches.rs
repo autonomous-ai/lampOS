@@ -278,6 +278,11 @@ pub struct UpdateSwitches {
     /// carried file turns it on for a lamp already in a home, and the round
     /// that does restarts lamp-update so it moves in that round.
     pub cdn_feed: bool,
+    /// Hermes's API gateway (Hermes direct, `LAMP_HERMES_GATEWAY`,
+    /// crate::hermes_gateway::SWITCH), on any lamp, read as `engines` is: the
+    /// carried file turns it on for a lamp already in a home, and the round
+    /// that does restarts lamp-update so its gateway is kept from then on.
+    pub hermes_gateway: bool,
 }
 
 /// lamp-update's switches, each by [`update_switch`], `env` giving
@@ -314,6 +319,11 @@ pub fn update_switches(
             root,
             crate::cdn_feed::SWITCH,
             env(crate::cdn_feed::SWITCH).as_deref(),
+        ),
+        hermes_gateway: update_switch(
+            root,
+            crate::hermes_gateway::SWITCH,
+            env(crate::hermes_gateway::SWITCH).as_deref(),
         ),
         tasks,
         one_path: tasks
@@ -626,6 +636,7 @@ mod tests {
                 now: true,
                 gateway_by_default: false,
                 cdn_feed: true,
+                hermes_gateway: true,
             }
         );
         assert!(restart_for(started, now));

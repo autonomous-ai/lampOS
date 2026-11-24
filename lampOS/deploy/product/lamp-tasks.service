@@ -80,9 +80,14 @@ Environment=LAMP_TASKS_KEPT_SESSION=on
 # OpenClaw spoken to directly (docs/switches.md, docs/install.md "OpenClaw on the lamp"): each OpenClaw turn handed to its
 # gateway over its WebSocket (127.0.0.1:18789, the lamp's own loopback: the gateway's namespaces are user, mount and PID,
 # never a network one), one connection and one kept session, with the token lamp-update leaves in
-# /var/lib/lampos-openclaw/gateway-token (lampos's, 0600); no Harness CLI, no TUI, no tmux. Hermes keeps Harness. Off,
+# /var/lib/lampos-openclaw/gateway-token (lampos's, 0600); no Harness CLI, no TUI, no tmux. Hermes has its own, next. Off,
 # the Harness path as before. On in the product.
 Environment=LAMP_TASKS_OPENCLAW_DIRECT=on
+# Hermes spoken to directly (docs/switches.md, docs/tasks.md "Hermes spoken to directly"): each turn of the lamp's own
+# Hermes handed to its API server (127.0.0.1:8642, Runs API) with the key lamp-update leaves in
+# /var/lib/lampos-hermes-gateway/api-key (lampos's, 0600), one kept session; no Harness pane, no `hermes chat -q`. Needs
+# lamp-update's LAMP_HERMES_GATEWAY (/etc/lampOS/update.env). Off, the Harness path as before. On in the product.
+Environment=LAMP_TASKS_HERMES_DIRECT=on
 # #7245: an agent make's own lamp-skills pack check takes a skill started by its words (docs/switches.md).
 Environment=LAMP_MADE_SKILL_ASKS=on
 RuntimeDirectory=lampos-tasks

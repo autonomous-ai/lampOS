@@ -3137,7 +3137,7 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
   `one_session_not_started` của #7919 qua Task news, không bao giờ cả hai.
   Câu này được nghe cùng câu trả lời, không phải ngay lúc thay phiên.
 
-### Nói thẳng với agent của đèn (`LAMP_TASKS_OPENCLAW_DIRECT=on` trong unit lamp-tasks của sản phẩm; `LAMP_TASKS_HERMES_DIRECT`, tắt)
+### Nói thẳng với agent của đèn (`LAMP_TASKS_OPENCLAW_DIRECT=on` trong unit lamp-tasks của sản phẩm; cả `LAMP_TASKS_HERMES_DIRECT=on`)
 
 Đường này giống nhau cho cả hai engine, mỗi engine sau công tắc riêng, với
 phiên riêng (`direct::Direct`), luồng bơm riêng và trạng thái sẵn sàng riêng;
@@ -3344,11 +3344,12 @@ event in <s> s and is stuck; ended, the next turn goes on`, và `tasks: direct:
 a fresh conversation for <id> (a full conversation | a broken session), about
 <n> tokens and <m> turns in the last`.
 
-#### Nói thẳng với Hermes (`LAMP_TASKS_HERMES_DIRECT=on`, tắt trong sản phẩm)
+#### Nói thẳng với Hermes (`LAMP_TASKS_HERMES_DIRECT=on`, bật trong sản phẩm)
 
 Khi môi trường riêng của lamp-tasks có `LAMP_TASKS_HERMES_DIRECT=on` (đúng
-`on`; giá trị khác, hoặc không đặt, là tắt; chưa unit nào đặt nó cho tới khi
-một hàng kiểm tra trên đèn Hermes qua), Hermes của chính đèn đi đường ở trên
+`on`; giá trị khác, hoặc không đặt, là tắt; bật trong unit lamp-tasks của sản
+phẩm, cùng `LAMP_HERMES_GATEWAY` của lamp-update bật trong
+`/etc/lampOS/update.env` của sản phẩm), Hermes của chính đèn đi đường ở trên
 thay cho Harness và `hermes chat -q`: một kết nối tới API server của chính
 Hermes và một phiên được giữ. Công tắc và đường của OpenClaw không đổi; mỗi
 engine có phiên riêng, và cả hai có thể cùng bật (`direct::lamps`).

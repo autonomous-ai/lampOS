@@ -7,9 +7,9 @@
 //! ([`crate::openclaw_install::UNIT`]), in Hermes's own namespace and user.
 //!
 //! **Behind [`SWITCH`].** `LAMP_HERMES_GATEWAY=on` exactly, in lamp-update's
-//! environment or the carried `/etc/lampOS/update.env`; no product file
-//! sets it yet (lamp-tasks' `LAMP_TASKS_HERMES_DIRECT` is off by default
-//! too, until a Hermes lamp's ROW passes). Off, nothing of this is written,
+//! environment or the carried `/etc/lampOS/update.env`, on in the product
+//! by that file (with lamp-tasks' `LAMP_TASKS_HERMES_DIRECT` on in its
+//! product unit). Off, nothing of this is written,
 //! and a unit an earlier round wrote is disabled, stopped and taken out
 //! ([`after_round_off`]).
 //!
