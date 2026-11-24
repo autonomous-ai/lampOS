@@ -1470,10 +1470,14 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                         window
                     }
                 });
-                hermes_install::after_round(
+                // With Hermes's gateway on, Hermes's own install asks for
+                // the gateway's script too, so a Hermes put back this round
+                // is served between rounds, not after the next round.
+                hermes_install::after_round_asking(
                     &config.root,
                     &records,
                     shown,
+                    hermes_gateway,
                     &mut systemd,
                     now_unix_ms,
                     window,

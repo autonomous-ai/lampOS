@@ -917,6 +917,23 @@ fn the_pane_is_adopted_by_its_kept_id() {
     assert_eq!(fake.count("new"), 1);
 }
 
+/// lamp-tasks' own pane for `gateway::panes_read`: open in memory, or
+/// only kept on disk (a restart after an engine switch, its removal not
+/// done yet, as on lamp-ee17), so the Gateway's pane read can leave it out.
+#[test]
+fn the_own_pane_is_known_open_or_only_kept_on_disk() {
+    let dir = tempfile::tempdir().unwrap();
+    assert_eq!(kept_session(dir.path()).own_agent(), None);
+    let (one, fake) = (kept_session(dir.path()), Fake::default());
+    one.open_if_due(&fake, &place());
+    assert_eq!(one.own_agent(), Some(agent_of(1)));
+    // A new lamp-tasks with the default moved: nothing open in memory,
+    // the kept record still names it.
+    let again = kept_session(dir.path());
+    assert_eq!(again.agent(), None);
+    assert_eq!(again.own_agent(), Some(agent_of(1)));
+}
+
 /// A kept pane stopped or gone is resumed once; resumed live, it is
 /// adopted; else a fresh `new`.
 #[test]

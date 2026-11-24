@@ -100,24 +100,35 @@ const PANE_ENDED: [&str; 6] = ["stopped", "failed", "offline", "exited", "done",
 
 /// Whether a pane in `listed` runs OpenClaw, by Harness's own `agent`
 /// field: a pane whose agent can't be read counts as OpenClaw, and an
-/// ended pane ([`PANE_ENDED`]) runs nothing.
-pub fn panes_on_openclaw(listed: &[crate::harness::Listed]) -> bool {
+/// ended pane ([`PANE_ENDED`]) runs nothing. `own` is lamp-tasks' own kept
+/// pane's agent id (`one_session::OneSession::own_agent`): it counts only
+/// while `working`, a turn still running in it. Idle, it is only lamp-tasks'
+/// standing session, never a person's: while OpenClaw is the default,
+/// lamp-update keeps the Gateway for the default alone, and once the
+/// default moved away (or with `LAMP_TASKS_OPENCLAW_DIRECT` on) nothing
+/// types into it, and lamp-tasks closes it itself. Counted, it kept
+/// OpenClaw's Gateway beside Hermes's after an engine switch (lamp-ee17,
+/// its kept session listed idle while its close was refused `WORKING`).
+/// Any other pane keeps the rule a person's pane needs (#8105).
+pub fn panes_on_openclaw(listed: &[crate::harness::Listed], own: Option<&str>) -> bool {
     listed.iter().any(|pane| {
         !PANE_ENDED.contains(&pane.state.as_str())
             && pane
                 .agent
                 .as_deref()
                 .is_none_or(|agent| agent == "openclaw")
+            && (own != Some(pane.agent_id.as_str()) || pane.state == "working")
     })
 }
 
 /// Takes a read of the lamp's own panes: one on OpenClaw marks it wanted
 /// and keeps it in use while it's listed; a failed read keeps the last.
-pub fn panes_read(read: &Result<Vec<crate::harness::Listed>, String>) {
+/// `own`: lamp-tasks' own kept pane, as [`panes_on_openclaw`] takes it.
+pub fn panes_read(read: &Result<Vec<crate::harness::Listed>, String>, own: Option<&str>) {
     let Ok(listed) = read else {
         return;
     };
-    let on = panes_on_openclaw(listed);
+    let on = panes_on_openclaw(listed, own);
     if on {
         mark_wanted();
     }
@@ -1831,34 +1842,85 @@ mod tests {
             about: None,
             agent: agent.map(str::to_owned),
         };
-        assert!(!panes_on_openclaw(&[]));
-        assert!(!panes_on_openclaw(&[pane(Some("hermes"), "idle")]));
-        assert!(panes_on_openclaw(&[
-            pane(Some("hermes"), "idle"),
-            pane(Some("openclaw"), "working")
-        ]));
-        assert!(panes_on_openclaw(&[pane(None, "idle")]));
-        assert!(!panes_on_openclaw(&[pane(Some("openclaw"), "stopped")]));
-        assert!(!panes_on_openclaw(&[
-            pane(None, "failed"),
-            pane(Some("openclaw"), "offline")
-        ]));
-        panes_read(&Ok(vec![pane(Some("openclaw"), "idle")]));
+        assert!(!panes_on_openclaw(&[], None));
+        assert!(!panes_on_openclaw(&[pane(Some("hermes"), "idle")], None));
+        assert!(panes_on_openclaw(
+            &[
+                pane(Some("hermes"), "idle"),
+                pane(Some("openclaw"), "working")
+            ],
+            None
+        ));
+        assert!(panes_on_openclaw(&[pane(None, "idle")], None));
+        assert!(!panes_on_openclaw(
+            &[pane(Some("openclaw"), "stopped")],
+            None
+        ));
+        assert!(!panes_on_openclaw(
+            &[pane(None, "failed"), pane(Some("openclaw"), "offline")],
+            None
+        ));
+        panes_read(&Ok(vec![pane(Some("openclaw"), "idle")]), None);
         assert_eq!(
             PANES_ON_OPENCLAW.load(std::sync::atomic::Ordering::Acquire),
             1
         );
-        panes_read(&Err("harness_failed".into()));
+        panes_read(&Err("harness_failed".into()), None);
         assert_eq!(
             PANES_ON_OPENCLAW.load(std::sync::atomic::Ordering::Acquire),
             1
         );
         assert_eq!(in_use_said(), Some(true));
-        panes_read(&Ok(vec![pane(Some("hermes"), "idle")]));
+        panes_read(&Ok(vec![pane(Some("hermes"), "idle")]), None);
         assert_eq!(
             PANES_ON_OPENCLAW.load(std::sync::atomic::Ordering::Acquire),
             2
         );
+    }
+
+    /// lamp-ee17 after an engine switch to Hermes: lamp-tasks' own kept
+    /// OpenClaw pane, listed idle (its close refused `WORKING` for 27 min),
+    /// kept OpenClaw's Gateway in use. Its own idle pane no longer counts,
+    /// nor marks the Gateway wanted; a turn still working in it does, and
+    /// any other pane (a person's in Harness) counts as before.
+    #[test]
+    fn lamp_tasks_own_idle_pane_keeps_no_gateway_in_use() {
+        const OWN: &str = "2f0f46a7-0000-4000-8000-000000000000";
+        const PERSON: &str = "33333333-3333-4333-8333-333333333333";
+        let pane = |id: &str, agent: Option<&str>, state: &str| crate::harness::Listed {
+            agent_id: id.into(),
+            state: state.into(),
+            last_active_unix_ms: None,
+            about: None,
+            agent: agent.map(str::to_owned),
+        };
+        assert!(!panes_on_openclaw(
+            &[pane(OWN, Some("openclaw"), "idle")],
+            Some(OWN)
+        ));
+        assert!(!panes_on_openclaw(&[pane(OWN, None, "idle")], Some(OWN)));
+        assert!(!panes_on_openclaw(
+            &[pane(OWN, Some("openclaw"), "needs-input")],
+            Some(OWN)
+        ));
+        assert!(panes_on_openclaw(
+            &[pane(OWN, Some("openclaw"), "working")],
+            Some(OWN)
+        ));
+        // A person's pane beside it keeps today's rule, idle or not.
+        assert!(panes_on_openclaw(
+            &[
+                pane(OWN, Some("openclaw"), "idle"),
+                pane(PERSON, Some("openclaw"), "idle")
+            ],
+            Some(OWN)
+        ));
+        assert!(panes_on_openclaw(&[pane(PERSON, None, "idle")], Some(OWN)));
+        // With no own pane known, every pane counts as before.
+        assert!(panes_on_openclaw(
+            &[pane(OWN, Some("openclaw"), "idle")],
+            None
+        ));
     }
 
     /// #7246: the approvals read's JSON allows the launcher only with an

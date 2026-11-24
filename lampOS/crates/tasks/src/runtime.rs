@@ -5995,7 +5995,15 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                 if crate::gateway::panes_due(panes_last) {
                     panes_last = Some(Instant::now());
                     if let Some(lamp) = lamp_panes() {
-                        crate::gateway::panes_read(&adapter.status(&lamp.machine_id));
+                        // lamp-tasks' own kept pane is not a person's: idle,
+                        // it keeps no Gateway in use.
+                        let own = crate::one_session::LAMP
+                            .get()
+                            .and_then(|one| one.own_agent());
+                        crate::gateway::panes_read(
+                            &adapter.status(&lamp.machine_id),
+                            own.as_deref(),
+                        );
                     }
                 }
                 match jobs_rx.recv_timeout(TICK) {

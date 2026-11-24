@@ -6384,7 +6384,10 @@ same as OpenClaw's skills. What is Hermes's own:
   (`lamp-hermes-gateway.service`, lamp-update's `LAMP_HERMES_GATEWAY=on`)
   runs only while lamp-tasks names Hermes the lamp's default agent, and then
   OpenClaw's gateway follows the default too, so only one runs
-  (docs/install.md, docs/switches.md).
+  (docs/install.md, docs/switches.md). Its namespace script is written by
+  Harness's one-shot, asked by any round that reached the channel (a refused
+  one too); one that puts Hermes back writes it in the same run, so a switch
+  to Hermes is served between rounds, within 10 s, not after the next round.
 - **Gateway not reachable.** The switch on but the gateway not up (its unit
   off, still starting, or gone) is handled as OpenClaw's gateway down: a
   spoken task waits at most 60 s and is `not_sent`, a queued turn waits at
@@ -6404,6 +6407,21 @@ same as OpenClaw's skills. What is Hermes's own:
   task never marks OpenClaw in use (#8105). Not ready by then, it is
   `not_sent` `openclaw_gateway_not_ready`, the same code Task news tells as
   "I'm still getting ready".
+- **OpenClaw's Gateway after a switch to Hermes.** lamp-tasks' own kept
+  OpenClaw pane (the one session's, `lamp-one-openclaw`, by its agent id in
+  memory or in `one-session.json`, `OneSession::own_agent`) never keeps
+  OpenClaw in use while it is idle: the Gateway's pane read
+  (`gateway::panes_read`, once a minute while lamp-update asks) leaves it out
+  and never marks the Gateway wanted for it; only a turn still `working` in it
+  counts. While OpenClaw is the default, lamp-update keeps the Gateway for the
+  default alone; once the default moved away, nothing types into that pane,
+  and lamp-tasks closes it itself (`remove_if_due`, a plain `harness close`,
+  tried again at each look while Harness refuses it `WORKING`). On lamp-ee17
+  it was listed idle while its close was refused for about 27 min, and its
+  reads kept OpenClaw's Gateway running beside Hermes's. Any other pane on
+  OpenClaw (a person's, opened in Harness) keeps the rule unchanged: listed
+  and not ended, it keeps the Gateway up, and marks it wanted for
+  `gateway::IN_USE_HOLD` (4 h).
 - **A skill's `do.task` and a make.** With the lamp's Hermes the default and its
   switch on, `HarnessRunner::run` takes the run on the one run path as a
   gateway agent's (`by_start`), whatever the Harness default-agent switch says,
