@@ -430,6 +430,39 @@ def test_the_fake_refuses_a_body_state_subscription_without_the_body_grant_as_th
     run(go())
 
 
+def test_keep_connected_subscribes_to_phrase_heard_again_with_all_its_phrases(tmp_path):
+    """#8126: a plain `connect` has no reconnect, so a dropped connection loses its phrases for good; under
+    `keep_connected` the setup runs on the new connection, and each of its `subscribe`s carries the program's whole
+    phrase list, 16 given one at a time or all at once."""
+    phrases = sorted(f"start workout {n:02d}" for n in range(16))
+
+    async def go():
+        async with FakeLamp(grants=("hear",)) as fake:
+            ring = await paired(fake, tmp_path)
+
+            async def setup(lamp):
+                for phrase in phrases[:8]:
+                    await lamp.on("phrase.heard", print, phrases=[phrase])
+                await lamp.on("phrase.heard", print, phrases=phrases[8:])
+
+            kept = asyncio.ensure_future(Lamp.keep_connected(setup, keyring=ring, pauses=(0.05, 0.1)))
+            try:
+                for round_ in (1, 2):
+                    while len(fake.asked("subscribe")) < 9 * round_:
+                        await asyncio.sleep(0.01)
+                    if round_ == 1:
+                        await fake.restart()
+                last = fake.asked("subscribe")[-1]
+                assert last["events"] == ["phrase.heard"] and last["phrases"] == phrases, last
+                assert fake.asked("subscribe")[8]["phrases"] == phrases
+            finally:
+                kept.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await kept
+
+    run(go())
+
+
 def test_keep_connected_stops_on_what_connecting_again_cant_mend(tmp_path):
     """No pairing, and an error in the program's own setup, end it at once;
     it doesn't retry them."""

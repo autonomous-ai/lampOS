@@ -1125,6 +1125,22 @@ impl Door {
         let Some(client) = &session.client else {
             return Vec::new();
         };
+        // What the connection held, said once (#8126): the event names and
+        // how many phrases it listened for, never a phrase, so a line "0
+        // listening for 0 phrases" can be read against a close.
+        let events: Vec<String> = session
+            .events
+            .iter()
+            .filter_map(|kind| serde_json::to_value(kind).ok())
+            .filter_map(|kind| kind.as_str().map(str::to_owned))
+            .collect();
+        let held = if events.is_empty() {
+            "nothing subscribed".to_owned()
+        } else {
+            format!("{}, {} phrases", events.join(" "), session.phrases.len())
+        };
+        let line = format!("{}: connection closed ({held})", self.who(client));
+        self.journal.line(client, now_us, &line);
         self.hold_phrases(client, session.nonce, 0);
         let left = self.open.get_mut(client).map(|count| {
             *count = count.saturating_sub(1);
@@ -3291,6 +3307,61 @@ mod tests {
             !lines.iter().any(|line| line.contains("today")),
             "{lines:?}"
         );
+    }
+
+    /// #8126: a second subscribe for `phrase.heard` replaces the connection's
+    /// phrases (8, then 16), and the connection's close says once what it
+    /// held (the event names and a phrase count, never a phrase), so a line
+    /// "0 listening for 0 phrases" can be read without anyone's journal.
+    #[test]
+    fn a_closed_connection_says_what_it_held_and_a_second_subscribe_replaces_the_phrases() {
+        let lines = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let into = lines.clone();
+        let (door, mut session, mut fake) = paired(&Computer::new(4), &[Grant::Hear, Grant::Look]);
+        let mut door = door.with_journal(Journal::to(move |line| {
+            into.lock().unwrap().push(line.to_owned())
+        }));
+        let subscribe = |events: &str, n: usize| {
+            let phrases: Vec<String> = (0..n).map(|n| format!("\"start workout {n}\"")).collect();
+            format!(
+                r#"{{"id":3,"op":"subscribe","events":[{events}],"phrases":[{}]}}"#,
+                phrases.join(",")
+            )
+        };
+        let eight = door.handle(
+            &mut session,
+            &subscribe("\"phrase.heard\"", 8),
+            &mut fake,
+            2 * S,
+            1,
+        );
+        assert_eq!(reply(&eight)["ok"], true, "{eight:?}");
+        assert_eq!(session.phrases().len(), 8);
+        let sixteen = door.handle(
+            &mut session,
+            &subscribe("\"phrase.heard\"", 16),
+            &mut fake,
+            3 * S,
+            1,
+        );
+        assert_eq!(reply(&sixteen)["ok"], true, "{sixteen:?}");
+        assert_eq!(session.phrases().len(), 16);
+        let person = r#"{"id":4,"op":"subscribe","events":["person.arrived"]}"#;
+        assert_eq!(
+            reply(&door.handle(&mut session, person, &mut fake, 4 * S, 1))["ok"],
+            true
+        );
+        door.closed(&session, 5 * S);
+        let lines = lines.lock().unwrap();
+        let closed = lines
+            .iter()
+            .find(|line| line.contains("connection closed"))
+            .unwrap_or_else(|| panic!("no close line in {lines:?}"));
+        assert!(
+            closed.contains("person.arrived phrase.heard") && closed.contains("16 phrases"),
+            "{closed}"
+        );
+        assert!(!closed.contains("start workout"), "{closed}");
     }
 
     /// A lamp's own quiet hours (`--quiet-hours`): `off` refuses nothing,
