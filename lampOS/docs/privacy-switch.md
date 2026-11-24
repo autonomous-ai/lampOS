@@ -144,9 +144,11 @@ level-less acquisition is that expiry too (`SwitchFence::accept_riding`,
 a state whose only fault is its own age, 50 ms or more when the worker reads
 it (#8466: a worker starved past 50 ms while Controls kept publishing finds
 its queue that old; on train 1198 it ended on the first, and with it the
-voice's session): its reading is never taken, capture's gate closes as for a
-lapsed reading, and a switch closed meanwhile is read closed in the first
-fresh state. Its publisher, clock, session, order and envelope must all
+voice's session): an open or level-less reading in it is never taken,
+capture's gate closes as for a lapsed reading, and a switch closed meanwhile
+is read closed in the first fresh state. A closed reading in an aged state is
+never passed over: it ends the worker, as before, so a slide closed and opened
+again inside one stall is never missed (the first builder's P2 on #8489). Its publisher, clock, session, order and envelope must all
 hold, as for any state; a state past its 300 ms header life still ends the
 worker, and so does age without the ride or before capture was allowed. The deadline is one second from the last
 accepted acquisition's 50 ms expiry, including the fresh-open gate's 60 ms

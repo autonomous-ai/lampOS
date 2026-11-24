@@ -211,6 +211,9 @@ impl Observation {
 /// The fence's refusal of an acquisition it cannot use: stale, without its
 /// level, faulted, of another clock or ahead of now.
 const UNAVAILABLE_ACQUISITION: &str = "physical privacy acquisition unavailable";
+/// Why a ridden worker ends on a closed reading it read too late.
+pub const AGED_CLOSED: &str =
+    "privacy Controls: a closed reading went past 50 ms while the worker was behind";
 
 /// A slide's state read by [`SwitchFence::accept_riding`].
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -409,6 +412,17 @@ impl SwitchFence {
         // reading: its envelope kept so the order goes on, its reading
         // never taken, capture's gate closed by the caller.
         if aged {
+            // A closed reading is never passed over: a slide closed and
+            // opened again within one stall would otherwise never set the
+            // lease's mute (the first builder's P2 on #8489). The worker
+            // ends, as before #8466, and the voice's session with it.
+            if state
+                .privacy
+                .as_ref()
+                .is_some_and(|value| value.muted == Some(true))
+            {
+                return Err(invalid(AGED_CLOSED));
+            }
             self.note_clock(&message.header);
             self.session = Some(state.session_id);
             self.header_sequence = h;
@@ -2377,8 +2391,8 @@ pub(crate) mod tests {
     #[test]
     fn a_state_stale_by_age_alone_ridden_keeps_its_envelope_and_never_its_reading() {
         let first = reading("boot", 100_000, 1, Some(false));
-        // Queued 60 ms ago: the state and its reading, the switch closed.
-        let aged = || slide_message(110_000, 2, reading("boot", 110_000, 2, Some(true)));
+        // Queued 60 ms ago: the state and its reading, the switch open.
+        let aged = || slide_message(110_000, 2, reading("boot", 110_000, 2, Some(false)));
         let next = || slide_message(175_000, 3, reading("boot", 175_000, 3, Some(true)));
         let mut fence = SwitchFence::new("boot".into());
         fence
@@ -2409,6 +2423,21 @@ pub(crate) mod tests {
                 .unwrap_err()
                 .to_string(),
             "privacy Controls publisher/clock/order changed"
+        );
+        // Ridden, an aged closed reading ends it: a slide closed and opened
+        // again inside one stall is never passed over (the first builder's
+        // P2 on #8489).
+        let mut fence = SwitchFence::new("boot".into());
+        fence
+            .accept_riding(&slide_message(100_000, 1, first.clone()), 100_001, 1000)
+            .unwrap();
+        let closed = slide_message(110_000, 2, reading("boot", 110_000, 2, Some(true)));
+        assert_eq!(
+            fence
+                .accept_riding(&closed, 170_000, 1000)
+                .unwrap_err()
+                .to_string(),
+            AGED_CLOSED
         );
         // Ridden, an aged state of another clock, or one older than the
         // last, still ends it.
@@ -2629,7 +2658,7 @@ pub(crate) mod tests {
         after: Option<bool>,
         done: impl Fn(&Ridden, u64) -> bool,
     ) -> Ridden {
-        ride_attempts(setup, ride, false, lapse_done, after, done)
+        ride_attempts(setup, ride, false, None, lapse_done, after, done)
     }
 
     /// [`ride_run`], and with `aging` the lapse's states are stamped as a
@@ -2639,11 +2668,20 @@ pub(crate) mod tests {
     fn ride_run_aging(
         ride: bool,
         aging: bool,
+        lapse_level: Option<bool>,
         lapse_done: impl Fn(&Ridden, u64) -> bool,
         after: Option<bool>,
         done: impl Fn(&Ridden, u64) -> bool,
     ) -> Ridden {
-        ride_attempts(Duration::ZERO, ride, aging, lapse_done, after, done)
+        ride_attempts(
+            Duration::ZERO,
+            ride,
+            aging,
+            lapse_level,
+            lapse_done,
+            after,
+            done,
+        )
     }
 
     /// The attempts of [`ride_run_set_up_in`] and [`ride_run_aging`].
@@ -2651,13 +2689,14 @@ pub(crate) mod tests {
         setup: Duration,
         ride: bool,
         aging: bool,
+        lapse_level: Option<bool>,
         lapse_done: impl Fn(&Ridden, u64) -> bool,
         after: Option<bool>,
         done: impl Fn(&Ridden, u64) -> bool,
     ) -> Ridden {
         let mut held = Vec::new();
         for stalls in 1..=STALLED_ATTEMPTS {
-            let ridden = ride_once(setup, ride, aging, &lapse_done, after, &done);
+            let ridden = ride_once(setup, ride, aging, lapse_level, &lapse_done, after, &done);
             if !ridden.held_up() {
                 return ridden;
             }
@@ -2674,6 +2713,7 @@ pub(crate) mod tests {
         setup: Duration,
         ride: bool,
         aging: bool,
+        lapse_level: Option<bool>,
         lapse_done: &impl Fn(&Ridden, u64) -> bool,
         after: Option<bool>,
         done: &impl Fn(&Ridden, u64) -> bool,
@@ -2776,7 +2816,7 @@ pub(crate) mod tests {
                     }
                     None => break,
                 },
-                2 => None,
+                2 => lapse_level,
                 _ if done(&ridden, now) => break,
                 _ => after,
             };
@@ -2811,16 +2851,18 @@ pub(crate) mod tests {
                     Err(error) => panic!("authority to the worker: {error}"),
                 }
             }
-            if muted.is_some() {
-                read = (now, sequence);
-            }
-            let physical = reading(&clock, read.0, read.1, muted);
             let at = if aging && phase.0 == 2 {
                 stamped + 1
             } else {
                 now
             };
             stamped = at;
+            // A lapse's own level is read when its state was queued, so it
+            // ages with it.
+            if muted.is_some() {
+                read = (at, sequence);
+            }
+            let physical = reading(&clock, read.0, read.1, muted);
             if now.saturating_sub(at) >= PRIVACY_FRESH_US {
                 ridden.aged_published += 1;
             }
@@ -2943,6 +2985,7 @@ pub(crate) mod tests {
         let ridden = ride_run_aging(
             true,
             true,
+            None,
             |ridden, now| {
                 ridden.aged_published >= 3
                     && ridden
@@ -2979,6 +3022,46 @@ pub(crate) mod tests {
             "the first fresh state's closed switch is read: {:?}",
             ridden.leases
         );
+    }
+
+    /// The first builder's P2 on #8489: with the ride on, a lapse whose
+    /// aged states read the slide closed ends the worker, as before #8466,
+    /// rather than passing the close over: a slide closed and opened again
+    /// inside one stall would otherwise never be seen. No lease grants
+    /// capture after the close, the fresh open reading after it included.
+    #[test]
+    fn an_aged_closed_reading_ends_the_ridden_worker_and_nothing_is_granted_after() {
+        let ridden = ride_run_aging(
+            true,
+            true,
+            Some(true),
+            |ridden, now| {
+                ridden.aged_published >= 3
+                    && ridden
+                        .lapsed_us
+                        .is_some_and(|lapsed| now >= lapsed + 120_000)
+            },
+            Some(false),
+            |ridden, now| {
+                ridden
+                    .back_us
+                    .is_some_and(|back| now >= back + 2 * crate::privacy::REOPEN_STABLE_US)
+            },
+        );
+        assert!(ridden.aged_published >= 1, "{}", ridden.said());
+        assert!(!ridden.running_at_end, "the worker ends: {}", ridden.said());
+        let (_, code) = ridden.fault().expect("the worker says why it ends");
+        assert_eq!(code, format!("{UNREADABLE}{AGED_CLOSED}"));
+        assert_eq!(ridden.ended, Some(Ok(())));
+        let lapsed = ridden.lapsed_us.unwrap();
+        let read_by = lapsed + 15_000;
+        let granted: Vec<u64> = ridden
+            .leases
+            .iter()
+            .filter(|(at, permitted, _)| *permitted && *at >= read_by)
+            .map(|(at, _, _)| *at)
+            .collect();
+        assert!(granted.is_empty(), "granted after the close: {granted:?}");
     }
 
     /// Heron's P2 on #8013: the lease itself. A lapsed reading carries the
