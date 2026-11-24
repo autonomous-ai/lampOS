@@ -449,6 +449,29 @@ impl Chat {
         Ok(chat)
     }
 
+    /// The person's own OpenAI-compatible model (#8362): asked plainly, as
+    /// another service may refuse a field it does not know, unless it is
+    /// DeepSeek's (the model named `deepseek...`, at `api.deepseek.com`, or
+    /// at the `relay`'s DeepSeek address): then as [`Self::deepseek_at`],
+    /// thinking off, as DeepSeek thinks by default and refuses a forced
+    /// `tool_choice` while thinking (400, kit-8420 on 24 Nov).
+    pub(crate) fn own_compatible(
+        base_url: &str,
+        model: &str,
+        key: &str,
+        declare: Declare,
+        relay: Option<&str>,
+    ) -> Result<Self> {
+        let deepseek = model.to_ascii_lowercase().starts_with("deepseek")
+            || crate::second_config::host(base_url) == "api.deepseek.com"
+            || relay == Some(base_url);
+        if deepseek {
+            Self::deepseek_at(base_url, model, key, declare, false)
+        } else {
+            Self::with(base_url, model, key, declare)
+        }
+    }
+
     /// Whether the model is sent a look's picture.
     pub fn sees(&self) -> bool {
         self.sees
@@ -1802,6 +1825,59 @@ data: [DONE]
         let on = Chat::deepseek("deepseek-v4-pro", "ds-key", Arc::new(Vec::new), true).unwrap();
         assert_eq!(on.body(&[])["thinking"], json!({"type": "enabled"}));
         assert!(!on.sees());
+    }
+
+    /// #8362, kit-8420 on 24 Nov: the person's own OpenAI-compatible model
+    /// is asked with DeepSeek's thinking off when it is DeepSeek's (by its
+    /// name, its host or the relay's DeepSeek address), as DeepSeek refuses
+    /// a forced `tool_choice` while thinking; any other is sent no
+    /// `thinking`, a field OpenAI refuses.
+    #[test]
+    fn an_own_compatible_deepseek_model_is_asked_with_thinking_off_and_no_other() {
+        let tool = lamp_gemini::Tool {
+            name: "light_on".into(),
+            description: "A tool.".into(),
+            parameters: None,
+            silent: false,
+        };
+        let declare: Declare = Arc::new(move || vec![tool.clone()]);
+        let own = |base: &str, model: &str| {
+            Chat::own_compatible(
+                base,
+                model,
+                "k",
+                declare.clone(),
+                Some("https://relay.invalid/ds"),
+            )
+            .unwrap()
+        };
+        for chat in [
+            own("https://llm.example.invalid/v1", "deepseek-flash"),
+            own("https://api.deepseek.com", "some-model"),
+            own("https://relay.invalid/ds", "some-model"),
+        ] {
+            assert_eq!(chat.body(&[])["thinking"], json!({"type": "disabled"}));
+        }
+        let openai = own("https://api.openai.com/v1", "gpt-4o-mini");
+        let body = openai.body(&[Message::user("Hi.")]);
+        assert_eq!(body["model"], "gpt-4o-mini");
+        assert_eq!(body.get("thinking"), None);
+        assert_eq!(body.get("stream_options"), None);
+
+        let forced = own("https://llm.example.invalid/v1", "deepseek-flash");
+        forced.forcing(Arc::new(|_: &[Message]| {
+            Some(Forced {
+                name: "light_on",
+                only: None,
+                fields: None,
+            })
+        }));
+        let body = forced.body(&[Message::user("Light on.")]);
+        assert_eq!(
+            body["tool_choice"],
+            json!({"type": "function", "function": {"name": "light_on"}})
+        );
+        assert_eq!(body["thinking"], json!({"type": "disabled"}));
     }
 
     /// OpenRouter's reasoning for a round's calls comes back with them, as

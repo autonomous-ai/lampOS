@@ -713,13 +713,14 @@ impl Net {
             .clone()
             .unwrap_or_else(|| crate::second_config::DEEPSEEK_BASE_URL.to_owned());
         // The person's own OpenAI-compatible model (#8362) is asked plainly,
-        // with none of DeepSeek's own fields.
+        // with none of DeepSeek's own fields unless it is DeepSeek's.
         self.chat = Arc::new(if self.config.hosted.lamps_own.is_some() {
-            Chat::with(
+            Chat::own_compatible(
                 &base,
                 &self.config.hosted.deepseek_model,
                 key,
                 self.declare.clone(),
+                self.config.hosted.relay_deepseek_base_url.as_deref(),
             )?
         } else {
             Chat::deepseek_at(
