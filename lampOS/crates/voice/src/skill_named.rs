@@ -1235,6 +1235,35 @@ mod tests {
         }
     }
 
+    /// #8451, the first builder's condition on (b): a made skill's ask is
+    /// matched as the whole phrase, never by its own words alone, so
+    /// "pebble hello", with one word of its own, is never started by
+    /// "pebble" alone, nor by its words the other way round.
+    #[test]
+    fn a_made_skills_ask_is_matched_whole_never_by_its_own_words_alone() {
+        let function = "made:pebble-hello";
+        let asks: BTreeMap<String, Vec<String>> =
+            [(function.to_owned(), vec!["pebble hello".to_owned()])].into();
+        for heard in [
+            "pebble hello",
+            "Pebble hello.",
+            "Lamp, pebble hello please.",
+        ] {
+            assert_eq!(asked(heard, &[function], &asks), Some(function), "{heard}");
+        }
+        for heard in [
+            "pebble",
+            "Pebble.",
+            "Lamp, pebble please.",
+            "hello pebble",
+            "pebble garden",
+            "pebble pebble",
+            "hello",
+        ] {
+            assert_eq!(asked(heard, &[function], &asks), None, "{heard}");
+        }
+    }
+
     /// The functions kept are read again once the tools file changes: a
     /// skill installed is matched on the next line, one removed is not.
     #[test]

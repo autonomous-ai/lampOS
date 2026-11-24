@@ -17794,10 +17794,6 @@ light = { colour = "green", level = 3, for = "20s" }
                 format!("\"what time is it\": {refused_why}"),
             ),
             (
-                "[\"pebble hello\"]".into(),
-                "\"pebble hello\": only 1 word of its own, \"pebble\"".into(),
-            ),
-            (
                 "[\"pebble garden tune\", \"Pebble garden tune\"]".into(),
                 "\"Pebble garden tune\": said twice".into(),
             ),
@@ -17830,6 +17826,46 @@ light = { colour = "green", level = 3, for = "20s" }
             let said = not_made_line(&plain_reason(&refused.0));
             assert_eq!(said, NOT_MADE_TRY, "{asks}");
         }
+        set_asks_here(None);
+        set_writes_here(None);
+    }
+
+    /// #8451, the first builder's call (b): an ask with one word of its
+    /// own ("pebble hello", "hello" being said around an ask) passes the
+    /// cap, and so the put-on's check of a skill already made with it, as
+    /// long as `skill_named::ask_refused` passes it; with none of its own
+    /// it is still refused. The two-word floor for asks the making model
+    /// chose is held at the make, to the person's line.
+    #[test]
+    fn a_made_skills_ask_with_one_word_of_its_own_passes_the_cap_and_the_put_on() {
+        set_writes_here(Some(true));
+        set_asks_here(Some(true));
+        let with = |asks: &str| ASKS_WRITE_TOML.replace("[\"send my test note\"]", asks);
+        let hello = with("[\"pebble hello\"]");
+        assert!(capped_with(&hello, false).is_ok());
+        assert!(put_on_cap(&hello).is_ok());
+        assert_eq!(
+            made_asks(&toml::from_str(&hello).unwrap()).unwrap(),
+            ["pebble hello"]
+        );
+        let none = with("[\"hello please\"]");
+        assert_eq!(
+            capped_with(&none, false).unwrap_err().0,
+            format!(
+                "its asks weren't kept: asks = [\"hello please\"]: \"hello please\": {}",
+                crate::skill_named::ask_refused("hello please").unwrap()
+            )
+        );
+        // A skill added from a file keeps the two-word floor: no person's
+        // line is there to hold it to.
+        let added = "asks = [\"pebble hello\"]\nkind = \"installable\"\nversion = \"1.0.0\"\n\
+                     tool = \"glow_back\"\n[permissions]\nlight = true\n[[do]]\n\
+                     light = { colour = \"cyan\" }\n";
+        assert_eq!(
+            capped_added(added).unwrap_err().0,
+            "its asks weren't kept: asks = [\"pebble hello\"]: \"pebble hello\": only 1 word of its \
+             own, \"pebble\""
+        );
         set_asks_here(None);
         set_writes_here(None);
     }
@@ -17872,15 +17908,13 @@ light = { colour = "green", level = 3, for = "20s" }
                 .0,
             "its asks weren't kept: asks = [\"pebble, hello\"]: \"pebble, hello\": a \",\" in it"
         );
-        // The row's own asks: its "!" tidied, then refused on the rule it
-        // still breaks ("hello" is said around an ask), named.
+        // The row's own asks: its "!" tidied, then past the cap with one
+        // word of its own ("hello" is said around an ask), the two-word
+        // floor being the make's, held to the person's line there (#8451,
+        // the first builder's call (b): `asks_heard`).
         let paced_hello = paced(&with("[\"pebble hello!\"]"));
         assert_eq!(paced_hello, with("[\"pebble hello\"]"));
-        assert_eq!(
-            capped_with(&paced_hello, false).unwrap_err().0,
-            "its asks weren't kept: asks = [\"pebble hello\"]: \"pebble hello\": only 1 word of its \
-             own, \"pebble\""
-        );
+        assert!(capped_with(&paced_hello, false).is_ok());
         set_asks_here(None);
         set_writes_here(None);
     }
