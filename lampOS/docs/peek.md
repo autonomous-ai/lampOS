@@ -31,7 +31,10 @@ It looks like V1's Flow Monitor (#7208): V1's dark tokens
 (`system/web/src/index.css`, `.lm-root`) copied as CSS variables, a left nav
 with an icon per section and the shown one highlighted, and a top bar with
 the lamp's host name, lamp-peek's build (its release folder), `read only`,
-and a live dot that turns grey within 3 s of the stream stopping. Each
+and a live dot that turns grey within 3 s of the stream stopping. A quiet
+lamp sends no section that hasn't changed, so the stream sends an empty
+`alive` event every 2 s when nothing else went, and the dot stays green
+while the page is connected. Each
 section sits in a card. Under 640 px the nav is a strip on top. Everything is
 inline: no font, script, stylesheet or picture comes from anywhere else, so
 the page works with the lamp offline. The shared classes for the sections

@@ -560,8 +560,7 @@ fn frame(peek: &Peek) -> String {
 async fn push(served: &Arc<Served>, count: u32, sent: &mut Sent) -> Vec<Event> {
     let mut events = Vec::new();
     let mut send = |name: &'static str, data: &str| {
-        let hash = text_hash(data);
-        if sent.insert(name, hash) != Some(hash) {
+        if changed(sent, name, data) {
             events.push(Event::default().event(name).data(data));
         }
     };
@@ -571,7 +570,24 @@ async fn push(served: &Arc<Served>, count: u32, sent: &mut Sent) -> Vec<Event> {
             send(name, data);
         }
     }
+    if events.is_empty() && count.is_multiple_of(ALIVE_EVERY) {
+        events.push(Event::default().event(ALIVE).data(""));
+    }
     events
+}
+
+/// The event a push with nothing changed sends every [`ALIVE_EVERY`]th
+/// push (2 s), so the page's live dot stays green while the stream is
+/// open on a quiet lamp; it carries no text.
+pub const ALIVE: &str = "alive";
+const ALIVE_EVERY: u32 = 2 * SECTIONS_EVERY;
+
+/// Whether `data` is not the text this stream sent last for `name`, and
+/// records it as sent: only the last text counts, so a section that
+/// changes back to an earlier text is sent again.
+fn changed(sent: &mut Sent, name: &'static str, data: &str) -> bool {
+    let hash = text_hash(data);
+    sent.insert(name, hash) != Some(hash)
 }
 
 /// What one stream sent last, by section: a hash of its text.
@@ -733,6 +749,19 @@ async fn events(
 
 #[cfg(test)]
 mod tests {
+    /// Only the last text sent counts: A, A, B, A sends A, B and A again,
+    /// and each section is kept apart.
+    #[test]
+    fn a_section_that_changes_back_is_sent_again() {
+        let mut sent = super::Sent::new();
+        assert!(super::changed(&mut sent, "health", "alpha"));
+        assert!(!super::changed(&mut sent, "health", "alpha"));
+        assert!(super::changed(&mut sent, "health", "beta"));
+        assert!(super::changed(&mut sent, "health", "alpha"));
+        assert!(super::changed(&mut sent, "tasks", "alpha"));
+        assert!(!super::changed(&mut sent, "health", "alpha"));
+    }
+
     use super::*;
 
     #[test]
