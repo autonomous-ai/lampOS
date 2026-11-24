@@ -2367,6 +2367,27 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     `agent_tasks::tests::a_new_ask_while_a_task_waits_replaces_it_and_the_yes_starts_the_new_one`,
     `agent_tasks::tests::a_question_while_a_task_waits_leaves_its_yes`,
     `agent_tasks::tests::a_yes_said_at_length_starts_the_waiting_task`.
+  - **A start on a plain yes confirms the task waiting (#8022 case 2).**
+    On lamp-52e6 (ROW on #8043, 24 Nov) a new ask said over the last
+    task's yes was prepared and read back, and the person's one-word yes
+    called `start_agent_task` again, not `confirm_agent_task`: the task
+    waiting never reached the tasks part. Now `start_agent_task` in a
+    request whose own heard line is a plain yes (`plain_yes`), while a task
+    waits that this request may confirm (`may_confirm`), with the same work
+    (`same_work`: the same words, or a task of at least `WHOLE_ASK_FEWEST`
+    ask words that keeps at least half of them) or no task, is that task's
+    confirm, through `confirm_agent_task`'s own path (journal `lamp-voice:
+    tasks: request N: start_agent_task on a plain yes while task <id> waits
+    for it: confirmed instead (#8022)`). A start in a request whose yes already
+    started the task (in code before the chat round, or by this rule)
+    answers `already_handed_over` and asks nothing.
+    And a different task prepared from a later request that may confirm the
+    one waiting now always replaces it, cancelled and said as declined,
+    with or without `LAMP_TASKS_CORRECT` and whether or not its line reads
+    as a new ask: before, such a start overwrote it silently, never
+    cancelled. Tests:
+    `agent_tasks::tests::a_start_called_on_a_plain_yes_while_a_task_waits_confirms_that_task`,
+    `agent_tasks::tests::a_different_start_while_a_task_waits_cancels_it_never_drops_it_silently`.
   - **No computer in `where` without a pairing (#6547 (1c)).** With no
     computer paired (no staff: the test the description already uses),
     `where`'s `enum` is `["lamp"]` alone and its description never names

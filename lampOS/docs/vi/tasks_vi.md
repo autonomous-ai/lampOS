@@ -4100,6 +4100,27 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   `agent_tasks::tests::a_new_ask_while_a_task_waits_replaces_it_and_the_yes_starts_the_new_one`,
   `agent_tasks::tests::a_question_while_a_task_waits_leaves_its_yes`,
   `agent_tasks::tests::a_yes_said_at_length_starts_the_waiting_task`.
+- **Gọi start trên một tiếng yes đơn thuần thì xác nhận việc đang chờ
+  (#8022 case 2).** Trên lamp-52e6 (ROW trên #8043, 24/11) một lời nhờ mới
+  nói đè lên tiếng yes của việc trước được chuẩn bị và đọc lại, rồi tiếng
+  yes một từ của người dùng lại gọi `start_agent_task`, không gọi
+  `confirm_agent_task`: việc đang chờ không bao giờ tới phần tasks. Giờ
+  `start_agent_task` trong một request mà câu nghe được của chính nó là yes
+  đơn thuần (`plain_yes`), khi đang có việc chờ mà request này được phép
+  xác nhận (`may_confirm`), với cùng việc (`same_work`: cùng lời, hoặc một
+  việc có ít nhất `WHOLE_ASK_FEWEST` từ nhờ việc giữ được ít nhất một nửa
+  số từ đó) hoặc không có task, chính là lần xác nhận việc đó, qua đường
+  của `confirm_agent_task` (journal `lamp-voice: tasks: request N:
+  start_agent_task on a plain yes while task <id> waits for it: confirmed
+  instead (#8022)`). Một start trong request mà tiếng yes đã khởi động
+  việc (trong code trước vòng chat, hoặc theo luật này) trả lời
+  `already_handed_over` và không hỏi gì.
+  Và một việc khác được chuẩn bị từ request sau, được phép xác nhận việc
+  đang chờ, giờ luôn thay việc đó, hủy nó và báo là declined, có hay không
+  có `LAMP_TASKS_CORRECT` và dù câu đó có được đọc là lời nhờ mới hay
+  không: trước đây start như vậy ghi đè lặng lẽ, không bao giờ hủy. Test:
+  `agent_tasks::tests::a_start_called_on_a_plain_yes_while_a_task_waits_confirms_that_task`,
+  `agent_tasks::tests::a_different_start_while_a_task_waits_cancels_it_never_drops_it_silently`.
 - **Một tiếng yes cho lời đọc lại chỉ bằng lời (#6547 A, bật trong sản
   phẩm, không có công tắc tắt).** Một tiếng yes đáp lại lời đọc lại chỉ
   bằng lời của đèn, ngay trong lượt trao đổi đó và trong `CONFIRM_WITHIN`
