@@ -365,6 +365,9 @@ Environment=LAMP_BUSY_NO_FACE_RENEWS=on
 Environment=LAMP_TURNED_FACE_SPEAKS=on
 # LAMP_SAID_TO_ME: its why and rules are its row in docs/switches.md (#7442).
 Environment=LAMP_SAID_TO_ME=on
+# LAMP_ASKED_LOOKS: its why and rules are its row in docs/switches.md (#8395). DEFAULT-ON asked of the first builder
+# on #8395.
+Environment=LAMP_ASKED_LOOKS=on
 # LAMP_SPEAKING_READ_LOOKS: its why and rules are its row in docs/switches.md (#7442, #7419).
 Environment=LAMP_SPEAKING_READ_LOOKS=on
 # LAMP_ONE_AS_LAMP: its why and rules are its row in docs/switches.md (#4710).

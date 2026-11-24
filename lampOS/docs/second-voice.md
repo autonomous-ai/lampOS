@@ -6503,8 +6503,8 @@ after a take-over, but now for every turn:
   of the lamp's words: its look counts (LAMP_ASKED_LOOKS)`. The name, a yes
   awaited, a look at the lamp, a pose unread and `LAMP_NAME_SIGN_TIED`'s one
   no-look answer (fresh `question_waits`, 120 s from the question's start)
-  are as before. Off unless set; the product switch-on waits for a ROW on
-  lamp-52e6. Risk: a reply said looking away to a question more than 20 s
+  are as before. Off unless set; on in the product's `lamp-voice` (#8395's
+  switch-on, after the ROW on lamp-52e6). Risk: a reply said looking away to a question more than 20 s
   after the lamp's words ended, or a second reply looking away, needs a
   look or the name. The 0-word wake that opened the 16:17 run is #8114's.
 - **Who spoke a line, from the looks its mouth was read**
