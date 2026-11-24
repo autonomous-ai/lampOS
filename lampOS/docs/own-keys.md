@@ -1,4 +1,4 @@
-# A person's own keys (#2094, built, off unless set)
+# A person's own keys (#2094, built, on in the product since #8367)
 
 Product lamps answer through the Autonomous relay and hold no provider key of
 the company's (the lead on #1711, 20 Oct 07:34). A person may bring their
@@ -7,16 +7,20 @@ and a **Deepgram** key for speech to text. Each is optional. With none, the
 lamp uses the relay, as before. The design was agreed on #2094 (El 09:42,
 the first builder 09:44, Third's privacy read 09:50).
 
-**Off unless `LAMP_OWN_KEYS=on`**, on three units: `lamp-setup` and
-`lamp-cloud` (`Environment=LAMP_OWN_KEYS=on` in a drop-in), and the voice,
-through `deploy/product/own-keys-voice.conf` placed as
-`/etc/systemd/system/lamp-voice.service.d/own-keys.conf`. `lamp-cloud` also
-needs `LAMP_CLOUD=on` and `LAMP_SETTINGS_CHANGE=on`. The helper's units
-(`lamp-setup-keys.socket`, `lamp-setup-keys@.service`) are enabled by hand
-with the switch, as they aren't in `install`'s list yet. The helper itself
-doesn't read the switch (its unit passes `--enable`): with the switch off it
-is closed because its units aren't installed, `lamp-cloud` answers "not on
-this lamp" and only `lamp-cloud` may ask. Off, nothing changes:
+**`LAMP_OWN_KEYS=on`, on in the product (#8367)** on three units:
+`lamp-setup.service`, `lamp-cloud.service` and `lamp-voice.service`, the
+voice's with the keys' folder (`ConfigurationDirectory=lampOS/voice/own`,
+mode 0700, and `LoadCredential=own:/etc/lampOS/voice/own`, the lines
+`deploy/product/own-keys-voice.conf` gave test lamps by hand, which a lamp
+no longer needs). `lamp-cloud` also needs `LAMP_CLOUD=on` and
+`LAMP_SETTINGS_CHANGE=on`, both on in the product. `install` places the
+helper's units (`lamp-setup-keys.socket`, enabled, and
+`lamp-setup-keys@.service`), and a round adds them to a lamp installed
+before; an added socket listens from the lamp's next start (`added::to_start`
+starts services only). The helper itself doesn't read the switch (its unit
+passes `--enable`): `lamp-cloud` answers "not on this lamp" with the switch
+off, and only `lamp-cloud` may ask. With a unit's switch set off in a
+drop-in (`LAMP_OWN_KEYS=off`), nothing changes:
 setup checks and keeps nothing and says nothing new, the app's kinds are
 "not on this lamp", and the voice reads no person's key even if one is
 there.
@@ -187,14 +191,15 @@ refused request goes through Autonomous's relay again. Only `lamp-health`'s
 `voice-keys` warning says so; the app could show it beside the keys screen
 (the reviewer's P3 5 on #2167).
 
-## Your own voice: ElevenLabs (#8367, built, off unless set)
+## Your own voice: ElevenLabs (#8367, built, on in the product since #8367)
 
 The person's own ElevenLabs API key and voice ID, set from the app on the
 same `keys.*` path, speak the lamp's live speech in their voice. Agreed on
 #8367 (Mobile 12:02, the first builder 12:03 and 12:18) on #8362's
 contract (the first builder 11:44, Mobile 11:46). The same switch,
-`LAMP_OWN_KEYS`, and nothing new with it off. Not yet run on a lamp, nor
-against ElevenLabs' own service.
+`LAMP_OWN_KEYS`, and nothing new with it off. Run on lamp-52e6 through the
+relay (#8394's row, ROW 7116296452); not yet against ElevenLabs' own
+service.
 
 - **The messages:** `keys.get` gains `offers`, one entry per service the
   lamp takes a key for, `kind` `"model"` or `"voice"` and `fields` the
@@ -329,7 +334,7 @@ test (#8367): a real key and voice ID entered from the app by that lamp's
 person, a few turns in that voice, a bad key told plainly, and a remove
 giving the lamp's own voice back.
 
-## An OpenAI-compatible model (#8362 step 1b, built, off unless set)
+## An OpenAI-compatible model (#8362 step 1b, built, on in the product since #8367)
 
 A person's own model at any OpenAI-compatible endpoint (Grok and the like),
 on the same `keys.*` path and the same switch, with the contract agreed on
@@ -432,7 +437,7 @@ on the same `keys.*` path and the same switch, with the contract agreed on
     round trip on that turn.
 - **Off:** nothing new is read or said; today's behaviour as it is.
 
-## Named model providers: OpenRouter, Gemini and Anthropic (#8420, built, off unless set)
+## Named model providers: OpenRouter, Gemini and Anthropic (#8420, built, on in the product since #8367)
 
 A person's own model by its provider's name, on the same `keys.*` path and
 switch as the OpenAI-compatible one, with the plan the first builder agreed
@@ -495,7 +500,7 @@ own provider (#2094's rule). The tests that pin it:
 - **Not yet run on a lamp:** a real key and model from the app, a few
   turns, a bad key and a made-up model told plainly, and a remove.
 
-### Gemini (#8420, built, off unless set)
+### Gemini (#8420, built, on in the product since #8367)
 
 The second named provider, by the same rule: Google's OpenAI-compatible
 endpoint, fixed. The tests that pin it: `setup/tests/it/keys.rs`
@@ -552,7 +557,7 @@ endpoint, fixed. The tests that pin it: `setup/tests/it/keys.rs`
 - **Not yet run on a lamp:** a real key and model from the app, as for
   OpenRouter.
 
-### Anthropic (#8420, built, off unless set)
+### Anthropic (#8420, built, on in the product since #8367)
 
 The third named provider, by the same rule: Anthropic's API, fixed. The
 tests that pin it: `setup/tests/it/keys.rs`
