@@ -431,6 +431,35 @@ pub fn said_in(ask: &str, line: &str) -> bool {
     holds(&lower_words(line), &phrase)
 }
 
+/// What ends a clause of the person's line for a make ([`said_whole`]).
+const CLAUSE_ENDS: &[char] = &[',', '.', ';', ':', '!', '?'];
+
+/// The words a person names a skill's start after ("whenever I say ...").
+const SAY_CUES: &[&str] = &["say", "says", "said", "saying", "hear", "hears", "heard"];
+
+/// The person's whole phrase in `line` that holds `ask` as words in a row
+/// ([`said_in`]), lowercased (#8451, the first builder's required change
+/// on #8469): the words after the last of [`SAY_CUES`] before it, to the
+/// end of its clause ([`CLAUSE_ENDS`]): "hello there pebble" for "hello
+/// there" in "whenever I say hello there pebble, email me". None when no
+/// clause holds it after such a word.
+pub fn said_whole(ask: &str, line: &str) -> Option<Vec<String>> {
+    let phrase = lower_words(ask);
+    if phrase.is_empty() {
+        return None;
+    }
+    line.split(CLAUSE_ENDS).find_map(|clause| {
+        let words = lower_words(clause);
+        let at = words
+            .windows(phrase.len())
+            .position(|window| window == phrase.as_slice())?;
+        let cue = words[..at]
+            .iter()
+            .rposition(|word| SAY_CUES.contains(&word.as_str()))?;
+        Some(words[cue + 1..].to_vec())
+    })
+}
+
 /// Whether two ask phrases are matched as the same ([`loose_ask`]): "Take
 /// a photo" and "take a photo".
 pub fn same_ask(one: &str, other: &str) -> bool {
@@ -1288,6 +1317,33 @@ mod tests {
         ] {
             assert_eq!(asked(heard, &[function], &asks), None, "{heard}");
         }
+    }
+
+    /// #8451, the first builder's required change on #8469: the person's
+    /// whole phrase holding an ask is the words after their "say" to the
+    /// end of its clause; none without such a word before it.
+    #[test]
+    fn the_persons_whole_phrase_runs_from_their_say_to_the_end_of_its_clause() {
+        let line = "Whenever I say hello there pebble, email me the note.";
+        let whole = Some(vec![
+            "hello".to_owned(),
+            "there".to_owned(),
+            "pebble".to_owned(),
+        ]);
+        assert_eq!(said_whole("hello there", line), whole);
+        assert_eq!(said_whole("there pebble", line), whole);
+        assert_eq!(said_whole("Hello there pebble", line), whole);
+        assert_eq!(
+            said_whole("stop the music", "when I say \"stop the music\", email me"),
+            Some(vec![
+                "stop".to_owned(),
+                "the".to_owned(),
+                "music".to_owned()
+            ])
+        );
+        assert_eq!(said_whole("email me", line), None);
+        assert_eq!(said_whole("pebble hello", line), None);
+        assert_eq!(said_whole("hello there", "hello there pebble"), None);
     }
 
     /// The functions kept are read again once the tools file changes: a

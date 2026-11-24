@@ -10380,6 +10380,140 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// #8451, the first builder's required change on #8469: the person's
+    /// whole phrase for a skill's start ("hello there", all of what they
+    /// named) refused by a rule no writer can change is said at once,
+    /// plainly, with no repair spent on it.
+    #[test]
+    fn a_refused_ask_that_is_the_persons_whole_phrase_is_said_at_once_with_no_repair() {
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        let request = "whenever I say hello there, email me@example.com with the subject Test \
+                       note, saying This is my test note.";
+        let toml = asks_mail_toml("hello there");
+        let (root, keeping) = keeping("asks-whole-refused");
+        let refused = made_skill::keep_asked(
+            &write_answer(&toml),
+            false,
+            FROM,
+            &keeping,
+            &made_skill::Asked {
+                request,
+                heard: Some(request),
+                ..made_skill::Asked::default()
+            },
+        )
+        .unwrap_err();
+        assert!(made_skill::their_ask(&refused.0), "{refused:?}");
+        assert!(refused.0.contains("‘hello there’, because"), "{refused:?}");
+        assert!(refused.1.is_none(), "no repair: {refused:?}");
+        let _ = std::fs::remove_dir_all(&root);
+        let (root, keeping) = keeping("asks-whole-refused-made");
+        let (url, served) = service(vec![(200, write_answer(&toml))]);
+        let told = make_with(
+            7,
+            Some(request),
+            request,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1, "no repair: {told}");
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", refused.0),
+            "{told}"
+        );
+        made_skill::set_asks_here(None);
+        made_skill::set_writes_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #8451, the first builder's required change on #8469: an ask that is
+    /// only part of a longer phrase the person named ("hello there" from
+    /// "whenever I say hello there pebble") and is refused is the writer's
+    /// mistake: a repair is spent on it, never the plain line, and the
+    /// repair names the person's whole phrase ("use the words they said:
+    /// hello there pebble"), which is then kept.
+    #[test]
+    fn a_refused_part_of_the_persons_longer_phrase_spends_a_repair_naming_it_whole() {
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        let request = "whenever I say hello there pebble, email me@example.com with the subject \
+                       Test note, saying This is my test note.";
+        let (root, keeping) = keeping("asks-part-refused");
+        let refused = made_skill::keep_asked(
+            &write_answer(&asks_mail_toml("hello there")),
+            false,
+            FROM,
+            &keeping,
+            &made_skill::Asked {
+                request,
+                heard: Some(request),
+                ..made_skill::Asked::default()
+            },
+        )
+        .unwrap_err();
+        assert!(!made_skill::their_ask(&refused.0), "{refused:?}");
+        assert_eq!(
+            refused.0,
+            format!(
+                "its asks weren't kept: asks = [\"hello there\"]: \"hello there\": {}",
+                crate::skill_named::ask_refused("hello there").unwrap()
+            )
+        );
+        let repair = refused.1.as_deref().expect("repaired");
+        assert!(
+            repair.contains("use the words they said: hello there pebble."),
+            "{repair}"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+        let (root, keeping) = keeping("asks-part-refused-made");
+        let (url, served) = service_sent(vec![
+            (200, write_answer(&asks_mail_toml("hello there"))),
+            (200, write_answer(&asks_mail_toml("hello there pebble"))),
+        ]);
+        let asked = manage_helper(&keeping.manage);
+        let told = make_with(
+            7,
+            Some(request),
+            request,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        let sent = served.join().unwrap();
+        assert_eq!(sent.len(), 2, "one repair: {told}");
+        assert!(
+            sent[1].contains("use the words they said: hello there pebble"),
+            "{}",
+            sent[1]
+        );
+        assert_eq!(told["made"], "leaving-mail", "{told}");
+        asked.join().unwrap();
+        assert_eq!(
+            made_skill::entries(&keeping.directory)[0]["asks"],
+            serde_json::json!(["hello there pebble"]),
+        );
+        made_skill::set_asks_here(None);
+        made_skill::set_writes_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A made skill sending the test note, started by `asks` (#8451).
+    fn asks_mail_toml(asks: &str) -> String {
+        format!(
+            "asks = [\"{asks}\"]\n\
+             kind = \"installable\"\nversion = \"1.0.0\"\n\
+             [permissions]\nservices = {{ gmail = \"write\" }}\n[[do]]\n\
+             write = {{ service = \"gmail\", action = \"send_mail\", to = [\"me@example.com\"], \
+             subject = \"Test note\", text = \"This is my test note.\" }}\n"
+        )
+    }
+
     /// #6307, with `LAMP_MADE_SCRIPTS` off: the making model is never told
     /// a skill may carry code, nor the function that a yes may put one on;
     /// on, it is told the form, its bounds and its grants.

@@ -4941,8 +4941,8 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    giữ; kỹ năng thêm từ file vẫn cần hai (`capped_added`). **Chính lời của
    người dùng phạm một quy tắc mà không người viết nào đổi được**
    (`made_skill::their_ask_refused`, trước cap, phần (a) của first
-   builder): một cụm là chuỗi từ trong câu của người dùng, 2 đến 8 từ và
-   trong 60 ký tự, bị `skill_named::ask_refused` từ chối, được nói ngay,
+   builder): một cụm là nguyên cụm từ người dùng nói để khởi động kỹ năng,
+   2 đến 8 từ và trong 60 ký tự, bị `skill_named::ask_refused` từ chối, được nói ngay,
    rõ ràng, mỗi quy tắc một câu, không tốn lần sửa nào và không giao cho
    agent của đèn: "I can't start a skill with ‘stop the music’, because
    that's how you stop me." (một lệnh dừng), "…, because a no or a
@@ -4952,9 +4952,26 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    of mine, like the light or the music." (`plain_reason` và
    `not_made_line` nói nguyên câu), ghi journal là `a made skill was not
    kept: its asks weren't kept: asks = [<như đã viết>]: "<cụm đó>": the
-   person's own words, <lời của ask_refused>: told at once, no repair`. Số
-   từ hay độ dài vẫn được sửa như trước: người viết có thể sửa bằng nhiều
-   hơn hoặc ít hơn từ của người dùng. Nếu
+   person's own words, <lời của ask_refused>: told at once, no repair`.
+   **Nguyên cụm của người dùng** (`skill_named::said_whole`, `made_skill::
+   their_whole`, thay đổi bắt buộc của first builder trên #8469) là các từ
+   trong câu của họ sau "say", "says", "said", "saying", "hear", "hears"
+   hoặc "heard" cuối cùng đứng trước cụm đó, đến hết mệnh đề (một `,`,
+   `.`, `;`, `:`, `!` hoặc `?`), viết thường: "hello there pebble" trong
+   "whenever I say hello there pebble, email me…". Câu không có cụm như
+   vậy, hoặc cụm không phải 2 đến 8 từ trong 60 ký tự, thì lấy chính cụm
+   đó làm nguyên cụm của người dùng. **Một cụm chỉ là một phần của cụm dài
+   hơn người dùng đã nói** ("hello there" từ "hello there pebble") và bị
+   từ chối như vậy là lỗi của người viết, người viết sửa được: nó tốn một
+   lần sửa, không bao giờ là câu nói thẳng. Nó bị từ chối như cap từ chối
+   (`its asks weren't kept: asks = [<như đã viết>]: "<cụm đó>": <lời của
+   ask_refused>`), và lần sửa nêu nguyên cụm của người dùng: `The lamp
+   refused it: <dòng đó>. "<cụm đó>" is only part of the words the person
+   said for its start; use the words they said: <nguyên cụm của người
+   dùng>. <mẫu form>`. Khi chính nguyên cụm của người dùng phạm một quy
+   tắc như vậy, câu nói thẳng được nói ngay cho nguyên cụm đó, như trên.
+   Số từ hay độ dài vẫn được sửa như trước: người viết có thể sửa bằng
+   nhiều hơn hoặc ít hơn từ của người dùng. Nếu
    không, nó bị từ chối và nêu đúng quy tắc (#8451): dòng journal (dòng
    sửa lại và dòng "wasn't kept") là `its asks weren't kept: asks = [<như
    đã viết>]: "<cụm bị từ chối>": <quy tắc>`, quy tắc bằng lời thường:

@@ -8652,8 +8652,8 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    added from a file keeps two (`capped_added`). **The person's own words
    that break a rule no writer can change** (`made_skill::
    their_ask_refused`, before the cap, the first builder's (a)): an ask
-   that is a run of the person's line, 2 to 8 words and within 60
-   characters, refused by `skill_named::ask_refused`, is said at once,
+   that is the person's whole phrase for its start, 2 to 8 words and
+   within 60 characters, refused by `skill_named::ask_refused`, is said at once,
    plainly, one line a rule, and no repair is spent on it, nor is it
    handed to the lamp's agent: "I can't start a skill with ‘stop the
    music’, because that's how you stop me." (a stop), "…, because a no or
@@ -8663,7 +8663,24 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    things of mine, like the light or the music." (`plain_reason` and
    `not_made_line` say it as it is), journaled as `a made skill was not
    kept: its asks weren't kept: asks = [<as given>]: "<the ask>": the
-   person's own words, <ask_refused's words>: told at once, no repair`. A
+   person's own words, <ask_refused's words>: told at once, no repair`.
+   **Their whole phrase** (`skill_named::said_whole`, `made_skill::
+   their_whole`, the first builder's required change on #8469) is the
+   words of their line after its last "say", "says", "said", "saying",
+   "hear", "hears" or "heard" before the ask, to the end of that clause
+   (a `,`, `.`, `;`, `:`, `!` or `?`), lowercased: "hello there pebble"
+   in "whenever I say hello there pebble, email me…". A line with no such
+   phrase, or one that is not 2 to 8 words within 60 characters, takes the
+   ask itself as their whole phrase. **An ask that is only part of their
+   longer phrase** ("hello there" from "hello there pebble") and is
+   refused so is the writer's mistake, which the writer can mend: it
+   spends a repair, never the plain line. It is refused as the cap
+   refuses it (`its asks weren't kept: asks = [<as given>]: "<the
+   ask>": <ask_refused's words>`), and its repair names their whole
+   phrase: `The lamp refused it: <that line>. "<the ask>" is only part of
+   the words the person said for its start; use the words they said:
+   <their whole phrase>. <the form>`. When their whole phrase itself
+   breaks such a rule, the plain line is said at once for it, as above. A
    count or a length of words is still repaired: the writer may mend it
    with more or fewer of the person's words. Otherwise it is refused naming its rule (#8451): the
    journal line (the repair's and the "wasn't kept" one) is `its asks
