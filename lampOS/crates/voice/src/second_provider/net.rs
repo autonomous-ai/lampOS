@@ -26,6 +26,8 @@ pub use gemini_tts::{GeminiSpeech, GeminiTts};
 pub(crate) use public::{DOH_ENVIRONMENT, get_public_json_within};
 pub use sentences::Sentences;
 pub use stt::{Early, QUIET_HELD_ENVIRONMENT, Replies, SttStream, check as stt_check};
+#[cfg(test)]
+pub(crate) use tts::{OWN_VOICE_LOST_LINE, OwnVoiceLost, SocketShape, socket_end, socket_opening};
 pub use tts::{
     OWN_VOICE_REFUSED, PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream, Turn, default_model,
     voice_name, voice_told,
@@ -36,8 +38,6 @@ pub(crate) use tts::{
     Request as SpeechRequest, SocketRequest, on_elevenlabs, request as speech_request,
     socket_answer, socket_piece, socket_request,
 };
-#[cfg(test)]
-pub(crate) use tts::{SocketShape, socket_end, socket_opening};
 pub use watch::{Opening, OpeningTold, Reach, Watch};
 
 /// To open a connection, TLS included.

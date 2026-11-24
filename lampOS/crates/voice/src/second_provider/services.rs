@@ -911,6 +911,21 @@ impl Voice {
     fn asks_fresh(&self, turn: Option<net::Turn>) -> bool {
         matches!((self, turn), (Self::Configured(..), Some(_)))
     }
+
+    /// Whether a piece asked now goes to the person's own ElevenLabs voice
+    /// (#8367), which gives way to the lamp's own once it fails a piece
+    /// twice ([`in_one_voice_near`], #8394's P2).
+    fn speaks_the_persons(&self) -> bool {
+        matches!(self, Self::Configured(tts, _) if tts.speaks_the_persons())
+    }
+
+    /// The person's own voice gives way to the lamp's own, `why` its second
+    /// failure ([`net::Tts::give_way`]); nothing for any other voice.
+    fn give_way(&self, why: &net::Error) {
+        if let Self::Configured(tts, _) = self {
+            tts.give_way(why);
+        }
+    }
 }
 
 /// What a piece of an answer's speech fails with when it could not be
@@ -935,7 +950,11 @@ const START_WITHIN: std::time::Duration = std::time::Duration::from_secs(4);
 /// which the answer's player says with the next piece, so the turn goes on
 /// and no sentence is silently dropped (#1844's C: before, the second
 /// failure failed the whole turn; #4338: before, the sentence was dropped).
-/// A sentence begun and then lost fails as any does.
+/// A sentence begun and then lost fails as any does. The person's own
+/// ElevenLabs voice failing a sentence twice gives way to the lamp's own,
+/// which is asked for it once, after the one notice, and says every one
+/// after (#8394's P2: before, it was left unsaid, and every reply after it
+/// silent until the voice restarted).
 #[cfg(test)]
 fn in_one_voice(
     voice: Voice,
@@ -997,8 +1016,32 @@ fn in_one_voice_near(
                     "lamp-voice second: {} failed to start a sentence ({error}); asked once more{how}",
                     voice.name()
                 );
+                // Whether the second asking goes to the person's own voice,
+                // read before it: after a refusal it goes to the lamp's,
+                // which is asked as any voice is.
+                let persons = voice.speaks_the_persons();
                 match fresh(&voice).await {
                     Ok(speech) => Ok(speech),
+                    // #8394's P2: the person's own voice failed it twice, for
+                    // any reason (a 400 or 422, a 429, a 5xx, a first sound
+                    // later than START_WITHIN): the lamp's own voice says it,
+                    // after the one notice, and every sentence after.
+                    Err(again) if persons => {
+                        eprintln!(
+                            "lamp-voice second: {} failed again ({again}); the lamp's own voice is asked for it (LAMP_OWN_KEYS)",
+                            voice.name()
+                        );
+                        voice.give_way(&again);
+                        match first(&voice).await {
+                            Ok(speech) => Ok(speech),
+                            Err(lamps) => {
+                                eprintln!(
+                                    "lamp-voice second: the lamp's own voice failed it too ({lamps}); the sentence could not be started"
+                                );
+                                Err(net::Error::Timeout(UNSAID))
+                            }
+                        }
+                    }
                     Err(again) => {
                         eprintln!(
                             "lamp-voice second: {} failed again ({again}); the sentence could not be started",
@@ -1647,6 +1690,297 @@ pub(crate) mod tests {
             "{took:?}"
         );
         held.abort();
+    }
+
+    /// The person's own ElevenLabs key, and the lamp's own voice's.
+    const PERSONS_KEY: &str = "sk-planted-8394-own";
+    const PERSONS_VOICE: &str = "PersonVoice8394";
+    const LAMPS_KEY: &str = "k-lamps-8394";
+
+    /// A local plain HTTP server answering every request carrying `key`,
+    /// each on its own connection, `after` it came, with `head` and `body`;
+    /// each such request's body as it came. Any other is answered 404 and
+    /// not kept, as [`next_ours`] does.
+    async fn recording(
+        head: String,
+        body: Vec<u8>,
+        key: &'static str,
+        after: std::time::Duration,
+    ) -> (String, Arc<Mutex<Vec<String>>>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let kept = bodies.clone();
+        tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                let (kept, head, body) = (kept.clone(), head.clone(), body.clone());
+                tokio::spawn(async move {
+                    let mut read = Vec::new();
+                    let mut buffer = [0; 4096];
+                    let end = loop {
+                        if let Some(end) = read.windows(4).position(|w| w == b"\r\n\r\n") {
+                            break end + 4;
+                        }
+                        match socket.read(&mut buffer).await {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => read.extend_from_slice(&buffer[..n]),
+                        }
+                    };
+                    let request = String::from_utf8_lossy(&read[..end]).to_lowercase();
+                    if !request.contains(key) {
+                        let _ = socket.write_all(NOT_HERE.as_bytes()).await;
+                        return;
+                    }
+                    let length: usize = request
+                        .lines()
+                        .find_map(|line| line.strip_prefix("content-length:"))
+                        .map_or(0, |n| n.trim().parse().unwrap());
+                    while read.len() < end + length {
+                        match socket.read(&mut buffer).await {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => read.extend_from_slice(&buffer[..n]),
+                        }
+                    }
+                    kept.lock()
+                        .unwrap()
+                        .push(String::from_utf8_lossy(&read[end..end + length]).into_owned());
+                    tokio::time::sleep(after).await;
+                    let _ = socket.write_all(head.as_bytes()).await;
+                    let _ = socket.write_all(&body).await;
+                    let _ = socket.shutdown().await;
+                });
+            }
+        });
+        (format!("http://{address}"), bodies)
+    }
+
+    /// An answer's head with `status` and a body of `length` bytes.
+    fn answer_head(status: u16, length: usize) -> String {
+        format!("HTTP/1.1 {status} X\r\ncontent-length: {length}\r\nconnection: close\r\n\r\n")
+    }
+
+    /// The person's own ElevenLabs voice at `own`, with the lamp's own at
+    /// `lamps` to fall back to (#8367), on a refusal state of its own.
+    fn persons_voice(own: &str, lamps: &str, lost: &Arc<net::OwnVoiceLost>) -> Voice {
+        let lamps = Tts::with(TtsProvider::ElevenLabs, lamps, LAMPS_KEY, None).unwrap();
+        let own = Tts::with(
+            TtsProvider::ElevenLabs,
+            own,
+            PERSONS_KEY,
+            Some(PERSONS_VOICE),
+        )
+        .unwrap()
+        .with_lamps_voice(lamps)
+        .with_lost(lost.clone());
+        Voice::Configured(Arc::new(own), "ElevenLabs")
+    }
+
+    /// The speech's samples, or the error it ended with.
+    async fn spoken(speech: BoxStream<'static, net::Result<Vec<i16>>>) -> net::Result<Vec<i16>> {
+        let packets: Vec<_> = speech.collect().await;
+        packets
+            .into_iter()
+            .collect::<net::Result<Vec<_>>>()
+            .map(|packets| packets.concat())
+    }
+
+    /// The texts the voice at a [`recording`] server was asked to say.
+    fn texts(asked: &Mutex<Vec<String>>) -> Vec<String> {
+        asked
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|body| {
+                let body: serde_json::Value = serde_json::from_str(body).unwrap();
+                body["text"].as_str().unwrap().to_owned()
+            })
+            .collect()
+    }
+
+    fn turn_of(request: u64) -> Option<net::Turn> {
+        Some(net::Turn {
+            request,
+            heard_at: std::time::Instant::now(),
+        })
+    }
+
+    /// #8394's P2 (the first builder, 24 Nov 15:04): the person's own voice
+    /// failing a sentence for another reason than a refusal (a 422, a voice
+    /// the model or plan won't speak, which the keys helper's check can't
+    /// catch; a 429; a 5xx) is asked once more, as any sentence is, and then
+    /// it is said in the lamp's own voice after the one notice; before, it
+    /// was left unsaid, and every reply after it silent until the voice
+    /// restarted. Every sentence after is the lamp's, the person's voice not
+    /// asked again. A refusal (401) is as before: the lamp's voice at once,
+    /// with no second asking of theirs.
+    #[tokio::test]
+    async fn the_persons_voice_failing_twice_gives_way_to_the_lamps_own() {
+        for status in [422, 429, 503, 401] {
+            let refusal = br#"{"detail":{"status":"refused_8394"}}"#.to_vec();
+            let (own_url, own_asked) = recording(
+                answer_head(status, refusal.len()),
+                refusal,
+                PERSONS_KEY,
+                std::time::Duration::ZERO,
+            )
+            .await;
+            let (lamps_url, lamps_asked) = recording(
+                answer_head(200, 4),
+                bytes(&[5, 6]),
+                LAMPS_KEY,
+                std::time::Duration::ZERO,
+            )
+            .await;
+            let lost = Arc::new(net::OwnVoiceLost::default());
+            let voice = persons_voice(&own_url, &lamps_url, &lost);
+            assert_eq!(
+                spoken(in_one_voice(
+                    voice.clone(),
+                    "Hello there.".into(),
+                    turn_of(8394)
+                ))
+                .await,
+                Ok(vec![10, 12]),
+                "HTTP {status}: said, in the lamp's own voice"
+            );
+            assert_eq!(
+                spoken(in_one_voice(voice, "And again.".into(), turn_of(8394))).await,
+                Ok(vec![10, 12]),
+                "HTTP {status}: the next sentence too"
+            );
+            assert_eq!(
+                own_asked.lock().unwrap().len(),
+                if status == 401 { 1 } else { 2 },
+                "HTTP {status}: the person's voice asked once more at most, then never again"
+            );
+            assert_eq!(
+                texts(&lamps_asked),
+                [
+                    format!("{} Hello there.", net::OWN_VOICE_LOST_LINE),
+                    "And again.".to_owned()
+                ],
+                "HTTP {status}: the notice said once, with the first sentence"
+            );
+            let journal = lost.said();
+            assert_eq!(journal.len(), 2, "HTTP {status}: {journal:?}");
+            assert!(
+                journal[0].contains(&format!("HTTP {status})"))
+                    && journal[0].contains("the lamp's own voice from now on"),
+                "{journal:?}"
+            );
+            assert!(
+                journal[1].contains("told once, in the lamp's own voice"),
+                "{journal:?}"
+            );
+            for line in &journal {
+                assert!(
+                    !line.contains(PERSONS_KEY) && !line.contains(PERSONS_VOICE),
+                    "{line}"
+                );
+            }
+        }
+    }
+
+    /// #8394's P2: the person's own voice whose first sound comes later than
+    /// [`START_WITHIN`] each time it is asked is given its two tries, as any
+    /// voice is, and then the lamp's own voice says the sentence after the
+    /// notice; before, it was left unsaid.
+    #[tokio::test(start_paused = true)]
+    async fn the_persons_voice_too_slow_twice_gives_way_to_the_lamps_own() {
+        // A 1 ms tick: the paused clock then steps by 1 ms while an answer
+        // is read off a local socket, rather than jumping to the next
+        // deadline, the 4 s the lamp's own voice is given.
+        let tick = tokio::spawn(async {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            }
+        });
+        let (own_url, own_asked) = recording(
+            answer_head(200, 4),
+            bytes(&[1, 2]),
+            PERSONS_KEY,
+            START_WITHIN + std::time::Duration::from_secs(1),
+        )
+        .await;
+        let (lamps_url, lamps_asked) = recording(
+            answer_head(200, 4),
+            bytes(&[5, 6]),
+            LAMPS_KEY,
+            std::time::Duration::ZERO,
+        )
+        .await;
+        let lost = Arc::new(net::OwnVoiceLost::default());
+        let began = tokio::time::Instant::now();
+        let said = spoken(in_one_voice(
+            persons_voice(&own_url, &lamps_url, &lost),
+            "Hello there.".into(),
+            turn_of(8394),
+        ))
+        .await;
+        let took = began.elapsed();
+        tick.abort();
+        assert_eq!(said, Ok(vec![10, 12]), "said, in the lamp's own voice");
+        assert!(
+            took >= 2 * START_WITHIN && took < 2 * START_WITHIN + std::time::Duration::from_secs(1),
+            "{took:?}"
+        );
+        assert_eq!(
+            own_asked.lock().unwrap().len(),
+            2,
+            "asked once more, no more"
+        );
+        assert_eq!(
+            texts(&lamps_asked),
+            [format!("{} Hello there.", net::OWN_VOICE_LOST_LINE)]
+        );
+        let journal = lost.said();
+        assert_eq!(journal.len(), 2, "{journal:?}");
+        assert!(
+            journal[0].contains("speech's first sound timed out"),
+            "{journal:?}"
+        );
+    }
+
+    /// The lamp's own voice failing a sentence, once the person's gave way,
+    /// is asked as any voice is, and never more: after a refusal (401) and
+    /// the lamp's voice failing twice, or after the person's voice failing
+    /// twice (503) and the lamp's once, the sentence is left for the next
+    /// piece ([`UNSAID`]), as before.
+    #[tokio::test]
+    async fn the_lamps_own_voice_failing_too_is_asked_no_more() {
+        for (status, own_tries, lamps_tries) in [(401, 1, 2), (503, 2, 1)] {
+            let (own_url, own_asked) = recording(
+                answer_head(status, 0),
+                Vec::new(),
+                PERSONS_KEY,
+                std::time::Duration::ZERO,
+            )
+            .await;
+            let (lamps_url, lamps_asked) = recording(
+                answer_head(503, 0),
+                Vec::new(),
+                LAMPS_KEY,
+                std::time::Duration::ZERO,
+            )
+            .await;
+            let lost = Arc::new(net::OwnVoiceLost::default());
+            let said = spoken(in_one_voice(
+                persons_voice(&own_url, &lamps_url, &lost),
+                "Hello there.".into(),
+                turn_of(8394),
+            ))
+            .await;
+            assert!(
+                matches!(&said, Err(error) if unsaid(error)),
+                "HTTP {status}: {said:?}"
+            );
+            assert_eq!(own_asked.lock().unwrap().len(), own_tries, "HTTP {status}");
+            assert_eq!(
+                lamps_asked.lock().unwrap().len(),
+                lamps_tries,
+                "HTTP {status}"
+            );
+        }
     }
 
     /// Nothing to say asks no voice at all.

@@ -249,6 +249,22 @@ against ElevenLabs' own service.
   the first answer's piece after it, never a line rendered ahead with no
   turn (the Start's, kept for later). A piece asked again over HTTP
   (`speak_fresh`) takes the same path.
+- **Any other failure** (#8394's P2, the first builder): a piece the
+  person's voice fails to start for another reason, a 400 or 422 (a voice
+  the model or the plan won't speak, which the check can't catch), a 429,
+  a 5xx, a lost connection, or a first sound later than 4 s
+  (`START_WITHIN`), is asked once more, as any piece is (#4338). If that
+  fails too, the person's voice gives way: the piece is said in the lamp's
+  own voice after the same notice, said once, and every piece after goes
+  to the lamp's voice until the voice restarts, with one journal line,
+  "the person's own ElevenLabs voice failed a sentence twice (<why>); the
+  lamp's own voice from now on", never the key or the ID. Before, the
+  piece was left unsaid, and a voice that kept failing left every reply
+  silent until the voice restarted. A refusal (401 to 404) still goes to
+  the lamp's voice at once, the person's never asked again, and only a
+  refusal makes `voice-keys` warn. The lamp's own voice failing a piece
+  after that is asked as any voice is, never more
+  (`in_one_voice_near` in `second_provider/services.rs`).
 - **Off:** the kinds are "not on this lamp", the helper refuses, and the
   voice reads neither file, so the route is as it was.
 - **Test lamps only, `LAMP_OWN_ELEVENLABS_URL` (#8394's lamp row):** an
@@ -286,6 +302,11 @@ against ElevenLabs' own service.
 `crates/voice/src/second_provider/net/tts.rs`
 (`a_refused_own_voice_falls_back_to_the_lamps_with_one_line`,
 `a_refusal_seen_by_many_pieces_and_voices_is_said_once`),
+`crates/voice/src/second_provider/services.rs`
+(`the_persons_voice_failing_twice_gives_way_to_the_lamps_own`, for a 422,
+a 429, a 503 and a 401;
+`the_persons_voice_too_slow_twice_gives_way_to_the_lamps_own`;
+`the_lamps_own_voice_failing_too_is_asked_no_more`),
 `crates/voice/src/second_provider/probe.rs`
 (`an_own_voice_key_is_never_sent_to_the_relay`) and
 `crates/voice/src/second_provider/worker.rs`
