@@ -23,7 +23,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, VecDeque};
 use std::fs;
 use std::io::{self, Read, Write};
-use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
@@ -487,6 +487,25 @@ pub struct ExitNote {
     pub restarts: Option<u32>,
 }
 
+fn canonical_exit_unit(unit_name: &str) -> Option<&'static str> {
+    if let Some((prefix, suffix)) = unit_name.split_once('@') {
+        let instance = suffix.strip_suffix(".service")?;
+        if instance.is_empty()
+            || !instance
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b":_.\\-".contains(&byte))
+        {
+            return None;
+        }
+        UNITS
+            .iter()
+            .copied()
+            .find(|name| name.strip_suffix("@.service") == Some(prefix))
+    } else {
+        unit(unit_name)
+    }
+}
+
 /// The note for one stop: `None` for a `success`, or a unit not lampOS's.
 /// A listed template's instance becomes its fixed template name before
 /// storage. The caller still asks systemd about the actual instance.
@@ -500,22 +519,7 @@ pub fn exit_note(
     shown: &BTreeMap<String, String>,
 ) -> Option<ExitNote> {
     ExitResult::of(result)?;
-    let unit = if let Some((prefix, suffix)) = unit_name.split_once('@') {
-        let instance = suffix.strip_suffix(".service")?;
-        if instance.is_empty()
-            || !instance
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || b":_.\\-".contains(&byte))
-        {
-            return None;
-        }
-        UNITS
-            .iter()
-            .copied()
-            .find(|name| name.strip_suffix("@.service") == Some(prefix))?
-    } else {
-        unit(unit_name)?
-    };
+    let unit = canonical_exit_unit(unit_name)?;
     let number = |key: &str| shown.get(key).and_then(|v| v.trim().parse::<u64>().ok());
     let ran_s = match (
         number("ExecMainStartTimestampMonotonic"),
@@ -841,15 +845,45 @@ fn json_why(error: &serde_json::Error) -> String {
     }
 }
 
-/// A small JSON file, or nothing.
-fn read_json(path: &Path) -> Option<Value> {
-    let mut text = String::new();
+#[derive(Debug)]
+enum NoteReadError {
+    Access(&'static str, io::ErrorKind),
+    Json(String),
+    TooLarge,
+}
+
+impl NoteReadError {
+    fn why(&self) -> String {
+        match self {
+            Self::Access(operation, kind) => format!("{operation}: {kind:?}"),
+            Self::Json(why) => format!("JSON: {why}"),
+            Self::TooLarge => "larger than 4096 bytes".into(),
+        }
+    }
+}
+
+/// A bounded JSON read. Keep access failures distinct from parse failures,
+/// without putting file contents or arbitrary error text into the journal.
+fn read_json(path: &Path) -> Result<Value, NoteReadError> {
+    let mut bytes = Vec::new();
     fs::File::open(path)
-        .ok()?
-        .take(4_096)
-        .read_to_string(&mut text)
-        .ok()?;
-    serde_json::from_str(&text).ok()
+        .map_err(|error| NoteReadError::Access("open", error.kind()))?
+        .take(4_097)
+        .read_to_end(&mut bytes)
+        .map_err(|error| NoteReadError::Access("read", error.kind()))?;
+    if bytes.len() > 4_096 {
+        return Err(NoteReadError::TooLarge);
+    }
+    serde_json::from_slice(&bytes).map_err(|error| NoteReadError::Json(json_why(&error)))
+}
+
+/// Only a canonical recorder filename can hold back this fixed unit's
+/// watermark. Template names contain '@', so split at the last separator.
+fn stored_exit_note(name: &str) -> Option<(&'static str, u64)> {
+    let (name, time) = name.rsplit_once('@')?;
+    let time = time.strip_suffix(".json")?;
+    let at: u64 = time.parse().ok()?;
+    (time == at.to_string()).then_some((unit(name)?, at))
 }
 
 /// A choice file as read: none there, one this build can't read (and
@@ -1036,6 +1070,9 @@ fn write_whole(path: &Path, bytes: &[u8], mode: u32) -> io::Result<()> {
         .mode(mode)
         .open(&temporary)?;
     file.write_all(bytes)?;
+    // Creation modes are filtered by the service umask, including for a
+    // privileged ExecStopPost. Set the promised mode on this exact file.
+    file.set_permissions(fs::Permissions::from_mode(mode))?;
     file.sync_all()?;
     fs::rename(&temporary, path)?;
     if let Some(parent) = path.parent() {
@@ -1781,6 +1818,14 @@ impl Reports {
     /// The notes in the exit folder not yet taken, oldest first, each taken
     /// now. A new boot starts the count again (the folder is in `/run`).
     pub fn new_notes(&mut self) -> Vec<ExitNote> {
+        self.new_notes_with(read_json)
+    }
+
+    fn new_notes_with(
+        &mut self,
+        read: impl Fn(&Path) -> Result<Value, NoteReadError>,
+    ) -> Vec<ExitNote> {
+        let mut unreadable: BTreeMap<&'static str, u64> = BTreeMap::new();
         let boot = fs::read_to_string(&self.places.boot_id)
             .map(|boot| boot.trim().to_owned())
             .unwrap_or_default();
@@ -1799,8 +1844,18 @@ impl Reports {
             .filter(|entry| entry.file_name().to_string_lossy().ends_with(".json"))
             .filter_map(|entry| {
                 let path = entry.path();
-                let note = read_json(&path).ok_or_else(|| "not JSON".to_owned());
-                match note.and_then(|note| {
+                let note = read(&path);
+                if let Err(NoteReadError::Access(_, kind)) = &note
+                    && *kind != io::ErrorKind::NotFound
+                    && let Some((unit, at)) = stored_exit_note(&entry.file_name().to_string_lossy())
+                    && self.kept.notes.get(unit).is_none_or(|newest| at > *newest)
+                {
+                    unreadable
+                        .entry(unit)
+                        .and_modify(|oldest| *oldest = (*oldest).min(at))
+                        .or_insert(at);
+                }
+                match note.map_err(|error| error.why()).and_then(|note| {
                     serde_json::from_value::<ExitNote>(note).map_err(|error| json_why(&error))
                 }) {
                     Ok(note) => Some(note),
@@ -1823,6 +1878,15 @@ impl Reports {
                     .is_none_or(|newest| note.at_us > *newest)
             })
             .collect();
+        // A poll may race the privileged repair: it can fail to open an
+        // earlier note, then read a newer one that became public meanwhile.
+        // Retry that unit next poll instead of advancing past the missed note.
+        // Malformed JSON still has the existing skip-and-keep behavior.
+        notes.retain(|note| {
+            unreadable
+                .get(note.unit.as_str())
+                .is_none_or(|oldest| note.at_us < *oldest)
+        });
         notes.sort_by_key(|note| note.at_us);
         for note in &notes {
             self.kept.notes.insert(note.unit.clone(), note.at_us);
@@ -1965,6 +2029,103 @@ impl Shared {
     }
 }
 
+/// Restore only this listed unit's same-boot notes, including on a successful
+/// stop after an update. No new note, systemd query or network request is made.
+/// Unknown units and an absent exit folder have nothing to repair.
+pub fn repair_exit_notes(exits: &Path, unit_name: &str, boot: &str) -> io::Result<()> {
+    let Some(unit) = canonical_exit_unit(unit_name) else {
+        return Ok(());
+    };
+    repair_unit_exit_notes(exits, unit, boot)
+}
+
+fn repair_unit_exit_notes(exits: &Path, unit: &str, boot: &str) -> io::Result<()> {
+    let directory = match fs::OpenOptions::new()
+        .read(true)
+        .custom_flags((rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::DIRECTORY).bits() as i32)
+        .open(exits)
+    {
+        Ok(directory) => directory,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    let owner = rustix::process::geteuid().as_raw();
+    let metadata = directory.metadata()?;
+    if metadata.uid() != owner || metadata.mode() & 0o022 != 0 {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "exit folder is not exclusively owner-written",
+        ));
+    }
+    let prefix = format!("{unit}@");
+    let mut candidates: Vec<_> = fs::read_dir(exits)?
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let name = entry.file_name().into_string().ok()?;
+            let at: u64 = name
+                .strip_prefix(&prefix)?
+                .strip_suffix(".json")?
+                .parse()
+                .ok()?;
+            (name == format!("{unit}@{at}.json")).then_some((at, entry.path()))
+        })
+        .collect();
+    // Cloud advances a per-unit watermark. Restore older notes before newer
+    // ones become readable, and before the caller publishes this stop's note.
+    candidates.sort_by_key(|(at, _)| *at);
+    for (at, path) in candidates {
+        let Ok(mut file) = fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(
+                (rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK).bits() as i32,
+            )
+            .open(path)
+        else {
+            continue;
+        };
+        let metadata = file.metadata()?;
+        if !metadata.is_file()
+            || metadata.uid() != owner
+            || metadata.nlink() != 1
+            || metadata.len() > 4_096
+        {
+            continue;
+        }
+        let mut bytes = Vec::new();
+        (&mut file).take(4_097).read_to_end(&mut bytes)?;
+        if bytes.len() > 4_096 {
+            continue;
+        }
+        let Ok(value) = serde_json::from_slice::<Value>(&bytes) else {
+            continue;
+        };
+        // A newer reader may ignore added fields, but permission repair must
+        // not expose unknown contents that a newer/private writer kept here.
+        let fields = [
+            "unit", "result", "code", "status", "at_us", "boot", "ran_s", "restarts",
+        ];
+        if !value
+            .as_object()
+            .is_some_and(|object| object.keys().all(|key| fields.contains(&key.as_str())))
+        {
+            continue;
+        }
+        let Ok(note) = serde_json::from_value::<ExitNote>(value) else {
+            continue;
+        };
+        if note.unit != unit || note.at_us != at || note.boot != boot {
+            continue;
+        }
+        if metadata.mode() & 0o777 != 0o644 {
+            file.set_permissions(fs::Permissions::from_mode(0o644))?;
+        }
+    }
+    // If the old directory was 0700, publish its readability only after the
+    // earlier notes are ready; Cloud must not jump over them to a newer note.
+    directory.set_permissions(fs::Permissions::from_mode(0o755))?;
+    Ok(())
+}
+
 /// `exit-note UNIT`: what systemd handed `ExecStopPost=` about one stop,
 /// kept in `exits` as `<unit>@<at_us>.json` (0644), the newest
 /// [`NOTES_PER_UNIT`] per unit. A `success` writes nothing. No journal is
@@ -1975,6 +2136,13 @@ pub fn write_exit_note(exits: &Path, note: &ExitNote) -> io::Result<PathBuf> {
         .recursive(true)
         .mode(0o755)
         .create(exits)?;
+    if unit(&note.unit).is_none() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "unlisted exit-note unit",
+        ));
+    }
+    repair_unit_exit_notes(exits, &note.unit, &note.boot)?;
     let path = exits.join(format!("{}@{}.json", note.unit, note.at_us));
     write_whole(&path, &serde_json::to_vec(note)?, 0o644)?;
     let prefix = format!("{}@", note.unit);
@@ -4352,6 +4520,376 @@ pub(crate) mod tests {
         assert_eq!(
             shown("NRestarts=3\nExecMainStartTimestampMonotonic=5\n")["NRestarts"],
             "3"
+        );
+    }
+
+    /// A child has the service's real process-wide umask, without changing
+    /// the mask of this parallel test runner. This is a synthetic fixture,
+    /// not the unavailable original note from the lamp in #8413.
+    #[test]
+    fn voice_exit_notes_under_the_unit_umask_keep_earlier_notes_readable() {
+        const CHILD: &str = "LAMP_TEST_VOICE_EXIT_NOTE_UMASK_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            let mut child = Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "reports::tests::voice_exit_notes_under_the_unit_umask_keep_earlier_notes_readable",
+                    "--nocapture",
+                    "--test-threads=1",
+                ])
+                .env(CHILD, "1")
+                .spawn()
+                .unwrap();
+            let until = Instant::now() + Duration::from_secs(20);
+            loop {
+                if let Some(status) = child.try_wait().unwrap() {
+                    assert!(status.success(), "isolated recorder failed: {status}");
+                    return;
+                }
+                if Instant::now() >= until {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    panic!("isolated recorder exceeded 20 seconds");
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        }
+        use std::os::unix::fs::PermissionsExt;
+        rustix::process::umask(rustix::fs::Mode::from_raw_mode(0o077));
+        let places = places("voice-exit-umask");
+        // Exactly the creation behavior of the previous recorder, including
+        // an earlier valid JSON note from this boot with mode 0600.
+        fs::DirBuilder::new()
+            .mode(0o755)
+            .create(&places.exits)
+            .unwrap();
+        let older_bytes = include_bytes!(
+            "../tests/fixtures/stores/reports-2026-10-21/exits/lamp-voice.service@5521000000.json"
+        )
+        .to_vec();
+        let older: ExitNote = serde_json::from_slice(&older_bytes).unwrap();
+        let older_path = places
+            .exits
+            .join(format!("lamp-voice.service@{}.json", older.at_us));
+        fs::write(&older_path, &older_bytes).unwrap();
+        assert_eq!(
+            fs::metadata(&older_path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        let newer = planted_note("lamp-voice.service", older.at_us + 1);
+        let newer_path = write_exit_note(&places.exits, &newer).unwrap();
+        assert_eq!(
+            fs::metadata(&places.exits).unwrap().permissions().mode() & 0o777,
+            0o755,
+            "the lampos reader must be able to list and traverse the root-owned exit folder"
+        );
+        for path in [&older_path, &newer_path] {
+            assert_eq!(
+                fs::metadata(path).unwrap().permissions().mode() & 0o777,
+                0o644,
+                "the lampos reader must be able to read each exit note"
+            );
+        }
+        assert_eq!(
+            fs::read(&older_path).unwrap(),
+            older_bytes,
+            "earlier bytes stay whole"
+        );
+        yes(&places);
+        let mut reports = Reports::open(places.clone());
+        let notes = reports.new_notes();
+        assert_eq!(notes, [older, newer]);
+        for note in notes {
+            assert!(reports.crash(NOW, None, &note).is_some());
+        }
+        let handed = sent(&mut reports);
+        assert_eq!(handed.len(), 2);
+        assert!(handed.iter().all(|report| report["kind"] == "crash"
+            && report["unit"] == "lamp-voice.service"
+            && report["signal"] == "SIGSEGV"));
+        assert!(
+            Reports::open(places.clone()).new_notes().is_empty(),
+            "taken once across restart"
+        );
+        assert_eq!(
+            fs::metadata(places.queue.join("1.json"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o600,
+            "private reporting state stays private"
+        );
+        fs::remove_dir_all(places.own.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn exit_note_read_failures_hold_only_later_unconsumed_notes_of_that_unit() {
+        let places = places("exit-read-retry");
+        let old = planted_note("lamp-voice.service", 1);
+        let new = planted_note("lamp-voice.service", 2);
+        let other = planted_note("lamp-air.service", 3);
+        let old_path = write_exit_note(&places.exits, &old).unwrap();
+        write_exit_note(&places.exits, &new).unwrap();
+        write_exit_note(&places.exits, &other).unwrap();
+        let mut reports = Reports::open(places.clone());
+        let first = reports.new_notes_with(|path| {
+            if path == old_path {
+                Err(NoteReadError::Access(
+                    "open",
+                    io::ErrorKind::PermissionDenied,
+                ))
+            } else {
+                read_json(path)
+            }
+        });
+        assert_eq!(
+            first,
+            [other],
+            "a repaired newer Voice note must not hide the earlier unreadable one"
+        );
+        assert!(
+            reports
+                .said()
+                .iter()
+                .any(|line| line.contains("open: PermissionDenied"))
+        );
+        assert!(!reports.said().iter().any(|line| line.contains("not JSON")));
+        assert_eq!(reports.new_notes(), [old, new]);
+        // An already consumed old file becoming unreadable cannot hold back
+        // a later note. The watermark belongs to this boot and unit only.
+        let last = planted_note("lamp-voice.service", 4);
+        write_exit_note(&places.exits, &last).unwrap();
+        assert_eq!(
+            reports.new_notes_with(|path| {
+                if path == old_path {
+                    Err(NoteReadError::Access(
+                        "read",
+                        io::ErrorKind::PermissionDenied,
+                    ))
+                } else {
+                    read_json(path)
+                }
+            }),
+            [last]
+        );
+        fs::remove_dir_all(places.own.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn malformed_or_pruned_exit_notes_do_not_hold_later_notes() {
+        for missing in [false, true] {
+            let places = places(if missing {
+                "exit-pruned"
+            } else {
+                "exit-malformed"
+            });
+            let old_path =
+                write_exit_note(&places.exits, &planted_note("lamp-voice.service", 1)).unwrap();
+            let new = planted_note("lamp-voice.service", 2);
+            write_exit_note(&places.exits, &new).unwrap();
+            fs::write(&old_path, [0xff, 0xfe]).unwrap();
+            let mut reports = Reports::open(places.clone());
+            assert_eq!(
+                reports.new_notes_with(|path| {
+                    if missing && path == old_path {
+                        Err(NoteReadError::Access("open", io::ErrorKind::NotFound))
+                    } else {
+                        read_json(path)
+                    }
+                }),
+                [new]
+            );
+            assert!(
+                reports
+                    .said()
+                    .iter()
+                    .all(|line| !line.contains("PRIVATE_INVALID_JSON"))
+            );
+            fs::remove_dir_all(places.own.parent().unwrap()).unwrap();
+        }
+    }
+
+    #[test]
+    fn exit_note_reader_distinguishes_access_json_and_size_failures() {
+        let root = tempfile::tempdir().unwrap();
+        assert!(matches!(
+            read_json(&root.path().join("missing")),
+            Err(NoteReadError::Access("open", io::ErrorKind::NotFound))
+        ));
+        let path = root.path().join("note.json");
+        fs::write(&path, "PRIVATE_INVALID_JSON").unwrap();
+        let error = read_json(&path).unwrap_err();
+        assert!(matches!(error, NoteReadError::Json(_)));
+        assert!(!error.why().contains("PRIVATE_INVALID_JSON"));
+        fs::write(&path, [0xff, 0xfe]).unwrap();
+        assert!(
+            matches!(read_json(&path), Err(NoteReadError::Json(_))),
+            "invalid UTF-8 is malformed content, not an access barrier"
+        );
+        fs::write(&path, " ".repeat(4_097)).unwrap();
+        assert!(matches!(read_json(&path), Err(NoteReadError::TooLarge)));
+    }
+
+    #[test]
+    fn successful_stop_repair_keeps_other_files_private_and_creates_no_note() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+        let root = tempfile::tempdir().unwrap();
+        let exits = root.path().join("exits");
+        repair_exit_notes(&exits, "lamp-voice.service", "boot-1").unwrap();
+        assert!(
+            !exits.exists(),
+            "success without earlier notes writes nothing"
+        );
+        fs::create_dir(&exits).unwrap();
+        fs::set_permissions(&exits, fs::Permissions::from_mode(0o700)).unwrap();
+        let valid = planted_note("lamp-voice.service", 1);
+        let valid_path = exits.join("lamp-voice.service@1.json");
+        let plant = |path: &Path, bytes: &[u8]| {
+            fs::write(path, bytes).unwrap();
+            fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+        };
+        let valid_bytes = serde_json::to_vec(&valid).unwrap();
+        plant(&valid_path, &valid_bytes);
+        let mut private = Vec::new();
+        for (at, mut value) in [
+            (
+                2,
+                serde_json::to_value(planted_note("lamp-voice.service", 2)).unwrap(),
+            ),
+            (
+                3,
+                serde_json::to_value(planted_note("lamp-air.service", 3)).unwrap(),
+            ),
+            (
+                4,
+                serde_json::to_value(planted_note("lamp-voice.service", 4)).unwrap(),
+            ),
+            (
+                5,
+                serde_json::to_value(planted_note("lamp-voice.service", 50)).unwrap(),
+            ),
+        ] {
+            if at == 2 {
+                value["private_future_field"] = json!("PRIVATE_VALUE");
+            }
+            if at == 4 {
+                value["boot"] = json!("another-boot");
+            }
+            let path = exits.join(format!("lamp-voice.service@{at}.json"));
+            plant(&path, &serde_json::to_vec(&value).unwrap());
+            private.push(path);
+        }
+        let other = exits.join("lamp-air.service@6.json");
+        plant(
+            &other,
+            &serde_json::to_vec(&planted_note("lamp-air.service", 6)).unwrap(),
+        );
+        private.push(other);
+        let outside = root.path().join("private.json");
+        plant(
+            &outside,
+            &serde_json::to_vec(&planted_note("lamp-voice.service", 7)).unwrap(),
+        );
+        symlink(&outside, exits.join("lamp-voice.service@7.json")).unwrap();
+        private.push(outside);
+        let linked = root.path().join("linked.json");
+        plant(
+            &linked,
+            &serde_json::to_vec(&planted_note("lamp-voice.service", 8)).unwrap(),
+        );
+        fs::hard_link(&linked, exits.join("lamp-voice.service@8.json")).unwrap();
+        private.push(linked);
+        let malformed = exits.join("lamp-voice.service@9.json");
+        plant(&malformed, b"PRIVATE_INVALID_JSON");
+        private.push(malformed);
+        let noncanonical = exits.join("lamp-voice.service@01.json");
+        plant(&noncanonical, &valid_bytes);
+        private.push(noncanonical);
+        let directory = exits.join("lamp-voice.service@10.json");
+        fs::create_dir(&directory).unwrap();
+        fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+        let before = fs::read_dir(&exits).unwrap().count();
+        repair_exit_notes(&exits, "unlisted.service", "boot-1").unwrap();
+        assert_eq!(
+            fs::metadata(&exits).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        repair_exit_notes(&exits, "lamp-voice.service", "boot-1").unwrap();
+        assert_eq!(
+            fs::metadata(&exits).unwrap().permissions().mode() & 0o777,
+            0o755
+        );
+        assert_eq!(
+            fs::metadata(&valid_path).unwrap().permissions().mode() & 0o777,
+            0o644
+        );
+        assert_eq!(fs::read(&valid_path).unwrap(), valid_bytes);
+        assert_eq!(
+            fs::read_dir(&exits).unwrap().count(),
+            before,
+            "no note created"
+        );
+        for path in private {
+            assert_eq!(
+                fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+                0o600,
+                "{path:?}"
+            );
+        }
+        assert_eq!(
+            fs::metadata(&directory).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        let alias = root.path().join("alias");
+        symlink(&exits, &alias).unwrap();
+        assert!(repair_exit_notes(&alias, "lamp-voice.service", "boot-1").is_err());
+        fs::set_permissions(&exits, fs::Permissions::from_mode(0o777)).unwrap();
+        assert!(repair_exit_notes(&exits, "lamp-voice.service", "boot-1").is_err());
+    }
+
+    #[test]
+    #[ignore = "host filesystem timing; run alone with --nocapture"]
+    fn exit_note_recorder_host_timing() {
+        let root = tempfile::tempdir().unwrap();
+        let exits = root.path().join("exits");
+        let first = Instant::now();
+        write_exit_note(&exits, &planted_note("lamp-voice.service", 1)).unwrap();
+        let first = first.elapsed();
+        // A full retained folder, including other units, without counting
+        // fixture construction as the recorder's work.
+        for unit in UNITS {
+            for at in 1..=NOTES_PER_UNIT {
+                let note = ExitNote {
+                    unit: (*unit).into(),
+                    at_us: at as u64,
+                    ..planted_note("lamp-voice.service", 1)
+                };
+                fs::write(
+                    exits.join(format!("{unit}@{at}.json")),
+                    serde_json::to_vec(&note).unwrap(),
+                )
+                .unwrap();
+            }
+        }
+        let mut times = Vec::new();
+        for at in 100..300 {
+            let start = Instant::now();
+            write_exit_note(&exits, &planted_note("lamp-voice.service", at)).unwrap();
+            times.push(start.elapsed());
+        }
+        times.sort_unstable();
+        let p95 = times[189];
+        eprintln!(
+            "exit recorder first={first:?} repeated=200 folder_units={} retained_per_unit={} p50={:?} p95={p95:?} max={:?}; boundary=directory+legacy-readability+serialize+write+chmod+fsync+rename+prune, excludes systemctl, Cloud polling and MQTT",
+            UNITS.len(),
+            NOTES_PER_UNIT,
+            times[99],
+            times[199]
+        );
+        assert!(
+            p95 < Duration::from_millis(50),
+            "host recorder p95 target is 50ms; this is not a device guarantee"
         );
     }
 

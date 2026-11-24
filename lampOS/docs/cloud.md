@@ -2328,6 +2328,42 @@ never in the note's contents, filename or report. The recorder still asks
 count. Empty or unrelated instances are refused. A `success`, or a unit
 not on the list, writes nothing; no journal is read.
 
+The recorder sets 0644 through the opened temporary-file descriptor before
+sync and rename, independently of the service umask. The exit directory is
+owner-written 0755. Voice keeps `UMask=0077`; private report state and queues
+keep 0600. The stop hook's `+` prefix does not reset the creation mask.
+
+Before publishing a new note, the recorder repairs earlier notes for the same
+fixed unit and boot, oldest first. A successful stop also repairs them without
+creating a note or querying systemd; an absent folder stays absent. Recovery
+therefore occurs on that unit's next stop using the new recorder, not merely
+when Cloud restarts. Only bounded (4,096-byte), regular, single-link files owned
+by the recorder, with canonical filenames and matching unit/boot/time and
+known fields, are eligible. It never follows symlinks or changes the bytes;
+permissions change on the validated descriptor. Another unit/boot, malformed
+content or unknown added fields are not widened. Ordinary reads still accept
+added fields. A symlinked or non-owner-controlled directory is refused; an old
+0700 directory becomes readable only after eligible notes are repaired.
+
+Cloud distinguishes open/read errors from malformed JSON without logging
+contents. An access failure on an earlier unconsumed canonical note holds
+later notes for that unit until a subsequent poll can read or prune it. This
+prevents the per-unit watermark from skipping an older note during repair;
+other units continue. Missing/pruned files, malformed JSON, invalid UTF-8 and
+already-consumed timestamps do not create this barrier. An unreadable note's
+boot is unknown, so the hold is conservative; `/run` clears on boot.
+
+Host regressions use an isolated child under umask 0077, the tracked October 21
+note format and deterministic access failures. Backend3 confirms the original #8413 incident
+file was never saved and is gone after reboot. Queue handoff is tested, but deployed root-to-lampos
+access and company-broker delivery are not established. The host p95 target is
+50 ms for local repair, serialization, atomic write/sync and pruning, excluding
+the bounded systemd query, Cloud's 10 s poll and MQTT. On macOS, the first
+invocation took 19.315 ms; 200 repeats with 45 units retaining eight notes
+each gave p50 12.781 ms, p95 16.957 ms and maximum 19.735 ms. This meets the
+host target, not a device or end-to-end delivery guarantee.
+[Tiếng Việt](vi/cloud-exit-notes_vi.md).
+
 These bounded local notes can be written with sharing off. With its
 reporting switches on, `lamp-cloud` reads the folder every 10 s and takes
 each note once, across its own restarts, until the next
