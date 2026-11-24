@@ -3045,7 +3045,12 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     Không bao giờ khi đang
     giữ một lượt (lần nhìn giữ pane trong lúc đóng), và không trong cửa sổ
     của phiên mới. Mỗi lần nhìn tốn một `show` và một lần đọc bản ghi
-    chỉ-đọc. TUI rảnh mà điếc khi không ai hỏi thì không bị tìm: nó được
+    chỉ-đọc. Trạng thái `show` của lần nhìn được giữ trên pane cùng lúc đọc
+    (#8445): đọc được `stopped` trong vòng `STOPPED_FRESH` (60 s, hai lần
+    nhìn), chưa có lượt nào gõ vào pane và chưa mở lại từ đó, thì `status`
+    nói `"computer":"stopped"` (`OneSession::known_stopped`). Lần nhìn không
+    bao giờ tự mở lại pane đang dừng: việc đó vẫn ở lúc giao việc, sau
+    tiếng có (Q1 của first builder trên #8445). TUI rảnh mà điếc khi không ai hỏi thì không bị tìm: nó được
     thấy ở lần hỏi kế tiếp (D). Mục tiêu: một lần hỏi vào pane điếc tới
     câu "hãy hỏi lại" trong khoảng 12-13 s (10 s giữ, một `show`, một lần
     đọc bản ghi, kết thúc), mục tiêu tối đa 15 s (trước ~134 s); mất kết
@@ -3557,6 +3562,47 @@ chờ, không bao giờ hai). Việc được nhờ bằng tin nhắn chữ thì
 câu này, và khi không có dịch vụ say (`LAMP_SAY` tắt) thì không đọc hay
 nói gì. Journal ghi `lamp-voice: tasks: work N still waits for its agent
 after 20 s: said it is starting`.
+
+### Câu báo đánh thức khi biết máy tính đang dừng (#8445)
+
+One session của lamp-tasks đọc pane giữ của đèn ở mỗi lần nhìn khi rảnh
+(mỗi 30 s, `KEEP_OPEN_WHILE_OPEN`) và giữ trạng thái đã đọc cùng lúc đọc.
+Khi lần đọc đó nói `stopped`, không cũ hơn 60 s (`STOPPED_FRESH`, hai lần
+nhìn) và từ đó chưa có lượt nào gõ vào pane, cũng chưa mở lại, thì
+`status` nói `"computer":"stopped"` bên cạnh `signed_in`
+(`runtime::with_computer`). Không có trường này là chưa biết, và câu trả
+lời như trước. Lần nhìn không bao giờ mở lại pane: việc đó vẫn ở lúc giao
+việc, sau tiếng có của người dùng (Q1 của first builder: đánh thức lúc
+nhìn sẽ mở thứ trên màn hình của họ trước khi họ đồng ý).
+
+Lần xác nhận vốn đã đọc `status` trước khi giao việc. Với
+`"computer":"stopped"`, cho việc của chính đèn (việc đi vào pane đó; một
+agent có tên trên máy tính mở pane riêng) được nhờ bằng giọng nói, lần
+giao việc được dặn nói một lần, ngay lúc giao (`agent_tasks::WAKING_LINE`,
+Q3 của first builder, đúng từng chữ):
+
+> "Your computer's asleep, so I'm waking it up. It'll take about a minute."
+
+Khi bật lời mở đầu của tool (`LAMP_TOOL_LEAD_IN`), lời mở đầu của vòng 1 đã
+được nói trước khi đọc `status`, nên câu này đến ở vòng 2
+(`agent_tasks::waking_next(true)`); khi tắt, hoặc với tiếng có được nhận
+trong code (#7027, `yes_taken`), câu nằm trong vòng duy nhất
+(`waking_next(false)`). Câu trả lời của lần xác nhận có `"waking":true`, và
+khoảng chờ của việc được đánh dấu là đã nói (`hand_wait::told_at_hand_over`),
+nên câu ở giây thứ 20 không được nói thêm: chỉ một câu về khoảng chờ, không
+bao giờ hai. Không có `computer` (chưa biết, đã cũ, đã mở lại), với một
+agent có tên trên máy tính, một việc hỏi, hoặc việc nhờ bằng tin nhắn chữ,
+lần giao việc như trước, từng byte, và câu ở giây thứ 20 vẫn dành cho khoảng
+chờ không ai biết trước. Không có công tắc riêng: câu ở giây thứ 20 (#8510)
+cũng không có.
+
+Test: `runtime::tests::status_says_the_computer_stopped_only_when_known`,
+`one_session::tests::an_idle_look_that_reads_the_pane_stopped_keeps_it_until_stale_or_reopened`,
+`agent_tasks::tests::the_waking_line_is_said_once_in_the_first_person`,
+`agent_tasks::tests::a_confirm_with_the_computer_known_stopped_says_the_waking_line_once`,
+`agent_tasks::tests::without_the_computer_known_stopped_the_confirm_is_as_before`,
+`agent_tasks::tests::a_yes_taken_in_code_with_the_computer_known_stopped_says_the_waking_line_once`,
+cùng với `hand_wait::tests::a_wait_told_at_the_hand_over_gets_no_line_at_20_s`.
 
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 

@@ -601,7 +601,7 @@ inspection evidence, not a playback grant.
 
 | Operation | Fields besides `op` | Route / meaning |
 |---|---|---|
-| `status` | none | Counts, bounds, current identities, last receipt; with `serve --set-up-later` and the sign-in read, `signed_in` (`yes`, `offline` or `no`, #5488) |
+| `status` | none | Counts, bounds, current identities, last receipt; with `serve --set-up-later` and the sign-in read, `signed_in` (`yes`, `offline` or `no`, #5488); `"computer":"stopped"` only while the one session's idle look knows the lamp's kept pane stopped (#8445) |
 | `targets` | none | Each target's `alias` and `engine`, in alias order; never its machine or project (since task 41, for the voice) |
 | `list` | optional `after_id` (default 0), `limit` (1–8, default 8) | Metadata page; follow `next_after_id` |
 | `get_task` | `id` | Exact task, configured target, dispatch and observation metadata |
@@ -5907,6 +5907,12 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     holds the pane while it closes), and not within a new session's window.
     Each look costs one `show` and one read-only record read. A deaf idle
     TUI with no ask is not looked for: it is found at the next ask (D).
+    The look's `show` state is kept on the pane with when it was read
+    (#8445): read `stopped` within `STOPPED_FRESH` (60 s, two looks), with
+    no turn typed into the pane and no reopen since, `status` says
+    `"computer":"stopped"` (`OneSession::known_stopped`). The look never
+    reopens a stopped pane itself: that stays at the hand-over, after the
+    yes (the first builder's Q1 on #8445).
     Targets: an ask on a deaf pane to its ask-again line in about 12-13 s
     (the 10 s hold, one `show`, one record read, the end), target at most
     15 s (was ~134 s); an idle lost link within ~630 s (600 s unmoved,
@@ -8008,6 +8014,46 @@ two). Work asked by text gets no line, and without the say service
 (`LAMP_SAY` off) nothing is read or said. The journal says
 `lamp-voice: tasks: work N still waits for its agent after 20 s: said it is
 starting`.
+
+### The waking line when the computer is known stopped (#8445)
+
+lamp-tasks' one session reads the lamp's kept pane at each idle look
+(every 30 s, `KEEP_OPEN_WHILE_OPEN`) and keeps the state it read, with when.
+While that read says `stopped`, is at most 60 s old (`STOPPED_FRESH`, two
+looks) and no turn was typed into the pane nor was it reopened since,
+`status` says `"computer":"stopped"` beside `signed_in`
+(`runtime::with_computer`). Absent is unknown, and the answer is as it was.
+The look never reopens the pane: that stays at the hand-over, after the
+person's yes (the first builder's Q1: waking it at the look would open
+things on their screen before they agreed).
+
+The confirm already reads `status` before it hands over. With
+`"computer":"stopped"`, for the lamp's own work (the work that goes to that
+pane; a computer's named agent opens a pane of its own) asked by voice, the
+hand-over is told to say once, at the hand-over (`agent_tasks::WAKING_LINE`,
+the first builder's Q3, word for word):
+
+> "Your computer's asleep, so I'm waking it up. It'll take about a minute."
+
+With the tool lead-in on (`LAMP_TOOL_LEAD_IN`), round 1's lead-in was
+already said before `status` is read, so the line comes in round 2
+(`agent_tasks::waking_next(true)`); with it off, or for a plain yes taken
+in code (#7027, `yes_taken`), in the one round (`waking_next(false)`). The
+confirm's answer carries `"waking":true`, and the work's wait is marked
+told (`hand_wait::told_at_hand_over`), so the 20 s line is not said too:
+one line about the wait, never two. Without `computer` (unknown, stale,
+reopened), for a named computer agent, a question task, or work asked by
+text, the hand-over is as before, byte for byte, and the 20 s line stays
+for the wait nobody knew of in advance. No switch of its own: the 20 s
+line (#8510) has none either.
+
+Tests: `runtime::tests::status_says_the_computer_stopped_only_when_known`,
+`one_session::tests::an_idle_look_that_reads_the_pane_stopped_keeps_it_until_stale_or_reopened`,
+`agent_tasks::tests::the_waking_line_is_said_once_in_the_first_person`,
+`agent_tasks::tests::a_confirm_with_the_computer_known_stopped_says_the_waking_line_once`,
+`agent_tasks::tests::without_the_computer_known_stopped_the_confirm_is_as_before`,
+`agent_tasks::tests::a_yes_taken_in_code_with_the_computer_known_stopped_says_the_waking_line_once`,
+with `hand_wait::tests::a_wait_told_at_the_hand_over_gets_no_line_at_20_s`.
 
 ### How the lamp's Harness is (#6061 part B, off unless `LAMP_TASKS_HARNESS_STATUS=on`)
 
