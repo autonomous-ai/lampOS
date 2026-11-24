@@ -985,3 +985,85 @@ fn each_rule_of_ops_and_views_refuses_with_its_own_words() {
         "unknown field",
     );
 }
+
+/// The package `change` makes, read with the tools switch `on` (#8386).
+fn with_tools(
+    on: bool,
+    change: impl FnOnce(&mut Value, &mut Files),
+) -> Result<app_package::AppPackage, String> {
+    let mut files = good_files();
+    let mut manifest = good_manifest(&files);
+    change(&mut manifest, &mut files);
+    manifest["files"] = files_entries(&files);
+    let bytes = tar("english-lessons", &manifest, &files, Some(&key(1)));
+    app_package::read_app_package_switched(&bytes, Some(&[public(&key(1))]), on)
+}
+
+/// An app's tools file (#8386, `LAMP_APP_TOOLS`): with the switch on, a
+/// manifest naming `tools.json` reads and the file is among the app's own;
+/// with it off it is refused as an unknown field, as a lamp before the
+/// field refused it. The path stays inside the app's folder; the file's
+/// contents are lamp-control's to check, so a bad one never stops this.
+#[test]
+fn an_apps_tools_file_reads_only_with_the_switch_on_and_stays_in_its_folder() {
+    let tools = |manifest: &mut Value, files: &mut Files| {
+        manifest["tools"] = json!("tools.json");
+        files.push(("tools.json".into(), br#"{"tools": []}"#.to_vec()));
+    };
+    let package = with_tools(true, tools).unwrap();
+    assert_eq!(package.manifest.tools.as_deref(), Some("tools.json"));
+    assert!(package.files.contains_key("tools.json"));
+    let written = serde_json::to_value(&package.manifest).unwrap();
+    assert_eq!(written["tools"], "tools.json");
+    // Off: refused, in an unknown field's words.
+    refused(with_tools(false, tools), "unknown field `tools`");
+    // A manifest without it is the same either way, and writes none back.
+    let plain = with_tools(false, |_, _| {}).unwrap();
+    assert!(plain.manifest.tools.is_none());
+    assert!(
+        serde_json::to_value(&plain.manifest)
+            .unwrap()
+            .get("tools")
+            .is_none()
+    );
+    // A file under src/ is a tools file too; contents are not this reader's.
+    let under = with_tools(true, |manifest, files| {
+        manifest["tools"] = json!("src/lamp_learn/tools.json");
+        files.push(("src/lamp_learn/tools.json".into(), b"not json".to_vec()));
+    })
+    .unwrap();
+    assert_eq!(
+        under.manifest.tools.as_deref(),
+        Some("src/lamp_learn/tools.json")
+    );
+    // Out of the folder, absolute, hidden, not JSON or elsewhere: refused.
+    for path in [
+        "../tools.json",
+        "/etc/tools.json",
+        "src/../../tools.json",
+        ".tools.json",
+        "src/tools.txt",
+        "assets/tools.json",
+        "other.json",
+        "",
+    ] {
+        refused(
+            with_tools(true, |manifest, _| manifest["tools"] = json!(path)),
+            "is not tools.json",
+        );
+    }
+    // A file at the top that the manifest does not name stays refused.
+    refused(
+        with_tools(true, |_, files| {
+            files.push(("tools.json".into(), b"{}".to_vec()));
+        }),
+        "an app's files are under src/, assets/ and skills/",
+    );
+    refused(
+        with_tools(true, |manifest, files| {
+            manifest["tools"] = json!("src/lamp_learn/tools.json");
+            files.push(("tools.json".into(), b"{}".to_vec()));
+        }),
+        "an app's files are under src/, assets/ and skills/",
+    );
+}
