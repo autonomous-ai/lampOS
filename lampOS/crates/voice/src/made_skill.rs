@@ -18022,6 +18022,27 @@ light = { colour = "green", level = 3, for = "20s" }
         set_writes_here(None);
     }
 
+    /// lamp-06c1 on #8469 (run-1843): a comma or a colon speech to text
+    /// put right after the person's cue keeps their phrase, so its ask is
+    /// held with one word of its own; one that doesn't start the next
+    /// clause still needs two.
+    #[test]
+    fn a_comma_after_the_cue_keeps_the_persons_one_word_ask() {
+        set_writes_here(Some(true));
+        set_asks_here(Some(true));
+        let hello = ASKS_WRITE_TOML.replace("[\"send my test note\"]", "[\"Pebble Hello\"]");
+        for line in [
+            "Lamp, make a skill called pebble hello that says hello little pebble whenever I say, pebble hello.",
+            "Lamp, make a skill that says hello when you hear: pebble hello",
+            "Lamp, make a skill called pebble hello that says hello little pebble whenever I say pebble hello.",
+        ] {
+            assert!(asks_heard(&hello, line).is_ok(), "{line}");
+        }
+        assert!(asks_heard(&hello, "Lamp, when I say, and then pebble hello, say hello").is_err());
+        set_asks_here(None);
+        set_writes_here(None);
+    }
+
     /// #8451, the first builder's call (b): an ask with one word of its
     /// own ("pebble hello", "hello" being said around an ask) passes the
     /// cap, and so the put-on's check of a skill already made with it, as
