@@ -542,7 +542,7 @@ as soon as the lamp may speak after the model's answer (below). `room_sounds` an
 ask their questions exactly too (see the step table), each ending "Just say yes
 or no.", and keep their consent clauses.
 
-**With nothing asked (`LAMP_FACE_NO_ASK=on`, off unless set).** The
+**With nothing asked (`LAMP_FACE_NO_ASK=on`, off unless set, on in the product units).** The
 product owner's no-asks rule (the first builder 18:50, 18 Nov; the setup
 walk's half, past setup and the photo are [eyes.md](eyes.md)'s). On a lamp
 that keeps faces with `LAMP_NAMES=checked`, "who you are" is asked with the
@@ -576,7 +576,7 @@ face" is unchanged. Off, the walk is as described above, the held save
 included.
 
 **A way back for a lamp that knows nobody (`LAMP_FACE_LEARN_LATER=on`, off
-unless set, #7876).** Only with `LAMP_FACE_NO_ASK` and
+unless set, on in the product unit, #7876).** Only with `LAMP_FACE_NO_ASK` and
 `LAMP_REMEMBER_SPEAKER` on too (`learn_later::switched`); the three go on in
 the product together. A lamp set up with no face kept (lamp-e82d, 18 Nov)
 kept nothing in every later conversation. With the walk over and nothing of

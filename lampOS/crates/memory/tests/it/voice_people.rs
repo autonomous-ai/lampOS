@@ -180,6 +180,7 @@ fn legacy_two_known_people_and_the_room_are_never_answered_from_each_other() {
             &call(REMEMBER, json!({"text":text})),
             BUDGET,
             person,
+            false,
         );
         assert!(ok && told["remembered"] == true, "{told}");
         assert_eq!(fixture.next("remember").1["ok"], true);
@@ -190,6 +191,7 @@ fn legacy_two_known_people_and_the_room_are_never_answered_from_each_other() {
             &call(RECALL, json!({"about":"coffee"})),
             BUDGET,
             person,
+            false,
         )
     });
     assert_eq!(
@@ -213,6 +215,7 @@ fn legacy_two_known_people_and_the_room_are_never_answered_from_each_other() {
         &call(FORGET, json!({})),
         BUDGET,
         Some(&minh),
+        false,
     );
     assert!(ok && told["forgotten"] == true, "{told}");
     let [to_minh, to_sam, _] = recalls(|person| {
@@ -221,6 +224,7 @@ fn legacy_two_known_people_and_the_room_are_never_answered_from_each_other() {
             &call(RECALL, json!({"about":"coffee"})),
             BUDGET,
             person,
+            false,
         )
     });
     assert_eq!(texts(&to_minh), ["the coffee machine is on the left"]);

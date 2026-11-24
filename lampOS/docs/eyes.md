@@ -2391,9 +2391,9 @@ service writes a name said once right.
 
 ### Remember only the person who spoke (`LAMP_REMEMBER_SPEAKER=on`)
 
-Off by default in both Voice and Eyes, and off in the product units: it goes
-on together with `LAMP_FACE_NO_ASK` and the coming `LAMP_FACE_LEARN_LATER`
-(the first builder's ruling on #7622, 18 Nov). Eyes needs its recognizer and who
+Off by default in both Voice and Eyes, and on in both product units, together
+with `LAMP_FACE_NO_ASK` and `LAMP_FACE_LEARN_LATER` (the first builder's ruling
+on #7622, 18 Nov; #7876). Eyes needs its recognizer and who
 socket, `LAMP_BUS=on` and `LAMP_EYES_SPEAKING=on`; Voice also needs
 `LAMP_EYES_SPEAKING=on` and the bus. With `LAMP_NAMES=checked`, the second
 voice route binds `remember_my_face` to the current microphone line, its
@@ -2879,7 +2879,8 @@ Tests (`photo.rs`):
 The asks' parsing is in `who.rs`, `--photo-dir` in `main.rs`, and the reset's
 wipe in `crates/setup/tests/it/reset.rs`. Not run on a lamp.
 
-**With nothing asked** (`LAMP_FACE_NO_ASK=on` on lamp-eyes, off unless set;
+**With nothing asked** (`LAMP_FACE_NO_ASK=on` on lamp-eyes, off unless set,
+on in the product unit;
 the first builder 18:50, 18 Nov, from the product owner: nothing is asked
 of the person). The photo's one face, found and printed as above, is kept
 **at once** in the people's file (`photo::keep_at_once`): the answer is the

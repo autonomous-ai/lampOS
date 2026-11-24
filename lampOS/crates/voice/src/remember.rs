@@ -2431,7 +2431,7 @@ pub fn forget_face_memory(
         name: FORGET_EVERYTHING.into(),
         args: json!({}),
     };
-    let (memory, _) = run_scoped(&socket, &call, deadline, lease);
+    let (memory, _) = run_scoped(&socket, &call, deadline, lease, false);
     (face_and_memory(told.0, &memory), told.1)
 }
 
@@ -5354,7 +5354,7 @@ fn wall_zone() -> Option<&'static LocalTime> {
 /// `deadline`: for a thread of its own. For whoever the eyes know is at the
 /// lamp now, the room's when nobody is.
 pub fn run(socket: &Path, call: &ToolCall, deadline: Duration) -> (Value, bool) {
-    run_for(socket, call, deadline, person_now().as_deref())
+    run_for(socket, call, deadline, person_now().as_deref(), false)
 }
 
 fn scope_current(lease: Option<&crate::memory_scope::ScopeLease>) -> bool {
@@ -5391,12 +5391,14 @@ fn history_allowed(person: Option<&str>, lease: Option<&crate::memory_scope::Sco
 /// Uses only the admitted request's immutable scope. Revoked is never room.
 /// Revocation suppresses undispatched work and late results; it cannot undo a
 /// write the memory already accepted. Such uncertain writes retain the existing
-/// conservative journal fence.
+/// conservative journal fence. `remember_speaker`: the memory route's face
+/// save is speaker-bound ([`crate::known_faces::FaceSwitches`], #7876).
 pub fn run_scoped(
     socket: &Path,
     call: &ToolCall,
     deadline: Duration,
     lease: &crate::memory_scope::ScopeLease,
+    remember_speaker: bool,
 ) -> (Value, bool) {
     let Some(snapshot) = lease.scope() else {
         return (gone(), false);
@@ -5407,6 +5409,7 @@ pub fn run_scoped(
         deadline,
         snapshot.person(),
         (Some(lease), Some(lease.key().request)),
+        remember_speaker,
     );
     if lease.is_current() {
         result
@@ -5425,6 +5428,7 @@ pub fn run_scoped_for(
     deadline: Duration,
     lease: &crate::memory_scope::ScopeLease,
     person: &str,
+    remember_speaker: bool,
 ) -> (Value, bool) {
     if lease.scope().is_none() {
         return (gone(), false);
@@ -5435,6 +5439,7 @@ pub fn run_scoped_for(
         deadline,
         Some(person),
         (Some(lease), Some(lease.key().request)),
+        remember_speaker,
     );
     if lease.is_current() {
         result
@@ -6445,14 +6450,15 @@ pub fn run_one_face_keep(
     deadline: Duration,
     lease: &crate::memory_scope::ScopeLease,
     person: &str,
+    remember_speaker: bool,
 ) -> (Value, bool) {
     if !still_one_face(lease, person) {
         eprintln!(
             "lamp-voice: a one-face keep whose line was narrowed since is the room's (LAMP_PERSON_SCOPE_ONE_FACE)"
         );
-        return run_scoped(socket, call, deadline, lease);
+        return run_scoped(socket, call, deadline, lease, remember_speaker);
     }
-    let result = run_scoped_for(socket, call, deadline, lease, person);
+    let result = run_scoped_for(socket, call, deadline, lease, person, remember_speaker);
     // Kept or corrected in their memory from a line told as the room's:
     // its exchange is told in their later turns too, so their history is
     // never older than their memory (the bike lock on lamp-06c1, 5 Nov).
@@ -6480,13 +6486,13 @@ pub fn run_one_face_forget(
         eprintln!(
             "lamp-voice: a one-face forget whose line was narrowed since is the room's (LAMP_PERSON_SCOPE_ONE_FACE)"
         );
-        return run_scoped(socket, call, deadline, lease);
+        return run_scoped(socket, call, deadline, lease, false);
     }
     if !forget_targets(call) {
         eprintln!(
             "lamp-voice: a one-face forget that names neither what nor which is the room's (LAMP_PERSON_SCOPE_ONE_FACE)"
         );
-        return run_scoped(socket, call, deadline, lease);
+        return run_scoped(socket, call, deadline, lease, false);
     }
     let shown = DAYS
         .get()
@@ -6496,13 +6502,14 @@ pub fn run_one_face_forget(
     let started = Instant::now();
     by_where_shown(
         shown,
-        || run_scoped_for(socket, call, deadline, lease, person),
+        || run_scoped_for(socket, call, deadline, lease, person, false),
         || {
             run_scoped(
                 socket,
                 call,
                 deadline.saturating_sub(started.elapsed()),
                 lease,
+                false,
             )
         },
     )
@@ -6510,13 +6517,20 @@ pub fn run_one_face_forget(
 
 /// [`run`] for this request's turn: with [`LINK_USED_ENVIRONMENT`], what it
 /// gives is linked to that request's exchange (#2176 finding 14).
-pub fn run_of(socket: &Path, call: &ToolCall, deadline: Duration, request: u64) -> (Value, bool) {
+pub fn run_of(
+    socket: &Path,
+    call: &ToolCall,
+    deadline: Duration,
+    request: u64,
+    remember_speaker: bool,
+) -> (Value, bool) {
     run_for_guarded(
         socket,
         call,
         deadline,
         person_now().as_deref(),
         (None, Some(request)),
+        remember_speaker,
     )
 }
 
@@ -6526,20 +6540,32 @@ pub fn run_for(
     call: &ToolCall,
     deadline: Duration,
     person: Option<&str>,
+    remember_speaker: bool,
 ) -> (Value, bool) {
-    run_for_guarded(socket, call, deadline, person, (None, None))
+    run_for_guarded(
+        socket,
+        call,
+        deadline,
+        person,
+        (None, None),
+        remember_speaker,
+    )
 }
 
 /// With the request's scope lease, if any, and the request whose turn it
 /// is, if known.
 type Turn<'a> = (Option<&'a crate::memory_scope::ScopeLease>, Option<u64>);
 
+/// `remember_speaker`: the memory route's face save is speaker-bound, from
+/// its [`crate::known_faces::FaceSwitches`] (#7876), never from this
+/// process's environment, which a worker's is cleared of.
 fn run_for_guarded(
     socket: &Path,
     call: &ToolCall,
     deadline: Duration,
     person: Option<&str>,
     (lease, asked_in): Turn<'_>,
+    remember_speaker: bool,
 ) -> (Value, bool) {
     if !scope_current(lease) {
         return (gone(), false);
@@ -6566,20 +6592,11 @@ fn run_for_guarded(
         person,
         needs_face::on(),
         crate::known_faces::name_learn_fix_on(),
-        // Saved unasked only where the face save is speaker-bound
-        // (`LAMP_REMEMBER_SPEAKER`); elsewhere nothing kept and nothing
-        // asked (#7787's HOLDs, the first builder 21:13).
-        if !crate::known_faces::face_no_ask_on() {
-            needs_face::NoAsk::Off
-        } else if crate::remember_speaker::switched_on(
-            std::env::var(crate::remember_speaker::ENVIRONMENT)
-                .ok()
-                .as_deref(),
-        ) {
-            needs_face::NoAsk::Save
-        } else {
-            needs_face::NoAsk::Quiet
-        },
+        // Saved unasked only where the memory route's face save is
+        // speaker-bound (its switches' `remember_speaker`, #7876); elsewhere
+        // nothing kept and nothing asked (#7787's HOLDs, the first builder
+        // 21:13).
+        needs_face::no_ask(crate::known_faces::face_no_ask_on(), remember_speaker),
     ) {
         return (told, true);
     }
@@ -7376,7 +7393,7 @@ pub fn keep_name_with_face(name: &str) {
     }
     let socket = client.socket.clone();
     std::thread::spawn(move || {
-        let (told, _) = run_for(&socket, &call, WRITER_DEADLINE, Some(&person));
+        let (told, _) = run_for(&socket, &call, WRITER_DEADLINE, Some(&person), false);
         let kept = told["remembered"] == true;
         eprintln!(
             "lamp-voice provider: the name a face was saved under at onboarding {} in their own memory",
@@ -19100,7 +19117,7 @@ mod tests {
         request.revoke();
         let call = call(REMEMBER, json!({"text":"private"}));
         assert_eq!(
-            run_scoped(&socket, &call, FIRST_READ, &lease),
+            run_scoped(&socket, &call, FIRST_READ, &lease, false),
             (gone(), false)
         );
         let client = DaysClient::new(socket.clone()).unwrap();
@@ -19144,6 +19161,7 @@ mod tests {
                     Duration::from_secs(2),
                     person,
                     (Some(&lease), None),
+                    false,
                 )
             };
             assert!(!result.1);
@@ -19205,6 +19223,7 @@ mod tests {
                     Duration::from_secs(2),
                     person,
                     (Some(&lease), None),
+                    false,
                 )
             };
             assert!(result.1);
@@ -20433,7 +20452,8 @@ mod tests {
             assert_eq!(kept.args, json!({ HEARD_KEPT: true }));
             // Never sent: nobody listens on this socket.
             let socket = std::env::temp_dir().join("lamp-remember-nobody-kept.sock");
-            let (told, answered) = run_for(&socket, &kept, Duration::from_secs(1), Some(MAI));
+            let (told, answered) =
+                run_for(&socket, &kept, Duration::from_secs(1), Some(MAI), false);
             assert!(answered);
             assert_eq!(
                 told,
@@ -29140,7 +29160,16 @@ mod tests {
             (RECALL, json!({"about":"coffee"})),
             (FORGET, json!({})),
         ] {
-            assert!(run_for(&socket, &call(name, args), Duration::from_secs(2), None).1);
+            assert!(
+                run_for(
+                    &socket,
+                    &call(name, args),
+                    Duration::from_secs(2),
+                    None,
+                    false
+                )
+                .1
+            );
         }
         assert_eq!(theirs_too(&socket, "room".into(), None, FIRST_READ), "room");
         assert_eq!(kept(&socket, None, Duration::from_secs(2)), Some(vec![]));
@@ -29384,6 +29413,7 @@ mod tests {
             &call(REMEMBER, json!({"text":"takes coffee black"})),
             deadline,
             Some(MINH),
+            false,
         );
         assert_eq!(remembered, (theirs(json!({"remembered":true})), true));
         let (told, answered) = run_for(
@@ -29391,13 +29421,23 @@ mod tests {
             &call(RECALL, json!({"about":"coffee"})),
             deadline,
             Some(MINH),
+            false,
         );
         assert!(answered, "{told}");
         assert_eq!(told["found"][0]["asked_to_remember"], "takes coffee black");
         assert_eq!(told["found"][0]["theirs"], true);
         assert_eq!(told["found"][1]["you_said"], "There is some.");
         assert!(told["found"][1].get("theirs").is_none());
-        assert!(run_for(&socket, &call(FORGET, json!({})), deadline, Some(MINH)).1);
+        assert!(
+            run_for(
+                &socket,
+                &call(FORGET, json!({})),
+                deadline,
+                Some(MINH),
+                false
+            )
+            .1
+        );
         let room = note(&[]);
         let both = theirs_too(&socket, room.clone(), Some(MINH), deadline);
         assert!(both.starts_with(&room) && both.ends_with("- takes coffee black\n"));
@@ -34019,7 +34059,7 @@ mod tests {
                 .expect("marked unclear");
             assert_eq!(unclear.args[HEARD_UNCLEAR], true);
             // Never sent to the memory: nobody listens on this socket.
-            let (told, answered) = run_for(&socket, &unclear, Duration::from_secs(1), None);
+            let (told, answered) = run_for(&socket, &unclear, Duration::from_secs(1), None, false);
             assert!(answered, "{said}");
             assert_eq!(told["forgotten"], false, "{said}");
             assert_eq!(told["note"], FORGET_UNCLEAR, "{said}");
