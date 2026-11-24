@@ -6467,7 +6467,8 @@ after a take-over, but now for every turn:
   `said_to_me::awaiting_yes`), so a bare "Yes." its mouth unread still
   reaches `held_rename::take` and the other holds; when its name is heard
   or written in it (heard: any hearing drained with the line, however old;
-  with `LAMP_SAID_TO_ME_NAME_IN_LINE=on`, #8384, only one that counts for
+  with `LAMP_SAID_TO_ME_NAME_IN_LINE=on`, #8384, on in the product's
+  `lamp-voice`, only one that counts for
   the line's own sound, from 1.5 s before its first sound to its end,
   `attention::hearing_counts_for_line`, or any for a line going on from
   another, its name maybe in its first half: on lamp-74ff on 23 Nov,
