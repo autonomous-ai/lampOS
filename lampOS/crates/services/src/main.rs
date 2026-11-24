@@ -180,7 +180,16 @@ fn main() -> ExitCode {
     if run_calls_on {
         say("skill runs' calls kept: the last 64 across all runs, no content, for the voice alone");
     }
+    // A run asked aloud just now sends its write with no yes (#8475): read
+    // from the voice's own record of the owner's spoken asks, here.
+    let task_no_yes = lamp_services::task_no_yes::on();
+    if task_no_yes && skill_tasks {
+        say(
+            "a skill's task with no yes on: a run the owner asked for aloud just now sends its write with no yes; any other run's waits for it",
+        );
+    }
     let services = serve::Services::new(store::Store(store), Https, Gmail, backend, write_on)
+        .with_task_no_yes(task_no_yes)
         .with_skill_reads(skill_reads)
         .with_skill_writes(skill_writes)
         .with_skill_tasks(skill_tasks)

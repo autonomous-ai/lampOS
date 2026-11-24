@@ -3839,6 +3839,52 @@ pub fn set_no_yes_switch_here(on: Option<bool>) {
     NO_YES_HERE.with(|here| here.set(on));
 }
 
+/// Whether a skill's task runs on its declared grants with no folder yes,
+/// whatever its source (#8475, `LAMP_TASK_NO_YES`,
+/// `lamp_services::task_no_yes`, the one switch read alike by lamp-control,
+/// lamp-skills, lamp-services and lamp-voice): on, lamp-control mints
+/// every source's declared grants, `net` among them, with no kept yes (its
+/// folder's SHA-256 still checked at the yes check, a changed folder a new
+/// one), the hand-over asks no yes ([`task::hand`]), and a model's call of
+/// a skill's task runs only on the owner's named ask
+/// ([`task_call_refused`]). Off, as before.
+pub fn task_no_yes_on() -> bool {
+    lamp_services::task_no_yes::on()
+}
+
+/// [`task_no_yes_on`]'s switch, `LAMP_TASK_NO_YES`.
+pub const TASK_NO_YES_ENVIRONMENT: &str = lamp_services::task_no_yes::ENVIRONMENT;
+
+/// [`task_no_yes_on`] for this test's thread alone: tests only (other
+/// crates' too, as [`set_no_yes_switch_here`]).
+#[doc(hidden)]
+pub fn set_task_no_yes_here(on: Option<bool>) {
+    lamp_services::task_no_yes::set_here(on);
+}
+
+/// What the voice's model is told of its call of a skill's task the owner
+/// didn't name (#8475, [`task_call_refused`]): nothing ran, and how to
+/// answer in words.
+pub const NOT_NAMED: &str = "Nothing ran: the person didn't name this skill, and a skill's task runs only when they ask for it by its name. Say what you heard and ask them to say the skill's name if they want it run.";
+
+/// Why the voice's model's call of a skill whose run would hand a task
+/// over is refused (#8475), or none: with [`task_no_yes_on`] (`no_yes`),
+/// a call from the voice (`voice`) of a run with a task (`task`) runs only
+/// when the voice says the owner named the skill (`spoken_ask`: the heard
+/// words' own call, or its record of the owner's spoken asks naming it
+/// within five minutes, `lamp_voice::tools::spoken_ask`). A half match
+/// runs nothing. A trigger's or a schedule's run never comes here, nor
+/// does a run now (`lamp_voice::made_run`, its own op); another peer's
+/// call is not the voice's model's, and runs as before.
+pub fn task_call_refused(
+    no_yes: bool,
+    voice: bool,
+    task: bool,
+    spoken_ask: bool,
+) -> Option<&'static str> {
+    (no_yes && voice && task && !spoken_ask).then_some(NOT_NAMED)
+}
+
 /// Where the skill in `folder` came from, as far as its grants' yes goes
 /// (#8180, `lamp_voice::made_skill::grants_need_no_yes`): pushed (under
 /// [`PUSHED_DIR`] or with a [`PUSHED_FROM`] record), from the Store (its
@@ -12880,6 +12926,30 @@ pub fn run_tests_at(dir: &Path, energy: u8) -> Result<(usize, usize), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #8475: with `LAMP_TASK_NO_YES` on, the voice's model's call of a
+    /// skill whose run hands a task over runs only when the voice says the
+    /// owner named it; refused, it is told in words the model can answer.
+    /// A call with no task, another peer's call, or any call with the
+    /// switch off runs as before. (A trigger's or a schedule's run never
+    /// reaches the gate: it hands over from its fire, `task::hand`, tested
+    /// with the switch on in `task.rs`.) No old line: the gate is new; the
+    /// old `tool_call` ran every such call.
+    #[test]
+    fn a_models_call_of_a_task_runs_only_when_the_owner_named_it() {
+        assert_eq!(task_call_refused(true, true, true, false), Some(NOT_NAMED));
+        assert_eq!(task_call_refused(true, true, true, true), None);
+        assert_eq!(task_call_refused(true, true, false, false), None);
+        assert_eq!(task_call_refused(true, false, true, false), None);
+        assert_eq!(task_call_refused(false, true, true, false), None);
+        assert!(NOT_NAMED.contains("didn't name this skill"));
+        assert!(NOT_NAMED.contains("ask them to say the skill's name"));
+        set_task_no_yes_here(Some(true));
+        assert!(task_no_yes_on());
+        set_task_no_yes_here(Some(false));
+        assert!(!task_no_yes_on());
+        set_task_no_yes_here(None);
+    }
 
     #[test]
     fn a_line_never_comes_twice_in_a_row_and_every_line_still_comes() {
