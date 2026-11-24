@@ -406,6 +406,10 @@ struct Pending {
     /// on a computer: what [`crate::hand_wait`]'s line says (the first
     /// builder's P3 on #8510).
     on_lamp: bool,
+    /// Asked aloud: prepared in a request a person said, not typed and not
+    /// the lamp's own line. Only such a task is said when it is let go
+    /// unstarted ([`let_go`], #8462).
+    heard: bool,
 }
 
 static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
@@ -4206,9 +4210,25 @@ fn reads_back(line: &str, pending: &Pending) -> bool {
 /// the task waiting. On 52e6 on 12 Nov "do not call start_agent_task
 /// again" left a new ask read back in words only, and the yes started the
 /// old task.
-pub fn pending_note(request: u64, words: &str, now: Instant) -> Option<String> {
+pub fn pending_note(
+    request: u64,
+    words: &str,
+    now: Instant,
+    cancel: impl FnOnce(u64),
+) -> Option<String> {
     let pending = PENDING.lock().ok()?.clone()?;
-    if request <= pending.request || now.duration_since(pending.at) > CONFIRM_WITHIN {
+    // Its yes window over (#8462): let go, and said once on this turn.
+    if now.saturating_duration_since(pending.at) > CONFIRM_WITHIN {
+        let lapsed = PENDING.lock().ok().and_then(|mut waiting| {
+            waiting
+                .as_ref()
+                .is_some_and(|waiting| waiting.id == pending.id)
+                .then(|| waiting.take())
+                .flatten()
+        })?;
+        return let_go(&lapsed, request, "its yes window is over", cancel);
+    }
+    if request <= pending.request {
         return None;
     }
     if new_ask(words) {
@@ -4383,6 +4403,44 @@ fn cancel_replaced(
     }
 }
 
+/// What the model is told, on the turn a task asked aloud was let go
+/// unstarted ([`let_go`], #8462): said once, plainly, in its few words,
+/// and that asking again starts it.
+fn let_go_note(label: &str) -> String {
+    format!(
+        "(For you to know: the task you prepared earlier, \"{label}\", was not started, and is let go. {LABEL_QUOTED} Say once, plainly and in a few words, that you didn't start it and that if they ask for it again you will; then answer this line as usual.)"
+    )
+}
+
+/// A task waiting for its yes and let go unstarted (#8462: the first
+/// builder's rule on #8043, "a task asked aloud never vanishes
+/// silently"): its yes window is over ([`pending_note`]), or another task
+/// was written over it without replacing it ([`START`]: in the same
+/// request, from a line the lamp wrote, or past its window). It is
+/// cancelled with `cancel`, said as declined, and journalled once; a task
+/// the person asked aloud ([`Pending::heard`]) gets [`let_go_note`] for
+/// this turn, a line the lamp wrote or a typed one nothing. The caller has
+/// already taken it from [`PENDING`], so it is let go once.
+fn let_go(waiting: &Pending, request: u64, why: &str, cancel: impl FnOnce(u64)) -> Option<String> {
+    eprintln!(
+        "lamp-voice: tasks: request {request}: task {} let go unstarted ({why}); this voice no longer confirms it and asks the tasks part to cancel it; {} (#8462)",
+        waiting.id,
+        if waiting.heard {
+            "the lamp says so once"
+        } else {
+            "not asked aloud, so nothing is said"
+        }
+    );
+    decided(
+        request,
+        waiting.id,
+        waiting.engine.as_deref(),
+        lamp_msgs::HandStage::Declined,
+    );
+    cancel(waiting.id);
+    waiting.heard.then(|| let_go_note(&label_of(&waiting.text)))
+}
+
 /// What the model is told when the person said a plain no to a task read
 /// back (#6582): it is dropped at once, here and in the tasks part.
 pub const DECLINED_NOTE: &str = "(For you to know: they said no to the task you read back. It is dropped and nothing was started. Say only, in the conversation's language, that you won't start it. Call nothing.)";
@@ -4398,8 +4456,15 @@ pub const DECLINED_NOTE: &str = "(For you to know: they said no to the task you 
 /// write a poem about tea instead") is not plain: it stays the model's, a
 /// correction as before (#2838). With nothing waiting, nothing is done.
 pub fn declined(place: &Place, request: u64, words: &str) -> Option<String> {
+    declined_with(request, words, Instant::now(), cancel_aside(place, request))
+}
+
+/// The cancel of a prepared task on a thread of its own ([`cancel_declined`],
+/// bounded by [`DEADLINE`]), so a cancel refused or never answered never
+/// holds the voice: for a no ([`declined`]) or a lapse ([`waiting_note`]).
+fn cancel_aside(place: &Place, request: u64) -> impl FnOnce(u64) + use<> {
     let directory = place.directory.clone();
-    declined_with(request, words, Instant::now(), move |id| {
+    move |id| {
         let spawned = std::thread::Builder::new()
             .name("lamp-voice-task-no".into())
             .spawn(move || {
@@ -4410,7 +4475,13 @@ pub fn declined(place: &Place, request: u64, words: &str) -> Option<String> {
                 "lamp-voice: tasks: request {request}: no thread to cancel task {id}; it lapses in the tasks part"
             );
         }
-    })
+    }
+}
+
+/// [`pending_note`] for a turn of the tasks part at `place`: a task whose
+/// yes window is over is cancelled there (#8462).
+pub fn waiting_note(place: &Place, request: u64, words: &str) -> Option<String> {
+    pending_note(request, words, Instant::now(), cancel_aside(place, request))
 }
 
 /// [`declined`] at `now`, with `cancel` for the tasks part's prepared task.
@@ -4957,6 +5028,7 @@ fn run_for_asked(
                     // When PENDING took it: [`same_start_again`] tells only
                     // this prepare's answer again.
                     let prepared_at = Instant::now();
+                    let mut overwritten = None;
                     if let Ok(mut pending) = PENDING.lock() {
                         // One still waiting for its yes is replaced by this
                         // different task (#2838, #6547 B): only from a later
@@ -4978,6 +5050,18 @@ fn run_for_asked(
                                     && may_confirm(waiting, request, heard, Instant::now())
                             })
                             .map(|waiting| (waiting.id, waiting.engine.clone()));
+                        // Any other task, different work, is written over
+                        // unstarted (#8462): in the same request, from a line
+                        // the lamp wrote, or after its yes window: let go,
+                        // never silently.
+                        if replaced.is_none() {
+                            overwritten = pending.clone().filter(|waiting| {
+                                waiting.id != id
+                                    && (waiting.text != task
+                                        || waiting.who != who
+                                        || waiting.session.as_deref() != session)
+                            });
+                        }
                         *pending = Some(Pending {
                             id,
                             digest: digest.to_owned(),
@@ -4989,6 +5073,7 @@ fn run_for_asked(
                             session: session.map(str::to_owned),
                             engine: handed_engine.clone(),
                             on_lamp: on_the_lamp,
+                            heard: heard && !crate::messages::is_text(request),
                         });
                     }
                     if let Some((old, old_engine)) = &replaced {
@@ -5010,6 +5095,18 @@ fn run_for_asked(
                             left(),
                         );
                     }
+                    let let_went = overwritten.and_then(|waiting| {
+                        let_go(&waiting, request, "written over by another task", |old| {
+                            cancel_replaced(
+                                place,
+                                request,
+                                old,
+                                status.get("store_id").and_then(Value::as_str),
+                                answer.get("revision").and_then(Value::as_u64),
+                                left(),
+                            );
+                        })
+                    });
                     decided(
                         request,
                         id,
@@ -5058,6 +5155,9 @@ fn run_for_asked(
                         && yes_in_the_same_turn_now(&waiting, request, heard)
                     {
                         next = ALREADY_YES.to_owned();
+                    }
+                    if let Some(said) = let_went {
+                        next = format!("{said} {next}");
                     }
                     let told = json!({
                         "prepared": true,
@@ -7027,6 +7127,7 @@ pub(crate) mod tests {
             correct: false,
             session: None,
             engine: None,
+            heard: true,
         };
         assert!(may_confirm(&pending, 6, true, at + Duration::from_secs(10)));
         // In the request that prepared it: the model asking itself.
@@ -7066,6 +7167,7 @@ pub(crate) mod tests {
             correct: false,
             session: None,
             engine: None,
+            heard: true,
         };
         assert!(may_confirm(
             &pending,
@@ -7101,6 +7203,7 @@ pub(crate) mod tests {
             correct: false,
             session: None,
             engine: Some("claude".into()),
+            heard: true,
         }
     }
 
@@ -12664,7 +12767,7 @@ pub(crate) mod tests {
         );
         assert_eq!(first, json!({"error": NO_HARNESS}));
         assert!(
-            pending_note(2, "", Instant::now()).is_none(),
+            pending_note(2, "", Instant::now(), |_| {}).is_none(),
             "nothing waits"
         );
         let (again, _) = run(
@@ -12676,7 +12779,7 @@ pub(crate) mod tests {
         );
         assert_eq!(again, json!({"error": NO_HARNESS}));
         assert!(
-            pending_note(3, "", Instant::now()).is_none(),
+            pending_note(3, "", Instant::now(), |_| {}).is_none(),
             "nothing waits"
         );
         let ops: Vec<String> = seen
@@ -12749,8 +12852,9 @@ pub(crate) mod tests {
                 correct,
                 session: None,
                 engine: None,
+                heard: true,
             });
-            let note = pending_note(2, "", at).unwrap();
+            let note = pending_note(2, "", at, |_| {}).unwrap();
             assert_eq!(note.contains("that is not a yes"), correct, "{note}");
             assert_eq!(note.contains("never confirm_agent_task"), correct, "{note}");
         }
@@ -13794,7 +13898,7 @@ pub(crate) mod tests {
         assert!(!next.starts_with(REPLACED_NEXT), "{next}");
         assert!(next.ends_with(CORRECTED_NEXT), "{next}");
         // The note beside "No, I said tea." says a correction replaces it.
-        let note = pending_note(2, "", Instant::now()).unwrap();
+        let note = pending_note(2, "", Instant::now(), |_| {}).unwrap();
         assert!(note.contains("no, I said …"), "{note}");
         assert!(note.contains("it replaces the one waiting"), "{note}");
         let (told, _) = run(
@@ -13836,10 +13940,12 @@ pub(crate) mod tests {
     }
 
     /// Reviewers' P2 on #3009: one line asking two agents makes two starts
-    /// in the same request; the second never replaces or cancels the first,
-    /// nor says it did. Nor does a start in a request the lamp wrote itself
-    /// (not heard, another chat) replace the person's waiting task, nor the
-    /// same work asked again (El's P3 on #3028).
+    /// in the same request; the second never replaces the first, nor says
+    /// it did. Nor does a start in a request the lamp wrote itself (not
+    /// heard, another chat) replace the person's waiting task, nor the same
+    /// work asked again (El's P3 on #3028). Only one task waits for a yes,
+    /// so one written over for other work is let go: cancelled and said
+    /// once, never silently (#8462).
     #[test]
     fn two_starts_in_one_request_or_a_written_one_replace_nothing() {
         let _one = ONE_AT_A_TIME
@@ -13864,11 +13970,13 @@ pub(crate) mod tests {
                     "request.sock",
                     json!({"ok":true,"id":8,"prepared_digest":"two","revision":2}),
                 ),
+                ("request.sock", json!({"ok":true,"id":7,"revision":3})),
                 ("request.sock", status(2)),
                 (
                     "request.sock",
                     json!({"ok":true,"id":9,"prepared_digest":"three","revision":3}),
                 ),
+                ("request.sock", json!({"ok":true,"id":8,"revision":4})),
                 ("request.sock", status(3)),
                 (
                     "request.sock",
@@ -13908,11 +14016,24 @@ pub(crate) mod tests {
             !again["next"].as_str().unwrap().starts_with(REPLACED_NEXT),
             "{again}"
         );
-        let ops: Vec<String> = seen
+        // Each task written over for other work is let go, cancelled and
+        // said once, never dropped silently (#8462): the haiku by the
+        // limerick, the limerick by the lamp's sonnet; the same sonnet again
+        // lets nothing go.
+        for (told, gone) in [(&second, "haiku"), (&written, "limerick")] {
+            let next = told["next"].as_str().unwrap();
+            assert!(
+                next.contains("was not started") && next.contains(gone),
+                "{next}"
+            );
+        }
+        assert!(!again["next"].as_str().unwrap().contains("was not started"));
+        let cancelled: Vec<Value> = seen
             .try_iter()
-            .map(|line| line["op"].as_str().unwrap().to_owned())
+            .filter(|line| line["op"] == "cancel")
+            .map(|line| line["id"].clone())
             .collect();
-        assert!(!ops.iter().any(|op| op == "cancel"), "{ops:?}");
+        assert_eq!(cancelled, [json!(7), json!(8)]);
         *PENDING.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
     }
@@ -14116,7 +14237,7 @@ pub(crate) mod tests {
         // A yes after it, within the 120 s, starts nothing and sends nothing.
         let (told, _) = run(&place, &call(CONFIRM, json!({})), 3, true, PEER_WAIT);
         assert!(told["error"].is_string(), "{told}");
-        assert!(pending_note(3, "", Instant::now()).is_none());
+        assert!(pending_note(3, "", Instant::now(), |_| {}).is_none());
         // A cancel never answered is bounded, and keeps nothing waiting.
         let silent = directory.join("silent");
         std::fs::create_dir_all(&silent).unwrap();
@@ -14181,6 +14302,7 @@ pub(crate) mod tests {
             session: None,
             engine: None,
             on_lamp: false,
+            heard: true,
         }
     }
 
@@ -14241,7 +14363,7 @@ pub(crate) mod tests {
         );
         assert!(told["error"].is_string(), "{told}");
         assert!(seen.try_iter().next().is_none());
-        assert!(pending_note(3, "", Instant::now()).is_none());
+        assert!(pending_note(3, "", Instant::now(), |_| {}).is_none());
         std::fs::remove_dir_all(directory).unwrap();
     }
 
@@ -14265,7 +14387,7 @@ pub(crate) mod tests {
             assert!(told.is_none(), "{correction}");
         }
         assert_eq!(PENDING.lock().unwrap().as_ref().unwrap().id, 7);
-        assert!(pending_note(2, "", Instant::now()).is_some());
+        assert!(pending_note(2, "", Instant::now(), |_| {}).is_some());
         *PENDING.lock().unwrap() = None;
     }
 
@@ -14343,14 +14465,15 @@ pub(crate) mod tests {
             correct,
             session: None,
             engine: None,
+            heard: true,
         };
         *PENDING.lock().unwrap() = Some(waiting(false));
         assert_eq!(
-            pending_note(2, "", at).unwrap(),
+            pending_note(2, "", at, |_| {}).unwrap(),
             "(For you to know, not to answer: you have prepared a task for Claude Code and asked the person whether to start it. If they say yes now, call confirm_agent_task; do not call start_agent_task again for that work.)"
         );
         *PENDING.lock().unwrap() = Some(waiting(true));
-        let note = pending_note(2, "", at).unwrap();
+        let note = pending_note(2, "", at, |_| {}).unwrap();
         assert!(
             note.contains("If they say no and say what they meant instead (\"no, I said …\", \"no, ask Codex …\"), call start_agent_task again with the corrected task"),
             "{note}"
@@ -14515,6 +14638,9 @@ pub(crate) mod tests {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         STAFF.lock().unwrap().clear();
+        // Another test's task left waiting would be let go here (#8462),
+        // and its cancel take this tasks part's answers.
+        *PENDING.lock().unwrap() = None;
         let directory = std::env::temp_dir().join(format!("agent-unpaired-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).unwrap();
@@ -15882,7 +16008,7 @@ pub(crate) mod tests {
         assert!(told["prepared"] == json!(true), "{told}");
         // A yes, a no or a short line is no new ask: the note is as before.
         for words in ["Yes.", "No.", "What was that?"] {
-            let note = pending_note(2, words, Instant::now()).unwrap();
+            let note = pending_note(2, words, Instant::now(), |_| {}).unwrap();
             assert!(
                 note.contains("do not call start_agent_task again"),
                 "{words}: {note}"
@@ -15890,7 +16016,7 @@ pub(crate) mod tests {
         }
         let plants = "Ask Claude Code to list five plants that grow well in the shade";
         assert!(new_ask(plants));
-        let note = pending_note(2, plants, Instant::now()).unwrap();
+        let note = pending_note(2, plants, Instant::now(), |_| {}).unwrap();
         assert!(note.contains("it replaces the one waiting"), "{note}");
         assert!(note.contains("call start_agent_task now"), "{note}");
         // The START in the new ask's own request replaces it.
@@ -15976,7 +16102,7 @@ pub(crate) mod tests {
         assert!(told["prepared"] == json!(true), "{told}");
         let question = "What's the weather going to be like in Hanoi today?";
         assert!(new_ask(question));
-        assert!(pending_note(2, question, Instant::now()).is_some());
+        assert!(pending_note(2, question, Instant::now(), |_| {}).is_some());
         // Answered in words, no START; then "Yes.": the fruits start.
         let (told, _) = run(&place, &call(CONFIRM, json!({})), 3, true, PEER_WAIT);
         assert!(told["handing_over"] == json!(true), "{told}");
@@ -16120,7 +16246,7 @@ pub(crate) mod tests {
                 };
                 let (told, _) = run(&place, &call(START), 1, true, PEER_WAIT);
                 assert!(told["prepared"] == json!(true), "{line}: {told}");
-                let note = pending_note(2, line, Instant::now()).unwrap();
+                let note = pending_note(2, line, Instant::now(), |_| {}).unwrap();
                 assert!(note.contains("If they say yes now"), "{line}: {note}");
                 HEARD_HERE.with(|here| here.set(Some(line)));
                 let (told, _) = run(&place, &call(CONFIRM), 2, true, PEER_WAIT);
@@ -16713,6 +16839,117 @@ pub(crate) mod tests {
         let rome = call("Look up the museum opening hours in Rome");
         let (told, _) = run(&place, &rome, 4, true, PEER_WAIT);
         assert!(told["prepared"] == json!(true), "{told}");
+        assert_eq!(PENDING.lock().unwrap().as_ref().map(|p| p.id), Some(41));
+        let sent: Vec<Value> = std::iter::from_fn(|| seen.recv_timeout(PEER_WAIT).ok())
+            .take(5)
+            .collect();
+        assert_eq!(sent.len(), 5, "{sent:?}");
+        assert_eq!(sent[4]["op"], json!("cancel"), "{sent:?}");
+        assert_eq!(sent[4]["id"], json!(40), "{sent:?}");
+        assert!(
+            decided_here()
+                .iter()
+                .any(|decided| decided.stage == Some(lamp_msgs::HandStage::Declined)),
+            "task 40 is said as declined"
+        );
+        *PENDING.lock().unwrap() = None;
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #8462: a task asked aloud whose yes window is over is let go once:
+    /// cancelled, said as declined, and the next turn's note says once that
+    /// it was not started and that asking again will. A second turn says
+    /// nothing more; a lamp-written task is cancelled and never said.
+    #[test]
+    fn a_waiting_task_past_its_yes_window_is_let_go_and_said_once() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        decided_here();
+        let at = Instant::now();
+        let later = at + CONFIRM_WITHIN + Duration::from_secs(1);
+        *PENDING.lock().unwrap() = Some(Pending {
+            request: 8,
+            ..moon(at)
+        });
+        let mut cancelled = Vec::new();
+        let note = pending_note(9, "What time is it?", later, |id| cancelled.push(id))
+            .expect("the lapse is said on this turn");
+        assert!(note.contains("was not started"), "{note}");
+        assert!(note.contains("two-line poem about the moon"), "{note}");
+        assert!(note.contains("ask for it again"), "{note}");
+        assert_eq!(cancelled, [4]);
+        assert!(PENDING.lock().unwrap().is_none());
+        assert_eq!(
+            decided_here()
+                .iter()
+                .map(|decided| decided.stage)
+                .collect::<Vec<_>>(),
+            [Some(lamp_msgs::HandStage::Declined)]
+        );
+        assert!(pending_note(10, "Thanks.", later, |_| panic!("cancelled twice")).is_none());
+        // The lamp's own line: let go, never said.
+        *PENDING.lock().unwrap() = Some(Pending {
+            request: 8,
+            heard: false,
+            ..moon(at)
+        });
+        let mut cancelled = Vec::new();
+        assert!(pending_note(9, "What time is it?", later, |id| cancelled.push(id)).is_none());
+        assert_eq!(cancelled, [4]);
+        assert!(PENDING.lock().unwrap().is_none());
+    }
+
+    /// #8462: a second start for other work in the very request that
+    /// prepared the first (or from a line that may not confirm it) used to
+    /// write over it silently. Now the first is cancelled, said as
+    /// declined, and the second start's answer says once that it was not
+    /// started and that asking again will.
+    #[test]
+    fn a_task_written_over_without_a_yes_is_let_go_and_said_once() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _thread = crate::provider_worker::tests::one_thread();
+        *PENDING.lock().unwrap() = None;
+        decided_here();
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-written-over-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status.clone()),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":40,"prepared_digest":"museum","revision":1}),
+                ),
+                ("request.sock", status),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":41,"prepared_digest":"rome","revision":2}),
+                ),
+                ("request.sock", json!({"ok":true,"id":40,"revision":3})),
+            ],
+        );
+        let place = correcting(&directory, false);
+        let call = |task: &str| ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({ "task": task }),
+        };
+        let paris = call("Look up the museum opening hours in Paris");
+        let (told, _) = run(&place, &paris, 3, true, PEER_WAIT);
+        assert!(told["prepared"] == json!(true), "{told}");
+        let rome = call("Look up the museum opening hours in Rome");
+        let (told, _) = run(&place, &rome, 3, true, PEER_WAIT);
+        assert!(told["prepared"] == json!(true), "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("was not started"), "{next}");
+        assert!(next.contains("museum opening hours in Paris"), "{next}");
         assert_eq!(PENDING.lock().unwrap().as_ref().map(|p| p.id), Some(41));
         let sent: Vec<Value> = std::iter::from_fn(|| seen.recv_timeout(PEER_WAIT).ok())
             .take(5)

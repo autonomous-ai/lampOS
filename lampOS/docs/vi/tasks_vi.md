@@ -4291,6 +4291,26 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   không: trước đây start như vậy ghi đè lặng lẽ, không bao giờ hủy. Test:
   `agent_tasks::tests::a_start_called_on_a_plain_yes_while_a_task_waits_confirms_that_task`,
   `agent_tasks::tests::a_different_start_while_a_task_waits_cancels_it_never_drops_it_silently`.
+- **Việc được nhờ bằng lời không bao giờ bị bỏ lặng lẽ (#8462).** Luật của
+  first builder trên #8043: một start chưa được xác nhận thì được nói một
+  lần. Trước đây có hai đường bỏ nó mà không nói gì: việc quá cửa sổ chờ
+  yes (`CONFIRM_WITHIN`, 120 s), và việc bị ghi đè mà không được thay (một
+  việc khác trong cùng request, từ câu đèn tự viết, hoặc đã quá cửa sổ). Giờ
+  cả hai đi qua `let_go`: việc bị hủy ở phần tasks (`cancel`), báo là
+  declined trên `voice/decision`, và ghi journal một lần (`lamp-voice:
+  tasks: request N: task <id> let go unstarted (<why>); this voice no
+  longer confirms it and asks the tasks part to cancel it; the lamp says so
+  once (#8462)`). Việc được nhờ bằng lời (`Pending::heard`: request nghe
+  được, không phải gõ, không phải câu của đèn) có một ghi chú cho lượt đó:
+  việc chưa được bắt đầu, bằng vài chữ của nhãn, và nhờ lại thì đèn sẽ làm.
+  Việc quá cửa sổ được phát hiện ở ghi chú chờ của lượt sau
+  (`waiting_note`), nên được nói trong câu trả lời của đèn cho câu tiếp theo
+  của người dùng, không bao giờ đè lên lúc họ đang nói; việc bị ghi đè được
+  nói trong chính câu trả lời của start mới (`next`). Việc bị lấy khỏi chỗ
+  chờ ngay khi bị bỏ, nên chỉ được nói một lần. Tiếng yes sau đó không khởi
+  động gì: nhờ lại thì việc được chuẩn bị mới. Test:
+  `agent_tasks::tests::a_waiting_task_past_its_yes_window_is_let_go_and_said_once`,
+  `agent_tasks::tests::a_task_written_over_without_a_yes_is_let_go_and_said_once`.
 - **Một tiếng yes cho lời đọc lại chỉ bằng lời (#6547 A, bật trong sản
   phẩm, không có công tắc tắt).** Một tiếng yes đáp lại lời đọc lại chỉ
   bằng lời của đèn, ngay trong lượt trao đổi đó và trong `CONFIRM_WITHIN`

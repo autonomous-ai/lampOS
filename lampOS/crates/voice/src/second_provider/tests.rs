@@ -8154,7 +8154,7 @@ fn a_yes_after_a_hand_over_on_this_route_starts_it() {
     )
     .announcing(false)
     .noting_a_task_waiting(Arc::new(|request, words: &str| {
-        crate::agent_tasks::pending_note(request, words, std::time::Instant::now())
+        crate::agent_tasks::pending_note(request, words, std::time::Instant::now(), |_| {})
     }));
     tokio::runtime::Builder::new_current_thread()
         .enable_all()

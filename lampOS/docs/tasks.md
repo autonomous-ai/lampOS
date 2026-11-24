@@ -2425,6 +2425,26 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     cancelled. Tests:
     `agent_tasks::tests::a_start_called_on_a_plain_yes_while_a_task_waits_confirms_that_task`,
     `agent_tasks::tests::a_different_start_while_a_task_waits_cancels_it_never_drops_it_silently`.
+  - **A task asked aloud is never let go silently (#8462).** The first
+    builder's rule on #8043: a start left unconfirmed is said once. Two
+    paths used to drop it with no word: a task past its yes window
+    (`CONFIRM_WITHIN`, 120 s), and one written over without replacing it
+    (another task in the same request, from a line the lamp wrote, or past
+    its window). Both now go through `let_go`: the task is cancelled in the
+    tasks part (`cancel`), said as declined on `voice/decision`, and
+    journalled once (`lamp-voice: tasks: request N: task <id> let go
+    unstarted (<why>); this voice no longer confirms it and asks the tasks
+    part to cancel it; the lamp says so once (#8462)`). A task asked aloud
+    (`Pending::heard`: a heard request, not typed, not the lamp's own line)
+    gets one note for the turn: that it was not started, in its label's few
+    words, and that asking again will. The lapse is found on the next
+    turn's waiting note (`waiting_note`), so it is said in the lamp's
+    answer to the person's next line, never over their talk; the overwrite
+    is said in the new start's own answer (`next`). The task is taken from
+    the waiting slot as it is let go, so it is said once. A yes after it
+    starts nothing: asking again prepares it anew. Tests:
+    `agent_tasks::tests::a_waiting_task_past_its_yes_window_is_let_go_and_said_once`,
+    `agent_tasks::tests::a_task_written_over_without_a_yes_is_let_go_and_said_once`.
   - **No computer in `where` without a pairing (#6547 (1c)).** With no
     computer paired (no staff: the test the description already uses),
     `where`'s `enum` is `["lamp"]` alone and its description never names
