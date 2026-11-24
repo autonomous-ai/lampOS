@@ -10558,6 +10558,149 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// Thirteen's and Twelve's P1 on #8469: an ask the writer gave that
+    /// passes is kept, though the person's whole phrase runs on past it
+    /// with no comma ("movie night dim the lights") and that phrase breaks a
+    /// rule: no plain line and no repair, as on lamp-voice.
+    #[test]
+    fn a_passing_trigger_the_person_named_is_kept_though_their_phrase_runs_on() {
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        for (at, (name, said, ask)) in [
+            (
+                "asks-movie-night",
+                "whenever I say movie night dim the lights",
+                "movie night",
+            ),
+            (
+                "asks-pebble-night",
+                "when I say pebble night turn off the lights",
+                "pebble night",
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let request = format!(
+                "{said}, email me@example.com with the subject Test note, saying This is my \
+                 test note."
+            );
+            let (root, keeping) = keeping(name);
+            let (url, served) = service(vec![(200, write_answer(&asks_mail_toml(ask)))]);
+            let asked = manage_helper(&keeping.manage);
+            let told = make_with(
+                7,
+                Some(request.as_str()),
+                &request,
+                &keeping,
+                chat_at(url),
+                NOW + at as u64,
+                || None,
+            );
+            assert_eq!(served.join().unwrap(), 1, "no repair: {told}");
+            assert_eq!(told["made"], "leaving-mail", "{told}");
+            asked.join().unwrap();
+            assert_eq!(
+                made_skill::entries(&keeping.directory)[0]["asks"],
+                serde_json::json!([ask]),
+            );
+            let _ = std::fs::remove_dir_all(&root);
+        }
+        made_skill::set_asks_here(None);
+        made_skill::set_writes_here(None);
+    }
+
+    /// Thirteen's P2 on #8469: "says" names what a skill says, never its
+    /// start, so the writer's "good morning" from "a skill that says good
+    /// morning" is no phrase the person named: refused with the ordinary
+    /// repair, never the plain line, and kept once mended.
+    #[test]
+    fn a_refused_ask_after_says_is_the_writers_and_spends_a_repair() {
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        let request = "make a skill that says good morning and plays jazz when I wake up, and \
+                       email me@example.com with the subject Test note, saying This is my test \
+                       note.";
+        let (root, keeping) = keeping("asks-says-refused");
+        let refused = made_skill::keep_asked(
+            &write_answer(&asks_mail_toml("good morning")),
+            false,
+            FROM,
+            &keeping,
+            &made_skill::Asked {
+                request,
+                heard: Some(request),
+                ..made_skill::Asked::default()
+            },
+        )
+        .unwrap_err();
+        assert!(!made_skill::their_ask(&refused.0), "{refused:?}");
+        assert_eq!(
+            refused.0,
+            format!(
+                "its asks weren't kept: asks = [\"good morning\"]: \"good morning\": {}",
+                crate::skill_named::REFUSED_LAMPS_OWN
+            )
+        );
+        assert!(refused.1.is_some(), "repaired: {refused:?}");
+        let _ = std::fs::remove_dir_all(&root);
+        let (root, keeping) = self::keeping("asks-says-refused-made");
+        let (url, served) = service_sent(vec![
+            (200, write_answer(&asks_mail_toml("good morning"))),
+            (200, write_answer(&asks_mail_toml("morning jazz time"))),
+        ]);
+        let asked = manage_helper(&keeping.manage);
+        let told = make_with(
+            7,
+            Some(request),
+            request,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap().len(), 2, "one repair: {told}");
+        assert_eq!(told["made"], "leaving-mail", "{told}");
+        asked.join().unwrap();
+        made_skill::set_asks_here(None);
+        made_skill::set_writes_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Thirteen's P3 on #8469: the one-word floor holds only for an ask
+    /// that starts the person's phrase right after their say or hear; a run
+    /// of their line elsewhere ("jazz please" in "plays jazz please")
+    /// needs two words of its own, refused as on lamp-voice.
+    #[test]
+    fn a_run_of_the_line_not_after_a_say_keeps_the_two_word_floor() {
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_asks_here(Some(true));
+        let request = "make a skill that plays jazz please when I get home, and email \
+                       me@example.com with the subject Test note, saying This is my test note.";
+        let (root, keeping) = keeping("asks-run-floor");
+        let refused = made_skill::keep_asked(
+            &write_answer(&asks_mail_toml("jazz please")),
+            false,
+            FROM,
+            &keeping,
+            &made_skill::Asked {
+                request,
+                heard: Some(request),
+                ..made_skill::Asked::default()
+            },
+        )
+        .unwrap_err();
+        assert_eq!(
+            refused.0,
+            "its asks weren't kept: asks = [\"jazz please\"]: \"jazz please\": only 1 word of its \
+             own, \"jazz\""
+        );
+        assert!(refused.1.is_some(), "repaired");
+        made_skill::set_asks_here(None);
+        made_skill::set_writes_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// A made skill sending the test note, started by `asks` (#8451).
     fn asks_mail_toml(asks: &str) -> String {
         format!(

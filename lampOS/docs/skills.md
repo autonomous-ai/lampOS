@@ -8634,64 +8634,78 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    to 3 strings, each at most 60 characters, 2 to 8 words of letters,
    digits and apostrophes with one space between (as lamp-skills takes any
    skill's), none refused by `skill_named::ask_refused` (a no, a question,
-   a stop, the lamp's own words), **none whose only word of its own is a
-   short answer** (`skill_named::made_ask_refused`, `ANSWER_WORDS`: yes,
+   a stop, the lamp's own words), **none whose words of their own are all
+   short answers** (`skill_named::made_ask_refused`, `ANSWER_WORDS`: yes,
    yeah, yep, ok, okay, sure, alright, no, nope, fine, good, great, cool,
-   right, maybe; #8451, the first builder's call: "yes please", "fine
-   thanks" and "cool thanks" are refused with `it is only a short answer,
-   and a yes or a no is the lamp's to answer`, while "great job pebble"
-   and "yes indeed" pass with other words of their own; a made skill's
-   alone, so a pushed or Store skill's "yes please" still loads, the
-   owner's ruling on #6842), each with at least one word of its own
-   past those said around an ask (`skill_named::own_words_in`), none
+   right, maybe; #8451, the first builder's call, and Twelve's P2 on
+   #8469: "yes please", "fine thanks", "cool thanks", "yeah sure", "yes
+   yes" and "fine fine" are refused with `it is only a short answer, and a
+   yes or a no is the lamp's to answer`, while "great job pebble" and "yes
+   indeed" pass with other words of their own; `ask_refused` is read
+   first, so "ok" and "okay", also said around an ask, make "okay please"
+   refused as only such words, and "no" and "nope" are refused as a no; a
+   made skill's alone, so a pushed or Store skill's "yes please" still
+   loads, the owner's ruling on #6842), each with at least one word of its
+   own past those said around an ask (`skill_named::own_words_in`), none
    twice. **The two-word floor is held at the make** (`made_skill::
    asks_heard`, in `keep_asked`, #8451, the first builder's call (b)): an
-   ask the making model chose needs two words of its own ("yes please"
-   has none, "pebble hello" one, "hello" being said around an ask); one
-   that is a run of the person's own words for the make
-   (`skill_named::said_in`: the voice's heard line, or the app's typed
-   ask, their case and punctuation not told apart) passes with one, so
-   "whenever I say pebble hello" keeps "pebble hello" on the first answer,
-   with no repair. A skill's ask is matched only as the whole phrase
-   (`skill_named`'s `named_among`), so "pebble" alone never starts it. The
-   cap, the put-on's check (`put_on_cap`), the say-back and the clash
-   check (`asks_taken`) read a made skill's asks with the one-word floor,
-   so a skill kept with the person's trigger is put on as kept; a skill
-   added from a file keeps two (`capped_added`). **The person's own words
-   that break a rule no writer can change** (`made_skill::
-   their_ask_refused`, before the cap, the first builder's (a)): an ask
-   that is the person's whole phrase for its start, 2 to 8 words and
-   within 60 characters, refused by `skill_named::made_ask_refused`, is said at once,
-   plainly, one line a rule, and no repair is spent on it, nor is it
-   handed to the lamp's agent: "I can't start a skill with ‘stop the
-   music’, because that's how you stop me." (a stop), "…, because a no or
-   a question is mine to answer.", "…, because those are my own words for
-   something I do myself.", "…, because those are only words like hello
-   or please, said to me all the time.", "…, because it only names
-   things of mine, like the light or the music." and "…, because a yes
-   or a no is mine to answer." ("whenever I say yes please") (`plain_reason` and
-   `not_made_line` say it as it is), journaled as `a made skill was not
-   kept: its asks weren't kept: asks = [<as given>]: "<the ask>": the
-   person's own words, <ask_refused's words>: told at once, no repair`.
-   **Their whole phrase** (`skill_named::said_whole`, `made_skill::
-   their_whole`, the first builder's required change on #8469) is the
-   words of their line after its last "say", "says", "said", "saying",
-   "hear", "hears" or "heard" before the ask, to the end of that clause
-   (a `,`, `.`, `;`, `:`, `!` or `?`), lowercased: "hello there pebble"
-   in "whenever I say hello there pebble, email me…". A line with no such
-   phrase, or one that is not 2 to 8 words within 60 characters, takes the
-   ask itself as their whole phrase. **An ask that is only part of their
-   longer phrase** ("hello there" from "hello there pebble") and is
-   refused so is the writer's mistake, which the writer can mend: it
-   spends a repair, never the plain line. It is refused as the cap
-   refuses it (`its asks weren't kept: asks = [<as given>]: "<the
-   ask>": <ask_refused's words>`), and its repair names their whole
-   phrase: `The lamp refused it: <that line>. "<the ask>" is only part of
-   the words the person said for its start; use the words they said:
-   <their whole phrase>. <the form>`. When their whole phrase itself
-   breaks such a rule, the plain line is said at once for it, as above. A
-   count or a length of words is still repaired: the writer may mend it
-   with more or fewer of the person's words. Otherwise it is refused naming its rule (#8451): the
+   ask needs two words of its own ("yes please" has none, "pebble hello"
+   one, "hello" being said around an ask), except one that starts the
+   person's own phrase right after their "say", "said", "hear" or "heard"
+   (`skill_named::said_whole`, below: the voice's heard line, or the app's
+   typed ask, their case and punctuation not told apart), which passes
+   with one, so "whenever I say pebble hello" keeps "pebble hello" on the
+   first answer, with no repair. A run of their line anywhere else needs
+   two (Thirteen's P3 on #8469): "jazz please" from "make a skill that
+   plays jazz please when I get home" is refused, as before. A skill's ask
+   is matched only as the whole phrase (`skill_named`'s `named_among`), so
+   "pebble" alone never starts it. The cap, the put-on's check
+   (`put_on_cap`), the say-back and the clash check (`asks_taken`) read a
+   made skill's asks with the one-word floor, so a skill kept with the
+   person's trigger is put on as kept; a skill added from a file keeps two
+   (`capped_added`). **Their whole phrase** (`skill_named::said_whole`,
+   the first builder's required change on #8469) is the words of their
+   line after its last "say", "said", "hear" or "heard" before the ask, to
+   the end of that clause (a `,`, `.`, `;`, `:`, `!` or `?`), lowercased:
+   "hello there pebble" in "whenever I say hello there pebble, email me…".
+   "says" and "saying" are no such words: in a make's line they mostly
+   tell what the skill says ("a skill that says good morning", Thirteen's
+   P2 on #8469). **An ask that passes is kept** (Thirteen's and Twelve's
+   P1 on #8469), though their whole phrase runs on past it and breaks a
+   rule: "movie night" from "whenever I say movie night dim the lights",
+   and "pebble night" from "when I say pebble night turn off the lights",
+   as on lamp-voice. **The person's own words that break a rule no writer
+   can change** (`made_skill::their_ask_refused`, before the cap, the
+   first builder's (a)) act only on an ask that is itself refused by
+   `skill_named::made_ask_refused`, 2 to 8 words and within 60 characters,
+   and a run of their line. When that ask is their whole phrase, it is
+   said at once, plainly, one line a rule, and no repair is spent on it,
+   nor is it handed to the lamp's agent: "I can't start a skill with
+   ‘stop the music’, because that's how you stop me." (a stop), "…,
+   because a no or a question is mine to answer.", "…, because those are
+   my own words for something I do myself.", "…, because those are only
+   words like hello or please, said to me all the time.", "…, because it
+   only names things of mine, like the light or the music." and "…,
+   because a yes or a no is mine to answer." ("whenever I say yes
+   please") (`plain_reason` and `not_made_line` say it as it is),
+   journaled as `a made skill was not kept: its asks weren't kept: asks =
+   [<as given>]: "<the ask>": the person's own words, <made_ask_refused's
+   words>: told at once, no repair`. **A refused ask that is only part of
+   their longer phrase** ("hello there" from "hello there pebble") is the
+   writer's mistake: when their whole phrase (2 to 8 words within 60
+   characters) also breaks such a rule, the plain line is said at once
+   for that phrase, as above; when it passes, the ask spends a repair,
+   never the plain line. It is refused as the cap refuses it (`its asks
+   weren't kept: asks = [<as given>]: "<the ask>": <made_ask_refused's
+   words>`), and its repair names their whole phrase: `The lamp refused
+   it: <that line>. "<the ask>" is only part of the words the person said
+   for its start; use the words they said: <their whole phrase>. <the
+   form>`. **A refused ask where no whole phrase of theirs is found**
+   (no "say", "said", "hear" or "heard" before it in its clause: "good
+   morning" from "make a skill that says good morning and plays jazz when
+   I wake up") is the writer's pick and gets the ordinary repair below,
+   never the plain line. A count or a length of words is still repaired:
+   the writer may mend it with more or fewer of the person's words. Otherwise it is refused naming its rule (#8451): the
    journal line (the repair's and the "wasn't kept" one) is `its asks
    weren't kept: asks = [<as given>]: "<the ask that failed>": <rule>`,
    the rule in plain words: `not a list`, `none`, `more than 3`, `3: not
