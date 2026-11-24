@@ -2625,7 +2625,8 @@ sequences), the round makes one pass that only adds (`installed_adds`):
   yet it changed the lamp. Its lines (`build N, which the lamp runs, adds
   …`, `started X, added by build N`, `X, added to build N, was taken away:
   …`) go into `log.jsonl` as a switch's do (`keep_lines`, `Run::adds_only`),
-  within the same cap of 200 lines.
+  within the same cap of 200 lines. A pass the room held (`not-quiet`)
+  changed nothing, so its lines are not kept, as before.
 - **Held or not quiet:** a pass that finds no quiet moment, or is held (a
   walk, a reset of the lamp), ends `not-quiet` with nothing written, on the
   build the lamp runs. lamp-control is looked at as in any up-to-date

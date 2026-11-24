@@ -889,10 +889,12 @@ impl Run<'_, '_> {
     /// A round that did nothing (up to date, unreachable, nothing published,
     /// not quiet, a refusal said again) keeps only its end, as before: they
     /// come every round and say the same. An up-to-date round's pass that
-    /// adds units (#7018) keeps its lines whatever its end: it changed the
-    /// lamp, or took back what it changed, though it ends up to date.
+    /// adds units (#7018) keeps its lines though it ends up to date: it
+    /// changed the lamp, or took back what it changed. Not a pass the room
+    /// held (`NotQuiet`): it changed nothing, and would say the same every
+    /// round until the room is quiet.
     fn keep_lines(&self, outcome: &Outcome) {
-        if (self.adds_only
+        if ((self.adds_only && !matches!(outcome, Outcome::NotQuiet(_)))
             || matches!(
                 outcome,
                 Outcome::Switched(_)
