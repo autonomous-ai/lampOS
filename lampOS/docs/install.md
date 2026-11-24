@@ -2841,8 +2841,17 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      gateway just (re)started is not ready yet (its namespace does not
      show Node, `'node': No such file or directory`, then `Config
      unavailable`) is tried again in the same run, 40 times 3 s apart (two
-     minutes) at most (#7135). A remove that fails is journaled and
-     passed over; an add that fails is journaled and not done: the
+     minutes) at most (#7135). Any other edit that fails, except the
+     `lamp-skill-run` remove (#8444: lamp-control restarted during it,
+     and `PartOf=` restarted the gateway under it), makes the one-shot
+     wait, once per run, as before its own restart (below: active,
+     listening on 18789, past its first start; a gateway not active
+     counts as not listening, 300 s at most), then run that edit once
+     more. Failing again, a remove is journaled ("still not taken out
+     after the gateway settled and the remove ran again") and passed
+     over; an add is journaled ("still does not let agent main run …
+     after the gateway settled and the add ran again", #8444) and not
+     done: the
      install is still `installed`, nothing is taken down, and the record's
      `exec_allowlist` stays false, so the next round asks the one-shot
      again, which then only writes the launcher and edits the allow-list.

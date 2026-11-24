@@ -222,6 +222,12 @@ struct Runs {
     /// The gateway's start as `ExecMainStartTimestampMonotonic` says it at
     /// each read, in order, the last one kept; none: not said.
     began: RefCell<Vec<String>>,
+    /// How many of the next allow-list adds fail because the gateway is
+    /// restarted under them (#8444): each makes the gateway inactive for 2
+    /// looks, not listening for 3 more, its process started at 1000 s.
+    restart_at_add: RefCell<u32>,
+    /// How many of the next `systemctl is-active` looks find it inactive.
+    inactive: RefCell<u32>,
 }
 
 impl Runs {
@@ -236,6 +242,8 @@ impl Runs {
             main_pid: "",
             not_listening: RefCell::new(0),
             began: RefCell::default(),
+            restart_at_add: RefCell::new(0),
+            inactive: RefCell::new(0),
         }
     }
     fn runner(&self) -> impl FnMut(&[String]) -> Result<String, String> + '_ {
@@ -244,6 +252,23 @@ impl Runs {
             self.log.borrow_mut().push(line.clone());
             if self.fail_on.is_some_and(|wanted| line.contains(wanted)) {
                 return Err(self.error.to_owned());
+            }
+            if line.contains(" approvals allowlist add ") {
+                let mut restarts = self.restart_at_add.borrow_mut();
+                if *restarts > 0 {
+                    *restarts -= 1;
+                    *self.inactive.borrow_mut() = 2;
+                    *self.not_listening.borrow_mut() = 3;
+                    *self.began.borrow_mut() = vec![format!("{}\n", 1000 * 1_000_000)];
+                    return Err("gateway closed (1012): service restart".into());
+                }
+            }
+            if line.starts_with("systemctl is-active") {
+                let mut inactive = self.inactive.borrow_mut();
+                if *inactive > 0 {
+                    *inactive -= 1;
+                    return Err("inactive".into());
+                }
             }
             let (uid, gid) = own_ids();
             if line == format!("systemctl show -p MainPID --value -- {UNIT}") {
@@ -2896,7 +2921,13 @@ fn a_failed_add_is_retried_and_never_fails_the_install() {
     );
     assert!(!said.exec_allowlist);
     assert!(lamp.at(WRAPPER).exists() && lamp.at(NS).exists() && lamp.at(SKILL_START).exists());
-    assert_eq!(approvals(&runs), on_lines(), "the removes still run");
+    // #8444: the failed add runs once more after the gateway settled.
+    let [add, main, fence] = on_lines();
+    assert_eq!(
+        approvals(&runs),
+        [add.clone(), add, main, fence],
+        "the removes still run"
+    );
 
     round_shown(&lamp, &mut systemd, one_path());
     assert!(lamp.asked().unwrap().one_path, "asked again");
@@ -2942,7 +2973,10 @@ fn a_failed_remove_is_not_fatal() {
     };
     let said = install(&lamp, &runs, 20).unwrap();
     assert!(said.install == "installed" && said.exec_allowlist);
-    assert_eq!(approvals(&runs), on_lines());
+    // #8444: main's failed remove runs once more; the old fence agent's,
+    // expected to fail, does not.
+    let [add, main, fence] = on_lines();
+    assert_eq!(approvals(&runs), [add, main.clone(), main, fence]);
 }
 
 /// With the one run path off, the install takes the launcher and agent
@@ -2978,8 +3012,11 @@ fn the_one_path_off_takes_the_launcher_and_the_entries_out() {
     );
     assert_eq!(
         approvals(&runs),
+        // #8444: each failed remove runs once more.
         [
             approvals_line("remove", "main", SKILL_START),
+            approvals_line("remove", "main", SKILL_START),
+            approvals_line("remove", "main", OLD_RUN_START),
             approvals_line("remove", "main", OLD_RUN_START)
         ]
     );
@@ -3462,7 +3499,8 @@ fn an_earlier_builds_gateway_unit_waits_and_never_takes_openclaw_out() {
 /// #7135 (c0a4's first run denied): a gateway just started answers the
 /// allow-list add "Config unavailable" until its config is read. The add
 /// is tried again until it is taken, so the install records the entry and
-/// a skill's first run is not denied; any other refusal is not retried.
+/// a skill's first run is not denied; any other refusal is not retried
+/// in that loop, only run once more after the gateway settled (#8444).
 #[test]
 fn the_allowlist_add_is_tried_again_while_the_gateways_config_is_not_ready() {
     let mut adds = 0;
@@ -3479,7 +3517,10 @@ fn the_allowlist_add_is_tried_again_while_the_gateways_config_is_not_ready() {
         one_path: true,
         ..Shown::default()
     };
-    assert_eq!(exec_allowlist(&mut run, shown, &mut quiet()), Some(true));
+    assert_eq!(
+        exec_allowlist(Path::new("/nonexistent"), &mut run, shown, &mut quiet()),
+        Some(true)
+    );
     assert_eq!(adds, 3);
 
     let mut adds = 0;
@@ -3490,8 +3531,14 @@ fn the_allowlist_add_is_tried_again_while_the_gateways_config_is_not_ready() {
         }
         Ok(String::new())
     };
-    assert_eq!(exec_allowlist(&mut run, shown, &mut quiet()), Some(false));
-    assert_eq!(adds, 1, "another refusal is not retried");
+    assert_eq!(
+        exec_allowlist(Path::new("/nonexistent"), &mut run, shown, &mut quiet()),
+        Some(false)
+    );
+    assert_eq!(
+        adds, 2,
+        "another refusal: one retry after the settle, #8444"
+    );
 }
 
 /// #7135 (c0a4, 21:22:21, an update's one-shot): the add joined a gateway
@@ -3516,8 +3563,82 @@ fn the_allowlist_add_is_tried_again_while_the_gateways_node_is_not_there_yet() {
         one_path: true,
         ..Shown::default()
     };
-    assert_eq!(exec_allowlist(&mut run, shown, &mut quiet()), Some(true));
+    assert_eq!(
+        exec_allowlist(Path::new("/nonexistent"), &mut run, shown, &mut quiet()),
+        Some(true)
+    );
     assert_eq!(adds, 4);
+}
+
+/// The install run with its gateway started long ago (400 s after a boot
+/// 1000 s ago) and `restarts` of its allow-list adds failing because the
+/// gateway is restarted under them: the record, what the install said,
+/// and its commands.
+fn install_restarted_at_add(restarts: u32) -> (OpenclawInstall, Vec<String>, Vec<String>) {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    tasks_there(&lamp, TASKS_BYTES);
+    round_shown(&lamp, &mut Fake::default(), one_path());
+    fs::write(lamp.at(crate::reset_hold::UPTIME), "1000.00 3000.00\n").unwrap();
+    let runs = Runs::new(&lamp);
+    *runs.began.borrow_mut() = vec![format!("{}\n", 400 * 1_000_000)];
+    *runs.restart_at_add.borrow_mut() = restarts;
+    let mut said = Vec::new();
+    let mut run = runs.runner();
+    let record = install_with(
+        lamp.root(),
+        &lamp.records(),
+        &mut run,
+        &mut || 20,
+        &mut |line: &str| said.push(line.to_owned()),
+        &kit(),
+    )
+    .unwrap()
+    .unwrap();
+    drop(run);
+    (record, said, runs.lines())
+}
+
+/// #8444 (kit-8324i on lamp-52e6, 24 Nov 03:49): lamp-control restarted
+/// while the one-shot ran agent main's allow-list add, `PartOf=` restarted
+/// the gateway under it, the add failed and skill-start stayed unlisted
+/// until a round. The one-shot waits as `settled` does until the gateway
+/// is active, listens and is past its first start (150 s from the start
+/// at 1000 s: 76 looks, 74 of them `ss` once it is active), then runs the
+/// add once more: the entry is there. A retry that fails too is said in
+/// its own line; the add is never run a third time.
+#[test]
+fn an_allowlist_add_failed_by_a_gateway_restart_is_run_again_once_it_settled() {
+    let (record, said, lines) = install_restarted_at_add(1);
+    let adds: Vec<usize> = (0..lines.len())
+        .filter(|&at| lines[at].contains(" approvals allowlist add "))
+        .collect();
+    assert_eq!(adds.len(), 2, "{lines:#?}");
+    let looks = lines[adds[0]..adds[1]]
+        .iter()
+        .filter(|line| line.starts_with("ss -Hltn"))
+        .count();
+    assert_eq!(looks, 74, "{lines:#?}");
+    assert_eq!(record.install, "installed");
+    assert!(record.exec_allowlist, "{said:#?}");
+    assert!(!said.iter().any(|line| line.contains("#8444")), "{said:#?}");
+
+    let (record, said, lines) = install_restarted_at_add(2);
+    assert_eq!(
+        lines
+            .iter()
+            .filter(|line| line.contains(" approvals allowlist add "))
+            .count(),
+        2,
+        "{lines:#?}"
+    );
+    assert!(!record.exec_allowlist);
+    assert!(
+        said.iter().any(|line| line.starts_with(&format!(
+            "OpenClaw's exec allow-list still does not let agent {RUN_AGENT} run {SKILL_START} after the gateway settled and the add ran again: gateway closed (1012)"
+        )) && line.ends_with("(#8444)")),
+        "{said:#?}"
+    );
 }
 
 /// #7135 (V2, 52e6 stuck): the package pinned already, the namespace
