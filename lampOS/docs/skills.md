@@ -1996,15 +1996,17 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   run's prepared write at once through the same send a spoken yes makes
   only when both agree: the mark names that run and the record names its
   skill within 5 minutes on the boot clock (`task_no_yes::boot_ms`).
-  lamp-skills' word alone can only hold a send (docs/tasks.md). The record
-  is let go on a forget, a privacy change and a stop. (4) A half match runs
+  lamp-skills' word alone can only hold a send (docs/tasks.md). With the
+  switch on, the record is let go on a forget, a privacy change and a stop;
+  off, it is left as before (Heron's P2 on #8550). (4) A half match runs
   nothing: the voice's model's call of a skill whose run hands a task over,
   and a made skill's run now (`make_skill`'s `run`, the `run` op), run
   only when the voice says the owner named it. The voice puts `spoken_ask`
   on each such line to lamp-skills
   (`lamp_voice::tools::SPOKEN_ASK`, `tools::spoken_ask`): true for the
-  heard words' own call (`skill_named::CALL_ID`), or when its record names
-  that skill (its name or its tool) within 5 minutes. lamp-skills runs as
+  heard words' own call (`skill_named::CALL_ID`) and no other: a model's
+  call is not, even of a skill the record names (Heron's P1 on #8550).
+  lamp-skills runs as
   `lampos` and can't read the voice's root-only folder, so it takes that
   word from the voice's cgroup alone, never from the call's arguments.
   Otherwise the whole call is refused before anything is made

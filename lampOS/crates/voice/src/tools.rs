@@ -3186,35 +3186,22 @@ fn stop_as_heard(directory: &Path, call: &ToolCall, request: u64, heard: bool) -
 pub const SPOKEN_ASK: &str = "spoken_ask";
 
 /// Whether `call` is the owner's named ask (#8475): the very call the
-/// heard words named in full ([`crate::skill_named::CALL_ID`], in code), or
-/// a call of a skill the voice's record `spoken` (the owner's spoken asks,
-/// [`crate::told_when_asked::keep_asked`], kept only for a full named call
-/// the owner was heard saying) names within
-/// [`crate::told_when_asked::WITHIN_MS`] before `now_ms` (the boot clock's,
-/// `lamp_services::task_no_yes::boot_ms`). A model's call on a half match,
-/// or a skill nobody named, is not.
-pub fn spoken_ask(call: &ToolCall, spoken: &Path, now_ms: u64) -> bool {
+/// heard words named in full ([`crate::skill_named::CALL_ID`], in code),
+/// and no other. A model's call is never one, even of a skill the owner
+/// named a moment ago (the voice's record of spoken asks names a skill, not
+/// a call): a later turn's call, a half match's, or one the model made from
+/// text it was shown would otherwise send with no yes (Heron's P1 on #8550).
+pub fn spoken_ask(call: &ToolCall) -> bool {
     call.id == crate::skill_named::CALL_ID
-        || crate::told_when_asked::asked_within(
-            spoken,
-            crate::skill_named::function_of(&call.name, &call.args),
-            now_ms,
-        )
 }
 
 /// [`spoken_ask`] on the lamp, for a line to `lamp-skills`: with
-/// `LAMP_TASK_NO_YES` on, whether `call` is the owner's named ask, read in
-/// the voice's own record now; off, none, and the line is as before. A
-/// tool's call and a made skill's run now (`make_skill`'s `run`, the
-/// `run` op, the first builder's P2 on #8550) say it alike.
+/// `LAMP_TASK_NO_YES` on, whether `call` is the owner's named ask; off,
+/// none, and the line is as before. A tool's call and a made skill's run
+/// now (`make_skill`'s `run`, the `run` op, the first builder's P2 on
+/// #8550) say it alike.
 pub fn spoken_ask_here(call: &ToolCall) -> Option<bool> {
-    lamp_services::task_no_yes::on().then(|| {
-        spoken_ask(
-            call,
-            Path::new(crate::told_when_asked::SPOKEN_ASKS_FILE),
-            lamp_services::task_no_yes::boot_ms(),
-        )
-    })
+    lamp_services::task_no_yes::on().then(|| spoken_ask(call))
 }
 
 fn ask_with_context(
@@ -4984,46 +4971,39 @@ mod tests {
         served.join().unwrap();
         std::fs::remove_dir_all(dir).unwrap();
     }
-    /// #8475: a call is the owner's named ask when it is the heard words'
-    /// own call in code, or the voice's record of the owner's spoken asks
-    /// names its skill (by its function, or through `use_skill`) within
-    /// five minutes; a model's call with no record, a record of another
-    /// skill or one over five minutes old is not.
+    /// #8475, Heron's P1 on #8550: only the heard words' own call is the
+    /// owner's named ask. A model's call is not, even of the very skill the
+    /// voice's record names a minute ago, by its tool or through
+    /// `use_skill`: its run goes unmarked, so lamp-services holds its send
+    /// for a yes. Fails on the old `spoken_ask`, which also took any call
+    /// of a skill the record named within five minutes.
     #[test]
-    fn a_call_is_a_spoken_ask_only_when_the_owner_named_its_skill() {
-        let dir = schedule_directory("task-no-yes-spoken");
-        let spoken = dir.join("spoken-asks.json");
+    fn a_call_is_a_spoken_ask_only_when_it_is_the_heard_words_own() {
         let call = |id: &str, name: &str, args: Value| ToolCall {
             id: id.into(),
             name: name.into(),
             args,
         };
+        assert!(spoken_ask(&call(
+            crate::skill_named::CALL_ID,
+            "photo_booth",
+            json!({})
+        )));
+        let dir = schedule_directory("task-no-yes-spoken");
+        let spoken = dir.join("spoken-asks.json");
         let now = 10 * crate::told_when_asked::WITHIN_MS;
-        let model = call("model-1", "photo_booth", json!({}));
-        assert!(spoken_ask(
-            &call(crate::skill_named::CALL_ID, "photo_booth", json!({})),
-            &spoken,
-            now
-        ));
-        assert!(!spoken_ask(&model, &spoken, now));
-        crate::told_when_asked::keep(&spoken, "desk-check", now - 1_000).unwrap();
-        assert!(!spoken_ask(&model, &spoken, now));
         crate::told_when_asked::keep(&spoken, "photo-booth", now - 60_000).unwrap();
-        assert!(spoken_ask(&model, &spoken, now));
-        assert!(spoken_ask(
-            &call(
-                "model-2",
-                crate::use_skill::NAME,
-                json!({"skill": "photo_booth"})
-            ),
+        assert!(crate::told_when_asked::asked_within(
             &spoken,
+            "photo_booth",
             now
         ));
-        assert!(!spoken_ask(
-            &model,
-            &spoken,
-            now - 60_000 + crate::told_when_asked::WITHIN_MS + 1
-        ));
+        assert!(!spoken_ask(&call("model-1", "photo_booth", json!({}))));
+        assert!(!spoken_ask(&call(
+            "model-2",
+            crate::use_skill::NAME,
+            json!({"skill": "photo_booth"})
+        )));
         std::fs::remove_dir_all(dir).unwrap();
     }
 
