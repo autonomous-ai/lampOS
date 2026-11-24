@@ -373,6 +373,96 @@ pub struct RefusedTo {
     pub relay: Arc<Chat>,
     /// Told each refusal's status: the journal's line, the health warning.
     pub told: Arc<dyn Fn(u16) + Send + Sync>,
+    /// Told when the person's own model answers again, to its first word, so
+    /// the health warning from an earlier failure clears ([`Net::telling_the_own_answered`],
+    /// Fifth's P2 on #8543: it stayed until the voice restarted).
+    pub answered: Option<Arc<dyn Fn() + Send + Sync>>,
+}
+
+/// No list of functions, for a request asked with all of them.
+const NONE: &[&str] = &[];
+
+/// The person's own model's answer, read to its first word: a text, or a
+/// call begun or made. Its events so far are kept to hand on first. An error
+/// first, or an end with no word, is no answer, and gives way (Fifth's P2 on
+/// #8543): a 200 whose stream then says the model is overloaded or out of
+/// credit, or an empty answer.
+async fn to_first_word(
+    mut answer: net::ChatStream,
+) -> net::Result<(Vec<ChatEvent>, net::ChatStream)> {
+    let mut before = Vec::new();
+    loop {
+        match answer.next().await? {
+            Some(
+                event @ (ChatEvent::Text(_)
+                | ChatEvent::Calling(_)
+                | ChatEvent::Argued(..)
+                | ChatEvent::ToolCalls(_)),
+            ) => {
+                before.push(event);
+                return Ok((before, answer));
+            }
+            Some(ChatEvent::Done) | None => {
+                return Err(net::Error::Protocol("chat answer with no word"));
+            }
+            Some(event) => before.push(event),
+        }
+    }
+}
+
+/// The person's own model asked, given way to the lamp's own at the relay
+/// on any failure before its first word ([`gives_way`]). A status the
+/// person's endpoint answered with is told at once. No answer at all may be
+/// the lamp's own link, so it's told only once the relay has answered: a lamp
+/// off its Wi-Fi never blames the person's model (Fifth's P2 on #8543).
+async fn own_or_relay(
+    chat: &Chat,
+    refused: &RefusedTo,
+    messages: &[Message],
+    only: Option<&'static [&'static str]>,
+    without: &'static [&'static str],
+    watch: Option<&net::Watch>,
+) -> net::Result<(Vec<ChatEvent>, net::ChatStream)> {
+    let own = match chat.send_watched(messages, only, without, watch).await {
+        Ok(answer) => to_first_word(answer).await,
+        Err(error) => Err(error),
+    };
+    let error = match own {
+        Ok(read) => {
+            if let Some(answered) = &refused.answered {
+                answered();
+            }
+            return Ok(read);
+        }
+        Err(error) => error,
+    };
+    let status = gives_way(&error);
+    let tell = watch.is_none_or(net::Watch::first_to_tell_a_refusal);
+    if tell && status != NO_HTTP_ANSWER {
+        (refused.told)(status);
+    }
+    let relay = refused
+        .relay
+        .send_watched(messages, only, without, watch)
+        .await?;
+    if tell && status == NO_HTTP_ANSWER {
+        (refused.told)(status);
+    }
+    Ok((Vec::new(), relay))
+}
+
+/// An answer's events: those read before it was handed on, then the rest.
+fn handed_on(
+    answer: net::Result<(Vec<ChatEvent>, net::ChatStream)>,
+) -> BoxStream<'static, net::Result<ChatEvent>> {
+    match answer {
+        Ok((before, answer)) => stream::iter(before.into_iter().map(Ok))
+            .chain(stream::try_unfold(answer, |mut answer| async move {
+                Ok(answer.next().await?.map(|event| (event, answer)))
+            }))
+            .boxed(),
+        Err(error) => stream::once(async move { Err(error) }).boxed(),
+    }
 }
 
 /// What [`gives_way`] tells for a failure with no HTTP status (the link, a
@@ -686,8 +776,19 @@ impl Net {
                 false,
             )?),
             told,
+            answered: None,
         });
         Ok(self)
+    }
+
+    /// `answered` is told each time the person's own model answers a request
+    /// to its first word, after [`Self::falling_back_to_the_relay`]: the
+    /// worker clears `voice-keys`' warning then. Nothing without a fallback.
+    pub fn telling_the_own_answered(mut self, answered: Arc<dyn Fn() + Send + Sync>) -> Self {
+        if let Some(refused) = &mut self.refused_to {
+            refused.answered = Some(answered);
+        }
+        self
     }
 
     /// The text model is Gemini, called directly (`LAMP_SECOND_CHAT=gemini`),
@@ -789,34 +890,25 @@ impl Net {
             // Near, unless it fails on the link: then the same request goes
             // to the chat's own address (#2882).
             if let Some((near_chat, taken, service)) = near {
-                let answer = near_chat.send_watched(&messages, only, &[], watch).await;
+                let answer = near_chat.send_watched(&messages, only, NONE, watch).await;
                 match answer.as_ref().err().and_then(routes::fallback_why) {
                     Some(why) => {
                         if watch.is_none_or(net::Watch::first_to_tell_a_fall) {
                             taken.fell(service, &why);
                         }
                     }
-                    None => return answer,
+                    None => return handed_on(answer.map(|answer| (Vec::new(), answer))),
                 }
             }
-            let answer = chat.send_watched(&messages, only, &[], watch).await;
-            if let (Err(error), Some(refused)) = (&answer, &refused_to) {
-                if watch.is_none_or(net::Watch::first_to_tell_a_refusal) {
-                    (refused.told)(gives_way(error));
-                }
-                return refused
-                    .relay
-                    .send_watched(&messages, only, &[], watch)
-                    .await;
-            }
-            answer
-        })
-        .map_ok(|answer| {
-            stream::try_unfold(answer, |mut answer| async move {
-                Ok(answer.next().await?.map(|event| (event, answer)))
+            handed_on(match &refused_to {
+                Some(refused) => own_or_relay(&chat, refused, &messages, only, NONE, watch).await,
+                None => chat
+                    .send_watched(&messages, only, NONE, watch)
+                    .await
+                    .map(|answer| (Vec::new(), answer)),
             })
         })
-        .try_flatten()
+        .flatten()
         .boxed()
     }
 
@@ -1089,30 +1181,23 @@ impl Net {
                             taken.fell(service, &why);
                         }
                     }
-                    None => return answer,
+                    None => return handed_on(answer.map(|answer| (Vec::new(), answer))),
                 }
             }
-            let answer = chat.send_watched(&messages, None, without, watch).await;
             // A held line's request gives way as any other does: before
             // this, it failed even on a 401 (the first builder's read of
             // #8393).
-            if let (Err(error), Some(refused)) = (&answer, &refused_to) {
-                if watch.is_none_or(net::Watch::first_to_tell_a_refusal) {
-                    (refused.told)(gives_way(error));
+            handed_on(match &refused_to {
+                Some(refused) => {
+                    own_or_relay(&chat, refused, &messages, None, without, watch).await
                 }
-                return refused
-                    .relay
+                None => chat
                     .send_watched(&messages, None, without, watch)
-                    .await;
-            }
-            answer
-        })
-        .map_ok(|answer| {
-            stream::try_unfold(answer, |mut answer| async move {
-                Ok(answer.next().await?.map(|event| (event, answer)))
+                    .await
+                    .map(|answer| (Vec::new(), answer)),
             })
         })
-        .try_flatten()
+        .flatten()
         .boxed()
     }
 
@@ -1247,7 +1332,33 @@ impl Services for Net {
         told: ChatTold,
         watch: net::Watch,
     ) -> Option<BoxStream<'static, net::Result<ChatEvent>>> {
-        Some(self.chat_watched(messages, told, watch))
+        // With the person's own model, a first try with no head by
+        // `SECOND_TRY_AFTER` goes once more to the lamp's own model at the
+        // relay, not to the same model again. A hung or black-holed endpoint
+        // is then answered within the turn's wait, where its own timeouts (10
+        // and 40 s) never could be (Fifth's P2 on #8543). Whichever try has
+        // the first event answers, as for any second try.
+        let Some(refused) = self.refused_to.clone() else {
+            return Some(self.chat_watched(messages, told, watch));
+        };
+        let (only, without) = match told {
+            ChatTold::Every => (None, NONE),
+            ChatTold::Only(only) => (Some(only), NONE),
+            ChatTold::Without(without) => (None, without),
+        };
+        Some(
+            stream::once(async move {
+                handed_on(
+                    refused
+                        .relay
+                        .send_watched(&messages, only, without, Some(&watch))
+                        .await
+                        .map(|answer| (Vec::new(), answer)),
+                )
+            })
+            .flatten()
+            .boxed(),
+        )
     }
 
     fn declares(&self, messages: &[Message], without: &[&str], name: &str) -> Option<bool> {
@@ -2371,6 +2482,133 @@ pub(crate) mod tests {
             let status = if refused { 401 } else { NO_HTTP_ANSWER };
             assert_eq!(*told.lock().unwrap(), [status], "{name}");
         }
+    }
+
+    /// What a fallback was told, and how often the person's model answered.
+    type Told = (Arc<Mutex<Vec<u16>>>, Arc<Mutex<u32>>);
+
+    /// The person's own model with the relay's fallback, over stubs `own` and
+    /// `relay`; what is told, and how often its answers cleared the warning.
+    fn own_with_fallback(name: &str, own_base: String, relay: &str) -> (Net, Told) {
+        let mut config = own_gemini(name, relay);
+        config.hosted.deepseek_base_url = Some(own_base);
+        let told = Arc::new(Mutex::new(Vec::new()));
+        let telling = told.clone();
+        let answered = Arc::new(Mutex::new(0));
+        let counting = answered.clone();
+        let net = Net::new(config, Arc::new(Vec::new))
+            .unwrap()
+            .chatting_with_deepseek("AIza-own-8543")
+            .unwrap()
+            .falling_back_to_the_relay(
+                relay,
+                Arc::new(move |status| telling.lock().unwrap().push(status)),
+            )
+            .unwrap()
+            .telling_the_own_answered(Arc::new(move || *counting.lock().unwrap() += 1));
+        (net, (told, answered))
+    }
+
+    fn words_of(events: Vec<net::Result<ChatEvent>>) -> String {
+        events
+            .into_iter()
+            .filter_map(|event| match event {
+                Ok(ChatEvent::Text(text)) => Some(text),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Fifth's P2 on #8543: "before its first word" means the word, not the
+    /// HTTP head. A 200 whose stream then carries only an error, or that ends
+    /// with no word, gives way too, told as no answer.
+    #[tokio::test]
+    async fn a_200_with_no_word_gives_way_to_the_lamps_own() {
+        for (name, body) in [
+            (
+                "error-chunk",
+                "data: {\"error\":{\"message\":\"Overloaded\",\"code\":529}}\n\ndata: [DONE]\n\n",
+            ),
+            ("empty", "data: [DONE]\n\n"),
+        ] {
+            let own = stub(
+                "AIza-own-8543",
+                vec![(CHAT, Some((SSE, body.as_bytes().to_vec())))],
+            )
+            .await;
+            let relay = stub("relay-key-8420", vec![(CHAT, answered("lamp's own"))]).await;
+            let (net, (told, cleared)) = own_with_fallback(
+                &format!("own-no-word-{name}"),
+                format!("{}/v1beta", own.url),
+                &relay.url,
+            );
+            let events: Vec<_> = net.chat(vec![Message::user("hello")]).collect().await;
+            assert_eq!(own.asked("/v1beta/openai/chat/completions"), 1, "{name}");
+            assert_eq!(words_of(events), "lamp's own", "{name}");
+            assert_eq!(relay.asked(CHAT), 1, "{name}");
+            assert_eq!(*told.lock().unwrap(), [NO_HTTP_ANSWER], "{name}");
+            assert_eq!(*cleared.lock().unwrap(), 0, "{name}");
+        }
+    }
+
+    /// Fifth's P2 on #8543: a hung endpoint never reached its 10 or 40 s
+    /// timeout within the turn's wait. With the person's own model, the
+    /// second try asks the lamp's own model at the relay, not the same model:
+    /// the person's would answer here, and isn't asked.
+    #[tokio::test]
+    async fn the_second_try_with_the_persons_model_asks_the_lamps_own() {
+        let own = stub("AIza-own-8543", vec![(CHAT, answered("own words"))]).await;
+        let relay = stub("relay-key-8420", vec![(CHAT, answered("lamp's own"))]).await;
+        let (net, (told, _)) =
+            own_with_fallback("own-second-try", format!("{}/v1beta", own.url), &relay.url);
+        let events: Vec<_> = net
+            .chat_second_try(
+                vec![Message::user("hello")],
+                ChatTold::Every,
+                net::Watch::default(),
+            )
+            .unwrap()
+            .collect()
+            .await;
+        assert_eq!(words_of(events), "lamp's own");
+        assert_eq!(relay.asked(CHAT), 1);
+        assert_eq!(own.asked("/v1beta/openai/chat/completions"), 0);
+        assert!(told.lock().unwrap().is_empty());
+    }
+
+    /// Fifth's P2 on #8543: the warning clears when the person's own model
+    /// answers again, and a request no one answered (the lamp's own link down)
+    /// is never told as the person's model's failure.
+    #[tokio::test]
+    async fn the_warning_clears_and_a_lamp_off_its_network_blames_no_one() {
+        let own = stub("AIza-own-8543", vec![(CHAT, answered("own words"))]).await;
+        let relay = stub("relay-key-8420", vec![(CHAT, answered("lamp's own"))]).await;
+        let (net, (told, cleared)) =
+            own_with_fallback("own-answers", format!("{}/v1beta", own.url), &relay.url);
+        let events: Vec<_> = net.chat(vec![Message::user("hello")]).collect().await;
+        assert_eq!(words_of(events), "own words");
+        assert_eq!(*cleared.lock().unwrap(), 1);
+        assert!(told.lock().unwrap().is_empty());
+        assert_eq!(relay.asked(CHAT), 0);
+        // Neither the person's endpoint nor the relay answers: nothing told.
+        let closed = {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            listener.local_addr().unwrap().port()
+        };
+        let no_relay = stub("relay-key-8420", vec![]).await;
+        let (net, (told, cleared)) = own_with_fallback(
+            "own-unreached",
+            format!("http://127.0.0.1:{closed}/v1beta"),
+            &no_relay.url,
+        );
+        let events: Vec<_> = net.chat(vec![Message::user("hello")]).collect().await;
+        assert!(events.iter().any(Result::is_err), "{events:?}");
+        assert!(
+            told.lock().unwrap().is_empty(),
+            "{:?}",
+            told.lock().unwrap()
+        );
+        assert_eq!(*cleared.lock().unwrap(), 0);
     }
 
     /// The person's own Anthropic key and model, as `with_own_keys` reads
