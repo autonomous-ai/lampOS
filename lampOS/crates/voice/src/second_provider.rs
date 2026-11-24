@@ -2269,6 +2269,10 @@ struct Shared {
     /// A test's copy of each named-ask journal line ([`Shared::named_ask_said`]).
     #[cfg(test)]
     named_ask_journal: Option<Arc<Mutex<Vec<String>>>>,
+    /// A test's copy of each end-of-request line for a make refused for
+    /// the person's own words ([`Shared::their_ask_after_said`], #8451).
+    #[cfg(test)]
+    their_ask_journal: Option<Arc<Mutex<Vec<String>>>>,
     /// Whether a request was judged in a busy room ([`Engine::judging_busy`]):
     /// a line that may follow on from the lamp is not told so there.
     busy: Option<Busy>,
@@ -5554,6 +5558,8 @@ impl Engine {
                 named_asked_again: crate::agent_tasks::AskedAgain::default(),
                 #[cfg(test)]
                 named_ask_journal: None,
+                #[cfg(test)]
+                their_ask_journal: None,
                 busy: None,
                 round_one_held: None,
                 named_to_a_face: None,
@@ -7968,6 +7974,16 @@ impl Engine {
     fn keeping_named_ask_journal(mut self, journal: Arc<Mutex<Vec<String>>>) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.named_ask_journal = Some(journal);
+        }
+        self
+    }
+
+    /// A test's copy of each end-of-request line for a make refused for
+    /// the person's own words for its start, as it is said (#8451).
+    #[cfg(test)]
+    fn keeping_their_ask_journal(mut self, journal: Arc<Mutex<Vec<String>>>) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.their_ask_journal = Some(journal);
         }
         self
     }
@@ -15287,6 +15303,17 @@ impl Shared {
     fn named_ask_said(&self, line: String) {
         #[cfg(test)]
         if let Some(journal) = &self.named_ask_journal {
+            journal.lock().unwrap().push(line.clone());
+        }
+        eprintln!("{line}");
+    }
+
+    /// The end-of-request line for a make refused for the person's own
+    /// words for its start said (#8469), and kept for a test that asked
+    /// for it (#8451).
+    fn their_ask_after_said(&self, line: String) {
+        #[cfg(test)]
+        if let Some(journal) = &self.their_ask_journal {
             journal.lock().unwrap().push(line.clone());
         }
         eprintln!("{line}");
@@ -24336,9 +24363,9 @@ async fn answer(
             .filter(|said| said.0 == request)
             .and_then(|said| said.1.get(given..).map(|words| words.trim().to_owned()))
             .unwrap_or_default();
-        eprintln!(
+        shared.their_ask_after_said(format!(
             "lamp-voice second: request {request}: a make was refused for the person's own words for its start; said after it: {after:?}"
-        );
+        ));
     }
     // `LAMP_CARE_LINE` (#7689): the care line owed, after whatever the
     // model said or failed to say: this care turn's, or one an earlier
