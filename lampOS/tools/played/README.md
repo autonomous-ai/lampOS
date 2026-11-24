@@ -108,6 +108,24 @@ These you can run on their own:
   and the story stops within about 1 s (`$PLAYED_OUT/scenarios/cut-in-keeps-LABEL.txt`).
   Its stand-in test is `cut-in-keeps-test.sh`.
 
+- `cut-in-words.sh LABEL [ROUNDS]`, about 1.5 minutes a round, three legs
+  (#8467, #7569; needs `PLAYED_VOICE`, a macOS `say` voice): after a cut-in
+  over the lamp's story the heard line carries none of the lamp's own words
+  and the person's first words stay. Leg A is the request-13 cut-in ("Lamp,
+  make a skill called tech news." over the story at 10 s); B has "Lamp,
+  stop." and 0.9 s of quiet first (more than the 600 ms that ends a line); C
+  starts the line on the lamp's last word of a short answer, at waits that
+  grow each round (a round counts only when the line began within 0.5 s of
+  the lamp's last sound). It changes nothing on the lamp: no drop-in, no
+  restart. It refuses, with nothing played, unless the voice runs as the
+  product's does (`--turn-taking duplex`, `--end-silence-ms 600`,
+  `LAMP_FIRST_WORDS=kept`, `LAMP_REPLY_END_REACH=on`, `LAMP_SOFT_START=on`,
+  `LAMP_SECOND_OWN_ECHO=on`), and prints the voice binary's SHA-256: run it
+  on a build made after #8467. Per trial it prints the heard line (the kit's
+  own scripted line) and PASS or FAIL, and a count per leg
+  (`$PLAYED_OUT/scenarios/cut-in-words-LABEL.txt`). Its stand-in test is
+  `cut-in-words-test.sh`.
+
 - `stop-lines.sh LABEL [ROUNDS]`, about 8 minutes a round
   (#4710): on the second route, a stop always gets "Okay, I'll stop there."
   (`LAMP_SPOKEN_STOP_ENDS`) and a cut-in that ended the answer with no words
