@@ -150,7 +150,11 @@ pub const SKILLS_FOLDERS: [&str; 2] = [
 /// #8550): a forget, a stop or a privacy close ends what the owner asked
 /// just now, so no run is sent with no yes on an ask made before it.
 pub fn forget_here() {
-    lamp_services::task_no_yes::forget(Path::new(SPOKEN_ASKS_FILE));
+    // Only with `LAMP_TASK_NO_YES` on (Heron's P2 on #8550): off, the record
+    // stays exactly as before, for #7180's quiet-hours ask and #8415's yes.
+    if lamp_services::task_no_yes::on() {
+        lamp_services::task_no_yes::forget(Path::new(SPOKEN_ASKS_FILE));
+    }
 }
 
 /// How long the say service's ask of a task's first yes, in quiet hours,
