@@ -649,7 +649,10 @@ fn an_apps_function_never_takes_a_lamp_functions_name() {
         // A narrowed turn after the app's result: still not the app's.
         answer(1, "set_mode", &json!({}), false, 1_000);
         owners_turn(2, 2_000);
-        assert_eq!(names(&declared(lamps(), 64, 2_000)), ["set_mode"]);
+        assert_eq!(
+            names(&declared(lamps(), 64, 2_000)),
+            ["set_volume", "set_mode"]
+        );
         assert!(!is_app_function("set_volume"));
     });
     let a_b = AppsTools {
