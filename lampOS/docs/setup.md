@@ -1296,8 +1296,10 @@ its only way back once its package carries the unit.
   60 s, `device-sta-mode`'s 45 s, `device-ap-mode`'s 4 min), and a person
   setting it up starts a new run at each try, so a phone really setting it
   up keeps the hold. The phone count is not part of it: during a run's join
-  the radio is a station, so the count can read none under a live run. Only
-  from the hotspot: off it, a run holds the 90 s as before. Online at any time ends recovery, and a 5 s reset
+  the radio is a station, so the count can read none under a live run. Off
+  the hotspot, a run holds the 90 s the same way: they start again only while
+  it takes steps, so a run that never ended can't keep a lamp off its network
+  and off the hotspot for good (Ten's P2 on #8500). Online at any time ends recovery, and a 5 s reset
   (the marker gone) ends the watcher, setup's own then serving.
 - **The hotspot** is setup's own (`device-ap-mode`), with its page and API,
   the marker and the person's data kept, and no setup light (the ring is the
