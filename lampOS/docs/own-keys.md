@@ -522,6 +522,28 @@ endpoint, fixed. The tests that pin it: `setup/tests/it/keys.rs`
   2.5-series model may answer 400 to it, which is not a fallback: the row
   with the person's own 2.5 model reads it, and if it does, the field is
   dropped for models other than 3.
+- **Test lamps only, `LAMP_OWN_GEMINI_URL` (#8420's lamp row):** an https
+  address that takes the place of Google's own API for the person's Gemini
+  key and model, read in one place (`lamp_msgs::own_gemini`) by both the
+  keys helper's unit and the voice's. It sends the person's key to that
+  address: never set on a customer's lamp. Set, the check is one token
+  asked of the model, `POST <address>/openai/chat/completions` with the key
+  as the bearer and `max_tokens: 1` (the relay's Gemini serves that chat; a
+  model read there isn't known to be served): 2xx works, 401 or 403 refuses
+  the key, a 400 is read for the key as above, 404 is no such model. The
+  chat goes to `<address>/openai/chat/completions`, and the voice says one
+  more line, "Gemini: the person's own model goes to <host>, not Google's
+  own API (LAMP_OWN_GEMINI_URL, test lamps only)", the host alone. Unset,
+  empty or not https: Google's own API, as above, byte for byte. With the
+  relay's Gemini address (`<base>/google-search/v1beta`) and key it lets the
+  lamp row run the person's Gemini path with no key of anyone's. A unit
+  test keeps it, with `LAMP_OWN_ELEVENLABS_URL`, out of every product unit
+  (`second_config.rs`,
+  `no_product_unit_sets_a_desktop_or_test_lamp_switch`); the other tests:
+  `msgs/src/own_gemini.rs`, `setup/src/keys.rs`
+  (`a_switched_gemini_check_asks_the_given_address_for_one_token_with_the_key`)
+  and `voice/src/second_config.rs`
+  (`a_test_lamps_switch_sends_the_persons_gemini_chat_to_its_address`).
 - **Not yet run on a lamp:** a real key and model from the app, as for
   OpenRouter.
 
