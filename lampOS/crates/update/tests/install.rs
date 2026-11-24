@@ -2659,6 +2659,42 @@ fn the_product_turns_the_skill_flows_three_switches_on_where_they_are_read() {
     }
 }
 
+/// #8475: `LAMP_TASK_NO_YES` (a skill's task with no folder yes, a send
+/// asked aloud just now with no per-send yes, a half match running
+/// nothing) is `on` once in each of the four units whose part reads it,
+/// lamp-control, lamp-skills, lamp-services and lamp-voice, and named in
+/// no other unit's settings. Fails before this pull request: no unit set it.
+#[test]
+fn the_product_turns_task_no_yes_on_in_the_four_units_that_read_it() {
+    let name = lamp_skills::TASK_NO_YES_ENVIRONMENT;
+    assert_eq!(name, "LAMP_TASK_NO_YES");
+    let owners = [
+        "lamp-control.service",
+        "lamp-skills.service",
+        "lamp-services.service",
+        "lamp-voice.service",
+    ];
+    let line = format!("Environment={name}=on");
+    for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service")
+            .iter()
+            .filter(|set| **set == line)
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|set| !set.starts_with('#') && set.contains(name))
+            .count();
+        assert_eq!(on, usize::from(owners.contains(unit)), "{unit}: {line}");
+        assert_eq!(mentioned, on, "{unit}: {name}");
+    }
+    for owner in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner} is not a product unit"
+        );
+    }
+}
+
 /// The make flow's five switches (the first builder's DEFAULT-ON, 19 Nov
 /// 21:42, on #7814), each `on` once in lamp-voice, whose part reads it, and
 /// in no other unit but lamp-control for made code's (its no-yes mint and

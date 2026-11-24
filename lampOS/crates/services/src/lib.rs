@@ -32,6 +32,7 @@ pub mod skill_secrets;
 pub mod skill_writes;
 pub mod spoken;
 pub mod store;
+pub mod task_no_yes;
 pub mod tools;
 pub mod writes;
 

@@ -17,7 +17,8 @@
 //! Every other part of the gate stays: the owner there and alone, no voice
 //! for a minute, not private or paused, the lamp's one read turn, and the
 //! night's volume.
-use serde_json::{Map, Value};
+use lamp_services::task_no_yes::{key, read};
+use serde_json::Value;
 use std::path::Path;
 
 /// Only the exact value `on`; off unless set.
@@ -29,21 +30,16 @@ pub fn on() -> bool {
 }
 
 /// How long after the owner's spoken ask its run's answer, or its task's
-/// first yes asked, still lifts the quiet: five minutes.
-pub const WITHIN_MS: u64 = 5 * 60 * 1000;
-
-/// Where the voice keeps the skills the owner asked for by voice lately,
-/// each with when ([`keep`]), for the say service's task ask
-/// ([`crate::skill_task_yes::asked_aloud_here`]): in the voice's own
-/// runtime folder (`RuntimeDirectory=lampos-voice`, 0700), so no skill or
-/// add-on can stand for an ask.
-pub const SPOKEN_ASKS_FILE: &str = "/run/lampos-voice/spoken-asks.json";
-
-/// A skill's name as asked and as kept alike: its function's `photo_booth`
-/// is the skill `photo-booth`.
-fn key(skill: &str) -> String {
-    skill.trim().to_lowercase().replace('_', "-")
-}
+/// first yes asked, still lifts the quiet: five minutes. And where the
+/// voice keeps the skills the owner asked for by voice lately, each with
+/// when ([`keep`]), for the say service's task ask
+/// ([`crate::skill_task_yes::asked_aloud_here`]), `lamp-services`' send of
+/// a run asked aloud just now and the voice's word to `lamp-skills` on a
+/// named ask (#8475): in the voice's own runtime folder
+/// (`RuntimeDirectory=lampos-voice`, 0700), so no skill or add-on can stand
+/// for an ask. One reader of it, `lamp-services`' (`task_no_yes`), for the
+/// voice and `lamp-services` alike.
+pub use lamp_services::task_no_yes::{SPOKEN_ASKS_FILE, WITHIN_MS, asked_within};
 
 /// Until when a told answer ready at `ready_ms`, of a run the owner asked
 /// for by voice at `asked_ms`, is told in quiet hours: [`WITHIN_MS`] after
@@ -77,16 +73,6 @@ pub fn keep(path: &Path, skill: &str, at_ms: u64) -> Result<(), String> {
         .map_err(|error| format!("the owner's spoken asks: {error}"))
 }
 
-/// The asks kept in `path`: none from no file, or one that can't be read.
-fn read(path: &Path) -> Map<String, Value> {
-    std::fs::read(path)
-        .ok()
-        .filter(|bytes| bytes.len() <= 64 * 1024)
-        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
-        .and_then(|value| value.as_object().cloned())
-        .unwrap_or_default()
-}
-
 /// How long the say service's ask of a task's first yes, in quiet hours,
 /// waits for the owner's spoken ask of its skill to be kept ([`keep`]):
 /// the voice judges whose line it was on a thread of its own, never
@@ -111,15 +97,6 @@ pub fn asked_within_waiting(
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
-}
-
-/// Whether `path` keeps an ask of `skill` by the owner's voice within
-/// [`WITHIN_MS`] before `now_ms`.
-pub fn asked_within(path: &Path, skill: &str, now_ms: u64) -> bool {
-    read(path)
-        .get(&key(skill))
-        .and_then(Value::as_u64)
-        .is_some_and(|at| at <= now_ms && now_ms - at <= WITHIN_MS)
 }
 
 #[cfg(test)]

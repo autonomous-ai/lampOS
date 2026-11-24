@@ -60,6 +60,10 @@ Environment=LAMP_NPU=on
 # its task check (a run's `net`) agreed for its folder as it is, with no yes kept (task_yes::no_yes_folder). The same
 # line in lamp-voice. Off, every skill's grants wait for the owner's kept yes, as before.
 Environment=LAMP_MADE_CODE_ON_AT_ONCE=on
+# #8475, docs/switches.md: every source's skill (pushed, Store, added by hand, made) is minted its declared grants,
+# and its task check (a run's `net`) agreed for its folder as it is, with no yes kept (task_yes::no_yes_folder). The
+# same line in lamp-skills, lamp-services and lamp-voice. Off, only LAMP_MADE_CODE_ON_AT_ONCE's made skills, as before.
+Environment=LAMP_TASK_NO_YES=on
 # The run socket (/run/lampos-control/control.sock) for lamp-tasks' skill runs as `lampos` (#6071 PR 1,
 # docs/control.md "The control socket, lamp-control's side"). With LAMP_CONTROL off, lamp-control serves only it and
 # admin.sock (no TLS door), once the first builder's (b) of 12 Nov 08:15 lands.
