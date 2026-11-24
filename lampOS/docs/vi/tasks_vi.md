@@ -3373,7 +3373,11 @@ grant skill-start của nó, giống hệt kỹ năng của OpenClaw. Phần ri�
   Hermes (`lamp-hermes-gateway.service`, `LAMP_HERMES_GATEWAY=on` của
   lamp-update) chỉ chạy khi lamp-tasks nói Hermes là agent mặc định của đèn,
   và khi đó gateway của OpenClaw cũng theo agent mặc định, nên chỉ một gateway
-  chạy (docs/install.md, docs/switches.md).
+  chạy (docs/install.md, docs/switches.md). Script namespace của nó do
+  one-shot của Harness ghi, được hỏi bởi mọi vòng đã tới được kênh (kể cả vòng
+  từ chối một bản dựng); vòng nào cài lại Hermes thì ghi luôn nó trong cùng lần
+  chạy, nên chuyển sang Hermes được phục vụ giữa các vòng, trong vòng 10 s,
+  không phải đợi tới vòng sau.
 - **Gateway không tới được.** Công tắc bật nhưng gateway chưa chạy (unit tắt,
   đang khởi động, hoặc đã mất) được xử lý như khi gateway của OpenClaw mất: một
   việc nói ra chờ tối đa 60 s rồi là `not_sent`, một lượt xếp hàng chờ tối đa
@@ -3394,6 +3398,21 @@ grant skill-start của nó, giống hệt kỹ năng của OpenClaw. Phần ri�
   nên việc Hermes không đánh dấu OpenClaw đang được dùng (#8105). Chưa sẵn
   sàng khi đó thì là `not_sent` `openclaw_gateway_not_ready`, cùng mã mà Task
   news nói là "I'm still getting ready".
+- **Gateway của OpenClaw sau khi chuyển sang Hermes.** Pane OpenClaw được giữ
+  của chính lamp-tasks (của one session, `lamp-one-openclaw`, theo agent id
+  trong bộ nhớ hoặc trong `one-session.json`, `OneSession::own_agent`) không
+  bao giờ giữ OpenClaw ở trạng thái đang được dùng khi nó rảnh: lần đọc pane
+  của Gateway (`gateway::panes_read`, mỗi phút một lần khi lamp-update hỏi) bỏ
+  nó ra và không bao giờ đánh dấu Gateway là cần cho nó; chỉ một lượt còn
+  `working` trong đó mới được tính. Khi OpenClaw là mặc định, lamp-update giữ
+  Gateway chỉ vì nó là mặc định; khi mặc định đã chuyển đi, không gì gõ vào
+  pane đó nữa, và lamp-tasks tự đóng nó (`remove_if_due`, một `harness close`
+  thường, thử lại ở mỗi lần nhìn khi Harness từ chối `WORKING`). Trên
+  lamp-ee17 nó được liệt kê là rảnh trong khi lần đóng bị từ chối khoảng 27
+  phút, và các lần đọc đó giữ Gateway của OpenClaw chạy bên cạnh của Hermes.
+  Mọi pane khác trên OpenClaw (của một người, mở trong Harness) giữ nguyên quy
+  tắc: được liệt kê và chưa kết thúc thì giữ Gateway chạy, và đánh dấu nó là
+  cần trong `gateway::IN_USE_HOLD` (4 giờ).
 - **`do.task` của kỹ năng và make.** Khi Hermes của đèn là mặc định và công tắc
   bật, `HarnessRunner::run` nhận lượt chạy trên đường chạy duy nhất như của một
   gateway agent (`by_start`), bất kể công tắc default-agent của Harness, và giao
