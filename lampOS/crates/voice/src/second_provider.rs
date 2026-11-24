@@ -19217,13 +19217,9 @@ async fn answer(
     // #7876, #8471): the armed greeting's reply asks it, the next line is
     // its answer, a later one is told nothing was kept. Judged once per
     // request, before any early end, so a line between counts.
-    let learn_note = crate::onboarding::learn_later::turn(
-        request,
-        heard,
-        &said,
-        crate::onboarding::file_from_environment().as_deref(),
-    )
-    .note();
+    // The ask counts, and its answer's window runs, only once its reply
+    // is heard ([`crate::onboarding::learn_later::sounded`]).
+    let learn_note = crate::onboarding::learn_later::turn(request, heard, &said).note();
     // A line the person said with words, answered: they went on from any
     // make whose turn was cut before it (`worker::made_running`).
     if heard && said.chars().any(char::is_alphanumeric) {
@@ -24484,6 +24480,10 @@ async fn answer(
                         if let Ok(mut last) = shared.answered_request.lock() {
                             *last = Some(request);
                         }
+                        // The walk's name ask, if this reply carries it, is
+                        // heard now: counted, its answer's window begun
+                        // (El's P2 on #8471).
+                        crate::onboarding::learn_later::sounded(request);
                         // The air's note, if this request was given it, is
                         // spent now its answer is heard.
                         if let Some((_, heard)) = &shared.air {

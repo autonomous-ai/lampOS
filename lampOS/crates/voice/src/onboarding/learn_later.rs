@@ -126,7 +126,10 @@ struct Asking {
     armed: bool,
     /// Asked on this arm already: never twice before the walk says again.
     used: bool,
-    /// The asking turn, its answer not yet come.
+    /// The asking turn judged, its reply not yet heard ([`sounded`]): a
+    /// reply gone before its first sound asked nothing (El's P2 on #8471).
+    pending: Option<u64>,
+    /// The asking turn heard, its answer not yet come.
     asked: Option<Instant>,
     /// The request that is the ask's answer, while it is the latest.
     answer: Option<u64>,
@@ -142,6 +145,7 @@ worker_global! {
     fn asking() -> Mutex<Asking> = Mutex::new(Asking {
         armed: false,
         used: false,
+        pending: None,
         asked: None,
         answer: None,
         unkept: None,
@@ -176,6 +180,11 @@ pub(crate) fn turn_at(request: u64, heard: bool, said: &str, now: Instant) -> Tu
         return turn;
     }
     asking.answer = None;
+    // An asking turn whose reply never sounded (revoked, cut, failed):
+    // nothing was asked, and this arm may ask again.
+    if asking.pending.take().is_some() {
+        asking.used = false;
+    }
     let within =
         |at: Instant, us: u64| now.saturating_duration_since(at) <= Duration::from_micros(us);
     let turn = if let Some(at) = asking.asked.take() {
@@ -190,7 +199,7 @@ pub(crate) fn turn_at(request: u64, heard: bool, said: &str, now: Instant) -> Tu
         }
     } else if heard && asking.armed && !asking.used && greeting_only(&words_of(said)) {
         asking.used = true;
-        asking.asked = Some(now);
+        asking.pending = Some(request);
         asking.unkept = None;
         Turn::Ask
     } else if heard
@@ -210,14 +219,36 @@ pub(crate) fn turn_at(request: u64, heard: bool, said: &str, now: Instant) -> Tu
     turn
 }
 
-/// [`turn_at`] now; on [`Turn::Ask`] the walk is told it asked
-/// (`{"learn_later":"asked"}` in its mailbox, `onboarding`), which counts
-/// it in its bounds.
-pub(crate) fn turn(request: u64, heard: bool, said: &str, onboarding: Option<&Path>) -> Turn {
+/// [`turn_at`] now.
+pub(crate) fn turn(request: u64, heard: bool, said: &str) -> Turn {
     let turn = turn_at(request, heard, said, Instant::now());
     if turn == Turn::Ask {
         eprintln!(
             "lamp-voice second: request {request}: the eyes know nobody and they greeted: the reply asks their name in place of its own question (LAMP_FACE_LEARN_LATER)"
+        );
+    }
+    turn
+}
+
+/// Request `request`'s answer's first sound is out, as the air's note is
+/// spent then (`Shared::air`): if it is the asking turn, the ask is heard.
+/// Only now does its answer's window run and is the walk told it asked
+/// (`{"learn_later":"asked"}` in its mailbox, `onboarding`), which counts
+/// it in its bounds; a reply gone before it posts nothing.
+pub(crate) fn sounded_at(request: u64, onboarding: Option<&Path>, now: Instant) {
+    let heard = asking().lock().is_ok_and(|mut asking| {
+        let heard = asking
+            .pending
+            .take_if(|pending| *pending == request)
+            .is_some();
+        if heard {
+            asking.asked = Some(now);
+        }
+        heard
+    });
+    if heard {
+        eprintln!(
+            "lamp-voice second: request {request}: its reply asking their name is heard (LAMP_FACE_LEARN_LATER)"
         );
         if let Some(file) = onboarding
             && let Err(error) = super::post(file, &json!({"learn_later": "asked"}))
@@ -225,7 +256,15 @@ pub(crate) fn turn(request: u64, heard: bool, said: &str, onboarding: Option<&Pa
             eprintln!("lamp-voice: onboarding: the name ask not noted: {error}");
         }
     }
-    turn
+}
+
+/// [`sounded_at`] now, with the walk's file from the environment.
+pub(crate) fn sounded(request: u64) {
+    sounded_at(
+        request,
+        crate::onboarding::file_from_environment().as_deref(),
+        Instant::now(),
+    );
 }
 
 /// Whether the turn in hand is the ask's answer ([`Turn::Answer`]).
@@ -504,10 +543,40 @@ mod tests {
         }
     }
 
-    /// The asking turn `request`, armed by the walk, at `at`.
+    /// The asking turn `request`, armed by the walk, at `at`, its reply
+    /// heard.
     fn asked_on(request: u64, at: Instant) {
         set_armed(true);
         assert_eq!(turn_at(request, true, "Hello, how are you?", at), Turn::Ask);
+        sounded_at(request, None, at);
+    }
+
+    /// El's P2 on #8471: an asking turn whose reply is gone before its
+    /// first sound (`Stop::Gone`: revoked, a barge-in) posts nothing to
+    /// the walk, and the next line gets no answer note for a question never
+    /// heard. Another request's sound hears nothing of it either.
+    #[test]
+    fn an_asking_reply_gone_before_its_sound_asked_nothing() {
+        let home = crate::process::SessionDirectory::create().unwrap();
+        let file = home.path.join("onboarding.json");
+        let mailbox =
+            || std::fs::read_to_string(crate::onboarding::mailbox_of(&file)).unwrap_or_default();
+        let at = Instant::now();
+        set_armed(true);
+        assert_eq!(turn_at(60, true, "Hi lamp.", at), Turn::Ask);
+        sounded_at(59, Some(&file), at);
+        assert_eq!(mailbox(), "");
+        assert_eq!(turn_at(61, true, "Juniper.", at + S_D), Turn::Other);
+        assert!(!answering());
+        sounded_at(60, Some(&file), at + S_D);
+        assert_eq!(mailbox(), "", "a late sound of the gone reply asks nothing");
+        // Heard: posted once, and the next line is its answer.
+        assert_eq!(turn_at(62, true, "Hello.", at + 2 * S_D), Turn::Ask);
+        sounded_at(62, Some(&file), at + 2 * S_D);
+        sounded_at(62, Some(&file), at + 2 * S_D);
+        assert_eq!(mailbox(), "{\"learn_later\":\"asked\"}\n");
+        assert_eq!(turn_at(63, true, "Juniper.", at + 3 * S_D), Turn::Answer);
+        remembered(None);
     }
 
     /// Rule 8 (#8471's lamp run: "...How are you?" then the name question):
@@ -530,6 +599,7 @@ mod tests {
         assert!(GREETING_NOTE.contains("What should I call you?"));
         assert!(GREETING_NOTE.contains("in place of any question of your own"));
         // Answered; a greeting later on the same arm asks nothing more.
+        sounded_at(4, None, at);
         assert_eq!(turn_at(5, true, "Sam.", at), Turn::Answer);
         remembered(None);
         assert_eq!(
@@ -623,9 +693,11 @@ mod tests {
         assert_eq!(mailbox(), "");
         // Asked, the walk told so; the model declines: posted once.
         set_armed(true);
-        assert_eq!(turn(50, true, "Hi lamp.", Some(&file)), Turn::Ask);
+        assert_eq!(turn(50, true, "Hi lamp."), Turn::Ask);
+        assert_eq!(mailbox(), "", "not before its reply is heard");
+        sounded_at(50, Some(&file), Instant::now());
         assert_eq!(mailbox(), "{\"learn_later\":\"asked\"}\n");
-        assert_eq!(turn(51, true, "No, thanks.", Some(&file)), Turn::Answer);
+        assert_eq!(turn(51, true, "No, thanks."), Turn::Answer);
         assert!(answering());
         assert_eq!(declined(&call, Some(&file)).0["ok"], true);
         assert!(mailbox().ends_with("{\"learn_later\":\"declined\"}\n"));
@@ -634,11 +706,9 @@ mod tests {
         // Asked, a name: answered, never declined.
         set_armed(false);
         set_armed(true);
-        assert_eq!(turn(52, true, "Hello.", Some(&file)), Turn::Ask);
-        assert_eq!(
-            turn(53, true, "I don't mind, call me Sam", Some(&file)),
-            Turn::Answer
-        );
+        assert_eq!(turn(52, true, "Hello."), Turn::Ask);
+        sounded_at(52, Some(&file), Instant::now());
+        assert_eq!(turn(53, true, "I don't mind, call me Sam"), Turn::Answer);
         remembered(Some(&file));
         assert!(mailbox().ends_with("{\"learn_later\":\"answered\"}\n"));
         assert!(!answering());

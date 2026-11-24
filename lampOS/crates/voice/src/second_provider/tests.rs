@@ -4243,6 +4243,69 @@ async fn a_chat_begun_on_the_early_words_is_kept_when_they_are_the_lines() {
     }
 }
 
+/// `LAMP_FACE_LEARN_LATER` (#7876, El's P3 on #8471): the walk's armed ask
+/// (`WalkUnderWay`'s `name_ask`, told with the line's Start) reaches the
+/// greeting's own chat request as its note, so the one reply asks the name;
+/// a chat begun on the early words, asked without it, does not stand. Its
+/// reply heard, the next line is asked with the answer's note.
+#[tokio::test(start_paused = true)]
+async fn the_armed_name_ask_reaches_the_greetings_request_and_its_answer() {
+    use crate::onboarding::learn_later::{ANSWER_NOTE, GREETING_NOTE};
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Hello, how are you?".to_owned()),
+                Ok("Juniper.".to_owned()),
+            ]
+            .into(),
+        ),
+        early: Mutex::new(
+            [
+                vec![net::Early::Words("Hello, how are you?".to_owned())],
+                vec![],
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![text("Hello! How are you?"), Ok(ChatEvent::Done)],
+                vec![
+                    text("Hello! I don't think we've met. What should I call you?"),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Nice to meet you."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine.preparing(true);
+    for (request, armed) in [(1, true), (2, false)] {
+        engine.submit(start(request));
+        engine.submit(ProviderInput::WalkUnderWay {
+            request,
+            privacy_generation: 1,
+            on: false,
+            updating: None,
+            name_ask: armed,
+        });
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    }
+    let asked = script.asked.lock().unwrap();
+    let greeting = Message::system(GREETING_NOTE);
+    let answer = Message::system(ANSWER_NOTE);
+    assert_eq!(asked.len(), 3, "the early chat is dropped: {asked:?}");
+    assert!(!asked[0].contains(&greeting), "{:?}", asked[0]);
+    assert!(asked[1].contains(&greeting), "{:?}", asked[1]);
+    assert!(!asked[1].contains(&answer), "{:?}", asked[1]);
+    assert!(asked[2].contains(&answer), "{:?}", asked[2]);
+    assert!(!asked[2].contains(&greeting), "{:?}", asked[2]);
+    crate::onboarding::learn_later::set_armed(false);
+}
+
 /// #2510, `LAMP_MEMORY_REPLACES` (`Engine::noting_turn_tools`): each turn
 /// has one journal line, whether `remember` was among the functions its
 /// chat was given, how many calls of each function it made in any round,
