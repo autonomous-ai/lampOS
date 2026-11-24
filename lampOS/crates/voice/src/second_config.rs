@@ -701,7 +701,8 @@ impl SecondConfig {
     }
 
     /// [`Self::with_own_keys`] with a test lamp's `LAMP_OWN_ELEVENLABS_URL`
-    /// given (`switched`, `lamp_msgs::own_voice::switched`): the person's
+    /// given (`switched`, `lamp_msgs::own_voice::switched`, read only under
+    /// its gate, [`LOOPBACK_SERVICES_ENV`] `on`, #8394's P2): the person's
     /// ElevenLabs voice goes there in place of [`ELEVENLABS_API`], and one
     /// more journal line names its host.
     pub fn with_own_keys_at(
@@ -1064,7 +1065,9 @@ impl SecondConfig {
 /// The desktop-only switch that lets the speech-to-text and text-to-speech
 /// base URLs be plain `http://127.0.0.1:PORT` or `http://[::1]:PORT` (a local
 /// service, lamp-sim's, reached by the real voice). Off unless it is exactly
-/// `on`; no product unit sets it (a test reads the units).
+/// `on`; no product unit sets it (a test reads the units). Also the gate of
+/// a test lamp's `LAMP_OWN_ELEVENLABS_URL` (`lamp_msgs::own_voice::GATE`,
+/// #8394's P2), read under it by the voice and the keys helper alike.
 pub const LOOPBACK_SERVICES_ENV: &str = "LAMP_VOICE_LOOPBACK_SERVICES";
 
 /// Whether [`LOOPBACK_SERVICES_ENV`] is `on`.
@@ -1791,6 +1794,47 @@ mod tests {
         );
     }
 
+    /// #8394's P2 (the first builder): a unit's `LAMP_OWN_ELEVENLABS_URL`
+    /// without its gate, this crate's switch for test addresses, which no
+    /// product unit sets, is ignored: the person's key and voice go to
+    /// ElevenLabs' own API alone, with no line of the switch. With the gate,
+    /// a test lamp's, the address it names, as before.
+    #[test]
+    fn without_its_gate_the_switch_leaves_the_persons_voice_at_elevenlabs() {
+        assert_eq!(lamp_msgs::own_voice::GATE, LOOPBACK_SERVICES_ENV);
+        let (_, config) = written("own-voice-ungated", r#","tts_provider":"elevenlabs""#);
+        let relay = load_from_path(&config).unwrap();
+        let units = directory("own-voice-ungated-units");
+        let dir = Some(units.as_os_str());
+        private(&units.join("own_elevenlabs.key"), "sk-planted-8394\n");
+        private(&units.join("own_elevenlabs.voice"), "PersonVoice8394\n");
+        let at = "https://relay.example.invalid/api/v1/ai";
+        // The address read from a unit that sets the switch, and the gate
+        // as `gate` gives it.
+        let unit = |gate: Option<&str>| {
+            lamp_msgs::own_voice::switched(|name| match name {
+                lamp_msgs::own_voice::ENVIRONMENT => Some(at.to_owned()),
+                lamp_msgs::own_voice::GATE => gate.map(str::to_owned),
+                _ => None,
+            })
+        };
+        for gate in [None, Some("ON"), Some("1")] {
+            let (own, lines) = relay
+                .clone()
+                .with_own_keys_at(true, dir, unit(gate).as_deref());
+            assert_eq!(own.tts_base_url, "https://api.elevenlabs.io/v1", "{gate:?}");
+            assert_eq!(own.tts_key.expose(), "sk-planted-8394", "{gate:?}");
+            assert!(
+                !lines
+                    .iter()
+                    .any(|line| line.contains(lamp_msgs::own_voice::ENVIRONMENT)),
+                "{gate:?}: {lines:?}"
+            );
+        }
+        let (own, _) = relay.with_own_keys_at(true, dir, unit(Some("on")).as_deref());
+        assert_eq!(own.tts_base_url, at);
+    }
+
     #[test]
     fn the_persons_elevenlabs_key_and_voice_speak_in_place_of_the_lamps() {
         let planted = "sk-planted-8367-elevenlabs-fake";
@@ -2451,11 +2495,12 @@ mod loopback_tests {
         }
     }
 
-    #[test]
-    fn no_product_unit_sets_the_loopback_switch() {
+    /// Every unit and drop-in of the product, `deploy/product`'s `.service`
+    /// and `.conf` files, with its text: more than 20 of them.
+    fn product_units() -> Vec<(std::path::PathBuf, String)> {
         let directory =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
-        let mut seen = 0;
+        let mut units = Vec::new();
         for entry in std::fs::read_dir(&directory).unwrap() {
             let path = entry.unwrap().path();
             // The units and the drop-ins (`own-keys-voice.conf`, ...) all
@@ -2466,18 +2511,41 @@ mod loopback_tests {
             {
                 continue;
             }
-            seen += 1;
             let text = std::fs::read_to_string(&path).unwrap();
+            units.push((path, text));
+        }
+        assert!(
+            units.len() > 20,
+            "only {} product units found in {}",
+            units.len(),
+            directory.display()
+        );
+        units
+    }
+
+    #[test]
+    fn no_product_unit_sets_the_loopback_switch() {
+        for (path, text) in product_units() {
             assert!(
                 !text.contains(LOOPBACK_SERVICES_ENV),
                 "{} sets {LOOPBACK_SERVICES_ENV}: a desktop-only switch, never a product's",
                 path.display()
             );
         }
-        assert!(
-            seen > 20,
-            "only {seen} product units found in {}",
-            directory.display()
-        );
+    }
+
+    /// #8394's P2: no product unit or drop-in sets the test lamps' address
+    /// for the person's own ElevenLabs voice either, which the loopback
+    /// switch gates (`lamp_msgs::own_voice`).
+    #[test]
+    fn no_product_unit_sets_the_own_elevenlabs_url() {
+        for (path, text) in product_units() {
+            assert!(
+                !text.contains(lamp_msgs::own_voice::ENVIRONMENT),
+                "{} sets {}: test lamps only, never a product's",
+                path.display(),
+                lamp_msgs::own_voice::ENVIRONMENT
+            );
+        }
     }
 }
