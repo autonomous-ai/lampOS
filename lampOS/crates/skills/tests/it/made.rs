@@ -541,11 +541,11 @@ fn a_pushed_made_here_card_gets_no_made_floor() {
         r#"{"computer":"studio laptop"}"#,
     )
     .unwrap();
+    // Pushed, it is not made here: its asks are not words that start it,
+    // so a card with no trigger and no tool is refused by the load's own
+    // shape rule, never taken through the made floor.
     let refused = lamp_skills::load(&folder).unwrap_err();
-    assert!(
-        refused.contains("asks are the phrases that call the skill's tool"),
-        "{refused}"
-    );
+    assert!(refused.contains("needs a trigger or a tool"), "{refused}");
     lamp_voice::made_skill::set_asks_here(None);
 }
 
