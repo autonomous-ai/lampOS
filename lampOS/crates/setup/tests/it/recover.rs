@@ -229,12 +229,40 @@ fn another_known_network_taken_is_online_and_opens_nothing() {
 
 #[test]
 fn setup_or_a_wifi_change_running_holds_it() {
-    let busy = Seen { busy: true, ..GONE };
+    // A live run takes a step every few minutes: a new run on the page at
+    // each try (#8484).
     let mut policy = Recovery::default();
-    assert!(looks(&mut policy, 0, 600_000, busy).is_empty());
+    for at in (0..=600_000).step_by(5_000) {
+        let busy = Seen {
+            busy: true,
+            run: 1 + at / 240_000,
+            ..GONE
+        };
+        assert_eq!(policy.step(at, busy), None, "{at}");
+    }
     // Done, still gone: a whole 90 s from its last look busy (600 s).
     assert!(looks(&mut policy, 605_000, 685_000, GONE).is_empty());
     assert_eq!(policy.step(690_000, GONE), Some(Act::OpenHotspot));
+}
+
+/// Ten's P2 on #8500: a setup run that took no step (a left-behind
+/// `.lamp-previous`, a stuck `lamp-setup`) holds the 90 s off the hotspot
+/// only its 10 min, as it holds the retry, and then the hotspot opens with
+/// the run still busy.
+#[test]
+fn a_setup_run_that_takes_no_step_holds_the_90_s_only_its_10_min() {
+    let stuck = Seen { busy: true, ..GONE };
+    let mut policy = Recovery::default();
+    assert_eq!(policy.step(0, BACK), None);
+    // Busy from 5 s, with no step after it: held to 600 s, the last look
+    // inside the bound, then the 90 s from that look.
+    let last_held = 5_000 + PHONE_HOLDS_MS - 5_000;
+    assert!(looks(&mut policy, 5_000, last_held + LOSS_GRACE_MS - 5_000, stuck).is_empty());
+    assert_eq!(
+        policy.step(last_held + LOSS_GRACE_MS, stuck),
+        Some(Act::OpenHotspot)
+    );
+    assert!(policy.recovering());
 }
 
 /// #8484: a setup run on the hotspot's page that takes steps (a new run
