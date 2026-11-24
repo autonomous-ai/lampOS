@@ -329,11 +329,14 @@ mod tests {
         // second sign, which a moved lamp's voice does not carry either (#5233). A misheard first
         // word said as a sentence is the name only on lamp-name's near hearing, which a moved
         // lamp's voice does not carry either (#6078).
-        const NOT_THE_GROUP: [&str; 11] = [
+        // A line said_to_me holds is not the reply to the lamp's news only where said_to_me runs,
+        // which a moved lamp's voice does not carry either (#8383).
+        const NOT_THE_GROUP: [&str; 12] = [
             "LAMP_FIRST_OUTPUT",
             "LAMP_HEAD_TOUCH",
             "LAMP_NAME_AS_A_SENTENCE",
             "LAMP_NAME_SAID_TO_A_PERSON",
+            "LAMP_NEWS_REPLY_HEEDS_HELD",
             "LAMP_PROVIDER_PATIENCE",
             "LAMP_REPORTS",
             "LAMP_SAME_VOICE_FOR",
