@@ -85,6 +85,7 @@ fn package_built(signer: &Ed25519KeyPair, skills: &[&str], extra: serde_json::Va
 fn reader() -> SkillsReader {
     SkillsReader {
         keys: vec![public(&key(1))],
+        tools: false,
     }
 }
 
@@ -187,7 +188,10 @@ fn a_package_with_companion_skills_is_refused_before_any_yes_is_asked() {
 
 #[test]
 fn no_keys_refuses_every_package() {
-    let none = SkillsReader { keys: vec![] };
+    let none = SkillsReader {
+        keys: vec![],
+        tools: false,
+    };
     assert!(none.read(&package(&key(1))).is_err());
 }
 
@@ -242,4 +246,93 @@ fn a_package_with_views_is_read_by_the_same_rules_as_the_reader_and_a_bad_one_is
             .expect_err(what);
         assert!(why.contains(words), "{what}: {why}");
     }
+}
+
+/// The sample with a tools file (#8386): `tools.json` at the folder's top,
+/// named by the manifest's `tools` and listed in `files`.
+fn package_with_tools(signer: &Ed25519KeyPair) -> Vec<u8> {
+    let tools = br#"{"tools": [{"name": "set_plan", "description": "Set the weekly plan."}]}"#;
+    let value = serde_json::json!({
+        "format": 2, "kind": "app", "name": "store-test", "title": "Store test",
+        "version": "0.1.0", "min_build": 1,
+        "runtime": {"name": "python3", "entry": "store_test_app"},
+        "grants": ["speak", "hear"], "net": false, "logs": false,
+        "phrases": [], "triggers": [], "settings": [], "skills": [], "assets": [],
+        "tools": "tools.json",
+        "files": [
+            {"path": "src/store_test_app.py", "size": APP.len(), "sha256": sha256_hex(APP)},
+            {"path": "tools.json", "size": tools.len(), "sha256": sha256_hex(tools)},
+        ],
+    });
+    let manifest = serde_json::to_vec_pretty(&value).unwrap();
+    let signature = serde_json::to_vec(&serde_json::json!({
+        "key": lamp_update::manifest::fingerprint(&public(signer)),
+        "signature": STANDARD.encode(signer.sign(&manifest).as_ref()),
+    }))
+    .unwrap();
+    let mut builder = tar::Builder::new(Vec::new());
+    for (path, bytes) in [
+        ("lamp-skill.json", manifest.as_slice()),
+        ("lamp-skill.sig", signature.as_slice()),
+        ("store-test/src/store_test_app.py", APP),
+        ("store-test/tools.json", tools.as_slice()),
+    ] {
+        let mut header = tar::Header::new_gnu();
+        header.set_size(bytes.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        builder.append_data(&mut header, path, bytes).unwrap();
+    }
+    builder.into_inner().unwrap()
+}
+
+/// An app with a tools file installs with `LAMP_APP_TOOLS` on, its
+/// `tools.json` laid beside its manifest; off, it is refused before any yes
+/// is asked, as a lamp before the field refused it.
+#[test]
+fn a_package_with_a_tools_file_installs_only_with_the_switch_on() {
+    let root = tempfile::tempdir().unwrap();
+    let layout = Layout::under(root.path());
+    let bytes = package_with_tools(&key(1));
+    let key_of = || YesKey {
+        op: Op::Install,
+        name: "store-test".into(),
+        version: "0.1.0".into(),
+        sha256: sha256_hex(&bytes),
+        grants: vec!["hear".into(), "speak".into()],
+        net: false,
+        logs: false,
+    };
+    let (mut fx, mut skills) = (FakeEffects::default(), FakeCompanions::default());
+    let mut yes = FakeYes::granting(vec![key_of()]);
+    let off = install(
+        &layout,
+        &mut fx,
+        &mut skills,
+        &mut yes,
+        &reader(),
+        &bytes,
+        Some(200),
+    )
+    .unwrap_err();
+    assert!(off.contains("unknown field `tools`"), "{off}");
+    assert_eq!(yes.asked, 0);
+    let on = SkillsReader {
+        tools: true,
+        ..reader()
+    };
+    let mut yes = FakeYes::granting(vec![key_of()]);
+    install(
+        &layout,
+        &mut fx,
+        &mut skills,
+        &mut yes,
+        &on,
+        &bytes,
+        Some(200),
+    )
+    .unwrap();
+    let app = layout.code.join("store-test/current");
+    assert!(app.join("tools.json").is_file());
+    assert!(app.join("src/store_test_app.py").is_file());
 }

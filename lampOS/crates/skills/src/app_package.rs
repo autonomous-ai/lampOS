@@ -56,6 +56,26 @@ pub const REMEMBER_GRANT: &str = "remember";
 /// each op's model when such an app is installed (`lamp-npu`), not at its
 /// first ask. An op rides an existing grant: `pose` the camera's.
 pub const NPU_OPS: [(&str, &str); 1] = [("pose", "camera")];
+/// The switch for an app's tools (#8386): `on` only, off unless set.
+pub const TOOLS_ENVIRONMENT: &str = "LAMP_APP_TOOLS";
+/// The one tools file an app may keep at its folder's top.
+pub const TOOLS_AT_TOP: &str = "tools.json";
+
+/// Whether [`TOOLS_ENVIRONMENT`] is `on` in this process.
+pub fn tools_on() -> bool {
+    std::env::var(TOOLS_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// A manifest's `tools` path: [`TOOLS_AT_TOP`], or a `.json` file under
+/// `src/`, each part plain (no `..`, no leading `/`, no dot first).
+pub fn tools_path_ok(path: &str) -> bool {
+    path_ok_within(path, MOST_DEPTH).is_ok()
+        && (path == TOOLS_AT_TOP
+            || (path.starts_with("src/")
+                && path.ends_with(".json")
+                && path.len() > "src/.json".len()))
+}
+
 /// The longest a phrase or trigger may be, and the fewest letters it holds.
 pub const PHRASE_BYTES: usize = 64;
 pub const PHRASE_LETTERS: usize = 8;
@@ -96,6 +116,15 @@ pub struct AppManifest {
     /// The screens the phone draws from an op's answer: up to 8 ([`super::app_views`]). Optional, as `ops`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub views: Vec<super::app_views::View>,
+    /// The app's tools file for Lamp's model (#8386, `docs/app-tools.md`):
+    /// a path inside the app's folder, `tools.json` at its top or a file
+    /// under `src/`. Read only with [`TOOLS_ENVIRONMENT`] on: off, a
+    /// manifest that names it is refused as an unknown field, as before.
+    /// The file's contents are lamp-control's to check when the app runs
+    /// (`lamp_control::app_tools`): a bad one leaves the app with no tools
+    /// and never stops its install. Optional, and left out when unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tools: Option<String>,
     #[serde(default)]
     pub phrases: Vec<String>,
     pub triggers: Vec<String>,
@@ -343,8 +372,27 @@ fn entry_ok(entry: &str) -> bool {
         })
 }
 
-/// An app's manifest checked on its own, against its own rules (no files).
+/// An app's manifest checked on its own, against its own rules (no files),
+/// with `tools` read as [`tools_on`] says.
 pub fn check_manifest(manifest: &AppManifest) -> Result<(), String> {
+    check_manifest_switched(manifest, tools_on())
+}
+
+/// [`check_manifest`] with the tools switch given: off, a manifest naming
+/// `tools` is refused as an unknown field ([`TOOLS_OFF`]).
+pub fn check_manifest_switched(manifest: &AppManifest, tools: bool) -> Result<(), String> {
+    match (&manifest.tools, tools) {
+        (None, _) => {}
+        (Some(_), false) => {
+            return Err(format!("{MANIFEST}: {TOOLS_OFF}"));
+        }
+        (Some(path), true) if !tools_path_ok(path) => {
+            return Err(format!(
+                "{MANIFEST}: tools {path:?} is not {TOOLS_AT_TOP} or a .json file under src/ inside the app's folder"
+            ));
+        }
+        (Some(_), true) => {}
+    }
     if manifest.format != FORMAT {
         return Err(format!(
             "{MANIFEST}: format {} is not an app's ({FORMAT})",
@@ -468,8 +516,22 @@ pub fn check_manifest(manifest: &AppManifest) -> Result<(), String> {
 /// size and SHA-256 and no file but the listed, the entry's module, the
 /// companion skills and the assets. Nothing is written anywhere.
 pub fn read_app_package_bytes(bytes: &[u8], keys: &[[u8; 32]]) -> Result<AppPackage, String> {
-    read_app_package(bytes, Some(keys))
+    read_app_package(bytes, Some(keys), tools_on())
 }
+
+/// [`read_app_package_bytes`] (`keys` given) or
+/// [`read_pushed_app_package_bytes`] (`None`), with the tools switch given.
+pub fn read_app_package_switched(
+    bytes: &[u8],
+    keys: Option<&[[u8; 32]]>,
+    tools: bool,
+) -> Result<AppPackage, String> {
+    read_app_package(bytes, keys, tools)
+}
+
+/// What a manifest naming `tools` is told with the switch off: an unknown
+/// field, refused as a lamp built before the field refused it.
+pub const TOOLS_OFF: &str = "unknown field `tools`: this lamp does not read an app's tools";
 
 /// What a pushed app's `signed_by` says: it carries no signature.
 pub const UNSIGNED: &str = "unsigned";
@@ -483,10 +545,14 @@ pub const PUSHED_IS_UNSIGNED: &str = "it carries lamp-skill.sig: an app pushed f
 /// never taken by this path. Only the apps helper's `install_dev`, which
 /// lamp-control alone may ask, reads with it.
 pub fn read_pushed_app_package_bytes(bytes: &[u8]) -> Result<AppPackage, String> {
-    read_app_package(bytes, None)
+    read_app_package(bytes, None, tools_on())
 }
 
-fn read_app_package(bytes: &[u8], keys: Option<&[[u8; 32]]>) -> Result<AppPackage, String> {
+fn read_app_package(
+    bytes: &[u8],
+    keys: Option<&[[u8; 32]]>,
+    tools: bool,
+) -> Result<AppPackage, String> {
     if bytes.len() as u64 > MOST_PACKAGE_BYTES {
         return Err(format!(
             "more than {MOST_PACKAGE_BYTES} bytes: too big for an app"
@@ -506,7 +572,7 @@ fn read_app_package(bytes: &[u8], keys: Option<&[[u8; 32]]>) -> Result<AppPackag
     };
     let manifest: AppManifest =
         serde_json::from_slice(&manifest_bytes).map_err(|error| format!("{MANIFEST}: {error}"))?;
-    check_manifest(&manifest)?;
+    check_manifest_switched(&manifest, tools)?;
     if folder.as_deref() != Some(manifest.name.as_str()) {
         return Err(format!(
             "{MANIFEST} names {:?}, and the package's folder is {:?}",
@@ -527,7 +593,11 @@ fn read_app_package(bytes: &[u8], keys: Option<&[[u8; 32]]>) -> Result<AppPackag
         }
         path_ok_within(&entry.path, MOST_DEPTH)?;
         let top = entry.path.split('/').next().unwrap_or_default();
-        if !matches!(top, "src" | "assets" | "skills") || !entry.path.contains('/') {
+        // The one file at the folder's top: the tools file the manifest names.
+        let tools_file =
+            manifest.tools.as_deref() == Some(entry.path.as_str()) && entry.path == TOOLS_AT_TOP;
+        if !tools_file && (!matches!(top, "src" | "assets" | "skills") || !entry.path.contains('/'))
+        {
             return Err(format!(
                 "{}: an app's files are under src/, assets/ and skills/",
                 entry.path

@@ -741,6 +741,13 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         }
         if let (true, Some(bus)) = (lamp_control::app_yes::on(), &bus) {
             lamp_control::app_triggers::start(bus, shared.clone());
+            // The running apps' tools for Lamp's model (#8386), dark behind
+            // LAMP_APP_TOOLS.
+            if lamp_control::app_tools::on() {
+                lamp_control::app_tools::start(bus, shared.clone());
+                eprintln!("lamp-control: app tools are on (LAMP_APP_TOOLS)");
+            }
+            lamp_control::app_calls::start(bus, shared.clone());
             // An app's facts for Lamp's memory to the voice and its word
             // back; `apps.remember` is refused
             // while the lamp is private, read as the speaker reads it.

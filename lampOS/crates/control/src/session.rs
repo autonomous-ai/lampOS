@@ -2007,16 +2007,19 @@ impl Door {
                 self.quiet.as_ref().and_then(|quiet| quiet.window),
                 self.rates.lifted(),
             );
-            return ok(
-                re,
-                json!({
-                    "lamp": self.lamp_info(),
-                    "grants": app.said_grants(),
-                    "limits": limits,
-                    "app": app.name,
-                    "version": app.version,
-                }),
-            );
+            let mut said = json!({
+                "lamp": self.lamp_info(),
+                "grants": app.said_grants(),
+                "limits": limits,
+                "app": app.name,
+                "version": app.version,
+            });
+            // An app may answer the model's calls (`app.call`), said only
+            // with `LAMP_APP_TOOLS` on, never a list (#8406).
+            if crate::app_calls::on() {
+                said["tools"] = json!(true);
+            }
+            return ok(re, said);
         }
         // By the run socket: a live one-run token and nothing else; the run's
         // own client and the grants the token names. Any other way in, a
@@ -4612,6 +4615,28 @@ mod tests {
             json!(["light", "speak", "remember"])
         );
         assert!(session.app_peer().is_some_and(|app| app.remember));
+    }
+
+    /// #8406: hello tells an app it may answer the model's calls only with
+    /// `LAMP_APP_TOOLS` on, as `"tools": true`, never a list.
+    #[test]
+    fn an_apps_hello_says_tools_only_with_app_tools_on() {
+        let hello_tools = |on: bool| {
+            crate::app_calls::set_on_for_test(Some(on));
+            let mut door = Door::new("lamp-75c9", "Lamp", PIN, Clients::default(), None);
+            let mut fake = Fake::default();
+            let (mut session, _) = door.open_app(app_peer(&[Grant::Speak]));
+            let hello =
+                json!({"id": 1, "op": "hello", "client": "c_0", "sig": crate::runs::hello_sig()})
+                    .to_string();
+            let outcome = door.handle(&mut session, &hello, &mut fake, S, 2);
+            let said = reply(&outcome).clone();
+            crate::app_calls::set_on_for_test(None);
+            assert_eq!(said["ok"], true, "{said}");
+            said.get("tools").cloned()
+        };
+        assert_eq!(hello_tools(false), None);
+        assert_eq!(hello_tools(true), Some(json!(true)));
     }
 
     #[test]

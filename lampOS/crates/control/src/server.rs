@@ -259,6 +259,9 @@ pub struct Shared {
     /// Told when an app takes a turn the voice offered it (`apps/took`,
     /// [`crate::app_triggers`]): none until the bus side is started.
     took_sink: Mutex<Option<TookSink>>,
+    /// Told when an app's tool call ends (`apps/called`,
+    /// [`crate::app_calls`]): none unless `LAMP_APP_TOOLS` is on.
+    called_sink: Mutex<Option<CalledSink>>,
     /// Whether apps are on, as the app socket reads it.
     apps_on: Mutex<fn() -> bool>,
     /// Whether `apps.remember` is on (`LAMP_APP_REMEMBER`), as the app
@@ -325,6 +328,8 @@ struct RememberWaiting {
 /// What is told when an app takes a turn the voice offered it: the app and
 /// the turn.
 pub type TookSink = Arc<dyn Fn(&str, u64) + Send + Sync>;
+/// How a call's end is told to the voice (`apps/called`, [`crate::app_calls`]).
+pub type CalledSink = Arc<dyn Fn(&lamp_msgs::AppCalled) + Send + Sync>;
 
 /// Whether the camera's, the microphone's and the speaker's streams are usable on
 /// this lamp: wired to their parts, and for the microphone and the speaker the
@@ -552,6 +557,7 @@ impl Shared {
             apps: Mutex::default(),
             apps_dir: Mutex::new(PathBuf::from(crate::app_yes::APPS_DIR)),
             took_sink: Mutex::new(None),
+            called_sink: Mutex::new(None),
             apps_on: Mutex::new(crate::app_yes::on),
             remember_on: Mutex::new(crate::app_remember::on),
             remember_sink: Mutex::new(None),
@@ -950,6 +956,7 @@ impl Shared {
                 apps: Mutex::default(),
                 apps_dir: Mutex::new(PathBuf::from(crate::app_yes::APPS_DIR)),
                 took_sink: Mutex::new(None),
+                called_sink: Mutex::new(None),
                 apps_on: Mutex::new(crate::app_yes::on),
                 remember_on: Mutex::new(crate::app_remember::on),
                 remember_sink: Mutex::new(None),
@@ -1249,6 +1256,14 @@ impl Shared {
         crate::app_triggers::list_of(&apps_dir, &running)
     }
 
+    /// The apps running now, each with when its session began
+    /// ([`crate::app_tools`]), and where the installed apps are.
+    pub fn running_since(&self) -> (Vec<(String, u64)>, std::path::PathBuf) {
+        let running = self.apps.lock().expect("apps").1.running_since();
+        let apps_dir = self.apps_dir.lock().expect("apps_dir").clone();
+        (running, apps_dir)
+    }
+
     /// The voice holds a line that says `trigger` of app `app`
     /// (`apps/trigger`): offered to the app's sockets, as `app.trigger`, only
     /// when apps are on, the app is running and the manifest's triggers
@@ -1305,6 +1320,84 @@ impl Shared {
     /// How a turn an app took is told to the voice (`apps/took`).
     pub fn set_took_sink(&self, sink: TookSink) {
         *self.took_sink.lock().expect("took_sink") = Some(sink);
+    }
+
+    /// How an app's call's end is told to the voice (`apps/called`).
+    pub fn set_called_sink(&self, sink: CalledSink) {
+        *self.called_sink.lock().expect("called_sink") = Some(sink);
+    }
+
+    /// The calls ended, told to the voice by the sink (after the apps' lock
+    /// is let go).
+    fn tell_called(&self, called: Vec<lamp_msgs::AppCalled>) {
+        if called.is_empty() {
+            return;
+        }
+        if let Some(sink) = self.called_sink.lock().expect("called_sink").clone() {
+            for each in &called {
+                sink(each);
+            }
+        }
+    }
+
+    /// The voice's call `call` (`apps/call`) at `now`, `listed` when the
+    /// newest `apps/tools` has its tool: sent to the app's socket as
+    /// `app.call`, or ended at once with the lamp's word, told to the voice
+    /// (`not running`, `unknown tool`, `busy`).
+    pub fn send_call(
+        &self,
+        call: &lamp_msgs::AppCall,
+        listed: bool,
+        now: std::time::Instant,
+    ) -> Result<(), &'static str> {
+        let begun = if !(*self.apps_on.lock().expect("apps_on"))() {
+            Err("not running")
+        } else {
+            let mut apps = self.apps.lock().expect("apps");
+            if !apps.1.is_running(&call.app) {
+                Err("not running")
+            } else if !listed {
+                Err("unknown tool")
+            } else {
+                apps.1.begin_call(&call.app, &call.call, now)
+            }
+        };
+        match begun {
+            Ok(()) => self.tell_client(
+                &crate::app_socket::app_client(&call.app),
+                &crate::app_calls::call_event(call),
+            ),
+            Err(word) => self.end_call(call, word),
+        }
+        begun
+    }
+
+    /// The voice's call `call` ended at once with the lamp's `word`, never
+    /// sent to the app.
+    pub fn end_call(&self, call: &lamp_msgs::AppCall, word: &str) {
+        self.tell_called(vec![lamp_msgs::AppCalled {
+            call: call.call.clone(),
+            app: call.app.clone(),
+            result: None,
+            error: Some(word.to_owned()),
+        }]);
+    }
+
+    /// The calls past their wait (4.5 s) at `now` ended as `timeout`, each app told
+    /// `app.call.stopped`, and every call ended since told to the voice.
+    pub fn sweep_calls(&self, now: std::time::Instant) {
+        let (late, called) = {
+            let mut apps = self.apps.lock().expect("apps");
+            let late = apps.1.expire_calls(now);
+            (late, apps.1.drain_called())
+        };
+        for (app, call) in late {
+            self.tell_client(
+                &crate::app_socket::app_client(&app),
+                &crate::app_calls::stopped_event(&call, "timeout"),
+            );
+        }
+        self.tell_called(called);
     }
 
     /// Where memory's forget socket is, for a test.
@@ -2108,7 +2201,14 @@ pub async fn serve_app_as(
             if let Ok(Ok(socket)) = opened {
                 shared.apps.lock().expect("apps").1.connection(&name, true);
                 connection(socket, shared.clone(), false, None, false, Some(peer)).await;
-                shared.apps.lock().expect("apps").1.connection(&name, false);
+                let called = {
+                    let mut apps = shared.apps.lock().expect("apps");
+                    apps.1.connection(&name, false);
+                    apps.1.drain_called()
+                };
+                // A call in flight ends with the app's last connection, told
+                // to the voice at once.
+                shared.tell_called(called);
                 // The app's session ended with its last connection: its live
                 // context line goes at the voice (`apps.context`).
                 shared.end_context(&name);
@@ -2359,8 +2459,12 @@ async fn connection<S>(
                             // A turn the app took is told to the voice after
                             // the apps' lock is let go.
                             let took = apps.1.drain_took();
+                            let called = apps.1.drain_called();
                             drop(apps);
                             shared.tell_took(took);
+                            // An app's answer goes to the voice at once, not
+                            // at the next sweep.
+                            shared.tell_called(called);
                             reply
                         };
                         if socket.send(Message::text(reply.to_string())).await.is_err() {
@@ -3350,6 +3454,105 @@ mod tests {
         (shared, lines, inbox, newest)
     }
 
+    /// #8406: the voice's call goes to a running app whose tools list it,
+    /// one in flight, as `app.call`; every end is told to the voice once:
+    /// the lamp's word, the app's answer, a `timeout` after 4.5 s (the app
+    /// told `app.call.stopped`), and its app's last connection closing.
+    #[test]
+    fn a_call_goes_to_a_running_app_and_each_end_is_told_to_the_voice_once() {
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
+        *shared.apps_on.lock().unwrap() = || true;
+        let told = Arc::new(Mutex::new(Vec::<lamp_msgs::AppCalled>::new()));
+        let into = told.clone();
+        shared.set_called_sink(Arc::new(move |called: &lamp_msgs::AppCalled| {
+            into.lock().unwrap().push(called.clone());
+        }));
+        let taken = || std::mem::take(&mut *told.lock().unwrap());
+        let (outbox, mut app_inbox) = mpsc::unbounded_channel();
+        let (frames, _) = mpsc::channel(FRAMES_QUEUED);
+        let (body_state, _) = watch::channel(None);
+        shared.open.lock().unwrap().insert(
+            9,
+            Open {
+                client: Some(crate::app_socket::app_client("gym-coach")),
+                outbox,
+                frames,
+                events: Default::default(),
+                phrases: Vec::new(),
+                grants: Default::default(),
+                body_state,
+            },
+        );
+        let call = |n: u64| lamp_msgs::AppCall {
+            call: format!("app-1-2-{n}"),
+            app: "gym-coach".into(),
+            name: "set_plan".into(),
+            args: json!({"sets": 3}),
+        };
+        let word = |called: Vec<lamp_msgs::AppCalled>| {
+            assert_eq!(called.len(), 1, "{called:?}");
+            called[0].error.clone()
+        };
+        let t0 = std::time::Instant::now();
+        // Not running, then running without the tool listed.
+        assert_eq!(shared.send_call(&call(1), true, t0), Err("not running"));
+        assert_eq!(word(taken()).as_deref(), Some("not running"));
+        shared.apps.lock().unwrap().1.connection("gym-coach", true);
+        assert_eq!(shared.send_call(&call(2), false, t0), Err("unknown tool"));
+        assert_eq!(word(taken()).as_deref(), Some("unknown tool"));
+        assert!(app_inbox.try_recv().is_err(), "nothing sent yet");
+        // Sent, then a second while it is in flight is busy.
+        assert_eq!(shared.send_call(&call(3), true, t0), Ok(()));
+        assert_eq!(
+            app_inbox.try_recv().unwrap(),
+            json!({"ev": "app.call", "call": "app-1-2-3", "name": "set_plan", "args": {"sets": 3}})
+        );
+        assert!(taken().is_empty());
+        assert_eq!(shared.send_call(&call(4), true, t0), Err("busy"));
+        assert_eq!(word(taken()).as_deref(), Some("busy"));
+        // Nothing past its 4.5 s yet; then a timeout, the app told it.
+        shared.sweep_calls(t0 + std::time::Duration::from_millis(4_400));
+        assert!(taken().is_empty());
+        shared.sweep_calls(t0 + crate::app_yes::CALL_FOR);
+        assert_eq!(word(taken()).as_deref(), Some("timeout"));
+        assert_eq!(
+            app_inbox.try_recv().unwrap(),
+            json!({"ev": "app.call.stopped", "call": "app-1-2-3", "why": "timeout"})
+        );
+        // Answered: the result told once, by the next drain.
+        let t1 = t0 + std::time::Duration::from_secs(10);
+        assert_eq!(shared.send_call(&call(5), true, t1), Ok(()));
+        let _ = app_inbox.try_recv();
+        let frame = json!({"id": 7, "op": "app.answer", "call": "app-1-2-5", "result": {"ok": 1}});
+        let reply = {
+            let mut apps = shared.apps.lock().unwrap();
+            crate::app_calls::answer_op(
+                &mut apps.1,
+                "gym-coach",
+                frame.as_object().unwrap(),
+                7,
+                true,
+                t1,
+            )
+        };
+        assert_eq!(reply["taken"], true);
+        shared.sweep_calls(t1);
+        let answered = taken();
+        assert_eq!(answered.len(), 1);
+        assert_eq!(answered[0].result, Some(json!({"ok": 1})));
+        shared.sweep_calls(t1);
+        assert!(taken().is_empty(), "once");
+        // In flight when its app's last connection goes: told at once.
+        assert_eq!(shared.send_call(&call(6), true, t1), Ok(()));
+        let called = {
+            let mut apps = shared.apps.lock().unwrap();
+            apps.1.connection("gym-coach", false);
+            apps.1.drain_called()
+        };
+        assert_eq!(called.len(), 1);
+        assert_eq!(called[0].error.as_deref(), Some("timeout"));
+    }
+
     /// #7415 piece 3b-2b: a trigger the voice holds is offered to an app only
     /// when apps are on, the app is running and its manifest has those exact
     /// words; the app's `app.took` within 3 s, once, is told to the voice.
@@ -3662,6 +3865,76 @@ mod tests {
             .expect("apps/took said");
         let took: AppTook = said.parse().unwrap();
         assert_eq!((took.app.as_str(), took.turn), ("demo", 5));
+    }
+
+    /// #8386 on a real bus: a running app whose manifest names `tools` has
+    /// its checked tools said on `apps/tools`, the voice's own topic and
+    /// type, with its session's start; once it stops, they are gone.
+    #[test]
+    fn a_running_apps_tools_file_is_said_on_apps_tools_and_gone_when_it_stops() {
+        use lamp_msgs::AppTools;
+        let base = std::env::temp_dir().join(format!("lampos-tools-bus-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let apps_dir = base.join("apps");
+        let dir = apps_dir.join("gym-coach").join("current");
+        std::fs::create_dir_all(&dir).unwrap();
+        let manifest = json!({
+            "format": 2, "kind": "app", "name": "gym-coach", "title": "Gym Coach", "version": "2.0.0",
+            "min_build": 1, "runtime": {"name": "python3", "entry": "coach"},
+            "grants": ["hear", "speak"], "triggers": [], "settings": [], "files": [],
+            "tools": "tools.json"
+        });
+        std::fs::write(dir.join("lamp-skill.json"), manifest.to_string()).unwrap();
+        std::fs::write(
+            dir.join("tools.json"),
+            json!({"tools": [{
+                "name": "set_plan",
+                "description": "Set the weekly training plan.",
+                "parameters": {"type": "object",
+                    "properties": {"days": {"type": "integer", "minimum": 1, "maximum": 7}},
+                    "required": ["days"]}
+            }]})
+            .to_string(),
+        )
+        .unwrap();
+        let bus = lamp_bus::Bus::new(base.join("bus")).unwrap();
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
+        *shared.apps_dir.lock().unwrap() = apps_dir;
+        shared.apps.lock().unwrap().1.connection("gym-coach", true);
+        crate::app_tools::start(&bus, shared.clone());
+        let reader = lamp_bus::Bus::new(base.join("bus")).unwrap();
+        let latest = || {
+            reader
+                .latest(AppTools::TOPIC)
+                .ok()
+                .flatten()
+                .and_then(|m| m.parse::<AppTools>().ok())
+        };
+        let until = |what: &str, ready: &dyn Fn() -> bool| {
+            let start = std::time::Instant::now();
+            while !ready() {
+                assert!(start.elapsed() < Duration::from_secs(5), "{what}");
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        };
+        until("apps/tools said", &|| {
+            latest().is_some_and(|list| list.apps.len() == 1)
+        });
+        let list = latest().unwrap();
+        assert_eq!(list.check(), Ok(()));
+        let app = &list.apps[0];
+        assert_eq!(
+            (app.app.as_str(), app.title.as_str()),
+            ("gym-coach", "Gym Coach")
+        );
+        assert!(app.since_ms > 0);
+        assert_eq!(app.tools.len(), 1);
+        assert_eq!(app.tools[0].name, "set_plan");
+        assert!(!app.tools[0].outside);
+        shared.apps.lock().unwrap().1.connection("gym-coach", false);
+        until("apps/tools empty once it stops", &|| {
+            latest().is_some_and(|list| list.apps.is_empty())
+        });
     }
 
     /// The admin op `{"app_forget": NAME}`: the helper's alone, with the switch
