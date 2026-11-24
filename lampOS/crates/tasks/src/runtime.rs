@@ -1717,7 +1717,7 @@ fn close_told(adapter: &impl Adapter, job: &CloseJob) -> Result<Closed, String> 
     // A direct OpenClaw task whose run is gone here has no harness: never
     // asked of Harness (`show`, `close`). One still here is the adapter's
     // (cancelled on the gateway, no Harness either).
-    if crate::direct::lamp_path(&job.engine.bus_name(), &job.machine_id)
+    if crate::direct::lamp_path(&job.engine.bus_name(), &job.machine_id, &job.agent_id)
         && crate::direct::lamp_owns(&job.agent_id).is_none()
     {
         return Ok(Closed::Gone);
