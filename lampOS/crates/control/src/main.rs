@@ -747,6 +747,7 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
                 lamp_control::app_tools::start(bus, shared.clone());
                 eprintln!("lamp-control: app tools are on (LAMP_APP_TOOLS)");
             }
+            lamp_control::app_calls::start(bus, shared.clone());
             // An app's facts for Lamp's memory to the voice and its word
             // back; `apps.remember` is refused
             // while the lamp is private, read as the speaker reads it.

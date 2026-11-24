@@ -79,6 +79,9 @@ pub const PANEL_EVERY: Duration = Duration::from_secs(60);
 pub const TRIGGER_FOR: Duration = Duration::from_secs(3);
 /// The triggers offered and not yet taken, at most.
 pub const MOST_OFFERED: usize = 16;
+/// How long an app's tool call (`app.call`, `LAMP_APP_TOOLS`) waits for its
+/// `app.answer`: the voice's own wait ([`crate::app_calls`]).
+pub const CALL_FOR: Duration = Duration::from_secs(5);
 
 /// Who is asking, by cgroup.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -324,6 +327,12 @@ pub struct Live {
     /// When each running app's session began, in ms since the epoch: its
     /// first connection's open (`apps/tools`' `since_ms`, #8386).
     since: BTreeMap<String, u64>,
+    /// Each app's tool call in flight (`app.call`, `LAMP_APP_TOOLS`): the
+    /// voice's id for it and when it was sent. One an app.
+    calls: BTreeMap<String, (String, Instant)>,
+    /// The calls ended (answered, timed out, or their app gone) and not yet
+    /// told to the voice (`apps/called`).
+    called_out: Vec<lamp_msgs::AppCalled>,
 }
 
 impl Live {
@@ -540,6 +549,79 @@ impl Live {
         true
     }
 
+    /// The voice's tool call `call` is sent to app `name` at `now`, or the
+    /// lamp's word for why not: `not running` with no socket up, `busy` with
+    /// another of its calls in flight (one an app).
+    pub fn begin_call(&mut self, name: &str, call: &str, now: Instant) -> Result<(), &'static str> {
+        self.expire_calls(now);
+        if !self.socket(name) {
+            return Err("not running");
+        }
+        if self.calls.contains_key(name) {
+            return Err("busy");
+        }
+        self.calls.insert(name.to_owned(), (call.to_owned(), now));
+        Ok(())
+    }
+
+    /// App `name` answers `call` (`app.answer`) at `now`: true, once, when
+    /// it is that app's call in flight within [`CALL_FOR`]; its result or
+    /// error is then told to the voice. A late, second or foreign answer is
+    /// false and told to nobody.
+    pub fn answer_call(
+        &mut self,
+        name: &str,
+        call: &str,
+        answer: Result<Value, String>,
+        now: Instant,
+    ) -> bool {
+        self.expire_calls(now);
+        if self.calls.get(name).is_none_or(|(held, _)| held != call) {
+            return false;
+        }
+        self.calls.remove(name);
+        let (result, error) = match answer {
+            Ok(result) => (Some(result), None),
+            Err(error) => (None, Some(error)),
+        };
+        self.called_out.push(lamp_msgs::AppCalled {
+            call: call.to_owned(),
+            app: name.to_owned(),
+            result,
+            error,
+        });
+        true
+    }
+
+    /// The calls past [`CALL_FOR`] at `now`, ended as `timeout` for the
+    /// voice: each app and call, so the app can be told.
+    pub fn expire_calls(&mut self, now: Instant) -> Vec<(String, String)> {
+        let late: Vec<String> = self
+            .calls
+            .iter()
+            .filter(|(_, (_, at))| now.saturating_duration_since(*at) >= CALL_FOR)
+            .map(|(name, _)| name.clone())
+            .collect();
+        let mut ended = Vec::new();
+        for name in late {
+            if let Some((call, _)) = self.calls.remove(&name) {
+                self.called_out.push(lamp_msgs::AppCalled {
+                    call: call.clone(),
+                    app: name.clone(),
+                    result: None,
+                    error: Some("timeout".to_owned()),
+                });
+                ended.push((name, call));
+            }
+        }
+        ended
+    }
+
+    /// The calls ended since the last drain, for the voice.
+    pub fn drain_called(&mut self) -> Vec<lamp_msgs::AppCalled> {
+        std::mem::take(&mut self.called_out)
+    }
+
     /// The turns taken since the last call, for the voice.
     pub fn drain_took(&mut self) -> Vec<(String, u64)> {
         std::mem::take(&mut self.took_out)
@@ -569,6 +651,18 @@ impl Live {
     pub fn forget_run(&mut self, name: &str) {
         self.panels.remove(name);
         self.offered.retain(|(app, _), _| app != name);
+        // A call in flight ends with its app's run, told to the voice at
+        // once rather than after the 5 s. Its word is `timeout`, never
+        // `stopped` or `not running`: the voice says those as "nothing was
+        // done", and an app gone mid-call may have done it.
+        if let Some((call, _)) = self.calls.remove(name) {
+            self.called_out.push(lamp_msgs::AppCalled {
+                call,
+                app: name.to_owned(),
+                result: None,
+                error: Some("timeout".to_owned()),
+            });
+        }
     }
 
     /// The revision of the app's panel, if it has one.
