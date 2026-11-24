@@ -82,6 +82,8 @@ fn main() -> ExitCode {
                     std::path::Path::new(lamp_skills::package::STORE_KEY),
                 )
                 .unwrap_or_default(),
+                // An app's tools file (#8386): read only with LAMP_APP_TOOLS on.
+                tools: lamp_skills::app_package::tools_on(),
             };
             let mut fx = RealEffects;
             let mut yes = AdminYes::product();

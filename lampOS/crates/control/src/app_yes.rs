@@ -321,6 +321,9 @@ pub struct Live {
     /// The apps whose context line the voice may hold now: told one and not
     /// cleared it. Its last connection closing clears it at the voice.
     context_told: std::collections::BTreeSet<String>,
+    /// When each running app's session began, in ms since the epoch: its
+    /// first connection's open (`apps/tools`' `since_ms`, #8386).
+    since: BTreeMap<String, u64>,
 }
 
 impl Live {
@@ -430,6 +433,14 @@ impl Live {
         } else {
             count.saturating_sub(1)
         };
+        if opened && *count == 1 {
+            // A new session: never the same `since_ms` as the one before it.
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_millis() as u64);
+            let before = self.since.get(name).copied().unwrap_or(0);
+            self.since.insert(name.to_owned(), now.max(before + 1));
+        }
         // A panel is gone with the app's last connection (its run).
         if *count == 0 {
             self.sockets.remove(name);
@@ -456,6 +467,18 @@ impl Live {
             .iter()
             .filter(|(_, count)| **count > 0)
             .map(|(name, _)| name.clone())
+            .collect()
+    }
+
+    /// The apps with a socket up now, each with when its session began
+    /// (ms since the epoch), in name order.
+    pub fn running_since(&self) -> Vec<(String, u64)> {
+        self.running()
+            .into_iter()
+            .map(|name| {
+                let since = self.since.get(&name).copied().unwrap_or(0);
+                (name, since)
+            })
             .collect()
     }
 
@@ -527,6 +550,7 @@ impl Live {
         self.offered.retain(|(app, _), _| app != name);
         self.forget_run(name);
         self.sockets.remove(name);
+        self.since.remove(name);
         self.reads.remove(name);
         self.took.remove(name);
         self.panel_last.remove(name);
@@ -557,14 +581,21 @@ impl Live {
     }
 }
 
-/// An installed app's manifest, from its `current` copy under `apps`.
+/// An installed app's manifest, from its `current` copy under `apps`. One
+/// naming `tools` reads only with `LAMP_APP_TOOLS` on, as a lamp built
+/// before the field read none (#8386).
 pub fn installed(apps: &Path, name: &str) -> Option<AppManifest> {
+    installed_switched(apps, name, lamp_skills::app_package::tools_on())
+}
+
+/// [`installed`] with the tools switch given.
+pub fn installed_switched(apps: &Path, name: &str, tools: bool) -> Option<AppManifest> {
     if !app_name_ok(name) {
         return None;
     }
     let bytes = std::fs::read(apps.join(name).join("current").join("lamp-skill.json")).ok()?;
     let manifest: AppManifest = serde_json::from_slice(&bytes).ok()?;
-    (manifest.name == name).then_some(manifest)
+    (manifest.name == name && (tools || manifest.tools.is_none())).then_some(manifest)
 }
 
 /// Every installed app's name.
