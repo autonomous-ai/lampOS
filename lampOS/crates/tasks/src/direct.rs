@@ -614,7 +614,9 @@ impl Direct {
 
     /// [`lamp_path`] for this session.
     fn path(&self, engine: &str, machine: &str) -> bool {
-        engine == self.engine.bus_name() && self.lamp_machine().as_deref() == Some(machine)
+        engine == self.engine.bus_name()
+            && serves_now(self.engine)
+            && self.lamp_machine().as_deref() == Some(machine)
     }
 
     /// The agents of this session's turns whose run has ended (answered,
@@ -1229,6 +1231,7 @@ impl Direct {
     /// machine, no session named. Any other engine or machine: `false`.
     pub fn takes(&self, launch: &Launch) -> bool {
         launch.target.engine == self.engine
+            && serves_now(self.engine)
             && launch.session.is_none()
             && self
                 .lamp_machine()
@@ -1531,6 +1534,55 @@ thread_local! {
     /// A test's own lamp session, seen on its thread only ([`lamps`]).
     static TEST_LAMP: std::cell::RefCell<Option<Arc<Direct>>> =
         const { std::cell::RefCell::new(None) };
+    /// A test's lamp default, seen on its thread only ([`serves_now`]):
+    /// None, no reader set.
+    static TEST_DEFAULT: std::cell::Cell<Option<Option<EngineKind>>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// The lamp's default engine now, as the runtime reads it from its lamp
+/// side ([`set_lamp_default`]).
+type DefaultReader = Box<dyn Fn() -> Option<EngineKind> + Send + Sync>;
+static LAMP_DEFAULT: OnceLock<DefaultReader> = OnceLock::new();
+
+/// Set once by the runtime: how the lamp's default engine is read now
+/// (the first of `lamp_order`, the app's choice live).
+pub fn set_lamp_default(read: impl Fn() -> Option<EngineKind> + Send + Sync + 'static) {
+    let _ = LAMP_DEFAULT.set(Box::new(read));
+}
+
+/// A test's lamp default on its own thread (`Some(None)`: none known).
+#[cfg(test)]
+pub(crate) fn set_test_default(default: Option<Option<EngineKind>>) {
+    TEST_DEFAULT.with(|cell| cell.set(default));
+}
+
+/// Whether `engine`'s direct session takes the lamp's work now. OpenClaw's
+/// always (its gateway follows "in use", #8105). Any other engine's only
+/// while it is the lamp's default: lamp-update runs Hermes's gateway only
+/// then, so a task named for Hermes on an OpenClaw lamp keeps Harness's
+/// path instead of waiting for a gateway that never starts. No reader set
+/// (no lamp side): as before, it does.
+fn serves_now(engine: EngineKind) -> bool {
+    if engine == EngineKind::Openclaw {
+        return true;
+    }
+    default_is(engine)
+}
+
+/// Whether `engine` is the lamp's default now, or none is read.
+#[cfg(not(test))]
+fn default_is(engine: EngineKind) -> bool {
+    LAMP_DEFAULT.get().is_none_or(|read| read() == Some(engine))
+}
+
+/// In the crate's tests, a test's own default only: a runtime test's
+/// reader, set once for the process, never leaks into another test.
+#[cfg(test)]
+fn default_is(engine: EngineKind) -> bool {
+    TEST_DEFAULT
+        .with(std::cell::Cell::get)
+        .is_none_or(|default| default == Some(engine))
 }
 
 /// The lamp's direct sessions, OpenClaw's first ([`LAMP`], [`HERMES_LAMP`]);
