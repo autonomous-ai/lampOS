@@ -513,6 +513,10 @@ Environment=LAMP_MADE_CODE_ON_AT_ONCE=on
 Environment=LAMP_MAKE_CORE_OFFER=on
 Environment=LAMP_SKILL_KEYTERM=on
 Environment=LAMP_SKILL_RECURRING_TOLD=on
+# #8475, docs/switches.md: the voice's call of a skill tells lamp-skills whether the owner named it (tools::SPOKEN_ASK,
+# from the heard words' own call or its record of the owner's spoken asks), so a half match runs no skill's task.
+# Passed to both routes. The same line in lamp-control, lamp-skills and lamp-services.
+Environment=LAMP_TASK_NO_YES=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
 Environment=LAMP_SCHEDULE_SPEAK=skill

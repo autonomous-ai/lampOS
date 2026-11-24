@@ -3226,7 +3226,9 @@ for each run, and is answered once the run ends
   lamp-tasks' own and new for each hand-over (`run_id`), the life 14
   minutes (`RUN_LIFETIME`, under lamp-control's most of 30, a minute under lamp-skills' 15-minute wait), and `{"end":{"run"}}` when
   it ends. A mint whose answer is lost (no answer in 5 s, or not JSON) is
-  ended at once too, since its token may be live. lamp-control reads the owner's yes itself and names its grants; a
+  ended at once too, since its token may be live. lamp-control reads the owner's yes itself and names its grants
+  (with `LAMP_TASK_NO_YES` on in lamp-control, #8475, no yes is needed for any skill: it names its folder's declared
+  grants, `task_yes::no_yes_folder`, below; and lamp-skills hands the run over asking no yes, docs/skills.md); a
   run whose minted grants are not exactly the ones its line asks is refused
   `no_token` and its token ended, so a run never gets grants its skill did
   not ask. A line that asks no grant and a yes kept with none match: its
@@ -3749,7 +3751,9 @@ runs its script itself: no agent, no Harness, no prompt
   own beside the agent's task (`HandOvers::one`), so it never waits behind a
   task that may run for minutes; a second is refused `busy`.
 - **Its token**: minted from lamp-control's kept yes for the skill's folder
-  and grants, exactly as a task's (`skill_run::answer`); a token naming other
+  and grants, exactly as a task's (`skill_run::answer`; with
+  `LAMP_TASK_NO_YES` on, #8475, from its folder's declared grants with no
+  yes, whatever its source); a token naming other
   grants than the line's (`net` aside, lamp-tasks' own) is ended at once and
   nothing runs. A line for a skill that names keys is refused before any
   token (`skill_run::NO_KEYS_HERE`): use a `do.task`.
@@ -3757,7 +3761,9 @@ runs its script itself: no agent, no Harness, no prompt
   asks `Tokens::net_agreed` before any token): lamp-control agrees for the
   owner's kept yes naming `net` for the folder as it is, or, with
   `LAMP_MADE_CODE_ON_AT_ONCE` on (the product's lamp-control unit), for a
-  skill made on the lamp with no yes (#8180, below); not agreed, refused
+  skill made on the lamp with no yes (#8180, below), or, with
+  `LAMP_TASK_NO_YES` on (#8475, the product's lamp-control unit), for any
+  skill's folder as it is with no yes; not agreed, refused
   `no_token` (`skill_run::NO_NET_YES`), no token and no egress socket.
   With `LAMP_TASK_NET` on, `DirectRunner::egress` makes the run's own egress
   socket `skill-<run id>` (`egress::Grant::lamp`: the public web on ports
@@ -4580,7 +4586,15 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   and answers its check `{"agreed": true}` for its folder as it is (its
   SHA-256 and declared grants, `task_yes::agreed_with_no_yes`), so its
   `net` asks nothing. A Store, pushed or other skill still needs its kept
-  yes, and with the switch off so does a made one, exactly as before. Off, `net` is refused as an unknown grant
+  yes, and with the switch off so does a made one, exactly as before.
+  With `LAMP_TASK_NO_YES` on in lamp-control (#8475,
+  `lamp_skills::task_no_yes_on`; on in the product), the source no longer
+  counts: a pushed, Store, hand-added or made skill alike is minted its
+  folder's declared grants and its check agreed for its folder as it is,
+  whoever started the run (the voice, a trigger, a schedule;
+  `task_yes::no_yes_folder`). The check still hashes the folder now, so a
+  line naming another SHA-256 (a folder changed since) is refused as
+  before. Off, `net` is refused as an unknown grant
   (`bad_request`) before any token.
 - **What a `net` run may hold, and its bounds** (Heron's P3s on #7590,
   the first builder's 23:22 calls; #7901):
@@ -5474,7 +5488,8 @@ exactly, the default when unset), every task and run is its own
 - **Per run, as before.** A skill run's folder `skill-<run id>`, its
   launcher claim, its pass and its token for linked services stay its
   own, and are ended and removed at its end; only the session is shared.
-  A write to a linked service still needs the owner's spoken yes.
+  A write to a linked service still needs the owner's spoken yes (but for
+  a run asked aloud just now with `LAMP_TASK_NO_YES` on, below).
 - **A skill run's cancel or deadline** ends the turn: the run's token is
   ended first, then the pane is closed `--now`, since Harness has no
   interrupt verb, its OpenClaw session is deleted (`sessions.delete`) and
@@ -5570,7 +5585,19 @@ at its deadline or at lamp-tasks' stop), the launcher's claim with it,
 and the run's folder `skill-<run id>` is removed, so a later turn in the
 same session holds no pass. A write to a linked service still waits for
 the owner's spoken yes: lamp-services sends only what the owner said yes
-to, once a run.
+to, once a run. The one exception (#8475, `LAMP_TASK_NO_YES` on in
+lamp-services, on in the product): a run asked aloud just now. lamp-services
+reads the voice's own record of the owner's spoken asks itself
+(`/run/lampos-voice/spoken-asks.json`, kept by the voice only for a skill
+the heard words named in full, the owner heard saying it, with
+`LAMP_TOLD_WHEN_ASKED` on), and when it names the run's skill within 5
+minutes, the run's prepared write is sent at once through the same send a
+spoken yes makes (its read-back's SHA-256, the link it was prepared under,
+the skills' bounds; `serve::Services::run_tool`), and the run is told
+`RUN_SENT_ASKED`. Never on lamp-skills' or the run's word. A run nobody
+asked for just now (a trigger's, a schedule's) is held for its yes as
+before; the record names a skill, not a run, so a trigger's run of a skill
+the owner named within those 5 minutes sends with no yes too.
 
 Follow-up: #7260 (proposal: in the one session, a skill's run keeps the reach of its grants).
 

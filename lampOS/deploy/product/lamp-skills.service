@@ -54,6 +54,10 @@ Environment=LAMP_SKILLS_TASKS_SOCKET=/run/lampos-tasks/skill-task.sock
 Environment=LAMP_SKILL_TASK_SURE=on
 # #7180, docs/skills.md; first builder, 16 Nov
 Environment=LAMP_TOLD_WHEN_ASKED=on
+# #8475, docs/switches.md: a skill's task is handed over with no yes asked (task::hand), and the voice's model's call
+# of a skill's task runs only when the voice says the owner named it (lamp_skills::task_call_refused). The same line
+# in lamp-control, lamp-services and lamp-voice.
+Environment=LAMP_TASK_NO_YES=on
 # Skills' runs wait once the relay's day used leaves the voice only half the day (#7342, docs/tasks.md "Skills' runs
 # and the voice's share of the day"; the first builder's DEFAULT-ON, #7814): read from lamp-cloud's day-used.json.
 # The same line in lamp-cloud, whose model forwarder keeps that reading.

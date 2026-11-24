@@ -1082,7 +1082,9 @@ pub fn lamp_has_skill_named(root: &Path, name: impl AsRef<Path>) -> bool {
 /// `grants`, handed over at `now_ms` through `send` (the socket and the
 /// line; lamp-tasks' answer), or why not: the journal's words. With the
 /// switch off, nothing ([`OFF`]); with no yes for the folder as it is now
-/// and these grants, nothing ([`WAITING`], [`CHANGED`]), and the yes is
+/// and these grants, nothing ([`WAITING`], [`CHANGED`]), unless
+/// `LAMP_TASK_NO_YES` is on (#8475, [`crate::task_no_yes_on`]: no yes is
+/// asked, of lamp-control or aloud), and the yes is
 /// asked aloud through `say_yes` ([`ask_yes`]): the run waits for its next
 /// trigger once agreed, never for this one; past the bounds or
 /// with its last still under way, nothing. The run is counted once it is
@@ -1114,8 +1116,12 @@ pub fn hand(
     };
     // A core variant's task is pre-approved (`crate::core_agent::pre_approved`,
     // the first builder's 08:57): no yes is asked, aloud or of lamp-control.
+    // With `LAMP_TASK_NO_YES` on (#8475, [`crate::task_no_yes_on`]) no
+    // folder yes is asked for any skill: handed over at once, whoever
+    // started the run; lamp-control mints its declared grants at the mint.
     let pre_approved = grants.is_empty() && crate::core_agent::pre_approved(folder);
-    if let Some(why) = (!pre_approved)
+    let no_yes = crate::task_no_yes_on();
+    if let Some(why) = (!pre_approved && !no_yes)
         .then(|| yes_refuses(place.control, skill, &sha256, grants))
         .flatten()
     {
@@ -2861,6 +2867,70 @@ mod tests {
         let (asked_at, ask) = take_yes_ask("yes-at-once");
         assert_eq!(asked_at, None);
         assert_eq!(ask["priority"], lamp_voice::say::NORMAL_PRIORITY);
+    }
+
+    /// #8475: with `LAMP_TASK_NO_YES` on, a task with no yes is handed over
+    /// at once, its folder's SHA-256 and grants in the line, and nothing is
+    /// asked, of lamp-control (none is even there) or aloud; off, the same
+    /// run is held to lamp-control's word as before: none there, nothing is
+    /// handed over or asked. Fails on the old `hand`, whose
+    /// `.then(|| yes_refuses(place.control, ...))` answered [`NO_CONTROL`].
+    #[test]
+    fn with_task_no_yes_a_task_is_handed_over_with_no_yes_asked() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        let folder = folder(dir.path());
+        let step = step(&folder, "scripts/main.py").unwrap();
+        let grants = vec!["camera".to_owned()];
+        let socket = dir.path().join("tasks.sock");
+        let no_control = dir.path().join("no-control.sock");
+        let place = Place {
+            state: Some(&state),
+            control: &no_control,
+            socket: Some(&socket),
+        };
+        let never = |_: &Path, _: &str| -> Result<String, crate::service_write::Unrun> {
+            panic!("handed over")
+        };
+        set_on_here(Some(true));
+        crate::set_task_no_yes_here(Some(true));
+        let mut sent = None;
+        let said = hand(
+            "no-yes-booth",
+            &step,
+            &folder,
+            &grants,
+            place,
+            1_000,
+            |_, line| {
+                sent = Some(line.to_owned());
+                crate::service_write::agent_answered("{\"ok\":true,\"id\":7}")
+            },
+            || panic!("asked aloud"),
+        );
+        assert_eq!(said, "do.task: handed to lamp-tasks: its run ended, task 7");
+        let line: serde_json::Value = serde_json::from_str(&sent.unwrap()).unwrap();
+        assert_eq!(line["sha256"], folder_sha256(&folder).unwrap().as_str());
+        assert_eq!(line["grants"], serde_json::json!(["camera"]));
+        assert!(read_asks(&state).unwrap().is_empty());
+        // Off: as before.
+        crate::set_task_no_yes_here(Some(false));
+        assert_eq!(
+            hand(
+                "no-yes-booth",
+                &step,
+                &folder,
+                &grants,
+                place,
+                2_000,
+                never,
+                || panic!("asked aloud")
+            ),
+            NO_CONTROL
+        );
+        crate::set_task_no_yes_here(None);
+        set_on_here(None);
     }
 
     #[test]
