@@ -5228,6 +5228,15 @@ fn run_for_asked(
                     // A made skill's brief is the lamp's own make: no note.
                     if !crate::made_skill::is_brief(&pending.text) {
                         handed_over(&pending.id.to_string(), &label_of(&pending.text));
+                        // One line if it still waits for its agent after
+                        // 20 s, on a cold session (#8445); asked by voice only.
+                        if !crate::messages::is_text(pending.request) {
+                            crate::hand_wait::watch(
+                                &place.directory,
+                                &pending.id.to_string(),
+                                who == OWN_ENGINE,
+                            );
+                        }
                     }
                     (
                         json!({
@@ -6105,6 +6114,13 @@ pub(crate) fn handed_over(id: &str, label: &str) {
     if work_id_fits(id) {
         set_handed(Some((id.to_owned(), label.to_owned(), Instant::now())));
     }
+}
+
+/// Whether work `id` is the work this voice handed over last (#8445,
+/// [`crate::hand_wait`]): another hand-over since, or none kept, and no
+/// line is said for it.
+pub(crate) fn handed_last_is(id: &str) -> bool {
+    handed().is_some_and(|(handed, ..)| handed == id)
 }
 
 /// Work `id` is finished and told: no more note for it.
