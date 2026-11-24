@@ -5857,8 +5857,11 @@ bounds; `serve::Services::run_tool`), and the run is told
 can only hold a send. A run nobody asked for aloud (a trigger's, a
 schedule's, the lamp's agent's `skill call` of a skill) runs on its
 declared grants with every send held for its yes, as before, even when the
-owner named that skill within those 5 minutes. The voice lets the record go
-on a forget, a privacy change and a stop or close.
+owner named that skill within those 5 minutes. Only the heard words' own
+call is marked: a model's call is not, even of a skill the owner named a
+moment ago (`tools::spoken_ask`, Heron's P1 on #8550). With the switch on,
+the voice lets the record go on a forget, a privacy change and a stop or
+close; off, the record is left as before (Heron's P2 on #8550).
 
 Follow-up: #7260 (proposal: in the one session, a skill's run keeps the reach of its grants).
 
