@@ -85,14 +85,18 @@ def after(rnd, facts, seq, prev, msha, prefix, window=96.0):
         else:
             ck("gw-exit1", False, "one exit 1 and no listen after it within %.0f s (watcher %s)" % (window, "read" if W else "log missing"))
     U = [l[5:] for l in F if l.startswith("UNIT ")]
-    badu = []
+    badu = []; off = []
     for l in U:
         name = l.split()[0]; a = kv(l)
         if a.get("active") == "active": continue
         if a.get("active") == "inactive" and a.get("type") == "oneshot" and a.get("result") == "success": continue
+        # A part off by its own switch (lamp-addons, lamp-mood, lamp-play, ...: "Off, it exits at once" and stays
+        # inactive, its unit's own words) ended with exit 0: inactive with Result=success is that, never a failure.
+        if a.get("active") == "inactive" and a.get("result") == "success": off.append(name); continue
         badu.append("%s %s/%s" % (name, a.get("active"), a.get("result")))
     fl = [x for x in (first(F, "FAILED") or "").split() if x.startswith("lamp")]
-    ck("units", bool(U) and not badu and not fl, "%d units, all active" % len(U) if U and not badu and not fl else
+    offs = "; off by their switch (exited 0): %s" % ", ".join(off) if off else ""
+    ck("units", bool(U) and not badu and not fl, "%d units, all active or off by their switch%s" % (len(U), offs) if U and not badu and not fl else
        "not active: %s; failed: %s" % (", ".join(badu) or "none", " ".join(fl) or "none") if U else "no UNIT lines")
     print("\n".join(out))
     v = "FAIL" if "FAIL" in res else ("FINDING" if "FINDING" in res else "PASS")

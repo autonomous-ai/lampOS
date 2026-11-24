@@ -72,6 +72,8 @@ ecase("E.fail-exit1-nowatch-old", "FAIL", f=facts(CAND, STABLE, CUPD, gwj=["%d.0
 U = ["%s active=active sub=running result=success type=simple" % u for u in UNITS]
 ecase("E.fail-unit-failed", "FAIL", f=facts(CAND, STABLE, CUPD, units=U[:2] + ["lamp-control.service active=failed sub=failed result=exit-code type=simple"] + U[3:]))
 ecase("E.fail-unit-inactive", "FAIL", f=facts(CAND, STABLE, CUPD, units=U + ["lamp-region.service active=inactive sub=dead result=exit-code type=oneshot"]))
+ecase("E.pass-unit-off-by-switch", "PASS", f=facts(CAND, STABLE, CUPD, units=U + ["lamp-mood.service active=inactive sub=dead result=success type=simple"]))
+ecase("E.fail-unit-simple-crashed", "FAIL", f=facts(CAND, STABLE, CUPD, units=U + ["lamp-mood.service active=inactive sub=dead result=exit-code type=simple"]))
 ecase("E.pass-unit-oneshot", "PASS", f=facts(CAND, STABLE, CUPD, units=U + ["lamp-region.service active=inactive sub=dead result=success type=oneshot"]))
 ecase("E.fail-failed-list", "FAIL", f=facts(CAND, STABLE, CUPD, failed="lamp-update-back.service"))
 ecase("E.fail-no-units", "FAIL", f=facts(CAND, STABLE, CUPD, units=[]))
