@@ -87,7 +87,7 @@ fn a_kept_switch_starts_its_added_long_running_parts_of_the_lamp_lamp_services_f
             "lamp-setup-recover.service",
             "[Service]\nExecStart=/x\n[Install]\nWantedBy=multi-user.target\n",
         ),
-        // A timed service, a template, a socket and a timer.
+        // A timed service, a template, a socket of lampos.target and a timer.
         (
             "lamp-records.service",
             "[Service]\nType=oneshot\nExecStart=/x\n",
@@ -109,7 +109,9 @@ fn a_kept_switch_starts_its_added_long_running_parts_of_the_lamp_lamp_services_f
     .collect();
     assert_eq!(
         to_start(&added, |name| name != "lamp-off.service"),
-        ["lamp-services.service", "lamp-mood.service"]
+        // #8367: a socket of lampos.target too, so a helper a round adds
+        // (the own keys' one) listens before the lamp's next start.
+        ["lamp-services.service", "lamp-mood.service", "lamp-a.socket"]
     );
     assert!(to_start(&added, |_| false).is_empty());
 }
