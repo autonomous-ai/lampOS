@@ -1219,11 +1219,9 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     // on, it runs only while Hermes is the lamp's default agent; with it on,
     // OpenClaw's gateway follows the default as well, so one agent gateway
     // runs at a time (crate::hermes_gateway).
-    let hermes_gateway_switch = lamp_update::switches::update_switch(
-        &config.root,
-        lamp_update::hermes_gateway::SWITCH,
-        std::env::var_os(lamp_update::hermes_gateway::SWITCH).as_deref(),
-    );
+    // Read with the others, so a round that turns it on in the carried
+    // file restarts lamp-update (switches::restart_for).
+    let hermes_gateway_switch = switches.hermes_gateway;
     let hermes_gateway = matches!(hermes, Some((true, _))) && hermes_gateway_switch;
     let gateway_by_default = matches!(openclaw, Some((true, _)))
         && (switches.gateway_by_default || hermes_gateway_switch);

@@ -5427,6 +5427,75 @@ fn the_product_speaks_to_openclaws_gateway_directly() {
     }
 }
 
+/// Hermes direct: the product's lamp-tasks speaks to Hermes's API gateway
+/// directly (`LAMP_TASKS_HERMES_DIRECT`, `on` exactly), once, in lamp-tasks
+/// alone, and the gateway it needs is on in the product by lamp-update's
+/// carried switch file (`LAMP_HERMES_GATEWAY=on`, once), never by a unit, so a
+/// lamp already in a home takes it. lamp-tasks' way to the gateway stays
+/// open: no network sandbox and the gateway's key folder not hidden from it.
+#[test]
+fn the_product_speaks_to_hermess_gateway_directly() {
+    // lamp_tasks::direct::HERMES_SWITCH (lamp-update does not depend on lamp-tasks).
+    let name = "LAMP_TASKS_HERMES_DIRECT";
+    let line = format!("Environment={name}=on");
+    let gateway = lamp_update::hermes_gateway::SWITCH;
+    for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service")
+            .iter()
+            .filter(|set| **set == line)
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|set| !set.starts_with('#') && set.contains(name))
+            .count();
+        let owner = *unit == "lamp-tasks.service";
+        assert_eq!(on, usize::from(owner), "{unit}: {line}");
+        assert_eq!(mentioned, on, "{unit}: {name}");
+        let gateway_set = text
+            .lines()
+            .filter(|set| !set.starts_with('#') && set.contains(gateway))
+            .count();
+        assert_eq!(gateway_set, 0, "{unit}: {gateway} is the carried file's");
+    }
+    let carried = install::UPDATE_SETTING.1;
+    assert_eq!(
+        carried
+            .lines()
+            .filter(|set| *set == format!("{gateway}=on"))
+            .count(),
+        1
+    );
+    assert!(lamp_update::models::file_says_on(
+        carried.as_bytes(),
+        gateway
+    ));
+    let tasks = install::PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-tasks.service")
+        .unwrap()
+        .1;
+    for set in section(tasks, "Service") {
+        for closed in [
+            "PrivateNetwork=",
+            "IPAddressDeny=",
+            "IPAddressAllow=",
+            "RestrictAddressFamilies=",
+            "NetworkNamespacePath=",
+            "ProtectHome=",
+            "ProtectSystem=",
+            "TemporaryFileSystem=",
+        ] {
+            assert!(!set.starts_with(closed), "lamp-tasks: {set}");
+        }
+        if set.starts_with("InaccessiblePaths=") || set.starts_with("ReadOnlyPaths=") {
+            assert!(
+                !set.contains(lamp_update::hermes_gateway::KEY_DIR),
+                "lamp-tasks: {set}"
+            );
+        }
+    }
+}
+
 /// #7245: the product's lamp-voice makes a skill on the lamp's agent with
 /// the guide, on the one run path (named on #7737, El's P2).
 #[test]
