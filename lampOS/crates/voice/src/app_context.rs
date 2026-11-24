@@ -191,11 +191,16 @@ pub fn played(source: &Source, name: &str, words: &str) {
         };
     }
     if let Some((_, publisher)) = out.as_mut() {
-        let _ = publisher.publish_json(lamp_ipc::monotonic_us(), &line);
-        eprintln!(
-            "lamp-voice: app {}: a spoken line told to the worker",
-            line.app
-        );
+        match publisher.publish_json(lamp_ipc::monotonic_us(), &line) {
+            Ok(_) => eprintln!(
+                "lamp-voice: app {}: a spoken line told to the worker",
+                line.app
+            ),
+            Err(error) => eprintln!(
+                "lamp-voice: app {}: a spoken line is not told: {error}",
+                line.app
+            ),
+        }
     }
 }
 
@@ -337,16 +342,17 @@ pub fn start(root: &Path, told: impl Fn(&AppContext) + Send + 'static) {
 
 /// Reads `apps/said` on the bus at `root` on a thread of its own and hands
 /// each well-formed line to `told`, as [`start`] does `apps/context`.
-pub fn start_said(root: &Path, told: impl Fn(&AppSaid) + Send + 'static) {
+/// `false`: it didn't start (said), and may be tried again.
+pub fn start_said(root: &Path, told: impl Fn(&AppSaid) + Send + 'static) -> bool {
     let Ok(bus) = lamp_bus::Bus::new(root) else {
-        eprintln!("lamp-voice: no app's spoken line is told: the bus can't be reached");
-        return;
+        eprintln!("lamp-voice: no app's spoken line is told yet: the bus can't be reached");
+        return false;
     };
     let mut lines = match bus.subscribe(AppSaid::TOPIC, "voice") {
         Ok(lines) => lines,
         Err(error) => {
-            eprintln!("lamp-voice: no app's spoken line is told: {error}");
-            return;
+            eprintln!("lamp-voice: no app's spoken line is told yet: {error}");
+            return false;
         }
     };
     let spawned = std::thread::Builder::new()
@@ -367,9 +373,62 @@ pub fn start_said(root: &Path, told: impl Fn(&AppSaid) + Send + 'static) {
                 }
             }
         });
-    if let Err(error) = spawned {
-        eprintln!("lamp-voice: no app's spoken line is told: {error}");
+    match spawned {
+        Ok(_) => true,
+        Err(error) => {
+            eprintln!("lamp-voice: no app's spoken line is told yet: {error}");
+            false
+        }
     }
+}
+
+/// The least time between two tries of the `apps/said` reader that failed.
+pub const SAID_RETRY_EVERY: Duration = Duration::from_secs(5);
+
+/// Whether `apps/said`'s reader started, and when it was last tried: one that
+/// failed is tried again, at most once each [`SAID_RETRY_EVERY`].
+#[derive(Debug, Default)]
+struct SaidStart {
+    started: bool,
+    tried_at: Option<std::time::Instant>,
+}
+
+impl SaidStart {
+    /// Runs `attempt` at `now` unless the reader started or was tried less
+    /// than [`SAID_RETRY_EVERY`] ago. Whether it is started now.
+    fn try_start(&mut self, now: std::time::Instant, attempt: impl FnOnce() -> bool) -> bool {
+        if self.started
+            || self
+                .tried_at
+                .is_some_and(|at| now.saturating_duration_since(at) < SAID_RETRY_EVERY)
+        {
+            return self.started;
+        }
+        self.tried_at = Some(now);
+        self.started = attempt();
+        self.started
+    }
+}
+
+static SAID_START: Mutex<SaidStart> = Mutex::new(SaidStart {
+    started: false,
+    tried_at: None,
+});
+
+/// Starts the worker's `apps/said` reader at `root` through [`SAID_START`].
+fn try_said(root: &Path) -> bool {
+    let Ok(mut start) = SAID_START.lock() else {
+        return false;
+    };
+    start.try_start(std::time::Instant::now(), || {
+        start_said(root, |line| {
+            let kept = heard(line, now_ms(), private_now());
+            #[cfg(test)]
+            SAID_HEARD.fetch_add(1, Ordering::SeqCst);
+            let done = if kept { "kept" } else { "not kept" };
+            eprintln!("lamp-voice: app {}: a spoken line {done}", line.app);
+        })
+    })
 }
 
 /// How many `apps/said` lines this process's reader took, kept or not, for
@@ -386,6 +445,27 @@ pub fn start_telling(root: &Path) {
     if !on() {
         return;
     }
+    // `apps/said`'s reader is tried on every call, at most once each
+    // [`SAID_RETRY_EVERY`] (Heron's P3 on #8525), and one that failed is
+    // tried again on a thread of its own at that pace until it starts, since
+    // the worker calls this once.
+    if !try_said(root) {
+        static RETRYING: AtomicBool = AtomicBool::new(false);
+        if !RETRYING.swap(true, Ordering::SeqCst) {
+            let root = root.to_path_buf();
+            let spawned = std::thread::Builder::new()
+                .name("app-said-retry".into())
+                .spawn(move || {
+                    while !try_said(&root) {
+                        std::thread::sleep(SAID_RETRY_EVERY);
+                    }
+                    RETRYING.store(false, Ordering::SeqCst);
+                });
+            if spawned.is_err() {
+                RETRYING.store(false, Ordering::SeqCst);
+            }
+        }
+    }
     STARTED.call_once(|| {
         start(root, |line| {
             let went = apply(line, now_ms(), private_now());
@@ -395,13 +475,6 @@ pub fn start_telling(root: &Path) {
                 (false, Err(why)) => format!("not told ({})", why.code()),
             };
             eprintln!("lamp-voice: app {}: a context line {done}", line.app);
-        });
-        start_said(root, |line| {
-            let kept = heard(line, now_ms(), private_now());
-            #[cfg(test)]
-            SAID_HEARD.fetch_add(1, Ordering::SeqCst);
-            let done = if kept { "kept" } else { "not kept" };
-            eprintln!("lamp-voice: app {}: a spoken line {done}", line.app);
         });
     });
 }
@@ -1030,6 +1103,24 @@ mod tests {
         );
         // Expired after 2 minutes, as before.
         assert!(notes(now_ms() + SAID_FOR_MS + 1, false).is_empty());
+        // The privacy switch closing after it was kept (`Engine::privacy`'s
+        // order: private, then every line cleared): nothing is held, and
+        // the parent's next say, still arriving, is not kept while private.
+        set_private(true);
+        // The reader is one thread: once it took one more line, any say it
+        // read open has been kept, and every later one reads private.
+        let next_say = || {
+            let heard_then = SAID_HEARD.load(Ordering::SeqCst);
+            let begun = std::time::Instant::now();
+            while SAID_HEARD.load(Ordering::SeqCst) == heard_then {
+                assert!(begun.elapsed() < Duration::from_secs(5), "no next say");
+                std::thread::sleep(Duration::from_millis(20));
+            }
+        };
+        next_say();
+        clear_all();
+        next_say();
+        assert!(notes(now_ms(), false).is_empty(), "closed: nothing held");
     }
 
     /// #8422: while the worker reads Lamp private, the say that reached it
@@ -1048,6 +1139,38 @@ mod tests {
         let told = notes(now_ms(), false);
         println!("worker notes: {}", told.len());
         assert!(told.is_empty(), "{told:?}");
+    }
+
+    /// A reader that failed to start is tried again on the next call, but at
+    /// most once each 5 s, and never again once it started.
+    #[test]
+    fn a_failed_said_reader_is_tried_again_at_most_each_five_seconds() {
+        let mut start = SaidStart::default();
+        let at = std::time::Instant::now();
+        let tries = std::cell::Cell::new(0);
+        let fails = || {
+            tries.set(tries.get() + 1);
+            false
+        };
+        assert!(!start.try_start(at, fails));
+        assert!(!start.try_start(at + Duration::from_secs(1), fails));
+        assert!(!start.try_start(at + Duration::from_millis(4_999), fails));
+        assert_eq!(tries.get(), 1, "no spin inside the 5 s");
+        assert!(!start.try_start(at + SAID_RETRY_EVERY, fails));
+        assert_eq!(tries.get(), 2);
+        let starts = || {
+            tries.set(tries.get() + 1);
+            true
+        };
+        assert!(start.try_start(at + 2 * SAID_RETRY_EVERY, starts));
+        assert!(start.try_start(at + 10 * SAID_RETRY_EVERY, starts));
+        assert_eq!(tries.get(), 3, "started: never tried again");
+        // A real subscribe that can't be made (the root is a file) fails
+        // closed and says so, so it is tried again.
+        let file = std::path::PathBuf::from(format!("/tmp/lvsaid-file-{}", std::process::id()));
+        std::fs::write(&file, b"").unwrap();
+        assert!(!start_said(&file, |_| {}));
+        let _ = std::fs::remove_file(&file);
     }
 
     /// The worker's reader refuses a line the coordinator never sends, and
