@@ -354,7 +354,7 @@ the install change merges.
 | `back_online` | "I'm back online." | `back-online.en-US.wav` |
 | `voice_service_unreachable` | "Sorry, I'm having trouble thinking right now. Give me a moment." | `voice-service-unreachable.en-US.wav` |
 | `wifi_lost` | "I can't reach any Wi-Fi. If you changed your Wi-Fi's name or password, push a paperclip into the hole marked reset on the back of my base and hold it for five seconds. That erases me and starts setup again." | `wifi-lost.en-US.wav` |
-| `wifi_recovering` | "I can't reach my Wi-Fi, so I've opened setup. Set my Wi-Fi again in the app." | `wifi-recovering.en-US.wav` |
+| `wifi_recovering` | "I can't reach my Wi-Fi, so I've opened setup. I'll keep trying it, or set my Wi-Fi again in the app." (#8484; the pinned clip below still says the words before it, "… so I've opened setup. Set my Wi-Fi again in the app.", until a release rendered from these is pinned) | `wifi-recovering.en-US.wav` |
 
 The two Wi-Fi lines (#3743) are not the second route's: they were rendered
 as `production` with `tools/render-wifi-line.sh` in Live's voice (Kore,

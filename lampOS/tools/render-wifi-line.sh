@@ -28,7 +28,7 @@ lost)
     ;;
 recovering)
     KIND=wifi_recovering
-    LINE="I can't reach my Wi-Fi, so I've opened setup. Set my Wi-Fi again in the app."
+    LINE="I can't reach my Wi-Fi, so I've opened setup. I'll keep trying it, or set my Wi-Fi again in the app."
     ;;
 *) echo "the line is lost or recovering" >&2; exit 2 ;;
 esac
