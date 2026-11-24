@@ -50,8 +50,11 @@ def after(rnd, facts, seq, prev, msha, prefix, window=96.0):
     if o is None:
         ck("outcome", False, "no round output in %s" % rnd)
     else:
-        ut = [l for l in o if re.search(r"(^|: )up to date: build %s$" % re.escape(seq), l)]
-        ck("outcome", bool(ut), "'%s'" % (ut[-1] if ut else "no 'up to date: build %s' line; last: %s" % (seq, (o[-1] if o else "none")[:120])))
+        # The round's own last word for the build: "up to date: build N" (a round whose updater switched itself and
+        # ran again, as round 1's), or "switched to build N; every part is well" (a round by the build's own updater,
+        # no self-switch, as round 2's).
+        ut = [l for l in o if re.search(r"(^|: )(up to date: build %s|switched to build %s; every part is well)$" % (re.escape(seq), re.escape(seq)), l)]
+        ck("outcome", bool(ut), "'%s'" % (ut[-1] if ut else "no 'up to date: build %s' or 'switched to build %s; every part is well' line; last: %s" % (seq, seq, (o[-1] if o else "none")[:120])))
         bad = [l for l in o if "refused" in l or "putting build" in l]
         ck("no-refused", not bad, "no 'refused' or 'putting build' line" if not bad else "%d line(s): %s" % (len(bad), bad[0][:140]))
     ck("exit", ex == "0", "EXIT %s" % ex)
