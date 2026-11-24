@@ -1091,7 +1091,10 @@ lamp-control: c_3f9a (lab-mac): say (28 characters, tag 3c1e07a9): ok, to the vo
 lamp-control: c_3f9a (lab-mac): gesture (nod): refused: no_grant, 0.0 ms
 lamp-control: c_3f9a (lab-mac): lease l_9 lost (hand)
 lamp-control: c_3f9a (lab-mac): event phrase.heard sent
+lamp-control: c_3f9a (lab-mac): connection closed (person.arrived phrase.heard, 16 phrases)
 ```
+
+A connection that says hello journals one line when it closes: the events it had subscribed to and how many phrases it listened for (`nothing subscribed` when none), never a phrase. A computer whose finished lines read `0 listening for 0 phrases` can then be told from one whose connection had closed, and the SDKs' `keep_connected` subscribes again on the new one (#8126).
 
 **Where a command goes:**
 - `light` goes to the ring, by `light/request`.
