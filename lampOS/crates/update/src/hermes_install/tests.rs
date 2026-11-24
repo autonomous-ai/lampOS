@@ -4714,3 +4714,49 @@ fn an_ask_with_the_gateway_writes_its_namespace_script_and_a_remove_takes_it_out
     assert!(!lamp.at(hermes_gateway::NS).exists());
     assert!(lamp.entry_points().is_empty());
 }
+
+/// Hermes direct (lamp-ee17, 24 Nov): with the gateway on, a round that
+/// finds Hermes's entry points not as this build writes them asks Hermes's
+/// install with the gateway, so the one-shot that puts Hermes back writes
+/// the gateway's namespace script in the same run, and the gateway is
+/// served between rounds; never only at the next round, which asks for the
+/// script once Hermes is there. Off, the ask stays Hermes's alone.
+#[test]
+fn hermes_put_back_with_the_gateway_on_writes_the_gateway_script_in_the_same_one_shot() {
+    use crate::hermes_gateway;
+    for gateway in [true, false] {
+        let lamp = Lamp::new();
+        lamp.harness_there();
+        lamp.hermes_there();
+        fs::write(lamp.at(WRAPPER), "#!/bin/sh\nexec sudo old\n").unwrap();
+        assert!(!present(lamp.root(), OFF));
+        let mut systemd = Fake::default();
+        let said = after_round_asking(
+            lamp.root(),
+            &lamp.records(),
+            OFF,
+            gateway,
+            &mut systemd,
+            5,
+            Ok(crate::hermes_schedule::Window::Reached),
+            &mut quiet(),
+        );
+        assert_eq!(said.unwrap().install, "installing");
+        assert_eq!(
+            systemd.asked,
+            ["reload", "show", "start"],
+            "Harness's one-shot's unit written, the one-shot started"
+        );
+        assert_eq!(lamp.asked().unwrap().gateway, gateway);
+        // The one-shot that round started.
+        let runs = Runs::new(&lamp);
+        assert_eq!(install(&lamp, &runs, 6).unwrap().install, "installed");
+        assert!(present(lamp.root(), OFF));
+        assert_eq!(
+            hermes_gateway::present(lamp.root(), OFF),
+            gateway,
+            "the gateway's script written in the same one-shot only with the gateway on"
+        );
+        assert!(!lamp.records().join(ASK).exists(), "the ask is spent");
+    }
+}

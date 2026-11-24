@@ -2455,7 +2455,17 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        `/etc/lampOS/update.env`, off by default), and runs it only while
        lamp-tasks names Hermes the lamp's default agent; with that switch on,
        OpenClaw's gateway follows the default too, so only one agent gateway
-       runs (docs/switches.md, its row). Hermes's `approvals.mode` stays
+       runs (docs/switches.md, its row). Each round that reached the channel
+       (one that refused a build and switched nothing too) writes the unit
+       and, with Hermes there, has Harness's one-shot write the gateway's
+       namespace script (`/usr/local/lib/lampos/hermes-gateway-ns`) when it
+       differs; `serve` then starts or stops the gateway within 10 s of a
+       change of default agent, between rounds. A round that finds Hermes's
+       own entry points not as this build writes them asks Hermes's install
+       with the gateway's script in the same ask, so the one-shot that puts
+       Hermes back writes the script too and the gateway is served between
+       rounds, not only after the next round (lamp-ee17, 24 Nov:
+       `hermes_install::after_round_asking`). Hermes's `approvals.mode` stays
        `manual`. Not reachable (the switch off, or still starting), the
        direct path fails as OpenClaw's does with its gateway down.
      - Its API key in `/var/lib/lampos-hermes-gateway/api-key` (0600

@@ -1240,6 +1240,39 @@ pub fn after_round(
     window: Result<crate::hermes_schedule::Window, String>,
     say: &mut dyn FnMut(&str),
 ) -> Option<HermesInstall> {
+    after_round_asking(
+        root,
+        records,
+        shown,
+        false,
+        systemd,
+        now_unix_ms,
+        window,
+        say,
+    )
+}
+
+/// [`after_round`], with `gateway` (`LAMP_HERMES_GATEWAY` on) carried in
+/// the install's [`ASK`] as [`ask_gateway`]'s is: the one-shot that puts
+/// Hermes there again writes Hermes's gateway namespace script
+/// ([`crate::hermes_gateway::NS`]) in the same run. Without it, a round
+/// that finds Hermes's entry points not as this build writes them (a new
+/// lamp-update, a switch turned) has Hermes put back with no gateway
+/// script, and [`crate::hermes_gateway::after_round`], which asks for the
+/// script only once Hermes is there, waits for the next round: the gateway
+/// is not served between rounds for a whole interval after a switch to
+/// Hermes (lamp-ee17, 24 Nov).
+#[allow(clippy::too_many_arguments)]
+pub fn after_round_asking(
+    root: &Path,
+    records: &Path,
+    shown: Shown,
+    gateway: bool,
+    systemd: &mut dyn Systemd,
+    now_unix_ms: u64,
+    window: Result<crate::hermes_schedule::Window, String>,
+    say: &mut dyn FnMut(&str),
+) -> Option<HermesInstall> {
     let before = record(records);
     if present(root, shown) {
         if before
@@ -1287,7 +1320,7 @@ pub fn after_round(
         return None;
     }
     say(&format!("Hermes may be installed now: {}", window.name()));
-    if let Err(error) = ask(records, false, shown) {
+    if let Err(error) = write_ask(records, false, shown, gateway) {
         say(&format!(
             "Hermes is not installed: {ASK} not written: {error}"
         ));

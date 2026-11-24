@@ -2091,6 +2091,15 @@ impl OneSession {
         self.lock().pane.as_ref().map(|pane| pane.agent.clone())
     }
 
+    /// lamp-tasks' own pane's agent id, open in memory or kept on disk (a
+    /// lamp-tasks restart, or a removal not done yet, as after an engine
+    /// switch): the pane `gateway::panes_read` leaves out of OpenClaw's use
+    /// while idle.
+    pub fn own_agent(&self) -> Option<String> {
+        self.agent()
+            .or_else(|| self.kept().map(|(agent, _, _)| agent))
+    }
+
     /// How many wait for the pane now.
     pub fn waiting(&self) -> usize {
         self.lock().waiting.len()
