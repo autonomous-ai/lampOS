@@ -54,6 +54,13 @@ fn ask(admit: bool) -> (Option<Ended>, u32, u32) {
         br#"{"op":"play","id":5,"url":"https://cdn.example.com/a.mp3","hosts":["cdn.example.com"]}"#,
     )
     .unwrap();
+    // The asker reads the sound, as lamp-control does. A socket pair holds
+    // about 200 KiB on Linux but 8 KiB each way on macOS, where an unread
+    // play fills it and ends "stopped".
+    std::thread::spawn(move || {
+        let mut sound = Vec::new();
+        let _ = far.read_to_end(&mut sound);
+    });
     let (lookups, connects) = (Arc::new(Mutex::new(0)), Arc::new(Mutex::new(0)));
     let mut net = Counting {
         lookups: Arc::clone(&lookups),
