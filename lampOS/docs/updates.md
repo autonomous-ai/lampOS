@@ -1665,6 +1665,7 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `lamp-setup-recover.service could not be started (…); it starts at the next boot` | that start failed: said only, the round stays switched |
 | `build N, which the lamp runs, adds X: the updater that switched to it did not carry them (#7018)` | an up-to-date round's pass begins: build N is the lamp's, and X are the product units it carries that the lamp lacks ("A part added over the air", "On an up-to-date round too") |
 | `X, added to build N, was taken away: …; build N is kept, and its units are tried again with the next build` | that pass failed (a watch, a write) or was cut short: X are stopped and removed, build N is not refused, and its units are not tried again at build N (#7018) |
+| `X could not all be taken away: …; build N is kept` | that pass failed and what it added could not all be removed: the round ends `failed`, not `rolled-back` (no build was being brought), build N is not refused, and the journal stays for the next start to take the rest away; `adds_tried` is set only then (#7018) |
 | `the units build N adds are not added this round: …; the next round tries again` | that pass could not be had this round (the units unread, a fetch, the disk): the round is up to date, and the next one looks again (#7018) |
 | `the units build N adds are not added: …; they are tried again with the next build` | the build's own units plan no pass (a link there that no unit starts through, say): the round is up to date, and they are tried at build N no more (#7018) |
 | `started <unit>, added by build N` | the watch passed and the build is kept; a long-running part of `lampos.target` the switch added, enabled and inactive, was started with `--no-block` ("A part added over the air") |
@@ -2613,6 +2614,32 @@ sequences), the round makes one pass that only adds (`installed_adds`):
 - **A pass that fails** removes what it added (`remove_added`), as a build
   put back does, and refuses nothing: the build is the lamp's. The same
   holds for a pass cut short and recovered at the next start.
+- **Not all taken away:** a pass that fails and cannot remove all it added
+  (a file that cannot be removed) ends `failed` with `X could not all be
+  taken away: …; build N is kept`, never `rolled-back`: no build was being
+  brought, so no `rolled-back` alert and no failed look of the ring for a
+  build put back. The journal stays as a build put back leaves it, and
+  `adds_tried` is not set, so the next start takes the rest away and only
+  then records the build as tried.
+- **Its lines are kept:** the pass ends up to date, which keeps no lines,
+  yet it changed the lamp. Its lines (`build N, which the lamp runs, adds
+  …`, `started X, added by build N`, `X, added to build N, was taken away:
+  …`) go into `log.jsonl` as a switch's do (`keep_lines`, `Run::adds_only`),
+  within the same cap of 200 lines.
+- **Held or not quiet:** a pass that finds no quiet moment, or is held (a
+  walk, a reset of the lamp), ends `not-quiet` with nothing written, on the
+  build the lamp runs. lamp-control is looked at as in any up-to-date
+  round: one that ended cleanly with its switch on is started
+  (`start_added`, #6699). The pass is not counted as tried; the next round
+  makes it again.
+- **A downgrade after a cut (the Reviewer-lead's case):** a pass
+  cut short leaves a journal marked `adds_only`. This updater's next start
+  takes it as the pass's and refuses nothing. An updater from before
+  #7018 does not know the mark, so if the lamp is switched back to one
+  (a downgrade) between the cut and the next start, its `recover` takes
+  the journal for a switch's cut short and puts it back as one. This
+  updater cannot change an older one's code; the case needs both a cut in
+  the pass and a downgrade before the next start.
 - **Once per installed build:** `adds_tried` records the build after the
   pass, well or not. A unit the owner deleted, or one that fails its watch,
   is not added again every round; the next build tries again, as a switch
