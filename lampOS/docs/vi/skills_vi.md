@@ -6492,29 +6492,41 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   bước khác vẫn làm các bước đó ngay, tác vụ vẫn bị từ chối trên luồng của
   nó.
 - **Không cần cái "có" cho thư mục, khi `LAMP_TASK_NO_YES=on`** (#8475,
-  thiết kế người xây dựng đầu tiên đã duyệt; tắt nếu không đặt, bật trong
-  các unit lamp-control, lamp-skills, lamp-services và lamp-voice của sản
-  phẩm; một công tắc, `lamp_services::task_no_yes::on`,
+  thiết kế người xây dựng đầu tiên đã duyệt; tắt nếu không đặt, và tắt
+  trong sản phẩm: không unit sản phẩm nào đặt nó cho tới khi phần 2 của
+  #8475 (#8535) được merge, lúc đó mới bật với dòng thử riêng
+  (docs/switches.md); một công tắc, `lamp_services::task_no_yes::on`,
   `lamp_skills::task_no_yes_on`). (1) Tác vụ của kỹ năng không chờ cái
   "có" cho thư mục, dù kỹ năng đến từ đâu (được đẩy lên, từ Store, thêm
   bằng tay, được tạo trên đèn) và dù ai bắt đầu lần chạy (giọng nói,
-  trigger, lịch): lamp-skills giao ngay, không hỏi lamp-control và không
+  trigger, lịch, lời gọi của chương trình khác như Hermes hay OpenClaw trên
+  đèn qua `lamp-tasks skill call`): lamp-skills giao ngay, không hỏi lamp-control và không
   hỏi thành tiếng (`task::hand`), và lamp-control tạo token của lần chạy từ
   các quyền khai báo trong thư mục, `net` được đồng ý cho thư mục đúng như
   hiện tại (`task_yes::no_yes_folder`); thư mục đã đổi là thư mục mới.
-  Khi bật, không mục nào bên dưới được hỏi. (2) Lần chạy không ai vừa yêu
-  cầu (của trigger, của lịch): lần gửi theo quyền `<code>-write` vẫn chờ
-  cái "có" nói ra của riêng nó trong lamp-services, như trước. (3) Lần
-  chạy vừa được yêu cầu bằng giọng nói: lamp-services tự đọc bản ghi của
-  giọng nói về các yêu cầu nói ra của chủ đèn
-  (`/run/lampos-voice/spoken-asks.json`, chỉ ghi cho kỹ năng mà lời nghe
-  được gọi đúng tên đầy đủ, khi nghe chính chủ đèn nói, với
-  `LAMP_TOLD_WHEN_ASKED` bật) và, khi bản ghi nêu kỹ năng của lần chạy
-  trong vòng 5 phút, gửi ngay lần ghi lần chạy đã chuẩn bị qua đúng đường
-  gửi của cái "có" nói ra, không bao giờ theo lời của lamp-skills
-  (docs/tasks.md). (4) Khớp một nửa thì không chạy gì: lời gọi của model
-  giọng nói tới kỹ năng có giao tác vụ chỉ chạy khi giọng nói nói chủ đèn
-  đã gọi tên nó. Giọng nói đặt `spoken_ask` trên mỗi dòng gọi tới
+  Khi bật, không mục nào bên dưới được hỏi. (2) Mọi lần gửi vẫn chờ cái
+  "có" trừ khi lần chạy của nó là yêu cầu gọi tên của chủ đèn vừa rồi: lần
+  chạy không ai vừa yêu cầu bằng giọng nói (của trigger, của lịch, lời gọi
+  của chương trình khác) chạy với các quyền khai báo, và lần gửi theo quyền
+  `<code>-write` vẫn chờ cái "có" nói ra của riêng nó trong lamp-services,
+  như trước. (3) Chỉ lần gửi của đúng lần chạy được yêu cầu mới được thả:
+  lamp-skills chỉ đánh dấu lần giao của lời gọi đúng tên từ giọng nói
+  (`"asked_aloud": true`, `task::named_ask`), lamp-tasks tạo token cho lần
+  chạy đó như vậy, và lamp-control gắn id của lần chạy đó vào dòng nó
+  chuyển tới lamp-services (`asked_aloud_run`, không bao giờ từ đối số của
+  lần chạy); lamp-services cũng tự đọc bản ghi của giọng nói về các yêu
+  cầu nói ra của chủ đèn (`/run/lampos-voice/spoken-asks.json`, chỉ ghi cho
+  kỹ năng mà lời nghe được gọi đúng tên đầy đủ, khi nghe chính chủ đèn
+  nói, dưới tên tool và tên thư mục của kỹ năng,
+  `told_when_asked::keep_asked`) và chỉ gửi ngay lần ghi đã chuẩn bị qua
+  đúng đường gửi của cái "có" nói ra khi cả hai khớp: dấu nêu đúng lần chạy
+  đó và bản ghi nêu kỹ năng của nó trong vòng 5 phút theo đồng hồ khởi động
+  (`task_no_yes::boot_ms`). Lời của lamp-skills một mình chỉ có thể giữ lần
+  gửi lại (docs/tasks.md). Bản ghi bị xoá khi quên, khi đổi chế độ riêng tư
+  và khi dừng. (4) Khớp một nửa thì không chạy gì: lời gọi của model giọng
+  nói tới kỹ năng có giao tác vụ, và lần chạy ngay một kỹ năng được tạo
+  (`run` của `make_skill`, op `run`), chỉ chạy khi giọng nói nói chủ đèn đã
+  gọi tên nó. Giọng nói đặt `spoken_ask` trên mỗi dòng như vậy tới
   lamp-skills (`lamp_voice::tools::SPOKEN_ASK`, `tools::spoken_ask`): true
   cho chính lời gọi của câu nghe được (`skill_named::CALL_ID`), hoặc khi
   bản ghi nêu kỹ năng đó (tên hoặc tool của nó) trong vòng 5 phút.
@@ -6523,10 +6535,12 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   từ đối số của lời gọi. Nếu không, cả lời gọi bị từ chối trước khi làm gì
   (`lamp_skills::task_call_refused`) và model được báo
   `lamp_skills::NOT_NAMED` (người dùng chưa gọi tên kỹ năng; hãy nói đã
-  nghe gì và nhờ họ nói tên kỹ năng nếu muốn chạy). Chạy ngay (`made_run`,
-  op riêng), lần chạy của trigger hay lịch và lời gọi của bên khác (`skill
-  call` của agent trên đèn) không bị chặn. Tắt: mọi cái "có" bên dưới,
-  đúng từng byte như trước.
+  nghe gì và nhờ họ nói tên kỹ năng nếu muốn chạy). Dấu đã-chạy-tool của
+  lời gọi bị từ chối được gỡ lại (`Engine::tool_not_run`), nên "lại lần
+  nữa" sau đó không chạy lại nó. Lần chạy của trigger hay lịch và lời gọi
+  của bên khác (`skill call` của agent trên đèn) không bị chặn; lời gọi đó
+  chạy với các quyền khai báo, không được đánh dấu, nên các lần gửi của nó
+  vẫn chờ cái "có". Tắt: mọi cái "có" bên dưới, đúng từng byte như trước.
 - **Tự hỏi thành tiếng khi tác vụ đến lượt** (V2 của #6071): lần chạy bị từ
   chối vì thiếu cái "có" thì lamp-skills nhờ say service của giọng nói
   (`{"skill": NAME, "task_yes": true, "priority": 5, "expires_in_ms":

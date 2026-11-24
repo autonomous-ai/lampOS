@@ -3842,18 +3842,30 @@ pub fn set_no_yes_switch_here(on: Option<bool>) {
 /// Whether a skill's task runs on its declared grants with no folder yes,
 /// whatever its source (#8475, `LAMP_TASK_NO_YES`,
 /// `lamp_services::task_no_yes`, the one switch read alike by lamp-control,
-/// lamp-skills, lamp-services and lamp-voice): on, lamp-control mints
-/// every source's declared grants, `net` among them, with no kept yes (its
-/// folder's SHA-256 still checked at the yes check, a changed folder a new
-/// one), the hand-over asks no yes ([`task::hand`]), and a model's call of
-/// a skill's task runs only on the owner's named ask
-/// ([`task_call_refused`]). Off, as before.
+/// lamp-skills, lamp-services and lamp-voice; off in the product until
+/// #8475's part 2, #8535): on, lamp-control mints every source's declared
+/// grants, `net` among them, with no kept yes (its folder's SHA-256 still
+/// checked at the yes check, a changed folder a new one), the hand-over
+/// asks no yes ([`task::hand`]), and the voice's call of a skill's task
+/// runs only on the owner's named ask ([`task_call_refused`]). A run nobody
+/// named just now (a trigger's, a schedule's, or a call that isn't the
+/// voice's: the lamp's own Hermes or OpenClaw through `lamp-tasks skill
+/// call`) runs on its declared grants too, and every send it makes keeps
+/// its yes: only the run started for the voice's named call
+/// ([`task_call_asked_aloud`]) is marked so on to lamp-services. Off, as
+/// before.
 pub fn task_no_yes_on() -> bool {
     lamp_services::task_no_yes::on()
 }
 
 /// [`task_no_yes_on`]'s switch, `LAMP_TASK_NO_YES`.
 pub const TASK_NO_YES_ENVIRONMENT: &str = lamp_services::task_no_yes::ENVIRONMENT;
+
+/// The key lamp-control stamps on a run's call line to lamp-services for a
+/// run minted for the owner's named ask (#8475,
+/// `lamp_services::task_no_yes::ASKED_ALOUD_RUN`), here for lamp-control,
+/// which reads `lamp-services` only through this crate.
+pub const TASK_ASKED_ALOUD_RUN: &str = lamp_services::task_no_yes::ASKED_ALOUD_RUN;
 
 /// [`task_no_yes_on`] for this test's thread alone: tests only (other
 /// crates' too, as [`set_no_yes_switch_here`]).
@@ -3867,15 +3879,18 @@ pub fn set_task_no_yes_here(on: Option<bool>) {
 /// answer in words.
 pub const NOT_NAMED: &str = "Nothing ran: the person didn't name this skill, and a skill's task runs only when they ask for it by its name. Say what you heard and ask them to say the skill's name if they want it run.";
 
-/// Why the voice's model's call of a skill whose run would hand a task
-/// over is refused (#8475), or none: with [`task_no_yes_on`] (`no_yes`),
-/// a call from the voice (`voice`) of a run with a task (`task`) runs only
-/// when the voice says the owner named the skill (`spoken_ask`: the heard
-/// words' own call, or its record of the owner's spoken asks naming it
-/// within five minutes, `lamp_voice::tools::spoken_ask`). A half match
-/// runs nothing. A trigger's or a schedule's run never comes here, nor
-/// does a run now (`lamp_voice::made_run`, its own op); another peer's
-/// call is not the voice's model's, and runs as before.
+/// Why the voice's call of a skill whose run would hand a task over is
+/// refused (#8475), or none: with [`task_no_yes_on`] (`no_yes`), a call
+/// from the voice (`voice`: the model's call of its tool, or a run now of a
+/// made skill, `lamp_voice::made_run`) of a run with a task (`task`) runs
+/// only when the voice says the owner named the skill (`spoken_ask`: the
+/// heard words' own call, or its record of the owner's spoken asks naming
+/// it within five minutes, `lamp_voice::tools::spoken_ask`). A half match
+/// runs nothing. A trigger's or a schedule's run never comes here. A call
+/// that isn't the voice's (the lamp's own Hermes or OpenClaw through
+/// `lamp-tasks skill call`) is not refused here: it runs on its declared
+/// grants, unmarked ([`task_call_asked_aloud`]), so each of its sends keeps
+/// its yes (the first builder's P1 on #8550).
 pub fn task_call_refused(
     no_yes: bool,
     voice: bool,
@@ -3883,6 +3898,17 @@ pub fn task_call_refused(
     spoken_ask: bool,
 ) -> Option<&'static str> {
     (no_yes && voice && task && !spoken_ask).then_some(NOT_NAMED)
+}
+
+/// Whether a call's run is the owner's named ask (#8475), so its task's
+/// hand-over is marked ([`task::named_ask`]) and its writes may go with no
+/// yes once lamp-services reads the voice's own record naming the skill:
+/// the switch on (`no_yes`), the voice's call (`voice`) of a run with a
+/// task (`task`) the voice says the owner named (`spoken_ask`). Any other
+/// call's run (another asker's, or with the switch off) is not, and
+/// lamp-skills' word can only hold a send, never free one.
+pub fn task_call_asked_aloud(no_yes: bool, voice: bool, task: bool, spoken_ask: bool) -> bool {
+    no_yes && voice && task && spoken_ask
 }
 
 /// Where the skill in `folder` came from, as far as its grants' yes goes
@@ -11359,6 +11385,27 @@ impl Engine {
         runs
     }
 
+    /// When `skill`'s tool last ran ([`Engine::tool`], `[again]`'s clock),
+    /// if it did.
+    pub fn tool_ran_at(&self, skill: &str) -> Option<u64> {
+        self.tool_ran.get(skill).copied()
+    }
+
+    /// `skill`'s tool's run taken back, its last run's time as it was
+    /// (`before`): a call refused after [`Engine::tool`] marked it run
+    /// (#8475's named-ask gate, the first builder's P3 on #8550), so an
+    /// `[again]` skill's next named ask is not told its again line.
+    pub fn tool_not_run(&mut self, skill: &str, before: Option<u64>) {
+        match before {
+            Some(at) => {
+                self.tool_ran.insert(skill.to_owned(), at);
+            }
+            None => {
+                self.tool_ran.remove(skill);
+            }
+        }
+    }
+
     /// The model called `name` with `args`: the first skill whose tool it is
     /// runs its steps. A person asked, so the Policy is not asked.
     /// The arguments must be the tool's (`Null`: none given), and its
@@ -12942,6 +12989,15 @@ mod tests {
         assert_eq!(task_call_refused(true, true, false, false), None);
         assert_eq!(task_call_refused(true, false, true, false), None);
         assert_eq!(task_call_refused(false, true, true, false), None);
+        assert!(task_call_asked_aloud(true, true, true, true));
+        for (no_yes, voice, task, spoken_ask) in [
+            (false, true, true, true),
+            (true, false, true, true),
+            (true, true, false, true),
+            (true, true, true, false),
+        ] {
+            assert!(!task_call_asked_aloud(no_yes, voice, task, spoken_ask));
+        }
         assert!(NOT_NAMED.contains("didn't name this skill"));
         assert!(NOT_NAMED.contains("ask them to say the skill's name"));
         set_task_no_yes_here(Some(true));

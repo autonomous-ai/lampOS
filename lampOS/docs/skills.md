@@ -1968,28 +1968,40 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   off or not reached, the skill is removed still and the journal says its
   yes may stay. Agreed already, the read-back says so and asks nothing.
 - **No folder yes, with `LAMP_TASK_NO_YES=on`** (#8475, the first
-  builder's approved design; off unless set, on in the product's
-  lamp-control, lamp-skills, lamp-services and lamp-voice units; one
-  switch, `lamp_services::task_no_yes::on`, `lamp_skills::task_no_yes_on`).
+  builder's approved design; off unless set, and off in the product: no
+  product unit sets it until #8475's part 2 (#8535) lands, switched on then
+  with its own row (docs/switches.md); one switch,
+  `lamp_services::task_no_yes::on`, `lamp_skills::task_no_yes_on`).
   (1) No skill's task waits for a folder yes, whatever its source (pushed,
   Store, added by hand, made) and whoever started the run (the voice, a
-  trigger, a schedule): lamp-skills hands it over at once, asking no yes of
+  trigger, a schedule, another program's call such as the lamp's Hermes or
+  OpenClaw through `lamp-tasks skill call`): lamp-skills hands it over at once, asking no yes of
   lamp-control and none aloud (`task::hand`), and lamp-control mints its
   run's token from its folder's declared grants, `net` agreed for its
   folder as it is now (`task_yes::no_yes_folder`); a changed folder is a
-  new one. Nothing below this item is asked while it is on. (2) A run
-  nobody asked for just now (a trigger's, a schedule's): a send under its
-  `<code>-write` grant waits for its own spoken yes in lamp-services, as
-  before. (3) A run asked aloud just now: lamp-services reads the voice's
-  own record of the owner's spoken asks itself
+  new one. Nothing below this item is asked while it is on. (2) Every send
+  keeps its yes unless its run is the owner's named ask just now: a run
+  nobody asked for aloud (a trigger's, a schedule's, another program's
+  call) runs on its declared grants, and a send under its `<code>-write`
+  grant waits for its own spoken yes in lamp-services, as before. (3) Only
+  the asked run's send is freed: lamp-skills marks the hand-over of the
+  voice's named call alone (`"asked_aloud": true`, `task::named_ask`),
+  lamp-tasks mints that run so, and lamp-control stamps the line it
+  forwards to lamp-services with that run's id (`asked_aloud_run`, never
+  from the run's arguments); lamp-services also reads the voice's own
+  record of the owner's spoken asks itself
   (`/run/lampos-voice/spoken-asks.json`, kept only for a skill the heard
-  words named in full and the owner was heard saying, with
-  `LAMP_TOLD_WHEN_ASKED` on) and, when it names the run's skill within 5
-  minutes, sends the run's prepared write at once through the same send a
-  spoken yes makes, never on lamp-skills' word (docs/tasks.md). (4) A half
-  match runs nothing: the voice's model's call of a skill whose run hands a
-  task over runs only when the voice says the owner named it. The voice
-  puts `spoken_ask` on each call line to lamp-skills
+  words named in full and the owner was heard saying, under its tool and
+  its skill's folder name, `told_when_asked::keep_asked`) and sends the
+  run's prepared write at once through the same send a spoken yes makes
+  only when both agree: the mark names that run and the record names its
+  skill within 5 minutes on the boot clock (`task_no_yes::boot_ms`).
+  lamp-skills' word alone can only hold a send (docs/tasks.md). The record
+  is let go on a forget, a privacy change and a stop. (4) A half match runs
+  nothing: the voice's model's call of a skill whose run hands a task over,
+  and a made skill's run now (`make_skill`'s `run`, the `run` op), run
+  only when the voice says the owner named it. The voice puts `spoken_ask`
+  on each such line to lamp-skills
   (`lamp_voice::tools::SPOKEN_ASK`, `tools::spoken_ask`): true for the
   heard words' own call (`skill_named::CALL_ID`), or when its record names
   that skill (its name or its tool) within 5 minutes. lamp-skills runs as
@@ -2000,9 +2012,12 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   `lamp_skills::NOT_NAMED`: "Nothing ran: the person didn't name this
   skill, and a skill's task runs only when they ask for it by its name.
   Say what you heard and ask them to say the skill's name if they want it
-  run." A run now (`made_run`, its own op), a trigger's or a schedule's run
-  and another peer's call (the lamp's agent's `skill call`) are not gated.
-  Off: every yes below, byte for byte as before.
+  run." A refused call's tool-ran mark is taken back
+  (`Engine::tool_not_run`), so a later "again" never reruns it. A trigger's
+  or a schedule's run and another peer's call (the lamp's agent's `skill
+  call`) are not gated; such a call runs on its declared grants, unmarked,
+  so its sends keep their yes. Off: every yes below, byte for byte as
+  before.
 - **Asked aloud when it comes up** (#6071's V2; Seventh's row on build 832:
   a Store or pushed skill used before anyone asked what it uses got nothing
   and was never told why). A run refused for want of the yes (either line

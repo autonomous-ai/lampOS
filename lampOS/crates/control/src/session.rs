@@ -921,6 +921,12 @@ impl Door {
         self.runs.mark_tried(run);
     }
 
+    /// Marks live run `run` as minted for the owner's named ask
+    /// ([`crate::runs::Run::asked_aloud`], #8475).
+    pub fn mark_asked_aloud(&mut self, run: &str) {
+        self.runs.mark_asked_aloud(run);
+    }
+
     /// Marks live run `run` as a skill's fixed write's, `write`
     /// ([`crate::runs::Run::fixed_write`]).
     pub fn mark_fixed_write(&mut self, run: &str, write: &crate::runs::FixedWrite) {
@@ -1340,9 +1346,10 @@ impl Door {
                 .filter(|_| session.run_socket)
                 .map(|run| {
                     let fixed = run.fixed_write.clone().map(|held| (run.run.clone(), held));
-                    (run.skill.clone(), run.run.clone(), fixed)
+                    (run.skill.clone(), run.run.clone(), fixed, run.asked_aloud)
                 });
-            let (Some((skill, run_id, fixed_write)), Some(services)) = (run, self.services.clone())
+            let (Some((skill, run_id, fixed_write, asked_aloud)), Some(services)) =
+                (run, self.services.clone())
             else {
                 return refuse(ErrorCode::NoGrant, crate::services::RUNS_ONLY.to_owned());
             };
@@ -1359,6 +1366,13 @@ impl Door {
             };
             if let Some((run, _)) = fixed_write {
                 line = crate::services::Services::fixed_write(&line, &run);
+            }
+            // A run minted for the owner's named ask (#8475): named so here,
+            // by lamp-control alone, never from the run's own args, so
+            // lamp-services may send its write with no yes when the voice's
+            // record names its skill. Any other run's line has no mark.
+            if asked_aloud {
+                line = crate::services::Services::asked_aloud(&line, &run_id);
             }
             return Outcome {
                 later: Some(Later {
@@ -4970,6 +4984,56 @@ mod tests {
         assert!(lines[0].get("fixed_write_run").is_none(), "{}", lines[0]);
         assert_eq!(lines[1]["fixed_write_run"], "r1", "{}", lines[1]);
         assert_eq!(lines[1]["args"], lines[0]["args"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #8475 (the first builder's P1 on #8550): a run minted for the
+    /// owner's named ask names its own run to lamp-services as
+    /// `asked_aloud_run` beside its write; any other run's line carries no
+    /// mark, even when the run's script puts one in its own args, where it
+    /// stays as the args' and never the line's. Fails on the old
+    /// `handle`, whose line was `Services::line` alone, with no mark for
+    /// any run.
+    #[test]
+    fn only_a_run_minted_for_the_named_ask_is_marked_to_lamp_services() {
+        use std::io::{BufRead as _, Write as _};
+        let dir =
+            std::env::temp_dir().join(format!("lamp-control-run-asked-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let socket = dir.join("call.sock");
+        let _ = std::fs::remove_file(&socket);
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            let mut lines = Vec::new();
+            for _ in 0..2 {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                std::io::BufReader::new(&stream)
+                    .read_line(&mut line)
+                    .unwrap();
+                writeln!(stream, r#"{{"ok":true,"result":{{"sent":true}}}}"#).unwrap();
+                lines.push(serde_json::from_str::<Value>(&line).unwrap());
+            }
+            lines
+        });
+        let (mut door, mut session, mut fake) =
+            run_door(&[service("gmail", protocol::Access::Write)], Some(socket));
+        // The run's script names a mark of its own: the args', never the line's.
+        let forged = json!({"id": 4, "op": "service.write", "service": "gmail",
+            "args": {"action": "send", "to": ["ann@example.com"], "text": "hi",
+                lamp_services::task_no_yes::ASKED_ALOUD_RUN: "r1"}})
+        .to_string();
+        let outcome = door.handle(&mut session, &forged, &mut fake, S, 1);
+        outcome.later.expect("answered off the lock").reply();
+        door.mark_asked_aloud("r1");
+        let outcome = door.handle(&mut session, &write_frame("gmail"), &mut fake, S, 1);
+        outcome.later.expect("answered off the lock").reply();
+        let lines = served.join().unwrap();
+        let mark = lamp_services::task_no_yes::ASKED_ALOUD_RUN;
+        assert!(lines[0].get(mark).is_none(), "{}", lines[0]);
+        assert_eq!(lines[1][mark], "r1", "{}", lines[1]);
+        assert_eq!(lines[1]["run"], "r1", "{}", lines[1]);
+        assert!(lines[1]["args"].get(mark).is_none(), "{}", lines[1]);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

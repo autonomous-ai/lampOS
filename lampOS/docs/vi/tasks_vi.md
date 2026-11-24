@@ -1071,8 +1071,8 @@ lamp-tasks tự chạy script: không agent, không Harness, không prompt
   lamp-control đồng ý khi lời đồng ý đã giữ của chủ đèn có `net` cho thư mục
   đúng như hiện tại, hoặc, khi `LAMP_MADE_CODE_ON_AT_ONCE` bật (trong unit
   lamp-control của sản phẩm), cho kỹ năng được tạo trên đèn mà không cần lời
-  đồng ý (#8180, ở dưới), hoặc, khi `LAMP_TASK_NO_YES` bật (#8475, trong
-  unit lamp-control của sản phẩm), cho thư mục đúng như hiện tại của bất kỳ
+  đồng ý (#8180, ở dưới), hoặc, khi `LAMP_TASK_NO_YES` bật (#8475, tắt
+  trong sản phẩm tới khi có #8535), cho thư mục đúng như hiện tại của bất kỳ
   kỹ năng nào mà không cần lời đồng ý; không đồng ý thì bị từ chối `no_token`
   (`skill_run::NO_NET_YES`), không token và không socket egress. Khi `LAMP_TASK_NET` bật, `DirectRunner::egress` tạo socket egress
   riêng của lần chạy `skill-<run id>` (`egress::Grant::lamp`: chỉ web công
@@ -1841,7 +1841,7 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   `net` của nó không hỏi gì. Kỹ năng từ Store, được đẩy lên hay khác vẫn
   cần lời đồng ý đã giữ, và khi tắt công tắc thì kỹ năng được tạo cũng vậy,
   đúng như trước. Khi `LAMP_TASK_NO_YES` bật trong lamp-control (#8475,
-  `lamp_skills::task_no_yes_on`; bật trong sản phẩm), nguồn không còn tính:
+  `lamp_skills::task_no_yes_on`; tắt trong sản phẩm tới khi có #8535), nguồn không còn tính:
   kỹ năng được đẩy lên, từ Store, thêm bằng tay hay được tạo trên đèn đều
   được tạo token từ các quyền khai báo trong thư mục và được đồng ý kiểm tra
   cho thư mục đúng như hiện tại, dù ai bắt đầu lần chạy (giọng nói,
@@ -2794,19 +2794,29 @@ launcher, và thư mục `skill-<run id>` của lần chạy bị xoá, nên m�
 sau trong cùng phiên không còn giữ pass nào. Một lần ghi vào dịch vụ liên
 kết vẫn chờ lời đồng ý nói ra của chủ đèn: lamp-services chỉ gửi đúng thứ
 chủ đèn đã đồng ý, một lần mỗi lần chạy. Ngoại lệ duy nhất (#8475,
-`LAMP_TASK_NO_YES` bật trong lamp-services, bật trong sản phẩm): lần chạy
-vừa được yêu cầu bằng giọng nói. lamp-services tự đọc bản ghi của giọng nói
-về các yêu cầu nói ra của chủ đèn (`/run/lampos-voice/spoken-asks.json`,
-giọng nói chỉ ghi cho kỹ năng mà lời nghe được gọi đúng tên đầy đủ, khi
-nghe chính chủ đèn nói, với `LAMP_TOLD_WHEN_ASKED` bật), và khi bản ghi nêu
-kỹ năng của lần chạy trong vòng 5 phút, lần ghi lần chạy đã chuẩn bị được
-gửi ngay qua đúng đường gửi mà lời đồng ý nói ra dùng (SHA-256 của phần đọc
-lại, liên kết lúc chuẩn bị, giới hạn của các kỹ năng;
-`serve::Services::run_tool`), và lần chạy được báo `RUN_SENT_ASKED`. Không
-bao giờ theo lời của lamp-skills hay của lần chạy. Lần chạy không ai vừa
-yêu cầu (của trigger, của lịch) vẫn bị giữ chờ lời đồng ý như trước; bản ghi
-nêu kỹ năng chứ không nêu lần chạy, nên lần chạy theo trigger của một kỹ
-năng mà chủ đèn vừa gọi tên trong 5 phút đó cũng gửi không cần lời đồng ý.
+`LAMP_TASK_NO_YES` bật trong lamp-services; tắt trong sản phẩm cho tới khi
+phần 2 của #8475, #8535, được merge): đúng lần chạy mà chủ đèn vừa yêu cầu
+bằng giọng nói, và chỉ lần chạy đó. Hai điều phải khớp. Nguồn gốc:
+lamp-skills chỉ đánh dấu lần giao của lời gọi đúng tên từ giọng nói
+(`"asked_aloud": true`); lamp-tasks tạo token cho lần chạy như vậy
+(`Tokens::mint_for`, `{"mint":{...,"asked_aloud":true}}`); lamp-control giữ
+dấu đó trên lần chạy (`Run.asked_aloud`) và tự gắn vào dòng nó chuyển tới
+lamp-services (`asked_aloud_run: <run id>`), không bao giờ lấy từ đối số
+của lần chạy. Bản ghi: lamp-services tự đọc bản ghi của giọng nói về các
+yêu cầu nói ra của chủ đèn (`/run/lampos-voice/spoken-asks.json`, giọng nói
+chỉ ghi cho kỹ năng mà lời nghe được gọi đúng tên đầy đủ, khi nghe chính
+chủ đèn nói, dưới tên tool được gọi và tên thư mục của kỹ năng), theo đồng
+hồ khởi động (`task_no_yes::boot_ms`, `CLOCK_BOOTTIME`). Khi dấu nêu đúng
+lần chạy của dòng và bản ghi nêu kỹ năng của nó trong vòng 5 phút, lần ghi
+lần chạy đã chuẩn bị được gửi ngay qua đúng đường gửi mà lời đồng ý nói ra
+dùng (SHA-256 của phần đọc lại, liên kết lúc chuẩn bị, giới hạn của các kỹ
+năng; `serve::Services::run_tool`), và lần chạy được báo `RUN_SENT_ASKED`;
+nếu không, nó bị giữ chờ lời đồng ý. Lời của lamp-skills một mình chỉ có
+thể giữ lần gửi lại. Lần chạy không ai vừa yêu cầu bằng giọng nói (của
+trigger, của lịch, `skill call` của agent trên đèn) chạy với các quyền khai
+báo, mọi lần gửi bị giữ chờ lời đồng ý như trước, kể cả khi chủ đèn vừa gọi
+tên kỹ năng đó trong 5 phút. Giọng nói xoá bản ghi khi quên, khi đổi chế độ
+riêng tư và khi dừng hay đóng cuộc trò chuyện.
 
 Việc tiếp theo: #7260 (proposal: in the one session, a skill's run keeps the reach of its grants).
 
