@@ -846,7 +846,10 @@ mod tests {
         rig.ears.send(block(1)).unwrap();
         settle();
         rig.private.store(true, Ordering::SeqCst);
-        rig.ears.send(block(2)).unwrap();
+        // The stream's thread looks at the gates every LOOK_EVERY as well,
+        // so it may end and let the ears go before this block is sent
+        // (#8145). Either way nothing more is heard.
+        let _ = rig.ears.send(block(2));
         settle();
         assert_eq!(rig.frames().len(), 1, "nothing after private");
         assert_eq!(
@@ -954,7 +957,10 @@ mod tests {
         rig.ears.send(block(1)).unwrap();
         settle();
         *rig.in_view.lock().unwrap() = Some(2);
-        rig.ears.send(block(2)).unwrap();
+        // The stream's thread looks at the gates every LOOK_EVERY as well,
+        // so it may end and let the ears go before this block is sent
+        // (#8145). Either way nothing more is heard.
+        let _ = rig.ears.send(block(2));
         settle();
         assert_eq!(rig.frames().len(), 1, "nothing after a second person");
         assert_eq!(
@@ -976,7 +982,10 @@ mod tests {
         settle();
         assert_eq!(rig.frames().len(), 1, "a fresh 1: heard");
         *rig.in_view.lock().unwrap() = None;
-        rig.ears.send(block(2)).unwrap();
+        // The stream's thread looks at the gates every LOOK_EVERY as well,
+        // so it may end and let the ears go before this block is sent
+        // (#8145). Either way nothing more is heard.
+        let _ = rig.ears.send(block(2));
         settle();
         assert_eq!(rig.frames().len(), 1, "nothing once the room is unseen");
         assert_eq!(
