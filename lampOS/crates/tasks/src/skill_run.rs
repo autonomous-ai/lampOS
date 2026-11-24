@@ -582,7 +582,8 @@ pub fn answer(
     }
     // `net` gets its way out only with lamp-control agreeing for this
     // folder as it is, as a net task's: the owner's yes naming it, or a
-    // made skill's with `LAMP_MADE_CODE_ON_AT_ONCE` on (#8180), no yes
+    // made skill's with `LAMP_MADE_CODE_ON_AT_ONCE` on (#8180), or any
+    // skill's with `LAMP_TASK_NO_YES` on in lamp-control (#8475), no yes
     // kept. Refused here: no token is minted and no egress socket made.
     let net = hand.grants.iter().any(|grant| grant == NET_GRANT);
     if net && !tokens.net_agreed(&hand.skill, &hand.sha256, &hand.grants) {

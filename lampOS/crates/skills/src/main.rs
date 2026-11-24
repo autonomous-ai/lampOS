@@ -2605,7 +2605,11 @@ fn privacy_to_skills(
 /// told how, and what the watch does done. Held to lamp-cloud's deadline
 /// again first ([`watch::let_go`]): the op may have waited in the loop too,
 /// and one let go turns nothing.
-fn app_call((name, args, _, reply, admission, _): ToolAsk, out: &mut Publisher, runner: &Runner) {
+fn app_call(
+    (name, args, _, reply, admission, _, _): ToolAsk,
+    out: &mut Publisher,
+    runner: &Runner,
+) {
     let late = watch::let_go(
         &name,
         args[watch::DEADLINE].as_u64(),
@@ -2655,7 +2659,11 @@ fn app_call((name, args, _, reply, admission, _): ToolAsk, out: &mut Publisher, 
 /// A watch's tool called: committed first, so a caller that gave up turns
 /// nothing; then turned on or off, the model told what to say, and what the
 /// watch does done.
-fn watch_call((name, args, _, reply, admission, _): ToolAsk, out: &mut Publisher, runner: &Runner) {
+fn watch_call(
+    (name, args, _, reply, admission, _, _): ToolAsk,
+    out: &mut Publisher,
+    runner: &Runner,
+) {
     if !admission.commit() {
         eprintln!("lamp-skills: {name} with {args} not run: the caller gave up");
         return;
@@ -3283,13 +3291,16 @@ fn give_up_late(waiting: &mut HashMap<u64, (lamp_skills::Run, Instant)>, out: &m
 }
 
 /// A call of a skill's tool from the voice, its arguments, where its
-/// answer goes, and whether the peer that asked it is the voice.
+/// answer goes, whether the peer that asked it is the voice, and whether
+/// the voice says the owner named the skill (#8475,
+/// `lamp_voice::tools::SPOKEN_ASK`: only ever true from the voice's peer).
 type ToolAsk = (
     String,
     serde_json::Value,
     Option<RequestedAudioContext>,
     mpsc::Sender<serde_json::Value>,
     Admission,
+    bool,
     bool,
 );
 
@@ -3410,7 +3421,7 @@ fn run_now_refused(
 /// never what it found. Refused, the voice is told why and nothing is
 /// made, counted or said.
 fn run_now_call(
-    (_, args, _, reply, admission, _): ToolAsk,
+    (_, args, _, reply, admission, _, _): ToolAsk,
     engine: &mut Engine,
     runs: &mut Runs,
     out: &mut Publisher,
@@ -3489,7 +3500,7 @@ fn run_now_call(
 /// the light are made (#1146). The say is the model's and the look the
 /// voice's, asked in the answer; the body and the light are made here.
 fn tool_call(
-    (name, args, context, reply, admission, voice): ToolAsk,
+    (name, args, context, reply, admission, voice, spoken_ask): ToolAsk,
     engine: &mut Engine,
     busy: &mut HashSet<String>,
     out: &mut Publisher,
@@ -3497,17 +3508,29 @@ fn tool_call(
     audio: &Arc<Mutex<Authority>>,
 ) {
     if name == lamp_skills::unplug::STAY_TOOL {
-        return stay_call((name, args, None, reply, admission, voice), engine, runner);
+        return stay_call(
+            (name, args, None, reply, admission, voice, spoken_ask),
+            engine,
+            runner,
+        );
     }
     // The owner's app's guard.on or guard.off (#2562): only ever from the
     // call socket's `guard` op, which no tool's call can name.
     if name == watch::APP_ON || name == watch::APP_OFF {
-        return app_call((name, args, None, reply, admission, voice), out, runner);
+        return app_call(
+            (name, args, None, reply, admission, voice, spoken_ask),
+            out,
+            runner,
+        );
     }
     // A watch's tool turns its watch, with no steps (guard mode, #1685).
     let watched_tool = runner.watching.borrow().watches.owner(&name).is_some();
     if watched_tool {
-        return watch_call((name, args, None, reply, admission, voice), out, runner);
+        return watch_call(
+            (name, args, None, reply, admission, voice, spoken_ask),
+            out,
+            runner,
+        );
     }
     let refuse = |why: &str| {
         if admission.commit() {
@@ -3720,6 +3743,24 @@ fn tool_call(
     let under_way = !nothing && busy.contains(&run.skill);
     if under_way && made.len() == run.calls.len() {
         return refuse("I'm still doing that.");
+    }
+    // A model's call of a skill whose run hands a task over, the owner not
+    // having named it (#8475, `LAMP_TASK_NO_YES`): no folder yes is asked
+    // any more, so a half match runs nothing, the whole call refused, and
+    // the model told in words it can answer. Only the voice's calls: a
+    // trigger's or a schedule's run never comes here, nor a run now.
+    if let Some(why) = lamp_skills::task_call_refused(
+        lamp_skills::task_no_yes_on(),
+        voice,
+        made.iter().any(|call| matches!(call, Call::Task(_))),
+        spoken_ask,
+    ) {
+        eprintln!(
+            "lamp-skills: {name} not run: the owner didn't name {} ({})",
+            run.skill,
+            lamp_services::task_no_yes::ENVIRONMENT
+        );
+        return refuse(why);
     }
     // A run that is only tasks the lamp would not hand over now: the model
     // is told nothing runs, and why, never "Done." (lamp-9adf, 15 Nov).
@@ -4093,6 +4134,11 @@ fn listen(
                 }
                 let (reply, told) = mpsc::channel();
                 let admission = Admission::default();
+                // The owner named the skill (#8475, `LAMP_TASK_NO_YES`):
+                // the voice's word alone, which reads its own record of the
+                // owner's spoken asks; never another peer's, never `args`.
+                let spoken_ask =
+                    voice && call[lamp_voice::tools::SPOKEN_ASK].as_bool() == Some(true);
                 // A tool's call never names the app's kinds: those come by
                 // the `guard` op alone, held to its checks.
                 let mut args = call["args"].clone();
@@ -4143,6 +4189,7 @@ fn listen(
                             reply,
                             admission.clone(),
                             voice,
+                            spoken_ask,
                         ))
                         .is_ok()
                     })
@@ -4240,7 +4287,7 @@ fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
 /// "Never mind": refused at once unless the unplug skill is loaded with its
 /// grants and the latch can be cancelled now; the line and the cancel follow
 /// on their own thread.
-fn stay_call((name, args, _, reply, admission, _): ToolAsk, engine: &Engine, runner: &Runner) {
+fn stay_call((name, args, _, reply, admission, _, _): ToolAsk, engine: &Engine, runner: &Runner) {
     use lamp_skills::unplug;
     // The skill granted the operation speaks the line, whatever its name.
     let granted = engine

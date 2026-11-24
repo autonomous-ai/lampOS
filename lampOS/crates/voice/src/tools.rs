@@ -3180,6 +3180,28 @@ fn stop_as_heard(directory: &Path, call: &ToolCall, request: u64, heard: bool) -
     }
 }
 
+/// The key the voice adds to a call line to `lamp-skills` (#8475,
+/// `LAMP_TASK_NO_YES`): `true` when the call is the owner's named ask
+/// ([`spoken_ask`]). `lamp-skills` reads it from the voice's peer alone
+/// (its cgroup), never from the call's `args`, which are the model's.
+pub const SPOKEN_ASK: &str = "spoken_ask";
+
+/// Whether `call` is the owner's named ask (#8475): the very call the
+/// heard words named in full ([`crate::skill_named::CALL_ID`], in code), or
+/// a call of a skill the voice's record `spoken` (the owner's spoken asks,
+/// [`crate::told_when_asked::keep`], kept only for a full named call the
+/// owner was heard saying) names within
+/// [`crate::told_when_asked::WITHIN_MS`] before `now_ms`. A model's call
+/// on a half match, or a skill nobody named, is not.
+pub fn spoken_ask(call: &ToolCall, spoken: &Path, now_ms: u64) -> bool {
+    call.id == crate::skill_named::CALL_ID
+        || crate::told_when_asked::asked_within(
+            spoken,
+            crate::skill_named::function_of(&call.name, &call.args),
+            now_ms,
+        )
+}
+
 fn ask_with_context(
     directory: &Path,
     call: &ToolCall,
@@ -3189,6 +3211,21 @@ fn ask_with_context(
     let mut line = json!({"op":"call","name":call.name,"args":call.args});
     if let Some(context) = context {
         line["requested_audio_context"] = json!(context);
+    }
+    // With `LAMP_TASK_NO_YES` on (#8475): whether the owner named this
+    // skill, for `lamp-skills`, which runs a model's call of a skill's
+    // task only then and can't read the voice's record itself.
+    if lamp_services::task_no_yes::on() {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| {
+                u64::try_from(since.as_millis()).unwrap_or(u64::MAX)
+            });
+        line[SPOKEN_ASK] = json!(spoken_ask(
+            call,
+            Path::new(crate::told_when_asked::SPOKEN_ASKS_FILE),
+            now_ms
+        ));
     }
     let told = exchange(&directory.join(CALL_SOCKET), &line, deadline).and_then(|answer| {
         match answer.get("ok").and_then(Value::as_bool)? {
@@ -4941,6 +4978,87 @@ mod tests {
         served.join().unwrap();
         std::fs::remove_dir_all(dir).unwrap();
     }
+    /// #8475: a call is the owner's named ask when it is the heard words'
+    /// own call in code, or the voice's record of the owner's spoken asks
+    /// names its skill (by its function, or through `use_skill`) within
+    /// five minutes; a model's call with no record, a record of another
+    /// skill or one over five minutes old is not.
+    #[test]
+    fn a_call_is_a_spoken_ask_only_when_the_owner_named_its_skill() {
+        let dir = schedule_directory("task-no-yes-spoken");
+        let spoken = dir.join("spoken-asks.json");
+        let call = |id: &str, name: &str, args: Value| ToolCall {
+            id: id.into(),
+            name: name.into(),
+            args,
+        };
+        let now = 10 * crate::told_when_asked::WITHIN_MS;
+        let model = call("model-1", "photo_booth", json!({}));
+        assert!(spoken_ask(
+            &call(crate::skill_named::CALL_ID, "photo_booth", json!({})),
+            &spoken,
+            now
+        ));
+        assert!(!spoken_ask(&model, &spoken, now));
+        crate::told_when_asked::keep(&spoken, "desk-check", now - 1_000).unwrap();
+        assert!(!spoken_ask(&model, &spoken, now));
+        crate::told_when_asked::keep(&spoken, "photo-booth", now - 60_000).unwrap();
+        assert!(spoken_ask(&model, &spoken, now));
+        assert!(spoken_ask(
+            &call(
+                "model-2",
+                crate::use_skill::NAME,
+                json!({"skill": "photo_booth"})
+            ),
+            &spoken,
+            now
+        ));
+        assert!(!spoken_ask(
+            &model,
+            &spoken,
+            now - 60_000 + crate::told_when_asked::WITHIN_MS + 1
+        ));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #8475: with `LAMP_TASK_NO_YES` on, every call line to the skills
+    /// carries [`SPOKEN_ASK`], `true` for the heard words' own call; off,
+    /// the line is as before, with no such key. Fails on the old
+    /// `ask_with_context`, whose line was only `op`, `name` and `args`.
+    #[test]
+    fn a_skills_call_line_says_whether_it_was_named_only_with_task_no_yes() {
+        for (on, id, expected) in [
+            (Some(true), crate::skill_named::CALL_ID, Some(true)),
+            (Some(true), "model-1", Some(false)),
+            (None, crate::skill_named::CALL_ID, None),
+        ] {
+            let dir = schedule_directory("task-no-yes-line");
+            let listener = UnixListener::bind(dir.join(CALL_SOCKET)).unwrap();
+            let served = std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                writeln!(stream, "{}", json!({"ok":true,"result":{}})).unwrap();
+                serde_json::from_str::<Value>(&line).unwrap()
+            });
+            lamp_services::task_no_yes::set_here(on);
+            let call = ToolCall {
+                id: id.into(),
+                name: "fixture_task_skill".into(),
+                args: json!({}),
+            };
+            let (_, answered) = ask(&dir, &call, ASK_DEADLINE);
+            lamp_services::task_no_yes::set_here(None);
+            assert!(answered);
+            let line = served.join().unwrap();
+            assert_eq!(line[SPOKEN_ASK].as_bool(), expected, "{line}");
+            assert_eq!(line["args"], json!({}));
+            std::fs::remove_dir_all(dir).unwrap();
+        }
+    }
+
     #[test]
     fn reports_and_requested_audio_flags_are_independent_and_leave_the_session_untouched() {
         let untouched = ["--session".to_owned(), "7".to_owned()];

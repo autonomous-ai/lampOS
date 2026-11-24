@@ -2010,6 +2010,10 @@ fn worker_command(
             role,
             var(crate::made_skill::CODE_AT_ONCE_ENVIRONMENT).as_deref(),
         ))
+        .envs(task_no_yes_worker_environment(
+            role,
+            var(lamp_services::task_no_yes::ENVIRONMENT).as_deref(),
+        ))
         .envs(upload_agent_worker_environment(
             role,
             var(crate::upload_agent::ENVIRONMENT).as_deref(),
@@ -2169,6 +2173,18 @@ fn made_code_at_once_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::made_skill::CODE_AT_ONCE_ENVIRONMENT, "on"))
+}
+
+// A skill's task with no folder yes (`LAMP_TASK_NO_YES`, #8475), passed
+// the same narrow way: the exact `on`, to the two routes whose call of a
+// skill tells lamp-skills whether the owner named it
+// (`tools::SPOKEN_ASK`).
+fn task_no_yes_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((lamp_services::task_no_yes::ENVIRONMENT, "on"))
 }
 
 // A skill's tasks (#6305), passed the same narrow way: the exact `on`, to
@@ -4033,6 +4049,10 @@ mod tests {
             ),
             (
                 crate::made_skill::CODE_AT_ONCE_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                lamp_services::task_no_yes::ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
             (

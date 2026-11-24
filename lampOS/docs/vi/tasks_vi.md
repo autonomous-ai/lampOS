@@ -504,7 +504,10 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   lời thì cũng được kết thúc ngay, vì token có thể đang sống), với mã lần
   chạy của riêng lamp-tasks, mới cho mỗi lần giao (`run_id`), và
   `{"end":{"run"}}` khi lần chạy kết thúc. lamp-control tự đọc lời đồng ý
-  của chủ đèn và nêu các quyền; lần chạy nào có quyền được cấp không khớp
+  của chủ đèn và nêu các quyền (khi `LAMP_TASK_NO_YES` bật trong
+  lamp-control, #8475, không kỹ năng nào cần lời đồng ý: nó nêu các quyền
+  khai báo trong thư mục, `task_yes::no_yes_folder`, ở dưới; và lamp-skills
+  giao lần chạy mà không hỏi lời đồng ý nào, docs/skills.md); lần chạy nào có quyền được cấp không khớp
   đúng các quyền dòng giao việc xin thì bị từ chối `no_token` và token bị
   kết thúc, nên lần chạy không bao giờ nhận quyền mà kỹ năng không xin. Dòng
   giao việc không xin quyền nào và lời đồng ý được giữ không có quyền nào thì
@@ -1057,7 +1060,9 @@ lamp-tasks tự chạy script: không agent, không Harness, không prompt
   cạnh task của agent (`HandOvers::one`), nên không bao giờ chờ sau một task
   có thể chạy nhiều phút; bước thứ hai bị từ chối `busy`.
 - **Token**: tạo từ lời đồng ý lamp-control giữ cho thư mục và các quyền của
-  kỹ năng, y như của task (`skill_run::answer`); token nêu quyền khác với
+  kỹ năng, y như của task (`skill_run::answer`; khi `LAMP_TASK_NO_YES` bật,
+  #8475, từ các quyền khai báo trong thư mục mà không cần lời đồng ý, dù
+  kỹ năng đến từ đâu); token nêu quyền khác với
   dòng (trừ `net`, quyền của chính lamp-tasks) thì bị kết thúc ngay và không
   gì chạy. Dòng của kỹ năng nêu khóa bị từ chối trước khi có token
   (`skill_run::NO_KEYS_HERE`): hãy dùng `do.task`.
@@ -1066,7 +1071,9 @@ lamp-tasks tự chạy script: không agent, không Harness, không prompt
   lamp-control đồng ý khi lời đồng ý đã giữ của chủ đèn có `net` cho thư mục
   đúng như hiện tại, hoặc, khi `LAMP_MADE_CODE_ON_AT_ONCE` bật (trong unit
   lamp-control của sản phẩm), cho kỹ năng được tạo trên đèn mà không cần lời
-  đồng ý (#8180, ở dưới); không đồng ý thì bị từ chối `no_token`
+  đồng ý (#8180, ở dưới), hoặc, khi `LAMP_TASK_NO_YES` bật (#8475, trong
+  unit lamp-control của sản phẩm), cho thư mục đúng như hiện tại của bất kỳ
+  kỹ năng nào mà không cần lời đồng ý; không đồng ý thì bị từ chối `no_token`
   (`skill_run::NO_NET_YES`), không token và không socket egress. Khi `LAMP_TASK_NET` bật, `DirectRunner::egress` tạo socket egress
   riêng của lần chạy `skill-<run id>` (`egress::Grant::lamp`: chỉ web công
   khai trên cổng 80 và 443), phục vụ đến hết giới hạn của lần chạy, và đặt
@@ -1833,7 +1840,14 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   tại (SHA-256 và các quyền khai báo, `task_yes::agreed_with_no_yes`), nên
   `net` của nó không hỏi gì. Kỹ năng từ Store, được đẩy lên hay khác vẫn
   cần lời đồng ý đã giữ, và khi tắt công tắc thì kỹ năng được tạo cũng vậy,
-  đúng như trước. Tắt: `net` bị từ chối trước khi có token.
+  đúng như trước. Khi `LAMP_TASK_NO_YES` bật trong lamp-control (#8475,
+  `lamp_skills::task_no_yes_on`; bật trong sản phẩm), nguồn không còn tính:
+  kỹ năng được đẩy lên, từ Store, thêm bằng tay hay được tạo trên đèn đều
+  được tạo token từ các quyền khai báo trong thư mục và được đồng ý kiểm tra
+  cho thư mục đúng như hiện tại, dù ai bắt đầu lần chạy (giọng nói,
+  trigger, lịch; `task_yes::no_yes_folder`). Kiểm tra vẫn băm thư mục lúc
+  này, nên dòng nêu SHA-256 khác (thư mục đã đổi) vẫn bị từ chối như
+  trước. Tắt: `net` bị từ chối trước khi có token.
 - **Điều lần chạy có `net` được giữ, và giới hạn của nó** (các P3 của Heron
   trên #7590, quyết định 23:22 của người xây dựng đầu tiên; #7901):
   - `net` được đi cùng mọi quyền (#7901, thiết kế đã chốt: mọi quyền khai
@@ -2779,7 +2793,20 @@ bị huỷ, tới hạn chót hay khi lamp-tasks dừng), cùng với lượt nh
 launcher, và thư mục `skill-<run id>` của lần chạy bị xoá, nên một lượt
 sau trong cùng phiên không còn giữ pass nào. Một lần ghi vào dịch vụ liên
 kết vẫn chờ lời đồng ý nói ra của chủ đèn: lamp-services chỉ gửi đúng thứ
-chủ đèn đã đồng ý, một lần mỗi lần chạy.
+chủ đèn đã đồng ý, một lần mỗi lần chạy. Ngoại lệ duy nhất (#8475,
+`LAMP_TASK_NO_YES` bật trong lamp-services, bật trong sản phẩm): lần chạy
+vừa được yêu cầu bằng giọng nói. lamp-services tự đọc bản ghi của giọng nói
+về các yêu cầu nói ra của chủ đèn (`/run/lampos-voice/spoken-asks.json`,
+giọng nói chỉ ghi cho kỹ năng mà lời nghe được gọi đúng tên đầy đủ, khi
+nghe chính chủ đèn nói, với `LAMP_TOLD_WHEN_ASKED` bật), và khi bản ghi nêu
+kỹ năng của lần chạy trong vòng 5 phút, lần ghi lần chạy đã chuẩn bị được
+gửi ngay qua đúng đường gửi mà lời đồng ý nói ra dùng (SHA-256 của phần đọc
+lại, liên kết lúc chuẩn bị, giới hạn của các kỹ năng;
+`serve::Services::run_tool`), và lần chạy được báo `RUN_SENT_ASKED`. Không
+bao giờ theo lời của lamp-skills hay của lần chạy. Lần chạy không ai vừa
+yêu cầu (của trigger, của lịch) vẫn bị giữ chờ lời đồng ý như trước; bản ghi
+nêu kỹ năng chứ không nêu lần chạy, nên lần chạy theo trigger của một kỹ
+năng mà chủ đèn vừa gọi tên trong 5 phút đó cũng gửi không cần lời đồng ý.
 
 Việc tiếp theo: #7260 (proposal: in the one session, a skill's run keeps the reach of its grants).
 

@@ -413,7 +413,8 @@ impl crate::runs::SkillYes for KeptYes {
             return Err(format!("{skill:?} is not a skill's name"));
         }
         // #8180: a skill whose source needs no yes
-        // (`lamp_voice::made_skill::grants_need_no_yes`, made skills today)
+        // (`lamp_voice::made_skill::grants_need_no_yes`, made skills today),
+        // or any skill with `LAMP_TASK_NO_YES` on (#8475, [`no_yes_folder`]),
         // is minted its folder's declared grants as it is, with no yes kept.
         if let Some(grants) = no_yes_grants(&self.skills, skill) {
             return grants;
@@ -471,13 +472,19 @@ impl crate::runs::SkillYes for KeptYes {
 /// lamp-control unit): its declared grants as the token's, `net` left out
 /// (lamp-tasks' own); none for any other source, or with the switch off,
 /// so the mint and the check need the kept yes exactly as before.
+/// With `LAMP_TASK_NO_YES` on (#8475, `lamp_skills::task_no_yes_on`, on in
+/// the product's lamp-control unit), every source's folder alike (pushed,
+/// from the Store, added by hand, made), whoever started the run; the
+/// check's SHA-256 still that of the folder as it is now
+/// ([`agreed_with_no_yes`]), so a changed folder is a new one.
 fn no_yes_folder(skills: &Path, name: &str) -> Option<(std::path::PathBuf, Vec<String>)> {
-    if !lamp_skills::no_yes_switch_on() {
+    let every_source = lamp_skills::task_no_yes_on();
+    if !every_source && !lamp_skills::no_yes_switch_on() {
         return None;
     }
     let folder = folder_of(skills, name);
     if !std::fs::symlink_metadata(&folder).is_ok_and(|meta| meta.is_dir())
-        || !lamp_skills::grants_need_no_yes(lamp_skills::source_of(&folder))
+        || !(every_source || lamp_skills::grants_need_no_yes(lamp_skills::source_of(&folder)))
     {
         return None;
     }
@@ -1067,6 +1074,125 @@ mod tests {
             kept.grants("tide-times").unwrap(),
             BTreeSet::from([Grant::Speak])
         );
+        lamp_skills::set_no_yes_switch_here(None);
+        lamp_voice::skill_task_yes::set_net_here(None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #8475 (the first builder's approved design): with `LAMP_TASK_NO_YES`
+    /// on, a pushed skill, one from the Store and one added by hand
+    /// (`Other`) are each minted their folder's declared grants with no yes
+    /// kept, as a made skill is, and each task check (lamp-tasks' `net`
+    /// check) is agreed for its folder as it is now; a check of another
+    /// SHA-256 (a folder changed since) or other grants is still refused.
+    /// With it off, exactly as before: [`NO_YES`] with no kept yes, the
+    /// check waiting. Fails on the old `no_yes_folder`, whose
+    /// `!lamp_skills::grants_need_no_yes(lamp_skills::source_of(&folder))`
+    /// left every source but `Made` to `NO_YES`.
+    #[test]
+    fn with_task_no_yes_every_source_is_minted_its_declared_grants_with_no_yes() {
+        use crate::runs::SkillYes as _;
+        use lamp_voice::made_skill::SkillSource;
+        lamp_voice::skill_task_yes::set_net_here(Some(true));
+        lamp_skills::set_no_yes_switch_here(Some(false));
+        let dir = folder("task-no-yes-sources");
+        let state = dir.join("state");
+        let skills = dir.join("skills");
+        std::fs::create_dir_all(&state).unwrap();
+        let pushed = task_skill(&skills, "pushed-booth", r#"["camera", "light"]"#);
+        std::fs::write(pushed.join(".pushed.json"), r#"{"computer":"desk"}"#).unwrap();
+        let store = task_skill(&skills, "store-tide", r#"["net", "speak"]"#);
+        let installed = lamp_skills::package::Installed {
+            sha256: "cd".repeat(32),
+            manifest: lamp_skills::package::Manifest {
+                format: 1,
+                name: "store-tide".into(),
+                version: "1.0.0".into(),
+                files: Vec::new(),
+            },
+            from_store: true,
+        };
+        std::fs::write(
+            store.join(lamp_skills::package::INSTALLED_FROM),
+            serde_json::to_vec(&installed).unwrap(),
+        )
+        .unwrap();
+        let other = task_skill(&skills, "hand-glow", r#"["light", "microphone"]"#);
+        assert_eq!(lamp_skills::source_of(&pushed), SkillSource::Pushed);
+        assert_eq!(lamp_skills::source_of(&store), SkillSource::Store);
+        assert_eq!(lamp_skills::source_of(&other), SkillSource::Other);
+        let kept = KeptYes {
+            state: state.clone(),
+            skills: skills.clone(),
+            on: true,
+            write_agent: false,
+            services_to_agent: false,
+        };
+        let st = Some(state.as_path());
+        let check = |name: &str, sha256: &str, grants: Value| {
+            answer(
+                &skills,
+                st,
+                &asked(
+                    CHECK,
+                    json!({"name": name, "sha256": sha256, "grants": grants}),
+                ),
+                false,
+                true,
+                0,
+            )
+            .unwrap()
+        };
+        let tide_sha = lamp_skills::task::folder_sha256(&store).unwrap();
+        // Off: exactly as before.
+        lamp_skills::set_task_no_yes_here(Some(false));
+        for name in ["pushed-booth", "store-tide", "hand-glow"] {
+            assert_eq!(kept.grants(name).unwrap_err(), NO_YES, "{name}");
+        }
+        assert_eq!(
+            check("store-tide", &tide_sha, json!(["net", "speak"])),
+            json!({"agreed": false, "why": "waiting"})
+        );
+        // On: every source its declared grants, `net` left to lamp-tasks.
+        lamp_skills::set_task_no_yes_here(Some(true));
+        assert_eq!(
+            kept.grants("pushed-booth").unwrap(),
+            BTreeSet::from([Grant::Camera, Grant::Light])
+        );
+        assert_eq!(
+            kept.grants("store-tide").unwrap(),
+            BTreeSet::from([Grant::Speak])
+        );
+        assert_eq!(
+            kept.grants("hand-glow").unwrap(),
+            BTreeSet::from([Grant::Light, Grant::Microphone])
+        );
+        // `net` agreed with no yes, for its folder as it is.
+        assert_eq!(
+            check("store-tide", &tide_sha, json!(["net", "speak"])),
+            json!({"agreed": true})
+        );
+        let booth_sha = lamp_skills::task::folder_sha256(&pushed).unwrap();
+        assert_eq!(
+            check("pushed-booth", &booth_sha, json!(["camera", "light"])),
+            json!({"agreed": true})
+        );
+        // A changed folder is a new folder: another SHA-256 is refused.
+        assert_eq!(
+            check("store-tide", &"a".repeat(64), json!(["net", "speak"]))["agreed"],
+            false
+        );
+        std::fs::write(pushed.join("scripts/main.py"), "print('smile')\n").unwrap();
+        assert_eq!(
+            check("pushed-booth", &booth_sha, json!(["camera", "light"]))["agreed"],
+            false
+        );
+        // Not its declared grants: refused.
+        assert_eq!(
+            check("store-tide", &tide_sha, json!(["speak"]))["agreed"],
+            false
+        );
+        lamp_skills::set_task_no_yes_here(None);
         lamp_skills::set_no_yes_switch_here(None);
         lamp_voice::skill_task_yes::set_net_here(None);
         let _ = std::fs::remove_dir_all(&dir);
