@@ -178,15 +178,142 @@ const JOINERS: [char; 5] = ['-', '\u{2010}', '\u{2011}', '\u{2013}', '\u{2014}']
 
 /// A written word's parts as [`super::word_key`] keys, empty ones left out: a
 /// hyphenated or dashed word is its parts ("twenty-four" is "twenty",
-/// "four"). The speech to text writes such a number as separate words and the
-/// lamp's answer as one hyphenated word, and [`super::word_key`] alone would
-/// make it one key that matches neither (#7569). Both sides are split the same
-/// way, so "well-known" heard as written still matches "well-known".
+/// "four"), and a number written in digits is its words ("24" is "twenty",
+/// "four"; "3:30" is "three", "thirty"), for the match only: the model is sent
+/// the heard words as they were (#8478). The speech to text writes such a
+/// number as separate words and the lamp's answer as one hyphenated word or in
+/// digits, and [`super::word_key`] alone would make it one key that matches
+/// neither (#7569). Both sides are split the same way, so "well-known" heard
+/// as written still matches "well-known".
 fn parts(word: &str) -> Vec<String> {
+    if let Some(time) = spell_time(word) {
+        return time;
+    }
+    // Only a piece of digits alone is spelled, whatever the sentence put at its
+    // ends ("24,"): "2.5", "$5", "50%" and "24/7" stay one key each, as before
+    // (Heron's P3 on #8486).
+    let edge = |c: char| {
+        matches!(
+            c,
+            '.' | ',' | '!' | '?' | ';' | ':' | '"' | '\'' | '(' | ')' | '\u{201c}' | '\u{201d}'
+        )
+    };
     word.split(JOINERS)
-        .map(super::word_key)
-        .filter(|key| !key.is_empty())
+        .flat_map(|piece| {
+            spell_digits(piece.trim_matches(edge)).unwrap_or_else(|| {
+                let key = super::word_key(piece);
+                if key.is_empty() {
+                    Vec::new()
+                } else {
+                    vec![key]
+                }
+            })
+        })
         .collect()
+}
+
+const ONES: [&str; 20] = [
+    "zero",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+];
+const TENS: [&str; 10] = [
+    "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+];
+
+/// 0 to 999 as the speech to text writes it: "twenty four", "one hundred five".
+fn spell(n: u32) -> Vec<String> {
+    let word = |text: &str| text.to_owned();
+    let mut out = Vec::new();
+    let rest = if n >= 100 {
+        out.push(word(ONES[(n / 100) as usize]));
+        out.push(word("hundred"));
+        n % 100
+    } else {
+        n
+    };
+    if n >= 100 && rest == 0 {
+        return out;
+    }
+    if rest >= 20 {
+        out.push(word(TENS[(rest / 10) as usize]));
+        if rest % 10 != 0 {
+            out.push(word(ONES[(rest % 10) as usize]));
+        }
+    } else {
+        out.push(word(ONES[rest as usize]));
+    }
+    out
+}
+
+/// A key of one to three digits, no leading zero, as words; none otherwise (a
+/// year or a long number stays as it is and matches only itself).
+fn spell_digits(key: &str) -> Option<Vec<String>> {
+    if key.is_empty()
+        || key.len() > 3
+        || !key.chars().all(|c| c.is_ascii_digit())
+        || (key.len() > 1 && key.starts_with('0'))
+    {
+        return None;
+    }
+    key.parse().ok().map(spell)
+}
+
+/// A time written as "3:30" or "10:05" as the words said: "three thirty",
+/// "ten oh five"; "3:00" is "three". None for anything else.
+fn spell_time(word: &str) -> Option<Vec<String>> {
+    let word = word.trim_matches(|c: char| !c.is_alphanumeric());
+    let (hours, minutes) = word.split_once(':')?;
+    if hours.is_empty() || hours.len() > 2 || minutes.len() != 2 {
+        return None;
+    }
+    if !hours
+        .chars()
+        .chain(minutes.chars())
+        .all(|c| c.is_ascii_digit())
+    {
+        return None;
+    }
+    let (hours, minutes): (u32, u32) = (hours.parse().ok()?, minutes.parse().ok()?);
+    if hours > 24 || minutes > 59 {
+        return None;
+    }
+    let mut out = spell(hours);
+    if minutes == 0 {
+        return Some(out);
+    }
+    if minutes < 10 {
+        out.push("oh".to_owned());
+    }
+    out.extend(spell(minutes));
+    Some(out)
+}
+
+/// Whether a written word is a number: every part of it a number word, in
+/// the form [`parts`] gives.
+fn is_number(word: &str) -> bool {
+    let parts = parts(word);
+    !parts.is_empty()
+        && parts.iter().all(|part| {
+            part == "hundred" || ONES.contains(&part.as_str()) || TENS.contains(&part.as_str())
+        })
 }
 
 /// The answer's words as keys ([`parts`]), empty ones left out.
@@ -240,25 +367,36 @@ fn offers(answer: &str) -> bool {
 /// in that order, in `answer`, a run starting at the start of a written word
 /// of the answer. Words of the answer heard in another order are not.
 fn own_in_order(heard: &[&str], answer: &[(String, bool)]) -> Vec<bool> {
-    // Each part of each heard word; a word with no part of its own (only
-    // punctuation) is one empty part, which no run passes.
-    let mut pieces: Vec<(String, usize)> = Vec::new();
+    // Each part of each heard word, with whether it starts its word; a word
+    // with no part of its own (only punctuation) is one empty part, which no
+    // run passes.
+    let mut pieces: Vec<(String, usize, bool)> = Vec::new();
     for (at, word) in heard.iter().enumerate() {
         let parts = parts(word);
         if parts.is_empty() {
-            pieces.push((String::new(), at));
+            pieces.push((String::new(), at, true));
         }
-        pieces.extend(parts.into_iter().map(|key| (key, at)));
+        pieces.extend(
+            parts
+                .into_iter()
+                .enumerate()
+                .map(|(k, key)| (key, at, k == 0)),
+        );
     }
     let mut own_piece = vec![false; pieces.len()];
     for i in 0..pieces.len() {
+        // A run starts at a word of the heard line, as at one of the answer: "25
+        // minutes" is not "5 minutes" with a "twenty" in front (#8486).
+        if !pieces[i].2 {
+            continue;
+        }
         let longest = (0..answer.len())
             .filter(|from| answer[*from].1)
             .map(|from| {
                 pieces[i..]
                     .iter()
                     .zip(&answer[from..])
-                    .take_while(|((key, _), (said, _))| !key.is_empty() && key == said)
+                    .take_while(|((key, _, _), (said, _))| !key.is_empty() && key == said)
                     .count()
             })
             .max()
@@ -268,7 +406,7 @@ fn own_in_order(heard: &[&str], answer: &[(String, bool)]) -> Vec<bool> {
         }
     }
     let mut own = vec![true; heard.len()];
-    for (piece, (_, word)) in own_piece.iter().zip(&pieces) {
+    for (piece, (_, word, _)) in own_piece.iter().zip(&pieces) {
         if !piece {
             own[*word] = false;
         }
@@ -321,7 +459,22 @@ pub(super) fn judge(line: &Line<'_>, said: Option<&Said<'_>>) -> Echo {
         return Echo::Answered(None);
     }
     let answer = answer_parts(said.words);
-    let own = own_in_order(&words, &answer);
+    let mut own = own_in_order(&words, &answer);
+    // A run of nothing but numbers is no own run: "twenty four" is two words
+    // once spelled, which would pass [`STRIP_RUN`] alone, and the person's
+    // own number must reach the model (#8478).
+    let mut at = 0;
+    while at < own.len() {
+        if !own[at] {
+            at += 1;
+            continue;
+        }
+        let end = (at..own.len()).find(|k| !own[*k]).unwrap_or(own.len());
+        if words[at..end].iter().all(|word| is_number(word)) {
+            own[at..end].fill(false);
+        }
+        at = end;
+    }
     let m = own.iter().filter(|own| **own).count();
     // Held: nothing the lamp did not say. Cut: one own run at an end. A
     // read-back's own words are held however short: its tail ("send it.",
@@ -367,6 +520,24 @@ pub(super) fn judge(line: &Line<'_>, said: Option<&Said<'_>>) -> Echo {
         Some("it began after the lamp's question")
     } else if (!line.over_the_lamps_voice || m < n) && offers(said.words) {
         Some("it answers the lamp's offer")
+    } else if matches!(cut, Some((_, "end"))) && is_number(words[n - m]) {
+        // A run at the end that begins with a number is the person's own
+        // quantity, said last ("No, make it 24 minutes"), not the lamp's tail
+        // (#8478).
+        Some("its last words begin with a number it may be changing")
+    } else if matches!(cut, Some((_, "start")))
+        && is_number(words[0])
+        && !line.over_the_lamps_voice
+        && !words[m - 1].ends_with(['.', '!', '?'])
+    {
+        // An own run that starts with a number is taken out only when the
+        // speech to text ended it with a sentence end (the lamp's tail is a
+        // sentence of its own: "Twenty four hours. make a skill ...") or the
+        // line began over the lamp's audible voice; begun in its tail and
+        // going on in the same sentence ("Twenty four hours is too long") it is
+        // the person's own, and goes whole (the first builder, 12:29 on #8486,
+        // #7569).
+        Some("it begins with a number in its own sentence")
     } else {
         None
     };
@@ -1186,5 +1357,213 @@ mod hyphen_tests {
             judge(&line("No, four hours."), Some(&said())),
             Echo::Answered(None)
         );
+    }
+}
+
+#[cfg(test)]
+mod number_tests {
+    use super::*;
+
+    /// #8478 (the first builder's 10:04 on #8467): the model writes numbers as
+    /// digits ("24 hours", "3:30", "15 minutes") and the speech to text as
+    /// words ("twenty four", "three thirty", "fifteen"), and the other way
+    /// round. The strip's match uses one form on both sides; what the model
+    /// is sent is the heard words as they were.
+    const UNTIL_US: u64 = 10_000_000;
+
+    fn line(heard: &str) -> Line<'_> {
+        Line {
+            request: 5,
+            heard,
+            began_us: 9_000_000,
+            over_the_lamps_voice: true,
+            called: false,
+        }
+    }
+
+    fn said(words: &str) -> Said<'_> {
+        Said {
+            request: 3,
+            words,
+            until_us: UNTIL_US,
+            read_back: false,
+        }
+    }
+
+    fn stripped(heard: &str, answer: &str) -> Option<String> {
+        match judge(&line(heard), Some(&said(answer))) {
+            Echo::Stripped(sent, _) => Some(sent),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn digits_in_the_answer_match_the_number_words_heard() {
+        assert_eq!(
+            stripped(
+                "Twenty four hours. make a skill called tech news",
+                "That headline list refreshes by itself, so the next one comes in 24 hours.",
+            )
+            .as_deref(),
+            Some("make a skill called tech news")
+        );
+        assert_eq!(
+            stripped(
+                "fifteen minutes. make a skill called tech news",
+                "The timer will ring in 15 minutes."
+            )
+            .as_deref(),
+            Some("make a skill called tech news")
+        );
+    }
+
+    #[test]
+    fn a_time_in_the_answer_matches_the_words_heard() {
+        assert_eq!(
+            stripped(
+                "at three thirty. make a skill called tech news",
+                "The next train is at 3:30, so you have time."
+            )
+            .as_deref(),
+            Some("make a skill called tech news")
+        );
+        assert_eq!(
+            stripped(
+                "at three oh five. make a skill called tech news",
+                "The next train is at 3:05, so you have time."
+            )
+            .as_deref(),
+            Some("make a skill called tech news")
+        );
+    }
+
+    #[test]
+    fn digits_heard_match_the_number_words_in_the_answer() {
+        assert_eq!(
+            stripped(
+                "24 hours. make a skill called tech news",
+                "The next one comes in twenty-four hours."
+            )
+            .as_deref(),
+            Some("make a skill called tech news")
+        );
+    }
+
+    /// What the model is sent is the heard words, whatever the match used.
+    #[test]
+    fn what_the_model_is_sent_keeps_the_heard_form() {
+        let sent = stripped(
+            "Twenty four hours. make it 15 minutes please",
+            "The next one comes in 24 hours.",
+        );
+        assert_eq!(sent.as_deref(), Some("make it 15 minutes please"));
+    }
+
+    /// The person's own number reaches the model: a line that ends with the
+    /// number they change or repeat is theirs, and a number alone is not a
+    /// run ("twenty four" is two words once spelled, which would pass
+    /// [`STRIP_RUN`] by itself).
+    #[test]
+    fn the_persons_own_number_reaches_the_model() {
+        let answer = "I set the timer for 24 minutes.";
+        for heard in [
+            "No, make it twenty four minutes",
+            "No, make it 24 minutes",
+            "make it twenty four",
+            "make it 24",
+        ] {
+            assert!(
+                matches!(judge(&line(heard), Some(&said(answer))), Echo::Answered(_)),
+                "{heard}"
+            );
+        }
+    }
+
+    /// Heron's P1 on #8486: a person's number that ends in the lamp's own
+    /// ("make it 25 minutes" over "5 minutes") is not cut: a run starts only at
+    /// the first part of a heard word, as it does in the answer.
+    #[test]
+    fn a_number_that_ends_in_the_lamps_is_the_persons_whole() {
+        for (heard, answer) in [
+            ("No, make it 25 minutes", "I set a timer for 5 minutes."),
+            ("No, make it 35 minutes", "I set a timer for 5 minutes."),
+            ("No, make it 45 minutes", "I set a timer for 5 minutes."),
+            ("No, make it 120 minutes", "I set a timer for 20 minutes."),
+            ("No, make it 124 minutes", "I set a timer for 24 minutes."),
+            (
+                "No, make it twenty five minutes",
+                "I set a timer for 5 minutes.",
+            ),
+        ] {
+            assert!(
+                matches!(judge(&line(heard), Some(&said(answer))), Echo::Answered(_)),
+                "{heard} over {answer}"
+            );
+        }
+    }
+
+    /// Heron's P2 on #8486, ruled by the first builder at 12:29: an own run
+    /// that STARTS with a number is taken out only when the speech to text
+    /// ended it with a sentence end, or the line began over the lamp's audible
+    /// voice; otherwise it is the person's own and goes whole. The end rule
+    /// stays: a number alone never ends an own run.
+    #[test]
+    fn an_own_run_that_starts_with_a_number_goes_whole_unless_ended_or_over_the_voice() {
+        let answer = "That list refreshes by itself, so the next one comes in 24 hours.";
+        let in_the_tail = |heard| Line {
+            request: 5,
+            heard,
+            began_us: UNTIL_US + 500_000,
+            over_the_lamps_voice: false,
+            called: false,
+        };
+        // The request-13 shape, over the lamp's voice and in its tail: taken out.
+        let heard = "Twenty four hours. make a skill called tech news";
+        let Echo::Stripped(sent, _) = judge(&line(heard), Some(&said(answer))) else {
+            panic!("not taken out over the voice");
+        };
+        assert_eq!(sent, "make a skill called tech news");
+        let Echo::Stripped(sent, _) = judge(&in_the_tail(heard), Some(&said(answer))) else {
+            panic!("not taken out in the tail");
+        };
+        assert_eq!(sent, "make a skill called tech news");
+        // In the tail and going on in the same sentence: the person's, whole.
+        assert!(matches!(
+            judge(
+                &in_the_tail("Twenty four hours is too long"),
+                Some(&said(answer))
+            ),
+            Echo::Answered(_)
+        ));
+        // Over the lamp's voice, with no sentence end: taken out.
+        assert!(matches!(
+            judge(&line("Twenty four hours is too long"), Some(&said(answer))),
+            Echo::Stripped(..)
+        ));
+        // The lamp's tail alone, with its full stop, in its own tail: held as its echo.
+        assert!(matches!(
+            judge(&in_the_tail("Twenty four hours."), Some(&said(answer))),
+            Echo::Held(_)
+        ));
+        // The end rule: the person's own number, last, goes whole.
+        assert!(matches!(
+            judge(
+                &in_the_tail("no, make it 24 minutes"),
+                Some(&said("I set the timer for 24 minutes."))
+            ),
+            Echo::Answered(_)
+        ));
+    }
+
+    /// Heron's P3 on #8486: only a word of digits alone is spelled; a price,
+    /// a percent, a decimal or a fraction stays as one key, as before.
+    #[test]
+    fn only_a_word_of_digits_alone_is_spelled() {
+        assert_eq!(parts("24,"), ["twenty", "four"]);
+        assert_eq!(parts("2.5"), ["25"]);
+        assert_eq!(parts("$5"), ["5"]);
+        assert_eq!(parts("50%"), ["50"]);
+        assert_eq!(parts("24/7"), ["247"]);
+        assert_eq!(parts("3:30."), ["three", "thirty"]);
     }
 }
