@@ -956,6 +956,64 @@ fn with_first_words_kept_a_yields_request_begins_at_the_words_said_under_the_lam
     assert_eq!(usual.last(), kept.last());
 }
 
+/// #7569 (P2, Fourteen's request 13 on 17 Nov): after a cut-in the lamp's own
+/// cut words were heard ahead of the person's line: the heard line began with
+/// "Twenty four hours.", the tail of the lamp's answer, before "make a skill".
+///
+/// ASSUMES (no trace of that run yet, the first builder's 06:14: build it from
+/// the code's own numbers): the canceller left the lamp's last words as a
+/// residue the detector scores 0.5, over a yield's bar
+/// ([`crate::activity::SILENCE_PROBABILITY`], 0.35) and under an onset's
+/// (0.8), under the evidence "the lamp's own" (the same evidence the person's
+/// first words have under the lamp, so the evidence cannot tell them apart);
+/// a lull of 610 ms follows (as long as the 600 ms that ends a line, the
+/// product's `--end-silence-ms 600`), then the person's words, scored 0.9, and
+/// the yield. With `LAMP_FIRST_WORDS=kept` a yield's request began
+/// [`crate::activity::REACH_LEAD_BLOCKS`] before the EARLIEST block of the last
+/// 160 scored 0.35 or more (`TurnDetector::begin`), wherever it was and
+/// whatever came between, so the request began in the lamp's words: the line
+/// the person said was led by the lamp's tail. It now begins in the line's
+/// own stretch, since a pause as long as the one that ends a line. A tail
+/// with no such pause before the person's words is not this test's: the
+/// scores cannot tell it from the person's attenuated words, and the text
+/// (`LAMP_SECOND_OWN_ECHO`) is where it is told apart.
+#[test]
+fn with_first_words_kept_a_yields_request_does_not_begin_in_the_lamps_own_cut_words() {
+    let mut h = Harness::keeping_first_words(true, 500);
+    // The product's end of a line: 600 ms of quiet.
+    let detector = std::mem::take(&mut h.detector);
+    h.detector = detector.with_end_silence(60).unwrap();
+    // Blocks 1 to 50: the lamp alone, its own sound scored low.
+    h.blocks(50, 0.1, Some(evidence(0, OWN)));
+    // Blocks 51 to 100: the lamp's last words, the canceller's residue.
+    h.blocks(50, 0.5, Some(evidence(0, OWN)));
+    // Blocks 101 to 161: a lull of 610 ms.
+    h.blocks(61, 0.1, Some(evidence(0, OWN)));
+    // Blocks 162 to 201: the person's first words, under the lamp's sound.
+    h.blocks(40, 0.9, Some(evidence(0, OWN)));
+    // A breath, then plainly over the lamp until it yields.
+    h.blocks(10, 0.1, Some(evidence(0, OWN)));
+    while h.events("duplex_yield").is_empty() {
+        h.block(0.9, Some(evidence(0, OVER)));
+    }
+    // The lamp falls silent while the person goes on: an interruption.
+    h.blocks(3, 0.9, Some(evidence(0, OVER)));
+    for quiet in 1..=29 {
+        h.block(0.9, Some(evidence(quiet, OVER)));
+    }
+    let clear = h.blocks(6, 0.9, Some(evidence(30, None)));
+    let accepted = clear[5]
+        .accepted
+        .as_ref()
+        .expect("the person was not let in");
+    let first = accepted.audio[0];
+    assert!(
+        first >= 162 - crate::activity::REACH_LEAD_BLOCKS as u64,
+        "the request begins at block {first}, in the lamp's own cut words (51 to 100), not at the person's (162, with its {} block lead)",
+        crate::activity::REACH_LEAD_BLOCKS
+    );
+}
+
 /// #1722 (the first builder at 06:56): "Hey Lamp, ask Codex to write a haiku
 /// about coffee." begun as the lamp's story ends. The duplex rule takes the
 /// name, said under the lamp's last words, for the lamp's own sound, and the

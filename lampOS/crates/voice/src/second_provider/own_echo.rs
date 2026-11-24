@@ -129,12 +129,7 @@ pub(super) fn yes_echo(line: &Line<'_>, said: Option<&Said<'_>>) -> Option<Strin
     let said = said.filter(|said| {
         said.request != 0 && said.request < line.request && !said.words.trim().is_empty()
     })?;
-    let words: Vec<&str> = line.heard.split_whitespace().collect();
-    let heard: Vec<String> = words
-        .iter()
-        .map(|word| super::word_key(word))
-        .filter(|key| !key.is_empty())
-        .collect();
+    let heard = keys(line.heard);
     if heard.is_empty() {
         return None;
     }
@@ -177,12 +172,40 @@ pub(super) fn yes_echo(line: &Line<'_>, said: Option<&Said<'_>>) -> Option<Strin
     ))
 }
 
-/// The answer's words as [`super::word_key`] keys, empty ones left out.
-fn keys(words: &str) -> Vec<String> {
-    words
-        .split_whitespace()
+/// The characters that join the parts of one written word: a hyphen and the
+/// dashes.
+const JOINERS: [char; 5] = ['-', '\u{2010}', '\u{2011}', '\u{2013}', '\u{2014}'];
+
+/// A written word's parts as [`super::word_key`] keys, empty ones left out: a
+/// hyphenated or dashed word is its parts ("twenty-four" is "twenty",
+/// "four"). The speech to text writes such a number as separate words and the
+/// lamp's answer as one hyphenated word, and [`super::word_key`] alone would
+/// make it one key that matches neither (#7569). Both sides are split the same
+/// way, so "well-known" heard as written still matches "well-known".
+fn parts(word: &str) -> Vec<String> {
+    word.split(JOINERS)
         .map(super::word_key)
         .filter(|key| !key.is_empty())
+        .collect()
+}
+
+/// The answer's words as keys ([`parts`]), empty ones left out.
+fn keys(words: &str) -> Vec<String> {
+    words.split_whitespace().flat_map(parts).collect()
+}
+
+/// The answer's keys, each with whether it starts its written word: a run
+/// the person said is the lamp's own only from the start of a word of the
+/// answer, so "four hours" said by the person is not "twenty-four hours".
+fn answer_parts(words: &str) -> Vec<(String, bool)> {
+    words
+        .split_whitespace()
+        .flat_map(|word| {
+            parts(word)
+                .into_iter()
+                .enumerate()
+                .map(|(at, key)| (key, at == 0))
+        })
         .collect()
 }
 
@@ -212,25 +235,42 @@ fn offers(answer: &str) -> bool {
     })
 }
 
-/// Which of the `heard` words are the lamp's own: those inside a run of at
-/// least [`STRIP_RUN`] heard words said one after another, in that order,
-/// in `answer`. Words of the answer heard in another order are not.
-fn own_in_order(heard: &[&str], answer: &[String]) -> Vec<bool> {
-    let heard: Vec<String> = heard.iter().map(|word| super::word_key(word)).collect();
-    let mut own = vec![false; heard.len()];
-    for i in 0..heard.len() {
+/// Which of the `heard` words are the lamp's own: those whose parts are all
+/// inside a run of at least [`STRIP_RUN`] heard parts said one after another,
+/// in that order, in `answer`, a run starting at the start of a written word
+/// of the answer. Words of the answer heard in another order are not.
+fn own_in_order(heard: &[&str], answer: &[(String, bool)]) -> Vec<bool> {
+    // Each part of each heard word; a word with no part of its own (only
+    // punctuation) is one empty part, which no run passes.
+    let mut pieces: Vec<(String, usize)> = Vec::new();
+    for (at, word) in heard.iter().enumerate() {
+        let parts = parts(word);
+        if parts.is_empty() {
+            pieces.push((String::new(), at));
+        }
+        pieces.extend(parts.into_iter().map(|key| (key, at)));
+    }
+    let mut own_piece = vec![false; pieces.len()];
+    for i in 0..pieces.len() {
         let longest = (0..answer.len())
-            .map(|at| {
-                heard[i..]
+            .filter(|from| answer[*from].1)
+            .map(|from| {
+                pieces[i..]
                     .iter()
-                    .zip(&answer[at..])
-                    .take_while(|(word, said)| !word.is_empty() && word == said)
+                    .zip(&answer[from..])
+                    .take_while(|((key, _), (said, _))| !key.is_empty() && key == said)
                     .count()
             })
             .max()
             .unwrap_or(0);
         if longest >= STRIP_RUN {
-            own[i..i + longest].fill(true);
+            own_piece[i..i + longest].fill(true);
+        }
+    }
+    let mut own = vec![true; heard.len()];
+    for (piece, (_, word)) in own_piece.iter().zip(&pieces) {
+        if !piece {
+            own[*word] = false;
         }
     }
     own
@@ -264,10 +304,7 @@ pub(super) fn in_tail_with_its_words(line: &Line<'_>, said: Option<&Said<'_>>) -
         return false;
     }
     let answer = keys(said.words);
-    line.heard
-        .split_whitespace()
-        .map(super::word_key)
-        .any(|word| !word.is_empty() && answer.contains(&word))
+    keys(line.heard).iter().any(|word| answer.contains(word))
 }
 
 /// Judge `line` against the lamp's answer `said`.
@@ -283,7 +320,7 @@ pub(super) fn judge(line: &Line<'_>, said: Option<&Said<'_>>) -> Echo {
     if n == 0 {
         return Echo::Answered(None);
     }
-    let answer = keys(said.words);
+    let answer = answer_parts(said.words);
     let own = own_in_order(&words, &answer);
     let m = own.iter().filter(|own| **own).count();
     // Held: nothing the lamp did not say. Cut: one own run at an end. A
@@ -1045,5 +1082,109 @@ mod tests {
             &line("Yes.", UNTIL_US + 300_000, false),
             None
         ));
+    }
+}
+
+#[cfg(test)]
+mod hyphen_tests {
+    use super::*;
+
+    /// #7569 (Fourteen's request 13): the heard line began with the tail of
+    /// the lamp's cut answer, "Twenty four hours.", before "make a skill ...".
+    ///
+    /// ASSUMES (no trace of that run yet): the answer wrote the number as a
+    /// hyphenated word, "twenty-four hours", the usual way of writing it;
+    /// the speech to text heard it as three words. [`super::word_key`] drops
+    /// the hyphen and keeps "twentyfour" as ONE key, so the heard "twenty",
+    /// "four" and the answer's "twentyfour" never match, the run is "hours"
+    /// alone, under [`STRIP_RUN`], and nothing is taken out.
+    const ANSWER: &str =
+        "That headline list refreshes by itself, so the next one comes in twenty-four hours.";
+    const UNTIL_US: u64 = 10_000_000;
+
+    fn line(heard: &str) -> Line<'_> {
+        Line {
+            request: 5,
+            heard,
+            began_us: 9_000_000,
+            over_the_lamps_voice: true,
+            called: false,
+        }
+    }
+
+    fn said() -> Said<'static> {
+        Said {
+            request: 3,
+            words: ANSWER,
+            until_us: UNTIL_US,
+            read_back: false,
+        }
+    }
+
+    #[test]
+    fn the_lamps_own_hyphenated_number_heard_as_two_words_is_taken_out_of_a_line_begun_over_it() {
+        let echo = judge(
+            &line("Twenty four hours. make a skill called tech news"),
+            Some(&said()),
+        );
+        let Echo::Stripped(sent, _) = echo else {
+            panic!("nothing was taken out of the line: {echo:?}");
+        };
+        assert_eq!(sent, "make a skill called tech news");
+    }
+
+    /// The same words as the answer wrote them: taken out as before.
+    #[test]
+    fn the_same_words_without_the_hyphen_are_taken_out() {
+        let answer =
+            "That headline list refreshes by itself, so the next one comes in twenty four hours.";
+        let said = Said {
+            words: answer,
+            ..said()
+        };
+        let Echo::Stripped(sent, _) = judge(
+            &line("Twenty four hours. make a skill called tech news"),
+            Some(&said),
+        ) else {
+            panic!("not taken out");
+        };
+        assert_eq!(sent, "make a skill called tech news");
+    }
+
+    /// Heron's P2 on #8467: the heard line says the hyphenated word as the
+    /// answer wrote it, which matched before the answer was split.
+    #[test]
+    fn a_hyphenated_word_heard_as_written_is_the_lamps_own_for_the_judge_and_the_yes_echo() {
+        let answer = Said {
+            words: "That's a well-known spot, and the next one comes in twenty-four hours.",
+            ..said()
+        };
+        let heard = "That's a well-known spot.";
+        assert!(
+            matches!(judge(&line(heard), Some(&answer)), Echo::Held(_)),
+            "held as the lamp's own echo, as before the split"
+        );
+        assert!(yes_echo(&line("well-known spot"), Some(&answer)).is_some());
+        assert!(yes_echo(&line("twenty-four hours"), Some(&answer)).is_some());
+        // And a heard number in the answer's hyphenated form, twice over.
+        let Echo::Stripped(sent, _) = judge(
+            &line("twenty-four hours. make a skill called tech news"),
+            Some(&answer),
+        ) else {
+            panic!("nothing was taken out");
+        };
+        assert_eq!(sent, "make a skill called tech news");
+        // The in-tail check shares a part of a hyphenated word.
+        assert!(in_tail_with_its_words(&line("well known"), Some(&answer)));
+    }
+
+    /// Heron's P3 on #8467: the person's own "four hours" is not the tail of
+    /// the answer's "twenty-four hours": a run starts at a word of the answer.
+    #[test]
+    fn the_tail_of_a_hyphenated_word_alone_is_not_a_run_the_person_said_after_it() {
+        assert_eq!(
+            judge(&line("No, four hours."), Some(&said())),
+            Echo::Answered(None)
+        );
     }
 }
