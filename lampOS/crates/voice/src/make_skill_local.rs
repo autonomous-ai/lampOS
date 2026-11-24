@@ -228,7 +228,9 @@ fn net_code_told() -> String {
     format!(
         "What only the internet tells at the time it runs (the weather or a forecast, the news, \
          a web lookup, a price, anything from the internet) is the skill's own code on this \
-         lamp, as told at the end, with \"{net}\" and \"speak\" in its grants: its script \
+         lamp, as told at the end, with \"{net}\" and \"speak\" in its grants, beside any other \
+         grant its code uses (\"notes\" when it keeps what it found for later and reads it back): \
+         its script \
          fetches it over https with Python's standard library alone (urllib.request; the lamp \
          gives the run its web proxy, and it reaches only the public web on ports 80 and 443), \
          says what it found in a sentence or two with lamp.say (a plain spoken line when the \
@@ -5162,6 +5164,14 @@ pub(crate) mod tests {
         let told = net_code_told();
         assert!(!told.contains("never sits beside"), "{told}");
         assert!(!told.contains("camera"), "{told}");
+        // ee17's row at 5534888ee0 (leg A): told "net and speak" alone, the
+        // agent made the coffee skill that keeps notes with net and speak
+        // only; the other grants its code uses are named beside them.
+        assert!(
+            told.contains("beside any other grant its code uses"),
+            "{told}"
+        );
+        assert!(told.contains("\"notes\" when it keeps"), "{told}");
     }
 
     /// #7679 (`LAMP_MAKE_QUEUE`): a make waiting its turn while a busy room
