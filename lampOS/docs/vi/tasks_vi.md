@@ -3354,6 +3354,13 @@ thay cho Harness và `hermes chat -q`: một kết nối tới API server của 
 Hermes và một phiên được giữ. Công tắc và đường của OpenClaw không đổi; mỗi
 engine có phiên riêng, và cả hai có thể cùng bật (`direct::lamps`).
 
+Phiên nói thẳng của Hermes chỉ nhận việc khi Hermes là engine mặc định của đèn
+(`direct::serves_now`, engine đầu tiên của `lamp_order`, đọc trực tiếp nên lựa
+chọn trong app có hiệu lực ngay), vì lamp-update chỉ chạy gateway của Hermes
+khi đó. Trên đèn có mặc định là OpenClaw, việc gọi tên Hermes ("Hỏi Hermes
+...", `LAMP_TASKS_NAMED_ONLY`) vẫn đi đường Harness và tiến độ của Harness như
+trước công tắc này, không chờ một gateway không bao giờ khởi động.
+
 Hermes nói thẳng hoạt động giống hệt OpenClaw nói thẳng (tiêu chí nghiệm thu
 của chủ sở hữu, 23/11): việc của đèn chạy, và "tới đâu rồi?" cùng các dòng
 trạng thái được trả lời từ lượt chạy trong lúc nó chạy; kỹ năng được tạo và
