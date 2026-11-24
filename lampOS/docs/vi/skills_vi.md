@@ -6519,12 +6519,23 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   `/run/lampos-voice/task-asked.json` (0600, tối đa hai phút), và chỉ đúng
   ghi chú đó mới bắt đầu việc chờ (`skill_task_yes::asked_in`); một ghi chú
   khác chép lời mở đầu không chờ gì và để nguyên ghi chú đã giữ cho lượt
-  của nó (`skill_task_yes::take_kept`). Mỗi lúc chỉ một lần hỏi tác vụ trên
-  đèn (P2 của App Only trên #6581): khi ghi chú của kỹ năng khác còn được
-  giữ chờ lượt, hoặc đang chờ bất kỳ cái "có" nào (của tác vụ, của write khi
-  tạo kỹ năng, của code ứng dụng), lần hỏi mới bị từ chối và không nói gì
-  (`skill_task_yes::keep_one`), nên không bị tính là đã nói và được thử lại
-  ở lần kích hoạt sau; mỗi lần hỏi đã nói đều có việc chờ riêng. Việc chờ là
+  của nó (`skill_task_yes::take_kept`). Worker nhận ghi chú đã giữ trước khi
+  đọc: nó đổi tên tệp sang một tên riêng bên cạnh
+  (`task-asked.json.<pid>-<n>`), rồi chỉ đọc và xóa tệp đó, và đặt lại ghi
+  chú không phải của lượt này bằng một hard link, không bao giờ đè lên lần
+  hỏi mà say service giữ trong lúc đó (kiểm tra của Second trên #6000,
+  #8475). Mỗi lúc chỉ một lần hỏi tác vụ trên đèn (P2 của App Only trên
+  #6581): khi ghi chú của kỹ năng khác còn được giữ chờ lượt, lần hỏi mới bị
+  từ chối và không nói gì (`skill_task_yes::keep_one`), nên không bị tính là
+  đã nói và được thử lại ở lần kích hoạt sau. Việc có đang chờ một cái "có"
+  khác hay không (của tác vụ, của write khi tạo kỹ năng, của code ứng dụng)
+  chỉ được quyết định trong worker của route thứ hai, nơi các việc chờ đó
+  nằm, không bao giờ trong tiến trình của say service (#8475): nếu đang chờ,
+  lượt của lần hỏi im lặng (`skill_task_yes::ASKED_WAITS_TURN`, nhật ký ghi
+  "another yes is awaited: kept for later"), ghi chú vẫn được giữ, và việc
+  chờ đang có không bao giờ bị thay. lamp-skills đã được báo là đã nói, nên
+  chỉ hỏi lại sau `ASK_AGAIN_MS`. Mỗi lần hỏi được chờ đều có việc chờ
+  riêng. Việc chờ là
   của read-back, đủ mọi cổng: nói trọn trước, một câu nghe được sau đó, giữ
   tiếng vọng, `YES_WITHIN`, `approve_id` được ghi chú ở các câu nghe sau, và
   chỉ cái "có" của chủ đèn. Câu của người ngay sau đó bị buộc vòng 1 gọi

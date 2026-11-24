@@ -2002,13 +2002,23 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   runtime folder, 0600, two minutes at most), and only that very note
   starts the wait (`skill_task_yes::asked_in`), so a skill's own note
   copying its words waits for nothing and leaves the kept note for its own
-  turn (`skill_task_yes::take_kept`). One task ask on the lamp at a time
-  (App Only's P2 on #6581): while another skill's note is kept for its turn,
-  or any yes is awaited (a task's, a make's writes, an app's code), a new
-  ask is refused and nothing is said ("another skill's ask waits for its
-  turn: kept for later", "another yes is awaited: kept for later",
+  turn (`skill_task_yes::take_kept`). The worker claims the kept note before
+  it reads it: it renames the file to a name of its own beside it
+  (`task-asked.json.<pid>-<n>`), then reads and removes only that file, and
+  puts one that isn't its turn's back with a hard link, which never replaces
+  an ask the say service kept meanwhile (Second's audit on #6000, #8475).
+  One task ask on the lamp at a time (App Only's P2 on #6581): while another
+  skill's note is kept for its turn, a new ask is refused and nothing is
+  said ("another skill's ask waits for its turn: kept for later",
   `skill_task_yes::keep_one`), so it is not counted as said and is tried
-  again at a later trigger; each ask said gets its own wait. The wait is
+  again at a later trigger. Whether another yes is awaited (a task's, a
+  make's writes, an app's code) is decided only in the second route's
+  worker, where those waits live, never in the say service's process
+  (#8475): with one awaited, the ask's turn is silent
+  (`skill_task_yes::ASKED_WAITS_TURN`, "another yes is awaited: kept for
+  later" in the journal), its note stays kept, and the live wait is never
+  replaced. lamp-skills was already told it was said, so it asks again only
+  after `ASK_AGAIN_MS`. Each ask waited for gets its own wait. The wait is
   the read-back's, with
   every guard: said whole and uncut first, a later heard line, the echo
   held, `YES_WITHIN`, its `approve_id` noted on each later heard line, and
