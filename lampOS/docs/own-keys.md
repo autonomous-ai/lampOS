@@ -172,8 +172,9 @@ well" for it, and tracks it again when it next reports
 ([health.md](health.md), "Stopping on purpose").
 
 **A key that later fails** (a rotation): a request the person's endpoint
-refuses with 401 or 403, or answers with a 429 or a 5xx (#8362), before any
-answer goes through the relay it went
+fails in any way before its first word (refused with 401 or 403, a 429 or a
+5xx, #8362, or any other failure: `services::gives_way`, below) goes through
+the relay it went
 over, with the relay's key, so the person never gets a failed answer. One
 journal line names the status, and the `voice-keys` part tells
 `lamp-health` "your DeepSeek key was refused, using the lamp's own" from
@@ -359,9 +360,12 @@ on the same `keys.*` path and the same switch, with the contract agreed on
   do a 429 (a usage limit too) and a 5xx before any answer (the endpoint
   down or spent), for DeepSeek's own key too, told once to `lamp-health`'s
   `voice-keys` part, "your own model couldn't answer, using the lamp's own",
-  and one journal line, never a silent turn. A 400 and a slow answer are
-  not the endpoint's: no fallback (the second try covers slowness). A link
-  that fails to the person's endpoint is not yet a fallback.
+  and one journal line, never a silent turn. Any other failure before the
+  first word gives way too (the first builder's gate on #8393, before the
+  switch-on): a 402 for no credit, a 404 for a model gone, any other 400 (a
+  picture to a text-only model, an effort it refuses), a link that fails or
+  a timeout. One with no HTTP status is told as 1 (`NO_HTTP_ANSWER`), never
+  0. A held line's request (`chat_without`) gives way the same.
 - **Off:** nothing new is read or said; today's behaviour as it is.
 
 ## Named model providers: OpenRouter, Gemini and Anthropic (#8420, built, off unless set)
@@ -421,8 +425,8 @@ own provider (#2094's rule). The tests that pin it:
   OpenRouter`. An OpenAI-compatible key, if one were somehow there too, is
   used over it. A model file missing or malformed is passed over for the
   relay, said by its error's kind. The search, the memory's passes and the
-  fallback stay on the lamp's own, and a 401, 403, 429 or 5xx falls back to
-  it as the OpenAI-compatible model's does.
+  fallback stay on the lamp's own, and any failure before the first word
+  falls back to it as the OpenAI-compatible model's does.
 - **Off:** nothing new is read or said.
 - **Not yet run on a lamp:** a real key and model from the app, a few
   turns, a bad key and a made-up model told plainly, and a remove.
@@ -439,7 +443,7 @@ endpoint, fixed. The tests that pin it: `setup/tests/it/keys.rs`
 (`the_persons_gemini_model_is_used_only_with_the_switch`) and
 `voice/src/second_provider/services.rs`
 (`the_persons_gemini_model_is_asked_as_geminis_chat`,
-`the_persons_gemini_key_refused_by_its_400_falls_back_and_a_plain_400_does_not`).
+`the_persons_gemini_key_refused_by_its_400_falls_back_and_a_plain_400_too`).
 
 - **`offers`:** `{"service": "gemini", "name": "Gemini", "kind": "model",
   "models": [], "base_url": false, "fields": ["model"], "endpoint":
@@ -473,12 +477,12 @@ endpoint, fixed. The tests that pin it: `setup/tests/it/keys.rs`
   own key, model <id> (LAMP_OWN_KEYS)`, and the start's ends `through
   Gemini`. An OpenAI-compatible or OpenRouter key, if one were somehow
   there too, is used over it.
-- **The fallback:** as the other own models', plus Gemini's 400 for the key.
-  Only the person's own Gemini chat reads a 400's body for it
-  (`net::Error::KeyInvalid`, told as 400); every other 400, and every other
-  chat's, stays the request's own, with no fallback.
+- **The fallback:** as the other own models': any failure before the first
+  word. Only the person's own Gemini chat reads a 400's body for the key
+  (`net::Error::KeyInvalid`, told as 400).
 - **`reasoning_effort: minimal`** is the lamp's floor for Gemini 3. A
-  2.5-series model may answer 400 to it, which is not a fallback: the row
+  2.5-series model may answer 400 to it, which then falls back to the
+  lamp's own, so that model would never answer: the row
   with the person's own 2.5 model reads it, and if it does, the field is
   dropped for models other than 3.
 - **Not yet run on a lamp:** a real key and model from the app, as for
@@ -534,9 +538,9 @@ tests that pin it: `setup/tests/it/keys.rs`
   model <id> (LAMP_OWN_KEYS)`, and the start's ends `through Anthropic`.
   Any other own model's key, if one were somehow there too, is used over
   it.
-- **The fallback:** as the other own models': 401, 403, 429 and 5xx (529,
-  overloaded, among them) go to the lamp's own model through the relay
-  with one line.
+- **The fallback:** as the other own models': any failure before the first
+  word (529, overloaded, and a 400 for a key with no credit among them)
+  goes to the lamp's own model through the relay with one line.
 - **Limits of the OpenAI-compatible endpoint** (Anthropic's docs call it a
   way to test, not for production): no prompt caching, so every turn pays
   for its whole prompt; `system` messages anywhere in the conversation are
