@@ -609,16 +609,16 @@ async fn a_head_and_nothing_after_it_sends_no_second_try() {
     lamp.told(&["second try: none goes, ", "the first's answer has begun"]);
 }
 
-/// Both refused the person's key: each still goes to the relay, and the refusal
-/// is told once, as one turn's. The second is refused first and waits there; the
-/// first, refused after it, is the one answered.
+/// With the person's own model, the second try asks the lamp's own model at the
+/// relay, never the person's again (Fifth's P2 on #8543: a hung endpoint was
+/// asked twice and the turn gave up first). The first try, slow and then
+/// refused, is dropped once the second's answer begins, so its refusal is never
+/// told and nothing is asked a third time.
 #[tokio::test]
-async fn both_tries_refused_are_told_once() {
+async fn the_second_try_with_the_persons_model_is_the_lamps_own() {
     let server = Server::saying(
         vec![
             Says::Refuses(AFTER * 3 / 2, 401),
-            Says::Refuses(Duration::ZERO, 401),
-            Says::Nothing,
             Says::Words(Duration::ZERO, "From the relay."),
         ],
         None,
@@ -629,7 +629,7 @@ async fn both_tries_refused_are_told_once() {
     let relay = server.url.clone();
     let mut lamp = Lamp::built(
         &server,
-        "refused-once",
+        "second-try-relay",
         Some(AFTER),
         Vec::new(),
         move |net| {
@@ -642,9 +642,13 @@ async fn both_tries_refused_are_told_once() {
         |engine| engine,
     );
     lamp.says(1).await;
-    assert_eq!(server.requests(), 4);
+    assert_eq!(server.requests(), 2);
     assert_eq!(lamp.spoken(), ["From the relay."]);
-    assert_eq!(*told.lock().unwrap(), [401]);
+    assert!(
+        told.lock().unwrap().is_empty(),
+        "{:?}",
+        told.lock().unwrap()
+    );
 }
 
 /// #8362 step 1b: the person's own endpoint down (a 5xx) or out of use (429)

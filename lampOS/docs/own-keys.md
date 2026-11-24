@@ -176,9 +176,11 @@ fails in any way before its first word (refused with 401 or 403, a 429 or a
 5xx, #8362, or any other failure: `services::gives_way`, below) goes through
 the relay it went
 over, with the relay's key, so the person never gets a failed answer. One
-journal line names the status, and the `voice-keys` part tells
-`lamp-health` "your DeepSeek key was refused, using the lamp's own" from
-then until the voice restarts. That covers the spoken chat; the search and
+journal line names the status, or says no answer came. The `voice-keys` part
+tells `lamp-health` "your DeepSeek key was refused, using the lamp's own"
+for a 401 or 403, and "your own model couldn't answer, using the lamp's own"
+for anything else, until the person's own model answers again. That covers
+the spoken chat; the search and
 the observation pass don't fall back yet. **The person's answer is then out
 of date:** they were told "your conversations now go to <host>", while each
 refused request goes through Autonomous's relay again. Only `lamp-health`'s
@@ -365,7 +367,22 @@ on the same `keys.*` path and the same switch, with the contract agreed on
   switch-on): a 402 for no credit, a 404 for a model gone, any other 400 (a
   picture to a text-only model, an effort it refuses), a link that fails or
   a timeout. One with no HTTP status is told as 1 (`NO_HTTP_ANSWER`), never
-  0. A held line's request (`chat_without`) gives way the same.
+  0. A held line's request (`chat_without`) gives way the same. Fifth's
+  three P2s on #8543 sharpen it:
+  - **The first word, not the head:** the answer is read to its first text
+    or call. A 200 whose stream then carries only an error, or ends with no
+    word, gives way too.
+  - **A hung endpoint:** the turn's second try (`LAMP_SECOND_CHAT_SECOND_TRY`,
+    2.5 s with no head) asks the lamp's own model at the relay, not the
+    person's again. So an endpoint that never answers is answered within the
+    turn's wait, which its own 10 and 40 s timeouts never reached.
+  - **The warning:** it clears when the person's own model answers again. A
+    failure with no HTTP status is told only once the relay has answered, so
+    a lamp off its own Wi-Fi never blames the person's model.
+  - **A request with a picture or kept calls** that the person's model
+    refuses with a 400 now goes to the lamp's own first. The lamp's own
+    model takes no picture either, so its text-only retry follows: one more
+    round trip on that turn.
 - **Off:** nothing new is read or said; today's behaviour as it is.
 
 ## Named model providers: OpenRouter, Gemini and Anthropic (#8420, built, off unless set)

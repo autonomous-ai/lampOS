@@ -1045,6 +1045,13 @@ fn own_key_refused(status: u16) {
     }
 }
 
+/// The person's own model answered a request to its first word: an earlier
+/// failure's health warning clears (Fifth's P2 on #8543: one brief 503 kept
+/// it until the voice restarted).
+fn own_model_answered() {
+    OWN_KEY_REFUSED.store(0, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// `voice-keys`' report: well, with whose DeepSeek key it uses (`uses`:
 /// `own` or `lamp`), or the warning once the person's own key (`own`) was
 /// refused. Without the person's key it is well, `uses=lamp`, so a part
@@ -1287,7 +1294,8 @@ pub fn services(
             {
                 net = net
                     .falling_back_to_the_relay(relay, Arc::new(own_key_refused))
-                    .map_err(io::Error::other)?;
+                    .map_err(io::Error::other)?
+                    .telling_the_own_answered(Arc::new(own_model_answered));
             }
             if let Some(chat) = hosted.own_chat {
                 eprintln!(
