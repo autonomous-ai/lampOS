@@ -18030,6 +18030,15 @@ light = { colour = "green", level = 3, for = "20s" }
             assert!(asks_heard(&hello, line).is_ok(), "{line}");
         }
         assert!(asks_heard(&hello, "Lamp, when I say, and then pebble hello, say hello").is_err());
+        // #8451, the first builder's P3 on #8469: the ask said alone after
+        // a cue is theirs, though said first with more before it.
+        assert!(
+            asks_heard(
+                &hello,
+                "make a skill that waves when I say hi pebble hello, and also when I say pebble hello"
+            )
+            .is_ok()
+        );
         set_asks_here(None);
         set_writes_here(None);
     }
