@@ -655,7 +655,7 @@ fn kept_fresh(kept: &Value, now_unix_ms: u64) -> bool {
 /// ([`ANOTHER_ASKED`]), so one refused is not counted as said. Written
 /// whole (`thread::write_file`). Whether a yes is awaited is never asked
 /// here: this runs in the say service's process, whose own wait never holds
-/// a task's, a make's or an app's yes (they live in the second route's
+/// the yes for a task, a make or an app (those live in the second route's
 /// worker), so the worker alone admits the ask's wait in its turn
 /// ([`asked_in`], [`ANOTHER_WAITS`]; Second's audit on #6000, #8475).
 pub fn keep_one(path: &Path, kept: &Value, now_unix_ms: u64) -> Result<(), String> {
