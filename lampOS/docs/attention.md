@@ -1703,7 +1703,8 @@ Second's colleagues 120 s after the news, held with the switch and without;
 within 45 s a conversation going on either way; a reply about nothing held
 in a busy room and taken in a quiet one).
 
-With `LAMP_NEWS_REPLY_HEEDS_HELD=on` (#8383, off by default), on the second
+With `LAMP_NEWS_REPLY_HEEDS_HELD=on` (#8383, off unless set, on in the
+product's `lamp-voice`), on the second
 route a line `said_to_me` held as not said to the lamp is not taken as the
 news's reply (`AFTER_NEWS`) in a quiet room either: on lamp-74ff on 23 Nov
 at 08:40:35 a 2-word line, 0 looks, 0 faces, was answered so 13 s after

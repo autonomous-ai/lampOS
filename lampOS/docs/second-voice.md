@@ -6471,7 +6471,8 @@ after a take-over, but now for every turn:
   marks or give no pitch still passes as `the speaker's pose unread`, until
   the head-down lines of the row are counted.
 - **A held line is no reply to the lamp's news**
-  (`LAMP_NEWS_REPLY_HEEDS_HELD=on`, #8383; off by default). The hold above
+  (`LAMP_NEWS_REPLY_HEEDS_HELD=on`, #8383; off unless set, on in the
+  product's `lamp-voice`, #8383's switch-on). The hold above
   clears only the line's face and conversation signs, and the rule's
   `AFTER_NEWS` (the first thing said within 180 s after the lamp's own
   news, in a room not busy) reads neither: on lamp-74ff on 23 Nov at
