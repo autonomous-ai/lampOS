@@ -285,16 +285,26 @@ NoNewPrivileges=yes
 WantedBy=multi-user.target
 ";
 
-/// The unit's text for `shown`: [`UNIT_TEXT`], ordered after lamp-control
-/// (and wanting it) with the tasks switch on, so the namespace's view of
-/// its socket is made once it is there.
+/// The line of [`unit_text`] (tasks on) that restarts the gateway with
+/// lamp-control (#8320, as OpenClaw's).
+const PART_OF: &str = "PartOf=lamp-control.service";
+
+/// The unit's text for `shown`: [`UNIT_TEXT`]; with the tasks switch on,
+/// [`openclaw_install::CONTROL_LINES`]: after lamp-control (and wanting
+/// it), so the namespace's view of its socket is made once it is there,
+/// and `PartOf=` it (#8320): the namespace binds lamp-control's socket
+/// file once, at the gateway's start, and each lamp-control start makes it
+/// anew (a new inode), so a lamp-control restart (an update round's
+/// switch, the keeper, its own `Restart=`) restarts the gateway too. A
+/// lamp-control stop stops it; [`keep_between_rounds`] starts it again
+/// within [`openclaw_install::KEEP_EVERY`] while Hermes is the default.
 pub fn unit_text(shown: Shown) -> String {
     if !shown.tasks {
         return UNIT_TEXT.to_owned();
     }
     UNIT_TEXT.replacen(
         "After=network-online.target lamp-cloud.service\n",
-        "After=network-online.target lamp-cloud.service lamp-control.service\nWants=lamp-control.service\n",
+        openclaw_install::CONTROL_LINES,
         1,
     )
 }
@@ -360,12 +370,37 @@ pub fn after_round(
     now_unix_ms: u64,
     say: &mut dyn FnMut(&str),
 ) -> bool {
+    // #8320: whether a unit was there before this write without `PartOf=`
+    // (an earlier build's), read before the write. A first write has no
+    // gateway running yet.
+    let adds_part_of = fs::read_to_string(unit_path(root))
+        .is_ok_and(|text| !text.lines().any(|line| line == PART_OF));
     match crate::writer_unit::write_unit(root, UNIT, &unit_text(shown)) {
         Ok(written) => {
-            if written && let Err(why) = systemd.reload() {
-                say(&format!("{UNIT} written, but systemd not reloaded: {why}"));
+            let reloaded = match written.then(|| systemd.reload()) {
+                Some(Err(why)) => {
+                    say(&format!("{UNIT} written, but systemd not reloaded: {why}"));
+                    false
+                }
+                _ => written,
+            };
+            let restarted = loaded_as_written(systemd, say);
+            // #8320: a running gateway, its unit just written anew with
+            // `PartOf=` over one without it (the round that ships it, which
+            // restarted lamp-control before this write), is try-restarted
+            // once, so its namespace binds the socket lamp-control has now.
+            // Only on that write (the next round finds the same bytes);
+            // `try-restart` leaves a stopped gateway stopped.
+            if reloaded && !restarted && adds_part_of && shown.tasks {
+                match systemd.try_restart_hermes_gateway() {
+                    Ok(()) => say(&format!(
+                        "{UNIT} written anew: the gateway restarted, so it shows lamp-control's socket as it is now (#8320)"
+                    )),
+                    Err(why) => say(&format!(
+                        "{UNIT} written anew, the gateway not restarted: {why} (#8320)"
+                    )),
+                }
             }
-            loaded_as_written(systemd, say);
         }
         Err(why) => {
             say(&format!("Hermes's gateway unit not written: {why}"));
@@ -538,15 +573,16 @@ fn gateway_state(systemd: &mut dyn Systemd) -> Option<String> {
 /// lamp-update's is said and left. A reload still owed, or a CPU cap not
 /// read back as [`openclaw_install::QUOTA_READ_BACK`], reloads systemd and,
 /// with the gateway running, `try-restart`s it, in one line naming the
-/// check. Anything still off is found again by the next round.
-fn loaded_as_written(systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)) {
+/// check. Anything still off is found again by the next round. Whether a
+/// `try-restart` was asked is returned.
+fn loaded_as_written(systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)) -> bool {
     let show = match systemd.hermes_gateway_unit_properties() {
         Ok(show) => show,
         Err(why) => {
             say(&format!(
                 "{UNIT}: what systemd loaded is not checked: {why}"
             ));
-            return;
+            return false;
         }
     };
     let field = |name: &str| {
@@ -559,10 +595,10 @@ fn loaded_as_written(systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)) {
             "{UNIT} has a drop-in lamp-update did not write, left as it is: {}",
             crate::world::clean_line(paths)
         ));
-        return;
+        return false;
     }
     let failed = match (field("NeedDaemonReload"), field("CPUQuotaPerSecUSec")) {
-        (Some("no"), Some(openclaw_install::QUOTA_READ_BACK)) => return,
+        (Some("no"), Some(openclaw_install::QUOTA_READ_BACK)) => return false,
         (Some("no"), quota) => format!(
             "its CPU cap reads back as {:?}, not {:?}",
             crate::world::clean_line(quota.unwrap_or("nothing")),
@@ -581,13 +617,13 @@ fn loaded_as_written(systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)) {
         say(&format!(
             "{UNIT} not loaded as written ({failed}), and systemd not reloaded: {why}"
         ));
-        return;
+        return false;
     }
     if !running {
         say(&format!(
             "{UNIT} not loaded as written ({failed}): systemd reloaded"
         ));
-        return;
+        return false;
     }
     match systemd.try_restart_hermes_gateway() {
         Ok(()) => say(&format!(
@@ -597,6 +633,7 @@ fn loaded_as_written(systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str)) {
             "{UNIT} not loaded as written ({failed}): systemd reloaded, the gateway not restarted: {why}"
         )),
     }
+    true
 }
 
 /// With [`SWITCH`] off, or Hermes off: a unit an earlier round wrote is

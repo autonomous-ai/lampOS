@@ -6399,6 +6399,14 @@ same as OpenClaw's skills. What is Hermes's own:
   Harness's one-shot, asked by any round that reached the channel (a refused
   one too); one that puts Hermes back writes it in the same run, so a switch
   to Hermes is served between rounds, within 10 s, not after the next round.
+  With the tasks switch on its unit is also `PartOf=lamp-control.service`, as
+  OpenClaw's (#8320): its namespace binds lamp-control's socket file once, at
+  its start, and each lamp-control start makes that socket anew, so a
+  lamp-control restart (an update round's switch, the keeper) restarts the
+  gateway too, and a lamp-control stop stops it until `serve` starts it again
+  within 10 s. The round that writes `PartOf=` over an earlier build's unit
+  without it try-restarts a running gateway once; the next round, finding the
+  same bytes, restarts nothing.
 - **Gateway not reachable.** The switch on but the gateway not up (its unit
   off, still starting, or gone) is handled as OpenClaw's gateway down: a
   spoken task waits at most 60 s and is `not_sent`, a queued turn waits at

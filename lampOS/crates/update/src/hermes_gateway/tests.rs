@@ -305,6 +305,59 @@ fn the_unit_runs_the_gateway_in_its_namespace_and_is_ready_on_health() {
     assert!(tasks.contains(
         "After=network-online.target lamp-cloud.service lamp-control.service\nWants=lamp-control.service\n"
     ));
+    // #8320: with the tasks switch on, restarted with lamp-control (its
+    // namespace binds lamp-control's socket file once, at its start); off,
+    // never tied to it.
+    for shown in every_shown() {
+        let unit = unit_text(shown);
+        let part_of = unit.lines().filter(|line| *line == PART_OF).count();
+        assert_eq!(part_of, usize::from(shown.tasks), "{shown:?}\n{unit}");
+        assert_eq!(unit.matches("PartOf=").count(), part_of, "{unit}");
+    }
+}
+
+/// #8320 (the second read's P2 on #8431): the round that ships `PartOf=`
+/// writes it over an earlier build's unit without it, after a round's
+/// switch restarted lamp-control; the running gateway still binds the old
+/// socket, so it is try-restarted once. The next round finds the same
+/// bytes and restarts nothing; a first write (no gateway yet) and the tasks
+/// switch off never restart it.
+#[test]
+fn the_round_that_adds_part_of_restarts_the_running_gateway_once() {
+    let lamp = Lamp::new();
+    let round = |shown: Shown| {
+        let mut systemd = Fake {
+            gateway: Some("active"),
+            ..Fake::default()
+        };
+        let mut lines = Vec::new();
+        after_round(
+            lamp.root(),
+            &lamp.records(),
+            shown,
+            Gateway::Wanted,
+            &mut systemd,
+            1,
+            &mut |line| lines.push(line.to_owned()),
+        );
+        (systemd.asked, lines)
+    };
+    // A first write: no unit before, nothing to restart.
+    let (asked, _) = round(PRODUCT);
+    assert_eq!(asked, ["reload"]);
+    // An earlier build's unit, without `PartOf=`.
+    let before = unit_text(PRODUCT).replacen("PartOf=lamp-control.service\n", "", 1);
+    fs::write(unit_path(lamp.root()), &before).unwrap();
+    let (asked, lines) = round(PRODUCT);
+    assert_eq!(asked, ["reload", "try-restart"]);
+    assert!(lines.iter().any(|line| line.contains("#8320")), "{lines:?}");
+    // The same bytes next round: nothing.
+    let (asked, _) = round(PRODUCT);
+    assert!(asked.is_empty(), "{asked:?}");
+    // The tasks switch off: written without `PartOf=`, never restarted.
+    fs::write(unit_path(lamp.root()), &before).unwrap();
+    let (asked, _) = round(OFF);
+    assert_eq!(asked, ["reload"]);
 }
 
 /// The rule: only Hermes as the default wants it; another default does
