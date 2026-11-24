@@ -839,7 +839,8 @@ pub fn asked_aloud_here(skill: &str) -> Result<String, String> {
                             .flatten()
                             .and_then(|asks| asks.tool)
                     },
-                    now_unix_ms,
+                    // The record's own clock, the boot clock (#8475).
+                    lamp_services::task_no_yes::boot_ms(),
                     crate::told_when_asked::ASKED_WAIT,
                 ),
         },
@@ -1114,17 +1115,16 @@ pub fn approve_by(manage: &Path, control: &Path, asks: &Asks) -> Result<Value, S
 /// is kept under the function the call named (`skill_named::function_of`):
 /// the skill's `tool` when the model called it by its tool, which is often
 /// not the skill's name (`sit-back`'s `wellbeing_nudges`; Thirteen's P2 on
-/// #8437), so both are looked for.
+/// #8437), and under the skill's own name beside it
+/// (`told_when_asked::keep_asked`, #8475), so both are looked for.
 pub fn asked_aloud_now(skill: &str, tool: Option<&str>) -> bool {
-    let now_unix_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |since| since.as_millis() as u64);
     crate::told_when_asked::on()
         && asked_aloud_in(
             Path::new(crate::told_when_asked::SPOKEN_ASKS_FILE),
             skill,
             tool,
-            now_unix_ms,
+            // The record's own clock, the boot clock (#8475).
+            lamp_services::task_no_yes::boot_ms(),
         )
 }
 

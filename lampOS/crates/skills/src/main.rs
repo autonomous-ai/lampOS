@@ -3421,7 +3421,7 @@ fn run_now_refused(
 /// never what it found. Refused, the voice is told why and nothing is
 /// made, counted or said.
 fn run_now_call(
-    (_, args, _, reply, admission, _, _): ToolAsk,
+    (_, args, _, reply, admission, _, spoken_ask): ToolAsk,
     engine: &mut Engine,
     runs: &mut Runs,
     out: &mut Publisher,
@@ -3447,6 +3447,19 @@ fn run_now_call(
             return refuse(&why);
         }
     };
+    // A made skill's task run now only on the owner's named ask (#8475,
+    // `LAMP_TASK_NO_YES`, the first builder's P2 on #8550): the voice says
+    // so on the `run` op itself, as on a tool's call.
+    let no_yes = lamp_skills::task_no_yes_on();
+    let has_task = run.calls.iter().any(|call| matches!(call, Call::Task(_)));
+    if let Some(why) = lamp_skills::task_call_refused(no_yes, true, has_task, spoken_ask) {
+        eprintln!(
+            "lamp-skills: skill:{skill}: not run now: the owner didn't name it ({})",
+            lamp_services::task_no_yes::ENVIRONMENT
+        );
+        return refuse(why);
+    }
+    let asked_aloud = lamp_skills::task_call_asked_aloud(no_yes, true, has_task, spoken_ask);
     let now_ms = unix_ms();
     let read_day = runner.local_time.as_ref().map(|local| local.day(now_ms));
     if let Some(why) = run_now_refused(
@@ -3492,7 +3505,12 @@ fn run_now_call(
     for event in run.events {
         publish(out, event);
     }
+    // Its task's hand-over marked as the owner's named ask's (#8475).
+    if asked_aloud {
+        lamp_skills::task::named_ask(&skill);
+    }
     let _ = start(run.skill, run.calls, run.held, &mut runs.busy, out, runner);
+    lamp_skills::task::forget_named_ask(&skill);
 }
 
 /// The model called a skill's tool: its steps run, and the voice is told
@@ -3622,6 +3640,13 @@ fn tool_call(
     let spoken = context
         .as_ref()
         .is_some_and(|context| context.check().is_ok());
+    // When its tool last ran, as it was before this call: a call the
+    // named-ask gate refuses below is taken back (#8475).
+    let ran_before = engine
+        .skills()
+        .iter()
+        .find(|skill| skill.tool.as_deref() == Some(name.as_str()))
+        .map(|skill| (skill.name.clone(), engine.tool_ran_at(&skill.name)));
     let mut run = match engine.tool_with_requested_audio(
         &name,
         &args,
@@ -3744,24 +3769,32 @@ fn tool_call(
     if under_way && made.len() == run.calls.len() {
         return refuse("I'm still doing that.");
     }
-    // A model's call of a skill whose run hands a task over, the owner not
-    // having named it (#8475, `LAMP_TASK_NO_YES`): no folder yes is asked
-    // any more, so a half match runs nothing, the whole call refused, and
-    // the model told in words it can answer. Only the voice's calls: a
-    // trigger's or a schedule's run never comes here, nor a run now.
-    if let Some(why) = lamp_skills::task_call_refused(
-        lamp_skills::task_no_yes_on(),
-        voice,
-        made.iter().any(|call| matches!(call, Call::Task(_))),
-        spoken_ask,
-    ) {
+    // The voice's call of a skill whose run hands a task over, the owner
+    // not having named it (#8475, `LAMP_TASK_NO_YES`): no folder yes is
+    // asked any more, so a half match runs nothing, the whole call refused,
+    // and the model told in words it can answer. A trigger's or a
+    // schedule's run never comes here; a run now is held to the same gate
+    // in `run_now_call`. A call that isn't the voice's runs on its declared
+    // grants, unmarked, so each of its sends keeps its yes.
+    let no_yes = lamp_skills::task_no_yes_on();
+    let has_task = made.iter().any(|call| matches!(call, Call::Task(_)));
+    if let Some(why) = lamp_skills::task_call_refused(no_yes, voice, has_task, spoken_ask) {
         eprintln!(
             "lamp-skills: {name} not run: the owner didn't name {} ({})",
             run.skill,
             lamp_services::task_no_yes::ENVIRONMENT
         );
+        // Never run, so never counted as run: an `[again]` skill's next
+        // named ask is not told its again line (the first builder's P3 on
+        // #8550).
+        if let Some((skill, before)) = ran_before.filter(|(skill, _)| *skill == run.skill) {
+            engine.tool_not_run(&skill, before);
+        }
         return refuse(why);
     }
+    // The run started for the voice's named call (#8475): its task's
+    // hand-over is marked, so lamp-control names it to lamp-services.
+    let asked_aloud = lamp_skills::task_call_asked_aloud(no_yes, voice, has_task, spoken_ask);
     // A run that is only tasks the lamp would not hand over now: the model
     // is told nothing runs, and why, never "Done." (lamp-9adf, 15 Nov).
     if let Some(why) = tasks_refused(&run.skill, &made, &runner.tasks.borrow()) {
@@ -3867,7 +3900,14 @@ fn tool_call(
         if !made.iter().any(|call| matches!(call, Call::Mood { .. })) {
             end_hold(&run.skill);
         }
+        let skill = run.skill.clone();
+        if asked_aloud {
+            lamp_skills::task::named_ask(&skill);
+        }
         let made = start(run.skill, made, None, busy, out, runner);
+        // Taken by its task's hand-over as it began; one the start never
+        // reached goes now, never left for a later run of the skill.
+        lamp_skills::task::forget_named_ask(&skill);
         if looks {
             // Bounded: the caller waits at most `TOOL_TIMEOUT` once more.
             let _ = clock::recv_timeout(&made, MADE_BEFORE_ANSWER);
@@ -4013,9 +4053,14 @@ fn from_the_app(stream: &UnixStream) -> bool {
 
 /// Whether the peer on `stream` is lamp-voice, by its credentials
 /// (`SO_PEERCRED`) and its cgroup ([`watch::from_the_voice`]), as
-/// [`from_the_app`] tells lamp-cloud; or, with `LAMP_SKILLS_ANY_ASKER=on`
-/// in this program's own environment, any peer, for the tests. Peer
-/// credentials are read on Linux only; elsewhere no peer is the voice.
+/// [`from_the_app`] tells lamp-cloud, its cgroup read between two reads of
+/// the peer's start time, which must agree, as lamp-play's and lamp-apps'
+/// peers are (`lamp_play::peer::peer_in_unit`; the first builder's P3 on
+/// #8550: the voice's word names a spoken ask, so a pid that went and came
+/// back as another process is no voice); or, with
+/// `LAMP_SKILLS_ANY_ASKER=on` in this program's own environment, any peer,
+/// for the tests. Peer credentials are read on Linux only; elsewhere no
+/// peer is the voice.
 fn from_the_voice(stream: &UnixStream) -> bool {
     if std::env::var(lamp_skills::package::ANY_ASKER).as_deref() == Ok("on") {
         return true;
@@ -4023,8 +4068,18 @@ fn from_the_voice(stream: &UnixStream) -> bool {
     #[cfg(target_os = "linux")]
     {
         rustix::net::sockopt::socket_peercred(stream).is_ok_and(|peer| {
-            std::fs::read_to_string(format!("/proc/{}/cgroup", peer.pid.as_raw_nonzero()))
+            let pid = peer.pid.as_raw_nonzero();
+            let start = || {
+                std::fs::read_to_string(format!("/proc/{pid}/stat"))
+                    .ok()
+                    .and_then(|stat| lamp_skills::package::start_of_stat(&stat))
+            };
+            let Some(before) = start() else {
+                return false;
+            };
+            std::fs::read_to_string(format!("/proc/{pid}/cgroup"))
                 .is_ok_and(|cgroup| watch::from_the_voice(&cgroup))
+                && start() == Some(before)
         })
     }
     #[cfg(not(target_os = "linux"))]
@@ -6133,6 +6188,9 @@ fn hand_task(
     let (asked_at, ask) = lamp_skills::task::take_yes_ask(skill);
     let owners = lamp_skills::task::take_asked_by_owner(skill);
     let asked = asked_at.filter(|_| lamp_voice::told_when_asked::on());
+    // Started for the voice's named call (#8475): taken here, on the main
+    // loop, before any other run of the skill can begin.
+    let asked_aloud = lamp_skills::task::take_named_ask(skill);
     let Some((folder, grants)) = tasks.of.get(skill).cloned() else {
         eprintln!("lamp-skills: skill:{skill}: do.task: not handed over: its folder is not known");
         return;
@@ -6145,6 +6203,7 @@ fn hand_task(
             state: state.as_deref(),
             control: Path::new(lamp_voice::skill_task_yes::CONTROL_SOCKET),
             socket: socket.as_deref(),
+            asked_aloud,
         };
         // The yes asked aloud: the voice builds the read-back itself from
         // the skill on the lamp; this asks only for it, by the skill's name.
@@ -6324,6 +6383,8 @@ fn hand_run(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
     let (asked_at, ask) = lamp_skills::task::take_yes_ask(skill);
     let by_words = asked_at.is_some();
     let _ = lamp_skills::task::take_asked_by_owner(skill);
+    // Started for the voice's named call (#8475), taken on the main loop.
+    let asked_aloud = lamp_skills::task::take_named_ask(skill);
     let Some((folder, grants)) = tasks.of.get(skill).cloned() else {
         eprintln!("lamp-skills: skill:{skill}: do.run: not handed over: its folder is not known");
         return;
@@ -6336,6 +6397,7 @@ fn hand_run(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
             state: state.as_deref(),
             control: Path::new(lamp_voice::skill_task_yes::CONTROL_SOCKET),
             socket: socket.as_deref(),
+            asked_aloud,
         };
         let say_yes = || say(&say_socket, "say", &skill, ask.clone(), &[], || {});
         let outcome = std::cell::Cell::new(None);
@@ -6382,6 +6444,20 @@ fn hand_run(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
 /// [`lamp_skills::task::RUN_STEP_MOST`], and never counted in [`HANDING`],
 /// so it neither waits behind an agent's task nor holds one back.
 fn hand_over_run(socket: &Path, line: &str) -> Result<String, lamp_skills::service_write::Unrun> {
+    let answer = hand_over_run_once(socket, line)?;
+    // A lamp-tasks from before the named-ask mark (#8475) refuses the line
+    // before anything runs: sent again once without it, unmarked.
+    match lamp_skills::task::without_getting_ready_if_refused(line, &answer) {
+        Some(plain) => hand_over_run_once(socket, &plain),
+        None => Ok(answer),
+    }
+}
+
+/// One `run` step's line sent and its answer read ([`hand_over_run`]).
+fn hand_over_run_once(
+    socket: &Path,
+    line: &str,
+) -> Result<String, lamp_skills::service_write::Unrun> {
     use lamp_skills::service_write::Unrun;
     let stream = UnixStream::connect(socket)
         .map_err(|error| Unrun::NotTaken(format!("lamp-tasks couldn't be reached: {error}")))?;

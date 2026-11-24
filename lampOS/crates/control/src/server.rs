@@ -357,6 +357,12 @@ impl Shared {
     /// nothing that needs a grant. No yes, or one that no longer holds, is
     /// refused.
     ///
+    /// A skill's mint with `"asked_aloud": true` (#8475, lamp-tasks' word
+    /// from lamp-skills' hand-over of the voice's named call, on the admin
+    /// socket no run reaches) marks the run so
+    /// ([`crate::runs::Run::asked_aloud`]): its writes may then go with no
+    /// yes, the voice's record naming the skill. Anything else marks none.
+    ///
     /// `{"mint": {"ask": ["<code>-read", ...], "run", "expires_in_ms"?}}`
     /// instead: a live spoken ask lamp-tasks runs on the lamp's agent
     /// (`LAMP_SERVICES_TO_AGENT`), minted as the skill
@@ -421,11 +427,16 @@ impl Shared {
         let Some(token) = crate::runs::new_token(&ring::rand::SystemRandom::new()) else {
             return json!({"error": "no token could be made"});
         };
+        // Minted for the owner's named ask (#8475): a skill's run alone.
+        let asked_aloud = ask.is_none() && asked.get("asked_aloud") == Some(&json!(true));
         let minted = {
             let mut door = self.door.lock().expect("door");
             let minted = door.mint_run(&token, run, skill, grants, for_ms, now);
             if let (Some(write), true) = (&fixed_write, minted.is_ok()) {
                 door.mark_fixed_write(run, write);
+            }
+            if asked_aloud && minted.is_ok() {
+                door.mark_asked_aloud(run);
             }
             minted
         };
@@ -441,8 +452,13 @@ impl Shared {
         let names = grant_names(&live.grants.iter().copied().collect::<Vec<_>>());
         let expires_in_ms = live.until_us.saturating_sub(now) / 1_000;
         eprintln!(
-            "lamp-control: run {run} of skill {skill}: a token for [{names}], {} s",
-            expires_in_ms / 1_000
+            "lamp-control: run {run} of skill {skill}: a token for [{names}], {} s{}",
+            expires_in_ms / 1_000,
+            if asked_aloud {
+                ", the owner's named ask"
+            } else {
+                ""
+            }
         );
         json!({"token": token, "run": run, "skill": skill, "grants": live.grants, "expires_in_ms": expires_in_ms})
     }

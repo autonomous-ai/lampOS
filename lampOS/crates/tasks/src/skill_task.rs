@@ -381,6 +381,14 @@ pub struct HandOver {
     /// kept for the record; lamp-tasks does not hash the folder again.
     pub sha256: String,
     pub grants: Vec<String>,
+    /// The run lamp-skills started for the voice's named call (#8475,
+    /// `LAMP_TASK_NO_YES`, `lamp_skills::task::named_ask`): its token is
+    /// asked of lamp-control so marked ([`Tokens::mint_for`]), which names
+    /// the run to lamp-services, so its write may go with no yes when the
+    /// voice's record names its skill. Absent, as every other run's line
+    /// and every line before it: none, and each write keeps its yes.
+    #[serde(default)]
+    pub asked_aloud: bool,
 }
 
 /// The line's `op`: `skill_task`, a task for the lamp's agent; or
@@ -672,6 +680,14 @@ pub struct Minted {
 /// `skill`, one for run id `run`, ended with the run.
 pub trait Tokens {
     fn mint(&self, skill: &str, run: &str) -> Result<Minted, String>;
+    /// [`Tokens::mint`], for a run lamp-skills started for the owner's
+    /// named ask when `asked_aloud` ([`HandOver::asked_aloud`], #8475):
+    /// lamp-control marks that run, and only that run. By default as
+    /// [`Tokens::mint`], which marks nothing.
+    fn mint_for(&self, skill: &str, run: &str, asked_aloud: bool) -> Result<Minted, String> {
+        let _ = asked_aloud;
+        self.mint(skill, run)
+    }
     /// The run ended: its token is refused from now on.
     fn end(&self, run: &str);
     /// Whether lamp-control's recorded yes for `skill` is for exactly the
@@ -776,14 +792,20 @@ impl Tokens for ControlTokens {
     }
 
     fn mint(&self, skill: &str, run: &str) -> Result<Minted, String> {
-        self.mint_asked(
-            &json!({"mint": {
-                "skill": skill,
-                "run": run,
-                "expires_in_ms": RUN_LIFETIME.as_millis() as u64,
-            }}),
-            run,
-        )
+        self.mint_for(skill, run, false)
+    }
+
+    fn mint_for(&self, skill: &str, run: &str, asked_aloud: bool) -> Result<Minted, String> {
+        let mut asked = json!({"mint": {
+            "skill": skill,
+            "run": run,
+            "expires_in_ms": RUN_LIFETIME.as_millis() as u64,
+        }});
+        // Only for the owner's named ask: every other mint's line as before.
+        if asked_aloud {
+            asked["mint"]["asked_aloud"] = json!(true);
+        }
+        self.mint_asked(&asked, run)
     }
 
     fn mint_try(&self, grants: &[String], run: &str) -> Result<Minted, String> {
@@ -1456,7 +1478,7 @@ pub fn answer_for(
         return run_on_token(
             &write.skill,
             &write.grants,
-            (true, false),
+            (true, false, false),
             tokens,
             runner,
             |run, token| {
@@ -1525,7 +1547,7 @@ pub fn answer_for(
     // through a runner that keeps it (Harness's, or a make's from the run's
     // own `answer.md`).
     let tells = tells_answer(runner);
-    let mode = (false, tells);
+    let mode = (false, tells, hand.asked_aloud);
     let told = run_on_token(&hand.skill, &asked, mode, tokens, runner, |run, token| {
         // `net` gets its way out only with lamp-control's yes naming it for
         // this folder as it is (the token can't carry it): never on the
@@ -1703,7 +1725,7 @@ fn tell_run(
 fn run_on_token(
     skill: &str,
     grants: &[String],
-    (write, tells): (bool, bool),
+    (write, tells, asked_aloud): (bool, bool, bool),
     tokens: &dyn Tokens,
     runner: &dyn Runner,
     made: impl FnOnce(
@@ -1712,7 +1734,7 @@ fn run_on_token(
     ) -> Result<(SkillRun, Option<crate::skill_make::MadeFolder>), Value>,
 ) -> Value {
     let run_id = run_id();
-    let minted = match tokens.mint(skill, &run_id) {
+    let minted = match tokens.mint_for(skill, &run_id, asked_aloud) {
         Ok(minted) => minted,
         Err(why) => return refusal("no_token", &why),
     };
@@ -5255,6 +5277,8 @@ mod tests {
         yes: Option<Vec<String>>,
         /// (skill, run id) of each mint.
         minted: RefCell<Vec<(String, String)>>,
+        /// Whether each mint was asked for the owner's named ask (#8475).
+        asked_aloud: RefCell<Vec<bool>>,
         /// (run id, token) of each live run.
         live: RefCell<Vec<(String, String)>>,
         ended: RefCell<Vec<String>>,
@@ -5265,6 +5289,11 @@ mod tests {
     impl Tokens for FakeTokens {
         fn net_agreed(&self, _: &str, _: &str, grants: &[String]) -> bool {
             self.net_yes && grants.iter().any(|grant| grant == NET_GRANT)
+        }
+
+        fn mint_for(&self, skill: &str, run: &str, asked_aloud: bool) -> Result<Minted, String> {
+            self.asked_aloud.borrow_mut().push(asked_aloud);
+            self.mint(skill, run)
         }
 
         fn mint(&self, skill: &str, run: &str) -> Result<Minted, String> {
@@ -6164,6 +6193,62 @@ mod tests {
                 json!({"mint": {"skill": "photo-booth", "run": "task-1", "expires_in_ms": 840_000}}),
                 json!({"end": {"run": "task-1"}}),
             ]
+        );
+    }
+
+    /// #8475 (the first builder's P1 on #8550): a hand-over line that says
+    /// its run was started for the owner's named ask has its token asked of
+    /// lamp-control so marked, and only that one; a line without it (every
+    /// trigger's, schedule's or other asker's run, and every line before
+    /// it) mints as before, unmarked. lamp-control's admin line carries
+    /// `"asked_aloud": true` only then. Fails on the old `run_on_token`,
+    /// whose `tokens.mint(skill, &run_id)` marked no run, and on the old
+    /// `HandOver`, whose `deny_unknown_fields` refused the field.
+    #[test]
+    fn a_run_handed_over_for_the_named_ask_is_minted_so_marked() {
+        let tokens = FakeTokens::default();
+        let ran = runner(&tokens, Ok(7));
+        let _ = answer(
+            &line(|value| value["asked_aloud"] = json!(true)),
+            true,
+            skills(),
+            &tokens,
+            &ran,
+        );
+        let _ = answer(&line(|_| {}), true, skills(), &tokens, &ran);
+        assert_eq!(*tokens.asked_aloud.borrow(), vec![true, false]);
+        assert_eq!(tokens.minted.borrow().len(), 2);
+        assert!(
+            HandOver::parse(&line(|value| value["asked_aloud"] = json!(true)), skills())
+                .unwrap()
+                .asked_aloud
+        );
+        assert!(
+            !HandOver::parse(&line(|_| {}), skills())
+                .unwrap()
+                .asked_aloud
+        );
+        let (_dir, control, served) = admin(
+            |asked| {
+                let mint = &asked["mint"];
+                json!({
+                    "token": "t".repeat(43),
+                    "run": mint["run"],
+                    "skill": mint["skill"],
+                    "grants": ["camera"],
+                    "expires_in_ms": 600_000,
+                })
+            },
+            2,
+        );
+        control.mint_for("photo-booth", "task-1", true).unwrap();
+        control.mint("photo-booth", "task-2").unwrap();
+        let served = served.join().unwrap();
+        assert_eq!(served[0]["mint"]["asked_aloud"], true, "{}", served[0]);
+        assert!(
+            served[1]["mint"].get("asked_aloud").is_none(),
+            "{}",
+            served[1]
         );
     }
 
