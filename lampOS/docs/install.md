@@ -2441,8 +2441,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `LAMP_TASKS_RESUME_CLOSED` (lamp-tasks) come with the routing that
      reads them (#6094).
    - **lamp-tasks, straight to Hermes's gateway** (`LAMP_TASKS_HERMES_DIRECT=on`
-     in lamp-tasks' own environment; off: no unit sets it yet, until a
-     Hermes lamp's row passes; docs/switches.md, its row; docs/tasks.md,
+     in lamp-tasks' own environment; on in the product's
+     `lamp-tasks.service`; docs/switches.md, its row; docs/tasks.md,
      "The lamp's agent spoken to directly"). lamp-tasks hands every turn of
      the lamp's own Hermes (a spoken task, a skill's `do.task`, a make) to
      Hermes's own API server over HTTP itself, with no Harness pane, no
@@ -2452,7 +2452,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        on loopback only (`127.0.0.1:8642`), with the internet (no `--net`).
        lamp-update installs and starts it with its own switch,
        `LAMP_HERMES_GATEWAY=on` (lamp-update's environment or
-       `/etc/lampOS/update.env`, off by default), and runs it only while
+       `/etc/lampOS/update.env`; on in the product by that carried file),
+       and runs it only while
        lamp-tasks names Hermes the lamp's default agent; with that switch on,
        OpenClaw's gateway follows the default too, so only one agent gateway
        runs (docs/switches.md, its row). Each round that reached the channel
@@ -2721,7 +2722,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      left OpenClaw's state unreadable (gate G); a stop 60 s or more after
      the listen took under 10 s. A gateway started long ago and listening,
      or not running, is restarted at once. With `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on` (#8105, off until
-     its row) it runs only while OpenClaw is the lamp's default agent, as
+     its row), or `LAMP_HERMES_GATEWAY=on` (on in the product), it runs only while OpenClaw is the lamp's default agent, as
      lamp-tasks says it on its app socket: `serve` asks every 10 s and
      each round once, enables and starts it for `openclaw`, disables and
      stops it for another engine, and leaves it as it is while lamp-tasks

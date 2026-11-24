@@ -5515,6 +5515,7 @@ fn a_round_writes_update_env_after_the_writer_refresh_and_the_switches_turn_on()
             now: true,
             gateway_by_default: false,
             cdn_feed: true,
+            hermes_gateway: true,
         }
     );
     assert!(restart_for(started, now));

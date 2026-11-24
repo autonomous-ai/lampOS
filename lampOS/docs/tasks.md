@@ -6155,7 +6155,7 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
   news, never both. The line is heard with the answer, not at the moment
   of the replacement.
 
-### The lamp's agent spoken to directly (`LAMP_TASKS_OPENCLAW_DIRECT=on` in the product's lamp-tasks unit; `LAMP_TASKS_HERMES_DIRECT`, off)
+### The lamp's agent spoken to directly (`LAMP_TASKS_OPENCLAW_DIRECT=on` in the product's lamp-tasks unit; `LAMP_TASKS_HERMES_DIRECT=on` too)
 
 The path is the same for both engines, each behind its own switch, with its
 own session (`direct::Direct`), its own pump and its own readiness; what
@@ -6355,11 +6355,12 @@ in <s> s and is stuck; ended, the next turn goes on`, and `tasks: direct: a
 fresh conversation for <id> (a full conversation | a broken session), about
 <n> tokens and <m> turns in the last`.
 
-#### Hermes spoken to directly (`LAMP_TASKS_HERMES_DIRECT=on`, off in the product)
+#### Hermes spoken to directly (`LAMP_TASKS_HERMES_DIRECT=on`, on in the product)
 
 With `LAMP_TASKS_HERMES_DIRECT=on` in lamp-tasks' own environment (`on`
-exactly; anything else, unset too, is off; no unit sets it until a Hermes
-lamp's row passes), the lamp's own Hermes takes the path above in place of
+exactly; anything else, unset too, is off; on in the product's lamp-tasks
+unit, with lamp-update's `LAMP_HERMES_GATEWAY` on in the product's
+`/etc/lampOS/update.env`), the lamp's own Hermes takes the path above in place of
 Harness and `hermes chat -q`: one connection to Hermes's own API server and one
 kept session. OpenClaw's switch and its path are unchanged; each engine has its
 own session, and both may be on (`direct::lamps`).
