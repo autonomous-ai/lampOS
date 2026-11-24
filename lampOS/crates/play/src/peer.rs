@@ -32,6 +32,7 @@ pub fn start_of_stat(stat: &str) -> Option<u64> {
     after.split_whitespace().nth(19)?.parse().ok()
 }
 
+#[cfg(target_os = "linux")]
 fn start_of(pid: i32) -> Option<u64> {
     start_of_stat(&std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?)
 }
@@ -40,6 +41,7 @@ fn start_of(pid: i32) -> Option<u64> {
 /// pid from the kernel, its cgroup read between two reads of its start time,
 /// which must agree (a pid that went and came back as another process is
 /// refused).
+#[cfg(target_os = "linux")]
 pub fn peer_in_unit(socket: impl std::os::fd::AsFd, unit: &str) -> bool {
     let Ok(credentials) = rustix::net::sockopt::socket_peercred(socket) else {
         return false;
@@ -52,6 +54,14 @@ pub fn peer_in_unit(socket: impl std::os::fd::AsFd, unit: &str) -> bool {
         return false;
     };
     start_of(pid) == Some(before) && cgroup_is(&cgroup, unit)
+}
+
+/// Elsewhere (a developer's Mac) there are no peer credentials or cgroups to
+/// read, so no peer is ever the unit: every play is refused, as `apps::peer`
+/// refuses its peers off Linux.
+#[cfg(not(target_os = "linux"))]
+pub fn peer_in_unit(_socket: impl std::os::fd::AsFd, _unit: &str) -> bool {
+    false
 }
 
 #[cfg(test)]
@@ -95,6 +105,15 @@ mod tests {
         assert_eq!(start_of_stat("1 (x) S"), None);
     }
 
+    #[cfg(not(target_os = "linux"))]
+    #[test]
+    fn off_linux_no_peer_is_any_unit() {
+        let (a, _b) = std::os::unix::net::UnixStream::pair().unwrap();
+        assert!(!peer_in_unit(&a, ASKER));
+        assert!(!peer_in_unit(&a, ""));
+    }
+
+    #[cfg(target_os = "linux")]
     #[test]
     fn a_peer_that_is_this_process_is_in_its_own_cgroup_and_in_no_other_unit() {
         let (a, _b) = std::os::unix::net::UnixStream::pair().unwrap();
