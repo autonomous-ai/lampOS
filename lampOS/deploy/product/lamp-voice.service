@@ -71,6 +71,15 @@ NoNewPrivileges=yes
 RuntimeDirectory=lampos-voice
 RuntimeDirectoryMode=0700
 RuntimeDirectoryPreserve=yes
+# LAMP_OWN_KEYS: #2094, #8367, a person's own model, hearing and voice keys from the app; on in the product by the first
+# builder's DEFAULT-ON (#8367); its rules are its row in docs/switches.md and docs/own-keys.md.
+# The keys helper's folder (root's, 0700), loaded whole: each file is the credential own_<file> in
+# $CREDENTIALS_DIRECTORY. ConfigurationDirectory makes it if missing (a new or reset lamp), so an empty one is no
+# credential, never a failed start. Never LAMP_OWN_ELEVENLABS_URL here: test lamps only.
+Environment=LAMP_OWN_KEYS=on
+ConfigurationDirectory=lampOS/voice/own
+ConfigurationDirectoryMode=0700
+LoadCredential=own:/etc/lampOS/voice/own
 Environment=LAMP_THREAD_FILE=/run/lampos-voice/thread.json
 Environment=LAMP_ONBOARDING_FILE=/var/lib/lampOS/voice/onboarding/progress.json
 # LAMP_ONBOARDING: its why and rules are its row in docs/switches.md (#2843, #3430).

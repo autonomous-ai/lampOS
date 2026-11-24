@@ -155,6 +155,9 @@ Environment=LAMP_MEMORY_FORGET_SOCKET=/run/lampos-memory/forget.sock
 Environment=LAMP_APP_MONITOR=on
 # LAMP_STORE_APPS: #7415, the Store apps; on in the product by the first builder's DEFAULT-ON of 20 Nov; its rules are its rows in docs/switches.md.
 Environment=LAMP_STORE_APPS=on
+# LAMP_OWN_KEYS: #2094, #8367, a person's own model, hearing and voice keys from the app; on in the product by the first
+# builder's DEFAULT-ON (#8367); its rules are its row in docs/switches.md and docs/own-keys.md.
+Environment=LAMP_OWN_KEYS=on
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos

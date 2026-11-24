@@ -351,8 +351,8 @@ pub fn placed(body: &str, part: &str) -> String {
 /// drop-in in `deploy/product` that `lamp-update install` places, and its
 /// settings' `.env` files. A file there that install never places is on no
 /// lamp, so nothing in it is on: `own-keys-voice.conf` goes on a test lamp
-/// by hand, and the keeper's restart and the own keys' helpers wait for
-/// their lamp checks (install's left-out list).
+/// by hand, and the keeper's restart helper waits for its lamp check
+/// (install's left-out list).
 pub fn product_files(lamp_os: &Path) -> io::Result<BTreeMap<String, String>> {
     let mut files = BTreeMap::new();
     let product = lamp_os.join("deploy/product");

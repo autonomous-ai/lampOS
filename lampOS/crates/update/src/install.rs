@@ -267,6 +267,17 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-setup-wifi@.service",
         include_str!("../../../deploy/product/lamp-setup-wifi@.service"),
     ),
+    // Root's helper for a person's own keys from the app (#2094, #8367,
+    // docs/own-keys.md), answering lamp-cloud alone: on in the product with
+    // LAMP_OWN_KEYS. Its socket enabled, its template never.
+    (
+        "lamp-setup-keys.socket",
+        include_str!("../../../deploy/product/lamp-setup-keys.socket"),
+    ),
+    (
+        "lamp-setup-keys@.service",
+        include_str!("../../../deploy/product/lamp-setup-keys@.service"),
+    ),
     (
         "lamp-setup-wifi-restore.service",
         include_str!("../../../deploy/product/lamp-setup-wifi-restore.service"),
@@ -1412,6 +1423,7 @@ pub(crate) fn enabled() -> Vec<String> {
             "lamp-apps-manage.socket",
             "lamp-setup-change.socket",
             "lamp-setup-wifi.socket",
+            "lamp-setup-keys.socket",
             "lamp-eyes-camera.socket",
         ])
         .map(str::to_owned)
@@ -4169,13 +4181,10 @@ mod tests {
     /// why it is not yet; every socket installed is enabled.
     #[test]
     fn every_deploy_product_unit_is_installed_or_named_left_out() {
-        // Left out until their lamp check: the keeper's restart helper
-        // (#2193) and the own keys' helper (#2094).
+        // Left out until its lamp check: the keeper's restart helper (#2193).
         const LEFT_OUT: &[&str] = &[
             "lamp-keeper-restart.socket",
             "lamp-keeper-restart@.service",
-            "lamp-setup-keys.socket",
-            "lamp-setup-keys@.service",
         ];
         let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
         let listed: Vec<&str> = PRODUCT.iter().map(|(name, _)| *name).collect();
