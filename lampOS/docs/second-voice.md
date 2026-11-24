@@ -3285,7 +3285,29 @@ When the coordinator switches (below):
 `worker::serve`:
 
 - **Character:** the instruction of the Live route's `provider.json`
-  (`ProviderConfig::instruction`, the version without a camera), then the
+  (`ProviderConfig::instruction`), the camera's version while the route has
+  a look and the eye is open (the camera allowed in the last authority the
+  coordinator installed, so on and with its privacy slide open), and the
+  version without one otherwise, which says it cannot see when no image is
+  attached (`config::NO_PICTURE`;
+  no claim about the eye, since texts, a turn after a forget and Live with
+  no picture are told it too, with the camera perhaps on) and not to
+  pretend to see (`worker::character_now`, `Engine::telling_the_eye`;
+  #5530: this route always took the version without a camera). Chosen for
+  each turn as its request is built, so a slide closed between two turns
+  tells the next one it cannot see without an attached image. An app photo
+  may still be described from its contents, never as a live camera view;
+  this instruction does not grant or bypass attachment or camera access.
+  At the first authority and when its
+  camera permission changes, the journal says `lamp-voice second: camera
+  permission is allowed (#5530)` or `… camera permission is denied (#5530)`
+  (`second_provider::eye_line`). This reports permission, not the selected
+  character: without a usable look route, the no-picture version still applies.
+  A [Vietnamese note](vi/second-voice_vi.md) describes this distinction.
+  Both versions describe the eye as a capability, not proof of current sight.
+  Lamp is the default identity; an active role supplied for the current person
+  retains its own identity rule. No role is inferred from other faces in the room.
+  Texts and the instruction after a forget keep the version without a camera. Then the
   time and place (the time as the request is built, "Second only" below),
   then the memory note (the
   Days note frozen for the process, or the memory writer's, read for each
@@ -7242,7 +7264,10 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   `LAMP_LOOK_FULL`), spoken turns are offered `take_a_look`
   (`second_provider::LOOK_CALL`, `worker::chat_tools` with `look`; texts
   are not) and told "When you would look, call take_a_look"
-  (`worker::LOOK_CALL_NOTE`). When point-light is offered in the same
+  (`worker::LOOK_CALL_NOTE`), only in the camera-aware character
+  (`worker::spoken_version`). The no-picture version does not also direct
+  the model to look. The function stays offered and its camera permission
+  checks still apply. When point-light is offered in the same
   round (installed and on, its `point_light` or `use_skill` naming it),
   the look's description ends "Never to put your light on a thing they
   name, as in "point the light at my book": that is point_light's."

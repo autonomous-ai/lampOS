@@ -159,4 +159,33 @@ mod tests {
             assert_eq!(told_with(&file), "You are a lamp.");
         }
     }
+
+    /// #5530: with a chosen character, either built-in version (and in the
+    /// owner's language) still begins "You are Lamp", keeps its name, eye,
+    /// voice and microphone, and has the owner's words last, after them.
+    #[test]
+    fn a_chosen_character_follows_the_lamps_own_name_and_body() {
+        let file = folder("built-in").join("character");
+        fs::write(&file, "curious and playful\n").unwrap();
+        let words = told("curious and playful");
+        for built_in in [
+            crate::config::CHAT_INSTRUCTION,
+            crate::config::CAMERA_CHAT_INSTRUCTION,
+        ] {
+            for language in [None, Some(crate::language::Language::Vietnamese)] {
+                let character = crate::language::instruction(built_in.to_owned(), language);
+                let told = with_character_at(character.clone(), &file);
+                assert!(told.starts_with("You are Lamp, "), "{told}");
+                assert_eq!(told, format!("{character}\n\n{words}"));
+                for line in [
+                    "If asked who or what you are, say you are Lamp",
+                    "a camera, your eye",
+                    "through your speaker",
+                    "through your microphone",
+                ] {
+                    assert!(told.contains(line), "{line}: {told}");
+                }
+            }
+        }
+    }
 }

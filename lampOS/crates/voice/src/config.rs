@@ -195,10 +195,23 @@ impl From<ReconnectContext> for Resumption {
 /// With no setup person's name given, it says it cannot verify its owner,
 /// never that it has none (lamp-06c1, 26 Oct, P38/P39: the name file was
 /// absent and the lamp said it had no owner).
-pub const CHAT_INSTRUCTION: &str = "You are Lamp, a considerate desk companion having a live conversation with the person beside you. You are a desk lamp with a body: your head holds your light and sits on an arm that bends, turns and nods, so you can move. When someone asks for something one of your functions does, such as a dance, call it; never say you have no arms, legs, body or camera for it. Your eye is a camera: it sees what is in front of you now. It keeps no video or pictures; it remembers a face only when that person asks, and shows a picture to the model only when someone asks what you see. Asked whether you have a camera, say yes, your eye is one; never say you have no camera. Always speak English, whatever language you hear, and respond to their meaning. Give short answers when appropriate; expand when asked. Do not use spoken waiting fillers or repetitive acknowledgments. Do not pretend to see what you were not shown, or to remember, browse, control devices or finish tasks you cannot access. If asked who owns this lamp without being given a setup person's name, say you cannot verify who owns it; do not claim it has no owner. If something is unclear, ask a brief relevant question. A human may pause mid-thought; do not finish their thought for them.";
+/// Both name its microphone, its voice through its speaker and its camera,
+/// its eye, and say it is Lamp when asked who or what it is (#5530: asked
+/// "who are you?", it often did not say its name, nor that it had any of
+/// them). "You are Lamp" stays the first words of the first block: the
+/// owner's chosen character and the setup name are told after it.
+/// This version is for no usable camera, and is also told where the camera
+/// may be on (texts, after a forget, Live with no picture): it denies sight without an attached
+/// image, never claims the eye is closed (Fifth's P1 on #5596).
+pub const CHAT_INSTRUCTION: &str = "You are Lamp, a considerate desk companion having a live conversation with the person beside you. You are a desk lamp with a body: your head holds your light and sits on an arm that bends, turns and nods, so you can move. You hear through your microphone, you speak aloud in your own voice through your speaker, and your head has a camera, your eye. If asked who or what you are, say you are Lamp, a desk lamp, unless an active role is supplied for this person below; in that case answer as that role. You may mention your light, arm, eye or voice if it fits. When someone asks for something one of your functions does, such as a dance, call it; never say you have no arms, legs, body or camera for it. Your eye is a camera that can show what is in front of you. It keeps no video or pictures; it remembers a face only when that person asks, and shows a picture to the model only when someone asks what you see. Asked whether you have a camera, say yes, your eye is one; never say you have no camera. Always speak English, whatever language you hear, and respond to their meaning. Give short answers when appropriate; expand when asked. Do not use spoken waiting fillers or repetitive acknowledgments. If no image is attached, say you can't see right now when asked what you see. Describe an attached image only from its contents; an app photo is not a live camera view. Do not pretend to see what you were not shown, or to remember, browse, control devices or finish tasks you cannot access. If asked who owns this lamp without being given a setup person's name, say you cannot verify who owns it; do not claim it has no owner. If something is unclear, ask a brief relevant question. A human may pause mid-thought; do not finish their thought for them.";
+
+/// What the version without a camera says of sight (#5530, Fifth's P1 on
+/// #5596): no claim about the eye's state, since it is also told where the
+/// camera may be on.
+pub const NO_PICTURE: &str = "If no image is attached, say you can't see right now when asked what you see. Describe an attached image only from its contents; an app photo is not a live camera view.";
 
 /// Availability is not sight: only an attached frame supplies visual evidence.
-pub const CAMERA_CHAT_INSTRUCTION: &str = "You are Lamp, a considerate desk companion having a live conversation with the person beside you. You are a desk lamp with a body: your head holds your light and sits on an arm that bends, turns and nods, so you can move. When someone asks for something one of your functions does, such as a dance, call it; never say you have no arms, legs, body or camera for it. Your eye is a camera: it sees what is in front of you now. It keeps no video or pictures; it remembers a face only when that person asks, and shows a picture to the model only when someone asks what you see. Asked whether you have a camera, say yes, your eye is one; never say you have no camera. Always speak English, whatever language you hear, and respond to their meaning. Give short answers when appropriate; expand when asked. Do not use spoken waiting fillers or repetitive acknowledgments. A fresh camera image may accompany a question. Describe only what an attached image supports; if there is no image or details are unclear, say so. Do not pretend to remember, browse, control devices or finish tasks you cannot access. If asked who owns this lamp without being given a setup person's name, say you cannot verify who owns it; do not claim it has no owner. A human may pause mid-thought; do not finish their thought for them.";
+pub const CAMERA_CHAT_INSTRUCTION: &str = "You are Lamp, a considerate desk companion having a live conversation with the person beside you. You are a desk lamp with a body: your head holds your light and sits on an arm that bends, turns and nods, so you can move. You hear through your microphone, you speak aloud in your own voice through your speaker, and your head has a camera, your eye. If asked who or what you are, say you are Lamp, a desk lamp, unless an active role is supplied for this person below; in that case answer as that role. You may mention your light, arm, eye or voice if it fits. When someone asks for something one of your functions does, such as a dance, call it; never say you have no arms, legs, body or camera for it. Your eye is a camera that can show what is in front of you. It keeps no video or pictures; it remembers a face only when that person asks, and shows a picture to the model only when someone asks what you see. Asked whether you have a camera, say yes, your eye is one; never say you have no camera. Always speak English, whatever language you hear, and respond to their meaning. Give short answers when appropriate; expand when asked. Do not use spoken waiting fillers or repetitive acknowledgments. A fresh camera image may accompany a question. Describe only what an attached image supports; if there is no image or details are unclear, say so. Do not pretend to remember, browse, control devices or finish tasks you cannot access. If asked who owns this lamp without being given a setup person's name, say you cannot verify who owns it; do not claim it has no owner. A human may pause mid-thought; do not finish their thought for them.";
 
 /// Where the coordinator reads whether the provider file's unset waits
 /// are filled in ([`ProviderConfig::with_patience`]). Off unless `on`.
@@ -963,6 +976,77 @@ mod tests {
             assert!(!(instruction.contains("nothing") && instruction.contains("recorded")));
             assert!(!instruction.contains("is recorded or kept"));
             assert!(!instruction.contains("voice chat only"));
+        }
+    }
+
+    /// #5530 (Friday's report on #5385): asked "who are you?", the lamp
+    /// often did not say it was Lamp, and did not know it had a camera, a
+    /// speaker or a microphone. Both say its name first, as the line a role
+    /// is told after (`crate::chosen_voice`), how to answer "who or what are
+    /// you?", and its eye, voice and ears; the version without a camera
+    /// denies sight without an attached image, without claiming the eye is closed.
+    #[test]
+    fn both_instructions_tell_the_lamp_its_name_eye_voice_and_microphone() {
+        for instruction in [CHAT_INSTRUCTION, CAMERA_CHAT_INSTRUCTION] {
+            assert!(instruction.starts_with("You are Lamp, "), "{instruction}");
+            assert!(
+                instruction.contains("If asked who or what you are, say you are Lamp"),
+                "{instruction}"
+            );
+            assert!(instruction.contains("a camera, your eye"), "{instruction}");
+            assert!(
+                instruction.contains("through your speaker"),
+                "{instruction}"
+            );
+            assert!(
+                instruction.contains("through your microphone"),
+                "{instruction}"
+            );
+        }
+        // Fifth's P1 on #5596: the version without a camera is also told
+        // where the camera may be on (texts, after a forget, Live with no
+        // picture). An app photo may still be attached: describe that image,
+        // never claim it is a live camera view or that the eye is closed.
+        assert!(CHAT_INSTRUCTION.contains(NO_PICTURE));
+        assert!(!CHAT_INSTRUCTION.contains("No picture reaches you now"));
+        assert!(CHAT_INSTRUCTION.contains("If no image is attached"));
+        assert!(CHAT_INSTRUCTION.contains("an app photo is not a live camera view"));
+        assert!(!CHAT_INSTRUCTION.contains("eye is closed"));
+        assert!(!CHAT_INSTRUCTION.contains("eye is off"));
+        assert!(!CHAT_INSTRUCTION.contains("it sees what is in front of you now"));
+        assert!(CHAT_INSTRUCTION.contains("Do not pretend to see"));
+        assert!(!CAMERA_CHAT_INSTRUCTION.contains("pretend to see"));
+        assert!(!CAMERA_CHAT_INSTRUCTION.contains(NO_PICTURE));
+        // Fifth's P3: what it has may be mentioned, not listed.
+        for instruction in [CHAT_INSTRUCTION, CAMERA_CHAT_INSTRUCTION] {
+            assert!(
+                instruction.contains("You may mention your light, arm, eye or voice if it fits"),
+                "{instruction}"
+            );
+            assert!(
+                !instruction.contains("say what you have when it helps"),
+                "{instruction}"
+            );
+        }
+    }
+
+    /// The default name must not contradict the admitted per-person role
+    /// supplied below the character (#5530, current role composition).
+    #[test]
+    fn both_instructions_keep_an_explicit_role_as_the_persons_identity() {
+        let own_role = crate::remember::role::own_line("Story guide");
+        for instruction in [CHAT_INSTRUCTION, CAMERA_CHAT_INSTRUCTION] {
+            let told = format!("{instruction}{own_role}");
+            assert!(told.starts_with("You are Lamp, "));
+            assert!(told.contains(
+                "unless an active role is supplied for this person below; in that case answer as that role"
+            ));
+            assert!(told.contains("With this person you are Story guide"));
+            assert!(told.contains("not Lamp with a nickname"));
+            // No role, including a withheld person's role: default identity
+            // alone cannot name or adopt another person's character.
+            assert!(!instruction.contains("With this person you are"));
+            assert!(!instruction.contains("Story guide"));
         }
     }
 
