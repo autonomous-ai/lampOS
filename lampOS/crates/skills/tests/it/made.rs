@@ -402,6 +402,153 @@ fn a_made_skill_past_the_cap_or_not_made_here_does_not_go_on() {
     }
 }
 
+/// A made skill started by its own words alone (`LAMP_MADE_SKILL_ASKS`,
+/// #8451): no trigger, `asks` and a light step.
+fn asked_toml(asks: &str) -> String {
+    format!(
+        "kind = \"installable\"\nversion = \"1.0.0\"\nasks = {asks}\n\n[permissions]\nlight = true\n\n[[do]]\nlight = {{ dim = 1 }}\n"
+    )
+}
+
+/// `toml` as the made skill `name`, its card `made: here`, packed by the
+/// real `lamp-skills pack` into the voice's made folder, entered in its
+/// index and marked to go on, as
+/// [`a_made_skill_past_the_cap_or_not_made_here_does_not_go_on`] keeps
+/// one: its SHA-256, for the helper's `install_made`.
+fn kept_made(dir: &Path, keeping: &Keeping, name: &str, toml: &str) -> String {
+    let folder = dir.join("src").join(name);
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("skill.toml"), toml).unwrap();
+    fs::write(
+        folder.join("SKILL.md"),
+        card(name).replace("---\n\n", "made: here\n---\n\n"),
+    )
+    .unwrap();
+    let packed = package::pack(&folder, &keeping.directory).unwrap();
+    let sha256 = package::sha256_hex(&fs::read(&packed).unwrap());
+    let index = keeping.directory.join(lamp_voice::made_skill::INDEX);
+    let mut entries: Vec<serde_json::Value> =
+        serde_json::from_slice(&fs::read(&index).unwrap()).unwrap();
+    entries.push(serde_json::json!({
+        "sha256": sha256,
+        "package": packed.file_name().unwrap().to_str().unwrap(),
+    }));
+    fs::write(&index, serde_json::to_vec(&entries).unwrap()).unwrap();
+    mark(keeping, &sha256);
+    sha256
+}
+
+/// #8469, lamp-06c1, 24 Nov: "whenever I say pebble hello" kept as the ask
+/// "pebble hello", one word of its own ("hello" is said around an ask).
+/// The voice's own install, the helper's `install_made` asked as the voice
+/// asks it, holds it to the made floor the voice read it with
+/// (`lamp_voice::made_skill::put_on_cap`): it goes on.
+#[test]
+fn a_voice_made_one_word_ask_goes_on_through_install_made() {
+    lamp_voice::made_skill::set_asks_here(Some(true));
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    // A kept one first, so the folder and its index are the voice's.
+    keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
+    let sha256 = kept_made(
+        dir.path(),
+        &keeping,
+        "pebble-hello",
+        &asked_toml("[\"pebble hello\"]"),
+    );
+    let mut answer = Vec::new();
+    let asked = format!("{{\"install_made\": \"{sha256}\"}}\n");
+    let ok = asked_helper(
+        &skills,
+        &keeping.directory,
+        &skills.join("no-state"),
+        std::time::Duration::from_millis(500),
+        None,
+        None,
+        asked.as_bytes(),
+        &mut answer,
+    )
+    .unwrap();
+    let answer: serde_json::Value = serde_json::from_slice(&answer).unwrap();
+    assert!(ok, "{answer}");
+    assert!(
+        answer["done"].as_str().unwrap().contains("pebble-hello"),
+        "{answer}"
+    );
+    let on = lamp_skills::load(&skills.join("pebble-hello")).unwrap();
+    assert!(on.made_here);
+    assert_eq!(on.asks, ["pebble hello"]);
+    lamp_voice::made_skill::set_asks_here(None);
+}
+
+/// #8451 (Twelve's P2 on #8469): an ask whose only word of its own is a
+/// short answer, "yes please", is refused by the voice's install of a made
+/// skill with the short-answer rule
+/// (`lamp_voice::skill_named::REFUSED_ANSWER`), and nothing goes on.
+#[test]
+fn a_voice_made_short_answer_ask_is_refused_by_install_made() {
+    lamp_voice::made_skill::set_asks_here(Some(true));
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
+    let sha256 = kept_made(
+        dir.path(),
+        &keeping,
+        "yes-glow",
+        &asked_toml("[\"yes please\"]"),
+    );
+    let refused = install_made(
+        &skills,
+        None,
+        &keeping.directory,
+        &sha256,
+        std::time::Duration::from_millis(500),
+    )
+    .unwrap_err();
+    assert!(
+        refused.contains(lamp_voice::skill_named::REFUSED_ANSWER),
+        "{refused}"
+    );
+    assert!(refused.contains("\"yes please\""), "{refused}");
+    assert!(!skills.join("yes-glow").exists());
+    lamp_voice::made_skill::set_asks_here(None);
+}
+
+/// #8469: the made floor is the voice's install's alone, never a card's
+/// `made: here`. A pushed folder (its `lamp_skills::PUSHED_FROM` record)
+/// whose card says `made: here` with "pebble hello" and no tool is no
+/// skill made here (`started_by_words` false): its asks are refused as
+/// any skill's with no tool. The same folder with no push record loads.
+#[test]
+fn a_pushed_made_here_card_gets_no_made_floor() {
+    lamp_voice::made_skill::set_asks_here(Some(true));
+    let dir = tempfile::tempdir().unwrap();
+    let folder = dir.path().join("pebble-hello");
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("skill.toml"), asked_toml("[\"pebble hello\"]")).unwrap();
+    fs::write(
+        folder.join("SKILL.md"),
+        card("pebble-hello").replace("---\n\n", "made: here\n---\n\n"),
+    )
+    .unwrap();
+    assert!(lamp_skills::load(&folder).unwrap().made_here);
+    fs::write(
+        folder.join(lamp_skills::PUSHED_FROM),
+        r#"{"computer":"studio laptop"}"#,
+    )
+    .unwrap();
+    let refused = lamp_skills::load(&folder).unwrap_err();
+    assert!(
+        refused.contains("asks are the phrases that call the skill's tool"),
+        "{refused}"
+    );
+    lamp_voice::made_skill::set_asks_here(None);
+}
+
 /// A person's own made skill never takes the place of a skill they put on
 /// another way (the reviewer's P3 on #2414): one of the same
 /// name, from a store, stays, and the made one is refused with its name.
