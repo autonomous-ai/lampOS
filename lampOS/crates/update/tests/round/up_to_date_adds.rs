@@ -488,3 +488,32 @@ fn an_up_to_date_rounds_pass_held_still_starts_a_lamp_control_that_ended_cleanly
         lamp.said
     );
 }
+
+/// A pass the room held changed nothing: `log.jsonl` keeps none of what it
+/// said, as it would say the same every round until the room is quiet.
+#[test]
+fn an_up_to_date_rounds_pass_held_keeps_no_lines_in_the_log() {
+    let mut lamp = product_lamp();
+    taken_by_an_older_updater(&mut lamp, "mood 1");
+    let reset = lamp.root.join("var/lib/lampos-setup/reset.json");
+    fs::create_dir_all(reset.parent().unwrap()).unwrap();
+    fs::write(&reset, "{}").unwrap();
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::NotQuiet(why) if why.contains("reset of the lamp")),
+        "{outcome:?}"
+    );
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.starts_with("build 2, which the lamp runs, adds ")),
+        "{:?}",
+        lamp.said
+    );
+    assert!(!lamp.exists(&format!("/etc/systemd/system/{MOOD}")));
+    assert!(kept_lines(&lamp, "not-quiet").is_empty());
+    let log =
+        fs::read_to_string(lamp.root.join("var/lib/lampos-update/log.jsonl")).unwrap_or_default();
+    assert!(!log.contains("which the lamp runs, adds "), "{log}");
+}
