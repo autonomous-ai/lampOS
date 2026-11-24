@@ -580,36 +580,58 @@ unless set, on in the product unit, #7876).** Only with `LAMP_FACE_NO_ASK` and
 `LAMP_REMEMBER_SPEAKER` on too (`learn_later::switched`); the three go on in
 the product together. A lamp set up with no face kept (lamp-e82d, 18 Nov)
 kept nothing in every later conversation. With the walk over and nothing of
-it led, the walk asks once, as its own line, "What should I call you?"
-(`learn_later::ASK`), when all of these hold:
+it led, the greeting that opens a conversation is answered with the name
+asked in its own reply, when all of these hold:
 
 - the eyes know nobody: 0 people in their `{"list":true}` answer, read by a
   thread of its own every 30 s off every reply's path (`learn_later::start`);
   not yet answered is no;
-- the conversation's first line (after 60 s of quiet) is a greeting and
-  nothing more ("Hi lamp.", "Hello, how are you?"; a task or a question is
-  not), a face read speaking as it was said (the eyes' `speaking`, within
-  6 s of its end), and no second face in view since it began;
-- the lamp's answer to it ended 1.5 to 10 s ago, no second line heard, one
-  face in view now, English (as the walk's name reading);
-- the bounds in the walk's file (`Progress::learn_later`, kept through a
+- as the line begins: one face in view, the walk over and nothing of it
+  led, English (as the walk's name reading), the line opening a
+  conversation (60 s of quiet before it, `learn_later::Moment::opens`), and
+  the bounds in the walk's file (`Progress::learn_later`, kept through a
   redo of the whole walk, wiped by a reset): at most once in 24 h; an ask
   left unanswered counts, and after 3 it is never asked again; the model
   judging the answer a decline, or "forget my face" at any time, stops it
-  for good.
+  for good. The walk arms the ask at each tick (`Onboarding::name_ask`) and
+  the coordinator tells the second route's worker with the line's Start
+  (`WalkUnderWay`'s `name_ask`), so the reply waits on nothing;
+- the line is a greeting and nothing more ("Hi lamp.", "Hello, how are
+  you?"; a task or a question is not), read by the worker
+  (`learn_later::turn`).
 
-It is getting to know someone, never a consent question. The ask is said
-with no chat, so nothing is read from memory for it, and the second route
-keeps its exchange out of memory (`learn_later::is_ask`, `remember::keep_out`).
-The model judges the answer, never a list of words (the owner's rule, 13
-Nov): on the one line after the ask (30 s at most) the second route tells it
-it just asked (`learn_later::ANSWER_NOTE`) and declares
-`not_telling_their_name` (`learn_later::DECLINED`, with the switch passed to
-the worker). That call, only on the ask's answer, tells the walk by its
-mailbox to stop for good (`{"learn_later":"declined"}`); `remember_my_face`
-on it tells it the ask was answered (`{"learn_later":"answered"}`). "I don't
-mind, call me Sam" is a name. On a name, names checked, the model calls
-`remember_my_face`, and the speaker-bound route (`known_faces::run_speaker`)
+Then the model is told, on that reply, to answer the greeting in a few words
+and, in place of any question of its own, ask only what to call them
+(`learn_later::GREETING_NOTE`): one reply, one question, "Hello! I don't
+think we've met. What should I call you?", never "How are you? What should I
+call you?" (rule 8, #8471's lamp run). The worker tells the walk it asked
+(`{"learn_later":"asked"}`), which counts it in the bounds. There is no
+second utterance: before #8471 the walk said the ask as its own line 1.5 to
+10 s after the reply, 8 to 13 s from the greeting heard to the ask's audio
+on the lamp; now the ask is in the reply's own audio, so it comes with the
+reply's first sound (expected about the reply's usual latency; not yet
+measured on a lamp). The speaker-bound route still proves who said the name
+before anything is kept; the walk no longer requires a face read speaking
+as the greeting is said, since it arms before the line.
+
+It is getting to know someone, never a consent question. The model judges
+the answer, never a list of words (the owner's rule, 13 Nov): on the next
+line from anyone, heard within 60 s of the asking turn
+(`learn_later::ANSWER_WITHIN_US`, 30 s until #8471's run missed a name 30.7 s
+on), the second route tells it it just asked (`learn_later::ANSWER_NOTE`,
+which also says the face is kept only if `remember_my_face`'s result says so)
+and declares `not_telling_their_name` (`learn_later::DECLINED`, with the
+switch passed to the worker). That call, only on the ask's answer, tells the
+walk by its mailbox to stop for good (`{"learn_later":"declined"}`);
+`remember_my_face` then or later in that conversation tells it the ask was
+answered (`{"learn_later":"answered"}`). Past the window, after another line
+between, or with the answer's turn gone by and nothing called, every later
+line of that conversation (until 60 s of quiet) tells the model their face
+was not kept and never to say it will know them
+(`learn_later::NOT_KEPT_NOTE`): on #8471's run the model said "I'll know you
+now." with nothing kept. "I don't mind, call me Sam" is a name. On a name,
+names checked, the model calls `remember_my_face`, and the speaker-bound
+route (`known_faces::run_speaker`)
 proves the face in view said its own name, unchanged (#7787). Only when the
 eyes answer `remembered` is the model told to say "I'll know you next time.
 Say 'forget my face' to undo." (`KEPT_NO_ASK`); the eyes refusing (two

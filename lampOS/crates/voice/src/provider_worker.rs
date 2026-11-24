@@ -936,6 +936,11 @@ pub enum ProviderInput {
         /// line is answered with it, no chat. Absent otherwise.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         updating: Option<String>,
+        /// The walk's name ask armed for this line (`LAMP_FACE_LEARN_LATER`,
+        /// `onboarding::learn_later::set_armed`): its reply asks the name if
+        /// the line is a greeting. Absent is false.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        name_ask: bool,
     },
     /// A whole request in writing, for a turn the lamp begins itself: it is
     /// a start and an end at once and carries no sound.

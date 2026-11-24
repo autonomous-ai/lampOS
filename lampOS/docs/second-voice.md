@@ -6830,7 +6830,11 @@ after a take-over, but now for every turn:
   way) loses the mark at the next refresh, so a later face saved under that
   name is never taken for the owner (the eyes' ids can't tell the two apart:
   a forgotten name gets the same id back); a whole redo or a reset drops it
-  too. A rename of the owner's own face is no forget: a `remember_my_face`
+  too. Eyes that answer they know nobody (an empty print store) drop
+  nothing: the owner is not named while they know nobody, but the mark
+  stays in the walk's file, through a restart too (#8471's lamp run, the
+  first builder's call of 24 Nov, a deliberate narrowing of #4290 to a list
+  the owner is not in). A rename of the owner's own face is no forget: a `remember_my_face`
   with `replace` while an owner is kept (`known_faces::OwnerRename`) is
   counted in flight before the eyes are asked, and the owner moves to B
   only when the eyes answer that they kept the face under B and that the

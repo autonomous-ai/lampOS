@@ -4438,6 +4438,11 @@ fn refresh_owner(file: Option<&Path>, socket: Option<&Path>) {
     let names = owner.as_ref().and(socket).and_then(names_reached);
     let found = match (owner, names) {
         (Some(owner), Some(Some(names))) if among(&names, &owner) => Some(owner),
+        // The eyes knowing nobody (an empty print store) is not the owner
+        // gone: the mark stays in the walk's file, through a restart too
+        // (#8471's lamp run, the first builder's 14:01 call, a deliberate
+        // narrowing of #4290's drop to a list the owner is not in).
+        (Some(_), Some(Some(names))) if names.is_empty() => None,
         (Some(owner), Some(Some(_))) => {
             if let Some(file) = file {
                 let now = renames_of(file);
@@ -6338,6 +6343,36 @@ mod tests {
         std::fs::remove_file(&mailbox).unwrap();
         refresh_owner(Some(&file), Some(&socket.with_file_name("none.sock")));
         assert_eq!(told(), "");
+    }
+
+    /// #8471's lamp run (the first builder's 14:01 call): while the eyes
+    /// know nobody (an empty print store) the owner is never dropped, so a
+    /// restart keeps `owner` in the walk's file; #4290's drop stands for a
+    /// list the owner is not in. A deliberate narrowing of #4290.
+    #[test]
+    fn an_empty_print_store_never_drops_the_owner_across_a_restart() {
+        let (socket, _asked) = eyes(vec![
+            serde_json::json!({"people": []}),
+            serde_json::json!({"people": []}),
+        ]);
+        let file = socket.with_file_name("progress.json");
+        std::fs::write(&file, r#"{"steps":{},"owner":"Example Name"}"#).unwrap();
+        let mailbox = crate::onboarding::mailbox_of(&file);
+        for _ in 0..2 {
+            refresh_owner(Some(&file), Some(&socket));
+        }
+        assert_eq!(std::fs::read_to_string(&mailbox).unwrap_or_default(), "");
+        // The voice started again: the walk reads its file and mailbox.
+        let mut walk = crate::onboarding::Onboarding::at(file.clone());
+        for at in 0..8 {
+            walk.drain_storage_for_test(at * 250_000);
+            let _ = walk.tick(at * 250_000, at * 250_000, true, false, None, true);
+            walk.drain_storage_for_test(at * 250_000);
+        }
+        assert_eq!(
+            crate::onboarding::owner_of(&file).as_deref(),
+            Some("Example Name")
+        );
     }
 
     /// An onboarding file whose setup owner is `owner`, beside a fresh
