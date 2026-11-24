@@ -16,8 +16,7 @@ no longer needs). `lamp-cloud` also needs `LAMP_CLOUD=on` and
 `LAMP_SETTINGS_CHANGE=on`, both on in the product. `install` places the
 helper's units (`lamp-setup-keys.socket`, enabled, and
 `lamp-setup-keys@.service`), and a round adds them to a lamp installed
-before; an added socket listens from the lamp's next start (`added::to_start`
-starts services only). The helper itself doesn't read the switch (its unit
+before, starting the socket with the round (`added::to_start`). The helper itself doesn't read the switch (its unit
 passes `--enable`): `lamp-cloud` answers "not on this lamp" with the switch
 off, and only `lamp-cloud` may ask. With a unit's switch set off in a
 drop-in (`LAMP_OWN_KEYS=off`), nothing changes:
