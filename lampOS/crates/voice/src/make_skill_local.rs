@@ -10286,7 +10286,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         // refused on the floor, its rule named, with a repair.
         let chosen = "when I say pebble garden tune, email me@example.com with the subject \
                       Test note, saying This is my test note.";
-        let (root, keeping) = keeping("asks-chosen");
+        let (root, keeping) = self::keeping("asks-chosen");
         let refused = made_skill::keep_asked(
             &write_answer(&toml("pebble hello")),
             false,
@@ -10306,7 +10306,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         );
         assert!(refused.1.is_some(), "repaired");
         let _ = std::fs::remove_dir_all(&root);
-        let (root, keeping) = keeping("asks-chosen-made");
+        let (root, keeping) = self::keeping("asks-chosen-made");
         let (url, served) = service(vec![
             (200, write_answer(&toml("pebble hello")));
             1 + MOST_REPAIRS
@@ -10408,7 +10408,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(refused.0.contains("‘hello there’, because"), "{refused:?}");
         assert!(refused.1.is_none(), "no repair: {refused:?}");
         let _ = std::fs::remove_dir_all(&root);
-        let (root, keeping) = keeping("asks-whole-refused-made");
+        let (root, keeping) = self::keeping("asks-whole-refused-made");
         let (url, served) = service(vec![(200, write_answer(&toml))]);
         let told = make_with(
             7,
@@ -10470,7 +10470,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             "{repair}"
         );
         let _ = std::fs::remove_dir_all(&root);
-        let (root, keeping) = keeping("asks-part-refused-made");
+        let (root, keeping) = self::keeping("asks-part-refused-made");
         let (url, served) = service_sent(vec![
             (200, write_answer(&asks_mail_toml("hello there"))),
             (200, write_answer(&asks_mail_toml("hello there pebble"))),
