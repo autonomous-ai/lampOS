@@ -119,6 +119,367 @@ pub(crate) fn ran_now(skill: &str, at: std::time::Instant) {
         name != skill && at.saturating_duration_since(*when) <= ANSWERS_WITHIN
     });
     ran.push((skill.to_owned(), at));
+    drop(ran);
+    // Under way too, for a stop that ends it (#8475).
+    ran_here(skill, at);
+}
+
+/// lamp-skills' call socket op that ends the run under way:
+/// `{"op":"cancel"}`, answered `{"stopped": NAME|null, "ms": N|null}` (or
+/// that inside `{"ok":true,"result":...}`): the skill it stopped and how
+/// long after its start, or none (#8475).
+pub const CANCEL_OP: &str = "cancel";
+
+/// How long after its start a run the voice asked is still taken as under
+/// way, for a stop to end it (#8475). A known approximation: lamp-skills
+/// tells the voice no run's end, so a run is under way from its start until
+/// it is stopped or this long has passed, whether or not it already ended
+/// on its own. A stop sent to a run already over is answered `stopped:
+/// null` and does nothing.
+pub const UNDER_WAY_FOR: std::time::Duration = std::time::Duration::from_secs(15 * 60);
+
+/// The last run the voice asked, as this process knows it, with when it
+/// was answered `ran`: the coordinator's (told by the worker, [`ran_now`])
+/// and the second route's worker's own ([`ran_here`]), each in its own
+/// process (#8475).
+#[derive(Debug, Default)]
+pub struct UnderWay {
+    run: Option<(String, std::time::Instant)>,
+}
+
+impl UnderWay {
+    pub const fn new() -> Self {
+        Self { run: None }
+    }
+
+    /// `skill` answered `ran` at `at`: the newest run, under way.
+    pub fn ran(&mut self, skill: &str, at: std::time::Instant) {
+        self.run = Some((skill.to_owned(), at));
+    }
+
+    /// The run under way at `now`, if one is: started within
+    /// [`UNDER_WAY_FOR`] and not stopped since.
+    pub fn under_way(&self, now: std::time::Instant) -> Option<(&str, std::time::Instant)> {
+        self.run
+            .as_ref()
+            .filter(|(_, at)| now.saturating_duration_since(*at) <= UNDER_WAY_FOR)
+            .map(|(skill, at)| (skill.as_str(), *at))
+    }
+
+    /// The run under way at `now`, taken as stopped: never stopped twice.
+    pub fn stopped(&mut self, now: std::time::Instant) -> Option<(String, std::time::Instant)> {
+        let run = self.run.take()?;
+        (now.saturating_duration_since(run.1) <= UNDER_WAY_FOR).then_some(run)
+    }
+
+    /// A line heard while the lamp is quiet (`text`, the lamp's name heard
+    /// for it: `named`; the said-to-me rule let it out: `facing`), when it
+    /// is a stop said to the lamp ([`quiet_stop_said_to_lamp`]) and a run
+    /// is under way: that run, taken as stopped. None otherwise, and the
+    /// run stays under way.
+    pub fn quiet_stop(
+        &mut self,
+        text: &str,
+        named: bool,
+        facing: bool,
+        now: std::time::Instant,
+    ) -> Option<String> {
+        self.under_way(now)?;
+        if !quiet_stop_said_to_lamp(text, named, facing) {
+            return None;
+        }
+        self.stopped(now).map(|(skill, _)| skill)
+    }
+}
+
+/// This process's [`UnderWay`].
+#[cfg(not(test))]
+static UNDER_WAY: std::sync::Mutex<UnderWay> = std::sync::Mutex::new(UnderWay::new());
+
+#[cfg(test)]
+thread_local! {
+    /// In tests, each test thread's own: a run one test notes is never
+    /// another's run under way, as tests run side by side.
+    static UNDER_WAY: std::cell::RefCell<UnderWay> = const { std::cell::RefCell::new(UnderWay::new()) };
+}
+
+/// `f` on this process's [`UnderWay`].
+#[cfg(not(test))]
+fn with_under_way<R>(f: impl FnOnce(&mut UnderWay) -> R) -> R {
+    let mut record = UNDER_WAY
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner());
+    f(&mut record)
+}
+
+/// `f` on this test thread's [`UnderWay`].
+#[cfg(test)]
+fn with_under_way<R>(f: impl FnOnce(&mut UnderWay) -> R) -> R {
+    UNDER_WAY.with(|record| f(&mut record.borrow_mut()))
+}
+
+/// `skill` answered `ran` at `at`, in this process: the second route's
+/// worker notes the run it asked, so a quiet stop said to the lamp can be
+/// told from one said to the room ([`quiet_stop_taken`], #8475). Never
+/// `RAN_NOW`: the say service reads that in the coordinator alone.
+pub fn ran_here(skill: &str, at: std::time::Instant) {
+    with_under_way(|record| record.ran(skill, at));
+}
+
+/// Whether `skill`, answered `ran` at `ran_at` or just before it was noted,
+/// is still this process's run under way at `now`: not stopped, nor another
+/// run noted since.
+pub fn still_under_way(skill: &str, ran_at: std::time::Instant, now: std::time::Instant) -> bool {
+    with_under_way(|record| {
+        record
+            .under_way(now)
+            .is_some_and(|(name, at)| name == skill && at >= ran_at)
+    })
+}
+
+/// [`UnderWay::quiet_stop`] on this process's record.
+pub fn quiet_stop_taken(
+    text: &str,
+    named: bool,
+    facing: bool,
+    now: std::time::Instant,
+) -> Option<String> {
+    with_under_way(|record| record.quiet_stop(text, named, facing, now))
+}
+
+/// Words that soften a stop and say nothing else: "okay, stop", "please
+/// stop", "stop now".
+const STOP_SOFT: &[&str] = &[
+    "okay", "ok", "please", "hey", "oh", "alright", "right", "just", "so", "now",
+];
+
+/// What may follow a bare "stop" in a short stop line: "stop it", "stop
+/// that".
+const STOP_WHAT: &[&str] = &["it", "that", "this", "there"];
+
+/// The most words a stop said to the lamp by its name or face has, as a
+/// spoken stop over its answer (`spoken_stop::is_stop_request`).
+const QUIET_STOP_MOST_WORDS: usize = 6;
+
+/// Whether a line heard while the lamp is NOT speaking is a stop said to
+/// the lamp, so it ends a run under way (#8475). Over the lamp's own voice
+/// the spoken stop's rules stand as they are; this is the quiet case only.
+///
+/// - **A short stop line on its own:** the whole line, soft words and the
+///   lamp's name aside, is "stop", "stop it", "stop that" ("Stop.", "Okay,
+///   stop.", "Please stop.", "Stop it.", "Lamp, stop.").
+/// - **Named** (`named`, or the lamp's name in its words) **or said facing
+///   it** (`facing`: the said-to-me rule let it out): a short ask to stop
+///   that opens with "stop" past the name and soft words ("Lamp, stop the
+///   photo booth."), never a question nor "don't stop".
+/// - Never a "stop" inside a longer sentence ("Don't stop now.", "I can't
+///   stop laughing.", "Tom, stop it." said to someone else).
+pub fn quiet_stop_said_to_lamp(text: &str, named: bool, facing: bool) -> bool {
+    if text.contains('?') {
+        return false;
+    }
+    let name = crate::second_provider::net::key_terms::NAME.to_ascii_lowercase();
+    let words = crate::not_speech::plain_words(text);
+    let named = named || words.contains(&name);
+    let own: Vec<&str> = words
+        .iter()
+        .map(String::as_str)
+        .filter(|word| *word != name && !STOP_SOFT.contains(word))
+        .collect();
+    let short = match own.as_slice() {
+        [] => false,
+        ["stop", what] => STOP_WHAT.contains(what) || *what == "stop",
+        all => all.iter().all(|word| *word == "stop"),
+    };
+    if short {
+        return true;
+    }
+    (named || facing)
+        && words.len() <= QUIET_STOP_MOST_WORDS
+        && own.first() == Some(&"stop")
+        && crate::spoken_stop::is_stop_request(text)
+}
+
+/// The journal's line for a run lamp-skills stopped at the voice's ask:
+/// grepped to count the runs stopped within 10 s (#8475).
+pub fn stopped_run_line(skill: &str, ms: u64) -> String {
+    format!("lamp-voice: stopped run {skill} {ms} ms after start (#8475)")
+}
+
+/// The run lamp-skills says its `cancel` stopped ([`CANCEL_OP`]), and how
+/// long after its start: its own `ms`, or `elapsed_ms` (the voice's count
+/// from the `ran` answer) when it gives none. None when it stopped none.
+pub fn stopped_of(answer: &Value, elapsed_ms: u64) -> Option<(String, u64)> {
+    let told = match answer.get("result") {
+        Some(result) if result.is_object() => result,
+        _ => answer,
+    };
+    let skill = told["stopped"].as_str().filter(|skill| !skill.is_empty())?;
+    Some((skill.to_owned(), told["ms"].as_u64().unwrap_or(elapsed_ms)))
+}
+
+/// Ask lamp-skills, on its call socket in `folder`, to stop the run under
+/// way ([`CANCEL_OP`]), on a thread of its own, so the stop that asks it
+/// waits for nothing: the stop's own reply cut is made before and without
+/// it. `skill` and `started` are the voice's record of the run; `why` says
+/// what stopped it. The thread journals the run stopped
+/// ([`stopped_run_line`]) and gives it back. None if no thread could start.
+pub fn cancel_run(
+    folder: &Path,
+    skill: String,
+    started: std::time::Instant,
+    why: &'static str,
+) -> Option<std::thread::JoinHandle<Option<(String, u64)>>> {
+    let socket = folder.join(crate::tools::CALL_SOCKET);
+    let spawned = std::thread::Builder::new()
+        .name("lamp-voice-run-stop".into())
+        .spawn(move || {
+            eprintln!("lamp-voice: {why}: the run of {skill} under way is asked to stop (#8475)");
+            let answer = crate::tools::exchange(
+                &socket,
+                &json!({ "op": CANCEL_OP }),
+                crate::tools::ASK_DEADLINE,
+            );
+            let elapsed_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+            let stopped = answer
+                .as_ref()
+                .and_then(|answer| stopped_of(answer, elapsed_ms));
+            match (&answer, &stopped) {
+                (_, Some((stopped, ms))) => eprintln!("{}", stopped_run_line(stopped, *ms)),
+                (Some(_), None) => eprintln!(
+                    "lamp-voice: {why}: lamp-skills had no run of {skill} to stop (#8475)"
+                ),
+                (None, None) => eprintln!(
+                    "lamp-voice: {why}: lamp-skills didn't answer the stop of {skill}'s run (#8475)"
+                ),
+            }
+            stopped
+        });
+    match spawned {
+        Ok(handle) => Some(handle),
+        Err(error) => {
+            eprintln!("lamp-voice: {why}: the run's stop wasn't sent: {error} (#8475)");
+            None
+        }
+    }
+}
+
+/// A stop (the button's, or a spoken one) with this process's run under
+/// way at `now`: that run taken as stopped and lamp-skills asked to stop
+/// it, on lamp-skills' call socket in `folder` ([`cancel_run`]). None when
+/// no run is under way.
+pub fn stop_under_way(
+    folder: &Path,
+    now: std::time::Instant,
+    why: &'static str,
+) -> Option<std::thread::JoinHandle<Option<(String, u64)>>> {
+    let (skill, started) = with_under_way(|record| record.stopped(now))?;
+    cancel_run(folder, skill, started, why)
+}
+
+/// How long after a run's `ran` answer its name line waits, so a run whose
+/// own first sound, or the lamp's reply, starts within it says no more
+/// (#8475).
+pub const NAME_AFTER: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// The latest after its `ran` answer a run's name line is still said, when
+/// a turn is in hand all that while: then the turn speaks for it.
+pub const NAME_LATEST: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// The few words naming a run the voice asked, from the skill's own folder
+/// name, never the model's text: "Running photo booth." (#8475).
+pub fn name_line(skill: &str) -> String {
+    format!("Running {}.", made_skill::spoken_name(skill))
+}
+
+/// Whether a run's name line is said with the lamp speaking `language`:
+/// only in English, since its words are English and, holding a skill's name,
+/// are none of the fixed lines each language has words for (#4473). In
+/// another language no line is said, never English in its place.
+pub fn names_runs_in(language: Option<crate::language::Language>) -> bool {
+    language.is_none()
+}
+
+/// What a run's name line does on a pass ([`NameLine::step`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum NameStep {
+    /// Not yet.
+    Wait,
+    /// Say these words now, once.
+    Say(String),
+    /// Never said, and why.
+    Drop(&'static str),
+}
+
+/// A run's name line, owed from its `ran` answer (#8475): said once,
+/// [`NAME_AFTER`] after it, unless the lamp began speaking (the run's own
+/// say, or a reply's audio) meanwhile, or the run was stopped.
+#[derive(Clone, Debug)]
+pub struct NameLine {
+    skill: String,
+    ran_at: std::time::Instant,
+    ran_us: u64,
+    spoke: bool,
+    done: bool,
+}
+
+impl NameLine {
+    /// `skill` answered `ran` at `ran_at` (`ran_us` on the voice's
+    /// monotonic clock).
+    pub fn after_ran(skill: &str, ran_at: std::time::Instant, ran_us: u64) -> Self {
+        Self {
+            skill: skill.to_owned(),
+            ran_at,
+            ran_us,
+            spoke: false,
+            done: false,
+        }
+    }
+
+    pub fn skill(&self) -> &str {
+        &self.skill
+    }
+
+    pub fn ran_at(&self) -> std::time::Instant {
+        self.ran_at
+    }
+
+    /// When the `ran` answer came, on the voice's monotonic clock: speech
+    /// begun at or after it counts as the lamp speaking.
+    pub fn ran_us(&self) -> u64 {
+        self.ran_us
+    }
+
+    /// One pass at `now`: `spoke_now`, the lamp is heard speaking since the
+    /// `ran` answer; `busy`, a turn is in hand; `under_way`, the run is not
+    /// stopped. Says or drops it once; [`NameStep::Wait`] after that.
+    pub fn step(
+        &mut self,
+        now: std::time::Instant,
+        spoke_now: bool,
+        busy: bool,
+        under_way: bool,
+    ) -> NameStep {
+        if self.done {
+            return NameStep::Wait;
+        }
+        self.spoke |= spoke_now;
+        let since = now.saturating_duration_since(self.ran_at);
+        let step = if !under_way {
+            NameStep::Drop("the run was stopped")
+        } else if self.spoke {
+            NameStep::Drop("the lamp began speaking")
+        } else if since < NAME_AFTER || (busy && since <= NAME_LATEST) {
+            // Too soon, or a turn in hand that may still end within the latest.
+            NameStep::Wait
+        } else if busy {
+            NameStep::Drop("a turn was still in hand")
+        } else {
+            NameStep::Say(name_line(&self.skill))
+        };
+        self.done = step != NameStep::Wait;
+        step
+    }
 }
 
 /// Whether `skill`'s line may answer the conversation that ran it at `now`:
@@ -1250,5 +1611,256 @@ mod tests {
         crate::skill_task_yes::set_on_here(None);
         crate::made_skill::set_scripts_here(None);
         crate::made_skill::set_writes_here(None);
+    }
+
+    /// A fake lamp-skills call socket in a folder of its own, answering one
+    /// line with `answer`: the folder, and the line it was asked.
+    fn skills_answering(test: &str, answer: Value) -> (PathBuf, std::thread::JoinHandle<Value>) {
+        use std::io::{BufRead as _, Write as _};
+        let folder = std::env::temp_dir().join(format!("run-stop-{test}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let listener =
+            std::os::unix::net::UnixListener::bind(folder.join(crate::tools::CALL_SOCKET)).unwrap();
+        let served = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(&stream)
+                .read_line(&mut line)
+                .unwrap();
+            writeln!(&stream, "{answer}").unwrap();
+            serde_json::from_str(&line).unwrap()
+        });
+        (folder, served)
+    }
+
+    /// #8475: a short "stop" heard while the lamp is quiet, with a run the
+    /// voice asked under way, takes that run as stopped and asks lamp-skills
+    /// to end it, on its call socket's `cancel`; with no run under way, or
+    /// one started over 15 min ago, nothing is sent.
+    #[test]
+    fn a_short_quiet_stop_with_a_run_under_way_sends_the_cancel() {
+        use std::time::{Duration, Instant};
+        for short in [
+            "Stop.",
+            "stop",
+            "Stop it.",
+            "Okay, stop.",
+            "Stop that!",
+            "Please stop.",
+            "Stop, stop.",
+            "Okay stop now.",
+        ] {
+            assert!(quiet_stop_said_to_lamp(short, false, false), "{short}");
+        }
+        let now = Instant::now();
+        let mut runs = UnderWay::new();
+        assert_eq!(runs.quiet_stop("Stop.", false, false, now), None, "no run");
+        runs.ran("photo-booth", now);
+        let later = now + Duration::from_secs(4);
+        let skill = runs.quiet_stop("Stop.", false, false, later);
+        assert_eq!(skill.as_deref(), Some("photo-booth"));
+        // Taken as stopped: a second stop sends nothing more.
+        assert_eq!(runs.quiet_stop("Stop.", false, false, later), None);
+        let (folder, served) = skills_answering(
+            "quiet",
+            json!({"ok": true, "result": {"stopped": "photo-booth", "ms": 4_200}}),
+        );
+        let stopped = cancel_run(&folder, skill.unwrap(), now, "a test's stop")
+            .expect("its thread")
+            .join()
+            .unwrap();
+        assert_eq!(served.join().unwrap(), json!({"op": CANCEL_OP}));
+        assert_eq!(stopped, Some(("photo-booth".to_owned(), 4_200)));
+        let _ = std::fs::remove_dir_all(&folder);
+        // Started more than 15 min ago: no longer taken as under way.
+        let mut old = UnderWay::new();
+        old.ran("photo-booth", now);
+        let past = now + UNDER_WAY_FOR + Duration::from_secs(1);
+        assert_eq!(old.quiet_stop("Stop.", false, false, past), None);
+        // lamp-skills not there: the stop's thread ends with nothing.
+        let gone = cancel_run(
+            Path::new("/nonexistent-run-stop"),
+            "photo-booth".to_owned(),
+            now,
+            "a test's stop",
+        )
+        .expect("its thread")
+        .join()
+        .unwrap();
+        assert_eq!(gone, None);
+    }
+
+    /// #8475: a "stop" inside a longer sentence, heard while the lamp is
+    /// quiet, is no stop of the run, named, facing or not: the run stays
+    /// under way and nothing is sent.
+    #[test]
+    fn a_quiet_sentence_with_stop_in_it_stops_no_run() {
+        let now = std::time::Instant::now();
+        let mut runs = UnderWay::new();
+        runs.ran("photo-booth", now);
+        for sentence in [
+            "Don't stop now.",
+            "Don\u{2019}t stop now.",
+            "I can't stop laughing.",
+            "Tom, stop it.",
+            "You two, stop it right now.",
+            "We had to stop at the shop on the way.",
+            "Why did it stop?",
+            "Stop?",
+        ] {
+            for (named, facing) in [(false, false), (false, true), (true, false), (true, true)] {
+                assert!(
+                    !quiet_stop_said_to_lamp(sentence, named, facing),
+                    "{sentence} named {named} facing {facing}"
+                );
+                assert_eq!(runs.quiet_stop(sentence, named, facing, now), None);
+            }
+        }
+        assert_eq!(
+            runs.under_way(now).map(|(skill, _)| skill),
+            Some("photo-booth")
+        );
+        // A longer ask to stop counts only named or said facing the lamp.
+        assert!(!quiet_stop_said_to_lamp(
+            "Stop the photo booth.",
+            false,
+            false
+        ));
+        assert!(quiet_stop_said_to_lamp(
+            "Stop the photo booth.",
+            true,
+            false
+        ));
+        assert!(quiet_stop_said_to_lamp(
+            "Stop the photo booth.",
+            false,
+            true
+        ));
+    }
+
+    /// #8475: "Lamp, stop." heard while quiet names the lamp: it stops the
+    /// run under way.
+    #[test]
+    fn lamp_stop_said_while_quiet_stops_the_run() {
+        for named in [
+            "Lamp, stop.",
+            "Lamp stop",
+            "Stop, Lamp!",
+            "Hey Lamp, stop it.",
+            "Lamp, stop the photo booth.",
+        ] {
+            assert!(quiet_stop_said_to_lamp(named, false, false), "{named}");
+        }
+        let now = std::time::Instant::now();
+        let mut runs = UnderWay::new();
+        runs.ran("photo-booth", now);
+        assert_eq!(
+            runs.quiet_stop("Lamp, stop.", false, false, now).as_deref(),
+            Some("photo-booth")
+        );
+        assert_eq!(runs.under_way(now), None);
+    }
+
+    /// #8475: a run's name line is said once, about 1 s after its `ran`
+    /// answer, in words made from the skill's own folder name; with a turn
+    /// in hand at 1 s it waits for that turn to end quietly.
+    #[test]
+    fn a_runs_name_line_is_said_once_from_its_skill_name() {
+        use std::time::Duration;
+        assert_eq!(name_line("photo-booth"), "Running photo booth.");
+        assert_eq!(name_line("moon-time"), "Running moon time.");
+        // English only: in another language no line is said.
+        assert!(names_runs_in(None));
+        assert!(!names_runs_in(
+            crate::language::Language::parse("vi").unwrap()
+        ));
+        let ran = std::time::Instant::now();
+        let mut line = NameLine::after_ran("photo-booth", ran, 1_000);
+        assert_eq!(line.ran_us(), 1_000);
+        assert_eq!(
+            line.step(ran + Duration::from_millis(500), false, false, true),
+            NameStep::Wait
+        );
+        assert_eq!(
+            line.step(ran + NAME_AFTER, false, false, true),
+            NameStep::Say("Running photo booth.".to_owned())
+        );
+        // Once only.
+        assert_eq!(
+            line.step(ran + Duration::from_secs(2), false, false, true),
+            NameStep::Wait
+        );
+        let mut held = NameLine::after_ran("photo-booth", ran, 1_000);
+        assert_eq!(
+            held.step(ran + Duration::from_millis(1_100), false, true, true),
+            NameStep::Wait
+        );
+        assert_eq!(
+            held.step(ran + Duration::from_secs(2), false, false, true),
+            NameStep::Say("Running photo booth.".to_owned())
+        );
+    }
+
+    /// #8475: the lamp began speaking within the second (the run's own say,
+    /// or the reply's audio): the name line is dropped and never said later;
+    /// so too for a run stopped, or a turn still in hand past
+    /// [`NAME_LATEST`].
+    #[test]
+    fn a_runs_name_line_is_dropped_when_speech_begins_within_a_second() {
+        use std::time::Duration;
+        let ran = std::time::Instant::now();
+        let mut line = NameLine::after_ran("photo-booth", ran, 1_000);
+        assert_eq!(
+            line.step(ran + Duration::from_millis(300), true, true, true),
+            NameStep::Drop("the lamp began speaking")
+        );
+        assert_eq!(
+            line.step(ran + Duration::from_secs(2), false, false, true),
+            NameStep::Wait
+        );
+        let mut stopped = NameLine::after_ran("photo-booth", ran, 1_000);
+        assert_eq!(
+            stopped.step(ran + NAME_AFTER, false, false, false),
+            NameStep::Drop("the run was stopped")
+        );
+        let mut busy = NameLine::after_ran("photo-booth", ran, 1_000);
+        assert_eq!(
+            busy.step(ran + NAME_AFTER, false, true, true),
+            NameStep::Wait
+        );
+        assert_eq!(
+            busy.step(
+                ran + NAME_LATEST + Duration::from_millis(1),
+                false,
+                true,
+                true
+            ),
+            NameStep::Drop("a turn was still in hand")
+        );
+    }
+
+    /// #8475: the journal's line for a run stopped, grepped to count those
+    /// stopped within 10 s, from lamp-skills' answer, bare or wrapped, its
+    /// own `ms` first; none when it stopped none.
+    #[test]
+    fn a_stopped_run_is_journaled_with_its_skill_and_ms() {
+        assert_eq!(
+            stopped_run_line("photo-booth", 4_200),
+            "lamp-voice: stopped run photo-booth 4200 ms after start (#8475)"
+        );
+        assert_eq!(
+            stopped_of(&json!({"stopped": "photo-booth", "ms": 4_200}), 9),
+            Some(("photo-booth".to_owned(), 4_200))
+        );
+        assert_eq!(
+            stopped_of(
+                &json!({"ok": true, "result": {"stopped": "photo-booth", "ms": null}}),
+                9
+            ),
+            Some(("photo-booth".to_owned(), 9))
+        );
+        assert_eq!(stopped_of(&json!({"stopped": null, "ms": null}), 9), None);
+        assert_eq!(stopped_of(&json!({"ok": false, "error": "no"}), 9), None);
     }
 }

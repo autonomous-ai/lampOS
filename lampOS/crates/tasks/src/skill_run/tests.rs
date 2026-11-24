@@ -644,3 +644,226 @@ fn a_script_past_its_process_cap_fails_its_run_while_another_task_answers() {
         refusal("run_failed", "its script ended with status 3")
     );
 }
+
+/// lamp-control as the serve loop's threads see it (#8475): each mint names
+/// `speak`, and each end is kept with whether the run's script was still
+/// there then (its process group, by the pid its script wrote to `pid`).
+struct SeenControl {
+    pid: PathBuf,
+    ended: std::sync::Mutex<Vec<(String, bool)>>,
+}
+
+impl Tokens for SeenControl {
+    fn mint(&self, _: &str, _: &str) -> Result<Minted, String> {
+        Ok(Minted {
+            token: RunToken::new("tok-1".into()),
+            grants: vec!["speak".into()],
+        })
+    }
+
+    fn end(&self, run: &str) {
+        let there = script_pid(&self.pid)
+            .is_some_and(|pid| rustix::process::test_kill_process_group(pid).is_ok());
+        self.ended.lock().unwrap().push((run.to_owned(), there));
+    }
+}
+
+/// The pid a script wrote to `file`, if it has yet.
+fn script_pid(file: &Path) -> Option<rustix::process::Pid> {
+    std::fs::read_to_string(file)
+        .ok()?
+        .trim()
+        .parse::<i32>()
+        .ok()
+        .and_then(rustix::process::Pid::from_raw)
+}
+
+/// No agent: a task's run is never asked of it in these tests.
+struct NoAgent;
+
+impl Runner for NoAgent {
+    fn run(&self, _: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
+        Err("no agent in this test".into())
+    }
+}
+
+/// lamp-tasks' hand-over socket served for `place`'s skills, its `run`
+/// steps through a fake fence, `tokens` as lamp-control.
+fn serve_hand_overs(
+    place: &Place,
+    tokens: &std::sync::Arc<SeenControl>,
+) -> (
+    PathBuf,
+    std::sync::Arc<AtomicBool>,
+    std::thread::JoinHandle<()>,
+) {
+    // `runtime::bind` makes this 0700 folder of this user's.
+    let socket = place.dir.path().join("s/skill-task.sock");
+    let stop = std::sync::Arc::new(AtomicBool::new(false));
+    let handle = crate::skill_task::HandOvers {
+        socket: socket.clone(),
+        skills: place.dir.path().join("skills"),
+        tokens: tokens.clone(),
+        runner: std::sync::Arc::new(NoAgent),
+        caller: |_| true,
+        net: None,
+        held: None,
+        work: None,
+        keys: None,
+        direct: Some(std::sync::Arc::new(place.runner(FAKE_UNSHARE))),
+    }
+    .start(true, stop.clone())
+    .unwrap()
+    .expect("on binds");
+    (socket, stop, handle)
+}
+
+/// One line asked on `socket`, one JSON line read back, as lamp-skills does.
+fn ask_line(socket: &Path, line: &str) -> Value {
+    let mut stream = std::os::unix::net::UnixStream::connect(socket).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(20)))
+        .unwrap();
+    stream.write_all(format!("{line}\n").as_bytes()).unwrap();
+    let mut answer = String::new();
+    BufReader::new(stream).read_line(&mut answer).unwrap();
+    serde_json::from_str(answer.trim()).unwrap_or_else(|_| panic!("not JSON: {answer:?}"))
+}
+
+/// `hand`'s `run` step line, as lamp-skills hands it over.
+fn run_line(hand: &HandOver) -> String {
+    json!({
+        "op": OP,
+        "skill": hand.skill,
+        "task": hand.task,
+        "run": hand.run,
+        "folder": hand.folder.display().to_string(),
+        "sha256": hand.sha256,
+        "grants": hand.grants,
+    })
+    .to_string()
+}
+
+/// A sleeping `run` step handed over on the socket, waited for until its
+/// script wrote its pid: the hand-over's answer comes on the returned
+/// thread.
+fn sleeping_run(
+    place: &Place,
+    socket: &Path,
+    pid: &Path,
+) -> std::thread::JoinHandle<(Value, Instant)> {
+    let hand = place.hand(&format!("echo $$ > {}\nexec sleep 30\n", pid.display()));
+    let (socket, line) = (socket.to_owned(), run_line(&hand));
+    let handed = std::thread::spawn(move || {
+        let answer = ask_line(&socket, &line);
+        (answer, Instant::now())
+    });
+    let began = Instant::now();
+    while script_pid(pid).is_none() {
+        assert!(began.elapsed() < Duration::from_secs(10), "never started");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    handed
+}
+
+/// #8475: a cancel line stops a sleeping run step at once: it is answered
+/// at once with the run it stopped, the run's own hand-over is answered
+/// stopped soon after, and its whole process group is gone.
+#[test]
+fn a_cancel_stops_a_sleeping_run_step_and_names_it() {
+    let place = Place::new();
+    let pid = place.dir.path().join("pid");
+    let tokens = std::sync::Arc::new(SeenControl {
+        pid: pid.clone(),
+        ended: Default::default(),
+    });
+    let (socket, stop, handle) = serve_hand_overs(&place, &tokens);
+    let handed = sleeping_run(&place, &socket, &pid);
+    let script = script_pid(&pid).unwrap();
+    let asked = Instant::now();
+    let answer = ask_line(&socket, r#"{"op":"cancel"}"#);
+    let answered_in = asked.elapsed();
+    let stopped = answer["stopped"].as_array().expect("a stopped list");
+    assert_eq!(stopped.len(), 1, "{answer}");
+    let run = stopped[0]["run"].as_str().unwrap().to_owned();
+    assert!(crate::skill_task::made_run_id(&run), "{answer}");
+    assert_eq!(stopped[0]["skill"], "tide", "{answer}");
+    assert!(stopped[0]["ms"].as_u64().is_some(), "{answer}");
+    let (told, told_at) = handed.join().unwrap();
+    assert_eq!(
+        told,
+        json!({"ok": false, "error": "run_failed", "message": "the run was cancelled", "stopped": true})
+    );
+    let ended_in = told_at.duration_since(asked);
+    eprintln!(
+        "#8475 timing: cancel answered in {} ms, run's hand-over answered stopped {} ms after the cancel",
+        answered_in.as_millis(),
+        ended_in.as_millis()
+    );
+    assert!(answered_in < Duration::from_secs(1), "{answered_in:?}");
+    assert!(ended_in < Duration::from_secs(3), "{ended_in:?}");
+    let gone = Instant::now();
+    while rustix::process::test_kill_process_group(script) != Err(rustix::io::Errno::SRCH) {
+        assert!(
+            gone.elapsed() < Duration::from_secs(2),
+            "its group outlived it"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    // The place is free again: a second cancel finds nothing.
+    assert_eq!(
+        ask_line(&socket, r#"{"op":"cancel"}"#),
+        json!({"stopped": []})
+    );
+    stop.store(true, Ordering::Release);
+    handle.join().unwrap();
+}
+
+/// #8475: a cancel with nothing running is answered an empty list; one
+/// with any other field is refused.
+#[test]
+fn a_cancel_with_nothing_running_stops_nothing() {
+    let place = Place::new();
+    let tokens = std::sync::Arc::new(SeenControl {
+        pid: place.dir.path().join("pid"),
+        ended: Default::default(),
+    });
+    let (socket, stop, handle) = serve_hand_overs(&place, &tokens);
+    assert_eq!(
+        ask_line(&socket, r#"{"op":"cancel"}"#),
+        json!({"stopped": []})
+    );
+    let refused = ask_line(&socket, r#"{"op":"cancel","run":"task-1-2-3"}"#);
+    assert_eq!(refused["error"], "bad_request", "{refused}");
+    assert!(tokens.ended.lock().unwrap().is_empty());
+    stop.store(true, Ordering::Release);
+    handle.join().unwrap();
+}
+
+/// #8475: a cancel ends the run's token at lamp-control while its script is
+/// still there (never reaped yet), so a say or motion it queued is refused
+/// before the kill; the run's own end after its exit is asked once more,
+/// for a run already ended.
+#[test]
+fn a_cancel_ends_the_runs_token_before_its_script_is_reaped() {
+    let place = Place::new();
+    let pid = place.dir.path().join("pid");
+    let tokens = std::sync::Arc::new(SeenControl {
+        pid: pid.clone(),
+        ended: Default::default(),
+    });
+    let (socket, stop, handle) = serve_hand_overs(&place, &tokens);
+    let handed = sleeping_run(&place, &socket, &pid);
+    let answer = ask_line(&socket, r#"{"op":"cancel"}"#);
+    let run = answer["stopped"][0]["run"].as_str().unwrap().to_owned();
+    let (told, _) = handed.join().unwrap();
+    assert_eq!(told["stopped"], true, "{told}");
+    let ended = tokens.ended.lock().unwrap().clone();
+    assert_eq!(
+        ended,
+        vec![(run.clone(), true), (run, false)],
+        "first ended while its script was there, then once more after"
+    );
+    stop.store(true, Ordering::Release);
+    handle.join().unwrap();
+}

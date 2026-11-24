@@ -12018,7 +12018,32 @@ async fn spoken(
             said.lock().map_or(0, |said| said.0),
             shared.said_until_us.load(Ordering::Relaxed),
         );
-    if shared.spoken_stop_ends
+    // A stop heard while the lamp is quiet, with a skill run the voice asked
+    // under way (#8475): a stop only when said to the lamp
+    // (`made_run::quiet_stop_said_to_lamp`: a short stop line on its own,
+    // or one named or said facing it, never a "stop" inside a longer
+    // sentence), and then answered as a spoken stop is, the run taken as
+    // stopped here and its stop asked by the coordinator (`StopAnswered`).
+    // Begun over the lamp's voice or just after it, the rule above stands
+    // as it is. With no run under way, nothing changes.
+    let quiet_run_stop = !marks.over_the_lamps_voice
+        && !just_after
+        && !echoed
+        && !went_on
+        && !empty
+        && crate::made_run::quiet_stop_taken(
+            &text,
+            name_of.is_some() || heard_at.is_some() || name_at_start(&text),
+            heed_ran && heeded.is_none(),
+            Instant::now(),
+        )
+        .inspect(|skill| {
+            eprintln!(
+                "lamp-voice second: request {request}: a stop said to the lamp while it is quiet, the run of {skill} under way: it ends the run (#8475)"
+            );
+        })
+        .is_some();
+    if (shared.spoken_stop_ends
         && !echoed
         && !held
         && heeded.is_none()
@@ -12028,7 +12053,8 @@ async fn spoken(
         && !shared
             .lamp_said
             .lock()
-            .is_ok_and(|said| crate::spoken_stop::could_be_echo(&text, &said.1))
+            .is_ok_and(|said| crate::spoken_stop::could_be_echo(&text, &said.1)))
+        || quiet_run_stop
     {
         drop(prepared.take());
         // Still a turn for the forget hold (Reviewer-three's P1 on #4004): a
@@ -12056,13 +12082,20 @@ async fn spoken(
         );
         // In the owner's language, as its other fixed lines (#4473).
         eprintln!(
-            "lamp-voice second: request {request}: a stop said {}: answered \"{}\", the model not asked (LAMP_SPOKEN_STOP_ENDS)",
-            if just_after {
+            "lamp-voice second: request {request}: a stop said {}: answered \"{}\", the model not asked ({})",
+            if quiet_run_stop {
+                "to the lamp while a run is under way"
+            } else if just_after {
                 "just after the lamp's answer"
             } else {
                 "over the lamp's answer"
             },
-            shared.fixed(crate::spoken_stop::LINE)
+            shared.fixed(crate::spoken_stop::LINE),
+            if quiet_run_stop {
+                "#8475"
+            } else {
+                "LAMP_SPOKEN_STOP_ENDS"
+            }
         );
         // The person stopped the lamp: the conversation is over, as after
         // the button's Stop or a computer's `turn.end`. The line stays in the
@@ -12087,7 +12120,11 @@ async fn spoken(
             &shared,
             request,
             crate::spoken_stop::LINE,
-            "LAMP_SPOKEN_STOP_ENDS",
+            if quiet_run_stop {
+                "#8475"
+            } else {
+                "LAMP_SPOKEN_STOP_ENDS"
+            },
         )
         .await;
         return;
@@ -23711,12 +23748,16 @@ async fn answer(
                 // coordinator, whose say service lets its failure answer
                 // this conversation (#7363); this process's record is never
                 // read there (El's P1).
-                if let Some(skill) = crate::made_run::ran_of(&answer.told)
-                    && !shared
+                // Noted in this process too, as under way, so a stop said to
+                // the lamp while it is quiet can end it (#8475).
+                if let Some(skill) = crate::made_run::ran_of(&answer.told) {
+                    crate::made_run::ran_here(&skill, Instant::now());
+                    if !shared
                         .emit(ProviderOutput::MadeRunNow { request, skill })
                         .await
-                {
-                    return Err(Stop::Gone);
+                    {
+                        return Err(Stop::Gone);
+                    }
                 }
                 if skill_looked.is_none()
                     && answer.told["look"] == true

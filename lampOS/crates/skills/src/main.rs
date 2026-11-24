@@ -1059,6 +1059,10 @@ fn serve(
         }
         Err(error) => eprintln!("lamp-skills: skills/tasks not declared: {error}"),
     }
+    // Where the call socket's stop of a run is sent (#8475 part 2).
+    if let Some(socket) = &options.tasks_socket {
+        let _ = TASKS_SOCKET.set(socket.clone());
+    }
     let audio = Arc::new(Mutex::new(Authority::new(
         requested_audio::from_environment(),
         out.boot().to_owned(),
@@ -4091,6 +4095,13 @@ fn listen(
                     let error = format!("{}: {why}", watch::PRIVATE_FOR_OTHERS);
                     return writeln!(&stream, "{}", json!({"ok": false, "error": error}));
                 }
+                // The skill run under way stopped, as the person asked by
+                // voice (#8475 part 2): only the voice's, as a run now is;
+                // answered here, never through the main loop.
+                if call["op"].as_str() == Some(lamp_skills::task::CANCEL_OP) {
+                    let answer = cancel_run(voice, TASKS_SOCKET.get().map(PathBuf::as_path));
+                    return writeln!(&stream, "{answer}");
+                }
                 let (reply, told) = mpsc::channel();
                 let admission = Admission::default();
                 // A tool's call never names the app's kinds: those come by
@@ -6109,6 +6120,7 @@ fn hand_task(
         let found = std::cell::Cell::new(None);
         let refused = std::cell::Cell::new(None);
         let not_ready = std::cell::Cell::new(None);
+        let stopped = std::cell::Cell::new(false);
         let tried = lamp_skills::task_sure::Tried::default();
         let send = |socket: &Path, line: &str| {
             // With `LAMP_SKILL_RUNS_VOICE_SHARE` set (#7342), the relay's day
@@ -6127,6 +6139,12 @@ fn hand_task(
                     "lamp-skills: skill:{skill}: do.task: {}",
                     lamp_skills::relay_share::run_line(before.as_ref(), after.as_ref())
                 );
+            }
+            // Stopped by the person (#8475 part 2): a quiet stop, no failed
+            // line kept and nothing of the run told.
+            if quiet_stop(&skill, &sent) {
+                stopped.set(true);
+                return Ok(STOPPED_BY_PERSON.to_owned());
             }
             if sure {
                 tried.sent(&skill, &sent);
@@ -6159,6 +6177,7 @@ fn hand_task(
             found.set(None);
             refused.set(None);
             not_ready.set(None);
+            stopped.set(false);
             tried.once(|| {
                 lamp_skills::task::hand(
                     &skill,
@@ -6204,6 +6223,12 @@ fn hand_task(
                     "lamp-skills: skill:{skill}: do.task: {what} came after its own line was said: dropped"
                 ),
             }
+            return;
+        }
+        // Stopped by the person (#8475 part 2): nothing more is said or
+        // told of it; the journal said so as its hand-over returned.
+        if stopped.get() {
+            let _ = (refused.take(), not_ready.take(), tried.failed());
             return;
         }
         // A refusal the person must hear (a run granted the internet the
@@ -6298,6 +6323,11 @@ fn hand_run(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
                 fired.elapsed().as_millis()
             );
             let sent = hand_over_run(socket, line);
+            // Stopped by the person (#8475 part 2): no outcome, so no
+            // failed line is said; the journal said so here.
+            if quiet_stop(&skill, &sent) {
+                return Ok(STOPPED_BY_PERSON.to_owned());
+            }
             outcome.set(Some(lamp_skills::task::run_outcome(
                 &skill, &sent, by_words,
             )));
@@ -6574,6 +6604,13 @@ fn hand_over_saying_getting_ready(
     skill: &str,
 ) -> Result<String, lamp_skills::service_write::Unrun> {
     let taken_back = Arc::new(SayHandle::default());
+    // Kept by skill while its hand-over waits, so a stop of its run
+    // (#8475 part 2) takes its line back too.
+    GETTING_READY_ASKS
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .get_or_insert_with(HashMap::new)
+        .insert(skill.to_owned(), Arc::clone(&taken_back));
     let sent = hand_over_asking(socket, line, &mut || {
         let (say_socket, skill) = (say_socket.to_owned(), skill.to_owned());
         let handle = Arc::clone(&taken_back);
@@ -6599,8 +6636,108 @@ fn hand_over_saying_getting_ready(
             );
         });
     });
+    {
+        let mut asks = GETTING_READY_ASKS
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        let asks = asks.get_or_insert_with(HashMap::new);
+        // Only this hand-over's own: never another's of the same skill.
+        if asks
+            .get(skill)
+            .is_some_and(|kept| Arc::ptr_eq(kept, &taken_back))
+        {
+            asks.remove(skill);
+        }
+    }
     taken_back.take_back_unless_begun();
     sent
+}
+
+/// The getting-ready asks of the hand-overs waiting now, by skill
+/// ([`hand_over_saying_getting_ready`]), for a stop to take back (#8475).
+static GETTING_READY_ASKS: Mutex<Option<HashMap<String, Arc<SayHandle>>>> = Mutex::new(None);
+
+/// lamp-tasks' hand-over socket, as `--tasks-socket` gave it, for the call
+/// socket's stop of a run ([`cancel_run`]); unset, nothing is stopped.
+static TASKS_SOCKET: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// What a hand-over stopped by the person ends as, in `do.task`'s and
+/// `do.run`'s journal line (#8475 part 2).
+const STOPPED_BY_PERSON: &str = "its run stopped by the person";
+
+/// Whether lamp-tasks' answer `sent` to `skill`'s hand-over (a `do.task`'s
+/// or a `run` step's) is its run stopped by the person
+/// ([`lamp_skills::task::stopped_by_person`]), journaled so when it is: then
+/// no failure line is said and nothing of the run is told (#8475 part 2).
+fn quiet_stop(skill: &str, sent: &Result<String, lamp_skills::service_write::Unrun>) -> bool {
+    let stopped = lamp_skills::task::stopped_by_person(skill, sent, unix_ms());
+    if stopped {
+        eprintln!("lamp-skills: {skill}'s run stopped by the person (#8475)");
+    }
+    stopped
+}
+
+/// How long a stop waits on lamp-tasks, to connect, write and read its
+/// answer (#8475 part 2): the voice's own call waits on it.
+const CANCEL_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// The call socket's [`lamp_skills::task::CANCEL_OP`] (#8475 part 2): the
+/// voice's alone (`voice`), as a run now is; any other peer is refused
+/// ([`lamp_skills::task::CANCEL_NOT_THE_VOICE`]) and nothing is sent. One
+/// `{"op":"cancel"}` line to lamp-tasks at `socket`, its answer
+/// `{"stopped":[{"run","skill","ms"}]}` read within [`CANCEL_TIMEOUT`],
+/// and the voice answered `{"stopped": "<skill>"|null, "ms": <n>|null}`
+/// for the first run stopped. That skill is marked stopped, so its
+/// hand-over's answer is a quiet stop ([`lamp_skills::task::stopped_by_person`]),
+/// and a getting-ready line for it not yet begun is taken back.
+fn cancel_run(voice: bool, socket: Option<&Path>) -> serde_json::Value {
+    if !voice {
+        eprintln!("lamp-skills: a stop asked by a peer that is not the voice refused");
+        return json!({"ok": false, "error": lamp_skills::task::CANCEL_NOT_THE_VOICE});
+    }
+    let nothing = json!({"stopped": null, "ms": null});
+    let Some(socket) = socket else {
+        eprintln!(
+            "lamp-skills: a stop asked: no lamp-tasks hand-over on this lamp (--tasks-socket)"
+        );
+        return nothing;
+    };
+    let asked = || -> io::Result<String> {
+        let stream = UnixStream::connect(socket)?;
+        stream.set_write_timeout(Some(CANCEL_TIMEOUT))?;
+        stream.set_read_timeout(Some(CANCEL_TIMEOUT))?;
+        (&stream).write_all(format!("{}\n", lamp_skills::task::cancel_line()).as_bytes())?;
+        let mut answer = String::new();
+        BufReader::new((&stream).take(16_384)).read_line(&mut answer)?;
+        Ok(answer)
+    };
+    let answer = match asked() {
+        Ok(answer) => lamp_skills::task::cancel_answer(&answer),
+        Err(error) => {
+            eprintln!("lamp-skills: a stop asked: lamp-tasks not reached: {error}");
+            return nothing;
+        }
+    };
+    match answer["stopped"].as_str() {
+        Some(skill) => {
+            lamp_skills::task::mark_stopped(skill, unix_ms());
+            let kept = GETTING_READY_ASKS
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner())
+                .get_or_insert_with(HashMap::new)
+                .get(skill)
+                .cloned();
+            if let Some(kept) = kept {
+                kept.take_back_unless_begun();
+            }
+            eprintln!(
+                "lamp-skills: a stop asked: {skill}'s run stopped after {} ms",
+                answer["ms"]
+            );
+        }
+        None => eprintln!("lamp-skills: a stop asked: no skill's run was under way"),
+    }
+    answer
 }
 
 /// One say ask its asker may take back while it waits (the say service's
@@ -6641,7 +6778,8 @@ impl SayHandle {
     /// connection when written, never written when not yet.
     fn take_back_unless_begun(&self) {
         let mut held = self.0.lock().unwrap_or_else(|poison| poison.into_inner());
-        if held.begun {
+        // Taken back once only: a stop (#8475) and the answer may both ask.
+        if held.begun || held.taken_back {
             return;
         }
         held.taken_back = true;
@@ -10038,5 +10176,143 @@ mod tests {
         );
         assert!(outcome.starts_with("say: dropped (taken back"), "{outcome}");
         assert_eq!(heard.join().unwrap(), "", "nothing was written");
+    }
+
+    /// A fake lamp-tasks hand-over socket at `path` answering one line with
+    /// `answer`: the line it was sent, once the exchange is over.
+    fn fake_cancel_tasks(
+        path: &Path,
+        answer: serde_json::Value,
+    ) -> std::thread::JoinHandle<String> {
+        let listener = UnixListener::bind(path).unwrap();
+        std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            writeln!(&stream, "{answer}").unwrap();
+            line
+        })
+    }
+
+    /// #8475 part 2: the voice's `cancel` op sends lamp-tasks one
+    /// `{"op":"cancel"}` line and answers the voice with the first run
+    /// stopped, its skill and ms; that skill is marked stopped, so its
+    /// hand-over's failure answer is quiet, and its getting-ready line not
+    /// yet begun is taken back.
+    #[test]
+    fn a_cancel_is_sent_to_lamp_tasks_and_answers_the_skill_and_ms() {
+        let dir = tempfile::Builder::new()
+            .prefix("cancel-")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let socket = dir.path().join("skill-task.sock");
+        let skill = "cancel-melon";
+        let ready = Arc::new(SayHandle::default());
+        GETTING_READY_ASKS
+            .lock()
+            .unwrap()
+            .get_or_insert_with(HashMap::new)
+            .insert(skill.to_owned(), Arc::clone(&ready));
+        let tasks = fake_cancel_tasks(
+            &socket,
+            json!({"stopped": [{"run": "r-1", "skill": skill, "ms": 420}]}),
+        );
+        let answer = cancel_run(true, Some(&socket));
+        assert_eq!(answer, json!({"stopped": skill, "ms": 420}));
+        let sent: serde_json::Value = serde_json::from_str(&tasks.join().unwrap()).unwrap();
+        assert_eq!(sent, json!({"op": "cancel"}));
+        assert!(
+            ready.0.lock().unwrap().taken_back,
+            "its getting-ready line taken back"
+        );
+        GETTING_READY_ASKS
+            .lock()
+            .unwrap()
+            .get_or_insert_with(HashMap::new)
+            .remove(skill);
+        // Its hand-over's failure answer is now a quiet stop, once.
+        let failed = Ok(json!({"ok": false, "error": "killed"}).to_string());
+        assert!(quiet_stop(skill, &failed));
+        assert!(
+            !quiet_stop(skill, &failed),
+            "its mark is cleared as it returned"
+        );
+    }
+
+    /// #8475 part 2: with no skill's run under way, lamp-tasks answers an
+    /// empty list and the voice `{"stopped":null,"ms":null}`; nothing is
+    /// marked stopped.
+    #[test]
+    fn a_cancel_with_nothing_running_answers_null() {
+        let dir = tempfile::Builder::new()
+            .prefix("cancel-none-")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let socket = dir.path().join("skill-task.sock");
+        let tasks = fake_cancel_tasks(&socket, json!({"stopped": []}));
+        assert_eq!(
+            cancel_run(true, Some(&socket)),
+            json!({"stopped": null, "ms": null})
+        );
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&tasks.join().unwrap()).unwrap(),
+            json!({"op": "cancel"})
+        );
+        // No lamp-tasks at all: the same.
+        assert_eq!(
+            cancel_run(true, Some(&dir.path().join("gone.sock"))),
+            json!({"stopped": null, "ms": null})
+        );
+        assert_eq!(cancel_run(true, None), json!({"stopped": null, "ms": null}));
+    }
+
+    /// #8475 part 2: lamp-tasks' answer to a hand-over that says
+    /// `"stopped": true` is a quiet stop, for a `do.task` and a `run`
+    /// step alike: the failed line either would say is never said.
+    #[test]
+    fn a_hand_over_answer_stopped_by_the_person_says_no_failure_line() {
+        let skill = "cancel-quiet";
+        let sent: Result<String, lamp_skills::service_write::Unrun> =
+            Ok(json!({"ok": false, "error": "stopped", "stopped": true}).to_string());
+        // Without the stop, each path would say a failed line.
+        assert!(lamp_skills::task_sure::failed_line(skill, &sent).is_some());
+        assert!(
+            lamp_skills::task::run_outcome(skill, &sent, true)
+                .1
+                .is_some()
+        );
+        assert!(quiet_stop(skill, &sent));
+        // Unmarked and not saying stopped, a failure is told as before.
+        let failed = Ok(json!({"ok": false, "error": "killed"}).to_string());
+        assert!(!quiet_stop(skill, &failed));
+        // A run that ended well is never a stop, though marked.
+        lamp_skills::task::mark_stopped(skill, unix_ms());
+        assert!(!quiet_stop(
+            skill,
+            &Ok(json!({"ok": true, "id": 7}).to_string())
+        ));
+    }
+
+    /// #8475 part 2: a peer that is not the voice is refused the `cancel`
+    /// op as it is refused `run`, and nothing reaches lamp-tasks.
+    #[test]
+    fn a_cancel_from_a_peer_that_is_not_the_voice_is_refused() {
+        let dir = tempfile::Builder::new()
+            .prefix("cancel-peer-")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let socket = dir.path().join("skill-task.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        assert_eq!(
+            cancel_run(false, Some(&socket)),
+            json!({"ok": false, "error": lamp_skills::task::CANCEL_NOT_THE_VOICE})
+        );
+        assert!(
+            listener
+                .accept()
+                .is_err_and(|error| error.kind() == io::ErrorKind::WouldBlock),
+            "nothing was sent to lamp-tasks"
+        );
     }
 }

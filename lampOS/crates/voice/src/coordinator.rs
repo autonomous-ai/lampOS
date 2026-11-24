@@ -7058,6 +7058,9 @@ fn conversation_with_gate_inner(
     // `LAMP_SECOND_TURN_LANGUAGE`, read once: off, a turn's language is ignored.
     let turn_language_on = crate::turn_language::armed();
     let mut person_line: Option<(u64, u64)> = None;
+    // A run the voice asked, its name line owed about 1 s after lamp-skills
+    // answered `ran`, unless the lamp spoke first or it was stopped (#8475).
+    let mut run_name_line: Option<crate::made_run::NameLine> = None;
     // The body's ask when it lets go for its pose, said through the say
     // service from a thread of its own (#2938, `LAMP_BODY_ASK=on`).
     #[cfg(not(test))]
@@ -8550,6 +8553,16 @@ fn conversation_with_gate_inner(
                     "observation_to_speaker_dispatch_us":cancellation.speaker_told_at_us.saturating_sub(observed_at_us),
                     "boundary":"coordinator observation to local speaker control send; excludes bus delivery and acoustic stop"}),
                 )?;
+                // The button's Stop or a spoken stop ends a skill run the
+                // voice started too (#8475): asked of lamp-skills on a thread
+                // of its own, after the cut above, which it never delays.
+                if (stop || spoken_stop) && !muted {
+                    stop_made_run(if stop {
+                        "the button's stop"
+                    } else {
+                        "a spoken stop"
+                    });
+                }
                 if let Some(mut current) = cancellation.reply {
                     // The person stopped a reminder's ring (a spoken stop,
                     // the head or the button): they heard it, so it is held,
@@ -8610,6 +8623,41 @@ fn conversation_with_gate_inner(
         }
         if let Some(observation) = observation {
             record_hand_pats(trace, observation.pets)?;
+        }
+        // A run's name line (#8475): said once about 1 s after its `ran`
+        // answer, unless the lamp began speaking (the run's own say, or a
+        // reply's audio) or the run was stopped.
+        if let Some(line) = run_name_line.as_mut() {
+            let ran_us = line.ran_us();
+            let spoke_now = reply.as_ref().is_some_and(|current| {
+                current
+                    .last_provider_audio_at_us
+                    .is_some_and(|at| at >= ran_us)
+                    || (current.playback.is_some() && current.notice.origin().local())
+            }) || says
+                .as_ref()
+                .and_then(|says| says.last_sound_us())
+                .is_some_and(|at| at >= ran_us);
+            let busy = reply.is_some() || speaker_pending.is_some();
+            let at = std::time::Instant::now();
+            let under_way = crate::made_run::still_under_way(line.skill(), line.ran_at(), at);
+            match line.step(at, spoke_now, busy, under_way) {
+                crate::made_run::NameStep::Wait => {}
+                crate::made_run::NameStep::Say(words) => {
+                    let skill = line.skill().to_owned();
+                    run_name_line = None;
+                    say_run_name(says.as_ref(), &skill, &words, trace)?;
+                }
+                crate::made_run::NameStep::Drop(why) => {
+                    let skill = line.skill().to_owned();
+                    run_name_line = None;
+                    eprintln!("lamp-voice: the run of {skill} is not named: {why} (#8475)");
+                    record(
+                        trace,
+                        json!({"kind":"run_name_line","skill":skill,"said":false,"why":why,"at_us":monotonic_us()}),
+                    )?;
+                }
+            }
         }
         // The unplug authority lost, or the say's asker cancelled it on its
         // own connection: only the turn that ticket rides on is cut.
@@ -9142,6 +9190,10 @@ fn conversation_with_gate_inner(
                 // The person's stop for a ring their line cut: held, not
                 // rung once more (the Reviewer-lead's P2 on #5351).
                 ProviderOutput::StopAnswered { request } => {
+                    // A stop the second route answered (over the lamp's
+                    // answer, or said to it while a run is under way) ends
+                    // the skill run the voice started (#8475).
+                    stop_made_run("a stop said to the lamp");
                     if crate::reminders::ring_stop_ends_it()
                         && let Some(reminders) = reminders.as_mut()
                     {
@@ -9304,7 +9356,23 @@ fn conversation_with_gate_inner(
                 // A made skill run now by the owner's voice, in the worker's
                 // process: kept here, where the say service reads it (#7363).
                 ProviderOutput::MadeRunNow { request, skill } => {
+                    // Taken before the run is noted, so the name line knows
+                    // it as the same run (`made_run::still_under_way`).
+                    let ran_at = std::time::Instant::now();
                     made_run_now(request, &skill, trace)?;
+                    // Its name said about 1 s on, unless it speaks first
+                    // (#8475); in English only.
+                    if crate::made_run::names_runs_in(crate::language::at_start()) {
+                        run_name_line = Some(crate::made_run::NameLine::after_ran(
+                            &skill,
+                            ran_at,
+                            monotonic_us(),
+                        ));
+                    } else {
+                        eprintln!(
+                            "lamp-voice: the run of {skill} is not named: its line is English only (#8475)"
+                        );
+                    }
                 }
                 ProviderOutput::SleepAsked { request } => {
                     // With `LAMP_SLEEP_LINE=on` and the line kept (#3748
@@ -15389,6 +15457,61 @@ fn skill_sound_now(gates: SoundGates<'_>, says: &crate::say::Says) -> crate::say
             .is_ok_and(|thread| thread.going_on(std::time::Instant::now())),
     }
 }
+
+/// A stop (the button's, or a spoken one) ends the skill run the voice
+/// started, if one is under way (#8475): lamp-skills is asked on its call
+/// socket in the voice's skills folder (`LAMP_SKILLS_DIR`, the folder the
+/// worker's `--skills-dir` and so `made_run::ran_by` use), on a thread of
+/// its own. Nothing without the folder: no run could have been asked.
+fn stop_made_run(why: &'static str) {
+    let Some(folder) = std::env::var_os(crate::tools::SKILLS_ENVIRONMENT)
+        .map(std::path::PathBuf::from)
+        .filter(|folder| folder.is_absolute())
+    else {
+        return;
+    };
+    // The thread journals what lamp-skills stopped; nothing waits for it.
+    drop(crate::made_run::stop_under_way(
+        &folder,
+        std::time::Instant::now(),
+        why,
+    ));
+}
+
+/// A run's name line ([`crate::made_run::name_line`]), asked of the say
+/// service as the voice's own parts ask (`say::OwnAsks`, as the language's
+/// line is): its words as written, never the model's, and not begun within
+/// [`RUN_NAME_EXPIRES_MS`] or not at all. The trace has the skill's name.
+fn say_run_name(
+    says: Option<&crate::say::Says>,
+    skill: &str,
+    words: &str,
+    trace: &mut SessionState,
+) -> Result<()> {
+    let asked = says.is_some();
+    if let Some(says) = says {
+        // Its answer is not waited for: a line not said is not said again.
+        drop(says.own_asks().text(
+            RUN_NAME_SKILL,
+            words,
+            crate::say::NORMAL_PRIORITY,
+            RUN_NAME_EXPIRES_MS,
+        ));
+        eprintln!("lamp-voice: the run of {skill} is named: \"{words}\" (#8475)");
+    } else {
+        eprintln!("lamp-voice: the run of {skill} is not named: no say service (#8475)");
+    }
+    record(
+        trace,
+        json!({"kind":"run_name_line","skill":skill,"said":asked,"at_us":monotonic_us()}),
+    )
+}
+
+/// The say service's skill name for a run's name line.
+const RUN_NAME_SKILL: &str = "run-name";
+/// A run's name line not begun this long after it is asked is dropped: by
+/// then the run has spoken, or the room is busy.
+const RUN_NAME_EXPIRES_MS: u64 = 4_000;
 
 /// A made skill the worker ran now for `request`, as its owner asked by
 /// voice (`ProviderOutput::MadeRunNow`): kept in this process, where the say

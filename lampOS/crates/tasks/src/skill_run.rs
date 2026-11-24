@@ -570,7 +570,8 @@ impl Runner for DirectRunner {
 /// it, or a made skill's with `LAMP_MADE_CODE_ON_AT_ONCE` on, #8180), the script
 /// run through `runner` within [`RUN_WITHIN`], the token ended and its
 /// said count read ([`Tokens::end_said`]): `{"ok":true,"id":0,"said":N}`
-/// for a run that ended well and said something, else the refusal.
+/// for a run that ended well and said something; one a cancel stopped
+/// (#8475) is `crate::skill_task::stopped_answer`; else the refusal.
 pub fn answer(
     hand: &HandOver,
     tokens: &dyn Tokens,
@@ -636,6 +637,9 @@ pub fn answer(
     // Its says counted as its token ends: none can be said after.
     let said = tokens.end_said(&run_id);
     let began = run.started.load(Ordering::Acquire);
+    // Stopped by a cancel (#8475, `crate::skill_task::CANCEL_OP`): its
+    // token was ended before its kill, so its said count is gone with it.
+    let stopped = run.cancelled();
     crate::skill_task::tell_run_ended(&hand.skill, &run_id, ran.is_ok() && said > Some(0));
     eprintln!(
         "[lamp-tasks] skill run {run_id}: ended in {} ms, {}, said {}",
@@ -648,6 +652,7 @@ pub fn answer(
     );
     match (ran, said) {
         (Ok(_), Some(said)) if said > 0 => json!({"ok": true, "id": 0, "said": said}),
+        (Err(why), _) if stopped => crate::skill_task::stopped_answer(&why),
         (Ok(_), Some(_)) => refusal("run_failed", SAID_NOTHING),
         (Ok(_), None) => refusal(
             "run_failed",

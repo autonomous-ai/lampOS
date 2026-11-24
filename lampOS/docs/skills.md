@@ -6384,6 +6384,62 @@ first."). Then, in code (`made_run::asked`):
   task's agent finds is said as a trigger's run says it. Refused, "NAME
   didn't run now, and why: …", never that it is running. lamp-skills not
   answering is "my skills didn't answer, so it may not have started".
+- **Named once, unless it speaks first** (#8475). Each run the coordinator
+  is told of (`MadeRunNow`: a run now, or a skill's tool call that marked
+  its task's run) owes a name line (`made_run::NameLine`): "Running NAME."
+  (`made_run::name_line`, the skill's folder name with its hyphens as
+  spaces, `made_skill::spoken_name`; never the model's words), said once
+  `made_run::NAME_AFTER` (1 s) after its `ran` answer, through the say
+  service as the voice's own ask (skill `run-name`, priority 5, dropped if
+  not begun within 4 s, `RUN_NAME_EXPIRES_MS`). It is dropped, never said
+  later, when the lamp began speaking since the `ran` answer (the run's
+  own say, the reply's audio, or a local playback), when the run was
+  stopped or another run was noted since (`made_run::still_under_way`),
+  or when a turn is still in hand at `made_run::NAME_LATEST` (5 s); a turn
+  in hand at 1 s is waited for until then. English words only, so it is
+  owed only when the lamp speaks English (`made_run::names_runs_in` on the
+  language at start): in another language no line is said, journaled
+  `lamp-voice: the run of SKILL is not named: its line is English only
+  (#8475)`. The journal says `lamp-voice: the run of SKILL is named: "WORDS" (#8475)` or
+  `lamp-voice: the run of SKILL is not named: WHY (#8475)`; the trace has a
+  `run_name_line` line with `skill`, `said` and, when dropped, `why`.
+- **Stopped by a stop** (#8475 part 2, no switch). The voice keeps the
+  last run it asked as under way for `made_run::UNDER_WAY_FOR` (15 min)
+  from its `ran` answer (`made_run::UnderWay`): lamp-skills tells it no
+  run's end, so a run that already ended counts too, and its stop then
+  stops nothing. With one under way, the button's Stop, a spoken stop the
+  coordinator hears over the lamp (`LAMP_STOP_WORDS`), and the second
+  route's stop answer (`StopAnswered`, also for a stop said to the lamp
+  while it is quiet: not-speech.md, "A stop always gets one line") take it
+  as stopped, once, and ask lamp-skills on its call socket, on a thread of
+  their own after the reply's cut, which never waits for it, in the
+  voice's `LAMP_SKILLS_DIR`: `{"op":"cancel"}` (`made_run::CANCEL_OP`,
+  lamp-skills' `task::CANCEL_OP`), at most 1.5 s
+  (`tools::ASK_DEADLINE`). Only the voice's unit may ask it; another peer
+  is answered `{"ok":false,"error":"only the voice may stop a skill's run"}`
+  (`task::CANCEL_NOT_THE_VOICE`) and nothing is sent on. lamp-skills sends
+  lamp-tasks one `{"op":"cancel"}` line on its hand-over socket
+  (`--tasks-socket`; [tasks.md](tasks.md), "A cancel") with a 2 s bound
+  (`CANCEL_TIMEOUT`) and answers the voice
+  `{"stopped": NAME|null, "ms": N|null}`: the first run lamp-tasks
+  stopped, and how long after its start; null when none ran, lamp-tasks
+  wasn't reached, or no `--tasks-socket` was given. That skill is marked
+  stopped (`task::mark_stopped`), and a getting-ready line for it not yet
+  begun is taken back. Its hand-over's answer, a `do.task`'s or a `run`
+  step's, is then a quiet stop (`task::stopped_by_person`): one that says
+  `"stopped": true`, or any answer short of `"ok": true` within
+  `task::STOPPED_FOR_MS` (30 s) of the mark. No failed line is said and
+  nothing of the run is told; the journal says
+  `lamp-skills: SKILL's run stopped by the person (#8475)` and the
+  hand-over's outcome `its run stopped by the person`. The voice's
+  journal says `lamp-voice: WHY: the run of SKILL under way is asked to
+  stop (#8475)` (WHY: "the button's stop", "a spoken stop" or "a stop said
+  to the lamp"), then `lamp-voice: stopped run SKILL MS ms after start
+  (#8475)` (`made_run::stopped_run_line`, grepped to count the runs
+  stopped within 10 s; its ms lamp-skills', else the voice's own count
+  from the `ran` answer), or that lamp-skills had no run of it to stop or
+  didn't answer. lamp-skills journals `a stop asked: SKILL's run stopped
+  after MS ms` or `a stop asked: no skill's run was under way`.
 
 Tests: `made_run::tests::the_owners_two_lines_each_run_that_made_skill`,
 `a_run_refused_is_said_plainly_with_why`,
@@ -6393,6 +6449,16 @@ Tests: `made_run::tests::the_owners_two_lines_each_run_that_made_skill`,
 `lamp_skills::tests::a_made_skill_runs_now_as_its_trigger_would_and_not_when_off`;
 `task::tests::a_run_now_past_its_own_days_runs_is_refused_plainly`; and
 lamp-skills' `tests::a_run_now_is_refused_as_its_trigger_s_run_would_be`.
+The stop and the name line (#8475): `made_run::tests::a_short_quiet_stop_with_a_run_under_way_sends_the_cancel`,
+`a_quiet_sentence_with_stop_in_it_stops_no_run`,
+`lamp_stop_said_while_quiet_stops_the_run`,
+`a_runs_name_line_is_said_once_from_its_skill_name`,
+`a_runs_name_line_is_dropped_when_speech_begins_within_a_second`,
+`a_stopped_run_is_journaled_with_its_skill_and_ms`; lamp-skills'
+`tests::a_cancel_is_sent_to_lamp_tasks_and_answers_the_skill_and_ms`,
+`a_cancel_with_nothing_running_answers_null`,
+`a_hand_over_answer_stopped_by_the_person_says_no_failure_line`,
+`a_cancel_from_a_peer_that_is_not_the_voice_is_refused`.
 
 Tests:
 - `make_skill_local::tests`: `a_good_answer_is_kept_and_put_on_with_no_yes`

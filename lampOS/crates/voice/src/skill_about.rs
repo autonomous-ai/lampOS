@@ -1722,7 +1722,10 @@ mod tests {
     /// ends within [`YES_CHECK_MOST`].
     #[test]
     fn a_tasks_yes_that_cant_be_checked_is_never_said_to_wait() {
-        let root = std::env::temp_dir().join(format!("skill-about-yes-{}", std::process::id()));
+        // Its own folder: `skill-about-yes-<pid>` is also `product_lamp("yes")`'s, whose start
+        // removes it, so run beside that test the socket below went missing and its accept
+        // never ended.
+        let root = std::env::temp_dir().join(format!("skill-about-waits-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         // No helper at all.
