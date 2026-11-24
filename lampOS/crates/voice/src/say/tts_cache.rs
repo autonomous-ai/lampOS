@@ -718,7 +718,9 @@ async fn whole_within<E: std::fmt::Display>(
 
 /// `text` rendered through the speech service `config` names, whole, within
 /// [`render_within`], on a runtime of its own; `refused` is told the status
-/// the service refused the key or voice with (401 to 404).
+/// the service refused the key or voice with (401 to 404), or
+/// [`UNREACHED`](crate::second_provider::net::UNREACHED) when it was never
+/// reached before any answer (#8362).
 fn render_with(
     config: &crate::second_config::SecondConfig,
     text: &str,
@@ -735,6 +737,8 @@ fn render_with(
             let mut speech = tts.speak(text).await.inspect_err(|why| {
                 if let Error::Status(status @ 401..=404) = why {
                     refused(*status);
+                } else if crate::second_provider::net::unreached(why) {
+                    refused(crate::second_provider::net::UNREACHED);
                 }
             })?;
             let mut samples = Vec::new();
@@ -827,7 +831,14 @@ fn made_from_environment() -> Option<Arc<TtsCache>> {
         let refused = Arc::clone(&lost);
         let render: Render = Box::new(move |text: &str| {
             render_with(&own, text, &|status| {
-                if !refused.swap(true, std::sync::atomic::Ordering::AcqRel) {
+                if refused.swap(true, std::sync::atomic::Ordering::AcqRel) {
+                    return;
+                }
+                if status == crate::second_provider::net::UNREACHED {
+                    eprintln!(
+                        "lamp-voice: the speech cache: couldn't reach ElevenLabs for the person's own voice; its lines are the lamp's own voice, kept as the lamp's, until the voice starts again (LAMP_OWN_KEYS)"
+                    );
+                } else {
                     eprintln!(
                         "lamp-voice: the speech cache: ElevenLabs refused the person's own key or voice (HTTP {status}); its lines are the lamp's own voice, kept as the lamp's, until the voice starts again (LAMP_OWN_KEYS)"
                     );
@@ -1402,7 +1413,13 @@ mod tests {
             format!("http://{}", listener.local_addr().unwrap())
         };
         let told = std::sync::Mutex::new(Vec::new());
-        assert!(render_with(&config, "Hello.", &|status| told.lock().unwrap().push(status)).is_err());
+        assert!(
+            render_with(&config, "Hello.", &|status| told
+                .lock()
+                .unwrap()
+                .push(status))
+            .is_err()
+        );
         assert_eq!(
             *told.lock().unwrap(),
             [crate::second_provider::net::UNREACHED]

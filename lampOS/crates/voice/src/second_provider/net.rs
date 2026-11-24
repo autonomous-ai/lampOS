@@ -106,8 +106,8 @@ pub const UNREACHED: u16 = 1;
 /// Whether `error` says a request never reached its service before any
 /// answer (#8362): no connection (a name that doesn't resolve, the
 /// connection refused, TLS) or none in time.
-pub(crate) fn unreached(_error: &Error) -> bool {
-    false
+pub(crate) fn unreached(error: &Error) -> bool {
+    matches!(error, Error::Transport(_) | Error::Timeout(_))
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

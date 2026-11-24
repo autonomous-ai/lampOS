@@ -226,11 +226,27 @@ impl OwnVoiceLost {
     /// ElevenLabs refused the person's voice with `status`: the lamp's own
     /// voice from now on, journalled by the first piece to see it only.
     fn refused(&self, status: u16) {
+        self.lose(status, || {
+            format!(
+                "lamp-voice second: ElevenLabs refused the person's own key or voice (HTTP {status}); the lamp's own voice from now on (LAMP_OWN_KEYS)"
+            )
+        });
+    }
+
+    /// ElevenLabs couldn't be reached for the person's voice before any
+    /// answer (#8362): as [`Self::refused`], said by its error's kind.
+    fn unreached(&self, error: &Error) {
+        self.lose(super::UNREACHED, || {
+            format!(
+                "lamp-voice second: couldn't reach ElevenLabs for the person's own voice ({error}); the lamp's own voice from now on (LAMP_OWN_KEYS)"
+            )
+        });
+    }
+
+    fn lose(&self, status: u16, line: impl FnOnce() -> String) {
         OWN_VOICE_REFUSED.store(status, Ordering::Relaxed);
         if !self.lost.swap(true, Ordering::AcqRel) {
-            self.say(format!(
-                "lamp-voice second: ElevenLabs refused the person's own key or voice (HTTP {status}); the lamp's own voice from now on (LAMP_OWN_KEYS)"
-            ));
+            self.say(line());
         }
     }
 
@@ -1070,6 +1086,7 @@ impl Tts {
                 // The person's voice refused here too: the one refusal and
                 // the one notice of the process ([`OwnVoiceLost`]).
                 Err(Error::Status(status @ 401..=404)) => self.lost.refused(status),
+                Err(error) if super::unreached(&error) => self.lost.unreached(&error),
                 spoken => return spoken,
             }
             return Box::pin(lamps.speak_fresh(&self.lost.told(text), turn)).await;
@@ -1094,6 +1111,7 @@ impl Tts {
         if !self.lost.lost.load(Ordering::Acquire) {
             match self.speak_own(text, turn).await {
                 Err(Error::Status(status @ 401..=404)) => self.lost.refused(status),
+                Err(error) if super::unreached(&error) => self.lost.unreached(&error),
                 spoken => return spoken,
             }
         }
@@ -2892,7 +2910,8 @@ mod tests {
             );
             assert!(!lines[0].contains("sk-planted") && !lines[0].contains("PersonVoice"));
             let asked = lamps_asked.lock().unwrap();
-            let text = |at: usize| serde_json::from_str::<Value>(&asked[at]).unwrap()["text"].clone();
+            let text =
+                |at: usize| serde_json::from_str::<Value>(&asked[at]).unwrap()["text"].clone();
             assert_eq!(text(0), format!("{OWN_VOICE_LOST_LINE} Hello there."));
             assert_eq!(text(1), "And again.", "said once");
         }

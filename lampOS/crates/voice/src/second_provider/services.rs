@@ -367,8 +367,9 @@ pub struct RefusedTo {
 /// Whether a chat's failure on the person's own key sends the request to
 /// the lamp's own at the relay: the key refused (401, 403, #2094), or the
 /// endpoint down or out of use (a 5xx or a 429, #8362), or Gemini's 400
-/// for the key (#8420). Any other 400 is the request's own, and a slow
-/// answer is the second try's.
+/// for the key (#8420), or the endpoint never reached before any answer
+/// (no connection, or none in time: [`net::UNREACHED`], #8362). Any other
+/// 400 is the request's own, and a slow answer is the second try's.
 pub fn key_refused(error: &net::Error) -> Option<u16> {
     match error {
         // Refused (#2094), or the endpoint down or out of use (#8362).
@@ -376,6 +377,9 @@ pub fn key_refused(error: &net::Error) -> Option<u16> {
         net::Error::UsageLimit(_) => Some(429),
         // Gemini's 400 for the person's key itself (#8420).
         net::Error::KeyInvalid => Some(400),
+        // Never reached: a name that doesn't resolve, the connection
+        // refused, TLS, or no answer in time (#8362).
+        error if net::unreached(error) => Some(net::UNREACHED),
         _ => None,
     }
 }

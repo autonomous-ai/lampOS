@@ -1029,7 +1029,11 @@ pub const OWN_MODEL_DOWN_WORDS: &str = "your own model couldn't answer, using th
 /// then on. Never the key.
 fn own_key_refused(status: u16) {
     OWN_KEY_REFUSED.store(status, std::sync::atomic::Ordering::Relaxed);
-    if matches!(status, 401 | 403) {
+    if status == super::net::UNREACHED {
+        eprintln!(
+            "lamp-voice second: the person's own model couldn't be reached (no connection, or none in time); this request goes to the lamp's own (LAMP_OWN_KEYS)"
+        );
+    } else if matches!(status, 401 | 403) {
         eprintln!(
             "lamp-voice second: DeepSeek: the person's own key was refused (HTTP {status}); this request goes through the relay (LAMP_OWN_KEYS)"
         );
@@ -1058,7 +1062,17 @@ pub fn own_key_health(own: bool, refused: u16) -> lamp_msgs::Diagnostic {
                 OWN_MODEL_DOWN_WORDS
             },
         )
-        .with("status", status),
+        .with("status", status_told(status)),
+    }
+}
+
+/// A failure's `status` as `voice-keys` says it: the HTTP status, or
+/// `unreached` for an endpoint never reached (#8362).
+fn status_told(status: u16) -> String {
+    if status == super::net::UNREACHED {
+        "unreached".to_owned()
+    } else {
+        status.to_string()
     }
 }
 
@@ -1077,9 +1091,13 @@ pub fn own_voice_health(status: u16) -> Option<lamp_msgs::Diagnostic> {
         lamp_msgs::Diagnostic::new(
             lamp_msgs::Level::Warn,
             OWN_KEY_HEALTH,
-            OWN_VOICE_REFUSED_WORDS,
+            if status == super::net::UNREACHED {
+                OWN_VOICE_UNREACHED_WORDS
+            } else {
+                OWN_VOICE_REFUSED_WORDS
+            },
         )
-        .with("status", status)
+        .with("status", status_told(status))
     })
 }
 
@@ -35097,10 +35115,16 @@ mod tests {
         let unreached = super::super::net::UNREACHED;
         let model = serde_json::to_string(&super::own_key_health(true, unreached)).unwrap();
         assert!(model.contains(super::OWN_MODEL_DOWN_WORDS), "{model}");
-        assert!(model.contains("unreached") && !model.contains("\"1\""), "{model}");
+        assert!(
+            model.contains("unreached") && !model.contains("\"1\""),
+            "{model}"
+        );
         let voice = serde_json::to_string(&super::own_voice_health(unreached).unwrap()).unwrap();
         assert!(voice.contains(super::OWN_VOICE_UNREACHED_WORDS), "{voice}");
-        assert!(voice.contains("unreached") && !voice.contains("\"1\""), "{voice}");
+        assert!(
+            voice.contains("unreached") && !voice.contains("\"1\""),
+            "{voice}"
+        );
     }
 
     /// The reviewer's P2 on #2167: with the switch on, `voice-keys` reports
