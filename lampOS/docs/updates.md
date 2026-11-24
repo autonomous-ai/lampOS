@@ -1862,7 +1862,21 @@ build could carry it units or settings.
    10 min, and that binary was refused for good, so those lamps never
    reached stable. Its rounds after the confirmation say why the build
    waits and try again. A round that fails on the lamp itself
-   (`Failed`) still doesn't confirm.
+   (`Failed`) still doesn't confirm, and neither does one whose signed
+   manifest this updater cannot parse: the signature counts only once the
+   manifest is read as this updater reads it (the Reviewer-lead's P2 on
+   #8509).
+   Before its dry round, the new binary also looks at the deadline. The
+   `lamp-update-back` a lamp has is as old as its image, and judges the
+   10 min on the wall clock, which jumps when a lamp with no clock battery
+   first syncs its time (#6901). If the wall clock is already past
+   `at_unix_ms` + 10 min as it starts, it writes `at_unix_ms` as now (and
+   `restarted_unix_ms`, which older readers pass over), once, under the
+   records' lock, and says `the clock moved past lamp-update's own deadline
+   before its build … started: counted again from now`. The old fallback
+   then waits a fresh 10 min; a build that still doesn't confirm is put back
+   when they end. Inside the deadline, or with the clock behind it, nothing
+   is written (#8472).
    Phase 1's `exec` replaces only the process whose round moved the link: a
    `lamp-update once` run by hand beside `serve` (lamp-52e6, 13 Nov, #6898)
    switched and confirmed while `serve` went on in the old build, whose

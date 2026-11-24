@@ -102,6 +102,12 @@ pub struct Pending {
     pub new: String,
     /// When the link moved, on the wall clock.
     pub at_unix_ms: u64,
+    /// Set once, when the new lamp-update found the wall clock already
+    /// past `at_unix_ms`'s deadline as it started and counted it again from
+    /// then ([`restart_deadline`], #8472). `lamp-update-back` of any age
+    /// reads past it, as it reads past any field it does not know.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restarted_unix_ms: Option<u64>,
 }
 
 fn is_build(name: &str) -> bool {
@@ -126,9 +132,40 @@ pub(crate) fn begin(records: &Path, old: &str, new: &str) -> io::Result<()> {
         old: old.to_owned(),
         new: new.to_owned(),
         at_unix_ms: unix_ms(),
+        restarted_unix_ms: None,
     };
     let bytes = serde_json::to_vec_pretty(&pending).map_err(io::Error::other)?;
     write_whole(&records.join(PENDING), &bytes, 0o600)
+}
+
+/// The new lamp-update, starting with its own switch pending, finds the
+/// wall clock already past `at_unix_ms`'s deadline: on a lamp with no
+/// clock battery, the time synced after the link moved (#6901), and the
+/// switch would be put back for that alone. The deadline is counted again
+/// from `now_unix_ms` once, written into `self.json` before the dry round,
+/// so the `lamp-update-back` the lamp has, however old, waits a fresh
+/// [`DEADLINE`] (#8472, the first builder's guard). Once only: a switch that
+/// then does not confirm is put back [`DEADLINE`] after it. Inside the
+/// deadline, or with the clock behind `at_unix_ms`, nothing is written.
+/// Whether it was written.
+pub fn restart_deadline(records: &Path, now_unix_ms: u64) -> io::Result<bool> {
+    let Some(pending) = pending(records)? else {
+        return Ok(false);
+    };
+    let deadline = pending
+        .at_unix_ms
+        .saturating_add(DEADLINE.as_millis() as u64);
+    if pending.restarted_unix_ms.is_some() || now_unix_ms < deadline {
+        return Ok(false);
+    }
+    let restarted = Pending {
+        at_unix_ms: now_unix_ms,
+        restarted_unix_ms: Some(now_unix_ms),
+        ..pending
+    };
+    let bytes = serde_json::to_vec_pretty(&restarted).map_err(io::Error::other)?;
+    write_whole(&records.join(PENDING), &bytes, 0o600)?;
+    Ok(true)
 }
 
 /// `self.json`, read as a switch waits on it: `Err(None)` when it is there
@@ -431,6 +468,26 @@ pub fn confirm(
     };
     if running != Some(pending.new.as_str()) || !link_names(&config.root, &pending.new) {
         return Ok(Confirm::NotOwn);
+    }
+    // The wall clock moved past the deadline before this updater could
+    // start (#8472): counted again, once, under the records' lock, which
+    // lamp-update-back takes too.
+    {
+        let records = Records::new(folder.clone());
+        let _lock = match records.lock() {
+            Ok(lock) => lock,
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => return Ok(Confirm::Busy),
+            Err(error) => return Err(error.to_string()),
+        };
+        if pending_now(&folder)?.is_none_or(|now| now.new != pending.new) {
+            return Ok(Confirm::NotOwn);
+        }
+        if restart_deadline(&folder, unix_ms()).map_err(failed)? {
+            (world.say)(&format!(
+                "the clock moved past lamp-update's own deadline before its build {} started: counted again from now",
+                &pending.new[..12]
+            ));
+        }
     }
     let dry = Config {
         apply: false,

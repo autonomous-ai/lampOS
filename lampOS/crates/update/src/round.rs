@@ -1120,13 +1120,16 @@ impl Run<'_, '_> {
         }
         let bytes = manifest::signed(&envelope, &self.config.key)
             .map_err(|why| Outcome::Refused(why.to_string()))?;
-        // The channel's manifest, read with its signature checked: a new
-        // lamp-update's own switch confirms on it, whatever this round then
-        // says of the build (#8472).
+        let opened = manifest::opened_or_too_old(bytes, self.config.updater)
+            .map_err(|why| Outcome::Refused(why.to_string()))?;
+        // The channel's manifest, its signature checked and the manifest
+        // read as this updater reads it (or, for a newer updater, what of it
+        // can be): a new lamp-update's own switch confirms on it, whatever
+        // this round then says of the build (#8472). One that cannot parse
+        // the manifest it must apply never does (the Reviewer-lead's P2 on
+        // #8509): it is put back.
         self.signed.set(true);
-        let manifest = match manifest::opened_or_too_old(bytes, self.config.updater)
-            .map_err(|why| Outcome::Refused(why.to_string()))?
-        {
+        let manifest = match opened {
             Opened::Manifest(manifest, _) => manifest,
             Opened::TooOld(too_old) => return Err(self.too_old(state, too_old)),
         };

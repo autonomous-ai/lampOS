@@ -4093,6 +4093,104 @@ fn a_new_updater_whose_dry_round_refuses_a_signed_build_confirms_itself() {
     );
 }
 
+/// #8509, the Reviewer-lead's P2: a manifest signed with the lamp's key
+/// that this updater cannot parse never confirms it, however good the
+/// signature: an updater that cannot read the manifest it must apply is
+/// put back, as before #8472.
+#[test]
+fn a_new_updater_that_cannot_parse_a_signed_manifest_is_never_confirmed() {
+    let mut lamp = Lamp::installed_switching_itself();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    // `seal` refuses to sign what a lamp cannot read, so the channel's own
+    // envelope is signed again with the lamp's key around a manifest it
+    // cannot parse: what a publisher with the key but a newer schema signs.
+    let path = format!("{CHANNEL}{}", manifest::ENVELOPE);
+    let mut envelope: serde_json::Value =
+        serde_json::from_slice(&lamp.channel.files[&path]).unwrap();
+    let unreadable = br#"{"not":"a manifest"}"#;
+    {
+        use base64::{Engine, engine::general_purpose::STANDARD};
+        envelope["manifest"] = STANDARD.encode(unreadable).into();
+        envelope["signature"] = STANDARD.encode(lamp.key.sign(unreadable).as_ref()).into();
+    }
+    lamp.channel
+        .files
+        .insert(path, serde_json::to_vec(&envelope).unwrap());
+    let confirm = lamp.confirm(&new);
+    assert!(matches!(confirm, own::Confirm::NotProven(_)), "{confirm:?}");
+    assert!(lamp.pending().is_some());
+}
+
+/// #8472, the first builder's guard at 17:52: `lamp-update-back` is as old
+/// as the lamp's image and judges the deadline on the wall clock, which
+/// jumps when a lamp with no clock battery first syncs its time. The new
+/// lamp-update, starting with its switch pending and the clock already past
+/// the deadline, counts it again from now, once; inside the deadline it
+/// leaves it; and a build that then never confirms is still put back
+/// 600 s after the rewrite.
+#[test]
+fn a_new_updater_counts_its_deadline_again_once_when_the_clock_moved_past_it() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    let set_at = |lamp: &Lamp, at: u64| {
+        let mut pending = lamp.pending().unwrap();
+        pending.at_unix_ms = at;
+        fs::write(
+            lamp.records().join("self.json"),
+            serde_json::to_vec(&pending).unwrap(),
+        )
+        .unwrap();
+    };
+    // The feed out of reach, so the switch stays pending to be looked at.
+    lamp.channel.offline = true;
+
+    // Inside its 600 s: left as it is.
+    let inside = records_now() - 60_000;
+    set_at(&lamp, inside);
+    let confirm = lamp.confirm(&new);
+    assert!(matches!(confirm, own::Confirm::NotProven(_)), "{confirm:?}");
+    let left = lamp.pending().unwrap();
+    assert_eq!((left.at_unix_ms, left.restarted_unix_ms), (inside, None));
+
+    // An hour past: counted again from now, and said.
+    set_at(&lamp, records_now() - 3_600_000);
+    let before = records_now();
+    let confirm = lamp.confirm(&new);
+    assert!(matches!(confirm, own::Confirm::NotProven(_)), "{confirm:?}");
+    let restarted = lamp.pending().unwrap();
+    assert!(restarted.at_unix_ms >= before, "{restarted:?}");
+    assert_eq!(restarted.restarted_unix_ms, Some(restarted.at_unix_ms));
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("counted again from now")),
+        "{:?}",
+        lamp.said
+    );
+    // The lamp's own lamp-update-back, reading it, waits a fresh 600 s.
+    assert_eq!(
+        lamp.back(
+            update_unit("active", "running"),
+            restarted.at_unix_ms + 1_000
+        ),
+        own::Back::Waiting
+    );
+
+    // Once only: past the new deadline nothing is counted again, and the
+    // build that never confirmed is put back.
+    let late = restarted.at_unix_ms + own::DEADLINE.as_millis() as u64;
+    assert!(!own::restart_deadline(&lamp.records(), late + 3_600_000).unwrap());
+    assert_eq!(lamp.pending().unwrap(), restarted);
+    let back = lamp.back(update_unit("active", "running"), late);
+    assert!(matches!(back, own::Back::PutBack(_)), "{back:?}");
+    assert_eq!(lamp.own_build(), old);
+}
+
 /// #1680, the first builder at 11:40: `self.json` is a contract for good.
 /// lamp-update-back is written once, by install, so the one a lamp has
 /// reads what any later lamp-update writes: a newer version, with fields it
