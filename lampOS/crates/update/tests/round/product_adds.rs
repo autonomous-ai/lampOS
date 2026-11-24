@@ -410,7 +410,13 @@ fn a_lamp_of_its_own_units_an_older_build_or_a_unit_install_leaves_out_gets_noth
     );
     assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
     assert!(!lamp.exists(&format!("/etc/systemd/system/{LEFT_OUT}")));
-    assert!(!lamp.channel.fetched.iter().any(|url| url.ends_with(LEFT_OUT)));
+    assert!(
+        !lamp
+            .channel
+            .fetched
+            .iter()
+            .any(|url| url.ends_with(LEFT_OUT))
+    );
 }
 
 /// A lamp already given lamp-mood at build `text`, enabled into

@@ -4020,8 +4020,8 @@ mod tests {
             assert!(part(text).is_some(), "{name} starts through a current link");
         }
         // Setup, its reset, the waking face, its recovery (#3020) and
-        // setup's three helpers (the names', the Wi-Fi's and its boot
-        // restore) share one binary, and so do the air and its bus clock,
+        // setup's four helpers (the names', the Wi-Fi's and its boot
+        // restore, and the own keys', #8367) share one binary, and so do the air and its bus clock,
         // the skills and their manage helper, the eyes and their camera
         // helper (#2892), the apps' manage helper with its boot start, its folders and its two app templates, and lamp-update
         // and its region one-shot (#6256);
@@ -4029,7 +4029,7 @@ mod tests {
         let services = PRODUCT.iter().filter(|(name, _)| linked(name)).count();
         assert_eq!(
             parts.len(),
-            services - 14,
+            services - 15,
             "every product service is a part"
         );
         for part in &parts {
@@ -4152,9 +4152,15 @@ mod tests {
                 .map(|(_, text)| *text)
                 .unwrap()
         };
-        for name in ["lamp-setup.service", "lamp-cloud.service", "lamp-voice.service"] {
+        for name in [
+            "lamp-setup.service",
+            "lamp-cloud.service",
+            "lamp-voice.service",
+        ] {
             assert!(
-                unit(name).lines().any(|line| line == "Environment=LAMP_OWN_KEYS=on"),
+                unit(name)
+                    .lines()
+                    .any(|line| line == "Environment=LAMP_OWN_KEYS=on"),
                 "{name}"
             );
         }
@@ -4166,7 +4172,11 @@ mod tests {
         ] {
             assert!(voice.lines().any(|have| have == line), "{line}");
         }
-        assert!(enabled().iter().any(|name| name == "lamp-setup-keys.socket"));
+        assert!(
+            enabled()
+                .iter()
+                .any(|name| name == "lamp-setup-keys.socket")
+        );
         for (name, text) in PRODUCT {
             assert!(
                 !text
@@ -4183,10 +4193,7 @@ mod tests {
     #[test]
     fn every_deploy_product_unit_is_installed_or_named_left_out() {
         // Left out until its lamp check: the keeper's restart helper (#2193).
-        const LEFT_OUT: &[&str] = &[
-            "lamp-keeper-restart.socket",
-            "lamp-keeper-restart@.service",
-        ];
+        const LEFT_OUT: &[&str] = &["lamp-keeper-restart.socket", "lamp-keeper-restart@.service"];
         let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
         let listed: Vec<&str> = PRODUCT.iter().map(|(name, _)| *name).collect();
         let mut missing = Vec::new();
