@@ -375,19 +375,30 @@ pub struct RefusedTo {
     pub told: Arc<dyn Fn(u16) + Send + Sync>,
 }
 
-/// Whether a chat's failure on the person's own key sends the request to
-/// the lamp's own at the relay: the key refused (401, 403, #2094), or the
-/// endpoint down or out of use (a 5xx or a 429, #8362), or Gemini's 400
-/// for the key (#8420). Any other 400 is the request's own, and a slow
-/// answer is the second try's.
-pub fn key_refused(error: &net::Error) -> Option<u16> {
+/// What [`gives_way`] tells for a failure with no HTTP status (the link, a
+/// timeout, an unusable address or answer): never 0, which `voice-keys`
+/// reads as never refused.
+pub const NO_HTTP_ANSWER: u16 = 1;
+
+/// The status told when the person's own model failed a request before its
+/// first event, which then goes to the lamp's own model at the relay. Any
+/// failure gives way, never a silent turn (the first builder's gate on
+/// #8393 for `LAMP_OWN_KEYS`' switch-on, as #8527 does for the person's
+/// voice):
+/// - the key refused (401, 403, #2094; Gemini's 400 for the key, #8420);
+/// - the endpoint down or spent (a 5xx, 429, 402 for no credit, #8362);
+/// - a model gone, or a request it can't take (404, any other 400, such as a
+///   picture to a text-only model or an effort it refuses);
+/// - no answer at all ([`NO_HTTP_ANSWER`]).
+pub fn gives_way(error: &net::Error) -> u16 {
     match error {
-        // Refused (#2094), or the endpoint down or out of use (#8362).
-        net::Error::Status(status @ (401 | 403 | 429 | 500..=599)) => Some(*status),
-        net::Error::UsageLimit(_) => Some(429),
-        // Gemini's 400 for the person's key itself (#8420).
-        net::Error::KeyInvalid => Some(400),
-        _ => None,
+        net::Error::Status(status) => *status,
+        net::Error::UsageLimit(_) => 429,
+        net::Error::KeyInvalid => 400,
+        net::Error::Url
+        | net::Error::Transport(_)
+        | net::Error::Timeout(_)
+        | net::Error::Protocol(_) => NO_HTTP_ANSWER,
     }
 }
 
@@ -789,11 +800,9 @@ impl Net {
                 }
             }
             let answer = chat.send_watched(&messages, only, &[], watch).await;
-            if let (Err(error), Some(refused)) = (&answer, &refused_to)
-                && let Some(status) = key_refused(error)
-            {
+            if let (Err(error), Some(refused)) = (&answer, &refused_to) {
                 if watch.is_none_or(net::Watch::first_to_tell_a_refusal) {
-                    (refused.told)(status);
+                    (refused.told)(gives_way(error));
                 }
                 return refused
                     .relay
@@ -1066,6 +1075,7 @@ impl Net {
         watch: Option<net::Watch>,
     ) -> BoxStream<'static, net::Result<ChatEvent>> {
         let chat = self.chat.clone();
+        let refused_to = self.refused_to.clone();
         let near = self.near_chat();
         stream::once(async move {
             let watch = watch.as_ref();
@@ -1082,7 +1092,20 @@ impl Net {
                     None => return answer,
                 }
             }
-            chat.send_watched(&messages, None, without, watch).await
+            let answer = chat.send_watched(&messages, None, without, watch).await;
+            // A held line's request gives way as any other does: before
+            // this, it failed even on a 401 (the first builder's read of
+            // #8393).
+            if let (Err(error), Some(refused)) = (&answer, &refused_to) {
+                if watch.is_none_or(net::Watch::first_to_tell_a_refusal) {
+                    (refused.told)(gives_way(error));
+                }
+                return refused
+                    .relay
+                    .send_watched(&messages, None, without, watch)
+                    .await;
+            }
+            answer
         })
         .map_ok(|answer| {
             stream::try_unfold(answer, |mut answer| async move {
@@ -2228,10 +2251,12 @@ pub(crate) mod tests {
     /// #8420: Gemini refuses a bad key with a 400, not a 401. The person's
     /// own Gemini key refused so (the body seen live on 24 Nov, "Please pass
     /// a valid API key", or the native API's `API_KEY_INVALID`) sends the
-    /// request to the lamp's own model at the relay, told as a refusal; any
-    /// other 400 stays the request's own, with no fallback.
+    /// request to the lamp's own model at the relay, told as a refusal. Any
+    /// other 400 goes there too, as every failure before the first word does
+    /// (the first builder's gate on #8393): a 2.5 model may refuse the
+    /// effort it's asked for, and a model the check found may not chat.
     #[tokio::test]
-    async fn the_persons_gemini_key_refused_by_its_400_falls_back_and_a_plain_400_does_not() {
+    async fn the_persons_gemini_key_refused_by_its_400_falls_back_and_a_plain_400_too() {
         const REFUSED: &str = "HTTP/1.1 400 Bad Request\r\ncontent-type: application/json\r\nconnection: close\r\n\r\n";
         for (name, body, falls) in [
             (
@@ -2247,7 +2272,7 @@ pub(crate) mod tests {
             (
                 "plain",
                 r#"[{"error":{"code":400,"message":"Invalid JSON payload received.","status":"INVALID_ARGUMENT"}}]"#,
-                false,
+                true,
             ),
         ] {
             let own = stub(
@@ -2287,6 +2312,64 @@ pub(crate) mod tests {
                 assert_eq!(relay.asked(CHAT), 0, "{name}");
                 assert!(told.lock().unwrap().is_empty(), "{name}");
             }
+        }
+    }
+
+    /// The first builder's gate on #8393: a held line's request (asked
+    /// without some functions, `chat_without`) gives way to the lamp's own
+    /// model as a spoken turn's does. It failed even on a 401 before. And a
+    /// person's endpoint that gives no answer at all gives way too, told as
+    /// [`NO_HTTP_ANSWER`], never as 0.
+    #[tokio::test]
+    async fn a_held_line_and_an_unreached_model_give_way_to_the_lamps_own() {
+        const REFUSED: &str = "HTTP/1.1 401 Unauthorized\r\ncontent-type: application/json\r\nconnection: close\r\n\r\n";
+        // A port nothing listens on: the connection is refused.
+        let closed = {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            listener.local_addr().unwrap().port()
+        };
+        for (name, refused) in [("held", true), ("unreached", false)] {
+            let own = stub(
+                "AIza-own-8393",
+                vec![(CHAT, Some((REFUSED, br#"{"error":"refused"}"#.to_vec())))],
+            )
+            .await;
+            let relay = stub("relay-key-8420", vec![(CHAT, answered("lamp's own"))]).await;
+            let mut config = own_gemini(&format!("own-gives-way-{name}"), &relay.url);
+            config.hosted.deepseek_base_url = Some(if refused {
+                format!("{}/v1beta", own.url)
+            } else {
+                format!("http://127.0.0.1:{closed}/v1beta")
+            });
+            let told = Arc::new(Mutex::new(Vec::new()));
+            let telling = told.clone();
+            let net = Net::new(config, Arc::new(Vec::new))
+                .unwrap()
+                .chatting_with_deepseek("AIza-own-8393")
+                .unwrap()
+                .falling_back_to_the_relay(
+                    &relay.url,
+                    Arc::new(move |status| telling.lock().unwrap().push(status)),
+                )
+                .unwrap();
+            let events: Vec<_> = if refused {
+                net.chat_without(vec![Message::user("hello")], &["take_a_look"])
+                    .collect()
+                    .await
+            } else {
+                net.chat(vec![Message::user("hello")]).collect().await
+            };
+            let words: String = events
+                .into_iter()
+                .filter_map(|event| match event {
+                    Ok(ChatEvent::Text(text)) => Some(text),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(words, "lamp's own", "{name}");
+            assert_eq!(relay.asked(CHAT), 1, "{name}");
+            let status = if refused { 401 } else { NO_HTTP_ANSWER };
+            assert_eq!(*told.lock().unwrap(), [status], "{name}");
         }
     }
 
