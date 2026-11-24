@@ -95,6 +95,13 @@ forward are still checked. From the second datagram on, or after that first
 second, datagrams or not, a skipped publication ends the worker (#1569 row
 45). One that hears no datagram at all ends sooner: after twice
 `controls/state`'s declared 100 ms the bus says Controls is late.
+The worker subscribes to `controls/state` only once its own setup is done
+(its lease's publisher, gates and guard), just before its Ready and first
+read, so that setup does not age what Controls queues for it. Subscribed
+first, a start slowed past 50 ms read a state already that old, and the
+worker ended on it (`privacy Controls publisher/clock/order changed`) before
+its first reading, with fresh states queued right behind it (the
+`privacy_bus` real-worker tests, 1 or 2 runs in 30 on a loaded Mac).
 It ends cleanly, telling the voice the switch is unreadable (a fault beginning
 `privacy switch unreadable: `), and the voice keeps the microphones closed and
 reads again with a fresh worker each second instead of exiting (#795). So

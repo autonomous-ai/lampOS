@@ -1217,7 +1217,6 @@ fn serve(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let clock = lamp_controls::runtime::clock_id(None)?;
     let bus = lamp_controls::privacy::selected_bus(Bus::new(root)?);
-    let mut subscriber = switch_subscriber(&bus)?;
     let mut publisher = bus.publisher_declared(
         MicrophonePrivacy::TOPIC,
         &MicrophonePrivacy::declaration(),
@@ -1236,9 +1235,26 @@ fn serve(
     // reaches this worker in its cleared environment (`worker_command`).
     let mut lapse =
         DeniedLapse::riding_granting(crate::privacy_gap::rides_stall_from_environment());
+    // A test can make the worker's own setup slow ([`tests::SETUP_TAKES`]).
+    #[cfg(test)]
+    tests::pause_setup();
+    // Subscribed last, just before Ready and the first read: from here on
+    // Controls' publisher queues each state for this worker (it finds the
+    // socket within its 5 ms rescan). Subscribed first, the worker's own
+    // setup counted against the first state's 50 ms freshness, and a slow
+    // start (a cold lamp's file work, a loaded host) read a state already
+    // stale first and ended on it, `publisher/clock/order changed`, before
+    // its first reading, with fresh ones queued right behind it.
+    let mut subscriber = switch_subscriber(&bus)?;
     let began = lamp_ipc::monotonic_us();
+    // A test judges only a run in which the host held neither this worker
+    // nor its Controls up ([`tests::worker_seen`]).
+    #[cfg(test)]
+    tests::worker_seen(began);
     channels.control.send(WorkerEvent::Ready)?;
     loop {
+        #[cfg(test)]
+        tests::worker_seen(lamp_ipc::monotonic_us());
         if !authority(channels, &mut guard, &mut lapse)? {
             return Ok(());
         }
@@ -1267,6 +1283,8 @@ fn serve(
                 break;
             };
             let now = lamp_ipc::monotonic_us();
+            #[cfg(test)]
+            tests::worker_seen(now);
             if resync {
                 fence.resync();
             }
@@ -1434,6 +1452,40 @@ pub(crate) mod tests {
         Duration::from_millis(100 << (stalls.clamp(1, 5) - 1))
     }
     use std::sync::atomic::AtomicU64;
+
+    thread_local! {
+        /// How long the privacy worker run on this thread takes over its own
+        /// setup in [`serve`]: none unless a test says so.
+        pub(super) static SETUP_TAKES: std::cell::Cell<Duration> =
+            const { std::cell::Cell::new(Duration::ZERO) };
+        /// When the worker on this thread was last seen running in [`serve`]'s
+        /// loop (a pass begun, a state read), and the longest it was held up
+        /// between two such moments.
+        static WORKER_SEEN: std::cell::Cell<(Option<u64>, u64)> =
+            const { std::cell::Cell::new((None, 0)) };
+    }
+
+    /// The worker's own setup taking [`SETUP_TAKES`].
+    pub(super) fn pause_setup() {
+        let takes = SETUP_TAKES.with(std::cell::Cell::get);
+        if !takes.is_zero() {
+            thread::sleep(takes);
+        }
+    }
+
+    /// The worker on this thread running at `at_us` ([`WORKER_SEEN`]).
+    pub(super) fn worker_seen(at_us: u64) {
+        WORKER_SEEN.with(|seen| {
+            let (last, most) = seen.get();
+            let held = last.map_or(0, |last| at_us.saturating_sub(last));
+            seen.set((Some(at_us), most.max(held)));
+        });
+    }
+
+    /// The longest the worker on this thread was held up in its loop.
+    fn worker_held_us() -> u64 {
+        WORKER_SEEN.with(std::cell::Cell::get).1
+    }
 
     /// A controller of a new boot, its microphones and camera as given at
     /// `at_us`, as the voice's wait sets both Denied.
@@ -2371,6 +2423,8 @@ pub(crate) mod tests {
     /// and whether the worker was still running at the end.
     #[derive(Default)]
     struct Ridden {
+        /// When the worker was started, just before its thread.
+        started_us: u64,
         events: Vec<(u64, WorkerEvent)>,
         receive_errors: Vec<String>,
         running_at_end: bool,
@@ -2382,9 +2436,21 @@ pub(crate) mod tests {
         /// first fresh one after it.
         lapsed_us: Option<u64>,
         back_us: Option<u64>,
+        /// The longest the host held this Controls up between two states it
+        /// stamped, and the worker between two moments of its loop.
+        controls_held_us: u64,
+        worker_held_us: u64,
+        /// A send to the worker refused: it had closed its end, ending.
+        refused_send: Option<String>,
     }
 
     impl Ridden {
+        /// Whether the host held this Controls or the worker up for
+        /// [`HELD_UP_US`] or more: then the run says nothing either way.
+        fn held_up(&self) -> bool {
+            self.controls_held_us.max(self.worker_held_us) >= HELD_UP_US
+        }
+
         fn fault(&self) -> Option<(u64, &str)> {
             self.events.iter().find_map(|(at, event)| match event {
                 WorkerEvent::Fault { code } => Some((*at, code.as_str())),
@@ -2422,8 +2488,13 @@ pub(crate) mod tests {
 
         fn said(&self) -> String {
             format!(
-                "ended {:?}, receive errors {:?}, events {:?}",
-                self.ended, self.receive_errors, self.events
+                "ended {:?}, receive errors {:?}, refused send {:?}, held up {} us (Controls) and {} us (worker), events {:?}",
+                self.ended,
+                self.receive_errors,
+                self.refused_send,
+                self.controls_held_us,
+                self.worker_held_us,
+                self.events
             )
         }
     }
@@ -2432,21 +2503,70 @@ pub(crate) mod tests {
     /// for: generous, so a slow runner only takes longer.
     const PHASE_MOST_US: u64 = 5_000_000;
 
+    /// How long the host may hold [`ride_run`]'s Controls or its worker up
+    /// before the run says nothing either way: half the 50 ms freshness. A
+    /// state's age when the worker reads it is the Controls' delay in
+    /// stamping and sending it plus the worker's in reading it, so with each
+    /// held up less than half no state is 50 ms old at its read, nor does the
+    /// worker go 50 ms without one. Held up longer, the worker ends on a
+    /// stale state or says the reading missing, as it should, and the run
+    /// tests nothing more: on a loaded Mac each was held up 40 to 61 ms in
+    /// runs that passed, and twice in 20 runs a worker so ended mid-run.
+    const HELD_UP_US: u64 = PRIVACY_FRESH_US / 2;
+
     /// The real privacy worker, [`run`], on a real Bus, with `ride`, the
-    /// controller granting the microphones throughout, and a Controls
-    /// publishing `controls/state` at its pace (every 5 ms). Event-driven,
+    /// controller granting the microphones from the worker's Ready on, and a
+    /// Controls publishing `controls/state` at its pace (every 5 ms) from
+    /// before the worker starts. Event-driven,
     /// each phase bounded by [`PHASE_MOST_US`]:
     /// 1. the slide read open until a lease permits capture;
     /// 2. the reading lapsed, as Controls says one (`Monitor::fault`: the
     ///    last reading's stamp, no level, a fault), until `lapse_done`;
     /// 3. read `after`, if given, until `done`.
     ///
-    /// The run ends early if the worker ends.
+    /// The run ends early if the worker ends. A run in which the host held
+    /// the Controls or the worker up ([`HELD_UP_US`]) is made again on a new
+    /// bus, as the lease-freshness tests' attempts are ([`STALLED_ATTEMPTS`]):
+    /// only a run that was not is judged.
     fn ride_run(
         ride: bool,
         lapse_done: impl Fn(&Ridden, u64) -> bool,
         after: Option<bool>,
         done: impl Fn(&Ridden, u64) -> bool,
+    ) -> Ridden {
+        ride_run_set_up_in(Duration::ZERO, ride, lapse_done, after, done)
+    }
+
+    /// [`ride_run`] with a worker whose own setup takes `setup`
+    /// ([`SETUP_TAKES`]): before its loop, so no hold-up.
+    fn ride_run_set_up_in(
+        setup: Duration,
+        ride: bool,
+        lapse_done: impl Fn(&Ridden, u64) -> bool,
+        after: Option<bool>,
+        done: impl Fn(&Ridden, u64) -> bool,
+    ) -> Ridden {
+        let mut held = Vec::new();
+        for stalls in 1..=STALLED_ATTEMPTS {
+            let ridden = ride_once(setup, ride, &lapse_done, after, &done);
+            if !ridden.held_up() {
+                return ridden;
+            }
+            held.push((ridden.controls_held_us, ridden.worker_held_us));
+            thread::sleep(after_a_stall(stalls));
+        }
+        panic!(
+            "the host held the Controls or the worker up {HELD_UP_US} us or more in {STALLED_ATTEMPTS} of {STALLED_ATTEMPTS} attempts (Controls, worker, us): {held:?}"
+        );
+    }
+
+    /// One attempt of [`ride_run_set_up_in`].
+    fn ride_once(
+        setup: Duration,
+        ride: bool,
+        lapse_done: &impl Fn(&Ridden, u64) -> bool,
+        after: Option<bool>,
+        done: &impl Fn(&Ridden, u64) -> bool,
     ) -> Ridden {
         use crate::{
             process::{SessionDirectory, new_boot},
@@ -2492,9 +2612,15 @@ pub(crate) mod tests {
         let (mut controller, boot) = controller(started, Permission::Allowed, Permission::Denied);
         let bus_root = root.0.clone();
         let worker = thread::spawn(move || {
-            run(child, boot, &bus_root, Route::Slide, ride).map_err(|error| error.to_string())
+            SETUP_TAKES.with(|takes| takes.set(setup));
+            let ended =
+                run(child, boot, &bus_root, Route::Slide, ride).map_err(|error| error.to_string());
+            (ended, worker_held_us())
         });
-        let mut ridden = Ridden::default();
+        let mut ridden = Ridden {
+            started_us: started,
+            ..Ridden::default()
+        };
         let take = |voice: &mut WorkerChannels, lease: &mut Subscriber, ridden: &mut Ridden| {
             // A refused datagram is consumed: read on past it (a bounded
             // number of times), so an event behind it is still seen.
@@ -2514,9 +2640,12 @@ pub(crate) mod tests {
         };
         let (mut sequence, mut read) = (0, (started, 0));
         let mut phase = (1, started);
+        let mut stamped = started;
         loop {
             take(&mut voice, &mut lease, &mut ridden);
             let now = lamp_ipc::monotonic_us();
+            // Held up since the last state stamped, at Controls' 5 ms pace.
+            ridden.controls_held_us = ridden.controls_held_us.max(now.saturating_sub(stamped));
             if worker.is_finished() || now.saturating_sub(phase.1) >= PHASE_MOST_US {
                 break;
             }
@@ -2540,20 +2669,55 @@ pub(crate) mod tests {
                 _ => after,
             };
             sequence += 1;
-            let snapshot = controller.snapshot(MonoTime::from_micros(now)).unwrap();
-            voice.control.send(Control::Authority { snapshot }).unwrap();
+            // No authority before the worker's Ready, as the voice sends none
+            // (`process.rs`'s startup wait). Queued from the spawn instead, a
+            // start of over 100 ms found the third past its control channel's
+            // 100 ms and ended, which the voice never asks of a worker.
+            if ridden
+                .events
+                .iter()
+                .any(|(_, event)| matches!(event, WorkerEvent::Ready))
+            {
+                let snapshot = controller.snapshot(MonoTime::from_micros(now)).unwrap();
+                match voice.control.send(Control::Authority { snapshot }) {
+                    Ok(()) => {}
+                    // The worker closed its end as it ended, its thread not
+                    // yet seen finished: as the voice reads such a refusal.
+                    Err(error)
+                        if matches!(
+                            error.kind(),
+                            io::ErrorKind::ConnectionReset
+                                | io::ErrorKind::ConnectionRefused
+                                | io::ErrorKind::NotConnected
+                                | io::ErrorKind::BrokenPipe
+                                | io::ErrorKind::NotFound
+                        ) =>
+                    {
+                        ridden.refused_send = Some(error.to_string());
+                        break;
+                    }
+                    Err(error) => panic!("authority to the worker: {error}"),
+                }
+            }
             if muted.is_some() {
                 read = (now, sequence);
             }
             let physical = reading(&clock, read.0, read.1, muted);
             let state = slide_state(controls.boot(), &clock, now, sequence, physical);
             controls.publish_json(now, &state).unwrap();
+            // Held up between stamping this state and sending it.
+            ridden.controls_held_us = ridden
+                .controls_held_us
+                .max(lamp_ipc::monotonic_us().saturating_sub(now));
+            stamped = now;
             // Controls' own pace, not a wait for the worker.
             thread::sleep(Duration::from_millis(5));
         }
-        ridden.running_at_end = !worker.is_finished();
+        ridden.running_at_end = ridden.refused_send.is_none() && !worker.is_finished();
         let _ = voice.control.send(Control::Stop);
-        ridden.ended = Some(worker.join().unwrap());
+        let (ended, worker_held_us) = worker.join().unwrap();
+        ridden.ended = Some(ended);
+        ridden.worker_held_us = worker_held_us;
         take(&mut voice, &mut lease, &mut ridden);
         drop(directory);
         ridden
@@ -2727,6 +2891,44 @@ pub(crate) mod tests {
         assert_eq!(unavailable.len(), 1, "{}", ridden.said());
         let after = ridden.privacy_after(unavailable[0].0);
         assert_eq!(after.first(), Some(&true), "{}", ridden.said());
+    }
+
+    /// A worker slow over its own setup (a cold lamp's file work, a loaded
+    /// host) still starts on a fresh state. It used to subscribe to Controls
+    /// before that setup, and Controls' publisher, finding the socket within
+    /// its 5 ms rescan, queued each state for it meanwhile: a setup of 50 ms
+    /// or more left its first read a state already that old, and the fence
+    /// ended the worker on it, `publisher/clock/order changed`, before its
+    /// first reading, with fresh ones queued right behind it (these tests, 1
+    /// or 2 runs in 30 on a loaded Mac). It subscribes last now: with its
+    /// setup taking three times that freshness, its first word after Ready
+    /// is a reading, and it goes on to grant.
+    #[test]
+    fn a_worker_slow_over_its_own_setup_still_starts_on_a_fresh_state() {
+        let setup = Duration::from_millis(150);
+        let ridden = ride_run_set_up_in(setup, true, |_, _| true, None, |_, _| true);
+        assert!(ridden.fault().is_none(), "{}", ridden.said());
+        let ready = ridden
+            .events
+            .iter()
+            .position(|(_, event)| matches!(event, WorkerEvent::Ready))
+            .unwrap_or_else(|| panic!("no Ready: {}", ridden.said()));
+        assert!(
+            ridden.events[ready].0 >= ridden.started_us + setup.as_micros() as u64,
+            "its setup did not take {setup:?}: {}",
+            ridden.said()
+        );
+        assert!(
+            matches!(
+                ridden.events.get(ready + 1),
+                Some((_, WorkerEvent::Privacy { muted: false, .. }))
+            ),
+            "{}",
+            ridden.said()
+        );
+        assert!(ridden.granted_before_lapse(), "{:?}", ridden.leases);
+        assert!(ridden.running_at_end, "{}", ridden.said());
+        assert_eq!(ridden.ended, Some(Ok(())));
     }
 
     /// #1569 row 45: the order begins again only before the worker's first
