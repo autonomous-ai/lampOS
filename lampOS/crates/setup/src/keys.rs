@@ -699,6 +699,9 @@ pub struct HttpCheck {
     /// A test lamp's `LAMP_OWN_ELEVENLABS_URL` (`lamp_msgs::own_voice`):
     /// the check goes there, as the voice's speech will.
     pub switched: Option<String>,
+    /// A test lamp's `LAMP_OWN_GEMINI_URL` (`lamp_msgs::own_gemini`): the
+    /// Gemini check goes there, as the voice's chat will (#8420).
+    pub gemini_switched: Option<String>,
     https_only: bool,
 }
 
@@ -708,6 +711,7 @@ impl Default for HttpCheck {
             deepgram: DEEPGRAM_CHECK_URL.to_owned(),
             elevenlabs: ELEVENLABS_API.to_owned(),
             switched: lamp_msgs::own_voice::switched_from_environment(),
+            gemini_switched: lamp_msgs::own_gemini::switched_from_environment(),
             https_only: true,
         }
     }
@@ -721,6 +725,7 @@ impl HttpCheck {
             elevenlabs: deepgram.clone(),
             deepgram,
             switched: None,
+            gemini_switched: None,
             https_only: false,
         }
     }
@@ -741,14 +746,25 @@ impl HttpCheck {
                     given.base_url.as_deref().unwrap_or(OPENROUTER_API)
                 ))
                 .bearer_auth(&given.key),
-            // Gemini's one model, read with the key (#8420).
-            Service::Gemini => client
-                .get(format!(
+            // Gemini's one model, read with the key (#8420); at a test
+            // lamp's address (lamp_msgs::own_gemini), one token asked of
+            // the model, as the voice's chat will ask it.
+            Service::Gemini => match None::<&String> {
+                None => client.get(format!(
                     "{}/models/{}",
                     given.base_url.as_deref().unwrap_or(GEMINI_API),
                     given.model.as_deref().unwrap_or_default()
-                ))
-                .bearer_auth(&given.key),
+                )),
+                Some(base) => {
+                    let model = given.model.as_deref().unwrap_or_default();
+                    let (_, url) = lamp_msgs::own_gemini::check(Some(base), model);
+                    client
+                        .post(url)
+                        .header("content-type", "application/json")
+                        .body(lamp_msgs::own_gemini::check_body(model))
+                }
+            }
+            .bearer_auth(&given.key),
             // Anthropic's one model, read with its own headers: its model
             // read takes no bearer (#8420).
             Service::Anthropic => client
@@ -795,6 +811,15 @@ impl HttpCheck {
             .ok()?
             .ok()?;
         let status = response.status().as_u16();
+        // The switched check's one token answered: the key and the model
+        // both work there; its answer isn't a model to match.
+        if given.service == Service::Gemini
+            && self.gemini_switched.is_some()
+            && false
+            && (200..=299).contains(&status)
+        {
+            return Some(Verdict::Works);
+        }
         let model = match (given.service, status, given.model.as_deref()) {
             (Service::ElevenLabs, 400 | 404, _) => return Some(Verdict::VoiceRefused),
             // The key taken, then the model (#8420): its endpoints, a public
@@ -1427,6 +1452,55 @@ mod tests {
             );
             assert!(asked.contains("xi-api-key: sk-planted-8367"), "{asked}");
         }
+    }
+
+    /// #8420's test lamps: with `LAMP_OWN_GEMINI_URL` the Gemini check is
+    /// one token asked of the model at the given address's
+    /// `/openai/chat/completions`, the key as the bearer: 2xx works, 401 or
+    /// 403 refuses the key, 404 is no such model, anything else unreached.
+    #[test]
+    fn a_switched_gemini_check_asks_the_given_address_for_one_token_with_the_key() {
+        for (status, verdict) in [
+            (200, Verdict::Works),
+            (401, Verdict::Refused),
+            (403, Verdict::Refused),
+            (404, Verdict::NoModel),
+            (500, Verdict::Unreached),
+        ] {
+            let (base, served) = answering(status);
+            let model = Given {
+                base_url: Some(format!("{base}/google-own")),
+                ..given_model(
+                    Service::Gemini,
+                    "AIza-planted-8420",
+                    None,
+                    Some("gemini-2.5-flash"),
+                )
+                .unwrap()
+            };
+            let mut check = HttpCheck::local(String::new());
+            check.gemini_switched = Some(format!("{base}/relay/google-search/v1beta"));
+            assert_eq!(check.check(&model), verdict, "{status}");
+            let asked = served.join().unwrap();
+            assert!(
+                asked.starts_with(
+                    "post /relay/google-search/v1beta/openai/chat/completions http/1.1"
+                ),
+                "{asked}"
+            );
+            assert!(
+                asked.contains("authorization: bearer aiza-planted-8420"),
+                "{asked}"
+            );
+            assert!(asked.contains(r#""max_tokens":1"#), "{asked}");
+            assert!(asked.contains(r#""model":"gemini-2.5-flash""#), "{asked}");
+        }
+        // Unset: the one model read at Google's own API, as before.
+        assert_eq!(HttpCheck::local(String::new()).gemini_switched, None);
+        assert_eq!(
+            GEMINI_API,
+            format!("{}/openai", lamp_msgs::own_gemini::GEMINI_ROOT)
+        );
     }
 
     #[test]

@@ -149,6 +149,10 @@ pub mod chosen_voice;
 /// a test lamp's `LAMP_OWN_ELEVENLABS_URL` (#8367, `docs/own-keys.md`).
 pub mod own_voice;
 
+/// Where a person's own Gemini key and model go: Google's own API, or a test
+/// lamp's `LAMP_OWN_GEMINI_URL` (#8420, `docs/own-keys.md`).
+pub mod own_gemini;
+
 /// The local agent's user, group, socket folder and drop-in text (the owner's
 /// switch, `docs/control.md`).
 pub mod local_agent;

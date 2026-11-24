@@ -697,18 +697,23 @@ impl SecondConfig {
         credentials: Option<&std::ffi::OsStr>,
     ) -> (Self, Vec<String>) {
         let switched = lamp_msgs::own_voice::switched_from_environment();
-        self.with_own_keys_at(on, credentials, switched.as_deref())
+        let gemini = lamp_msgs::own_gemini::switched_from_environment();
+        self.with_own_keys_at(on, credentials, switched.as_deref(), gemini.as_deref())
     }
 
     /// [`Self::with_own_keys`] with a test lamp's `LAMP_OWN_ELEVENLABS_URL`
     /// given (`switched`, `lamp_msgs::own_voice::switched`): the person's
     /// ElevenLabs voice goes there in place of [`ELEVENLABS_API`], and one
-    /// more journal line names its host.
+    /// more journal line names its host; with a test lamp's
+    /// `LAMP_OWN_GEMINI_URL` (`gemini_at`, `lamp_msgs::own_gemini::switched`)
+    /// the person's Gemini chat goes there in place of [`GEMINI_BASE_URL`],
+    /// with its own line (#8420).
     pub fn with_own_keys_at(
         mut self,
         on: bool,
         credentials: Option<&std::ffi::OsStr>,
         switched: Option<&str>,
+        gemini_at: Option<&str>,
     ) -> (Self, Vec<String>) {
         if !on {
             return (self, Vec::new());
@@ -760,7 +765,7 @@ impl SecondConfig {
                 (
                     OwnChat::Gemini,
                     OWN_GEMINI_KEY,
-                    GEMINI_BASE_URL,
+                    lamp_msgs::own_gemini::root(gemini_at),
                     OWN_GEMINI_MODEL,
                 ),
                 (
@@ -776,8 +781,17 @@ impl SecondConfig {
             .unwrap_or((OwnChat::OpenRouter, Ok(None))),
             found => (OwnChat::OpenAiCompatible, found),
         };
+        let mut gemini_line = None;
         let compatible_line = match found {
             Ok(Some((key, url, model))) => {
+                if chat == OwnChat::Gemini
+                    && let Some(at) = gemini_at.filter(|_| false)
+                {
+                    gemini_line = Some(format!(
+                        "Gemini: the person's own model goes to {}, not Google's own API (LAMP_OWN_GEMINI_URL, test lamps only)",
+                        host(at)
+                    ));
+                }
                 let line = match chat {
                     OwnChat::OpenAiCompatible => format!(
                         "OpenAI-compatible: the person's own key, at {}, model {model} (LAMP_OWN_KEYS)",
@@ -873,6 +887,7 @@ impl SecondConfig {
             });
         }
         lines.extend(compatible_line);
+        lines.extend(gemini_line);
         lines.extend(switched_line);
         (self, lines)
     }
@@ -1763,7 +1778,7 @@ mod tests {
         private(&units.join("own_elevenlabs.key"), "sk-planted-8394\n");
         private(&units.join("own_elevenlabs.voice"), "PersonVoice8394\n");
         let at = "https://campaign-api.autonomous.ai/api/v1/ai";
-        let (own, lines) = relay.clone().with_own_keys_at(true, dir, Some(at));
+        let (own, lines) = relay.clone().with_own_keys_at(true, dir, Some(at), None);
         assert_eq!(own.tts_base_url, at);
         assert_eq!(own.tts_key.expose(), "sk-planted-8394");
         assert!(
@@ -1771,7 +1786,7 @@ mod tests {
             "{lines:?}"
         );
         // Unset: ElevenLabs' own API, and no such line.
-        let (own, lines) = relay.clone().with_own_keys_at(true, dir, None);
+        let (own, lines) = relay.clone().with_own_keys_at(true, dir, None, None);
         assert_eq!(own.tts_base_url, ELEVENLABS_API);
         assert!(
             !lines
@@ -1781,7 +1796,7 @@ mod tests {
         );
         // No key of the person's: the switch changes nothing.
         fs::remove_file(units.join("own_elevenlabs.key")).unwrap();
-        let (alone, lines) = relay.clone().with_own_keys_at(true, dir, Some(at));
+        let (alone, lines) = relay.clone().with_own_keys_at(true, dir, Some(at), None);
         assert_eq!(alone.tts_base_url, relay.tts_base_url);
         assert!(
             !lines
@@ -2012,6 +2027,53 @@ mod tests {
                 .iter()
                 .any(|line| line.starts_with("Gemini: the relay")
                     && line.contains("could not be read")),
+            "{lines:?}"
+        );
+    }
+
+    /// #8420's test lamps: with `LAMP_OWN_GEMINI_URL` the person's Gemini
+    /// chat goes to that address in place of Google's own API, with one more
+    /// line by host; unset, Google's, byte for byte; with no Gemini key, the
+    /// switch changes nothing.
+    #[test]
+    fn a_test_lamps_switch_sends_the_persons_gemini_chat_to_its_address() {
+        let (_, config) = written("own-gemini-switched", "");
+        let mut relay = load_from_path(&config).unwrap();
+        relay.hosted.deepseek_base_url = Some("https://relay.example.invalid/deepseek".into());
+        let units = directory("own-gemini-switched-units");
+        let dir = Some(units.as_os_str());
+        private(&units.join("own_gemini.key"), "relay-key-8420\n");
+        private(&units.join("own_gemini.model"), "gemini-2.5-flash\n");
+        let at = "https://campaign-api.autonomous.ai/api/v1/ai/v1/google-search/v1beta";
+        let (own, lines) = relay.clone().with_own_keys_at(true, dir, None, Some(at));
+        assert_eq!(own.hosted.deepseek_base_url.as_deref(), Some(at));
+        assert_eq!(format!("{:?}", own.hosted.own_chat), "Some(Gemini)");
+        assert!(
+            lines.contains(&"Gemini: the person's own model goes to campaign-api.autonomous.ai, not Google's own API (LAMP_OWN_GEMINI_URL, test lamps only)".to_owned()),
+            "{lines:?}"
+        );
+        assert!(!lines.join(" ").contains("relay-key-8420"), "{lines:?}");
+        // Unset: Google's own API, and no such line.
+        let (own, lines) = relay.clone().with_own_keys_at(true, dir, None, None);
+        assert_eq!(
+            own.hosted.deepseek_base_url.as_deref(),
+            Some(GEMINI_BASE_URL)
+        );
+        assert_eq!(GEMINI_BASE_URL, lamp_msgs::own_gemini::GEMINI_ROOT);
+        assert!(
+            !lines
+                .iter()
+                .any(|line| line.contains("LAMP_OWN_GEMINI_URL")),
+            "{lines:?}"
+        );
+        // No key of the person's: the switch changes nothing.
+        fs::remove_file(units.join("own_gemini.key")).unwrap();
+        let (alone, lines) = relay.clone().with_own_keys_at(true, dir, None, Some(at));
+        assert_eq!(alone.hosted, relay.hosted);
+        assert!(
+            !lines
+                .iter()
+                .any(|line| line.contains("LAMP_OWN_GEMINI_URL")),
             "{lines:?}"
         );
     }
@@ -2448,8 +2510,11 @@ mod loopback_tests {
         }
     }
 
+    /// The desktop's loopback switch and the test lamps' own-key addresses
+    /// (#8394's `LAMP_OWN_ELEVENLABS_URL`, #8420's `LAMP_OWN_GEMINI_URL`,
+    /// which send the person's key elsewhere) are never in a product unit.
     #[test]
-    fn no_product_unit_sets_the_loopback_switch() {
+    fn no_product_unit_sets_a_desktop_or_test_lamp_switch() {
         let directory =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
         let mut seen = 0;
@@ -2465,11 +2530,17 @@ mod loopback_tests {
             }
             seen += 1;
             let text = std::fs::read_to_string(&path).unwrap();
-            assert!(
-                !text.contains(LOOPBACK_SERVICES_ENV),
-                "{} sets {LOOPBACK_SERVICES_ENV}: a desktop-only switch, never a product's",
-                path.display()
-            );
+            for switch in [
+                LOOPBACK_SERVICES_ENV,
+                lamp_msgs::own_voice::ENVIRONMENT,
+                lamp_msgs::own_gemini::ENVIRONMENT,
+            ] {
+                assert!(
+                    !text.contains(switch),
+                    "{} sets {switch}: a desktop or test lamp switch, never a product's",
+                    path.display()
+                );
+            }
         }
         assert!(
             seen > 20,
