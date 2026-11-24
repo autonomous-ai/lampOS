@@ -6,7 +6,8 @@
 //! a name the app says. Its grants are its installed manifest's; the owner's
 //! pairing has no part in it. Behind `LAMP_STORE_APPS` ([`crate::app_yes::on`]).
 //!
-//! The ops only an app has (`app.took`, `app.settings.get`, `app.panel.set`)
+//! The ops only an app has (`app.took`, `app.settings.get`, `app.panel.set`,
+//! `app.answer`)
 //! are answered here, before the door parses a frame, so no other socket can
 //! send them and the door's `Op` is the same for all.
 use crate::app_yes::{self, Live, Place};
@@ -189,7 +190,7 @@ fn refuse(re: u64, code: ErrorCode, why: &str) -> Value {
 pub fn is_app_op(frame: &Map<String, Value>) -> bool {
     matches!(
         frame.get("op").and_then(Value::as_str),
-        Some("app.took" | "app.settings.get" | "app.panel.set")
+        Some("app.took" | "app.settings.get" | "app.panel.set" | "app.answer")
     )
 }
 
@@ -279,6 +280,9 @@ pub fn answer(
                 Some(settings) => crate::protocol::ok(re, json!({"settings": settings})),
                 None => refuse(re, ErrorCode::Refused, "this app is not installed"),
             }
+        }
+        "app.answer" => {
+            crate::app_calls::answer_op(live, name, frame, re, crate::app_calls::on(), now)
         }
         _ => {
             let title = frame.get("title").and_then(Value::as_str);
