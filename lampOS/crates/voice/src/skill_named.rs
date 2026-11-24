@@ -398,6 +398,13 @@ pub fn own_words_of(ask: &str) -> usize {
     own_words(&lower_words(ask)).len()
 }
 
+/// The words of its own an ask phrase has ([`own_words`]), lowercased: a
+/// made skill refused on [`own_words_of`] names them (#8451).
+pub fn own_words_in(ask: &str) -> Vec<String> {
+    let words = lower_words(ask);
+    own_words(&words).into_iter().map(str::to_owned).collect()
+}
+
 /// Whether two ask phrases are matched as the same ([`loose_ask`]): "Take
 /// a photo" and "take a photo".
 pub fn same_ask(one: &str, other: &str) -> bool {

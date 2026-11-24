@@ -1239,20 +1239,27 @@ pub const MOST_MADE_ASK_CHARS: usize = 60;
 /// any skill's (`lamp_skills::ASK_WORDS`).
 const MADE_ASK_WORDS: std::ops::RangeInclusive<usize> = 2..=8;
 
-/// What a made skill's `asks` are told when they aren't as [`made_asks`]
-/// takes them, for a repair.
-pub const MADE_ASKS_FORM: &str = "its asks aren't words the lamp can start it by: asks = \
-     [\"send my test note\"], the person's own words, 2 to 8 plain words each (letters, digits \
-     and apostrophes, one space between, no punctuation), at most 3, each once, never a yes, a \
-     no, a question, a stop or the lamp's own words for what it does itself";
+/// How a made skill's refused `asks` begin in the journal and its repair
+/// ([`made_asks`], #8451).
+pub const ASKS_NOT_KEPT: &str = "its asks weren't kept";
+
+/// What a made skill's `asks` are told after the line naming why they
+/// weren't kept, for a repair (#8451): the form set apart, its example
+/// never beside the skill's own asks.
+pub const MADE_ASKS_FORM: &str = "The form, for example: asks = [\"send my test note\"], the \
+     person's own words, 2 to 8 plain words each (letters, digits and apostrophes, one space \
+     between, no punctuation), at most 3, each once, never a yes, a no, a question, a stop or \
+     the lamp's own words for what it does itself.";
 
 /// A made skill's `asks` (with [`ASKS_ENVIRONMENT`] on): the words that
 /// start it, as lamp-skills takes any skill's (`lamp_skills::checked_asks`:
 /// [`MADE_ASK_WORDS`] words of letters, digits and apostrophes, one space
 /// between, never ordinary speech, `crate::skill_named::ask_refused`), at
 /// most [`MOST_MADE_ASKS`] of at most [`MOST_MADE_ASK_CHARS`] each, once
-/// each whatever their case. None when it gives no `asks`; why not, for a
-/// repair ([`MADE_ASKS_FORM`]).
+/// each whatever their case. None when it gives no `asks`; why not, for
+/// the journal and a repair: the asks as given, the one that failed and
+/// the rule it broke, in plain words (#8451, [`ASKS_NOT_KEPT`]), the
+/// repair then giving the form ([`MADE_ASKS_FORM`]).
 pub fn made_asks(table: &toml::Table) -> Result<Vec<String>, Refused> {
     made_asks_of(table, MOST_MADE_ASKS)
 }
@@ -1263,43 +1270,179 @@ pub const MOST_ADDED_ASKS: usize = 8;
 
 /// [`made_asks`], at most `most`.
 fn made_asks_of(table: &toml::Table, most: usize) -> Result<Vec<String>, Refused> {
-    let Some(asks) = table.get("asks") else {
+    let Some(given) = table.get("asks") else {
         return Ok(Vec::new());
     };
-    let form = || {
-        Refused(
-            MADE_ASKS_FORM.to_owned(),
-            Some(format!("The lamp refused it: {MADE_ASKS_FORM}.")),
-        )
+    // Lamp-06c1, 24 Nov (#8451): one line for every rule logged only the
+    // form's example; each refusal names the asks and its own rule.
+    let refused = |rule: String| {
+        let line = format!("{ASKS_NOT_KEPT}: asks = {}: {rule}", asks_given(given));
+        let repair = format!("The lamp refused it: {line}. {MADE_ASKS_FORM}");
+        Refused(line, Some(repair))
     };
-    let asks = asks.as_array().ok_or_else(form)?;
-    if asks.is_empty() || asks.len() > most {
-        return Err(form());
+    let Some(asks) = given.as_array() else {
+        return Err(refused("not a list".to_owned()));
+    };
+    if asks.is_empty() {
+        return Err(refused("none".to_owned()));
+    }
+    if asks.len() > most {
+        return Err(refused(format!("more than {most}")));
     }
     let mut kept: Vec<String> = Vec::new();
-    for ask in asks {
-        let ask = ask.as_str().ok_or_else(form)?;
-        let words: Vec<&str> = ask.split(' ').collect();
-        let plain = MADE_ASK_WORDS.contains(&words.len())
-            && ask.chars().count() <= MOST_MADE_ASK_CHARS
-            && words.iter().all(|word| {
-                !word.is_empty()
-                    && word
-                        .chars()
-                        .all(|letter| letter.is_alphanumeric() || letter == '\'')
-            });
-        if !plain
-            || crate::skill_named::ask_refused(ask).is_some()
-            || crate::skill_named::own_words_of(ask) < 2
-            || kept
-                .iter()
-                .any(|seen| seen.to_lowercase() == ask.to_lowercase())
-        {
-            return Err(form());
+    for value in asks {
+        let Some(ask) = value.as_str() else {
+            return Err(refused(format!("{}: not words", asks_given(value))));
+        };
+        if let Some(rule) = ask_broken(ask, &kept) {
+            return Err(refused(format!("{ask:?}: {rule}")));
         }
         kept.push(ask.to_owned());
     }
     Ok(kept)
+}
+
+/// A made skill's `asks`, or one of them, as it was written, for the
+/// journal: a string quoted, a list in brackets.
+fn asks_given(value: &toml::Value) -> String {
+    match value {
+        toml::Value::String(text) => format!("{text:?}"),
+        toml::Value::Array(items) => format!(
+            "[{}]",
+            items.iter().map(asks_given).collect::<Vec<_>>().join(", ")
+        ),
+        toml::Value::Integer(number) => number.to_string(),
+        toml::Value::Float(number) => number.to_string(),
+        toml::Value::Boolean(value) => value.to_string(),
+        toml::Value::Datetime(_) => "a date".to_owned(),
+        toml::Value::Table(_) => "a table".to_owned(),
+    }
+}
+
+/// The rule one of a made skill's asks breaks, in plain words, the first
+/// of: one space between its words, only letters, digits and apostrophes,
+/// [`MADE_ASK_WORDS`] words, [`MOST_MADE_ASK_CHARS`] characters,
+/// `crate::skill_named::ask_refused`, two words of its own
+/// (`crate::skill_named::own_words_in`), once among those `kept` whatever
+/// their case. None when it breaks none.
+fn ask_broken(ask: &str, kept: &[String]) -> Option<String> {
+    let words: Vec<&str> = ask.split(' ').collect();
+    if words.iter().any(|word| word.is_empty()) {
+        return Some("not one space between its words".to_owned());
+    }
+    if let Some(other) = ask
+        .chars()
+        .find(|&letter| letter != ' ' && !letter.is_alphanumeric() && letter != '\'')
+    {
+        return Some(format!("a \"{other}\" in it"));
+    }
+    let plural = |count: usize, one: &str| match count {
+        1 => format!("1 {one}"),
+        _ => format!("{count} {one}s"),
+    };
+    if !MADE_ASK_WORDS.contains(&words.len()) {
+        return Some(format!(
+            "{}, not {} to {}",
+            plural(words.len(), "word"),
+            MADE_ASK_WORDS.start(),
+            MADE_ASK_WORDS.end()
+        ));
+    }
+    let chars = ask.chars().count();
+    if chars > MOST_MADE_ASK_CHARS {
+        return Some(format!("{chars} characters, over {MOST_MADE_ASK_CHARS}"));
+    }
+    if let Some(why) = crate::skill_named::ask_refused(ask) {
+        return Some(why.to_owned());
+    }
+    let own = crate::skill_named::own_words_in(ask);
+    if own.len() < 2 {
+        let listed: Vec<String> = own.iter().map(|word| format!("{word:?}")).collect();
+        return Some(match own.len() {
+            0 => "no word of its own".to_owned(),
+            count => format!(
+                "only {} of its own, {}",
+                plural(count, "word"),
+                listed.join(", ")
+            ),
+        });
+    }
+    if kept
+        .iter()
+        .any(|seen| seen.to_lowercase() == ask.to_lowercase())
+    {
+        return Some("said twice".to_owned());
+    }
+    None
+}
+
+/// One of a made skill's asks with its ends tidied (#8451, lamp-06c1, 24
+/// Nov: "pebble hello!"): its ends trimmed, runs of spaces folded to one,
+/// and a `.`, `!`, `?` or `,` at its start or end dropped. None when that
+/// changes nothing, or leaves no letter or digit; punctuation inside is
+/// kept, for the check to refuse.
+fn ask_tidied(ask: &str) -> Option<String> {
+    let edge = |letter: char| letter.is_whitespace() || matches!(letter, '.' | '!' | '?' | ',');
+    let tidy = ask
+        .trim_matches(edge)
+        .split(' ')
+        .filter(|word| !word.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    (tidy != ask && tidy.chars().any(char::is_alphanumeric)).then_some(tidy)
+}
+
+/// A made skill's `asks` with each one's ends tidied ([`ask_tidied`]),
+/// with [`ASKS_ENVIRONMENT`] on, before the check: the person never said
+/// the model's punctuation. Each tidied ask is its one `"..."` in the
+/// text, rewritten in place, taken only when the text then reads as the
+/// same skill with those asks alone changed; otherwise, off, or with
+/// nothing to tidy, it is given back byte for byte as it came. One journal
+/// line for each.
+pub fn asks_tidied(text: &str) -> String {
+    if !asks_on() {
+        return text.to_owned();
+    }
+    let Ok(table) = toml::from_str::<toml::Table>(text) else {
+        return text.to_owned();
+    };
+    let Some(asks) = table.get("asks").and_then(toml::Value::as_array) else {
+        return text.to_owned();
+    };
+    let mut out = text.to_owned();
+    let mut expected = table.clone();
+    let mut changed = Vec::new();
+    for (index, ask) in asks.iter().enumerate() {
+        let Some(ask) = ask.as_str() else {
+            continue;
+        };
+        let Some(tidy) = ask_tidied(ask) else {
+            continue;
+        };
+        let written = format!("\"{ask}\"");
+        if ask.contains(['"', '\\'])
+            || tidy.contains(['"', '\\'])
+            || out.matches(&written).count() != 1
+        {
+            continue;
+        }
+        out = out.replacen(&written, &format!("\"{tidy}\""), 1);
+        if let Some(toml::Value::Array(list)) = expected.get_mut("asks") {
+            list[index] = toml::Value::String(tidy.clone());
+        }
+        changed.push((ask.to_owned(), tidy));
+    }
+    if changed.is_empty() {
+        return text.to_owned();
+    }
+    match toml::from_str::<toml::Table>(&out) {
+        Ok(read) if read == expected => {}
+        _ => return text.to_owned(),
+    }
+    for (ask, tidy) in changed {
+        eprintln!("lamp-voice: a made skill tidied: its ask {ask:?} kept as {tidy:?}");
+    }
+    out
 }
 
 /// Why a made skill's `asks` can't be its own on this lamp (with
@@ -3592,7 +3735,7 @@ pub fn paced_with(text: &str, asked: &[(u32, u32)], limits: bool) -> String {
 pub fn paced_for(text: &str, asked: &[(u32, u32)], limits: bool, repeat: Option<u64>) -> String {
     mannered_with(
         &say_paced_with(
-            &topic_granted(&notes_granted(&tidied(&asks_lifted(text)))),
+            &topic_granted(&notes_granted(&tidied(&asks_tidied(&asks_lifted(text))))),
             repeat,
         ),
         asked,
