@@ -2510,6 +2510,33 @@ mod loopback_tests {
         }
     }
 
+    /// Whether a unit's text sets `name` (RED: the whole text, comments
+    /// included, as the product test read it before #8481's HOLD).
+    fn unit_sets(text: &str, name: &str) -> bool {
+        text.contains(name)
+    }
+
+    /// A comment naming a switch is not setting it (#8476's lamp-voice.service
+    /// names `LAMP_OWN_ELEVENLABS_URL` in one); an `Environment=` line, among
+    /// its other assignments or quoted, is.
+    #[test]
+    fn a_unit_sets_a_switch_only_by_an_environment_line() {
+        let name = lamp_msgs::own_gemini::ENVIRONMENT;
+        let named = "[Service]\n# Not LAMP_OWN_GEMINI_URL here: test lamps only (own-keys.md)\n  ; nor LAMP_OWN_GEMINI_URL=https://x.invalid\nEnvironment=LAMP_OWN_KEYS=on\n";
+        assert!(!unit_sets(named, name), "a comment naming it");
+        for set in [
+            "[Service]\nEnvironment=LAMP_OWN_GEMINI_URL=https://relay.example.invalid/v1beta\n",
+            "[Service]\n  Environment=LAMP_OWN_KEYS=on LAMP_OWN_GEMINI_URL=https://relay.example.invalid\n",
+            "[Service]\nEnvironment=\"LAMP_OWN_GEMINI_URL=https://relay.example.invalid\"\n",
+        ] {
+            assert!(unit_sets(set, name), "{set}");
+        }
+        assert!(
+            !unit_sets("Environment=LAMP_OWN_GEMINI_URLX=1\n", name),
+            "another name"
+        );
+    }
+
     /// The desktop's loopback switch and the test lamps' own-key addresses
     /// (#8394's `LAMP_OWN_ELEVENLABS_URL`, #8420's `LAMP_OWN_GEMINI_URL`,
     /// which send the person's key elsewhere) are never in a product unit.
@@ -2536,7 +2563,7 @@ mod loopback_tests {
                 lamp_msgs::own_gemini::ENVIRONMENT,
             ] {
                 assert!(
-                    !text.contains(switch),
+                    !unit_sets(&text, switch),
                     "{} sets {switch}: a desktop or test lamp switch, never a product's",
                     path.display()
                 );
