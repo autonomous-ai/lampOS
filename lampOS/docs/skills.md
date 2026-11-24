@@ -8677,7 +8677,17 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    hello" still names nothing. Every place the line holds the ask counts,
    not only its first: "make a skill called pebble hello … whenever I say
    pebble hello" holds it first in the skill's name, with no cue before it,
-   and the place after "I say" is their phrase (run-1843). "says" and "saying" are no such words: in a make's line they mostly
+   and the place after "I say" is their phrase (run-1843). Of the places
+   the line holds the ask after such a cue, the shortest phrase that
+   starts with the ask is theirs (#8451, the first builder's P3 on
+   #8469): "pebble hello" in "make a skill that waves when I say hi pebble
+   hello, and also when I say pebble hello", never "hi pebble hello"; with
+   none that starts with it, the first found (test
+   `the_persons_own_phrase_is_the_shortest_that_starts_with_the_ask`).
+   With no heard line (`made_skill`'s `line = request.heard.unwrap_or(request.request)`),
+   their line is the model's `request` for the make, so a paraphrase
+   there that has a "say" or a "hear" can name the phrase; this is older
+   than #8469 and unchanged. "says" and "saying" are no such words: in a make's line they mostly
    tell what the skill says ("a skill that says good morning", Thirteen's
    P2 on #8469), and an order to the skill with no "I" or "you" before
    its cue ("when I wake up, say good morning", "every night at ten, say
@@ -8710,9 +8720,10 @@ grants, its code, or the lamp's own steps (the light, the head, a say).
    said): within the same request, a later `make_skill` call (a change
    too, `make_skill_local::makes_a_skill`) after that plain line makes
    nothing and is given the same answer, word for word, journaled as
-   `lamp-voice second: request <n> chat round <r>: make_skill not run: a
+   `lamp-voice second: request <n> chat round <r>: <tool> not run: a
    make in this request was refused for the person's own words for its
-   start: told the same`, so they choose a new start in their own words
+   start: told the same`, `<tool>` being the name of the tool called, a
+   make (`make_skill`) or a change read as one, so they choose a new start in their own words
    next time; no "I'll make it now" opens it. The next request makes as
    before. When that request ends, what the lamp said after the plain
    line is journaled: `lamp-voice second: request <n>: a make was refused

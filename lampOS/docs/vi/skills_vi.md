@@ -4968,7 +4968,18 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    vẫn không nêu cụm nào. Mọi chỗ câu chứa cụm khởi động đều được xét,
    không chỉ chỗ đầu tiên: "make a skill called pebble hello … whenever I
    say pebble hello" chứa nó trước tiên trong tên kỹ năng, không có từ báo
-   nào trước đó, và chỗ sau "I say" mới là cụm của họ (run-1843). "says" và "saying"
+   nào trước đó, và chỗ sau "I say" mới là cụm của họ (run-1843). Trong
+   các chỗ câu chứa cụm khởi động sau một từ báo như vậy, cụm ngắn nhất
+   bắt đầu bằng cụm khởi động là của họ (#8451, P3 của first builder trên
+   #8469): "pebble hello" trong "make a skill that waves when I say hi
+   pebble hello, and also when I say pebble hello", không bao giờ là "hi
+   pebble hello"; khi không cụm nào bắt đầu bằng nó, lấy cụm tìm thấy đầu
+   tiên (test
+   `the_persons_own_phrase_is_the_shortest_that_starts_with_the_ask`).
+   Khi không có câu nghe được (`line = request.heard.unwrap_or(request.request)`
+   của `made_skill`), câu của họ là `request` mà model viết cho lần tạo,
+   nên một câu diễn đạt lại ở đó có "say" hoặc "hear" vẫn có thể nêu cụm;
+   điều này có từ trước #8469 và không đổi. "says" và "saying"
    không phải từ như vậy: trong câu tạo kỹ năng chúng thường nói kỹ năng
    sẽ nói gì ("a skill that says good morning", P2 của Thirteen trên
    #8469), và một lệnh cho kỹ năng mà trước từ đó không có "I" hoặc "you"
@@ -5003,9 +5014,10 @@ chính đèn (đèn, đầu, một câu nói). "When I say send my test note, em
    gọi `make_skill` sau đó (cả một thay đổi,
    `make_skill_local::makes_a_skill`) sau câu nói thẳng đó không tạo gì
    và nhận đúng câu trả lời ấy, từng chữ, ghi journal là `lamp-voice
-   second: request <n> chat round <r>: make_skill not run: a make in this
+   second: request <n> chat round <r>: <tool> not run: a make in this
    request was refused for the person's own words for its start: told
-   the same`, để lần sau họ chọn cách khởi động mới bằng lời của chính
+   the same`, `<tool>` là tên của tool được gọi, một lần tạo
+   (`make_skill`) hoặc một thay đổi được đọc như lần tạo, để lần sau họ chọn cách khởi động mới bằng lời của chính
    họ; không có "I'll make it now" mở đầu. Request kế tiếp tạo như cũ.
    Khi request đó kết thúc, những gì đèn nói sau câu nói thẳng được ghi
    journal: `lamp-voice second: request <n>: a make was refused for the
