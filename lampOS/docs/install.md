@@ -2468,7 +2468,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        rounds, not only after the next round (lamp-ee17, 24 Nov:
        `hermes_install::after_round_asking`). Hermes's `approvals.mode` stays
        `manual`. Not reachable (the switch off, or still starting), the
-       direct path fails as OpenClaw's does with its gateway down.
+       direct path fails as OpenClaw's does with its gateway down. With
+       the tasks switch on, its unit is `PartOf=lamp-control.service`, as
+       OpenClaw's (#8320): a lamp-control restart restarts it, so its
+       namespace binds lamp-control's socket as it is now; the round that
+       writes `PartOf=` over an earlier build's unit without it
+       try-restarts a running gateway once.
      - Its API key in `/var/lib/lampos-hermes-gateway/api-key` (0600
        `lampos`), which lamp-tasks reads as `lampos` at each check
        (`direct::HERMES_KEY_PATH`).
