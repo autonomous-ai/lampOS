@@ -99,7 +99,8 @@ MAKE(){ local n0 rb; MSTAT=; MW=; Y=; O=; MPATH=none; AT=; TRYL=; SO=; n0=$(line
   echo "  make end: $(show $MW)"
   TRYL=$(sed -n "$(( n0 + 1 )),${MW}p" $J | grep -E "$TRY"); [ -n "$TRYL" ] && echo "$TRYL" | cut -c1-220 | sed 's/^/  try: /'
   sed -n "${MW}p" $J | grep -qE "$KEPT" || { MSTAT=notkept; return 1; }; MSTAT=kept
-  AT=$(tail -n +$(( n0 + 1 )) $J | grep -E "$ATONCE" | head -1)
+  # The at-once line can follow the make end by a few hundred ms (run 2, 24 Nov: 127 ms after it): wait for it.
+  waitfor "$ATONCE" $n0 ${ATWAIT:-10} >/dev/null; AT=$(tail -n +$(( n0 + 1 )) $J | grep -E "$ATONCE" | head -1)
   if [ -n "$AT" ]; then MPATH=at-once; echo "  PATH at-once (no read-back, no yes played): $(echo "$AT" | cut -c1-200)"
     O=$(waitfor "$ON" $n0 ${ONWAIT:-90}) && echo "  on: $(show $O)"
     SO=$(tail -n +$(( n0 + 1 )) $J | grep -oE "$SAIDON" | head -1); echo "  tried line: ${SO:-none in the journal}"
