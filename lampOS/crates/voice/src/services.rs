@@ -1188,6 +1188,10 @@ pub fn forget_waiting() {
     // on #7509): every caller of this, the thread's forget, memory's and a
     // privacy change, drops it.
     crate::agent_asks::forget();
+    // And the owner's spoken asks (#8475, the first builder's P3 on #8550):
+    // no run is sent with no yes on an ask made before a forget or a
+    // privacy change.
+    crate::told_when_asked::forget_here();
     if kept::pending(Option::take).is_some() {
         eprintln!("lamp-voice: a waiting write is dropped: forgotten, or a privacy change");
     }

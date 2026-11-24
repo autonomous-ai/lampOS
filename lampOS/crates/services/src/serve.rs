@@ -392,11 +392,12 @@ pub struct Services<H, M> {
     /// `run_calls_since` ([`run_calls`]); none off.
     pub run_calls: Option<run_calls::RunCalls>,
     /// `LAMP_TASK_NO_YES=on` (#8475, [`crate::task_no_yes`]): a skill run's
-    /// write, when the voice's record of the owner's spoken asks
-    /// ([`Services::spoken_asks`]) names its skill within
-    /// [`crate::task_no_yes::WITHIN_MS`], is sent at once with no per-send
-    /// yes ([`Services::run_tool`]). Off, every run's write is held for its
-    /// yes, as before.
+    /// write is sent at once with no per-send yes ([`Services::run_tool`])
+    /// only when its line says lamp-control minted the run for the owner's
+    /// named ask ([`crate::task_no_yes::ASKED_ALOUD_RUN`]) and the voice's
+    /// record of the owner's spoken asks ([`Services::spoken_asks`]) names
+    /// its skill within [`crate::task_no_yes::WITHIN_MS`]. Off, or either
+    /// missing, every run's write is held for its yes, as before.
     pub task_no_yes: bool,
     /// The voice's record of the owner's spoken asks
     /// ([`crate::task_no_yes::SPOKEN_ASKS_FILE`] on a lamp), read here
@@ -627,18 +628,24 @@ impl<H: Http, M: Mail> Services<H, M> {
         self
     }
 
-    /// Whether `skill`'s run was asked aloud just now (#8475): the switch
-    /// on, and the voice's own record of the owner's spoken asks, read here
-    /// ([`Services::spoken_asks`]), naming `skill` from a full named call
-    /// within [`crate::task_no_yes::WITHIN_MS`]. Nothing the run or
-    /// `lamp-skills` says counts for it.
-    fn asked_aloud_now(&self, skill: &str) -> bool {
-        let now_ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_or(0, |since| {
-                u64::try_from(since.as_millis()).unwrap_or(u64::MAX)
-            });
-        self.task_no_yes && crate::task_no_yes::asked_within(&self.spoken_asks, skill, now_ms)
+    /// Whether `skill`'s run is the one the owner asked for aloud just now
+    /// (#8475, the first builder's P1 on #8550): the switch on, the run
+    /// minted for the owner's named ask (`asked_run`: its line's
+    /// [`crate::task_no_yes::ASKED_ALOUD_RUN`], lamp-control's own word,
+    /// never the run's), and the voice's own record of the owner's spoken
+    /// asks, read here ([`Services::spoken_asks`]), naming `skill` within
+    /// [`crate::task_no_yes::WITHIN_MS`] on the boot clock. Without the
+    /// mark (a trigger's or a schedule's run, a later call of the skill,
+    /// another asker's) the record frees nothing; without the record the
+    /// mark frees nothing.
+    fn asked_aloud_now(&self, skill: &str, asked_run: bool) -> bool {
+        self.task_no_yes
+            && asked_run
+            && crate::task_no_yes::asked_within(
+                &self.spoken_asks,
+                skill,
+                crate::task_no_yes::boot_ms(),
+            )
     }
 
     /// A run's write just held as `send_id` for `service`, its read-back in
@@ -770,6 +777,15 @@ impl<H: Http, M: Mail> Services<H, M> {
         let Some(skill) = skill else {
             return refused("the call names no skill");
         };
+        // The run minted for the owner's named ask (#8475): lamp-control
+        // names it by the line's own `run`, which it builds itself.
+        let asked_run = serde_json::from_str::<Value>(line)
+            .ok()
+            .is_some_and(|call| {
+                call.get(crate::task_no_yes::ASKED_ALOUD_RUN)
+                    .and_then(Value::as_str)
+                    .is_some_and(|run| Some(run) == call.get("run").and_then(Value::as_str))
+            });
         // A skill's fixed write run through the lamp's agent: lamp-control
         // minted its token for that write and says so with the run's id.
         if let Some(run) = serde_json::from_str::<Value>(line)
@@ -811,10 +827,11 @@ impl<H: Http, M: Mail> Services<H, M> {
                             .unwrap_or_else(|poisoned| poisoned.into_inner()) =
                             Some((send_id.clone(), skill.clone()));
                     }
-                    // Asked aloud just now (#8475, `LAMP_TASK_NO_YES`): sent
-                    // at once, with no per-send yes; a run nobody asked for
-                    // just now (a trigger's, a schedule's) is held for it.
-                    match send_id.filter(|_| self.asked_aloud_now(&skill)) {
+                    // The run the owner asked for aloud just now (#8475,
+                    // `LAMP_TASK_NO_YES`): sent at once, with no per-send
+                    // yes; any other run (a trigger's, a schedule's, a later
+                    // call's, another asker's) is held for it.
+                    match send_id.filter(|_| self.asked_aloud_now(&skill, asked_run)) {
                         Some(send_id) => self.run_send_asked(asked, &send_id, &held).await,
                         None => {
                             eprintln!(
@@ -3698,16 +3715,20 @@ mod tests {
         );
     }
 
-    /// #8475: with `LAMP_TASK_NO_YES` on, a run's write whose skill the
-    /// voice's record of the owner's spoken asks names within five minutes
-    /// is sent at once, with no yes, its read-back said; the same write in
-    /// a run nobody asked for just now (no record, a record of another
-    /// skill, one over five minutes old) is held for its yes as before, and
-    /// with the switch off a record changes nothing. Fails on the old
-    /// `run_tool_answer`, whose `held["held"] = json!(true)` held every
-    /// run's write for the voice's yes.
+    /// #8475 (the first builder's P1 on #8550): with `LAMP_TASK_NO_YES` on,
+    /// a run's write is sent at once, with no yes, its read-back said, only
+    /// when its line carries lamp-control's mark of the run minted for the
+    /// owner's named ask (`asked_aloud_run`, its own `run`) and the voice's
+    /// record names its skill within five minutes. The same write is held
+    /// for its yes as before in a run with the mark and no record (or a
+    /// record of another skill), in a run with a fresh record and no mark
+    /// (a trigger's or a schedule's run, a later call of the skill, another
+    /// asker's), in one whose mark names another run, and with the switch
+    /// off. Fails on the old `run_tool_answer`, whose
+    /// `send_id.filter(|_| self.asked_aloud_now(&skill))` sent a write with
+    /// no mark at all while a record named its skill.
     #[test]
-    fn a_runs_write_asked_aloud_just_now_is_sent_with_no_yes() {
+    fn only_the_asked_runs_write_is_sent_with_no_yes() {
         let dir = tempfile::tempdir().unwrap();
         let asks = dir.path().join("task-no-yes-spoken-asks.json");
         let link = || {
@@ -3719,30 +3740,39 @@ mod tests {
         let draft = json!({"service":"gmail","action":"send_mail","to":["mom@home.test"],
             "subject":"Dinner","text":"Home by 7"});
         let waiting = json!({"op":"call","name":RUN_WAITING,"args":{}}).to_string();
-        let now_ms = || {
-            u64::try_from(
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis(),
-            )
-            .unwrap()
+        // A run's line as lamp-control forwards it: its run's id, and its
+        // mark only for a run minted for the owner's named ask.
+        let line = |mark: Option<&str>| {
+            let mut line = json!({"op":"call","name":tools::WRITE,"args":draft,
+                "skill":"mail-count","run":"task-1"});
+            if let Some(run) = mark {
+                line[crate::task_no_yes::ASKED_ALOUD_RUN] = json!(run);
+            }
+            line.to_string()
         };
-        let keep = |skill: &str, at: u64| {
+        let keep = |skill: Option<&str>| match skill {
             // Kept under its key, as the voice's `told_when_asked::keep`
-            // writes it (`mail_count` is kept as `mail-count`).
-            let mut kept = serde_json::Map::new();
-            kept.insert(crate::task_no_yes::key(skill), json!(at));
-            std::fs::write(&asks, Value::Object(kept).to_string()).unwrap();
+            // writes it, on the boot clock.
+            Some(skill) => {
+                let mut kept = serde_json::Map::new();
+                kept.insert(
+                    crate::task_no_yes::key(skill),
+                    json!(crate::task_no_yes::boot_ms()),
+                );
+                std::fs::write(&asks, Value::Object(kept).to_string()).unwrap();
+            }
+            None => {
+                let _ = std::fs::remove_file(&asks);
+            }
         };
         let mut on = services(dir.path(), "[]", true)
             .with_skill_tasks(true)
             .with_task_no_yes(true);
         on.spoken_asks = asks.clone();
         run(on.admin(&link()));
-        // Asked aloud just now: sent, nothing waits.
-        keep("mail_count", now_ms());
-        let sent = run(on.run_tool(&run_line(tools::WRITE, draft.clone())));
+        // The asked run, its ask kept: sent, nothing waits.
+        keep(Some("mail_count"));
+        let sent = run(on.run_tool(&line(Some("task-1"))));
         assert_eq!(sent["ok"], true, "{sent}");
         assert_eq!(sent["result"]["sent"], true, "{sent}");
         assert_eq!(sent["result"]["next"], RUN_SENT_ASKED);
@@ -3750,40 +3780,33 @@ mod tests {
         assert!(sent["result"].get("held").is_none(), "{sent}");
         assert_eq!(on.mail.sent.lock().unwrap().len(), 1);
         assert_eq!(run(on.tool(&waiting))["result"], json!({"waiting": null}));
-        // A trigger's or a schedule's run: no record of it, another
-        // skill's, or one over five minutes old. Held for the yes.
-        for kept in [
-            None,
-            Some(("desk-check", now_ms())),
-            Some((
-                "mail-count",
-                now_ms() - crate::task_no_yes::WITHIN_MS - 60_000,
-            )),
+        // Held for the yes: the mark with no record or another skill's; a
+        // fresh record with no mark, or a mark of another run.
+        for (mark, kept) in [
+            (Some("task-1"), None),
+            (Some("task-1"), Some("desk-check")),
+            (None, Some("mail-count")),
+            (Some("task-2"), Some("mail-count")),
         ] {
-            match kept {
-                Some((skill, at)) => keep(skill, at),
-                None => {
-                    let _ = std::fs::remove_file(&asks);
-                }
-            }
-            let held = run(on.run_tool(&run_line(tools::WRITE, draft.clone())));
-            assert_eq!(held["result"]["held"], true, "{kept:?}: {held}");
+            keep(kept);
+            let held = run(on.run_tool(&line(mark)));
+            assert_eq!(held["result"]["held"], true, "{mark:?} {kept:?}: {held}");
             assert_eq!(held["result"]["next"], RUN_HELD);
-            assert_eq!(on.mail.sent.lock().unwrap().len(), 1, "{kept:?}");
+            assert_eq!(on.mail.sent.lock().unwrap().len(), 1, "{mark:?} {kept:?}");
             let waits = run(on.tool(&waiting))["result"]["waiting"].clone();
-            assert_eq!(waits["skill"], "mail-count", "{kept:?}");
+            assert_eq!(waits["skill"], "mail-count", "{mark:?} {kept:?}");
             // Cancelled, so the next is not refused for one waiting.
             let no = json!({"op":"call","name":"service_write","args":{"service":"gmail",
                 "send_id":waits["send_id"],"said":"no"}});
             run(on.tool(&no.to_string()));
         }
-        // The switch off: the record changes nothing.
+        // The switch off: the mark and the record change nothing.
         let off_dir = tempfile::tempdir().unwrap();
         let mut off = services(off_dir.path(), "[]", true).with_skill_tasks(true);
         off.spoken_asks = asks.clone();
         run(off.admin(&link()));
-        keep("mail-count", now_ms());
-        let held = run(off.run_tool(&run_line(tools::WRITE, draft)));
+        keep(Some("mail-count"));
+        let held = run(off.run_tool(&line(Some("task-1"))));
         assert_eq!(held["result"]["held"], true, "{held}");
         assert!(off.mail.sent.lock().unwrap().is_empty());
     }

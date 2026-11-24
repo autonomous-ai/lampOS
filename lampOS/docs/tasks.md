@@ -3762,7 +3762,7 @@ runs its script itself: no agent, no Harness, no prompt
   owner's kept yes naming `net` for the folder as it is, or, with
   `LAMP_MADE_CODE_ON_AT_ONCE` on (the product's lamp-control unit), for a
   skill made on the lamp with no yes (#8180, below), or, with
-  `LAMP_TASK_NO_YES` on (#8475, the product's lamp-control unit), for any
+  `LAMP_TASK_NO_YES` on (#8475, off in the product until #8535), for any
   skill's folder as it is with no yes; not agreed, refused
   `no_token` (`skill_run::NO_NET_YES`), no token and no egress socket.
   With `LAMP_TASK_NET` on, `DirectRunner::egress` makes the run's own egress
@@ -4588,7 +4588,7 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   `net` asks nothing. A Store, pushed or other skill still needs its kept
   yes, and with the switch off so does a made one, exactly as before.
   With `LAMP_TASK_NO_YES` on in lamp-control (#8475,
-  `lamp_skills::task_no_yes_on`; on in the product), the source no longer
+  `lamp_skills::task_no_yes_on`; off in the product until #8535), the source no longer
   counts: a pushed, Store, hand-added or made skill alike is minted its
   folder's declared grants and its check agreed for its folder as it is,
   whoever started the run (the voice, a trigger, a schedule;
@@ -5586,18 +5586,28 @@ and the run's folder `skill-<run id>` is removed, so a later turn in the
 same session holds no pass. A write to a linked service still waits for
 the owner's spoken yes: lamp-services sends only what the owner said yes
 to, once a run. The one exception (#8475, `LAMP_TASK_NO_YES` on in
-lamp-services, on in the product): a run asked aloud just now. lamp-services
-reads the voice's own record of the owner's spoken asks itself
-(`/run/lampos-voice/spoken-asks.json`, kept by the voice only for a skill
-the heard words named in full, the owner heard saying it, with
-`LAMP_TOLD_WHEN_ASKED` on), and when it names the run's skill within 5
-minutes, the run's prepared write is sent at once through the same send a
-spoken yes makes (its read-back's SHA-256, the link it was prepared under,
-the skills' bounds; `serve::Services::run_tool`), and the run is told
-`RUN_SENT_ASKED`. Never on lamp-skills' or the run's word. A run nobody
-asked for just now (a trigger's, a schedule's) is held for its yes as
-before; the record names a skill, not a run, so a trigger's run of a skill
-the owner named within those 5 minutes sends with no yes too.
+lamp-services; off in the product until #8475's part 2, #8535, lands): the
+run the owner asked for aloud just now, and only that run. Two things must
+agree. The origin: lamp-skills marks the hand-over of the voice's named
+call alone (`"asked_aloud": true`); lamp-tasks mints the run so
+(`Tokens::mint_for`, `{"mint":{...,"asked_aloud":true}}`); lamp-control
+keeps it on the run (`Run.asked_aloud`) and stamps the line it forwards to
+lamp-services itself (`asked_aloud_run: <run id>`), never from the run's
+arguments. The record: lamp-services reads the voice's own record of the
+owner's spoken asks itself (`/run/lampos-voice/spoken-asks.json`, kept by
+the voice only for a skill the heard words named in full, the owner heard
+saying it, under the tool named and the skill's folder name), on the boot
+clock (`task_no_yes::boot_ms`, `CLOCK_BOOTTIME`). When the mark names the
+line's own run and the record names its skill within 5 minutes, the run's
+prepared write is sent at once through the same send a spoken yes makes
+(its read-back's SHA-256, the link it was prepared under, the skills'
+bounds; `serve::Services::run_tool`), and the run is told
+`RUN_SENT_ASKED`; otherwise it is held for its yes. lamp-skills' word alone
+can only hold a send. A run nobody asked for aloud (a trigger's, a
+schedule's, the lamp's agent's `skill call` of a skill) runs on its
+declared grants with every send held for its yes, as before, even when the
+owner named that skill within those 5 minutes. The voice lets the record go
+on a forget, a privacy change and a stop or close.
 
 Follow-up: #7260 (proposal: in the one session, a skill's run keeps the reach of its grants).
 

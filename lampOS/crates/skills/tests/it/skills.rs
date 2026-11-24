@@ -6806,6 +6806,32 @@ tool = "jig"
 body = { gesture = "acknowledge" }
 "#;
 
+/// #8475 (the first builder's P3 on #8550): a call refused after the
+/// engine marked its tool run (the named-ask gate in lamp-skills'
+/// `tool_call`) is taken back, its last run's time as it was, so an
+/// `[again]` skill's next named ask runs, never told its again line; a
+/// tool that had run before keeps that run's time.
+#[test]
+fn a_refused_calls_run_is_taken_back_for_again() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = load(&skill_with(dir.path(), "jig", AGAIN)).unwrap();
+    let mut engine = Engine::new(vec![skill], false);
+    let null = serde_json::Value::Null;
+    assert_eq!(engine.tool_ran_at("jig"), None);
+    assert!(engine.tool("jig", &null, 1_000_000).is_ok());
+    engine.tool_not_run("jig", None);
+    assert_eq!(engine.tool_ran_at("jig"), None);
+    assert!(
+        engine.tool("jig", &null, 2_000_000).is_ok(),
+        "not told its again line"
+    );
+    let before = engine.tool_ran_at("jig");
+    assert_eq!(before, Some(2_000_000));
+    assert!(engine.tool("jig", &null, 60_000_000).is_ok());
+    engine.tool_not_run("jig", before);
+    assert_eq!(engine.tool_ran_at("jig"), Some(2_000_000));
+}
+
 #[test]
 fn the_loader_refuses_an_again_it_cannot_use() {
     let dir = tempfile::tempdir().unwrap();

@@ -3188,10 +3188,11 @@ pub const SPOKEN_ASK: &str = "spoken_ask";
 /// Whether `call` is the owner's named ask (#8475): the very call the
 /// heard words named in full ([`crate::skill_named::CALL_ID`], in code), or
 /// a call of a skill the voice's record `spoken` (the owner's spoken asks,
-/// [`crate::told_when_asked::keep`], kept only for a full named call the
-/// owner was heard saying) names within
-/// [`crate::told_when_asked::WITHIN_MS`] before `now_ms`. A model's call
-/// on a half match, or a skill nobody named, is not.
+/// [`crate::told_when_asked::keep_asked`], kept only for a full named call
+/// the owner was heard saying) names within
+/// [`crate::told_when_asked::WITHIN_MS`] before `now_ms` (the boot clock's,
+/// `lamp_services::task_no_yes::boot_ms`). A model's call on a half match,
+/// or a skill nobody named, is not.
 pub fn spoken_ask(call: &ToolCall, spoken: &Path, now_ms: u64) -> bool {
     call.id == crate::skill_named::CALL_ID
         || crate::told_when_asked::asked_within(
@@ -3199,6 +3200,21 @@ pub fn spoken_ask(call: &ToolCall, spoken: &Path, now_ms: u64) -> bool {
             crate::skill_named::function_of(&call.name, &call.args),
             now_ms,
         )
+}
+
+/// [`spoken_ask`] on the lamp, for a line to `lamp-skills`: with
+/// `LAMP_TASK_NO_YES` on, whether `call` is the owner's named ask, read in
+/// the voice's own record now; off, none, and the line is as before. A
+/// tool's call and a made skill's run now (`make_skill`'s `run`, the
+/// `run` op, the first builder's P2 on #8550) say it alike.
+pub fn spoken_ask_here(call: &ToolCall) -> Option<bool> {
+    lamp_services::task_no_yes::on().then(|| {
+        spoken_ask(
+            call,
+            Path::new(crate::told_when_asked::SPOKEN_ASKS_FILE),
+            lamp_services::task_no_yes::boot_ms(),
+        )
+    })
 }
 
 fn ask_with_context(
@@ -3214,17 +3230,8 @@ fn ask_with_context(
     // With `LAMP_TASK_NO_YES` on (#8475): whether the owner named this
     // skill, for `lamp-skills`, which runs a model's call of a skill's
     // task only then and can't read the voice's record itself.
-    if lamp_services::task_no_yes::on() {
-        let now_ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_or(0, |since| {
-                u64::try_from(since.as_millis()).unwrap_or(u64::MAX)
-            });
-        line[SPOKEN_ASK] = json!(spoken_ask(
-            call,
-            Path::new(crate::told_when_asked::SPOKEN_ASKS_FILE),
-            now_ms
-        ));
+    if let Some(spoken_ask) = spoken_ask_here(call) {
+        line[SPOKEN_ASK] = json!(spoken_ask);
     }
     let told = exchange(&directory.join(CALL_SOCKET), &line, deadline).and_then(|answer| {
         match answer.get("ok").and_then(Value::as_bool)? {

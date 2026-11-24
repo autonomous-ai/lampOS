@@ -500,7 +500,14 @@ pub fn use_skill_off_here(
     eprintln!(
         "lamp-voice: request {request}: use_skill named a made skill turned off: its run now (LAMP_MADE_SKILL_OFF_SAID)"
     );
-    Some(asked_here(&made, request, heard, lease, skills))
+    Some(asked_here(
+        &made,
+        request,
+        heard,
+        lease,
+        skills,
+        crate::tools::spoken_ask_here(call),
+    ))
 }
 
 /// Whether one `make_skill` call's `turn_on` (`on`) and run now (`run`)
@@ -538,11 +545,19 @@ pub fn two_skills(on: &str, run: &str) -> Value {
 
 /// The made skill `name` run now by lamp-skills, on its call socket in
 /// `folder` ([`OP`]): whether its run speaks its own words (`says`), or why
-/// not, in its words, or [`NOT_ANSWERED`].
-pub fn ran_by(folder: &Path, name: &str) -> Result<bool, String> {
+/// not, in its words, or [`NOT_ANSWERED`]. With `LAMP_TASK_NO_YES` on
+/// (`spoken_ask`, [`crate::tools::spoken_ask_here`]), the line says whether
+/// the owner named the skill ([`crate::tools::SPOKEN_ASK`]): lamp-skills
+/// runs a made skill's task now only then (#8475, the first builder's P2
+/// on #8550); off, the line is as before.
+pub fn ran_by(folder: &Path, name: &str, spoken_ask: Option<bool>) -> Result<bool, String> {
+    let mut line = json!({ "op": OP, "skill": name });
+    if let Some(spoken_ask) = spoken_ask {
+        line[crate::tools::SPOKEN_ASK] = json!(spoken_ask);
+    }
     let answer = crate::tools::exchange(
         &folder.join(crate::tools::CALL_SOCKET),
-        &json!({ "op": OP, "skill": name }),
+        &line,
         crate::tools::ASK_DEADLINE,
     )
     .ok_or(NOT_ANSWERED)?;
@@ -571,6 +586,7 @@ pub fn asked_here(
     heard: bool,
     lease: Option<&crate::memory_scope::ScopeLease>,
     skills: Option<&Path>,
+    spoken_ask: Option<bool>,
 ) -> Value {
     let (Some(keeping), Some(skills)) = (Keeping::when(true), skills) else {
         return crate::tools::unavailable();
@@ -622,7 +638,7 @@ pub fn asked_here(
             .map(|asks| asks.map(|asks| asks.approved))
         },
         |asks| crate::services::skill_writes_approved(Path::new(crate::services::FOLDER), asks),
-        |skill| ran_by(skills, skill),
+        |skill| ran_by(skills, skill, spoken_ask),
         turns,
     )
 }
@@ -735,9 +751,56 @@ mod tests {
         };
         assert_eq!(route(&on, made_skill::MAKE), Route::MakeLocal(Some(folder)));
         assert_eq!(
-            asked_here("unread mail", 3, true, None, None),
+            asked_here("unread mail", 3, true, None, None, None),
             crate::tools::unavailable()
         );
+    }
+
+    /// #8475 (the first builder's P2 on #8550): a made skill's run now
+    /// tells lamp-skills whether the owner named it, as a tool's call does,
+    /// so its task runs only then; with the switch off (`None`) the line is
+    /// as before. Fails on the old `ran_by`, whose line was `op` and
+    /// `skill` alone.
+    #[test]
+    fn a_run_now_says_whether_the_owner_named_it() {
+        use std::io::{BufRead as _, Write as _};
+        for (spoken_ask, expected) in [
+            (Some(true), Some(true)),
+            (Some(false), Some(false)),
+            (None, None),
+        ] {
+            // A short path keeps the socket within macOS's 103 bytes.
+            let dir = PathBuf::from(format!("/tmp/lv-rn-{}-{expected:?}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&dir);
+            std::fs::create_dir_all(&dir).unwrap();
+            let listener =
+                std::os::unix::net::UnixListener::bind(dir.join(crate::tools::CALL_SOCKET))
+                    .unwrap();
+            let served = std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                std::io::BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                writeln!(
+                    stream,
+                    "{}",
+                    json!({"ok": true, "result": {"ran": "mail-made"}})
+                )
+                .unwrap();
+                serde_json::from_str::<Value>(&line).unwrap()
+            });
+            assert_eq!(ran_by(&dir, "mail-made", spoken_ask), Ok(false));
+            let line = served.join().unwrap();
+            assert_eq!(line["op"], OP);
+            assert_eq!(line["skill"], "mail-made");
+            assert_eq!(
+                line.get(crate::tools::SPOKEN_ASK).and_then(Value::as_bool),
+                expected,
+                "{line}"
+            );
+            let _ = std::fs::remove_dir_all(&dir);
+        }
     }
 
     #[test]

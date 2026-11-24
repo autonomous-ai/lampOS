@@ -4980,7 +4980,16 @@ pub fn answer(
             if !crate::made_run::one_skill(on, name, Keeping::when(true).as_ref()) {
                 return crate::made_run::two_skills(on, name);
             }
-            return crate::made_run::asked_here(name, request, heard, lease, skills);
+            return crate::made_run::asked_here(
+                name,
+                request,
+                heard,
+                lease,
+                skills,
+                // Whether the owner named it (#8475): the heard words' own
+                // call, or the voice's record of their spoken asks.
+                crate::tools::spoken_ask_here(call),
+            );
         }
         for (key, off) in [
             (crate::made_turn::TURN_OFF, true),
@@ -5024,7 +5033,16 @@ pub fn answer(
     // "Run my unread mail skill now" was read back, and nothing ran): the
     // owner's alone, held to its trigger's bounds ([`crate::made_run`]).
     if let Some(name) = call.args[crate::made_run::RUN].as_str() {
-        return crate::made_run::asked_here(name, request, heard, lease, skills);
+        return crate::made_run::asked_here(
+            name,
+            request,
+            heard,
+            lease,
+            skills,
+            // Whether the owner named it (#8475): the heard words' own
+            // call, or the voice's record of their spoken asks.
+            crate::tools::spoken_ask_here(call),
+        );
     }
     // A made skill read back by voice (`LAMP_SKILL_WRITES`): what it
     // sends, and its yes awaited again when it waits for one. Or a skill on

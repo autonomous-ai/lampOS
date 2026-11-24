@@ -3192,6 +3192,16 @@ fn forget_counts(state: &Path, made: &Path, lock_wait: Duration) -> Result<Strin
 /// The most bytes of a request to [`asked`].
 pub const ASKED_MOST: u64 = 4_096;
 
+/// The start time (field 22, in clock ticks since boot) from a
+/// `/proc/<pid>/stat` line, as lamp-play's and lamp-apps' peers read it
+/// (`lamp_play::peer::start_of_stat`): the command's name may hold spaces
+/// and brackets, so the fields are counted after its last `)`. lamp-skills
+/// reads the voice's peer's twice around its cgroup (#8475).
+pub fn start_of_stat(stat: &str) -> Option<u64> {
+    let after = &stat[stat.rfind(')')? + 1..];
+    after.split_whitespace().nth(19)?.parse().ok()
+}
+
 /// What the manage helper says of a line that is no request.
 pub const NOT_A_REQUEST: &str = "a request is one line, {\"remove\": NAME}, \
     {\"install\": {\"url\": URL, \"sha256\": HASH, \"name\": NAME, \"version\": VERSION}}, all but url optional, \
@@ -3532,6 +3542,16 @@ pub fn list(skills: &Path) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #8475: the voice's peer's start time, read as lamp-play reads it,
+    /// counted after the command's last bracket.
+    #[test]
+    fn a_peers_start_time_is_counted_after_the_commands_last_bracket() {
+        let stat = "1234 (my (odd) name) S 1 1234 1234 0 -1 4194560 100 0 0 0 1 2 0 0 20 0 3 0 987654 1000 100 18446744073709551615 0 0 0 0 0 0 0 0 0 0 0 0 17 1 0 0 0 0 0";
+        assert_eq!(start_of_stat(stat), Some(987654));
+        assert_eq!(start_of_stat("garbage"), None);
+        assert_eq!(start_of_stat("1 (x) S"), None);
+    }
 
     /// Heron's P3 on #7509: no skill is put on as a live voice ask's run
     /// (`voice-ask`), whatever its folder holds; the same folder under

@@ -591,7 +591,8 @@ pub fn answer(
     }
     let handed = Instant::now();
     let run_id = crate::skill_task::run_id();
-    let minted = match tokens.mint(&hand.skill, &run_id) {
+    // Asked for the owner's named ask (#8475): lamp-control marks the run.
+    let minted = match tokens.mint_for(&hand.skill, &run_id, hand.asked_aloud) {
         Ok(minted) => minted,
         Err(why) => return refusal("no_token", &why),
     };

@@ -83,6 +83,17 @@ impl Services {
         value.to_string()
     }
 
+    /// `line` for a run minted for the owner's named ask (#8475,
+    /// `LAMP_TASK_NO_YES`): with its run's id beside it
+    /// ([`lamp_skills::TASK_ASKED_ALOUD_RUN`]), so lamp-services
+    /// may send its write with no yes when the voice's own record names its
+    /// skill just now.
+    pub fn asked_aloud(line: &str, run: &str) -> String {
+        let mut value: Value = serde_json::from_str(line).unwrap_or_default();
+        value[lamp_skills::TASK_ASKED_ALOUD_RUN] = json!(run);
+        value.to_string()
+    }
+
     /// Sends `line` and waits for its answer, off the door's lock: the
     /// reply's `result`, or lamp-services' refusal in its own words.
     pub fn call(&self, line: &str) -> Result<Value, Error> {
