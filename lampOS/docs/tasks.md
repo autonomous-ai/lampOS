@@ -3882,6 +3882,28 @@ for each run, and is answered once the run ends
   words or the token. lamp-skills names the socket with `--tasks-socket` or
   `LAMP_SKILLS_TASKS_SOCKET` (#6346); the product's lamp-skills unit passes
   `/run/lampos-tasks/skill-task.sock`.
+- **A cancel** (#8475 part 2, `CANCEL_OP`): `{"op":"cancel"}` alone on the
+  same socket, from lamp-skills as any line is (lamp-skills sends it when
+  the voice asks it to stop the run under way, skills.md, "Run now by
+  voice"), takes no run's place and is answered at once with the runs it
+  stopped: `{"stopped":[{"run":"<run id>","skill":"<name>","ms":<ms since
+  its start>}]}`, the skill's task and the `run` step running beside it
+  (`Lanes`: each runner keeps its run there while it runs), or
+  `{"stopped":[]}` with nothing running. A cancel line with any other field
+  is `bad_request`. Each run stopped is ended on a thread of its own
+  (`stop_run`): its token first, with lamp-control's admin `end` (the
+  token refused, what it queued gone, its connections closed), so a `say`
+  or motion its script still asks is refused; then its `SkillRun::cancel`
+  is set, at once when `end` answers or after `END_FIRST_WAIT` (500 ms) if
+  it hangs, and its runner kills it as at its deadline (a `run` step's
+  whole process group). A second cancel names a run already stopping again
+  but doesn't end it twice. The run's own end asks `end` once more, which
+  lamp-control answers `"ended": false`. Its hand-over is answered
+  `stopped_answer`: `{"ok":false,"error":"run_failed","message":WHY,"stopped":true}`
+  (`STOPPED`), never retried and never `busy`, and the journal says
+  `lamp-tasks: run RUN of SKILL stopped by a cancel MS ms after start
+  (#8475)` and then `[lamp-tasks] skill task: the run was stopped by a
+  cancel`. A cancel is one of the 4 connections at once, as any line is.
 - **No other network: two ways out** (the first builder's design on
   #6443). The run is started with `LAMP_NS_NET=run` (`NET_ENV`), the only
   opt-in, which only takes access away: with `LAMP_SKILL_TASKS=on` in
@@ -4109,7 +4131,10 @@ runs its script itself: no agent, no Harness, no prompt
   (`Tokens::end_said`). Exit 0 and `said` at least 1 is
   `{"ok":true,"id":0,"said":N}`; exit 0 and nothing said is `run_failed`
   (`skill_run::SAID_NOTHING`); a failed exit, the 30 s limit or the output
-  cap is `run_failed` with the reason; a fence never made is `not_started`.
+  cap is `run_failed` with the reason; a fence never made is `not_started`;
+  a run a cancel stopped is `run_failed` with `"stopped": true` (#8475,
+  "A cancel" above: its token is ended before the kill, so its `said` is
+  gone with it).
   `skills/tasks` tells its end (`Ran` or `Failed`, no engine).
 - **Timing**: the journal says when the token was minted after the line
   (`skill run RUN: SKILL handed over, token minted in N ms`), when the
