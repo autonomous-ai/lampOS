@@ -1335,10 +1335,18 @@ impl Shared {
     }
 
     /// The calls ended, told to the voice by the sink (after the apps' lock
-    /// is let go).
+    /// is let go), each with its journal line (Twelve's P3 4 on #8496).
     fn tell_called(&self, called: Vec<lamp_msgs::AppCalled>) {
         if called.is_empty() {
             return;
+        }
+        for each in &called {
+            eprintln!(
+                "lamp-control: app {}: call {}: {}",
+                each.app,
+                each.call,
+                crate::app_calls::outcome(each)
+            );
         }
         if let Some(sink) = self.called_sink.lock().expect("called_sink").clone() {
             for each in &called {
@@ -1350,7 +1358,8 @@ impl Shared {
     /// The voice's call `call` (`apps/call`) at `now`, `listed` when the
     /// newest `apps/tools` has its tool: sent to the app's socket as
     /// `app.call`, or ended at once with the lamp's word, told to the voice
-    /// (`not running`, `unknown tool`, `busy`).
+    /// (`not running`, `unknown tool`, `busy`). The call already in flight
+    /// sent again is [`crate::app_yes::ALREADY`]: neither sent nor ended.
     pub fn send_call(
         &self,
         call: &lamp_msgs::AppCall,
@@ -1374,6 +1383,8 @@ impl Shared {
                 &crate::app_socket::app_client(&call.app),
                 &crate::app_calls::call_event(call),
             ),
+            // The same call again: the first's end is the voice's answer.
+            Err(crate::app_yes::ALREADY) => {}
             Err(word) => self.end_call(call, word),
         }
         begun
@@ -3519,6 +3530,15 @@ mod tests {
         assert!(taken().is_empty());
         assert_eq!(shared.send_call(&call(4), true, t0), Err("busy"));
         assert_eq!(word(taken()).as_deref(), Some("busy"));
+        // The same call published again (Twelve's P3 3 on #8496): neither
+        // sent to the app again nor ended for the voice, whose answer is the
+        // first one's.
+        assert_eq!(
+            shared.send_call(&call(3), true, t0),
+            Err(crate::app_yes::ALREADY)
+        );
+        assert!(taken().is_empty(), "no word told for it");
+        assert!(app_inbox.try_recv().is_err(), "not sent twice");
         // Nothing past its 4.5 s yet; then a timeout, the app told it.
         shared.sweep_calls(t0 + std::time::Duration::from_millis(4_400));
         assert!(taken().is_empty());

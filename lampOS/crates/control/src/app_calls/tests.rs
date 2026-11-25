@@ -131,13 +131,13 @@ fn one_call_an_app_in_flight_for_its_wait_then_timeout_and_a_late_answer_is_not_
     // Another app is not held up by it.
     live.connection("timer-app", true);
     live.begin_call("timer-app", "app-1-2-5", t0).unwrap();
-    assert!(
-        live.expire_calls(t0 + Duration::from_millis(4_499))
-            .is_empty()
-    );
-    let late = live.expire_calls(t0 + crate::app_yes::CALL_FOR);
-    assert_eq!(late.len(), 2);
+    live.expire_calls(t0 + Duration::from_millis(4_499));
+    assert!(live.drain_stopped().is_empty());
+    assert!(live.drain_called().is_empty());
+    live.expire_calls(t0 + crate::app_yes::CALL_FOR);
+    assert_eq!(live.drain_stopped().len(), 2);
     let told = live.drain_called();
+    assert_eq!(told.len(), 2);
     assert!(
         told.iter()
             .all(|called| called.error.as_deref() == Some("timeout"))
@@ -203,4 +203,89 @@ fn the_switch_is_on_only_for_on() {
     set_on_for_test(Some(true));
     assert!(on());
     set_on_for_test(None);
+}
+
+/// Twelve's P3 3 on #8496: the call in flight published again is
+/// `ALREADY`, never `busy`, and leaves the first call as it is.
+#[test]
+fn the_same_call_again_leaves_the_first_alone() {
+    let t0 = Instant::now();
+    let mut live = in_flight(t0);
+    assert_eq!(
+        live.begin_call("gym-coach", "app-1-2-3", t0 + Duration::from_millis(100)),
+        Err(crate::app_yes::ALREADY)
+    );
+    assert!(live.drain_called().is_empty());
+    // Its wait still runs from the first send.
+    live.expire_calls(t0 + crate::app_yes::CALL_FOR);
+    assert_eq!(
+        live.drain_stopped(),
+        [("gym-coach".to_owned(), "app-1-2-3".to_owned())]
+    );
+}
+
+/// Twelve's P3 2 on #8496: ten `app.answer` frames an app in any second,
+/// a bad one counted too; the eleventh is refused `rate` with its wait, and
+/// another app is not held up by it.
+#[test]
+fn an_app_sends_ten_answers_a_second_at_most() {
+    let t0 = Instant::now();
+    let mut live = in_flight(t0);
+    let wrong = frame(json!({"id": 4, "op": "app.answer", "call": "app-1-2-9", "result": {}}));
+    for n in 0..crate::app_yes::ANSWERS_A_SECOND {
+        let at = t0 + Duration::from_millis(n as u64);
+        let reply = answer_op(&mut live, "gym-coach", &wrong, 4, true, at);
+        assert_eq!(reply["taken"], false, "{n}");
+    }
+    let right = frame(json!({"id": 5, "op": "app.answer", "call": "app-1-2-3", "result": {}}));
+    let refused = answer_op(
+        &mut live,
+        "gym-coach",
+        &right,
+        5,
+        true,
+        t0 + Duration::from_millis(20),
+    );
+    assert_eq!(refused["error"]["code"], "rate", "{refused}");
+    assert_eq!(refused["error"]["retry_ms"], 980);
+    assert!(live.drain_called().is_empty(), "nothing told");
+    live.connection("timer-app", true);
+    let other = answer_op(
+        &mut live,
+        "timer-app",
+        &wrong,
+        6,
+        true,
+        t0 + Duration::from_millis(20),
+    );
+    assert_eq!(other["taken"], false);
+    // A second after the first, it may answer again, and its call is taken.
+    let later = answer_op(
+        &mut live,
+        "gym-coach",
+        &right,
+        7,
+        true,
+        t0 + Duration::from_secs(1),
+    );
+    assert_eq!(later["taken"], true);
+}
+
+/// Twelve's P3 4 on #8496: a call's journal word is the outcome, never the
+/// result or the app's own words.
+#[test]
+fn a_calls_journal_word_never_carries_the_apps_words() {
+    let called = |result: Option<Value>, error: Option<&str>| AppCalled {
+        call: "app-1-2-3".into(),
+        app: "gym-coach".into(),
+        result,
+        error: error.map(str::to_owned),
+    };
+    assert_eq!(outcome(&called(Some(json!({"sets": 3})), None)), "answered");
+    assert_eq!(outcome(&called(None, Some("timeout"))), "timeout");
+    assert_eq!(outcome(&called(None, Some("unknown tool"))), "unknown tool");
+    assert_eq!(
+        outcome(&called(None, Some("Anna's plan is full"))),
+        "the app's error"
+    );
 }
