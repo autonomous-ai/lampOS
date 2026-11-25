@@ -34,7 +34,7 @@ people, air and hands, by your computer's camera and microphone or by hand. Linu
 ```sh
 cd lampOS
 cargo build -p lamp-sim -p lamp-body -p lamp-control
-cd sdk/js && npm ci
+cd sdk/js && npm install
 node examples/twin/virtual-lamp.js --lamp-sim ../../target/debug/lamp-sim
 ```
 

@@ -70,7 +70,14 @@ async function onFake() {
 }
 
 async function onPaired() {
-  const lamp = await Lamp.connect();
+  let lamp;
+  try {
+    lamp = await Lamp.connect();
+  } catch (refused) {
+    if (refused?.code !== 'not_paired') throw refused;
+    console.error(`conformance: ${refused.why ?? refused.message}\n(this needs a paired lamp: pair one into LAMPOS_HOME first, or run with --fake)`);
+    process.exit(2);
+  }
   try { return await run(lamp); } finally { await lamp.close(); }
 }
 
