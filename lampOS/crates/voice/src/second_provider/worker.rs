@@ -9507,6 +9507,27 @@ fn going_on_from(
         || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR)
 }
 
+/// Whether the thread's window (`said_going_on`: 45 s from an answer's
+/// start, [`crate::thread::GOING_ON_FOR`]) counts for [`going_on_from`].
+/// With `LAMP_FOLLOW_UPS` (`follow_ups`, the product owner's "about 20 s
+/// after the lamp answers", 25 Nov 2026) it counts only where the lamp said
+/// no words (`said_ago` unknown) or a skill's yes is awaited
+/// (`yes_going_on`, from the end of its say-back, #6749): else a
+/// conversation goes on [`AFTER_THE_LAMPS_WORDS`] from the end of the
+/// lamp's words, in a room not busy as in a busy one.
+fn thread_window_kept(
+    follow_ups: bool,
+    said_going_on: bool,
+    said_ago: Option<Duration>,
+    yes_going_on: bool,
+) -> bool {
+    if follow_ups && said_ago.is_some() {
+        yes_going_on
+    } else {
+        said_going_on
+    }
+}
+
 /// With `LAMP_NAME_OR_FOLLOW_UP`, whether a line begun `began_ago` ago is
 /// a follow-up: begun within [`crate::name_or_follow_up::follow_up_for`] of
 /// the end of the lamp's own last words (`said_ago`, now) or of a call let
@@ -12655,7 +12676,18 @@ impl Heeding {
             );
         }
         let said_going_on = said_going_on || yes_going_on;
-        let going_on = going_on_from(said_going_on, at_start(said_ago), at_start(called_ago));
+        // `LAMP_FOLLOW_UPS`: 20 s from the end of the lamp's words, not the
+        // thread's 45 s from its answer's start ([`thread_window_kept`]).
+        let thread_kept =
+            thread_window_kept(self.follow_ups, said_going_on, at_start(said_ago), yes_going_on);
+        let going_on = going_on_from(thread_kept, at_start(said_ago), at_start(called_ago));
+        if said_going_on && !going_on {
+            eprintln!(
+                "lamp-voice second: request {request}: the thread's {} s from the answer's start don't count, only {} s from the end of the lamp's words (LAMP_FOLLOW_UPS)",
+                crate::thread::GOING_ON_FOR.as_secs(),
+                AFTER_THE_LAMPS_WORDS.as_secs()
+            );
+        }
         // `LAMP_NAME_OR_FOLLOW_UP`: whether the line is a follow-up begun
         // while the lamp's words played or soon after them, or its call,
         // however long it went on; in a busy room such a line, and only
@@ -17564,6 +17596,30 @@ mod tests {
         assert!(!super::going_on_from(false, None, None));
         assert!(super::going_on_from(false, None, Some(s(10))));
         assert!(super::going_on_from(true, Some(s(44)), None));
+    }
+
+    /// `LAMP_FOLLOW_UPS` in a room not busy (the product owner's "about 20 s
+    /// after the lamp answers", 25 Nov 2026): on lamp-74ff "And of
+    /// Argentina?" 35 s after a short answer was answered by the thread's
+    /// 45 s from the answer's start. With the switch a conversation goes on
+    /// 20 s from the end of the lamp's words, as in a busy room; the thread's
+    /// window counts only where the lamp said no words, and a skill's yes
+    /// awaited goes on from its say-back's end as before.
+    #[test]
+    fn with_follow_ups_a_conversation_goes_on_twenty_seconds_after_the_lamps_words() {
+        let s = Duration::from_secs;
+        let going_on = |follow_ups: bool, said_ago: Option<u64>, yes_going_on: bool| {
+            let said_ago = said_ago.map(s);
+            // Inside the thread's 45 s from the answer's start.
+            let kept = super::thread_window_kept(follow_ups, true, said_ago, yes_going_on);
+            super::going_on_from(kept, said_ago, None)
+        };
+        assert!(going_on(false, Some(35), false), "off: the thread's 45 s, as before");
+        assert!(!going_on(true, Some(35), false), "35 s after the lamp's words");
+        assert!(going_on(true, Some(20), false));
+        assert!(!going_on(true, Some(21), false));
+        assert!(going_on(true, None, false), "no words said: the thread's window");
+        assert!(going_on(true, Some(35), true), "a skill's yes awaited");
     }
 
     /// #1712, the first builder at 18:57: in a busy room a conversation goes
