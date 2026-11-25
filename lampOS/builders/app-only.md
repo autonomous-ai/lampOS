@@ -44,9 +44,10 @@ Store apps on the lamp, from install to the conversation:
 - **Store apps in the product:** `LAMP_STORE_APPS` (#8131), and the app
   doors in lamp-control it changed (`crates/control/src/server.rs`,
   `app_yes.rs`, `tests/door.rs`), each with its owner's read.
-- **The SDK's app checks:** #8506, the checker refusing `tools`. The SDK
-  itself (`sdk/python`, `sdk/js`, `sdk/mcp`) is Migrate's; App Only reads
-  and tests on a lamp.
+- **The SDK's app checks:** #8506, the checker refusing `tools`. Who owns
+  the SDK's packages, PyPI and npm, and the first-app tutorial is for the
+  first builder to place (Migrate's 12:12 on #8363); App Only reads SDK
+  changes and tests them on a lamp.
 - **Apps it ships to the Store** (outside this repository, listed by
   Backend3): Gym Coach and its hidden beta (2.0.0 on tools), and each
   app's row and eval before it is listed.
