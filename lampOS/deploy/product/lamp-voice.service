@@ -167,6 +167,10 @@ Environment=LAMP_NAME_GREETED_STAND_IN=on
 Environment=LAMP_NAME_AS_A_SENTENCE=on
 # LAMP_NAME_SAID_TO_A_PERSON: its why and rules are its row in docs/switches.md (#3945, #5233).
 Environment=LAMP_NAME_SAID_TO_A_PERSON=on
+# LAMP_NAME_SURE_OVER_A_PERSON_WORD: a sure hearing at a line's start stays its second sign past "ma'am", "sir", …
+# ("Hey, ma'am. …", speech to text's "Hey Lamp"; the product owner's first rule, 25 Nov 2026). Its why and rules are
+# its row in docs/switches.md.
+Environment=LAMP_NAME_SURE_OVER_A_PERSON_WORD=on
 # LAMP_NAMED_ALWAYS: its why and rules are its row in docs/switches.md (#2191).
 Environment=LAMP_NAMED_ALWAYS=on
 # A hearing of the name inside one line's sound stays with that line: on lamp-4ace on 26 Oct (6919) a hearing in

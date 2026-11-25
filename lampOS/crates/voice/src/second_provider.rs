@@ -1085,6 +1085,19 @@ pub(crate) fn greeted_stand_in_on() -> bool {
     std::env::var(NAME_GREETED_STAND_IN_ENVIRONMENT).is_ok_and(|value| value == "on")
 }
 
+/// `on` exactly, off unless set (the product owner's first rule of 25 Nov
+/// 2026: a clear "Hey Lamp" counts): a hearing of the name at
+/// [`crate::attention::SURE_SCORE`] or more at the line's start stays its
+/// second sign though the line's first word, set off, is said to a person
+/// ("Hey, ma'am. …", speech to text's "Hey Lamp";
+/// [`crate::attention::Attention::keep_a_sure_start_past_a_person_word`]).
+pub const NAME_SURE_OVER_A_PERSON_WORD_ENVIRONMENT: &str = "LAMP_NAME_SURE_OVER_A_PERSON_WORD";
+
+/// [`NAME_SURE_OVER_A_PERSON_WORD_ENVIRONMENT`] from this worker's environment.
+pub(crate) fn sure_over_a_person_word_on() -> bool {
+    std::env::var(NAME_SURE_OVER_A_PERSON_WORD_ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
 /// Where the worker reads whether a hearing of the lamp's name inside one
 /// line's sound stays with that line, never counting for the one begun
 /// after it (`on`, and nothing else;

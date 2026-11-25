@@ -5577,6 +5577,18 @@ pub fn serve(
                 heeding.attention.keep_greeted_stand_ins(true);
             }
         }
+        // "Hey, ma'am. …", speech to text's "Hey Lamp": a sure hearing at the
+        // line's start stays its second sign past a word said to a person
+        // (`LAMP_NAME_SURE_OVER_A_PERSON_WORD=on`, the product owner's first
+        // rule, 25 Nov 2026).
+        if crate::second_provider::sure_over_a_person_word_on() {
+            eprintln!(
+                "lamp-voice second: a sure hearing of the name at a line's start stays its second sign though the line's first word, set off, is said to a person (\"Hey, ma'am. …\"); an unsure one is held as before (LAMP_NAME_SURE_OVER_A_PERSON_WORD)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.attention.keep_a_sure_start_past_a_person_word(true);
+            }
+        }
         // A hearing at the line's start is no second sign of its own on a
         // line said to a person ("Ma'am, …"), and a conversation going on
         // gives back only that start (`LAMP_NAME_SAID_TO_A_PERSON=on`, #3945).
@@ -13063,6 +13075,12 @@ impl Heeding {
         // sound needs a second sign; the eyes are read for it whatever the
         // rule's form.
         let said_to_a_person = self.attention.start_said_to_a_person();
+        if let Some(word) = self.attention.person_word_a_sure_start_passed() {
+            eprintln!(
+                "lamp-voice second: request {request}: lamp-name heard the name sure at the line's start (began {} ms into the line{soft_lead}); its first word, set off, said to a person (\"{word}\"), does not take it (LAMP_NAME_SURE_OVER_A_PERSON_WORD)",
+                name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
+            );
+        }
         if self.attention.weigh_the_name(signs.turned, signs.going_on) {
             if self.attention.name_dropped_by_near() {
                 eprintln!(
