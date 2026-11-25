@@ -965,13 +965,17 @@ fn expired(task: &Task, now: &Clock) -> bool {
 }
 /// Whether one more read finding `task`'s run gone ends it
 /// ([`GONE_READS`] in a row, the first [`GONE_AFTER_MS`] ago or in an
-/// earlier boot).
+/// earlier boot). Never a task already settled (an answer, a question, a
+/// stop or a failure kept, told or not): its run gone after it finished is
+/// no news, and ending it would tell it again (lamp-ee17 task 91, read
+/// again by the follow after a restart, its "Vienna." told twice).
 fn gone_past_bound(task: &Task, now: &Clock) -> bool {
-    task.gone.as_ref().is_some_and(|gone| {
-        gone.reads.saturating_add(1) >= GONE_READS
-            && (gone.since.boot_id != now.boot_id
-                || now.monotonic_ms.saturating_sub(gone.since.monotonic_ms) >= GONE_AFTER_MS)
-    })
+    !task.observations.iter().any(|o| settled(&o.data))
+        && task.gone.as_ref().is_some_and(|gone| {
+            gone.reads.saturating_add(1) >= GONE_READS
+                && (gone.since.boot_id != now.boot_id
+                    || now.monotonic_ms.saturating_sub(gone.since.monotonic_ms) >= GONE_AFTER_MS)
+        })
 }
 fn given_on(task: &Task) -> bool {
     task.close
@@ -4327,6 +4331,39 @@ mod tests {
             1
         );
         assert!(again.watched(&clock(at + 60_000)).is_empty());
+    }
+
+    /// lamp-ee17 task 91: a task settled idle with its answer and told,
+    /// then a lamp-tasks restart, then its run gone read after read (the
+    /// follow's looks): it stays idle with its answer, is never ended as
+    /// failed, and nothing new is kept to be told again.
+    #[test]
+    fn a_settled_and_told_task_whose_run_is_gone_is_never_ended_again() {
+        let (mut engine, memory) = opened();
+        let id = accepted(&mut engine, 0);
+        let observation = observe(&mut engine, id, "Vienna.", 10);
+        engine
+            .handle(&claim(&engine, id, observation), &clock(11), true)
+            .unwrap();
+        engine
+            .handle(&acknowledgement(&engine, id, observation), &clock(12), true)
+            .unwrap();
+        let mut engine = Engine::open(memory, targets(), STORE, RESTART, &clock(60_000)).unwrap();
+        engine.close_told(true);
+        for read in 1..=6 {
+            let at = 60_000 + read * 120_000;
+            let job = request_read(&mut engine, id, at);
+            engine
+                .observation_failed(&job, RUN_GONE, &clock(at))
+                .unwrap();
+        }
+        let task = &engine.state.tasks[find(&engine.state, id).unwrap()];
+        assert_eq!(task.observations.len(), 1, "nothing new kept to tell");
+        assert_eq!(task.observations[0].data.state, "idle");
+        assert_eq!(task.observations[0].data.answer, "Vienna.");
+        let works = engine.works(&clock(60_000 + 6 * 120_000), None);
+        let work = works.iter().find(|work| work.task_id == id).unwrap();
+        assert_eq!(work.answer.as_deref(), Some("Vienna."));
     }
 
     #[test]

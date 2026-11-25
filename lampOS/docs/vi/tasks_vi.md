@@ -4283,8 +4283,12 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   một dòng journal): đã xong, nên không còn được theo dõi hay tính là việc
   đang làm, và giọng nói báo nó một lần như mọi việc lỗi. Chuỗi được giữ
   trong store (`gone`), nên khởi động lại vẫn đếm tiếp; mọi lần đọc khác
-  kết thúc chuỗi. Test:
-  `engine::tests::a_task_whose_run_stays_gone_is_ended_failed_once_across_a_restart`.
+  kết thúc chuỗi. Việc đã xong (đã giữ câu trả lời, câu hỏi, lần dừng hay
+  lỗi) không bao giờ bị kết thúc như vậy: các lần nhìn theo dõi sau khi
+  khởi động lại thấy run đã xong của nó không còn, và kết thúc nó đã làm
+  việc 91 trên lamp-ee17 ("Vienna.") được báo hai lần. Test:
+  `engine::tests::a_task_whose_run_stays_gone_is_ended_failed_once_across_a_restart`,
+  `a_settled_and_told_task_whose_run_is_gone_is_never_ended_again`.
 - **Voice** (`agent_tasks`, `task_news`): đọc engine của target của đèn từ
   `{"op":"targets"}` và gọi đúng tên, nên một việc giao không nêu máy nào được
   nói là "OpenClaw on the lamp" và mô tả công cụ nói "OpenClaw here on the
