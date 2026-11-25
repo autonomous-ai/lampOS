@@ -5146,13 +5146,7 @@ async fn a_lead_in_whose_next_round_is_out_makes_one_sound() {
         first.push(Ok(ChatEvent::Done));
         let script = Arc::new(Script {
             heard: Mutex::new([Ok("What's in the news today?".to_owned())].into()),
-            chats: Mutex::new(
-                [
-                    first,
-                    vec![text("Here is the news."), Ok(ChatEvent::Done)],
-                ]
-                .into(),
-            ),
+            chats: Mutex::new([first, vec![text("Here is the news."), Ok(ChatEvent::Done)]].into()),
             round_after: Mutex::new([Duration::ZERO, Duration::from_millis(round_ms)].into()),
             ..Script::default()
         });

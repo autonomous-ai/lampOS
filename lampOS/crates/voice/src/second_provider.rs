@@ -162,6 +162,17 @@ pub const BEGIN_WITHIN: Duration = Duration::from_secs(3);
 /// by silence is the worst of both (the first builder, 15:43). On lamp-4ace
 /// on 2026-10-16, 9 of 10 backup turns waited past 1.5 s.
 pub const CUE_AFTER: Duration = Duration::from_millis(1_500);
+/// With `LAMP_SECOND_WAIT_CUE=on` (#8615 item 2, a customer: "speech
+/// pauses at random"): a spoken turn that has said a lead-in, and whose
+/// next chat round (its calls running, or a round asked whose words have
+/// not begun) is still out this long after the lead-in's audio ended,
+/// makes the wait sound once: never twice in a reply, never over a newer
+/// line, never right after another wait sound, and not once the next
+/// round's words have begun to come. On 70 journals of 24-25 Nov, 113 of
+/// 122 sentence boundaries had no gap; those of 300 ms or more were nearly
+/// all such a round (7 cases, p50 1.4 s, p90 4.0 s), each of its waits
+/// under [`CUE_AFTER`].
+pub const GAP_CUE_AFTER: Duration = Duration::from_secs(1);
 /// Time allowed for the first chat event after the scheduled cue, when a
 /// clip is ready. The deadline from the words is the configured cue delay
 /// plus this interval: 4.5 s with [`CUE_AFTER`], 7 s with [`CUE_AFTER_MOST`].
@@ -18852,8 +18863,9 @@ async fn run_tool_in_context(
             // With the switch: once a round, never over a newer line. A
             // round is marked only by a sound that played, so one with no
             // clip ready leaves the round after it its own.
-            let cue_now = !shared.every_tool_cued
-                || !shared.tool_cued_for(request) && !shared.newer_line_began(request);
+            // Nor after the gap's sound in this wait ([`GAP_CUE_AFTER`]).
+            let cue_now = !shared.tool_cued_for(request)
+                && (!shared.every_tool_cued || !shared.newer_line_began(request));
             let clip = cue_now.then(|| cues.next()).flatten();
             if shared.every_tool_cued && clip.is_some() {
                 shared.mark_tool_cued(request);
@@ -18892,9 +18904,46 @@ enum Stop {
     Gone,
 }
 
-/// A spoken piece's journal line (#8615 item 3).
-fn piece_audio_line(_request: u64, _piece: usize, _samples: usize) -> String {
-    String::new()
+/// A spoken piece's journal line once all its audio went to the speaker
+/// (#8615 item 3): its place in the answer and its audio's length, so a
+/// row tells the reply's gaps from its pieces.
+fn piece_audio_line(request: u64, piece: usize, samples: usize) -> String {
+    format!(
+        "lamp-voice second: request {request} piece {piece} handed to the speaker: {} ms of audio",
+        samples as u64 * 1_000 / u64::from(net::TTS_SAMPLE_RATE)
+    )
+}
+
+/// Ready once `due` has passed with a further chat round out
+/// (`round_out` true, [`GAP_CUE_AFTER`]); never once the answer's writing
+/// is over.
+async fn round_still_out(
+    due: tokio::time::Instant,
+    round_out: &mut tokio::sync::watch::Receiver<bool>,
+) {
+    tokio::time::sleep_until(due).await;
+    if round_out.wait_for(|out| *out).await.is_err() {
+        std::future::pending::<()>().await;
+    }
+}
+
+/// The gap's wait sound ([`GAP_CUE_AFTER`]): none over a newer line, nor
+/// right after another wait sound with no words between. It marks the
+/// request cued, so no other wait sound follows it in the same wait
+/// (`LAMP_BUSY_FOLLOW_UP_RENEWS`'s, or a connected service's).
+async fn gap_cue(shared: &Shared, request: u64, cues: &Cues) -> Result<(), Stop> {
+    if shared.newer_line_began(request) || shared.only_its_wait_sound(request) {
+        return Ok(());
+    }
+    let Some(clip) = cues.next() else {
+        return Ok(());
+    };
+    shared.mark_tool_cued(request);
+    eprintln!(
+        "lamp-voice second: request {request} made a sound: its next chat round was still out {} ms after its lead-in's audio ended",
+        GAP_CUE_AFTER.as_millis()
+    );
+    cue(shared, request, clip).await
 }
 
 /// One wait sound for `request`, as audio only: no words, so nothing of it
@@ -20023,6 +20072,9 @@ async fn answer(
     // round 1's words are not said before it is known whether it handed
     // the work over.
     let mut decline_held = (round_one_held || named_agent.is_some()).then(String::new);
+    // Whether a further chat round is out, its calls running or its words
+    // not begun, for the gap's wait sound ([`GAP_CUE_AFTER`]).
+    let (round_out, mut round_waited) = tokio::sync::watch::channel(false);
     let writing = async move {
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
@@ -20909,6 +20961,9 @@ async fn answer(
                 return Err(Stop::Gone);
             }
             round += 1;
+            if round > 1 {
+                round_out.send_replace(true);
+            }
             // `LAMP_BUSY_FOLLOW_UP_RENEWS` (#7332): a round after a call is
             // timed for the wait sound, unless the calls made it.
             let cue_this_round =
@@ -21255,7 +21310,10 @@ async fn answer(
                     match tokio::time::timeout(shared.cue_after, stream.next()).await {
                         Ok(next) => next,
                         Err(_) => {
+                            // Nor after the gap's sound in this round
+                            // ([`GAP_CUE_AFTER`]).
                             if !shared.newer_line_began(request)
+                                && !shared.tool_cued_for(request)
                                 && let Some(clip) = cues.next()
                             {
                                 eprintln!(
@@ -21559,6 +21617,10 @@ async fn answer(
                 match event {
                     ChatEvent::Calling(_) | ChatEvent::Argued(..) => {}
                     ChatEvent::Text(piece) => {
+                        // Its words begun: the next audio is near.
+                        if piece.chars().any(char::is_alphanumeric) {
+                            round_out.send_replace(false);
+                        }
                         let piece = match silent_after.as_mut() {
                             Some(silent) => silent.piece(piece),
                             None => piece,
@@ -23239,6 +23301,8 @@ async fn answer(
                 );
                 return Ok(());
             }
+            // Its calls run now: the next round is out.
+            round_out.send_replace(true);
             if std::mem::take(&mut seeing) {
                 messages[asked_at] = words.clone();
             }
@@ -24692,7 +24756,28 @@ async fn answer(
         // #4338): said with the next piece, as one, so no sentence of the
         // answer is silently dropped.
         let mut carried: Option<String> = None;
-        while let Some((text, packets, ends)) = queued.recv().await {
+        // When the answer's audio given so far ends, for the gap's wait
+        // sound ([`GAP_CUE_AFTER`]); spent once it sounded, once a reply.
+        let gap_cues = shared.cues.as_deref().filter(|_| heard);
+        let mut audio_end: Option<tokio::time::Instant> = None;
+        let mut gap_spent = false;
+        // The answer's pieces handed to the speaker, for their journal line.
+        let mut pieces_said = 0;
+        loop {
+            let next = match (gap_cues, audio_end.filter(|_| !gap_spent)) {
+                (Some(cues), Some(end)) => tokio::select! {
+                    next = queued.recv() => next,
+                    () = round_still_out(end + GAP_CUE_AFTER, &mut round_waited) => {
+                        gap_spent = true;
+                        gap_cue(shared, request, cues).await?;
+                        continue;
+                    }
+                },
+                _ => queued.recv().await,
+            };
+            let Some((text, packets, ends)) = next else {
+                break;
+            };
             // Nothing of it goes out while its pause's grace keeps it back
             // (`LAMP_ENDPOINT_PAUSE_JOIN`): a line begun meanwhile cuts it
             // short unheard, and it says nothing more.
@@ -24761,6 +24846,7 @@ async fn answer(
                 ),
             };
             let mut played = false;
+            let mut piece_samples = 0;
             while let Some(packet) = packets.next().await {
                 let samples = match packet {
                     // Not started twice, and none of it played: kept for the
@@ -24777,6 +24863,14 @@ async fn answer(
                     packet => packet.map_err(|error| Stop::Failed(fault(&error)))?,
                 };
                 played = true;
+                if answering {
+                    piece_samples += samples.len();
+                    let now = tokio::time::Instant::now();
+                    let length = Duration::from_micros(
+                        samples.len() as u64 * 1_000_000 / u64::from(net::TTS_SAMPLE_RATE),
+                    );
+                    audio_end = Some(audio_end.map_or(now, |end| end.max(now)) + length);
+                }
                 for part in samples.chunks(PACKET_SAMPLES) {
                     let audio = ProviderOutput::Audio {
                         spoken: answering,
@@ -24865,6 +24959,10 @@ async fn answer(
                         crate::skill_write_yes::played_until(request, until);
                     }
                 }
+            }
+            if answering && played {
+                pieces_said += 1;
+                eprintln!("{}", piece_audio_line(request, pieces_said, piece_samples));
             }
             // A make's waiting line on the one run path (#7371), played
             // whole: its generation is over, after its last audio, so the
