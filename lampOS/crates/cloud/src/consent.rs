@@ -26,6 +26,11 @@ use std::time::Duration;
 
 pub use lamp_msgs::consent::{ENVIRONMENT, KINDS};
 
+/// What `system.info`'s `can` carries beside the kinds when the app's
+/// yeses are taken and `LAMP_NOTICING_BY_DEFAULT=on` (#7767, slice 6): the
+/// app reads a missing answer as on only on a lamp that says it.
+pub const DEFAULTS_ON: &str = "defaults_on";
+
 /// The privacy route's switch, read here only to know whether room sounds
 /// applies.
 pub const PRIVACY_ENVIRONMENT: &str = "LAMP_PRIVACY_CONTROLS";
@@ -58,6 +63,9 @@ pub struct Place {
     /// #6543): said in the desk noticing reply, so the app shows the
     /// disclosure that names posture.
     pub posture: bool,
+    /// `LAMP_NOTICING_BY_DEFAULT=on` in `lamp-cloud`'s own unit (#7767,
+    /// [`lamp_msgs::consent::noticing_by_default`]).
+    pub by_default: bool,
 }
 
 /// lamp-seen's posture switch, read here only to say it: `on` exactly.
@@ -71,7 +79,11 @@ pub fn gates(cloud: Option<&str>, consent: Option<&str>) -> bool {
 impl Place {
     /// The product's, as the environment says: none when off.
     pub fn from_environment() -> Option<Self> {
-        let var = |name: &str| std::env::var(name).ok();
+        Self::from_var(|name| std::env::var(name).ok())
+    }
+
+    /// [`Place::from_environment`] with `var` as the environment.
+    pub fn from_var(var: impl Fn(&str) -> Option<String>) -> Option<Self> {
         gates(var("LAMP_CLOUD").as_deref(), var(ENVIRONMENT).as_deref()).then(|| Self {
             folder: lamp_msgs::consent::FOLDER.into(),
             socket: crate::settings::SOCKET.into(),
@@ -79,6 +91,9 @@ impl Place {
             room_sounds: var(PRIVACY_ENVIRONMENT).as_deref() == Some(NO_SLIDE),
             seen_activity: var(SEEN_ENVIRONMENT).as_deref() == Some("on"),
             posture: false,
+            by_default: lamp_msgs::consent::by_default_on(
+                var(lamp_msgs::consent::NOTICING_BY_DEFAULT).as_deref(),
+            ),
         })
     }
 
@@ -97,12 +112,14 @@ impl Place {
 }
 
 /// What the lamp keeps now, as `consent.get` answers it: each key this lamp
-/// has, `true` only while its file holds a yes.
+/// has, `true` only while its file holds a yes, or, with
+/// [`Place::by_default`] (#7767, slice 6), while it holds no kept no, by the
+/// readers' one rule ([`lamp_msgs::consent::read_or`]).
 pub fn now(place: &Place) -> Value {
     let mut said = Map::new();
     for key in place.keys() {
         let yes = lamp_msgs::consent::file_in(&place.folder, key)
-            .is_some_and(|file| lamp_msgs::consent::read(&file, key).yes);
+            .is_some_and(|file| lamp_msgs::consent::read_or(&file, key, place.by_default).yes);
         said.insert(key.into(), yes.into());
     }
     Value::Object(said)
@@ -157,8 +174,9 @@ pub fn get(place: &Place) -> Value {
 /// `LAMP_CLOUD=on`), not behind [`ENVIRONMENT`]: it is the same yes as
 /// `consent.set`'s `seen_activity`, the same file, made by the same helper
 /// with `"by":"app"`, so a yes from the app and one spoken at the lamp are
-/// one yes. Off is what the voice's stop does: the file removed, and
-/// lamp-seen closes its gate at its next read and forgets the sitting.
+/// one yes. Off is what the voice's stop does: the file removed (a no kept
+/// where a missing file is on, #7767), and lamp-seen closes its gate at its
+/// next read and forgets the sitting.
 pub const DESK_KINDS: [&str; 2] = ["desk_noticing.get", "desk_noticing.set"];
 
 /// The desk noticing switch's place, as the environment says: none unless
@@ -175,6 +193,9 @@ pub fn desk_from(var: impl Fn(&str) -> Option<String>) -> Option<Place> {
     )
     .then(|| Place {
         posture: var(POSTURE_ENVIRONMENT).as_deref() == Some("on"),
+        by_default: lamp_msgs::consent::by_default_on(
+            var(lamp_msgs::consent::NOTICING_BY_DEFAULT).as_deref(),
+        ),
         ..desk_in(
             Path::new(lamp_msgs::consent::FOLDER),
             Path::new(crate::settings::SOCKET),
@@ -195,15 +216,18 @@ pub fn desk_in(folder: &Path, socket: &Path) -> Place {
 
 /// What the switch says now: `{"desk_noticing": {"on", "by", "posture"}}`,
 /// `on` only while the file holds a yes, `by` `"app"` for the app's,
-/// `"voice"` for any other (a file from before `by` is the voice's), null
-/// when off; `posture`, whether `LAMP_SEEN_POSTURE=on`, so the app shows
-/// the disclosure naming it.
+/// `"voice"` for any other (a file from before `by` is the voice's),
+/// `"default"` for a missing file read as on ([`Place::by_default`],
+/// #7767, slice 6), null when off; `posture`, whether
+/// `LAMP_SEEN_POSTURE=on`, so the app shows the disclosure naming it.
 pub fn desk_now(place: &Place) -> Value {
     let kept = lamp_msgs::consent::file_in(&place.folder, SEEN_ACTIVITY)
-        .map(|file| lamp_msgs::consent::read(&file, SEEN_ACTIVITY))
+        .map(|file| lamp_msgs::consent::read_or(&file, SEEN_ACTIVITY, place.by_default))
         .unwrap_or_default();
     let by = kept.yes.then(|| {
-        if kept.by_app() {
+        if kept.by_default {
+            lamp_msgs::consent::BY_DEFAULT
+        } else if kept.by_app() {
             lamp_msgs::consent::BY_APP
         } else {
             lamp_msgs::consent::BY_VOICE
@@ -250,6 +274,7 @@ pub fn place_in(folder: &Path, socket: &Path, room_sounds: bool) -> Place {
         room_sounds,
         seen_activity: false,
         posture: false,
+        by_default: false,
     }
 }
 
@@ -305,6 +330,7 @@ mod tests {
         for (posture, said) in [(Some("on"), true), (None, false), (Some("yes"), false)] {
             let var = |name: &str| match name {
                 POSTURE_ENVIRONMENT => posture.map(str::to_owned),
+                lamp_msgs::consent::NOTICING_BY_DEFAULT => None,
                 _ => Some("on".to_owned()),
             };
             assert_eq!(
@@ -319,6 +345,17 @@ mod tests {
                 }),
                 "{posture:?}"
             );
+        }
+        // #7767, slice 6: the default said only with its switch `on`
+        // exactly, in both places.
+        for (value, said) in [(Some("on"), true), (None, false), (Some("ON"), false)] {
+            let var = |name: &str| match name {
+                lamp_msgs::consent::NOTICING_BY_DEFAULT => value.map(str::to_owned),
+                POSTURE_ENVIRONMENT => None,
+                _ => Some("on".to_owned()),
+            };
+            assert_eq!(desk_from(var).unwrap().by_default, said, "{value:?}");
+            assert_eq!(Place::from_var(var).unwrap().by_default, said, "{value:?}");
         }
     }
 
@@ -452,6 +489,65 @@ mod tests {
             get(&no_slide),
             json!({"face_expressions": true, "room_sounds": true})
         );
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// #7767, slice 6: with `LAMP_NOTICING_BY_DEFAULT` on and the old nos
+    /// kept, a missing file is on in both answers, desk noticing's `by`
+    /// `"default"`; a kept no is off either way, and before the done mark,
+    /// or with the switch off, a missing file is off as before.
+    #[test]
+    fn with_the_switch_on_a_missing_file_is_on_and_a_kept_no_is_off() {
+        let folder =
+            std::env::temp_dir().join(format!("cloud-consent-default-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let on = Place {
+            seen_activity: true,
+            by_default: true,
+            ..place_in(&folder, Path::new("/nowhere.sock"), true)
+        };
+        let off = Place {
+            by_default: false,
+            ..on.clone()
+        };
+        let all =
+            |yes: bool| json!({"face_expressions": yes, "room_sounds": yes, "seen_activity": yes});
+        let desk =
+            |on: bool, by: Value| json!({"desk_noticing": {"on": on, "by": by, "posture": false}});
+        // Before the old nos are kept, no file is no.
+        assert_eq!(get(&on), all(false));
+        assert_eq!(desk_now(&on), desk(false, Value::Null));
+        std::fs::write(folder.join(lamp_msgs::consent::OLD_NOS_DONE), b"{}").unwrap();
+        assert_eq!(get(&on), all(true));
+        assert_eq!(desk_now(&on), desk(true, json!("default")));
+        assert_eq!(get(&off), all(false));
+        assert_eq!(desk_now(&off), desk(false, Value::Null));
+        // A kept no, the app's or the voice's: off, whatever the switch.
+        for (key, by) in [
+            (FACE_EXPRESSIONS, lamp_msgs::consent::BY_APP),
+            (SEEN_ACTIVITY, lamp_msgs::consent::BY_VOICE),
+        ] {
+            std::fs::write(
+                lamp_msgs::consent::file_in(&folder, key).unwrap(),
+                lamp_msgs::consent::no_bytes(key, 5, by),
+            )
+            .unwrap();
+        }
+        assert_eq!(
+            get(&on),
+            json!({"face_expressions": false, "room_sounds": true, "seen_activity": false})
+        );
+        assert_eq!(desk_now(&on), desk(false, Value::Null));
+        assert_eq!(get(&off), all(false));
+        // A kept yes is said by who gave it, never as the default.
+        std::fs::write(
+            lamp_msgs::consent::file_in(&folder, SEEN_ACTIVITY).unwrap(),
+            lamp_msgs::consent::bytes(SEEN_ACTIVITY, 6, lamp_msgs::consent::BY_APP),
+        )
+        .unwrap();
+        assert_eq!(desk_now(&on), desk(true, json!("app")));
+        assert_eq!(desk_now(&off), desk(true, json!("app")));
         let _ = std::fs::remove_dir_all(folder);
     }
 }

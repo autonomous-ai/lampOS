@@ -54,7 +54,9 @@
 //!   for lamp-ears, each a file in [`Config::consent`] as the voice's
 //!   onboarding keeps it, with `"by":"app"` ([`lamp_msgs::consent`]),
 //!   `root:lampos` 0640 (the folder's group; 0600 with none). Off removes
-//!   it. lamp-eyes reads its yes every 2 s, so nothing restarts; lamp-ears
+//!   it, or keeps a no where a missing file is on (#7767, slice 6:
+//!   `LAMP_NOTICING_BY_DEFAULT=on`, or the old nos kept, [`apply_or`]).
+//!   lamp-eyes reads its yes every 2 s, so nothing restarts; lamp-ears
 //!   reads room sounds' only at start, so a new yes there restarts it once
 //!   no update is at work ([`restart_ears_when_unlocked`]); an off is
 //!   followed within 2 s as it is. `lamp-cloud` sends them only with
@@ -396,7 +398,10 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
 }
 
 /// [`apply`] with `LAMP_NOTICING_BY_DEFAULT` given (#7767): `by_default`
-/// changes only the desk noticing switch, whose off then keeps a no.
+/// changes only the app's yeses (`consent` and desk noticing), whose off
+/// then keeps a no (`"by":"app"`), as it does with the switch off once the
+/// old nos are kept ([`lamp_msgs::consent::OLD_NOS_DONE`], slice 6), and
+/// whose yes with no file, on by default already, writes nothing.
 pub fn apply_or(change: &Change, config: &Config, by_default: bool) -> io::Result<Done> {
     let mut files = Files(config);
     match change {
@@ -649,11 +654,15 @@ pub fn apply_or(change: &Change, config: &Config, by_default: bool) -> io::Resul
         Change::Consent(key, yes) => {
             let path = lamp_msgs::consent::file_in(&config.consent, key)
                 .ok_or_else(|| io::Error::other("no such yes"))?;
-            let before = lamp_msgs::consent::read(&path, key).yes;
+            let before = lamp_msgs::consent::read_or(&path, key, by_default).yes;
             if *yes && !before {
                 keep_yes(&path, key)?;
             } else if !*yes {
-                remove(&path)?;
+                if keeps_no(config, by_default) {
+                    keep_no(&path, key)?;
+                } else {
+                    remove(&path)?;
+                }
             }
             let words = match *key {
                 lamp_msgs::consent::ROOM_SOUNDS => "room sounds",
@@ -694,7 +703,7 @@ pub fn apply_or(change: &Change, config: &Config, by_default: bool) -> io::Resul
                     keep_yes(&path, key)?;
                 }
             } else {
-                if by_default {
+                if keeps_no(config, by_default) {
                     keep_no(&path, key)?;
                 } else {
                     remove(&path)?;
@@ -734,6 +743,13 @@ pub fn apply_or(change: &Change, config: &Config, by_default: bool) -> io::Resul
             })
         }
     }
+}
+
+/// Whether an app's off keeps a no in place of the removal (#7767): with
+/// the switch on, and once the old nos are kept with it off too, so on, off,
+/// on still reads it as no, as the voice's stop.
+fn keeps_no(config: &Config, by_default: bool) -> bool {
+    by_default || lamp_msgs::consent::old_nos_done(&config.consent)
 }
 
 /// A drop-in at `path` made to follow `on`: written with `write` when it

@@ -556,9 +556,12 @@ the consent folder every reader reads a missing file as no, so a person
 who declined face expressions, room sounds or seen activity never reads as
 on afterwards (the first builder's c7002724376 and c7003588081;
 [onboarding.md](onboarding.md), "Room sounds"). The reset still removes
-both files, a no too. The app's `consent.set` off still removes the file
-(slice 6 of #7767, behind `LAMP_APP_CONSENT`), so the switch goes on in no
-unit before that slice. Body sounds are not under it.
+both files, a no too. The app's `consent.set` off keeps a no too, `"by":"app"`
+(slice 6 of #7767, behind `LAMP_APP_CONSENT`), with the switch on and,
+once the old nos are kept, with it off, as the app's desk noticing off
+does; `consent.get` says a missing file as `true`, and `system.info`'s
+`can` carries `defaults_on` only with both switches on
+([cloud.md](cloud.md), "The two yeses from the app"). Body sounds are not under it.
 
 **Only for a board with no slide.** Controls refuses `no-slide` only when the
 pins file has a `privacy` section, and no pins file has one today. A slide
