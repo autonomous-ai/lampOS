@@ -8502,7 +8502,13 @@ request socket, as
 does). If the work still waits for its agent (`queued`, or `working` with
 `waiting` true), no work started before it is still under way (not `done`),
 and it is still the work handed over last, one line is asked of the say service as the voice's own, at the normal
-priority, let go if not begun within 15 s:
+priority, let go if not begun within 15 s. It is asked as a client of the say
+socket (`LAMP_SAY_SOCKET`, `/run/lampos-say/say.sock` if unset), under the
+skill name `voice-tasks`: the hand-over's tool call runs in the second
+route's worker, a process that holds none of the voice's in-process asks
+(#8510, lamp-ee17: every hand-over journaled `no line: no say service`
+while they were kept at the main process's start). The service checks it
+as any say's line. The line:
 
 - "Your computer is waking up; it'll start in a moment.";
 - for the lamp's own engine, "I'm still getting ready; I'll start in a
@@ -8538,8 +8544,11 @@ starting`; a look that ends with no line says one line why,
 `lamp-voice: tasks: work N after 20 s: no line: <reason>`, the reason one of
 `read failed`, `not on the records`, `with its agent`, `not queued or
 working`, `behind earlier work`, `not the last hand-over` or `already said`;
-a hand-over without the say service says `lamp-voice: tasks: work N: no
-line: no say service`.
+a hand-over without the say service (nothing answering at its socket) says
+`lamp-voice: tasks: work N: no line: no say service`. A line the say service
+refuses says `lamp-voice: tasks: work N after 20 s: no line: the say service
+refused: <why>`, and one begun but not said, or let go, `... the line not
+said: <outcome>`.
 
 ### How the lamp's Harness is (#6061 part B, off unless `LAMP_TASKS_HARNESS_STATUS=on`)
 
