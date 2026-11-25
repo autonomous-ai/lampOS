@@ -974,3 +974,64 @@ fn a_kept_trigger_skill_that_would_speak_is_refused_in_a_plain_line() {
     assert_eq!(previewed(&places, "told", "told-ok").len(), 64);
     lamp_skills::task::set_made_here(None);
 }
+
+/// #8629 (the owner on lamp-9adf: a voice-made skill's files read "not
+/// packed: skill.toml needs a trigger or a tool"): a preview answers from
+/// the files as they are, so a made skill started only by its own words
+/// (`asks`, no trigger, no tool) previews its files; the Store's pack
+/// check is not the preview's. Its package can't be made, so the preview
+/// says why in `pack_refused` with no `sha256`, and a send still refuses.
+#[test]
+fn a_preview_of_a_made_skill_started_by_its_words_shows_its_files_and_the_send_still_refuses() {
+    lamp_voice::made_skill::set_asks_here(Some(true));
+    let places = places("share-asks");
+    let dir = places.folder.join("brief");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(
+        dir.join("SKILL.md"),
+        "---\nname: brief\ndescription: Counts the day's briefs.\nmade: here\n---\n\n# Daily brief count\n",
+    )
+    .unwrap();
+    let toml = "kind = \"installable\"\nversion = \"1.0.0\"\nasks = [\"daily brief count\"]\n\
+                [permissions]\nlight = true\n[[do]]\nlight = { colour = \"warm\" }\n";
+    fs::write(dir.join("skill.toml"), toml).unwrap();
+    let preview = share(
+        &nowhere(),
+        &places,
+        &json!({"name": "brief", "preview": true}),
+        &scratch("asks-preview"),
+        "en",
+    )
+    .unwrap();
+    let files = preview["preview"]["files"].as_array().unwrap();
+    assert_eq!(
+        files
+            .iter()
+            .map(|file| file["path"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        ["SKILL.md", "skill.toml"]
+    );
+    assert_eq!(files[1]["text"], toml);
+    assert!(!files[0]["text"].as_str().unwrap().contains("made: here"));
+    assert_eq!(preview["preview"]["sha256"], Value::Null);
+    assert!(
+        preview["preview"]["pack_refused"]
+            .as_str()
+            .unwrap()
+            .contains("needs a trigger or a tool"),
+        "{preview}"
+    );
+    // A send is the Store's packing: still refused, and nothing sent.
+    let (store, sent) = store(201, r#"{"status":1,"data":{"id":"s1"}}"#);
+    let refused = share(
+        &store,
+        &places,
+        &json!({"name": "brief", "sha256": "ab".repeat(32)}),
+        &scratch("asks-send"),
+        "en",
+    )
+    .unwrap_err();
+    assert!(refused.starts_with("not packed:"), "{refused}");
+    assert!(sent.try_recv().is_err(), "nothing was sent");
+    lamp_voice::made_skill::set_asks_here(None);
+}

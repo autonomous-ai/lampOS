@@ -3338,4 +3338,252 @@ pub mod tests {
             .is_err()
         );
     }
+
+    /// A skills folder with one skill of each group (#8629): a core one, a
+    /// Store one, a made one and a pushed one, each a tool with its
+    /// `SKILL.md` and `skill.toml`. The places, and each skill's name, where
+    /// it came from as `skills.files` says it, and its folder.
+    fn every_group(
+        name: &str,
+    ) -> (
+        crate::skills::Places,
+        Vec<(&'static str, &'static str, std::path::PathBuf)>,
+    ) {
+        let places = crate::skills::tests::places(name);
+        const INSTALLABLE: &str =
+            "kind = \"installable\"\nversion = \"1.0.0\"\n[permissions]\nbody = true";
+        crate::skills::tests::skill(
+            &places,
+            "dance",
+            "Dance",
+            "",
+            "kind = \"core\"\n[permissions]\nbody = true",
+        );
+        crate::skills::tests::skill(&places, "sip", "Sip", "", INSTALLABLE);
+        crate::skills::tests::skill(&places, "water", "Water", "made: here\n", INSTALLABLE);
+        let dev = places.folder.with_file_name("skills-dev");
+        std::fs::create_dir_all(&dev).unwrap();
+        crate::skills::tests::skill(
+            &crate::skills::Places {
+                folder: dev.clone(),
+                ..places.clone()
+            },
+            "wave",
+            "Wave",
+            "",
+            INSTALLABLE,
+        );
+        std::fs::write(
+            dev.join("wave").join(".pushed.json"),
+            r#"{"computer":"laptop","client":"c_1","sha256":"ab","at_unix_ms":1}"#,
+        )
+        .unwrap();
+        let skills = vec![
+            ("dance", "built-in", places.folder.join("dance")),
+            ("sip", "store", places.folder.join("sip")),
+            ("water", "made", places.folder.join("water")),
+            ("wave", "pushed", dev.join("wave")),
+        ];
+        (places, skills)
+    }
+
+    /// `skills.files {"name"}`'s `files`, as the app reads it.
+    fn files_of(lamp: &mut Fake, name: &str) -> Value {
+        answer(lamp, "skills.files", &json!({"name": name}))
+            .unwrap()
+            .unwrap()["files"]
+            .clone()
+    }
+
+    /// `skills.files {"name", "path"}`: the file, or the refusal.
+    fn file_of(lamp: &mut Fake, name: &str, path: &str) -> Result<Value, String> {
+        answer(lamp, "skills.files", &json!({"name": name, "path": path}))
+            .map(|answer| answer.unwrap()["file"].clone())
+    }
+
+    /// #8629 (the owner: every skill's files readable from its page, the
+    /// first builder's three conditions): `skills.files {"name"}` lists a
+    /// skill's plain files whatever its group, with where it came from,
+    /// sorted by path, subfolders walked, dot files and `lamp-skill.sig`
+    /// left out, a link shown as one and never read through; `{"name",
+    /// "path"}` reads one UTF-8 text file; `..`, a dot part, an absolute
+    /// path, a link and a path under one are refused in the same words, and
+    /// a binary, an unknown skill and an unknown path each in their own.
+    #[test]
+    fn the_skills_files_list_and_read_every_group_never_through_a_link() {
+        let mut lamp = lamp();
+        assert_eq!(
+            answer(&mut lamp, "skills.files", &json!({"name": "dance"})),
+            Err(not_here("skills.files"))
+        );
+        let (places, skills) = every_group("files");
+        lamp.skills = Some(places.clone());
+        let size = |path: &std::path::Path| std::fs::metadata(path).unwrap().len();
+        for (name, source, folder) in &skills {
+            let listed = files_of(&mut lamp, name);
+            assert_eq!(listed["name"], *name, "{name}");
+            assert_eq!(listed["source"], *source, "{name}");
+            assert_eq!(
+                listed["files"],
+                json!([
+                    {"path": "SKILL.md", "size": size(&folder.join("SKILL.md"))},
+                    {"path": "skill.toml", "size": size(&folder.join("skill.toml"))},
+                ]),
+                "{name}"
+            );
+            assert!(listed.get("cut").is_none(), "{name}");
+            assert_eq!(
+                file_of(&mut lamp, name, "skill.toml").unwrap(),
+                json!({"path": "skill.toml", "text": std::fs::read_to_string(folder.join("skill.toml")).unwrap()}),
+                "{name}"
+            );
+        }
+        // A subfolder, a binary, a dot file, the signature, a link to a
+        // file outside the skill and a link to a folder outside it.
+        let dance = places.folder.join("dance");
+        std::fs::create_dir_all(dance.join("moves")).unwrap();
+        std::fs::write(dance.join("moves/wave.json"), "{\"frames\": []}\n").unwrap();
+        std::fs::create_dir_all(dance.join("sounds")).unwrap();
+        std::fs::write(dance.join("sounds/hello.wav"), [0xff, 0xfe, 0x00, 0x01]).unwrap();
+        std::fs::write(dance.join(".package.json"), "{}").unwrap();
+        std::fs::write(dance.join("lamp-skill.sig"), "sig").unwrap();
+        let outside = places.off.parent().unwrap().to_path_buf();
+        std::fs::write(outside.join("secret.txt"), "the lamp's own").unwrap();
+        std::os::unix::fs::symlink(outside.join("secret.txt"), dance.join("link.txt")).unwrap();
+        std::os::unix::fs::symlink(&outside, dance.join("elsewhere")).unwrap();
+        let listed = files_of(&mut lamp, "dance");
+        let files = listed["files"].as_array().unwrap();
+        let paths: Vec<&str> = files
+            .iter()
+            .map(|file| file["path"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            paths,
+            [
+                "SKILL.md",
+                "elsewhere",
+                "link.txt",
+                "moves/wave.json",
+                "skill.toml",
+                "sounds/hello.wav"
+            ]
+        );
+        assert_eq!(files[1], json!({"path": "elsewhere", "link": true}));
+        assert_eq!(files[2], json!({"path": "link.txt", "link": true}));
+        assert_eq!(files[5], json!({"path": "sounds/hello.wav", "size": 4}));
+        // One file read, as it is.
+        assert_eq!(
+            file_of(&mut lamp, "dance", "moves/wave.json"),
+            Ok(json!({"path": "moves/wave.json", "text": "{\"frames\": []}\n"}))
+        );
+        // The refusals, each in its own words.
+        assert_eq!(
+            file_of(&mut lamp, "dance", "sounds/hello.wav"),
+            Err("not a text file: sounds/hello.wav".to_owned())
+        );
+        for tricky in [
+            "link.txt",
+            "elsewhere/secret.txt",
+            "../sip/skill.toml",
+            "moves/../../sip/skill.toml",
+            "/etc/hostname",
+            ".package.json",
+            "./SKILL.md",
+            "",
+        ] {
+            assert_eq!(
+                file_of(&mut lamp, "dance", tricky),
+                Err("not a path in the skill".to_owned()),
+                "{tricky}"
+            );
+        }
+        assert_eq!(
+            file_of(&mut lamp, "dance", "lamp-skill.sig"),
+            Err("no file lamp-skill.sig in dance".to_owned())
+        );
+        assert_eq!(
+            file_of(&mut lamp, "dance", "moves"),
+            Err("no file moves in dance".to_owned())
+        );
+        assert_eq!(
+            file_of(&mut lamp, "dance", "nothing.txt"),
+            Err("no file nothing.txt in dance".to_owned())
+        );
+        assert_eq!(
+            answer(&mut lamp, "skills.files", &json!({"name": "nobody"})),
+            Err("no skill named nobody on this lamp".to_owned())
+        );
+        assert_eq!(
+            answer(&mut lamp, "skills.files", &json!({"name": "../sip"})),
+            Err(crate::skills::NOT_A_NAME.to_owned())
+        );
+        assert_eq!(
+            answer(&mut lamp, "skills.files", &json!({})),
+            Err(crate::skills::NOT_A_NAME.to_owned())
+        );
+    }
+
+    /// #8629, the first builder's second and third conditions: a list stops
+    /// at 500 entries with `"cut": true`, and a text over 65,536 characters
+    /// comes back cut at the cap with `"cut": true`, never refused; one at
+    /// the cap is whole.
+    #[test]
+    fn the_skills_files_are_cut_at_500_entries_and_64_kb_of_text() {
+        let mut lamp = lamp();
+        let (places, _) = every_group("files-cut");
+        lamp.skills = Some(places.clone());
+        let dance = places.folder.join("dance");
+        std::fs::create_dir_all(dance.join("tests")).unwrap();
+        std::fs::write(
+            dance.join("tests/long.txt"),
+            "é".repeat(crate::share::PREVIEW_MOST + 1),
+        )
+        .unwrap();
+        std::fs::write(
+            dance.join("tests/whole.txt"),
+            "é".repeat(crate::share::PREVIEW_MOST),
+        )
+        .unwrap();
+        let long = file_of(&mut lamp, "dance", "tests/long.txt").unwrap();
+        assert_eq!(
+            long["text"].as_str().unwrap().chars().count(),
+            crate::share::PREVIEW_MOST
+        );
+        assert_eq!(long["cut"], true);
+        let whole = file_of(&mut lamp, "dance", "tests/whole.txt").unwrap();
+        assert_eq!(
+            whole["text"].as_str().unwrap().chars().count(),
+            crate::share::PREVIEW_MOST
+        );
+        assert!(whole.get("cut").is_none());
+        // 503 entries in the skill: 500 listed, then cut.
+        let many = places.folder.join("sip").join("many");
+        std::fs::create_dir_all(&many).unwrap();
+        for n in 0..501 {
+            std::fs::write(many.join(format!("{n:03}.txt")), "x").unwrap();
+        }
+        let listed = files_of(&mut lamp, "sip");
+        assert_eq!(listed["files"].as_array().unwrap().len(), 500);
+        assert_eq!(listed["cut"], true);
+        assert!(files_of(&mut lamp, "dance").get("cut").is_none());
+    }
+
+    /// #8629: `skills.files` is named in `can` with the skills page and
+    /// with nothing more, as `skills.list` is.
+    #[test]
+    fn skills_files_is_named_in_can_only_with_the_skills_page() {
+        let mut lamp = lamp();
+        assert!(!can(&lamp).contains(&"skills.files"));
+        assert!(!on(&lamp, "skills.files"));
+        lamp.skills = Some(places_of(false));
+        assert!(can(&lamp).contains(&"skills.files"));
+        assert!(on(&lamp, "skills.files"));
+        assert_eq!(
+            can(&lamp)
+                .iter()
+                .filter(|kind| **kind == "skills.files")
+                .count(),
+            1
+        );
+    }
 }
