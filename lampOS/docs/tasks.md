@@ -2386,6 +2386,15 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     `agent_tasks::tests::where_offers_no_computer_without_a_pairing`,
     `agent_tasks::tests::no_computer_paired_a_computer_asked_for_is_refused_never_the_lamps`,
     `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`.
+    With no computer paired, `start_agent_task`'s description also says
+    so before the call (`agent_tasks::NONE_PAIRED`, " No computer is
+    paired: never say work goes to one."). On lamp-74ff on 25 Nov 2026 at
+    18:56 the model said "I'll hand that to Claude Code on your office
+    computer now." before its call was refused, then "No computer is
+    paired with me": a promise taken back in one breath. Test:
+    `agent_tasks::tests::with_no_computer_paired_the_model_is_told_so_before_it_calls`;
+    `every_description_fits_the_service_whatever_the_switches` keeps it
+    within the link's 1,024 bytes.
   - **Tests:** `readiness::tests::the_lamp_is_kept_only_where_hermes_is_known_installed`,
     `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
     `runtime::tests::hermes_settings_are_written_at_start_only_with_a_token`,
