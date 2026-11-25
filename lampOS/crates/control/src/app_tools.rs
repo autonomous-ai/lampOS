@@ -104,6 +104,7 @@ pub fn read(folder: &Path, app: &str, title: &str, path: &str) -> Result<AppsToo
                 parameters: tool.parameters,
             })
             .collect(),
+        phrases: Vec::new(),
     };
     AppTools {
         apps: vec![tools.clone()],
@@ -254,7 +255,12 @@ pub fn start(bus: &lamp_bus::Bus, shared: Arc<Shared>) {
             loop {
                 let now = Instant::now();
                 let (running, apps_dir) = shared.running_since();
-                let list = lister.list(&apps_dir, &running, true);
+                let mut list = lister.list(&apps_dir, &running, true);
+                // Each app's listened phrases, so the voice offers none of
+                // its tools in a line told to it as a phrase (#8386).
+                for app in &mut list.apps {
+                    app.phrases = shared.listened_phrases(&app.app);
+                }
                 let due = match &said {
                     Some((last, at)) => *last != list || now.duration_since(*at) >= SAY_EVERY,
                     None => true,
