@@ -1822,6 +1822,8 @@ pub struct Attention {
     usual_began_us: Option<u64>,
     /// When the lamp's name last began to be heard in the room's sound.
     named_us: Option<u64>,
+    /// The score lamp-name gave the hearing at `named_us`.
+    named_score: f32,
     /// The name was heard for the request in hand: as it began, or in its
     /// sound.
     named: bool,
@@ -2387,13 +2389,16 @@ impl Attention {
         let ruled_out = ruled.is_some() && !sure_kept && !called_by_real_name(&self.heard);
         self.name_near_dropped = weighed && self.sign_tied && (ruled_out || one_word_unlike);
         self.name_sure_kept = weighed && self.sign_tied && sure_kept && !self.name_near_dropped;
-        // `LAMP_NAME_FACE_OR_WORDS`: under a sure hearing only a face turned
+        // `LAMP_NAME_FACE_OR_WORDS`: under [`NEAR_SCORE`] only a face turned
         // to the lamp or its words calling it count, busy room or not; the
         // start is the same false hearing again (#8136: lamp-74ff, 17:26:23,
-        // 0.921 by 210 ms into two people's talk, answered).
+        // 0.921 by 210 ms into two people's talk, answered). At it or over,
+        // the second signs count: under [`SURE_SCORE`] it held plain calls
+        // whose words came back without the name (the P0 of 25 Nov:
+        // lamp-74ff at 0.980 to 0.997, lamp-52e6 at 0.997).
         self.name_unsure_dropped = weighed
             && self.face_or_words
-            && !self.named_sure
+            && self.best_score < NEAR_SCORE
             && turned != Some(true)
             && !text_calls
             && !signs.is_empty();
@@ -2813,6 +2818,9 @@ impl Attention {
         let start = self.start_of(now_us, lead_us);
         self.named = self.named_us.is_some_and(counts);
         self.named_sure = self.named_sure_us.is_some_and(counts);
+        if self.named {
+            self.best_score = self.best_score.max(self.named_score);
+        }
         self.named_at_start = self.named
             && self
                 .named_us
@@ -2980,6 +2988,9 @@ impl Attention {
     /// The same, with the hearing's score: one at [`SURE_SCORE`] or more is
     /// also kept as a sure one.
     pub fn name_heard_scored(&mut self, at_us: u64, score: f32) {
+        if self.named_us.is_none_or(|before| at_us >= before) {
+            self.named_score = score;
+        }
         self.named_us = Some(self.named_us.map_or(at_us, |before| before.max(at_us)));
         let sure = score >= SURE_SCORE;
         if sure {
@@ -8217,8 +8228,9 @@ mod tests {
             (false, vec![start], false),
             "shape 5, off"
         );
-        // Closeness at an unsure hearing mid-line is no call alone either.
-        let close = ("What time is it?", 15_194_000, 0.96);
+        // Closeness at an unsure hearing mid-line is no call alone either
+        // (under [`NEAR_SCORE`]; one at it or over: the next test).
+        let close = ("What time is it?", 15_194_000, 0.94);
         assert_eq!(
             weighed(true, close, None, true),
             (true, Vec::new(), true),
@@ -8249,6 +8261,68 @@ mod tests {
                 weighed(true, sure, None, false),
                 (false, vec![start], false),
                 "sure at {score}"
+            );
+        }
+    }
+
+    /// The P0 of 25 Nov (lamp-74ff, stable 16031, 16:43-17:04; lamp-52e6
+    /// speed5, 17:43): "Hey Lamp, …" said plainly, its words written
+    /// without the name and no face turned, lamp-name at 0.948 to 0.997,
+    /// at the line's start (52e6 request 6: 0.997, 1.03 s in) or close to
+    /// it 2.5 to 2.9 s in (74ff requests 31, 53 and 64: 0.990, 0.980,
+    /// 0.997), was held by `LAMP_NAME_FACE_OR_WORDS` as unsure. A hearing
+    /// at [`NEAR_SCORE`] or over is weighed by its second signs again, heard
+    /// before the line began or in it; under it a face or the words are
+    /// still asked for: #8136's 0.921 and 52e6's 0.948 stay no call.
+    #[test]
+    fn with_a_face_or_words_needed_a_clear_hearing_counts_by_its_start_or_closeness() {
+        let began = 10_000_000;
+        let weighed = |at: u64, score: f32, near: bool| {
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            attention.tie_the_second_sign(true);
+            attention.need_a_face_or_words(true);
+            if at < began {
+                attention.name_heard_scored(at, score);
+            }
+            attention.began_at(5, 1, began);
+            if at >= began {
+                attention.name_heard_scored(at, score);
+            }
+            attention.heard("What is the capital of France?");
+            attention.set_near(near);
+            attention.set_near_at_the_name(near);
+            let dropped = attention.weigh_the_name(None, false);
+            (
+                dropped,
+                attention.second_signs().to_vec(),
+                attention.name_dropped_as_unsure(),
+            )
+        };
+        let start = "its hearing at the line's start";
+        for (at, score) in [
+            (began + 1_034_000, 0.997),
+            (began + 1_034_000, NEAR_SCORE),
+            (began - 200_000, 0.997),
+        ] {
+            assert_eq!(
+                weighed(at, score, false),
+                (false, vec![start], false),
+                "at the start, {score}, {at}"
+            );
+        }
+        for score in [0.990, 0.980, 0.997] {
+            assert_eq!(
+                weighed(began + 2_700_000, score, true),
+                (false, vec!["the name said close to it"], false),
+                "close, {score}"
+            );
+        }
+        for score in [0.921, 0.948] {
+            assert_eq!(
+                weighed(began + 1_034_000, score, false),
+                (true, Vec::new(), true),
+                "unsure, {score}"
             );
         }
     }
