@@ -434,7 +434,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 92] = [
+pub const KINDS: [(&str, Switch); 93] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -467,6 +467,9 @@ pub const KINDS: [(&str, Switch); 92] = [
     ("skills.off", |lamp| lamp.skills().is_some()),
     ("skills.on", |lamp| lamp.skills().is_some()),
     ("skills.camera", |lamp| lamp.skills().is_some()),
+    // A skill's files read from its page (#8629): with the page, no
+    // switch of its own, since it reads what the page already shows.
+    (crate::skill_files::KIND, |lamp| lamp.skills().is_some()),
     // The owner's yes to tiredness, desk work and celebrating (#6543):
     // named only while the lamp says them (`LAMP_SEEN_MORE_DOINGS=on`).
     ("skills.seen_more", |lamp| {
@@ -821,6 +824,12 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         "skills.list" if on(lamp, kind) => {
             let places = lamp.skills().ok_or_else(|| not_here(kind))?;
             crate::skills::list(&places).map(Some)
+        }
+        // A skill's files, listed or one read, whatever its group (#8629).
+        // Read only, with the page.
+        crate::skill_files::KIND if on(lamp, kind) => {
+            let places = lamp.skills().ok_or_else(|| not_here(kind))?;
+            crate::skill_files::files(&places, data).map(Some)
         }
         // Names and the time zone after setup (#1959): handed to root's
         // helper, answered `starting` now and its result later.
@@ -2502,6 +2511,7 @@ pub mod tests {
                     "skills.off",
                     "skills.on",
                     "skills.camera",
+                    "skills.files",
                 ],
             ),
             (
@@ -2513,6 +2523,7 @@ pub mod tests {
                     "skills.off",
                     "skills.on",
                     "skills.camera",
+                    "skills.files",
                     "skills.install",
                 ],
             ),
@@ -2640,6 +2651,7 @@ pub mod tests {
                     "skills.off",
                     "skills.on",
                     "skills.camera",
+                    "skills.files",
                     "skills.share",
                     "skills.shared",
                     "skills.unshare",

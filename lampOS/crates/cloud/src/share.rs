@@ -446,20 +446,26 @@ fn shown(copy: &Path) -> Result<Vec<Value>, String> {
 /// one copy of `folder` taken once: a skill made again while they are read
 /// can't pair one skill's text with another's package (Mobile's P2 on
 /// #4965). `copied` runs right after the copy is taken (a test's seam).
+/// The files are read as they are, before the package is tried (#8629): a
+/// skill the Store's packer refuses (a made skill started only by its own
+/// words, with no trigger or tool) still shows its files, and the refusal
+/// comes back in the SHA-256's place, for the preview to say.
 pub(crate) fn seen(
     folder: &Path,
     scratch: &Path,
     copied: impl FnOnce(),
-) -> Result<(String, Vec<Value>), String> {
+) -> Result<(Result<String, String>, Vec<Value>), String> {
     let work = scratch.join(format!("lamp-seen-{}", std::process::id()));
     let _ = fs::remove_dir_all(&work);
     let read = (|| {
         let copy = prepared(folder, &work)?;
         copied();
         let files = shown(&copy)?;
-        let tar = lamp_skills::package::pack(&copy, &work.join("out")).map_err(plain)?;
-        let bytes = fs::read(&tar).map_err(|error| format!("the package: {error}"))?;
-        Ok((lamp_skills::package::sha256_hex(&bytes), files))
+        let packed = lamp_skills::package::pack(&copy, &work.join("out"))
+            .map_err(plain)
+            .and_then(|tar| fs::read(&tar).map_err(|error| format!("the package: {error}")))
+            .map(|bytes| lamp_skills::package::sha256_hex(&bytes));
+        Ok((packed, files))
     })();
     let _ = fs::remove_dir_all(&work);
     read
@@ -698,7 +704,9 @@ pub const CHANGED: &str = "the skill changed since you looked: look again before
 /// nothing is sent: `{"preview": {"name", "sha256", "files": [{"path",
 /// "text"}]}}`, the text exactly as it would leave and the SHA-256 of the
 /// package it would be, both from one copy of the skill, for the app to
-/// show before Send. A send must name
+/// show before Send. The files are read as they are (#8629): a skill the
+/// Store's packer refuses still shows them, with `"sha256": null` and the
+/// refusal in `pack_refused`. A send must name
 /// that same SHA-256, so the lamp sends only the bytes the owner saw: none,
 /// [`NOT_SEEN`]; another, as when the skill was made again since,
 /// [`CHANGED`] (the Reviewer-lead's P2 on #4948). The package carries no
@@ -716,9 +724,22 @@ pub fn share(
     let visibility = visibility(data)?;
     let folder = shareable(places, &name)?;
     if data.get("preview").and_then(Value::as_bool) == Some(true) {
-        let (sha256, files) =
+        let (packed, files) =
             seen(&folder, scratch, || {}).map_err(|why| in_language(why, language))?;
-        let mut preview = json!({"name": name, "sha256": sha256, "files": files});
+        let mut preview = json!({"name": name, "files": files});
+        // The files as they are, whatever the Store's packer says of them
+        // (#8629): refused, the preview still shows them, says why, and
+        // names no package, so a send is refused as before. The told-only
+        // refusal is the owner's own rule, not the packer's shape (#8610):
+        // it refuses the preview too, in the owner's plain line.
+        match packed {
+            Ok(sha256) => preview["sha256"] = json!(sha256),
+            Err(why) if why == SPEAKS_ON_ITS_OWN => return Err(in_language(why, language)),
+            Err(why) => {
+                preview["sha256"] = Value::Null;
+                preview["pack_refused"] = json!(why);
+            }
+        }
         // The mode the owner named, and the lamp's line for it in the
         // owner's language, to be read before the yes; none named, none
         // said and none picked for the owner (#5209).

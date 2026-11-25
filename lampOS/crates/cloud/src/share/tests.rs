@@ -445,10 +445,11 @@ fn a_preview_shows_and_hashes_one_copy_even_when_the_skill_changes_meanwhile() {
     let folder = places.folder.join("water");
     let toml = fs::read_to_string(folder.join("skill.toml")).unwrap();
     let before = previewed(&places, "water", "snapshot-before");
-    let (sha256, files) = seen(&folder, &scratch("snapshot-seen"), || {
+    let (packed, files) = seen(&folder, &scratch("snapshot-seen"), || {
         fs::write(folder.join("skill.toml"), format!("{toml}\n# made again\n")).unwrap();
     })
     .unwrap();
+    let sha256 = packed.unwrap();
     // Both from the copy taken before the change.
     assert_eq!(sha256, before);
     let shown = files

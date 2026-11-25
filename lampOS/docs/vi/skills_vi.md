@@ -5861,9 +5861,27 @@ trang kỹ năng và `LAMP_CLOUD`); unit `lamp-cloud` của sản phẩm bật n
   có id, tên hay trạng thái thì báo "the Skills Store's answer couldn't be
   read", vì ứng dụng sẽ không bao giờ rút lại được nó.
   **`"preview": true`** không gửi gì: bản chép giống hệt được đọc lại thành
-  `{"preview": {"name", "files": [{"path", "text"}]}}` (tệp không phải văn
-  bản chỉ cho `bytes`; tối đa 65.536 ký tự), để ứng dụng cho chủ đèn xem
-  đúng những gì sẽ rời đi trước khi bấm Send.
+  `{"preview": {"name", "sha256", "files": [{"path", "text"}]}}` (tệp không
+  phải văn bản chỉ cho `bytes`; tối đa 65.536 ký tự), để ứng dụng cho chủ
+  đèn xem đúng những gì sẽ rời đi trước khi bấm Send. Các tệp được đọc
+  nguyên trạng, không qua quy tắc đóng gói của Store (#8629: một kỹ năng tạo
+  bằng giọng nói chỉ có `asks`, không trigger hay tool, từng báo "not packed:
+  skill.toml needs a trigger or a tool" ngay trên trang của nó): khi trình
+  đóng gói từ chối bản chép, phần xem trước vẫn cho thấy các tệp, với
+  `"sha256": null` và lý do trong `"pack_refused"`, còn lệnh gửi vẫn bị từ
+  chối như trước, vì bước kiểm tra đóng gói là của lệnh gửi.
+  **Tệp của mọi kỹ năng (#8629, `skills.files`):** cùng trang kỹ năng, không
+  công tắc riêng, `skills.files {"name"}` liệt kê các tệp thường trong thư
+  mục của kỹ năng thuộc mọi nhóm (`source` là `built-in`, `store`, `made`
+  hay `pushed`), sắp theo đường dẫn, tối đa 500 mục rồi `"cut": true`; liên
+  kết chỉ được hiển thị là `{"path", "link": true}`, không bao giờ đi theo;
+  tệp chấm, `lamp-skill.sig` và thư mục trạng thái không bao giờ được liệt
+  kê. `skills.files {"name", "path"}` trả về một tệp văn bản UTF-8, cắt ở
+  65.536 ký tự với `"cut": true`. Từ chối bằng lời thường: `no skill named
+  NAME on this lamp`, `no file PATH in NAME`, `not a text file: PATH`, và
+  `not a path in the skill` cho `..`, phần bắt đầu bằng dấu chấm, đường dẫn
+  tuyệt đối hay liên kết ở bất kỳ đâu trên đường dẫn. Chi tiết ở
+  [cloud.md](../cloud.md), "A skill's files".
 - **`skills.shared`** (`{}`): `GET {host}/api/v1/skills/mine?limit=100`,
   trang lớn nhất Store cho, mới nhất trước: **chỉ 100 kỹ năng gửi gần
   nhất** hiện ra (với 5 gói một ngày của Store, khoảng hai mươi ngày), các
