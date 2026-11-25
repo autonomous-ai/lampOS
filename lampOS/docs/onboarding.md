@@ -694,7 +694,9 @@ The record, for lamp-ears (`onboarding/storage.rs`, `room_sounds`):
   walk and the voice's stop keep a no even with the switch off, and a
   start off leaves a kept no, so on, off, on still reads it as no; the
   app's offs (`consent.set` and desk noticing) keep a no then too (slice
-  6). Off on a
+  6), and a forget (`forget`, "forget everything") leaves a kept no in
+  place, removing only a kept yes (`seen_yes::forget_takes`, Twelve's P3 3
+  on #8631). Off on a
   lamp never switched on (no done mark), all of it is as above, byte for
   byte, and nothing is written.
   Every one of these writes and removals, the voice's, the app's and the

@@ -758,12 +758,15 @@ pub fn forgotten(path: &Path) {
 }
 
 /// Whether a forget removes `key`'s file at `path` (#7767, the first
-/// builder's answer 1 on #7767): always with `by_default` off, as before;
-/// with it on only a kept yes, which leaves noticing on by default, so a
-/// kept no (or a file that can't be read, off) stays and a forget never
-/// turns noticing on.
+/// builder's answer 1 on #7767): with `by_default` on, or with it off and
+/// [`lamp_msgs::consent::OLD_NOS_DONE`] beside `path` (the rule that keeps
+/// a no, as `lamp-setup change`'s `keeps_no`), only a kept yes, so a kept
+/// no (or a file that can't be read, off) stays and a forget never turns
+/// noticing on, nor lets a later switch-on read it as on (Twelve's P3 3 on
+/// #8631). With neither, always, as before.
 pub fn forget_takes(path: &Path, key: &str, by_default: bool) -> bool {
-    !by_default || lamp_msgs::consent::read(path, key).yes
+    let keeps_no = by_default || path.parent().is_some_and(lamp_msgs::consent::old_nos_done);
+    !keeps_no || lamp_msgs::consent::read(path, key).yes
 }
 
 /// [`forgotten`] with `LAMP_NOTICING_BY_DEFAULT` given.
@@ -1403,8 +1406,8 @@ mod tests {
 
     /// #7767, the first builder's answer 1: with `LAMP_NOTICING_BY_DEFAULT`
     /// on, a forget keeps a no (and a file that can't be read) in place and
-    /// removes only a kept yes, so it never turns noticing on; off, it
-    /// removes whatever is there, as before.
+    /// removes only a kept yes, so it never turns noticing on; off with no
+    /// done mark, it removes whatever is there, as before.
     #[test]
     fn with_the_switch_on_a_forget_keeps_a_no() {
         use lamp_msgs::consent::{BY_APP, SEEN_ACTIVITY, allowed, bytes, no_bytes};
@@ -1416,14 +1419,46 @@ mod tests {
             forgotten_or(&path, true);
             assert_eq!(std::fs::read(&path).unwrap(), text);
             assert!(!allowed(&path, SEEN_ACTIVITY, true));
-            assert!(forget_takes(&path, SEEN_ACTIVITY, false));
         }
         std::fs::write(&path, bytes(SEEN_ACTIVITY, 5, BY_APP)).unwrap();
         assert!(forget_takes(&path, SEEN_ACTIVITY, true));
         forgotten_or(&path, true);
         assert!(!path.exists() && allowed(&path, SEEN_ACTIVITY, true));
-        // Off: a no is removed, as any file was.
+        // Off with no done mark: a no is removed, as any file was.
+        std::fs::remove_file(folder.join(lamp_msgs::consent::OLD_NOS_DONE)).unwrap();
+        for text in [no_bytes(SEEN_ACTIVITY, 5, BY_APP), b"not json".to_vec()] {
+            std::fs::write(&path, &text).unwrap();
+            assert!(forget_takes(&path, SEEN_ACTIVITY, false));
+        }
         std::fs::write(&path, no_bytes(SEEN_ACTIVITY, 5, BY_APP)).unwrap();
+        forgotten_or(&path, false);
+        assert!(!path.exists());
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// Twelve's P3 3 on #8631 (#7767): with the switch off and the done
+    /// mark there, a forget still keeps a no (so on, off, on still reads it
+    /// as no) and still removes a kept yes; with the mark gone, a no goes
+    /// as before.
+    #[test]
+    fn with_the_switch_off_and_the_done_mark_a_forget_keeps_a_no() {
+        use lamp_msgs::consent::{BY_APP, OLD_NOS_DONE, SEEN_ACTIVITY, allowed, bytes, no_bytes};
+        let folder = folder("forget-done-mark");
+        let path = file_in(&folder);
+        // `folder` writes the done mark.
+        assert!(lamp_msgs::consent::old_nos_done(&folder));
+        let no = no_bytes(SEEN_ACTIVITY, 5, BY_APP);
+        std::fs::write(&path, &no).unwrap();
+        assert!(!forget_takes(&path, SEEN_ACTIVITY, false));
+        forgotten_or(&path, false);
+        assert_eq!(std::fs::read(&path).unwrap(), no);
+        assert!(!allowed(&path, SEEN_ACTIVITY, true));
+        std::fs::write(&path, bytes(SEEN_ACTIVITY, 5, BY_APP)).unwrap();
+        assert!(forget_takes(&path, SEEN_ACTIVITY, false));
+        forgotten_or(&path, false);
+        assert!(!path.exists());
+        std::fs::remove_file(folder.join(OLD_NOS_DONE)).unwrap();
+        std::fs::write(&path, &no).unwrap();
         forgotten_or(&path, false);
         assert!(!path.exists());
         let _ = std::fs::remove_dir_all(folder);

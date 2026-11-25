@@ -3288,7 +3288,9 @@ file, no yes.
   it, and a later yes turns it back; with no file, a yes is on already and
   writes nothing. Once the old nos are kept (`noticing-old-nos.done`), an
   off keeps a no with the switch off too (on, off, on), as the voice's stop
-  does (#7767, slice 6). The voice's stop keeps its own no the same way.
+  does (#7767, slice 6). The voice's stop keeps its own no the same way,
+  and a forget then leaves a kept no in place, removing only a kept yes
+  (`seen_yes::forget_takes`).
 - **The read-back.** `{"desk_noticing": {"on": bool, "by": "app"|"voice"|"default"|null, "posture": bool}}`,
   from both kinds: `on` only while the file holds a yes, `by` `"app"` for the
   app's and `"voice"` for any other (a file from before `by` is the
