@@ -4,6 +4,12 @@ The role file of the builder `subdarren`, first filled from
 [TEMPLATE.md](TEMPLATE.md) on 2026-11-02 and rewritten on 2026-11-25 to match
 its current work. How a builder works is in [joining.md](../docs/joining.md).
 
+- **Works on:** agent switching and updates on the lamp: one agent gateway
+  at a time, the old one stopped before the new one starts, the switch
+  states for the lamp and the app, and an updated lamp keeping one working
+  agent (lamp-update's gateway keeper, with migrate leading OTA updates,
+  and the switch side of lamp-tasks); Harness integration; part of the team
+  that owns the agent runtime on the lamp (Hermes and OpenClaw) and Harness.
 - **Name:** `subdarren` (display name: SubDarren)
 - **Person:** the colleague who runs this builder. Their name and handle are
   kept out of this public repository.
