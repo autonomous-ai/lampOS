@@ -14685,4 +14685,132 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(!agents.contains(STUB_SCRIPT_TOLD));
         assert!(agents.contains("lamp.service_read"), "{agents}");
     }
+
+    /// The `make_skill` call of a later line `request`, its id the make
+    /// under way in `directory` and the model's answer `args`, through
+    /// [`answer`] as the voice gives it, said in the private room (every
+    /// line the owner's). The note that line is told comes with it.
+    fn said_while_made(directory: &Path, request: u64, args: Value) -> (Option<String>, Value) {
+        let id = ASKS
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|ask| ask.directory == directory && ask.made.is_none() && !ask.dropped)
+            .map(|ask| ask.id)
+            .unwrap();
+        let note = making_note_where(request, |at| at == directory);
+        let mut args = args;
+        args[crate::skill_write_yes::APPROVE_ID] = json!(format!("{MAKING_ID}{id}"));
+        let call = lamp_gemini::ToolCall {
+            id: "c1".to_owned(),
+            name: crate::made_skill::MAKE.to_owned(),
+            args,
+        };
+        crate::person::set_private_room_for_test(Some(true));
+        let told = answer(&call, request, true, None, None);
+        crate::person::set_private_room_for_test(None);
+        (note, told)
+    }
+
+    /// #7912 (lamp-9adf, 19 Nov, both runs): "…remind me to take a break
+    /// after forty five minutes", then "make it fifty", was answered
+    /// "Alright, I won't make it.", and nothing was made. A line said while
+    /// a skill is made that changes it is made with the change, never read
+    /// as a no: the note offers the model `answer "change"` for it, the
+    /// change's turn is told it is taken and never that it won't be made,
+    /// and the one skill kept and put on has the change.
+    #[test]
+    fn a_change_said_while_made_is_made_with_it_never_declined() {
+        let (root, keeping) = keeping("change-said-while-made-7912");
+        let fifty = good().replace("to = \"22:30\"", "to = \"22:50\"");
+        let (url, served) = service_sent(vec![(200, good()), (200, fifty)]);
+        let helper = manage_helper(&keeping.manage);
+        let directory = keeping.directory.clone();
+        let chat = chat_at(url);
+        let change = Arc::new(std::sync::OnceLock::new());
+        let seen = change.clone();
+        let told = make_with(
+            7_912_001,
+            Some(REQUEST),
+            REQUEST,
+            &keeping,
+            move || {
+                // "Make it ten fifty", while the model writes the first.
+                if seen.get().is_none() {
+                    let _ = seen.set(said_while_made(
+                        &directory,
+                        7_912_002,
+                        json!({
+                            crate::skill_write_yes::ANSWER: "change",
+                            super::REQUEST: "make me a skill that dims the light at 10:50 pm"
+                        }),
+                    ));
+                }
+                chat()
+            },
+            NOW,
+            || None,
+        );
+        let (note, changed) = change.get().unwrap();
+        let note = note.clone().expect("a make under way is noted");
+        assert_eq!(changed["changed"], true, "{changed}");
+        assert!(changed.get("dropped").is_none(), "{changed}");
+        assert!(
+            !changed["next"].as_str().unwrap().contains("won't make it"),
+            "{changed}"
+        );
+        assert!(note.contains("answer \"change\""), "{note}");
+        assert!(note.contains("A change is never a no"), "{note}");
+        // Made with the change: the one skill kept and on has it.
+        assert!(told.get("dropped").is_none(), "{told}");
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(told["on"], true, "{told}");
+        assert!(
+            told["description"].as_str().unwrap().contains("22:50"),
+            "{told}"
+        );
+        assert_eq!(
+            served.join().unwrap().len(),
+            2,
+            "made again with the change"
+        );
+        assert!(helper.join().unwrap()["install_made"].is_string());
+        assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        let said = take_said_line().unwrap_or_default();
+        assert!(!said.contains("won't make it"), "{said}");
+        ASKS.lock()
+            .unwrap()
+            .retain(|ask| ask.directory != keeping.directory);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #7912: only a line that means stop ends a make. "Never mind" while a
+    /// skill is made (the model's `answer "no"`) still ends it: never put
+    /// on, told the plain line, nothing made again.
+    #[test]
+    fn a_never_mind_said_while_made_still_ends_it() {
+        let (root, keeping) = keeping("never-mind-while-made-7912");
+        let (url, served) = service(vec![(200, good())]);
+        let directory = keeping.directory.clone();
+        let chat = chat_at(url);
+        let told = make_with(
+            7_912_003,
+            Some(REQUEST),
+            REQUEST,
+            &keeping,
+            move || {
+                let (_, no) = said_while_made(&directory, 7_912_004, json!({"answer": "no"}));
+                assert_eq!(no["dropped"], true, "{no}");
+                chat()
+            },
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(told["dropped"], true, "{told}");
+        assert_eq!(told["next"], WONT_MAKE_NEXT, "{told}");
+        assert!(!any_on(&keeping.directory));
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }
