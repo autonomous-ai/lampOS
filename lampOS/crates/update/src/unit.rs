@@ -324,7 +324,9 @@ mod tests {
         // Reports decide nothing about whom the voice answers: a held line naming reports
         // gets one round for `reports_stop`, the product's only (#2862). The product's voice
         // print is for the linked services alone (`LAMP_SAME_VOICE_FOR=services`): no rule on
-        // whom the voice answers reads it (docs/same-voice.md, "For the services only").
+        // whom the voice answers reads it but `LAMP_FOLLOW_UPS`'s window, inert without
+        // `LAMP_SAID_TO_ME`, which a moved lamp's voice does not carry (docs/same-voice.md,
+        // "For the services only").
         // A "Ma'am,"/"Sir," start said to a person needs `LAMP_NAME_SECOND_SIGN`'s
         // second sign, which a moved lamp's voice does not carry either (#5233). A misheard first
         // word said as a sentence is the name only on lamp-name's near hearing, which a moved
