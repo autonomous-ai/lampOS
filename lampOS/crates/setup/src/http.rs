@@ -263,15 +263,22 @@ pub fn router(shared: Arc<Shared>) -> Router {
 mod tests {
     use super::PAGE;
 
-    /// #2862: the lamp's own setup page asks about reports and sends
-    /// `share_reports` only from that box. The box starts ticked: reports
-    /// are on by default (the product owner, 25 Nov 2026), and unticking it
-    /// keeps the person's no.
+    /// #2862, #8642: the lamp's own setup page asks about reports. The box
+    /// starts ticked (reports are on by default, the product owner, 25 Nov
+    /// 2026), then shows what the lamp kept, read from setup's status. It
+    /// sends `share_reports` only when the person changed the box, so a kept
+    /// no is never turned into a yes by a box shown before the lamp answered.
     #[test]
-    fn the_setup_page_asks_about_reports_ticked_and_sends_only_the_box() {
+    fn the_setup_page_starts_from_the_kept_answer_and_sends_only_a_change() {
         assert!(PAGE.contains("<input id=\"reports\" type=\"checkbox\" checked>"));
         assert!(PAGE.contains("Send health and crash reports"));
-        assert!(PAGE.contains("share_reports: $(\"reports\").checked,"));
-        assert_eq!(PAGE.matches("share_reports").count(), 1);
+        assert!(PAGE.contains(
+            "$(\"reports\").addEventListener(\"change\", () => { reportsTouched = true; });"
+        ));
+        assert!(PAGE.contains("$(\"reports\").checked = status.share_reports;"));
+        assert!(
+            PAGE.contains("share_reports: reportsTouched ? $(\"reports\").checked : undefined,")
+        );
+        assert_eq!(PAGE.matches("share_reports").count(), 3);
     }
 }
