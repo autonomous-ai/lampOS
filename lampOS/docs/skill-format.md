@@ -75,8 +75,13 @@ speaks only through the lamp's told answer** (#8610): its `[[do]]` is a
 `speak` or `speaker`. Its agent's last answer is what the lamp tells the
 owner, once, only when the owner is alone in view, no voice has been heard
 for a minute, and it isn't quiet hours ([skills.md](skills.md), "A skill's
-task"). The voice refuses any other such made skill before its check and
-its try (`made_skill::told_only`), so a repair reshapes it; a `run` step,
+task"). The voice refuses such a made skill by what it may do, a `run`
+step or a code step granted `speak` or `speaker`, before its check and its
+try (`made_skill::told_only`), so a repair reshapes it. A script that calls
+`lamp.say` with neither grant is not refused at the make; lamp-control
+refuses its say at each run. Known limit: lamp-control's volume op needs
+`speak` too, so a trigger skill that only sets the volume is refused as
+well (a follow-up). A `run` step,
 and code that says its own line, are only for a skill the person's own
 words start. Fixed `say` and `remind` steps are as before.
 
