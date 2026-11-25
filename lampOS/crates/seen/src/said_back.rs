@@ -11,6 +11,13 @@
 //!   forget (`memory/forgot` turns the opt-in off), so the person hears the
 //!   lamp stopped looking. A lamp whose on line was never said says no off
 //!   line.
+//! - **The default (#7767).** With `LAMP_NOTICING_BY_DEFAULT` on, the
+//!   default's yes ([`Kept::by_default`], no file, nobody's yes) is owed no
+//!   line and needs none: the gate, posture and the more doings take it as
+//!   said (the first builder's 18 Nov 18:38: no told line, no gating of the
+//!   first burst on one). Nor is the off line owed for a no the voice kept
+//!   (a spoken stop, `"by":"voice"`): the voice's own answer said it, once
+//!   (19 Nov 13:55, "say so in one line"). The app's off still hears it.
 //! - Once the voice has begun a line (`{"event":"begun"}`) it counts as
 //!   said, and what it was (on, for which yes, or off) is kept in
 //!   `lamp-seen`'s own state folder ([`Store::set_said`]), never beside the
@@ -245,6 +252,17 @@ impl SaidBack {
     /// said.
     fn owed(&self, opted_in: bool, kept: &Kept, store: &impl Store) -> Option<Said> {
         let last = self.last(store);
+        if opted_in && kept.by_default {
+            // The default's on, a yes nobody gave, is said by nobody: no
+            // told line under `LAMP_NOTICING_BY_DEFAULT` (#7767, the first
+            // builder's 18 Nov 18:38).
+            return None;
+        }
+        if !opted_in && said_by_the_voice(kept) {
+            // A spoken stop's no: the voice's own answer said it (#7767,
+            // "say so in one line", the first builder's 19 Nov 13:55).
+            return None;
+        }
         if opted_in {
             let said = last.is_some_and(|last| {
                 last.is_on_for(kept)
@@ -259,15 +277,18 @@ impl SaidBack {
 
     /// Whether the on line for `kept` has begun (in this run, or kept from
     /// an earlier one): the gate asks for no frame before it.
+    /// The default's yes ([`Kept::by_default`]) needs no line (#7767).
     pub fn said_on(&self, kept: &Kept, store: &impl Store) -> bool {
-        self.last(store).is_some_and(|last| last.is_on_for(kept))
+        default_yes(kept) || self.last(store).is_some_and(|last| last.is_on_for(kept))
     }
 
     /// Whether an on line naming posture has begun for `kept`: posture
     /// sends no frame before it.
     pub fn said_posture(&self, kept: &Kept, store: &impl Store) -> bool {
-        self.last(store)
-            .is_some_and(|last| last.names_posture_for(kept))
+        default_yes(kept)
+            || self
+                .last(store)
+                .is_some_and(|last| last.names_posture_for(kept))
     }
 
     /// Whether `humans/doing_more` may be timed and said: the opt-in is on
@@ -275,10 +296,21 @@ impl SaidBack {
     /// work and celebrating has begun for `kept`. Off, none of it is.
     pub fn said_more(&self, opted_in: bool, kept: &Kept, store: &impl Store) -> bool {
         opted_in
-            && self
-                .last(store)
-                .is_some_and(|last| last.names_more_for(kept))
+            && (default_yes(kept)
+                || self
+                    .last(store)
+                    .is_some_and(|last| last.names_more_for(kept)))
     }
+}
+
+/// The default's yes (#7767): no file, read as on, nobody's yes.
+fn default_yes(kept: &Kept) -> bool {
+    kept.yes && kept.by_default
+}
+
+/// A no kept by the voice (a spoken stop), whose answer already said it.
+fn said_by_the_voice(kept: &Kept) -> bool {
+    kept.no && kept.by.as_deref() == Some(lamp_msgs::consent::BY_VOICE)
 }
 
 /// The voice's say service on its socket (`LAMP_SAY_SOCKET`,
@@ -734,6 +766,65 @@ mod tests {
             back.step(opted_in, kept, store, voice, now + 1),
             Step::Said(begun, _) if begun == said
         ));
+    }
+
+    /// #7767: the default's yes is said by nobody and needs no line; a
+    /// spoken stop's no is not said again; the app's no still is.
+    #[test]
+    fn the_default_says_no_on_line_and_a_spoken_stop_no_second_off() {
+        let by_default = Kept {
+            yes: true,
+            by: Some(lamp_msgs::consent::BY_DEFAULT.into()),
+            by_default: true,
+            ..Kept::default()
+        };
+        let no = |by: &str| Kept {
+            no: true,
+            by: Some(by.into()),
+            at_unix_s: Some(9),
+            ..Kept::default()
+        };
+        let store = Memory::default();
+        let mut voice = Voice::default();
+        let mut back = SaidBack::with_posture(true).with_more(true);
+        assert_eq!(
+            back.step(true, &by_default, &store, &mut voice, 0),
+            Step::Idle
+        );
+        assert!(voice.asked.is_empty(), "{:?}", voice.asked);
+        assert!(back.said_on(&by_default, &store));
+        assert!(back.said_posture(&by_default, &store));
+        assert!(back.said_more(true, &by_default, &store));
+        assert!(!back.said_more(false, &by_default, &store));
+        // A spoken stop after it, and after an on line said before the
+        // switch: the voice's answer is the one line.
+        let voice_no = no(lamp_msgs::consent::BY_VOICE);
+        assert_eq!(
+            back.step(false, &voice_no, &store, &mut voice, 1),
+            Step::Idle
+        );
+        store.set_said(on(7)).unwrap();
+        let mut back = SaidBack::default();
+        assert_eq!(
+            back.step(false, &voice_no, &store, &mut voice, 2),
+            Step::Idle
+        );
+        assert!(voice.asked.is_empty(), "{:?}", voice.asked);
+        assert!(!back.said_on(&voice_no, &store));
+        // The app's off is heard nowhere else: said once.
+        say(
+            &mut back,
+            false,
+            &no(lamp_msgs::consent::BY_APP),
+            &store,
+            &mut voice,
+            3,
+            Said::Off,
+        );
+        assert_eq!(voice.asked, [OFF_LINE]);
+        // A person's own yes still hears the on line.
+        say(&mut back, true, &yes(11), &store, &mut voice, 5, on(11));
+        assert_eq!(voice.asked, [OFF_LINE, ON_LINE]);
     }
 
     #[test]

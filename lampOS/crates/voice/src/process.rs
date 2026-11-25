@@ -2076,6 +2076,10 @@ fn worker_command(
             role,
             var(crate::privacy_gap::STALL_SWITCH).as_deref(),
         ))
+        .envs(noticing_by_default_worker_environment(
+            role,
+            var(lamp_msgs::consent::NOTICING_BY_DEFAULT).as_deref(),
+        ))
         .envs(ledger_refence_worker_environment(
             role,
             var(crate::reminders::REFENCE_VARIABLE).as_deref(),
@@ -2096,6 +2100,20 @@ fn memory_days_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some(("LAMP_MEMORY_DAYS", "on"))
+}
+
+// Desk noticing on by default (#7767, `LAMP_NOTICING_BY_DEFAULT`): the exact
+// `on`, to the two routes whose functions read it in their own process
+// (`seen_yes::tools`, `look_at_my_desk`, the forget's kept nos), through
+// `lamp_msgs::consent::noticing_by_default`. Without it the second worker on
+// lamp-06c1 (26 Nov) still offered to look and said noticing was off while
+// bursts ran.
+fn noticing_by_default_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((lamp_msgs::consent::NOTICING_BY_DEFAULT, "on"))
 }
 
 // Riding the voice's own stall closed (#5611, `LAMP_PRIVACY_RIDES_STALL`):
@@ -4256,6 +4274,42 @@ mod tests {
             Some(std::ffi::OsStr::new("")),
         ] {
             assert_eq!(near_calibrated_worker_environment("provider", off), None);
+        }
+    }
+
+    /// #7767: `LAMP_NOTICING_BY_DEFAULT` reaches the Live and second routes'
+    /// workers, only as the exact `on`: their desk-noticing functions read it
+    /// in their own process (lamp-06c1, 26 Nov: the second worker lacked it).
+    #[test]
+    fn noticing_by_default_reaches_both_voice_routes_only_as_on() {
+        let boot = new_boot().unwrap();
+        for role in [
+            "provider", "second", "capture", "speaker", "ring", "camera", "privacy",
+        ] {
+            for value in ["on", "ON", "on ", "1", ""] {
+                let command = worker_command(
+                    Path::new("/bin/true"),
+                    Path::new("/"),
+                    role,
+                    (boot, boot),
+                    &[],
+                    |name| {
+                        (name == lamp_msgs::consent::NOTICING_BY_DEFAULT)
+                            .then(|| std::ffi::OsString::from(value))
+                    },
+                );
+                let given: Vec<_> = command
+                    .get_envs()
+                    .filter(|(key, _)| *key == lamp_msgs::consent::NOTICING_BY_DEFAULT)
+                    .map(|(_, given)| given.map(|given| given.to_owned()))
+                    .collect();
+                let expected = if matches!(role, "provider" | "second") && value == "on" {
+                    vec![Some(std::ffi::OsString::from("on"))]
+                } else {
+                    Vec::new()
+                };
+                assert_eq!(given, expected, "role {role}, value {value:?}");
+            }
         }
     }
 
