@@ -1,4 +1,4 @@
-//! Health and crash reports to the company, opt-in at setup (#1683,
+//! Health and crash reports to the company, on unless a person kept a no (#1683,
 //! `docs/cloud.md`, "Health and crash reports"). `lamp-cloud` sends them; on the bus there is only
 //! the way to turn them off and whether they are on. Off unless
 //! `LAMP_REPORTS=on`.
@@ -86,8 +86,8 @@ impl ReportsState {
 /// One answer's wait (`voice/turn_time`, #6256 F8): from when the voice
 /// decided the person had finished to its answer's first audio, in whole
 /// milliseconds. Only with `LAMP_REPORT_COUNTERS=on` in the voice; read by
-/// `lamp-cloud` into the opt-in report's `voice_turn_ms` buckets, and only
-/// with the person's yes. A number only.
+/// `lamp-cloud` into the health report's `voice_turn_ms` buckets, and never
+/// after the person's no. A number only.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VoiceTurnTime {
     pub after_ms: u64,

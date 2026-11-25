@@ -583,7 +583,7 @@ skills".)
   unit gives `--state-dir /var/lib/lampos-skills-state` with
   `StateDirectory=lampos-skills-state` (mode 0700, which the daily journal
   requires), the folder #1732's daily journal shares.
-- **Runs, counted** (#4710, for `lamp-cloud`'s opt-in health report,
+- **Runs, counted** (#4710, for `lamp-cloud`'s health report,
   `cloud.md`, "Skills, counted"; `lamp_skills::usage`). With `--state-dir`,
   each run is counted where it starts against its skill's source: core, the
   Skills Store (by the package's SHA-256, from its `installed_from`), made
@@ -4543,7 +4543,7 @@ gone ([switches.md](switches.md)). What happens:
    (`made_skill::Maker`, from what it is kept as made from: an app's ask's
    `local:app:…` is the app's), inside the package, so the SHA-256 it is
    put on by covers it; a `made` or `made_by` line the model wrote is dropped. The
-   opt-in health report counts a made skill by this marker
+   health report counts a made skill by this marker
    (`cloud.md`, "Skills, counted"). Then `lamp-skills pack` (#1698) checks the folder:
    every check a load makes, its permissions among them, and the package
    read back as an install reads one. A skill that does more than it
@@ -8275,7 +8275,7 @@ lamp's agent when DeepSeek fails", "The app's MAKE IT too").
    "Make a skill" shows on the switch alone.
    `{"counts": {}}` (#4710): what became of the made skills, by voice and
    from the app, as running totals, `{"made_by_voice": {"kept", "on",
-   "refused", "left_off"}, "made_by_app": {...}}`, for `lamp-cloud`'s opt-in health
+   "refused", "left_off"}, "made_by_app": {...}}`, for `lamp-cloud`'s health
    report (`cloud.md`, "Skills, counted"; `made_counts::counts`). `kept`,
    `on` and `left_off` (kept and not put on, its `not_on`; or asked about
    before #5977 and never said yes to) are read from the made skills' index, each skill

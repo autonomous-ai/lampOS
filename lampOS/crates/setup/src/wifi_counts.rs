@@ -1,8 +1,8 @@
-//! The Wi-Fi joins of setup, counted for the opt-in health report (#6256
-//! F8, Backend's B10 `wifi_setup`; `docs/cloud.md`, "Report counters").
+//! The Wi-Fi joins of setup, counted for the health report (#6256 F8,
+//! Backend's B10 `wifi_setup`; `docs/cloud.md`, "Report counters").
 //! Running totals since the last factory reset, in [`FILE`] (0644, in the
-//! reset plan), which `lamp-cloud` reads at a health report and sends only
-//! with the person's yes: they wait here until the lamp's first report goes
+//! reset plan), which `lamp-cloud` reads at a health report and never sends
+//! after the person's no: they wait here until the lamp's first report goes
 //! through, so a lamp that joined after some failures still tells of them.
 //! Numbers only: no network name, password or reason text. Off unless
 //! [`ENVIRONMENT`] is `on` in setup's environment.

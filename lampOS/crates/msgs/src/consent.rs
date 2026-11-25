@@ -716,10 +716,11 @@ impl Kept {
 }
 
 /// The switch that reads a missing yes file as on (#7767): `on` exactly
-/// makes the face expressions yes, the room sounds yes, seen activity and
-/// health and crash reports default on. A kept `"no"` stays no and a file
-/// that can't be read stays off either way; off, a missing file is no, as
-/// before. Off unless set, in no unit (`docs/switches.md`).
+/// makes the face expressions yes, the room sounds yes and seen activity
+/// default on. A kept `"no"` stays no and a file that can't be read stays
+/// off either way; off, a missing file is no, as before. Off unless set, in
+/// no unit (`docs/switches.md`). Health and crash reports are not under it:
+/// [`reports_by_default`].
 pub const NOTICING_BY_DEFAULT: &str = "LAMP_NOTICING_BY_DEFAULT";
 
 /// `by` for a yes nobody gave: no file is kept and
@@ -735,6 +736,15 @@ pub fn by_default_on(value: Option<&str>) -> bool {
 /// place the switch is read, so every reader takes the same default.
 pub fn noticing_by_default() -> bool {
     by_default_on(std::env::var(NOTICING_BY_DEFAULT).ok().as_deref())
+}
+
+/// Health and crash reports with no record of a person's answer: on. The
+/// product owner's call of 25 Nov 2026: health and crash reports are on
+/// unless a person kept a no (at setup, or later in the app). Apart from
+/// [`noticing_by_default`], which desk pictures, face expressions and room
+/// sounds keep. Read by lamp-cloud's reports and setup's status.
+pub fn reports_by_default() -> bool {
+    true
 }
 
 /// The done mark of the voice's migration of earlier nos (#7767, the first
@@ -1330,6 +1340,40 @@ mod tests {
             assert!(!allowed(&file, key, true), "{key}, a kept no");
         }
         let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// The product owner's call of 25 Nov 2026: health and crash reports
+    /// are on with no record, whatever [`NOTICING_BY_DEFAULT`] says. This
+    /// test binary runs this test again with the switch `on`, `off` and
+    /// unset; each child checks the switch reached it, and the default.
+    #[test]
+    fn reports_are_on_by_default_whatever_the_noticing_switch_says() {
+        const NAME: &str =
+            "consent::tests::reports_are_on_by_default_whatever_the_noticing_switch_says";
+        const CHILD: &str = "LAMP_MSGS_TEST_REPORTS_DEFAULT_SWITCH";
+        if let Ok(switch) = std::env::var(CHILD) {
+            assert_eq!(noticing_by_default(), switch == "on", "{switch:?}");
+            assert!(reports_by_default(), "{switch:?}");
+            return;
+        }
+        assert!(reports_by_default());
+        for switch in [Some("on"), Some("off"), None] {
+            let mut child = std::process::Command::new(std::env::current_exe().unwrap());
+            child
+                .args([NAME, "--exact", "--test-threads", "1"])
+                .env(CHILD, switch.unwrap_or_default());
+            match switch {
+                Some(value) => child.env(NOTICING_BY_DEFAULT, value),
+                None => child.env_remove(NOTICING_BY_DEFAULT),
+            };
+            let out = child.output().unwrap();
+            let said = String::from_utf8_lossy(&out.stdout);
+            // Passed, and ran this one test, not none.
+            assert!(
+                out.status.success() && said.contains("1 passed"),
+                "{switch:?}: {out:?}"
+            );
+        }
     }
 
     #[test]

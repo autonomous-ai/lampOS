@@ -211,10 +211,12 @@ fn the_apps_switch_reads_the_agreed_reply_and_its_refusal() {
     places.setup = places.own.with_file_name("none.json");
     real.reports = Some(Shared::new(Reports::open(places)));
     for (kind, data, share) in [
-        ("reports.get", Value::Null, false),
+        // No record: on (the product owner, 25 Nov 2026).
+        ("reports.get", Value::Null, true),
         ("reports.set", json!({"share": true}), true),
         ("reports.get", Value::Null, true),
         ("reports.set", json!({"share": false}), false),
+        ("reports.get", Value::Null, false),
     ] {
         let result = answer(&mut real, kind, &data);
         let sent: Value = serde_json::from_str(&me.data("t", kind, &result).to_string()).unwrap();

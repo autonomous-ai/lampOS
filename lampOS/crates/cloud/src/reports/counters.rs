@@ -1,4 +1,4 @@
-//! Report counters in the opt-in health report (#6256 F8; `docs/cloud.md`,
+//! Report counters in the health report (#6256 F8; `docs/cloud.md`,
 //! "Report counters"): an added field under `lamp-report/1`, `metrics`, in
 //! Backend's B10 shape (#6256, 12 Nov, with Twelve's `mqtt` block). Every
 //! value counts what happened since the last report the broker took, in

@@ -34,7 +34,8 @@ lamp also says once when the opt-in is turned off.
    switches.md; off unless set, in no unit) turns a missing
    `seen-activity.json` into a yes nobody gave (`"by":"default"`, no
    time), by `lamp_msgs::consent::allowed`'s one rule, shared with face
-   expressions, room sounds and health reports: exactly `"yes"` is on,
+   expressions, room sounds and health reports (these with their own
+   default, on, since 25 Nov 2026): exactly `"yes"` is on,
    exactly `"no"` stays off with the switch on, and a file that can't be
    read is off. With it off, a missing file is no, as before. With it on,
    the voice's stop and the app's desk off keep a no (`consent::no_bytes`)

@@ -114,7 +114,8 @@ fn a_request_is_checked_before_anything_is_touched() {
             language: None,
             // A port alone is no link.
             backend: None,
-            share_reports: false,
+            // None given: nothing is kept.
+            share_reports: None,
             own_keys: vec![],
         }
     );
@@ -465,12 +466,13 @@ fn a_recovery_run_joins_the_network_and_saves_nothing_else() {
 }
 
 /// The status of a recovery's hotspot says the answer on reports the owner
-/// kept: a yes only where the file says so.
+/// kept: no record is on (the product owner, 25 Nov 2026), and a record is
+/// a yes only where the file says so.
 #[test]
 fn the_kept_answer_on_reports_is_read_as_kept() {
     let root = Root::new();
     let path = root.config(false).reports;
-    assert!(!lamp_setup::serve::kept_share_reports(&path), "missing");
+    assert!(lamp_setup::serve::kept_share_reports(&path), "missing");
     for (kept, yes) in [
         (
             lamp_setup::serve::reports_record(true, std::time::SystemTime::now()),
@@ -493,11 +495,11 @@ fn the_kept_answer_on_reports_is_read_as_kept() {
     assert!(!lamp_setup::serve::kept_share_reports(&path));
 }
 
-/// #7767: with `LAMP_NOTICING_BY_DEFAULT` on, no record is a yes; a kept no
-/// and a record that can't be read stay no either way. Off, no record is
-/// no, as before.
+/// #7767's rule, with the default given: on, no record is a yes; a kept no
+/// and a record that can't be read stay no either way; off, no record is
+/// no. The product gives on (`lamp_msgs::consent::reports_by_default`).
 #[test]
-fn no_kept_answer_on_reports_is_the_default_only_with_the_switch() {
+fn no_kept_answer_on_reports_is_the_default_given() {
     let root = Root::new();
     let path = root.config(false).reports;
     assert!(
@@ -1643,40 +1645,51 @@ fn a_null_or_a_number_in_a_link_field_never_fails_setup() {
     assert_eq!(backend_link(&request(body)).unwrap_err(), ["fd_channel"]);
 }
 
-/// #1683: only the JSON `true` is a yes to health and crash reports; an app
-/// that doesn't ask, V1's page and a link all mean no.
+/// #1683: only the JSON `true` is a yes to health and crash reports, and
+/// any other value given is a no. A request without `share_reports` (an
+/// app that doesn't ask, V1's page, a link) gives no answer at all (the
+/// product owner, 25 Nov 2026), so setup keeps none.
 #[test]
-fn only_a_json_true_is_a_yes_to_reports() {
+fn only_a_json_true_is_a_yes_to_reports_and_none_given_is_no_answer() {
     let config = Root::new().config(false);
-    for (given, yes) in [
-        (Some(json!(true)), true),
-        (Some(json!(false)), false),
-        (None, false),
-        (Some(Value::Null), false),
-        (Some(json!("true")), false),
-        (Some(json!(1)), false),
-        (Some(json!({"share": true})), false),
+    for (given, answer) in [
+        (Some(json!(true)), Some(true)),
+        (Some(json!(false)), Some(false)),
+        (None, None),
+        (Some(Value::Null), Some(false)),
+        (Some(json!("true")), Some(false)),
+        (Some(json!(1)), Some(false)),
+        (Some(json!({"share": true})), Some(false)),
     ] {
         let mut body = good();
         if let Some(given) = given.clone() {
             body["share_reports"] = given;
         }
         assert_eq!(
+            request(body.clone()).share_reports,
+            answer,
+            "request {given:?}"
+        );
+        assert_eq!(
             check(&request(body), &config).unwrap().share_reports,
-            yes,
+            answer,
             "{given:?}"
         );
     }
 }
 
-/// The answer is kept at every setup, a no included, and one that can't be
-/// kept never fails the setup: reports then stay off.
+/// A person's answer is kept at every setup that gives one, a no included;
+/// with none, nothing is written. One that can't be kept never fails the
+/// setup. Either way the status says what is kept after: the answer, or
+/// what was kept before, no record being on.
 #[test]
 fn the_answer_on_reports_is_kept_and_its_failure_is_no_failed_setup() {
     #[derive(Default)]
     struct Answer {
         kept: Vec<bool>,
         fails: bool,
+        /// What an earlier setup kept, if anything.
+        before: Option<bool>,
     }
     impl Save for Answer {
         fn credential(&mut self, _: &str) -> io::Result<()> {
@@ -1698,18 +1711,42 @@ fn the_answer_on_reports_is_kept_and_its_failure_is_no_failed_setup() {
             self.kept.push(share);
             Ok(())
         }
+        fn kept_reports(&self) -> bool {
+            self.kept
+                .last()
+                .copied()
+                .or(self.before)
+                .unwrap_or_else(lamp_msgs::consent::reports_by_default)
+        }
         fn marker(&mut self) -> io::Result<()> {
             Ok(())
         }
     }
     let config = Root::new().config(false);
-    for (share, fails) in [(true, false), (false, false), (true, true)] {
+    // The answer given, whether its write fails, what was kept before; then
+    // what is written and what the status says.
+    for (share, fails, before, written, said) in [
+        (Some(true), false, None, vec![true], true),
+        (Some(false), false, None, vec![false], false),
+        (Some(false), false, Some(true), vec![false], false),
+        // Not kept: what was kept before stands, none being on.
+        (Some(true), true, None, vec![], true),
+        (Some(true), true, Some(false), vec![], false),
+        (Some(false), true, None, vec![], true),
+        // No answer: nothing written, so a kept no stays and none is on.
+        (None, false, None, vec![], true),
+        (None, false, Some(false), vec![], false),
+        (None, false, Some(true), vec![], true),
+    ] {
         let mut body = good();
-        body["share_reports"] = json!(share);
+        if let Some(share) = share {
+            body["share_reports"] = json!(share);
+        }
         let accepted = check(&request(body), &config).unwrap();
         let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
         let mut save = Answer {
             fails,
+            before,
             ..Answer::default()
         };
         run(
@@ -1720,11 +1757,85 @@ fn the_answer_on_reports_is_kept_and_its_failure_is_no_failed_setup() {
             &mut save,
             || Some("192.168.1.23".into()),
         );
-        assert!(status.lock().unwrap().set_up_completed);
-        assert_eq!(save.kept, if fails { vec![] } else { vec![share] });
-        // The status says what was kept: a yes not kept is a no.
-        assert_eq!(status.lock().unwrap().share_reports, share && !fails);
+        let case = format!("{share:?} fails {fails} before {before:?}");
+        assert!(status.lock().unwrap().set_up_completed, "{case}");
+        assert_eq!(save.kept, written, "{case}");
+        assert_eq!(status.lock().unwrap().share_reports, said, "{case}");
     }
+}
+
+/// Setup's own writer and reader of the answer on reports on a test root's
+/// file, every other setting dropped.
+struct ReportsOnly<'a>(Files<'a>);
+impl Save for ReportsOnly<'_> {
+    fn credential(&mut self, _: &str) -> io::Result<()> {
+        Ok(())
+    }
+    fn name(&mut self, _: &str) -> io::Result<()> {
+        Ok(())
+    }
+    fn timezone(&mut self, _: &str) -> io::Result<()> {
+        Ok(())
+    }
+    fn backend(&mut self, _: &Backend) -> io::Result<()> {
+        Ok(())
+    }
+    fn reports(&mut self, share: bool) -> io::Result<()> {
+        self.0.reports(share)
+    }
+    fn kept_reports(&self) -> bool {
+        self.0.kept_reports()
+    }
+    fn marker(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+/// The product owner, 25 Nov 2026: setup keeps only a person's own answer
+/// on reports, in the file lamp-cloud reads. No answer writes no record,
+/// which reads as on; `false` keeps a no and `true` a yes; a setup again
+/// with no answer leaves a kept no (or yes) as it was. The status says
+/// what is kept after each.
+#[test]
+fn setup_keeps_only_a_persons_own_answer_on_reports() {
+    use lamp_setup::serve::kept_share_reports;
+    let root = Root::new();
+    let config = root.config(false);
+    let setup = |share: Option<bool>| {
+        let mut body = good();
+        if let Some(share) = share {
+            body["share_reports"] = json!(share);
+        }
+        let accepted = check(&request(body), &config).unwrap();
+        let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
+        run(
+            &status,
+            &accepted,
+            "VN",
+            &mut Lamp::new(true),
+            &mut ReportsOnly(Files(&config)),
+            || Some("192.168.1.23".into()),
+        );
+        let status = status.lock().unwrap().clone();
+        assert!(status.set_up_completed, "{share:?}");
+        status.share_reports
+    };
+    assert!(setup(None), "no answer: on");
+    assert!(!config.reports.exists(), "no answer: no record");
+    assert!(kept_share_reports(&config.reports), "no record: on");
+
+    assert!(!setup(Some(false)), "a no");
+    assert!(!kept_share_reports(&config.reports), "a no is kept");
+    let kept_no = fs::read(&config.reports).unwrap();
+    assert!(!setup(None), "again with no answer: the no stands");
+    assert_eq!(fs::read(&config.reports).unwrap(), kept_no, "untouched");
+    assert!(!kept_share_reports(&config.reports));
+
+    assert!(setup(Some(true)), "a yes");
+    assert!(kept_share_reports(&config.reports), "a yes is kept");
+    let kept_yes = fs::read(&config.reports).unwrap();
+    assert!(setup(None), "again with no answer: the yes stands");
+    assert_eq!(fs::read(&config.reports).unwrap(), kept_yes, "untouched");
 }
 
 /// `lamp-cloud` runs as `lampos` and reads the answer where it is: 0644, the
