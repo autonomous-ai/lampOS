@@ -487,9 +487,14 @@ struct Gone {
     since: Audit,
 }
 
-/// A read's code when the agent's run is not there to read: Harness never
-/// had it, or the direct path's run is gone (pruned, or from before a
-/// restart; `crate::direct::lamp_observe`).
+/// A read's code when Harness has no such agent (`UNKNOWN_HARNESS` or
+/// `GONE`, `crate::harness::Cli::observe`): its run is gone.
+pub const HARNESS_GONE: &str = "observe_gone";
+/// A read's code when a `show` failed any other way (a computer
+/// `DISCONNECTED`, asleep or off its network, is waited out and never
+/// counted as gone, Twelve's P2 on #8666), or, on the lamp's direct path
+/// only, when its run is gone (pruned, or from before a restart;
+/// `crate::direct::lamp_observe`).
 pub const RUN_GONE: &str = "observe_failed";
 /// A task whose agent's run is gone this many reads in a row...
 pub const GONE_READS: u32 = 3;
@@ -962,6 +967,15 @@ fn expired(task: &Task, now: &Clock) -> bool {
         DispatchState::Queued => now.monotonic_ms >= queued_until(task),
         _ => false,
     }
+}
+/// Whether a read of `job` that failed with `failure` found its run gone:
+/// Harness has no such agent ([`HARNESS_GONE`]), or, on the lamp's direct
+/// path, its run is not there ([`RUN_GONE`]). A computer's agent read
+/// `observe_failed` (offline, a timeout) is not gone (#8666's P2).
+fn run_gone(job: &ObservationJob, failure: &str) -> bool {
+    failure == HARNESS_GONE
+        || failure == RUN_GONE
+            && crate::direct::lamp_path(job.engine.argument(), &job.machine_id, &job.agent_id)
 }
 /// Whether one more read finding `task`'s run gone ends it
 /// ([`GONE_READS`] in a row, the first [`GONE_AFTER_MS`] ago or in an
@@ -3500,7 +3514,7 @@ impl<P: Persistence> Engine<P> {
         // Its run gone read after read, past the bound: ended as failed,
         // kept as its agent's last reading, so it is settled, no longer
         // watched or counted as work under way, and told once as stopped.
-        if failure == RUN_GONE && gone_past_bound(task, now) {
+        if run_gone(job, failure) && gone_past_bound(task, now) {
             eprintln!(
                 "tasks: task {}: its agent's run is gone, {} reads in a row: ended as failed, told once",
                 task.id, GONE_READS
@@ -3536,7 +3550,7 @@ impl<P: Persistence> Engine<P> {
         let task = &mut next.tasks[index];
         task.watch_idle = watch_idle;
         task.background_since = background_since;
-        task.gone = (failure == RUN_GONE).then(|| Gone {
+        task.gone = run_gone(job, failure).then(|| Gone {
             reads: task
                 .gone
                 .as_ref()
@@ -4224,7 +4238,7 @@ mod tests {
         let gone = |engine: &mut Engine<Memory>, at: u64| {
             let job = request_read(engine, id, at);
             engine
-                .observation_failed(&job, RUN_GONE, &clock(at))
+                .observation_failed(&job, HARNESS_GONE, &clock(at))
                 .unwrap();
         };
         let failed = |engine: &Engine<Memory>| {
@@ -4270,7 +4284,7 @@ mod tests {
         for at in [1_000, 61_000, 121_000, 181_000] {
             let job = request_read(&mut early, early_id, at);
             early
-                .observation_failed(&job, RUN_GONE, &clock(at))
+                .observation_failed(&job, HARNESS_GONE, &clock(at))
                 .unwrap();
         }
         assert!(
@@ -4301,7 +4315,7 @@ mod tests {
             let at = start + read * 120_000;
             let job = request_read(&mut engine, id, at);
             engine
-                .observation_failed(&job, RUN_GONE, &clock(at))
+                .observation_failed(&job, HARNESS_GONE, &clock(at))
                 .unwrap();
             let task = &engine.state.tasks[find(&engine.state, id).unwrap()];
             if task.observations.iter().any(|o| o.data.state == "failed") {
@@ -4354,7 +4368,7 @@ mod tests {
             let at = 60_000 + read * 120_000;
             let job = request_read(&mut engine, id, at);
             engine
-                .observation_failed(&job, RUN_GONE, &clock(at))
+                .observation_failed(&job, HARNESS_GONE, &clock(at))
                 .unwrap();
         }
         let task = &engine.state.tasks[find(&engine.state, id).unwrap()];
@@ -4364,6 +4378,41 @@ mod tests {
         let works = engine.works(&clock(60_000 + 6 * 120_000), None);
         let work = works.iter().find(|work| work.task_id == id).unwrap();
         assert_eq!(work.answer.as_deref(), Some("Vienna."));
+    }
+
+    /// Twelve's P2 on #8666: a computer's task whose computer is offline
+    /// (`harness show` refused `DISCONNECTED`, read `observe_failed`) for
+    /// well over [`GONE_AFTER_MS`], read after read, is never ended as
+    /// failed: it waits, and once the computer is back its answer is kept,
+    /// once, to be told. Only Harness having no such agent
+    /// ([`HARNESS_GONE`]) counts as gone.
+    #[test]
+    fn a_computer_offline_for_long_is_waited_out_and_its_answer_kept_once() {
+        let (mut engine, _) = opened();
+        let id = accepted(&mut engine, 0);
+        for read in 1..=15 {
+            let at = read * 120_000;
+            let job = request_read(&mut engine, id, at);
+            engine
+                .observation_failed(&job, RUN_GONE, &clock(at))
+                .unwrap();
+        }
+        let task = &engine.state.tasks[find(&engine.state, id).unwrap()];
+        assert!(task.observations.is_empty(), "never ended while offline");
+        assert!(task.gone.is_none(), "offline is not gone");
+        assert!(
+            engine
+                .watched(&clock(30 * 60_000))
+                .iter()
+                .any(|task| task.task_id == id)
+        );
+        // Back: its answer read and kept once.
+        observe(&mut engine, id, "Vienna.", 31 * 60_000);
+        let task = &engine.state.tasks[find(&engine.state, id).unwrap()];
+        assert_eq!(task.observations.len(), 1);
+        assert_eq!(task.observations[0].data.state, "idle");
+        assert_eq!(task.observations[0].data.answer, "Vienna.");
+        assert!(!task.observations.iter().any(|o| o.data.state == "failed"));
     }
 
     #[test]
