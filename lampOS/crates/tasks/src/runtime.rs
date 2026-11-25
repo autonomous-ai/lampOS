@@ -8999,6 +8999,13 @@ mod tests {
     /// A store with one spoken OpenClaw task for the lamp, prepared and
     /// confirmed at 0 ms on the boot clock (#8601).
     fn queued_for_the_lamp(root: &Path) -> (Engine<Store>, u64) {
+        let (engine, ids) = queued_many_for_the_lamp(root, 1);
+        (engine, ids[0])
+    }
+
+    /// [`queued_for_the_lamp`] with `count` tasks, each prepared and
+    /// confirmed at 0 ms, queued in that order.
+    fn queued_many_for_the_lamp(root: &Path, count: usize) -> (Engine<Store>, Vec<u64>) {
         use crate::protocol::Guard;
         let targets = BTreeMap::from([(
             LAMP_TARGET.to_owned(),
@@ -9021,28 +9028,37 @@ mod tests {
             revision: engine.revision(),
             request_id: format!("{what}-{}", engine.revision()),
         };
-        let prepared = engine
-            .handle(
-                &Request::Prepare {
-                    guard: guard(&engine, "prepare"),
-                    text: "What's on my calendar?".into(),
-                    target: LAMP_TARGET.into(),
-                    session: None,
-                    engine: None,
-                },
-                &boot(0),
-                false,
-            )
-            .unwrap();
-        let id = prepared["id"].as_u64().unwrap();
-        let confirm = Request::Confirm {
-            guard: guard(&engine, "confirm"),
-            id,
-            prepared_digest: prepared["prepared_digest"].as_str().unwrap().into(),
-            session_id: engine.session_id().into(),
-        };
-        engine.handle(&confirm, &boot(0), true).unwrap();
-        (engine, id)
+        let mut ids = Vec::new();
+        for at in 0..count {
+            let text = if at == 0 {
+                "What's on my calendar?".to_owned()
+            } else {
+                format!("What's on my calendar, part {at}?")
+            };
+            let prepared = engine
+                .handle(
+                    &Request::Prepare {
+                        guard: guard(&engine, "prepare"),
+                        text,
+                        target: LAMP_TARGET.into(),
+                        session: None,
+                        engine: None,
+                    },
+                    &boot(0),
+                    false,
+                )
+                .unwrap();
+            let id = prepared["id"].as_u64().unwrap();
+            let confirm = Request::Confirm {
+                guard: guard(&engine, "confirm"),
+                id,
+                prepared_digest: prepared["prepared_digest"].as_str().unwrap().into(),
+                session_id: engine.session_id().into(),
+            };
+            engine.handle(&confirm, &boot(0), true).unwrap();
+            ids.push(id);
+        }
+        (engine, ids)
     }
 
     fn boot(monotonic_ms: u64) -> ClockSample {
@@ -9161,6 +9177,167 @@ mod tests {
                 "not_sent".to_owned(),
                 Some(crate::gateway::NOT_READY.to_owned())
             )
+        );
+    }
+
+    /// #8601 (El's P2 on #8666): four OpenClaw tasks queued behind a Gateway
+    /// that never answers. Only the head is held, each its own
+    /// [`crate::gateway::COLD_WITHIN`], so the first three are given up
+    /// `not_sent` `openclaw_gateway_not_ready` and the fourth passes its
+    /// queued life ([`crate::engine::QUEUED_MS`]) and ends `invalidated`
+    /// `expired`, said yes to. Each ends once, none left queued; task news
+    /// tells each once (`lamp_voice::task_news`'s
+    /// `an_expired_hand_over_said_yes_to_is_told_once`).
+    #[test]
+    fn four_tasks_behind_a_gateway_that_never_answers_each_end_once() {
+        let root = tempfile::tempdir().unwrap();
+        let (mut engine, ids) = queued_many_for_the_lamp(root.path(), 4);
+        let start = Instant::now();
+        let mut held = None;
+        let mut ended = std::collections::BTreeMap::new();
+        let end = crate::engine::QUEUED_MS / 1000 + 600;
+        for second in 0..=end {
+            let now = boot(second * 1000);
+            engine.tick(&now).unwrap();
+            let next = engine.queued_launches().first().map(|l| (*l).clone());
+            let answer = gateway_wait(
+                next.as_ref(),
+                crate::gateway::Asking::Yes,
+                || false,
+                &mut held,
+                start + Duration::from_secs(second),
+                crate::gateway::COLD_WITHIN,
+            );
+            if answer == PlaceWait::GiveUp
+                && let Some(job) = engine.begin_launch(&now).unwrap()
+            {
+                held = None;
+                let outcome = LaunchOutcome::NotSent {
+                    code: crate::gateway::NOT_READY.into(),
+                };
+                engine.finish_launch(job.task_id, outcome, &now).unwrap();
+            }
+            for id in &ids {
+                if !ended.contains_key(id) {
+                    let (state, code) = dispatch_of(&mut engine, *id, second * 1000);
+                    if state != "queued" {
+                        ended.insert(*id, (state, code, second));
+                    }
+                }
+            }
+        }
+        let cold = crate::gateway::COLD_WITHIN.as_secs();
+        let not_ready = Some(crate::gateway::NOT_READY.to_owned());
+        for (at, id) in ids.iter().take(3).enumerate() {
+            let at = at as u64 + 1;
+            assert_eq!(
+                ended[id],
+                // Each next hold starts on the round after a give-up.
+                ("not_sent".to_owned(), not_ready.clone(), cold * at + at - 1),
+                "task {id}"
+            );
+        }
+        assert_eq!(
+            ended[&ids[3]],
+            (
+                "invalidated".to_owned(),
+                Some("expired".to_owned()),
+                crate::engine::QUEUED_MS / 1000
+            ),
+            "the fourth passes its queued life"
+        );
+        let got = engine
+            .handle(&Request::GetTask { id: ids[3] }, &boot(end * 1000), true)
+            .unwrap();
+        assert!(
+            !got["task"]["dispatch"]["confirmed"].is_null(),
+            "said yes to"
+        );
+    }
+
+    /// #8601 (El's second case on #8666, `LAMP_TASKS_ONE_SESSION` on): two
+    /// OpenClaw tasks held while the lamp's place is not known, known just
+    /// inside [`crate::one_session::QUEUE_WAIT`], then a Gateway that never
+    /// answers. The head waits its [`crate::gateway::COLD_WITHIN`] and is
+    /// given up `not_sent`; the second then starts its own and passes its
+    /// queued life at about 30 min, `invalidated` `expired`, said yes to,
+    /// which task news tells once.
+    #[test]
+    fn two_tasks_held_for_the_place_then_a_cold_gateway_each_end_once() {
+        let root = tempfile::tempdir().unwrap();
+        let (mut engine, ids) = queued_many_for_the_lamp(root.path(), 2);
+        let one = lamp_one();
+        let pane = Pane::default();
+        let start = Instant::now();
+        let at = |second: u64| start + Duration::from_secs(second);
+        let known = crate::one_session::QUEUE_WAIT.as_secs() - 1;
+        let (mut place_held, mut gateway_held) = (None, None);
+        let mut ended = std::collections::BTreeMap::new();
+        let end = crate::engine::QUEUED_MS / 1000 + 600;
+        for second in 0..=end {
+            let now = boot(second * 1000);
+            if second == known {
+                one.open_if_due(&pane, &pane_place());
+            }
+            engine.tick(&now).unwrap();
+            let next = engine.queued_launches().first().map(|l| (*l).clone());
+            let place = place_wait(
+                &one,
+                next.as_ref(),
+                &mut place_held,
+                at(second),
+                crate::one_session::QUEUE_WAIT,
+            );
+            let gateway = if place == PlaceWait::Go {
+                gateway_wait(
+                    next.as_ref(),
+                    crate::gateway::Asking::Yes,
+                    || false,
+                    &mut gateway_held,
+                    at(second),
+                    crate::gateway::COLD_WITHIN,
+                )
+            } else {
+                PlaceWait::Go
+            };
+            let code = match (place, gateway) {
+                (PlaceWait::GiveUp, _) => Some("busy"),
+                (_, PlaceWait::GiveUp) => Some(crate::gateway::NOT_READY),
+                _ => None,
+            };
+            if let Some(code) = code
+                && let Some(job) = engine.begin_launch(&now).unwrap()
+            {
+                gateway_held = None;
+                let outcome = LaunchOutcome::NotSent { code: code.into() };
+                engine.finish_launch(job.task_id, outcome, &now).unwrap();
+            }
+            for id in &ids {
+                if !ended.contains_key(id) {
+                    let (state, code) = dispatch_of(&mut engine, *id, second * 1000);
+                    if state != "queued" {
+                        ended.insert(*id, (state, code, second));
+                    }
+                }
+            }
+        }
+        let cold = crate::gateway::COLD_WITHIN.as_secs();
+        assert_eq!(
+            ended[&ids[0]],
+            (
+                "not_sent".to_owned(),
+                Some(crate::gateway::NOT_READY.to_owned()),
+                known + cold
+            )
+        );
+        assert_eq!(
+            ended[&ids[1]],
+            (
+                "invalidated".to_owned(),
+                Some("expired".to_owned()),
+                crate::engine::QUEUED_MS / 1000
+            ),
+            "the second passes its queued life"
         );
     }
 
