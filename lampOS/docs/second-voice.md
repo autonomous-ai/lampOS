@@ -6601,7 +6601,10 @@ after a take-over, but now for every turn:
   the lamp's words ended (`Heeding::said_until_us`; `Heeding::asked_line_after`
   remembers the end a line was last judged after) and it began within 20 s
   of that end (`follows_on::WITHIN_US` by `follows_on::due`;
-  `said_to_me::Line::first_after_asked`, `Line::asked_lets_in`). Any later
+  `said_to_me::Line::first_after_asked`, `Line::asked_lets_in`). A line
+  going on from the one that took that pass (`continues_from`: an answer
+  the lamp cut and takes up again, `LAMP_CUT_KEEPS_NAME`) keeps it
+  (`Heeding::asked_first`; the first builder's P2 on #8416). Any other later
   line, or one answering an older question, is judged as a line with no
   question waiting: looking away is `held: looking away in a conversation`
   (#7726's rule), head down or up `held: not facing in a conversation
