@@ -380,6 +380,9 @@ Environment=LAMP_NEWS_REPLY_HEEDS_HELD=on
 # LAMP_SAID_TO_ME_NAME_IN_LINE: its why and rules are its row in docs/switches.md (#8384). DEFAULT-ON asked of the first builder
 # on #8384.
 Environment=LAMP_SAID_TO_ME_NAME_IN_LINE=on
+# LAMP_FOLLOW_UPS: the product owner's rules of 25 Nov 2026 (#7570): in a conversation no line is held on a camera sign alone,
+# and a busy room's conversation goes on 20 s. Its why and rules are its row in docs/switches.md. DEFAULT-ON asked of its readers.
+Environment=LAMP_FOLLOW_UPS=on
 # LAMP_SPEAKING_READ_LOOKS: its why and rules are its row in docs/switches.md (#7442, #7419).
 Environment=LAMP_SPEAKING_READ_LOOKS=on
 # LAMP_ONE_AS_LAMP: its why and rules are its row in docs/switches.md (#4710).
