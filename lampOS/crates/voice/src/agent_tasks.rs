@@ -776,6 +776,14 @@ fn on_the_lamp_with(args: &Value, there: bool, _unpaired: bool, engines: &[Strin
     }
 }
 
+/// What [`START`]'s description says on a lamp with its own target and no
+/// computer paired (`on_the_lamp_description`). On lamp-74ff on 25 Nov
+/// 2026 at 18:56, asked to have Claude Code on the office computer write a
+/// story, the model said "I'll hand that to Claude Code on your office
+/// computer now." before its call was refused ([`NO_COMPUTER_PAIRED`]), then
+/// "No computer is paired with me": a promise taken back in one breath.
+pub const NONE_PAIRED: &str = " No computer is paired: never say work goes to one.";
+
 /// What a [`START`] call asking for a computer is told when none is paired
 /// (#6547, V2's P1 on 12587): nothing was started, and the person decides.
 pub const NO_COMPUTER_PAIRED: &str = "Nothing was started: no computer is paired with the lamp. Tell the person so, and ask whether the lamp's own agent should do it here instead.";
@@ -2128,8 +2136,11 @@ fn on_the_lamp_description(place: &Place, staff: &[Member]) -> String {
             computer(place)
         )
     };
+    // And the model is told none is paired ([`NONE_PAIRED`]), so it never
+    // says it hands work to a computer before the call is refused.
+    let none_paired = if staff.is_empty() { NONE_PAIRED } else { "" };
     format!(
-        "Hand work over: the lamp's own{or_computer}. Call it for what takes \
+        "Hand work over: the lamp's own{or_computer}.{none_paired} Call it for what takes \
          you over 10 s (research, code, files, several steps), what is asked of an agent, and \
          what you have no function for: hand it over, never say you can't. Never for a quick \
          answer, a story or joke told aloud, or your functions (light, volume, timers, \
@@ -15480,6 +15491,34 @@ pub(crate) mod tests {
         let unread = engine_with(&[]);
         assert_eq!(unread.get("enum"), None, "{unread}");
         assert_eq!(unread["type"], "string");
+    }
+
+    /// lamp-74ff, 25 Nov 2026 18:56: with the lamp's own target and no
+    /// computer paired, `start_agent_task` tells the model none is paired
+    /// ([`NONE_PAIRED`]), so it never says it hands work to a computer before
+    /// the call is refused. With a computer paired it says nothing of the
+    /// kind; without the lamp's target the description is the computer's.
+    #[test]
+    fn with_no_computer_paired_the_model_is_told_so_before_it_calls() {
+        let start = |place: &Place, staff: &[Member], lamp: bool| {
+            declared_on(place, staff, lamp)
+                .into_iter()
+                .find(|tool| tool.name == START)
+                .unwrap()
+                .description
+        };
+        let at = place(Path::new("/run/t"), false);
+        let alone = start(&at, &[], true);
+        assert!(alone.contains(NONE_PAIRED), "{alone}");
+        assert!(
+            alone.starts_with("Hand work over: the lamp's own. No computer is paired"),
+            "{alone}"
+        );
+        let paired = place(Path::new("/run/t"), true);
+        let staff = vec![member("office-claude", "claude")];
+        let with_one = start(&paired, &staff, true);
+        assert!(!with_one.contains(NONE_PAIRED), "{with_one}");
+        assert!(!start(&paired, &staff, false).contains(NONE_PAIRED));
     }
 
     /// #5978, the Reviewer-lead's P3 on #6094: declared with the lamp's
