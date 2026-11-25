@@ -694,6 +694,9 @@ class Lamp:
         # `welcome`): `connect_app`.
         self.app: str | None = hello.get("app") or welcome.get("app")
         self.app_version: str | None = hello.get("version") or welcome.get("version")
+        # Whether the lamp sends this app the model's tool calls (`app.call`): an app socket's `hello` says `tools: true`
+        # only with LAMP_APP_TOOLS on (#8406); False otherwise, and from a lamp built before it.
+        self.tools: bool = hello.get("tools") is True
         self._waiting: dict[int, asyncio.Future] = {}
         self._done: dict[int, asyncio.Future] = {}
         self._handlers: dict[str, list[Handler]] = defaultdict(list)
@@ -1202,6 +1205,22 @@ class Lamp:
         """Take the turn an `app.trigger` named (its `turn`): the voice keeps quiet. A `say`, gesture or light within
         3 s of the trigger counts as well; with neither, the voice answers itself."""
         return await self.request("app.took", turn=turn)
+
+    async def answer(self, call: str, result: dict | None = None, *, error: str | None = None) -> bool:
+        """Answer the model's call of one of the app's tools: an `app.call` event's `call` (`lamp.on("app.call", ...)`,
+        with `name` and `args`), and exactly one of `result`, a JSON object of at most 2,048 bytes, or `error`, one line
+        of the app's own words (at most 200 characters, never one of the lamp's: `timeout`, `too_long`, `busy`,
+        `private`, `stopped`, `unknown tool`, `not running`). Answer within 4.5 s: after that the lamp sends
+        `app.call.stopped` and takes no answer. True when the lamp took it, False when the call was not in flight (late,
+        stopped, answered already). Only when `lamp.tools` is True; a lamp with app tools off refuses it `off`."""
+        if (result is None) == (error is None):
+            raise LampError("answer: exactly one of result (an object) or error (one line)", code="bad_request")
+        if result is not None and not isinstance(result, dict):
+            raise LampError("answer: result is a JSON object", code="bad_request")
+        if error is not None and (not isinstance(error, str) or error == "" or any(unicodedata.category(c) == "Cc" for c in error)):
+            raise LampError("answer: error is one line of text, no control characters", code="bad_request")
+        fields: dict[str, Any] = {"call": call, "result": result} if result is not None else {"call": call, "error": error}
+        return bool((await self.request("app.answer", **fields)).get("taken"))
 
     async def settings(self) -> dict:
         """The owner's values for every key of the manifest's settings (the default for one never set), by key. The

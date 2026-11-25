@@ -419,3 +419,85 @@ def test_a_clear_with_for_ms_is_a_bad_request():
                     await lamp.request("apps.context", line="", for_ms=1000)
 
     run(go())
+
+
+# An app's tools (#8406, LAMP_APP_TOOLS): the model's call comes as `app.call`, the app answers with `app.answer`.
+
+
+def test_app_call_events_are_known_and_hello_says_tools():
+    from lampos import schema
+
+    assert {"app.call", "app.call.stopped"} <= set(schema.app_events())
+    assert "app.answer" in schema.app_ops()
+
+    async def go():
+        async with FakeLamp(app=True, app_tools=True) as fake:
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                assert lamp.tools is True
+        async with FakeLamp(app=True) as fake:
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                assert lamp.tools is False
+                # The events are an app's own even with tools off: on() never raises for them.
+                lamp.on("app.call", lambda event: None)
+                lamp.on("app.call.stopped", lambda event: None)
+                with pytest.raises(BY_CODE["off"]):
+                    await lamp.answer("app-1-1-1", {"ok": True})
+
+    run(go())
+
+
+def test_a_tool_call_is_answered_with_a_result_once():
+    async def go():
+        async with FakeLamp(app=True, app_tools=True) as fake:
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                taken: list[bool] = []
+
+                async def on_call(event):
+                    assert set(event) == {"ev", "call", "name", "args"}
+                    taken.append(await lamp.answer(event["call"], {"plan": "legs", "sets": event["args"]["sets"]}))
+
+                lamp.on("app.call", on_call)
+                call = await fake.call_tool("set_plan", {"sets": 3})
+                await settle()
+                assert taken == [True]
+                assert fake.app_answers[call] == {"result": {"plan": "legs", "sets": 3}}
+                assert fake.asked("app.answer") == [{"call": call, "result": {"plan": "legs", "sets": 3}}]
+                # Answered already: not taken again.
+                assert await lamp.answer(call, {"plan": "arms"}) is False
+
+    run(go())
+
+
+def test_a_tool_call_answered_with_the_apps_error_and_the_lamps_words_refused():
+    async def go():
+        async with FakeLamp(app=True, app_tools=True) as fake:
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                call = await fake.call_tool("set_plan", {})
+                with pytest.raises(BY_CODE["bad_request"]):
+                    await lamp.answer(call, error="timeout")
+                for bad in ({}, {"result": {"a": 1}, "error": "x"}, {"error": "two\nlines"}, {"result": [1]}):
+                    with pytest.raises(LampError):
+                        await lamp.answer(call, **bad)
+                assert await lamp.answer(call, error="no plan picked yet") is True
+                assert fake.app_answers[call] == {"error": "no plan picked yet"}
+                over = await fake.call_tool("set_plan", {})
+                assert await lamp.answer(over, error="x" * 201) is True
+                assert fake.app_answers[over] == {"error": "too_long"}
+
+    run(go())
+
+
+def test_a_stopped_call_is_told_and_a_late_answer_not_taken():
+    async def go():
+        async with FakeLamp(app=True, app_tools=True) as fake:
+            async with await Lamp.connect_app(path=fake.app_path) as lamp:
+                stopped: list[dict] = []
+                lamp.on("app.call.stopped", stopped.append)
+                call = await fake.call_tool("set_plan", {})
+                await fake.stop_call(call)
+                await settle()
+                assert stopped == [{"ev": "app.call.stopped", "call": call, "why": "timeout"}]
+                assert await lamp.answer(call, {"late": True}) is False
+                assert fake.app_answers[call] == {"error": "timeout"}
+
+    run(go())

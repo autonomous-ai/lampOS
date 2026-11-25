@@ -284,3 +284,52 @@ test('a clear with for_ms is a bad request', async () => {
     await assert.rejects(lamp.request('apps.context', { line: '', for_ms: 1000 }), byCode.bad_request);
   });
 });
+
+// An app's tools (#8406, LAMP_APP_TOOLS): the model's call comes as `app.call`, the app answers with `app.answer`.
+
+test('app.call and app.call.stopped are an app\'s events, and hello says tools', async () => {
+  await withApp({ appTools: true }, async (fake, lamp) => { assert.equal(lamp.tools, true); });
+  await withApp({}, async (fake, lamp) => {
+    assert.equal(lamp.tools, false);
+    lamp.on('app.call', () => {});
+    lamp.on('app.call.stopped', () => {});
+    await assert.rejects(lamp.answer('app-1-1-1', { result: { ok: true } }), (error) => error.code === 'off');
+  });
+});
+
+test('a tool call is answered with a result once, or with the app\'s own error', async () => {
+  await withApp({ appTools: true }, async (fake, lamp) => {
+    const taken = [];
+    const onCall = async (event) => {
+      assert.deepEqual(Object.keys(event).sort(), ['args', 'call', 'ev', 'name']);
+      taken.push(await lamp.answer(event.call, { result: { plan: 'legs', sets: event.args.sets } }));
+    };
+    lamp.on('app.call', onCall);
+    const call = fake.callTool('set_plan', { sets: 3 });
+    await settle();
+    lamp.off('app.call', onCall);
+    assert.deepEqual(taken, [true]);
+    assert.deepEqual(fake.appAnswers.get(call), { result: { plan: 'legs', sets: 3 } });
+    assert.equal(await lamp.answer(call, { result: { plan: 'arms' } }), false);
+    const other = fake.callTool('set_plan', {});
+    await assert.rejects(lamp.answer(other, { error: 'timeout' }), (error) => error.code === 'bad_request');
+    for (const bad of [{}, { result: { a: 1 }, error: 'x' }, { error: 'two\nlines' }, { result: [1] }]) {
+      await assert.rejects(lamp.answer(other, bad), (error) => error.code === 'bad_request');
+    }
+    assert.equal(await lamp.answer(other, { error: 'no plan picked yet' }), true);
+    assert.deepEqual(fake.appAnswers.get(other), { error: 'no plan picked yet' });
+  });
+});
+
+test('a stopped call is told and a late answer is not taken', async () => {
+  await withApp({ appTools: true }, async (fake, lamp) => {
+    const stopped = [];
+    lamp.on('app.call.stopped', (event) => stopped.push(event));
+    const call = fake.callTool('set_plan', {});
+    fake.stopCall(call);
+    await settle();
+    assert.deepEqual(stopped, [{ ev: 'app.call.stopped', call, why: 'timeout' }]);
+    assert.equal(await lamp.answer(call, { result: { late: true } }), false);
+    assert.deepEqual(fake.appAnswers.get(call), { error: 'timeout' });
+  });
+});
