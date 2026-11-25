@@ -5873,8 +5873,10 @@ trang kỹ năng và `LAMP_CLOUD`); unit `lamp-cloud` của sản phẩm bật n
   **Tệp của mọi kỹ năng (#8629, `skills.files`):** cùng trang kỹ năng, không
   công tắc riêng, `skills.files {"name"}` liệt kê các tệp thường trong thư
   mục của kỹ năng thuộc mọi nhóm (`source` là `built-in`, `store`, `made`
-  hay `pushed`), sắp theo đường dẫn, tối đa 500 mục rồi `"cut": true`; liên
-  kết chỉ được hiển thị là `{"path", "link": true}`, không bao giờ đi theo;
+  hay `pushed`), sắp theo đường dẫn, tối đa 500 mục và 500 thư mục được duyệt
+  rồi `"cut": true`; liên kết chỉ được hiển thị là `{"path", "link": true}`,
+  không bao giờ đi theo (tệp được mở với `O_NOFOLLOW`), và kỹ năng mà thư mục
+  của nó là một liên kết thì không phải kỹ năng trên đèn;
   tệp chấm, `lamp-skill.sig` và thư mục trạng thái không bao giờ được liệt
   kê. `skills.files {"name", "path"}` trả về một tệp văn bản UTF-8, cắt ở
   65.536 ký tự với `"cut": true`. Từ chối bằng lời thường: `no skill named

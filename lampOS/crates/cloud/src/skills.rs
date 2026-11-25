@@ -663,6 +663,11 @@ pub(crate) fn located(places: &Places, name: &str) -> Option<(PathBuf, Group)> {
         .into_iter()
         .find(|(folder, _)| folder.file_name().is_some_and(|file| file == name))
     {
+        // A real folder only, as a pushed row is: a link in the lamp's
+        // folder is no skill here, and is never read through (#8629).
+        if !fs::symlink_metadata(&folder).is_ok_and(|meta| meta.is_dir()) {
+            return None;
+        }
         let group = row(&folder, loaded, None, places.addons).group;
         return Some((folder, group));
     }

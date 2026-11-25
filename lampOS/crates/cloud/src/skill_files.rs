@@ -26,9 +26,10 @@ use crate::skills::{Group, Places};
 /// The kind, answered with the page's.
 pub const KIND: &str = "skills.files";
 
-/// The most entries one list holds (the first builder's second condition):
-/// past it the list stops and says `"cut": true`, so one odd folder can't
-/// make a reply the app chokes on.
+/// The most entries one list holds, and the most folders one walk visits
+/// (the first builder's second condition): past either the walk stops and
+/// the list says `"cut": true`, so one odd folder can't make a reply the
+/// app chokes on, nor keep the lamp walking thousands of empty folders.
 pub const MOST_ENTRIES: usize = 500;
 
 /// The most characters of one file's text, the preview's cap: over it the
@@ -102,7 +103,13 @@ fn listed(folder: &Path, name: &str, source: &str) -> Result<Value, String> {
     let mut files = Vec::new();
     let mut cut = false;
     let mut folders = VecDeque::from([folder.to_path_buf()]);
+    let mut visited = 0;
     'walk: while let Some(dir) = folders.pop_front() {
+        if visited >= MOST_ENTRIES {
+            cut = true;
+            break;
+        }
+        visited += 1;
         let mut entries: Vec<_> = fs::read_dir(&dir)
             .map_err(unread)?
             .filter_map(Result::ok)
@@ -191,10 +198,24 @@ fn read(folder: &Path, name: &str, path: &str) -> Result<Value, String> {
     if !meta.is_some_and(|meta| meta.is_file()) || parts.last() == Some(&SIGNATURE) {
         return Err(no_file());
     }
+    // Opened without following a link (`O_NOFOLLOW`), so a link put in the
+    // file's place between the look above and the open fails to open, and
+    // is refused as a link found by the look is.
+    let file = match rustix::fs::open(
+        &at,
+        rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::CLOEXEC,
+        rustix::fs::Mode::empty(),
+    ) {
+        Ok(fd) => fs::File::from(fd),
+        Err(rustix::io::Errno::LOOP) => return Err(NOT_IN_SKILL.to_owned()),
+        Err(rustix::io::Errno::NOENT) => return Err(no_file()),
+        Err(error) => return Err(unread(std::io::Error::from(error))),
+    };
+    if !file.metadata().map_err(unread)?.is_file() {
+        return Err(no_file());
+    }
     let mut bytes = Vec::new();
-    fs::File::open(&at)
-        .map_err(unread)?
-        .take(READ_MOST as u64 + 1)
+    file.take(READ_MOST as u64 + 1)
         .read_to_end(&mut bytes)
         .map_err(unread)?;
     let more = bytes.len() > READ_MOST;

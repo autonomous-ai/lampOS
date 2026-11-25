@@ -3598,4 +3598,51 @@ pub mod tests {
             1
         );
     }
+
+    /// #8629, round 2: a skill whose folder is itself a link in the lamp's
+    /// folder is no skill for `skills.files`, listing or reading, as a
+    /// pushed row is no row; nothing is read through it.
+    #[test]
+    fn a_skill_whose_folder_is_a_link_is_no_skill_for_skills_files() {
+        let mut lamp = lamp();
+        let (places, _) = every_group("files-link");
+        std::os::unix::fs::symlink(places.folder.join("dance"), places.folder.join("ghost"))
+            .unwrap();
+        lamp.skills = Some(places.clone());
+        assert_eq!(
+            answer(&mut lamp, "skills.files", &json!({"name": "ghost"})),
+            Err("no skill named ghost on this lamp".to_owned())
+        );
+        assert_eq!(
+            file_of(&mut lamp, "ghost", "SKILL.md"),
+            Err("no skill named ghost on this lamp".to_owned())
+        );
+        // The real folder is still a skill.
+        assert_eq!(files_of(&mut lamp, "dance")["source"], "built-in");
+    }
+
+    /// #8629, round 2: the walk itself is bounded, not only the entries: 600
+    /// empty subfolders stop it at 500 with `"cut": true`, so a file in a
+    /// folder sorted after them is never reached.
+    #[test]
+    fn the_skills_files_walk_stops_at_500_folders() {
+        let mut lamp = lamp();
+        let (places, _) = every_group("files-folders");
+        lamp.skills = Some(places.clone());
+        let water = places.folder.join("water");
+        for n in 0..600 {
+            std::fs::create_dir_all(water.join(format!("empty-{n:03}"))).unwrap();
+        }
+        std::fs::create_dir_all(water.join("zzz")).unwrap();
+        std::fs::write(water.join("zzz/last.txt"), "x").unwrap();
+        let listed = files_of(&mut lamp, "water");
+        assert_eq!(listed["cut"], true);
+        let paths: Vec<&str> = listed["files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|file| file["path"].as_str().unwrap())
+            .collect();
+        assert_eq!(paths, ["SKILL.md", "skill.toml"]);
+    }
 }
