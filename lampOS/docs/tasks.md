@@ -2683,8 +2683,12 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     line): settled, so it is no longer watched nor counted as work under
     way, and the voice tells it once as any failed task. The row is kept
     in the store (`gone`), so a restart goes on counting; any other read
-    ends it. Test:
-    `engine::tests::a_task_whose_run_stays_gone_is_ended_failed_once_across_a_restart`.
+    ends it. A task already settled (an answer, a question, a stop or a
+    failure kept) is never ended so: the follow's looks after a restart
+    find its finished run gone, and ending it told lamp-ee17's task 91
+    ("Vienna.") twice. Tests:
+    `engine::tests::a_task_whose_run_stays_gone_is_ended_failed_once_across_a_restart`,
+    `a_settled_and_told_task_whose_run_is_gone_is_never_ended_again`.
   - **The voice** (`agent_tasks`, `task_news`): reads the lamp's target's
     engine from `{"op":"targets"}` and names it, so a hand-over naming no
     machine is said as "OpenClaw on the lamp" and the tool descriptions
