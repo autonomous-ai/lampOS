@@ -1434,25 +1434,302 @@ fn a_hermes_task_on_an_openclaw_default_lamp_keeps_harnesss_path() {
     );
 }
 
-/// #8431 read (P3): a direct Hermes turn keeps the direct path when the
-/// app's default moves to OpenClaw while it runs (its looks and close stay
-/// on its run, never Harness's, which never had it); a task of another
-/// agent then is Harness's.
+/// The agent switch (owner's rule), in place of #8431's read (P3), which
+/// kept a running Hermes turn on the direct path when the default moved
+/// under it: a turn still running no longer keeps the path once Hermes is
+/// not the default (the switch ends it rather than keeping it), while one
+/// of its own that has ended still reads from here, never from Harness,
+/// which never had it; a task of another agent then is Harness's.
 #[test]
-fn a_direct_hermes_turn_keeps_its_path_when_the_default_moves_under_it() {
+fn a_running_turn_does_not_keep_its_path_when_the_default_moves_under_it() {
     let lamp = started(Fake::of(Engine::Hermes));
     set_test_lamp(Some(lamp.direct.clone()));
     set_test_default(Some(Some(EngineKind::Hermes)));
     until("ready", || lamp.direct.is_ready());
-    let agent = joined(
+    let running = joined(
         lamp.direct
             .spoken_launch(&launch(EngineKind::Hermes, "Next")),
     );
+    lamp.direct
+        .ended_for_tests("an-ended-agent", End::Failed(SWITCHED.into()));
     set_test_default(Some(Some(EngineKind::Openclaw)));
-    let own = lamp_path("hermes", MACHINE, &agent);
+    let own_running = lamp_path("hermes", MACHINE, &running);
+    let own_ended = lamp_path("hermes", MACHINE, "an-ended-agent");
     let other = lamp_path("hermes", MACHINE, "a-harness-agent");
-    let looked = lamp_observe("hermes", MACHINE, &agent).is_some();
+    let looked = lamp_observe("hermes", MACHINE, "an-ended-agent").is_some();
     set_test_default(None);
     set_test_lamp(None);
-    assert_eq!((own, other, looked), (true, false, true));
+    assert_eq!(
+        (own_running, own_ended, other, looked),
+        (false, true, false, true)
+    );
+}
+
+/// The agent switch (owner's rule): when the lamp's default moves from
+/// this session's engine, its turns, the running one and the one queued
+/// behind it, end at once with the switch's words, told as a stopped task
+/// (the observation's answer, state `failed`), the running one aborted on
+/// its gateway; the turns stay on the direct path for their last look; a
+/// new task for the old agent is no longer taken. The first look (a
+/// start) and a look with no change end nothing.
+#[test]
+fn a_switch_ends_the_old_agents_running_and_queued_turns() {
+    let lamp = started(Fake::of(Engine::Hermes));
+    set_test_lamp(Some(lamp.direct.clone()));
+    set_test_default(Some(Some(EngineKind::Hermes)));
+    until("ready", || lamp.direct.is_ready());
+    let first_look = switch_check();
+    let running = joined(
+        lamp.direct
+            .spoken_launch(&launch(EngineKind::Hermes, "Tell me a story")),
+    );
+    until("handed over", || lamp.fake.state().sent.len() == 1);
+    let queued = joined(
+        lamp.direct
+            .spoken_launch(&launch(EngineKind::Hermes, "And the weather")),
+    );
+    let no_change = switch_check();
+    set_test_default(Some(Some(EngineKind::Openclaw)));
+    let switched = switch_check();
+    let seen: Vec<(String, String, bool)> = [&running, &queued]
+        .into_iter()
+        .map(|agent| {
+            let look = lamp_observe("hermes", MACHINE, agent).unwrap().unwrap();
+            (look.state, look.answer, lamp_path("hermes", MACHINE, agent))
+        })
+        .collect();
+    let taken = lamp.direct.takes(&launch(EngineKind::Hermes, "Again"));
+    until("aborted", || lamp.fake.state().aborted.len() == 1);
+    set_test_default(None);
+    set_test_lamp(None);
+    assert_eq!((first_look, no_change), (None, None));
+    assert_eq!(
+        switched,
+        Some(Switched {
+            from: Some(EngineKind::Hermes),
+            to: Some(EngineKind::Openclaw)
+        })
+    );
+    let told = ("failed".to_owned(), SWITCHED.to_owned(), true);
+    assert_eq!(seen, vec![told.clone(), told]);
+    assert!(!taken);
+    assert_eq!(lamp.fake.state().aborted, vec![lamp.fake.run_of(1)]);
+    assert_eq!(lamp.fake.state().sent.len(), 1);
+}
+
+/// A default not read (start-up, before Harness's first engine report, or a
+/// passing gap in the read) is no switch: going from it to an engine, or
+/// from an engine through it back to the same one, ends nothing.
+#[test]
+fn a_default_not_read_is_never_a_switch() {
+    set_test_default(Some(None));
+    let unread_first = switch_check();
+    set_test_default(Some(Some(EngineKind::Hermes)));
+    let then_hermes = switch_check();
+    set_test_default(Some(None));
+    let gap = switch_check();
+    set_test_default(Some(Some(EngineKind::Hermes)));
+    let back = switch_check();
+    set_test_default(Some(Some(EngineKind::Openclaw)));
+    let real = switch_check();
+    set_test_default(None);
+    assert_eq!(
+        (unread_first, then_hermes, gap, back),
+        (None, None, None, None)
+    );
+    assert_eq!(
+        real,
+        Some(Switched {
+            from: Some(EngineKind::Hermes),
+            to: Some(EngineKind::Openclaw)
+        })
+    );
+}
+
+/// The agent switch's state for the app: `switching` from the moment the
+/// default moves to this session's engine, though the pump last found it
+/// ready, until its gateway answers ready again, then `ready`; the
+/// engines' default read carries it as `gateway`. Within about
+/// [`RETRY_WAITING_MOST`] of the gateway coming up.
+#[test]
+fn the_gateway_says_switching_until_the_new_defaults_gateway_answers() {
+    let lamp = started(Fake::of(Engine::Hermes));
+    set_test_lamp(Some(lamp.direct.clone()));
+    set_test_default(Some(Some(EngineKind::Openclaw)));
+    until("ready", || lamp.direct.is_ready());
+    switch_check();
+    let before = gateway_said();
+    lamp.fake.state().not_ready = u32::MAX;
+    set_test_default(Some(Some(EngineKind::Hermes)));
+    switch_check();
+    let dir = tempfile::tempdir().unwrap();
+    let side = crate::runtime::LampSide::with_order(
+        std::path::PathBuf::new(),
+        vec![EngineKind::Hermes, EngineKind::Openclaw],
+    );
+    let answer = crate::runtime::app_engine_default_operation(
+        &crate::protocol::Request::AppEngineDefaultState {},
+        Some(&side),
+        &dir.path().join(crate::runtime::ENGINE_DEFAULT_FILE),
+    )
+    .unwrap();
+    std::thread::sleep(Duration::from_millis(50));
+    let still = (gateway_said(), lamp.direct.is_ready());
+    let up = Instant::now();
+    lamp.fake.state().not_ready = 0;
+    until("ready again", || gateway_said() == "ready");
+    let took = up.elapsed();
+    set_test_default(None);
+    set_test_lamp(None);
+    assert_eq!(before, "ready");
+    assert_eq!(answer["gateway"], "switching");
+    assert_eq!(still, ("switching", false));
+    assert!(took < RETRY_WAITING_MOST, "{took:?}");
+    assert!(lamp.direct.is_ready());
+}
+
+/// Owner's rule: OpenClaw's session follows the default too (lamp-update no
+/// longer keeps its gateway up on a Hermes lamp). A spoken OpenClaw task on
+/// a Hermes lamp is refused at once with [`NOT_DEFAULT`], never left 60 s
+/// on a gateway that never starts, and is not the direct path's; a skill
+/// run for it is refused at once in words that say why. OpenClaw the
+/// default, or none read, it takes them as before.
+#[test]
+fn an_openclaw_task_on_a_hermes_default_lamp_is_refused_at_once() {
+    let fake = Fake::of(Engine::Openclaw);
+    fake.state().not_ready = u32::MAX;
+    let lamp = started(fake);
+    set_test_lamp(Some(lamp.direct.clone()));
+    let openclaw = launch(EngineKind::Openclaw, "Ask OpenClaw the time");
+    let mut seen = Vec::new();
+    for default in [
+        Some(Some(EngineKind::Hermes)),
+        Some(Some(EngineKind::Openclaw)),
+        None,
+    ] {
+        set_test_default(default);
+        let began = Instant::now();
+        let refused = not_default_for(&openclaw);
+        let run = skill_run("run-not-default", Duration::from_millis(300));
+        let skill = skill_turn(
+            &lamp.direct,
+            &run,
+            None,
+            Path::new("/nonexistent"),
+            "Run skill-start run-not-default",
+            false,
+            began,
+            began + Duration::from_millis(300),
+            &|| false,
+        );
+        seen.push((
+            default,
+            lamp.direct.takes(&openclaw),
+            lamp_path("openclaw", MACHINE, "no-such-agent"),
+            refused,
+            skill.is_err_and(|why| why.contains(NOT_DEFAULT)),
+            began.elapsed() < Duration::from_millis(100),
+        ));
+    }
+    set_test_default(None);
+    set_test_lamp(None);
+    let not_sent = Some(LaunchOutcome::NotSent {
+        code: NOT_DEFAULT.into(),
+    });
+    assert_eq!(
+        seen,
+        vec![
+            (
+                Some(Some(EngineKind::Hermes)),
+                false,
+                false,
+                not_sent,
+                true,
+                true
+            ),
+            (
+                Some(Some(EngineKind::Openclaw)),
+                true,
+                true,
+                None,
+                false,
+                false
+            ),
+            (None, true, true, None, false, false),
+        ]
+    );
+}
+
+/// Leg R on lamp-ee17: the queue's hold for OpenClaw's gateway (#8105, up
+/// to 480 s) never holds an OpenClaw task on a Hermes-default lamp, so it
+/// reaches the worker's refusal at once; OpenClaw the default, it is held
+/// for its cold gateway as before.
+#[test]
+fn the_queue_never_holds_an_openclaw_task_for_a_gateway_not_the_default() {
+    use crate::runtime::{PlaceWait, gateway_wait};
+    let fake = Fake::of(Engine::Openclaw);
+    fake.state().not_ready = u32::MAX;
+    let lamp = started(fake);
+    set_test_lamp(Some(lamp.direct.clone()));
+    let openclaw = launch(EngineKind::Openclaw, "Ask OpenClaw the time");
+    let mut seen = Vec::new();
+    for default in [Some(EngineKind::Hermes), Some(EngineKind::Openclaw)] {
+        set_test_default(Some(default));
+        let mut held = None;
+        let wait = gateway_wait(
+            Some(&openclaw),
+            crate::gateway::Asking::Yes,
+            || false,
+            &mut held,
+            Instant::now(),
+            crate::gateway::COLD_WITHIN,
+        );
+        seen.push((default, wait, held.is_some()));
+    }
+    set_test_default(None);
+    set_test_lamp(None);
+    assert_eq!(
+        seen,
+        vec![
+            (Some(EngineKind::Hermes), PlaceWait::Go, false),
+            (Some(EngineKind::Openclaw), PlaceWait::Hold, true),
+        ]
+    );
+}
+
+/// Ready fast: the most pause between readiness looks is 2 s while
+/// something waits or the session's engine is the lamp's default, 30 s
+/// only for the other agent with nothing waiting.
+#[test]
+fn the_defaults_session_looks_at_least_every_two_seconds() {
+    assert_eq!(retry_most(false, false), RETRY_MOST);
+    assert_eq!(retry_most(false, true), RETRY_WAITING_MOST);
+    assert_eq!(retry_most(true, false), RETRY_WAITING_MOST);
+    assert_eq!(RETRY_WAITING_MOST, Duration::from_secs(2));
+}
+
+/// Ready fast: a launch that starts waiting for readiness wakes a pump
+/// resting through a long back-off, so it looks at once and the launch is
+/// ready within its short wait, not at the pump's next retry.
+#[test]
+fn a_launch_waiting_for_readiness_wakes_a_resting_pump() {
+    let fake = Fake::of(Engine::Hermes);
+    fake.state().not_ready = 1;
+    let stop = Arc::new(AtomicBool::new(false));
+    let direct = Arc::new(
+        Direct::new(Box::new(fake.clone()), stop.clone()).with_bounds(
+            Duration::from_millis(5),
+            Duration::from_millis(5),
+            Duration::from_secs(3),
+        ),
+    );
+    direct.start().unwrap();
+    until("first look failed", || fake.state().readies == 1);
+    std::thread::sleep(Duration::from_millis(50));
+    let began = Instant::now();
+    let ready = direct.ready_by(Instant::now() + Duration::from_millis(600), &|| false);
+    let took = began.elapsed();
+    stop.store(true, Ordering::Release);
+    assert_eq!(ready, Ok(()));
+    assert!(took < Duration::from_millis(300), "{took:?}");
 }

@@ -22,6 +22,7 @@ pub mod engines;
 pub mod fetch;
 pub mod first_update;
 pub mod fixed_copy;
+pub mod gateway_keeper;
 pub mod harness_install;
 mod head_touch;
 pub mod heat;

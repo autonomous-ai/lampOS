@@ -18,9 +18,12 @@
 //! default agent ([`gateway_wanted`]), disabled and stopped while it says
 //! another; unknown, it is left as it is. A round looks once, and `serve`
 //! every [`crate::openclaw_install::KEEP_EVERY`] between rounds
-//! ([`keep_between_rounds`]). OpenClaw's gateway follows the default with
-//! the switch on too (main: `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` read as on),
-//! so the two never run side by side.
+//! ([`keep_between_rounds`]), both through [`crate::gateway_keeper`].
+//! OpenClaw's gateway follows the default with the switch on too (main:
+//! `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` read as on), so the two never run
+//! side by side: the keeper reads the default once for both, stops the
+//! unwanted gateway first, and starts the wanted one only once the other
+//! is down.
 //!
 //! **As `lampos`, in Hermes's namespace.** The unit starts [`NS`] in a new
 //! user, mount and PID namespace (`unshare`, as Hermes's wrapper does) with
@@ -438,10 +441,12 @@ pub fn after_round(
     }
 }
 
-/// Between rounds: with the unit and [`NS`] there, the gateway kept as
-/// `gateway` says. Already as wanted, nothing is run or said. A `failed`
-/// gateway (past its start limit) is left to the next round, which resets
-/// it, as OpenClaw's.
+/// Between rounds, one look of [`crate::gateway_keeper`]'s: with the unit
+/// and [`NS`] there, the gateway kept as `gateway` says; not wanted, it is
+/// disabled and stopped whether they are there or not, so a gateway left
+/// running never holds OpenClaw's start. Already as wanted, nothing is run
+/// or said. A `failed` gateway (past its start limit) is left to the next
+/// round, which resets it, as OpenClaw's.
 pub fn keep_between_rounds(
     root: &Path,
     systemd: &mut dyn Systemd,
@@ -450,7 +455,7 @@ pub fn keep_between_rounds(
 ) {
     let there =
         fs::symlink_metadata(on(root, NS)).is_ok() && fs::symlink_metadata(unit_path(root)).is_ok();
-    if !there {
+    if !there && gateway != Gateway::NotWanted {
         return;
     }
     let enabled = fs::symlink_metadata(on(root, WANTS)).is_ok();
@@ -473,8 +478,9 @@ pub fn keep_between_rounds(
 }
 
 /// The gateway kept as `gateway` says: wanted, [`gateway_on`]; not wanted,
-/// [`gateway_idle`]; unknown, nothing.
-fn keep_gateway(
+/// [`gateway_idle`]; unknown, nothing. `round`: a round's look, which
+/// resets a `failed` gateway before its start.
+pub fn keep_gateway(
     root: &Path,
     systemd: &mut dyn Systemd,
     gateway: Gateway,
@@ -557,6 +563,16 @@ fn gateway_idle(root: &Path, systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str
             Err(why) => say(&format!("{UNIT} not stopped: {why}")),
         }
     }
+}
+
+/// Whether the gateway is down as systemd says it (`inactive` or
+/// `failed`): a state not read, or any other (`active`, `activating`,
+/// `deactivating`, `reloading`), is not down.
+pub fn gateway_down(systemd: &mut dyn Systemd) -> bool {
+    matches!(
+        gateway_state(systemd).as_deref(),
+        Some("inactive" | "failed")
+    )
 }
 
 /// The gateway's `ActiveState` as systemd says it, `None` when it can't.
