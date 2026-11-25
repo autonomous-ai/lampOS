@@ -44,7 +44,8 @@ BUSY = ('speaker_first_write', 'provider_audio_enqueued')
 
 def lamp_done(since_us, most=90.0, quiet_us=2_000_000):
     """Until the lamp is done with the line played at `since_us` (the lamp's clock): a turn finished after it, nothing
-    heard or said for `quiet_us` since, and no answer begun after that turn's end. At most `most` seconds."""
+    said for `quiet_us` since, and no answer begun after that turn's end. Gives the seconds since the lamp's last
+    sample, or None after `most` seconds."""
     until = time.monotonic() + most
     while time.monotonic() < until:
         time.sleep(0.8)
@@ -63,9 +64,10 @@ def lamp_done(since_us, most=90.0, quiet_us=2_000_000):
             if r.get('kind') == 'turn_finished': finished = max(finished, at)
             elif r.get('kind') in BUSY: busy = max(busy, at)
         if now and finished and busy <= finished and now - max(finished, busy) >= quiet_us:
-            return True
+            # Seconds since its last sample, so a wait "Na" counts N from there, not from this poll.
+            return (now - max(finished, busy)) / 1e6
     print(f'scenario.py: the lamp was not done with the line in {most:.0f} s; going on', file=sys.stderr)
-    return False
+    return None
 
 def main():
     if not os.environ.get('LAMP_HOST'):
@@ -105,8 +107,8 @@ def main():
         done = time.monotonic()
         played.append((at, voice, text))
         if wait.endswith('a'):
-            lamp_done(at)
-            time.sleep(float(wait[:-1]))
+            since = lamp_done(at) or 0.0
+            time.sleep(max(0.0, float(wait[:-1]) - since))
         else:
             time.sleep(float(wait))
     if background:

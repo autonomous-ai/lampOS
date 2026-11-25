@@ -55,9 +55,11 @@ SCENES = [
                                          (S, 'What else did he write?', 18, 'A')]),
     ('follow-ups', 'plan-three-turns', [(D, 'Hey Lamp, I want to cook dinner tonight. Any ideas?', 18, 'A'),
                                         (D, 'Something with chicken, please.', 18, 'A'), (D, 'How long does that take?', 14, 'A')]),
-    ('follow-ups', 'after-5s', [(S, 'Hey Lamp, what is the capital of Italy?', 5, '-'), (S, 'pause', 4, ''), (S, 'And of Spain?', 14, 'A')]),
-    ('follow-ups', 'after-18s', [(S, 'Hey Lamp, what is the capital of Canada?', 8, '-'), (S, 'pause', 16, ''), (S, 'And of Australia?', 14, 'A')]),
-    ('follow-ups', 'after-35s', [(S, 'Hey Lamp, what is the capital of Brazil?', 8, '-'), (S, 'pause', 30, ''), (S, 'And of Argentina?', 14, 'Q')]),
+    # 25 Nov 22:5x: each follow-up now comes its named seconds after the lamp is done ("Na"); the fixed gaps before let
+    # "after-18s" come 22.5 s after a short answer, past the owner's 20 s.
+    ('follow-ups', 'after-5s', [(S, 'Hey Lamp, what is the capital of Italy?', '5a', '-'), (S, 'And of Spain?', 14, 'A')]),
+    ('follow-ups', 'after-18s', [(S, 'Hey Lamp, what is the capital of Canada?', '18a', '-'), (S, 'And of Australia?', 14, 'A')]),
+    ('follow-ups', 'after-35s', [(S, 'Hey Lamp, what is the capital of Brazil?', '35a', '-'), (S, 'And of Argentina?', 14, 'Q')]),
     ('follow-ups', 'number-echo', [(S, 'Hey Lamp, what is twenty four times three?', 12, 'A'), (S, 'And times two?', 12, 'A')]),
     ('follow-ups', 'yes-to-its-question', [(S, 'Hey Lamp, can you suggest a short exercise I can do at my desk?', 20, 'A'),
                                            (S, 'Yes, tell me more.', 16, 'A')]),
