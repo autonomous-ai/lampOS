@@ -489,6 +489,7 @@ fn bounded(text: &str) -> String {
 }
 
 fn blanked(link: &mut impl RingLink, receipt: BlankReceipt) -> io::Result<()> {
+    say(blank_line(receipt.reason, receipt.faded));
     let reason = match receipt.reason {
         BlankReason::Shutdown => RingBlankReason::Shutdown,
         BlankReason::ControlLost => RingBlankReason::ControlLost,
@@ -661,6 +662,8 @@ fn service(
     // after (#8615).
     let mut cap = CapEase::new(if caps.is_some() { 0 } else { 120 });
     let mut cap_ceiling = cap.now(monotonic_us());
+    // The brightest channel written is said every RING_SAID_WINDOW_US, when lit (#8615).
+    let mut peak_said_at = monotonic_us();
     // With LAMP_STALLS=on: a pass of this loop, or a gap between two, of
     // 50 ms or more is recorded, against its lease (#1178).
     let mut stalls = crate::stalls::Stalls::from_environment("ring");
@@ -708,8 +711,27 @@ fn service(
         if let Some(head) = head.as_mut() {
             face.hand(head.tick(at));
         }
+        if at.saturating_sub(peak_said_at) >= RING_SAID_WINDOW_US {
+            peak_said_at = at;
+            let (peak, fades) = (ring.take_peak(), ring.take_fades());
+            if peak > 0 || fades > 0 {
+                say(peak_line(
+                    peak,
+                    resting.map(|ceiling| ceiling.get()),
+                    cap_ceiling,
+                    fades,
+                ));
+            }
+        }
         if let Some(caps) = caps.as_mut() {
-            cap.toward(caps.tick(at), at);
+            if cap.toward(caps.tick(at), at) {
+                say(format!(
+                    "lamp-voice ring: cap {} -> {}, eased over {} ms",
+                    cap.from,
+                    cap.to,
+                    CAP_EASE_US / 1_000
+                ));
+            }
             cap_ceiling = cap.now(at);
             // A tighter cap must not leave an earlier bright frame latched
             // while no new turn frame arrives: the strip is dimmed to it as
@@ -983,12 +1005,15 @@ impl CapEase {
         }
     }
 
-    fn toward(&mut self, target: u16, at_us: u64) {
-        if target != self.to {
-            self.from = self.now(at_us);
-            self.to = target;
-            self.since_us = at_us;
+    /// `true` when the target changed.
+    fn toward(&mut self, target: u16, at_us: u64) -> bool {
+        if target == self.to {
+            return false;
         }
+        self.from = self.now(at_us);
+        self.to = target;
+        self.since_us = at_us;
+        true
     }
 
     fn now(&self, at_us: u64) -> u16 {
@@ -1030,6 +1055,76 @@ fn warning(held: Option<u64>, reset: Option<u64>) -> Option<[lamp_ring::Rgb; PIX
 
 /// Late writes are said at most this often.
 const LATE_SAID_EVERY_US: u64 = 60_000_000;
+
+/// Each ring black and cap change is journalled, numbers and names only
+/// (#8615), so a flicker can be read from the lamp: at most
+/// [`RING_SAID_MAX`] lines per [`RING_SAID_WINDOW_US`]. A conversation ends a
+/// cue a few times a minute, so 20 per 10 s says every real one, and a loop
+/// of blanks from a fault is held to 2 lines a second.
+const RING_SAID_MAX: u32 = 20;
+const RING_SAID_WINDOW_US: u64 = 10_000_000;
+
+struct RingSaid {
+    window_us: u64,
+    said: u32,
+    unsaid: u32,
+}
+
+impl RingSaid {
+    const fn new() -> Self {
+        Self {
+            window_us: 0,
+            said: 0,
+            unsaid: 0,
+        }
+    }
+
+    fn line(&mut self, now_us: u64, text: String) -> Option<String> {
+        if now_us.saturating_sub(self.window_us) >= RING_SAID_WINDOW_US {
+            self.window_us = now_us;
+            self.said = 0;
+        }
+        if self.said >= RING_SAID_MAX {
+            self.unsaid += 1;
+            return None;
+        }
+        self.said += 1;
+        Some(match std::mem::take(&mut self.unsaid) {
+            0 => text,
+            unsaid => format!("{text} ({unsaid} unsaid before it)"),
+        })
+    }
+}
+
+static RING_SAID: std::sync::Mutex<RingSaid> = std::sync::Mutex::new(RingSaid::new());
+
+fn say(text: String) {
+    let line = match RING_SAID.lock() {
+        Ok(mut said) => said.line(monotonic_us(), text),
+        Err(poisoned) => poisoned.into_inner().line(monotonic_us(), text),
+    };
+    if let Some(line) = line {
+        eprintln!("{line}");
+    }
+}
+
+fn peak_line(peak: u8, ceiling: Option<u8>, cap: u16, fades: u32) -> String {
+    let ceiling = ceiling.map_or("none".to_owned(), |ceiling| ceiling.to_string());
+    format!(
+        "lamp-voice ring: lit up to {peak} in the last {} s, ceiling {ceiling}, cap {cap}, {fades} fades begun",
+        RING_SAID_WINDOW_US / 1_000_000
+    )
+}
+
+fn blank_line(reason: BlankReason, faded: Option<(u32, u64)>) -> String {
+    match faded {
+        Some((steps, us)) => format!(
+            "lamp-voice ring: black, {reason:?}, after a fade of {steps} steps over {} ms",
+            us / 1_000
+        ),
+        None => format!("lamp-voice ring: black, {reason:?}, at once"),
+    }
+}
 
 /// The journal of late SPI writes: the newest one, at most once a minute,
 /// with how many went unsaid since the last line.
@@ -1429,6 +1524,55 @@ mod late_said_tests {
                 "lamp-voice ring: SPI write 11500 us, over 10000 us, late for 11 ms (2 more since the last line)"
             )
         );
+    }
+}
+
+#[cfg(test)]
+mod ring_said_tests {
+    use super::*;
+    use lamp_turn_owner::Error as Denial;
+
+    #[test]
+    fn a_black_says_its_reason_and_whether_it_faded() {
+        assert_eq!(
+            blank_line(
+                BlankReason::AuthorityLost(Denial::StaleOwner),
+                Some((8, 200_400))
+            ),
+            "lamp-voice ring: black, AuthorityLost(StaleOwner), after a fade of 8 steps over 200 ms"
+        );
+        assert_eq!(
+            blank_line(BlankReason::AuthorityLost(Denial::PrivacyClosed), None),
+            "lamp-voice ring: black, AuthorityLost(PrivacyClosed), at once"
+        );
+    }
+
+    #[test]
+    fn the_brightest_channel_written_is_said_with_its_ceiling_and_cap() {
+        assert_eq!(
+            peak_line(60, Some(60), 120, 2),
+            "lamp-voice ring: lit up to 60 in the last 10 s, ceiling 60, cap 120, 2 fades begun"
+        );
+        assert_eq!(
+            peak_line(24, None, 24, 0),
+            "lamp-voice ring: lit up to 24 in the last 10 s, ceiling none, cap 24, 0 fades begun"
+        );
+    }
+
+    #[test]
+    fn ring_lines_are_held_to_20_per_10_s_with_the_unsaid_counted() {
+        let mut said = RingSaid::new();
+        let line = |n: u32| format!("line {n}");
+        for n in 0..RING_SAID_MAX {
+            assert_eq!(said.line(1_000 + u64::from(n), line(n)), Some(line(n)));
+        }
+        assert_eq!(said.line(2_000, line(20)), None);
+        assert_eq!(said.line(9_999_999, line(21)), None);
+        assert_eq!(
+            said.line(10_001_000, line(22)).as_deref(),
+            Some("line 22 (2 unsaid before it)")
+        );
+        assert_eq!(said.line(10_002_000, line(23)).as_deref(), Some("line 23"));
     }
 }
 

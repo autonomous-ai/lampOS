@@ -138,6 +138,18 @@ impl EncodedFrame {
         &self.0
     }
 
+    /// The highest channel value this frame carries.
+    pub fn peak(&self) -> u8 {
+        self.0[PRIMER_BYTES..PRIMER_BYTES + PIXEL_COUNT * 24]
+            .chunks(8)
+            .map(|bits| {
+                bits.iter()
+                    .fold(0, |byte, bit| (byte << 1) | u8::from(*bit == 0xFC))
+            })
+            .max()
+            .unwrap_or(0)
+    }
+
     pub fn black() -> Self {
         encode(&[Rgb::BLACK; PIXEL_COUNT], ChannelCeiling(0))
     }
@@ -214,6 +226,9 @@ pub struct BlankReceipt {
     pub reason: BlankReason,
     /// Successful transfer only, never an assertion that the LEDs are optically off.
     pub write: WriteReceipt,
+    /// `Some((steps, us))` when this black ended a fade: its lit steps and
+    /// how long since the fade began; `None` for a black at once.
+    pub faded: Option<(u32, u64)>,
 }
 
 #[derive(Debug)]
@@ -321,6 +336,11 @@ pub struct GuardedRing<S: FrameSink> {
     late_last: Option<MonoTime>,
     /// Late writes so far that were kept as frames, for the owner to say.
     late_writes: u64,
+    /// The highest channel value put on the wire since [`Self::take_peak`].
+    peak_written: u8,
+    /// Fades begun since [`Self::take_peak`]: most end under the resting
+    /// face, with no black and so no [`BlankReceipt`].
+    fades_begun: u32,
     /// The newest of them.
     last_late: Option<LateWrite>,
     /// The cue or resting frame on the strip, as written, while it is lit.
@@ -358,6 +378,7 @@ struct Fade {
     reason: lamp_turn_owner::Error,
     started_at: MonoTime,
     written_at: MonoTime,
+    steps: u32,
 }
 
 /// A cue that ended for one of these fades out ([`FADE_US`]); any other
@@ -392,6 +413,8 @@ impl<S: FrameSink> GuardedRing<S> {
             late_since: None,
             late_last: None,
             late_writes: 0,
+            peak_written: 0,
+            fades_begun: 0,
             last_late: None,
             lit: None,
             fading: None,
@@ -595,6 +618,17 @@ impl<S: FrameSink> GuardedRing<S> {
     }
 
     /// Late writes so far that were kept as frames (see [`LATE_RUN_US`]).
+    /// The highest channel value written since the last call, read off the
+    /// encoded frames themselves (after every ceiling and cap); then 0.
+    pub fn take_peak(&mut self) -> u8 {
+        std::mem::take(&mut self.peak_written)
+    }
+
+    /// The fades begun since the last call; then 0.
+    pub fn take_fades(&mut self) -> u32 {
+        std::mem::take(&mut self.fades_begun)
+    }
+
     pub fn late_writes(&self) -> u64 {
         self.late_writes
     }
@@ -630,6 +664,7 @@ impl<S: FrameSink> GuardedRing<S> {
         started_at: MonoTime,
     ) -> Result<WriteReceipt, WriteFailure> {
         self.sink.write_frame(frame).map_err(WriteFailure::Io)?;
+        self.peak_written = self.peak_written.max(frame.peak());
         let finished_at = (self.clock)();
         let measured_us = finished_at
             .as_micros()
@@ -700,7 +735,11 @@ impl<S: FrameSink> GuardedRing<S> {
         // Copy a fixed 1,028-byte frame; no heap allocation or arbitrary retry.
         let frame = self.black.clone();
         let write = self.transfer(&frame, (self.clock)())?;
-        Ok(BlankReceipt { reason, write })
+        Ok(BlankReceipt {
+            reason,
+            write,
+            faded: None,
+        })
     }
 
     fn latch_fault(&mut self) {
@@ -760,7 +799,9 @@ impl<S: FrameSink> GuardedRing<S> {
                     reason,
                     started_at: now,
                     written_at: now,
+                    steps: 0,
                 });
+                self.fades_begun += 1;
                 return Ok(None);
             }
         }
@@ -812,12 +853,18 @@ impl<S: FrameSink> GuardedRing<S> {
         if peak == 0 {
             return self
                 .blank(BlankReason::AuthorityLost(fade.reason))
-                .map(Some);
+                .map(|receipt| {
+                    Some(BlankReceipt {
+                        faded: Some((fade.steps, elapsed)),
+                        ..receipt
+                    })
+                });
         }
         let ceiling = ChannelCeiling(peak);
         self.transfer(&encode(&pixels, ceiling), now)?;
         self.fading = Some(Fade {
             written_at: now,
+            steps: fade.steps + 1,
             ..fade
         });
         Ok(None)
