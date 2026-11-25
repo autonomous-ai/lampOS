@@ -1024,34 +1024,65 @@ pub(crate) fn is_greeting(word: &str) -> bool {
         .any(|greeting| word.eq_ignore_ascii_case(greeting))
 }
 
-/// Whether `heard` opens with a greeting and then a word written for the
-/// lamp's name ([`written_for_the_name`]), that word set off by a comma or a
+/// The words a greeted stand-in may be ([`greeted_stand_in`]): only those
+/// shaped like the lamp's name. Not a word said to a person ("man", "mom"),
+/// nor a name or word of its own ("helen", "milan", "plan", "amen"): in a
+/// busy room "Hi, Mom." or "Hey, Helen!" said to someone is their talk (the
+/// Reviewer-lead's and Twelve's P3s on #8672).
+const GREETED_STAND_INS: &[&str] = &["lynn", "lyn", "lin", "len", "lan", "lam"];
+
+/// Whether `heard` opens with a greeting and then a word shaped like the
+/// lamp's name ([`GREETED_STAND_INS`]), that word set off by a comma or a
 /// stop, or ending the line: "Hey, Lynn. What time is it?", "Hi, Lan, …",
-/// "Hey, man. …", "Hello, Lynn.". That is how speech to text writes "Hey
-/// Lamp, …" (#1712: on lamp-4ace on 19 Oct "Hey Lamp, how are you today?"
-/// came back "Hey, Lynn. How are you today?"). Such a word with no greeting
-/// before it ("Lynn, pass me that") is not, nor one running on into the
-/// sentence ("Hey man what's up").
+/// "Hello, Lynn.". That is how speech to text writes "Hey Lamp, …" (#1712:
+/// on lamp-4ace on 19 Oct "Hey Lamp, how are you today?" came back "Hey,
+/// Lynn. How are you today?"). Such a word with no greeting before it
+/// ("Lynn, pass me that") is not, nor one running on into the sentence
+/// ("Hey lynn what's up"), nor "Hey, man." or "Hi, Mom.".
 pub(crate) fn greeted_stand_in(heard: &str) -> bool {
-    let mut words = heard
-        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
-        .filter(|word| !word.is_empty());
-    let (Some(greeting), Some(word)) = (words.next(), words.next()) else {
+    // The first two words where they stand in the line, so the word is read
+    // in its own place (Twelve's P3 on #8672: a search for its letters could
+    // land in the greeting).
+    let mut spans = Vec::with_capacity(2);
+    let mut start = None;
+    for (at, c) in heard.char_indices() {
+        let in_word = c.is_alphanumeric() || c == '\'';
+        match (in_word, start) {
+            (true, None) => start = Some(at),
+            (false, Some(from)) => {
+                spans.push((from, at));
+                start = None;
+                if spans.len() == 2 {
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    if spans.len() < 2
+        && let Some(from) = start
+    {
+        spans.push((from, heard.len()));
+    }
+    let [(greeting_from, greeting_to), (word_from, word_to)] = spans[..] else {
         return false;
     };
+    let (greeting, word) = (
+        &heard[greeting_from..greeting_to],
+        &heard[word_from..word_to],
+    );
     if !["hey", "hi", "hello", "ok", "okay"]
         .iter()
         .any(|known| greeting.eq_ignore_ascii_case(known))
-        || !written_for_the_name(word)
+        || !GREETED_STAND_INS
+            .iter()
+            .any(|known| word.eq_ignore_ascii_case(known))
     {
         return false;
     }
     // The word set off: what follows it, past spaces, is a comma, a stop or
     // nothing at all.
-    let Some(at) = heard.find(word) else {
-        return false;
-    };
-    let after = heard[at + word.len()..].trim_start();
+    let after = heard[word_to..].trim_start();
     after.is_empty() || after.starts_with([',', '.', '!', '?', ';', ':'])
 }
 
@@ -8011,22 +8042,30 @@ mod tests {
         let call = "Hey, Lynn. What is 24 times three?";
         // Off: dropped in a busy room, however sure, as before.
         assert!(weighed(false, call, 1.0));
-        // On: kept with a sure hearing; a greeted "man" or "Lan" too.
+        // On: kept with a sure hearing; a greeted "Lan" too.
         assert!(!weighed(true, call, 1.0));
-        assert!(!weighed(
+        assert!(!weighed(true, "Hi, Lan, what time is it?", 0.999));
+        // Still dropped: no greeting, a hearing under the sure score, a word
+        // running on into the sentence, another person's name, or a word said
+        // to a person or a name of its own, though written for the lamp's
+        // name elsewhere (the Reviewer-lead's and Twelve's P3s on #8672).
+        assert!(weighed(true, "Lynn, pass me that.", 1.0));
+        assert!(weighed(true, call, 0.98));
+        assert!(weighed(true, "Hey lynn what's up with the printer?", 1.0));
+        assert!(weighed(true, "Hey, Lance. Can you come here?", 1.0));
+        assert!(weighed(
             true,
             "Hey, man. Make your light a little dimmer.",
             1.0
         ));
-        assert!(!weighed(true, "Hi, Lan, what time is it?", 0.999));
-        // Still dropped: no greeting, a hearing under the sure score, a word
-        // running on into the sentence, or another person's name.
-        assert!(weighed(true, "Lynn, pass me that.", 1.0));
-        assert!(weighed(true, call, 0.98));
-        assert!(weighed(true, "Hey man what's up with the printer?", 1.0));
-        assert!(weighed(true, "Hey, Lance. Can you come here?", 1.0));
+        assert!(weighed(true, "Hi, Mom. I'll be home at six.", 1.0));
+        assert!(weighed(true, "Hey, Helen! Can you check the printer?", 1.0));
         assert!(greeted_stand_in("Hello, Lynn."));
+        assert!(greeted_stand_in("Hey, Len"));
         assert!(!greeted_stand_in("Hello! How was your weekend?"));
+        // The word is read where it stands, past the greeting.
+        assert!(!greeted_stand_in("Hello lynnwood, hi."));
+        assert!(!greeted_stand_in("Hey"));
     }
 
     #[test]

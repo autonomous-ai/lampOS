@@ -5956,12 +5956,17 @@ after a take-over, but now for every turn:
     **"Hey, Lynn. …" in a busy room** (`LAMP_NAME_GREETED_STAND_IN=on`, the
     product owner's first rule of 25 Nov 2026: a clear "Hey Lamp" counts,
     face or no face): a sure hearing outlives the ruling in a busy room too
-    when the line opens with a greeting and then a word written for the
-    lamp's name, set off (`attention::greeted_stand_in`: "Hey, Lynn. What
-    time is it?", "Hi, Lan, …", "Hey, man. …"), the shape speech to text
-    gives "Hey Lamp, …" (#1712). A stand-in with no greeting ("Lynn, pass
-    me that"), one running on ("Hey man what's up"), another person's name
-    ("Hey, Lance.") and a hearing under the sure score stay ruled. On
+    when the line opens with a greeting and then a word shaped like the
+    lamp's name (`attention::GREETED_STAND_INS`: "lynn", "lyn", "lin",
+    "len", "lan", "lam"), set off (`attention::greeted_stand_in`: "Hey,
+    Lynn. What time is it?", "Hi, Lan, …"), the shape speech to text gives
+    "Hey Lamp, …" (#1712). A stand-in with no greeting ("Lynn, pass me
+    that"), one running on ("Hey lynn what's up"), another person's name
+    ("Hey, Lance."), a word said to a person or a name of its own though
+    written for the lamp's name elsewhere ("Hey, man.", "Hi, Mom.", "Hey,
+    Helen!": the Reviewer-lead's and Twelve's P3s on #8672) and a hearing
+    under the sure score stay ruled. A busy-office call under the sure score
+    (the owner's 0.94 at 18:15) is not this switch's. On
     lamp-74ff on 25 Nov at 19:49, request 34, "Hey, Lynn. What is 24 times
     three?" at 1.00 was kept only because the room was quiet.
     The first builder's rulings at 12:45 on #8092 ("the bar is a pet's: it
