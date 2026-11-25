@@ -37,7 +37,7 @@ lamp also says once when the opt-in is turned off.
    not mouth or owner check"). Only a line spoken at the lamp counts
    (`heard`); one nobody spoke (a skill's, a written turn's) is refused
    (`seen_yes::NOT_SPOKEN`). `LAMP_NOTICING_BY_DEFAULT=on` (#7767,
-   switches.md; off unless set, in no unit) turns a missing
+   switches.md; off unless set, on in the product's units) turns a missing
    `seen-activity.json` into a yes nobody gave (`"by":"default"`, no
    time), by `lamp_msgs::consent::allowed`'s one rule, shared with face
    expressions, room sounds and health reports (these with their own

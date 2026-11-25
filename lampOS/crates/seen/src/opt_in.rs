@@ -8,11 +8,11 @@
 //! present only while the yes stands (Fourteen's design on #6543). It is a
 //! yes only when [`KEY`] is exactly `"yes"`; missing, unreadable, over
 //! `lamp_msgs::consent::MOST_BYTES` (4096), not JSON or anything else is
-//! no. With `LAMP_NOTICING_BY_DEFAULT=on` (#7767, off unless set, in no
-//! unit) a missing file is a yes nobody gave and a kept `"no"` stays no. It
-//! is read with `lamp_msgs::consent::read_or`, the same rule lamp-ears
-//! keeps for `room-sounds.json`, and read again every [`READ_EVERY`], as
-//! lamp-ears asks its yes again every 2 s: once the file is gone, the gate
+//! no. With `LAMP_NOTICING_BY_DEFAULT=on` (#7767, off unless set, on in
+//! the product's units) a missing file is a yes nobody gave and a kept
+//! `"no"` stays no. It is read with `lamp_msgs::consent::read_or`, the
+//! same rule lamp-ears keeps for `room-sounds.json`, and read again every
+//! [`READ_EVERY`], as lamp-ears asks its yes again every 2 s: once the file is gone, the gate
 //! closes at the next read.
 //!
 //! `lamp-seen` never writes the consent folder. The voice writes the file
