@@ -3764,6 +3764,200 @@ pub fn say_text(say: &toml::Value) -> Option<String> {
     (plain && !web && sentences >= 1 && within).then(|| text.to_owned())
 }
 
+/// The fields of a say table `lamp-skills pack` takes and a made skill's
+/// say drops ([`say_made_plain`]): how urgent it is and when it lapses,
+/// which a made skill's one line of its own words never needs.
+const SAY_PACK_ONLY: [&str; 2] = ["priority", "expires"];
+
+/// A made skill's `skill.toml` with each say step written in a form
+/// `lamp-skills pack` takes but [`say_text`] refuses made the voice's own,
+/// `say = { text = "…" }` (#8514; El's run on lamp-ee17, 25 Nov: the
+/// agent's draft passed its own `pack` with a `priority`, the voice refused
+/// it, and its repair outran the make's time): its `priority` and
+/// `expires` taken out ([`SAY_PACK_ONLY`]), and a `text` that is a list of
+/// one string made that string. The string is never changed, and nothing
+/// is put in; any other form (a list of several lines, a note, `from`)
+/// stays as it came, for [`capped`] to refuse with its repair lines, and
+/// so do words quoted, braced or with a link, which [`say_text`] still
+/// refuses. Each change is one entry taken out ([`field_taken_out`]) or the
+/// list's brackets taken from round its string ([`one_line_listed`]), kept
+/// only when the text then reads as the same skill with that change alone,
+/// as [`tidied`] does. What changed is given back for the one journal
+/// line [`keep_asked`] writes ([`SayMadePlain::journal_line`]), never the
+/// say's words.
+pub fn say_made_plain(text: &str) -> (String, SayMadePlain) {
+    let mut done = SayMadePlain::default();
+    let Ok(mut table) = toml::from_str::<toml::Table>(text) else {
+        return (text.to_owned(), done);
+    };
+    let mut text = text.to_owned();
+    let steps = table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .map_or(0, Vec::len);
+    for index in 0..steps {
+        let say: &dyn Fn(&mut toml::Table) -> Option<&mut toml::Table> =
+            &|table| say_of(table, index);
+        for key in SAY_PACK_ONLY {
+            let has = table["do"][index]
+                .get("say")
+                .and_then(toml::Value::as_table)
+                .is_some_and(|say| say.contains_key(key));
+            if !has {
+                continue;
+            }
+            if let Some((plain, expected)) = field_taken_out(&text, &table, say, key) {
+                text = plain;
+                table = expected;
+                if !done.dropped.contains(&key) {
+                    done.dropped.push(key);
+                }
+            }
+        }
+        if let Some((plain, expected)) = one_line_listed(&text, &table, say) {
+            text = plain;
+            table = expected;
+            done.listed = true;
+        }
+    }
+    (text, done)
+}
+
+/// A table's `index`th `[[do]]` step's say table, if it has one.
+fn say_of(table: &mut toml::Table, index: usize) -> Option<&mut toml::Table> {
+    table
+        .get_mut("do")?
+        .as_array_mut()?
+        .get_mut(index)?
+        .get_mut("say")?
+        .as_table_mut()
+}
+
+/// What [`say_made_plain`] changed: the say fields it dropped, and
+/// whether a list of one line was made that line.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SayMadePlain {
+    pub dropped: Vec<&'static str>,
+    pub listed: bool,
+}
+
+impl SayMadePlain {
+    /// The one journal line for the skill called `name` (First's condition
+    /// on #8514): its name and the fields changed, never the say's words.
+    /// None when nothing changed.
+    pub fn journal_line(&self, name: &str) -> Option<String> {
+        let mut what = Vec::new();
+        if !self.dropped.is_empty() {
+            what.push(format!("dropped {}", self.dropped.join(", ")));
+        }
+        if self.listed {
+            what.push("list of one made a string".to_owned());
+        }
+        (!what.is_empty()).then(|| {
+            format!(
+                "lamp-voice: make: skill {name}: the say step's form was made plain (#8514): {}",
+                what.join("; ")
+            )
+        })
+    }
+}
+
+/// `text` with a say's `text = ["…"]`, a list of one string, written as
+/// that string, and the table it then reads as ([`say_made_plain`]): the
+/// string's own characters as they stand, only the brackets round it (and
+/// a comma after it) taken out, kept only when the text then reads as
+/// `table` with that one change. None for any other `text`.
+fn one_line_listed(
+    text: &str,
+    table: &toml::Table,
+    say: &dyn Fn(&mut toml::Table) -> Option<&mut toml::Table>,
+) -> Option<(String, toml::Table)> {
+    let mut expected = table.clone();
+    let field = say(&mut expected)?.get_mut("text")?;
+    let line = match field.as_array()?.as_slice() {
+        [toml::Value::String(line)] => line.clone(),
+        _ => return None,
+    };
+    *field = toml::Value::String(line);
+    let mut start = 0;
+    for line in text.split_inclusive('\n') {
+        for (from, to, string) in listed_strings(line) {
+            let plain = format!(
+                "{}{}{}",
+                &text[..start + from],
+                &line[string.0..string.1],
+                &text[start + to..]
+            );
+            if toml::from_str::<toml::Table>(&plain).is_ok_and(|read| read == expected) {
+                return Some((plain, expected));
+            }
+        }
+        start += line.len();
+    }
+    None
+}
+
+/// Where in `line` each `text = [ "…" ]` list of one string is
+/// ([`one_line_listed`]): the list's span, brackets and all, and its
+/// string's, quotes and all. A basic string's escapes are skipped whole;
+/// what this misreads, the read back refuses.
+fn listed_strings(line: &str) -> Vec<(usize, usize, (usize, usize))> {
+    let bytes = line.as_bytes();
+    let blank = |at: usize| {
+        let mut at = at;
+        while bytes
+            .get(at)
+            .is_some_and(|byte| matches!(byte, b' ' | b'\t'))
+        {
+            at += 1;
+        }
+        at
+    };
+    let mut found = Vec::new();
+    for (at, _) in line.match_indices("text") {
+        let before = line[..at].trim_end();
+        if !(before.is_empty() || before.ends_with('{') || before.ends_with(',')) {
+            continue;
+        }
+        let equals = blank(at + "text".len());
+        if bytes.get(equals) != Some(&b'=') {
+            continue;
+        }
+        let open = blank(equals + 1);
+        if bytes.get(open) != Some(&b'[') {
+            continue;
+        }
+        let from = blank(open + 1);
+        let Some(&quote) = bytes.get(from).filter(|byte| matches!(byte, b'"' | b'\'')) else {
+            continue;
+        };
+        let mut end = None;
+        let mut escaped = false;
+        for (offset, &byte) in bytes[from + 1..].iter().enumerate() {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' && quote == b'"' {
+                escaped = true;
+            } else if byte == quote {
+                end = Some(from + 1 + offset + 1);
+                break;
+            }
+        }
+        let Some(to) = end else {
+            continue;
+        };
+        let mut close = blank(to);
+        if bytes.get(close) == Some(&b',') {
+            close = blank(close + 1);
+        }
+        if bytes.get(close) != Some(&b']') {
+            continue;
+        }
+        found.push((open, close + 1, (from, to)));
+    }
+    found
+}
+
 /// The least `absent_for` of a made skill on a face coming into view
 /// (#6070, the Reviewer-lead's P2): a face lost for a frame and seen again
 /// is the same person still there, never someone new to greet (CLAUDE.md
@@ -10097,7 +10291,14 @@ pub fn keep_asked(
     // loosened (#6811, with [`REACTIONS_ENVIRONMENT`] on): marked as asked.
     let limits =
         limits_asked(request.request) || (reactions_on() && behaviour_trigger_of(&files.toml));
-    files.toml = paced_for(&files.toml, asked, limits, repeat);
+    // A say in a form `pack` takes made the voice's own (#8514), before
+    // it is paced and checked: one journal line naming the skill and what
+    // changed, never its words.
+    let (plain, done) = say_made_plain(&files.toml);
+    if let Some(line) = done.journal_line(&card_name(&files.card).unwrap_or_default()) {
+        eprintln!("{line}");
+    }
+    files.toml = paced_for(&plain, asked, limits, repeat);
     let waited = waited.filter(|_| dropped_wait(&files.toml).is_none());
     // A blink's gap, which [`tidied`] takes out: the blinking said as left
     // out, with whatever else the model left out.
@@ -14089,6 +14290,115 @@ say = { text = "Welcome back!" }
         assert_eq!(MOST_REQUEST_CHARS, 2_000);
     }
 
+    /// #8514, El's run 1816 on lamp-ee17 (25 Nov): the agent's draft passed
+    /// its own `lamp-skills pack` with a say in a form pack takes, and the
+    /// voice refused it. A `priority` or `expires` is dropped and a list of
+    /// one line made that line, the words as written, before the check, so
+    /// it is kept on the first answer; the one journal line names the skill
+    /// and the fields, never the words (First's condition). A list of
+    /// several lines, a note, `from`, or words quoted stay refused.
+    #[test]
+    fn a_say_step_in_packs_list_or_priority_form_is_made_plain_and_kept() {
+        let kept = [
+            (
+                "{ text = \"Welcome back!\", priority = 9 }",
+                &["priority"][..],
+                false,
+            ),
+            (
+                "{ text = \"Welcome back!\", expires = \"1h\" }",
+                &["expires"],
+                false,
+            ),
+            (
+                "{ text = \"Welcome back!\", priority = 5, expires = \"10m\" }",
+                &["priority", "expires"],
+                false,
+            ),
+            ("{ text = [\"Welcome back!\"] }", &[], true),
+            ("{ text = [ 'Welcome back!', ] }", &[], true),
+            (
+                "{ priority = 2, text = [\"Welcome back!\"] }",
+                &["priority"],
+                true,
+            ),
+        ];
+        for (say, dropped, listed) in kept {
+            let text = HELLO.replace("{ text = \"Welcome back!\" }", say);
+            assert!(capped(&text).is_err(), "{say}: refused as it came");
+            let (plain, done) = say_made_plain(&text);
+            // The words as written, quotes and all: only the form changes.
+            let words = match say.contains('\'') {
+                true => "{ text = 'Welcome back!' }",
+                false => "{ text = \"Welcome back!\" }",
+            };
+            assert_eq!(
+                plain,
+                HELLO.replace("{ text = \"Welcome back!\" }", words),
+                "{say}"
+            );
+            assert_eq!(done.dropped, dropped, "{say}");
+            assert_eq!(done.listed, listed, "{say}");
+            capped(&plain).unwrap_or_else(|why| panic!("{say}: {why:?}"));
+            assert!(
+                plainly_with(&plain, false)
+                    .unwrap()
+                    .contains("Welcome back!"),
+                "{say}"
+            );
+            let line = done.journal_line("hello-pebble").unwrap();
+            assert!(line.contains("skill hello-pebble"), "{line}");
+            assert!(line.contains("(#8514)"), "{line}");
+            for field in dropped {
+                assert!(line.contains(field), "{line}");
+            }
+            assert_eq!(line.contains("list of one made a string"), listed, "{line}");
+            assert!(
+                !line.contains("Welcome") && !line.contains("back!"),
+                "{line}"
+            );
+        }
+        assert_eq!(
+            say_made_plain(HELLO),
+            (HELLO.to_owned(), SayMadePlain::default())
+        );
+        assert_eq!(SayMadePlain::default().journal_line("hello-pebble"), None);
+        for say in [
+            "{ text = [\"Hi.\", \"Hello.\"] }",
+            "{ text = [\"Hi.\", \"Hello.\"], priority = 9 }",
+            "{ note = \"greet them warmly\", priority = 9 }",
+            "{ from = \"tasks\" }",
+            "{ text = [\"Say \\\"hello there\\\"\"] }",
+            "{ text = \"Say \\\"hello there\\\"\", priority = 9 }",
+            "{ text = [\"See https://example.com now\"] }",
+        ] {
+            let text = HELLO.replace("{ text = \"Welcome back!\" }", say);
+            let (plain, _) = say_made_plain(&text);
+            match capped(&plain) {
+                Err(Refused(why, Some(_))) => assert_eq!(why, SAY_NOT_TEXT, "{say}"),
+                other => panic!("{say}: {other:?}"),
+            }
+        }
+        // Through the make: the first answer's say with a priority is
+        // checked, said and handed to the checker, never refused for its
+        // form (no checker here, so "couldn't check it").
+        let dir = std::env::temp_dir().join(format!("made-say-plain-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let keeping = Keeping {
+            directory: dir.clone(),
+            program: dir.join("no-such-program"),
+            manage: dir.join("manage.sock"),
+            installed: dir.join("skills"),
+        };
+        let toml = HELLO.replace(
+            "{ text = \"Welcome back!\" }",
+            "{ text = [\"Welcome back!\"], priority = 9 }",
+        );
+        let refused = keep(&answer(&toml, CARD), false, "s:1:2", &keeping).unwrap_err();
+        assert_eq!(refused.0, NOT_CHECKED);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     /// #6062: a say that isn't exact words (a bare note, `{ note }`, a list),
     /// or words quoted, with a web address, a control or a format
     /// character, is refused, plainly and with lines for a repair; a say
@@ -14101,7 +14411,6 @@ say = { text = "Welcome back!" }
             "\"greet them warmly\"".to_owned(),
             "{ note = \"greet them warmly\" }".to_owned(),
             "{ text = [\"Hi.\", \"Hello.\"] }".to_owned(),
-            "{ text = \"Hi.\", priority = 9 }".to_owned(),
             "{ from = \"tasks\" }".to_owned(),
             "{ text = \"Say \\\"hello there\\\"\" }".to_owned(),
             "{ text = \"See https://example.com now\" }".to_owned(),
