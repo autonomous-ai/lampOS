@@ -3709,7 +3709,13 @@ xem việc của mình, #7930). Nếu việc vẫn chờ agent của nó (`queue
 `working` với `waiting` là true), không có việc nào bắt đầu trước nó còn
 đang chạy (chưa `done`), và vẫn là việc được giao gần nhất,
 giọng nói nhờ dịch vụ say nói một câu, như câu của chính nó, ở mức ưu tiên
-thường; nếu không bắt đầu nói được trong 15 s thì bỏ:
+thường; nếu không bắt đầu nói được trong 15 s thì bỏ. Câu được nhờ như một
+client của socket say (`LAMP_SAY_SOCKET`, `/run/lampos-say/say.sock` nếu không
+đặt), với tên skill `voice-tasks`: lời gọi tool của lần giao chạy trong worker
+của route thứ hai, một tiến trình không giữ lời nhờ nội bộ nào của giọng nói
+(#8510, lamp-ee17: mọi lần giao đều ghi `no line: no say service` khi chúng
+được giữ lúc tiến trình chính khởi động). Dịch vụ kiểm tra nó như mọi câu
+say. Câu đó:
 
 - "Your computer is waking up; it'll start in a moment.";
 - với engine của chính đèn, "I'm still getting ready; I'll start in a
@@ -3745,8 +3751,11 @@ after 20 s: said it is starting`; một lần xem kết thúc không có câu gh
 dòng lý do, `lamp-voice: tasks: work N after 20 s: no line: <reason>`, lý do
 là một trong `read failed`, `not on the records`, `with its agent`, `not
 queued or working`, `behind earlier work`, `not the last hand-over` hoặc
-`already said`; một lần giao khi không có dịch vụ say ghi `lamp-voice:
-tasks: work N: no line: no say service`.
+`already said`; một lần giao khi không có dịch vụ say (không có gì trả lời ở
+socket của nó) ghi `lamp-voice: tasks: work N: no line: no say service`. Một
+câu bị dịch vụ say từ chối ghi `lamp-voice: tasks: work N after 20 s: no
+line: the say service refused: <why>`, và một câu đã bắt đầu mà không nói
+xong, hoặc bị bỏ, ghi `... the line not said: <outcome>`.
 
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
