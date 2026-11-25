@@ -5,6 +5,10 @@ usage: scenario.py NAME STEP [STEP ...]
   STEP is  VOICE|TEXT|WAIT_AFTER_SECONDS      e.g.  "Daniel|Lamp, how are you today?|9"
            or  pause|SECONDS
            or  wav|PATH|WAIT_AFTER_SECONDS|LABEL   a wav played as it is, its PLAY line "wav: LABEL"
+           or  bg|NAME|VOLUME[|LEAD]          make_noise.py's bed NAME under the rest of the scene, at afplay's VOLUME
+                                               (0 to 1), LEAD seconds (2) before the next step; "bgstop" ends it
+  WAIT_AFTER_SECONDS may be "6a": 6 s after the lamp is done with the line (its answer played to its last sample, or
+  its turn ended with none), as a person goes on after the lamp stops.
 Speech is synthesised once with macOS `say`, kept in $PLAYED_OUT/prompts/generated/ and reused. A played voice is a smoke
 test: the lamp's voice microphone hears replayed speech worse than a person. Output is also saved under
 $PLAYED_OUT/scenarios/ (PLAYED_OUT defaults to ~/lamp-played). The lamp is reached with lamp_ssh beside this file
@@ -33,6 +37,33 @@ KEEP = ('listening_ready', 'input_candidate', 'input_admitted', 'local_endpoint'
         'provider_turn_failed', 'provider_unavailable', 'provider_ready', 'input_candidate_rejected', 'duplex_yield', 'duplex_commit', 'duplex_resume', 'barrier_assumed',
         'provider_ownership_assumed', 'provider_turn_complete', 'provider_terminal', 'service_provider_ended', 'provider_first_audio')
 
+TAIL = r'''S=$(sudo -n ls -t /var/lib/lampOS/voice/sessions | head -1); F=$(sudo -n sh -c "ls -t /var/lib/lampOS/voice/sessions/$S/metadata/events-*.jsonl" | head -1); sudo -n tail -n 400 "$F"; python3 -c 'import time; print("NOW", time.monotonic_ns()//1000)' '''
+BUSY = ('speaker_first_write', 'provider_audio_enqueued', 'input_candidate', 'transcript', 'local_endpoint')
+
+def lamp_done(since_us, most=90.0, quiet_us=2_000_000):
+    """Until the lamp is done with the line played at `since_us` (the lamp's clock): a turn finished after it, nothing
+    heard or said for `quiet_us` since, and no answer begun after that turn's end. At most `most` seconds."""
+    until = time.monotonic() + most
+    while time.monotonic() < until:
+        time.sleep(0.8)
+        try:
+            out = lamp(TAIL, timeout=10)
+        except subprocess.TimeoutExpired:
+            continue
+        now, finished, busy = None, 0, 0
+        for line in out.splitlines():
+            if line.startswith('NOW '):
+                now = int(line[4:]); continue
+            try: r = json.loads(line)
+            except ValueError: continue
+            at = r.get('at_us', 0)
+            if at <= since_us: continue
+            if r.get('kind') == 'turn_finished': finished = max(finished, at)
+            elif r.get('kind') in BUSY: busy = max(busy, at)
+        if now and finished and busy <= finished and now - max(finished, busy) >= quiet_us:
+            return True
+    return False
+
 def main():
     if not os.environ.get('LAMP_HOST'):
         sys.exit("scenario.py: LAMP_HOST is not set. Set it to your own lamp's address (see README.md). Nothing was played.")
@@ -45,21 +76,38 @@ def main():
     name, steps = sys.argv[1], sys.argv[2:]
     start = int(lamp("python3 -c 'import time; print(time.monotonic_ns()//1000)'").strip())
     played = []
+    background, beds = None, []
     for step in steps:
         parts = step.split('|')
         if parts[0] == 'pause':
             time.sleep(float(parts[1])); continue
+        if parts[0] == 'bg':
+            if background: background.terminate()
+            at = int(lamp("python3 -c 'import time; print(time.monotonic_ns()//1000)'").strip())
+            background = subprocess.Popen(['/usr/bin/afplay', '-v', parts[2], f'{V}/prompts/noise/{parts[1]}.wav'])
+            beds.append((at, parts[1], parts[2]))
+            time.sleep(float(parts[3]) if len(parts) > 3 else 2.0)
+            continue
+        if parts[0] == 'bgstop':
+            if background: background.terminate(); background = None
+            continue
         if parts[0] == 'wav':
-            voice, path, wait = 'wav', parts[1], float(parts[2])
+            voice, path, wait = 'wav', parts[1], parts[2]
             text = parts[3] if len(parts) > 3 else os.path.basename(path)
         else:
-            voice, text, wait = parts[0], parts[1], float(parts[2])
+            voice, text, wait = parts[0], parts[1], parts[2]
             path = wav_for(voice, text)
         at = int(lamp("python3 -c 'import time; print(time.monotonic_ns()//1000)'").strip())
         subprocess.run(['/usr/bin/afplay', path], check=True)
         done = time.monotonic()
         played.append((at, voice, text))
-        time.sleep(wait)
+        if wait.endswith('a'):
+            lamp_done(at)
+            time.sleep(float(wait[:-1]))
+        else:
+            time.sleep(float(wait))
+    if background:
+        background.terminate()
     rows = []
     # Turns whose audio reached the speaker, from the whole session: a turn cut before its first write (the person went
     # on talking, 17 Oct 16:2x) has a transcript of words never heard, which read as the lamp saying its opening twice.
@@ -72,6 +120,7 @@ def main():
     rows.sort(key=lambda r: r.get('service_sequence', 0))
     out = [f'scenario {name}  {time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}  say rate {RATE}']
     events = [(at, 'PLAY ', f'{voice}: {text}') for at, voice, text in played]
+    events += [(at, '     ', f'[background {bed} at volume {volume}]') for at, bed, volume in beds]
     ep = None; waits = []
     for r in rows:
         k = r['kind']; at = r['at_us']

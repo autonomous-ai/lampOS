@@ -438,6 +438,60 @@ lampOS/tools/played/night_compare.py r1 r2      # two rounds side by side
   lock or lease: on a shared lamp, run it under `lamp-lock.sh <lamp> run`,
   as above.
 
+## The scored voice set (voiceset.py)
+
+`voiceset.py LABEL [GROUP | GROUP/SCENE ...]` plays every voice use case as
+a scene, in macOS voices from this computer's speakers. It then scores each
+line from the voice's own events against what should happen:
+
+- `A`: answered.
+- `Q`: left alone.
+- `S`: the lamp stops talking.
+- `-`: played and kept, not scored.
+
+It is the set for runs compared day by day and week by week: the same lines,
+the same voices and the same beds every time. `voiceset.py --list` prints
+the groups:
+
+| Group | What it plays |
+|---|---|
+| `calls`, `calls-2` | "Hey Lamp" in every form and position, in about 20 voices and accents |
+| `follow-ups`, `multi-turn`, `corrections` | Conversations of 2 to 4 turns with the name only at the start, a change of mind, and a line 35 s after an answer (left alone) |
+| `questions`, `everyday`, `controls`, `controls-2`, `timers`, `timers-2` | Asks of each kind, the light by voice, and timers rung out |
+| `delivery` | Quiet, fast, slow, hesitant and long asks |
+| `cut-ins` | Stopping the lamp, and a new ask over its answer |
+| `busy`, `room`, `room-2`, `two-people` | Colleagues' talk, phone calls, TV, greetings to people, another person's name, and two people at the lamp |
+| `noise` | A call and its follow-up over make_noise.py's beds (babble, TV, a fan, music, typing) at two levels, with someone else's line in the noise |
+| `day` | The day from `day.sh`, its memory lines and computer task swapped for lines of the same kind, at day.sh's gaps (`october-day`) and as a person paces it (`paced-day`) |
+
+```sh
+export LAMP_HOST=<your lamp's address> LAMP_SSH_KEY=<your key file>
+lampOS/tools/played/make_noise.py              # once: the noise beds
+lampOS/tools/played/voiceset.py v1125          # every group, about three hours
+lampOS/tools/played/voiceset.py d1125 day/october-day calls room
+```
+
+- **Waits.** A line's wait is seconds after it, or `6a`: 6 s after the lamp
+  is done with the line, its answer played to its last sample or its turn
+  ended with none (`scenario.py`'s `lamp_done`). A follow-up then comes as a
+  person's would, however long the answer was.
+- **Beds.** A `("bg", NAME, VOLUME, '')` step plays `$PLAYED_OUT/prompts/noise/NAME.wav`
+  under the rest of the scene, at afplay's VOLUME. `make_noise.py` makes the five
+  beds, deterministic, with no recording anyone owns.
+- **Safe on a person's own lamp.** No line writes to the lamp's memory,
+  starts work on a computer, puts the lamp to sleep, turns privacy on or
+  moves its body, so a lamp with no head touch never needs waking. Run it
+  in an empty room. Scenes are 30 s apart (`VOICESET_GAP`), longer than a
+  conversation's 20 s, so each starts outside one.
+- **Results.**
+  - `$PLAYED_OUT/scenarios/voiceset-LABEL.txt`: the scorecard. A line a group, each miss with what was heard, and the first answer sound's median and p90.
+  - `voiceset-LABEL.tsv`: a row a played line.
+  - `voiceset-history.tsv`: a row a group a run (when, label, lamp, group, right, lines), for the trend.
+- **Its limits.** A played voice from a speaker is heard worse than a
+  person, and `say` voices are not people. The lines are a smoke test of
+  each use case, and the desk kit's made voices (above) are the better test
+  of hearing.
+
 ## What it needs
 
 - A Mac beside the lamp, its speaker where the lamp can hear it.
