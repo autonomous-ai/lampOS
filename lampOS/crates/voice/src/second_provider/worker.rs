@@ -12678,8 +12678,12 @@ impl Heeding {
         let said_going_on = said_going_on || yes_going_on;
         // `LAMP_FOLLOW_UPS`: 20 s from the end of the lamp's words, not the
         // thread's 45 s from its answer's start ([`thread_window_kept`]).
-        let thread_kept =
-            thread_window_kept(self.follow_ups, said_going_on, at_start(said_ago), yes_going_on);
+        let thread_kept = thread_window_kept(
+            self.follow_ups,
+            said_going_on,
+            at_start(said_ago),
+            yes_going_on,
+        );
         let going_on = going_on_from(thread_kept, at_start(said_ago), at_start(called_ago));
         if said_going_on && !going_on {
             eprintln!(
@@ -17614,11 +17618,20 @@ mod tests {
             let kept = super::thread_window_kept(follow_ups, true, said_ago, yes_going_on);
             super::going_on_from(kept, said_ago, None)
         };
-        assert!(going_on(false, Some(35), false), "off: the thread's 45 s, as before");
-        assert!(!going_on(true, Some(35), false), "35 s after the lamp's words");
+        assert!(
+            going_on(false, Some(35), false),
+            "off: the thread's 45 s, as before"
+        );
+        assert!(
+            !going_on(true, Some(35), false),
+            "35 s after the lamp's words"
+        );
         assert!(going_on(true, Some(20), false));
         assert!(!going_on(true, Some(21), false));
-        assert!(going_on(true, None, false), "no words said: the thread's window");
+        assert!(
+            going_on(true, None, false),
+            "no words said: the thread's window"
+        );
         assert!(going_on(true, Some(35), true), "a skill's yes awaited");
     }
 
@@ -31025,10 +31038,19 @@ mod tests {
             *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
             held.is_none()
         };
-        assert!(answered(true, 1, 48_000), "the conversation's own voice, no look");
+        assert!(
+            answered(true, 1, 48_000),
+            "the conversation's own voice, no look"
+        );
         assert!(!answered(true, -1, 48_000), "another voice, no look");
-        assert!(answered(true, -1, 8_000), "too short for a print: no other voice");
-        assert!(!answered(false, 1, 48_000), "off: no look holds it, as before");
+        assert!(
+            answered(true, -1, 8_000),
+            "too short for a print: no other voice"
+        );
+        assert!(
+            !answered(false, 1, 48_000),
+            "off: no look holds it, as before"
+        );
         assert!(!answered(false, -1, 48_000), "off, another voice");
     }
 
