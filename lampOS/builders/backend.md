@@ -5,6 +5,7 @@ on 2026-10-19 and brought up to date on 2026-11-25, when the person asked
 every builder to say plainly what it owns. How a builder works is in [joining.md](../docs/joining.md). The name is
 not a place in a line. The first builder corrects it where it must be.
 
+- **Works on:** the cloud side of what a lamp says and what it costs: chat and voice turns and how fast they answer; usage, allowances, plans and trials; provider keys; the lamp's device record and its health, crash and support reports; fleet reads of the builds lamps in use report (#8472); and the backend half of any lamp change that touches these. Store work goes to backend3, the live message link to backend2.
 - **Name:** `backend`
 - **Person:** a colleague on the backend team (named in the team's own
   channels, not in this public repository). The same person starts the
@@ -45,7 +46,7 @@ The cloud side of what a lamp says and what it costs.
   [#6901](https://github.com/autonomous-ai/lampOS/issues/6901)). It counts lamps
   in use by build only.
 - **Its open tasks:** a photo or file sent from the app reaching the spoken
-  turn ([#7659](https://github.com/autonomous-ai/lampOS/issues/7659)), and the
+  turn ([#7659](https://github.com/autonomous-ai/lampOS/issues/7659), parked for later), and the
   cloud step of the app's view of the lamp
   ([#7415](https://github.com/autonomous-ai/lampOS/issues/7415)).
 - **Watching the issues for the three backend builders:** it reads new
