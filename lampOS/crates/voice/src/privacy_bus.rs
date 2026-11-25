@@ -622,10 +622,34 @@ fn authority(
     guard: &mut BoundaryGuard,
     lapse: &mut DeniedLapse,
 ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
-    for _ in 0..AUTHORITY_DRAIN_MOST {
+    drain_authority(channels, guard, lapse, AUTHORITY_DRAIN_MOST)
+}
+
+/// [`authority`] with its bound as `most`: a test cannot queue
+/// [`AUTHORITY_DRAIN_MOST`] on the control socket, which holds about 118
+/// authorities on the Mac (64 KiB), so it tests the overflow at a smaller one.
+fn drain_authority(
+    channels: &mut WorkerChannels,
+    guard: &mut BoundaryGuard,
+    lapse: &mut DeniedLapse,
+    most: usize,
+) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    // The whole queue is read before any lease, in order (#8466): a worker
+    // stalled alone finds one renewal per AUTHORITY_RENEW_US queued, and a
+    // mute or a Stop behind them must land before anything is published.
+    // Each is installed, so the guard checks every one, or ridden if it
+    // lapsed in the queue. Past the bound the switch is unreadable: the
+    // microphones closed and a fresh worker, never an exit.
+    let mut read = 0;
+    loop {
         match channels.control.receive()? {
             Some(Control::Stop) => return Ok(false),
+            None => return Ok(true),
+            Some(_) if read == most => {
+                return Err(unreadable("privacy authority drain overflow"));
+            }
             Some(Control::Authority { snapshot }) => {
+                read += 1;
                 match guard.install(MonoTime::from_micros(lamp_ipc::monotonic_us()), snapshot) {
                     Ok(()) => {}
                     // Queued while the board was held up, it lapsed in the
@@ -651,15 +675,19 @@ fn authority(
                 }
             }
             Some(_) => return Err(invalid("invalid Controls privacy worker command").into()),
-            None => return Ok(true),
         }
     }
-    Err(invalid("privacy authority drain overflow").into())
 }
 
-/// The most control messages one drain reads before it says the queue
-/// overflowed (#8466).
-pub(crate) const AUTHORITY_DRAIN_MOST: usize = 16;
+/// The most authorities one drain installs or rides before the queue is the
+/// switch unreadable (#8466). Derived, not picked: twice the renewals queued
+/// for a worker stalled alone through a lease and the whole lapse ride, for
+/// the voice's event publishes on top,
+/// 4 × (`DENIED_LAPSE_MOST_US` + `MAX_AUTHORITY_LEASE_US`) /
+/// [`crate::coordinator::AUTHORITY_RENEW_US`] = 4 × 1.75 s / 20 ms = 352.
+/// Awaiting the owner's call: with no bound (option A′) the drain reads to
+/// empty however long, and this and its check go.
+pub(crate) const AUTHORITY_DRAIN_MOST: usize = 352;
 
 /// The longest a lapsed Denied-only authority is ridden (#4332): capture's
 /// own bound on a closed microphone, as the speaker's lapse.
@@ -1729,12 +1757,14 @@ pub(crate) mod tests {
         let _ = std::fs::remove_dir(&directory.path);
     }
 
-    /// Past [`AUTHORITY_DRAIN_MOST`] the queue is the switch unreadable
-    /// (#8466): a clean fault, the microphones closed and a fresh worker,
-    /// never the worker's exit 1 that ended the voice. Exactly that many
-    /// still drain.
+    /// Past its bound the queue is the switch unreadable (#8466): a clean
+    /// fault, the microphones closed and a fresh worker, never the worker's
+    /// exit 1 that ended the voice. Exactly that many still drain. Tested
+    /// at a bound of 8: the control socket cannot hold
+    /// [`AUTHORITY_DRAIN_MOST`] (it took 117-119 on the Mac).
     #[test]
     fn a_drain_past_its_bound_is_the_switch_unreadable_never_a_crash() {
+        const MOST: usize = 8;
         let directory = crate::process::SessionDirectory::create().unwrap();
         let (mut coordinator, mut worker, _input) =
             crate::process::Worker::cooperative_fixture(&directory.path, "privacy");
@@ -1742,15 +1772,14 @@ pub(crate) mod tests {
         let (mut denied, boot) = controller(began, Permission::Denied, Permission::Denied);
         let mut guard = BoundaryGuard::new(boot, MonoTime::from_micros(began));
         let mut lapse = DeniedLapse::default();
-        let over = AUTHORITY_DRAIN_MOST as u64 + 1;
-        let queued = renewals(&mut denied, began, 1, over);
-        queue(&mut coordinator, &queued);
-        let error = authority(&mut worker, &mut guard, &mut lapse).unwrap_err();
+        let over = MOST as u64 + 1;
+        queue(&mut coordinator, &renewals(&mut denied, began, 1, over));
+        let error = drain_authority(&mut worker, &mut guard, &mut lapse, MOST).unwrap_err();
         assert!(error.is::<Unreadable>(), "not a clean fault: {error}");
         assert_eq!(error.to_string(), "privacy authority drain overflow");
-        let queued = renewals(&mut denied, began + over, 1, AUTHORITY_DRAIN_MOST as u64);
+        let queued = renewals(&mut denied, began + over, 1, MOST as u64);
         queue(&mut coordinator, &queued);
-        assert!(authority(&mut worker, &mut guard, &mut lapse).unwrap());
+        assert!(drain_authority(&mut worker, &mut guard, &mut lapse, MOST).unwrap());
         assert_eq!(guard.state(), queued.last().copied());
         let _ = coordinator.channels.control.send(Control::Stop);
         drop(_input);

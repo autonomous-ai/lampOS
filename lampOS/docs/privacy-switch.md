@@ -299,6 +299,28 @@ switch on:
   stayed closed)`. The re-armed lease is judged on the switch and the mute as
   they are then: a slide closed or a software mute in the stall grants
   nothing after it.
+  The worker reads its whole control queue before any lease (#8466). A
+  stall of the privacy worker alone, the voice still running, leaves one
+  renewal queued every 20 ms (`AUTHORITY_RENEW_US`) plus the voice's own
+  event publishes; each is installed in order, or ridden as above if it
+  lapsed in the queue, so a mute or a Stop queued behind them lands before
+  anything is published, and the newest is the one held. A drain reads up
+  to 352 (`AUTHORITY_DRAIN_MOST`, 4 × (1.5 s + 250 ms) / 20 ms, the bound
+  awaiting the owner's call); a queue longer than that is the switch
+  unreadable (the microphones closed, a fresh worker), never an exit.
+  The control socket holds fewer than that (117-119 authorities in a Mac
+  test, its 64 KiB buffer; not measured on a lamp), and past what it holds
+  the voice skips renewals (#8204), so the bound is a backstop.
+  Before, a drain read 16 and ended the worker on `privacy authority drain
+  overflow` with exit 1, and the voice with it, restarted muted by the
+  guard: lamp-06c1 on 25 Nov, the #8608 row's 300 ms `SIGSTOP` of the
+  privacy worker, the microphones closed throughout. A stall of the
+  privacy worker alone over about 350 ms finds its Controls reading
+  expired on the Bus (`controls/state` lasts 300 ms, plus 50 ms grace):
+  `invalid Controls message discarded`, the switch unreadable, which ends
+  the conversation cleanly with the microphones closed, not the voice.
+  One over about 1.75 s, the lease and the whole 1.5 s lapse bound, still
+  ends the worker on `privacy controller lease expired`, as above.
 - The second worker holds closed while its lease lapsed by time and the
   controller has been silent under 1.5 s (`STALLED_CONTROL_US`): it takes no
   input, drops what was queued under the lapsed authority, sends nothing and
