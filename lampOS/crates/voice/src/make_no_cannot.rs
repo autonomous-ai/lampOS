@@ -1287,7 +1287,10 @@ pub fn on_the_clock(block: &str) -> bool {
 /// (`LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK`), which the product doesn't set
 /// (the lead's read on #8079's round 1). Off, the form reached for what
 /// only the internet tells ([`net_by_agent`]) is byte for byte as before.
-fn watch_taught() -> bool {
+/// The keep is the same switch's (`made_skill::watch_here`): a clock watch
+/// the model answers on that path alone is refused as any clock trigger
+/// that isn't a daily time, as before (the review's P2 on #8079).
+pub(crate) fn watch_taught() -> bool {
     on()
 }
 

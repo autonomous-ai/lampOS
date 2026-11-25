@@ -3787,9 +3787,17 @@ cả hai người viết.
   hẹn giờ của đèn khi lại trả lời như vậy. `cannot:` nhắc việc không có
   trigger như thế trước nó ("remind me at 5 pm to call the bakery") vẫn là
   bộ hẹn giờ của đèn y như trước. Việc theo dõi theo đồng hồ được nói
-  "Every 90 minutes, …"; chỉ được nói (và giữ) cho task của agent đèn làm ở
-  đây (`made_skill::clock_watch`, `watch_here`): bản nháp DeepSeek hỏi đồng
-  hồ đều đặn là nhắc việc lặp lại và vẫn bị từ chối. Brief mà mọi task của
+  "Every 90 minutes, …"; chỉ được nói (và giữ) với cùng công tắc
+  `LAMP_MAKE_NO_CANNOT` (`made_skill::watch_here` chính là
+  `make_no_cannot::watch_taught`; trên đường chỉ có `LAMP_TASK_NET`, trigger
+  đồng hồ mỗi khoảng vẫn bị từ chối như trước), chỉ cho task của agent đèn
+  làm ở đây (`made_skill::clock_watch`), và chỉ khi có `net` trong grants
+  (`watch_said`): bản nháp DeepSeek hỏi đồng hồ đều đặn, hay task theo
+  đồng hồ không có `net` ("every 2 hours remind me to stretch", chỉ
+  `speak`), không phải việc theo dõi và được đọc y như trước: bị từ chối
+  vì không phải giờ hằng ngày, hoặc, khi `LAMP_MADE_SKILL_LOOSE` bật như
+  sản phẩm chạy, được giữ và nói bằng lời chung ("When its moment comes,
+  …", `plainly_as`), không bao giờ "Every 2 hours". Brief mà mọi task của
   agent chạy (`make_no_cannot::SCRIPT`, `scripts/agent.py`) giờ kết thúc
   "…, or nothing at all when the task is only for when something holds and
   it doesn't now", nên việc theo dõi im lặng cho tới khi điều kiện đúng.

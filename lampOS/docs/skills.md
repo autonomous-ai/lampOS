@@ -7374,9 +7374,17 @@ the same code for both writers.
   answered so again. A `cannot:` reminder with no such trigger before it
   ("remind me at 5 pm to call the bakery") is the lamp's own timer exactly
   as before. Such a clock watch is said "Every 90 minutes, …"; it is said
-  (and kept) only for a task for the lamp's agent made here
-  (`made_skill::clock_watch`, `watch_here`): a DeepSeek draft polling on
-  the clock is a repeating reminder and stays refused. The brief every
+  (and kept) only with the same switch, `LAMP_MAKE_NO_CANNOT`
+  (`made_skill::watch_here` is `make_no_cannot::watch_taught`; on the
+  net-only path, `LAMP_TASK_NET` alone, a clock trigger every while is
+  refused as before), only for a task for the lamp's agent made here
+  (`made_skill::clock_watch`), and only with `net` among its grants
+  (`watch_said`): a DeepSeek draft polling on the clock, or a clock task
+  without `net` ("every 2 hours remind me to stretch", `speak` alone), is
+  no watch and is read exactly as before: refused as no daily time, or,
+  with `LAMP_MADE_SKILL_LOOSE` on as the product runs, kept said in
+  general words ("When its moment comes, …", `plainly_as`), never "Every
+  2 hours". The brief every
   agent task runs (`make_no_cannot::SCRIPT`, `scripts/agent.py`) now ends
   "…, or nothing at all when the task is only for when something holds and
   it doesn't now", so a watch is silent until it holds. With
