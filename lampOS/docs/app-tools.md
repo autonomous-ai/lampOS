@@ -4,7 +4,7 @@
 socket, `app.call` and `app.answer` (#8496, b936da4015), the timeout and
 `app.call.stopped` (#8511, f6e2596e05) and the voice's side (fd4dc6fdd3) are
 in the code. `LAMP_APP_TOOLS` is in no product unit, so it is off on every
-lamp; the switch-on, #8504, is open. It began as the design asked for on #8386
+lamp; the switch-on, #8602 (it replaces the closed #8504), is open. It began as the design asked for on #8386
 (the first builder's 18:14 GMT+7, 23 Nov 2026), for Heron (the voice and
 safety), Eighth (lamp-control) and Migrate (the SDK). Where this page and the
 code differ, the code is the truth. Not built yet: the per-app rate of 20 calls
@@ -166,7 +166,7 @@ runs the same ones, and the voice runs the link's own again at each read):
 
 Heron's part. Behind a new switch, `LAMP_APP_TOOLS` (lamp-voice and
 lamp-control, `on` only, off unless set, inside `LAMP_STORE_APPS`; it is in
-`docs/switches.md` and the census tests; in no product unit yet, #8504).
+`docs/switches.md` and the census tests; in no product unit yet; the switch-on is #8602, which replaces the closed #8504).
 
 **The second route only, in the first build** (Heron's answer, 18:23 on
 #8406), as `start_app` is: Live's function declarations are fixed when its
