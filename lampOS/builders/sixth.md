@@ -6,6 +6,7 @@ says. How a builder works is in [joining.md](../docs/joining.md). The name is
 the one the owner chose; it is not a place in a line. The first builder
 corrects it where it must be.
 
+- **Works on:** voice hearing and attention (lamp-name, said_to_me, LAMP_NAME_NEAR / SIGN_TIED, asked-looks: #8092, #8384, #8395); the eyes and faces (face reads, face rows); the lamp's China firmware items (#6256, F1-F9).
 - **Name:** `sixth`
 - **Person:** a colleague (named in the team's own channels, not in this public
   repository); a Claude Code session they start
