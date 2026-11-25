@@ -582,6 +582,27 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   announcement still comes before the first real answer, and a written
   turn never makes one. On lamp-4ace on 2026-10-16, 9 of 10 backup turns
   waited past 1.5 s.
+  After a lead-in (#8615 item 2, a customer: "speech pauses at random"):
+  a spoken turn that has said some words and whose next chat round is
+  still out `GAP_CUE_AFTER` (1 s) after the audio given so far ends (its
+  calls running, or a round asked, an ask again included, whose words
+  have not begun) makes the same sound once. Never twice in a reply,
+  never over a newer line, never right after another wait sound with no
+  words between, and not once the next round's words begin to come. It
+  marks the request cued, so neither `LAMP_BUSY_FOLLOW_UP_RENEWS`'s sound
+  nor a connected service's follows it in the same wait. On 70 journals
+  of 24-25 Nov, 113 of 122 sentence boundaries had no gap; those of
+  300 ms or more were nearly all such a round (7 cases, p50 1.4 s, p90
+  4.0 s: weather 1.4 s, list_reminders 0.9 s, an ask again for a live
+  figure 3.5 to 4 s, make_skill 82 s), each of its waits under 1.5 s.
+  The audio's end is when the pieces handed on would have played, as
+  `Shared::said_through` counts it. Nothing waits for it: it races the next
+  piece in the saying half. Journal: `made a sound: its next chat round
+  was still out 1000 ms after its lead-in's audio ended`. Each piece of
+  the answer is journalled once all its audio went to the speaker:
+  `request N piece K handed to the speaker: M ms of audio`; each playback
+  gap too, from the coordinator (`docs/duplex-listening.md`). Test:
+  `a_lead_in_whose_next_round_is_out_makes_one_sound`.
   With `LAMP_SECOND_CUE_AFTER_MS` (500 to 4,000 ms, off unless set), the
   sound comes that long after the words in place of 1.5 s; a value it
   can't take is said and left at 1.5 s. A ready sound also moves the
@@ -5014,7 +5035,8 @@ after a take-over, but now for every turn:
     only a sound that played counts), none
     once a newer line began, so never over the person's own words, and none
     for a held line's calls (`attention::DONE_THOUGH_HELD`), whose line the
-    lamp won't answer. Journal: `made a sound while chat
+    lamp won't answer, nor after the gap's sound in the same wait
+    (`GAP_CUE_AFTER`, #8615). Journal: `made a sound while chat
     round N had not begun in 1500 ms (LAMP_BUSY_FOLLOW_UP_RENEWS)`.
   Latency: nothing waits for it. The renewal, the note and the question
   check are bookkeeping at the verdict; the sound is raced against work

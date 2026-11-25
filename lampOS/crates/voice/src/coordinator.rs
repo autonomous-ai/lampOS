@@ -18825,13 +18825,31 @@ fn cut_after_speaker_lapse<T>(
     Ok(true)
 }
 
-/// A playback gap's journal line (#8615 item 3).
+/// A playback gap's journal line (#8615 item 3: a customer's "speech
+/// pauses at random"; until then a gap went to events.jsonl only): its
+/// phase and its zeros' length so far (a start's is its first render
+/// block), and whether it is the lamp's own listening hold at a sentence's
+/// end (#828), which is no delivery gap.
 fn playback_gap_line(
-    _gap: &crate::wire::PlaybackGap,
-    _phase: PlaybackGapPhase,
-    _listening: bool,
+    gap: &crate::wire::PlaybackGap,
+    phase: PlaybackGapPhase,
+    listening: bool,
 ) -> String {
-    String::new()
+    let phase = match phase {
+        PlaybackGapPhase::Started => "started",
+        PlaybackGapPhase::Resumed => "resumed",
+        PlaybackGapPhase::Cancelled => "cancelled",
+    };
+    format!(
+        "lamp-voice: request {}: playback gap {phase}: {} ms of zeros{}",
+        gap.owner.turn(),
+        gap.zero_frames * 1_000 / u64::from(lamp_audio::RENDER_RATE),
+        if listening {
+            ", the lamp's listening hold"
+        } else {
+            ""
+        }
+    )
 }
 
 /// The speaker's accepted zeros while a reply was unfinished: a delivery
@@ -18886,6 +18904,7 @@ fn handle_playback_gap(
     } else {
         (None, None, None)
     };
+    eprintln!("{}", playback_gap_line(&gap, phase, listening));
     record(
         trace,
         json!({"kind":"playback_gap","origin":origin,"phase":phase,"gap":gap,
