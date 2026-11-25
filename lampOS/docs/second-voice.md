@@ -6665,13 +6665,23 @@ after a take-over, but now for every turn:
   (`said_to_me::Line::another_voice`: the line's print under
   `same_voice::DIFFERENT_BELOW` against the conversation's, or a line of it
   that showed another person; a print not come yet is no other voice), and
-  such a line is judged by the checks above. **On the product unit there is
-  no print here:** it sets `LAMP_SAME_VOICE_FOR=services`, so the second
-  worker's `Heeding::voices` is `None` and `likeness_so_far` never answers;
-  `another_voice` is then only `another_person`, which the product sets only
-  when two faces were seen speaking an earlier line of the conversation, a
-  camera sign (Twelve's P2 on #8656). So in the window TV, room talk or a
-  third person is let out to the model, which may still call `not_for_me`.
+  such a line is judged by the checks above. **The prints read there are
+  the join's** (`Heeding::window_voices`): the product sets
+  `LAMP_SAME_VOICE_FOR=services`, so the second worker's `Heeding::voices`
+  is `None`, and with `LAMP_FOLLOW_UPS` the window reads the prints the join
+  of cut words reads (`Heeding::join_voices`; with `LAMP_JOIN_SAME_VOICE=on`,
+  as the product runs, the services' prints or in the private room the
+  join's own, every heard line printed, in RAM). Before, `another_voice` was
+  there only `another_person`, which the product sets only when two faces
+  were seen speaking an earlier line of the conversation, a camera sign, and
+  TV, room talk or a third person in the window was let out to the model
+  (Twelve's P2 on #8656). On lamp-74ff on 25 Nov, with prints read there (a
+  trial with `LAMP_SAME_VOICE_FOR` unset, the same bar), the played room-talk
+  set went from 19 to 25 of 27 as it should, and none of 17 follow-ups in the
+  person's own voice was held. A line under 1.5 s
+  (`same_voice::LEAST_SAMPLES`) or begun over the lamp's voice has no print,
+  so it is no other voice. Nothing else reads these prints for whom the lamp
+  answers: memory and the services are as before.
   In a room not busy that window is the thread's 45 s from the answer's
   start or 20 s after its words end (`crate::thread::GOING_ON_FOR`), and
   the answer to a line let out so renews it, since the product sets neither
