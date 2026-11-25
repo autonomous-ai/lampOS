@@ -3655,6 +3655,21 @@ gone ([switches.md](switches.md)). What happens:
      asking for its voice") and `speak = true` with no say step and no
      read ("it asks for its voice but never says anything"). Each is
      repaired as the cap's refusal is.
+     - **A say in `pack`'s form is made plain first** (#8514: on lamp-ee17,
+       25 Nov, the agent's draft passed its own `lamp-skills pack` with a
+       say `pack` takes, the voice refused it, and the repair ran out of
+       the make's time). Before the say is paced and checked
+       (`made_skill::say_made_plain`, in `keep_asked`), a say table's
+       `priority` and `expires` are dropped, and a `text` that is a list
+       of one string becomes that string, its characters as written. The
+       words are never changed and nothing is put in. Each change is kept
+       only when the text then reads as the same skill with that change
+       alone. A list of several lines, a note, `from`, and words quoted,
+       braced or with a link stay refused as above. One journal line
+       names the skill and what changed, never the words:
+       `lamp-voice: make: skill NAME: the say step's form was made plain
+       (#8514): dropped priority, expires; list of one made a string`.
+       Test: `a_say_step_in_packs_list_or_priority_form_is_made_plain_and_kept`.
      - **Never an instruction, never with tools** (the readers' P1 on
        #6062: a note was the voice model's written turn with its tools,
        memory and reads, so "read them my newest email" or "send Anna a
@@ -7365,7 +7380,14 @@ the same code for both writers.
   #7874: asking for a whole 10-minute answer's time left let a repair begin
   only when the first answer came within 30 s, and OpenClaw's takes 34-40 s)
   and given no more than what is left, so the make's 10 minutes 30 s still
-  hold; and one still refused is said as not made, as today. Off, the line, the run's words and the make's folder are today's,
+  hold; and one still refused is said as not made, as today. A refusal
+  with under 2 minutes left gets no repair and is said at once, in its
+  plain line (`made_skill::plain_reason`, one line). A repair cut at its
+  deadline or never answered (#8514: on lamp-ee17, repair 1 ended at
+  lamp-tasks' deadline and the person heard the model's silence) leaves
+  the refusal it was asked for standing, said once in its plain line,
+  never the silence (test
+  `a_late_refused_say_is_said_at_once_and_a_repair_cut_at_its_deadline_says_the_refusal`). Off, the line, the run's words and the make's folder are today's,
   byte for byte. Read by the second route's worker (passed by
   `process::second_route_worker_environment`), and for the app's MAKE IT
   by the coordinator (below).

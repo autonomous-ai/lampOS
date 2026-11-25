@@ -4364,7 +4364,7 @@ fn handed_to_agent(
     let first = cannot_asked_again(first, agent, began, models_cannot, |agent, again| {
         kept(write_by(agent, &format!("{brief}\n\n{again}")))
     });
-    let (made, _) = repaired(
+    let (made, refused_before) = repaired(
         first,
         request,
         " by the agent",
@@ -4381,6 +4381,24 @@ fn handed_to_agent(
             kept(write_by(&within, &repair))
         },
     );
+    // A repair cut at its deadline or never answered (#8514, El's run 1816
+    // on lamp-ee17: repair 1 ended at lamp-tasks' deadline, and the person
+    // heard the model's silence, the say step's reason lost): what stands
+    // is the refusal the repair was asked for, said once in its plain words
+    // ([`made_skill::plain_reason`], #8454's one line), as DeepSeek's are.
+    // A refusal with no time left for a repair already stands as it is.
+    let made = match (made, refused_before) {
+        (Err(Refused(why, _)), Some(before))
+            if [made_skill::MODEL_CUT_OFF, made_skill::MODEL_SILENT].contains(&why.as_str()) =>
+        {
+            eprintln!(
+                "lamp-voice: a made skill's repair by the agent ({engine}) gave no answer in \
+                 time: told why it was refused"
+            );
+            Err(before)
+        }
+        (made, _) => made,
+    };
     match &made {
         Ok(_) => eprintln!("lamp-voice: a skill made here: made by the agent ({engine})"),
         Err(_) => eprintln!("lamp-voice: a skill made here: the agent's ({engine}) wasn't kept"),
@@ -8384,6 +8402,62 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                 2 => assert_eq!(told["made"], "evening-dim", "{name}: {told}"),
                 _ => assert!(told.get("made").is_none(), "{name}: {told}"),
             }
+            let _ = std::fs::remove_dir_all(&root);
+        }
+    }
+
+    /// #8514, El's runs 1816 and 1843-A on lamp-ee17 (25 Nov): the agent's
+    /// first answer, a say step the check refuses, came late. With too
+    /// little of the make left for a repair it gets one hand-over; with a
+    /// repair asked and cut at its deadline (no answer) it gets two. Either
+    /// way the person hears the say step's refusal once, in its plain line
+    /// (#8454's [`made_skill::NOT_MADE_TRY`], El's condition: one line),
+    /// never the model's silence.
+    #[test]
+    fn a_late_refused_say_is_said_at_once_and_a_repair_cut_at_its_deadline_says_the_refusal() {
+        // A say of two lines: refused as it came and after it is made plain.
+        let says = good()
+            .replace("light = true\n", "light = true\nspeak = true\n")
+            .replace(
+                "light = { dim = 1 }\n",
+                "say = { text = [\"Good evening.\", \"Time to rest.\"] }\n",
+            );
+        let cases = [
+            ("late", REPAIR_AT_LEAST - Duration::from_secs(1), 1),
+            ("cut", crate::make_skill_agent::MAKE_WITHIN, 2),
+        ];
+        for (name, make_within, hand_overs) in cases {
+            let (root, keeping) = keeping(&format!("agent-say-refused-{name}"));
+            let tasks = agent_answering(vec![Some(says.clone()), None]);
+            let (url, served) = service(vec![(200, faces())]);
+            let agent = crate::make_skill_agent::Agent {
+                within: crate::make_skill_agent::GUIDED_WRITE_WITHIN,
+                make_within,
+                ..tasks.guided()
+            };
+            let told = made_by(&keeping, url, Some(&agent), NOW);
+            assert_eq!(served.join().unwrap(), 1, "{name}");
+            assert_eq!(tasks.hand_overs(), hand_overs, "{name}: {told}");
+            assert!(told.get("made").is_none(), "{name}: {told}");
+            assert_eq!(
+                told["error"],
+                format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY),
+                "{name}"
+            );
+            // One line said, once (El's condition on #8514): the error holds
+            // it once, and the turn's instruction quotes it once to say;
+            // never the silence beside it.
+            for part in ["error", "next"] {
+                let said = told[part].as_str().unwrap_or_default();
+                assert_eq!(
+                    said.matches(made_skill::NOT_MADE_TRY).count(),
+                    1,
+                    "{name}: {part}: {told}"
+                );
+            }
+            let whole = told.to_string();
+            assert!(!whole.contains(made_skill::MODEL_SILENT), "{name}: {told}");
+            assert!(made_skill::entries(&keeping.directory).is_empty(), "{name}");
             let _ = std::fs::remove_dir_all(&root);
         }
     }
