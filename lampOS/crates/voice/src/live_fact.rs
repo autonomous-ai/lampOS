@@ -704,6 +704,10 @@ pub(crate) struct Hold {
     /// Whether the weather was found in the turn: it backs the weather's
     /// figures only, never a price.
     weathered: bool,
+    /// Whether `start_agent_task` answered in the turn (#8556): the rounds
+    /// after it read the person's own task back, no claim about the world,
+    /// so none is judged.
+    task_answered: bool,
     /// The sentences held this round, from the first with a figure.
     held: Vec<String>,
     /// What was said of the sentence in hand, when its first words were cut
@@ -781,7 +785,7 @@ impl Hold {
     /// a live fact, a reply's first words wait for their sentence's end
     /// ([`Self::holds_back`]).
     pub(crate) fn watching(&self) -> bool {
-        self.on && !self.searched
+        self.on && !self.searched && !self.task_answered
     }
 
     /// Whether the reply's first words wait for their sentence's end:
@@ -806,7 +810,7 @@ impl Hold {
 
     /// Whether this turn's lookups back `sentence`'s figure.
     fn backs(&self, sentence: &str) -> bool {
-        self.searched || (self.weathered && speaks_of_weather(sentence))
+        self.searched || self.task_answered || (self.weathered && speaks_of_weather(sentence))
     }
 
     /// A sentence as the hold lets it go: none once a figure is held this
@@ -973,8 +977,21 @@ impl Hold {
     }
 
     /// A call answered: a lookup that found something backs the turn's
-    /// figures; the weather's backs only the weather.
+    /// figures; the weather's backs only the weather. A `start_agent_task`
+    /// answered, whatever it said, ends the judging for the turn (#8556):
+    /// lamp-06c1, 25 Nov, build 15903, "…a short poem about rain" was held
+    /// as the weather and the model's second start prepared a second task.
     pub(crate) fn ran(&mut self, name: &str, told: &Value) {
+        if name == crate::agent_tasks::START {
+            if self.on && !self.task_answered {
+                eprintln!(
+                    "lamp-voice second: request {}: start_agent_task answered: the rounds after it are not judged (LAMP_LIVE_FACT_CHECKED, #8556)",
+                    self.request
+                );
+            }
+            self.task_answered = true;
+            return;
+        }
         if !is_lookup(name) || !found(told) {
             return;
         }
@@ -1187,6 +1204,29 @@ mod tests {
             Some("It's $4,050 an ounce.".into())
         );
         assert_eq!(off.take(), None);
+    }
+
+    /// #8556 (lamp-06c1, 25 Nov, build 15903): the read-back of a task
+    /// `start_agent_task` answered restates the person's own ask ("…a
+    /// short poem about rain"), no claim about the world, so no round after
+    /// it in the turn is judged; before it, the same words are.
+    #[test]
+    fn a_task_read_back_after_its_start_answered_is_never_held() {
+        let read_back = "Claude Code will write a short poem about rain.";
+        assert!(states_figure(read_back));
+        let mut hold = Hold::new(true, 1, &[]).asked("Ask Claude Code to write a poem about rain.");
+        assert!(hold.holds_back());
+        assert_eq!(hold.pass(read_back.into()), None);
+        assert_eq!(hold.take(), Some((Lookup::Weather, 1)));
+        hold.begin_round();
+        hold.ran(
+            crate::agent_tasks::START,
+            &serde_json::json!({"prepared": true, "task": "Write a short poem about rain"}),
+        );
+        assert!(!hold.watching());
+        assert!(!hold.holds_back());
+        assert_eq!(hold.pass(read_back.into()), Some(read_back.into()));
+        assert_eq!(hold.take(), None);
     }
 
     /// The first words wait only on a line that asks for a live fact

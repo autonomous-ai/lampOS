@@ -276,6 +276,66 @@ pub(crate) const MOST_TASK_BYTES: usize = 3_000;
 /// #3239): a control character escapes to 6 bytes.
 pub(crate) const MOST_ENCODED_TASK_BYTES: usize = 2 * MOST_TASK_BYTES;
 
+/// [`START`]'s arguments for the journal (#8556): each one's length only,
+/// never the person's words.
+fn arguments_by_length(args: &Value) -> String {
+    ["task", WHO, "where", "engine", "session"]
+        .iter()
+        .map(|key| match args.get(key) {
+            None | Some(Value::Null) => format!("{key} none"),
+            Some(Value::String(said)) => format!("{key} {} bytes", said.len()),
+            Some(_) => format!("{key} not text"),
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// The last answer a prepare was told (#8556): a second [`START`] with the
+/// same arguments in the same request is told it again, nothing more
+/// prepared ([`same_start_again`]).
+struct PreparedTold {
+    /// The task's id, and when [`PENDING`] took it: only that very prepare
+    /// is told again, never a [`Pending`] made any other way.
+    id: u64,
+    at: Instant,
+    /// The tasks part it was prepared at ([`Place::directory`]).
+    directory: PathBuf,
+    told: Value,
+}
+
+static PREPARED_TOLD: Mutex<Option<PreparedTold>> = Mutex::new(None);
+
+/// The answer the task waiting was prepared with, when this [`START`] is
+/// the same again in the request that prepared it: the same task as it
+/// would be prepared, for the same who, in the same session (#8556). One
+/// line asking two agents for the same work names two whos, so it still
+/// makes two tasks; a later request is a new ask.
+fn same_start_again(
+    place: &Place,
+    request: u64,
+    task: &str,
+    who: &str,
+    session: Option<&str>,
+) -> Option<Value> {
+    let waiting = PENDING.lock().ok()?.clone()?;
+    if waiting.request != request
+        || waiting.text != task
+        || waiting.who != who
+        || waiting.session.as_deref() != session
+    {
+        return None;
+    }
+    let kept = PREPARED_TOLD.lock().ok()?;
+    let kept = kept.as_ref().filter(|kept| {
+        kept.id == waiting.id && kept.at == waiting.at && kept.directory == place.directory
+    })?;
+    eprintln!(
+        "lamp-voice provider: request {request}: the same start again in this request: told task {}'s answer, nothing prepared (#8556)",
+        kept.id
+    );
+    Some(kept.told.clone())
+}
+
 fn task_fits(task: &str) -> bool {
     serde_json::to_string(task).is_ok_and(|encoded| encoded.len() - 2 <= MOST_ENCODED_TASK_BYTES)
 }
@@ -4647,6 +4707,11 @@ fn run_for_asked(
                 }
                 None => call,
             };
+            // By length only, never the person's words (#8556).
+            eprintln!(
+                "lamp-voice provider: request {request}: start_agent_task called with {}",
+                arguments_by_length(&call.args)
+            );
             // The session the person named (#5535): only with the switch,
             // and refused, not cut, when it can't be a session's name.
             let session = match named_session_of(place, &call.args) {
@@ -4760,6 +4825,12 @@ fn run_for_asked(
             } else {
                 task
             };
+            // The same start again in the request that prepared it (#8556:
+            // lamp-06c1, 25 Nov, tasks 24 and 25 for one rain ask): told
+            // the first's answer, the tasks part asked nothing.
+            if let Some(told) = same_start_again(place, request, task, who, session) {
+                return (told, true);
+            }
             let Some(status) = ask(
                 &place.directory.join("request.sock"),
                 &json!({"op":"status"}),
@@ -4822,6 +4893,9 @@ fn run_for_asked(
                         return (unreached(place), false);
                     };
                     let mut replaced = None;
+                    // When PENDING took it: [`same_start_again`] tells only
+                    // this prepare's answer again.
+                    let prepared_at = Instant::now();
                     if let Ok(mut pending) = PENDING.lock() {
                         // With the switch, one still waiting for its yes is
                         // replaced by this corrected ask (#2838): only from
@@ -4850,7 +4924,7 @@ fn run_for_asked(
                             id,
                             digest: digest.to_owned(),
                             request,
-                            at: Instant::now(),
+                            at: prepared_at,
                             who,
                             text: task.to_owned(),
                             correct: place.correct,
@@ -4926,15 +5000,21 @@ fn run_for_asked(
                     {
                         next = ALREADY_YES.to_owned();
                     }
-                    (
-                        json!({
-                            "prepared": true,
-                            "task": task,
-                            "where": place_said,
-                            "next": next
-                        }),
-                        true,
-                    )
+                    let told = json!({
+                        "prepared": true,
+                        "task": task,
+                        "where": place_said,
+                        "next": next
+                    });
+                    if let Ok(mut kept) = PREPARED_TOLD.lock() {
+                        *kept = Some(PreparedTold {
+                            id,
+                            at: prepared_at,
+                            directory: place.directory.clone(),
+                            told: told.clone(),
+                        });
+                    }
+                    (told, true)
                 }
                 Some(answer) => {
                     // The tasks part's code only, never the task's words.
@@ -8518,6 +8598,12 @@ pub(crate) mod tests {
         answers: Vec<(&'static str, Value)>,
         knows_work: bool,
     ) -> mpsc::Receiver<Value> {
+        // A new tasks part holds none of this voice's prepares (#8556):
+        // tests repeat request numbers, which the voice never does, so no
+        // earlier test's prepare is told again as the same start.
+        *PREPARED_TOLD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
         let (sent, seen) = mpsc::channel();
         for name in ["request.sock", "voice.sock"] {
             let listener = UnixListener::bind(directory.join(name)).unwrap();
@@ -13742,6 +13828,137 @@ pub(crate) mod tests {
         assert!(!ops.iter().any(|op| op == "cancel"), "{ops:?}");
         *PENDING.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #8556 (lamp-06c1, 25 Nov, build 15903): the rain ask's read-back
+    /// was held and the model called `start_agent_task` again, so one
+    /// spoken ask prepared tasks 24 and 25. A second start in the same
+    /// request with the pending one's task, who and session is told the
+    /// first's answer, and nothing more is asked of the tasks part; the
+    /// same task for another agent in that line is still its own task.
+    #[test]
+    fn the_same_start_again_in_one_request_prepares_nothing_more() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *PENDING.lock().unwrap() = None;
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-again-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status = |revision: u64| json!({"ok":true,"store_id":"s1","revision":revision,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(0)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":24,"prepared_digest":"rain","revision":1}),
+                ),
+                ("request.sock", status(1)),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":25,"prepared_digest":"rain-codex","revision":2}),
+                ),
+            ],
+        );
+        let place = place(&directory, true);
+        let staff = two();
+        let call = |who: &str| ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({"task": "Write a short poem about rain", "who": who}),
+        };
+        let (first, _) = run_for(&place, &staff, &call("Claude Code"), 1, true, PEER_WAIT);
+        assert!(first["prepared"] == json!(true), "{first}");
+        // The same start again, as round 4 called it: the first's answer.
+        let (again, _) = run_for(&place, &staff, &call("Claude Code"), 1, true, PEER_WAIT);
+        assert_eq!(again, first);
+        assert_eq!(PENDING.lock().unwrap().as_ref().map(|p| p.id), Some(24));
+        // One line, two agents: the same task for Codex is its own.
+        let (codex, _) = run_for(&place, &staff, &call("Codex"), 1, true, PEER_WAIT);
+        assert!(codex["prepared"] == json!(true), "{codex}");
+        assert_eq!(codex["where"], "Codex on the office computer", "{codex}");
+        assert_eq!(PENDING.lock().unwrap().as_ref().map(|p| p.id), Some(25));
+        let ops: Vec<String> = seen
+            .try_iter()
+            .map(|line| line["op"].as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(ops, ["status", "prepare", "status", "prepare"]);
+        *PENDING.lock().unwrap() = None;
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #8556's backstop is the prepare's own: a task left waiting by
+    /// another tasks part (here another test's, whose request numbers
+    /// repeat), with the same request and arguments, is never told as this
+    /// one's; this start is prepared where it is asked. (The full gate hung
+    /// on `a_task_is_prepared_on_the_request_socket_…`'s `recv` without
+    /// this.)
+    #[test]
+    fn the_same_start_elsewhere_is_prepared_there() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *PENDING.lock().unwrap() = None;
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let call = ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({"task": "Write hello.txt"}),
+        };
+        let mut ops = Vec::new();
+        for tag in ["one", "two"] {
+            let directory = std::env::temp_dir().join(format!(
+                "agent-tasks-elsewhere-{tag}-{}",
+                std::process::id()
+            ));
+            let _ = std::fs::remove_dir_all(&directory);
+            std::fs::create_dir_all(&directory).unwrap();
+            let seen = tasks_part(
+                &directory,
+                vec![
+                    ("request.sock", status.clone()),
+                    (
+                        "request.sock",
+                        json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1}),
+                    ),
+                ],
+            );
+            let (told, _) = run(&correcting(&directory, false), &call, 3, true, PEER_WAIT);
+            assert!(told["prepared"] == json!(true), "{tag}: {told}");
+            ops.push(
+                seen.try_iter()
+                    .map(|line| line["op"].as_str().unwrap().to_owned())
+                    .collect::<Vec<_>>(),
+            );
+            std::fs::remove_dir_all(directory).unwrap();
+        }
+        assert_eq!(ops, [["status", "prepare"], ["status", "prepare"]]);
+        *PENDING.lock().unwrap() = None;
+    }
+
+    /// #8556: a start's arguments are journalled by their lengths alone,
+    /// never the person's words.
+    #[test]
+    fn a_starts_arguments_are_journalled_by_length_only() {
+        let line = arguments_by_length(&json!({
+            "task": "Write a short poem about rain",
+            "who": "Claude Code",
+            "session": "poems",
+        }));
+        assert_eq!(
+            line,
+            "task 29 bytes, who 11 bytes, where none, engine none, session 5 bytes"
+        );
+        for words in ["rain", "poem", "Claude", "poems"] {
+            assert!(!line.contains(words), "{line}");
+        }
+        assert_eq!(
+            arguments_by_length(&json!({"task": 7})),
+            "task not text, who none, where none, engine none, session none"
+        );
     }
 
     /// #2838, with #6582: a plain "no" drops the task waiting at once, so a
