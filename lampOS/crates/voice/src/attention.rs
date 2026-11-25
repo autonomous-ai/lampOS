@@ -1280,11 +1280,13 @@ fn written(language: Language) -> Written {
         Language::French => Written {
             greetings: &["hey", "hé"],
             real: &[],
-            stand_ins: &["man", "make", "madame"],
+            // "Thème" is an everyday word too: only set off, as the others
+            // ("Thème de la soirée ?" is no call, SubDarren's P2 on #8571).
+            stand_ins: &["man", "make", "madame", "thème"],
             whole_words: true,
             not_the_name: |_| false,
             everyday: true,
-            line_start: &["Thème"],
+            line_start: &[],
         },
     }
 }
@@ -4031,6 +4033,8 @@ mod tests {
             (French, "Hé non, je ne viens pas."),
             (French, "C'est un thème difficile."),
             (French, "Le thème de la soirée."),
+            (French, "Thème de la soirée ?"),
+            (French, "Thème du jour, les pirates."),
             (French, "Oui, man."),
             (French, "Hey man tu viens ce soir ?"),
             (French, "Man."),
