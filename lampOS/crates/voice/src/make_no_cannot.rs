@@ -2551,18 +2551,20 @@ equals = true
     /// with a whole answer for one the lamp keeps: a trigger on its own
     /// clock every 90 minutes, said so, for the lamp's agent's task alone.
     /// A poll more often than that, or with no task for the agent made
-    /// here, is no watch. Off, the prompt is as before.
+    /// here, is no watch. The middle form's switch off, the prompt is as
+    /// before.
     #[test]
     fn with_reactions_on_a_watch_on_outside_data_is_told_on_the_clock() {
-        made_skill::set_reactions_here(Some(false));
+        middle_on(Some(true));
+        set_on_here(Some(false));
         let before = system();
         assert!(
             !before.contains(WATCH) && !before.contains(WATCH_EXAMPLE),
             "{before}"
         );
-        made_skill::set_reactions_here(Some(true));
+        set_on_here(Some(true));
         let told = system();
-        made_skill::set_reactions_here(None);
+        middle_on(None);
         let reminder = told.find(made_skill::REMINDER_IS_TIMER).unwrap();
         let watch = told.find(WATCH).unwrap();
         assert!(
@@ -2678,26 +2680,79 @@ equals = true
 
     /// #8079: a `cannot:` reminder is still the lamp's own timer when no
     /// trigger on what no topic carries came before it: a one-off reminder
-    /// at once ("remind me at 5 pm to call the bakery"), one after a
-    /// trigger on a topic the lamp has, and any with the reactions switch
-    /// off, whose make is as before.
+    /// at once ("remind me at 5 pm to call the bakery") and one after a
+    /// trigger on a topic the lamp has, the reactions switch on or off.
     #[test]
     fn a_reminder_with_no_watch_before_it_is_still_the_lamps_timer() {
+        for reactions in [true, false] {
+            middle_on(Some(true));
+            made_skill::set_reactions_here(Some(reactions));
+            let bakery = format!(
+                "cannot: I can't do that yet: a reminder at five to call the bakery. {}",
+                made_skill::REMINDER_INSTEAD
+            );
+            let refused = || Err(Refused(Uncovered::Reminder.line(), None));
+            let (result, briefs, texts) = watch_made(&[bakery]);
+            assert_eq!((result, briefs.len(), texts.len()), (refused(), 1, 0));
+            let (result, briefs, _) = watch_made(&[SEATED.to_owned(), price_reminder()]);
+            assert_eq!((result, briefs.len()), (refused(), 2));
+            assert!(!briefs[1].contains(WATCH_REPAIR), "{}", briefs[1]);
+            middle_on(None);
+        }
+    }
+
+    /// #8079, the lead's read: the watch rule is the middle form's
+    /// (`LAMP_MAKE_NO_CANNOT`, on in the product), not the reactions
+    /// switch's, which the product doesn't set. With reactions off the one
+    /// more call is still told the watch and its whole answer (after the
+    /// grants, as no reminder's refusal is told), a trigger on what no topic
+    /// carries still gets the watch's repair, and a `cannot:` reminder after
+    /// it is still asked again once as a watch and kept.
+    #[test]
+    fn with_reactions_off_the_watch_is_still_told_and_a_reminder_after_it_asked_again() {
         middle_on(Some(true));
-        let bakery = format!(
-            "cannot: I can't do that yet: a reminder at five to call the bakery. {}",
-            made_skill::REMINDER_INSTEAD
-        );
-        let refused = || Err(Refused(Uncovered::Reminder.line(), None));
-        let (result, briefs, texts) = watch_made(&[bakery]);
-        assert_eq!((result, briefs.len(), texts.len()), (refused(), 1, 0));
-        let (result, briefs, _) = watch_made(&[SEATED.to_owned(), price_reminder()]);
-        assert_eq!((result, briefs.len()), (refused(), 2));
-        assert!(!briefs[1].contains(WATCH_REPAIR), "{}", briefs[1]);
         made_skill::set_reactions_here(Some(false));
-        let (result, briefs, _) = watch_made(&[PRICED.to_owned(), price_reminder()]);
-        assert_eq!((result, briefs.len()), (refused(), 2));
-        assert!(!briefs[1].contains(WATCH_REPAIR), "{}", briefs[1]);
+        let told = system();
+        assert!(!told.contains(made_skill::REMINDER_IS_TIMER), "{told}");
+        let needs = told.find("needs: and what").unwrap();
+        let watch = told.find(WATCH).unwrap();
+        assert!(needs < watch, "the watch told after the grants: {told}");
+        assert!(told.contains(WATCH_EXAMPLE), "{told}");
+        let watch = WATCH_EXAMPLE.replace("rain-watch", "bitcoin-watch");
+        let (result, briefs, texts) = watch_made(&[PRICED.to_owned(), price_reminder(), watch]);
+        assert_eq!(result, Err(Refused::new("kept here")));
+        assert_eq!(briefs.len(), 3, "{briefs:?}");
+        assert!(!briefs[0].contains(WATCH_REPAIR), "{}", briefs[0]);
+        for brief in &briefs[1..] {
+            assert!(brief.contains(WATCH_REPAIR), "{brief}");
+        }
+        assert_eq!(texts.len(), 2, "{texts:?}");
+        assert!(texts[1].contains("topic = \"clock/local\""), "{}", texts[1]);
         middle_on(None);
+    }
+
+    /// #8079: with `LAMP_MAKE_NO_CANNOT` off, the middle form reached for
+    /// what only the internet tells ([`net_by_agent`]) is byte for byte as
+    /// before, the reactions switch on or off: no watch in the prompt, no
+    /// watch's repair, and a `cannot:` reminder after a trigger on what no
+    /// topic carries is refused as the lamp's timer.
+    #[test]
+    fn with_the_switch_off_the_prompt_and_the_repair_carry_no_watch() {
+        for reactions in [false, true] {
+            middle_on(Some(true));
+            set_on_here(Some(false));
+            made_skill::set_reactions_here(Some(reactions));
+            assert!(net_by_agent() && !on());
+            let told = system();
+            assert!(
+                !told.contains(WATCH) && !told.contains(WATCH_EXAMPLE),
+                "{reactions}: {told}"
+            );
+            let (result, briefs, texts) = watch_made(&[PRICED.to_owned(), price_reminder()]);
+            assert_eq!(result, Err(Refused(Uncovered::Reminder.line(), None)));
+            assert_eq!((briefs.len(), texts.len()), (2, 1), "{briefs:?}");
+            assert!(!briefs[1].contains(WATCH_REPAIR), "{}", briefs[1]);
+            middle_on(None);
+        }
     }
 }
