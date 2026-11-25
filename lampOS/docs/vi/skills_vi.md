@@ -3004,6 +3004,71 @@ a skill on the lamp uses, saying nothing first."). Sau đó, trong code
   didn't run now, and why: …", không bao giờ nói nó đang chạy. lamp-skills
   không trả lời thì là "my skills didn't answer, so it may not have
   started".
+- **Được gọi tên một lần, trừ khi nó nói trước** (#8475). Mỗi lần chạy mà
+  coordinator được báo (`MadeRunNow`: một lần chạy ngay, hay một tool call
+  của kỹ năng đã đánh dấu lần chạy task của nó) nợ một câu gọi tên
+  (`made_run::NameLine`): "Running NAME." (`made_run::name_line`, tên thư
+  mục của kỹ năng với dấu gạch nối thành khoảng trắng,
+  `made_skill::spoken_name`; không bao giờ là lời của model), nói một lần
+  `made_run::NAME_AFTER` (1 s) sau câu trả lời `ran` của nó, qua say
+  service như lời xin của chính giọng nói (skill `run-name`, mức ưu tiên 5,
+  bị bỏ nếu không bắt đầu trong 4 s, `RUN_NAME_EXPIRES_MS`). Nó bị bỏ,
+  không bao giờ nói sau, khi đèn đã bắt đầu nói kể từ câu trả lời `ran`
+  (lời say của chính lần chạy, audio của câu trả lời, hay một lần phát cục
+  bộ), khi lần chạy đã bị dừng hay một lần chạy khác được ghi nhận kể từ đó
+  (`made_run::still_under_way`), hoặc khi một lượt vẫn đang xử lý lúc
+  `made_run::NAME_LATEST` (5 s); một lượt đang xử lý lúc 1 s thì được chờ
+  tới lúc đó. Chỉ lời tiếng Anh, nên câu này chỉ nợ khi đèn nói tiếng Anh
+  (`made_run::names_runs_in` trên ngôn ngữ lúc khởi động): ở ngôn ngữ khác
+  không câu nào được nói, journal ghi `lamp-voice: the run of SKILL is not
+  named: its line is English only (#8475)`. Journal ghi
+  `lamp-voice: the run of SKILL is named: "WORDS" (#8475)` hoặc
+  `lamp-voice: the run of SKILL is not named: WHY (#8475)`; trace có một
+  dòng `run_name_line` với `skill`, `said` và, khi bị bỏ, `why`.
+- **Bị dừng bởi một lời dừng** (#8475 phần 2, không công tắc). Giọng nói
+  giữ lần chạy cuối nó đã xin là đang diễn ra trong
+  `made_run::UNDER_WAY_FOR` (15 min) từ câu trả lời `ran` của nó
+  (`made_run::UnderWay`): lamp-skills không báo cho nó lần chạy nào kết
+  thúc, nên một lần chạy đã kết thúc cũng tính, và lời dừng khi đó không
+  dừng gì. Khi có một lần đang diễn ra, nút Stop, một lời dừng coordinator
+  nghe được khi đèn đang nói (`LAMP_STOP_WORDS`), và câu trả lời dừng của
+  tuyến thứ hai (`StopAnswered`, cả cho một lời dừng nói với đèn khi nó
+  đang im lặng: not-speech.md, "A stop always gets one line") coi nó là đã
+  dừng, một lần, và hỏi lamp-skills trên socket call của nó, trên một luồng
+  riêng sau khi cắt câu trả lời, không bao giờ chờ nó, trong
+  `LAMP_SKILLS_DIR` của giọng nói: `{"op":"cancel","skill":"<name>"}`, kỹ
+  năng mà nó đã xin chạy (`made_run::CANCEL_OP`, `task::CANCEL_OP` của
+  lamp-skills), tối đa 1,5 s (`tools::ASK_DEADLINE`). Chỉ unit của giọng
+  nói được hỏi; peer khác được trả lời
+  `{"ok":false,"error":"only the voice may stop a skill's run"}`
+  (`task::CANCEL_NOT_THE_VOICE`) và không gì được gửi tiếp. lamp-skills gửi
+  lamp-tasks một dòng `{"op":"cancel","skill":"<name>"}` trên socket bàn
+  giao của nó, nên chỉ lần chạy của kỹ năng đó bị dừng, không bao giờ task
+  theo lịch hay theo trigger của kỹ năng khác (P2 của Reviewer-lead trên
+  #8535; một cancel không nêu kỹ năng nào thì không dừng gì)
+  (`--tasks-socket`; [tasks_vi.md](tasks_vi.md), "Một cancel") với giới hạn 2 s
+  (`CANCEL_TIMEOUT`) và trả lời giọng nói
+  `{"stopped": NAME|null, "ms": N|null}`: lần chạy đầu tiên lamp-tasks đã
+  dừng, và bao lâu sau khi nó bắt đầu; null khi không có lần nào chạy,
+  không tới được lamp-tasks, hoặc không có `--tasks-socket`. Kỹ năng đó
+  được đánh dấu đã dừng (`task::mark_stopped`), và một câu chuẩn bị cho nó
+  chưa bắt đầu thì được rút lại. Câu trả lời bàn giao của nó, của một
+  `do.task` hay của một bước `run`, khi đó là một lần dừng yên lặng
+  (`task::stopped_by_person`): câu có `"stopped": true`, hoặc bất kỳ câu
+  trả lời nào không đạt `"ok": true` trong `task::STOPPED_FOR_MS` (30 s)
+  kể từ lúc đánh dấu. Không câu thất bại nào được nói và không gì của lần
+  chạy được báo; journal ghi
+  `lamp-skills: SKILL's run stopped by the person (#8475)` và kết quả của
+  lần bàn giao `its run stopped by the person`. Journal của giọng nói ghi
+  `lamp-voice: WHY: the run of SKILL under way is asked to stop (#8475)`
+  (WHY: "the button's stop", "a spoken stop" hoặc "a stop said to the
+  lamp"), rồi `lamp-voice: stopped run SKILL MS ms after start (#8475)`
+  (`made_run::stopped_run_line`, được grep để đếm các lần chạy bị dừng
+  trong 10 s; ms của lamp-skills, nếu không thì số đếm riêng của giọng nói
+  từ câu trả lời `ran`), hoặc rằng lamp-skills không có lần chạy nào của
+  nó để dừng hay không trả lời. lamp-skills ghi journal `a stop asked:
+  SKILL's run stopped after MS ms` hoặc `a stop asked: no skill's run was
+  under way`.
 
 Kiểm thử: `made_run::tests::the_owners_two_lines_each_run_that_made_skill`,
 `a_run_refused_is_said_plainly_with_why`,
@@ -3013,6 +3078,16 @@ Kiểm thử: `made_run::tests::the_owners_two_lines_each_run_that_made_skill`,
 `lamp_skills::tests::a_made_skill_runs_now_as_its_trigger_would_and_not_when_off`;
 `task::tests::a_run_now_past_its_own_days_runs_is_refused_plainly`; và
 `tests::a_run_now_is_refused_as_its_trigger_s_run_would_be` của lamp-skills.
+Lời dừng và câu gọi tên (#8475): `made_run::tests::a_short_quiet_stop_with_a_run_under_way_sends_the_cancel`,
+`a_quiet_sentence_with_stop_in_it_stops_no_run`,
+`lamp_stop_said_while_quiet_stops_the_run`,
+`a_runs_name_line_is_said_once_from_its_skill_name`,
+`a_runs_name_line_is_dropped_when_speech_begins_within_a_second`,
+`a_stopped_run_is_journaled_with_its_skill_and_ms`; của lamp-skills
+`tests::a_cancel_is_sent_to_lamp_tasks_and_answers_the_skill_and_ms`,
+`a_cancel_with_nothing_running_answers_null`,
+`a_hand_over_answer_stopped_by_the_person_says_no_failure_line`,
+`a_cancel_from_a_peer_that_is_not_the_voice_is_refused`.
 
 Kiểm thử: `make_skill_local::tests` (kể cả
 `a_good_answer_is_kept_and_put_on_with_no_yes`,

@@ -6527,12 +6527,16 @@ first."). Then, in code (`made_run::asked`):
   while it is quiet: not-speech.md, "A stop always gets one line") take it
   as stopped, once, and ask lamp-skills on its call socket, on a thread of
   their own after the reply's cut, which never waits for it, in the
-  voice's `LAMP_SKILLS_DIR`: `{"op":"cancel"}` (`made_run::CANCEL_OP`,
+  voice's `LAMP_SKILLS_DIR`: `{"op":"cancel","skill":"<name>"}`, the
+  skill it asked to run (`made_run::CANCEL_OP`,
   lamp-skills' `task::CANCEL_OP`), at most 1.5 s
   (`tools::ASK_DEADLINE`). Only the voice's unit may ask it; another peer
   is answered `{"ok":false,"error":"only the voice may stop a skill's run"}`
   (`task::CANCEL_NOT_THE_VOICE`) and nothing is sent on. lamp-skills sends
-  lamp-tasks one `{"op":"cancel"}` line on its hand-over socket
+  lamp-tasks one `{"op":"cancel","skill":"<name>"}` line on its hand-over
+  socket, so only that skill's run is stopped, never another skill's
+  scheduled or triggered task (the Reviewer-lead's P2 on #8535; a cancel
+  naming no skill stops nothing)
   (`--tasks-socket`; [tasks.md](tasks.md), "A cancel") with a 2 s bound
   (`CANCEL_TIMEOUT`) and answers the voice
   `{"stopped": NAME|null, "ms": N|null}`: the first run lamp-tasks
