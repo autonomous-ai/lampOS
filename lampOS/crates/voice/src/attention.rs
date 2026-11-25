@@ -4014,6 +4014,10 @@ mod tests {
             (Chinese, "嘿兰普。"),
             (Korean, "헤이 램프."),
             (Vietnamese, "Hây lăm."),
+            // #8517: "Hey Lamp." said in English, as Deepgram `fr` writes it.
+            (French, "Hey man."),
+            (French, "Hé make."),
+            (French, "Hey madame."),
         ] {
             assert!(only_the_name_as_written(alone, Some(language)), "{alone}");
             assert!(!only_the_name_as_written(alone, None), "{alone}");
