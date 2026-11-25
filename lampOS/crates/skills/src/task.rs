@@ -1520,9 +1520,11 @@ pub const CANCEL_OP: &str = "cancel";
 pub const CANCEL_NOT_THE_VOICE: &str = "only the voice may stop a skill's run";
 
 /// The one line lamp-skills writes to lamp-tasks' hand-over socket to stop
-/// the skill run under way (#8475 part 2).
-pub fn cancel_line() -> String {
-    serde_json::json!({"op": "cancel"}).to_string()
+/// the run of `skill` under way (#8475 part 2): that skill's run only, never
+/// another skill's scheduled or triggered task (the Reviewer-lead's P2 on
+/// #8535).
+pub fn cancel_line(skill: &str) -> String {
+    serde_json::json!({"op": "cancel", "skill": skill}).to_string()
 }
 
 /// The voice's answer to [`CANCEL_OP`] from lamp-tasks' `answer` to

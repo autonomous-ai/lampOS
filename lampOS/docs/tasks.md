@@ -3621,15 +3621,17 @@ for each run, and is answered once the run ends
   words or the token. lamp-skills names the socket with `--tasks-socket` or
   `LAMP_SKILLS_TASKS_SOCKET` (#6346); the product's lamp-skills unit passes
   `/run/lampos-tasks/skill-task.sock`.
-- **A cancel** (#8475 part 2, `CANCEL_OP`): `{"op":"cancel"}` alone on the
-  same socket, from lamp-skills as any line is (lamp-skills sends it when
+- **A cancel** (#8475 part 2, `CANCEL_OP`): `{"op":"cancel","skill":"<name>"}`
+  alone on the same socket, from lamp-skills as any line is (lamp-skills sends it when
   the voice asks it to stop the run under way, skills.md, "Run now by
   voice"), takes no run's place and is answered at once with the runs it
   stopped: `{"stopped":[{"run":"<run id>","skill":"<name>","ms":<ms since
-  its start>}]}`, the skill's task and the `run` step running beside it
+  its start>}]}`, the named skill's task and `run` step running beside it
   (`Lanes`: each runner keeps its run there while it runs), or
-  `{"stopped":[]}` with nothing running. A cancel line with any other field
-  is `bad_request`. Each run stopped is ended on a thread of its own
+  `{"stopped":[]}` with none of that skill running. Another skill's run,
+  a scheduled or triggered task the voice never asked for, is never
+  stopped (the Reviewer-lead's P2 on #8535). A cancel line naming no
+  skill, or with any other field, is `bad_request`. Each run stopped is ended on a thread of its own
   (`stop_run`): its token first, with lamp-control's admin `end` (the
   token refused, what it queued gone, its connections closed), so a `say`
   or motion its script still asks is refused; then its `SkillRun::cancel`

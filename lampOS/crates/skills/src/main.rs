@@ -4099,7 +4099,11 @@ fn listen(
                 // voice (#8475 part 2): only the voice's, as a run now is;
                 // answered here, never through the main loop.
                 if call["op"].as_str() == Some(lamp_skills::task::CANCEL_OP) {
-                    let answer = cancel_run(voice, TASKS_SOCKET.get().map(PathBuf::as_path));
+                    let answer = cancel_run(
+                        voice,
+                        call["skill"].as_str(),
+                        TASKS_SOCKET.get().map(PathBuf::as_path),
+                    );
                     return writeln!(&stream, "{answer}");
                 }
                 let (reply, told) = mpsc::channel();
@@ -6683,19 +6687,26 @@ const CANCEL_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// The call socket's [`lamp_skills::task::CANCEL_OP`] (#8475 part 2): the
 /// voice's alone (`voice`), as a run now is; any other peer is refused
-/// ([`lamp_skills::task::CANCEL_NOT_THE_VOICE`]) and nothing is sent. One
-/// `{"op":"cancel"}` line to lamp-tasks at `socket`, its answer
+/// ([`lamp_skills::task::CANCEL_NOT_THE_VOICE`]) and nothing is sent. No
+/// `skill` named: nothing is sent or stopped. One
+/// `{"op":"cancel","skill":"<name>"}` line to lamp-tasks at `socket`, its answer
 /// `{"stopped":[{"run","skill","ms"}]}` read within [`CANCEL_TIMEOUT`],
 /// and the voice answered `{"stopped": "<skill>"|null, "ms": <n>|null}`
 /// for the first run stopped. That skill is marked stopped, so its
 /// hand-over's answer is a quiet stop ([`lamp_skills::task::stopped_by_person`]),
 /// and a getting-ready line for it not yet begun is taken back.
-fn cancel_run(voice: bool, socket: Option<&Path>) -> serde_json::Value {
+fn cancel_run(voice: bool, skill: Option<&str>, socket: Option<&Path>) -> serde_json::Value {
     if !voice {
         eprintln!("lamp-skills: a stop asked by a peer that is not the voice refused");
         return json!({"ok": false, "error": lamp_skills::task::CANCEL_NOT_THE_VOICE});
     }
     let nothing = json!({"stopped": null, "ms": null});
+    // Only the run the voice asked for, by its skill's name: a stop never
+    // ends another skill's task (the Reviewer-lead's P2 on #8535).
+    let Some(skill) = skill.filter(|skill| !skill.is_empty()) else {
+        eprintln!("lamp-skills: a stop asked with no skill named: nothing stopped");
+        return nothing;
+    };
     let Some(socket) = socket else {
         eprintln!(
             "lamp-skills: a stop asked: no lamp-tasks hand-over on this lamp (--tasks-socket)"
@@ -6706,7 +6717,7 @@ fn cancel_run(voice: bool, socket: Option<&Path>) -> serde_json::Value {
         let stream = UnixStream::connect(socket)?;
         stream.set_write_timeout(Some(CANCEL_TIMEOUT))?;
         stream.set_read_timeout(Some(CANCEL_TIMEOUT))?;
-        (&stream).write_all(format!("{}\n", lamp_skills::task::cancel_line()).as_bytes())?;
+        (&stream).write_all(format!("{}\n", lamp_skills::task::cancel_line(skill)).as_bytes())?;
         let mut answer = String::new();
         BufReader::new((&stream).take(16_384)).read_line(&mut answer)?;
         Ok(answer)
@@ -10195,7 +10206,8 @@ mod tests {
     }
 
     /// #8475 part 2: the voice's `cancel` op sends lamp-tasks one
-    /// `{"op":"cancel"}` line and answers the voice with the first run
+    /// `{"op":"cancel","skill":"<name>"}` line, naming the skill the voice
+    /// asked for (the Reviewer-lead's P2 on #8535), and answers the voice with the first run
     /// stopped, its skill and ms; that skill is marked stopped, so its
     /// hand-over's failure answer is quiet, and its getting-ready line not
     /// yet begun is taken back.
@@ -10217,10 +10229,10 @@ mod tests {
             &socket,
             json!({"stopped": [{"run": "r-1", "skill": skill, "ms": 420}]}),
         );
-        let answer = cancel_run(true, Some(&socket));
+        let answer = cancel_run(true, Some(skill), Some(&socket));
         assert_eq!(answer, json!({"stopped": skill, "ms": 420}));
         let sent: serde_json::Value = serde_json::from_str(&tasks.join().unwrap()).unwrap();
-        assert_eq!(sent, json!({"op": "cancel"}));
+        assert_eq!(sent, json!({"op": "cancel", "skill": skill}));
         assert!(
             ready.0.lock().unwrap().taken_back,
             "its getting-ready line taken back"
@@ -10251,19 +10263,38 @@ mod tests {
         let socket = dir.path().join("skill-task.sock");
         let tasks = fake_cancel_tasks(&socket, json!({"stopped": []}));
         assert_eq!(
-            cancel_run(true, Some(&socket)),
+            cancel_run(true, Some("cancel-none"), Some(&socket)),
             json!({"stopped": null, "ms": null})
         );
         assert_eq!(
             serde_json::from_str::<serde_json::Value>(&tasks.join().unwrap()).unwrap(),
-            json!({"op": "cancel"})
+            json!({"op": "cancel", "skill": "cancel-none"})
         );
         // No lamp-tasks at all: the same.
         assert_eq!(
-            cancel_run(true, Some(&dir.path().join("gone.sock"))),
+            cancel_run(
+                true,
+                Some("cancel-none"),
+                Some(&dir.path().join("gone.sock"))
+            ),
             json!({"stopped": null, "ms": null})
         );
-        assert_eq!(cancel_run(true, None), json!({"stopped": null, "ms": null}));
+        assert_eq!(
+            cancel_run(true, Some("cancel-none"), None),
+            json!({"stopped": null, "ms": null})
+        );
+        // No skill named (or an empty name): nothing is sent, nothing
+        // stopped; a stop never ends a run by no name (the Reviewer-lead's
+        // P2 on #8535).
+        let listener = UnixListener::bind(dir.path().join("unnamed.sock")).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        for unnamed in [None, Some("")] {
+            assert_eq!(
+                cancel_run(true, unnamed, Some(&dir.path().join("unnamed.sock"))),
+                json!({"stopped": null, "ms": null})
+            );
+        }
+        assert!(listener.accept().is_err(), "nothing reached lamp-tasks");
     }
 
     /// #8475 part 2: lamp-tasks' answer to a hand-over that says
@@ -10305,7 +10336,7 @@ mod tests {
         let listener = UnixListener::bind(&socket).unwrap();
         listener.set_nonblocking(true).unwrap();
         assert_eq!(
-            cancel_run(false, Some(&socket)),
+            cancel_run(false, Some("cancel-peer"), Some(&socket)),
             json!({"ok": false, "error": lamp_skills::task::CANCEL_NOT_THE_VOICE})
         );
         assert!(

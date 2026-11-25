@@ -780,8 +780,22 @@ fn a_cancel_stops_a_sleeping_run_step_and_names_it() {
     let (socket, stop, handle) = serve_hand_overs(&place, &tokens);
     let handed = sleeping_run(&place, &socket, &pid);
     let script = script_pid(&pid).unwrap();
+    // The Reviewer-lead's P2 on #8535: a stop for another skill's run (the
+    // voice's, ended long ago) never ends this one, a task the voice never
+    // asked for: nothing stopped, its token not ended, its script still
+    // there.
+    assert_eq!(
+        ask_line(&socket, r#"{"op":"cancel","skill":"photo-booth"}"#),
+        json!({"stopped": []})
+    );
+    assert!(tokens.ended.lock().unwrap().is_empty());
+    std::thread::sleep(Duration::from_millis(300));
+    assert!(
+        rustix::process::test_kill_process_group(script).is_ok(),
+        "another skill's stop killed it"
+    );
     let asked = Instant::now();
-    let answer = ask_line(&socket, r#"{"op":"cancel"}"#);
+    let answer = ask_line(&socket, r#"{"op":"cancel","skill":"tide"}"#);
     let answered_in = asked.elapsed();
     let stopped = answer["stopped"].as_array().expect("a stopped list");
     assert_eq!(stopped.len(), 1, "{answer}");
@@ -812,7 +826,7 @@ fn a_cancel_stops_a_sleeping_run_step_and_names_it() {
     }
     // The place is free again: a second cancel finds nothing.
     assert_eq!(
-        ask_line(&socket, r#"{"op":"cancel"}"#),
+        ask_line(&socket, r#"{"op":"cancel","skill":"tide"}"#),
         json!({"stopped": []})
     );
     stop.store(true, Ordering::Release);
@@ -820,7 +834,7 @@ fn a_cancel_stops_a_sleeping_run_step_and_names_it() {
 }
 
 /// #8475: a cancel with nothing running is answered an empty list; one
-/// with any other field is refused.
+/// naming no skill, or with any other field, is refused.
 #[test]
 fn a_cancel_with_nothing_running_stops_nothing() {
     let place = Place::new();
@@ -830,11 +844,18 @@ fn a_cancel_with_nothing_running_stops_nothing() {
     });
     let (socket, stop, handle) = serve_hand_overs(&place, &tokens);
     assert_eq!(
-        ask_line(&socket, r#"{"op":"cancel"}"#),
+        ask_line(&socket, r#"{"op":"cancel","skill":"tide"}"#),
         json!({"stopped": []})
     );
-    let refused = ask_line(&socket, r#"{"op":"cancel","run":"task-1-2-3"}"#);
-    assert_eq!(refused["error"], "bad_request", "{refused}");
+    for line in [
+        r#"{"op":"cancel"}"#,
+        r#"{"op":"cancel","skill":""}"#,
+        r#"{"op":"cancel","run":"task-1-2-3"}"#,
+        r#"{"op":"cancel","skill":"tide","run":"task-1-2-3"}"#,
+    ] {
+        let refused = ask_line(&socket, line);
+        assert_eq!(refused["error"], "bad_request", "{line}: {refused}");
+    }
     assert!(tokens.ended.lock().unwrap().is_empty());
     stop.store(true, Ordering::Release);
     handle.join().unwrap();
@@ -854,7 +875,7 @@ fn a_cancel_ends_the_runs_token_before_its_script_is_reaped() {
     });
     let (socket, stop, handle) = serve_hand_overs(&place, &tokens);
     let handed = sleeping_run(&place, &socket, &pid);
-    let answer = ask_line(&socket, r#"{"op":"cancel"}"#);
+    let answer = ask_line(&socket, r#"{"op":"cancel","skill":"tide"}"#);
     let run = answer["stopped"][0]["run"].as_str().unwrap().to_owned();
     let (told, _) = handed.join().unwrap();
     assert_eq!(told["stopped"], true, "{told}");

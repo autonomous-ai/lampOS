@@ -35,9 +35,9 @@
 //! - **The socket** ([`HandOvers`]): with the switch on, `serve` binds
 //!   [`HAND_OVER_SOCKET`] for lamp-skills alone, one line a connection,
 //!   one run at a time (another is refused `busy`).
-//! - **A cancel** (#8475, [`CANCEL_OP`]): `{"op":"cancel"}` on the same
-//!   socket, from lamp-skills alone, is answered at once with the runs it
-//!   stopped; each has its token ended at lamp-control first, then is
+//! - **A cancel** (#8475, [`CANCEL_OP`]): `{"op":"cancel","skill":"<name>"}`
+//!   on the same socket, from lamp-skills alone, is answered at once with
+//!   the runs of that skill it stopped (never another skill's); each has its token ended at lamp-control first, then is
 //!   killed, and its own hand-over is answered [`stopped_answer`].
 //! - **A run that never reached its agent** (#6835 gap 1): Harness keeps a
 //!   pane whose engine exited before it was ready as a shell (agent
@@ -1012,7 +1012,7 @@ pub struct SkillRun {
     /// Set to end the run at once, as at its deadline: by the lamp's own
     /// ask for task news's line (`crate::voice_ask`, `news`), by a person's
     /// ask that comes while it runs (#7765's follow-up's make cancel,
-    /// #7789, for an ask); and by a `{"op":"cancel"}` line on
+    /// #7789, for an ask); and by a `{"op":"cancel","skill":...}` line on
     /// [`HAND_OVER_SOCKET`] for the skill's task or `run` step running
     /// there (#8475, [`CANCEL_OP`]), which ends its token first. A run so
     /// stopped is answered [`stopped_answer`].
@@ -4918,9 +4918,15 @@ impl HandOvers {
         };
         let parsed = serde_json::from_slice::<Value>(&line).ok();
         if parsed.as_ref().is_some_and(|line| line["op"] == CANCEL_OP) {
-            let answered = match parsed.as_ref().and_then(Value::as_object) {
-                Some(fields) if fields.len() == 1 => self.cancel(lanes),
-                _ => refusal("bad_request", "a cancel line is {\"op\":\"cancel\"} alone"),
+            let skill = parsed.as_ref().and_then(|line| line["skill"].as_str());
+            let answered = match (parsed.as_ref().and_then(Value::as_object), skill) {
+                (Some(fields), Some(skill)) if fields.len() == 2 && !skill.is_empty() => {
+                    self.cancel(lanes, skill)
+                }
+                _ => refusal(
+                    "bad_request",
+                    "a cancel line is {\"op\":\"cancel\",\"skill\":\"<name>\"} alone",
+                ),
             };
             write_answer(stream, &answered);
             return;
@@ -4993,10 +4999,10 @@ impl HandOvers {
     /// cancel set, on a thread of its own), and named with its skill and
     /// how long it had run:
     /// `{"stopped":[{"run","skill","ms"}]}`, empty with nothing running.
-    fn cancel(&self, lanes: &Lanes) -> Value {
+    fn cancel(&self, lanes: &Lanes, skill: &str) -> Value {
         let mut stopped = Vec::new();
         for lane in [&lanes.task, &lanes.direct] {
-            let Some((run, skill, ms, first)) = lane.stop() else {
+            let Some((run, skill, ms, first)) = lane.stop(skill) else {
                 continue;
             };
             eprintln!(
@@ -5012,9 +5018,10 @@ impl HandOvers {
 }
 
 /// The `op` of a cancel line on [`HAND_OVER_SOCKET`] (#8475):
-/// `{"op":"cancel"}` alone, from lamp-skills as any hand-over is
-/// ([`caller_is_lamp_skills`]). It stops the skill's task and the `run`
-/// step running there, and is answered at once:
+/// `{"op":"cancel","skill":"<name>"}` alone, from lamp-skills as any
+/// hand-over is ([`caller_is_lamp_skills`]). It stops that skill's task and
+/// `run` step running there, never another skill's (the Reviewer-lead's P2
+/// on #8535), and is answered at once:
 /// `{"stopped":[{"run":"<run id>","skill":"<name>","ms":<ms since its start>}]}`,
 /// `{"stopped":[]}` with nothing running. Each run stopped is answered on
 /// its own hand-over [`stopped_answer`].
@@ -5099,11 +5106,14 @@ impl Lane {
         LaneHeld(self)
     }
 
-    /// The run here, marked stopping: its id, skill, milliseconds since its
-    /// start, and its cancel for the first cancel only. None: nothing runs.
+    /// The run of `skill` here, marked stopping: its id, skill,
+    /// milliseconds since its start, and its cancel for the first cancel
+    /// only. None: nothing runs, or another skill's run does, which a
+    /// cancel never ends (the Reviewer-lead's P2 on #8535).
     #[allow(clippy::type_complexity)]
     fn stop(
         &self,
+        skill: &str,
     ) -> Option<(
         String,
         String,
@@ -5111,7 +5121,7 @@ impl Lane {
         Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
     )> {
         let mut now = self.0.lock().unwrap_or_else(|p| p.into_inner());
-        let running = now.as_mut()?;
+        let running = now.as_mut().filter(|running| running.skill == skill)?;
         let first = !std::mem::replace(&mut running.stopping, true);
         Some((
             running.run.clone(),

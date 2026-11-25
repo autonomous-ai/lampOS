@@ -125,7 +125,8 @@ pub(crate) fn ran_now(skill: &str, at: std::time::Instant) {
 }
 
 /// lamp-skills' call socket op that ends the run under way:
-/// `{"op":"cancel"}`, answered `{"stopped": NAME|null, "ms": N|null}` (or
+/// `{"op":"cancel","skill":"<name>"}` for the skill the voice asked to
+/// run, never another's (the Reviewer-lead's P2 on #8535), answered `{"stopped": NAME|null, "ms": N|null}` (or
 /// that inside `{"ok":true,"result":...}`): the skill it stopped and how
 /// long after its start, or none (#8475).
 pub const CANCEL_OP: &str = "cancel";
@@ -337,7 +338,7 @@ pub fn cancel_run(
             eprintln!("lamp-voice: {why}: the run of {skill} under way is asked to stop (#8475)");
             let answer = crate::tools::exchange(
                 &socket,
-                &json!({ "op": CANCEL_OP }),
+                &json!({ "op": CANCEL_OP, "skill": skill }),
                 crate::tools::ASK_DEADLINE,
             );
             let elapsed_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
@@ -1670,7 +1671,10 @@ mod tests {
             .expect("its thread")
             .join()
             .unwrap();
-        assert_eq!(served.join().unwrap(), json!({"op": CANCEL_OP}));
+        assert_eq!(
+            served.join().unwrap(),
+            json!({"op": CANCEL_OP, "skill": "photo-booth"})
+        );
         assert_eq!(stopped, Some(("photo-booth".to_owned(), 4_200)));
         let _ = std::fs::remove_dir_all(&folder);
         // Started more than 15 min ago: no longer taken as under way.
