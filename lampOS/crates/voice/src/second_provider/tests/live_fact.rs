@@ -1062,3 +1062,32 @@ fn true_answers_stand_as_without_the_switch() {
         assert!(on.notes.is_empty(), "{heard}");
     }
 }
+
+/// #8556 (lamp-06c1, 25 Nov, build 15903, #8240's leg B): round 2 started
+/// the rain poem, round 3 read it back ("…a short poem about rain"), and
+/// the check took "rain" for the weather and "Code" for a place: held, the
+/// model was told to look the weather up, called `start_agent_task` again
+/// and a second task was prepared. A round after the start answered in the
+/// same request is never held: the read-back is said, and the start runs
+/// once.
+#[test]
+fn the_read_back_after_a_start_answered_is_said_and_the_start_runs_once() {
+    const RAIN: &str = "Ask Claude Code to write a short poem about rain.";
+    const READ_BACK: &str = "Claude Code will write a short poem about rain. Shall I go ahead?";
+    let rounds = || {
+        vec![
+            calling(crate::agent_tasks::START),
+            saying(READ_BACK),
+            calling(crate::agent_tasks::START),
+            saying(COULD_NOT),
+        ]
+    };
+    let went = lines(true, false, vec![(RAIN, rounds())]);
+    assert_eq!(went.ran, [crate::agent_tasks::START], "{went:?}");
+    assert_eq!(went.asked, 2, "{went:?}");
+    assert!(went.notes.is_empty(), "{went:?}");
+    // Said as with the switch off.
+    let off = lines(false, false, vec![(RAIN, rounds())]);
+    assert_eq!(went.said, off.said);
+    assert!(!went.said.is_empty() && !went.said.concat().contains(COULD_NOT));
+}

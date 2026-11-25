@@ -4725,7 +4725,14 @@ after a take-over, but now for every turn:
   with T required (LAMP_LIVE_FACT_CHECKED)` and, once the ask again
   speaks, `the live figure's ask again said its first words N ms after it
   was asked`, or `… ended in the line that it couldn't look it up N ms
-  after it was asked`: the extra round's time. English only. Tests:
+  after it was asked`: the extra round's time. A round after
+  `start_agent_task` has answered in the same request is never judged, its
+  first words never wait (`live_fact::Hold::ran`, #8556): its read-back
+  restates the person's own ask, and on lamp-06c1 (25 Nov, build 15903)
+  "…a short poem about rain" was held as the weather ("rain" with "Code" as a
+  place), so the model called `start_agent_task` again and one ask prepared
+  two tasks (`docs/tasks.md`, "The same start again in one request").
+  English only. Tests:
   `second_provider::tests::live_fact::*`, `live_fact::tests::*` and
   `held_forget::a_take_back_is_said_before_a_held_live_figure_asks_again`.
 - **With `LAMP_ACTION_CLAIM_WORDED=on` too, a claim the model words its own

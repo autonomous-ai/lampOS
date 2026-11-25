@@ -259,6 +259,53 @@ tuyến thứ hai (`second_provider/tests/task_yes_in_code.rs`)
 `a_yes_over_the_lamps_voice_is_not_taken_in_code`,
 `a_typed_yes_is_not_taken_in_code`. Chưa được phát thử trên đèn.
 
+### Cùng một lần bắt đầu lặp lại trong một request (#8556, luôn bật)
+
+Trên lamp-06c1 (25/11, build 15903), một lời nhờ viết bài thơ về mưa đã
+chuẩn bị hai việc, 24 và 25. Vòng 2 gọi `start_agent_task`; lời đọc lại ở
+vòng 3 ("…một bài thơ ngắn về mưa") bị kiểm tra số liệu trực tiếp
+(`LAMP_LIVE_FACT_CHECKED`) giữ lại, vì nó coi "rain" là thời tiết và "Code"
+là một địa danh; và vòng 4 lại gọi `start_agent_task`. Khi người dùng nói
+"có", hai việc đã chuẩn bị có thể thành hai lần chạy. Hai phần chặn việc này:
+
+- Một vòng sau khi `start_agent_task` đã trả lời trong cùng request không
+  bao giờ bị kiểm tra số liệu trực tiếp giữ lại (`live_fact::Hold::ran`).
+  Lời đọc lại nhắc lại chính lời nhờ của người dùng, không phải một khẳng
+  định về thế giới. Xem `docs/second-voice.md` và dòng
+  `LAMP_LIVE_FACT_CHECKED` trong `docs/switches.md`.
+- Một lớp chặn trong `agent_tasks::run_for_asked`: lần `start_agent_task`
+  thứ hai trong cùng request, cùng task, who và session với việc đang chờ
+  "có", do chính lần gọi đó chuẩn bị ở cùng phần tasks (`PreparedTold`: id,
+  thời điểm được nhận và thư mục của phần tasks), không hỏi phần tasks gì cả. Nó nhận lại đúng câu trả lời của lần
+  đầu, và nhật ký ghi `lamp-voice provider: request N: the same start again
+  in this request: told task <id>'s answer, nothing prepared (#8556)`.
+  "Cùng" nghĩa là task như khi được chuẩn bị (từng byte, kể cả phần đuôi của
+  câu hỏi), agent nhận việc theo cách người dùng gọi, và session được nêu.
+  Mô hình tự đánh giá ý nghĩa của câu, nên ở đây không đọc từ ngữ nào. Một
+  câu nhờ hai agent khác nhau cùng một việc vẫn tạo hai việc, vì who khác
+  nhau. Một lần bắt đầu ở request sau là lời nhờ mới, như trước.
+
+Mỗi `start_agent_task` cũng được ghi vào nhật ký chỉ bằng độ dài của các
+tham số, không bao giờ bằng lời của người dùng: `lamp-voice provider:
+request N: start_agent_task called with task 29 bytes, who 11 bytes, where
+none, engine none, session none` (`agent_tasks::arguments_by_length`).
+
+| Giới hạn | Giá trị | Mới? |
+|---|---|---|
+| Số vòng chat trong một lượt (`second_provider::MAX_ROUNDS`) | 4 | đã có |
+| Hỏi lại vì số liệu trực tiếp | một lần mỗi lượt | đã có |
+| Kiểm tra số liệu trực tiếp sau khi `start_agent_task` đã trả lời | không có, đến hết request | mới (#8556) |
+| Lần bắt đầu giống hệt nhận câu trả lời của lần đầu | chỉ trong cùng request, việc đang chờ, task, who và session giống hệt | mới (#8556) |
+
+Test: `the_same_start_again_in_one_request_prepares_nothing_more`,
+`a_starts_arguments_are_journalled_by_length_only`, `the_same_start_elsewhere_is_prepared_there`,
+`two_starts_in_one_request_or_a_written_one_replace_nothing` (một câu, hai
+việc), `live_fact::tests::a_task_read_back_after_its_start_answered_is_never_held`,
+và trên tuyến thứ hai (`second_provider/tests/live_fact.rs`)
+`the_read_back_after_a_start_answered_is_said_and_the_start_runs_once`.
+Chưa chạy trên đèn: dòng kiểm tra là lời nhờ về mưa trên lamp-06c1 chỉ tạo
+đúng một lần chuẩn bị.
+
 ### Giữ trong bộ nhớ của người dùng (bản ghi liên kết, lát 3, `LAMP_SERVICE_RECORDS_TASKS`, bật trong sản phẩm)
 
 Bật trong sản phẩm từ 20/11 (`lamp-voice.service`), theo quy tắc của chủ
