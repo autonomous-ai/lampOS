@@ -13104,9 +13104,11 @@ async fn spoken(
         // An installed app's tools (`LAMP_APP_TOOLS`, #8406): their section,
         // on the owner's turn by the same gate, never while private, in the
         // care hold or for a line let in only as the conversation going on;
-        // this also marks the request the tools are offered on.
+        // this also marks the request the tools are offered on. An app the
+        // line was told to as a phrase offers none on it (#8386).
         .chain(crate::app_tools::notes_for(
             request,
+            &text,
             crate::app_tools::now_ms(),
             shared.private_now.load(Ordering::SeqCst),
             shared
