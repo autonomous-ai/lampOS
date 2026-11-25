@@ -2627,14 +2627,18 @@ const CHANGE_UNSAID_NEXT: &str = "Nothing was changed yet: their change wasn't c
      them once, short, in the conversation's language, what to change. Call nothing now.";
 
 /// What the model is told of a change of the make that made `name` a
-/// moment ago and put it on (or holds its writes for a yes): a new make
-/// of it, the whole ask with the change.
+/// moment ago and put it on (or holds its writes for a yes): a change of
+/// a skill they made, `change_skill`'s (`crate::made_change`, #8008),
+/// changed in place under its name, never a new make of the whole ask
+/// beside it. Where #7912's change of a make under way meets #8008's
+/// change of a skill made.
 fn made_change_next(name: &str) -> String {
+    let name = made_skill::spoken_name(name);
     format!(
-        "It was made a moment ago: {}. Their change is a new make of it: call make_skill now \
-         with request: the whole ask as it should be, the first ask with their change in it. \
-         Never say it won't be made.",
-        made_skill::spoken_name(name)
+        "It was made a moment ago: {name}. Their change is a change of that skill: call {} now \
+         with name: {name} and request: their change, in their words. Never say it won't be \
+         made.",
+        crate::made_change::FUNCTION
     )
 }
 
@@ -2779,8 +2783,8 @@ const CHANGE_BUSY_NEXT: &str = "Nothing was changed: another skill is being made
 /// make that waits; false while another make holds it, and nothing
 /// changes), then the wait and its package (never on) are dropped, and it
 /// is to be made again ([`Making::Again`]). Made and on, the model is told
-/// a change is a new make of it. [`Making::NotOurs`] for an id of no voice
-/// make.
+/// the change is `change_skill`'s ([`made_change_next`], #8008).
+/// [`Making::NotOurs`] for an id of no voice make.
 pub fn making_changed(
     id: &str,
     request: u64,
@@ -2887,11 +2891,11 @@ pub fn making_changed(
         .filter(|waits| crate::skill_write_yes::waits(waits))
         .map(str::to_owned);
     let Some(waits) = waits else {
-        // Its record for the same ask asked again let go: the change is a
-        // new make, never "you already have that skill".
+        // Its record for the same ask asked again let go: the change is
+        // `change_skill`'s, in place, never "you already have that skill".
         ask.dropped = true;
         eprintln!(
-            "lamp-voice: request {request}: the person changed {name}, made a moment ago: a new make of it (#7912)"
+            "lamp-voice: request {request}: the person changed {name}, made a moment ago: change_skill's, in place (#7912, #8008)"
         );
         return Making::Told(json!({ "approved": false, "next": made_change_next(&name) }));
     };

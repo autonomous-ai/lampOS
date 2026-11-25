@@ -1800,7 +1800,13 @@ sau:
     tiếp khỏi nó (`make_skill_local::take_changed_here`; ROW của #7936 trên
     lamp-9adf ở 09ede55c76, "make it seven thirty instead", thất bại của lần
     tạo lại không bao giờ được nói). Một lần tạo đã xong và đã bật được báo rằng thay
-    đổi của nó là một lần tạo mới, cả lời nhờ cùng thay đổi. Một câu về
+    đổi của nó là của `change_skill` (#8008, `made_change`): kỹ năng đó theo
+    tên, thay đổi bằng lời của họ, đổi tại chỗ dưới tên của nó, không bao giờ
+    là một lần tạo mới cả lời nhờ bên cạnh nó (`made_change_next`). Đó là
+    chỗ thay đổi của #7912 gặp #8008: nhánh `approve_id` của `make_skill`
+    được đọc trước, nên `answer: "change"` với id của một lần tạo là của lần
+    tạo đang làm hoặc đang chờ "có", còn thay đổi một kỹ năng đã làm xong là
+    lời gọi `change_skill`, chạy như lời gọi `make_skill` với `change`. Một câu về
     chuyện khác để yên lần tạo. "change" cho một lần chờ không phải của một
     lần tạo bằng giọng nói (tác vụ của một kỹ năng, một lần gỡ, một bản ghi
     đã thả) được đọc là chưa rõ, không bao giờ là lời "không". Kiểm thử:
@@ -1818,6 +1824,10 @@ sau:
     `a_change_past_the_longest_ask_is_told_at_once`,
     `make_queue::tests::a_remake_after_a_waiting_yes_keeps_the_slot`,
     `never_mind_said_while_made_ends_it`,
+    `a_change_said_while_made_is_made_with_it_never_declined` (thất bại
+    trước, trên lamp-voice trước khi sửa),
+    `a_never_mind_said_while_made_still_ends_it`,
+    `a_change_to_a_skill_made_a_moment_ago_is_change_skills`,
     `an_unrelated_line_while_made_leaves_the_make_alone`.
 
     Tham số `request` nói không
@@ -2596,7 +2606,7 @@ lại do `crate::made_change` làm:
 
 Một lần đổi không thêm gì vào tham số của `make_skill`, mà sản phẩm giữ
 trong `PRODUCT_MOST_PARAMETERS_BYTES` (3.750 trong 4.096 của liên kết,
-#8002; 3.737 khi các công tắc của sản phẩm bật, như trước #8008): tham số
+#8002; 3.746 khi các công tắc của sản phẩm bật, có câu trả lời `change` của #7912, như trước #8008): tham số
 của hàm riêng của nó là 233 byte và mô tả 277 byte, tự nằm trong giới hạn
 của liên kết, và các hàm riêng của sản phẩm là 51 (55 với 4 hàm của
 tuyến, trong 64 của `second_provider::MAX_TOOLS`). Test:

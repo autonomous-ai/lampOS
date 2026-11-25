@@ -5079,8 +5079,14 @@ gone ([switches.md](switches.md)). What happens:
     the person said since: the change's own line is no going on from it
     (`make_skill_local::take_changed_here`; #7936's ROW on lamp-9adf at
     09ede55c76, "make it seven thirty instead", its remake's failure never
-    said). A make done and on is told
-    its change is a new make of it, the whole ask with the change. A line
+    said). A make done and on is told its change is `change_skill`'s
+    (#8008, `made_change`): that skill by its name, the change in their
+    words, changed in place under its name, never a new make of the whole
+    ask beside it (`made_change_next`). That is where #7912's change meets
+    #8008's: `make_skill`'s `approve_id` branch is read first, so `answer:
+    "change"` with a make's id is a make under way's or one waiting for its
+    yes, and a change to a skill already made is `change_skill`'s call,
+    run as `make_skill`'s with `change`. A line
     about something else leaves the make alone. "change" on a wait that is
     no voice make's (a skill's task, a remove, a record let go) reads as
     unclear, never as a no. Tests:
@@ -5098,6 +5104,10 @@ gone ([switches.md](switches.md)). What happens:
     `a_change_past_the_longest_ask_is_told_at_once`,
     `make_queue::tests::a_remake_after_a_waiting_yes_keeps_the_slot`,
     `never_mind_said_while_made_ends_it`,
+    `a_change_said_while_made_is_made_with_it_never_declined` (failed
+    first, on lamp-voice before the fix),
+    `a_never_mind_said_while_made_still_ends_it`,
+    `a_change_to_a_skill_made_a_moment_ago_is_change_skills`,
     `an_unrelated_line_while_made_leaves_the_make_alone`.
 
     The `request` parameter says never to
@@ -5888,8 +5898,8 @@ does the rest:
   remove takes it with the skill.
 
 A change adds nothing to `make_skill`'s parameters, which the product holds
-to `PRODUCT_MOST_PARAMETERS_BYTES` (3,750 of the link's 4,096, #8002; 3,737
-with the product's switches on, as before #8008): its own function's
+to `PRODUCT_MOST_PARAMETERS_BYTES` (3,750 of the link's 4,096, #8002; 3,746
+with the product's switches on, #7912's `change` answer in, as before #8008): its own function's
 parameters are 233 bytes and its description 277, within the link's
 bounds by themselves, and the product's own functions are 51 (55 with
 the route's 4, within `second_provider::MAX_TOOLS`' 64).
