@@ -41,7 +41,7 @@
     <label for="name">Your name</label>
     <input id="name" maxlength="64" autocomplete="given-name">
     <div class="hint" id="zone-hint"></div>
-    <label class="check" for="reports"><input id="reports" type="checkbox"> Send health and crash reports</label>
+    <label class="check" for="reports"><input id="reports" type="checkbox" checked> Send health and crash reports</label>
     <div class="hint">Numbers about how your lamp is running, and which part stopped if one does, to help us fix it. Never anything said, seen or kept. You can stop them any time from the app, or by asking the lamp.</div>
     <div class="error" id="form-error" role="alert"></div>
     <button id="go" type="button">Set up</button>
@@ -176,7 +176,8 @@ $("go").addEventListener("click", async () => {
         device_id: params.get("device_id") || "",
         name: $("name").value,
         timezone: zone,
-        // A yes only when ticked; unticked, nothing is ever sent (#2862).
+        // Ticked by default (reports on, the product owner, 25 Nov 2026);
+        // unticked, the person's no is kept and nothing is ever sent (#2862).
         share_reports: $("reports").checked,
       }),
     });
