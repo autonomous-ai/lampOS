@@ -3306,6 +3306,8 @@ fn second_route_worker_environment(
         // "Hey, Lynn. …" keeps a sure hearing in a busy room (the owner's
         // first rule, 25 Nov 2026).
         crate::second_provider::NAME_GREETED_STAND_IN_ENVIRONMENT,
+        // "Mom, …" is said to a mother, not a call (26 Nov 2026).
+        crate::attention::MOM_NOT_THE_NAME_ENVIRONMENT,
         // A sure start past a word said to a person, the same rule.
         crate::second_provider::NAME_SURE_OVER_A_PERSON_WORD_ENVIRONMENT,
         crate::second_provider::NAME_STAYS_ENVIRONMENT,
@@ -3813,6 +3815,7 @@ mod tests {
             crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT,
             crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT,
             crate::second_provider::NAME_GREETED_STAND_IN_ENVIRONMENT,
+            crate::attention::MOM_NOT_THE_NAME_ENVIRONMENT,
             crate::second_provider::NAME_SURE_OVER_A_PERSON_WORD_ENVIRONMENT,
             crate::second_provider::NAME_STAYS_ENVIRONMENT,
             crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT,
@@ -5078,6 +5081,7 @@ mod tests {
                     || name == crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT
                     || name == crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT
                     || name == crate::second_provider::NAME_GREETED_STAND_IN_ENVIRONMENT
+                    || name == crate::attention::MOM_NOT_THE_NAME_ENVIRONMENT
                     || name == crate::second_provider::NAME_SURE_OVER_A_PERSON_WORD_ENVIRONMENT
                     || name == crate::second_provider::NAME_STAYS_ENVIRONMENT
                     || name == crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT
@@ -5435,6 +5439,7 @@ mod tests {
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_MEMORY_UNSURE_NOT_KEPT=on",
                     "LAMP_MEMORY_WEEKLY_CHAPTERS=on",
+                    "LAMP_MOM_NOT_THE_NAME=on",
                     "LAMP_NAMED_AGENT_TAKES_LINE=on",
                     "LAMP_NAMED_ALWAYS=on",
                     "LAMP_NAMES_RECORD_TOLD=on",
