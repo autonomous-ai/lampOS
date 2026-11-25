@@ -344,6 +344,18 @@ input loss, a fault or lost authority still blanks at once. An output cap
 (`LAMP_OUTPUT_CAPS`) that changes is eased over 200 ms, and a tighter one dims
 the frame already shown instead of blanking it.
 
+lamp-voice journals each black and each cap change, at most 20 lines in 10 s
+with the rest counted into the next line:
+`lamp-voice ring: black, AuthorityLost(StaleOwner), after a fade of 8 steps over 200 ms`,
+`lamp-voice ring: black, AuthorityLost(PrivacyClosed), at once` and
+`lamp-voice ring: cap 24 -> 60, eased over 200 ms`. Every 10 s that the ring
+was lit it also says the highest channel value put on the wire, read off the
+encoded frames, with the ceiling and cap in force and the fades begun (most
+end under the resting face, with no black line):
+`lamp-voice ring: lit up to 60 in the last 10 s, ceiling 60, cap 120, 2 fades begun`. A
+flicker or brightness report can be read from the lamp's journal with no
+camera.
+
 So the resting face means one thing: the lamp is on and able to hear. It is
 dark when the privacy switch is closed.
 

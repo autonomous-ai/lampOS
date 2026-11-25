@@ -60,7 +60,11 @@ only while a resting frame could be shown (fresh authority, a permitted
 microphone, input available, no fault) and its own camera grant is current; a
 resting frame or a new cue paints over it with no dark frame between. Any other
 revocation of the displayed cue (privacy, input, camera, expired authority, a
-fault) and a refused paint still cause one black frame at once. `dim` brings
+fault) and a refused paint still cause one black frame at once. A
+`BlankReceipt`'s `faded` is `Some((steps, us))` for the black that ends a fade
+and `None` for one at once. `take_peak` gives the highest channel value
+written since its last call, read off the encoded frames, and `take_fades` the
+fades begun (most end under the resting face, with no black). `dim` brings
 the lit cue or resting frame down to a tighter output cap in the same steps,
 never brighter and never black. Malformed
 trusted control, transport loss or an I/O fault latches the writer fault and

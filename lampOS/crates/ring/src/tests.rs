@@ -942,6 +942,13 @@ fn a_cue_whose_permit_runs_out_fades_to_black_with_no_lit_frame_going_straight_t
     assert!(faded.windows(2).all(|pair| pair[1] < pair[0]), "{faded:?}");
     // The last lit frame before black is a glow, not the cue.
     assert!(faded[faded.len() - 2] <= 60 / 8, "{faded:?}");
+    // Its receipt says it faded: the lit steps between the cue and black.
+    let (steps, us) = blanks[0].faded.unwrap();
+    assert_eq!(steps as usize, faded.len() - 2, "{faded:?}");
+    assert!(us >= FADE_US * 3 / 4, "{us}");
+    // The brightest channel put on the wire was the cue's own 60, once.
+    assert_eq!(ring.take_peak(), 60);
+    assert_eq!(ring.take_peak(), 0);
     assert!(ring.tick().unwrap().is_none());
 }
 
@@ -961,6 +968,9 @@ fn a_turn_that_ends_goes_into_the_resting_frame_with_no_dark_frame_between() {
     assert!(ring.tick().unwrap().is_none());
     assert!(rest(&mut ring).is_some());
     assert!(tick_until(&mut ring, 20 + FADE_US + FADE_STEP_US).is_empty());
+    // No black, so no receipt: the fade that began is counted all the same.
+    assert_eq!(ring.take_fades(), 1);
+    assert_eq!(ring.take_fades(), 0);
     assert!(
         ring.sink
             .frames
@@ -1004,6 +1014,7 @@ fn a_safety_cut_is_still_one_black_frame_at_once_even_during_a_fade() {
         blank.reason,
         BlankReason::AuthorityLost(lamp_turn_owner::Error::PrivacyClosed)
     );
+    assert_eq!(blank.faded, None);
     assert_eq!(ring.sink.frames.len(), fading + 1);
     assert!(is_black(ring.sink.frames.last().unwrap()));
 
