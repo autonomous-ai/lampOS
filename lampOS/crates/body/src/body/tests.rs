@@ -22746,3 +22746,169 @@ fn a_gesture_under_way_ends_as_the_lamp_begins_to_keep_still() {
         "{fates:?}"
     );
 }
+
+#[test]
+fn a_dev_reach_widens_the_heads_look_down_only_at_full_height_and_never_narrows_it() {
+    let today = Limits::FOLDED;
+    let widened = Limits {
+        dev_pitch_down: Some(856.0),
+        ..Limits::FOLDED
+    };
+    // Off (`None`), the standing head looks down as it does today: the folded reach growing to the up reach as it clears the base.
+    assert_eq!(today.pitch_down_at(0.0), today.pitch_down);
+    assert_eq!(
+        today.pitch_down_at(1.0),
+        today.pitch_up.max(today.pitch_down)
+    );
+    // On, nothing changes before the lamp stands at its full height (the map is read at the stand pose, no other).
+    for clear in [0.0, 0.25, 0.5, 0.99] {
+        assert_eq!(
+            widened.pitch_down_at(clear),
+            today.pitch_down_at(clear),
+            "clear {clear}"
+        );
+    }
+    // At full height, the map's reach.
+    assert_eq!(widened.pitch_down_at(1.0), 856.0);
+    // A map reach below today's does not narrow it.
+    let tight = Limits {
+        dev_pitch_down: Some(10.0),
+        ..Limits::FOLDED
+    };
+    assert_eq!(tight.pitch_down_at(1.0), today.pitch_down_at(1.0));
+}
+
+#[test]
+fn the_product_unit_never_turns_the_dev_reach_on_and_the_census_lists_it_off() {
+    let unit = include_str!("../../../../deploy/product/lamp-body.service");
+    assert!(
+        !unit.contains("LAMP_BODY_DEV_REACH"),
+        "a product unit must not set the dev lamp's reach"
+    );
+    assert!(!unit.contains("reach-map"), "a product unit passes no map");
+    let census = include_str!("../../../../docs/switches.md");
+    let row = census
+        .lines()
+        .find(|line| line.starts_with("| `lamp-body` LAMP_BODY_DEV_REACH"))
+        .expect("docs/switches.md lists LAMP_BODY_DEV_REACH");
+    assert!(
+        row.contains("`on`; off."),
+        "the census says it is off: {row}"
+    );
+    assert!(
+        row.contains("off in the product"),
+        "the census says the product unit does not set it"
+    );
+}
+
+#[test]
+fn a_dev_lamps_look_down_is_held_inside_the_pitch_servos_own_range() {
+    // Off, or a servo storing the whole turn: 4,095 as before.
+    assert_eq!(dev_pitch_ceiling(None, Some((1_457, 3_029))), 4_095);
+    assert_eq!(dev_pitch_ceiling(Some(828.0), None), 4_095);
+    assert_eq!(dev_pitch_ceiling(Some(828.0), Some((0, 4_095))), 4_095);
+    // On, with 75c9's own stored range: its upper limit less the body's 20 counts.
+    assert_eq!(dev_pitch_ceiling(Some(828.0), Some((1_457, 3_029))), 3_009);
+}
+
+#[test]
+fn a_dev_lamp_waits_to_sit_down_while_its_head_looks_far_down() {
+    let dev = Limits {
+        dev_pitch_down: Some(828.0),
+        ..Limits::FOLDED
+    };
+    let today = Limits::FOLDED;
+    let home = 1_791.0;
+    // Today's reach standing is the up reach (45 counts on the folded limits): a head 300 counts down is far.
+    assert!(dev_sit_waits(&dev, home + 300.0, home, 1.0));
+    // Inside today's reach, or the dev reach off: no wait. The wait ends when the head's goal is inside.
+    assert!(!dev_sit_waits(&dev, home + 10.0, home, 1.0));
+    assert!(!dev_sit_waits(&today, home + 300.0, home, 1.0));
+    // Part way down the arm, today's reach is smaller still, so the same head is far.
+    assert!(dev_sit_waits(&dev, home + 40.0, home, 0.3));
+    // While it waits, today's reach is in force (the head's goal is pulled in); otherwise the dev reach at full height.
+    assert_eq!(
+        pitch_down_in_force(&dev, 1.0, true),
+        today.pitch_down_at(1.0)
+    );
+    assert_eq!(pitch_down_in_force(&dev, 1.0, false), 828.0);
+}
+
+/// A dev lamp looks far down at a face: in the run's loop its head goes past today's reach, and today's lamp's never does (so the pure
+/// sit-down tests above are about a head that really gets there). The loop-level idle fold from that look is NOT pinned here: a standing
+/// lamp in this harness never folds on its own while it has seen a face (no sit-down in 90 s), so it is the ROW's idle-fold step.
+#[test]
+fn a_dev_lamp_looking_far_down_goes_past_todays_reach_in_the_loop_and_todays_does_not() {
+    let below = || {
+        Some(Seen {
+            face: Some(crate::gaze::Sight {
+                x: 0.0,
+                y: 0.9,
+                size: 0.2,
+                turned: 0.0,
+            }),
+        })
+    };
+    let looking = Looking::new([342, 200], [250, 120]).unwrap();
+    let run_with = |limits: Limits| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(20));
+        lamp.arm_moves = true;
+        lamp.overload_clears = 1;
+        let mut seen: Vec<(f32, u16)> = Vec::new();
+        let report = run_looking(
+            &mut lamp,
+            &mut clock,
+            limits,
+            Some(HOME),
+            Some(standing(100, 60)),
+            Some(looking),
+            || Some((Mood::Listening, 100)),
+            below,
+            |glimpse| seen.push((glimpse.stand, glimpse.goals[0])),
+        );
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        seen
+    };
+    // HOME's pitch is 1,900 and today's standing reach 45 counts: 1,945 is the edge of today's reach.
+    let edge = 1_945u16;
+    let today = run_with(Limits::FOLDED);
+    assert!(
+        today
+            .iter()
+            .filter(|(stand, _)| *stand >= 1.0)
+            .all(|(_, goal)| *goal <= edge + 1),
+        "today's reach is never passed"
+    );
+    let dev = run_with(Limits {
+        dev_pitch_down: Some(828.0),
+        ..Limits::FOLDED
+    });
+    assert!(
+        dev.iter()
+            .any(|(stand, goal)| *stand >= 1.0 && *goal > edge + 5),
+        "the head never looked past today's reach"
+    );
+    // Folded, and on the way up, it is today's reach and no more.
+    assert!(
+        dev.iter()
+            .filter(|(stand, _)| *stand < 1.0)
+            .all(|(_, goal)| *goal <= 2_016),
+        "the widening is for the full height only"
+    );
+}
+
+#[test]
+fn a_dev_lamps_reach_is_withdrawn_at_once_for_a_safety_fold_or_an_ending_run() {
+    let dev = Limits {
+        dev_pitch_down: Some(828.0),
+        ..Limits::FOLDED
+    };
+    // Standing and awake: the dev reach stays.
+    assert!(!dev_reach_withdrawn(&dev, false, false, false));
+    // A sit-down that waits, a lamp kept down (tired, hot, seated, rest) or a run that is ending: today's reach at once.
+    assert!(dev_reach_withdrawn(&dev, true, false, false));
+    assert!(dev_reach_withdrawn(&dev, false, true, false));
+    assert!(dev_reach_withdrawn(&dev, false, false, true));
+    // Off, nothing is withdrawn (there is nothing to withdraw).
+    assert!(!dev_reach_withdrawn(&Limits::FOLDED, true, true, true));
+}

@@ -115,6 +115,19 @@ run on a lamp.
   geometry, not measured on a lamp). Its plain-JSON maps and the guard that reads
   them (`sdk/js/examples/twin/reach-map-4ace.json`, `reach-guard.js`, #7786) are
   used by the try-it page only. The body itself still uses the fixed reach above.
+- `LAMP_BODY_DEV_REACH=on` (a dev lamp only, never a product unit; #7513): a standing head may look down as far as the lamp's own
+  reach map says (`tools/reach/README.md`, the per-lamp file at `/var/lib/lampos-body/reach-map.json`, or the file
+  `LAMP_BODY_DEV_REACH_MAP` names), 48 counts short of the map's end at the stand pose, instead of the 150 counts it looks up. It
+  needs `--stand` and `--home`, widens only once the lamp stands at its full height and never narrows, and keeps every other bound. The look
+  is held inside the pitch servo's own stored range less 20 counts, and a lamp about to sit down from a look past today's reach waits, with
+  today's reach in force so the head's goal is pulled in at the pose's speed cap, and folds only once the head is back inside it (no timeout;
+  a safety sit-down or a run that is ending is never held, but today's reach is in force at once for it), so the arm never folds under a head the map has not cleared.
+  The margin is 48 counts, taken from the stand pose's pitch (what the reach is added to), stricter than the body's own 20. A look is held to
+  these bounds; `body/limits` and `get body` stay a folded lamp's ("The body's limits", `docs/control.md`), so the page's band reads the
+  folded numbers while the lamp stands.
+  A file that is not root's, is a link, names another lamp, was laid for another folded arm or head home, or whose stand is not a
+  safe pose on it is refused in one journal line and the reach stays as it was. The map is V1's masses on lamp-4ace's geometry,
+  not measured on a lamp.
 - The commanded pose moves at 50 counts a second at most (about 4 degrees a
   second). That is the speed the head was moved at when it was backed off the
   base on lamp-4ace on 2026-10-12 (47 counts a second at most), which it

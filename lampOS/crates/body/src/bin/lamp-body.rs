@@ -160,6 +160,44 @@ struct StandingChoice {
     idle: bool,
 }
 
+#[cfg(unix)]
+/// `LAMP_BODY_DEV_REACH=on` (a dev lamp only): the standing head's look down from the lamp's own reach map, or ONE line why not.
+fn dev_pitch_down_of(arguments: &Arguments) -> Option<f32> {
+    use lamp_body::reach_map as map;
+    if !map::dev_reach_from(std::env::var(map::DEV_REACH).ok().as_deref()) {
+        return None;
+    }
+    let (Some(standing), Some(home)) = (arguments.standing.as_ref(), arguments.home) else {
+        eprintln!(
+            "lamp-body: LAMP_BODY_DEV_REACH is on but this lamp has no --stand and --home: the head's reach stays as it was"
+        );
+        return None;
+    };
+    let path =
+        std::env::var(map::DEV_REACH_MAP).unwrap_or_else(|_| map::DEV_REACH_MAP_PATH.to_owned());
+    // The file is root's: a body (or anyone else) that can write it could widen its own reach.
+    let text = map::read_trusted(std::path::Path::new(&path), 0);
+    let lamp = map::DevLamp {
+        unit: arguments.unit_id.as_str(),
+        folded_arm: standing.folded,
+        home_pitch: home[0],
+        stand: standing.pose,
+    };
+    match map::dev_pitch_down(text, &lamp) {
+        Ok(counts) => {
+            eprintln!(
+                "lamp-body: LAMP_BODY_DEV_REACH: the standing head may look down {counts} counts from home (the map {path}, {} counts kept off its end)",
+                map::DEV_MARGIN
+            );
+            Some(counts)
+        }
+        Err(why) => {
+            eprintln!("lamp-body: LAMP_BODY_DEV_REACH is on but stays off: {why}");
+            None
+        }
+    }
+}
+
 /// Whole numbers separated by commas, exactly as many as asked for.
 fn counts_of<const N: usize>(value: &str) -> Option<[u16; N]> {
     let parts: Vec<u16> = value
@@ -1717,6 +1755,8 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
 /// the raw mode and the baud this sets on open are what make the port raw.
 #[cfg(unix)]
 fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
+    // A dev lamp's map reach (LAMP_BODY_DEV_REACH), read before `arguments` is taken apart.
+    let dev_pitch_down = dev_pitch_down_of(&arguments);
     use lamp_body::stop_signal::StopSignal;
     use lamp_body::{
         body::{Limits, Stop, Tuning},
@@ -2127,6 +2167,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     let limits = Limits {
         yaw_unset: arguments.reach.is_none(),
         stand_roll: arguments.stand_roll.map_or(folded.stand_roll, f32::from),
+        dev_pitch_down,
         head_stall_load: arguments.head_stall_load.unwrap_or(limits.head_stall_load),
         force: arguments.force_limit,
         recover_force: arguments.recover_force,

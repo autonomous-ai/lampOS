@@ -1240,6 +1240,55 @@ fn unsmooth(lift: f32) -> f32 {
     (low + high) / 2.0
 }
 
+/// The pitch ceiling while the lamp stands: 4,095, or with a dev reach (`Limits::dev_pitch_down`) the pitch servo's own stored limit
+/// less `OWN_RANGE_MARGIN`, so that a goal past it is held, never a goal that ends the run on `Stop::Window`. A servo storing the
+/// whole turn (0..=4095, never calibrated) keeps 4,095 as before.
+fn dev_pitch_ceiling(dev_pitch_down: Option<f32>, stored: Option<(u16, u16)>) -> u16 {
+    match (dev_pitch_down, stored) {
+        (Some(_), Some(range)) if range != (0, ENCODER_MAX) => {
+            range.1.saturating_sub(OWN_RANGE_MARGIN).min(ENCODER_MAX)
+        }
+        _ => ENCODER_MAX,
+    }
+}
+
+/// Whether a dev lamp's widened look-down is withdrawn this step (today's reach in force): its sit-down waits for a far look, or the lamp
+/// is being kept down or the run is ending, where it must not wait (sim-2's P2 on #8648: a safety fold with the dev reach still in force
+/// pulls the head in only as the arm goes down).
+fn dev_reach_withdrawn(limits: &Limits, sit_waits: bool, kept_down: bool, leaving: bool) -> bool {
+    limits.dev_pitch_down.is_some() && (sit_waits || kept_down || leaving)
+}
+
+/// The head's look-down reach in force now: a dev lamp that is waiting to sit down from a far look (`dev_sit_waits`) is held to today's reach,
+/// so the head's goal is pulled in (at the pose's speed cap) while the arm waits; otherwise `Limits::pitch_down_at`.
+fn pitch_down_in_force(limits: &Limits, clear: f32, sit_waiting: bool) -> f32 {
+    if sit_waiting {
+        Limits {
+            dev_pitch_down: None,
+            ..*limits
+        }
+        .pitch_down_at(clear)
+    } else {
+        limits.pitch_down_at(clear)
+    }
+}
+
+/// Whether a lamp that is to sit down waits first: a dev reach is on and the head's commanded pitch is farther down than today's reach
+/// would allow at this height. Otherwise the arm folds while the head is far down, where the map does not clear the arm's way (sim-2's
+/// P2 on #8648). While it waits `pitch_down_in_force` is today's reach, which pulls the head's goal in at the pose's speed cap; the wait
+/// ends when the head's goal is inside it, and it has no timeout: the arm never folds under a head that is still out. It is never asked
+/// of a sit-down for safety (`kept_down`) or of a run that is ending.
+fn dev_sit_waits(limits: &Limits, commanded_pitch: f32, home_pitch: f32, stand: f32) -> bool {
+    if limits.dev_pitch_down.is_none() {
+        return false;
+    }
+    let today = Limits {
+        dev_pitch_down: None,
+        ..*limits
+    };
+    commanded_pitch > home_pitch + today.pitch_down_at(head_share(stand).powi(2))
+}
+
 /// How far the head is toward its standing pose with the arm this far up.
 /// It waits for the first quarter of the arm's way and is back at its folded
 /// pose before the arm comes down that far: the head leaves the base and
@@ -1275,6 +1324,11 @@ pub struct Limits {
     /// than `roll`: folded, lamp-4ace's head cannot tilt at all (its roll
     /// servo meets something after four counts); stood up it is free.
     pub stand_roll: f32,
+    /// `LAMP_BODY_DEV_REACH` (a dev lamp only: off in the product): how far (counts) the head may look down from home once the lamp has
+    /// stood to its full height, from the lamp's own reach map (`reach_map`), never less than `pitch_down` or `pitch_up` allow today.
+    pub dev_pitch_down: Option<f32>,
+    /// The most the head's pitch goal may be while the lamp stands: 4,095, or with a dev reach the servo's own stored limit less the margin.
+    pub pitch_ceiling: u16,
     /// The fastest the commanded pose moves, and how fast that may change.
     pub speed: f32,
     pub acceleration: f32,
@@ -1455,6 +1509,16 @@ impl Tuning {
 }
 
 impl Limits {
+    /// How far (counts) the head may look down from home when it is `clear` of the base (0 folded, 1 stood at full height): as today, the
+    /// folded reach growing to the up reach; and with a dev lamp's map reach, that reach once FULLY stood and never less than today's.
+    pub fn pitch_down_at(&self, clear: f32) -> f32 {
+        let today = self.pitch_down + (self.pitch_up - self.pitch_down).max(0.0) * clear;
+        match self.dev_pitch_down {
+            Some(reach) if clear >= 1.0 => today.max(reach),
+            _ => today,
+        }
+    }
+
     /// How fast the arm folds during the recovery, counts a second.
     pub fn fold_speed(&self) -> f32 {
         self.recover_speed.unwrap_or(ARM_LOWER_SPEED)
@@ -1553,6 +1617,8 @@ impl Limits {
         roll: 30.0,
         yaw: 40.0,
         stand_roll: 0.0,
+        dev_pitch_down: None,
+        pitch_ceiling: ENCODER_MAX,
         speed: 50.0,
         acceleration: 400.0,
         servo_speed: 150,
@@ -6039,6 +6105,16 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         _ => limits,
     };
+    // A dev lamp's look down is held inside the pitch servo's own stored range less the margin, never past it (Stop::Window).
+    let limits = Limits {
+        pitch_ceiling: dev_pitch_ceiling(
+            limits.dev_pitch_down,
+            report
+                .own_ranges
+                .map(|ranges| ranges[Joint::WristPitch.index()]),
+        ),
+        ..limits
+    };
     let (gesture_low, gesture_high): ([f32; 5], [f32; 5]) = match app {
         Some(app) => (
             std::array::from_fn(|index| GESTURE_REACH[index].max(f32::from(app.low[index]))),
@@ -7028,9 +7104,14 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         .max(looking.map_or(0.0, |looking| looking.reach[0]));
     // `stand_roll` is the limits' own, taken from the energy level the body
     // is at (`Limits::at`).
+    // Whether this step's sit-down is waiting for a far look (`dev_sit_waits`): the head's bounds are today's reach meanwhile.
+    let dev_sit_holding = std::cell::Cell::new(false);
     let bounds = |home: [f32; 3], stand: f32, stand_roll: f32| -> ([f32; 3], [f32; 3]) {
         let (floor, ceiling) = if head_share(stand) > 0.0 {
-            (f32::from(limits.pitch_floor), 4_095.0)
+            (
+                f32::from(limits.pitch_floor),
+                f32::from(limits.pitch_ceiling),
+            )
         } else {
             (
                 f32::from(limits.pitch_window.0),
@@ -7041,7 +7122,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // Stood up there is nothing under it, so it may look down as far as
         // it may look up; in between, in proportion to how clear it is.
         let clear = head_share(stand).powi(2);
-        let down = limits.pitch_down + (limits.pitch_up - limits.pitch_down).max(0.0) * clear;
+        let down = pitch_down_in_force(&limits, clear, dev_sit_holding.get());
         let roll = limits.roll + (stand_roll - limits.roll).max(0.0) * clear;
         (
             [
@@ -8026,13 +8107,30 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 woke_for_gesture = true;
             }
             let awake = awake_until.is_some_and(|until| now < until);
-            let wanted = if leaving.is_none() && awake && !kept_down {
+            let mut wanted = if leaving.is_none() && awake && !kept_down {
                 asked_now
                     .stand_share
                     .map_or(up.share, |asked| asked.min(up.share))
             } else {
                 0.0
             };
+            // A dev lamp does not sit down from a look far down (past today's reach): it waits for the head to come back inside it
+            // (today's reach is in force meanwhile, `dev_sit_holding`), so the arm never folds under a head the map has not cleared.
+            let sit_waits = leaving.is_none()
+                && !kept_down
+                && wanted < stand
+                && dev_sit_waits(&limits, commanded[0], home_now[0], stand);
+            // Today's reach is in force at once for a sit-down that waits, and for one that must not (a safety fold: tired, hot, seated, rest;
+            // or a run that is ending): the head's goal is pulled in from the first step, not only as the arm goes down.
+            dev_sit_holding.set(dev_reach_withdrawn(
+                &limits,
+                sit_waits,
+                kept_down,
+                leaving.is_some(),
+            ));
+            if sit_waits {
+                wanted = stand;
+            }
             let was_folded = stand <= 0.0;
             awake_now = wanted > 0.0;
             if !blind {
