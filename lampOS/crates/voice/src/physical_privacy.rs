@@ -31,6 +31,7 @@ pub fn run(mut channels: WorkerChannels) -> Result<(), Box<dyn std::error::Error
                     Control::StartCapture
                     | Control::ConnectReference { .. }
                     | Control::ProviderOutputCapacity { .. }
+                    | Control::HistoryRoute { .. }
                     | Control::NameGrant { .. },
                 ) => {
                     return Err(io::Error::other("invalid privacy worker command").into());

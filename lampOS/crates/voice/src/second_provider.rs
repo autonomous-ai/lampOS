@@ -800,6 +800,18 @@ pub(crate) type RequestedAudioRunner = Arc<
         + Sync,
 >;
 
+/// Tool dispatch with a history-only origin; the optional origin grants no action.
+pub(crate) type FixedLineRunner = Arc<
+    dyn Fn(
+            Option<lamp_msgs::FixedLineOrigin>,
+            lamp_msgs::RequestedAudioContext,
+            lamp_gemini::ToolCall,
+            crate::memory_scope::ScopeLease,
+        ) -> BoxFuture<'static, crate::tools::ToolAnswer>
+        + Send
+        + Sync,
+>;
+
 #[derive(Clone, Copy)]
 struct SpokenTurn {
     request: u64,
@@ -2005,6 +2017,8 @@ struct Shared {
     tools: ToolRunner,
     scoped_tools: Option<ScopedToolRunner>,
     requested_audio: Option<(String, RequestedAudioRunner)>,
+    fixed_line_tools: Option<(String, RequestedAudioRunner)>,
+    fixed_line_route: Arc<crate::fixed_line_history::Route>,
     system: System,
     after_forget_instruction: String,
     scoped_system: Option<ScopedSystem>,
@@ -5490,6 +5504,8 @@ impl Engine {
                 tools,
                 scoped_tools: None,
                 requested_audio: None,
+                fixed_line_tools: None,
+                fixed_line_route: Arc::new(crate::fixed_line_history::Route::default()),
                 system,
                 after_forget_instruction: crate::language::instruction(
                     crate::config::CHAT_INSTRUCTION.to_owned(),
@@ -5759,6 +5775,7 @@ impl Engine {
     /// installed authority; a change from the last tells
     /// [`Self::forgetting_on_privacy`]'s hook.
     pub(crate) fn privacy(&mut self, now: (bool, u64, bool, u64)) {
+        self.shared.fixed_line_route.privacy(now);
         // The camera or the microphone not allowed: the privacy switch
         // closed, or a mute (`LAMP_CUT_IN_PROMPT_LOG` stays silent).
         self.shared
@@ -6665,6 +6682,43 @@ impl Engine {
     pub fn answering_named_to_a_face(mut self, named: Busy) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.named_to_a_face = Some(named);
+        }
+        self
+    }
+
+    pub(crate) fn history_link(&self, link: &crate::provider_link::ProviderLink) {
+        self.shared.fixed_line_route.link(link);
+    }
+
+    pub(crate) fn history_authority(&self, until_us: u64) {
+        self.shared.fixed_line_route.authority(until_us);
+    }
+
+    pub(crate) fn history_route(&self, epoch: u64, active: bool) -> std::io::Result<()> {
+        self.shared.fixed_line_route.activate(epoch, active)
+    }
+
+    pub(crate) fn keeping_fixed_lines(
+        mut self,
+        boot: lamp_turn_owner::BootId,
+        runner: FixedLineRunner,
+    ) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            let route = shared.fixed_line_route.clone();
+            shared.fixed_line_tools = Some((
+                crate::process::boot_text(boot),
+                Arc::new(move |context, call, lease| {
+                    let origin = route.origin(&context).filter(|origin| {
+                        crate::thread::THREAD
+                            .try_lock()
+                            .ok()
+                            .is_some_and(|mut thread| {
+                                thread.fixed_lines.register(origin.clone(), &lease, &route)
+                            })
+                    });
+                    runner(origin, context, call, lease)
+                }),
+            ));
         }
         self
     }
@@ -8493,6 +8547,8 @@ impl Engine {
 
     pub fn submit(&mut self, input: ProviderInput) {
         match input {
+            // Handled synchronously by worker::run, never a model turn.
+            ProviderInput::PlayedFixedLine { .. } => {}
             ProviderInput::Start {
                 request,
                 session,
@@ -16427,7 +16483,13 @@ fn chat_watching(
 /// it was taken is let go (`services::waiting_note_stands`; Reviewer-two's
 /// HOLDs at `285f844b9e` and `6be2fc0fc7`: a forget between a turn's
 /// rounds, or before a delayed second try, still reached the chat).
-fn forgotten_notes_let_go(mut messages: Vec<Message>) -> Vec<Message> {
+pub(crate) fn forgotten_notes_let_go(mut messages: Vec<Message>) -> Vec<Message> {
+    messages.retain(|message| {
+        message
+            .fixed_line
+            .as_ref()
+            .is_none_or(|proof| proof.valid())
+    });
     messages.retain(|message| {
         message.role != "system"
             || message
@@ -23490,7 +23552,13 @@ async fn answer(
                             "error": "not now: nothing was started"
                         }));
                     }
-                    match (&shared.requested_audio, spoken) {
+                    match (
+                        shared
+                            .fixed_line_tools
+                            .as_ref()
+                            .or(shared.requested_audio.as_ref()),
+                        spoken,
+                    ) {
                         (Some((worker_boot, runner)), Some(turn)) if turn.captured => {
                             let context = lamp_msgs::RequestedAudioContext {
                                 worker_boot: worker_boot.clone(),
@@ -23542,7 +23610,8 @@ async fn answer(
                             };
                             let now = monotonic_us();
                             answer.requested_audio = answer.requested_audio.filter(|offer| {
-                                offer.check().is_ok()
+                                shared.requested_audio.is_some()
+                                    && offer.check().is_ok()
                                     && offer.context == context
                                     && now >= offer.issued_us
                                     && now < offer.start_before_us

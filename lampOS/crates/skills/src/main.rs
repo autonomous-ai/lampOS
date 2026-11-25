@@ -14,6 +14,9 @@ macro_rules! eprintln {
     };
 }
 
+#[cfg(test)]
+mod fixed_line_tests;
+
 use lamp_bus::{Bus, Declaration, Kind, Publisher, Subscriber};
 use lamp_msgs::{
     BodyGesture, Decision, GestureState, Hand, LampDid, Light, LightOutranked, LightReached,
@@ -144,6 +147,55 @@ struct Sockets {
     /// Whose run these are for, and what that skill may use: checked where
     /// each call is sent. The program's own, before a run, may use nothing.
     may: May,
+    /// The immutable spoken call for this run, never the next run of its skill.
+    fixed_origin: Option<lamp_msgs::FixedLineOrigin>,
+}
+
+impl Sockets {
+    fn say(
+        &self,
+        what: &str,
+        skill: &str,
+        asking: serde_json::Value,
+        rest_permits: &[Permit],
+        begun: impl FnMut(),
+    ) -> String {
+        say(
+            &self.say,
+            what,
+            skill,
+            fixed_line_asking(asking, self.fixed_origin.as_ref()),
+            rest_permits,
+            begun,
+        )
+    }
+}
+
+/// Metadata is attached only by this run's executor, never accepted from args.
+fn fixed_line_asking(
+    mut asking: serde_json::Value,
+    origin: Option<&lamp_msgs::FixedLineOrigin>,
+) -> serde_json::Value {
+    if let Some(object) = asking.as_object_mut() {
+        object.remove("fixed_line_origin");
+    }
+    if asking["exact"] == true
+        && asking["text"]
+            .as_str()
+            .is_some_and(lamp_voice::language::is_fixed)
+        && let Some(origin) = origin.filter(|origin| origin.check().is_ok())
+    {
+        asking["fixed_line_origin"] = json!(origin);
+    }
+    asking
+}
+
+fn fixed_line_origin(call: &serde_json::Value, voice: bool) -> Option<lamp_msgs::FixedLineOrigin> {
+    voice
+        .then(|| call.get("fixed_line_origin"))
+        .flatten()
+        .and_then(|value| serde_json::from_value::<lamp_msgs::FixedLineOrigin>(value.clone()).ok())
+        .filter(|origin| origin.check().is_ok())
 }
 
 /// A run's skill and its `[permissions]`, checked where each call leaves
@@ -215,6 +267,7 @@ fn main() -> ExitCode {
         actions: "/run/lampos-actions/call.sock".into(),
         say: "/run/lampos-say/say.sock".into(),
         may: May::default(),
+        fixed_origin: None,
     };
     let mut arguments = given.iter();
     while let Some(flag) = arguments.next() {
@@ -2605,7 +2658,11 @@ fn privacy_to_skills(
 /// told how, and what the watch does done. Held to lamp-cloud's deadline
 /// again first ([`watch::let_go`]): the op may have waited in the loop too,
 /// and one let go turns nothing.
-fn app_call((name, args, _, reply, admission, _): ToolAsk, out: &mut Publisher, runner: &Runner) {
+fn app_call(
+    (name, args, _, reply, admission, _, _): ToolAsk,
+    out: &mut Publisher,
+    runner: &Runner,
+) {
     let late = watch::let_go(
         &name,
         args[watch::DEADLINE].as_u64(),
@@ -2655,7 +2712,11 @@ fn app_call((name, args, _, reply, admission, _): ToolAsk, out: &mut Publisher, 
 /// A watch's tool called: committed first, so a caller that gave up turns
 /// nothing; then turned on or off, the model told what to say, and what the
 /// watch does done.
-fn watch_call((name, args, _, reply, admission, _): ToolAsk, out: &mut Publisher, runner: &Runner) {
+fn watch_call(
+    (name, args, _, reply, admission, _, _): ToolAsk,
+    out: &mut Publisher,
+    runner: &Runner,
+) {
     if !admission.commit() {
         eprintln!("lamp-skills: {name} with {args} not run: the caller gave up");
         return;
@@ -2872,6 +2933,20 @@ fn start(
     out: &mut Publisher,
     runner: &Runner,
 ) -> mpsc::Receiver<()> {
+    start_with_fixed_line(skill, calls, held, busy, out, runner, None)
+}
+
+fn start_with_fixed_line(
+    skill: String,
+    calls: Vec<Call>,
+    held: Option<String>,
+    busy: &mut HashSet<String>,
+    out: &mut Publisher,
+    runner: &Runner,
+    origin: Option<lamp_msgs::FixedLineOrigin>,
+) -> mpsc::Receiver<()> {
+    let mut run_sockets = runner.sockets_for(&skill);
+    run_sockets.fixed_origin = origin.clone();
     let (made, made_rx) = mpsc::channel();
     let made_here = runner.made.borrow().contains(&skill);
     if !busy.insert(skill.clone()) {
@@ -2929,10 +3004,11 @@ fn start(
         let Call::Task(step) = call else { continue };
         // A `run` step (#8158): its script run by lamp-tasks with no agent.
         if step.direct {
-            hand_run(&skill, *step, &runner.tasks.borrow());
+            hand_run(&skill, *step, &runner.tasks.borrow(), origin.clone());
             continue;
         }
-        let room = task_room(&skill, &step, runner);
+        let mut room = task_room(&skill, &step, runner);
+        room.fixed_origin = origin.clone();
         hand_task(&skill, *step, &runner.tasks.borrow(), room, line_to.clone());
     }
     drop(line_to);
@@ -2952,7 +3028,7 @@ fn start(
     if let [Call::ServiceRead(read)] = calls.as_slice() {
         let read = (**read).clone();
         let (sockets, finished, bus, local_time) = (
-            runner.sockets_for(&skill),
+            run_sockets.clone(),
             runner.finished.clone(),
             runner.bus.clone(),
             runner.local_time.clone(),
@@ -2974,7 +3050,7 @@ fn start(
     // thread of its own, as long as `lamp-services` takes to answer.
     if let [Call::ServiceWrite(write)] = calls.as_slice() {
         let write = (**write).clone();
-        let (sockets, finished) = (runner.sockets_for(&skill), runner.finished.clone());
+        let (sockets, finished) = (run_sockets.clone(), runner.finished.clone());
         // Through the lamp's agent (LAMP_SKILL_WRITE_AGENT): its folder and
         // lamp-tasks' socket, as a do.task's.
         let agent = lamp_skills::service_write::agent().then(|| {
@@ -2997,11 +3073,7 @@ fn start(
     // An add-on's run proposes, and nothing else: written for the judge at
     // once, on this thread, as it holds no output to wait on.
     if !calls.is_empty() && calls.iter().all(|call| matches!(call, Call::Propose(_))) {
-        let why = propose(
-            &calls,
-            runner.proposals.as_ref(),
-            &runner.sockets_for(&skill).may,
-        );
+        let why = propose(&calls, runner.proposals.as_ref(), &run_sockets.may);
         let _ = made.send(());
         let _ = runner.finished.send(SkillEvent {
             skill,
@@ -3016,7 +3088,7 @@ fn start(
     // thread, one a skill, so the skills go on listening.
     // ponytail: a skill removed meanwhile still finishes its run.
     let (sockets, finished, bus, glows, asks_body, rest_client) = (
-        runner.sockets_for(&skill),
+        run_sockets.clone(),
         runner.finished.clone(),
         runner.bus.clone(),
         runner.glows.clone(),
@@ -3034,6 +3106,7 @@ fn start(
         ended
     });
     std::thread::spawn(move || {
+        let mut sockets = sockets;
         // The agent's line, or the skill's own at once (`LAMP_CORE_VIA_AGENT`).
         let calls = match line_from {
             Some(from) => {
@@ -3042,6 +3115,11 @@ fn start(
                     lamp_skills::core_agent::FALLBACK_WITHIN,
                 );
                 eprintln!("lamp-skills: skill:{skill}: {}", said.journal());
+                // An agent's replacement is arbitrary text, even if it happens
+                // to equal a built-in line. Only the skill's own fallback keeps provenance.
+                if matches!(said, lamp_skills::core_agent::Said::Agent(_)) {
+                    sockets.fixed_origin = None;
+                }
                 lamp_skills::core_agent::with_line(calls, &said)
             }
             None => calls,
@@ -3291,6 +3369,7 @@ type ToolAsk = (
     mpsc::Sender<serde_json::Value>,
     Admission,
     bool,
+    Option<lamp_msgs::FixedLineOrigin>,
 );
 
 /// The name a made skill's run now is asked by on the main loop, from the
@@ -3410,7 +3489,7 @@ fn run_now_refused(
 /// never what it found. Refused, the voice is told why and nothing is
 /// made, counted or said.
 fn run_now_call(
-    (_, args, _, reply, admission, _): ToolAsk,
+    (_, args, _, reply, admission, _, _): ToolAsk,
     engine: &mut Engine,
     runs: &mut Runs,
     out: &mut Publisher,
@@ -3489,7 +3568,7 @@ fn run_now_call(
 /// the light are made (#1146). The say is the model's and the look the
 /// voice's, asked in the answer; the body and the light are made here.
 fn tool_call(
-    (name, args, context, reply, admission, voice): ToolAsk,
+    (name, args, context, reply, admission, voice, origin): ToolAsk,
     engine: &mut Engine,
     busy: &mut HashSet<String>,
     out: &mut Publisher,
@@ -3497,17 +3576,29 @@ fn tool_call(
     audio: &Arc<Mutex<Authority>>,
 ) {
     if name == lamp_skills::unplug::STAY_TOOL {
-        return stay_call((name, args, None, reply, admission, voice), engine, runner);
+        return stay_call(
+            (name, args, None, reply, admission, voice, origin),
+            engine,
+            runner,
+        );
     }
     // The owner's app's guard.on or guard.off (#2562): only ever from the
     // call socket's `guard` op, which no tool's call can name.
     if name == watch::APP_ON || name == watch::APP_OFF {
-        return app_call((name, args, None, reply, admission, voice), out, runner);
+        return app_call(
+            (name, args, None, reply, admission, voice, None),
+            out,
+            runner,
+        );
     }
     // A watch's tool turns its watch, with no steps (guard mode, #1685).
     let watched_tool = runner.watching.borrow().watches.owner(&name).is_some();
     if watched_tool {
-        return watch_call((name, args, None, reply, admission, voice), out, runner);
+        return watch_call(
+            (name, args, None, reply, admission, voice, None),
+            out,
+            runner,
+        );
     }
     let refuse = |why: &str| {
         if admission.commit() {
@@ -3826,7 +3917,7 @@ fn tool_call(
         if !made.iter().any(|call| matches!(call, Call::Mood { .. })) {
             end_hold(&run.skill);
         }
-        let made = start(run.skill, made, None, busy, out, runner);
+        let made = start_with_fixed_line(run.skill, made, None, busy, out, runner, origin);
         if looks {
             // Bounded: the caller waits at most `TOOL_TIMEOUT` once more.
             let _ = clock::recv_timeout(&made, MADE_BEFORE_ANSWER);
@@ -4143,6 +4234,7 @@ fn listen(
                             reply,
                             admission.clone(),
                             voice,
+                            fixed_line_origin(&call, voice),
                         ))
                         .is_ok()
                     })
@@ -4240,7 +4332,11 @@ fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
 /// "Never mind": refused at once unless the unplug skill is loaded with its
 /// grants and the latch can be cancelled now; the line and the cancel follow
 /// on their own thread.
-fn stay_call((name, args, _, reply, admission, _): ToolAsk, engine: &Engine, runner: &Runner) {
+fn stay_call(
+    (name, args, _, reply, admission, _, origin): ToolAsk,
+    engine: &Engine,
+    runner: &Runner,
+) {
     use lamp_skills::unplug;
     // The skill granted the operation speaks the line, whatever its name.
     let granted = engine
@@ -4248,7 +4344,8 @@ fn stay_call((name, args, _, reply, admission, _): ToolAsk, engine: &Engine, run
         .iter()
         .find(|skill| skill.prepares_unplug())
         .map(|skill| skill.name.clone());
-    let sockets = runner.sockets_for(granted.as_deref().unwrap_or_default());
+    let mut sockets = runner.sockets_for(granted.as_deref().unwrap_or_default());
+    sockets.fixed_origin = origin;
     let checked = if granted.is_none() {
         Err("Preparing to unplug is not enabled.".to_owned())
     } else if let Some(why) = sockets.may.refuses(&Call::PrepareUnplug) {
@@ -4388,8 +4485,7 @@ fn stay_even_unsaid(
     }
     let outcome = match sockets.may.refuses(&Call::Say(String::new())) {
         Some(refused) if when != Cancel::AfterLine => refused,
-        _ => say(
-            &sockets.say,
+        _ => sockets.say(
             "staying plugged in",
             &sockets.may.skill,
             exact(line, 8),
@@ -4450,8 +4546,7 @@ fn say_check(sockets: &Sockets) -> String {
     let Some(lines) = &sockets.may.unplug else {
         return "nothing said: the skill says no [unplug] words".into();
     };
-    say(
-        &sockets.say,
+    sockets.say(
         "unplug needs checking",
         &sockets.may.skill,
         exact(&lines.check, 8),
@@ -4538,8 +4633,7 @@ fn say_unplug_failure(skill: &str, sockets: &Sockets) -> String {
     let Some(lines) = &sockets.may.unplug else {
         return "nothing said: the skill says no [unplug] words".into();
     };
-    say(
-        &sockets.say,
+    sockets.say(
         "unplug preparation failed",
         skill,
         exact(&lines.failed, 5),
@@ -4614,8 +4708,7 @@ fn yes_to_turn_off(skill: &str, sockets: &Sockets, bus: &Bus) -> Result<(), Stri
     let mut heard = bus
         .subscribe(Speech::TOPICS[0], "skills_unplug_yes")
         .map_err(|error| format!("voice/heard not read: {error}"))?;
-    let said = say(
-        &sockets.say,
+    let said = sockets.say(
         "unplug: turn-off asked",
         skill,
         exact(&lines.ask_off, 8),
@@ -5029,22 +5122,13 @@ fn perform(
             let outcome = match news {
                 Some(task) => lamp_skills::say_held(
                     task,
-                    || {
-                        say(
-                            &sockets.say,
-                            what,
-                            skill,
-                            asking.clone(),
-                            rest_permits,
-                            &mut on_begun,
-                        )
-                    },
+                    || sockets.say(what, skill, asking.clone(), rest_permits, &mut on_begun),
                     || lamp_skills::routine::private_for_news(bus),
                     || clock::now_us() / 1_000,
                     clock::sleep,
                     |line| eprintln!("lamp-skills: skill:{skill}: {line}"),
                 ),
-                None => say(&sockets.say, what, skill, asking, rest_permits, on_begun),
+                None => sockets.say(what, skill, asking, rest_permits, on_begun),
             };
             said.extend(begun);
             said.push(outcome);
@@ -5779,8 +5863,23 @@ fn say_with(
     mut begun: impl FnMut(),
     handle: Option<&SayHandle>,
 ) -> String {
-    let start_before_us = rest_permits.iter().map(Permit::expires_us).min();
-    let mut attempt = || -> io::Result<String> {
+    let metadata = asking.get("fixed_line_origin").is_some();
+    // A legacy-parser retry is still the original ask, with the same deadline.
+    let original_deadline = metadata.then(|| {
+        lamp_ipc::monotonic_us().saturating_add(
+            asking["expires_in_ms"]
+                .as_u64()
+                .unwrap_or(lamp_skills::SAY_EXPIRES_MS)
+                .saturating_mul(1_000),
+        )
+    });
+    let start_before_us = rest_permits
+        .iter()
+        .map(Permit::expires_us)
+        .chain(original_deadline)
+        .min();
+    let mut attempt = |with_origin: bool| -> io::Result<(String, bool)> {
+        let mut did_begin = false;
         let mut stream = if let Some(expires_us) = start_before_us {
             // Sample Instant first so conversion cannot extend the original
             // shared-clock deadline. Only permit-bearing runs use this path.
@@ -5805,6 +5904,9 @@ fn say_with(
         stream.set_read_timeout(Some(SAY_TIMEOUT))?;
         stream.set_write_timeout(Some(ACTIONS_TIMEOUT))?;
         let mut ask = asking.clone();
+        if !with_origin && let Some(object) = ask.as_object_mut() {
+            object.remove("fixed_line_origin");
+        }
         ask["skill"] = json!(skill);
         if ask.get("expires_in_ms").is_none() {
             ask["expires_in_ms"] = json!(lamp_skills::SAY_EXPIRES_MS);
@@ -5821,7 +5923,10 @@ fn say_with(
         match handle {
             Some(handle) => {
                 if !handle.write(&stream, &ask)? {
-                    return Ok("dropped (taken back by its asker before it was asked)".into());
+                    return Ok((
+                        "dropped (taken back by its asker before it was asked)".into(),
+                        false,
+                    ));
                 }
             }
             None => writeln!(stream, "{ask}")?,
@@ -5830,25 +5935,40 @@ fn say_with(
         loop {
             let mut line = String::new();
             if lines.read_line(&mut line)? == 0 {
-                return Ok("the voice ended without an outcome".into());
+                return Ok(("the voice ended without an outcome".into(), false));
             }
             let answer: serde_json::Value = serde_json::from_str(&line)
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
             if answer["event"] == "begun" {
+                did_begin = true;
                 if let Some(handle) = handle {
                     handle.begun();
                 }
                 begun();
             } else if let Some(outcome) = answer["outcome"].as_str() {
-                return Ok(match answer["why"].as_str() {
-                    Some(why) => format!("{outcome} ({why})"),
-                    None => outcome.to_owned(),
-                });
+                // Old strict Wire refuses an unknown field before admission.
+                // No other refusal, partial playback or transport error retries.
+                let unsupported = with_origin
+                    && metadata
+                    && !did_begin
+                    && outcome == "refused"
+                    && answer["why"] == "not a say request";
+                return Ok((
+                    match answer["why"].as_str() {
+                        Some(why) => format!("{outcome} ({why})"),
+                        None => outcome.to_owned(),
+                    },
+                    unsupported,
+                ));
             }
         }
     };
-    match attempt() {
-        Ok(outcome) => format!("{what}: {outcome}"),
+    let result = match attempt(true) {
+        Ok((_, true)) => attempt(false),
+        result => result,
+    };
+    match result {
+        Ok((outcome, _)) => format!("{what}: {outcome}"),
         Err(error) => format!("{what}: the voice's say service was not reached ({error})"),
     }
 }
@@ -6004,6 +6124,7 @@ fn lamp_room(
     let services = std::env::var_os(SERVICES_SOCKET_ENVIRONMENT)
         .map_or_else(|| PathBuf::from(SERVICES_SOCKET), PathBuf::from);
     LampRoom {
+        fixed_origin: sockets.fixed_origin.clone(),
         skill: skill.to_owned(),
         say: sockets.say.clone(),
         services,
@@ -6092,6 +6213,7 @@ fn hand_task(
     };
     let (state, socket, skill) = (tasks.state.clone(), tasks.socket.clone(), skill.to_owned());
     let say_socket = tasks.say.clone();
+    let fixed_origin = room.fixed_origin.clone();
     std::thread::spawn(move || {
         // The owner's yes is lamp-control's, only asked here.
         let place = lamp_skills::task::Place {
@@ -6101,7 +6223,16 @@ fn hand_task(
         };
         // The yes asked aloud: the voice builds the read-back itself from
         // the skill on the lamp; this asks only for it, by the skill's name.
-        let say_yes = || say(&say_socket, "say", &skill, ask.clone(), &[], || {});
+        let say_yes = || {
+            say(
+                &say_socket,
+                "say",
+                &skill,
+                fixed_line_asking(ask.clone(), fixed_origin.as_ref()),
+                &[],
+                || {},
+            )
+        };
         // With `LAMP_SKILL_TASK_SURE` on: a failed run's told line, and
         // whether lamp-tasks said `busy`, so it waits its turn
         // (`lamp_skills::task_sure`). Off, neither is ever set.
@@ -6120,7 +6251,13 @@ fn hand_task(
             // starting (#7354), on a thread of its own, so the answer is
             // read as it comes.
             let line = lamp_skills::task::asking_getting_ready(line, asked_at.is_some());
-            let sent = hand_over_saying_getting_ready(socket, &line, &say_socket, &skill);
+            let sent = hand_over_saying_getting_ready_with_origin(
+                socket,
+                &line,
+                &say_socket,
+                &skill,
+                fixed_origin.clone(),
+            );
             if metered {
                 let after = lamp_skills::relay_share::read_here();
                 eprintln!(
@@ -6228,7 +6365,14 @@ fn hand_task(
             Some(line) if refused.is_none() => {
                 let asking =
                     json!({"text": line, "exact": true, "priority": lamp_skills::SAY_PRIORITY});
-                let outcome = say(&say_socket, "say", &skill, asking, &[], || {});
+                let outcome = say(
+                    &say_socket,
+                    "say",
+                    &skill,
+                    fixed_line_asking(asking, fixed_origin.as_ref()),
+                    &[],
+                    || {},
+                );
                 eprintln!(
                     "lamp-skills: skill:{skill}: do.task: the lamp is still getting ready: {outcome}"
                 );
@@ -6271,7 +6415,12 @@ fn hand_task(
 /// written; one line to lamp-tasks, which mints the token (one local
 /// socket line to lamp-control) and starts the fence (`unshare`, mounts,
 /// `python3`). No agent, no Harness, no network.
-fn hand_run(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
+fn hand_run(
+    skill: &str,
+    step: lamp_skills::task::TaskStep,
+    tasks: &Tasks,
+    fixed_origin: Option<lamp_msgs::FixedLineOrigin>,
+) {
     // Asked aloud just now, the yes is asked as the lamp's next line
     // (#8414); a trigger's or a schedule's waits for the quiet as before.
     let (asked_at, ask) = lamp_skills::task::take_yes_ask(skill);
@@ -6290,7 +6439,16 @@ fn hand_run(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
             control: Path::new(lamp_voice::skill_task_yes::CONTROL_SOCKET),
             socket: socket.as_deref(),
         };
-        let say_yes = || say(&say_socket, "say", &skill, ask.clone(), &[], || {});
+        let say_yes = || {
+            say(
+                &say_socket,
+                "say",
+                &skill,
+                fixed_line_asking(ask.clone(), fixed_origin.as_ref()),
+                &[],
+                || {},
+            )
+        };
         let outcome = std::cell::Cell::new(None);
         let send = |socket: &Path, line: &str| {
             eprintln!(
@@ -6325,7 +6483,14 @@ fn hand_run(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
         if let Some(line) = line {
             let asking =
                 json!({"text": line, "exact": true, "priority": lamp_skills::SAY_PRIORITY});
-            let said = say(&say_socket, "say", &skill, asking, &[], || {});
+            let said = say(
+                &say_socket,
+                "say",
+                &skill,
+                fixed_line_asking(asking, fixed_origin.as_ref()),
+                &[],
+                || {},
+            );
             eprintln!("lamp-skills: skill:{skill}: do.run: its failed line: {said}");
         }
     });
@@ -6567,16 +6732,28 @@ fn hand_over(socket: &Path, line: &str) -> Result<String, lamp_skills::service_w
 /// answer is read before the voice began it, so it is never said after the
 /// answer; [`lamp_skills::task::GETTING_READY_EXPIRES_MS`] is only the
 /// backstop.
+#[cfg(test)]
 fn hand_over_saying_getting_ready(
     socket: &Path,
     line: &str,
     say_socket: &Path,
     skill: &str,
 ) -> Result<String, lamp_skills::service_write::Unrun> {
+    hand_over_saying_getting_ready_with_origin(socket, line, say_socket, skill, None)
+}
+
+fn hand_over_saying_getting_ready_with_origin(
+    socket: &Path,
+    line: &str,
+    say_socket: &Path,
+    skill: &str,
+    fixed_origin: Option<lamp_msgs::FixedLineOrigin>,
+) -> Result<String, lamp_skills::service_write::Unrun> {
     let taken_back = Arc::new(SayHandle::default());
     let sent = hand_over_asking(socket, line, &mut || {
         let (say_socket, skill) = (say_socket.to_owned(), skill.to_owned());
         let handle = Arc::clone(&taken_back);
+        let fixed_origin = fixed_origin.clone();
         std::thread::spawn(move || {
             let asking = json!({
                 "text": lamp_skills::task::GETTING_READY_LINE,
@@ -6589,7 +6766,7 @@ fn hand_over_saying_getting_ready(
                 &say_socket,
                 "say",
                 &skill,
-                asking,
+                fixed_line_asking(asking, fixed_origin.as_ref()),
                 &[],
                 || {},
                 Some(&handle),
@@ -6746,7 +6923,7 @@ fn write_service(
             || {
                 let asking = json!({"text": service_write::NOT_SENT_LINE, "exact": true,
                                     "priority": lamp_skills::SAY_PRIORITY});
-                say(&sockets.say, "say", skill, asking, &[], || {})
+                sockets.say("say", skill, asking, &[], || {})
             },
         );
     }
@@ -6795,6 +6972,8 @@ fn send_write(skill: &str, write: &lamp_skills::service_write::WriteStep) -> Str
 
 /// The lamp as a skill's read sees it ([`lamp_skills::service_read::Room`]).
 struct LampRoom {
+    // Passed to explicit task status lines, never arbitrary service/read text.
+    fixed_origin: Option<lamp_msgs::FixedLineOrigin>,
     skill: String,
     say: PathBuf,
     services: PathBuf,
@@ -7449,6 +7628,7 @@ mod tests {
             .unwrap();
         // No local time: the lamp's quiet hours, as at 00:12.
         let mut room = LampRoom {
+            fixed_origin: None,
             skill: "btc-price".into(),
             say: dir.path().join("say.sock"),
             services: dir.path().join("call.sock"),
@@ -7509,6 +7689,7 @@ mod tests {
         let bus = Bus::new(dir.path().join("bus")).unwrap();
         // No faces said: nobody in view, and no gate of a read's opens.
         let mut room = LampRoom {
+            fixed_origin: None,
             skill: "fig-facts".into(),
             say: say_path,
             services: dir.path().join("call.sock"),
@@ -7646,6 +7827,7 @@ mod tests {
         let local = Arc::new(lamp_local_time::LocalTime::Offset(0));
         let minute = local.minute_of_day(unix_ms());
         let mut room = LampRoom {
+            fixed_origin: None,
             skill: "btc-price".into(),
             say: say_path,
             services: dir.path().join("call.sock"),
@@ -7731,6 +7913,7 @@ mod tests {
             .tempdir_in("/tmp")
             .unwrap();
         let mut room = LampRoom {
+            fixed_origin: None,
             skill: "mail-check".into(),
             say: dir.path().join("say.sock"),
             services: dir.path().join("call.sock"),
@@ -7777,6 +7960,7 @@ mod tests {
             .unwrap();
         let bus = Bus::new(dir.path().join("bus")).unwrap();
         let mut room = LampRoom {
+            fixed_origin: None,
             skill: "read-calendar".into(),
             say: dir.path().join("say.sock"),
             services: dir.path().join("call.sock"),
@@ -8081,6 +8265,7 @@ mod tests {
             mood: dir.join("mood.sock"),
             actions: dir.join("actions.sock"),
             say: dir.join("say.sock"),
+            fixed_origin: None,
             may: May {
                 skill: "test".into(),
                 permissions,

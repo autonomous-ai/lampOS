@@ -484,6 +484,9 @@ impl FixtureProvider {
             .state()
             .ok_or_else(|| invalid("fixture has no authority"))?;
         let (request, privacy) = match &command {
+            ProviderInput::PlayedFixedLine { .. } => {
+                return Err(invalid("history receipt is not fixture input"));
+            }
             ProviderInput::Start {
                 request,
                 privacy_generation,
@@ -568,6 +571,9 @@ impl FixtureProvider {
             .filter(|owner| owner.turn() == request)
             .ok_or_else(|| invalid("fixture input has no matching admitted owner"))?;
         match command {
+            ProviderInput::PlayedFixedLine { .. } => {
+                return Err(invalid("history receipt is not fixture input"));
+            }
             ProviderInput::Reminder { session, .. } => {
                 if self.input.is_none() && self.reply.is_none() && self.first_owner == Some(owner) {
                     self.first_owner = None;
@@ -776,6 +782,7 @@ impl FixtureProvider {
                 Some(
                     Control::StartCapture
                     | Control::ConnectReference { .. }
+                    | Control::HistoryRoute { .. }
                     | Control::NameGrant { .. },
                 ) => {
                     return Err(invalid("invalid fixture provider control"));

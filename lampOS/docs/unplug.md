@@ -107,13 +107,17 @@ below). An ordinary bedtime request belongs to the bedtime skill.
    `stay` line came, and taken at once the line was dropped, "the voice has
    gone"). An owner's language other than English hears them in
    its own words: each is a fixed line (`language::FIXED_LINES`, second-voice.md,
-   "The fixed lines"; #5777's P3). Once one is played to `spoken`, Voice keeps
-   it in the thread as the lamp's own line, so the chat model's next turn has it
-   in its history (lamp-52e6, 10 Nov: with the ask and the stay left out, the
-   model's last word was its own "I'm preparing to fold", and it answered three
-   asks to unplug "I'm still folding" with no call); its `exact_line` event
-   carries the words. An exact line that is not a fixed line (a computer's, the
-   pairing pin, a service's read) is never kept nor journalled. A file from before `[unplug]` says the words lamp-skills kept
+   "The fixed lines"; #5777's P3). Once one is played to `spoken`, its
+   `exact_line` event carries the words and the parent keeps its local thread
+   entry. That parent entry alone does not reach a provider worker's history.
+   For an admitted spoken tool call dispatched by Second, verified Skills
+   metadata now lets the parent return the completed built-in line to that
+   original worker. The next matching-scope chat can see what was actually
+   said, including the rendered language, under the bounded rules in
+   [Fixed lines in Second's history](conversation-thread.md#fixed-lines-in-seconds-history-8546).
+   This does not inject a line into Live's current session or carry it to
+   another route. Arbitrary computer text, pairing pins and service reads do
+   not enter this history transport. A file from before `[unplug]` says the words lamp-skills kept
    before, for this release only, and the journal says so. The request carries
    `unplug_request`; Voice keeps that completion guard while the reply is
    queued or under way. An ordinary tool answer or an old asleep frame is
@@ -197,6 +201,41 @@ for completion and the asleep presentation. Readiness speech uses priority 8
 (the existing one-second quiet rule) and a 500 ms queue expiry; an expired,
 unbegun attempt can be retried only inside that bounded wait, with proof read
 again each time. A begun or dropped line is never replayed automatically.
+
+## Completed fixed lines in Second's next chat (#8546)
+
+The origin is captured from the admitted spoken call and its effective memory
+scope in the Second worker, not supplied by model arguments. Skills preserves
+it on that run; Voice accepts it only from the verified Skills caller for an
+exact built-in canonical line, with its matching rendered language and text.
+Only full playback reaching `spoken` produces a receipt. The line remains
+history context, not permission to hear, run a tool, write memory or play again.
+The parent-local thread and the worker's transient history are separate.
+
+The origin expires 600 seconds after the admitted tool call. The default
+unattended timeout waits 10 minutes after the fold becomes Ready, so its later
+timeout line falls outside this history transfer window. Its ordinary speech
+still works; its old origin is not refreshed. The immediate “no/stay” path and
+the 30-second turn-off confirmation path can fit this age bound; delivery
+still requires the original binding to remain valid.
+
+An explicit stop clears pending receipts and fences older history through a
+new Second route epoch; normal turn completion does not. Worker conversation
+closes apply an issue-time cutoff, preserving newer origins. Privacy changes,
+forget (including one pending on the Thread lock) and reload invalidate copied
+history. So do provider unavailability and a new provider session on the same
+worker; history requires the original matching Ready session. Each chat
+boundary also requires fresh installed control authority;
+renewing authority never extends the original 600-second lifetime.
+
+If an older Voice parser refuses this added metadata with `not a say request`
+before `begun`, Skills retries once without the metadata, within the original
+request deadline and existing permits. Other refusals, transport errors and
+partial playback do not trigger that retry. The fallback preserves ordinary
+speech behavior but supplies no new worker-history receipt. Live's current
+session behavior is unchanged. See the
+[transport and retention limits](conversation-thread.md#fixed-lines-in-seconds-history-8546)
+and the [Vietnamese note](vi/unplug_vi.md).
 
 ## What counts as physically folded
 

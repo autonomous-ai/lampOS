@@ -1208,6 +1208,9 @@ impl Peers {
     fn tick_provider(&mut self, index: usize) {
         for _ in 0..64 {
             match self.peers[index].channels.data.receive::<ProviderInput>() {
+                Ok(Some(ProviderInput::PlayedFixedLine { .. })) => {
+                    panic!("fixed-line history receipts are unexpected in the pilot fault fixture")
+                }
                 Ok(Some(ProviderInput::Start {
                     request, session, ..
                 })) => {

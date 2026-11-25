@@ -148,6 +148,9 @@ impl Gate {
             state.microphone_permission() == lamp_turn_owner::Permission::Allowed,
             state.microphone_generation(),
         ));
+        // Publish privacy invalidation before renewing history's deadline: an
+        // expired old proof must never borrow fresh authority from a new state.
+        engine.history_authority(state.expires_at().as_micros());
         if let Some(since) = self.held_since.take() {
             eprintln!(
                 "lamp-voice second: held closed {} ms through a stall; a fresh authority came, going on",
@@ -238,6 +241,7 @@ impl Gate {
     /// microphone generation. Input for a retired request is dropped.
     fn admits(&self, now_us: u64, command: &ProviderInput) -> io::Result<bool> {
         let (request, privacy) = match command {
+            ProviderInput::PlayedFixedLine { .. } => return Ok(false),
             ProviderInput::Start {
                 request,
                 privacy_generation,
@@ -404,6 +408,9 @@ impl Gate {
                 }
                 Some(Control::Authority { snapshot }) => {
                     self.install(monotonic_us(), snapshot, engine)?
+                }
+                Some(Control::HistoryRoute { epoch, active }) => {
+                    engine.history_route(epoch, active)?
                 }
                 Some(Control::ProviderOutputCapacity { through }) => self.flow.grant(through)?,
                 Some(
@@ -3946,6 +3953,38 @@ pub fn serve(
             app_help.clone(),
         )
     });
+    let fixed_runner: super::FixedLineRunner = {
+        let settings = tools.clone();
+        let search = search.clone();
+        let early = early.clone();
+        let weather = weather.clone();
+        let app_start = app_start.clone();
+        let app_help = app_help.clone();
+        Arc::new(move |origin, context, call, scope| {
+            let settings = settings.clone();
+            let search = search.clone();
+            let early = early.clone();
+            let base: super::RequestedAudioRunner = Arc::new(move |context, call, scope| {
+                Box::pin(run_call_with_fixed(
+                    settings.clone(),
+                    search.clone(),
+                    early.clone(),
+                    (context.request, true, policed),
+                    call,
+                    Some(scope),
+                    (Some(context), origin.clone()),
+                ))
+            });
+            let run = audio_answering_app_help(
+                audio_answering_app_start(
+                    audio_answering_weather(base, weather.clone()),
+                    app_start.clone(),
+                ),
+                app_help.clone(),
+            );
+            run(context, call, scope)
+        })
+    };
     let runner = answering_app_help(
         answering_app_start(
             answering_weather(
@@ -3981,6 +4020,7 @@ pub fn serve(
         },
         runner.clone(),
     )
+    .keeping_fixed_lines(boots.own, fixed_runner)
     .with_after_forget_instruction(forget_character)
     .with_memory_scope(boots.own, face_cache.clone(), scoped_runner, scoped_system)
     .reading_the_lease_for_the_name(lease_system)
@@ -6985,6 +7025,30 @@ async fn run_call(
     scope: Option<crate::memory_scope::ScopeLease>,
     context: Option<lamp_msgs::RequestedAudioContext>,
 ) -> crate::tools::ToolAnswer {
+    run_call_with_fixed(
+        settings,
+        search,
+        early,
+        (request, heard, policed),
+        call,
+        scope,
+        (context, None),
+    )
+    .await
+}
+
+async fn run_call_with_fixed(
+    settings: crate::tools::Settings,
+    search: Option<Arc<Search>>,
+    early: Option<Arc<Early>>,
+    (request, heard, policed): (u64, bool, bool),
+    call: lamp_gemini::ToolCall,
+    scope: Option<crate::memory_scope::ScopeLease>,
+    (context, origin): (
+        Option<lamp_msgs::RequestedAudioContext>,
+        Option<lamp_msgs::FixedLineOrigin>,
+    ),
+) -> crate::tools::ToolAnswer {
     use crate::tools::ToolAnswer;
     if context.as_ref().is_some_and(|context| {
         context.check().is_err()
@@ -7123,6 +7187,17 @@ async fn run_call(
         }
         // A news key stays in the answer: the turn takes it out before
         // its model reads it, and tells the coordinator (#1390).
+        if let (Some(origin), Some(scope)) = (origin.as_ref(), scope.as_ref()) {
+            return crate::tools::answer_scoped_keeping_news_with_fixed_line(
+                &settings,
+                &call,
+                request,
+                heard,
+                context.as_ref(),
+                scope,
+                Some(origin),
+            );
+        }
         match (context.as_ref(), scope.as_ref()) {
             (Some(context), Some(scope)) => {
                 crate::tools::answer_spoken_scoped_keeping_news(&settings, &call, context, scope)
@@ -15584,34 +15659,17 @@ fn thread_and_history_summed(
     };
     let room = room.saturating_sub(summary.len());
     let (thread, recent) = crate::thread::current(file, |thread| {
-        let recent = match whose {
-            Some(person) if room_lines => thread.recent_with_room_lines_after_note(
-                person,
-                now,
-                HISTORY_WITHIN,
-                HISTORY_EXCHANGES,
-                note,
-            ),
-            _ => thread.recent_after_note(whose, now, HISTORY_WITHIN, HISTORY_EXCHANGES, note),
-        };
-        // The exchanges the history tells, picked as it picks them (the
-        // note's left out already), left out of the thread's text
-        // (`LAMP_HISTORY_SAID_ONCE`); off, the text is the scope's recall
-        // less the note's, as before.
-        let told = if said_once {
-            match whose {
-                Some(person) if room_lines => thread.recent_picks_with_room_lines(
-                    person,
-                    now,
-                    HISTORY_WITHIN,
-                    HISTORY_EXCHANGES,
-                    note,
-                ),
-                _ => thread.recent_picks_for(whose, now, HISTORY_WITHIN, HISTORY_EXCHANGES, note),
-            }
-        } else {
-            Vec::new()
-        };
+        let (recent, selected) = thread.recent_with_fixed_selection(
+            whose,
+            now,
+            HISTORY_WITHIN,
+            HISTORY_EXCHANGES,
+            note,
+            room_lines,
+        );
+        // Leave out only the ordinary exchanges actually represented after
+        // transient lines and ordinary history share the twelve-exchange cap.
+        let told = if said_once { selected } else { Vec::new() };
         (
             thread.recall_for_leaving_out(whose, now, room, note, &told),
             recent,
@@ -15823,7 +15881,12 @@ fn messages(exchange: crate::thread::Recent) -> Vec<Message> {
 /// words when `keeps_calls` ([`HISTORY_KEEPS_CALLS`]).
 fn messages_told(exchange: crate::thread::Recent, keeps_calls: bool) -> Vec<Message> {
     let cut = crate::cut_in_told::cut_here(exchange.cut);
-    messages_marked(exchange, cut, keeps_calls)
+    let proof = exchange.fixed_line.clone();
+    let mut messages = messages_marked(exchange, cut, keeps_calls);
+    for message in &mut messages {
+        message.fixed_line = proof.clone();
+    }
+    messages
 }
 
 /// `LAMP_HISTORY_KEEPS_CALLS=on`, set once as the worker starts ([`serve`]):
@@ -16218,6 +16281,7 @@ pub async fn run(
     engine.render_lines();
     let (mut link, ready) = super::link::Watch::new(probe_targets, started_us, monotonic_us());
     ready.validate(monotonic_us())?;
+    engine.history_link(&ready);
     channels
         .control
         .send(WorkerEvent::ProviderLink { link: ready })?;
@@ -16294,6 +16358,36 @@ pub async fn run(
             let Some(command) = retained.take() else {
                 break;
             };
+            if let ProviderInput::PlayedFixedLine { receipt } = &command {
+                let instant = Instant::now();
+                let at = monotonic_us();
+                let current = gate.guard.state().is_some_and(|state| {
+                    receipt.owner.boot() == boot
+                        && state.microphone_permission() == lamp_turn_owner::Permission::Allowed
+                        && state.microphone_generation()
+                            == receipt.line.origin.microphone_generation
+                        && state.camera_generation() == receipt.line.origin.camera_generation
+                });
+                if current && receipt.current(at) {
+                    // Keep a bounded ordered barrier while the history lock is busy.
+                    // Capture/control still runs; later input cannot overtake this line.
+                    match crate::thread::THREAD.try_lock() {
+                        Ok(mut thread) => {
+                            if !thread.fixed_lines.accept(receipt, at, instant) {
+                                eprintln!("lamp-voice second: fixed-line history receipt refused");
+                            }
+                        }
+                        Err(std::sync::TryLockError::WouldBlock) => {
+                            retained = Some(command);
+                            continue 'tick;
+                        }
+                        Err(std::sync::TryLockError::Poisoned(_)) => {
+                            eprintln!("lamp-voice second: fixed-line history unavailable");
+                        }
+                    }
+                }
+                continue;
+            }
             if gate.admits(monotonic_us(), &command)? {
                 // A skill with code of its own made from the app, said back
                 // in this written request (#6307): its yes awaited from it
@@ -16395,6 +16489,9 @@ pub async fn run(
         // The lamp's only voice tells the coordinator its link (#1844).
         if let Some((changed, was_down)) = link.tick(monotonic_us()).await {
             changed.validate(monotonic_us())?;
+            // Fence old session context before link-back callbacks or the
+            // parent can admit a turn against this worker's new ready session.
+            engine.history_link(&changed);
             if was_down {
                 eprintln!("lamp-voice second: a service host answers again: the link is back");
                 // The relay's routes asked again now, not at their time's
@@ -25683,6 +25780,7 @@ mod tests {
     #[test]
     fn a_written_request_goes_to_the_chat_as_a_note_and_silence_as_nothing() {
         let written = messages(crate::thread::Recent {
+            fixed_line: None,
             written: Some("Say ORCHID.".into()),
             person: String::new(),
             lamp: "ORCHID.".into(),
@@ -25700,6 +25798,7 @@ mod tests {
             ]
         );
         let spoken = messages(crate::thread::Recent {
+            fixed_line: None,
             written: None,
             person: "Hi.".into(),
             lamp: "Hello.".into(),
@@ -26186,6 +26285,7 @@ mod tests {
     #[test]
     fn a_cut_answer_is_told_where_it_stopped_and_a_whole_one_is_not() {
         let story = |cut: bool| crate::thread::Recent {
+            fixed_line: None,
             written: None,
             person: "Tell me a story.".into(),
             lamp: format!(

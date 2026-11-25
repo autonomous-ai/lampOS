@@ -606,6 +606,7 @@ fn controls(
             Control::StartCapture
             | Control::ConnectReference { .. }
             | Control::ProviderOutputCapacity { .. }
+            | Control::HistoryRoute { .. }
             | Control::NameGrant { .. } => {
                 return Err(io::Error::other("invalid ring control command"));
             }

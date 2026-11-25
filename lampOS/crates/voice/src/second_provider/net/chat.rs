@@ -13,6 +13,9 @@ use std::sync::Arc;
 /// One message of the conversation, in the wire's own shape.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Message {
+    /// Local-only provenance, rechecked at every service call and never serialized.
+    #[serde(skip)]
+    pub(crate) fixed_line: Option<Arc<crate::fixed_line_history::Proof>>,
     pub role: &'static str,
     /// Text, or for a look the text and its picture as parts.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -30,6 +33,7 @@ impl Message {
     fn new(role: &'static str, content: Option<String>) -> Self {
         Self {
             role,
+            fixed_line: None,
             content: content.map(Value::String),
             tool_calls: Vec::new(),
             tool_call_id: None,

@@ -130,6 +130,8 @@ pub use devices::*;
 
 mod activity;
 pub use activity::*;
+mod fixed_line;
+pub use fixed_line::*;
 mod requested_audio;
 pub use requested_audio::*;
 mod speaker_state;

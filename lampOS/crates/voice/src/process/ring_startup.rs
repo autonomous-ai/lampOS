@@ -196,6 +196,8 @@ impl Worker {
                 boot,
                 role: "ring".into(),
                 diagnostic_start: None,
+                history_epoch: 0,
+                history_active: false,
                 ring_resources: Some(resources),
                 renewal_stall: RenewalStall::default(),
                 #[cfg(test)]

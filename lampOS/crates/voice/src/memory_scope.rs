@@ -716,6 +716,8 @@ struct RequestContext {
     /// Set once the line is found to be someone else's
     /// ([`ScopeLease::narrow_to_room`]): the room from then on, never wider.
     narrowed: AtomicBool,
+    /// Counts even repeated room narrowing for history-only attribution proofs.
+    history_narrowing: AtomicU64,
     room: ScopeSnapshot,
     active: AtomicBool,
     /// A line admitted as the room's with the camera allowed: its late look
@@ -992,6 +994,7 @@ impl RequestScope {
                 one_face_reads: AtomicBool::new(one_face_reads),
                 carried_reads: OnceLock::new(),
                 narrowed: AtomicBool::new(false),
+                history_narrowing: AtomicU64::new(0),
                 everything: AtomicBool::new(false),
                 own_keep_undone: AtomicU64::new(0),
                 forget_agreed: AtomicU64::new(0),
@@ -1050,6 +1053,7 @@ impl RequestScope {
                 one_face_reads: AtomicBool::new(one_face_reads),
                 carried_reads: OnceLock::new(),
                 narrowed: AtomicBool::new(false),
+                history_narrowing: AtomicU64::new(0),
                 everything: AtomicBool::new(false),
                 own_keep_undone: AtomicU64::new(0),
                 forget_agreed: AtomicU64::new(0),
@@ -1080,6 +1084,90 @@ impl Drop for RequestScope {
     }
 }
 
+/// Attribution for an already played history line, never a grant to read
+/// memory, run tools, or produce output. Ordinary request retirement preserves
+/// it; later scope narrowing or a carry/source change invalidates it. Its owner
+/// must additionally revoke history on cancellation, forget, route and privacy
+/// changes, which request retirement alone cannot distinguish from completion.
+#[derive(Clone)]
+pub(crate) struct HistoryScopeProof {
+    context: Arc<RequestContext>,
+    scope: ScopeSnapshot,
+    fingerprint: HistoryScopeFingerprint,
+}
+
+impl std::fmt::Debug for HistoryScopeProof {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HistoryScopeProof").finish_non_exhaustive()
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct HistoryScopeFingerprint {
+    narrowing: u64,
+    narrowed: bool,
+    carried: bool,
+    carried_reads: bool,
+    seen_words: bool,
+    keep_for: bool,
+}
+
+impl RequestContext {
+    fn history_fingerprint(&self) -> HistoryScopeFingerprint {
+        HistoryScopeFingerprint {
+            narrowing: self.history_narrowing.load(Ordering::Acquire),
+            narrowed: self.narrowed.load(Ordering::Acquire),
+            carried: self.carried.get().is_some(),
+            carried_reads: self.carried_reads.get().is_some(),
+            seen_words: self.seen_words.get().is_some(),
+            keep_for: self.keep_for.get().is_some(),
+        }
+    }
+
+    fn history_state(&self) -> Option<(HistoryScopeFingerprint, ScopeSnapshot)> {
+        // Narrowing and seen/read changes already use this lock. Carry slots
+        // are monotonic OnceLocks; reject any concurrent source transition.
+        let _one_face = self.one_face.try_lock().ok()?;
+        let fingerprint = self.history_fingerprint();
+        let scope = if fingerprint.narrowed {
+            &self.room
+        } else {
+            self.seen_words
+                .get()
+                .or_else(|| self.carried_reads.get())
+                .or_else(|| self.carried.get())
+                .unwrap_or(&self.scope)
+        };
+        (fingerprint == self.history_fingerprint()).then(|| (fingerprint, scope.clone()))
+    }
+}
+
+impl HistoryScopeProof {
+    /// Recheck at each history serialization/dispatch boundary. This deliberately
+    /// ignores `active`: completed requests no longer authorize work, but their
+    /// unchanged attribution can still describe what was actually played.
+    pub(crate) fn valid(&self) -> bool {
+        self.context
+            .history_state()
+            .is_some_and(|(fingerprint, scope)| {
+                fingerprint == self.fingerprint && scope == self.scope
+            })
+    }
+
+    /// Compare immutable attribution before checking validity. An invalid
+    /// personal proof must never become a room match through an absent value.
+    pub(crate) fn matches_scope(&self, person: Option<&str>) -> bool {
+        self.scope.person() == person && self.valid()
+    }
+
+    /// `None` is also a valid room attribution: use `valid` to distinguish it
+    /// from invalidated history. A reply's display name never widens the scope.
+    #[cfg(test)]
+    pub(crate) fn person(&self) -> Option<&str> {
+        self.valid().then(|| self.scope.person()).flatten()
+    }
+}
+
 #[derive(Clone)]
 pub struct ScopeLease {
     context: Arc<RequestContext>,
@@ -1090,6 +1178,20 @@ impl ScopeLease {
     }
     pub fn is_current(&self) -> bool {
         self.context.active.load(Ordering::Acquire)
+    }
+    /// Capture only while authorized, for later history attribution alone.
+    /// This cannot restore a lease or authorize new work after retirement.
+    pub(crate) fn history_proof(&self) -> Option<HistoryScopeProof> {
+        if !self.is_current() {
+            return None;
+        }
+        let (fingerprint, scope) = self.context.history_state()?;
+        let proof = HistoryScopeProof {
+            context: self.context.clone(),
+            scope,
+            fingerprint,
+        };
+        (self.is_current() && proof.valid()).then_some(proof)
     }
     /// None means revoked, NOT room. A borrowed snapshot is not an ongoing
     /// grant: recheck is_current at each RPC/output boundary after slow work.
@@ -1118,6 +1220,9 @@ impl ScopeLease {
             .one_face
             .lock()
             .unwrap_or_else(|e| e.into_inner());
+        self.context
+            .history_narrowing
+            .fetch_add(1, Ordering::AcqRel);
         self.context.narrowed.store(true, Ordering::Release);
         self.context.hits_face.store(false, Ordering::Release);
         // Any narrow after the name is a sign of someone else: the line
@@ -1481,6 +1586,9 @@ impl ScopeLease {
             .one_face
             .lock()
             .unwrap_or_else(|e| e.into_inner());
+        self.context
+            .history_narrowing
+            .fetch_add(1, Ordering::AcqRel);
         self.context.narrowed.store(true, Ordering::Release);
         *one_face = Some(Arc::from(person));
         mark_one_face_line(self.context.key.request, Some(person));
@@ -1907,6 +2015,125 @@ impl ScopeLease {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn history_proof_busy_scope_never_blocks_or_becomes_the_rooms() {
+        let owner = RequestScope::new(key(67), ScopeSnapshot::of("A"));
+        let lease = owner.lease();
+        let proof = lease.history_proof().unwrap();
+        let person = proof.scope.person().unwrap().to_owned();
+        let held = lease.context.one_face.lock().unwrap();
+        assert!(!proof.valid());
+        assert!(!proof.matches_scope(None));
+        assert!(!proof.matches_scope(Some(&person)));
+        assert!(lease.history_proof().is_none());
+        drop(held);
+        assert!(proof.matches_scope(Some(&person)));
+        assert!(!proof.matches_scope(None));
+    }
+
+    #[test]
+    fn history_proof_requires_live_mint_but_survives_ordinary_end() {
+        for scope in [ScopeSnapshot::room(), ScopeSnapshot::of("A")] {
+            let owner = RequestScope::new(key(61), scope.clone());
+            let lease = owner.lease();
+            let proof = lease.history_proof().expect("live history proof");
+            assert!(proof.valid());
+            assert_eq!(proof.person(), scope.person());
+            drop(owner);
+            assert!(!lease.is_current());
+            assert!(lease.scope().is_none(), "history never renews authority");
+            assert!(lease.history_proof().is_none(), "no mint after retirement");
+            assert!(
+                proof.valid(),
+                "ordinary completion preserves past attribution"
+            );
+            assert_eq!(proof.person(), scope.person());
+        }
+    }
+
+    #[test]
+    fn history_proof_rejects_narrowing_even_after_retirement_or_from_room() {
+        for scope in [ScopeSnapshot::room(), ScopeSnapshot::of("A")] {
+            let owner = RequestScope::new(key(62), scope);
+            let lease = owner.lease();
+            let proof = lease.history_proof().unwrap();
+            owner.revoke();
+            lease.narrow_to_room();
+            assert!(!proof.valid());
+            assert!(proof.person().is_none());
+        }
+        let owner = RequestScope::new(key(63), ScopeSnapshot::of("A"));
+        let lease = owner.lease();
+        lease.narrow_to_room();
+        lease.name_for_reply();
+        lease.name_for_conversation();
+        let proof = lease.history_proof().unwrap();
+        assert!(proof.valid());
+        assert!(
+            proof.person().is_none(),
+            "a reply name does not widen room history"
+        );
+        lease.narrow_to_room();
+        assert!(
+            !proof.valid(),
+            "a second narrow invalidates named room history"
+        );
+    }
+
+    #[test]
+    fn history_proof_rejects_carry_and_seen_source_changes() {
+        let owner = RequestScope::new(key(64), ScopeSnapshot::room());
+        let lease = owner.lease();
+        let room = lease.history_proof().unwrap();
+        let person = ScopeSnapshot::of("A");
+        let person = person.person().unwrap();
+        assert!(lease.carry_conversation(person));
+        assert!(!room.valid());
+        let carried = lease.history_proof().unwrap();
+        assert_eq!(carried.person(), Some(person));
+        assert!(carried.scope.held(), "capture the full effective scope");
+        assert!(lease.read_carried());
+        assert!(!carried.valid());
+        let reads = lease.history_proof().unwrap();
+        assert!(!reads.scope.held());
+        assert!(lease.answer_words_seen(person));
+        assert_eq!(lease.scope(), Some(&reads.scope));
+        assert!(
+            !reads.valid(),
+            "equal snapshots still have distinct sources"
+        );
+        let seen = lease.history_proof().unwrap();
+        owner.revoke();
+        assert!(seen.valid());
+        assert_eq!(seen.person(), Some(person));
+    }
+
+    #[test]
+    fn history_proof_keeps_keep_only_room_and_rejects_one_face_narrow() {
+        let owner = RequestScope::new(key(65), ScopeSnapshot::room());
+        let lease = owner.lease();
+        let room = lease.history_proof().unwrap();
+        assert!(lease.carry_keep_only("person"));
+        assert!(!room.valid());
+        let kept = lease.history_proof().unwrap();
+        assert!(kept.valid());
+        assert!(kept.person().is_none());
+        assert!(kept.scope.held());
+
+        let owner = RequestScope::new(key(66), ScopeSnapshot::of("A"));
+        let lease = owner.lease();
+        let personal = lease.history_proof().unwrap();
+        assert!(lease.take_by_one_face());
+        assert!(!personal.valid());
+        let room = lease.history_proof().unwrap();
+        assert!(room.person().is_none());
+        assert!(lease.take_by_one_face());
+        assert!(
+            !room.valid(),
+            "repeated one-face narrowing also invalidates"
+        );
+    }
 
     /// #4339: a line carried as a person's conversation reads their scope
     /// held ([`ScopeSnapshot::held`]): their thread, never memory's reads.
