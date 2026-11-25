@@ -30380,6 +30380,62 @@ mod tests {
         );
     }
 
+    /// #8384 replayed from lamp-74ff's saved read (23 Nov, Sixth's
+    /// `read-74ff-8092/out-3.txt`: counts and times only, the words made up).
+    /// 14:23:12 the name was heard at 0.98 in a line the faint floor turned
+    /// away (10 of 10 speech blocks under, loudest -33.3 dBFS against -28.0);
+    /// requests 152-155 had no words; 14:23:40 request 156, 7 words, 1 face
+    /// turned and seen speaking in 8 looks, looking away (pitch -7), out of
+    /// the window, no conversation, was let through. The read saves neither
+    /// `began_ms_ago` nor the line's length: the hearing is taken at its log
+    /// time and the line as 3.1 s ending at request 156's, 28 s on. With 74ff's
+    /// switches (`LAMP_SAID_TO_ME`, `LAMP_TURNED_FACE_SPEAKS`), off it is named
+    /// by that hearing and let through as on 74ff; with
+    /// `LAMP_SAID_TO_ME_NAME_IN_LINE` it is held.
+    #[test]
+    fn lamp_74ff_request_156_a_hearing_28_s_before_names_it_only_with_the_switch_off() {
+        use lamp_msgs::SpeakingState::Yes;
+        let judged = |name_in_line: bool, hearing: bool| {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let (now, now_us) = (Instant::now(), monotonic_us());
+            // 14:23:12 is 0; request 156's sound runs 24.9 s to 28 s.
+            let said = (now_us + 24_900_000, now_us + 28_000_000);
+            let pose = (Some((-7f32).to_radians()), Some(false));
+            // Eight looks in the line's sound, each seen speaking.
+            turned_face_looks_posed(&eyes, now, 25_000, &[Some(Yes)], &mut 0, pose);
+            turned_face_looks_posed(&eyes, now, 27_000, &[Some(Yes)], &mut 5, pose);
+            let mut heeding = super::Heeding::new(true, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.seeing_speaking_faces(eyes, None);
+            heeding.needing_the_turned_face_to_speak();
+            heeding.hearing_only_said_to_me();
+            if name_in_line {
+                heeding.naming_only_in_the_line();
+            }
+            let signs = super::Signs {
+                names: if hearing {
+                    vec![(now_us, 0.98)]
+                } else {
+                    vec![]
+                },
+                ..turned_signs(crate::room_told::Room::Unknown)
+            };
+            let verdict = heeding.heed_signs(156, said, "the plan for the day looks fine", signs);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            verdict
+        };
+        assert!(
+            judged(false, false).is_some(),
+            "without the hearing the line is held: the name is what let it out"
+        );
+        assert_eq!(
+            judged(false, true),
+            None,
+            "off: named by the stale hearing, as on 74ff"
+        );
+        assert!(judged(true, true).is_some(), "on: the line is held");
+    }
+
     /// `LAMP_SAID_TO_ME` with the eyes' pitch and gaze (#7442): a question
     /// said facing the lamp and seen speaking is held with the head down to
     /// a phone (40 degrees) or the eyes looking away, and answered level and
