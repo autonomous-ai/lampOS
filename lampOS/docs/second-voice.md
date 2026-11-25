@@ -4741,7 +4741,20 @@ after a take-over, but now for every turn:
   on any topic; the chat's own search (`ChatEvent::Searched`) backs any; a cut answer's carried lookup counts
   only when its answer found something; another turn's never) is held with
   the rest of its round, and the round's words are not kept. A quoted line
-  and a reminder's ring are not judged. With no call, the model is asked
+  and a reminder's ring are not judged. On a line that asked no live fact
+  (`live_fact::asks_live` false), once some of the turn's words were said,
+  a figure with no number in it (a weather condition with a place) is
+  said as it is, with no ask again and no extra round (#8615, the lead's
+  choice (d'), 25 Nov: on lamp-52e6, kit-10824, a story about a
+  cat said its first piece, then held "sunny in Da Nang" and asked again
+  with `weather` required, 3.3 s of silence inside the story). Journal,
+  once a turn: `a live figure in a line that asked none, words already
+  out: said as it is (LAMP_LIVE_FACT_CHECKED)`. A price, degrees, a score
+  or any figure with a number (`live_fact::is_number`) stays held and asked
+  again, as on a live line `asks_live` misses ("How much is an ounce of
+  silver?"); so does any figure on a line that asked one, or before
+  anything was said. Test:
+  `live_fact::a_numberless_figure_in_a_line_that_asked_none_is_said_once_words_are_out`. With no call, the model is asked
   once with `live_fact::note`, whose round must call the lookup it names
   (`live_fact::force`, `tool_choice`; `weather` when the held words speak
   of weather and it is declared, else `web_search`); a second such reply,
