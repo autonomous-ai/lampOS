@@ -5566,6 +5566,17 @@ pub fn serve(
                 heeding.attention.hold_anothers_name(true);
             }
         }
+        // "Hey, Lynn. …", speech to text's "Hey Lamp", keeps a sure hearing in
+        // a busy room too (`LAMP_NAME_GREETED_STAND_IN=on`, the product
+        // owner's first rule, 25 Nov 2026).
+        if crate::second_provider::greeted_stand_in_on() {
+            eprintln!(
+                "lamp-voice second: in a busy room a sure hearing at a line's start is kept when its words open with a greeting and a word written for the lamp's name, set off (\"Hey, Lynn. …\"); \"Lynn, pass me that\" is still not the lamp's (LAMP_NAME_GREETED_STAND_IN)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.attention.keep_greeted_stand_ins(true);
+            }
+        }
         // A hearing at the line's start is no second sign of its own on a
         // line said to a person ("Ma'am, …"), and a conversation going on
         // gives back only that start (`LAMP_NAME_SAID_TO_A_PERSON=on`, #3945).
