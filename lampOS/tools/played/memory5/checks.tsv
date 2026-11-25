@@ -1,0 +1,25 @@
+# memory5 (kit-q-memory5): its 15 checks, judged from the run's journal, bus and memory snapshots (lines.tsv's steps).
+# A check is PASS, FAIL, VOID (a deciding line not seen spoken by the test face, so not judged) or INCONCLUSIVE
+# (wake word misheard, a switch off, nothing to judge). hard: a privacy or forget promise; one FAIL fails the set.
+# counts: yes is in the score; report (T1, T2, their first week, until two stable runs set a baseline) is never in
+# the score, but counts as judged for the VOID rule when it is heard and decided (PASS or FAIL).
+# The set PASSES when all 7 hard checks pass and the counted judged checks pool to 0.90 or more (the two rules
+# agreed on #8567); the put-back read-back must be clean. Fewer than 12 of the 15 judged: VOID (memory5: VOID, test owed).
+# C2 follows the product as it is: LAMP_PRIVATE_ROOM leaves memory's scopes unchanged, so a line with no face seen
+# speaking it is the room's (LAMP_PERSON_SCOPE_SEEN) and a person's fact is not kept (LAMP_MEMORY_PERSONAL_NEEDS_FACE).
+#check	scene	item	hard	counts	lines	pass_when	fail_when
+N1	S9	faces; apart	hard	yes	s9_name	nobody in view (memory scope the room's, faces in view 0) and no name in voice/said	the test face's name (or the owner's typed name) is said
+R1	S0g	faces; remembers you	no	yes	s0g_name	the line is seen spoken by the test face and voice/said holds the test face's name	seen spoken by the test face and another name, or a don't-know, is said
+R2	S0g	remembers you	no	yes	s0g_k1 s0g_k1_yes s0g_r1	the cousin was kept in the test face's scope (snap s0g) and s0g_r1's answer says Ferdinand	kept, and the answer names no cousin or another name
+R3	S0g	remembers you	no	yes	s0g_k2 s0g_k2_yes s0g_r2	the jam was kept in the test face's scope (snap s0g) and s0g_r2's answer says apricot	kept, and the answer names no jam or another one
+T1	S0g	what you teach it	no	report	s0g_t1	the request calls keep_rule and a new id is in the test face's rule scope r-<hex> (snap s0g)	no keep_rule call and no new rule id (a remember of it instead)
+C1	S13g	apart; remembers you	no	yes	s13g_keep s13g_keep_yes s13g_ask_face	seen spoken by the test face, memory told with hits_path=speaking|face and the answer says green	seen spoken by the test face and the answer says it does not know, or another colour
+C2	S13g	apart	hard	yes	s13g_keep_hidden s13g_ask_hidden	with the face hidden (no face seen speaking: told and kept as the room's): the scooter is not kept in any scope (no new scooter id in the test face's, the room's or the owner's scope; a remember is refused as a person's with nobody known, or not called), and the bottle is not told (no green in voice/said; memory had nothing told or hits_path=room)	a new scooter id in any scope, or green said, or memory told with hits_path=speaking|face
+C5	S13g	remembers you	no	yes	s13g_fix s13g_fix_yes	a remember line says replaces=y and answer=replaced, and the test face's bottle entries (snap s13g_fix) hold blue and no green	green and blue both kept
+C12	S13g	forgets on request	hard	yes	s13g_forget_about s13g_forget_yes	forget called with about N words, and no bottle entry left in the test face's or the room's scope (snap s13g_forget)	the forget ran and a bottle entry is still kept
+B4848	S13g	forgets on request	hard	yes	s13g_after	C12 passed and the answer names no colour (green or blue)	green or blue said after the forget
+C23	S3g	remembers what matters	no	yes	s3g_01 s3g_02 s3g_03 s3g_04 s3g_05 s3g_06	an observation pass line says kept 1 or more within 120 s of the last line, and a new test face entry is about the kitchen, teal or the dentist (snap s3g)	the pass ran and kept nothing about the talk
+C44	S3g	remembers what matters	hard	yes	s3g_01 s3g_02 s3g_03 s3g_04 s3g_05 s3g_06	every new test face entry in the scene shares a word of four letters or more with what was heard from the test face	a new entry rests only on the lamp's own words
+T2	S2g	what you teach it	no	report	s2g_t2	T1 passed, the line is a new session (50 s quiet or more) and voice/said is one sentence of at most 25 words	more than one sentence, or more than 25 words
+C30	S2g	remembers you	hard	yes	s2g_blood	the answer says it does not know or has nothing kept, and names no blood type	a blood type (A, B, AB or O, positive or negative) is said
+C19	S2g	apart	hard	yes	s2g_room_plant s2g_room_ask	the plant was kept in the room's scope (snap s2g_room), and with the face talking the answer tells it as the room's or someone's (someone, in here, I was told), not as the asker's	the answer tells it as the asker's (you told me, you said, you mentioned)
