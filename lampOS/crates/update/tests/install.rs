@@ -2809,6 +2809,43 @@ fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
     }
 }
 
+/// Handed tasks kept as the owner's linked records (#8135,
+/// `LAMP_SERVICE_RECORDS_TASKS`): on in the product only in lamp-voice, the
+/// second route's worker its one reader, once, and beside
+/// `LAMP_SERVICE_RECORDS`, without which it does nothing (Twelve's P3 on
+/// #8135). A later edit that drops the parent, or sets the child in another
+/// unit, fails here.
+#[test]
+fn the_product_keeps_handed_tasks_only_beside_the_service_records() {
+    const CHILD: &str = "LAMP_SERVICE_RECORDS_TASKS";
+    const PARENT: &str = "Environment=LAMP_SERVICE_RECORDS=on";
+    let mut seen = 0;
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let child = service.iter().filter(|line| line.contains(CHILD)).count();
+        if *unit != "lamp-voice.service" {
+            assert_eq!(child, 0, "{unit} sets {CHILD}");
+            continue;
+        }
+        seen += 1;
+        assert_eq!(
+            service
+                .iter()
+                .filter(|line| **line == "Environment=LAMP_SERVICE_RECORDS_TASKS=on")
+                .count(),
+            1,
+            "{unit} sets {CHILD}=on once"
+        );
+        assert_eq!(child, 1, "{unit} names {CHILD} on one line only");
+        assert_eq!(
+            service.iter().filter(|line| **line == PARENT).count(),
+            1,
+            "{unit} sets {CHILD} without {PARENT}"
+        );
+    }
+    assert_eq!(seen, 1, "lamp-voice.service is a product unit");
+}
+
 /// The skills page loads skills as lamp-skills does (16 Nov, lamp build
 /// 13329: a connector skill lamp-skills ran was listed "Doesn't load:
 /// grants: \"gmail-read\" is not a grant"). `lamp-cloud` answers
