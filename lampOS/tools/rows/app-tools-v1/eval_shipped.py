@@ -212,7 +212,9 @@ def ask(url, model, key, system, declared, prefix, say):
     body = {"model": model, "stream": False, "thinking": {"type": "disabled"}, "tools": declared,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": say}]}
     request = urllib.request.Request(url, json.dumps(body).encode(), method="POST", headers={
-        "Content-Type": "application/json", "Authorization": "Bearer " + key})
+        "Content-Type": "application/json", "Authorization": "Bearer " + key,
+        # The relay's edge refuses Python's default User-Agent (HTTP 403, error 1010).
+        "User-Agent": "lampOS-eval"})
     try:
         with urllib.request.urlopen(request, timeout=60) as reply:
             message = json.loads(reply.read())["choices"][0]["message"]
