@@ -579,6 +579,7 @@ class FakeLamp:
         app_grants: tuple[str, ...] | list[str] = ("speak", "hear", "light"),
         app_version: str = "1.0.0",
         app_settings: dict[str, Any] | None = None,
+        app_tools: bool = False,
         panel_rate_s: float = 60.0,
         store_apps: bool = True,
         apps_helper: bool = True,
@@ -592,6 +593,13 @@ class FakeLamp:
         self.app_name = app_name
         self.app_version = app_version
         self.app_grants = list(app_grants)
+        # `app_tools`: LAMP_APP_TOOLS on (#8406): hello says `tools: true`, `call_tool` sends the model's call as
+        # `app.call`, and `app.answer` is taken (refused `off` without it). The calls in flight, and each call's end as
+        # the voice would be told it (`{"result": ...}`, or `{"error": ...}` with the app's words or the lamp's).
+        self.app_tools = app_tools
+        self.app_calls: dict[str, dict[str, Any]] = {}
+        self.app_answers: dict[str, dict[str, Any]] = {}
+        self._call_n = 0
         # The owner's values for the manifest's settings (`set_app_setting` changes one and tells the app), the
         # phrases each connection listens for (`phrases.set`), the turns an app took (`app.took`), and the panel.
         self.app_settings: dict[str, Any] = dict(app_settings or {})
@@ -1353,9 +1361,10 @@ class FakeLamp:
         client = f"app_{self.app_name}"
         self.clients[client] = {"key": b"", "name": f"app {self.app_name}", "grants": list(self.app_grants)}
         limits = {**LIMITS, "motion_done": True} if self.motion_done else LIMITS
-        await self._ok(
-            ws, request["id"], lamp=self.lamp, grants=list(self.app_grants), limits=limits, app=self.app_name, version=self.app_version
-        )
+        said: dict[str, Any] = {"app": self.app_name, "version": self.app_version}
+        if self.app_tools:
+            said["tools"] = True
+        await self._ok(ws, request["id"], lamp=self.lamp, grants=list(self.app_grants), limits=limits, **said)
         return client
 
     async def _hello_token(self, ws, request: dict) -> str | None:
@@ -1698,6 +1707,8 @@ class FakeLamp:
                 return
             self.app_phrases[id(ws)] = list(phrases)
             await self._ok(ws, id_, phrases=len(phrases))
+        elif op == "app.answer":
+            await self._app_answer(ws, request)
         elif op == "app.took":
             self.app_took_turns.append(request["turn"])
             await self._ok(ws, id_)
@@ -1716,6 +1727,57 @@ class FakeLamp:
             self._panel_rev += 1
             self.app_panel = {"title": request["title"], "lines": list(request["lines"]), "rev": self._panel_rev}
             await self._ok(ws, id_, rev=self._panel_rev)
+
+    # The lamp's own words for a call with no answer of the app's (lamp_msgs::AppCalled::LAMP_WORDS).
+    LAMP_WORDS = ("timeout", "too_long", "busy", "private", "stopped", "unknown tool", "not running")
+
+    async def _app_answer(self, ws, request: dict) -> None:
+        """`app.answer`, as lamp-control's app_calls.rs takes it: refused `off` with app tools off; the lamp's own words
+        refused; a result over 2,048 bytes or an error over 200 characters ends the call as `too_long`; `taken` once,
+        for the call in flight."""
+        id_ = request["id"]
+        if not self.app_tools:
+            await self._refuse(ws, id_, "off", "app tools are off on this lamp")
+            return
+        error = request.get("error")
+        if error is not None and (error == "" or any(unicodedata.category(c) == "Cc" for c in error)):
+            await self._refuse(ws, id_, "bad_request", "app.answer takes call and one of result (an object) or error (one line)")
+            return
+        if error in self.LAMP_WORDS:
+            await self._refuse(ws, id_, "bad_request", "error: the app's own words, never one of the lamp's")
+            return
+        if error is not None:
+            end = {"error": "too_long" if len(error) > 200 else error}
+        else:
+            result = request["result"]
+            end = {"error": "too_long"} if len(json.dumps(result, separators=(",", ":"))) > 2048 else {"result": result}
+        taken = self.app_calls.pop(request["call"], None) is not None
+        if taken:
+            self.app_answers[request["call"]] = end
+        await self._ok(ws, id_, taken=taken)
+
+    async def call_tool(self, name: str, args: dict[str, Any] | None = None, *, call: str | None = None) -> str:
+        """The voice's model calls the app's tool `name`: each app connection is told `app.call` with a call id (the
+        lamp's `app-<boot>-<request>-<n>` shape), the name and `args`. Returns the call's id; its end is in
+        `app_answers` once the app answers."""
+        if not self.app_tools:
+            raise RuntimeError("call_tool: FakeLamp(app_tools=True) first")
+        self._call_n += 1
+        call = call or f"app-1-{self._call_n}-1"
+        self.app_calls[call] = {"name": name, "args": dict(args or {})}
+        frame = json.dumps({"ev": "app.call", "call": call, "name": name, "args": dict(args or {})})
+        for ws in [ws for ws in list(self._connections) if id(ws) in self._app_ws]:
+            await ws.send(frame)
+        return call
+
+    async def stop_call(self, call: str, why: str = "timeout") -> None:
+        """The lamp stops waiting for `call` (its 4.5 s): the voice is told `why`, the app `app.call.stopped`, and a
+        later answer is not taken."""
+        if self.app_calls.pop(call, None) is not None:
+            self.app_answers[call] = {"error": why}
+        frame = json.dumps({"ev": "app.call.stopped", "call": call, "why": why})
+        for ws in [ws for ws in list(self._connections) if id(ws) in self._app_ws]:
+            await ws.send(frame)
 
     async def _app_memory(self, ws, request: dict) -> None:
         """`apps.remember` and `apps.context`, as lamp-control answers them: nothing while the lamp is private, a

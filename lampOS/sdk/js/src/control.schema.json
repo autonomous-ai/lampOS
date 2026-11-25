@@ -1925,6 +1925,14 @@
               "description": "turn.end's: the id of the turn.start it ended.",
               "$ref": "#/$defs/id"
             },
+            "tools": {
+              "description": "Only in an installed app's hello answer: true when this lamp may send the app the model's tool calls (app.call; LAMP_APP_TOOLS on). Left out otherwise, and by a lamp built before it: read it as false.",
+              "type": "boolean"
+            },
+            "taken": {
+              "description": "app.took's and app.answer's: whether the lamp counted the turn or the answer. False for app.answer when the call was not this app's call in flight (late, after app.call.stopped, unknown, answered already).",
+              "type": "boolean"
+            },
             "mute": {
               "enum": [
                 "held",
@@ -3947,6 +3955,48 @@
       ],
       "additionalProperties": false
     },
+    "app.answer": {
+      "description": "The app's answer to an app.call (LAMP_APP_TOOLS on): call, that event's id, and exactly one of result, a JSON object of at most 2048 bytes serialized, or error, one line of the app's own words (no control characters, at most 200 characters (lamp-control counts them), never one of the lamp's: timeout, too_long, busy, private, stopped, unknown tool, not running). A result or error over its bound ends the call as too_long. Answered taken: true once, for the app's call in flight within 4.5 s; false otherwise. Refused off with the switch off, rate past ten answers a second an app (retry_ms), and bad_request for any other shape. JSON Schema can't count a result's bytes, so lamp-control checks it.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "app.answer"
+        },
+        "call": {
+          "description": "The app.call's call; any other is answered taken: false.",
+          "type": "string"
+        },
+        "result": {
+          "type": "object"
+        },
+        "error": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "call"
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "result"
+          ]
+        },
+        {
+          "required": [
+            "error"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
     "app_request": {
       "description": "The ops only an installed app's socket (LAMP_APP_SOCKET) takes, besides the door's own that its manifest's grants allow. Apart from `request` until lamp-control's app socket takes them as ops (#7415).",
       "oneOf": [
@@ -3967,6 +4017,9 @@
         },
         {
           "$ref": "#/$defs/apps.context"
+        },
+        {
+          "$ref": "#/$defs/app.answer"
         }
       ]
     },
@@ -3977,7 +4030,9 @@
         "ev": {
           "enum": [
             "app.trigger",
-            "app.settings"
+            "app.settings",
+            "app.call",
+            "app.call.stopped"
           ]
         },
         "at": {
@@ -4047,6 +4102,65 @@
             "required": [
               "changed",
               "settings"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "app.call"
+              }
+            }
+          },
+          "then": {
+            "description": "The voice's model calls one of the app's tools (LAMP_APP_TOOLS on; the manifest's tools file, newest on apps/tools): call, the call's id (app-<boot>-<request>-<n>, the app's idempotency key), the tool's name and its args, an object of at most 2048 bytes. One call in flight an app. Answer it with app.answer within 4.5 s; after that the lamp sends app.call.stopped and takes no answer.",
+            "properties": {
+              "call": {
+                "type": "string",
+                "pattern": "^app-[0-9]+-[0-9]+-[0-9]+$",
+                "maxLength": 64
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "args": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "call",
+              "name",
+              "args"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "app.call.stopped"
+              }
+            }
+          },
+          "then": {
+            "description": "The lamp stopped waiting for the app's answer to call (why: timeout, after 4.5 s): a later app.answer for it is answered taken: false. The voice was told the lamp's word, not the app's.",
+            "properties": {
+              "call": {
+                "type": "string",
+                "maxLength": 64
+              },
+              "why": {
+                "type": "string",
+                "examples": [
+                  "timeout"
+                ]
+              }
+            },
+            "required": [
+              "call",
+              "why"
             ]
           }
         }

@@ -95,6 +95,8 @@ SHOWN = frozenset({
     "why", "within_ms", "x", "y", "yaw",
     # An installed app's `app.settings` event and `app.trigger` (#7415).
     "changed", "trigger",
+    # An app's tools (#8406): the call's id, whether an answer was taken, hello's `tools`; `args` and `result` are secret.
+    "call", "taken", "tools",
     # A computer's own pushed apps (`app.push`'s last answer, `app.list`); an app's title is secret above.
     "app", "apps",
 })
