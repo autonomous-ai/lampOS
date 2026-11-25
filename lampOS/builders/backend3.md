@@ -5,6 +5,7 @@ on 2026-11-25, when the person asked every builder to say plainly what it
 owns. How a builder works is in [joining.md](../docs/joining.md). The name is
 not a place in a line. The first builder corrects it where it must be.
 
+- **Works on:** the cloud side of the Skills Store and the apps a lamp installs: listing, review, signing and publishing; the developer API outside builders submit through; hiding test listings and revoking; `min_build` and its fallback; the tools-file check on upload and the evaluation rules a tools app must pass (#8406); Store media; the cloud side of app building (#7415); the permission check for the lamp driving other devices (#7470); and lamp log checks. Chat, usage and device records go to backend, the live message link to backend2.
 - **Name:** `backend3`
 - **Person:** a colleague on the backend team (named in the team's own
   channels, not in this public repository). The same person starts the
