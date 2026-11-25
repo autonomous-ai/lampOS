@@ -35,21 +35,40 @@ sau:
 2. **Bản hướng dẫn** (`made_skill::brief`): chữ cố định, gồm định dạng kỹ
    năng và những gì một kỹ năng tạo ra được phép dùng, rồi đến yêu cầu của
    người dùng.
-   - Yêu cầu tối đa 2.000 ký tự (`MOST_REQUEST_CHARS`, #7245, 19/11: đếm
+   - Yêu cầu tối đa 7.500 ký tự (`MOST_REQUEST_CHARS`; #8630, 25/11: một
+     giới hạn an toàn lớn duy nhất của đèn, không phải con số người dùng
+     gặp khi dùng bình thường, nên app không hiện bộ đếm hay giới hạn riêng
+     mà theo `make_skill_most_chars` trong `system.info`; #7245, 19/11: đếm
      theo chữ, nên yêu cầu tiếng Việt dài bằng tiếng Anh; trước đó đếm theo
      byte: lúc đầu là 180, để vừa task 1.000 byte của phần tasks cùng bản
      hướng dẫn, từ 6/11 là 480 khi chủ sở hữu thấy 180 quá ngắn trong app,
      từ 18/11 là 2.000 khi một yêu cầu tiếng Việt, 2 hoặc 3 byte mỗi chữ,
-     vẫn bị cắt ở 160 đến 240 chữ); dài hơn thì bị từ chối kèm giới hạn
-     ("That is too long to ask for as one skill, past 2,000 characters: say
-     it more shortly."), không bao giờ bị cắt, và khi đó không hỏi mô hình
-     gì cả. Vì sao có giới hạn: cả yêu cầu đi tới mô hình tạo kỹ năng cùng
-     system prompt, nên dài hơn nhiều chỉ khiến người dùng chờ lâu hơn cho
-     một kỹ năng làm một việc. Không đường truyền nào cần ít hơn 8.000 byte
-     tối đa của nó (bốn byte mỗi chữ, `MOST_REQUEST_BYTES`): một dòng của
-     socket app-make là 64 KiB, gói MQTT của lamp-cloud hơn 1 MiB, rules
-     tạo kỹ năng của agent 48 KiB. MAKE IT của app và lần tạo bằng giọng nói
-     dùng chung giới hạn này.
+     vẫn bị cắt ở 160 đến 240 chữ, và 2.000 ký tự từ 19/11 đến 25/11); dài
+     hơn thì bị từ chối bằng một câu rõ ràng không nêu con số ("That is too
+     long for me to make as one skill: please say it more shortly.",
+     `REQUEST_TOO_LONG`, mô hình được bảo nói câu đó bằng ngôn ngữ của cuộc
+     trò chuyện như các lời từ chối khác khi tạo kỹ năng; từ app là câu của
+     lamp-cloud "what the skill should do is too long for the lamp to make
+     as one skill: shorten it"), không bao giờ bị cắt, không bao giờ bị từ
+     chối trong im lặng, và khi đó không hỏi mô hình gì cả. Vì sao là
+     7.500: đường truyền duy nhất yêu cầu phải vừa là rules tạo kỹ năng của
+     agent (`lamp_tasks::skill_make::MOST_RULES_BYTES`, 48 KiB, 49.152
+     byte), chứa system prompt dài nhất (15.270 byte khi mọi công tắc thêm
+     vào nó đều bật, đo bởi
+     `the_longest_repair_and_system_prompt_fit_the_agents_make_rules`), chữ
+     riêng của một lần sửa (1.488 byte: 960 của bản hướng dẫn, dấu sửa, 735
+     byte dòng kiểm tra và câu hỏi), ba ký tự xuống dòng, và yêu cầu tối đa
+     bốn byte mỗi chữ (`MOST_REQUEST_BYTES`, 30.000; một chữ tiếng Việt tối
+     đa 3 byte): 15.270 + 1.488 + 3 + 30.000 = 46.761, còn 2.391 byte cho
+     system prompt lớn thêm. Mức 20.000 đến 30.000 issue đề xuất không vừa
+     đường truyền này (chỗ trống là 32.391 byte, 8.097 chữ bốn byte). Mọi
+     giới hạn khác đều lớn hơn nhiều: một dòng của socket app-make là 64
+     KiB, gói MQTT của lamp-cloud hơn 1 MiB, và ngữ cảnh của mô hình tạo kỹ
+     năng là 128k token (`lamp_tasks::one_session::CONTEXT_TOKENS`), phiên
+     tạo được làm mới ở 60 % (76.800), trong đó 48 KiB rules chưa tới 25k
+     token kể cả khi hai byte một token. MAKE IT của app và lần tạo bằng
+     giọng nói dùng chung giới hạn này, test của lamp-cloud giữ chúng bằng
+     nhau (`the_words_bound_is_lamp_voices_one_safety_bound`).
    - Không có gì khác của cuộc trò chuyện đi kèm.
    - Giờ trong ngày được hỏi là khung giờ riêng của trigger,
      `during = { from = "HH:MM", to = "HH:MM" }` "if asked", không phải một
@@ -71,8 +90,9 @@ sau:
      (coming to the desk is room/presence)" và `body = { gesture }`: system
      prompt liệt kê từng cái (`TRIGGER_MEANINGS`,
      `made_skill::gesture_names`). Vì vậy chữ riêng của bản hướng dẫn tối
-     đa 960 byte, bản hướng dẫn dài nhất là 8.960 byte với yêu cầu 2.000
-     ký tự bốn byte (`MOST_BRIEF_BYTES`; 2.960 với yêu cầu 2.000 byte, 1.160
+     đa 960 byte, bản hướng dẫn dài nhất là 30.960 byte với yêu cầu 7.500
+     ký tự bốn byte (`MOST_BRIEF_BYTES`; 8.960 với 2.000 ký tự cho tới
+     #8630, 2.960 với yêu cầu 2.000 byte, 1.160
      với 480, 1.440 khi bản hướng dẫn nêu
      bước remind và `every` của nó ở #7245, trước đó là 1.340) và các dòng
      kiểm tra của một lần sửa là 735 byte (`MOST_REPAIR_BYTES`, trước là
@@ -4861,7 +4881,7 @@ công tắc không đọc được. Câu của kỹ năng vừa tạo, nếu h�
 từ chối ngay như mọi câu nói, và kỹ năng vẫn bật.
 
 - `{"make": {"words", "request_id"}}`: chữ thành cùng bản hướng dẫn (tối đa
-  2.000 ký tự) và được mô hình của đèn tạo ngay trên một luồng riêng
+  7.500 ký tự, #8630) và được mô hình của đèn tạo ngay trên một luồng riêng
   (`make_skill_local::make_kept`, `app_make::make_here`), được ghi là tạo từ
   `local:app:<ms>:1`: `making`, rồi `on`, hoặc `not_kept` kèm lý do. Không
   tạo được (hoặc kỹ năng viết trong ứng dụng không giữ được), đèn cũng nói

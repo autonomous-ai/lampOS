@@ -46,25 +46,38 @@ pub const MAKE: &str = "make_skill";
 /// part's 1,000-byte task with the brief, no longer handed there since 3
 /// Nov), 480 bytes since the owner found 180 too short in the app (6 Nov),
 /// 2,000 bytes since a Vietnamese request, 2 or 3 bytes a letter, was still
-/// cut at 160 to 240 letters (18 Nov), and 2,000 characters since 19 Nov.
-/// Why a bound at all: the whole request goes to the making model with its
-/// system prompt, and the lamp's own model reads it all before it writes a
-/// word, so a far longer one makes the person wait longer for a skill that
-/// does one thing. The app's MAKE IT (`crate::app_make`, held to it by
-/// lamp-cloud's own `make_skill::MOST_WORDS_CHARS`, which `system.info`
-/// tells the app) and the voice's own make share it: a spoken request is
-/// far shorter.
-pub const MOST_REQUEST_CHARS: usize = 2_000;
+/// cut at 160 to 240 letters (18 Nov), 2,000 characters from 19 Nov, and
+/// 7,500 since 25 Nov (#8630, the owner: no visible limit for the person;
+/// the lamp keeps one large safety bound no one meets in normal use). Why
+/// 7,500: the one wire the request must fit is the agent's make rules
+/// (`lamp_tasks::skill_make::MOST_RULES_BYTES`, 48 KiB, 49,152 bytes),
+/// which carry the longest system prompt (15,270 bytes with every switch
+/// that adds to it on), a repair's own words (1,488 bytes), three newlines
+/// and the request at four bytes a letter at most ([`MOST_REQUEST_BYTES`],
+/// 30,000): 15,270 + 1,488 + 3 + 30,000 = 46,761, 2,391 bytes short of the
+/// rules, room for the system prompt to grow
+/// (`make_skill_local::tests::the_longest_repair_and_system_prompt_fit_the_agents_make_rules`
+/// holds it). The app's MAKE IT (`crate::app_make`, held to it by
+/// lamp-cloud's own `make_skill::MOST_WORDS_CHARS`, equal by its test,
+/// which `system.info` tells the app, so the app follows it with no cap of
+/// its own) and the voice's own make share it: a spoken request is far
+/// shorter.
+pub const MOST_REQUEST_CHARS: usize = 7_500;
 /// [`MOST_REQUEST_CHARS`] in bytes at most, four a letter, which UTF-8
-/// never passes: no wire or file of the request needs a smaller bound (the
-/// app-make socket's line is 64 KiB, lamp-cloud's MQTT packet over 1 MiB,
-/// and the agent's make rules 48 KiB), so it is no check of its own, only
-/// what [`MOST_BRIEF_BYTES`] is sized for.
+/// never passes (a Vietnamese letter is three at most): what sizes
+/// [`MOST_BRIEF_BYTES`] and so the agent's make rules, no check of its own.
+/// Every other wire of the request is far larger: the app-make socket's
+/// line is 64 KiB, lamp-cloud's MQTT packet over 1 MiB, and the make
+/// model's context 128k tokens, a make's session rotated fresh at 60 % of
+/// it (`lamp_tasks::one_session::MAKE_FRESH_TOKENS`).
 pub const MOST_REQUEST_BYTES: usize = 4 * MOST_REQUEST_CHARS;
-/// What the person is told of a request past [`MOST_REQUEST_CHARS`]: the
-/// bound, so they know why and by how much to shorten it.
+/// What the person is told of a request past [`MOST_REQUEST_CHARS`]:
+/// plainly, with no number (#8630: the person meets no visible limit), and
+/// never in silence. The model is told to say it in the conversation's
+/// language, as the make's other refusals are (`make_skill_local::make`'s
+/// "Tell them that in a few words.").
 pub const REQUEST_TOO_LONG: &str =
-    "That is too long to ask for as one skill, past 2,000 characters: say it more shortly.";
+    "That is too long for me to make as one skill: please say it more shortly.";
 /// At most this many made skills are kept; the oldest not on is let go,
 /// and one on never is.
 pub const KEPT_MOST: usize = 5;
@@ -2516,7 +2529,7 @@ pub const MOST_REPAIR_BYTES: usize = 735;
 /// request's [`MOST_REQUEST_BYTES`]. 1,160 with a 480-byte request; 1,440
 /// since the brief tells the remind step, `every` with it (#7245); 2,960
 /// with a 2,000-byte request (18 Nov); 8,960 with 2,000 characters, four
-/// bytes each at most (19 Nov).
+/// bytes each at most (19 Nov); 30,960 with 7,500 (#8630, 25 Nov).
 pub const MOST_BRIEF_BYTES: usize = 960 + MOST_REQUEST_BYTES;
 
 /// The longest request a [`brief`] takes, in bytes too, for tests:

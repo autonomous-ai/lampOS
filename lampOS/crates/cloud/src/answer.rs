@@ -689,10 +689,11 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 info["character"] = json!({"energy_alone": true});
             }
             // `make_skill_most_chars` (#7245, 19 Nov): the most characters
-            // of words `skills.make` takes, 2,000, and
-            // `make_skill_most_bytes` (18 Nov), those in bytes at most,
-            // 8,000, only while `can` names it, so the app holds a lamp
-            // that says neither, an older one, to 480 bytes.
+            // of words `skills.make` takes, the lamp's one safety bound
+            // (7,500, #8630), which the app follows with no cap of its
+            // own, and `make_skill_most_bytes` (18 Nov), those in bytes at
+            // most, four a letter, only while `can` names it, so the app
+            // holds a lamp that says neither, an older one, to 480 bytes.
             if on(lamp, "skills.make") {
                 info[crate::make_skill::MOST_CHARS_FIELD] =
                     json!(crate::make_skill::MOST_WORDS_CHARS);

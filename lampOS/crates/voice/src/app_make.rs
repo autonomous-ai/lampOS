@@ -10,8 +10,9 @@
 //! - **The socket** ([`SOCKET_ENVIRONMENT`], [`DEFAULT_SOCKET`] if unset),
 //!   for `lamp-cloud`: one JSON line in, one out, then closed.
 //!   - `{"make": {"words", "request_id"}}`: the words become the voice's
-//!     own brief ([`crate::made_skill::brief`], at most 2,000 characters,
-//!     [`crate::made_skill::MOST_REQUEST_CHARS`]) and are
+//!     own brief ([`crate::made_skill::brief`], at most 7,500 characters,
+//!     [`crate::made_skill::MOST_REQUEST_CHARS`], the lamp's one safety
+//!     bound, which `system.info` tells the app) and are
 //!     made at once on a thread of their own: typing them in the app is the
 //!     person's ask. The answer is `{"making": true}` once the ask is
 //!     recorded, before it is made, or `{"refused": WHY}` in plain words.

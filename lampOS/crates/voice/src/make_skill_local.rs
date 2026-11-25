@@ -10354,13 +10354,16 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         made_skill::set_asks_here(None);
     }
 
-    /// The longest request in bytes (2,000 characters of four bytes since
-    /// #7245, [`made_skill::MOST_REQUEST_BYTES`]):
+    /// The longest request in bytes (7,500 characters of four bytes since
+    /// #8630, 2,000 from #7245, [`made_skill::MOST_REQUEST_BYTES`]):
     /// its longest repair, with the longest system prompt this worker can
-    /// give (every switch that adds to it on), still fits the rules the
+    /// give (every switch that adds to it on; 15,270 bytes on 25 Nov, the
+    /// measure #8630's bound was set by), still fits the rules the
     /// lamp's agent's make run takes (`lamp_tasks::skill_make`), and the
     /// lamp's own chat is handed the same two. Nothing of a brief goes to
-    /// the tasks part's 2,000 bytes any more.
+    /// the tasks part's 2,000 bytes any more. This is the test that sizes
+    /// `MOST_REQUEST_CHARS`: a system prompt grown past the 2,391 bytes
+    /// left fails here, and the bound must come down with it.
     #[test]
     fn the_longest_repair_and_system_prompt_fit_the_agents_make_rules() {
         let longest = made_skill::longest_request();

@@ -48,16 +48,22 @@ pub const UNREACHED: &str = "making a skill can't be reached on the lamp now";
 /// request (`lamp_voice::made_skill::MOST_REQUEST_CHARS`, held equal by a
 /// test). 480 bytes from 6 Nov (180 before); 2,000 bytes since 18 Nov,
 /// when a Vietnamese request, 2 or 3 bytes a letter, was still cut at 160
-/// to 240 letters; 2,000 characters since 19 Nov (#7245), so Vietnamese is
-/// as long as English. `system.info` tells the app this bound
-/// ([`MOST_CHARS_FIELD`]). Past it the app is told [`past_most_words`].
-pub const MOST_WORDS_CHARS: usize = 2_000;
+/// to 240 letters; 2,000 characters from 19 Nov (#7245), so Vietnamese is
+/// as long as English; 7,500 since 25 Nov (#8630): the lamp's one large
+/// safety bound, sized to the agent's 48 KiB make rules with the request
+/// at four bytes a letter (the arithmetic is at the voice's constant),
+/// not a number a person meets in normal use. `system.info` tells the app
+/// this bound ([`MOST_CHARS_FIELD`]), and the app follows it with no
+/// counter and no cap of its own. Past it the app is told
+/// [`past_most_words`].
+pub const MOST_WORDS_CHARS: usize = 7_500;
 
 /// [`MOST_WORDS_CHARS`] in bytes at most, four a letter
 /// (`lamp_voice::made_skill::MOST_REQUEST_BYTES`): no check of its own,
 /// the characters bound it. Said as [`MOST_WORDS_FIELD`] for an app that
-/// still counts bytes; the app holds its box to at most 2,000 of them
-/// whatever a lamp says, so that app is never refused for its length.
+/// still counts bytes (one from before #7245 holds its box to at most
+/// 2,000 of them whatever a lamp says, so it is never refused for its
+/// length).
 pub const MOST_WORDS_BYTES: usize = 4 * MOST_WORDS_CHARS;
 
 /// `system.info`'s field for [`MOST_WORDS_BYTES`], there only while
@@ -71,10 +77,12 @@ pub const MOST_WORDS_FIELD: &str = "make_skill_most_bytes";
 /// letters.
 pub const MOST_CHARS_FIELD: &str = "make_skill_most_chars";
 
-/// What the app is told of words past [`MOST_WORDS_CHARS`]: the bound in
-/// plain digits.
+/// What the app is told of words past [`MOST_WORDS_CHARS`]: plainly, with
+/// no number (#8630: the person meets no visible limit; the app reads the
+/// bound from `system.info` and tells them before it sends), never in
+/// silence.
 pub fn past_most_words() -> String {
-    format!("what the skill should do is at most {MOST_WORDS_CHARS} characters")
+    "what the skill should do is too long for the lamp to make as one skill: shorten it".to_owned()
 }
 
 /// How often lamp-cloud asks lamp-voice whether making a skill is ready
