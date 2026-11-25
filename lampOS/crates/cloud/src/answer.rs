@@ -618,7 +618,12 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // `can`: the kinds the app may ask now (#2864); a lamp without it
         // is read as before.
         "system.info" => {
-            let can = can(lamp);
+            let mut can = can(lamp);
+            // `defaults_on` (#7767, slice 6): no kind, only a marker, so the
+            // app reads a missing answer as on only on a lamp that says it.
+            if lamp.consent().is_some_and(|place| place.by_default) {
+                can.push(crate::consent::DEFAULTS_ON);
+            }
             let mut info = json!({
                 "versions": lamp.versions(),
                 "network": lamp.network(),
@@ -1591,6 +1596,56 @@ pub mod tests {
             Err("the lamp's settings are not running".to_owned())
         );
         let _ = std::fs::remove_dir_all(&folder);
+    }
+
+    /// #7767, slice 6: `system.info`'s `can` carries
+    /// [`crate::consent::DEFAULTS_ON`] only with the app's yeses taken
+    /// (`LAMP_APP_CONSENT=on`) and `LAMP_NOTICING_BY_DEFAULT=on`, so the app
+    /// reads a missing answer as on only on a lamp that ships the default.
+    /// It is no kind: asked, it is refused as any unknown one.
+    #[test]
+    fn system_info_can_carries_defaults_on_only_with_the_default() {
+        let place = crate::consent::place_in(
+            std::path::Path::new("/nowhere"),
+            std::path::Path::new("/nowhere.sock"),
+            false,
+        );
+        let info_can = |lamp: &mut Fake| {
+            answer(lamp, "system.info", &json!({})).unwrap().unwrap()["can"]
+                .as_array()
+                .unwrap()
+                .clone()
+        };
+        let marker = json!(crate::consent::DEFAULTS_ON);
+        let mut off = lamp();
+        let mut opt_in = Fake {
+            consent: Some(place.clone()),
+            ..lamp()
+        };
+        // The default alone, on the desk noticing switch's place: not said.
+        let mut desk_alone = Fake {
+            desk_noticing: Some(crate::consent::Place {
+                by_default: true,
+                ..place.clone()
+            }),
+            ..lamp()
+        };
+        let mut on = Fake {
+            consent: Some(crate::consent::Place {
+                by_default: true,
+                ..place
+            }),
+            ..lamp()
+        };
+        assert!(!info_can(&mut off).contains(&marker));
+        assert!(!info_can(&mut opt_in).contains(&marker));
+        assert!(!info_can(&mut desk_alone).contains(&marker));
+        let with = info_can(&mut on);
+        assert!(with.contains(&marker));
+        let without: Vec<Value> = with.into_iter().filter(|kind| *kind != marker).collect();
+        assert_eq!(without, info_can(&mut opt_in));
+        assert!(!can(&on).contains(&crate::consent::DEFAULTS_ON));
+        assert!(answer(&mut on, crate::consent::DEFAULTS_ON, &json!({})).is_err());
     }
 
     /// #6543: the owner's desk noticing switch in the app. Off (no

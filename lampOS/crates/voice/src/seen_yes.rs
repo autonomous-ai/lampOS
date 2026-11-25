@@ -126,13 +126,25 @@ pub const NOT_LOOKING: &str =
 /// [`POSTURE_FLAG`] with posture `on` too and [`OFFER_FLAG`] with the
 /// voice's offer `on` too.
 pub fn arguments(value: Option<&str>, posture: Option<&str>, offer: Option<&str>) -> Vec<String> {
+    arguments_or(value, posture, offer, false)
+}
+
+/// [`arguments`] with `LAMP_NOTICING_BY_DEFAULT` given (#7767, slice 6):
+/// with it on, [`OFFER_FLAG`] is never passed, so the offer is never
+/// declared while noticing is on by default.
+pub fn arguments_or(
+    value: Option<&str>,
+    posture: Option<&str>,
+    offer: Option<&str>,
+    by_default: bool,
+) -> Vec<String> {
     let mut flags = Vec::new();
     if value == Some("on") {
         flags.push(FLAG.to_owned());
         if posture == Some("on") {
             flags.push(POSTURE_FLAG.to_owned());
         }
-        if offer == Some("on") {
+        if offer == Some("on") && !by_default {
             flags.push(OFFER_FLAG.to_owned());
         }
     }
@@ -893,6 +905,19 @@ mod tests {
             assert_eq!(arguments(Some("on"), None, value), [FLAG], "{value:?}");
         }
         assert!(is_tool(OFFER) && is_tool(LOOK) && is_tool(STOP) && !is_tool("look"));
+        // #7767, slice 6 (the first builder's 13:55 on #7767): with
+        // LAMP_NOTICING_BY_DEFAULT on, the offer is never declared, so the
+        // lamp never asks to send pictures while it already sends them.
+        assert_eq!(
+            arguments_or(Some("on"), Some("on"), Some("on"), true),
+            [FLAG, POSTURE_FLAG]
+        );
+        assert_eq!(arguments_or(Some("on"), None, Some("on"), true), [FLAG]);
+        assert_eq!(
+            arguments_or(Some("on"), None, Some("on"), false),
+            arguments(Some("on"), None, Some("on"))
+        );
+        assert!(arguments_or(None, Some("on"), Some("on"), true).is_empty());
         assert_eq!(
             path(),
             Path::new(lamp_msgs::consent::FOLDER).join("seen-activity.json")
