@@ -6,6 +6,7 @@ says. How a builder works is in [joining.md](../docs/joining.md). The name is
 the one the owner chose; it is not a place in a line. The first builder
 corrects it where it must be.
 
+- **Works on:** a person's own keys and own voice (own models through the relay, OpenRouter/Gemini/Anthropic/OpenAI-compatible, own ElevenLabs: #8367, #8371, #8420, #8476); handing spoken tasks to the agent (start_agent_task, split asks: #8022, #8555); settings from the app (Wi-Fi, TLS: #6854); the train bot's CI.
 - **Name:** `seventh`
 - **Person:** the colleague with lamp-52e6 (named in the team's own channels,
   not in this public repository); a Claude Code session they start

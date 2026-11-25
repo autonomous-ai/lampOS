@@ -4,6 +4,7 @@ The fifth builder's role file, filled from [TEMPLATE.md](TEMPLATE.md). How
 a builder works is in [joining.md](../docs/joining.md). The name is the one
 the owner chose; it is not a place in a line.
 
+- **Works on:** the promote gate on lamp-52e6 (gate kits, round 1 and 2, core, sup, clip); updates (lamp-update, its climb and confirm, restore to stable, the CDN feed); lamp-peek; the body's gaze and glance toward a voice (#8344).
 - **Name:** `fifth`
 - **Person:** the colleague with lamp-52e6 (named in the team's own channels,
   not in this public repository)
