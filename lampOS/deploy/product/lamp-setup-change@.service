@@ -18,6 +18,10 @@ Type=simple
 # (the owner's developer setting, under /etc/systemd/system, below /etc's ReadWritePaths), systemd's
 # reload and lamp-control's restart or stop.
 User=root
+# LAMP_NOTICING_BY_DEFAULT: its why and rules are its row in docs/switches.md (#7767). Root's helper reads it from
+# this unit, never from lamp-setup's or lamp-cloud's (change::apply): with it on, the app's offs keep a no. The
+# same line in lamp-seen, lamp-eyes, lamp-ears, lamp-skills, lamp-cloud, lamp-setup and lamp-voice.
+Environment=LAMP_NOTICING_BY_DEFAULT=on
 ExecStart=/opt/lampOS/setup/current/lamp-setup change --config /etc/lampOS/setup/serve.json --bus-root /run/lampos-bus --enable
 StandardInput=socket
 StandardOutput=socket

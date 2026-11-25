@@ -718,9 +718,9 @@ impl Kept {
 /// The switch that reads a missing yes file as on (#7767): `on` exactly
 /// makes the face expressions yes, the room sounds yes and seen activity
 /// default on. A kept `"no"` stays no and a file that can't be read stays
-/// off either way; off, a missing file is no, as before. Off unless set, in
-/// no unit (`docs/switches.md`). Health and crash reports are not under it:
-/// [`reports_by_default`].
+/// off either way; off, a missing file is no, as before. Off unless set; on
+/// in the product's units (`docs/switches.md`). Health and crash reports are
+/// not under it: [`reports_by_default`].
 pub const NOTICING_BY_DEFAULT: &str = "LAMP_NOTICING_BY_DEFAULT";
 
 /// `by` for a yes nobody gave: no file is kept and

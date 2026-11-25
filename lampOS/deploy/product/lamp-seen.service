@@ -30,6 +30,9 @@ Environment=LAMP_SEEN_HOLDS_SITTING=on
 Environment=LAMP_SEEN_BREAK_IS_STANDING=on
 # LAMP_SEEN_MORE_DOINGS: its why and rules are its row in docs/switches.md (#6543).
 Environment=LAMP_SEEN_MORE_DOINGS=on
+# LAMP_NOTICING_BY_DEFAULT: its why and rules are its row in docs/switches.md (#7767). The same line in lamp-seen,
+# lamp-eyes, lamp-ears, lamp-skills, lamp-cloud, lamp-setup, lamp-setup-change@ and lamp-voice.
+Environment=LAMP_NOTICING_BY_DEFAULT=on
 # As the eyes' user: the eyes take a frame link reader only in a folder of their own user's with no
 # group or other access (/run/lampos-eyes-frames, made by lampos.conf). lampos is also the bus's group
 # and the say socket's (the voice's LAMP_SAY_GROUP=lampos), so no other group is needed.
