@@ -88,7 +88,7 @@ lamp also says once when the opt-in is turned off.
   | Rule | Read from | Closed when |
   |---|---|---|
   | The opt-in | the opt-in file (below) | no kept yes, or a forget came after it |
-  | The opt-in said back | the said-back record (below) | the on line for the kept yes has not begun (`not_said_yet`), so the ring's first camera mark never comes before the lamp said it would look |
+  | The opt-in said back | the said-back record (below) | the on line for the kept yes has not begun (`not_said_yet`), so the ring's first camera mark never comes before the lamp said it would look; the default's yes under `LAMP_NOTICING_BY_DEFAULT` needs no line (#7767) |
   | The privacy is open | `voice/privacy` (`MicrophonePrivacy`) | the lease is invalid, is not permitted, or is older than 50 ms. The camera looks exactly while the microphone may listen ([eyes.md](eyes.md#when-the-camera-is-open)) |
   | Someone is at the desk | `room/presence` (`someone`) and `humans/faces/tracked` | nobody, no face in view, or either value stale |
   | Awake | `expression/state` (`says_asleep()`, valid and enabled) | asleep, falling asleep, disabled or stale |
@@ -239,6 +239,16 @@ lamp also says once when the opt-in is turned off.
   - **A forget says the off line too.** Forget everything turns the opt-in
     off, so the person hears that the lamp stopped looking, as when the
     yes is taken back in the app.
+  - **No line for the default, and no second off for a spoken stop**
+    (#7767). With `LAMP_NOTICING_BY_DEFAULT` on, the default's yes (no
+    file, nobody's yes, `Kept::by_default`) is owed no on line, and the
+    gate, posture's gate and the more doings take it as said: the first
+    builder's 18 Nov 18:38 ruling dropped the told line and any gating of
+    the first burst on one. A no the voice kept (a spoken stop,
+    `"by":"voice"`) is owed no off line either: the voice's own answer
+    already said it, once (19 Nov 13:55, "say so in one line"). An off from
+    the app (`"by":"app"`) still says the off line, and a person's own
+    yes still says the on line.
   - Not begun (no say service, refused, expired): asked again 2 min later
     (`said_back::RETRY_US`), while that line is still the one owed.
   - **A line still queued is withdrawn when the line owed changes**, for
