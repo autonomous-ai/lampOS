@@ -228,14 +228,16 @@ fn net_code_told() -> String {
     format!(
         "What only the internet tells at the time it runs (the weather or a forecast, the news, \
          a web lookup, a price, anything from the internet) is the skill's own code on this \
-         lamp, as told at the end, with \"{net}\" and \"speak\" in its grants, beside any other \
-         grant its code uses (\"notes\" when it keeps what it found for later and reads it back): \
-         its script \
+         lamp, as told at the end, with \"{net}\" in its grants, beside any other grant its code \
+         uses (\"notes\" when it keeps what it found for later and reads it back): its script \
          fetches it over https with Python's standard library alone (urllib.request; the lamp \
-         gives the run its web proxy, and it reaches only the public web on ports 80 and 443), \
-         says what it found in a sentence or two with lamp.say (a plain spoken line when the \
-         fetch fails), and then prints only \"{said}\", so the lamp's agent that ran it ends \
-         with a dash and it is heard once. Never \
+         gives the run its web proxy, and it reaches only the public web on ports 80 and 443). \
+         A skill a time, an event or a repeat starts speaks only through the lamp's told \
+         answer: no \"speak\" in its grants and no lamp.say; its script prints what it found (a \
+         plain line when the fetch fails), and the lamp's agent that ran it ends with that in a \
+         sentence or two, which the lamp says when the person is there. Only a skill the \
+         person's words start may have \"speak\" too and say what it found with lamp.say, then \
+         print only \"{said}\", so the agent ends with a dash and it is heard once. Never \
          {cannot} for it, never {needs_net} for it, and never a say telling the person to look \
          it up themselves.",
         net = crate::skill_task_yes::NET.0,
@@ -8587,6 +8589,94 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         }
     }
 
+    /// #8610 (the first builder's 16:17): the agent's skill a trigger
+    /// starts whose code would speak on its own goes back to the agent as
+    /// the try's failure. Repaired to print for the told answer, it is kept
+    /// and the person hears nothing of the refusal; never repaired, or its
+    /// repair cut, the person hears [`made_skill::TOLD_ONLY_TRY`] once,
+    /// never the model's silence.
+    #[test]
+    fn an_agent_skill_that_speaks_on_its_own_is_repaired_or_said_once() {
+        if made_skill::a_python_here().is_none() {
+            eprintln!("skipped: no python3 here to parse a made script with");
+            return;
+        }
+        made_skill::set_scripts_here(Some(true));
+        made_skill::set_code_at_once_here(Some(false));
+        let code = |grants: &str, script: &str| {
+            format!(
+                "```skill.toml\n{}```\n\n```SKILL.md\n{AGENT_CODE_CARD}```\n\n\
+                 ```scripts/main.py\n{script}```\n",
+                CODE_TOML.replace("grants = [\"camera\"]", grants)
+            )
+        };
+        let says = code(
+            "grants = [\"camera\", \"speak\"]",
+            "import asyncio\nfrom lampos import Lamp\n\n\nasync def main():\n    \
+             lamp = await Lamp.local()\n    await lamp.say('A photo.', wait=True)\n    \
+             await lamp.close()\n\n\nasyncio.run(main())\n",
+        );
+        let prints = code("grants = [\"camera\"]", "print('A photo was taken.')\n");
+        let cases = [
+            ("repaired", vec![Some(says.clone()), Some(prints)], 2, true),
+            ("twice", vec![Some(says.clone()); 8], 0, false),
+            ("cut", vec![Some(says), None], 2, false),
+        ];
+        for (name, answers, hand_overs, kept) in cases {
+            let (root, keeping) = keeping(&format!("agent-told-only-{name}"));
+            // Answered in turn; the rules are the code make's own here.
+            let answers = std::sync::Mutex::new(answers.into_iter());
+            let tasks = crate::make_skill_agent::tests::stub(
+                Some("hermes"),
+                std::sync::Arc::new(move |_: &str| answers.lock().unwrap().next().flatten()),
+            );
+            let (url, served) = service(vec![(200, faces())]);
+            let agent = crate::make_skill_agent::Agent {
+                within: crate::make_skill_agent::GUIDED_WRITE_WITHIN,
+                make_within: crate::make_skill_agent::MAKE_WITHIN,
+                ..tasks.guided()
+            };
+            let told = made_by(&keeping, url, Some(&agent), NOW);
+            assert_eq!(served.join().unwrap(), 1, "{name}");
+            if hand_overs > 0 {
+                assert_eq!(tasks.hand_overs(), hand_overs, "{name}: {told}");
+            } else {
+                assert_eq!(
+                    tasks.hand_overs(),
+                    1 + agent.most_repairs(),
+                    "{name}: {told}"
+                );
+            }
+            let whole = told.to_string();
+            if kept {
+                assert_eq!(told["made"], "photo-booth", "{name}: {told}");
+                assert!(!whole.contains(made_skill::TOLD_ONLY_TRY), "{name}: {told}");
+                assert!(!whole.contains("speak on its own"), "{name}: {told}");
+                assert_eq!(made_skill::entries(&keeping.directory).len(), 1, "{name}");
+            } else {
+                assert!(told.get("made").is_none(), "{name}: {told}");
+                assert_eq!(
+                    told["error"],
+                    format!("the skill couldn't be made: {}", made_skill::TOLD_ONLY_TRY),
+                    "{name}"
+                );
+                for part in ["error", "next"] {
+                    let said = told[part].as_str().unwrap_or_default();
+                    assert_eq!(
+                        said.matches(made_skill::TOLD_ONLY_TRY).count(),
+                        1,
+                        "{name}: {part}: {told}"
+                    );
+                }
+                assert!(!whole.contains(made_skill::MODEL_SILENT), "{name}: {told}");
+                assert!(made_skill::entries(&keeping.directory).is_empty(), "{name}");
+            }
+            let _ = std::fs::remove_dir_all(&root);
+        }
+        made_skill::set_code_at_once_here(None);
+        made_skill::set_scripts_here(None);
+    }
+
     /// The first builder's guard on #6643: when lamp-tasks can't run the
     /// agent in a skill run's namespace (an older build with no make
     /// socket, or held, a wrapper that can't hold it off), never handed over:
@@ -11921,7 +12011,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(
             description.ends_with(&format!(
                 "The lamp's agent does it, and {}. It runs only once you agree.",
-                crate::skill_task_yes::uses_said(&["light".to_owned(), "speak".to_owned()])
+                crate::skill_task_yes::uses_said(&["light".to_owned()])
             )),
             "{description}"
         );
@@ -11935,11 +12025,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let [entry] = entries.as_slice() else {
             panic!("{entries:?}")
         };
-        assert_eq!(
-            entry["uses"]["grants"],
-            json!(["light", "speak"]),
-            "{entry}"
-        );
+        // On its trigger, never `speak` (#8610).
+        assert_eq!(entry["uses"]["grants"], json!(["light"]), "{entry}");
         assert_eq!(entry["uses"]["agent_task"], true, "{entry}");
         assert!(take_said_line().is_some_and(|line| !line.contains("I made")));
         no_cannot_here(None);
@@ -12256,7 +12343,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                 1,
                 "when I sit down at my desk, tell me how many open issues I have on Linear",
                 format!("name: linear-issues\ngrants: linear-read, speak\n{at_desk}"),
-                json!(["linear-read", "speak"]),
+                // On a trigger, never `speak` (#8610).
+                json!(["linear-read"]),
                 true,
             ),
             (
@@ -12594,27 +12682,20 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
-    /// The agent's web code for a Bitcoin price ([`net_code_told`]): it
-    /// says the price with `lamp.say`, then prints [`NET_CODE_SAID`] so the
-    /// agent that ran it ends with a dash, and it is heard once.
+    /// The agent's web code for a Bitcoin price ([`net_code_told`]), on a
+    /// trigger: it prints the price, and the agent's answer is the told
+    /// answer (#8610).
     fn net_code_main() -> String {
-        format!(
-            "import asyncio\nimport json\nimport urllib.request\n\nfrom lampos import Lamp\n\n\
+        "import json\nimport urllib.request\n\n\
              URL = \"https://api.coinbase.com/v2/prices/BTC-USD/spot\"\n\n\n\
              def fetch():\n    \
              with urllib.request.urlopen(URL, timeout=15) as reply:\n        \
              return json.load(reply)[\"data\"][\"amount\"]\n\n\n\
-             async def main():\n    \
-             lamp = await Lamp.local()\n    \
-             try:\n        \
-             price = await asyncio.to_thread(fetch)\n        \
-             await lamp.say(f\"Bitcoin is {{price}} US dollars.\", wait=True)\n    \
-             except Exception:\n        \
-             await lamp.say(\"I couldn't reach the Bitcoin price just now.\", wait=True)\n    \
-             await lamp.close()\n    \
-             print(\"{NET_CODE_SAID}\")\n\n\n\
-             asyncio.run(main())\n"
-        )
+             try:\n    \
+             print(f\"Bitcoin is {fetch()} US dollars.\")\n\
+             except Exception:\n    \
+             print(\"The Bitcoin price could not be reached just now.\")\n"
+            .to_owned()
     }
 
     /// #7742: with `LAMP_TASK_NET_GATEWAY` on and OpenClaw the lamp's
@@ -12637,7 +12718,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         made_skill::set_code_at_once_here(Some(false));
         let (root, keeping) = keeping("net-gateway-code");
         let toml = CODE_TOML
-            .replace("grants = [\"camera\"]", "grants = [\"net\", \"speak\"]")
+            .replace("grants = [\"camera\"]", "grants = [\"net\"]")
             .replace("take a photo", "fetch the Bitcoin price from the web");
         let main = net_code_main();
         let answer = format!(
@@ -12683,7 +12764,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(told["made"], "photo-booth", "{told}");
         assert_eq!(told["code_waits_for_yes"], true, "{told}");
         let entry = &made_skill::entries(&keeping.directory)[0];
-        assert_eq!(entry["uses"]["grants"], json!(["net", "speak"]), "{entry}");
+        assert_eq!(entry["uses"]["grants"], json!(["net"]), "{entry}");
         assert_ne!(entry["on"], true, "{entry}");
         // Off on this thread once the make is done: code a model wrote is
         // never granted `net` outside it.
@@ -12716,7 +12797,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let toml = CODE_TOML
             .replace(
                 "grants = [\"camera\"]",
-                "grants = [\"net\", \"speak\", \"camera\", \"notes\"]",
+                "grants = [\"net\", \"camera\", \"notes\"]",
             )
             .replace("take a photo", "fetch the Bitcoin price from the web");
         let main = net_code_main();
@@ -12748,7 +12829,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let entry = &made_skill::entries(&keeping.directory)[0];
         assert_eq!(
             entry["uses"]["grants"],
-            json!(["net", "speak", "camera", "notes"]),
+            json!(["net", "camera", "notes"]),
             "{entry}"
         );
         crate::skill_task_yes::set_gateway_net_here(None);
@@ -12787,7 +12868,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         .unwrap();
         keeping.installed = root.join("skills");
         let toml = CODE_TOML
-            .replace("grants = [\"camera\"]", "grants = [\"net\", \"speak\"]")
+            .replace("grants = [\"camera\"]", "grants = [\"net\"]")
             .replace("take a photo", "fetch the Bitcoin price from the web");
         let main = net_code_main();
         let answer = format!(
@@ -12815,7 +12896,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         served.join().unwrap();
         assert_eq!(told["code_waits_for_yes"], true, "{told}");
         let entry = &made_skill::entries(&keeping.directory)[0];
-        assert_eq!(entry["uses"]["grants"], json!(["net", "speak"]), "{entry}");
+        assert_eq!(entry["uses"]["grants"], json!(["net"]), "{entry}");
         // The helper's check, on its own thread with its unit's switches.
         let helper = |gateway: bool| {
             let packed = packed.clone();
@@ -12909,7 +12990,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         );
         assert!(web_task_for_agent(&deepseeks), "{deepseeks}");
         let toml = CODE_TOML
-            .replace("grants = [\"camera\"]", "grants = [\"net\", \"speak\"]")
+            .replace("grants = [\"camera\"]", "grants = [\"net\"]")
             .replace("take a photo", "fetch the Bitcoin price from the web");
         let main = net_code_main();
         let answer = format!(
@@ -12947,7 +13028,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let [entry] = entries.as_slice() else {
             panic!("{entries:?}")
         };
-        assert_eq!(entry["uses"]["grants"], json!(["net", "speak"]), "{entry}");
+        assert_eq!(entry["uses"]["grants"], json!(["net"]), "{entry}");
         assert!(!made_skill::net_code_here_for_tests());
         crate::skill_task_yes::set_gateway_net_here(None);
         made_skill::set_code_at_once_here(None);
@@ -13015,7 +13096,8 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(told["made"], "bitcoin-daily", "{told}");
         assert_eq!(told["code_waits_for_yes"], true, "{told}");
         assert_eq!(told["on"], false, "{told}");
-        let grants = ["net".to_owned(), "speak".to_owned()];
+        // On its trigger, never `speak` (#8610).
+        let grants = ["net".to_owned()];
         let description = told["description"].as_str().unwrap();
         assert!(
             description.contains(&format!("hands one task to the lamp's agent: “{request}”")),

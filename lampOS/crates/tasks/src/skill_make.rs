@@ -319,9 +319,11 @@ pub const EXAMPLES_FOLDER: &str = "examples";
 /// by words; a linked-service read started by words (its helper script
 /// reads the calendar, the lamp's agent sums it up; #8157), and `run`
 /// steps whose script does the whole job and says it (a coin, breaths, a
-/// `net` script that fetches one public value). lamp-skills' `tests/it/make_check.rs` packs each with the
-/// real `lamp-skills pack`, so none can be one the check refuses.
-pub const MAKE_EXAMPLES: [(&str, &str); 25] = [
+/// `net` script that fetches one public value); and a `net` task a time
+/// starts, whose script only prints for the told answer (#8610).
+/// lamp-skills' `tests/it/make_check.rs` packs each with the real
+/// `lamp-skills pack`, so none can be one the check refuses.
+pub const MAKE_EXAMPLES: [(&str, &str); 28] = [
     (
         "desk-light/skill.toml",
         include_str!("make_examples/desk-light/skill.toml"),
@@ -421,6 +423,18 @@ pub const MAKE_EXAMPLES: [(&str, &str); 25] = [
     (
         "sun-times/scripts/main.py",
         include_str!("make_examples/sun-times/scripts/main.py"),
+    ),
+    (
+        "morning-headline/skill.toml",
+        include_str!("make_examples/morning-headline/skill.toml"),
+    ),
+    (
+        "morning-headline/SKILL.md",
+        include_str!("make_examples/morning-headline/SKILL.md"),
+    ),
+    (
+        "morning-headline/scripts/main.py",
+        include_str!("make_examples/morning-headline/scripts/main.py"),
     ),
 ];
 
@@ -2604,6 +2618,54 @@ mod tests {
         }
     }
 
+    /// #8610: the shipped recipe teaches that a made skill a time, an event
+    /// or a repeat starts speaks only through the told answer: its rule
+    /// paragraph, a `run` step and code that says its line only for a
+    /// skill the person's words start, and an example a time starts whose
+    /// task's script only prints, with no `speak` grant.
+    #[test]
+    fn the_guide_says_a_made_tell_me_skill_speaks_only_through_the_told_answer() {
+        let flat = GUIDE.split_whitespace().collect::<Vec<_>>().join(" ");
+        for told in [
+            "**A skill a time, an event or a repeat starts (any `[trigger]`) speaks only \
+             through the lamp's told answer.**",
+            "Its scripts print what they found and never call `lamp.say`, `lamp.sound`, the \
+             speaker or `control.sock`, and its grants never name `speak` or `speaker`.",
+            "only when the owner is alone in view, no one has spoken for a minute, and it \
+             isn't quiet hours",
+            "only in a skill the person's own words start (`asks`, no trigger)",
+            "Started by a time, an event or a repeat: `grants = [\"net\"]`, a `task` step, \
+             and scripts/main.py fetches it and prints it; examples/morning-headline.",
+            "only in a skill the person's words start, a script says it with `lamp.say`",
+        ] {
+            assert!(flat.contains(told), "{told}");
+        }
+        let file = |name: &str| {
+            MAKE_EXAMPLES
+                .iter()
+                .find(|(path, _)| *path == format!("morning-headline/{name}"))
+                .map(|(_, text)| *text)
+                .unwrap_or_else(|| panic!("morning-headline/{name}"))
+        };
+        let toml: toml::Table = toml::from_str(file("skill.toml")).unwrap();
+        assert!(toml.contains_key("trigger"));
+        assert_eq!(toml["grants"].as_array().unwrap().len(), 1);
+        assert_eq!(toml["grants"][0].as_str(), Some("net"));
+        assert!(toml["do"][0]["task"]["run"].as_str() == Some("scripts/main.py"));
+        let main = file("scripts/main.py");
+        assert!(main.contains("print("), "{main}");
+        for never in ["lamp.say", "lamp.sound", "speaker", "control.sock", "Lamp"] {
+            assert!(!main.contains(never), "{never}: {main}");
+        }
+        // The examples that speak from their code are all started by words.
+        for (path, text) in MAKE_EXAMPLES {
+            if path.ends_with("skill.toml") && text.contains("[trigger]") {
+                assert!(!text.contains("run = \"scripts/main.py\"\n"), "{path}");
+                assert!(!text.contains("\"speak\""), "{path}");
+            }
+        }
+    }
+
     /// `LAMP_MAKE_AGENT_GUIDE` (the owner's ask, 13 Nov: make skills as
     /// V1's skill-creator did): the guide is given only when the line asks
     /// for it, beside the rules, 0600, the run told to draft, check with
@@ -2693,7 +2755,7 @@ mod tests {
             "a lone dash (-) is said as nothing",
             "one plain sentence a person understands, at most 120 characters",
             "`await lamp.service_read(service, args)`",
-            "granted `net` and `speak`",
+            "own code granted `net`",
             "`HTTPS_PROXY`",
             "examples/agenda-count",
             "examples/exchange-rate, sun-times",
@@ -2701,7 +2763,7 @@ mod tests {
             // SKILL.md's three sections, its tried run, its own folder.
             "written exactly `run = \"scripts/main.py\"`",
             "calls `lamp.say` for its success line and for its failure line",
-            "only when each start needs the lamp's agent to sum up or reason",
+            "when each start needs the lamp's agent to sum up or reason",
             "Scripts are written at the make, never at a run",
             "`## Uses`",
             "`## Result`",

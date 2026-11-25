@@ -1183,7 +1183,14 @@ fn task_plain(request: &str) -> String {
 /// down at 9 still runs; Twelve's P1 on #7764, the first builder's 01:29
 /// and 02:41).
 pub fn skill_text(name: &str, grants: &[String], block: &str, words: &str) -> String {
-    let grants: Vec<String> = grants.iter().map(|grant| format!("\"{grant}\"")).collect();
+    // On its trigger it tells the person only through the lamp's told
+    // answer, its agent's last answer (#8610): never `speak` or `speaker`,
+    // which `made_skill::keep_asked` refuses on a trigger.
+    let grants: Vec<String> = grants
+        .iter()
+        .filter(|grant| !["speak", "speaker"].contains(&grant.as_str()))
+        .map(|grant| format!("\"{grant}\""))
+        .collect();
     let guards = if made_skill::reactions_on() && !on_the_clock(block) {
         format!("{}\n\n", made_skill::template_guards())
     } else {
@@ -1961,7 +1968,8 @@ mod tests {
         let text = skill_text("bitcoin-daily", &kept, &block, &words);
         let files = made_skill::files(&text).unwrap();
         let (_, uses) = made_skill::capped(&files.toml).unwrap();
-        assert_eq!(uses.grants, ["net", "speak"]);
+        // On its trigger, never `speak` (#8610).
+        assert_eq!(uses.grants, ["net"]);
         assert!(uses.agent_task && uses.code);
         let (_, put) = made_skill::put_on_cap(&files.toml).unwrap();
         let held = |scripts: &[(String, String)]| {
