@@ -837,7 +837,7 @@ mod tests {
         assert_eq!((line.about, line.last_active_unix_ms), (None, None));
         assert_eq!(
             crate::works::line_of(Some(&tracker), 225),
-            Some((Some(crate::works::State::Working), None))
+            Some((Some(crate::works::State::Working), None, false))
         );
         // Active after its hand-over: its own line and time.
         let own = Listed {
