@@ -1468,8 +1468,9 @@ pub type TurnStartTaken = (
 );
 
 /// The say socket's path: [`SOCKET_ENVIRONMENT`], [`DEFAULT_SOCKET`] if
-/// unset, as [`Says::from_environment`] binds it. A worker is given no
-/// [`SOCKET_ENVIRONMENT`], so it asks at the product's socket.
+/// unset, as [`Says::from_environment`] binds it. The provider and second
+/// workers are given the coordinator's [`SOCKET_ENVIRONMENT`] when it is an
+/// absolute path (`process.rs`), so they ask where it binds.
 pub fn socket_path() -> PathBuf {
     std::env::var_os(SOCKET_ENVIRONMENT)
         .map_or_else(|| PathBuf::from(DEFAULT_SOCKET), PathBuf::from)
