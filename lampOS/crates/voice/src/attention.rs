@@ -2576,6 +2576,16 @@ impl Attention {
         self.near_not_the_name_of = Some((request, score));
     }
 
+    /// Whether `LAMP_NAME_NEAR` ruled the request in hand's line not the
+    /// name ([`Self::near_not_the_name`]) and its words don't call the lamp
+    /// by its real name: a stand-in in its place ("Hey Man, …") did not call
+    /// it (#8555's band rule).
+    pub fn ruled_not_the_name(&self) -> bool {
+        self.near_not_the_name_of
+            .is_some_and(|(of, _)| of == self.request)
+            && !called_by_real_name(&self.heard)
+    }
+
     /// Whether the room is busy for the line about to be weighed
     /// ([`Self::weigh_the_name`]), as the worker's verdict of the room has it.
     pub fn set_room_busy(&mut self, busy: bool) {
