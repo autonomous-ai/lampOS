@@ -928,6 +928,32 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   quả, không bao giờ giữ dòng, lời của việc hay token. lamp-skills chỉ tới
   socket bằng `--tasks-socket` hoặc `LAMP_SKILLS_TASKS_SOCKET` (#6346); unit
   lamp-skills của sản phẩm truyền `/run/lampos-tasks/skill-task.sock`.
+- **Một cancel** (#8475 phần 2, `CANCEL_OP`): `{"op":"cancel","skill":"<name>"}`
+  một mình trên cùng socket, từ lamp-skills như mọi dòng (lamp-skills gửi
+  nó khi giọng nói xin dừng lần chạy đang diễn ra, skills.md, "Run now by
+  voice"), không chiếm chỗ của lần chạy nào và được trả lời ngay với các
+  lần chạy nó đã dừng: `{"stopped":[{"run":"<run id>","skill":"<name>","ms":<ms since
+  its start>}]}`, task của kỹ năng được nêu và bước `run` chạy bên cạnh nó
+  (`Lanes`: mỗi runner giữ lần chạy của nó ở đó trong khi chạy), hoặc
+  `{"stopped":[]}` khi không có lần chạy nào của kỹ năng đó. Lần chạy của
+  kỹ năng khác, một task theo lịch hay theo trigger mà giọng nói không hề
+  xin, không bao giờ bị dừng (P2 của Reviewer-lead trên #8535). Một dòng
+  cancel không nêu kỹ năng, hoặc có bất kỳ trường nào khác, là
+  `bad_request`. Mỗi lần chạy bị dừng được kết thúc trên một luồng riêng
+  (`stop_run`): token của nó trước, bằng `end` của admin lamp-control
+  (token bị từ chối, những gì nó xếp hàng bị bỏ, các kết nối của nó bị
+  đóng), nên một `say` hay chuyển động script của nó vẫn xin bị từ chối;
+  rồi `SkillRun::cancel` của nó được đặt, ngay khi `end` trả lời hoặc sau
+  `END_FIRST_WAIT` (500 ms) nếu nó treo, và runner của nó giết nó như ở hạn
+  chót (cả process group của một bước `run`). Một cancel thứ hai nêu lại
+  một lần chạy đang dừng nhưng không kết thúc nó hai lần. Kết thúc của
+  chính lần chạy hỏi `end` thêm một lần, mà lamp-control trả lời
+  `"ended": false`. Lần bàn giao của nó được trả lời `stopped_answer`:
+  `{"ok":false,"error":"run_failed","message":WHY,"stopped":true}`
+  (`STOPPED`), không bao giờ thử lại và không bao giờ `busy`, và nhật ký
+  ghi `lamp-tasks: run RUN of SKILL stopped by a cancel MS ms after start
+  (#8475)` rồi `[lamp-tasks] skill task: the run was stopped by a
+  cancel`. Một cancel là một trong 4 kết nối cùng lúc, như mọi dòng.
 - **Không mạng nào khác: hai đường ra** (thiết kế của người xây dựng đầu
   tiên trên #6443). Lần chạy được khởi động với `LAMP_NS_NET=run`
   (`NET_ENV`), cách chọn duy nhất, và nó chỉ lấy bớt quyền truy cập: với
@@ -1157,7 +1183,10 @@ lamp-tasks tự chạy script: không agent, không Harness, không prompt
   nói đã nói trọn (`Tokens::end_said`). Thoát 0 và `said` ít nhất 1 là
   `{"ok":true,"id":0,"said":N}`; thoát 0 mà không nói gì là `run_failed`
   (`skill_run::SAID_NOTHING`); thoát lỗi, quá 30 s hay quá giới hạn đầu ra là
-  `run_failed` kèm lý do; hàng rào không dựng được là `not_started`.
+  `run_failed` kèm lý do; hàng rào không dựng được là `not_started`; lần
+  chạy bị một cancel dừng là `run_failed` với `"stopped": true` (#8475,
+  "Một cancel" ở trên: token của nó được kết thúc trước khi giết, nên
+  `said` của nó mất theo).
   `skills/tasks` báo kết thúc (`Ran` hoặc `Failed`, không engine).
 - **Thời gian**: nhật ký ghi lúc tạo token sau dòng bàn giao, lúc script
   bắt đầu (`its script started N ms into its run`), cả hai cộng lại
