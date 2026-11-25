@@ -23,7 +23,18 @@ pub const MAX_PROMPT_BYTES: usize = 3000;
 pub const MAX_ANSWER_BYTES: usize = 16_384;
 pub const MAX_ASK_BYTES: usize = 4096;
 pub const MAX_SPEECH_BYTES: usize = 1000;
+/// A prepared task's life: its spoken yes must come within this of its
+/// prepare, or it ends `expired` (`expires_monotonic_ms`).
 pub const CONFIRM_MS: u64 = 120_000;
+/// A queued task's life, from its prepare (#8105's hold on lamp-e38c, 16031):
+/// a yes is a task the person still wants, so it waits out the runtime's
+/// queue holds, which end it with a spoken reason of their own. The longest
+/// is the lamp's place unknown (`one_session::QUEUE_WAIT`, 15 min) and then
+/// OpenClaw's Gateway cold (`gateway::COLD_WITHIN`, 480 s), after a yes
+/// within [`CONFIRM_MS`]: 25 min. Its 5 min over that is only a backstop.
+/// Until 16031 a queued task had [`CONFIRM_MS`] too, so a cold start of
+/// about 220 s ended it `expired`, unheard.
+pub const QUEUED_MS: u64 = 30 * 60_000;
 /// A `prepare` (or the app's default) naming an engine with no name: empty
 /// or blank (#6492). Any other name is Harness's to know.
 pub const ENGINE_UNKNOWN: &str = "engine_unknown";
@@ -157,7 +168,11 @@ fn persistence_kept<P: Persistence>(persistence: &P) -> Option<String> {
 /// task while its answer was untold (#7600): a build before would refuse
 /// two tasks on one agent. Only a state holding such a task is written as
 /// 8, by the same rule.
-const SCHEMA: u32 = 8;
+///
+/// 9: a task's launch may be attempted past its `expires_monotonic_ms`,
+/// within [`QUEUED_MS`] (#8105's hold): a build before refuses the store.
+/// Only a state holding such a task is written as 9, by the same rule.
+const SCHEMA: u32 = 9;
 /// The oldest `schema` this build reads and writes: a state with no Devin
 /// task.
 const OLDEST_SCHEMA: u32 = 1;
@@ -458,7 +473,31 @@ struct Task {
     /// gone on with since, and the issue leaves those to the person.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     closable: bool,
+    /// Reads in a row that found its agent's run gone ([`RUN_GONE`]), and
+    /// when the first did (#8601's family, lamp-ee17 task 85): kept in the
+    /// store, so a restart goes on counting. Any other read ends the row.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    gone: Option<Gone>,
 }
+
+/// A row of reads that found a task's agent run gone ([`Task::gone`]).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+struct Gone {
+    reads: u32,
+    since: Audit,
+}
+
+/// A read's code when the agent's run is not there to read: Harness never
+/// had it, or the direct path's run is gone (pruned, or from before a
+/// restart; `crate::direct::lamp_observe`).
+pub const RUN_GONE: &str = "observe_failed";
+/// A task whose agent's run is gone this many reads in a row...
+pub const GONE_READS: u32 = 3;
+/// ...and at least this long since the first of them (or since an earlier
+/// boot) is ended as failed and told once (#8601's family): on lamp-ee17
+/// task 85 read `working` for 3.75 h, its run gone, a read failing every
+/// 120 s across restarts, and held every later hand-over behind it.
+pub const GONE_AFTER_MS: u64 = 5 * 60_000;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 struct Receipt {
@@ -911,6 +950,29 @@ fn handed_on(task: &Task) -> bool {
 }
 /// Whether `task` gave its session on to a later one while its answer was
 /// untold ([`CloseState::HandedOn`], #7600).
+/// The end of a queued task's life ([`QUEUED_MS`] from its prepare); a
+/// prepared one's is its `expires_monotonic_ms` ([`CONFIRM_MS`]).
+fn queued_until(task: &Task) -> u64 {
+    task.created.monotonic_ms.saturating_add(QUEUED_MS)
+}
+/// Whether `task`, prepared or queued, is past its life at `now`.
+fn expired(task: &Task, now: &Clock) -> bool {
+    match task.dispatch.state {
+        DispatchState::Prepared => now.monotonic_ms >= task.expires_monotonic_ms,
+        DispatchState::Queued => now.monotonic_ms >= queued_until(task),
+        _ => false,
+    }
+}
+/// Whether one more read finding `task`'s run gone ends it
+/// ([`GONE_READS`] in a row, the first [`GONE_AFTER_MS`] ago or in an
+/// earlier boot).
+fn gone_past_bound(task: &Task, now: &Clock) -> bool {
+    task.gone.as_ref().is_some_and(|gone| {
+        gone.reads.saturating_add(1) >= GONE_READS
+            && (gone.since.boot_id != now.boot_id
+                || now.monotonic_ms.saturating_sub(gone.since.monotonic_ms) >= GONE_AFTER_MS)
+    })
+}
 fn given_on(task: &Task) -> bool {
     task.close
         .as_ref()
@@ -966,6 +1028,14 @@ impl State {
         self.tasks
             .iter()
             .map(|task| {
+                if task
+                    .dispatch
+                    .attempted
+                    .as_ref()
+                    .is_some_and(|a| a.monotonic_ms >= task.expires_monotonic_ms)
+                {
+                    return 9;
+                }
                 if given_on(task) {
                     return 8;
                 }
@@ -1032,6 +1102,10 @@ impl State {
                 || task.created.monotonic_ms.checked_add(CONFIRM_MS)
                     != Some(task.expires_monotonic_ms)
                 || task.observations.len() > MAX_OBSERVATIONS
+                || task
+                    .gone
+                    .as_ref()
+                    .is_some_and(|gone| gone.reads == 0 || !gone.since.check(self))
             {
                 return Err(fail());
             }
@@ -1061,7 +1135,7 @@ impl State {
                     && d.confirmed.as_ref().is_some_and(|b| {
                         a.follows(b) && a.session_id == b.session_id && a.boot_id == b.boot_id
                     })
-                    && a.monotonic_ms < task.expires_monotonic_ms
+                    && a.monotonic_ms < queued_until(task)
                     && task.updated.follows(a)
             });
             let finished = d.finished.as_ref().is_some_and(|a| {
@@ -1836,22 +1910,13 @@ impl<P: Persistence> Engine<P> {
     }
     pub fn tick(&mut self, now: &Clock) -> Result<bool, Error> {
         self.clock(now)?;
-        if !self.state.tasks.iter().any(|t| {
-            matches!(
-                t.dispatch.state,
-                DispatchState::Prepared | DispatchState::Queued
-            ) && now.monotonic_ms >= t.expires_monotonic_ms
-        }) {
+        if !self.state.tasks.iter().any(|t| expired(t, now)) {
             return Ok(false);
         }
         let mut next = self.state.clone();
         let at = next_audit(&mut next, now)?;
         for task in &mut next.tasks {
-            if matches!(
-                task.dispatch.state,
-                DispatchState::Prepared | DispatchState::Queued
-            ) && now.monotonic_ms >= task.expires_monotonic_ms
-            {
+            if expired(task, now) {
                 task.dispatch.state = DispatchState::Invalidated;
                 task.dispatch.code = Some("expired".into());
                 task.dispatch.finished = Some(at.clone());
@@ -2238,6 +2303,7 @@ impl<P: Persistence> Engine<P> {
                     background_since: None,
                     close: None,
                     closable: self.close_told,
+                    gone: None,
                 });
             }
             Request::Confirm {
@@ -3408,6 +3474,7 @@ impl<P: Persistence> Engine<P> {
         let task = &mut next.tasks[index];
         task.watch_idle = None;
         task.background_since = background_since;
+        task.gone = None;
         let read = task.read.as_mut().expect("current read");
         read.state = ReadState::Finished;
         read.finished = Some(at.clone());
@@ -3426,6 +3493,24 @@ impl<P: Persistence> Engine<P> {
         self.read_job(job)?;
         let index = find(&self.state, job.task_id)?;
         let task = &self.state.tasks[index];
+        // Its run gone read after read, past the bound: ended as failed,
+        // kept as its agent's last reading, so it is settled, no longer
+        // watched or counted as work under way, and told once as stopped.
+        if failure == RUN_GONE && gone_past_bound(task, now) {
+            eprintln!(
+                "tasks: task {}: its agent's run is gone, {} reads in a row: ended as failed, told once",
+                task.id, GONE_READS
+            );
+            let ended = Observation {
+                agent_id: job.agent_id.clone(),
+                state: "failed".into(),
+                ask: None,
+                answer: String::new(),
+                truncated: false,
+                tools: 0,
+            };
+            return self.finish_observation(job, ended, now);
+        }
         let (watch_idle, background_since) =
             (task.watch_idle.clone(), task.background_since.clone());
         self.watch_looked(job, watch_idle, background_since, failure, now)
@@ -3447,6 +3532,17 @@ impl<P: Persistence> Engine<P> {
         let task = &mut next.tasks[index];
         task.watch_idle = watch_idle;
         task.background_since = background_since;
+        task.gone = (failure == RUN_GONE).then(|| Gone {
+            reads: task
+                .gone
+                .as_ref()
+                .map_or(0, |gone| gone.reads)
+                .saturating_add(1),
+            since: task
+                .gone
+                .as_ref()
+                .map_or_else(|| at.clone(), |gone| gone.since.clone()),
+        });
         let read = task.read.as_mut().expect("current read");
         read.state = ReadState::Failed;
         read.finished = Some(at.clone());
@@ -4020,9 +4116,12 @@ mod tests {
         engine
             .handle(&original, &clock(100 + CONFIRM_MS - 1), true)
             .unwrap();
+        // Queued, it lives [`QUEUED_MS`] from its prepare (#8105's hold).
+        engine.tick(&clock(100 + QUEUED_MS - 1)).unwrap();
+        assert_eq!(dispatch(&engine, id), DispatchState::Queued);
         assert!(
             engine
-                .begin_launch(&clock(100 + CONFIRM_MS))
+                .begin_launch(&clock(100 + QUEUED_MS))
                 .unwrap()
                 .is_none()
         );
@@ -4039,13 +4138,195 @@ mod tests {
         let id = prepare(&mut engine, 0);
         let request = confirmation(&engine, id);
         let receipt = engine.handle(&request, &clock(0), true).unwrap();
-        engine.tick(&clock(CONFIRM_MS)).unwrap();
+        engine.tick(&clock(QUEUED_MS)).unwrap();
         assert_eq!(
-            engine.handle(&request, &clock(CONFIRM_MS), true).unwrap(),
+            engine.handle(&request, &clock(QUEUED_MS), true).unwrap(),
             receipt
         );
         assert_eq!(dispatch(&engine, id), DispatchState::Invalidated);
-        assert!(engine.begin_launch(&clock(CONFIRM_MS)).unwrap().is_none());
+        assert!(engine.begin_launch(&clock(QUEUED_MS)).unwrap().is_none());
+    }
+
+    /// #8601: a queued task lives [`QUEUED_MS`] from its prepare, so one
+    /// held for OpenClaw's cold Gateway (about 220 s) is still handed over.
+    /// Its store checks and opens again at a restart, written as schema 9
+    /// (a build before would refuse an attempt past `expires_monotonic_ms`
+    /// and sets it aside instead); a store whose attempts are all within
+    /// [`CONFIRM_MS`] keeps its old schema, so a rollback reads it. An
+    /// attempt past [`QUEUED_MS`] is refused.
+    #[test]
+    fn a_queued_task_held_past_the_confirm_bound_is_launched_and_its_store_checks() {
+        let (mut engine, memory) = opened();
+        let early = accepted(&mut engine, 0);
+        assert_eq!(engine.state.schema, OLDEST_SCHEMA, "an old-shaped store");
+        let held = queued(&mut engine, 1_000);
+        engine.tick(&clock(1_000 + CONFIRM_MS)).unwrap();
+        assert_eq!(dispatch(&engine, held), DispatchState::Queued);
+        let job = engine
+            .begin_launch(&clock(221_000))
+            .unwrap()
+            .expect("handed over at 220 s");
+        assert_eq!(job.task_id, held);
+        engine
+            .finish_launch(
+                held,
+                LaunchOutcome::NotSent {
+                    code: "openclaw_gateway_not_ready".into(),
+                },
+                &clock(221_001),
+            )
+            .unwrap();
+        assert_eq!(engine.state.schema, 9);
+        engine.state.check().unwrap();
+        let recovered = Engine::open(memory, targets(), STORE, RESTART, &clock(222_000)).unwrap();
+        assert_eq!(dispatch(&recovered, early), DispatchState::Accepted);
+        assert_eq!(dispatch(&recovered, held), DispatchState::NotSent);
+        let attempted_at = |at: u64| {
+            let mut late = recovered.state.clone();
+            late.saved_at.monotonic_ms = at + 10;
+            let index = find(&late, held).unwrap();
+            let task = &mut late.tasks[index];
+            for audit in [
+                task.dispatch.attempted.as_mut(),
+                task.dispatch.finished.as_mut(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                audit.monotonic_ms = at;
+            }
+            task.updated.monotonic_ms = at;
+            late.check()
+        };
+        let past = 1_000 + QUEUED_MS;
+        assert!(attempted_at(past - 1).is_ok(), "within its queued life");
+        assert!(
+            attempted_at(past).is_err(),
+            "attempted past its queued life"
+        );
+    }
+
+    /// #8601's family (lamp-ee17, task 85): a task whose agent's run is
+    /// gone (`observe_failed`, read after read) is ended as failed once
+    /// [`GONE_READS`] reads in a row found it gone over [`GONE_AFTER_MS`]:
+    /// its agent's last reading is `failed`, kept once, so it is settled,
+    /// no longer watched nor counted as work under way, and told once. A
+    /// gone read followed by a good one starts the count again, and the
+    /// count holds across a restart.
+    #[test]
+    fn a_task_whose_run_stays_gone_is_ended_failed_once_across_a_restart() {
+        let (mut engine, memory) = opened();
+        let id = accepted(&mut engine, 0);
+        let gone = |engine: &mut Engine<Memory>, at: u64| {
+            let job = request_read(engine, id, at);
+            engine
+                .observation_failed(&job, RUN_GONE, &clock(at))
+                .unwrap();
+        };
+        let failed = |engine: &Engine<Memory>| {
+            engine.state.tasks[find(&engine.state, id).unwrap()]
+                .observations
+                .iter()
+                .filter(|o| o.data.state == "failed")
+                .count()
+        };
+        let watched = |engine: &Engine<Memory>, at: u64| {
+            engine
+                .watched(&clock(at))
+                .iter()
+                .any(|task| task.task_id == id)
+        };
+        // A transient failure, then a good read: the row starts again.
+        gone(&mut engine, 1_000);
+        gone(&mut engine, 121_000);
+        let job = request_read(&mut engine, id, 241_000);
+        let working = Observation {
+            state: "working".into(),
+            ..data("")
+        };
+        engine
+            .finish_observation(&job, working, &clock(241_000))
+            .unwrap();
+        gone(&mut engine, 400_000);
+        gone(&mut engine, 520_000);
+        assert_eq!(failed(&engine), 0, "a good read between: not ended");
+        assert!(watched(&engine, 520_000));
+        // Restarted: the row is kept.
+        let mut engine = Engine::open(memory, targets(), STORE, RESTART, &clock(600_000)).unwrap();
+        engine.close_told(true);
+        // The third in a row, 360 s after the first: ended, failed, once.
+        gone(&mut engine, 760_000);
+        assert_eq!(failed(&engine), 1);
+        assert_eq!(dispatch(&engine, id), DispatchState::Accepted);
+        assert!(!watched(&engine, 760_000), "no longer watched");
+        engine.state.check().unwrap();
+        // Three in a row inside the bound are not enough.
+        let (mut early, _) = opened();
+        let early_id = accepted(&mut early, 0);
+        for at in [1_000, 61_000, 121_000, 181_000] {
+            let job = request_read(&mut early, early_id, at);
+            early
+                .observation_failed(&job, RUN_GONE, &clock(at))
+                .unwrap();
+        }
+        assert!(
+            early
+                .watched(&clock(181_000))
+                .iter()
+                .any(|task| task.task_id == early_id),
+            "inside {GONE_AFTER_MS} ms: still watched"
+        );
+    }
+
+    /// lamp-ee17's task 85: an Accepted task hours old, its store written
+    /// before the gone count existed (no `gone`), reloaded after a
+    /// restart. The count starts fresh with the first read after it; reads
+    /// every 120 s end it at the first one 5 min or more after the first,
+    /// as `failed`, in a store `check` and `save` accept, and its work
+    /// record says failed, no longer work under way.
+    #[test]
+    fn an_old_accepted_task_whose_run_is_gone_ends_failed_after_a_restart() {
+        let (mut engine, memory) = opened();
+        let id = accepted(&mut engine, 0);
+        assert!(engine.state.tasks[0].gone.is_none());
+        let start = 4 * 3_600_000;
+        let mut engine = Engine::open(memory, targets(), STORE, RESTART, &clock(start)).unwrap();
+        engine.close_told(true);
+        let mut ended_at = None;
+        for read in 1..=6 {
+            let at = start + read * 120_000;
+            let job = request_read(&mut engine, id, at);
+            engine
+                .observation_failed(&job, RUN_GONE, &clock(at))
+                .unwrap();
+            let task = &engine.state.tasks[find(&engine.state, id).unwrap()];
+            if task.observations.iter().any(|o| o.data.state == "failed") {
+                ended_at = Some(read);
+                break;
+            }
+        }
+        // Reads 1-3 (0, 120, 240 s from the first) are within 5 min; read 4
+        // at 360 s ends it.
+        assert_eq!(ended_at, Some(4));
+        engine.state.check().unwrap();
+        let at = start + 4 * 120_000;
+        assert!(engine.watched(&clock(at)).is_empty());
+        let works = engine.works(&clock(at), None);
+        let work = works.iter().find(|work| work.task_id == id).unwrap();
+        assert_eq!(work.state, Some(crate::works::State::Failed));
+        // Restarted again: still ended, one `failed` reading, never read
+        // nor ended a second time.
+        let memory = engine.persistence.clone();
+        let again = Engine::open(memory, targets(), STORE, SESSION, &clock(at + 60_000)).unwrap();
+        let task = &again.state.tasks[find(&again.state, id).unwrap()];
+        assert_eq!(
+            task.observations
+                .iter()
+                .filter(|o| o.data.state == "failed")
+                .count(),
+            1
+        );
+        assert!(again.watched(&clock(at + 60_000)).is_empty());
     }
 
     #[test]
@@ -5855,11 +6136,11 @@ mod tests {
         assert!(engine.begin_launch(&clock(3)).unwrap().is_none());
         assert!(engine.begin_observation(&clock(3)).unwrap().is_none());
         engine
-            .finish_observation(&job, data("after slow read"), &clock(2 + CONFIRM_MS))
+            .finish_observation(&job, data("after slow read"), &clock(2 + QUEUED_MS))
             .unwrap();
         assert!(
             engine
-                .begin_launch(&clock(2 + CONFIRM_MS))
+                .begin_launch(&clock(2 + QUEUED_MS))
                 .unwrap()
                 .is_none()
         );
@@ -8373,7 +8654,7 @@ mod tests {
         assert_eq!(
             (SCHEMA, vocabulary.as_str()),
             (
-                8,
+                9,
                 "dispatch: prepared queued attempting accepted pending not_sent uncertain cancelled invalidated; \
                  read: requested attempting finished failed; speech: claimed spoken uncertain; \
                  close: attempting closed refused left failed handed_on; engine: codex claude opencode devin devin-cloud hermes openclaw"

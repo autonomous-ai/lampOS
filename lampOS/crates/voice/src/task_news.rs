@@ -2029,18 +2029,17 @@ fn note_joined(words: &NewsWords, task: &Value, session: &Value) -> Option<Strin
     })
 }
 
-/// The refusal code a failed hand-over is told by: a not-ready one (its
-/// OpenClaw Gateway or Harness not up) only when it was refused within
+/// The refusal code a failed hand-over is told by: Harness not running
+/// only when it was refused within
 /// [`crate::skill_words::NOT_READY_WITHIN_MS`] of the lamp's start, at
 /// `refused_ms` on lamp-tasks' boot clock; past it, none, so the plain
-/// failure is told, as before (El's P2 on #7351).
+/// failure is told, as before (El's P2 on #7351). OpenClaw's Gateway not
+/// ready is told as not ready at any time (#8601): lamp-update stops it on
+/// a lamp whose default isn't OpenClaw, so a cold start long after boot is
+/// the usual case, and lamp-tasks gives it up only after its own hold.
 fn told_code(code: Option<&str>, refused_ms: Option<u64>) -> Option<&str> {
     match code {
-        Some("openclaw_gateway_not_ready" | "harness_not_running")
-            if !crate::skill_words::not_ready_told(refused_ms) =>
-        {
-            None
-        }
+        Some("harness_not_running") if !crate::skill_words::not_ready_told(refused_ms) => None,
         code => code,
     }
 }
@@ -4020,7 +4019,8 @@ mod tests {
     #[test]
     fn a_not_ready_refusal_past_the_start_window_is_told_as_a_plain_failure() {
         let window = crate::skill_words::NOT_READY_WITHIN_MS;
-        for code in ["openclaw_gateway_not_ready", "harness_not_running"] {
+        {
+            let code = "harness_not_running";
             assert_eq!(told_code(Some(code), Some(60_000)), Some(code));
             assert_eq!(told_code(Some(code), Some(window)), Some(code));
             assert_eq!(told_code(Some(code), Some(window + 1)), None);
@@ -4042,6 +4042,25 @@ mod tests {
             Some("folder_missing")
         );
         assert_eq!(told_code(None, Some(1)), None);
+    }
+
+    /// #8601: OpenClaw's Gateway not ready is told with the not-ready line
+    /// whatever the lamp's uptime: lamp-update stops the Gateway on a lamp
+    /// whose default isn't OpenClaw, so its cold start hours after boot is
+    /// the usual case, and the person hears why, not a plain failure.
+    #[test]
+    fn a_gateway_not_ready_refusal_is_told_as_not_ready_whatever_the_uptime() {
+        let code = "openclaw_gateway_not_ready";
+        for refused in [Some(60_000), Some(3_600_000), Some(86_400_000), None] {
+            let told = told_code(Some(code), refused);
+            assert_eq!(told, Some(code), "{refused:?}");
+            let said = note_failed(&own(), &task("openclaw", json!([])), false, told).unwrap();
+            assert!(
+                said.contains(crate::skill_words::NOT_READY_LINE)
+                    && !said.contains("did not reach"),
+                "{refused:?}: {said}"
+            );
+        }
     }
 
     /// Reviewer-two's P2 on #2875: a valid task of 250 three-byte

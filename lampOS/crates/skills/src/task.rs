@@ -1415,7 +1415,10 @@ fn told_bounded(lines: Vec<String>) -> Vec<String> {
 /// Harness target of its own yet" is not one of them: it also stands for
 /// Hermes on the lamp being off, which asking again never changes (Heron's
 /// P2 on #7351).
-pub const NOT_READY_SAID: [&str; 2] = ["openclaw_gateway_not_ready", "harness_not_running"];
+pub const NOT_READY_SAID: [&str; 2] = [GATEWAY_NOT_READY, "harness_not_running"];
+/// lamp-tasks' code for OpenClaw's Gateway not ready
+/// (`lamp_tasks::gateway::NOT_READY`): told as not ready at any time (#8601).
+pub const GATEWAY_NOT_READY: &str = "openclaw_gateway_not_ready";
 
 /// What the person who just asked for a run by voice hears, once, when its
 /// agent's start-up wait passes about 5 s (#7354, the first builder's
@@ -1481,23 +1484,30 @@ pub fn is_getting_ready(line: &str) -> bool {
 /// The words the person hears, once, when a run they asked for by voice is
 /// refused as the lamp is still getting ready ([`NOT_READY_SAID`]) in
 /// lamp-tasks' `answer`; none for any other answer or a run not asked by
-/// voice (a trigger's run says nothing unprompted), or one refused past
-/// [`lamp_voice::skill_words::NOT_READY_WITHIN_MS`] after the lamp started
-/// (`since_boot_ms`): its Gateway or Harness is broken, not starting, and
-/// the run's failure is told as before (El's P2 on #7351).
+/// voice (a trigger's run says nothing unprompted). Harness not running is
+/// told so only within [`lamp_voice::skill_words::NOT_READY_WITHIN_MS`]
+/// after the lamp started (`since_boot_ms`), past it broken, not starting,
+/// and the run's failure is told as before (El's P2 on #7351). OpenClaw's
+/// Gateway not ready is told so at any time (#8601, the owner's choice):
+/// lamp-update stops it on a lamp whose default isn't OpenClaw, so its cold
+/// start long after boot is the usual case.
 pub fn not_ready_line(
     answer: &str,
     asked_by_voice: bool,
     since_boot_ms: Option<u64>,
 ) -> Option<&'static str> {
-    if !lamp_voice::skill_words::not_ready_told(since_boot_ms) {
-        return None;
-    }
     let answer: serde_json::Value = serde_json::from_str(answer.trim()).ok()?;
     let refused = answer.get("ok").and_then(serde_json::Value::as_bool) == Some(false);
     let message = answer.get("message")?.as_str()?;
-    (asked_by_voice && refused && NOT_READY_SAID.iter().any(|said| message.contains(said)))
-        .then_some(lamp_voice::skill_words::NOT_READY_LINE)
+    let in_time = |said: &str| {
+        said == GATEWAY_NOT_READY || lamp_voice::skill_words::not_ready_told(since_boot_ms)
+    };
+    (asked_by_voice
+        && refused
+        && NOT_READY_SAID
+            .iter()
+            .any(|said| message.contains(said) && in_time(said)))
+    .then_some(lamp_voice::skill_words::NOT_READY_LINE)
 }
 
 #[cfg(test)]
@@ -1629,26 +1639,22 @@ mod tests {
                 "{message}"
             );
             assert_eq!(not_ready_line(&answer, false, STARTING), None, "{message}");
-            // Past the start window, or with no time since the start, the
-            // same refusal is a broken Gateway or Harness: no "give me a
-            // minute" for good (El's P2 on #7351).
+            // Past the start window, or with no time since the start,
+            // Harness not running is broken: no "give me a minute" for good
+            // (El's P2 on #7351). OpenClaw's Gateway is told not ready at
+            // any time (#8601): it is stopped on purpose when not in use.
             let window = lamp_voice::skill_words::NOT_READY_WITHIN_MS;
+            let late = message
+                .contains(GATEWAY_NOT_READY)
+                .then_some(lamp_voice::skill_words::NOT_READY_LINE);
             assert_eq!(
                 not_ready_line(&answer, true, Some(window)),
                 Some(lamp_voice::skill_words::NOT_READY_LINE),
                 "{message}"
             );
-            assert_eq!(
-                not_ready_line(&answer, true, Some(window + 1)),
-                None,
-                "{message}"
-            );
-            assert_eq!(
-                not_ready_line(&answer, true, Some(3_600_000)),
-                None,
-                "{message}"
-            );
-            assert_eq!(not_ready_line(&answer, true, None), None, "{message}");
+            for since in [Some(window + 1), Some(3_600_000), None] {
+                assert_eq!(not_ready_line(&answer, true, since), late, "{message}");
+            }
         }
         let other = json!({"ok":false,"error":"run_failed","message":"Harness isn't set up on this lamp yet, so a skill's run can't be started"});
         assert_eq!(not_ready_line(&other.to_string(), true, STARTING), None);
