@@ -16300,4 +16300,51 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(made_skill::entries(&keeping.directory).is_empty());
         let _ = std::fs::remove_dir_all(&root);
     }
+
+    /// Where #7912's change meets #8008's: a change to the skill a make made
+    /// a moment ago and put on is `change_skill`'s (`crate::made_change`),
+    /// which changes it in place under its name, never a new make of the
+    /// whole ask, a second skill beside it (#7975). The model is told to
+    /// call it, with the skill's name and the change in their words.
+    #[test]
+    fn a_change_to_a_skill_made_a_moment_ago_is_change_skills() {
+        let directory =
+            std::env::temp_dir().join(format!("one-ask-made-change-{}", std::process::id()));
+        let held = with_asked_by(by("ann", true), || {
+            OneAsk::begin_in(
+                &directory,
+                Some("make a skill that dims the light at 10 pm"),
+                "dims the light at 10 pm",
+                NOW,
+                7_912_011,
+            )
+        })
+        .unwrap();
+        let id = format!("{MAKING_ID}{}", held.0);
+        held.made(
+            "evening-dim",
+            &json!({"made": "evening-dim", "on": true}),
+            NOW,
+        );
+        let Making::Told(told) = making_changed(
+            &id,
+            7_912_012,
+            (Some("dims the light at 10:50 pm"), "make it ten fifty"),
+            &by("ann", true),
+            free,
+        ) else {
+            panic!("told");
+        };
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains(crate::made_change::FUNCTION), "{told}");
+        assert!(!next.contains("call make_skill"), "{told}");
+        assert!(
+            next.contains(&made_skill::spoken_name("evening-dim")),
+            "{told}"
+        );
+        assert!(next.contains("Never say it won't be made"), "{told}");
+        ASKS.lock()
+            .unwrap()
+            .retain(|ask| ask.directory != directory);
+    }
 }
