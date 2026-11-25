@@ -9069,7 +9069,7 @@ fn join_same_voice(on: bool, joins: bool, for_services: bool, confirms: bool) ->
         }
         None => {
             eprintln!(
-                "lamp-voice second: the join of cut words reads the voice: two pieces at cosine {:.2} or over are one person's and join with no face in view, under {:.2} never; every heard line is printed, in RAM only, and no other rule reads it (LAMP_JOIN_SAME_VOICE)",
+                "lamp-voice second: the join of cut words reads the voice: two pieces at cosine {:.2} or over are one person's and join with no face in view, under {:.2} never; every heard line is printed, in RAM only, and no other rule reads it but LAMP_FOLLOW_UPS's window, for another voice than the conversation's (LAMP_JOIN_SAME_VOICE)",
                 crate::same_voice::SAME_FROM,
                 crate::same_voice::DIFFERENT_BELOW
             );
