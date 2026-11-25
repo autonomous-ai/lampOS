@@ -5258,6 +5258,9 @@ struct Marks {
     /// sound (`Start`'s `over_the_lamps_voice`): judged for its echo
     /// ([`Engine::holding_own_echo`]).
     over_the_lamps_voice: bool,
+    /// The request whose answer it cut as it began (`Start`'s
+    /// `heard_of_cut`): its echo has no end run (`LAMP_SECOND_OWN_ECHO_CUT_END`).
+    cut_of: Option<u64>,
     /// When it began by the engine's clock, or, folded, when the line it
     /// began with did ([`KeptSound::began`]); none for a line not spoken.
     began: Option<Instant>,
@@ -8805,6 +8808,7 @@ impl Engine {
                     after_end: link,
                     folded,
                     over_the_lamps_voice,
+                    cut_of: heard_of_cut.map(|cut| cut.request),
                     began: Some(began),
                     name_of: Mutex::new(name_of),
                     ended_at: Mutex::new(None),
@@ -14701,6 +14705,10 @@ pub const FIRST_SECONDS_QUIET_ENVIRONMENT: &str = "LAMP_FIRST_SECONDS_QUIET";
 /// nothing else.
 pub const OWN_ECHO_ENVIRONMENT: &str = "LAMP_SECOND_OWN_ECHO";
 
+/// Where the worker reads [`own_echo::CUT_END_ENVIRONMENT`] (#8570): `on`,
+/// and nothing else.
+pub const OWN_ECHO_CUT_END_ENVIRONMENT: &str = own_echo::CUT_END_ENVIRONMENT;
+
 /// The known person's name told to the model each turn, as the Live route
 /// tells it (#2539, the forgotten name): `on`, and nothing else.
 pub const FACE_NAME_ENVIRONMENT: &str = "LAMP_SECOND_FACE_NAME";
@@ -14923,6 +14931,9 @@ fn against_the_lamps_answer<R>(
     let began_us = said.lock().map_or(0, |said| said.0);
     let answer = shared.lamp_said.lock().ok().map(|said| said.clone());
     let until_us = shared.said_until_us.load(Ordering::Relaxed);
+    let cut_it = answer
+        .as_ref()
+        .is_some_and(|(of, _)| marks.cut_of == Some(*of));
     judge(
         &own_echo::Line {
             request,
@@ -14930,6 +14941,7 @@ fn against_the_lamps_answer<R>(
             began_us,
             over_the_lamps_voice: marks.over_the_lamps_voice,
             called: marks.called.load(Ordering::Acquire),
+            cut_it,
         },
         answer
             .as_ref()
@@ -14962,6 +14974,8 @@ fn own_yes_echo_of(
             began_us,
             over_the_lamps_voice: marks.over_the_lamps_voice,
             called: marks.called.load(Ordering::Acquire),
+            // `yes_echo` holds by its own rules, never by an end run.
+            cut_it: false,
         },
         answer
             .as_ref()
@@ -20412,6 +20426,16 @@ async fn answer(
             .flatten();
         if let Some((Some(note), _)) = &done_already {
             messages.push(Message::system(note.clone()));
+        }
+        // A done forget told on this yes backs the turn's "Forgotten." as a
+        // forget that removed something would (`LAMP_MEMORY_DONE_YES_AGAIN`,
+        // #8570, lamp-06c1 req 467: told it is done, it said so, and the
+        // claim check asked it again). Outcome fields only, as every status.
+        if crate::remember::heard::done_backs_a_forget(done_already.as_ref()) {
+            call_statuses.push(after_forget::status(
+                crate::remember::FORGET,
+                &serde_json::json!({"forgotten": true, "already": true}),
+            ));
         }
         // The done write backs the turn whether or not its note was told: a
         // bare "Okay." gets no note, yet its "Pip is kept." is true

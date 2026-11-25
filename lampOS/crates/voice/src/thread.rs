@@ -1473,6 +1473,19 @@ impl Thread {
             .any(|exchange| exchange.request > after && exchange.request < before)
     }
 
+    /// [`Self::answered_between`], leaving out an exchange whose person's
+    /// line `skip` takes (`remember::heard`'s yes said again, #8570).
+    pub fn answered_between_but(
+        &self,
+        after: u64,
+        before: u64,
+        skip: impl Fn(&str) -> bool,
+    ) -> bool {
+        self.exchanges.iter().any(|exchange| {
+            exchange.request > after && exchange.request < before && !skip(&exchange.person)
+        })
+    }
+
     /// Whether the lamp's newest line before `request` ended in a question:
     /// then a bare answer ("23") is an answer to it (#926).
     pub fn lamp_asked(&self, request: u64) -> bool {
