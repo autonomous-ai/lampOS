@@ -5964,6 +5964,17 @@ pub fn serve(
                     heeding.letting_only_the_first_answer_skip_its_look();
                 }
             }
+            // The person's next line soon after the lamp's answer is said to
+            // it, looking or not (`LAMP_FOLLOW_UPS=on`, the product owner's
+            // second rule, 25 Nov 2026).
+            if crate::said_to_me::follow_ups_on() {
+                eprintln!(
+                    "lamp-voice second: in the 20 s after the lamp's words a line is said to it, looking or not, unless a second voice, another voice than the conversation's, or a short line a face was read silent through shows it someone else's; in a busy room a conversation goes on 20 s (LAMP_FOLLOW_UPS)"
+                );
+                if let Ok(mut heeding) = heeding.lock() {
+                    heeding.taking_follow_ups();
+                }
+            }
         }
         // Only a hearing of the name in the line's own sound names it for
         // the said-to-me rule (`LAMP_SAID_TO_ME_NAME_IN_LINE=on`, #8384).
@@ -8724,6 +8735,8 @@ pub(crate) struct Heeding {
     /// after the same words is not the first (#8395).
     asked_looks: bool,
     asked_line_after: Option<u64>,
+    /// `LAMP_FOLLOW_UPS=on` ([`Self::taking_follow_ups`]).
+    follow_ups: bool,
     /// The request that took the first line's pass, so a line going on
     /// from it keeps the pass (the first builder's P2 on #8416).
     asked_first: Option<u64>,
@@ -9336,6 +9349,11 @@ fn turned_only_silent(
 }
 
 pub(crate) const BUSY_GOING_ON_FOR: Duration = Duration::from_secs(15);
+/// With `LAMP_FOLLOW_UPS`, how long a conversation goes on in a busy room
+/// from the end of the lamp's last words: the product owner's "about 20 s
+/// after the lamp answers" (25 Nov 2026), `follows_on::WITHIN_US`.
+pub(crate) const FOLLOW_UPS_GOING_ON_FOR: Duration =
+    Duration::from_micros(crate::follows_on::WITHIN_US);
 /// Held in a busy room: let out only as the conversation going on, and
 /// neither a question, nor three words, nor an answer to the lamp's own
 /// question ("yes" to "Shall I start it?").
@@ -9402,7 +9420,10 @@ fn to_the_end(said_ago: Option<Duration>, ended_ago: Option<Duration>) -> Option
 /// it let office talk out in the 15 s after the words (the first builder's
 /// agent on #2032, 03:09). When none is going on, the journal says why,
 /// without words (#1712, the first builder at 16:16: which of these had
-/// held the owner's lines was not told).
+/// held the owner's lines was not told). `going_on_for` is
+/// [`BUSY_GOING_ON_FOR`], or [`FOLLOW_UPS_GOING_ON_FOR`] with
+/// `LAMP_FOLLOW_UPS`.
+#[allow(clippy::too_many_arguments)]
 fn went_on_told(
     request: u64,
     mut signs: Signs,
@@ -9411,12 +9432,13 @@ fn went_on_told(
     left_alone: Option<usize>,
     (thread_or_call, yes_going_on): (bool, bool),
     ran_for: Duration,
+    going_on_for: Duration,
 ) -> Signs {
     let busy = signs.room == crate::room_told::Room::Busy;
     if busy {
         signs.going_on &= yes_going_on
             || thread_or_call
-                && (said_ago.is_some_and(|ago| ago <= BUSY_GOING_ON_FOR)
+                && (said_ago.is_some_and(|ago| ago <= going_on_for)
                     || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR));
     }
     if !signs.going_on {
@@ -9434,9 +9456,12 @@ fn went_on_told(
                 ", {left} lines left alone since it last spoke"
             )),
             if busy {
-                ", in a busy room, where it goes on 15 s"
+                format!(
+                    ", in a busy room, where it goes on {} s",
+                    going_on_for.as_secs()
+                )
             } else {
-                ""
+                String::new()
             }
         );
     }
@@ -9964,6 +9989,7 @@ impl Heeding {
             said_to_me_name_in_line: false,
             asked_looks: false,
             asked_line_after: None,
+            follow_ups: false,
             asked_first: None,
             face_not_speaking: None,
             name_or_follow_up: false,
@@ -10442,6 +10468,27 @@ impl Heeding {
     /// (`LAMP_ASKED_LOOKS=on`, #8395).
     pub(crate) fn letting_only_the_first_answer_skip_its_look(&mut self) {
         self.asked_looks = true;
+    }
+
+    /// With `LAMP_SAID_TO_ME`, a line in a conversation's window is said to
+    /// the lamp, looking or not, unless another voice than the
+    /// conversation's said it ([`crate::said_to_me::Said::FollowUp`]): no
+    /// camera sign holds it alone. And in a busy room a conversation goes on
+    /// [`FOLLOW_UPS_GOING_ON_FOR`] from the end of the lamp's words
+    /// (`LAMP_FOLLOW_UPS=on`, the product owner's rules, 25 Nov 2026).
+    pub(crate) fn taking_follow_ups(&mut self) {
+        self.follow_ups = true;
+    }
+
+    /// How long a conversation goes on in a busy room from the end of the
+    /// lamp's last words: [`FOLLOW_UPS_GOING_ON_FOR`] with
+    /// [`Self::taking_follow_ups`], else [`BUSY_GOING_ON_FOR`].
+    fn busy_going_on_for(&self) -> Duration {
+        if self.follow_ups {
+            FOLLOW_UPS_GOING_ON_FOR
+        } else {
+            BUSY_GOING_ON_FOR
+        }
     }
 
     /// With people talking at a desk, a line is the lamp's by its name, a
@@ -12355,6 +12402,10 @@ impl Heeding {
             cut_in: self.began_over == Some(request),
             asked_looks: self.asked_looks,
             first_after_asked: self.first_after_asked(said.0, signs.continues_from),
+            // `LAMP_FOLLOW_UPS`: in the window only another voice than the
+            // conversation's holds the line.
+            follow_ups: self.follow_ups,
+            another_voice,
             ..Default::default()
         };
         // The eyes' signs as the replay of saved journals reads them
@@ -12621,6 +12672,7 @@ impl Heeding {
         }
         let switch = self.name_or_follow_up;
         let follow_up_renews = self.follow_up_renews;
+        let busy_going_on_for = self.busy_going_on_for();
         // `LAMP_SAME_SPEAKER_CARRIES`: in a busy room the one the lamp
         // answered goes on for `SAME_SPEAKER_CARRIES_FOR` after the end of
         // its words, or once from a held colleague line's audio end,
@@ -12718,6 +12770,7 @@ impl Heeding {
                 left_alone,
                 (thread_or_call, yes_going_on),
                 line_ran,
+                busy_going_on_for,
             )
         };
         let Some((bus, names)) = &mut self.bus else {
@@ -17409,7 +17462,8 @@ mod tests {
                 None,
                 None,
                 (true, false),
-                Duration::ZERO
+                Duration::ZERO,
+                crate::second_provider::worker::BUSY_GOING_ON_FOR,
             )
             .going_on
         );
@@ -17421,10 +17475,43 @@ mod tests {
                 None,
                 None,
                 (true, false),
-                Duration::ZERO
+                Duration::ZERO,
+                crate::second_provider::worker::BUSY_GOING_ON_FOR,
             )
             .going_on
         );
+        // `LAMP_FOLLOW_UPS` (the product owner, 25 Nov 2026: "about 20 s
+        // after the lamp answers"): 18 s after its words goes on, 21 s
+        // doesn't; the switch sets the window, `Heeding::busy_going_on_for`.
+        assert!(
+            went_on_told(
+                5,
+                busy(),
+                Some(s(18)),
+                None,
+                None,
+                (true, false),
+                Duration::ZERO,
+                crate::second_provider::worker::FOLLOW_UPS_GOING_ON_FOR,
+            )
+            .going_on
+        );
+        assert!(
+            !went_on_told(
+                5,
+                busy(),
+                Some(s(21)),
+                None,
+                None,
+                (true, false),
+                Duration::ZERO,
+                crate::second_provider::worker::FOLLOW_UPS_GOING_ON_FOR,
+            )
+            .going_on
+        );
+        assert_eq!(heeding.busy_going_on_for(), s(15));
+        heeding.taking_follow_ups();
+        assert_eq!(heeding.busy_going_on_for(), s(20));
         // No words in the thread: none, whatever was played.
         assert_eq!(to_the_end(None, Some(s(1))), None);
         assert_eq!(to_the_end(Some(s(30)), None), Some(s(30)));
@@ -17472,6 +17559,7 @@ mod tests {
                 None,
                 (true, false),
                 Duration::ZERO,
+                crate::second_provider::worker::BUSY_GOING_ON_FOR,
             )
             .going_on
         };
@@ -17496,6 +17584,7 @@ mod tests {
                 None,
                 (false, false),
                 Duration::ZERO,
+                crate::second_provider::worker::BUSY_GOING_ON_FOR,
             )
             .going_on
         };
@@ -21279,6 +21368,7 @@ mod tests {
             None,
             (true, false),
             Duration::ZERO,
+            crate::second_provider::worker::BUSY_GOING_ON_FOR,
         );
         assert!(window.going_on, "inside the busy room's 15 s");
         let said = (10_000_000, 11_000_000);

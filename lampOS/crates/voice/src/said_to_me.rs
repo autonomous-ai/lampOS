@@ -86,6 +86,21 @@ pub fn asked_looks_on() -> bool {
     std::env::var(ASKED_LOOKS).ok().as_deref() == Some("on")
 }
 
+/// Where the second route's worker reads `LAMP_FOLLOW_UPS`, the product
+/// owner's rules of 25 Nov 2026 (#7570, 18:16 and 18:30): `on` only. A
+/// line in a live conversation's window is said to the lamp, looking or
+/// not, unless another voice than the conversation's said it
+/// ([`Line::follow_ups`], [`Said::FollowUp`]): no line is held on a camera
+/// sign alone (its look, its mouth, its pose), as the camera can't yet tell
+/// them reliably (lamp-74ff, 25 Nov: the mouth unread in 1,085 of 1,125
+/// frames, "looking away" in 40 of 40 while the owner looked at the lamp).
+pub const FOLLOW_UPS: &str = "LAMP_FOLLOW_UPS";
+
+/// Whether `LAMP_FOLLOW_UPS` is on in this process's environment.
+pub fn follow_ups_on() -> bool {
+    std::env::var(FOLLOW_UPS).ok().as_deref() == Some("on")
+}
+
 /// A line of this many words or fewer is a short line.
 pub const SHORT_WORDS: usize = 2;
 
@@ -266,6 +281,14 @@ pub struct Line<'a> {
     /// (`Heeding::began_over`); a line begun over only the lamp's wait
     /// sound is not one (#8205).
     pub cut_in: bool,
+    /// `LAMP_FOLLOW_UPS=on` ([`FOLLOW_UPS`]): in the window, only
+    /// [`Self::another_voice`] holds the line.
+    pub follow_ups: bool,
+    /// Another voice in the conversation: this line's voice print under
+    /// `same_voice::DIFFERENT_BELOW` against the conversation's, or a line of
+    /// it that showed another person (the worker's `another_voice`). A print
+    /// not come yet is no other voice.
+    pub another_voice: bool,
 }
 
 impl Line<'_> {
@@ -336,6 +359,10 @@ pub enum Said {
     /// nothing (#8205: lamp-52e6's core row w3, "Hey Lamp, ..." said over
     /// the lamp's story, its name not heard).
     CutInNoLook,
+    /// With `LAMP_FOLLOW_UPS`, in the window and not said by another voice
+    /// than the conversation's: its pose, look and mouth are not read (the
+    /// product owner's rules, 25 Nov 2026).
+    FollowUp,
     /// Said to the lamp: facing, seen speaking, long enough or a question.
     ToTheLamp,
     /// Not said to the lamp: the face and the conversation are no sign.
@@ -353,6 +380,9 @@ impl Said {
                 "an answer to the lamp's waiting question, no look: it renews nothing"
             }
             Self::CutInNoLook => "a cut-in over the lamp's own answer, no look: it renews nothing",
+            Self::FollowUp => {
+                "said to the lamp, in a conversation, looking or not: no camera sign holds it alone (LAMP_FOLLOW_UPS)"
+            }
             Self::ToTheLamp => "said to the lamp, facing and seen speaking",
             Self::Held(held) => held.reason(),
         }
@@ -376,6 +406,16 @@ pub fn judge(line: Line<'_>) -> Said {
         return Said::Stands;
     }
     if line.going_on {
+        // `LAMP_FOLLOW_UPS`, the product owner's rules (25 Nov 2026, #7570
+        // 18:16 and 18:30): a follow-up in a conversation is said to the
+        // lamp, looking or not, and no line is held on a camera sign alone;
+        // only another voice than the conversation's holds it here. On
+        // lamp-74ff that evening follow-ups were held "looking away" in 40
+        // of 40 looks while the owner looked straight at the lamp, and "no
+        // look" while the camera saw no face.
+        if line.follow_ups && !line.another_voice {
+            return Said::FollowUp;
+        }
         // `LAMP_NAME_SIGN_TIED` (#8092): no look, no renewal; one answer
         // to the lamp's waiting question, or one line that cut in over the
         // lamp's own answer (#8205), only.
@@ -447,6 +487,8 @@ pub fn short_stood_by(line: Line<'_>) -> Option<&'static str> {
         "named"
     } else if yes_awaited() {
         "yes awaited"
+    } else if judge(line) == Said::FollowUp {
+        "follow_ups"
     } else if line.asked_lets_in() {
         "lamp_asked"
     } else if line.seen_speaking {
@@ -489,6 +531,77 @@ mod tests {
             facing_looks: if seen_speaking { FACING_LOOKS } else { 0 },
             ..Line::default()
         }
+    }
+
+    /// `LAMP_FOLLOW_UPS`, the product owner's rules of 25 Nov 2026: in a
+    /// conversation's window no camera sign holds a line alone. lamp-74ff
+    /// that evening held the owner's follow-ups "looking away" (pitch -15,
+    /// 40 looks, all looking false) while they looked straight at the lamp,
+    /// "no look" while the camera saw no face, and "no face seen speaking"
+    /// on a short line. With the switch each is said to the lamp; another
+    /// voice than the conversation's still holds it, and out of the window
+    /// nothing changes. Without the switch every hold stands as before.
+    #[test]
+    fn with_follow_ups_no_camera_sign_alone_holds_a_line_in_the_window() {
+        let in_window = |heard| Line {
+            heard,
+            going_on: true,
+            ..Line::default()
+        };
+        let looking_away = Line {
+            pitch: Some((-15.0f32).to_radians()),
+            looking: Some(false),
+            ..in_window("And what is two plus two")
+        };
+        let head_down = Line {
+            pitch: Some(40.0f32.to_radians()),
+            looking: Some(true),
+            ..in_window("And what about tomorrow")
+        };
+        let no_look = Line {
+            looks_needed: true,
+            ..in_window("And what is two plus two")
+        };
+        let short_silent = Line {
+            read_silent: true,
+            ..in_window("Thank you")
+        };
+        let second_voice = Line {
+            second_voice: true,
+            ..looking_away
+        };
+        // Without the switch: held, as before.
+        assert_eq!(judge(looking_away), Said::Held(Held::AwayInConversation));
+        assert_eq!(judge(head_down), Said::Held(Held::NotFacingInConversation));
+        assert_eq!(judge(no_look), Said::Held(Held::NoLook));
+        assert_eq!(judge(short_silent), Said::Held(Held::NotSeenSpeaking));
+        // With it: said to the lamp, whatever the camera read, a second
+        // voice by faces and looks alone too.
+        let on = |line: Line<'static>| Line {
+            follow_ups: true,
+            ..line
+        };
+        for line in [looking_away, head_down, no_look, short_silent, second_voice] {
+            assert_eq!(judge(on(line)), Said::FollowUp, "{line:?}");
+        }
+        // Another voice than the conversation's still holds it.
+        assert_eq!(
+            judge(Line {
+                another_voice: true,
+                ..on(looking_away)
+            }),
+            Said::Held(Held::AwayInConversation)
+        );
+        // Out of the window nothing changes: a turned face looking away,
+        // not named, is held as before.
+        let out = Line {
+            going_on: false,
+            turned: true,
+            ..on(looking_away)
+        };
+        assert_eq!(judge(out), Said::Held(Held::LookingAway));
+        // A short line let out so says which input let it stand.
+        assert_eq!(short_stood_by(on(short_silent)), Some("follow_ups"));
     }
 
     /// #7891 (lamp-74ff, 19 Nov, request 151): out of the window, meeting
