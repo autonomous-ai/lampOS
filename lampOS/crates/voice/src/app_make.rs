@@ -737,8 +737,9 @@ pub fn say_waiting_at(socket: &Path, line: &str, within_ms: u64) {
 }
 
 /// One ask of `words` on the say socket at `socket`, as a note or as
-/// written, at `priority`, not begun after `within_ms`: its answers, read until the
-/// outcome. The receiver's sender is dropped, with no outcome, when the
+/// written, at `priority`, not begun after `within_ms`, under
+/// [`VOICE_MAKE_SKILL`] ([`crate::say::ask_at`]): its answers, read until
+/// the outcome. The receiver's sender is dropped, with no outcome, when the
 /// socket isn't there or goes quiet past the ask's wait.
 fn socket_ask(
     socket: &Path,
@@ -747,45 +748,21 @@ fn socket_ask(
     priority: u8,
     within_ms: u64,
 ) -> std::sync::mpsc::Receiver<crate::say::Answer> {
-    use crate::say::{Answer, Outcome};
-    let (answer, answered) = std::sync::mpsc::channel();
-    let key = if note { "note" } else { "text" };
-    let ask = json!({
-        "skill": VOICE_MAKE_SKILL,
-        key: words,
-        "priority": priority,
-        "expires_in_ms": within_ms,
-    });
-    let Ok(mut stream) = std::os::unix::net::UnixStream::connect(socket) else {
+    crate::say::ask_at(
+        socket,
+        VOICE_MAKE_SKILL,
+        words,
+        note,
+        priority,
+        within_ms,
+        LINE_SAID_WITHIN,
+    )
+    .unwrap_or_else(|_| {
         eprintln!(
             "lamp-voice: a skill made by voice: the say service is not there; its line wasn't said"
         );
-        return answered;
-    };
-    let waits = Duration::from_millis(within_ms).saturating_add(LINE_SAID_WITHIN);
-    if writeln!(stream, "{ask}").is_err() || stream.set_read_timeout(Some(waits)).is_err() {
-        return answered;
-    }
-    for read in BufReader::new(stream).lines() {
-        let Ok(read) = read else {
-            break;
-        };
-        let told: Value = serde_json::from_str(&read).unwrap_or(Value::Null);
-        let why = || told["why"].as_str().unwrap_or_default().to_owned();
-        let outcome = match told["outcome"].as_str() {
-            Some("spoken") => Outcome::Spoken,
-            Some("dropped") => Outcome::Dropped(why()),
-            Some("expired") => Outcome::Expired,
-            Some(other) => Outcome::Refused(format!("{other} {}", why()).trim().to_owned()),
-            None => {
-                let _ = answer.send(Answer::Begun(told["at_us"].as_u64().unwrap_or_default()));
-                continue;
-            }
-        };
-        let _ = answer.send(Answer::Done(outcome));
-        break;
-    }
-    answered
+        std::sync::mpsc::channel().1
+    })
 }
 
 /// How long past an ask's wait its outcome may still come over the say

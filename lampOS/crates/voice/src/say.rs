@@ -1467,6 +1467,67 @@ pub type TurnStartTaken = (
     Ticket,
 );
 
+/// The say socket's path: [`SOCKET_ENVIRONMENT`], [`DEFAULT_SOCKET`] if
+/// unset, as [`Says::from_environment`] binds it. A worker is given no
+/// [`SOCKET_ENVIRONMENT`], so it asks at the product's socket.
+pub fn socket_path() -> PathBuf {
+    std::env::var_os(SOCKET_ENVIRONMENT)
+        .map_or_else(|| PathBuf::from(DEFAULT_SOCKET), PathBuf::from)
+}
+
+/// One ask of `words` on the say socket at `socket`, as a client, from a
+/// process that holds no [`OwnAsks`] (a second route's worker): as `skill`,
+/// as a note or as written, at `priority`, not begun after `within_ms`. The
+/// same line [`OwnAsks::text`] and [`OwnAsks::note`] build, checked by the
+/// service as theirs is ([`parse_from`]). Blocking: its answers are read
+/// until the outcome, or until the socket goes quiet past `within_ms` and
+/// `said_within`, when the receiver's sender is dropped with no outcome.
+/// The connection's error when the say service isn't there.
+pub(crate) fn ask_at(
+    socket: &Path,
+    skill: &str,
+    words: &str,
+    note: bool,
+    priority: u8,
+    within_ms: u64,
+    said_within: Duration,
+) -> io::Result<mpsc::Receiver<Answer>> {
+    use std::io::BufRead;
+    let (answer, answered) = mpsc::channel();
+    let key = if note { "note" } else { "text" };
+    let ask = json!({
+        "skill": skill,
+        key: words,
+        "priority": priority,
+        "expires_in_ms": within_ms,
+    });
+    let mut stream = UnixStream::connect(socket)?;
+    let waits = Duration::from_millis(within_ms).saturating_add(said_within);
+    if writeln!(stream, "{ask}").is_err() || stream.set_read_timeout(Some(waits)).is_err() {
+        return Ok(answered);
+    }
+    for read in io::BufReader::new(stream).lines() {
+        let Ok(read) = read else {
+            break;
+        };
+        let told: serde_json::Value = serde_json::from_str(&read).unwrap_or_default();
+        let why = || told["why"].as_str().unwrap_or_default().to_owned();
+        let outcome = match told["outcome"].as_str() {
+            Some("spoken") => Outcome::Spoken,
+            Some("dropped") => Outcome::Dropped(why()),
+            Some("expired") => Outcome::Expired,
+            Some(other) => Outcome::Refused(format!("{other} {}", why()).trim().to_owned()),
+            None => {
+                let _ = answer.send(Answer::Begun(told["at_us"].as_u64().unwrap_or_default()));
+                continue;
+            }
+        };
+        let _ = answer.send(Answer::Done(outcome));
+        break;
+    }
+    Ok(answered)
+}
+
 /// A request handed to the voice, with where its answer goes and when it
 /// expires: its `expires_in_ms` from the moment its line was read, on the
 /// shared monotonic clock (`lamp_ipc::monotonic_us`, the voice's own clock
@@ -1996,8 +2057,7 @@ impl Says {
             );
         }
         EVERY_SOUND.store(every_sound, std::sync::atomic::Ordering::Relaxed);
-        let path = std::env::var_os(SOCKET_ENVIRONMENT)
-            .map_or_else(|| PathBuf::from(DEFAULT_SOCKET), PathBuf::from);
+        let path = socket_path();
         let group = match std::env::var(GROUP_ENVIRONMENT) {
             Ok(name) => match fs::read_to_string("/etc/group")
                 .ok()

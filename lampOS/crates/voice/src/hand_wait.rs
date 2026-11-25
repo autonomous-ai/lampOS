@@ -17,7 +17,7 @@
 //! earlier
 //! work on the records is still under way, and it is still the work this
 //! voice handed over last, one short line is
-//! asked of the say service ([`crate::say::OwnAsks`]), as the voice's own:
+//! asked of the say service, under the voice's own skill name [`SKILL`]:
 //! "Your computer is waking up; it'll start in a moment.", or, for work
 //! that runs on the lamp (its own engine, or one the person named), "I'm
 //! still getting ready; I'll start in a moment."
@@ -37,19 +37,25 @@
 //! The say service's gates hold for it as for any say: nobody being heard,
 //! nothing under way, the speaker free, and [`crate::say::QUIET_US`] since
 //! the last turn. Not begun within [`EXPIRES_MS`], it is let go: the
-//! moment for it has passed. Without the say service (`LAMP_SAY` off) the
-//! voice has no own asks, and nothing is read or said.
+//! moment for it has passed.
+//!
+//! The line is asked as a client of the say socket
+//! ([`crate::say::ask_at`], at [`crate::say::socket_path`]), never through
+//! the voice's in-process own asks: the hand-over's tool call runs in the
+//! second route's worker (`lamp-voice worker second|provider`), a process
+//! of its own that holds none (#8510, lamp-ee17: `no line: no say
+//! service` on every hand-over while the asks were kept at the main
+//! process's start). The ask is the same line the own asks build, checked
+//! by the service as theirs is. Without the say service (`LAMP_SAY` off,
+//! nothing answering at the socket) nothing is read or said.
 //!
 //! Every look that ends with no line leaves one journal line saying why
-//! (`lamp-voice: tasks: work N after 20 s: no line: <reason>`), and the
-//! hand-over without the say service one too.
-use crate::say::{Answer, OwnAsks};
+//! (`lamp-voice: tasks: work N after 20 s: no line: <reason>`), the
+//! hand-over without the say service one too, and a line the say service
+//! refused or did not say one with its answer.
+use crate::say::{Answer, Outcome};
 use serde_json::{Value, json};
-use std::{
-    path::Path,
-    sync::{Mutex, OnceLock},
-    time::Duration,
-};
+use std::{path::Path, sync::Mutex, time::Duration};
 
 /// How long after the hand-over the work's record is read.
 pub const AFTER: Duration = Duration::from_secs(20);
@@ -71,8 +77,10 @@ const LISTED: u16 = 10;
 /// handed over last, so the newest few are enough (Jarvis's P3 on #8510).
 pub const SAID_KEPT: usize = 8;
 
-/// The say service's own asks, set once at start ([`start`]).
-static OWN: OnceLock<OwnAsks> = OnceLock::new();
+/// How long past the line's wait its outcome may still come over the say
+/// socket: the line begun at the end of its wait, said whole (as
+/// `app_make`'s socket lines wait).
+const SAID_WITHIN: Duration = Duration::from_secs(120);
 
 /// The work ids a line was asked for, so that no hand-over gets two: the
 /// newest [`SAID_KEPT`] only ([`mark_said`]).
@@ -96,22 +104,17 @@ fn keep_newest(said: &mut Vec<String>, id: &str) {
     said.drain(..over);
 }
 
-/// Keep the say service's own asks for the lines (the coordinator, at
-/// start, as the app-make socket takes them). None: no line is ever said.
-pub fn start(own: Option<OwnAsks>) {
-    if let Some(own) = own {
-        let _ = OWN.set(own);
-    }
-}
-
 /// Work `id` was just handed over through lamp-tasks at `directory`: one
 /// line [`AFTER`] from now while it still waits ([`check_once`]), on a
-/// thread of its own, never the turn's. Nothing without the say service.
+/// thread of its own, never the turn's, asked on the say socket
+/// ([`crate::say::socket_path`]). Nothing when no say service answers
+/// there: one connection taken and closed at once, nothing asked.
 pub fn watch(directory: &Path, id: &str, on_lamp: bool) {
-    let Some(own) = OWN.get().cloned() else {
+    let say = crate::say::socket_path();
+    if std::os::unix::net::UnixStream::connect(&say).is_err() {
         eprintln!("lamp-voice: tasks: work {id}: no line: no say service");
         return;
-    };
+    }
     let socket = directory.join("request.sock");
     let id = id.to_owned();
     let _ = std::thread::Builder::new()
@@ -119,7 +122,7 @@ pub fn watch(directory: &Path, id: &str, on_lamp: bool) {
         .spawn(move || {
             std::thread::sleep(AFTER);
             let still_last = || crate::agent_tasks::handed_last_is(&id);
-            check_once(&socket, &id, on_lamp, &own, still_last);
+            check_once(&socket, &say, &id, on_lamp, still_last);
         });
 }
 
@@ -190,45 +193,125 @@ fn decide(
 }
 
 /// [`watch`]'s one read of work `id` on `socket`, and its one line, asked
-/// of `own`: what was asked, if anything, and where its answer comes.
+/// on the say socket at `say` as [`SKILL`]: what was asked, if anything,
+/// and what became of it (none: the say service unreached or quiet).
+/// Blocking until the line's outcome; [`watch`]'s thread alone waits.
 pub(crate) fn check_once(
     socket: &Path,
+    say: &Path,
     id: &str,
     on_lamp: bool,
-    own: &OwnAsks,
     still_last: impl FnOnce() -> bool,
-) -> Option<(&'static str, std::sync::mpsc::Receiver<Answer>)> {
+) -> Option<(&'static str, Option<Outcome>)> {
     let answer = crate::agent_tasks::ask(
         socket,
         &json!({"op": "work_list", "limit": LISTED}),
         READ_DEADLINE,
     );
+    let after = AFTER.as_secs();
     let line = match decide(answer.as_ref(), id, on_lamp, still_last()) {
         Ok(line) => line,
         Err(why) => {
-            eprintln!(
-                "lamp-voice: tasks: work {id} after {} s: no line: {why}",
-                AFTER.as_secs()
-            );
+            eprintln!("lamp-voice: tasks: work {id} after {after} s: no line: {why}");
             return None;
         }
     };
     mark_said(id);
     eprintln!(
-        "lamp-voice: tasks: work {id} still waits for its agent after {} s: said it is starting",
-        AFTER.as_secs()
+        "lamp-voice: tasks: work {id} still waits for its agent after {after} s: said it is starting"
     );
-    Some((
+    let outcome = ask_line(say, line);
+    match &outcome {
+        None => eprintln!("lamp-voice: tasks: work {id} after {after} s: no line: no say service"),
+        Some(Outcome::Refused(why)) => eprintln!(
+            "lamp-voice: tasks: work {id} after {after} s: no line: the say service refused: {why}"
+        ),
+        Some(Outcome::Spoken) => {}
+        Some(other) => {
+            eprintln!("lamp-voice: tasks: work {id} after {after} s: the line not said: {other:?}");
+        }
+    }
+    Some((line, outcome))
+}
+
+/// `line` asked once on the say socket at `say`, as written, as [`SKILL`],
+/// at the normal priority, not begun after [`EXPIRES_MS`]: its outcome,
+/// none when the say service isn't there or goes quiet.
+fn ask_line(say: &Path, line: &str) -> Option<Outcome> {
+    let answered = crate::say::ask_at(
+        say,
+        SKILL,
         line,
-        own.text(SKILL, line, crate::say::NORMAL_PRIORITY, EXPIRES_MS),
-    ))
+        false,
+        crate::say::NORMAL_PRIORITY,
+        EXPIRES_MS,
+        SAID_WITHIN,
+    )
+    .ok()?;
+    loop {
+        match answered.recv() {
+            Ok(Answer::Done(outcome)) => break Some(outcome),
+            Ok(_) => continue,
+            Err(_) => break None,
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::agent_tasks::tests::tasks_part_with;
-    use std::path::PathBuf;
+    use std::{
+        io::{BufRead, BufReader, Write},
+        os::unix::net::UnixListener,
+        path::PathBuf,
+        thread::JoinHandle,
+    };
+
+    /// A fake say service bound at `dir`'s `say.sock`, as `app_make`'s
+    /// socket tests bind one: one connection an answer in `answers`, each
+    /// ask begun, then told its outcome. What it was asked, and the
+    /// listener, to tell that nothing more was asked.
+    fn say_service(
+        dir: &Path,
+        answers: Vec<&'static str>,
+    ) -> (PathBuf, JoinHandle<(Vec<Value>, UnixListener)>) {
+        let socket = dir.join("say.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            let mut asked = Vec::new();
+            for answer in answers {
+                let stream = crate::make_skill_local::tests::accept_within(&listener);
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                asked.push(serde_json::from_str::<Value>(&line).unwrap());
+                writeln!(&stream, r#"{{"event":"begun","at_us":7}}"#).unwrap();
+                writeln!(&stream, "{answer}").unwrap();
+            }
+            (asked, listener)
+        });
+        (socket, served)
+    }
+
+    /// Nothing more was asked of `listener`'s say service.
+    fn asked_nothing_more(listener: &UnixListener) {
+        listener.set_nonblocking(true).unwrap();
+        assert_eq!(
+            listener.accept().map(|_| ()).unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock,
+            "a say asked"
+        );
+    }
+
+    /// The ask the line goes as: the voice's own skill name, as written,
+    /// at the normal priority, within [`EXPIRES_MS`].
+    fn assert_the_ask(asked: &Value, line: &str) {
+        assert_eq!(asked["skill"], SKILL);
+        assert_eq!(asked["text"], line);
+        assert!(asked.get("note").is_none());
+        assert_eq!(asked["priority"], crate::say::NORMAL_PRIORITY);
+        assert_eq!(asked["expires_in_ms"], EXPIRES_MS);
+    }
 
     /// A folder of its own for one test's tasks part.
     fn folder(name: &str) -> PathBuf {
@@ -262,7 +345,7 @@ mod tests {
     #[test]
     fn a_hand_over_still_queued_after_20_s_gets_one_line_and_never_a_third() {
         let dir = folder("queued");
-        let (own, asked) = OwnAsks::for_test();
+        let (say, served) = say_service(&dir, vec![r#"{"outcome":"spoken"}"#]);
         let seen = tasks_part_with(
             &dir,
             vec![
@@ -273,19 +356,20 @@ mod tests {
             true,
         );
         let socket = dir.join("request.sock");
-        let (line, _answer) =
-            check_once(&socket, "q-1", false, &own, || true).expect("the line, after 20 s queued");
+        let (line, outcome) =
+            check_once(&socket, &say, "q-1", false, || true).expect("the line, after 20 s queued");
         assert_eq!(line, LINE_COMPUTER);
-        assert_eq!(
-            asked(),
-            Some((SKILL.to_owned(), crate::say::NORMAL_PRIORITY))
-        );
+        assert_eq!(outcome, Some(Outcome::Spoken));
         assert_eq!(
             seen.recv().unwrap(),
             json!({"op": "work_list", "limit": 10})
         );
-        assert!(check_once(&socket, "q-1", false, &own, || true).is_none());
-        assert!(check_once(&socket, "q-1", false, &own, || true).is_none());
+        assert!(check_once(&socket, &say, "q-1", false, || true).is_none());
+        assert!(check_once(&socket, &say, "q-1", false, || true).is_none());
+        let (asked, listener) = served.join().unwrap();
+        assert_eq!(asked.len(), 1, "said once");
+        assert_the_ask(&asked[0], LINE_COMPUTER);
+        asked_nothing_more(&listener);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -293,12 +377,13 @@ mod tests {
     #[test]
     fn the_lamps_own_work_still_queued_is_said_in_the_first_person() {
         let dir = folder("own");
-        let (own, asked) = OwnAsks::for_test();
+        let (say, served) = say_service(&dir, vec![r#"{"outcome":"spoken"}"#]);
         let _seen = tasks_part_with(&dir, vec![("request.sock", work("q-own", "queued"))], true);
-        let (line, _answer) =
-            check_once(&dir.join("request.sock"), "q-own", true, &own, || true).unwrap();
+        let (line, _outcome) =
+            check_once(&dir.join("request.sock"), &say, "q-own", true, || true).unwrap();
         assert_eq!(line, LINE_OWN);
-        assert!(asked().is_some());
+        let (asked, _listener) = served.join().unwrap();
+        assert_the_ask(&asked[0], LINE_OWN);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -458,14 +543,16 @@ mod tests {
     #[test]
     fn the_computers_queue_behind_a_running_turn_says_nothing() {
         let dir = folder("one-session");
-        let (own, asked) = OwnAsks::for_test();
+        let (say, served) = say_service(&dir, Vec::new());
         let listed = json!({"ok": true, "works": [
             record("s-2", "queued", 2_000),
             record("s-1", "working", 1_000),
         ]});
         let _seen = tasks_part_with(&dir, vec![("request.sock", listed)], true);
-        assert!(check_once(&dir.join("request.sock"), "s-2", false, &own, || true).is_none());
-        assert_eq!(asked(), None);
+        assert!(check_once(&dir.join("request.sock"), &say, "s-2", false, || true).is_none());
+        let (asked, listener) = served.join().unwrap();
+        assert!(asked.is_empty());
+        asked_nothing_more(&listener);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -486,11 +573,76 @@ mod tests {
         );
     }
 
-    /// The yes's hand-over starts the one look, for work asked by voice,
-    /// right after it is kept as the work handed over last; and the
-    /// coordinator gives it the say service's own asks at start.
+    /// #8510, lamp-ee17: the hand-over's tool call runs in the second
+    /// route's worker, a process that holds no own asks, and every
+    /// hand-over journaled `no line: no say service`. The line is asked on
+    /// the say socket as a client, with nothing set up in this process
+    /// first: the say service's answer reaches the look, and a refusal is
+    /// told back as the outcome, never as said.
     #[test]
-    fn the_hand_over_starts_the_look_and_the_coordinator_gives_it_the_say_service() {
+    fn the_line_is_asked_on_the_say_socket_with_no_start_in_this_process() {
+        let dir = folder("socket");
+        let (say, served) = say_service(
+            &dir,
+            vec![
+                r#"{"outcome":"spoken"}"#,
+                r#"{"outcome":"refused","why":"the microphones are closed"}"#,
+            ],
+        );
+        let _seen = tasks_part_with(
+            &dir,
+            vec![
+                ("request.sock", work("o-1", "queued")),
+                ("request.sock", work("o-2", "queued")),
+            ],
+            true,
+        );
+        let socket = dir.join("request.sock");
+        assert_eq!(
+            check_once(&socket, &say, "o-1", false, || true),
+            Some((LINE_COMPUTER, Some(Outcome::Spoken)))
+        );
+        assert_eq!(
+            check_once(&socket, &say, "o-2", true, || true),
+            Some((
+                LINE_OWN,
+                Some(Outcome::Refused(
+                    "refused the microphones are closed".to_owned()
+                ))
+            ))
+        );
+        let (asked, listener) = served.join().unwrap();
+        assert_eq!(asked.len(), 2);
+        assert_the_ask(&asked[0], LINE_COMPUTER);
+        assert_the_ask(&asked[1], LINE_OWN);
+        asked_nothing_more(&listener);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// No say service at the socket: the line is decided, nothing is said,
+    /// and the look tells it had no outcome.
+    #[test]
+    fn with_no_say_service_the_line_has_no_outcome() {
+        let dir = folder("no-say");
+        let _seen = tasks_part_with(&dir, vec![("request.sock", work("n-1", "queued"))], true);
+        assert_eq!(
+            check_once(
+                &dir.join("request.sock"),
+                &dir.join("none.sock"),
+                "n-1",
+                false,
+                || true
+            ),
+            Some((LINE_COMPUTER, None))
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The yes's hand-over starts the one look, for work asked by voice,
+    /// right after it is kept as the work handed over last; nothing in the
+    /// coordinator sets it up, and the look asks on the say socket.
+    #[test]
+    fn the_hand_over_starts_the_look_with_no_start_in_the_coordinator() {
         let tasks = include_str!("agent_tasks.rs");
         let handed = tasks
             .find("handed_over(&pending.id.to_string(), &label_of(&pending.text));")
@@ -501,12 +653,10 @@ mod tests {
         assert!(handed < watched && watched - handed < 400);
         assert!(tasks[handed..watched].contains("if !crate::messages::is_text(pending.request)"));
         let coordinator = include_str!("coordinator.rs");
-        let parked = coordinator
-            .find("crate::app_make::start_from_environment(crate::say::Says::parked_asks());")
-            .unwrap();
-        let started = coordinator
-            .find("crate::hand_wait::start(crate::say::Says::parked_asks());")
-            .expect("started with the say service's own asks");
-        assert!(parked < started);
+        assert!(!coordinator.contains("crate::hand_wait::"));
+        let own = include_str!("hand_wait.rs");
+        let watch = own.find("pub fn watch(").unwrap();
+        let ends = watch + own[watch..].find("\n}\n").unwrap();
+        assert!(own[watch..ends].contains("crate::say::socket_path()"));
     }
 }
