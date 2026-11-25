@@ -3718,11 +3718,10 @@ Mỗi lần giao việc chỉ nói tối đa một lần, và không bao giờ c
 sau đó không đọc hay nói gì thêm cho việc đó. Nếu việc đã được nhận, đã
 xong, đã lỗi, không còn, hoặc đã có lần giao khác sau đó, thì không nói gì.
 Một lần giao sau đó bị lỗi vẫn được kể như tin về việc vẫn kể: câu này
-không đánh dấu gì là đã kể. Khoảng chờ đã được nói ngay lúc giao việc thì
-không có câu ở giây thứ 20 (`hand_wait::told_at_hand_over`): khi đèn biết
-ô của máy tính đang dừng, câu báo máy tính đang khởi động được nói ngay từ
-đầu, và chỉ câu đó (first builder trên #8445, 14:51: chỉ một câu về khoảng
-chờ, không bao giờ hai). Việc đang xếp hàng sau một việc trước còn đang
+không đánh dấu gì là đã kể. Câu được chọn theo nơi việc chạy, không theo
+tên người nhận việc: việc chạy trên đèn, bằng engine của chính đèn hay
+engine người dùng gọi tên, nhận câu ở ngôi thứ nhất, không bao giờ là
+"máy tính của bạn" (P3 của first builder trên #8510). Việc đang xếp hàng sau một việc trước còn đang
 chạy thì không có câu này: lamp-tasks chạy từng việc một (OpenClaw direct
 "waiting for the task before it to end", `LAMP_TASKS_OPENCLAW_DIRECT=on`;
 hàng đợi của phiên duy nhất sau lượt đang chạy, `LAMP_TASKS_ONE_SESSION=on`),

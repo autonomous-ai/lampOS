@@ -342,6 +342,10 @@ struct Pending {
     /// The engine it was prepared for, as `tasks/status` names it, when the
     /// voice knows it (not the lamp's own default): for `voice/decision`.
     engine: Option<String>,
+    /// It runs on the lamp, by its own engine or one the person named, not
+    /// on a computer: what [`crate::hand_wait`]'s line says (the first
+    /// builder's P3 on #8510).
+    on_lamp: bool,
 }
 
 static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
@@ -4856,6 +4860,7 @@ fn run_for_asked(
                             correct: place.correct,
                             session: session.map(str::to_owned),
                             engine: handed_engine.clone(),
+                            on_lamp: on_the_lamp,
                         });
                     }
                     if let Some((old, old_engine)) = &replaced {
@@ -5100,7 +5105,7 @@ fn run_for_asked(
                             crate::hand_wait::watch(
                                 &place.directory,
                                 &pending.id.to_string(),
-                                who == OWN_ENGINE,
+                                pending.on_lamp,
                             );
                         }
                     }
@@ -6883,6 +6888,7 @@ pub(crate) mod tests {
             request: 5,
             at,
             who: CLAUDE_CODE,
+            on_lamp: false,
             text: String::new(),
             correct: false,
             session: None,
@@ -6921,6 +6927,7 @@ pub(crate) mod tests {
             request: asked,
             at,
             who: CLAUDE_CODE,
+            on_lamp: false,
             text: String::new(),
             correct: false,
             session: None,
@@ -6955,6 +6962,7 @@ pub(crate) mod tests {
             request: 9,
             at,
             who: CLAUDE_CODE,
+            on_lamp: false,
             text: "Write a two-line poem about the moon".into(),
             correct: false,
             session: None,
@@ -12588,6 +12596,7 @@ pub(crate) mod tests {
                 request: 1,
                 at,
                 who: CLAUDE_CODE,
+                on_lamp: false,
                 text: "Summarise the readme in three short lines".into(),
                 correct,
                 session: None,
@@ -13892,6 +13901,7 @@ pub(crate) mod tests {
             correct: true,
             session: None,
             engine: None,
+            on_lamp: false,
         }
     }
 
@@ -14049,6 +14059,7 @@ pub(crate) mod tests {
             request: 1,
             at,
             who: CLAUDE_CODE,
+            on_lamp: false,
             text: String::new(),
             correct,
             session: None,
@@ -14838,6 +14849,17 @@ pub(crate) mod tests {
             3,
         );
         assert_eq!(by_engine["where"], "OpenClaw on the lamp", "{by_engine}");
+        // An engine named on the lamp runs on the lamp: its 20 s line is
+        // the lamp's own, never the computer's (the first builder's P3 on
+        // #8510).
+        let on_lamp = || {
+            PENDING
+                .lock()
+                .unwrap()
+                .as_ref()
+                .map(|pending| pending.on_lamp)
+        };
+        assert_eq!(on_lamp(), Some(true));
         let sent = prepare();
         assert_eq!(
             (&sent["target"], &sent["engine"]),
@@ -14864,6 +14886,7 @@ pub(crate) mod tests {
             computer["where"], "Claude Code on the office computer",
             "{computer}"
         );
+        assert_eq!(on_lamp(), Some(false));
         let sent = prepare();
         assert_eq!(sent["target"], "office");
         assert_eq!(sent.get("engine"), None, "{sent}");
