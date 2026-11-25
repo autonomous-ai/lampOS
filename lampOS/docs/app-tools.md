@@ -1,10 +1,15 @@
 # App tools: an app's actions called by Lamp's model, as a skill's are (#8386)
 
-**Designed, not built.** Nothing on this page is in the code yet. It is the
-design asked for on #8386 (the first builder's 18:14 GMT+7, 23 Nov 2026), for
-Heron (the voice and safety), Eighth (lamp-control) and Migrate (the SDK) to
-read. Where it names code that exists today, that code is the truth; where it
-proposes a number or a name, it says so. The app contract it extends is
+**Built, off.** The tools file (#8491, 6aff726a6b), the call to the app's
+socket, `app.call` and `app.answer` (#8496, b936da4015), the timeout and
+`app.call.stopped` (#8511, f6e2596e05) and the voice's side (fd4dc6fdd3) are
+in the code. `LAMP_APP_TOOLS` is in no product unit, so it is off on every
+lamp; the switch-on, #8504, is open. It began as the design asked for on #8386
+(the first builder's 18:14 GMT+7, 23 Nov 2026), for Heron (the voice and
+safety), Eighth (lamp-control) and Migrate (the SDK). Where this page and the
+code differ, the code is the truth. Not built yet: the per-app rate of 20 calls
+a minute and the 4 calls in flight across apps (see "Rates"). The call times
+out at 4.5 s in lamp-control, under the voice's 5 s. The app contract it extends is
 [apps.md](apps.md). It is in English only ([the docs rule](../AGENTS.md)).
 
 The rule in one line: **the person talks to one Lamp, and Lamp's model holds
@@ -40,7 +45,7 @@ Two fixes were agreed on #8386 the same evening:
   Trained before?", so a reply the app doesn't take is at least answered in
   context. It is not part of this page.
 - **This design:** app actions as tools for the model. It replaces the
-  `apps.ask` op once proposed on this issue, which was never built.
+  `apps.ask` op once proposed on this issue, which was never built (the tools above replaced it).
 
 ## What exists today, and what this reuses
 
@@ -118,7 +123,7 @@ entry, for example:
 }
 ```
 
-**The Store's checks** (proposed; the package reader, `lamp_skills::app_package`,
+**The Store's checks** (built on the lamp in `lamp_msgs::app_tools`; the Store's own copy is proposed; the package reader, `lamp_skills::app_package`,
 runs the same ones, and the voice runs the link's own again at each read):
 
 - **Count:** at most 8 tools an app, and the file at most 8 KiB.
@@ -160,8 +165,8 @@ runs the same ones, and the voice runs the link's own again at each read):
 ## The voice: a section of their own, beside the skills'
 
 Heron's part. Behind a new switch, `LAMP_APP_TOOLS` (lamp-voice and
-lamp-control, `on` only, off unless set, inside `LAMP_STORE_APPS`; it goes
-into `docs/switches.md` and every census test when built).
+lamp-control, `on` only, off unless set, inside `LAMP_STORE_APPS`; it is in
+`docs/switches.md` and the census tests; in no product unit yet, #8504).
 
 **The second route only, in the first build** (Heron's answer, 18:23 on
 #8406), as `start_app` is: Live's function declarations are fixed when its
@@ -253,7 +258,7 @@ Eighth's part, beside app views piece 2.
   quoted frame. An answer for a call not sent to that app, a second answer
   or a late one is answered `{"ok": true, "taken": false}` and told to
   nobody, as `app.took` is.
-- **A timeout of 5 s** (proposed), counted from the voice's publish. Past
+- **A timeout of 5 s** (built: the voice waits 5 s; lamp-control ends a call at 4.5 s as `timeout` and tells the app `app.call.stopped`), counted from the voice's publish. Past
   it the model is told "Gym Coach did not answer in time; it may or may not
   have done it", and a later answer is dropped. **The `call` id is an
   idempotency key:** it is unique to one call, the app is sent it, and the
@@ -264,11 +269,11 @@ Eighth's part, beside app views piece 2.
   needs longer (a session that runs for minutes) answers at once that it
   began (`{"started": true}`) and goes on by itself, with its `say`, its
   light and `apps.context`; no call stays open past 5 s.
-- **A result cap of 2 KB** (proposed: 2,048 bytes as JSON), so the result,
+- **A result cap of 2 KB** (built: 2,048 bytes as JSON), so the result,
   the frame and the voice's note stay inside the link's 4,096-byte answer.
   A larger one is refused, never cut: the model is told "Gym Coach's answer
   was too long", and the journal says so.
-- **Rates, per app** (proposed): one call in flight an app (a second is
+- **Rates, per app** (one call in flight an app is built; the 20 a minute and the 4 across apps are not): one call in flight an app (a second is
   answered `busy` to the model), 20 a minute an app, held across the app's
   reconnects and forgotten by a remove; 4 calls in flight across all apps.
   A refused call costs nothing.
