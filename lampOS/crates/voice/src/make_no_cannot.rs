@@ -2557,7 +2557,12 @@ equals = true
     /// skill's `skill.toml` read back (`made_skill::plainly`, which begins
     /// with the trigger), or none when the read check refuses it.
     fn heard(block: &str) -> Option<String> {
-        let grants = ["net".to_owned(), "speak".to_owned()];
+        heard_with(block, &["net", "speak"])
+    }
+
+    /// [`heard`] with the task skill granted `grants`.
+    fn heard_with(block: &str, grants: &[&str]) -> Option<String> {
+        let grants: Vec<String> = grants.iter().map(|grant| (*grant).to_owned()).collect();
         let text = skill_text("rain-watch", &grants, block, "tell me when it rains");
         let files = made_skill::files(&text).ok()?;
         made_skill::plainly(&files.toml).ok()
@@ -2629,6 +2634,15 @@ equals = true
         ] {
             assert_eq!(heard(&unwatched), None, "{unwatched}");
         }
+        // Without `net` among its grants it is no watch on outside data but
+        // a repeating reminder, the lamp's own timer, refused as before
+        // ("every 2 hours remind me to stretch"; the review's P2 on #8079).
+        assert_eq!(
+            heard_with(&block.replace("90m", "2h"), &["speak"]),
+            None,
+            "a clock task granted only speak"
+        );
+        assert_eq!(heard_with(&block, &["speak", "light"]), None);
         // No task for the lamp's agent made here: no watch either.
         middle_on(None);
         set_on_here(Some(false));
@@ -2769,6 +2783,18 @@ equals = true
             assert_eq!(result, Err(Refused(Uncovered::Reminder.line(), None)));
             assert_eq!((briefs.len(), texts.len()), (2, 1), "{briefs:?}");
             assert!(!briefs[1].contains(WATCH_REPAIR), "{}", briefs[1]);
+            // Nor is a clock watch the model answers on its own kept or
+            // said "Every …" on the net-only path (the review's P2 on
+            // #8079): the keep gate is the switch's too.
+            let Ok(Answer::Skill {
+                when: When::Trigger(block),
+                ..
+            }) = read(WATCH_EXAMPLE)
+            else {
+                panic!("{WATCH_EXAMPLE}")
+            };
+            let block = block_kept(&block).unwrap();
+            assert_eq!(heard(&block), None, "{reactions}: kept with the switch off");
             middle_on(None);
         }
     }

@@ -14097,6 +14097,143 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// The review's P2 on #8079: with the product's switches
+    /// (`LAMP_MAKE_NO_CANNOT` on, reactions unset) a repeating reminder the
+    /// model answers as a clock task without `net` ("every 2 hours remind
+    /// me to stretch": `clock/local`, cooldown 2h, grants `speak`) is no
+    /// watch on outside data and is read exactly as lamp-voice read it
+    /// before the watch: never said "Every 2 hours". Strict, it is refused
+    /// at every repair as no daily time and nothing is kept; loosened
+    /// (`LAMP_MADE_SKILL_LOOSE`, as the product runs), it is kept said in
+    /// general words, "When its moment comes, …" (`plainly_as`).
+    #[test]
+    fn with_the_product_switches_a_repeating_reminder_is_still_refused_never_a_watch() {
+        const STRETCH: &str = "every 2 hours remind me to stretch";
+        let timed = trigger_answer(
+            "stretch-reminder",
+            "speak",
+            "clock/local",
+            "field = \"known\"\nequals = true\ncooldown = \"2h\"\n",
+        );
+        for loose in [false, true] {
+            made_skill::set_reactions_here(None);
+            made_skill::set_loose_here(Some(loose));
+            net_make_here(Some(true));
+            crate::make_no_cannot::set_on_here(Some(true));
+            let (root, keeping) = keeping(&format!("product-repeating-reminder-{loose}"));
+            let rounds = if loose { 1 } else { MOST_REPAIRS + 1 };
+            let mut answers = vec![(
+                200,
+                "cannot: a skill can't keep time on its own.".to_owned(),
+            )];
+            answers.extend((0..rounds).map(|_| (200, timed.clone())));
+            let (url, served) = service_sent(answers);
+            let told = make(STRETCH, &keeping, chat_at(url), NOW);
+            let sent = served.join().unwrap();
+            assert_eq!(sent.len(), rounds + 1, "{loose}: {told}");
+            assert!(!told.to_string().contains("Every 2 hours"), "{told}");
+            if loose {
+                assert_eq!(told["made"], "stretch-reminder", "{told}");
+                assert!(
+                    told.to_string().contains("When its moment comes"),
+                    "said in general words, as before: {told}"
+                );
+            } else {
+                assert!(told.get("made").is_none(), "{told}");
+                assert!(told["error"].as_str().is_some(), "{told}");
+                assert!(made_skill::entries(&keeping.directory).is_empty());
+            }
+            crate::make_no_cannot::set_on_here(None);
+            net_make_here(None);
+            made_skill::set_loose_here(None);
+            let _ = std::fs::remove_dir_all(&root);
+        }
+    }
+
+    /// The review's P3 on #8079, the product's likeliest route: the one run
+    /// path agent, reactions unset, `LAMP_MAKE_NO_CANNOT` and `LAMP_TASK_NET`
+    /// on, and the make's first answer `internet:` (`net_made`), which
+    /// reaches the middle form; its trigger on `price/bitcoin` is repaired
+    /// as a watch and the clock's answer kept: one task granted `net` on
+    /// `clock/local` every 90 minutes, said back so, the agent never asked
+    /// to write it.
+    #[test]
+    fn on_the_products_path_an_internet_answer_becomes_a_clock_watch_granted_net() {
+        made_skill::set_reactions_here(None);
+        made_skill::set_loose_here(Some(true));
+        net_make_here(Some(true));
+        crate::make_no_cannot::set_on_here(Some(true));
+        let (root, keeping, copy) = keeping_copied("product-path-price-watch");
+        const BTC: &str =
+            "Lamp, if Bitcoin goes under ninety thousand dollars, tell me right away.";
+        let priced = trigger_answer(
+            "bitcoin-watch",
+            "net, speak",
+            "price/bitcoin",
+            "field = \"usd\"\nequals = true\n",
+        );
+        let reminder = format!(
+            "cannot: I can't do that yet: a reminder when Bitcoin goes under ninety thousand \
+             dollars. {}",
+            made_skill::REMINDER_INSTEAD
+        );
+        let watch = trigger_answer(
+            "bitcoin-watch",
+            "net, speak",
+            "clock/local",
+            "field = \"known\"\nequals = true\ncooldown = \"90m\"\n",
+        );
+        let tasks = agent_answering(vec![]);
+        let agent = one_path_agent(&tasks, crate::make_skill_agent::MAKE_WITHIN);
+        let (url, served) = service_sent(vec![
+            (200, "internet: the Bitcoin price".to_owned()),
+            (200, priced),
+            (200, reminder),
+            (200, watch),
+        ]);
+        let told = make_with_by(
+            0,
+            None,
+            BTC,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&agent),
+        );
+        let sent = served.join().unwrap();
+        assert_eq!((sent.len(), tasks.hand_overs()), (4, 0), "{told}");
+        assert!(
+            sent[1].contains("A watch on something only the internet tells"),
+            "{}",
+            sent[1]
+        );
+        assert_eq!(told["made"], "bitcoin-watch", "{told}");
+        assert_eq!(told["code_waits_for_yes"], true, "{told}");
+        assert!(
+            told.to_string().contains("Every 90 minutes"),
+            "said back: {told}"
+        );
+        let words = crate::make_no_cannot::task_words(BTC);
+        let table = one_task_of(&copy, &words, crate::make_no_cannot::RUN);
+        assert_eq!(
+            table["trigger"]["topic"].as_str(),
+            Some("clock/local"),
+            "{table:?}"
+        );
+        let grants: Vec<&str> = table["grants"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(toml::Value::as_str)
+            .collect();
+        assert!(grants.contains(&"net"), "{table:?}");
+        crate::make_no_cannot::set_on_here(None);
+        net_make_here(None);
+        made_skill::set_loose_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// The Reviewer-lead's P2 on #7764: judged a quick reaction, a first
     /// draft that can't be read gets DeepSeek's repairs, each held to
     /// [`made_skill::quick_reaction`] as the first draft is: a repair on
