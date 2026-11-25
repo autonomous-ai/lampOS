@@ -293,6 +293,29 @@ fn would_block(error: &io::Error) -> bool {
     )
 }
 
+/// The TLS handshake, done before the socket is used. The socket's read
+/// timeout is [`POLL`], so a server slower than that to answer (a front such
+/// as Cloudflare, 240-1400 ms from a lamp) gives `WouldBlock` mid-handshake:
+/// that is a wait, bounded by `deadline` and seen against `cancel`, not a
+/// failed connect (#8622).
+fn handshake<T: Read + Write>(
+    connection: &mut rustls::ClientConnection,
+    io: &mut T,
+    cancel: &AtomicBool,
+    deadline: Instant,
+) -> Result<(), Stop> {
+    while connection.is_handshaking() {
+        match connection.complete_io(io) {
+            // Closed before the handshake ended: no progress can follow.
+            Ok((0, 0)) => return Err(Stop::Failed(Failure::Connect)),
+            Ok(_) => {}
+            Err(error) if would_block(&error) => waiting(cancel, deadline, Failure::Timeout)?,
+            Err(_) => return Err(Stop::Failed(Failure::Connect)),
+        }
+    }
+    Ok(())
+}
+
 /// Why a wait ended without its answer.
 enum Stop {
     Cancelled,
@@ -379,8 +402,16 @@ impl Client {
         }
         let name = rustls::pki_types::ServerName::try_from(self.address.host.clone())
             .map_err(|_| Stop::Failed(Failure::Connect))?;
-        let connection = rustls::ClientConnection::new(tls_config().map_err(Stop::Failed)?, name)
-            .map_err(|_| Stop::Failed(Failure::Connect))?;
+        let mut connection =
+            rustls::ClientConnection::new(tls_config().map_err(Stop::Failed)?, name)
+                .map_err(|_| Stop::Failed(Failure::Connect))?;
+        let mut tcp = tcp;
+        handshake(
+            &mut connection,
+            &mut tcp,
+            cancel,
+            Instant::now() + Duration::from_secs(ANSWER_WITHIN_S),
+        )?;
         Ok(Stream::Tls(Box::new(rustls::StreamOwned::new(
             connection, tcp,
         ))))
@@ -780,6 +811,96 @@ mod tests {
             client.request("AAAA", &cancel),
             Outcome::Failed(Failure::PublicKey)
         );
+    }
+
+    /// A TLS server that reads the ClientHello and answers nothing for
+    /// `silent`, then closes: slower than [`POLL`], as the relay's front.
+    fn slow_tls_server(silent: Duration) -> (Client, std::thread::JoinHandle<()>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            // Bounded: a client that sends no hello must not hang the test.
+            socket
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut hello = [0u8; 4096];
+            let _ = socket.read(&mut hello);
+            std::thread::sleep(silent);
+        });
+        let address = Address {
+            tls: true,
+            host: "127.0.0.1".into(),
+            port,
+            prefix: "/v1".into(),
+        };
+        (
+            Client::new(address, Zeroizing::new("account-key".into()), None),
+            server,
+        )
+    }
+
+    #[test]
+    fn a_handshake_slower_than_the_poll_is_waited_for() {
+        // #8622: the handshake's first read gives WouldBlock at POLL; it
+        // waits on, and the server closing is what ends it.
+        let (client, server) = slow_tls_server(Duration::from_millis(500));
+        let started = Instant::now();
+        let opened = client.open(&AtomicBool::new(false));
+        let took = started.elapsed();
+        server.join().unwrap();
+        assert!(matches!(opened, Err(Stop::Failed(Failure::Connect))));
+        assert!(
+            took >= Duration::from_millis(450),
+            "ended at {took:?}, not waited for"
+        );
+    }
+
+    #[test]
+    fn a_cancel_during_the_handshake_ends_it_within_the_poll() {
+        let (client, server) = slow_tls_server(Duration::from_millis(1500));
+        let cancel = Arc::new(AtomicBool::new(false));
+        let cancelling = {
+            let cancel = Arc::clone(&cancel);
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(300));
+                cancel.store(true, Ordering::Relaxed);
+            })
+        };
+        let started = Instant::now();
+        let opened = client.open(&cancel);
+        let took = started.elapsed();
+        cancelling.join().unwrap();
+        server.join().unwrap();
+        assert!(matches!(opened, Err(Stop::Cancelled)));
+        assert!(
+            took >= Duration::from_millis(250),
+            "ended at {took:?}, before the cancel"
+        );
+        assert!(
+            took < Duration::from_millis(1000),
+            "ended at {took:?}, not within the poll"
+        );
+    }
+
+    #[test]
+    fn a_handshake_past_its_deadline_is_a_timeout() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let mut tcp = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        tcp.set_read_timeout(Some(POLL)).unwrap();
+        let name = rustls::pki_types::ServerName::try_from("127.0.0.1".to_owned()).unwrap();
+        let mut connection =
+            rustls::ClientConnection::new(tls_config().ok().unwrap(), name).unwrap();
+        let started = Instant::now();
+        let shaken = handshake(
+            &mut connection,
+            &mut tcp,
+            &AtomicBool::new(false),
+            started + Duration::from_millis(300),
+        );
+        assert!(matches!(shaken, Err(Stop::Failed(Failure::Timeout))));
+        assert!(started.elapsed() >= Duration::from_millis(300));
+        drop(listener);
     }
 
     #[test]
