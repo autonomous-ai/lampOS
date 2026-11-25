@@ -376,6 +376,21 @@ moves the dates (Wed 25, Thu 26, Fri 27 Nov).
      matched in code against the whole utterance only, at least two words
      each, and each is tried against ordinary sentences in the app's
      tests: a bare "done" or "next" would catch "I'm done with dinner".
+   - **A line told to an app as a phrase offers none of that app's
+     tools** (the first builder's ruling at 16:44 on #8386). lamp-control
+     lists each app's listened phrases (`phrases.set`, from its connections
+     with `hear` and `phrase.heard`) beside its tools on `apps/tools`
+     (`phrases`, left out when none). The voice matches the turn's line
+     against them with the one match lamp-control tells `phrase.heard`
+     with (`lamp_msgs::phrase_in`), and on a match neither the section nor
+     the functions hold that app's tools, for every round of that turn;
+     the other apps' tools and the lamp's own stay, and the turn is not
+     ended. So "Hey Lamp, end workout" ends the session once, by the
+     phrase, and the model is never offered `end_session` for it. A plain
+     "Stop" is the lamp's own stop path, as above. The match is local, so
+     no turn waits on lamp-control; a phrase change reaches the voice
+     within 0.5 s (`apps/tools` is looked at twice a second). Only the
+     app's name is journaled, never the phrase or the line.
    - **When a stop is heard,** lamp-control ends the app's session: its
      `say`, its moves and its open `app.call`s (answered to the voice as
      stopped). It does not wait for the app to agree; the app is then told

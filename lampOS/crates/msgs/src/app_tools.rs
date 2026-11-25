@@ -328,8 +328,8 @@ impl AppTool {
 }
 
 /// A running app's tools: its manifest name, its title as shown, when its
-/// session began (the one running longest keeps the voice's section), and
-/// its tools.
+/// session began (the one running longest keeps the voice's section), its
+/// tools, and the phrases its connections listen for (`phrase.heard`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AppsTools {
@@ -337,6 +337,57 @@ pub struct AppsTools {
     pub title: String,
     pub since_ms: u64,
     pub tools: Vec<AppTool>,
+    /// The phrases lamp-control tells this app as `phrase.heard` when a
+    /// finished line holds one ([`phrase_in`]): the voice offers none of
+    /// the app's tools in such a line's turn, so the app's phrase and its
+    /// tool never both act on one line (#8386). None, and left out of the
+    /// message, when the app listens for none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub phrases: Vec<String>,
+}
+
+/// The most phrases told of one app on `apps/tools`: a client's own cap
+/// (lamp-control's `PHRASES_MAX`).
+pub const MOST_PHRASES: usize = 16;
+/// The longest phrase told, in characters (lamp-control's
+/// `PHRASE_MAX_CHARS`).
+pub const PHRASE_MOST_CHARS: usize = 64;
+
+/// A line's or a phrase's words as the phrase match sees them: split on
+/// anything but letters, digits and the apostrophe, lowercased, each
+/// without its apostrophes ("it's" and "its" are one).
+fn phrase_match_words(text: &str) -> Vec<String> {
+    text.split(|c: char| !c.is_alphanumeric() && c != '\'')
+        .map(|word| word.to_lowercase().replace('\'', ""))
+        .filter(|word| !word.is_empty())
+        .collect()
+}
+
+/// Whether the finished line `heard` holds `phrase`, as lamp-control
+/// matches it before it tells an app `phrase.heard` (one match for both
+/// sides): some run of whole heard words spells the phrase's words, their
+/// letters joined, so "goodnight" holds "good night" and the other way
+/// round; the heard run may end in one "s" more than the phrase ("lamps"
+/// for "lamp"), never fewer.
+pub fn phrase_in(heard: &str, phrase: &str) -> bool {
+    let wanted: String = phrase_match_words(phrase).concat();
+    if wanted.is_empty() {
+        return false;
+    }
+    let heard = phrase_match_words(heard);
+    (0..heard.len()).any(|start| {
+        let mut joined = String::new();
+        for word in &heard[start..] {
+            joined.push_str(word);
+            if joined == wanted || joined.strip_suffix('s') == Some(wanted.as_str()) {
+                return true;
+            }
+            if joined.len() > wanted.len() {
+                return false;
+            }
+        }
+        false
+    })
 }
 
 /// The tools of the apps running now, each with a session open, the newest
@@ -379,6 +430,15 @@ impl AppTools {
             }
             if app.tools.len() > MOST_TOOLS {
                 return Err(Invalid("more than 8 tools an app".into()));
+            }
+            if app.phrases.len() > MOST_PHRASES
+                || app.phrases.iter().any(|phrase| {
+                    phrase.chars().count() > PHRASE_MOST_CHARS || phrase.contains(['\n', '\r'])
+                })
+            {
+                return Err(Invalid(
+                    "an app's phrases are at most 16 lines of at most 64 characters".into(),
+                ));
             }
             for (at, tool) in app.tools.iter().enumerate() {
                 tool.check()?;
@@ -532,6 +592,7 @@ mod tests {
                 })),
                 outside: false,
             }],
+            phrases: Vec::new(),
         }
     }
 
@@ -690,5 +751,41 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    /// #8386: the phrase match both lamp-control and the voice read.
+    #[test]
+    fn a_phrase_is_in_a_line_as_lamp_control_tells_it() {
+        assert!(phrase_in("Hey Lamp, end workout.", "end workout"));
+        assert!(phrase_in("ENDWORKOUT", "end workout"));
+        assert!(phrase_in("goodnight lamps", "good night lamp"));
+        assert!(phrase_in("it's done now", "its done"));
+        assert!(!phrase_in("end the workout", "end workout"));
+        assert!(!phrase_in("goodnights lamp", "good night lamp"));
+        assert!(!phrase_in("anything", ""));
+        assert!(!phrase_in("", "end workout"));
+    }
+
+    /// An app's phrases on `apps/tools` are held to a client's own caps,
+    /// and an old message without them still reads.
+    #[test]
+    fn an_apps_phrases_are_held_to_the_clients_caps() {
+        let with = |phrases: Vec<String>| AppTools {
+            apps: vec![AppsTools { phrases, ..coach() }],
+        };
+        assert_eq!(with(vec!["end workout".into()]).check(), Ok(()));
+        assert!(
+            with((0..17).map(|n| format!("phrase {n}")).collect())
+                .check()
+                .is_err()
+        );
+        assert!(with(vec!["x".repeat(65)]).check().is_err());
+        assert!(with(vec!["end\nworkout".into()]).check().is_err());
+        let old: AppsTools = serde_json::from_value(json!({
+            "app": "gym-coach", "title": "Gym Coach", "since_ms": 1, "tools": []
+        }))
+        .unwrap();
+        assert!(old.phrases.is_empty());
+        assert!(serde_json::to_value(&old).unwrap().get("phrases").is_none());
     }
 }
