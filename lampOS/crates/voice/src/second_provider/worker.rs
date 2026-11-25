@@ -5996,6 +5996,14 @@ pub fn serve(
                 if let Ok(mut heeding) = heeding.lock() {
                     heeding.taking_follow_ups();
                 }
+                if crate::said_to_me::follow_ups_after_the_answer_on() {
+                    eprintln!(
+                        "lamp-voice second: a line begun over the lamp's answer is no follow-up: it has no voice print, and it is judged as before LAMP_FOLLOW_UPS (LAMP_FOLLOW_UPS_AFTER_THE_ANSWER)"
+                    );
+                    if let Ok(mut heeding) = heeding.lock() {
+                        heeding.taking_follow_ups_after_the_answer_only();
+                    }
+                }
             }
         }
         // Only a hearing of the name in the line's own sound names it for
@@ -8759,6 +8767,9 @@ pub(crate) struct Heeding {
     asked_line_after: Option<u64>,
     /// `LAMP_FOLLOW_UPS=on` ([`Self::taking_follow_ups`]).
     follow_ups: bool,
+    /// `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER=on`
+    /// ([`Self::taking_follow_ups_after_the_answer_only`]).
+    follow_ups_after_the_answer: bool,
     /// The request that took the first line's pass, so a line going on
     /// from it keeps the pass (the first builder's P2 on #8416).
     asked_first: Option<u64>,
@@ -10033,6 +10044,7 @@ impl Heeding {
             asked_looks: false,
             asked_line_after: None,
             follow_ups: false,
+            follow_ups_after_the_answer: false,
             asked_first: None,
             face_not_speaking: None,
             name_or_follow_up: false,
@@ -10521,6 +10533,21 @@ impl Heeding {
     /// (`LAMP_FOLLOW_UPS=on`, the product owner's rules, 25 Nov 2026).
     pub(crate) fn taking_follow_ups(&mut self) {
         self.follow_ups = true;
+    }
+
+    /// With [`Self::taking_follow_ups`], only lines begun after the lamp's
+    /// answer are follow-ups: one begun over it takes no follow-up pass and
+    /// is judged as before (`LAMP_FOLLOW_UPS_AFTER_THE_ANSWER=on`,
+    /// [`crate::said_to_me::FOLLOW_UPS_AFTER_THE_ANSWER`]).
+    pub(crate) fn taking_follow_ups_after_the_answer_only(&mut self) {
+        self.follow_ups_after_the_answer = true;
+    }
+
+    /// Whether `request` began over the lamp's answer and so, with
+    /// [`Self::taking_follow_ups_after_the_answer_only`], takes no
+    /// follow-up pass.
+    fn over_the_answer_no_follow_up(&self, request: u64) -> bool {
+        self.follow_ups && self.follow_ups_after_the_answer && self.began_over == Some(request)
     }
 
     /// How long a conversation goes on in a busy room from the end of the
@@ -12468,8 +12495,10 @@ impl Heeding {
             asked_looks: self.asked_looks,
             first_after_asked: self.first_after_asked(said.0, signs.continues_from),
             // `LAMP_FOLLOW_UPS`: in the window only another voice than the
-            // conversation's holds the line.
-            follow_ups: self.follow_ups,
+            // conversation's holds the line. With
+            // `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER`, not a line begun over the
+            // lamp's answer: it has no voice print, and is judged as before.
+            follow_ups: self.follow_ups && !self.over_the_answer_no_follow_up(request),
             another_voice,
             ..Default::default()
         };
@@ -12490,6 +12519,11 @@ impl Heeding {
         }
         let going_on = signs.going_on;
         let decision = crate::said_to_me::judge(line);
+        if going_on && self.over_the_answer_no_follow_up(request) {
+            eprintln!(
+                "lamp-voice second: request {request}: it began over the lamp's answer: no follow-up pass, it has no voice print; judged as before LAMP_FOLLOW_UPS (LAMP_FOLLOW_UPS_AFTER_THE_ANSWER)"
+            );
+        }
         // The next line after the same words of the lamp's is not the first;
         // the line that took the pass is kept for a line going on from it.
         if !heard.trim().is_empty() {
@@ -31070,6 +31104,67 @@ mod tests {
             "off: no look holds it, as before"
         );
         assert!(!answered(false, -1, 48_000), "off, another voice");
+    }
+
+    /// `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER` (the product owner on 26 Nov 2026:
+    /// several people talking, not to the lamp, are left alone). On lamp-74ff
+    /// that night, October's two-person battery let 41 lines said over the
+    /// lamp's answers out as follow-ups: a line begun over the lamp's voice
+    /// gets no print, so the window could never tell another voice there.
+    /// With the switch such a line is judged as before `LAMP_FOLLOW_UPS`:
+    /// with no look, the first is let out once as a cut-in (#8205) and the
+    /// next is held. A line begun after the answer is still a follow-up,
+    /// looking or not. Without the switch every such line is a follow-up.
+    #[test]
+    fn with_follow_ups_after_the_answer_a_line_over_the_answer_is_judged_as_before() {
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::second_provider::Heard;
+        // Whether line 9 is answered: `heed_signs` gives why it is held.
+        let answered = |after_only: bool, over: bool, one_used: bool| {
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let now_us = monotonic_us();
+            let mut heeding = product_heeding(eyes);
+            heeding.attention.tie_the_second_sign(true);
+            heeding.taking_follow_ups();
+            if after_only {
+                heeding.taking_follow_ups_after_the_answer_only();
+            }
+            heeding.look_free_used = one_used;
+            heeding.hear(
+                9,
+                Heard::Began {
+                    over_the_lamps_voice: over,
+                },
+            );
+            heeding.hear(9, Heard::Samples(&vec![1; 48_000]));
+            heeding.hear(9, Heard::Ended);
+            let signs = super::Signs {
+                going_on: true,
+                turned: None,
+                ..turned_signs(crate::room_told::Room::Unknown)
+            };
+            let line = "Did you finish the report?";
+            let held = heeding.heed_signs(9, (now_us, now_us + 2_200_000), line, signs);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            held.is_none()
+        };
+        assert!(
+            answered(false, true, true),
+            "LAMP_FOLLOW_UPS alone: over the answer, a follow-up"
+        );
+        assert!(
+            answered(true, true, false),
+            "over the answer, the first with no look: let out once as a cut-in"
+        );
+        assert!(
+            !answered(true, true, true),
+            "over the answer, the next with no look: held, as before"
+        );
+        assert!(
+            answered(true, false, true),
+            "after the answer: a follow-up, looking or not"
+        );
     }
 
     /// One face as [`product_looks`] gives it: its id, its mouth, its

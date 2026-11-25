@@ -6713,7 +6713,15 @@ after a take-over, but now for every turn:
   1.5 s by someone else; an answer to it keeps the window open. The row
   counts it: the lead's two-way legs (#7570, 18:25), and Twelve's quiet-room
   legs on #8656 (TV or a third voice 25 to 40 s after an answer, and a
-  two-turn TV exchange).
+  two-turn TV exchange). With `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER=on` (the
+  product owner, 26 Nov 2026), a line begun over the lamp's own answer
+  takes no follow-up pass and is judged as before
+  (`Heeding::over_the_answer_no_follow_up`). With no look, the first such
+  line is let out once as a cut-in (#8205) and the next is held. Such a line
+  has no voice print, so the window could never call it another voice. On
+  lamp-74ff on 26 Nov, October's two-person battery let 41 lines of two
+  people's talk over the lamp's answers through as follow-ups, and 40 were
+  answered.
 - **Who spoke a line, from the looks its mouth was read**
   (`LAMP_SPEAKING_READ_LOOKS=on`, #7442, #7419). A face is a line's speaker
   when it read `yes` in at least half of the line's looks
