@@ -170,7 +170,7 @@ impl ServiceGrant {
 }
 
 /// The plain grants' wire names, in [`Grant::ALL`]'s order.
-const PLAIN_WIRE: [&str; 14] = [
+const PLAIN_WIRE: [&str; 15] = [
     "body",
     "light",
     "speak",
@@ -185,6 +185,7 @@ const PLAIN_WIRE: [&str; 14] = [
     "speaker",
     "notes",
     "speech",
+    "volume",
 ];
 
 impl Serialize for Grant {
@@ -213,7 +214,8 @@ pub enum Grant {
     Body,
     /// The light, and feelings.
     Light,
-    /// `say` and `sound`; with `hear`, `turn.start`; `turn.end`.
+    /// `say` and `sound`; with `hear`, `turn.start`; `turn.end`; and all
+    /// [`Grant::Volume`] gives.
     Speak,
     /// Presence: arrivals, leavings, facing, standing up (positions, never
     /// who).
@@ -251,6 +253,11 @@ pub enum Grant {
     /// what it reads to the person, never what a person says to it
     /// (docs/control.md, "What the lamp says").
     Speech,
+    /// The speaker's volume alone (`volume`, the `volume` state and
+    /// `volume.changed`), never a sound: a skill a trigger starts may set it
+    /// and still tell only through the lamp's told answer (#8610, El's P2.2
+    /// on #8651). [`Grant::Speak`] gives it too ([`Grant::held_in`]).
+    Volume,
     /// One linked service, read or a write prepared, through lamp-services
     /// (`service.read`, `service.write`): only in a skill run's token, from
     /// the owner's yes, used only with `LAMP_SKILL_TASKS=on`
@@ -287,7 +294,7 @@ impl Grant {
     }
 
     /// Every grant this build knows, in the pairing screen's order.
-    pub const ALL: [Grant; 14] = [
+    pub const ALL: [Grant; 15] = [
         Self::Body,
         Self::Light,
         Self::Speak,
@@ -302,7 +309,15 @@ impl Grant {
         Self::Speaker,
         Self::Notes,
         Self::Speech,
+        Self::Volume,
     ];
+
+    /// Whether `grants` hold this grant: [`Grant::Volume`] is held by
+    /// [`Grant::Speak`] too, so a client or skill granted `speak` before
+    /// `volume` was its own still sets the volume.
+    pub fn held_in(self, grants: &std::collections::BTreeSet<Grant>) -> bool {
+        grants.contains(&self) || (self == Self::Volume && grants.contains(&Self::Speak))
+    }
 
     /// The words for every grant this build knows, by wire name: what the
     /// owner's app shows for a grant it has no label of its own for, so the
@@ -342,6 +357,7 @@ impl Grant {
             Self::Notes => {
                 "can keep small notes of its own on the lamp, which stay until it is let go"
             }
+            Self::Volume => "can change the speaker's volume, never play a sound",
             Self::Service(ServiceGrant {
                 access: Access::Read,
                 ..
@@ -422,7 +438,7 @@ impl EventKind {
             Self::PhraseHeard | Self::NameHeard => Some(Grant::Hear),
             Self::SoundHeard => Some(Grant::Sound),
             Self::AirChanged => Some(Grant::Air),
-            Self::VolumeChanged => Some(Grant::Speak),
+            Self::VolumeChanged => Some(Grant::Volume),
             Self::BodyState => Some(Grant::Body),
             Self::LampSaid => Some(Grant::Speech),
             Self::Touch | Self::Button | Self::Time | Self::LampChanged => None,
@@ -461,7 +477,7 @@ impl StateKind {
             Self::Presence => Some(Grant::Look),
             Self::Air => Some(Grant::Air),
             Self::Device => Some(Grant::Device),
-            Self::Volume => Some(Grant::Speak),
+            Self::Volume => Some(Grant::Volume),
             // The body's bounds and where it is: as `body.state`, with the
             // body grant.
             Self::Body => Some(Grant::Body),
@@ -857,8 +873,10 @@ impl Op {
             | Self::Sound { .. }
             | Self::SoundUpload { .. }
             | Self::SoundList {}
-            | Self::SoundRemove { .. }
-            | Self::Volume { .. } => vec![Grant::Speak],
+            | Self::SoundRemove { .. } => vec![Grant::Speak],
+            // The volume alone is not a sound (#8610): its own grant, which
+            // `speak` holds too (`Grant::held_in`).
+            Self::Volume { .. } => vec![Grant::Volume],
             Self::TurnEnd {} => vec![Grant::Speak],
             // A turn speaks and hears what is said to the lamp.
             Self::TurnStart { .. } => vec![Grant::Speak, Grant::Hear],
@@ -2000,6 +2018,7 @@ mod tests {
             Grant::Speaker,
             Grant::Notes,
             Grant::Speech,
+            Grant::Volume,
         ]
         .into_iter()
         .map(|grant| (json!(grant), grant.shown()))
@@ -2047,6 +2066,10 @@ mod tests {
                 (
                     json!("speech"),
                     "can read everything the lamp says out loud, which can be personal: it includes what it repeats back to you and what it reads to you from your mail and calendar, never what you say to it; every computer you give this to reads the same lines; what it has sent can't be taken back, and the computer may pass it on"
+                ),
+                (
+                    json!("volume"),
+                    "can change the speaker's volume, never play a sound"
                 ),
             ]
         );
@@ -2415,7 +2438,7 @@ mod tests {
     }
 
     #[test]
-    fn a_volume_asks_exactly_one_thing_and_needs_speak() {
+    fn a_volume_asks_exactly_one_thing_and_needs_volume_or_speak() {
         let checked = |frame: &str| parse(frame).map(|request| request.op.check());
         assert_eq!(checked(r#"{"id":1,"op":"volume","to":0}"#), Ok(Ok(())));
         assert_eq!(
@@ -2436,9 +2459,23 @@ mod tests {
         }
         assert!(parse(r#"{"id":1,"op":"volume","step":"sideways"}"#).is_err());
         let op = parse(r#"{"id":1,"op":"volume","to":30}"#).unwrap().op;
-        assert_eq!(op.needs(), vec![Grant::Speak]);
-        assert_eq!(StateKind::Volume.needs(), Some(Grant::Speak));
-        assert_eq!(EventKind::VolumeChanged.needs(), Some(Grant::Speak));
+        // The volume is not a sound (#8610, El's P2.2 on #8651): its own
+        // grant, which `speak` holds too; `volume` never holds a sound.
+        assert_eq!(op.needs(), vec![Grant::Volume]);
+        assert_eq!(StateKind::Volume.needs(), Some(Grant::Volume));
+        assert_eq!(EventKind::VolumeChanged.needs(), Some(Grant::Volume));
+        let held = |grants: &[Grant]| {
+            grants
+                .iter()
+                .copied()
+                .collect::<std::collections::BTreeSet<_>>()
+        };
+        assert!(Grant::Volume.held_in(&held(&[Grant::Volume])));
+        assert!(Grant::Volume.held_in(&held(&[Grant::Speak])));
+        assert!(!Grant::Volume.held_in(&held(&[Grant::Light, Grant::Speaker])));
+        assert!(!Grant::Speak.held_in(&held(&[Grant::Volume])));
+        let say = parse(r#"{"id":1,"op":"say","text":"Hi."}"#).unwrap().op;
+        assert_eq!(say.needs(), vec![Grant::Speak]);
         // Every line the lamp says needs its own grant, not `speak`: what a
         // computer has the lamp say is not the same as reading all it says.
         assert_eq!(EventKind::LampSaid.needs(), Some(Grant::Speech));

@@ -101,7 +101,7 @@ pub const NOT_SAID_BACK: &str =
 /// the say-back uses: the five a pushed skill's own permissions may ask
 /// say what `lamp_skills::package::grants_asked` says of them. `skills`
 /// is never one: a script never puts skills on the lamp ([`NEVER`]).
-pub const GRANTS: [(&str, &str); 12] = [
+pub const GRANTS: [(&str, &str); 13] = [
     ("body", "moves the lamp's body"),
     ("light", "changes the light"),
     ("speak", "speaks and plays sounds"),
@@ -117,6 +117,9 @@ pub const GRANTS: [(&str, &str); 12] = [
     ("microphone", "uses the microphone"),
     ("notes", "keeps small notes of its own on the lamp"),
     ("speech", "reads everything the lamp says out loud"),
+    // The volume alone, never a sound (#8610): a trigger's skill may hold
+    // it and still tell only through the lamp's told answer.
+    ("volume", "changes the speaker's volume"),
 ];
 
 /// lamp-control's grant a script never holds: putting skills on the lamp.

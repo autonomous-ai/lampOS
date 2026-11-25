@@ -31,7 +31,7 @@ pub const MOST_DEPTH: usize = 8;
 /// (`lamp_control::protocol`'s), then [`REMEMBER_GRANT`], an app's own. `net`
 /// and `logs` are manifest booleans, never grants, and a service's grant is
 /// never an app's own.
-pub const GRANTS: [&str; 15] = [
+pub const GRANTS: [&str; 16] = [
     "body",
     "light",
     "speak",
@@ -46,6 +46,7 @@ pub const GRANTS: [&str; 15] = [
     "speaker",
     "notes",
     "speech",
+    "volume",
     REMEMBER_GRANT,
 ];
 /// An app's own grant, no computer's: `apps.remember` on the app socket, a

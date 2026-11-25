@@ -63,7 +63,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 |---|---|
 | `body` | `gesture`, `move`, `play`, `look`, `joints`; with `light`, `express` |
 | `light` | `light`; with `body`, `express` |
-| `speak` | `say`, `sound`, `turn.end`, `volume`; with `hear`, `turn.start`; the `volume` state and `volume.changed` |
+| `speak` | `say`, `sound`, `turn.end`; with `hear`, `turn.start`; and all `volume` gives |
 | `look` | presence events and state: arrivals, leavings, facing, standing up, a hand in view. Positions, never who |
 | `hear` | `phrase.heard` for the client's own phrases (never the words around them), `name.heard`, `listen.set` (its own mute); with `speak`, `turn.start` |
 | `sound` | `sound.heard`, by class |
@@ -74,6 +74,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `camera` | `camera.snapshot`, `camera.stream`: the camera's pictures, the eyes' own newest frame, never while the lamp is private ("The camera"); `pose`: one person's pose in a JPEG of the computer's own, from the lamp's NPU ("Poses") |
 | `microphone` | `microphone.stream`: the room's sound as the ears hear it, 20 ms blocks, never while the lamp is private ("The microphone") |
 | `notes` | `notes.set`, `notes.get`, `notes.delete`, `notes.list`: its own small key/value notes kept on the lamp, which survive restarts and go with its revoke ("Notes" below) |
+| `volume` | `volume`, the `volume` state and `volume.changed`: the speaker's volume alone, never a sound. `speak` holds it too (`Grant::held_in`), so a client granted `speak` sets the volume as before; a skill a trigger starts may hold `volume` and still tell only through the lamp's told answer (#8610, [skills.md](skills.md)) |
 
 **Events**, pushed to a client that subscribed:
 
@@ -92,7 +93,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` (as read on lamp-75c9 on stable 12728, 13 Nov 2026; no lease holder and no quiet hours: a lease change is a `lease` event) and `muted_after_fault` (#8081, from code and unit tests, not yet read on a lamp): the lamp's mute is the restart guard's, put on after a fault and not the person's choice, so the lamp is deaf and every `say` is refused; from the voice's `voice/mute` with `muted_by` `restart_guard`; false for the person's button or sleep mute and for a computer's own mute. It never lifts a mute: that stays the owner's, with the lamp's own control or the owner's app, and a computer's `listen.set` `true` lifts only its own | `voice/state`, `lamp/pause`, privacy, `voice/mute` | none |
 | `body.state` | `joints`: `pitch`, `roll`, `yaw`, `shoulder`, `elbow`, each `deg`, `counts`, `goal_deg`, `load`, `moving`, `temp_c`; `lamp`: `light`, `talking`, `private` ("Where the body is") | `body/joint_states`, the body's `diagnostics`, the light and the voice | `body` (proposed: a read-only `body_state`, Queue #3997) |
 | `air.changed` | `pm1_0`, `pm2_5`, `pm4_0`, `pm10` (µg/m³), `co2_ppm`, `humidity` (%), `temperature` (°C at the sensor, inside the base), each to a tenth (carbon dioxide whole) and left out while the sensor doesn't know it; `feel` (`fresh`, `fine`, `stuffy`, `very_stuffy`, `unknown`) | `air/state`, every 5 s. Told on the first reading, then when a value moves by its step (particles 5, carbon dioxide 50 ppm, humidity 3, temperature 0.5 °C, `watch::AIR_STEPS`), comes or goes, or `feel` changes; at most every 5 s, the newest held back until then | `air` |
-| `volume.changed` | `level` (0–100 of what the lamp allows), `muted` | `speaker/volume`, which lamp-actions says after each change: the person's by voice or in the app, or a computer's | `speak` |
+| `volume.changed` | `level` (0–100 of what the lamp allows), `muted` | `speaker/volume`, which lamp-actions says after each change: the person's by voice or in the app, or a computer's | `volume` (or `speak`) |
 | `lamp.said` | `text`, `by` (`lamp`, `computer`), `source` (`reply`, `exact`, `cached`), `cut` (true when cut short) | `voice/line` ("What the lamp says") | `speech` |
 
 ### What the lamp says (`lamp.said`, grant `speech`)
@@ -124,7 +125,7 @@ lamp-control reads each topic on its own thread. A state topic's message that sa
 | `sound` | `name`: `hum`, the voice's built-in short hum (no file, no model), or one of the computer's own clips by name ("Sounds" below); the recorded notices are never a computer's, and no path is ever asked | `hum`: `say.sock` `{cue: "hum"}`, with say's quiet, rarity, privacy and busy gates. A clip: `say.sock` `{clip: PATH}`, its path in the clips folder, read by the voice with a skill sound's format and loudness checks and up to 30 s (`say::read_clip`) and played as an exact `say` is (`say::may_play_exact`). Its `done` follows | `speak` | no |
 | `notes.set`, `notes.get`, `notes.delete`, `notes.list` | a note of the computer's own, kept, read, dropped or listed ("Notes" below) | the state folder's `notes/` | `notes` |
 | `sound.upload`, `sound.list`, `sound.remove` | a clip of the computer's own, kept, listed or deleted ("Sounds" below) | the state folder's `sounds/` | `speak` | no |
-| `volume` | one of `to` (0–100), `step` (`up`, `down`) or `mute` (`true`, `false`) | lamp-actions' `call.sock` (`--actions-socket`): `volume_to`, `volume_step` or `volume_muted`, the speaker's only writer, so the person's own volume within its ceiling; the reply is the level it left, `{level, muted}` | `speak` | no |
+| `volume` | one of `to` (0–100), `step` (`up`, `down`) or `mute` (`true`, `false`) | lamp-actions' `call.sock` (`--actions-socket`): `volume_to`, `volume_step` or `volume_muted`, the speaker's only writer, so the person's own volume within its ceiling; the reply is the level it left, `{level, muted}` | `volume` (or `speak`) | no |
 | `turn.start` | `prompt` (optional) | `say.sock` `{turn: "start"}`, with its prompt as `text` ("Turns and listening") | `speak`, `hear` | no |
 | `turn.end` | | `say.sock` `{turn: "end", id}`, the id of this computer's own turn | `speak` | no |
 | `listen.set` | `on` | `say.sock` `{listen}` on one connection the door holds for the computer | `hear` | no |
@@ -506,7 +507,7 @@ in bytes, not characters, so `take_max_ms` and `say_max_chars`, which older lamp
 only with it. A `get` reply carries each state asked for: `presence`,
 `light`, `mood`, `lamp_state` for `lamp`, and `volume` (`{level, muted}`, from
 `speaker/volume`; `null` until lamp-actions has said it, and only with the
-`speak` grant). `air` (the `air` grant) is
+`volume` grant, or `speak`). `air` (the `air` grant) is
 the newest `air/state` reading, as `air.changed` tells it, with `known:
 true`. `device` (the `device` grant) is `board/state`'s `cpu_load`,
 `memory_used`, `disk_free`, `uptime_s` and `temperature_c`, with `known:
@@ -789,7 +790,7 @@ folded, may wait up to that long for its first motion to begin.
 | `notes.get` | `key` | `notes` | — |
 | `notes.delete` | `key` | `notes` | — |
 | `notes.list` | optional `prefix` (0–64 of the same characters) | `notes` | — |
-| `volume` | exactly one of `to` 0–100, `step` `up`/`down`, `mute` `true`/`false` | `speak` | — |
+| `volume` | exactly one of `to` 0–100, `step` `up`/`down`, `mute` `true`/`false` | `volume` (or `speak`) | — |
 | `stop` | — | — | — |
 | `turn.start` | optional `prompt`: words said first, as `say`'s `text` (no control characters, at most 900 UTF-8 bytes) | `speak` + `hear` | — |
 | `turn.end` | —; only a turn this computer started | `speak` | — |

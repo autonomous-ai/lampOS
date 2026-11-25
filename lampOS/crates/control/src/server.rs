@@ -1121,9 +1121,7 @@ impl Shared {
                     event["at"] = Value::String(at.clone());
                     let mut sent = Vec::new();
                     for open in self.open.lock().expect("open").values() {
-                        let granted = kind
-                            .needs()
-                            .is_none_or(|grant| open.grants.contains(&grant));
+                        let granted = kind.needs().is_none_or(|grant| grant.held_in(&open.grants));
                         if open.client.is_none() || !granted || !open.events.contains(&kind) {
                             continue;
                         }

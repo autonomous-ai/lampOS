@@ -22,6 +22,7 @@ pub const DOOR_GRANTS: &[&str] = &[
     "speaker",
     "notes",
     "speech",
+    "volume",
 ];
 
 /// An app's own grants beyond the door's, which no computer is paired with:
