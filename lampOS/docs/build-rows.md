@@ -1,10 +1,17 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-11-24 08:37 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the next post. It's a copy, cut once a day in the morning. The figures the first builder posts on #1711 every four hours are the live ones.
+Written by the first builder from the team's review page at 2026-11-25 13:10 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the next post. It's a copy, cut once a day in the morning. The figures the first builder posts on #1711 every four hours are the live ones.
 
-**Build 92.1% over 76 rows. Quality 72.4% over 17 rows.** For later (mood, and texting from the app): 48.8% over 4 rows, not in the build figure.
+**Build 91.9% over 76 rows. Quality 72.4% over 17 rows.** For later (mood, and texting from the app): 48.8% over 4 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
+
+**How a feature row proves it works well, and when its issue closes** (the lead's rule, 25 Nov 2026; for rows started from 26 Nov 07:00 +07). A row for a customer-facing feature (voice, body, eyes, memory, agent tasks, skills, apps) has two parts in the same kit run:
+
+1. **Function:** the fix works and does no harm, as before.
+2. **Quality:** the same thing done the way a customer does it, at least 10 times, with numbers against its quality item's threshold: the success rate, the median and p90 latency, every miss with its raw journal lines, and, for anything that moves, lights or speaks on its own, whether it looks alive and not mechanical.
+
+The quality part's kit becomes that item's gate test, so it is written once and every build is measured again. Each quality item's threshold is stated in numbers with its test (#8567); until an item has one, the quality part posts its numbers and the item's owner proposes the threshold for the lead's yes. Hotfixes, CI, docs and internal fixes keep a single row, as before. **An issue closes** when its fix is promoted, its function part passed, and its quality part is at or above the threshold.
 
 **Mood, for later:** the mood rows stay in V2 but out of the build figure, which counts the rows that ship. No day slot or new work goes into them until those reach 100% (the lead, 23 Oct on #1711). On 22 Oct the first builder had kept them in the figure as rows that aren't ship gates.
 
@@ -12,7 +19,7 @@ Written by the first builder from the team's review page at 2026-11-24 08:37 (+0
 
 | Row | Score | Issues | Owners | Where it is |
 |---|---|---|---|---|
-| The voice never dies (SD stalls, power cuts, midnight) | 0.93 | #784 #762 #1178 #6672 #8081 #8269 | fifth, eighth, el | 22 Nov 09:0x, up from 0.9: #8204 is fixed for customers on stable 15391, but a USB audio reset mid-run ends the voice and the guard brings it back muted (#8269, P1, lamp-06c1 this morning). |
+| The voice never dies (SD stalls, power cuts, midnight) | 0.96 | #784 #762 #1178 #6672 #8081 #8269 #8466 | fifth, eighth, el, heron | 24 Nov 13:4x, up from 0.93: on stable 15860 a microphone or speaker gone mid-run is waited for and opened again, so the voice comes back listening, not muted (#8288, its row on lamp-06c1 passing legs 1 and 1s). |
 | Speed: tool turns and comma pauses | 1.00 | #799 #782 | second, fourth |  |
 | Who is talking, and when not to answer | 0.95 | #753 #792 #800 #7297 | fourth, second, sixth | 22 Nov 09:0x, up from 0.93: a cut-in over the lamp’s own answer, with no name heard and no face in view, is answered on stable 15454, not held as said to nobody (#8212, P1 #8205 closed). |
 | Privacy switch closes both microphones | 1.00 | #795 | — |  |
@@ -21,7 +28,7 @@ Written by the first builder from the team's review page at 2026-11-24 08:37 (+0
 | Backup voice when Gemini is down | 0.50 | #778 #754 | sixth | 16 Nov 13:0x, down from 1.0: the product runs one voice route, and when that route is down the lamp says so and no second voice takes over. |
 | Gives way to a hand; wakes after power | 1.00 | #780 #790 #702 #703 #701 | fifth | Arm-goal guard merged (#1192) |
 | “Lamp, that was weird” marks a moment | 1.00 | #803 | sixth | 16 Nov 01:0x, unchanged at 1.0, the note put right: this is a builder’s review tool by decision, on lamp-4ace only (LAMP_MARK_WEIRD is set in no product unit, and switches.md counts it off on purpose), so it isn’t someth… |
-| The first five minutes | 0.95 | #841 #2843 #2844 #7219 | seventh, el, fifth | 17 Nov 14:1x, back up from 0.9: a fresh lamp’s setup ran end to end on stable 13753 with 21 more switches on (walk3e on lamp-52e6, 14:03–14:09): where_you_sit, who_you_are, touch and how_you_sound done, and the voice up … |
+| The first five minutes | 0.85 | #841 #2843 #2844 #7219 #8472 | seventh, el, fifth, migrate | 24 Nov 13:4x, down from 0.95: new homes set their lamps up on factory images from early November (8474 to 9980), so a new customer’s first five minutes run that software until the first update lands (#8472, P0). |
 | Speaks first when it should (the Policy) | 1.00 | #752 | second |  |
 | Each person’s memory kept apart | 1.00 | #764 | seventh |  |
 | Sleep, and waking on its name | 0.90 | #749 #714 #7219 | fourth, second, fifth, seventh | 16 Nov 20:2x, up from 0.85: the sleep a person asks for by voice is on again in the product, on stable 13500 since 19:00, after its walk on a freshly reset lamp-52e6 (#7318). |
@@ -40,7 +47,7 @@ Written by the first builder from the team's review page at 2026-11-24 08:37 (+0
 | Everything is a skill, core and installable, no one-off code | 0.85 | #940 #938 #1667 #1696 #1698 #2643 #2654 #2674 #2822 #2823 #2824 #2825 #2826 | seventh, fifth, thirteen, fourth, fourteen | 24 Oct 08:4x, up from 0.72: this row’s note was stale. |
 | An owner makes their own skill | 0.95 | #941 #1698 #2424 #2811 #2813 #2814 #2815 #2816 #7939 | sixth, ten, subdarren, blue, fourteen, seventh | 22 Nov 17:0x, unchanged at 0.95: left is #7939, a make asked in one breath with its content that read a headline instead (its fix #7952 is merged dark), with #7975 closed today by #8214 on stable 15454. |
 | A Skills Store to publish skills | 1.00 | #1698 #2801 #2802 | fourteen, mobile, backend3 | 31 Oct 11:1x, built: Take back ran too (Fourteen, 10:29, lamp-9adf on 9063): a made skill shared, approved, taken back by its owner and gone from the Store’s queue and downloads (Backend3). |
-| Updates over the internet, by themselves | 0.98 | #737 #1812 #7946 #6901 #7728 | migrate, second, first, sixth | 21 Nov 21:0x, up from 0.95 this morning: lamp-06c1 took all three of today’s promotes from the CDN by its own rounds, its updater changing each time, and a China-routed lamp updated and reported, 1883 blocked (#7693). |
+| Updates over the internet, by themselves | 0.85 | #737 #1812 #7946 #6901 #7728 #8472 | migrate, second, first, sixth | 24 Nov 13:4x, down from 0.98: new lamps leave the factory on images 8474 to 9980, which must climb before they update, and one in a new home stayed on 9980 for hours (#8472, P0). |
 | A voice cheaper than Gemini Live, as fast and as good | 1.00 | #754 #1686 #1712 #1973 #2135 #2136 | sixth, fourth, first, backend, third | 20 Oct 10:1x, built, by the lead’s rule (it works and it is fast enough are separate): on the main line since #1973, on lamp-4ace, and 32 of 32 answered for the lead on lamp-52e6. |
 | A person brings their own DeepSeek and Deepgram keys, in setup or the app | 0.80 | #2094 #2845 #2846 | fourteen, backend2, el | 6 Nov 17:3x, down from 0.90: LAMP_OWN_KEYS is off in the product, its last run was by hand on 21 Oct, and its fix waits on the broker team. |
 | Lamp 2 in the Autonomous app | 1.00 | #1396 | mobile, backend | 20 Oct 11:4x, built: the app's Skills page and name and time zone (ecm-sds-mobile#8, #9) merged into the app's v3 after their tries on lamp-0c89. |
