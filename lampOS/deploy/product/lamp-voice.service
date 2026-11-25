@@ -169,6 +169,10 @@ Environment=LAMP_NAME_AS_A_SENTENCE=on
 Environment=LAMP_NAME_SAID_TO_A_PERSON=on
 # LAMP_NAMED_ALWAYS: its why and rules are its row in docs/switches.md (#2191).
 Environment=LAMP_NAMED_ALWAYS=on
+# LAMP_CLEAR_CALL_NOT_DECLINED: a line whose words open with "Lamp" and whose name lamp-name heard at its start is not
+# declined by the model once, face or no face (the product owner's first rule, 25 Nov 2026). Its why and rules are
+# its row in docs/switches.md.
+Environment=LAMP_CLEAR_CALL_NOT_DECLINED=on
 # A hearing of the name inside one line's sound stays with that line: on lamp-4ace on 26 Oct (6919) a hearing in
 # "Can you pass me the charger? The white one." counted for the desk line begun 0.7 s after it, which was answered.
 Environment=LAMP_NAME_STAYS_IN_ITS_LINE=on

@@ -6134,7 +6134,16 @@ after a take-over, but now for every turn:
   taken once (`Engine::answering_named_to_a_face`, `NAMED_TO_A_FACE_ANSWER`
   as each call's result, the calls not run): asked again, a second decline
   ends the turn in silence. Without a face turned to the lamp, with the
-  name later in the line, or without the name, nothing changes. Not yet:
+  name later in the line, or without the name, nothing changes, but with
+  `LAMP_CLEAR_CALL_NOT_DECLINED=on` (the product owner's first rule of 25
+  Nov 2026: a clear "Hey Lamp" counts, face or no face): a line whose
+  words open with the lamp's own name set off as a call
+  (`attention::begins_with_the_name`, never a stand-in) and whose
+  `lamp-name` hearing at the line's start counted as its second sign
+  (`Attention::called_clearly`) has its `not_for_me` not taken once too,
+  told `CALLED_CLEARLY_ANSWER`, which claims no face
+  (`Engine::answering_clear_calls`). On lamp-74ff at 01:11:05 on 26 Nov
+  "Hey, Lamp. Good morning." was counted so and declined. Not yet:
   `not_for_me{}` written as words still ends such a turn, the Live route is
   unchanged, and the speaking face (`LAMP_SECOND_SPEAKING_FACE`) is not
   read here. The rule's own text call (`attention::called`) still lets out

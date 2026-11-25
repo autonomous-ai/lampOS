@@ -1146,6 +1146,23 @@ pub const NAME_AS_A_SENTENCE_ENVIRONMENT: &str = "LAMP_NAME_AS_A_SENTENCE";
 /// `not_for_me` on it is not taken ([`Engine::answering_named_to_a_face`]).
 pub const NAMED_ALWAYS_ENVIRONMENT: &str = "LAMP_NAMED_ALWAYS";
 
+/// `on` exactly, off unless set (the product owner's first rule of 25 Nov
+/// 2026: a clear "Hey Lamp" counts, face or no face): a line whose words
+/// open with the lamp's own name set off as a call
+/// ([`crate::attention::begins_with_the_name`], never a stand-in) and whose
+/// name lamp-name heard at its start, counted as a second sign
+/// ([`crate::attention::Attention::called_clearly`]), has the model's
+/// `not_for_me` not taken once, as [`NAMED_ALWAYS_ENVIRONMENT`] does with a
+/// face turned to the lamp ([`Engine::answering_clear_calls`]). On
+/// lamp-74ff on 26 Nov at 01:11:05 "Hey, Lamp. Good morning." was heard so
+/// and let out by its name, and the model called `not_for_me`.
+pub const CLEAR_CALL_NOT_DECLINED_ENVIRONMENT: &str = "LAMP_CLEAR_CALL_NOT_DECLINED";
+
+/// [`CLEAR_CALL_NOT_DECLINED_ENVIRONMENT`] from this worker's environment.
+pub(crate) fn clear_call_not_declined_on() -> bool {
+    std::env::var(CLEAR_CALL_NOT_DECLINED_ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
 /// Where the worker reads whether a reply to a line told
 /// `worker::CONVERSATION_ALONE` that opens with the words "not for me" is
 /// taken as `not_for_me` ([`Engine::declining_in_words`]): `on`, and nothing
@@ -1422,6 +1439,43 @@ const NAMED_AGENT_NOT_RUN: &str = "Not run: the person asked another agent to do
 /// ([`NAMED_ALWAYS_ENVIRONMENT`]): the model is asked once more.
 pub(crate) const NAMED_TO_A_FACE_ANSWER: &str =
     "Not taken: they called you by name while facing you, so this is said to you. Answer them.";
+
+/// What a `not_for_me` is answered in a turn whose words and hearing both
+/// called the lamp by name ([`CLEAR_CALL_NOT_DECLINED_ENVIRONMENT`]): the
+/// model is asked once more.
+pub(crate) const CALLED_CLEARLY_ANSWER: &str =
+    "Not taken: they called you by name, so this is said to you. Answer them.";
+
+/// How a request's `not_for_me` is not taken once: called by name to a
+/// face turned to the lamp ([`NAMED_ALWAYS_ENVIRONMENT`]), or called by name
+/// in its words and its hearing ([`CLEAR_CALL_NOT_DECLINED_ENVIRONMENT`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CalledByName {
+    Faced,
+    Clearly,
+}
+
+impl CalledByName {
+    /// What the model's `not_for_me` is answered.
+    fn answer(self) -> &'static str {
+        match self {
+            Self::Faced => NAMED_TO_A_FACE_ANSWER,
+            Self::Clearly => CALLED_CLEARLY_ANSWER,
+        }
+    }
+
+    /// Why, as the journal says it.
+    fn why(self) -> &'static str {
+        match self {
+            Self::Faced => {
+                "it began with the lamp's name said to a face turned to the lamp (LAMP_NAMED_ALWAYS)"
+            }
+            Self::Clearly => {
+                "its words opened with the lamp's name and lamp-name heard it at the line's start (LAMP_CLEAR_CALL_NOT_DECLINED)"
+            }
+        }
+    }
+}
 
 /// Where the worker reads whether a skill's answer with `"look": true`
 /// (`skills/look-for-things`' `look_for`, #941) asks the coordinator for
@@ -2296,6 +2350,9 @@ struct Shared {
     /// Whether a request began with the lamp's name said to a face turned
     /// to the lamp ([`Engine::answering_named_to_a_face`]).
     named_to_a_face: Option<Busy>,
+    /// Whether a request's words and hearing both called the lamp by name
+    /// ([`Engine::answering_clear_calls`]).
+    called_clearly: Option<Busy>,
     /// The Policy's decision for a line that waits for it
     /// ([`Engine::asking_the_policy`], [`WAITS_FOR_POLICY`]).
     policy_now: Option<PolicyNow>,
@@ -4627,6 +4684,23 @@ struct Written {
 }
 
 impl Shared {
+    /// How a spoken request (`heard`) was called by name so that the
+    /// model's `not_for_me` on it is not taken once: to a face turned to
+    /// the lamp ([`Engine::answering_named_to_a_face`]) before by its words
+    /// and hearing ([`Engine::answering_clear_calls`]).
+    fn called_by_name(&self, heard: bool, request: u64) -> Option<CalledByName> {
+        let asks = |hook: &Option<Busy>| hook.as_ref().is_some_and(|hook| hook(request));
+        if !heard {
+            None
+        } else if asks(&self.named_to_a_face) {
+            Some(CalledByName::Faced)
+        } else if asks(&self.called_clearly) {
+            Some(CalledByName::Clearly)
+        } else {
+            None
+        }
+    }
+
     /// A piece of `request`'s answer handed to the saying half; the first of
     /// a newer request's starts the record afresh.
     fn wrote_piece(&self, request: u64, words: &str) {
@@ -5588,6 +5662,7 @@ impl Engine {
                 busy: None,
                 round_one_held: None,
                 named_to_a_face: None,
+                called_clearly: None,
                 policy_now: None,
                 call_note: None,
                 name_sounded: None,
@@ -6648,6 +6723,17 @@ impl Engine {
     pub fn answering_named_to_a_face(mut self, named: Busy) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.named_to_a_face = Some(named);
+        }
+        self
+    }
+
+    /// Whether a request's words opened with the lamp's name and lamp-name
+    /// heard it at the line's start (`LAMP_CLEAR_CALL_NOT_DECLINED=on`): the
+    /// model's `not_for_me` on it is not taken, and it is asked once more,
+    /// told it was called ([`CALLED_CLEARLY_ANSWER`]). Before any turn only.
+    pub fn answering_clear_calls(mut self, clear: Busy) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.called_clearly = Some(clear);
         }
         self
     }
@@ -21418,11 +21504,7 @@ async fn answer(
                     ),
                 }
                 if calls.is_empty() && !text.chars().any(char::is_alphanumeric) && !queue.started {
-                    let named = heard
-                        && shared
-                            .named_to_a_face
-                            .as_ref()
-                            .is_some_and(|named| named(request));
+                    let named = shared.called_by_name(heard, request).is_some();
                     if name == NOT_FOR_ME && !named {
                         return Err(Stop::Declined);
                     }
@@ -22450,12 +22532,10 @@ async fn answer(
             let first_calls = !called_earlier;
             called_earlier |= !calls.is_empty();
             if calls.iter().any(|call| call.name == NOT_FOR_ME) {
-                let named = heard
-                    && shared
-                        .named_to_a_face
-                        .as_ref()
-                        .is_some_and(|named| named(request));
-                if !named || std::mem::replace(&mut named_asked_again, true) {
+                let named = shared.called_by_name(heard, request);
+                let Some(named) =
+                    named.filter(|_| !std::mem::replace(&mut named_asked_again, true))
+                else {
                     // The person the lamp asked, answering its question:
                     // asked to say it again, not declined (Queue #4710).
                     if ask_again_instead(!first_calls, held_forget_ran)
@@ -22464,13 +22544,15 @@ async fn answer(
                         return asked_again_for_a_decline(&mut queue, request, round).await;
                     }
                     return Err(Stop::Declined);
-                }
-                // Called by name while faced (#2191): the decline is not
-                // taken, and the model is asked once more. Every call of
-                // the round is answered so, none run: the next round calls
-                // again what it needs.
+                };
+                // Called by name while faced (#2191), or by its words and
+                // hearing both (`LAMP_CLEAR_CALL_NOT_DECLINED`): the decline
+                // is not taken, and the model is asked once more. Every call
+                // of the round is answered so, none run: the next round
+                // calls again what it needs.
                 eprintln!(
-                    "lamp-voice second: request {request} chat round {round}: not_for_me not taken: it began with the lamp's name said to a face turned to the lamp (LAMP_NAMED_ALWAYS); asked once more"
+                    "lamp-voice second: request {request} chat round {round}: not_for_me not taken: {}; asked once more",
+                    named.why()
                 );
                 messages.push(Message::assistant_calls_with(
                     Some(std::mem::take(&mut text)),
@@ -22478,10 +22560,7 @@ async fn answer(
                     reasoning.take(),
                 ));
                 for call in &calls {
-                    messages.push(Message::tool(
-                        call.id.clone(),
-                        NAMED_TO_A_FACE_ANSWER.to_owned(),
-                    ));
+                    messages.push(Message::tool(call.id.clone(), named.answer().to_owned()));
                 }
                 continue;
             }

@@ -3367,6 +3367,8 @@ fn second_route_worker_environment(
         // An ask left on its holding line is not told to later turns.
         crate::second_provider::LATE_ANSWER_LET_GO_ENVIRONMENT,
         crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
+        // A clear call by name, words and hearing, the same rule unfaced.
+        crate::second_provider::CLEAR_CALL_NOT_DECLINED_ENVIRONMENT,
         crate::remember::HITS_ENVIRONMENT,
         // A don't-know about the person recalls their kept things first (C57).
         crate::dont_know::ENVIRONMENT,
@@ -3807,6 +3809,7 @@ mod tests {
             crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT,
             crate::second_provider::LATE_ANSWER_LET_GO_ENVIRONMENT,
             crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
+            crate::second_provider::CLEAR_CALL_NOT_DECLINED_ENVIRONMENT,
             crate::dont_know::ENVIRONMENT,
             crate::remember::doubted::UNDOES_ENVIRONMENT,
             crate::remember::heard::NEAR_ENVIRONMENT,
@@ -5041,6 +5044,7 @@ mod tests {
                     || name == crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT
                     || name == crate::second_provider::LATE_ANSWER_LET_GO_ENVIRONMENT
                     || name == crate::second_provider::NAMED_ALWAYS_ENVIRONMENT
+                    || name == crate::second_provider::CLEAR_CALL_NOT_DECLINED_ENVIRONMENT
                     || name == crate::remember::HITS_ENVIRONMENT
                     || name == crate::dont_know::ENVIRONMENT
                     || name == crate::remember::doubted::UNDOES_ENVIRONMENT
@@ -5255,6 +5259,7 @@ mod tests {
                     "LAMP_CARRIED_LINES_KEEP_TALK=on",
                     "LAMP_CARRY_UNANSWERED_SOUND=on",
                     "LAMP_CHOSEN_VOICE=on",
+                    "LAMP_CLEAR_CALL_NOT_DECLINED=on",
                     "LAMP_CONVERSATION_CARRIED_MEMORY=on",
                     "LAMP_CONVERSATION_CARRIED_SAVES=on",
                     "LAMP_CONVERSATION_CARRIES=on",

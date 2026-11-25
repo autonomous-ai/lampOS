@@ -5916,6 +5916,20 @@ pub fn serve(
             std::env::var(crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT)
                 .is_ok_and(|value| value == "on"),
         );
+        if crate::second_provider::clear_call_not_declined_on() {
+            eprintln!(
+                "lamp-voice second: a line whose words open with the lamp's name, which lamp-name heard at its start, is said to the lamp: the model's not_for_me on it is not taken once, face or no face (LAMP_CLEAR_CALL_NOT_DECLINED)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.not_declining_clear_calls();
+            }
+            let heeding = heeding.clone();
+            engine = engine.answering_clear_calls(Arc::new(move |request| {
+                heeding
+                    .lock()
+                    .is_ok_and(|heeding| heeding.called_clearly(request))
+            }));
+        }
         if crate::remark_about_it::on() {
             eprintln!(
                 "lamp-voice second: in a busy room, a remark about the lamp is held, and an answer let out for its name in the room's sound alone opens no conversation (LAMP_REMARK_ABOUT_IT)"
@@ -8681,6 +8695,11 @@ pub(crate) struct Heeding {
     /// The request judged last, if it began with the lamp's name said to a
     /// face turned to the lamp ([`named_to_a_face`]).
     named_faced: Option<u64>,
+    /// `LAMP_CLEAR_CALL_NOT_DECLINED=on` ([`Self::not_declining_clear_calls`]).
+    clear_calls: bool,
+    /// The request judged last, if its words and its hearing both called the
+    /// lamp by name ([`crate::attention::Attention::called_clearly`]).
+    clear_called: Option<u64>,
     /// The request judged last, if the person the lamp asked said it
     /// ([`asked_person_said`], `LAMP_ANSWER_ASK_AGAIN`).
     asked_one: Option<u64>,
@@ -9997,6 +10016,8 @@ impl Heeding {
             voice_ends_going_on: false,
             named_always: false,
             named_faced: None,
+            clear_calls: false,
+            clear_called: None,
             asked_one: None,
             answer_again: false,
             not_own: false,
@@ -10213,6 +10234,20 @@ impl Heeding {
     /// taken ([`Self::named_to_a_face`]).
     pub(crate) fn always_answering_named(&mut self) {
         self.named_always = true;
+    }
+
+    /// A line whose words open with the lamp's own name set off as a call
+    /// and whose name lamp-name heard at its start, counted as its second
+    /// sign, has the model's `not_for_me` not taken once, face or no face
+    /// (`LAMP_CLEAR_CALL_NOT_DECLINED=on`, [`Self::called_clearly`]).
+    pub(crate) fn not_declining_clear_calls(&mut self) {
+        self.clear_calls = true;
+    }
+
+    /// Whether `request` was judged called by name in both its words and its
+    /// hearing, with [`Self::not_declining_clear_calls`].
+    pub(crate) fn called_clearly(&self, request: u64) -> bool {
+        self.clear_called == Some(request)
     }
 
     /// The lamp's own answers to lines let out only as the conversation
@@ -13130,6 +13165,11 @@ impl Heeding {
                 );
             }
         }
+        // `LAMP_CLEAR_CALL_NOT_DECLINED`: its words and its hearing both
+        // called the lamp, so the model's `not_for_me` on it is not taken
+        // once (`Engine::answering_clear_calls`).
+        self.clear_called =
+            (self.clear_calls && self.attention.called_clearly()).then_some(request);
         let turned = signs.turned.filter(|_| self.strict);
         // `LAMP_SAME_SPEAKER_CARRIES`: a print come after its line's verdict
         // is another voice's only when it is sure (`Voices::sure_of_another_only`).
