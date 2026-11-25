@@ -805,6 +805,13 @@ struct Ask {
     /// ([`wrapper_text_for`]).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     one_path: bool,
+    /// [`BY_DEFAULT_SWITCH`] on in the round that asked: the one-shot then
+    /// starts or restarts the gateway only while OpenClaw is the lamp's
+    /// default agent, as lamp-tasks says it right before ([`steps`]). Off
+    /// (an ask of an earlier build, the image's pre-install): always, as
+    /// before.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    by_default: bool,
 }
 
 /// The install as [`RECORD`] has it, when lamp-update could have written
@@ -953,12 +960,18 @@ pub fn ask_install(records: &Path, shown: Shown) -> io::Result<()> {
 }
 
 fn ask(records: &Path, remove: bool, shown: Shown) -> io::Result<()> {
+    ask_with(records, remove, shown, false)
+}
+
+/// [`ask`], with [`Ask::by_default`].
+fn ask_with(records: &Path, remove: bool, shown: Shown, by_default: bool) -> io::Result<()> {
     let text = serde_json::to_vec(&Ask {
         version: 1,
         remove,
         skills: shown.skills,
         tasks: shown.tasks,
         one_path: shown.one_path,
+        by_default,
     })
     .map_err(io::Error::other)?;
     write_whole(&records.join(ASK), &text, 0o600)
@@ -997,6 +1010,7 @@ pub fn after_round(
         records,
         shown,
         Gateway::Wanted,
+        false,
         systemd,
         run,
         now_unix_ms,
@@ -1009,13 +1023,19 @@ pub fn after_round(
 /// #8105): wanted, it is enabled and started as before; not wanted, it is
 /// stopped and not started at boot, and agent `main`'s allow-list entry,
 /// which goes through the running gateway, waits for a round that wants
-/// it; unknown, it is left as it is.
+/// it; unknown, it is left as it is. `by_default`: [`BY_DEFAULT_SWITCH`]
+/// on, handed to the one-shot in its ask ([`Ask::by_default`]), so it
+/// starts the gateway only while OpenClaw is the default. With the other
+/// engine's gateway on too, main stops the unwanted gateway before this
+/// runs and passes a wanted one as unknown while the other still runs
+/// ([`crate::gateway_keeper::round_gateways`]).
 #[allow(clippy::too_many_arguments)]
 pub fn after_round_with(
     root: &Path,
     records: &Path,
     shown: Shown,
     gateway: Gateway,
+    by_default: bool,
     systemd: &mut dyn Systemd,
     run: &mut Runner,
     now_unix_ms: u64,
@@ -1093,10 +1113,14 @@ pub fn after_round_with(
     // A gateway not wanted (#8105) asks no one-shot for the allow-list,
     // which goes through the running gateway: it would start it every round
     // only to be stopped again. The entry is added by a round that wants it.
-    // #7868: the gateway block is read here only; the one-shot writes it.
+    // #7868: the gateway block is read here only; the one-shot writes it,
+    // checked through the running gateway, and restarts the gateway on it:
+    // asked only while the gateway may run, so the one-shot never works on
+    // a gateway the other engine's has replaced. OpenClaw's own files (the
+    // launcher) are still kept, so a switch back to OpenClaw is fast.
     let due = (allowlist_due && gateway != Gateway::NotWanted)
         || launcher_due(root, shown)
-        || (there && gateway_block_due(root));
+        || (there && gateway != Gateway::NotWanted && gateway_block_due(root));
     if there && !due {
         if before
             .as_ref()
@@ -1140,7 +1164,7 @@ pub fn after_round_with(
     if !hermes_first {
         say(&format!("OpenClaw may be installed now: {}", window.name()));
     }
-    if let Err(error) = ask(records, false, shown) {
+    if let Err(error) = ask_with(records, false, shown, by_default) {
         say(&format!(
             "OpenClaw is not installed: {ASK} not written: {error}"
         ));
@@ -1224,12 +1248,12 @@ pub enum Gateway {
 }
 
 /// What lamp-tasks says on its read for lamp-update (#8105): the lamp's
-/// default engine (`None` when it has none), and whether OpenClaw is in
-/// use whatever the default (`None` from a lamp-tasks that doesn't say).
+/// default engine (`None` when it has none). Any other field of its answer
+/// (an older lamp-tasks' `openclaw_in_use`, say) is not read: the gateways
+/// follow the default only.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Said {
     pub default: Option<String>,
-    pub openclaw_in_use: Option<bool>,
 }
 
 /// lamp-tasks' answer at `socket`, `None` when it does not answer (down,
@@ -1262,31 +1286,23 @@ fn default_of(reply: &str) -> Option<Said> {
             .map(str::trim)
             .filter(|engine| !engine.is_empty())
             .map(str::to_owned),
-        openclaw_in_use: reply
-            .get("openclaw_in_use")
-            .and_then(serde_json::Value::as_bool),
     })
 }
 
 /// The rule (#8105): with the switch off, always [`Gateway::Wanted`]. On:
-/// wanted while OpenClaw is the default **or in use** (a launch or run
-/// waited for its Gateway within lamp-tasks' hold, the first builder's
-/// 15:29 on #8116); not wanted only while lamp-tasks says another default
-/// and OpenClaw not in use; unknown otherwise (no answer, or a lamp-tasks
-/// that doesn't say whether it's in use), so a guess never stops it.
+/// wanted while lamp-tasks says OpenClaw is the lamp's default agent, not
+/// wanted while it says another, unknown with no answer or no default
+/// said, so a guess never starts or stops it. The default only: one agent
+/// gateway runs at a time (the owner's rule), so no hold keeps OpenClaw's
+/// up after a switch away (#8105's 4 h `openclaw_in_use` hold is gone).
 pub fn gateway_wanted(by_default: bool, said: Option<Said>) -> Gateway {
     if !by_default {
         return Gateway::Wanted;
     }
-    let Some(said) = said else {
-        return Gateway::Unknown;
-    };
-    if said.default.as_deref() == Some("openclaw") || said.openclaw_in_use == Some(true) {
-        return Gateway::Wanted;
-    }
-    match (said.default, said.openclaw_in_use) {
-        (Some(_), Some(false)) => Gateway::NotWanted,
-        _ => Gateway::Unknown,
+    match said.and_then(|said| said.default).as_deref() {
+        Some("openclaw") => Gateway::Wanted,
+        Some(_) => Gateway::NotWanted,
+        None => Gateway::Unknown,
     }
 }
 
@@ -1307,13 +1323,20 @@ pub fn keep_gateway(
     }
 }
 
-/// Between rounds (#8105): with OpenClaw there ([`WRAPPER`] and its unit),
-/// the gateway kept as [`Gateway`] says. Each change is said once; a
-/// gateway already as wanted is left with no word. A gateway started here
-/// with the one run path on (`one_path`) gets agent `main`'s allow-list
-/// entry added at once ([`keep_run_entry`], which waits for it to be
-/// ready), as a round adds it, so a first make after OpenClaw is chosen
-/// doesn't wait for the next round (Twelve's P2 on #8116).
+/// Between rounds (#8105), one look of [`crate::gateway_keeper`]'s: with
+/// OpenClaw there ([`WRAPPER`] and its unit), the gateway kept as
+/// [`Gateway`] says; not wanted, it is disabled and stopped whether OpenClaw
+/// is there or not, so a gateway left running never holds the other
+/// engine's start. Each change is said once; a gateway already as wanted is
+/// left with no word. While Harness's one-shot is at work (an install or its
+/// steps run through the gateway), a wanted gateway is left to it, but an
+/// unwanted one is still stopped and kept disabled: the one-shot never
+/// starts one that isn't wanted (`steps`). A gateway started here with the
+/// one run path on (`one_path`) gets agent `main`'s allow-list entry tried
+/// once at once ([`run_entry_once`]), never waited for (Twelve's P2 on
+/// #8116): whether the entry is still owed (the gateway not ready yet) is
+/// returned (`Some(true)`; `Some(false)` taken, refused or not tried), or
+/// `None` when nothing was started or stopped.
 pub fn keep_between_rounds(
     root: &Path,
     systemd: &mut dyn Systemd,
@@ -1321,21 +1344,14 @@ pub fn keep_between_rounds(
     one_path: bool,
     run: &mut Runner,
     say: &mut dyn FnMut(&str),
-) {
+) -> Option<bool> {
     let there = fs::symlink_metadata(on(root, WRAPPER)).is_ok()
         && fs::symlink_metadata(unit_path(root)).is_ok();
-    if !there {
-        return;
+    if !there && gateway != Gateway::NotWanted {
+        return None;
     }
-    // Harness's one-shot at work (an install or its steps run through the
-    // gateway): left to it, and kept again at the next look.
-    let one_shot = systemd
-        .states(&[harness_install::UNIT.to_owned()])
-        .ok()
-        .and_then(|states| states.into_iter().next())
-        .is_some_and(|state| state.active == "active" || state.active == "activating");
-    if one_shot {
-        return;
+    if one_shot_at_work(systemd) && gateway != Gateway::NotWanted {
+        return None;
     }
     // Already as wanted: nothing run, nothing said, every KEEP_EVERY.
     let enabled = fs::symlink_metadata(on(root, WANTS)).is_ok();
@@ -1355,19 +1371,48 @@ pub fn keep_between_rounds(
         Gateway::NotWanted => !enabled && down,
         Gateway::Unknown => true,
     };
-    if !settled {
-        if gateway == Gateway::Wanted && !failed {
-            say(&format!(
-                "{UNIT} started: OpenClaw is the lamp's agent (#8105)"
-            ));
-        }
-        keep_gateway(root, systemd, gateway, false, say);
-        if gateway == Gateway::Wanted && one_path && keep_run_entry(run, say) == Some(false) {
+    if settled {
+        return None;
+    }
+    if gateway == Gateway::Wanted && !failed {
+        say(&format!(
+            "{UNIT} started: OpenClaw is the lamp's agent (#8105)"
+        ));
+    }
+    keep_gateway(root, systemd, gateway, false, say);
+    if gateway != Gateway::Wanted || !one_path {
+        return Some(false);
+    }
+    match run_entry_once(run, say) {
+        Some(false) => {
             say(&format!(
                 "agent {RUN_AGENT}'s allow-list entry not taken after the gateway started; the next round asks the one-shot"
             ));
+            Some(false)
         }
+        Some(true) => Some(false),
+        None => Some(true),
     }
+}
+
+/// Whether Harness's one-shot ([`harness_install::UNIT`]) is at work
+/// (`active` or `activating`).
+pub fn one_shot_at_work(systemd: &mut dyn Systemd) -> bool {
+    systemd
+        .states(&[harness_install::UNIT.to_owned()])
+        .ok()
+        .and_then(|states| states.into_iter().next())
+        .is_some_and(|state| state.active == "active" || state.active == "activating")
+}
+
+/// Whether the gateway is down as systemd says it (`inactive` or
+/// `failed`): a state not read, or any other (`active`, `activating`,
+/// `deactivating`, `reloading`), is not down.
+pub fn gateway_down(systemd: &mut dyn Systemd) -> bool {
+    matches!(
+        gateway_state(systemd).as_deref(),
+        Some("inactive" | "failed")
+    )
 }
 
 /// The gateway not wanted (#8105): [`WANTS`] taken out (systemd reloaded),
@@ -1708,11 +1753,31 @@ fn install_with(
     say: &mut dyn FnMut(&str),
     kit: &Kit,
 ) -> Result<Option<OpenclawInstall>, String> {
+    let socket = root.join(TASKS_APP_SOCKET.trim_start_matches('/'));
+    install_said(root, records, run, now_unix_ms, say, kit, &mut || {
+        said_default(&socket)
+    })
+}
+
+/// [`install_with`], lamp-tasks' answer read through `said` (asked only
+/// with [`Ask::by_default`], right before each start or restart of the
+/// gateway).
+fn install_said(
+    root: &Path,
+    records: &Path,
+    run: &mut Runner,
+    now_unix_ms: &mut dyn FnMut() -> u64,
+    say: &mut dyn FnMut(&str),
+    kit: &Kit,
+    said: &mut dyn FnMut() -> Option<Said>,
+) -> Result<Option<OpenclawInstall>, String> {
     let Ok(bytes) = fs::read(records.join(ASK)) else {
         return Ok(None);
     };
     let asked = serde_json::from_slice::<Ask>(&bytes).unwrap_or_default();
     let _lock = lock_named(records, LOCK, "OpenClaw")?;
+    let by_default = asked.by_default;
+    let mut wanted = || gateway_wanted(by_default, said());
     let said = if asked.remove {
         remove_entry_points(root, run, say);
         let _ = fs::remove_file(records.join(RECORD));
@@ -1730,6 +1795,7 @@ fn install_with(
                 tasks: asked.tasks,
                 one_path: asked.one_path,
             },
+            &mut wanted,
         );
         if said.install == "failed" {
             remove_entry_points(root, run, say);
@@ -1779,6 +1845,16 @@ fn remove_entry_points(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str))
 /// removed, and agent `main`'s exec allow-list edited through the running
 /// gateway ([`exec_allowlist`]). OpenClaw there already: only the
 /// launcher and the allow-list, when not done yet.
+///
+/// One agent gateway at a time: `wanted` ([`gateway_wanted`], read right
+/// before) says whether the gateway may be (re)started. Wanted (always with
+/// [`BY_DEFAULT_SWITCH`] off), as above. Not wanted (another engine the
+/// lamp's default), it is neither started nor restarted: OpenClaw's files
+/// are installed, its allow-list waits for a gateway that runs, and
+/// [`crate::gateway_keeper`] stops one still running. Unknown (lamp-tasks
+/// not answering, as right after lamp-tasks' own restart), only a running one is
+/// restarted (`try-restart`), never one that is down.
+#[allow(clippy::too_many_arguments)]
 fn steps(
     root: &Path,
     records: &Path,
@@ -1787,6 +1863,7 @@ fn steps(
     say: &mut dyn FnMut(&str),
     kit: &Kit,
     shown: Shown,
+    wanted: &mut dyn FnMut() -> Gateway,
 ) -> OpenclawInstall {
     // What the record says of agent main's entry before this run: kept
     // when no edit runs (no gateway), so a switch-off's removes stay due.
@@ -1797,7 +1874,7 @@ fn steps(
         ));
         sync_launcher(root, shown, say);
         sync_socket_dir(root, run, shown, say);
-        gateway_block(root, run, say);
+        gateway_block(root, run, say, wanted);
         let before = record(records).filter(|said| said.install == "installed");
         if let Some(said) = &before
             && said.exec_allowlist == shown.one_path
@@ -2055,12 +2132,33 @@ fn steps(
     // running an older OpenClaw runs the new one. The round enables it.
     // A gateway past its start limit refuses a restart: its failed state
     // is reset first (#8238), a no-op for any other.
-    if let Err(why) = run(&["systemctl", "reset-failed", UNIT].map(str::to_owned)) {
-        say(&format!("{UNIT} not reset-failed: {why}"));
-    }
-    settled(root, run, say, false);
-    if let Err(why) = run(&["systemctl", "restart", UNIT].map(str::to_owned)) {
-        return fail("gateway", format!("systemctl restart {UNIT}: {why}"), say);
+    // Only while OpenClaw's gateway is wanted (one agent gateway at a time).
+    match wanted() {
+        Gateway::Wanted => {
+            if let Err(why) = run(&["systemctl", "reset-failed", UNIT].map(str::to_owned)) {
+                say(&format!("{UNIT} not reset-failed: {why}"));
+            }
+            settled(root, run, say, false);
+            if let Err(why) = run(&["systemctl", "restart", UNIT].map(str::to_owned)) {
+                return fail("gateway", format!("systemctl restart {UNIT}: {why}"), say);
+            }
+        }
+        Gateway::Unknown => {
+            settled(root, run, say, false);
+            if let Err(why) = run(&["systemctl", "try-restart", "--", UNIT].map(str::to_owned)) {
+                return fail(
+                    "gateway",
+                    format!("systemctl try-restart {UNIT}: {why}"),
+                    say,
+                );
+            }
+            say(&format!(
+                "{UNIT} restarted only if it ran: lamp-tasks did not say the lamp's agent; lamp-update starts it once OpenClaw is"
+            ));
+        }
+        Gateway::NotWanted => say(&format!(
+            "{UNIT} not started: OpenClaw is not the lamp's agent; lamp-update starts it once it is"
+        )),
     }
     remove_aside(root, say);
     // Through the gateway just (re)started; an add not done is retried by
@@ -2402,6 +2500,21 @@ fn allowlist_argv(args: [&str; 7]) -> Vec<String> {
 /// marked gone and OpenClaw never reinstalled for it (#7135, c0a4's
 /// reboot at 22:59:00), and the next round checks again.
 fn keep_run_entry(run: &mut Runner, say: &mut dyn FnMut(&str)) -> Option<bool> {
+    add_run_entry(run, say, ADD_TRIES)
+}
+
+/// [`keep_run_entry`]'s add run once, never waited for: for
+/// [`crate::gateway_keeper`]'s looks, which hold the gateways' lock and so
+/// must never wait for a gateway to be ready (a stop of the other engine's
+/// gateway would wait behind it). A gateway not active or not ready yet is
+/// None, with nothing said: the keeper tries again at its next look.
+pub fn run_entry_once(run: &mut Runner, say: &mut dyn FnMut(&str)) -> Option<bool> {
+    add_run_entry(run, say, 1)
+}
+
+/// The add, `tries` times at most while the gateway is not ready, each
+/// [`ADD_AGAIN`] apart; a last "not ready" is said only after a wait.
+fn add_run_entry(run: &mut Runner, say: &mut dyn FnMut(&str), tries: u32) -> Option<bool> {
     if !gateway_active(run) {
         return None;
     }
@@ -2410,7 +2523,7 @@ fn keep_run_entry(run: &mut Runner, say: &mut dyn FnMut(&str)) -> Option<bool> {
         ..Shown::default()
     })[0];
     let mut ran = run(&allowlist_argv(add));
-    for _ in 1..ADD_TRIES {
+    for _ in 1..tries {
         match &ran {
             Err(why) if gateway_not_ready(why) => {
                 std::thread::sleep(ADD_AGAIN);
@@ -2421,6 +2534,7 @@ fn keep_run_entry(run: &mut Runner, say: &mut dyn FnMut(&str)) -> Option<bool> {
     }
     match ran {
         Ok(_) => Some(true),
+        Err(why) if tries <= 1 && gateway_not_ready(&why) => None,
         Err(why) if gateway_not_ready(&why) => {
             say(&format!(
                 "OpenClaw's gateway is not ready yet, so agent {RUN_AGENT}'s allow-list entry is not known: {why}; the next round checks again"
@@ -2769,7 +2883,12 @@ fn gateway_block_due(root: &Path) -> bool {
 /// (`lamp_checked_replace::gateway_not_there`) is tried again, after each
 /// of [`GATEWAY_WAITS`] (lamp-tasks' schedule, #7268), each said in one
 /// line; past the last, it is refused as any refusal is.
-fn gateway_block(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
+fn gateway_block(
+    root: &Path,
+    run: &mut Runner,
+    say: &mut dyn FnMut(&str),
+    wanted: &mut dyn FnMut() -> Gateway,
+) {
     let mut waits = GATEWAY_WAITS.iter();
     let written = loop {
         match gateway_config(root, run, say) {
@@ -2788,6 +2907,12 @@ fn gateway_block(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
     };
     match written {
         Ok(false) => {}
+        // Not wanted (another engine the lamp's default): the block is
+        // written, the gateway not restarted, so the one-shot never keeps
+        // one up beside the other engine's ([`steps`]).
+        Ok(true) if wanted() == Gateway::NotWanted => say(&format!(
+            "{CONFIG}'s gateway block was not as lamp-update writes it: written again and checked by OpenClaw; the gateway not restarted: OpenClaw is not the lamp's agent"
+        )),
         Ok(true) => {
             // #8324: as the install's restart, never in a first start.
             settled(root, run, say, false);

@@ -43,6 +43,9 @@ pub enum Moment {
     Onboarding(Option<u8>),
     /// The line about the software update (and its done line).
     UpdateLine,
+    /// A line about the lamp's agent switch, said in a conversation
+    /// (`agent_switch_told`).
+    AgentSwitch,
 }
 
 impl Moment {
@@ -52,6 +55,7 @@ impl Moment {
             Moment::TaskNews => "lamp-voice:task-news",
             Moment::Onboarding(_) => "lamp-voice:onboarding",
             Moment::UpdateLine => "lamp-voice:update-line",
+            Moment::AgentSwitch => "lamp-voice:agent-switch",
         }
     }
 
@@ -64,6 +68,7 @@ impl Moment {
             }
             Moment::Onboarding(None) => "the first minutes with a new person".into(),
             Moment::UpdateLine => "the lamp's software is being updated".into(),
+            Moment::AgentSwitch => "the lamp's agent is being switched".into(),
         }
     }
 }

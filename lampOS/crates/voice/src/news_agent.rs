@@ -125,6 +125,9 @@ fn worded(news: &News) -> bool {
         && !crate::sign_in::is_news(&news.key)
         && !news.key.contains(":progress-")
         && news.task().is_some()
+        // The lamp's own exact line (a task the agent switch ended): said
+        // as written, never reworded.
+        && crate::onboarding::own_words(&news.note).is_none()
 }
 
 /// The ask for `note`: the brief, then the note word for word; none when
