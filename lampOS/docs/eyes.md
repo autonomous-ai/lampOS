@@ -2553,7 +2553,15 @@ process, shows there before any trial waits for it. For each face:
   60 degrees in the middle of the picture, more toward its edges, where
   the lens shows a straight face turned). A face narrower than 7.5% of
   the picture, or with an eye or the nose outside it, has neither: it
-  counts for nothing either way;
+  counts for nothing either way. Nor does a face whose eyes are under
+  3.75% of the picture's width apart (12 pixels of the 320-across
+  working picture, `facing::LEAST_EYES`) when its turn reads past
+  facing (`facing::turn_read`): there the nose's mark wanders a pixel or
+  two and the turn swings to 90 degrees. On lamp-74ff on 25 Nov, one
+  person facing the lamp read 90 in 155 of 433 looks at 8 to 12 pixels
+  between the eyes and in none of 41 at 20 or more. Such a face still
+  reads turned to the lamp, and the mouth's speaking judge still weighs
+  the turn as measured;
 - with `LAMP_EYES_PITCH_GAZE=on` (#7442, off unless set), **how far the
   head is tipped** (`pitch`, radians, positive down as ROS has it) and,
   for one face, **whether its eyes look toward the lamp** (`looking`).
