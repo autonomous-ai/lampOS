@@ -7593,6 +7593,57 @@ in Piper's voice, `LAMP_SPOKEN_TO=off` as lamp-name didn't take Piper's
     clears it, so the note goes with it);
   - "yes, and also …" isn't shown cleanly yet.
 
+### The same start again in one request (#8556, always on)
+
+On lamp-06c1 (25 Nov, build 15903) one spoken ask for a poem about rain
+prepared two tasks, 24 and 25. Round 2 called `start_agent_task`; round 3's
+read-back ("…a short poem about rain") was held by the live-fact check
+(`LAMP_LIVE_FACT_CHECKED`, which took "rain" for the weather and "Code" for
+a place); and round 4 called `start_agent_task` again. Once the person says
+yes, two prepared tasks can mean two runs. Two parts stop it:
+
+- A round after `start_agent_task` has answered in the same request is never
+  held by the live-fact check (`live_fact::Hold::ran`). Its read-back
+  restates the person's own ask, not a claim about the world. See
+  `docs/second-voice.md` and the `LAMP_LIVE_FACT_CHECKED` row in
+  `docs/switches.md`.
+- A backstop in `agent_tasks::run_for_asked`: a second `start_agent_task` in
+  the same request with the same task, who and session as the task still
+  waiting for its yes, prepared by that very call at the same tasks part
+  (`PreparedTold`: its id, the moment it was taken and the tasks part's
+  directory), asks the tasks part nothing. It is told the first's
+  answer as it was, and the journal says `lamp-voice provider: request N:
+  the same start again in this request: told task <id>'s answer, nothing
+  prepared (#8556)`. "The same" is the task as it would be prepared (byte
+  for byte, the question's suffix included), the agent it goes to as the
+  person calls them, and the session named. The model judges what a line
+  means, so nothing here reads its words. One line asking two different
+  agents for the same work still makes two tasks, since their who differ.
+  A start in a later request is a new ask, as before (it may replace the
+  one waiting, above).
+
+Each `start_agent_task` is also journalled by its arguments' lengths only,
+never the person's words: `lamp-voice provider: request N: start_agent_task
+called with task 29 bytes, who 11 bytes, where none, engine none, session
+none` (`agent_tasks::arguments_by_length`). A case like this one can then be
+read from the journal.
+
+| Limit | Value | New? |
+|---|---|---|
+| Chat rounds in a turn (`second_provider::MAX_ROUNDS`) | 4 | existing |
+| Live-fact ask again | once a turn | existing |
+| Live-fact check after `start_agent_task` answered | none for the rest of the request | new (#8556) |
+| Same start told the first's answer | the same request only, the task waiting, identical task, who and session | new (#8556) |
+
+Tests: `the_same_start_again_in_one_request_prepares_nothing_more`,
+`a_starts_arguments_are_journalled_by_length_only`, `the_same_start_elsewhere_is_prepared_there`,
+`two_starts_in_one_request_or_a_written_one_replace_nothing` (one line, two
+tasks), `live_fact::tests::a_task_read_back_after_its_start_answered_is_never_held`,
+and on the second route (`second_provider/tests/live_fact.rs`)
+`the_read_back_after_a_start_answered_is_said_and_the_start_runs_once`.
+Not yet played on a lamp: the row is the rain ask on lamp-06c1 making exactly
+one prepare.
+
 ### Kept in the person's memory (linked records, slice 3, `LAMP_SERVICE_RECORDS_TASKS`, on in the product)
 
 On in the product since 20 Nov (`lamp-voice.service`), by the product
