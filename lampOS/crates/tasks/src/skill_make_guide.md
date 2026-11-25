@@ -55,18 +55,20 @@ What a skill can do, all of it in format.md and examples/:
   camera, the microphone, speech, linked services), loops, waits, sums,
   several steps in order, and Python's own standard library. Code runs in
   one of two step kinds, chosen now, at the make:
-  - **`run`**: a `[[do]]` step written exactly `run = "scripts/main.py"`.
+  - **`run`**: a `[[do]]` step written exactly `run = "scripts/main.py"`,
+    only in a skill the person's own words start (`asks`, no trigger).
     The script does the whole job and calls `lamp.say` for its success
     line and for its failure line (the fetch failed, nothing was found, a
     service isn't linked). The lamp runs it with no agent at all. This is
-    the kind to choose whenever the job is the same each time;
-    examples/exchange-rate, sun-times, breathing-coach.
-  - **`task`**: `task = { task = "...", run = "scripts/main.py" }`, only
-    when each start needs the lamp's agent to sum up or reason (sum up
-    today's mail, pick what matters in the calendar). Its helper scripts
-    (fetch the mail, read the calendar, filter) are written now too, each
-    its own file in scripts/, printing what the agent sums up;
-    examples/agenda-count.
+    the kind to choose whenever the job is the same each time and the
+    person asks for it; examples/exchange-rate, sun-times, breathing-coach.
+  - **`task`**: `task = { task = "...", run = "scripts/main.py" }`, when
+    each start needs the lamp's agent to sum up or reason (sum up today's
+    mail, pick what matters in the calendar), and always when a time, an
+    event or a repeat starts the skill. Its helper scripts (fetch the mail,
+    read the calendar, filter) are written now too, each its own file in
+    scripts/, printing what the agent sums up; examples/agenda-count,
+    morning-headline.
   Scripts are written at the make, never at a run: a run only runs what
   you wrote here.
 - **Its `grants` must name every grant its code's calls need**, as sdk.md
@@ -75,13 +77,17 @@ What a skill can do, all of it in format.md and examples/:
   `<code>-read` / `<code>-write`. A call whose grant isn't named is refused
   when the skill runs, and the lamp's check can't see that in the code:
   check each call against sdk.md yourself. Code that talks needs `speak`
-  (`lamp.say`); code that keeps a note needs `notes`. Light, speak and body
+  (`lamp.say`), only in a skill the person's words start; code that keeps a
+  note needs `notes`. Light, speak and body
   go on at once; the others the owner says yes to once.
 - **The internet, when rules.md allows `net`**: what only the web knows at
   the time it runs (a price, the weather, the news, a search) is the skill's
-  own code granted `net` beside `speak`: `grants = ["net", "speak"]`, a
-  `run` step, and scripts/main.py fetches it and says it with `lamp.say`;
-  examples/exchange-rate. Light, body, sound, air and device may join them.
+  own code granted `net`. Started by the person's words: `grants = ["net",
+  "speak"]`, a `run` step, and scripts/main.py fetches it and says it with
+  `lamp.say`; examples/exchange-rate. Started by a time, an event or a
+  repeat: `grants = ["net"]`, a `task` step, and scripts/main.py fetches it
+  and prints it; examples/morning-headline. Light, body, sound, air and
+  device may join them.
   Use Python's own `urllib.request` (no packages to install), a public HTTPS
   API that needs no key, a `timeout` of 15 s or less, and a plain spoken
   line when the fetch fails. The run's proxy is already set (`HTTPS_PROXY`),
@@ -94,14 +100,25 @@ What a skill can do, all of it in format.md and examples/:
   minutes with the web: the same held trigger and cooldown, its `[[do]]` the
   `task` step. When rules.md doesn't allow `net`, answer its internet line.
 
+**A skill a time, an event or a repeat starts (any `[trigger]`) speaks
+only through the lamp's told answer.** Its `[[do]]` is a `task` step. Its
+scripts print what they found and never call `lamp.say`, `lamp.sound`, the
+speaker or `control.sock`, and its grants never name `speak` or `speaker`.
+The agent's last answer, one to three plain sentences, is what the lamp
+tells the owner, once: only when the owner is alone in view, no one has
+spoken for a minute, and it isn't quiet hours. A `run` step, and code that
+says its own line, are only for a skill the person's own words start. The
+lamp refuses any other way; examples/morning-headline.
+
 How a skill runs, so its code fits:
 
 - The lamp starts a `task` step's scripts/main.py on its own each time the
   skill starts: by its words, its trigger, or its repeat. One run at a time;
   keep a run short (a fetch and a line or two). Only `notes` lasts from one
   run to the next, and a skill granted `net` has none.
-- What the person hears is what the code says with
-  `await lamp.say(text, wait=True)` (said exactly, within 900 bytes).
+- In a skill the person's words start, what the person hears is what the
+  code says with `await lamp.say(text, wait=True)` (said exactly, within
+  900 bytes); in one a trigger starts, what the agent answers.
   Always pass `wait=True`: it returns once the line is said, so lines come
   in order and the script never exits before its last line is said (a
   script that exits first has its line dropped, and its run fails).
@@ -139,7 +156,8 @@ A skill does nothing that would surprise the person who asked for it.
   helper scripts `## Uses` names, and sums up. Its last answer is said
   aloud to the owner, word for word (about 400 characters at most), so it
   is only the spoken summary; a lone dash (-) is said as nothing, the
-  answer when a script has said it with `lamp.say` already.
+  answer when a script has said it with `lamp.say` already, which is never
+  so in a skill a trigger starts.
 - The `task` words are read back whole for the owner's yes: one plain
   sentence a person understands, at most 120 characters.
 - **A linked service** (mail, a calendar, GitHub): `grants =
@@ -150,16 +168,17 @@ A skill does nothing that would surprise the person who asked for it.
   said aloud is enough. A `service_write` is only prepared: the owner's
   spoken yes sends it, never the run. The script never holds a token.
   examples/agenda-count.
-- **The public web**: the skill's own code granted `net` and `speak`, as
-  "The internet" above says: urllib reaches the public web on ports 80 and
-  443 through the run's proxy (`HTTPS_PROXY`), and the code says the result
-  with `lamp.say`. It is kept only on a lamp whose net switches are on.
-  examples/exchange-rate, sun-times.
+- **The public web**: the skill's own code granted `net`, as "The
+  internet" above says: urllib reaches the public web on ports 80 and 443
+  through the run's proxy (`HTTPS_PROXY`). Started by words, the code says
+  the result with `lamp.say` (`speak` granted too); started by a trigger,
+  it prints it for the agent's told answer. It is kept only on a lamp whose
+  net switches are on. examples/exchange-rate, sun-times, morning-headline.
 - **Tried before it is kept**: once its check passes, the lamp runs each
   script once, in that same fence with the skill's own grants: a `run`
   step's script, or each script of a `task` step. Each must exit 0 within
   30 s; a `run` step's must say at least one line with `lamp.say`, and a
-  `task` step's must print something. The try is a real run: it has
+  `task` step's must print something (a trigger's never says anything). The try is a real run: it has
   every grant the skill declares (the internet, the camera, the microphone,
   its voice, sounds, light and body), and what it says, shows, keeps or
   sends is done for real, as at the skill's own run. So a script runs with
@@ -183,8 +202,9 @@ letters, digits and hyphens. Write in it, as rules.md says:
     arguments;
   - `## Result`: where each script's result is (what it prints, a file);
   - `## Answer`: what is said aloud, in one to three plain sentences:
-    either a script says it with `lamp.say` and the agent's answer is a
-    lone `-`, or the agent's final answer is only the spoken summary.
+    the agent's final answer is only the spoken summary, or, only in a
+    skill the person's words start, a script says it with `lamp.say` and
+    the agent's answer is a lone `-`.
   Its `asks` in skill.toml are the words a person says to start it: one to
   three short, plain phrases, so the voice finds it ("sunset time", "count
   my meetings"). Never a question (no what, how, when, who, is or does) and
