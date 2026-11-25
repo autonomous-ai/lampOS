@@ -769,6 +769,35 @@ mod tests {
         ));
     }
 
+    /// #8570, S6 (lamp-06c1, stable 15986, 25 Nov, req 416): the lamp was
+    /// reading the reminders ("… Water the plants at nine tonight …") when
+    /// "Cancel the reminder to water the plants." cut in over its voice; its
+    /// answer was cut as the line began (21 of 51 words played), yet "water
+    /// the plants", the line's own last words, were taken out as the lamp's
+    /// echo, and the model, sent "Cancel the reminder to", asked "which
+    /// reminder?". The lamp's voice stopped as the line began, so its end
+    /// is the person's: sent as heard.
+    #[test]
+    fn a_cut_in_naming_what_the_lamp_read_keeps_its_last_words() {
+        let read = Said {
+            words: "Three things are set: a timer, ringing at 14:36. Call the plumber at 20:00 tonight. Water the plants",
+            ..said()
+        };
+        // Begun 70 ms before the played words' end: the lamp's voice was cut
+        // there.
+        assert_eq!(
+            judge(
+                &line(
+                    "Cancel the reminder to water the plants.",
+                    UNTIL_US - 70_000,
+                    true
+                ),
+                Some(&read)
+            ),
+            Echo::Answered(None)
+        );
+    }
+
     #[test]
     fn its_own_words_first_or_last_are_taken_out_and_in_the_middle_kept() {
         assert_eq!(

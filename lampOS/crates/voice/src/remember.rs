@@ -27413,6 +27413,33 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
     }
 
+    /// #8570, S15 (lamp-06c1, stable 15986, 25 Nov, reqs 484-487): the room
+    /// kept "the coffee here is made with oat milk and honey"; asked "how do
+    /// I take my coffee?" with nobody known in view, the turn whose hits
+    /// told it (req 484, `hits_told=1 hits_path=room`) answered "You take it
+    /// the way the room keeps it: …", the room's note as the asker's own.
+    /// The two asks with no hit told (485, 487) said it was said in the
+    /// room. The room's hits are told with `LAMP_MEMORY_ROOM_NOT_ASKER`'s
+    /// own rule: never as the asker's own.
+    #[test]
+    fn a_room_hit_is_told_never_as_the_askers_own() {
+        const NOW: u64 = 1_792_000_000_000;
+        let (socket, served) = memory("hits-room-not-asker", 1, |_| {
+            json!({"ok":true,"entries":[
+                {"id":1,"at_unix_ms":NOW,"text":"The coffee here is made with oat milk and honey."}
+            ]})
+        });
+        let room = hits_note(&socket, None, "how do I take my coffee", NOW, None).unwrap();
+        assert!(room.contains("oat milk and honey"), "{room}");
+        assert!(
+            room.contains("not necessarily the one asking now")
+                && room.contains("as the asker's own"),
+            "{room}"
+        );
+        served.join().unwrap();
+        let _ = std::fs::remove_file(&socket);
+    }
+
     /// The reviewer's P2 on #2251: hits only when the eyes and the session
     /// agree on who is at the lamp; the room's when neither names anyone.
     #[test]

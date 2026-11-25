@@ -1882,6 +1882,64 @@ mod tests {
         assert!(done_already_in(&thread, (2, None, now), bike).is_some());
     }
 
+    /// #8570, S13 (lamp-06c1, stable 15986, 25 Nov, reqs 449-454): "Actually,
+    /// my water bottle is blue now." was changed (request 1); "Yes, please
+    /// keep that." was told it is done already and answered (request 2);
+    /// the same yes said once more (request 3) was told nothing was kept,
+    /// and the lamp asked "what would you like me to hold on to?". A turn
+    /// between that was itself only a yes, answered as done already, keeps
+    /// the done write the yes's last turn: told it is done already, never
+    /// asked again. The same for a done forget's repeated yes.
+    #[test]
+    fn a_yes_said_again_after_a_done_yes_is_still_told_it_is_done() {
+        use super::super::MemoryDone;
+        use crate::thread::Thread;
+        let now = Instant::now();
+        let again = |line: &str, lamp: &str, yes: &str, done: &str| {
+            let mut thread = Thread::new();
+            thread.person(line, true, now);
+            thread.lamp(1, lamp, now);
+            thread.person(yes, true, now);
+            thread.lamp(2, done, now);
+            thread.person(yes, true, now);
+            thread
+        };
+        let changed = Some((MemoryDone::Changed, Some(1)));
+        let thread = again(
+            "Actually, my water bottle is blue now.",
+            "Blue now, not green.",
+            "Yes, please keep that.",
+            "It's changed: blue now.",
+        );
+        let told = done_already_in(&thread, (3, None, now), changed);
+        assert!(
+            told.as_ref().is_some_and(|(note, done)| {
+                *done == MemoryDone::Changed
+                    && note.as_deref().is_some_and(|note| note.contains(DONE_ALREADY_CHANGED))
+            }),
+            "{told:?}"
+        );
+        let held = yes_alone_in(&thread, (3, None, now), false, changed);
+        assert_eq!(
+            held.as_ref().map(|held| held["already"].clone()),
+            Some(json!(true)),
+            "{held:?}"
+        );
+        let forgotten = Some((MemoryDone::Forgotten, Some(1)));
+        let thread = again(
+            "Lamp, forget what I said about my water bottle.",
+            "I've forgotten what you told me about your water bottle.",
+            "Yes, please forget it.",
+            "It's forgotten.",
+        );
+        let held = yes_alone_in(&thread, (3, None, now), true, forgotten);
+        assert_eq!(
+            held.as_ref().map(|held| held["note"].clone()),
+            Some(json!(DONE_ALREADY_FORGOTTEN)),
+            "{held:?}"
+        );
+    }
+
     /// C37 (lamp-06c1, 5 Nov): heard "renunculus", the model wrote
     /// "ranunculus". Its words not heard are each a near spelling of a heard
     /// one, so the keep is asked about; with the same words heard nothing
