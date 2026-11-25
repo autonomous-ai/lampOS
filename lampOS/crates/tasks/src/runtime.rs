@@ -8995,4 +8995,233 @@ mod tests {
         drop(gate);
         assert!(!shared.busy());
     }
+
+    /// A store with one spoken OpenClaw task for the lamp, prepared and
+    /// confirmed at 0 ms on the boot clock (#8601).
+    fn queued_for_the_lamp(root: &Path) -> (Engine<Store>, u64) {
+        use crate::protocol::Guard;
+        let targets = BTreeMap::from([(
+            LAMP_TARGET.to_owned(),
+            Target {
+                machine_id: PANE_MACHINE.into(),
+                project: "lamp".into(),
+                engine: EngineKind::Openclaw,
+            },
+        )]);
+        let mut engine = Engine::open(
+            Store::open(&root.join("private")).unwrap(),
+            targets,
+            &"1".repeat(32),
+            &"2".repeat(32),
+            &boot(0),
+        )
+        .unwrap();
+        let guard = |engine: &Engine<Store>, what: &str| Guard {
+            store_id: engine.store_id().into(),
+            revision: engine.revision(),
+            request_id: format!("{what}-{}", engine.revision()),
+        };
+        let prepared = engine
+            .handle(
+                &Request::Prepare {
+                    guard: guard(&engine, "prepare"),
+                    text: "What's on my calendar?".into(),
+                    target: LAMP_TARGET.into(),
+                    session: None,
+                    engine: None,
+                },
+                &boot(0),
+                false,
+            )
+            .unwrap();
+        let id = prepared["id"].as_u64().unwrap();
+        let confirm = Request::Confirm {
+            guard: guard(&engine, "confirm"),
+            id,
+            prepared_digest: prepared["prepared_digest"].as_str().unwrap().into(),
+            session_id: engine.session_id().into(),
+        };
+        engine.handle(&confirm, &boot(0), true).unwrap();
+        (engine, id)
+    }
+
+    fn boot(monotonic_ms: u64) -> ClockSample {
+        ClockSample {
+            boot_id: "test-boot".into(),
+            monotonic_ms,
+        }
+    }
+
+    /// The task's dispatch state and code, as the voice reads them.
+    fn dispatch_of(engine: &mut Engine<Store>, id: u64, at: u64) -> (String, Option<String>) {
+        let got = engine
+            .handle(&Request::GetTask { id }, &boot(at), true)
+            .unwrap();
+        let dispatch = &got["task"]["dispatch"];
+        (
+            dispatch["state"].as_str().unwrap().to_owned(),
+            dispatch["code"].as_str().map(str::to_owned),
+        )
+    }
+
+    /// The owner loop's round for a held launch, once a second from the yes
+    /// for `seconds` (`serve_with_adapter`'s order): the store's tick, the
+    /// hold's answer for that second, and on a give-up the launch ended
+    /// `not_sent` with `code`. The second a launch was begun and the hold's
+    /// answer then, and how many launches were ended `not_sent`.
+    fn hold_each_second(
+        engine: &mut Engine<Store>,
+        mut hold: impl FnMut(Option<&Launch>, u64) -> PlaceWait,
+        code: &str,
+        seconds: u64,
+    ) -> (Option<(u64, PlaceWait)>, usize) {
+        let mut ended = 0;
+        let mut begun = None;
+        for second in 0..=seconds {
+            let now = boot(second * 1000);
+            engine.tick(&now).unwrap();
+            let next = engine.queued_launches().first().map(|l| (*l).clone());
+            let answer = hold(next.as_ref(), second);
+            if answer == PlaceWait::Hold {
+                continue;
+            }
+            if let Some(job) = engine.begin_launch(&now).unwrap() {
+                if answer == PlaceWait::GiveUp {
+                    let outcome = LaunchOutcome::NotSent { code: code.into() };
+                    engine.finish_launch(job.task_id, outcome, &now).unwrap();
+                    ended += 1;
+                }
+                begun.get_or_insert((second, answer));
+            }
+        }
+        (begun, ended)
+    }
+
+    /// #8601: a task held for OpenClaw's Gateway cold-starting lives as long
+    /// as the hold. One serving after 200 s (220-241 s on lamp-e82d, about
+    /// 220 s on lamp-ee17) is handed over then, never `expired` unheard at
+    /// [`crate::engine::CONFIRM_MS`] as on 16031. One that never serves is
+    /// given up at [`crate::gateway::COLD_WITHIN`]: `not_sent`
+    /// `openclaw_gateway_not_ready` once, the not-ready line's code.
+    #[test]
+    fn a_task_held_for_a_cold_gateway_runs_once_it_serves_or_is_told_not_ready_once() {
+        let start = Instant::now();
+        let at = |second: u64| start + Duration::from_secs(second);
+        for serves_at in [200, 241] {
+            let root = tempfile::tempdir().unwrap();
+            let (mut engine, id) = queued_for_the_lamp(root.path());
+            let mut held = None;
+            let (begun, ended) = hold_each_second(
+                &mut engine,
+                |next, second| {
+                    gateway_wait(
+                        next,
+                        crate::gateway::Asking::Yes,
+                        || second >= serves_at,
+                        &mut held,
+                        at(second),
+                        crate::gateway::COLD_WITHIN,
+                    )
+                },
+                crate::gateway::NOT_READY,
+                serves_at + 10,
+            );
+            assert_eq!(begun, Some((serves_at, PlaceWait::Go)), "{serves_at} s");
+            assert_eq!(ended, 0);
+            assert_eq!(
+                dispatch_of(&mut engine, id, serves_at * 1000 + 10_000),
+                ("attempting".to_owned(), None),
+                "handed over, not expired"
+            );
+        }
+        let root = tempfile::tempdir().unwrap();
+        let (mut engine, id) = queued_for_the_lamp(root.path());
+        let mut held = None;
+        let cold = crate::gateway::COLD_WITHIN.as_secs();
+        let (begun, ended) = hold_each_second(
+            &mut engine,
+            |next, second| {
+                gateway_wait(
+                    next,
+                    crate::gateway::Asking::Yes,
+                    || false,
+                    &mut held,
+                    at(second),
+                    crate::gateway::COLD_WITHIN,
+                )
+            },
+            crate::gateway::NOT_READY,
+            cold + 120,
+        );
+        assert_eq!(begun, Some((cold, PlaceWait::GiveUp)));
+        assert_eq!(ended, 1, "told once");
+        assert_eq!(
+            dispatch_of(&mut engine, id, (cold + 120) * 1000),
+            (
+                "not_sent".to_owned(),
+                Some(crate::gateway::NOT_READY.to_owned())
+            )
+        );
+    }
+
+    /// #8601: the same for a task held until the lamp's place is known
+    /// (`place_wait`, [`crate::one_session::QUEUE_WAIT`]): known after 200 s
+    /// it goes on; never known, it is given up `busy` once at the wait's
+    /// end, never `expired` unheard.
+    #[test]
+    fn a_task_held_for_the_lamps_place_goes_on_once_known_or_is_told_busy_once() {
+        let start = Instant::now();
+        let at = |second: u64| start + Duration::from_secs(second);
+        let wait = crate::one_session::QUEUE_WAIT;
+        let root = tempfile::tempdir().unwrap();
+        let (mut engine, id) = queued_for_the_lamp(root.path());
+        let one = lamp_one();
+        let pane = Pane::default();
+        let mut held = None;
+        let (begun, ended) = hold_each_second(
+            &mut engine,
+            |next, second| {
+                if second == 200 {
+                    one.open_if_due(&pane, &pane_place());
+                }
+                place_wait(&one, next, &mut held, at(second), wait)
+            },
+            "busy",
+            210,
+        );
+        assert_eq!(begun, Some((200, PlaceWait::Go)));
+        assert_eq!(ended, 0);
+        assert_eq!(
+            dispatch_of(&mut engine, id, 210_000),
+            ("attempting".to_owned(), None)
+        );
+        let root = tempfile::tempdir().unwrap();
+        let (mut engine, id) = queued_for_the_lamp(root.path());
+        let one = lamp_one();
+        let mut held = None;
+        let end = wait.as_secs();
+        let (begun, ended) = hold_each_second(
+            &mut engine,
+            |next, second| place_wait(&one, next, &mut held, at(second), wait),
+            "busy",
+            end + 60,
+        );
+        assert_eq!(begun, Some((end, PlaceWait::GiveUp)));
+        assert_eq!(ended, 1, "told once");
+        assert_eq!(
+            dispatch_of(&mut engine, id, (end + 60) * 1000),
+            ("not_sent".to_owned(), Some("busy".to_owned()))
+        );
+    }
+
+    /// #8601: a task's queued life covers the longest the runtime holds a
+    /// launch in the queue (the place, then the Gateway, after a yes within
+    /// the confirm bound), with a margin, so a hold always ends it in words.
+    #[test]
+    fn a_queued_tasks_life_covers_the_runtimes_holds() {
+        let holds = crate::engine::CONFIRM_MS
+            + crate::one_session::QUEUE_WAIT.as_millis() as u64
+            + crate::gateway::COLD_WITHIN.as_millis() as u64;
+        assert!(crate::engine::QUEUED_MS >= holds + 60_000);
+    }
 }

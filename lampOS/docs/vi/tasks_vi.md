@@ -2483,7 +2483,20 @@ một byte (`crates/tasks/src/one_session.rs`).
   khi daemon của Harness không chạy; đăng nhập hay đăng xuất đều vậy)
   không đi đường riêng. Nó được giữ trong hàng đợi tới khi biết vị trí,
   tối đa 15 phút (`QUEUE_WAIT`), rồi thất bại `busy` mà không có
-  `harness new` nào.
+  `harness new` nào. Việc trong hàng đợi sống qua hết lần chờ này
+  (`QUEUED_MS`, 30 phút, #8601), nên nó đi tiếp khi biết vị trí, hoặc
+  được báo `busy` một lần. `QUEUED_MS` tính từ lúc prepare, không phải
+  120 s của tiếng "có" (`CONFIRM_MS`): đủ cho các lần giữ trong hàng đợi
+  (vị trí của đèn, tối đa 15 phút, rồi Gateway nguội của OpenClaw, tối đa
+  480 s), mỗi lần kết thúc bằng `not_sent` với lý do được giọng nói báo
+  một lần. Tới 16031 nó cũng chỉ có 120 s, nên Gateway khởi động nguội
+  khoảng 220 s (lamp-ee17) làm việc kết thúc `expired` mà không ai nghe.
+  Store có việc được thử quá 120 s của nó được ghi là schema 9, mà bản
+  build trước sẽ để sang một bên. Test:
+  `runtime::tests::a_task_held_for_a_cold_gateway_runs_once_it_serves_or_is_told_not_ready_once`,
+  `a_task_held_for_the_lamps_place_goes_on_once_known_or_is_told_busy_once`,
+  `a_queued_tasks_life_covers_the_runtimes_holds`,
+  `engine::tests::a_queued_task_held_past_the_confirm_bound_is_launched_and_its_store_checks`.
 - **Tìm lại theo id đã giữ.** Agent id của pane từ lệnh `new` được giữ
   trong `one-session.json` ở thư mục store của lamp-tasks
   (`/var/lib/lampos-tasks/store`, 0600). Lần mở sau (khởi động lại
@@ -3027,8 +3040,8 @@ khi đăng xuất, và với 0.6.60 khi đăng nhập (ROW của #7507).
     chờ khi dấu hiệu 5 đóng phiên (lần đóng (a), hoặc `--fresh` (b)) kết
     thúc ngay, `not_sent` `one_session_stuck` (`STUCK_ENDED`), không bao
     giờ bị trả lại hàng đợi: trả lại quá giới hạn xác nhận của store
-    (`CONFIRM_MS`, 120 s từ lúc prepare việc) làm nó hết hạn mà không ai
-    nghe, nên nó nằm chờ tới giới hạn 480 s của lamp-voice (lamp-c0a4,
+    (`CONFIRM_MS`, 120 s từ lúc prepare việc; từ #8601 việc trong hàng
+    đợi sống `QUEUED_MS`, 30 phút) làm nó hết hạn mà không ai nghe, nên nó nằm chờ tới giới hạn 480 s của lamp-voice (lamp-c0a4,
     19/11 21:47-21:55). Việc đang chờ kết thúc với một câu ngắn "hãy hỏi
     lại", được Task news báo một lần (`failed_stuck`: "I can't handle that
     right now; please ask me again in a few minutes."); việc đóng và mở lại
@@ -3798,9 +3811,15 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
 - **Đèn còn đang chuẩn bị.** Một lần giao việc kết thúc `not_sent` với
   `openclaw_gateway_not_ready` (Gateway của OpenClaw không trả lời trong
   60 s; khi bật `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT`, không phục vụ trong
-  480 s mà lần giao việc được giữ trong hàng đợi, #8105) hoặc `harness_not_running` (#7282) được Task news kể bằng lời
+  480 s mà lần giao việc được giữ trong hàng đợi, #8105; việc trong hàng
+  đợi sống qua hết lần giữ đó, `QUEUED_MS`, #8601) hoặc `harness_not_running` (#7282) được Task news kể bằng lời
   `failed_not_ready`, "I'm still getting ready. Give me a minute and ask me
-  again.", không phải là việc "did not reach" agent. Chỉ trong 180 s sau khi
+  again.", không phải là việc "did not reach" agent.
+  `openclaw_gateway_not_ready` được kể như vậy vào bất kỳ lúc nào từ #8601:
+  lamp-update dừng Gateway của OpenClaw trên đèn có mặc định không phải
+  OpenClaw, nên khởi động nguội nhiều giờ sau khi bật đèn là chuyện thường
+  (test `task_news::tests::a_gateway_not_ready_refusal_is_told_as_not_ready_whatever_the_uptime`).
+  `harness_not_running` chỉ trong 180 s sau khi
   đèn khởi động (`skill_words::NOT_READY_WITHIN_MS`, bằng `STARTING_AT_MOST`
   của lamp-tasks), tính theo `dispatch.finished.monotonic_ms` của lời từ
   chối trên đồng hồ boot của lamp-tasks: quá mức đó, Gateway hoặc Harness
@@ -4254,6 +4273,18 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   Việc đã được hỏi, đã trả lời hoặc đã dùng công cụ trước giới hạn, việc từ
   lần khởi động trước, phiên của chính người dùng, Hermes và các agent trên
   máy tính đều như trước.
+- **Run đã mất: báo và kết thúc** (họ hàng của #8601, việc 85 trên
+  lamp-ee17 đọc `working` 3,75 giờ qua nhiều lần khởi động lại, giữ chân
+  mọi lần giao việc sau): một việc mà các lần đọc thấy run của agent đã mất
+  (`observe_failed`: Harness chưa từng có nó, hoặc run của đường trực tiếp
+  đã bị dọn hay từ trước một lần khởi động lại) `GONE_READS` (3) lần liên
+  tiếp, lần đầu cách đây `GONE_AFTER_MS` (5 phút) hoặc ở lần bật đèn trước,
+  được giữ là `failed` ở lần đọc như vậy kế tiếp (`engine::gone_past_bound`,
+  một dòng journal): đã xong, nên không còn được theo dõi hay tính là việc
+  đang làm, và giọng nói báo nó một lần như mọi việc lỗi. Chuỗi được giữ
+  trong store (`gone`), nên khởi động lại vẫn đếm tiếp; mọi lần đọc khác
+  kết thúc chuỗi. Test:
+  `engine::tests::a_task_whose_run_stays_gone_is_ended_failed_once_across_a_restart`.
 - **Voice** (`agent_tasks`, `task_news`): đọc engine của target của đèn từ
   `{"op":"targets"}` và gọi đúng tên, nên một việc giao không nêu máy nào được
   nói là "OpenClaw on the lamp" và mô tả công cụ nói "OpenClaw here on the

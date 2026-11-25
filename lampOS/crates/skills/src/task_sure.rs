@@ -112,6 +112,26 @@ pub fn failed_line(skill: &str, sent: &Result<String, Unrun>) -> Option<String> 
     if answer.get("ok").and_then(serde_json::Value::as_bool) == Some(true) {
         return None;
     }
+    // Refused as the lamp's agent never got ready (its OpenClaw Gateway or
+    // Harness, `crate::task::NOT_READY_SAID`): nothing began, so said as
+    // not started, never "didn't finish" (#6577, lamp-fc4b, 17 Nov). Never
+    // the agent's name, nor lamp-tasks' message.
+    let message = answer["message"].as_str().unwrap_or("");
+    // OpenClaw's Gateway: still getting ready, whatever the uptime (#8601,
+    // the owner's choice), as a spoken task is told.
+    if message.contains(crate::task::GATEWAY_NOT_READY) {
+        return Some(format!(
+            "{name} couldn't run this time: the lamp is still getting ready. Ask me again in a minute."
+        ));
+    }
+    if crate::task::NOT_READY_SAID
+        .iter()
+        .any(|said| message.contains(said))
+    {
+        return Some(format!(
+            "{name} couldn't run this time: the lamp couldn't get it started."
+        ));
+    }
     match answer["error"].as_str().unwrap_or("") {
         "busy" => None,
         "missing_secret" => Some(format!(
@@ -470,6 +490,49 @@ mod tests {
             "a clock gone back"
         );
     }
+
+    /// #6577 (lamp-fc4b, 17 Nov): a run refused because the lamp's agent
+    /// never got ready (its OpenClaw Gateway down, or Harness not running)
+    /// began nothing, so it is told plainly that it couldn't be started,
+    /// never "didn't finish". Past lamp-tasks' start window this is the
+    /// only line the person hears of it (inside it, `task::not_ready_line`
+    /// is said instead). It never names the agent nor carries the message.
+    #[test]
+    fn a_run_refused_as_its_agent_never_got_ready_is_told_it_couldnt_start() {
+        for (message, said) in [
+            (
+                "Harness didn't start the run (openclaw_gateway_not_ready)",
+                NOT_READY_LINE_FIG,
+            ),
+            (
+                "Harness didn't start the run (harness_not_running)",
+                NOT_STARTED_LINE_FIG,
+            ),
+        ] {
+            let line = failed_line("fig-facts", &refused("run_failed", message));
+            assert_eq!(line.as_deref(), Some(said), "{message}");
+            let line = line.unwrap();
+            assert!(
+                !line.contains("OpenClaw") && !line.contains("Harness"),
+                "{line}"
+            );
+        }
+        // Another run_failed is still one that may have begun.
+        assert_eq!(
+            failed_line("fig-facts", &refused("run_failed", "its session closed")).as_deref(),
+            Some("Fig facts didn't finish this time.")
+        );
+        // A run that went, whatever its message, says nothing here.
+        let went = serde_json::json!({"ok":true,"id":"r1","message":"openclaw_gateway_not_ready"});
+        assert_eq!(failed_line("fig-facts", &Ok(went.to_string())), None);
+    }
+
+    /// #8601, the owner's choice: OpenClaw's Gateway not ready is still
+    /// getting ready, whatever the uptime, as a spoken task is told.
+    const NOT_READY_LINE_FIG: &str = "Fig facts couldn't run this time: the lamp is still getting ready. Ask me again in a minute.";
+
+    const NOT_STARTED_LINE_FIG: &str =
+        "Fig facts couldn't run this time: the lamp couldn't get it started.";
 
     /// Every way lamp-tasks' answer says a run failed is one fixed line:
     /// a key not added says what to do in the app, a refusal before its agent began that it couldn't run, a run begun

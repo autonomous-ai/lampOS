@@ -534,11 +534,23 @@ spoken yes, and a typed yes never confirms a spoken task.
 ## Local state transitions
 
 1. `prepare` commits the exact text, operator target, unique task ID and label,
-   payload digest, current boot/service session, and a 120-second expiry.
-   No Harness command runs. Voice obtains that immutable content with
+   payload digest, current boot/service session, and a 120-second expiry
+   for its yes (`CONFIRM_MS`). No Harness command runs. Voice obtains that immutable content with
    `get_task` before requesting confirmation.
 2. Trusted `confirm` must name that ID, digest and current service session.
    It commits `queued` and returns promptly without waiting for Harness.
+   A queued task lives 30 min from its prepare (`QUEUED_MS`, #8601), not
+   the 120 s of its yes: long enough for the runtime's queue holds (the
+   lamp's place, at most 15 min, then OpenClaw's cold Gateway, at most
+   480 s), which end it `not_sent` with a reason the voice tells once.
+   Until 16031 it had 120 s too, so a Gateway cold-starting in about 220 s
+   (lamp-ee17) let it end `expired`, unheard (`tasks: <task>: held for
+   OpenClaw's gateway no longer`). A store holding a task attempted past
+   its 120 s is written as schema 9, which a build before sets aside.
+   Tests: `runtime::tests::a_task_held_for_a_cold_gateway_runs_once_it_serves_or_is_told_not_ready_once`,
+   `a_task_held_for_the_lamps_place_goes_on_once_known_or_is_told_busy_once`,
+   `a_queued_tasks_life_covers_the_runtimes_holds`,
+   `engine::tests::a_queued_task_held_past_the_confirm_bound_is_launched_and_its_store_checks`.
    The storage owner commits `attempting` before giving one job to the CLI
    worker. That durable transition is the only launch grant.
 3. The worker preflights the full machine ID, invokes `new` at most once, and
@@ -908,9 +920,15 @@ of 5 s at most there). Only a known no refuses:
 A hand-over that ends `not_sent` as the lamp is still getting ready,
 `openclaw_gateway_not_ready` (its OpenClaw Gateway didn't answer within
 60 s; with `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT` on, didn't serve within the
-480 s its launch is held in the queue, #8105) or `harness_not_running` (#7282), is told with Task news'
+480 s its launch is held in the queue, #8105; the queued task lives
+through that hold, `QUEUED_MS`, #8601) or `harness_not_running` (#7282), is told with Task news'
 `failed_not_ready` words, "I'm still getting ready. Give me a minute and ask
-me again.", not as work that "did not reach" its agent. Only within 180 s
+me again.", not as work that "did not reach" its agent.
+`openclaw_gateway_not_ready` is told so at any time since #8601: lamp-update
+stops OpenClaw's Gateway on a lamp whose default isn't OpenClaw, so a cold
+start hours after boot is the usual case (test
+`task_news::tests::a_gateway_not_ready_refusal_is_told_as_not_ready_whatever_the_uptime`).
+`harness_not_running` only within 180 s
 of the lamp's start (`skill_words::NOT_READY_WITHIN_MS`, lamp-tasks' own
 `STARTING_AT_MOST`), by the refusal's `dispatch.finished.monotonic_ms` on
 lamp-tasks' boot clock: past it a Gateway or Harness still not up is broken,
@@ -2655,6 +2673,18 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     and not moved to Hermes (the lead's rule). Anything asked, answered or
     used before the bound, a task from an earlier boot, the person's own
     session, Hermes and the computer's agents are as before.
+  - **Its run gone, told and ended** (#8601's family, lamp-ee17 task 85,
+    read `working` for 3.75 h across restarts, every later hand-over held
+    behind it): a task whose reads find its agent's run gone
+    (`observe_failed`: Harness never had it, or the direct path's run is
+    pruned or from before a restart) `GONE_READS` (3) times in a row, the
+    first `GONE_AFTER_MS` (5 min) ago or in an earlier boot, is kept as
+    `failed` at the next such read (`engine::gone_past_bound`, one journal
+    line): settled, so it is no longer watched nor counted as work under
+    way, and the voice tells it once as any failed task. The row is kept
+    in the store (`gone`), so a restart goes on counting; any other read
+    ends it. Test:
+    `engine::tests::a_task_whose_run_stays_gone_is_ended_failed_once_across_a_restart`.
   - **The voice** (`agent_tasks`, `task_news`): reads the lamp's target's
     engine from `{"op":"targets"}` and names it, so a hand-over naming no
     machine is said as "OpenClaw on the lamp" and the tool descriptions
@@ -5495,6 +5525,8 @@ exactly, the default when unset), every task and run is its own
   start, or with Harness's daemon down; signed in or out alike) is not
   sent the per-run way. It is held in the queue until the place is known,
   at most 15 min (`QUEUE_WAIT`), then fails `busy` with no `harness new`.
+  The queued task lives through the wait (`QUEUED_MS`, 30 min, #8601),
+  so it goes on once the place is known, or is told `busy` once.
 - **Found again by its kept id.** The pane's agent id from its `new` is
   kept in `one-session.json` in lamp-tasks' store folder
   (`/var/lib/lampos-tasks/store`, 0600). At the next open (a lamp-tasks
@@ -6027,7 +6059,8 @@ in and signed out, and on 0.6.60, signed in (#7507's ROW).
     closes the session (its (a) close, or its (b) `--fresh`) ends at once,
     `not_sent` `one_session_stuck` (`STUCK_ENDED`), never put back: a
     put-back past the store's confirm bound (`CONFIRM_MS`, 120 s from the
-    task's prepare) expired it unheard, so it sat until lamp-voice's 480 s
+    task's prepare; since #8601 a queued task lives `QUEUED_MS`, 30 min)
+    expired it unheard, so it sat until lamp-voice's 480 s
     bound (lamp-c0a4, 19 Nov 21:47-21:55). The waiting task ends with a
     short "ask me again" line, told once by Task news (`failed_stuck`:
     "I can't handle that right now; please ask me again in a few
