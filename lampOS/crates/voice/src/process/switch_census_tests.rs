@@ -482,6 +482,19 @@ fn named_functions(
                     name(module, rest[rest.len() - 2], last);
                 }
             }
+            ["lamp_msgs", rest @ ..] if !rest.is_empty() => {
+                let last = rest[rest.len() - 1];
+                let module = |parts: &[&str]| {
+                    std::iter::once("lamp_msgs")
+                        .chain(parts.iter().copied())
+                        .collect::<Vec<_>>()
+                        .join("::")
+                };
+                name(&module(&rest[..rest.len() - 1]), "", last);
+                if rest.len() >= 2 {
+                    name(&module(&rest[..rest.len() - 2]), rest[rest.len() - 2], last);
+                }
+            }
             ["Self", function] => name(top.unwrap_or(""), owner, function),
             [kind, function] => match imports.get(*kind) {
                 Some(module) => name(module, kind, function),
@@ -555,13 +568,29 @@ fn census_leaving_out(left_out: &[&str]) -> Census {
         .collect();
     let mut bodies: BTreeMap<Function, Vec<Body>> = BTreeMap::new();
     for (file, module, code) in &sources {
-        let Ok(relative) = file.strip_prefix(&voice) else {
-            continue;
+        // A `lamp_msgs` function is followed too, by its module's path
+        // (`lamp_msgs::consent::noticing_by_default`, #7767: the second
+        // worker read `LAMP_NOTICING_BY_DEFAULT` through it, never passed).
+        let (top, relative, brought) = match file.strip_prefix(&voice) {
+            Ok(relative) => {
+                let Some(top) = top_module(relative).filter(|_| !is_test(relative)) else {
+                    continue;
+                };
+                (top, relative.to_owned(), imports(code, &modules))
+            }
+            Err(_) => {
+                let relative = file.strip_prefix(&msgs).unwrap();
+                if is_test(relative) {
+                    continue;
+                }
+                (
+                    module.clone(),
+                    Path::new("../../msgs/src").join(relative),
+                    BTreeMap::new(),
+                )
+            }
         };
-        let Some(top) = top_module(relative).filter(|_| !is_test(relative)) else {
-            continue;
-        };
-        let brought = std::rc::Rc::new(imports(code, &modules));
+        let brought = std::rc::Rc::new(brought);
         for (owner, name, text) in functions(code) {
             bodies
                 .entry((top.clone(), owner, name))
@@ -679,6 +708,12 @@ const THROUGH_HELPERS: &[(&str, &str)] = &[
     (
         "LAMP_EYES_SPEAKING",
         "speaking_faces::eyes_from_environment",
+    ),
+    // Another crate's helper (#7767): `seen_yes::tools` and `run_at`, in
+    // the worker, read it through `lamp_msgs::consent`.
+    (
+        "LAMP_NOTICING_BY_DEFAULT",
+        "lamp_msgs::consent::noticing_by_default",
     ),
 ];
 
@@ -816,7 +851,7 @@ fn the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches() {
 fn a_helper_left_out_loses_its_switches() {
     // The omission control: not following one helper loses exactly the
     // switches only it reads, so the assertion above would fail.
-    for left_out in ["memory_scope", "speaking_faces"] {
+    for left_out in ["memory_scope", "speaking_faces", "lamp_msgs::consent"] {
         let Census { read, helpers } = census_leaving_out(&[left_out]);
         assert!(!helpers.keys().any(|helper| helper.starts_with(left_out)));
         for (switch, helper) in THROUGH_HELPERS {
