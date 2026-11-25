@@ -5769,12 +5769,12 @@ của Store đọc nó trước khi lên danh sách; chỉ khi được duyệt 
 bằng khóa của Store. Chi tiết, giới hạn và lý do từ chối ở
 [cloud.md](../cloud.md), "A made skill sent to the Store".
 
-## Đếm kỹ năng (#4710, cho báo cáo sức khỏe tự nguyện)
+## Đếm kỹ năng (#4710, cho báo cáo sức khỏe)
 
 Cho trường `skills` trong báo cáo sức khỏe của `lamp-cloud` (`cloud.md`,
 "Skills, counted"). Không thêm công tắc nào: `lamp-cloud` chỉ đọc khi ba cổng
-của báo cáo đều mở và người dùng đã đồng ý. Chỉ có số và SHA-256, không bao
-giờ có tên, lời hay tệp của một kỹ năng.
+của báo cáo đều mở, nên không bao giờ đọc sau khi người dùng nói không. Chỉ
+có số và SHA-256, không bao giờ có tên, lời hay tệp của một kỹ năng.
 
 - **Số lần chạy, trong `lamp-skills`** (`lamp_skills::usage`). Có
   `--state-dir` thì mỗi lần chạy được đếm ngay khi bắt đầu theo nguồn của kỹ

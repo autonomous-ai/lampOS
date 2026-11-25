@@ -318,9 +318,11 @@ pub struct Status {
     /// which Lamp it set up from this (#1396, decided 19 Oct); `lamp-cloud`
     /// says the same on every MQTT reply.
     pub generation: &'static str,
-    /// Whether the person's yes to health and crash reports was kept by the
-    /// last setup (#1683), so the app can show it after a reconnect. Read
-    /// only: the app sets it later through `lamp-cloud`, not here.
+    /// Whether health and crash reports are on as the last setup left them
+    /// (#1683), so the app can show it after a reconnect: the person's
+    /// answer it kept, or with none given what is kept already, no record
+    /// being on ([`kept_share_reports`]). Read only: the app sets it later
+    /// through `lamp-cloud`, not here.
     pub share_reports: bool,
     /// Whether this setup takes a person's own keys (#2094): [`Save::own_keys_on`],
     /// `LAMP_OWN_KEYS=on`. Always said, so the app asks its own-keys question
@@ -393,11 +395,14 @@ pub struct SetupRequest {
     pub fa_channel: String,
     #[serde(default, deserialize_with = "text")]
     pub fd_channel: String,
-    /// Health and crash reports (#1683): only the JSON `true` is a yes.
-    /// Absent, `false`, `null`, `"true"`, `1` or anything else is no, so an
-    /// app that does not ask, V1's page and this crate's own all mean no.
+    /// Health and crash reports (#1683): the person's answer, if given.
+    /// Absent is none: no answer, so nothing is kept and the reports'
+    /// default stands (on, the product owner on 25 Nov 2026,
+    /// `lamp_msgs::consent::reports_by_default`). Given, only the JSON
+    /// `true` is a yes; `false`, `null`, `"true"`, `1` or anything else is
+    /// a no.
     #[serde(default, deserialize_with = "only_true")]
-    pub share_reports: bool,
+    pub share_reports: Option<bool>,
     /// A person's own keys (#2094), each optional, read only with
     /// `LAMP_OWN_KEYS=on`: DeepSeek's endpoint (absent: DeepSeek's own API)
     /// and key, and Deepgram's key.
@@ -409,9 +414,11 @@ pub struct SetupRequest {
     pub deepgram_api_key: String,
 }
 
-/// Whether the field is the JSON `true`, and nothing else.
-fn only_true<'de, D: serde::Deserializer<'de>>(given: D) -> Result<bool, D::Error> {
-    Ok(Value::deserialize(given)? == Value::Bool(true))
+/// A field that is there: a yes only for the JSON `true`, and a no for
+/// anything else, `null` included. A field that isn't there never comes
+/// here: `#[serde(default)]` makes it none.
+fn only_true<'de, D: serde::Deserializer<'de>>(given: D) -> Result<Option<bool>, D::Error> {
+    Ok(Some(Value::deserialize(given)? == Value::Bool(true)))
 }
 
 /// A link field as text: a string as given, a number or `true`/`false` as its
@@ -530,8 +537,9 @@ pub struct Accepted {
     pub language: Option<&'static str>,
     /// The backend's link, when the request carried a whole one.
     pub backend: Option<Backend>,
-    /// Whether the person said yes to health and crash reports (#1683).
-    pub share_reports: bool,
+    /// The person's answer on health and crash reports (#1683), if the
+    /// request gave one; none keeps whatever is kept already.
+    pub share_reports: Option<bool>,
     /// The person's own keys given (#2094), each fitted or why not; checked
     /// against its service only after the join, and kept only if it works.
     pub own_keys: Vec<Result<crate::keys::Given, (crate::keys::Service, &'static str)>>,
@@ -732,6 +740,13 @@ pub trait Save {
     fn reports(&mut self, _share: bool) -> io::Result<()> {
         Ok(())
     }
+    /// The answer on reports kept now, as lamp-cloud reads it: what the
+    /// status says when this setup kept none (no answer given, or one that
+    /// could not be written). No record by default, so the reports' default
+    /// (`lamp_msgs::consent::reports_by_default`): only [`Files`] reads one.
+    fn kept_reports(&self) -> bool {
+        lamp_msgs::consent::reports_by_default()
+    }
     fn marker(&mut self) -> io::Result<()>;
     /// A new lamp's first speaker volume (#5551, `LAMP_FIRST_VOLUME=on`),
     /// just before the marker: best effort, it never fails setup. Nothing
@@ -897,19 +912,18 @@ pub fn takes_own_keys_at_start(save: &impl Save, recovering: bool) -> bool {
 /// The answer on reports the last setup kept at `path`, read as lamp-cloud
 /// reads setup's record: a yes only with `"share": true` to a wording this
 /// setup knows (`asked` at most [`REPORTS_ASKED`]) and no field but
-/// `share`, `asked` and `at`; missing, unreadable, a later wording or a newer
+/// `share`, `asked` and `at`; unreadable, a later wording or a newer
 /// build's field is a no. A later change in the app is lamp-cloud's own
-/// record, not this one (reviewer-two's P3 on #3024). With
-/// `LAMP_NOTICING_BY_DEFAULT=on` (#7767, `lamp_msgs::consent`'s one place
-/// for it) no record is [`kept_share_reports_or`]'s default.
+/// record, not this one (reviewer-two's P3 on #3024). No record is on
+/// (`lamp_msgs::consent::reports_by_default`, the product owner on 25 Nov
+/// 2026): reports are on unless a person kept a no.
 pub fn kept_share_reports(path: &Path) -> bool {
-    kept_share_reports_or(path, lamp_msgs::consent::noticing_by_default())
+    kept_share_reports_or(path, lamp_msgs::consent::reports_by_default())
 }
 
-/// [`kept_share_reports`] with the default given (#7767), as lamp-cloud
-/// reads it: no record (not found) is `by_default`; a kept `false`, a
-/// record that can't be read, a later wording or a newer build's field is
-/// still no.
+/// [`kept_share_reports`] with the default given, as lamp-cloud reads it:
+/// no record (not found) is `by_default`; a kept `false`, a record that
+/// can't be read, a later wording or a newer build's field is still no.
 pub fn kept_share_reports_or(path: &Path, by_default: bool) -> bool {
     let bytes = match std::fs::read(path) {
         Ok(bytes) => bytes,
@@ -1067,6 +1081,9 @@ impl Save for Files<'_> {
         let temporary = stage(&self.0.reports, &bytes, 0o644)?;
         put_in_place(&temporary, &self.0.reports)
     }
+    fn kept_reports(&self) -> bool {
+        kept_share_reports(&self.0.reports)
+    }
     fn marker(&mut self) -> io::Result<()> {
         write_private(&self.0.marker, b"")
     }
@@ -1214,7 +1231,7 @@ pub fn run(
     let joined = wifi::join(host, country, &accepted.ssid, &accepted.password);
     drop(joining);
     let _ = watcher.join();
-    // Counted for the opt-in report (#6256 F8), sent only with the yes.
+    // Counted for the health report (#6256 F8), never sent after a no.
     if crate::wifi_counts::on()
         && let Err(why) = crate::wifi_counts::count(Path::new(crate::wifi_counts::FILE), &joined)
     {
@@ -1250,13 +1267,23 @@ pub fn run(
                         "lamp-setup: the backend's link could not be saved ({why}); setup goes on without it"
                     );
                 }
-                // Best effort too (#1683): an answer that cannot be kept is
-                // a no, never a failed setup.
-                match save.reports(accepted.share_reports) {
-                    Ok(()) => reports_kept = accepted.share_reports,
-                    Err(why) => eprintln!(
-                        "lamp-setup: the answer on reports could not be saved ({why}); reports stay off"
-                    ),
+                // Best effort too (#1683): an answer that cannot be kept
+                // never fails setup. Only a person's own answer is kept: with
+                // none, nothing is written, so a no kept by an earlier setup
+                // stands, and with no record the default (on). Either way
+                // the status says what is kept now.
+                match accepted.share_reports {
+                    Some(share) => match save.reports(share) {
+                        Ok(()) => reports_kept = share,
+                        Err(why) => {
+                            reports_kept = save.kept_reports();
+                            eprintln!(
+                                "lamp-setup: the answer on reports could not be saved ({why}); reports stay {}, as kept",
+                                if reports_kept { "on" } else { "off" }
+                            );
+                        }
+                    },
+                    None => reports_kept = save.kept_reports(),
                 }
             })
             .and_then(|()| match &accepted.credential {

@@ -564,13 +564,14 @@ root:
 `chown root:lampos` and `chmod 0640` it, and remove it after.
 
 **One rule for the yeses, and the default (#7767).** The face-expressions
-and room-sounds files above, seen activity's (seen.md) and health and crash
-reports' `share` (cloud.md) are all read by one rule,
-`lamp_msgs::consent::allowed`: exactly `"yes"` is on, exactly `"no"` is
-off, a file that can't be read, over 4096 bytes or not JSON is off, and a
-missing file is off unless `LAMP_NOTICING_BY_DEFAULT=on` (switches.md, off
-unless set, in no unit). With the switch on, a missing face-expressions or
-room-sounds file reads as a yes, so faces are read and room sounds
+and room-sounds files above and seen activity's (seen.md) are all read by
+one rule, `lamp_msgs::consent::allowed`: exactly `"yes"` is on, exactly
+`"no"` is off, a file that can't be read, over 4096 bytes or not JSON is
+off, and a missing file is off unless `LAMP_NOTICING_BY_DEFAULT=on`
+(switches.md, off unless set, in no unit). Health and crash reports'
+`share` (cloud.md) keeps the same rule with its own default: no record is
+on (the product owner, 25 Nov 2026). With the switch on, a missing
+face-expressions or room-sounds file reads as a yes, so faces are read and room sounds
 classified by default, while a kept `{"face_expressions":"no",...}` or
 `{"room_sounds":"no",...}` (`consent::no_bytes`) stays no. Off, each reader
 answers exactly as described above. With the switch on, the voice's "stop

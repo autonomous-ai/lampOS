@@ -453,7 +453,7 @@ No lamp has shipped. V2 is installed on the current lamps before they ship, so n
 | A face for a failed part (GO-3.17, `not-feeling-well`) | Core skill: the droop is a behaviour the lamp shows; the health facts it reads stay system | #1681 |
 | "I'm unplugging you": the arm folds first | Core skill | #1674 |
 | Smoke and bad-air alerts (HAL-3.4) | Core skill, never worded as a certified alarm | #1684 |
-| Health and crash reports reaching the company (GO-3.13, HAL-5.17) | System, opt-in at setup: only health and crashes, never sound, pictures or words | #1683 |
+| Health and crash reports reaching the company (GO-3.13, HAL-5.17) | System, opt-in at setup: only health and crashes, never sound, pictures or words. On by default since 25 Nov 2026 (the product owner): on unless a person keeps a no, at setup or in the app | #1683 |
 | Languages | English only at launch | |
 | With no internet | A recorded notice now. Spoken commands offline come later, as a core skill | |
 | Joys: swaying to music, glancing at a laugh, watching you leave | Core skills | #1669 |

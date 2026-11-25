@@ -390,6 +390,9 @@ impl<S: Save> Save for ReleasingSave<'_, S> {
     fn reports(&mut self, share: bool) -> io::Result<()> {
         self.save.reports(share)
     }
+    fn kept_reports(&self) -> bool {
+        self.save.kept_reports()
+    }
     fn own_keys_on(&self) -> bool {
         self.save.own_keys_on()
     }

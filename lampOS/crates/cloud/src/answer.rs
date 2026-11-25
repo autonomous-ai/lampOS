@@ -2058,9 +2058,10 @@ pub mod tests {
         let got = answer(&mut lamp, "reports.get", &Value::Null)
             .unwrap()
             .unwrap();
+        // No record: on, a yes nobody gave (the product owner, 25 Nov 2026).
         assert_eq!(
             got,
-            json!({"share": false, "since": null, "queued": 0, "by": null, "held": false, "at": null})
+            json!({"share": true, "since": null, "queued": 0, "by": null, "held": false, "at": null})
         );
         let on = answer(&mut lamp, "reports.set", &json!({"share": true}))
             .unwrap()

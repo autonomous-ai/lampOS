@@ -109,9 +109,10 @@ against lamp-06c1.
     the device's record, and the app picks the Lamp 2 page by it (#1396, the
     first builder and the backend, 19 Oct). V1's readers pass over a field
     they don't know. Setup's status says the same (`docs/setup.md`).
-- **Sends health and crash reports** with `LAMP_REPORTS=on` and the
-  person's yes (#1683): numbers and listed names only, on
-  `<fd_channel>/report` at QoS 1 ("Health and crash reports", below).
+- **Sends health and crash reports** with `LAMP_REPORTS=on`, unless the
+  person kept a no (#1683; on by default since 25 Nov 2026): numbers and
+  listed names only, on `<fd_channel>/report` at QoS 1 ("Health and crash
+  reports", below).
 - **Pings the backend every 15 s**, as V1's `status_reporter`: `POST
   {base}/ping`, where `base` is `llm_base_url` with a trailing `/v1` cut,
   `?mqtt=true` while no broker is kept, with the voice's key as the bearer
@@ -180,7 +181,7 @@ lamp says so.
 | `led.resting.set` (`{"mode": "default" \| "off" \| "custom", "color": [r, g, b]}`) | asked on `light/command`, as the actions program asks it, and read back from `light/state` within 1 s; the snapshot of what is shown. `off` keeps the colour and the level, and black is `off`, as V1 |
 | `led.resting.preview` (`{"color": [r, g, b]}`) | asked on `light/request` at `conversation` priority (over a skill's glow, under the person's own light), on the host's boot clock, holding 10 s unless asked again, so an abandoned screen leaves nothing behind (V1's 10 s); a save gives it back first. A light asked for at the lamp ("make your light blue") ends it, and a drag that goes on stays given way until it pauses past its 10 s (the reviewer on #1464). Answered only when it fails, as V1, so a drag does not flood `fd_channel`. Refused where the ring takes no lights that lapse (`LAMP_LIGHT_REQUESTS`, on in the product) |
 | `chat.send` (`{"message", "session_id", "speak"}`) | with `LAMP_MESSAGES=on`: acked with `{"run_id", "session_id"}` and put on `chat/in`; the answer goes out after it as `chat.event`s, in V1's shapes ([messages.md](messages.md)). Refused at once when nothing on the lamp takes texts, and for a photo or a file, which aren't read yet. Without the switch, V1's "not on this lamp" |
-| `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued", "by", "held", "at"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`), how many reports wait, and how the newest choice was made: `by` is `voice` (only ever a stop), `app` or `setup` (`null` for a choice kept before these were), `held` is true for a voice's stop from a line whose answer was held, and `at` is when (as `since`), so the app's row can say "Stopped by voice at 3 pm" (#1880). A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
+| `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued", "by", "held", "at"}`, whether reports are on (a kept yes, or no choice kept at all), since when (RFC 3339 UTC, or `null`), how many reports wait, and how the newest choice was made: `by` is `voice` (only ever a stop), `app` or `setup` (`null` for a choice kept before these were, or none kept), `held` is true for a voice's stop from a line whose answer was held, and `at` is when (as `since`), so the app's row can say "Stopped by voice at 3 pm" (#1880). A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
 | `consent.get` (`{}`), `consent.set` (`{"face_expressions": bool, "if": REV}` or `{"room_sounds": bool, "if": REV}`, exactly one key; `if` the key's `rev` from the last `consent.get` or `consent.set`, 1 to 64 printable ASCII characters) | with `LAMP_APP_CONSENT=on` (#5500, "The two yeses from the app" below): the owner's face expressions yes and, on a lamp with no privacy slide only (`lamp-cloud`'s own `LAMP_PRIVACY_CONTROLS=no-slide`), the room sounds yes. A missing file reads as on only with `LAMP_NOTICING_BY_DEFAULT=on` in `lamp-cloud`'s unit and the old nos kept (the done mark `noticing-old-nos.done` in the folder, `lamp_msgs::consent::read_or`), and as off otherwise; a kept no is off either way (#7767, slice 6). `consent.get` reads the files and answers at once, `{"face_expressions": bool, "rev": {"face_expressions": REV}}` on a slide lamp, `{"face_expressions": bool, "room_sounds": bool, "rev": {"face_expressions": REV, "room_sounds": REV}}` on one with none, and `seen_activity` beside them (and in `rev`) only where `lamp-cloud` has `LAMP_SEEN_ACTIVITY=on` (#6543; elsewhere refused: "seen activity is not on this lamp"). `consent.set` is a compare-and-set handed to root's helper, which changes the file only while the key's revision is still `if`: it keeps a yes (`"by":"app"`; a yes with no file that already reads as on writes nothing) and answers at once; its off keeps a no (`"by":"app"`) whenever the done mark is there, or with `LAMP_NOTICING_BY_DEFAULT=on` in the helper's own unit (`lamp-setup-change@.service`), and otherwise removes the file; `success` carries the same shape as `consent.get`, read after it, with the key's new `rev`, and `"stale": true` when nothing changed because the key's revision had moved on (a retry, or a change at the lamp since the app looked): the app then shows what it says and takes its `rev` for the next tap. A key's revision is the same whatever `LAMP_NOTICING_BY_DEFAULT` says: a default yes is no file's, so it reads as the state's (`gone-REV`), and a lamp no (a kept one too) always renews it. Refused at once, before the helper: no key, two keys, a key this lamp lacks (room sounds on a slide lamp: "room sounds is not on this lamp: it has a privacy slide"), a value not `true` or `false`, no `if` or one that is not 1 to 64 printable ASCII characters ("consent.set takes if: the rev from the last consent.get or consent.set"). Listed in `can` only with the switch; without it, V1's "not on this lamp" |
 | `desk_noticing.get` (`{}`), `desk_noticing.set` (`{"allow": bool, "request_id": N}`) | with `LAMP_SEEN_ACTIVITY=on` in `lamp-cloud`'s own unit (#6543, "Desk noticing from the app" below), not behind `LAMP_APP_CONSENT`: the owner's switch for lamp-seen's desk noticing, as mute's. Both answer `{"desk_noticing": {"on": bool, "by": "app"|"voice"|"default"|null, "posture": bool}}`, read from `seen-activity.json` by the same rule as `consent.get` (a missing file is `on: true`, `by: "default"` only with `LAMP_NOTICING_BY_DEFAULT=on` in `lamp-cloud`'s unit and the done mark; a kept no is off either way); `posture` is `LAMP_SEEN_POSTURE=on` in `lamp-cloud`'s unit, so the app shows the disclosure naming posture. `set` needs `request_id`, the app's send time in Unix milliseconds, and hands `{"desk_noticing": {"allow", "request_id"}}` to root's helper (`"by":"app"`; off keeps a no whenever the done mark `noticing-old-nos.done` is there, or with `LAMP_NOTICING_BY_DEFAULT=on` in the helper's own unit, `lamp-setup-change@.service`, and otherwise removes the file, #7767, slice 6), which keeps a yes only with a `request_id` above the mark kept beside it, and answers with the file after it. `allow` that isn't a JSON bool is `allow must be true or false`; no `request_id`, or one that is no positive integer, `request_id must be the app's send time in Unix milliseconds`; a yes at or below the mark, `this request was sent before the lamp's last change: send a new one`; a yes with a `request_id` more than a day past the lamp's clock, `request_id is more than a day ahead of the lamp's clock: send the app's time in Unix milliseconds`. Listed in `can` only with the switch; without it, V1's "not on this lamp" |
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`, and `pushed` for a skill a paired computer pushed), whether it can be removed or turned off, and what it may use in plain words. Without the switch, V1's "not on this lamp" |
@@ -1977,16 +1978,18 @@ and the first builder's yes; the backend agreed the record on #1683, with
 [two changes](https://github.com/autonomous-ai/lampOS/issues/1683#issuecomment-6259804444):
 a sub-topic and `id`). This is the lamp side
 (`crates/cloud/src/reports.rs`); the app's screen and the backend's store
-are built by their own builders.
+are built by their own builders. **On by default since 25 Nov 2026** (the
+product owner): health and crash reports are on unless a person kept a
+no, at setup or later in the app.
 
 **Off unless set.** No health or crash report is queued or sent unless all
 three are on: `LAMP_CLOUD=on`; `LAMP_REPORTS=on` in `lamp-cloud`'s unit
 (and in the voice's, for the stop by voice), both on in the product units
-since #2862; and the person's yes, read at
-each send, never kept past a change. Without the switch `lamp-cloud` starts
+since #2862; and the person's choice, read at each send, never kept past
+a change: on unless they kept a no. Without the switch `lamp-cloud` starts
 no reports driver, subscribes to nothing for reports, writes no reports
 file, and answers `reports.get` and `reports.set` as kinds it lacks.
-Without the yes, the driver says
+With a no kept, the driver says
 `reports/state` (`share: false`) and does not read health values or queue
 crashes. It still consumes local exit notes and keeps their bookkeeping.
 The separate local exit-note recorder below does not depend on these
@@ -2112,7 +2115,7 @@ here, on the lamp, so the backend counts no app make itself and nothing is
 counted twice. An added field under `lamp-report/1`,
 `skills`, on a health report (Backend3, #4710: no new schema, the report
 within its 4 KiB). It has no switch of its own: it goes with the reports'
-three gates, and nothing is read without the person's yes.
+three gates, and nothing is read after the person's no.
 
 Only numbers, enums, dates and a Store package's SHA-256 (64 lowercase hex,
 the id the Store's catalogue names it by). Never a skill's name, title,
@@ -2228,10 +2231,10 @@ Vietnamese: [vi/report-counters_vi.md](vi/report-counters_vi.md).
 For Backend's B10 dashboard by region (a lamp in China against the rest):
 an added field under `lamp-report/1`, `metrics`, on a health report, in
 the shape Backend posted on #6256 (12 Nov, with Twelve's `mqtt` block).
-Off unless `LAMP_REPORT_COUNTERS=on`; then still only with the reports'
-three gates and the person's yes. Off, a report is byte for byte as before
-(no `metrics` key). Numbers only: no per-event data, no ids, no words, no
-region (the cloud splits by region itself).
+Off unless `LAMP_REPORT_COUNTERS=on`; then still only through the reports'
+three gates, so never after a person's no. Off, a report is byte for byte
+as before (no `metrics` key). Numbers only: no per-event data, no ids, no
+words, no region (the cloud splits by region itself).
 
 ```json
 "metrics": {
@@ -2349,9 +2352,10 @@ or not, with the voice's key as the bearer and the body
 untouched.
 
 **Off unless set,** by the same three gates as the reports: `LAMP_CLOUD=on`,
-`LAMP_REPORTS=on`, and the person's yes, read at each send through the
-reports' own reading. Nothing is sent or retried without them, and a stage
-seen while any gate is closed is dropped, not kept for later. The small
+`LAMP_REPORTS=on`, and the person's choice (on unless they kept a no),
+read at each send through the reports' own reading. Nothing is sent or
+retried without them, and a stage seen while any gate is closed is
+dropped, not kept for later. The small
 file below is kept either way: it holds no personal data (outcomes, builds
 and times) and is what stops a stage seen before the yes being sent after
 it.
@@ -2459,10 +2463,12 @@ put back from it runs the previous `lamp-cloud`, which has none. A
 
 ### The person's choice
 
-- **At setup**, `"share_reports": true` in the setup request; only the
-  JSON `true` is a yes. Setup keeps the answer, a no included, in
-  `/etc/lampOS/setup/reports.json` ([setup.md](setup.md)), which
-  `lamp-cloud` reads where it is. The lamp's own setup page asks too
+- **At setup**, `"share_reports"` in the setup request: only the JSON
+  `true` is a yes, and any other value given is a no. Setup keeps that
+  answer, a no included, in `/etc/lampOS/setup/reports.json`
+  ([setup.md](setup.md)), which `lamp-cloud` reads where it is. A request
+  without the field gives no answer: nothing is written, and a no kept
+  before stays. The lamp's own setup page asks too
   (#2862): "Send health and crash reports", a box left unticked, which
   sends `share_reports` only as the box is. Unticked, it is off.
 - **Later, in the app:** `reports.get` and `reports.set` (the device API
@@ -2502,15 +2508,16 @@ put back from it runs the previous `lamp-cloud`, which has none. A
   the new reports. Nothing else is sent after it.
 - **Factory reset** removes `/etc/lampOS/setup/reports.json` and empties
   `/var/lib/lampos-cloud` (the later choice and the queue); the next setup
-  asks again, default off.
-- **On by default, dark (#7767):** with `LAMP_NOTICING_BY_DEFAULT=on`
-  (switches.md; off unless set, in no unit), neither record there (setup's
-  and `lamp-cloud`'s own both not found) reads as a yes nobody gave, with
-  no `by` and no time (`read_consent_or`; setup's status reads its record
-  the same way, `kept_share_reports_or`). A kept `false`, setup's or the
-  lamp's own, stays off, and so does a record this build can't read: the
-  same rule as the consent folder's yeses (`lamp_msgs::consent::allowed`).
-  Off, no record is a no, as above.
+  asks again, and with no answer reports are on.
+- **On by default (the product owner, 25 Nov 2026):** neither record
+  there (setup's and `lamp-cloud`'s own both not found) reads as a yes
+  nobody gave, with no `by` and no time (`read_consent_or` with
+  `lamp_msgs::consent::reports_by_default`; setup's status reads its
+  record the same way, `kept_share_reports`). A kept `false`, setup's or
+  the lamp's own, stays off, and so does a record this build can't read:
+  the same rule as the consent folder's yeses (`lamp_msgs::consent::allowed`).
+  `LAMP_NOTICING_BY_DEFAULT` (#7767) no longer reaches reports: it keeps
+  desk pictures, face expressions and room sounds only.
 
 ### Its files, one release forward (#2052)
 
@@ -3672,8 +3679,9 @@ unacknowledged branches and the five-second result-ack contract. A
 completes; a fixed sleep no longer determines either branch's end.
 
 The reports (#1683): each kind's fields as sent; the canary; each of the
-three gates closed sends nothing (no setup file, a no, one unreadable,
-`"true"`, `1`, a newer wording; a later no of the lamp's own); the bus only
+three gates closed sends nothing (a no, one unreadable, `"true"`, `1`, a
+newer wording; a later no of the lamp's own), and no record at all sends
+(on by default); the bus only
 turning reports off; a no deleting the queue and its files with nothing
 after but `stopped`; a no given offline kept across a restart, sent on the
 next connection and once more on the one after; the bounds (12 an hour, 50
