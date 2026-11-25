@@ -3976,7 +3976,7 @@ impl Run<'_, '_> {
         }
         own::note_began(self.records.folder(), &self.config.root, &file.sha256)
             .map_err(|error| format!("self-began cannot be written: {error}"))?;
-        own::begin(self.records.folder(), &old, &file.sha256)
+        own::begin_on(self.records.folder(), &self.config.root, &old, &file.sha256)
             .map_err(|error| format!("self.json cannot be written: {error}"))?;
         replace_link(&link, &file.sha256).map_err(|error| {
             format!(

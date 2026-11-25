@@ -2188,8 +2188,17 @@ file is `{"version": 1, "old": "<64 hex>", "new": "<64 hex>", "at_unix_ms": N}`.
 These four keep their meaning in every version. A later version may add
 fields, and back reads any version and ignores fields it does not know. Back
 does three things only: the link, the refusal and the restart. The deadline
-is on the wall clock: on a lamp without a battery clock, a switch made
-before NTP set the time may be put back early, or late, once it is set.
+was on the wall clock: on a lamp without a battery clock, a switch made
+before NTP set the time may be put back early, or late, once it is set. A
+lamp-update that writes `boot_id` and `at_uptime_ms` beside it (#8472) has a
+`lamp-update-back` of the same build judge the 10 minutes on the kernel's
+uptime (`/proc/uptime`) while the boot is the same, which a time sync never
+moves; after a reboot the wall clock decides, and one set back past
+`at_unix_ms` counts as late, never as a deadline held open. A `self.json`
+without the two fields is judged on the wall clock as before. A lamp's
+`lamp-update-back` is refreshed only by a confirmed lamp-update's first
+applying round (`writer_swap`, #3689), so on an old image the climb itself
+is still judged by the image's own copy.
 
 **A `self.json` that can't be read** (#1505) is a switch that failed, never
 one confirmed. The builds are taken as known only when `update/current`

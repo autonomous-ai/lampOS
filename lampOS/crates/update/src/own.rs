@@ -70,6 +70,8 @@ const BEGAN: &str = "self-began";
 const PUT_BACK: &str = "self-put-back";
 /// The kernel's id of this boot, new at every start.
 pub const BOOT_ID: &str = "/proc/sys/kernel/random/boot_id";
+/// The kernel's uptime, on the boot clock, which a wall-clock jump never moves.
+pub const UPTIME: &str = "/proc/uptime";
 
 /// Whether the switch is on, from its value.
 pub fn on(value: Option<&str>) -> bool {
@@ -102,6 +104,14 @@ pub struct Pending {
     pub new: String,
     /// When the link moved, on the wall clock.
     pub at_unix_ms: u64,
+    /// The boot the link moved on, and the kernel's uptime then, in ms:
+    /// the deadline runs on the boot clock within that boot, which a time
+    /// sync's jump of the wall clock never moves (#8472). Absent in a
+    /// `self.json` an older lamp-update wrote, which the wall clock judges.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub boot_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at_uptime_ms: Option<u64>,
 }
 
 fn is_build(name: &str) -> bool {
@@ -119,16 +129,55 @@ pub fn pending(records: &Path) -> io::Result<Option<Pending>> {
     }
 }
 
-/// Written by the round, before the link moves.
+/// The kernel's uptime under `root`, in ms: the boot clock, which does not
+/// jump when the wall clock is set.
+pub fn uptime_ms(root: &Path) -> Option<u64> {
+    let text = fs::read_to_string(on_root(root, UPTIME)).ok()?;
+    let seconds: f64 = text.split_whitespace().next()?.parse().ok()?;
+    (seconds.is_finite() && seconds >= 0.0).then_some((seconds * 1000.0) as u64)
+}
+
+/// [`begin_on`] for the real root, for tests.
+#[cfg(test)]
 pub(crate) fn begin(records: &Path, old: &str, new: &str) -> io::Result<()> {
+    begin_on(records, Path::new("/"), old, new)
+}
+
+/// Written by the round, before the link moves: for the lamp under `root`,
+/// with the boot and its uptime noted.
+pub(crate) fn begin_on(records: &Path, root: &Path, old: &str, new: &str) -> io::Result<()> {
+    let boot_id = boot_id(root);
     let pending = Pending {
         version: VERSION,
         old: old.to_owned(),
         new: new.to_owned(),
         at_unix_ms: unix_ms(),
+        at_uptime_ms: boot_id.as_ref().and_then(|_| uptime_ms(root)),
+        boot_id,
     };
     let bytes = serde_json::to_vec_pretty(&pending).map_err(io::Error::other)?;
     write_whole(&records.join(PENDING), &bytes, 0o600)
+}
+
+/// Whether a switch's [`DEADLINE`] has passed. On the boot it began on, by
+/// the boot clock: a lamp with no clock of its own has its wall clock jump
+/// at the first time sync, and a good climb is not put back for that
+/// (#8472). After a reboot the boot clock cannot say, so the wall clock
+/// does, and one set back past the switch's start does not hold the
+/// deadline open for ever: an unconfirmed switch across a reboot is late.
+/// A `self.json` with no boot clock is judged on the wall clock alone.
+fn late_on(pending: &Pending, root: &Path, now_unix_ms: u64) -> bool {
+    let deadline = DEADLINE.as_millis() as u64;
+    if let (Some(boot), Some(at)) = (&pending.boot_id, pending.at_uptime_ms) {
+        if boot_id(root).as_ref() == Some(boot) {
+            if let Some(now) = uptime_ms(root) {
+                return now >= at.saturating_add(deadline);
+            }
+        } else if now_unix_ms < pending.at_unix_ms {
+            return true;
+        }
+    }
+    now_unix_ms >= pending.at_unix_ms.saturating_add(deadline)
 }
 
 /// `self.json`, read as a switch waits on it: `Err(None)` when it is there
@@ -548,7 +597,7 @@ pub fn back(
             return settle(records, root, say).map(Back::Unreadable);
         }
     };
-    let late = late(pending.at_unix_ms);
+    let late = late_on(&pending, root, now_unix_ms);
     if running && !late {
         return Ok(Back::Waiting);
     }
@@ -688,6 +737,109 @@ mod tests {
         let records = root.path().join("records");
         fs::create_dir_all(&records).unwrap();
         (root, exe, records)
+    }
+
+    /// A lamp whose clock the test moves: `proc/uptime` and the boot id,
+    /// a switch begun on it, and `back` asked with the wall clock it names.
+    struct Clocked {
+        root: tempfile::TempDir,
+        records: PathBuf,
+    }
+
+    impl Clocked {
+        fn new(boot: &str, uptime_s: &str) -> Self {
+            let root = tempfile::tempdir().unwrap();
+            let records = root.path().join("records");
+            fs::create_dir_all(&records).unwrap();
+            let lamp = Self { root, records };
+            lamp.boot(boot, uptime_s);
+            for build in [A, B] {
+                let folder = on_root(lamp.root.path(), FOLDER).join(build);
+                fs::create_dir_all(&folder).unwrap();
+                fs::write(folder.join(BINARY), build).unwrap();
+            }
+            std::os::unix::fs::symlink(B, on_root(lamp.root.path(), CURRENT)).unwrap();
+            lamp
+        }
+
+        fn boot(&self, boot: &str, uptime_s: &str) {
+            for (at, text) in [(BOOT_ID, boot), (UPTIME, uptime_s)] {
+                let path = on_root(self.root.path(), at);
+                fs::create_dir_all(path.parent().unwrap()).unwrap();
+                fs::write(path, text).unwrap();
+            }
+        }
+
+        /// `back` for a lamp-update that runs, at the wall clock `wall_ms`.
+        fn back(&self, wall_ms: u64) -> Back {
+            let unit = UnitState {
+                unit: "lamp-update.service".into(),
+                active: "active".into(),
+                sub: "running".into(),
+                pid: 1,
+                restarts: 0,
+                result: String::new(),
+                condition: String::new(),
+                status: String::new(),
+            };
+            back(&self.records, self.root.path(), wall_ms, &unit, &mut |_| {}).unwrap()
+        }
+
+        /// `self.json`'s `at_unix_ms`, which a time sync can leave far from now.
+        fn begun_at(&self) -> u64 {
+            pending(&self.records).unwrap().unwrap().at_unix_ms
+        }
+    }
+
+    /// #8472: an old image has no clock battery, so its wall clock jumps at
+    /// the first time sync. A switch that began 100 s ago on the boot clock
+    /// is not late because the wall clock now reads an hour on.
+    #[test]
+    fn a_wall_clock_jump_forward_does_not_put_back_a_switch_within_its_deadline() {
+        let lamp = Clocked::new("boot-1\n", "50.00 90.00\n");
+        begin_on(&lamp.records, lamp.root.path(), A, B).unwrap();
+        lamp.boot("boot-1\n", "150.00 290.00\n");
+        assert_eq!(lamp.back(lamp.begun_at() + 3_600_000), Back::Waiting);
+    }
+
+    /// Past its 600 s on the boot clock the switch is put back, whatever
+    /// the wall clock says, even a clock set back.
+    #[test]
+    fn a_switch_that_does_not_come_up_is_put_back_after_600_s_on_the_boot_clock() {
+        let lamp = Clocked::new("boot-1\n", "50.00 90.00\n");
+        begin_on(&lamp.records, lamp.root.path(), A, B).unwrap();
+        lamp.boot("boot-1\n", "649.00 900.00\n");
+        assert_eq!(lamp.back(lamp.begun_at() + 1_000), Back::Waiting);
+        lamp.boot("boot-1\n", "651.00 900.00\n");
+        assert!(matches!(
+            lamp.back(lamp.begun_at().saturating_sub(5_000)),
+            Back::PutBack(_)
+        ));
+    }
+
+    /// A reboot ends the boot clock's reckoning; the wall clock decides, and
+    /// one that went back past `at_unix_ms` does not hold the deadline open
+    /// for ever: the switch, unconfirmed across a reboot, is late.
+    #[test]
+    fn after_a_reboot_a_wall_clock_set_back_does_not_hold_the_deadline_open() {
+        let lamp = Clocked::new("boot-1\n", "50.00 90.00\n");
+        begin_on(&lamp.records, lamp.root.path(), A, B).unwrap();
+        lamp.boot("boot-2\n", "20.00 30.00\n");
+        assert!(matches!(
+            lamp.back(lamp.begun_at().saturating_sub(86_400_000)),
+            Back::PutBack(_)
+        ));
+    }
+
+    /// A `self.json` an older lamp-update wrote has no boot clock: the wall
+    /// clock decides, as before.
+    #[test]
+    fn a_self_json_with_no_boot_clock_is_judged_on_the_wall_clock_as_before() {
+        let lamp = Clocked::new("boot-1\n", "50.00 90.00\n");
+        let old = format!(r#"{{"version":1,"old":"{A}","new":"{B}","at_unix_ms":1000}}"#);
+        fs::write(lamp.records.join(PENDING), old).unwrap();
+        assert_eq!(lamp.back(1_000 + 599_000), Back::Waiting);
+        assert!(matches!(lamp.back(1_000 + 601_000), Back::PutBack(_)));
     }
 
     #[test]
