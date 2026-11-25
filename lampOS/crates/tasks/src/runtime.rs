@@ -841,6 +841,7 @@ pub(crate) fn gateway_wait(
     let Some(next) = next.filter(|next| {
         asking != Asking::No
             && next.target.engine == EngineKind::Openclaw
+            && next.target.project != MACHINES_PROJECT
             && crate::direct::not_default_for(next).is_none()
     }) else {
         if let Some((name, _)) = held.take() {
@@ -6414,7 +6415,10 @@ fn with_sign_in(
     answer: Result<Value, EngineError>,
     sign_in: Option<SignIn>,
 ) -> Result<Value, EngineError> {
-    let (Request::Status {} | Request::AppSignInState {}, Some(sign_in)) = (request, sign_in)
+    // `targets` too (the owner, 25 Nov): the voice says why an agent no
+    // computer can take isn't available (Harness signed out).
+    let (Request::Status {} | Request::AppSignInState {} | Request::Targets {}, Some(sign_in)) =
+        (request, sign_in)
     else {
         return answer;
     };
@@ -6531,7 +6535,7 @@ mod tests {
     }
 
     /// #5488: `status` says Harness's sign-in once it was read, and nothing
-    /// else changes.
+    /// else changes; `targets` says it too (rule 2b, 25 Nov).
     #[test]
     fn status_says_harness_signed_in_once_read() {
         use super::{Request, SignIn, with_sign_in};
@@ -6547,7 +6551,20 @@ mod tests {
         let unread = with_sign_in(&Request::Status {}, body(), None).unwrap();
         assert_eq!(unread, serde_json::json!({"summary": {}}));
         let targets = with_sign_in(&Request::Targets {}, body(), Some(SignIn::Out)).unwrap();
-        assert_eq!(targets, serde_json::json!({"summary": {}}));
+        assert_eq!(
+            targets,
+            serde_json::json!({"summary": {}, "signed_in": "no"})
+        );
+        let list = with_sign_in(
+            &Request::List {
+                after_id: 0,
+                limit: 1,
+            },
+            body(),
+            Some(SignIn::Out),
+        )
+        .unwrap();
+        assert_eq!(list, serde_json::json!({"summary": {}}));
     }
 
     /// #5524: the app's state says Harness's sign-in once it was read,

@@ -1393,10 +1393,11 @@ fn a_hermes_launch_waits_on_its_own_session() {
     assert_eq!(ready, None);
 }
 
-/// #8431 HOLD (P2): a task named for Hermes while OpenClaw is the lamp's
-/// default is not the direct path's (lamp-update runs Hermes's gateway only
-/// while Hermes is the default): no 60 s wait and "still getting ready",
-/// Harness's path and its progress keep it. Hermes the default, or none
+/// #8431 HOLD (P2): a Hermes launch while OpenClaw is the lamp's default
+/// (one prepared just before the default moved; a new lamp task always
+/// runs on the default) is not the direct path's (lamp-update runs Hermes's
+/// gateway only while Hermes is the default): no 60 s wait and "still
+/// getting ready", Harness's path and its progress keep it. Hermes the default, or none
 /// read (no lamp side), the direct session takes it as before.
 #[test]
 fn a_hermes_task_on_an_openclaw_default_lamp_keeps_harnesss_path() {
