@@ -6654,15 +6654,27 @@ after a take-over, but now for every turn:
   (`said_to_me::Line::another_voice`: the line's print under
   `same_voice::DIFFERENT_BELOW` against the conversation's, or a line of it
   that showed another person; a print not come yet is no other voice), and
-  such a line is judged by the checks above. In a busy room the
+  such a line is judged by the checks above. **On the product unit there is
+  no print here:** it sets `LAMP_SAME_VOICE_FOR=services`, so the second
+  worker's `Heeding::voices` is `None` and `likeness_so_far` never answers;
+  `another_voice` is then only `another_person`, which the product sets only
+  when two faces were seen speaking an earlier line of the conversation, a
+  camera sign (Twelve's P2 on #8656). So in the window TV, room talk or a
+  third person is let out to the model, which may still call `not_for_me`.
+  In a room not busy that window is the thread's 45 s from the answer's
+  start or 20 s after its words end (`crate::thread::GOING_ON_FOR`), and
+  the answer to a line let out so renews it, since the product sets neither
+  `LAMP_GOING_ON_NOT_OWN` nor `LAMP_UNTIED_GOING_ON`. In a busy room the
   conversation then goes on 20 s from the end of the lamp's words
   (`FOLLOW_UPS_GOING_ON_FOR`, `follows_on::WITHIN_US`; the owner's "about
   20 s after the lamp answers"), not 15 (`BUSY_GOING_ON_FOR`), and the
   journal's `no conversation going on` says `where it goes on 20 s`. A short
   line let out so stands `by follow_ups`. Out of the window nothing changes.
-  Risk: talk by someone else in the window, short enough to have no print
-  yet or said in the conversation's own voice (the person on a phone), is
-  answered; the lead's two-way ROW on lamp-52e6 counts it (#7570, 18:25).
+  Risk: on the product unit, talk by someone else in the window (TV, a
+  third person, the person on a phone) reaches the model, and an answer to
+  it keeps the window open. The row counts it: the lead's two-way legs
+  (#7570, 18:25), and Twelve's quiet-room legs on #8656 (TV or a third voice
+  25 to 40 s after an answer, and a two-turn TV exchange).
 - **Who spoke a line, from the looks its mouth was read**
   (`LAMP_SPEAKING_READ_LOOKS=on`, #7442, #7419). A face is a line's speaker
   when it read `yes` in at least half of the line's looks
