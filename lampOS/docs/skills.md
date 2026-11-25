@@ -7845,8 +7845,12 @@ forces one), a skill it makes is made whole, with everything a run needs:
   person's words start, and fixed `say` and `remind` steps, are as before;
   skills already kept are unchanged. The lamp's own task for its agent on
   a trigger (`make_no_cannot::skill_text`) is never granted `speak`. No
-  switch. The same check in `lamp-skills pack`, and a never-the-same-twice
-  check, are follow-ups.
+  switch. The check is by grant, not by what a script calls: a script that
+  calls `lamp.say` with no `speak` grant is kept, and lamp-control refuses
+  its say at each run. Known limit: lamp-control's volume op needs `speak`
+  too, so a trigger skill that only sets the volume is refused as well. The
+  same check in `lamp-skills pack`, a never-the-same-twice check, and
+  letting a volume-only trigger skill through are follow-ups.
 - **The voice reads a `run` step as it reads a `task` step**: code of its
   own, held to its grants and its script among the files written
   (`made_skill::code_step`, `task_run`), and read back for the yes plainly,
