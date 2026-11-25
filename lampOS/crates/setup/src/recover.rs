@@ -32,8 +32,11 @@ pub const RETRY_EVERY_MS: u64 = 120_000;
 /// [`crate::wifi_change::ONLINE_WAIT`], [`crate::wifi_change::CONFIRM_WAIT`]
 /// and three [`crate::wifi_change::BACK_WAIT`]s back. Only if every radio
 /// command also runs to its bound (45 s each, and 10 s for each reload on
-/// the way back) does it reach about 10.5 min, past this. Even then, the Lost
-/// arm's 90 s after this ends after that run.
+/// the way back) does it reach about 10.5 min, past this, and the Lost arm's
+/// 90 s after this still ends after it. If the Wi-Fi queries inside its
+/// checks hang as well (10 s each, and 5 s for the broker), it can reach
+/// about 12 min, past the Lost arm's 90 s too (El's and Twelve's P3s on
+/// #8564).
 pub const PHONE_HOLDS_MS: u64 = 600_000;
 /// How long a try of the saved network has to join: V1's.
 pub const JOIN_WAIT_MS: u64 = 45_000;

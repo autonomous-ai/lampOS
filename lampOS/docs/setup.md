@@ -1299,8 +1299,10 @@ its only way back once its package carries the unit.
   answer: its 60 s join, 60 s for the link to come up, 120 s for the app's
   confirmation and three 60 s waits back. Only if every radio command also
   runs to its bound (45 s each, and 10 s for each reload on the way back)
-  does it reach about 10.5 min, past the bound. Even then, the Lost arm's
-  90 s after the bound ends after that run. A person
+  does it reach about 10.5 min, past the bound, and the Lost arm's 90 s
+  after the bound still ends after it. If the Wi-Fi queries inside its
+  checks hang as well (10 s each, and 5 s for the broker), it can reach
+  about 12 min, past the Lost arm's 90 s too. A person
   setting it up starts a new run at each try, so a phone really setting it
   up keeps the hold. The phone count is not part of it: during a run's join
   the radio is a station, so the count can read none under a live run. Off
