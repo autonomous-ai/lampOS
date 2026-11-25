@@ -10,6 +10,11 @@
 //! journal (`/var/log/journal`) is the reset's [`super::FORGET`]'s, and no
 //! service is restarted: files only (a journald restart broke every
 //! service's log pipe on a lamp, 15 Oct).
+//!
+//! Best effort, unlike the engines' homes (#8671): a log that can't be
+//! read, truncated or removed (`EACCES`, `EPERM`, `EROFS`) is said with its
+//! path and error, counted, and passed over; the reset goes on, so a stray
+//! log never leaves the person's data half wiped.
 
 use super::{empty, is_dir, open_dir};
 use rustix::{
@@ -23,8 +28,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// The eMMC copy first, then the RAM disk it is synced from.
-pub const LOG_FOLDERS: [&str; 2] = ["/var/log.hdd", "/var/log"];
+/// The RAM disk first, then its eMMC copy (the Reviewer-lead's P3 on
+/// #8671): an orangepi-ramlog sync between the two then copies no old line
+/// of the RAM disk back into the copy.
+pub const LOG_FOLDERS: [&str; 2] = ["/var/log", "/var/log.hdd"];
 
 /// The copy's archived journals, one folder a machine id.
 pub const COPY_JOURNAL: &str = "/var/log.hdd/journal";
@@ -54,63 +61,49 @@ impl std::fmt::Display for LogStep {
     }
 }
 
-/// The logs under `root` (`/` on a lamp) forgotten, as the module says;
-/// how many entries were truncated (those not empty), removed or emptied
-/// (those that held anything). A folder that is missing, or reached through
-/// a link, is passed over; nothing is followed through a link.
+/// What [`forget_logs_saying`] did: entries truncated (those not empty),
+/// removed or emptied (those that held anything), and those that could not
+/// be.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct LogsForgotten {
+    pub emptied: usize,
+    pub failed: usize,
+}
+
+/// The logs under `root` (`/` on a lamp) forgotten, as the module says,
+/// each failure said on stderr; how many entries were emptied. Only a
+/// relative `root` is an error.
 pub fn forget_logs(root: &Path) -> io::Result<usize> {
-    walk(root, true, &mut Vec::new())
+    forget_logs_saying(root, &mut |line| eprintln!("lamp-setup: {line}")).map(|done| done.emptied)
+}
+
+/// [`forget_logs`], each failure given to `say` as `reset: a log could
+/// not be emptied: <path>: <error>`. A folder that is missing, or reached
+/// through a link, is passed over; nothing is followed through a link.
+pub fn forget_logs_saying(root: &Path, say: &mut dyn FnMut(&str)) -> io::Result<LogsForgotten> {
+    let mut walk = Walk {
+        act: true,
+        steps: Vec::new(),
+        done: LogsForgotten::default(),
+        say,
+    };
+    walk.all(root)?;
+    Ok(walk.done)
 }
 
 /// What [`forget_logs`] would do under `root`, one step an entry, changing
 /// nothing (`lamp-setup forget-logs --dry-run`): paths only, never a line.
+/// A folder that can't be read is said on stderr and passed over.
 pub fn plan_logs(root: &Path) -> io::Result<Vec<LogStep>> {
-    let mut steps = Vec::new();
-    walk(root, false, &mut steps)?;
-    Ok(steps)
-}
-
-fn open_under(root: &Path, folder: &str) -> io::Result<Option<(PathBuf, OwnedFd)>> {
-    let path = root.join(folder.trim_start_matches('/'));
-    match open_dir(&path) {
-        Ok(dir) => Ok(Some((path, dir))),
-        Err(rustix::io::Errno::NOENT | rustix::io::Errno::NOTDIR | rustix::io::Errno::LOOP) => {
-            Ok(None)
-        }
-        Err(error) => Err(error.into()),
-    }
-}
-
-fn names(dir: &OwnedFd) -> io::Result<Vec<CString>> {
-    let mut names = Vec::new();
-    for entry in rustix::fs::Dir::read_from(dir)? {
-        let name = entry?.file_name().to_owned();
-        if !matches!(name.as_bytes(), b"." | b"..") {
-            names.push(name);
-        }
-    }
-    names.sort();
-    Ok(names)
-}
-
-fn walk(root: &Path, act: bool, steps: &mut Vec<LogStep>) -> io::Result<usize> {
-    if !root.is_absolute() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "the reset's logs' root must be absolute",
-        ));
-    }
-    let mut forgotten = 0;
-    for folder in LOG_FOLDERS {
-        let Some((path, dir)) = open_under(root, folder)? else {
-            continue;
-        };
-        forgotten += text_logs(&path, &dir, act, steps)?;
-    }
-    if let Some((path, dir)) = open_under(root, COPY_JOURNAL)? {
-        forgotten += journals(&path, &dir, act, steps)?;
-    }
-    Ok(forgotten)
+    let mut say = |line: &str| eprintln!("lamp-setup: {line}");
+    let mut walk = Walk {
+        act: false,
+        steps: Vec::new(),
+        done: LogsForgotten::default(),
+        say: &mut say,
+    };
+    walk.all(root)?;
+    Ok(walk.steps)
 }
 
 /// Whether `name` is one of [`TEXT_LOGS`] (`Some(true)`), a rotated copy of
@@ -128,86 +121,183 @@ fn text_log(name: &[u8]) -> Option<bool> {
     })
 }
 
-fn text_logs(
-    folder: &Path,
-    dir: &OwnedFd,
-    act: bool,
-    steps: &mut Vec<LogStep>,
-) -> io::Result<usize> {
-    let mut forgotten = 0;
-    for name in names(dir)? {
-        let Some(live) = text_log(name.as_bytes()) else {
-            continue;
-        };
-        let path = folder.join(OsStr::from_bytes(name.as_bytes()));
-        let stat = match rustix::fs::statat(dir, name.as_c_str(), AtFlags::SYMLINK_NOFOLLOW) {
-            Ok(stat) => stat,
-            Err(rustix::io::Errno::NOENT) => continue,
-            Err(error) => return Err(error.into()),
-        };
-        let kind = rustix::fs::FileType::from_raw_mode(stat.st_mode);
-        if is_dir(&stat) {
-            continue;
-        }
-        if live && kind == rustix::fs::FileType::RegularFile {
-            steps.push(LogStep::Truncate(path));
-            if act && stat.st_size > 0 {
-                let flags = OFlags::WRONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC | OFlags::NOCTTY;
-                let file = rustix::fs::openat(dir, name.as_c_str(), flags, Mode::empty())?;
-                rustix::fs::ftruncate(&file, 0)?;
-                rustix::fs::fsync(&file)?;
-            }
-            forgotten += usize::from(stat.st_size > 0);
-        } else {
-            steps.push(LogStep::Remove(path));
-            if act {
-                rustix::fs::unlinkat(dir, name.as_c_str(), AtFlags::empty())?;
-            }
-            forgotten += 1;
+fn names(dir: &OwnedFd) -> io::Result<Vec<CString>> {
+    let mut names = Vec::new();
+    for entry in rustix::fs::Dir::read_from(dir)? {
+        let name = entry?.file_name().to_owned();
+        if !matches!(name.as_bytes(), b"." | b"..") {
+            names.push(name);
         }
     }
-    if act && forgotten > 0 {
-        rustix::fs::fsync(dir)?;
-    }
-    Ok(forgotten)
+    names.sort();
+    Ok(names)
 }
 
-fn journals(
-    folder: &Path,
-    dir: &OwnedFd,
+struct Walk<'a> {
     act: bool,
-    steps: &mut Vec<LogStep>,
-) -> io::Result<usize> {
-    let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
-    let mut forgotten = 0;
-    for name in names(dir)? {
-        let path = folder.join(OsStr::from_bytes(name.as_bytes()));
-        let stat = match rustix::fs::statat(dir, name.as_c_str(), AtFlags::SYMLINK_NOFOLLOW) {
-            Ok(stat) => stat,
-            Err(rustix::io::Errno::NOENT) => continue,
-            Err(error) => return Err(error.into()),
-        };
-        if is_dir(&stat) {
-            let child = rustix::fs::openat(dir, name.as_c_str(), flags, Mode::empty())?;
-            let held = rustix::fs::Dir::read_from(&child)?
-                .filter_map(Result::ok)
-                .any(|entry| !matches!(entry.file_name().to_bytes(), b"." | b".."));
-            steps.push(LogStep::Empty(path));
-            if act && held {
-                empty(&child)?;
-                rustix::fs::fsync(&child)?;
+    steps: Vec<LogStep>,
+    done: LogsForgotten,
+    say: &'a mut dyn FnMut(&str),
+}
+
+impl Walk<'_> {
+    fn failed(&mut self, path: &Path, error: impl std::fmt::Display) {
+        (self.say)(&format!(
+            "reset: a log could not be emptied: {}: {error}",
+            path.display()
+        ));
+        self.done.failed += 1;
+    }
+
+    fn all(&mut self, root: &Path) -> io::Result<()> {
+        if !root.is_absolute() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "the reset's logs' root must be absolute",
+            ));
+        }
+        for folder in LOG_FOLDERS {
+            if let Some((path, dir)) = self.open(root, folder) {
+                self.text_logs(&path, &dir);
             }
-            forgotten += usize::from(held);
-        } else {
-            steps.push(LogStep::Remove(path));
-            if act {
-                rustix::fs::unlinkat(dir, name.as_c_str(), AtFlags::empty())?;
+        }
+        if let Some((path, dir)) = self.open(root, COPY_JOURNAL) {
+            self.journals(&path, &dir);
+        }
+        Ok(())
+    }
+
+    fn open(&mut self, root: &Path, folder: &str) -> Option<(PathBuf, OwnedFd)> {
+        let path = root.join(folder.trim_start_matches('/'));
+        match open_dir(&path) {
+            Ok(dir) => Some((path, dir)),
+            Err(rustix::io::Errno::NOENT | rustix::io::Errno::NOTDIR | rustix::io::Errno::LOOP) => {
+                None
             }
-            forgotten += 1;
+            Err(error) => {
+                self.failed(&path, error);
+                None
+            }
         }
     }
-    if act && forgotten > 0 {
-        rustix::fs::fsync(dir)?;
+
+    fn names(&mut self, folder: &Path, dir: &OwnedFd) -> Vec<CString> {
+        names(dir).unwrap_or_else(|error| {
+            self.failed(folder, error);
+            Vec::new()
+        })
     }
-    Ok(forgotten)
+
+    fn stat(&mut self, dir: &OwnedFd, name: &CString, path: &Path) -> Option<rustix::fs::Stat> {
+        match rustix::fs::statat(dir, name.as_c_str(), AtFlags::SYMLINK_NOFOLLOW) {
+            Ok(stat) => Some(stat),
+            Err(rustix::io::Errno::NOENT) => None,
+            Err(error) => {
+                self.failed(path, error);
+                None
+            }
+        }
+    }
+
+    fn remove(&mut self, dir: &OwnedFd, name: &CString, path: PathBuf) -> bool {
+        self.steps.push(LogStep::Remove(path.clone()));
+        if !self.act {
+            return true;
+        }
+        match rustix::fs::unlinkat(dir, name.as_c_str(), AtFlags::empty()) {
+            Ok(()) => {
+                self.done.emptied += 1;
+                true
+            }
+            Err(error) => {
+                self.failed(&path, error);
+                false
+            }
+        }
+    }
+
+    fn sync(&mut self, dir: &OwnedFd, path: &Path) {
+        if let Err(error) = rustix::fs::fsync(dir) {
+            self.failed(path, error);
+        }
+    }
+
+    fn text_logs(&mut self, folder: &Path, dir: &OwnedFd) {
+        let mut changed = false;
+        for name in self.names(folder, dir) {
+            let Some(live) = text_log(name.as_bytes()) else {
+                continue;
+            };
+            let path = folder.join(OsStr::from_bytes(name.as_bytes()));
+            let Some(stat) = self.stat(dir, &name, &path) else {
+                continue;
+            };
+            if is_dir(&stat) {
+                continue;
+            }
+            let regular = rustix::fs::FileType::from_raw_mode(stat.st_mode)
+                == rustix::fs::FileType::RegularFile;
+            if live && regular {
+                self.steps.push(LogStep::Truncate(path.clone()));
+                if self.act && stat.st_size > 0 {
+                    match truncate(dir, &name) {
+                        Ok(()) => self.done.emptied += 1,
+                        Err(error) => self.failed(&path, error),
+                    }
+                }
+            } else {
+                changed |= self.remove(dir, &name, path);
+            }
+        }
+        if self.act && changed {
+            self.sync(dir, folder);
+        }
+    }
+
+    fn journals(&mut self, folder: &Path, dir: &OwnedFd) {
+        let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
+        let mut changed = false;
+        for name in self.names(folder, dir) {
+            let path = folder.join(OsStr::from_bytes(name.as_bytes()));
+            let Some(stat) = self.stat(dir, &name, &path) else {
+                continue;
+            };
+            if !is_dir(&stat) {
+                changed |= self.remove(dir, &name, path);
+                continue;
+            }
+            self.steps.push(LogStep::Empty(path.clone()));
+            let child = match rustix::fs::openat(dir, name.as_c_str(), flags, Mode::empty()) {
+                Ok(child) => child,
+                Err(error) => {
+                    self.failed(&path, error);
+                    continue;
+                }
+            };
+            let held = rustix::fs::Dir::read_from(&child).is_ok_and(|entries| {
+                entries
+                    .filter_map(Result::ok)
+                    .any(|entry| !matches!(entry.file_name().to_bytes(), b"." | b".."))
+            });
+            if self.act && held {
+                match empty(&child)
+                    .and_then(|()| rustix::fs::fsync(&child).map_err(io::Error::from))
+                {
+                    Ok(()) => self.done.emptied += 1,
+                    Err(error) => self.failed(&path, error),
+                }
+            }
+        }
+        if self.act && changed {
+            self.sync(dir, folder);
+        }
+    }
+}
+
+fn truncate(dir: &OwnedFd, name: &CString) -> io::Result<()> {
+    let flags = OFlags::WRONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC | OFlags::NOCTTY;
+    let file = rustix::fs::openat(dir, name.as_c_str(), flags, Mode::empty())?;
+    rustix::fs::ftruncate(&file, 0)?;
+    rustix::fs::fsync(&file)?;
+    Ok(())
 }

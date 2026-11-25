@@ -158,7 +158,7 @@ Codex's and any engine's transcripts, history, memory files and sign-ins:
 each home emptied and kept with its owner and mode, anything else there
 removed; `reset::forget_engine_homes`, #7771, below), then the text logs
 and the eMMC log copy (`syslog`, `user.log`, `kern.log` and `auth.log` in
-`/var/log.hdd` and in the `/var/log` RAM disk orangepi-ramlog syncs into it,
+the `/var/log` RAM disk and then in `/var/log.hdd`, the copy orangepi-ramlog syncs it into,
 truncated in place, their rotated copies removed, and each folder of
 `/var/log.hdd/journal` emptied; `reset::forget_logs`, #7771, below), the user's key
 (`/etc/lampOS/voice/credential` and `/etc/lampOS/policy/jev.key`, #806,
@@ -395,7 +395,8 @@ lamp-setup reset-now`). That unit, in this order:
    stays. Then the logs (`reset::forget_logs`, the first builder's four
    conditions on #7771): orangepi-ramlog keeps `/var/log` in a RAM disk and
    its copy on the eMMC in `/var/log.hdd`, and writes each into the other
-   (install.md), so in both `syslog`, `user.log`, `kern.log` and `auth.log`
+   (install.md), so in both, the RAM disk first so that a sync between
+   the two brings no old line back, `syslog`, `user.log`, `kern.log` and `auth.log`
    are truncated in place, never removed, so rsyslog, which holds them open,
    goes on writing to them, and their rotated copies (`syslog.1`,
    `syslog.2.gz`, …) are removed; each folder of `/var/log.hdd/journal` (the
@@ -407,7 +408,20 @@ lamp-setup reset-now`). That unit, in this order:
    DIR]` and `lamp-setup forget-logs --dry-run [--root DIR]` list what each
    step would do, one line an entry (`empty PATH`, `remove PATH`, and for a
    log `truncate PATH`), paths only, never what a home or a log holds, and
-   change nothing; without `--dry-run` each is refused;
+   change nothing; without `--dry-run` each is refused. A failure is
+   handled as each step's data asks (#8671). The engines' homes hold the
+   person's memory, so, as with `forget_agents`, an error there (`EROFS`,
+   or `EPERM` on a stray entry) ends the reset at that point, before the
+   plan's wipes: it is returned, the lamp reboots into setup with the
+   journal kept, and `resume-reset` runs the steps again from the start.
+   The logs step is best effort: a log, or a log folder, that can't be
+   read, truncated or removed (`EACCES`, `EPERM`, `EROFS`) is said with its
+   path and error (`reset: a log could not be emptied: PATH: ERROR`),
+   counted and passed over, and the reset goes on, so a stray log never
+   leaves the person's data half wiped. In the tests that run the reset
+   through the program, `LAMP_SETUP_RESET_ROOT` (`reset::ROOT_ENV`) is
+   where these two steps find `/`, so no test reaches the host's own
+   `/var/log` or `/var/lib/lampos-agents`; it is never set on a lamp;
 5. it removes the journal, syncs, and **starts setup again in place, with no
    reboot** (#4500), on a product lamp: one whose stop is `systemctl stop
    lampos.target` and which has `lamp-setup.service`. It runs `systemctl

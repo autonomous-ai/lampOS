@@ -32,7 +32,23 @@ mod skill_reset_tests;
 mod skill_staging;
 
 pub use engine_homes::{ENGINE_HOMES, forget_engine_homes, plan_engine_homes};
-pub use logs::{COPY_JOURNAL, LOG_FOLDERS, LogStep, TEXT_LOGS, forget_logs, plan_logs};
+pub use logs::{
+    COPY_JOURNAL, LOG_FOLDERS, LogStep, LogsForgotten, TEXT_LOGS, forget_logs, forget_logs_saying,
+    plan_logs,
+};
+
+/// Where [`System`]'s engines' homes and logs steps find `/`, for the
+/// tests that run the reset through the program (#8671's ARM64 run: with
+/// none, a test's reset emptied the CI host's own `/var/log`). Never set on
+/// a lamp: unset or empty, it is `/`.
+pub const ROOT_ENV: &str = "LAMP_SETUP_RESET_ROOT";
+
+/// [`ROOT_ENV`]'s folder, `/` when it is unset or empty.
+pub fn system_root() -> PathBuf {
+    std::env::var_os(ROOT_ENV)
+        .filter(|root| !root.is_empty())
+        .map_or_else(|| PathBuf::from("/"), PathBuf::from)
+}
 
 /// The product plan's journal, read by Wi-Fi's restore of an old network
 /// ([`wifi_restore_allowed`]).
@@ -327,7 +343,8 @@ pub trait Effects {
     /// [`ENGINE_HOMES`] (#7771); how many.
     fn forget_engine_homes(&mut self) -> io::Result<usize>;
     /// The text logs and the eMMC log copy emptied, files only,
-    /// [`forget_logs`] (#7771); how many.
+    /// [`forget_logs`] (#7771); how many. Best effort: an error here is
+    /// said and the reset goes on.
     fn forget_logs(&mut self) -> io::Result<usize>;
     /// [`AGENT_USER`]'s own systemd manager, `user@<uid>.service`, its uid
     /// read from [`PASSWD`] at the reset ([`agent_manager_unit`]); none when
@@ -1409,10 +1426,10 @@ impl Effects for System {
         forget_agents(Path::new("/"))
     }
     fn forget_engine_homes(&mut self) -> io::Result<usize> {
-        forget_engine_homes(Path::new("/"))
+        forget_engine_homes(&system_root())
     }
     fn forget_logs(&mut self) -> io::Result<usize> {
-        forget_logs(Path::new("/"))
+        forget_logs(&system_root())
     }
 }
 
@@ -2166,8 +2183,13 @@ fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io:
         steps.push(Step::EngineHomesEmptied);
     }
     // The text logs and the eMMC log copy (#7771), files only: no log
-    // service is restarted.
-    let logs = effects.forget_logs()?;
+    // service is restarted. Best effort (#8671): a log that can't be
+    // emptied never stops the wipe of the person's data below; the
+    // engines' homes above hold the person's memory, so they fail the reset.
+    let logs = effects.forget_logs().unwrap_or_else(|error| {
+        eprintln!("lamp-setup: reset: the logs could not be emptied: {error}");
+        0
+    });
     if logs > 0 {
         eprintln!("lamp-setup: reset: emptied {logs} log entries");
         steps.push(Step::LogsForgotten);

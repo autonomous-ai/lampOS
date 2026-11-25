@@ -143,6 +143,9 @@ struct Fake {
     /// whether [`reset::forget_agents`] had run before it (#7771).
     homes: usize,
     agents_before_homes: Option<bool>,
+    /// The engines' homes or the logs step fails (#8671).
+    fail_homes: bool,
+    fail_logs: bool,
     /// How many log entries [`reset::forget_logs`] truncated, removed or
     /// emptied, and whether the engines' homes were emptied before it.
     logs: usize,
@@ -265,10 +268,16 @@ impl Effects for Fake {
     }
     fn forget_engine_homes(&mut self) -> io::Result<usize> {
         self.agents_before_homes = Some(self.calls.borrow().iter().any(|call| call == "agents"));
+        if self.fail_homes {
+            return Err(io::Error::from(io::ErrorKind::PermissionDenied));
+        }
         Ok(self.homes)
     }
     fn forget_logs(&mut self) -> io::Result<usize> {
         self.homes_before_logs = Some(self.agents_before_homes.is_some());
+        if self.fail_logs {
+            return Err(io::Error::from(io::ErrorKind::PermissionDenied));
+        }
         Ok(self.logs)
     }
     fn agent_manager(&mut self) -> Option<String> {
@@ -1960,7 +1969,13 @@ fn the_command_checks_plans_and_reports_an_unfinished_reset_without_acting() {
     let plan = lamp(&root);
     let file = root.path("plan.json");
     fs::write(&file, serde_json::to_vec(&plan).unwrap()).unwrap();
-    let run = |args: &[&str]| Command::new(PROGRAM).args(args).output().unwrap();
+    let run = |args: &[&str]| {
+        Command::new(PROGRAM)
+            .args(args)
+            .env(reset::ROOT_ENV, &root.0)
+            .output()
+            .unwrap()
+    };
     let checked = run(&["check", "--plan", file.to_str().unwrap()]);
     assert!(checked.status.success(), "{checked:?}");
     let off = run(&["reset-now", "--plan", file.to_str().unwrap()]);
@@ -2005,8 +2020,11 @@ fn ahead(plan: &Plan, more: serde_json::Value) -> serde_json::Value {
 fn act_on(root: &Root, command: &str, plan: &serde_json::Value) -> std::process::Output {
     let file = root.path("plan.json");
     fs::write(&file, serde_json::to_vec(plan).unwrap()).unwrap();
+    // The program's code steps under the test's root, never the host's
+    // own `/var/log` or `/var/lib/lampos-agents` (#8671's ARM64 run).
     Command::new(PROGRAM)
         .args([command, "--plan", file.to_str().unwrap(), "--enable"])
+        .env(reset::ROOT_ENV, &root.0)
         .output()
         .unwrap()
 }
@@ -4303,6 +4321,103 @@ fn the_reset_forgets_the_log_copies_after_the_engines_homes() {
     assert_eq!(none.homes_before_logs, Some(true), "still run, after");
 }
 
+/// #8671: the logs step is best effort, so a log that can't be emptied
+/// never stops the wipe of the person's data; the engines' homes hold the
+/// person's memory, so a failure there fails the reset before the plan's
+/// wipes, as `forget_agents` does, and setup finishes it at its start.
+#[test]
+fn a_failed_log_step_finishes_the_reset_and_a_failed_homes_step_stops_it() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        fail_logs: true,
+        ..Fake::default()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert!(!steps.contains(&Step::LogsForgotten));
+    assert!(steps.contains(&Step::JournalRemoved));
+
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        fail_homes: true,
+        ..Fake::default()
+    };
+    assert!(reset::reset(&plan, &mut fake).is_err());
+    assert!(root.path("memory/index.json").exists(), "no plan wipe yet");
+    assert!(plan.journal.exists(), "setup finishes it at its start");
+    assert!(fake.calls.borrow().contains(&"reboot".to_owned()));
+}
+
+/// #8671: a log the step can't remove is said with its path and counted,
+/// and the rest is still emptied.
+#[test]
+fn a_log_that_cannot_be_emptied_is_said_and_the_rest_are_emptied() {
+    if root_user() {
+        return; // root removes from a read-only folder
+    }
+    let root = Root::new();
+    let live = root.path("var/log");
+    let copy = root.path("var/log.hdd");
+    for file in ["var/log/syslog", "var/log/syslog.1", "var/log.hdd/syslog.1"] {
+        let path = root.path(file);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, b"synthetic words").unwrap();
+    }
+    fs::set_permissions(&live, fs::Permissions::from_mode(0o555)).unwrap();
+    let mut said = Vec::new();
+    let done = reset::forget_logs_saying(&root.0, &mut |line| said.push(line.to_owned()));
+    fs::set_permissions(&live, fs::Permissions::from_mode(0o755)).unwrap();
+    let done = done.unwrap();
+    assert_eq!(done.failed, 1, "{said:?}");
+    assert_eq!(done.emptied, 2, "{said:?}");
+    assert_eq!(said.len(), 1);
+    assert!(
+        said[0].starts_with(&format!(
+            "reset: a log could not be emptied: {}: ",
+            live.join("syslog.1").display()
+        )),
+        "{said:?}"
+    );
+    assert!(!said[0].contains("synthetic"));
+    assert_eq!(fs::read(live.join("syslog")).unwrap(), b"");
+    assert!(live.join("syslog.1").exists());
+    assert!(!copy.join("syslog.1").exists());
+}
+
+/// #8671's ARM64 run: the program's reset finds the logs and the engines'
+/// homes under [`reset::ROOT_ENV`], the test's root, never the host's own.
+#[test]
+fn the_programs_reset_empties_the_logs_and_homes_under_its_root() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    for file in [
+        "var/log/syslog",
+        "var/log.hdd/syslog.1",
+        "var/lib/lampos-agents/claude/session.jsonl",
+    ] {
+        let path = root.path(file);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, b"synthetic words").unwrap();
+    }
+    fs::write(root.path("setup/reset.json"), b"{}").unwrap();
+    let out = act_on(&root, "resume-reset", &ahead(&plan, serde_json::json!({})));
+    assert!(out.status.success(), "{out:?}");
+    wiped(&root);
+    assert_eq!(fs::read(root.path("var/log/syslog")).unwrap(), b"");
+    assert!(!root.path("var/log.hdd/syslog.1").exists());
+    assert!(root.path("var/lib/lampos-agents/claude").is_dir());
+    assert_eq!(
+        fs::read_dir(root.path("var/lib/lampos-agents/claude"))
+            .unwrap()
+            .count(),
+        0
+    );
+    let said = String::from_utf8_lossy(&out.stderr);
+    assert!(!said.contains("could not be emptied"), "{said}");
+}
+
 /// #7771 (the first builder, 19:05): orangepi-ramlog keeps the eMMC copy of
 /// the RAM disk's `/var/log` in `/var/log.hdd` and syncs the RAM disk back
 /// into it. A reset empties the copy's archived journals (each folder
@@ -4362,6 +4477,22 @@ fn the_log_copies_are_emptied_in_place_and_the_dry_run_says_so() {
     let mut after_plan = Vec::new();
     snapshot(&var, &mut after_plan);
     assert_eq!(before, after_plan, "a dry run changes nothing");
+    // The RAM disk first (the Reviewer-lead's P3 on #8671): a ramlog sync
+    // between the two can then copy no old RAM log back into the copy.
+    let in_folder = |step: &reset::LogStep, folder: &Path| match step {
+        reset::LogStep::Truncate(path)
+        | reset::LogStep::Remove(path)
+        | reset::LogStep::Empty(path) => path.starts_with(folder),
+    };
+    let last_live = plan
+        .iter()
+        .rposition(|step| in_folder(step, &live))
+        .unwrap();
+    let first_copy = plan.iter().position(|step| in_folder(step, &copy)).unwrap();
+    assert!(
+        last_live < first_copy,
+        "/var/log before /var/log.hdd: {plan:?}"
+    );
     let mut lines: Vec<String> = plan.iter().map(ToString::to_string).collect();
     lines.sort();
     let line = |kind: &str, path: &Path| format!("{kind} {}", path.display());
