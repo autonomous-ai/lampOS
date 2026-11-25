@@ -1843,6 +1843,44 @@ reminder's line. Tests: `an_offer_without_timer_is_a_reminders_and_sent_as_befor
 named for a due timer (the third pins that a run of plain 429s rings none:
 only the relay's `usage_limit` 429 does).
 
+With no link (`LAMP_OFFLINE_RINGS`, #8632, off unless exactly `on`), a due
+timer or reminder rings on time. Before, a ring was only ever a model turn,
+and its gate needs a ready cloud session (`unasked_session`), so with the
+link down nothing passed it: on lamp-06c1 on 25 Nov a 4-minute timer set
+before a cut was silent for 409 s and rang 414 s late, 5 s after the link
+came back. With the switch, once the link has been down past its grace
+(`bus_out::LINK_GRACE_US`, 5 s) and no session is ready, a due item that
+passes every other gate of a reminder's (the lamp free, the room quiet, the
+microphones open, not paused or signed out, an overdue one only with
+someone here and after a pause in the talk) is rung from its clip as a turn
+of the lamp's own (`commit_offline_ring`, origin `offline_ring`): "Your
+timer is done." for a timer and "You have a reminder." for a reminder
+(`language::ring_words`, in the owner's language), warmed into the speech
+cache at start (`TtsCache::keeping_offline_rings`) and read, never
+rendered, as it rings (`TtsCache::ring_clip`: the owner's words, else the
+English). Nothing goes to the provider, and it waits for no skill's ask
+(`SKILL_WAITS_US`), since a skill's words need the model. The item's receipt
+rides the turn as a model ring's does: its first chunk handed to the
+speaker counts as its audio, its retirement as its generation, and played
+whole with the microphones open it is completed as said
+(`Reply::complete_reminder`), so the consumer acknowledges it and nothing
+about it is said again when the link returns. Cut before any of it
+sounded, it is `no_audio` and offered again; cut after, it keeps the
+once-more rule. With no clip kept (the cache never warmed, or no speech
+cache), the item waits for the link as before, said once per item in the
+journal. The proof's `provider_session` is the last session the link had
+(`CloudAvailability::last_session`); a voice that has never seen one waits
+for the link. Off, nothing changes. Tests:
+`a_due_ring_is_rung_from_its_clip_only_offline_past_the_grace_and_unpaused`
+(`offline_rings.rs`),
+`an_offline_ring_played_whole_completes_its_item_and_one_never_sounded_is_not_heard`
+(`coordinator/tests/reminders.rs`),
+`the_offline_rings_lines_are_warmed_only_with_the_switch_and_read_not_rendered`
+(`say/tts_cache.rs`) and
+`the_offline_rings_lines_have_their_words_in_each_language` (`language.rs`).
+Not built: a reminder's own words as its clip, rendered when it is set; a
+reminder rings with the generic line.
+
 Crash-uncertain attempts (no settlement ever sent) stay pending without
 re-speech while the voice that made them runs. Such an oldest entry does
 not starve other due work: a bounded page scan may select another pending

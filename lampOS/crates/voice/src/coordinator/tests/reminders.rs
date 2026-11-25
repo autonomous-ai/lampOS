@@ -2450,3 +2450,116 @@ fn joined_reminder_cut_receipt_latency() {
         );
     }
 }
+
+impl Test {
+    /// The test's own reply ended, then a due ring's clip committed as
+    /// `LAMP_OFFLINE_RINGS` commits it (#8632), its item's receipt on it.
+    fn offline_ring(&mut self, clip: Vec<i16>) {
+        let done = self.reply.take().unwrap();
+        self.owner.complete_turn(now(), done.owner).unwrap();
+        drop(done);
+        let speaker = &mut self.speaker;
+        self.snapshot = commit_offline_ring(
+            &mut self.owner,
+            &mut self.reply,
+            clip,
+            PlayoutStart::default(),
+            &mut self.trace,
+            |state| speaker.publish_speaker_snapshot(state),
+        )
+        .unwrap();
+        let current = self.reply.as_mut().unwrap();
+        let (receipt, probe) =
+            receipt_for_test(current.owner, self.snapshot.microphone_generation(), 1);
+        current.reminder = Some(receipt);
+        self.probe = probe;
+    }
+
+    /// The ring's next clip chunk handed to the speaker.
+    fn ring_chunk(&mut self) -> SpeakerChunk {
+        dispatch_speaker_chunk(
+            &mut self.owner,
+            &mut self.reply,
+            &mut self.speaker.channels.data,
+            &mut self.pending,
+            &mut self.sequence,
+            &mut self.snapshot,
+            &mut self.mask,
+        )
+        .unwrap();
+        let chunk = self.peer.data.receive::<SpeakerChunk>().unwrap().unwrap();
+        self.trace
+            .receipts
+            .dispatched(chunk.permit.owner(), chunk.chunk_sequence)
+            .unwrap();
+        chunk
+    }
+}
+
+/// #8632, lamp-06c1 25 Nov: a timer due with the link down stayed silent
+/// 409 s. Rung from its clip, played whole, the item is completed as said,
+/// so it is never rung again when the link returns. Cut before any of it
+/// sounded, it is certainly not heard and is offered again; cut after its
+/// first chunk sounded, it may have been heard, as any ring.
+#[test]
+fn an_offline_ring_played_whole_completes_its_item_and_one_never_sounded_is_not_heard() {
+    let clock = crate::scenario_clock::Scope::enter(Duration::from_secs(24)).unwrap();
+    clock.set_pump(|_| Ok(())).unwrap();
+    // Played whole: completed.
+    let mut test = Test::new();
+    test.offline_ring(vec![9; 480]);
+    let first = test.ring_chunk();
+    assert!(!first.end_of_speech);
+    test.accept(&first, 240);
+    let last = test.ring_chunk();
+    assert!(last.end_of_speech);
+    test.accept(&last, 240);
+    test.retire(&last);
+    assert!(test.finish_if_settled());
+    assert!(
+        matches!(test.probe.settlement(), Some(ToWorker::Complete { proof, .. })
+            if proof.provider_session == 1 && proof.final_frame == 480 && proof.retired_generations == 1),
+        "{:?}",
+        test.probe.settlement()
+    );
+    // Cut before the speaker took any of it: never heard.
+    let mut test = Test::new();
+    test.offline_ring(vec![9; 240]);
+    cancel_reply(
+        &mut test.owner,
+        &mut test.reply,
+        &mut test.trace,
+        "user_interrupted",
+    )
+    .unwrap();
+    test.reply = None;
+    assert!(
+        matches!(
+            test.probe.settlement(),
+            Some(ToWorker::Abandon { no_audio: true, .. })
+        ),
+        "{:?}",
+        test.probe.settlement()
+    );
+    // Cut after its first chunk went: it may have been heard.
+    let mut test = Test::new();
+    test.offline_ring(vec![9; 480]);
+    let first = test.ring_chunk();
+    test.accept(&first, 240);
+    cancel_reply(
+        &mut test.owner,
+        &mut test.reply,
+        &mut test.trace,
+        "user_interrupted",
+    )
+    .unwrap();
+    test.reply = None;
+    assert!(
+        !matches!(
+            test.probe.settlement(),
+            Some(ToWorker::Complete { .. }) | Some(ToWorker::Abandon { no_audio: true, .. })
+        ),
+        "{:?}",
+        test.probe.settlement()
+    );
+}

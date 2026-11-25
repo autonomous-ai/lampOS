@@ -213,6 +213,43 @@ pub const WOKEN_BY_NAME_LINE: &str = "Yes?";
 /// out of [`FIXED_LINES`]: a say of "Yes?" isn't this line, and stays "Yes?".
 const WOKEN_BY_NAME_WORDS: [&str; 5] = ["Dạ?", "はい？", "嗯？", "네?", "Oui ?"];
 
+/// A due timer's line when it rings with no link (`LAMP_OFFLINE_RINGS`,
+/// #8632): the usage limit's words (`second_provider::LIMIT_TIMER_DONE`).
+pub const RING_TIMER_DONE: &str = "Your timer is done.";
+/// [`RING_TIMER_DONE`] for a reminder (`second_provider::LIMIT_REMINDER_DUE`).
+pub const RING_REMINDER_DUE: &str = "You have a reminder.";
+
+/// [`RING_TIMER_DONE`] and [`RING_REMINDER_DUE`] in Vietnamese, Japanese,
+/// Chinese, Korean and French. Kept out of [`FIXED_LINES`], so a lamp with
+/// the switch off warms and says exactly what it did.
+const RING_WORDS: [[&str; 5]; 2] = [
+    [
+        "Hẹn giờ của bạn đã xong rồi.",
+        "タイマーが終わりました。",
+        "你的计时到了。",
+        "타이머가 끝났어요.",
+        "Votre minuteur est terminé.",
+    ],
+    [
+        "Bạn có một lời nhắc.",
+        "リマインダーがあります。",
+        "你有一个提醒。",
+        "알림이 하나 있어요.",
+        "Vous avez un rappel.",
+    ],
+];
+
+/// The line a timer (`timer`) or a reminder rings with offline, in
+/// `language`; English for none.
+pub fn ring_words(language: Option<Language>, timer: bool) -> &'static str {
+    let row = usize::from(!timer);
+    match language {
+        None if timer => RING_TIMER_DONE,
+        None => RING_REMINDER_DUE,
+        Some(language) => RING_WORDS[row][language.column()],
+    }
+}
+
 /// The lamp's fixed lines (#4473 (c)), by their English words, in
 /// Vietnamese, Japanese, Chinese, Korean and French, in that order: said from the
 /// speech cache in the owner's language, English where a line is not kept.
@@ -1261,6 +1298,44 @@ mod tests {
 
     /// #4473 (c): every fixed line has its own words in each language, none
     /// left English; English keeps the English, byte for byte.
+    /// #8632: the offline ring's two lines, English as the usage limit's,
+    /// and each language's own words, none left English.
+    #[test]
+    fn the_offline_rings_lines_have_their_words_in_each_language() {
+        assert_eq!(ring_words(None, true), RING_TIMER_DONE);
+        assert_eq!(ring_words(None, false), RING_REMINDER_DUE);
+        assert_eq!(RING_TIMER_DONE, crate::second_provider::LIMIT_TIMER_DONE);
+        assert_eq!(
+            RING_REMINDER_DUE,
+            crate::second_provider::LIMIT_REMINDER_DUE
+        );
+        for language in [
+            Language::Vietnamese,
+            Language::Japanese,
+            Language::Chinese,
+            Language::Korean,
+            Language::French,
+        ] {
+            let (timer, reminder) = (
+                ring_words(Some(language), true),
+                ring_words(Some(language), false),
+            );
+            assert!(
+                !timer.trim().is_empty() && !reminder.trim().is_empty(),
+                "{language:?}"
+            );
+            assert_ne!(timer, reminder, "{language:?}");
+            assert_ne!(timer, RING_TIMER_DONE, "{language:?}");
+            assert_ne!(reminder, RING_REMINDER_DUE, "{language:?}");
+        }
+        assert_eq!(
+            ring_words(Some(Language::Vietnamese), false),
+            "Bạn có một lời nhắc."
+        );
+        // Not fixed lines: a lamp with the switch off warms what it did.
+        assert!(!is_fixed(RING_TIMER_DONE) && !is_fixed(RING_REMINDER_DUE));
+    }
+
     #[test]
     fn each_fixed_line_has_its_words_in_each_language() {
         // Each English key once: a second entry for a key is never said.
