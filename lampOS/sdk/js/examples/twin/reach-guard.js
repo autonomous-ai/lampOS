@@ -31,6 +31,11 @@ export const countsOf = (deg) => ({
   elbow: FOLDED.elbow + deg.elbow / DEG_A_COUNT,
   pitch: HEAD_HOME - deg.pitch / DEG_A_COUNT,
 });
+/** A per-lamp map's pose (`{ shoulder, elbow, pitch }` in that lamp's own counts) in the map's counts: its `frame.offset` taken off. A map with no frame is the map's own lamp. */
+export const mapCountsOf = (map, pose) => Object.fromEntries(MAPPED.map((joint) => [joint, pose[joint] - (map.frame?.offset?.[joint] ?? 0)]));
+/** Whether a per-lamp file may be used on `unit`: only the lamp it names (a file with no unit is the page's lamp-4ace map). */
+export const forUnit = (map, unit) => map.unit === unit;
+
 const degOf = (joint, counts) => (joint === 'pitch' ? (HEAD_HOME - counts) * DEG_A_COUNT : (counts - FOLDED[joint]) * DEG_A_COUNT);
 
 const nearest = (axis, value) => {
