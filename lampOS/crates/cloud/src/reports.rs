@@ -119,6 +119,7 @@ pub const UNITS: &[&str] = &[
     "lamp-apps-folders.service",
     "lamp-apps-manage@.service",
     "lamp-apps-start.service",
+    "lamp-body-port.service",
     "lamp-body.service",
     "lamp-cloud.service",
     "lamp-control.service",

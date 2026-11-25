@@ -1,0 +1,29 @@
+# lampOS body: started again once its servo port comes back (#8594). lamp-body stops for good after
+# three failed starts in ten minutes (its StartLimitBurst), and a lamp whose servo port dropped and came
+# back stayed still until a reboot (lamp-8ffc, 20 Nov). systemd starts this one-shot each time the
+# port's device appears (WantedBy=dev-ttyACM0.device), at boot too, and a round that adds it starts it
+# once. `lamp-update body-port` acts only on a lamp-body that has given up (`systemctl is-failed`): it
+# clears the failure and starts it. One running, starting, stopped on purpose or never started is left
+# alone. It is no restart loop: it runs once each time the port appears, never on a timer, so a port
+# that is there but broken still stops after three tries. Each failed stop's reason is kept by
+# lamp-cloud's exit note (/run/lampos-exits). lamp-update's own one-shot, as lamp-region.service is.
+[Unit]
+Description=lampOS body, started again when its servo port comes back (lamp-update body-port)
+# Not before setup has finished (#806), as lamp-body itself.
+ConditionPathExists=/var/lib/lampos-setup/done
+After=dev-ttyACM0.device
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/opt/lampOS/update/current/lamp-update body-port
+StandardInput=null
+StandardError=journal
+SyslogIdentifier=lamp-body-port
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=dev-ttyACM0.device

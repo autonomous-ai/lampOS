@@ -168,7 +168,9 @@ fn oneshot(text: &str) -> bool {
 /// A unit's plain name: letters, digits and `-_.`, then a known suffix.
 fn is_target(name: &str) -> bool {
     name.len() <= 64
-        && [".target", ".service", ".socket", ".timer", ".path"]
+        // A device: the body's port one-shot is wanted by the servo port's
+        // (`dev-ttyACM0.device`, #8594), so it runs each time the port appears.
+        && [".target", ".service", ".socket", ".timer", ".path", ".device"]
             .iter()
             .any(|suffix| {
                 name.strip_suffix(suffix)

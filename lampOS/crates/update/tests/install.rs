@@ -1534,6 +1534,12 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
             // so a reset in place never starts it again.
             assert!(unit.contains(&condition.as_str()), "{name}");
             assert!(section(text, "Install").contains(&"WantedBy=multi-user.target"));
+        } else if *name == "lamp-body-port.service" {
+            // The body's port one-shot (#8594): it starts lamp-body again,
+            // so a set-up lamp only, as the body itself; outside the target,
+            // wanted by the servo port's device.
+            assert!(unit.contains(&condition.as_str()), "{name}");
+            assert!(section(text, "Install").contains(&"WantedBy=dev-ttyACM0.device"));
         } else if *name == "lampos-setup-done.path" {
             // And this starts the lamp once it is there.
             let path = section(text, "Path");

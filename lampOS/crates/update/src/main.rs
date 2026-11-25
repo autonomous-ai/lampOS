@@ -53,6 +53,9 @@ install lampOS on a blank lamp (docs/install.md): the newest build's binary of e
         nothing. As root, on the lamp itself.
 region  the name and time servers for the region lamp-cloud keeps (docs/install.md, #6256):
         China's only on a lamp placed in China. As root; lamp-region.service runs it.
+body-port starts lamp-body again when it had given up after its failed starts, and does
+        nothing otherwise (#8594). As root; lamp-body-port.service runs it each time the
+        servo port appears.
 harness-off undoes install's Harness at boot, and only that: as lampos, the Harness CLI's
         `harness service uninstall` and `harness stop`, then `loginctl disable-linger
         lampos`, then install's record of it. Harness itself, its sign-in and the
@@ -174,6 +177,7 @@ fn main() -> ExitCode {
         "check" | "once" | "serve" => return on_the_lamp(command, &options),
         "install" => install(&options),
         "region" => region(&options),
+        "body-port" => body_port(&options),
         "harness-off" => harness_off(&options),
         "harness-on" => harness_on(&options),
         "harness-install" => harness_install(&options),
@@ -449,6 +453,19 @@ fn region(options: &BTreeMap<String, String>) -> Result<(), String> {
         println!("{line}");
     }
     servers.and(sysstat).and(kept)
+}
+
+fn body_port(options: &BTreeMap<String, String>) -> Result<(), String> {
+    known(options, &[])?;
+    let said = install::body_port(&mut |argv: &[&str]| {
+        Command::new(argv[0])
+            .args(&argv[1..])
+            .status()
+            .map(|status| status.success())
+            .map_err(|error| format!("{}: {error}", argv.join(" ")))
+    })?;
+    eprintln!("lamp-update: {said}");
+    Ok(())
 }
 
 fn harness_off(options: &BTreeMap<String, String>) -> Result<(), String> {

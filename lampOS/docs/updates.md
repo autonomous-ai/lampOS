@@ -2499,7 +2499,11 @@ made to name it. A part's template, socket or timer is added when its part
 is here or added with it. Each is enabled only if `install` enables it
 (`install::enabled`), and then as `systemctl enable` would: the links its
 `[Install]` asks for (`WantedBy=` in `<target>.wants/`, `RequiredBy=` in
-`<target>.requires/`) are written beside it before the reload. One already
+`<target>.requires/`) are written beside it before the reload. The target may be a
+target, a service, a socket, a timer, a path or a device: the body's port one-shot
+(`lamp-body-port.service`, #8594), lamp-update's own as the region's is, is
+wanted by the servo port's `dev-ttyACM0.device`, so it runs each time the port
+appears and starts lamp-body again if it had given up. One already
 there (an old enable) is left as it is, and stays on the way back too. An
 `[Install]` with anything else (`Alias=`, `Also=`), or a template's, is
 refused. As `install` leaves it, an added unit is enabled for the lamp's
