@@ -255,10 +255,10 @@ fn on_time(name: &str, scenario: impl Fn()) {
     }
 }
 
-/// [`on_time`] begins a scenario again when its worker's error end (exit
-/// 1) came while the producer was held up, and fails it at once when the
-/// producer was on time (train 1226: "privacy worker exited: exit status:
-/// 1" in a 410 ms stall, not begun again).
+/// [`on_time`] begins a scenario again when its worker's error end (exit 1)
+/// came while the producer was held up, and fails it at once when the
+/// producer was on time (train 1226: "privacy worker exited: exit status: 1"
+/// in a 410 ms stall, not begun again).
 #[test]
 fn an_error_exit_in_a_producer_stall_is_begun_again_and_on_time_it_fails() {
     let fails = |held_up: bool| {
