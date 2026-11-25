@@ -1274,14 +1274,17 @@ fn written(language: Language) -> Written {
         // French (#8381): the call is "Hey Lamp", as in English, and read
         // as English reads it. "Lampe", the everyday word for a lamp ("la
         // lampe est cassée"), is never the name (the owner, 23 Nov).
+        // Deepgram `fr` writes the English call as "Hey man.", "Hé make.",
+        // "Hey madame." and "Thème." (#8517, lamp-e82d, 25 Nov): stand-ins,
+        // everyday words, so only greeted or set off in the first clause.
         Language::French => Written {
-            greetings: &[],
+            greetings: &["hey", "hé"],
             real: &[],
-            stand_ins: &[],
+            stand_ins: &["man", "make", "madame"],
             whole_words: true,
             not_the_name: |_| false,
-            everyday: false,
-            line_start: &[],
+            everyday: true,
+            line_start: &["Thème"],
         },
     }
 }
@@ -3907,6 +3910,16 @@ mod tests {
             (Vietnamese, "Này lem, mấy giờ rồi?"),
             (Vietnamese, "Làm, mấy giờ rồi?"),
             (Vietnamese, "Ê lắm."),
+            // #8517: "Hey Lamp," said in English, then French, as Deepgram
+            // `fr` wrote it on lamp-e82d.
+            (French, "Hey man. Et l'heure est-il"),
+            (
+                French,
+                "Hé make. Je voudrais refaire l'étape de mon prénom.",
+            ),
+            (French, "Hey madame. Refais l'étape, s'il te plaît."),
+            (French, "Hé man. Oui."),
+            (French, "Thème. Comment dire merci en anglais"),
         ] {
             assert!(called(heard, Some(language)), "{heard}");
             assert!(!called(heard, None), "English adds nothing: {heard}");
@@ -3949,6 +3962,14 @@ mod tests {
             (French, "Hé lampe, quelle heure est-il ?"),
             (French, "Lampe, allume la lumière."),
             (French, "Hey lampe."),
+            // Its stand-ins are everyday words: never mid-sentence, never
+            // a later clause, never "Hé non" (the row's negative).
+            (French, "Hé non, je ne viens pas."),
+            (French, "C'est un thème difficile."),
+            (French, "Le thème de la soirée."),
+            (French, "Oui, man."),
+            (French, "Hey man tu viens ce soir ?"),
+            (French, "Man."),
             // The name opening a longer word, or Korean's subject or
             // object particle after it, is talk about a lamp.
             (Japanese, "ランプシェード"),
