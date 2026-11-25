@@ -1506,13 +1506,16 @@ fn answer(
     // for own keys (#2094). Recovery saves the network only, so never.
     status.lock().unwrap().takes_own_keys =
         lamp_setup::serve::takes_own_keys_at_start(&Files(&config), recovering);
+    // Said from the start too (#8642): the answer on reports a person kept,
+    // or with none kept the default (on), so the lamp's own page starts its
+    // box from it and a kept no is never ticked again. A recovery request
+    // never changes it.
+    status.lock().unwrap().share_reports = lamp_setup::serve::kept_share_reports(&config.reports);
     // Recovery's (#3020): the lamp is set up, its network gone; the page
     // says so, and setting a new network keeps everything else.
     if recovering {
         let mut status = status.lock().unwrap();
         status.runtime_phase = lamp_setup::recover::RECOVERING.into();
-        // What the owner kept, which a recovery request never changes.
-        status.share_reports = lamp_setup::serve::kept_share_reports(&config.reports);
     }
     eprintln!(
         "lamp-setup: the lamp's hotspot is up; answering on {}",

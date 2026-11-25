@@ -176,9 +176,11 @@ $("go").addEventListener("click", async () => {
         device_id: params.get("device_id") || "",
         name: $("name").value,
         timezone: zone,
-        // Ticked by default (reports on, the product owner, 25 Nov 2026);
-        // unticked, the person's no is kept and nothing is ever sent (#2862).
-        share_reports: $("reports").checked,
+        // Sent only when the person changed the box (#8642): untouched, no
+        // answer goes, and setup keeps what was kept, or with nothing kept
+        // the default (on, the product owner, 25 Nov 2026). Unticked, the
+        // person's no is kept and nothing is ever sent (#2862).
+        share_reports: reportsTouched ? $("reports").checked : undefined,
       }),
     });
   } catch (e) {
@@ -192,6 +194,16 @@ $("go").addEventListener("click", async () => {
 
 $("rescan").addEventListener("click", scan);
 $("again").addEventListener("click", () => { $("again").hidden = true; $("progress-error").textContent = ""; show(true); scan(); });
+
+// The reports box starts from what the lamp kept (#8642): a person's earlier
+// no shows unticked; with nothing kept it stays ticked, as reports are on by
+// default. Only a change by the person is sent, so a box shown before the
+// lamp answered can never undo a kept answer.
+let reportsTouched = false;
+$("reports").addEventListener("change", () => { reportsTouched = true; });
+api("/api/device/setup/status")
+  .then((status) => { if (typeof status.share_reports === "boolean") $("reports").checked = status.share_reports; })
+  .catch(() => {});
 
 // Reopened on the home network after the move: carry on watching that run.
 if (params.get("after")) {

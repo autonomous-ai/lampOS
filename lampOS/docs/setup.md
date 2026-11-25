@@ -27,8 +27,9 @@ on that commit. Nothing here was run on a lamp.
    pops up; the person opens a browser.
 4. **The wizard** shows one step in normal use: pick the home network, type
    its password, say whether to send health and crash reports (a box that
-   starts ticked, as reports are on by default; unticking it keeps a no,
-   #2862), press Setup. The page's admin password defaults to the
+   shows the kept answer, ticked when none is kept, as reports are on by
+   default; only a change is sent, and unticking it keeps a no, #2862,
+   #8642), press Setup. The page's admin password defaults to the
    sticker suffix. The AI, channel, language and voice steps appear only with
    `?debug=true`.
 5. **"Your device is joining Wi-Fi…"** The light blinks blue. About 2 s after
