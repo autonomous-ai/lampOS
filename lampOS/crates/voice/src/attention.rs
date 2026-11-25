@@ -2100,6 +2100,10 @@ pub struct Attention {
     /// "not the name" as a sure hearing at the line's start, for the
     /// journal (#8092).
     name_sure_kept: bool,
+    /// The line last weighed was called clearly: its words open with the
+    /// lamp's own name set off as a call, and its hearing at the line's
+    /// start counted ([`Self::called_clearly`]).
+    clear_call: bool,
 }
 
 /// The most text kept for one request.
@@ -2483,6 +2487,7 @@ impl Attention {
                 || self.name_unsure_dropped
                 || self.name_anothers_dropped);
         self.name_signs = if weighed && !alone { signs } else { Vec::new() };
+        self.clear_call = weighed && !alone && start_counts && begins_with_the_name(&self.heard);
         if alone {
             self.named = false;
             self.named_sure = false;
@@ -2566,6 +2571,17 @@ impl Attention {
     /// start, the room not busy or a face turned to the lamp (#8092).
     pub fn name_kept_as_sure(&self) -> bool {
         self.name_sure_kept
+    }
+
+    /// Whether the line last weighed ([`Self::weigh_the_name`]) was called
+    /// by name in both its words and its sound: its words open with the
+    /// lamp's own name set off as a call ([`begins_with_the_name`], never a
+    /// stand-in such as "mom" or "man"), and lamp-name's hearing at the
+    /// line's start counted as its second sign, nothing dropping it
+    /// (`LAMP_CLEAR_CALL_NOT_DECLINED`, the product owner's first rule of
+    /// 25 Nov 2026: a clear "Hey Lamp" counts, face or no face).
+    pub fn called_clearly(&self) -> bool {
+        self.clear_call
     }
 
     /// Whether the name heard for the line last weighed was dropped because
@@ -8643,6 +8659,53 @@ mod tests {
         // Said to a person only set off: "Dad's car" is no call to a person.
         assert_eq!(said_to_a_person("Dad's car is outside."), None);
         assert_eq!(said_to_a_person("Sir Paul sang it."), None);
+    }
+
+    /// `LAMP_CLEAR_CALL_NOT_DECLINED` (the product owner's first rule of 25
+    /// Nov 2026): on lamp-74ff at 01:11:05 on 26 Nov "Hey, Lamp. Good
+    /// morning.", counted by its words and its hearing at the line's start,
+    /// was declined by the model. Such a line is called clearly: its words
+    /// open with the lamp's own name set off as a call, and its start
+    /// hearing counted. A stand-in ("Hey, mom.", "Hey man,"), the name not
+    /// set off ("Lamp is broken"), a hearing past the line's start, no
+    /// hearing, a start held as said to a person, or the name's second sign
+    /// not asked is not.
+    #[test]
+    fn a_line_called_in_its_words_and_at_its_start_is_called_clearly() {
+        let began = 10_000_000;
+        let clearly = |line: &str, heard_at: Option<u64>, second_sign: bool| {
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(second_sign);
+            attention.hold_a_start_said_to_a_person(true);
+            attention.began_at(1, 1, began);
+            if let Some(at) = heard_at {
+                attention.name_heard_scored(began + at, 1.0);
+            }
+            attention.heard(line);
+            attention.weigh_the_name(None, false);
+            attention.called_clearly()
+        };
+        let start = Some(200_000);
+        for line in [
+            "Hey, Lamp. Good morning.",
+            "Lamp, what time is it?",
+            "Hey Lamp, can you make your light a little warmer?",
+        ] {
+            assert!(clearly(line, start, true), "{line}");
+            // Its words alone, or its hearing past the start, are not both.
+            assert!(!clearly(line, Some(4_000_000), true), "{line}");
+            assert!(!clearly(line, None, true), "{line}");
+            assert!(!clearly(line, start, false), "{line}");
+        }
+        for line in [
+            "Hey, mom. You dropped your keys.",
+            "Hey man, how are you doing?",
+            "Lamp is broken, can you look at it?",
+            "Ma'am, could you pass me the salt please?",
+            "Good morning.",
+        ] {
+            assert!(!clearly(line, start, true), "{line}");
+        }
     }
 
     /// #3945, `LAMP_NAME_SAID_TO_A_PERSON=on`: "Ma'am, could you pass me the

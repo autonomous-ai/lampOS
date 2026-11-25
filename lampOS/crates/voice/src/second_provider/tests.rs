@@ -2420,6 +2420,110 @@ async fn a_decline_of_a_line_named_to_a_face_is_not_taken_once() {
     }
 }
 
+/// `LAMP_CLEAR_CALL_NOT_DECLINED=on` (the product owner's first rule of 25
+/// Nov 2026): on lamp-74ff at 01:11:05 on 26 Nov "Hey, Lamp. Good morning."
+/// was let out by its words and its hearing, and the model called
+/// `not_for_me`. In a turn the hook says was called so, the decline is not
+/// taken: the model is asked once more, told it was called by name (no face
+/// claimed), and its answer is said. A second decline ends the turn; without
+/// the hook, or for a turn it does not name, the first does, as before. A
+/// turn named to a face too is told so, as `LAMP_NAMED_ALWAYS` tells it.
+#[tokio::test]
+async fn a_decline_of_a_clear_call_is_not_taken_once() {
+    let decline = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c1",
+                NOT_FOR_ME,
+                json!({}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let answer = || vec![text("Good morning!"), Ok(ChatEvent::Done)];
+    let cases = [
+        (
+            "called clearly",
+            Some(true),
+            None,
+            vec![decline(), answer()],
+            true,
+            Some(CALLED_CLEARLY_ANSWER),
+        ),
+        (
+            "declined twice",
+            Some(true),
+            None,
+            vec![decline(), decline()],
+            false,
+            Some(CALLED_CLEARLY_ANSWER),
+        ),
+        (
+            "not called clearly",
+            Some(false),
+            None,
+            vec![decline(), answer()],
+            false,
+            None,
+        ),
+        (
+            "no switch",
+            None,
+            None,
+            vec![decline(), answer()],
+            false,
+            None,
+        ),
+        (
+            "faced too",
+            Some(true),
+            Some(true),
+            vec![decline(), answer()],
+            true,
+            Some(NAMED_TO_A_FACE_ANSWER),
+        ),
+    ];
+    for (case, clear, faced, rounds, said, told) in cases {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Hey, Lamp. Good morning.".to_owned())].into()),
+            chats: Mutex::new(rounds.into()),
+            ..Script::default()
+        });
+        let (engine, calls, _) = scripted(script.clone());
+        let engine = match clear {
+            Some(clear) => engine.answering_clear_calls(Arc::new(move |_| clear)),
+            None => engine,
+        };
+        let mut engine = match faced {
+            Some(faced) => engine.answering_named_to_a_face(Arc::new(move |_| faced)),
+            None => engine,
+        };
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let out = turn(&mut engine).await;
+        assert_eq!(out.last().map(String::as_str), Some("complete"), "{case}");
+        assert_eq!(
+            out.iter().any(|o| o == "said:Good morning!"),
+            said,
+            "{case}: {out:?}"
+        );
+        assert!(calls.lock().unwrap().is_empty(), "{case}");
+        let asked_rounds = script.asked.lock().unwrap();
+        assert_eq!(
+            asked_rounds.len(),
+            1 + usize::from(told.is_some()),
+            "{case}"
+        );
+        if let Some(told) = told {
+            assert!(
+                asked_rounds[1].contains(&Message::tool("c1".to_owned(), told.to_owned())),
+                "{case}"
+            );
+        }
+    }
+}
+
 /// #3704, `LAMP_NO_WORDS_AGAIN=on`: on lamp-52e6 on 27 Oct "Lamp, What's my
 /// name?" got an answer with no words, and the lamp said nothing. With the
 /// switch, a line begun with the lamp's name answered with no words and no
