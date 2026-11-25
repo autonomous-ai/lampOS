@@ -2492,7 +2492,14 @@ một byte (`crates/tasks/src/one_session.rs`).
   một lần. Tới 16031 nó cũng chỉ có 120 s, nên Gateway khởi động nguội
   khoảng 220 s (lamp-ee17) làm việc kết thúc `expired` mà không ai nghe.
   Store có việc được thử quá 120 s của nó được ghi là schema 9, mà bản
-  build trước sẽ để sang một bên. Test:
+  build trước sẽ để sang một bên. **Quay lui:** quay về một bản build đọc
+  schema 8 sau khi có việc được giữ quá 120 s sẽ để cả store sang một bên
+  (`tasks.sqlite3.newer-9-<secs>`, có tên trong `set_aside` của summary)
+  và bắt đầu store trống: các việc còn đang theo dõi và câu trả lời chưa
+  báo bị mất với bản build đó, và nó không báo cho ai (thấy trên một đèn,
+  25/11). Cập nhật lên lại không gộp nó về; chỉ đổi tên file bằng tay mới
+  được. Các lời "có" đã nhớ và kỹ năng đã tạo nằm ở lamp-control và
+  lamp-skills, không bị ảnh hưởng. Test:
   `runtime::tests::a_task_held_for_a_cold_gateway_runs_once_it_serves_or_is_told_not_ready_once`,
   `a_task_held_for_the_lamps_place_goes_on_once_known_or_is_told_busy_once`,
   `a_queued_tasks_life_covers_the_runtimes_holds`,
@@ -4276,8 +4283,16 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
 - **Run đã mất: báo và kết thúc** (họ hàng của #8601, việc 85 trên
   lamp-ee17 đọc `working` 3,75 giờ qua nhiều lần khởi động lại, giữ chân
   mọi lần giao việc sau): một việc mà các lần đọc thấy run của agent đã mất
-  (`observe_failed`: Harness chưa từng có nó, hoặc run của đường trực tiếp
-  đã bị dọn hay từ trước một lần khởi động lại) `GONE_READS` (3) lần liên
+  (`observe_gone`: `harness show` bị từ chối `UNKNOWN_HARNESS` hoặc
+  `GONE`, Harness không có agent đó; hoặc, chỉ trên đường trực tiếp của
+  đèn, `observe_failed`, run đã bị dọn hay từ trước một lần khởi động lại;
+  agent trên máy tính đọc `observe_failed` vì cách khác, máy tính
+  `DISCONNECTED`, đang ngủ hay rời mạng, hoặc quá giờ, không bao giờ được
+  đếm: việc được chờ, và câu trả lời được báo khi máy quay lại; P2 của
+  Twelve trên #8666, test
+  `engine::tests::a_computer_offline_for_long_is_waited_out_and_its_answer_kept_once`
+  và `a_show_refused_for_no_such_agent_reads_gone_and_an_offline_one_does_not`
+  trong `tests/harness.rs`) `GONE_READS` (3) lần liên
   tiếp, lần đầu cách đây `GONE_AFTER_MS` (5 phút) hoặc ở lần bật đèn trước,
   được giữ là `failed` ở lần đọc như vậy kế tiếp (`engine::gone_past_bound`,
   một dòng journal): đã xong, nên không còn được theo dõi hay tính là việc
