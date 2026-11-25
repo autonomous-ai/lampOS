@@ -6,6 +6,7 @@ builder works is in [joining.md](../docs/joining.md). The name is a plain word
 its person chose; it is not a place in a line. The first builder corrects
 it where it must be.
 
+- **Works on:** the voice's care turns (words of self-harm, the care line and hold: #7689, `LAMP_CARE_LINE`); the app boundary in lamp-control and the voice (app calls and answers, `LAMP_APP_TOOLS`: #8386, #8560); a skill or task whose agent never gets ready (lamp-skills, lamp-tasks, OpenClaw: #6577, #8334); the privacy bus and the voice's timing flakes in tests (#8466, #8489, #8568); reads of voice and control pull requests; rows on lamp-8ffc.
 - **Name:** `heron`
 - **Person:** the colleague who started this session (named in the team's
   own channels, not in this public repository); a Claude Code session they
