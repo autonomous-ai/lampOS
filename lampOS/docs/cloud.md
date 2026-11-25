@@ -2469,9 +2469,11 @@ put back from it runs the previous `lamp-cloud`, which has none. A
   ([setup.md](setup.md)), which `lamp-cloud` reads where it is. A request
   without the field gives no answer: nothing is written, and a no kept
   before stays. The lamp's own setup page asks too
-  (#2862): "Send health and crash reports", a box that starts ticked
-  (reports are on by default, the product owner's call of 25 Nov 2026),
-  which sends `share_reports` only as the box is. Unticked, it keeps a no.
+  (#2862): "Send health and crash reports", a box that shows the answer
+  setup's status says is kept, or ticked with none kept (reports are on by
+  default, the product owner's call of 25 Nov 2026). It sends
+  `share_reports` only when the person changed the box (#8642), so an
+  untouched box keeps what was kept. Unticked, it keeps a no.
 - **Later, in the app:** `reports.get` and `reports.set` (the device API
   above), the only way to turn reports on after setup: it is the person's
   own tap, from their account. `lamp-cloud` keeps that choice in
