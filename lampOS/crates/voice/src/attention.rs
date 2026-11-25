@@ -1024,6 +1024,37 @@ pub(crate) fn is_greeting(word: &str) -> bool {
         .any(|greeting| word.eq_ignore_ascii_case(greeting))
 }
 
+/// Whether `heard` opens with a greeting and then a word written for the
+/// lamp's name ([`written_for_the_name`]), that word set off by a comma or a
+/// stop, or ending the line: "Hey, Lynn. What time is it?", "Hi, Lan, …",
+/// "Hey, man. …", "Hello, Lynn.". That is how speech to text writes "Hey
+/// Lamp, …" (#1712: on lamp-4ace on 19 Oct "Hey Lamp, how are you today?"
+/// came back "Hey, Lynn. How are you today?"). Such a word with no greeting
+/// before it ("Lynn, pass me that") is not, nor one running on into the
+/// sentence ("Hey man what's up").
+pub(crate) fn greeted_stand_in(heard: &str) -> bool {
+    let mut words = heard
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty());
+    let (Some(greeting), Some(word)) = (words.next(), words.next()) else {
+        return false;
+    };
+    if !["hey", "hi", "hello", "ok", "okay"]
+        .iter()
+        .any(|known| greeting.eq_ignore_ascii_case(known))
+        || !written_for_the_name(word)
+    {
+        return false;
+    }
+    // The word set off: what follows it, past spaces, is a comma, a stop or
+    // nothing at all.
+    let Some(at) = heard.find(word) else {
+        return false;
+    };
+    let after = heard[at + word.len()..].trim_start();
+    after.is_empty() || after.starts_with([',', '.', '!', '?', ';', ':'])
+}
+
 /// Whether `word` is the lamp's name or a word the service has written for
 /// it ([`STAND_INS`], [`STAND_ALONE_INS`]): for a name a person gives, where
 /// such a word opening the line called the lamp (`known_faces`).
@@ -2025,6 +2056,8 @@ pub struct Attention {
     name_unsure_dropped: bool,
     /// `LAMP_NAME_NOT_ANOTHERS=on` (#8114, [`Self::hold_anothers_name`]).
     not_anothers: bool,
+    /// `LAMP_NAME_GREETED_STAND_IN=on` ([`Self::keep_greeted_stand_ins`]).
+    greeted_stand_ins: bool,
     /// The name heard was dropped for the line last weighed because its
     /// call word is another person's name and no face is turned (#8114).
     name_anothers_dropped: bool,
@@ -2384,8 +2417,11 @@ impl Attention {
         let ruled = self
             .near_not_the_name_of
             .filter(|(of, _)| *of == self.request);
+        // `LAMP_NAME_GREETED_STAND_IN`: in a busy room too, when the line
+        // opens "Hey, Lynn. …", speech to text's way of writing "Hey Lamp".
+        let greeted = self.greeted_stand_ins && greeted_stand_in(&self.heard);
         let sure_kept = ruled.is_some_and(|(_, score)| score >= SURE_SCORE)
-            && (!self.room_busy || turned == Some(true));
+            && (!self.room_busy || turned == Some(true) || greeted);
         let ruled_out = ruled.is_some() && !sure_kept && !called_by_real_name(&self.heard);
         self.name_near_dropped = weighed && self.sign_tied && (ruled_out || one_word_unlike);
         self.name_sure_kept = weighed && self.sign_tied && sure_kept && !self.name_near_dropped;
@@ -2531,6 +2567,17 @@ impl Attention {
     /// no face is turned to the lamp.
     pub fn hold_anothers_name(&mut self, on: bool) {
         self.not_anothers = on;
+    }
+
+    /// `LAMP_NAME_GREETED_STAND_IN=on`, the product owner's first rule of
+    /// 25 Nov 2026 (a clear "Hey Lamp" counts, face or no face): in a busy
+    /// room a sure hearing ([`SURE_SCORE`]) that `LAMP_NAME_NEAR` ruled not
+    /// the name is kept when the line opens with a greeting and a word written
+    /// for the name, set off ([`greeted_stand_in`]: "Hey, Lynn. …"), as it is
+    /// in a room not busy or with a face turned to the lamp. Without a
+    /// greeting ("Lynn, pass me that") the ruling stands.
+    pub fn keep_greeted_stand_ins(&mut self, on: bool) {
+        self.greeted_stand_ins = on;
     }
 
     /// Whether the name heard for the line last weighed was dropped because
@@ -7937,6 +7984,51 @@ mod tests {
     /// [`NEAR_SCORE`] or more. Off, both count as before; a real call at
     /// the line's start, said close, counts on; a ruling on another
     /// request's line changes nothing here.
+    /// `LAMP_NAME_GREETED_STAND_IN`, the product owner's first rule (25 Nov
+    /// 2026: a clear "Hey Lamp" counts, face or no face). On lamp-74ff that
+    /// evening, request 34: "Hey Lamp, what is twenty four times three?"
+    /// written "Hey, Lynn. What is 24 times three?", lamp-name at 1.00 by
+    /// its start, `LAMP_NAME_NEAR` ruling "Lynn" not the name. In a room not
+    /// busy the sure hearing was kept; in a busy room the ruling drops it
+    /// whatever the score. With the switch, a greeting and a word written for
+    /// the name, set off, keep a sure hearing in a busy room too; with no
+    /// greeting ("Lynn, pass me that") or a hearing under the sure score the
+    /// ruling stands, and off nothing changes.
+    #[test]
+    fn with_greeted_stand_ins_a_sure_hey_lynn_is_kept_in_a_busy_room() {
+        let weighed = |switch: bool, heard: &str, score: f32| {
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            attention.tie_the_second_sign(true);
+            attention.keep_greeted_stand_ins(switch);
+            attention.set_room_busy(true);
+            attention.near_not_the_name(34, score);
+            attention.began_at(34, 1, 10_000_000);
+            attention.name_heard_scored(10_300_000, score);
+            attention.heard(heard);
+            attention.weigh_the_name(None, false)
+        };
+        let call = "Hey, Lynn. What is 24 times three?";
+        // Off: dropped in a busy room, however sure, as before.
+        assert!(weighed(false, call, 1.0));
+        // On: kept with a sure hearing; a greeted "man" or "Lan" too.
+        assert!(!weighed(true, call, 1.0));
+        assert!(!weighed(
+            true,
+            "Hey, man. Make your light a little dimmer.",
+            1.0
+        ));
+        assert!(!weighed(true, "Hi, Lan, what time is it?", 0.999));
+        // Still dropped: no greeting, a hearing under the sure score, a word
+        // running on into the sentence, or another person's name.
+        assert!(weighed(true, "Lynn, pass me that.", 1.0));
+        assert!(weighed(true, call, 0.98));
+        assert!(weighed(true, "Hey man what's up with the printer?", 1.0));
+        assert!(weighed(true, "Hey, Lance. Can you come here?", 1.0));
+        assert!(greeted_stand_in("Hello, Lynn."));
+        assert!(!greeted_stand_in("Hello! How was your weekend?"));
+    }
+
     #[test]
     fn with_the_sign_tied_a_line_name_near_ruled_not_the_name_counts_by_no_second_sign() {
         let began = 10_000_000;

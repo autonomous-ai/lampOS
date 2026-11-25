@@ -5953,6 +5953,17 @@ after a take-over, but now for every turn:
     room with no look, so it stays held; a hearing under the sure score
     (request 4 at 0.86, a line at 0.998) stays held in any room. A one-word
     line with no face turned is still ruling 1's, below.
+    **"Hey, Lynn. …" in a busy room** (`LAMP_NAME_GREETED_STAND_IN=on`, the
+    product owner's first rule of 25 Nov 2026: a clear "Hey Lamp" counts,
+    face or no face): a sure hearing outlives the ruling in a busy room too
+    when the line opens with a greeting and then a word written for the
+    lamp's name, set off (`attention::greeted_stand_in`: "Hey, Lynn. What
+    time is it?", "Hi, Lan, …", "Hey, man. …"), the shape speech to text
+    gives "Hey Lamp, …" (#1712). A stand-in with no greeting ("Lynn, pass
+    me that"), one running on ("Hey man what's up"), another person's name
+    ("Hey, Lance.") and a hearing under the sure score stay ruled. On
+    lamp-74ff on 25 Nov at 19:49, request 34, "Hey, Lynn. What is 24 times
+    three?" at 1.00 was kept only because the room was quiet.
     The first builder's rulings at 12:45 on #8092 ("the bar is a pet's: it
     looks up when it's called, and lets the room's talk go by") add two more
     under the same switch. **One word:** a line of one word, `?` or not,
