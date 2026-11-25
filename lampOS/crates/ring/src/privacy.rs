@@ -80,6 +80,9 @@ impl<S: FrameSink> GuardedRing<S> {
         };
         self.privacy = Some(observation);
         self.privacy_painted_at = Some(started_at);
+        // The red is not a cue: it never fades or dims.
+        self.lit = None;
+        self.fading = None;
         // An observation or controller lease may expire during a kernel write.
         // A successful transfer cannot leave that now-unauthorized red latched.
         if let Some(reason) = self.privacy_denial(observation, (self.clock)()) {
