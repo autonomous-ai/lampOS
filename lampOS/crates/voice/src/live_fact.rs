@@ -56,7 +56,13 @@
 //! when they hold a number ("Your timer is set for 5 minutes"). A piece cut off
 //! before its sentence's end leads the rest of it when that is judged.
 //! A search or a page read backs every figure in the turn, and so does
-//! the chat's own search (`ChatEvent::Searched`), on no topic of its own. Off unless the
+//! the chat's own search (`ChatEvent::Searched`), on no topic of its own.
+//! On a line that asked no live fact, once some of the turn's words were
+//! said, a figure with no number in it (a condition with a place) is said
+//! as it is, with no ask again (#8615, the lead's choice (d')): a story's
+//! "sunny in Da Nang" is no answer to look up, and its ask again left
+//! seconds of silence inside the reply. A figure with a number stays held.
+//! Off unless the
 //! environment says exactly `on`, and off the turn is as before.
 
 use serde_json::Value;
@@ -744,6 +750,11 @@ pub(crate) struct Hold {
     dangling: bool,
     /// [`BRIDGE`] was said this turn: never again.
     bridged: bool,
+    /// Some of the turn's words were said (#8615): on a line that asked no
+    /// live fact, a figure after them is said as it is.
+    words_out: bool,
+    /// [`Self::words_out`]'s line was journalled: once a turn.
+    let_through: bool,
     /// The reply asked again goes on from the dangling words (their
     /// repeat dropped): no bridge.
     continuing: bool,
@@ -788,6 +799,30 @@ impl Hold {
         self.on && !self.searched && !self.task_answered
     }
 
+    /// Whether `sentence`'s figure, which no lookup backs, is said as it
+    /// is: on a line that asked no live fact ([`asks_live`]), once some of
+    /// the turn's words were said, and only when the figure has no number
+    /// in it ([`is_number`]: a weather condition with a place). The lead's
+    /// choice (d') on #8615, 25 Nov 17:50: kit-10824's story about a cat
+    /// held "sunny in Da Nang" after its first piece and asked again with
+    /// the weather required, 3.3 s of silence inside the story. A price,
+    /// degrees, a score or any figure with a number stays held, as on a
+    /// live line `asks_live` misses ("How much is an ounce of silver?",
+    /// Twelve's HOLD on #8224); so does any figure on a line that asked
+    /// one, or before anything was said.
+    fn lets_through(&mut self, sentence: &str) -> bool {
+        if self.asked_live || !self.words_out || sentence.split_whitespace().any(is_number) {
+            return false;
+        }
+        if !std::mem::replace(&mut self.let_through, true) {
+            eprintln!(
+                "lamp-voice second: request {}: a live figure in a line that asked none, words already out: said as it is (LAMP_LIVE_FACT_CHECKED)",
+                self.request
+            );
+        }
+        true
+    }
+
     /// Whether the reply's first words wait for their sentence's end:
     /// while [`Self::watching`], and only on a line that [`asks_live`]
     /// (the first builder on #8224, rule 7). Any other line's are cut as
@@ -825,7 +860,13 @@ impl Hold {
         } else {
             format!("{} {}", self.lead, sentence.trim_start())
         };
-        if !self.held.is_empty() || (states_figure(&judged) && !self.backs(&judged)) {
+        if self.held.is_empty()
+            && states_figure(&judged)
+            && !self.backs(&judged)
+            && self.lets_through(&judged)
+        {
+            // Said as it is, below.
+        } else if !self.held.is_empty() || (states_figure(&judged) && !self.backs(&judged)) {
             self.lead.clear();
             self.held.push(judged);
             return None;
@@ -868,6 +909,7 @@ impl Hold {
             None => sentence.trim(),
         };
         if words.chars().any(char::is_alphanumeric) {
+            self.words_out = true;
             self.dangling = false;
             self.continuing = false;
             self.round_said.push(words.to_owned());
