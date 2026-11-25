@@ -1,0 +1,28 @@
+# memory5 (kit-q-memory5): one WAV per line lines.tsv says (say and mem), 23 lines. All in one ElevenLabs stock voice,
+# the made-up test face Olivia's (Sarah, EXAVITQu4vr4xnSDxMaL, eleven_flash_v2_5, speed 1.0), rendered through the
+# lamp's own speech relay. file = the first 16 hex of SHA-256(text). The WAVs are not in the repo: the draft release
+# kit-memory5-clips-1125 holds them with SHA256SUMS (as kit-voice49-clips-1125). Played tests only.
+#file	voice	text
+3106ce03c3ba2d33.wav	olivia	Lamp, actually, my water bottle is blue now.
+633d8cbe68eaa676.wav	olivia	Lamp, forget what I said about my water bottle.
+4f05e435a6bda1da.wav	olivia	Lamp, from now on, please keep your answers to me to one short sentence.
+9a4018fbf219d2f0.wav	olivia	Lamp, I have a dentist appointment tomorrow at ten, so I'll paint after that.
+8fbfcd783d42c027.wav	olivia	Lamp, I'm planning to repaint my kitchen next week.
+ef01bbc66d0a4996.wav	olivia	Lamp, please remember that my cousin is called Ferdinand.
+dab491919d513e66.wav	olivia	Lamp, please remember that my favourite jam is apricot.
+4c1bdbe0f97931cf.wav	olivia	Lamp, please remember that my scooter is orange.
+d1fcec1a1d713ab1.wav	olivia	Lamp, please remember that my water bottle is green.
+9c2b6dfbac9979b9.wav	olivia	Lamp, quiz me: what's the capital of Ghana?
+bd6f2700c1008b26.wav	olivia	Lamp, quiz me: what's the capital of Nepal?
+e44eeefb04954393.wav	olivia	Lamp, quiz me: what's the capital of Sweden?
+c67467f2205b776c.wav	olivia	Lamp, remember that the office plant gets watered on Fridays.
+946a4448dd5cb633.wav	olivia	Lamp, tell me about the moon.
+429e4e253a25787e.wav	olivia	Lamp, what colour is my water bottle?
+21bfac1c8f93d963.wav	olivia	Lamp, what do you know about the office plant?
+b4b2f1d3fb3870fb.wav	olivia	Lamp, what do you think of teal for the kitchen walls?
+23b6201544a217c7.wav	olivia	Lamp, what is my blood type?
+ae2e4fe6e3f53220.wav	olivia	Lamp, what's my cousin called?
+0cf41520f907887d.wav	olivia	Lamp, what's my favourite jam?
+abbe46a40fa22cff.wav	olivia	Lamp, what's my name?
+27a9ef3dad6dc964.wav	olivia	Yes, please forget it.
+ad525cf40d8ea83a.wav	olivia	Yes, please keep that.
