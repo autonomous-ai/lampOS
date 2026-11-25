@@ -141,11 +141,16 @@ const SHORTLY_US: u64 = 500_000;
 /// the producer, 2 of 5 runs failed only as that refusal. A worker killed by
 /// a signal between the rig's `check_running` and its send reads as that
 /// refusal too, so under a producer stall such a crash is begun again; it
-/// still opens nothing (the reviewer on #2255).
-const FAIL_CLOSED: [&str; 4] = [
+/// still opens nothing (the reviewer on #2255). The worker's exit 1 is its
+/// error end, as on "authority snapshot has expired" when a granting
+/// authority lapses in a stall (`privacy_bus::DeniedLapse`): its process
+/// gone, its lease expires, so it fails closed too (train 1226's ARM64, a
+/// 410 ms stall; the first builder's 09:00 on #7814).
+const FAIL_CLOSED: [&str; 5] = [
     lamp_voice::privacy_bus::UNREADABLE,
     "privacy lease stream lost continuity",
     "privacy worker exited: exit status: 0",
+    "privacy worker exited: exit status: 1",
     "privacy.c.p: Connection refused",
 ];
 
@@ -248,6 +253,43 @@ fn on_time(name: &str, scenario: impl Fn()) {
             _ => panic::resume_unwind(failure),
         }
     }
+}
+
+/// [`on_time`] begins a scenario again when its worker's error end (exit
+/// 1) came while the producer was held up, and fails it at once when the
+/// producer was on time (train 1226: "privacy worker exited: exit status:
+/// 1" in a 410 ms stall, not begun again).
+#[test]
+fn an_error_exit_in_a_producer_stall_is_begun_again_and_on_time_it_fails() {
+    let fails = |held_up: bool| {
+        let held = HeldUp::default();
+        let now = monotonic_us();
+        held.sampled(now.saturating_sub(5_000), None);
+        if held_up {
+            held.sampled(now, Some(410_000));
+        }
+        held.failed();
+        RUNNING.with(|running| *running.borrow_mut() = Some(held));
+        panic!(
+            "called `Result::unwrap()` on an `Err` value: Custom {{ kind: Other, error: \"privacy worker exited: exit status: 1\" }}"
+        );
+    };
+    let attempts = AtomicU64::new(0);
+    on_time("stalled", || {
+        if attempts.fetch_add(1, Ordering::Relaxed) == 0 {
+            fails(true);
+        }
+    });
+    assert_eq!(attempts.load(Ordering::Relaxed), 2, "begun once again");
+    let on_time_too = panic::catch_unwind(AssertUnwindSafe(|| {
+        on_time("on time", || {
+            fails(false);
+        })
+    }));
+    assert!(
+        on_time_too.is_err(),
+        "the producer on time: it fails at once"
+    );
 }
 
 impl Producer {
