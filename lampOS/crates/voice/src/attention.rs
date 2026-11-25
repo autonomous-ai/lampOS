@@ -1494,14 +1494,39 @@ pub(crate) fn only_the_name_as_written(heard: &str, language: Option<Language>) 
     all && named
 }
 
+/// Where the second route's worker reads `LAMP_MOM_NOT_THE_NAME`: `on` only.
+/// With it, "mom" is no stand-in for the lamp's name in the words
+/// ([`called_by_stand_in`]), and a hearing of the name in the sound still
+/// counts as before. On lamp-74ff on 26 Nov (the product owner's "test all
+/// scenarios"), none of 196 played calls opening with the lamp's name came
+/// back as "mom". Lines said to a mother, or to a person as "ma'am", were
+/// answered as calls by it, with no hearing of the name: "Mom, can I have a
+/// snack?" and "Mom, can you leave the lamp on tonight?" (requests 129 and
+/// 134, 05:58 and 05:59), and "Hey, mom. You dropped your keys." for "Hey
+/// ma'am, …" in every person-word pass. "Hey Mom" was written for "Hey Lamp"
+/// on lamp-4ace in October, and such a call is now answered only when
+/// lamp-name hears the name.
+pub const MOM_NOT_THE_NAME_ENVIRONMENT: &str = "LAMP_MOM_NOT_THE_NAME";
+
+/// Whether [`MOM_NOT_THE_NAME_ENVIRONMENT`] is on in this process's
+/// environment.
+pub fn mom_not_the_name_on() -> bool {
+    std::env::var(MOM_NOT_THE_NAME_ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
 /// What the service has written in the name's place, first or after a
-/// greeting ([`called`]).
+/// greeting ([`called`]). With `LAMP_MOM_NOT_THE_NAME`, not "mom".
 fn called_by_stand_in(words: &[&str]) -> bool {
+    called_by_stand_in_with(words, mom_not_the_name_on())
+}
+
+/// [`called_by_stand_in`], `mom_out` saying whether "mom" is left out.
+fn called_by_stand_in_with(words: &[&str], mom_out: bool) -> bool {
     let is = |word: &str, list: &[&str]| list.iter().any(|known| word.eq_ignore_ascii_case(known));
     words
         .iter()
         .find(|word| !is(word, GREETINGS))
-        .is_some_and(|word| is(word, STAND_INS))
+        .is_some_and(|word| is(word, STAND_INS) && !(mom_out && word.eq_ignore_ascii_case("mom")))
 }
 
 /// Whether a call for this function is the start of an answer, to be
@@ -6830,6 +6855,52 @@ mod tests {
                 "{heard}"
             );
         }
+    }
+
+    /// `LAMP_MOM_NOT_THE_NAME` (the product owner's "test all scenarios",
+    /// 26 Nov 2026): on lamp-74ff "Mom, can I have a snack?" and "Hey, mom.
+    /// You dropped your keys." (for "Hey ma'am, …") were answered as calls by
+    /// the stand-in "mom", with no hearing of the name, and none of 196 played
+    /// calls came back as it. With the switch "mom" opening the words calls
+    /// nothing, and every other stand-in and the name itself still do.
+    #[test]
+    fn with_mom_not_the_name_mom_opening_the_words_calls_nothing() {
+        let words = |line: &'static str| -> Vec<&'static str> {
+            line.split(|c: char| !c.is_alphanumeric())
+                .filter(|word| !word.is_empty())
+                .collect()
+        };
+        for line in [
+            "Mom, can I have a snack?",
+            "Mom, can you leave the lamp on tonight?",
+            "Hey, mom. You dropped your keys.",
+            "Hi Mom, I will be home at six.",
+        ] {
+            assert!(
+                called_by_stand_in_with(&words(line), false),
+                "{line}: as before"
+            );
+            assert!(
+                !called_by_stand_in_with(&words(line), true),
+                "{line}: with the switch"
+            );
+        }
+        for line in [
+            "Man, tell me a joke.",
+            "Hey, Lam. Set your light back to normal.",
+            "Helen, what is the weather like?",
+            "Plan, set a timer for ten minutes.",
+        ] {
+            assert!(
+                called_by_stand_in_with(&words(line), true),
+                "{line}: still a stand-in"
+            );
+        }
+        assert!(called("Hey, Lamp. Good morning."), "the name itself");
+        assert!(
+            !called_by_stand_in_with(&words("Where is my mom?"), false),
+            "not first"
+        );
     }
 
     /// #1973, the first builder at 22:38: on Live "Lin, pass me that."

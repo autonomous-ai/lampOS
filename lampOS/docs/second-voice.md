@@ -5884,7 +5884,10 @@ after a take-over, but now for every turn:
     on the list: the lamp's name, "lamb", `STAND_INS`, `STAND_ALONE_INS`,
     `HEARD_FOR_THE_NAME`, `NAMES_OF_ITS_SHAPE`, a word that isn't
     alphabetic. Known costs: "man" and "mom" stay stand-ins (the text
-    calls them before the hearing matters), and a "Lamp, …" written
+    calls them before the hearing matters; with `LAMP_MOM_NOT_THE_NAME=on`,
+    on in the product since 26 Nov 2026, "mom" no longer is: none of 196
+    played calls came back as it on lamp-74ff that night, and "Mom, can I
+    have a snack?" was answered by it), and a "Lamp, …" written
     "Ma'am, …" (#3923) needs a face, a conversation or closeness. Lamp
     check on c0a4 (28 Oct): a person's "Ma'am, …" heard as the name at
     1.00 was held, two "Lamp, …" calls were answered

@@ -163,6 +163,9 @@ Environment=LAMP_NAME_FACE_OR_WORDS=on
 # LAMP_NAME_GREETED_STAND_IN: "Hey, Lynn. …" keeps a sure hearing in a busy room (the product owner's first rule,
 # 25 Nov 2026). Its why and rules are its row in docs/switches.md. DEFAULT-ON asked of its readers.
 Environment=LAMP_NAME_GREETED_STAND_IN=on
+# LAMP_MOM_NOT_THE_NAME: "Mom, can I have a snack?" is said to a mother: "mom" in the words is no stand-in for the
+# lamp's name; a hearing of the name still counts (26 Nov 2026). Its why and rules are its row in docs/switches.md.
+Environment=LAMP_MOM_NOT_THE_NAME=on
 # LAMP_NAME_AS_A_SENTENCE: its why and rules are its row in docs/switches.md (#5277, #6078).
 Environment=LAMP_NAME_AS_A_SENTENCE=on
 # LAMP_NAME_SAID_TO_A_PERSON: its why and rules are its row in docs/switches.md (#3945, #5233).
