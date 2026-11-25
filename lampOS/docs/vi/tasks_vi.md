@@ -4134,6 +4134,15 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   `agent_tasks::tests::where_offers_no_computer_without_a_pairing`,
   `agent_tasks::tests::no_computer_paired_a_computer_asked_for_is_refused_never_the_lamps`,
   `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`.
+  Khi chưa ghép máy tính nào, mô tả của `start_agent_task` cũng nói trước
+  điều đó (`agent_tasks::NONE_PAIRED`, " No computer is paired: never say
+  work goes to one."). Trên lamp-74ff lúc 18:56 ngày 25/11/2026, model nói
+  "I'll hand that to Claude Code on your office computer now." trước khi
+  lệnh gọi bị từ chối, rồi "No computer is paired with me": hứa rồi rút lại
+  ngay trong một hơi. Test:
+  `agent_tasks::tests::with_no_computer_paired_the_model_is_told_so_before_it_calls`;
+  `every_description_fits_the_service_whatever_the_switches` giữ nó trong
+  1.024 byte của đường link.
 - **Việc gì giao đi, việc gì đèn tự trả lời (#7930, quy tắc của owner).**
   Khi tasks part có target `lamp`, mô tả của `start_agent_task`, `where` và
   session note bảo model giao đi việc sẽ mất hơn khoảng 10 giây (tìm hiểu
