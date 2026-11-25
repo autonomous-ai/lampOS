@@ -14593,8 +14593,10 @@ say = { text = "Welcome back!" }
     /// #7245: the request is counted in characters, so a Vietnamese one
     /// past the old 2,000-byte bound is briefed whole: 1,500 letters as
     /// written, about 2,100 bytes, or 1,000 of its widest letters, 3,000
-    /// bytes; as are [`MOST_REQUEST_CHARS`] of them; one more is refused
-    /// with the bound named.
+    /// bytes; so is one of 5,000 letters, about 7,000 bytes (#8630: the
+    /// person meets no bound in normal use), as are [`MOST_REQUEST_CHARS`]
+    /// of them; one more is refused with the plain line, which names no
+    /// number.
     #[test]
     fn a_vietnamese_request_is_counted_in_letters() {
         let letters = |count: usize| -> String {
@@ -14611,14 +14613,21 @@ say = { text = "Welcome back!" }
         let widest = "ộ".repeat(1_000);
         assert_eq!(widest.len(), 3_000);
         assert_eq!(request_of(&brief(&widest).unwrap()), widest);
+        let long = letters(5_000);
+        assert!(long.len() > 6_500, "{}", long.len());
+        assert_eq!(request_of(&brief(&long).unwrap()), long);
         let most = letters(MOST_REQUEST_CHARS);
         assert_eq!(request_of(&brief(&most).unwrap()), most);
         assert_eq!(
             brief(&letters(MOST_REQUEST_CHARS + 1)),
             Err(REQUEST_TOO_LONG)
         );
-        assert!(REQUEST_TOO_LONG.contains("2,000 characters"));
-        assert_eq!(MOST_REQUEST_CHARS, 2_000);
+        assert_eq!(
+            REQUEST_TOO_LONG,
+            "That is too long for me to make as one skill: please say it more shortly."
+        );
+        assert!(!REQUEST_TOO_LONG.chars().any(|c| c.is_ascii_digit()));
+        assert_eq!(MOST_REQUEST_CHARS, 7_500);
     }
 
     /// #8514, El's run 1816 on lamp-ee17 (25 Nov): the agent's draft passed
