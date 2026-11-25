@@ -5964,12 +5964,11 @@ pub fn serve(
                     heeding.letting_only_the_first_answer_skip_its_look();
                 }
             }
-            // The person's next line soon after the lamp's answer is said to
-            // it, looking or not (`LAMP_FOLLOW_UPS=on`, the product owner's
-            // second rule, 25 Nov 2026).
+            // In a conversation no camera sign holds a line alone
+            // (`LAMP_FOLLOW_UPS=on`, the product owner's rules, 25 Nov 2026).
             if crate::said_to_me::follow_ups_on() {
                 eprintln!(
-                    "lamp-voice second: in the 20 s after the lamp's words a line is said to it, looking or not, unless a second voice, another voice than the conversation's, or a short line a face was read silent through shows it someone else's; in a busy room a conversation goes on 20 s (LAMP_FOLLOW_UPS)"
+                    "lamp-voice second: in a conversation a line is said to the lamp, looking or not, unless another voice than the conversation's said it: no camera sign holds it alone; in a busy room a conversation goes on 20 s (LAMP_FOLLOW_UPS)"
                 );
                 if let Ok(mut heeding) = heeding.lock() {
                     heeding.taking_follow_ups();
