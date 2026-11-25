@@ -415,10 +415,15 @@ async fn to_first_word(
 /// #8543, before `LAMP_OWN_KEYS` goes on). An endpoint that takes the
 /// connection and never answers would otherwise hold the turn until the
 /// client's read timeout (`net::STALL`, 30 s with no byte, inside the
-/// request's 40 s bound), and the turn would end unanswered. The same 4 s
-/// the person's own voice has for its first sound (`START_WITHIN`). A head that comes in time keeps the answer
-/// with the person's model; only its first word's wait is left to the
-/// stream's own bound.
+/// request's 40 s bound). The same 4 s the person's own voice has for its
+/// first sound (`START_WITHIN`). It frees the link, not the turn: a product
+/// turn waits 4.5 s from the words (`CUE_AFTER` + `BEGIN_WITHIN_AFTER_CUE`),
+/// 3 s with no cue clip, so the relay has 0.5 s at most for a first answer
+/// that comes at about 2 s, and a hung endpoint mostly still ends the turn
+/// unanswered (Fifth's #8543 P2; #8476's row times it). Shorter would hand
+/// healthy but slow own models to the relay. A head that comes in time keeps
+/// the answer with the person's model; only its first word's wait is left
+/// to the stream's own bound.
 pub const OWN_HEAD_WITHIN: std::time::Duration = std::time::Duration::from_secs(4);
 
 /// The person's own model asked, given way to the lamp's own at the relay
@@ -2238,7 +2243,8 @@ pub(crate) mod tests {
     /// with no second try (`LAMP_SECOND_CHAT_SECOND_TRY` is in no product
     /// unit), an own endpoint that takes the connection and never answers
     /// gives way to the lamp's own once [`OWN_HEAD_WITHIN`] passes, not after
-    /// the client's 30 s read timeout. It is told as no answer once the relay
+    /// the client's 30 s read timeout. This times the Net, not the turn: the
+    /// turn's own wait is shorter (see [`OWN_HEAD_WITHIN`]). It is told as no answer once the relay
     /// has answered, and the person's model is never counted as having
     /// answered. Fails on the old `own_or_relay`, which waited out the 30 s
     /// (seen: failed at 30.0 s with the deadline removed).

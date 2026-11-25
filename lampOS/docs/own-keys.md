@@ -376,9 +376,16 @@ on the same `keys.*` path and the same switch, with the contract agreed on
     head (`OWN_HEAD_WITHIN`, the same 4 s the person's own voice has for its
     first sound). An endpoint that takes the connection and never answers
     then gives way to the lamp's own model at the relay, told as no answer.
-    Before, it held the turn until the link's 30 s read timeout, past the
-    turn's wait, and the turn ended unanswered. This is the Reviewer-lead's must-fix on
-    #8543, before the switch-on, and it holds with or without the second try.
+    Before, it held the link until its 30 s read timeout. That is not a
+    rescue on a product turn: its wait is 4.5 s from the words (the 1.5 s
+    cue and 3 s after it, `BEGIN_WITHIN_AFTER_CUE`), 3 s with no cue clip,
+    so the relay has 0.5 s at most, and its first answer comes at about
+    2 s (p50 1.99 s, p90 3.47 s). A hung endpoint mostly still ends the turn
+    unanswered; what it gains is a link freed at 4 s, the warning told, and
+    the next turn's own model tried afresh. A shorter head bound would hand
+    healthy but slow own models to the relay, so it stays at 4 s; #8476's
+    row times the hung case on the lamp. This is the Reviewer-lead's must-fix
+    on #8543, before the switch-on, with or without the second try.
     A head that comes in time keeps the answer with the person's model, and
     the wait for its first word is the stream's own. Where the turn's second
     try is on (`LAMP_SECOND_CHAT_SECOND_TRY`, 2.5 s with no head, in no
