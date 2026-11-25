@@ -1,0 +1,21 @@
+kind = "installable"
+version = "1.0.0"
+grants = ["net"]
+
+[permissions]
+topics = ["clock/local"]
+
+# A time starts it, so it speaks only through the lamp's told answer: a
+# task step, no speak grant, and a script that only prints (#8610).
+[trigger]
+topic = "clock/local"
+field = "known"
+equals = true
+rearm = "ends"
+during = { from = "08:00", to = "08:01" }
+
+[ask]
+policy = "nudge"
+
+[[do]]
+task = { task = "Tell the owner the top story on Hacker News in one plain sentence", run = "scripts/main.py" }

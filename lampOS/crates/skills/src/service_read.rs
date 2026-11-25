@@ -1347,6 +1347,38 @@ mod tests {
         assert!(lamp.said_at[0] >= 1_000 + STEADY.as_millis() as u64);
     }
 
+    /// #8610: a made skill a trigger starts tells the person only through
+    /// its agent's answer, and that answer (nobody asked) waits for the
+    /// gate: nothing said while the owner is not in view, nor within
+    /// [`VOICE_WITHIN`] of a voice heard; then said once, the owner alone
+    /// and steady. Pins the gate the made skill's rule relies on.
+    #[test]
+    fn a_trigger_runs_told_answer_waits_for_the_owner_in_view_and_a_quiet_minute() {
+        let lines = vec!["The top story is about a desk lamp.".to_owned()];
+        let nobody = Seen {
+            faces: Some(0),
+            owner_in_view: false,
+            ..alone()
+        };
+        let heard = Seen {
+            heard_ago: Some(VOICE_WITHIN - Duration::from_secs(1)),
+            ..alone()
+        };
+        let mut seen = vec![nobody; 40];
+        seen.extend(vec![heard; 40]);
+        seen.push(alone());
+        let mut lamp = Lamp::new(seen, json!({}));
+        assert_eq!(tell_answer(&lines, Asker::Nobody, &mut lamp), "told 1");
+        assert_eq!(lamp.said, lines, "said once");
+        assert_eq!(
+            lamp.waits,
+            [Closed::Nobody.words(), Closed::VoiceHeard.words()],
+            "waited for the owner, then for the quiet"
+        );
+        assert!(lamp.looked > 80, "said only after the gate opened");
+        assert!(lamp.said_at[0] >= 1_000 + STEADY.as_millis() as u64);
+    }
+
     /// #7894, V2's 12:47 on #7902 and the first builder's 10:02 on #7874:
     /// a run its owner asked by voice now (in the private room, whoever
     /// asked) is said at once with two faces in view; asked by anyone else
