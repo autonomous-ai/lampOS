@@ -1258,6 +1258,30 @@ impl Shared {
 
     /// The apps running now, each with when its session began
     /// ([`crate::app_tools`]), and where the installed apps are.
+    /// The phrases app `app`'s connections listen for, as a finished line
+    /// is told them (`Out::Heard`: the `hear` grant and `phrase.heard`
+    /// subscribed), each once, at most [`lamp_msgs::MOST_PHRASES`]: told on
+    /// `apps/tools` so the voice offers none of the app's tools in a line
+    /// told to it (#8386).
+    pub fn listened_phrases(&self, app: &str) -> Vec<String> {
+        let client = crate::app_socket::app_client(app);
+        let mut phrases: Vec<String> = Vec::new();
+        for open in self.open.lock().expect("open").values() {
+            if open.client.as_deref() != Some(client.as_str())
+                || !open.grants.contains(&Grant::Hear)
+                || !open.events.contains(&EventKind::PhraseHeard)
+            {
+                continue;
+            }
+            for phrase in &open.phrases {
+                if phrases.len() < lamp_msgs::MOST_PHRASES && !phrases.contains(phrase) {
+                    phrases.push(phrase.clone());
+                }
+            }
+        }
+        phrases
+    }
+
     pub fn running_since(&self) -> (Vec<(String, u64)>, std::path::PathBuf) {
         let running = self.apps.lock().expect("apps").1.running_since();
         let apps_dir = self.apps_dir.lock().expect("apps_dir").clone();
@@ -4045,6 +4069,46 @@ mod tests {
         until("apps/tools empty once it stops", &|| {
             latest().is_some_and(|list| list.apps.is_empty())
         });
+    }
+
+    /// #8386: the phrases told on `apps/tools` are the app's own
+    /// connections' that a finished line is told (`hear` and
+    /// `phrase.heard`), each once; another app's, or a connection not
+    /// listening, are not its.
+    #[test]
+    fn an_apps_listened_phrases_are_its_own_told_ones() {
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
+        let connect = |id: u64, app: &str, listens: bool, phrases: &[&str]| {
+            let (outbox, _inbox) = mpsc::unbounded_channel();
+            let (frames, _) = mpsc::channel(FRAMES_QUEUED);
+            let (body_state, _) = watch::channel(None);
+            let events: BTreeSet<EventKind> = if listens {
+                [EventKind::PhraseHeard].into()
+            } else {
+                BTreeSet::new()
+            };
+            shared.open.lock().unwrap().insert(
+                id,
+                Open {
+                    client: Some(crate::app_socket::app_client(app)),
+                    outbox,
+                    frames,
+                    events,
+                    phrases: phrases.iter().map(|p| (*p).to_owned()).collect(),
+                    grants: [Grant::Hear].into(),
+                    body_state,
+                },
+            );
+        };
+        connect(1, "gym-coach", true, &["end workout", "next exercise"]);
+        connect(2, "gym-coach", true, &["end workout"]);
+        connect(3, "gym-coach", false, &["not listened"]);
+        connect(4, "english-lessons", true, &["next lesson"]);
+        let mut coach = shared.listened_phrases("gym-coach");
+        coach.sort();
+        assert_eq!(coach, ["end workout", "next exercise"]);
+        assert_eq!(shared.listened_phrases("english-lessons"), ["next lesson"]);
+        assert!(shared.listened_phrases("timer").is_empty());
     }
 
     /// The admin op `{"app_forget": NAME}`: the helper's alone, with the switch

@@ -58,6 +58,7 @@ fn coach() -> AppsTools {
                 None,
             ),
         ],
+        phrases: Vec::new(),
     }
 }
 
@@ -67,6 +68,7 @@ fn lessons(since_ms: u64) -> AppsTools {
         title: "English lessons".into(),
         since_ms,
         tools: vec![tool("next_word", "Give the next word of the lesson.", None)],
+        phrases: Vec::new(),
     }
 }
 
@@ -92,7 +94,7 @@ fn alone<T>(apps: Vec<AppsTools>, f: impl FnOnce(&Fake) -> T) -> T {
 
 /// The owner's turn, nothing held.
 fn owners_turn(request: u64, now_ms: u64) -> Vec<String> {
-    let notes = notes_for(request, now_ms, false, false, false, Some("owner-1"));
+    let notes = notes_for(request, "", now_ms, false, false, false, Some("owner-1"));
     // The turn's functions declared, as each chat request does.
     declared(lamps(), 64, now_ms);
     notes
@@ -165,7 +167,7 @@ fn no_tool_is_offered_or_run_off_the_owners_plain_turn() {
         (false, false, true, Some("owner-1")),
     ] {
         alone(vec![coach()], |fake| {
-            let notes = notes_for(1, 1_000, private, care, alone_line, person);
+            let notes = notes_for(1, "", 1_000, private, care, alone_line, person);
             assert!(notes.is_empty(), "{notes:?}");
             assert_eq!(
                 names(&declared(lamps(), 64, 1_000)),
@@ -481,6 +483,7 @@ fn the_section_holds_eight_tools_at_the_caps_and_leaves_out_what_wont_fit() {
         tools: (0..8)
             .map(|n| tool(&format!("{}{n}", "t".repeat(29)), &"w".repeat(150), None))
             .collect(),
+        phrases: Vec::new(),
     };
     assert_eq!(
         AppTools {
@@ -619,6 +622,7 @@ fn an_apps_function_never_takes_a_lamp_functions_name() {
             tool("volume", "Change the app's own sound level.", None),
             tool("mode", "Choose the app's mode.", None),
         ],
+        phrases: Vec::new(),
     };
     alone(vec![set.clone()], |fake| {
         owners_turn(1, 1_000);
@@ -660,12 +664,14 @@ fn an_apps_function_never_takes_a_lamp_functions_name() {
         title: "A B".into(),
         since_ms: 1,
         tools: vec![tool("c", "One thing.", None)],
+        phrases: Vec::new(),
     };
     let a = AppsTools {
         app: "a".into(),
         title: "A".into(),
         since_ms: 2,
         tools: vec![tool("b_c", "Another thing.", None)],
+        phrases: Vec::new(),
     };
     let (kept, left_out) = offered(&[a_b, a], &HashMap::new());
     assert_eq!(
@@ -673,4 +679,113 @@ fn an_apps_function_never_takes_a_lamp_functions_name() {
         ["a-b"]
     );
     assert_eq!(left_out, ["a"]);
+}
+
+/// The first builder's ruling on #8386 (16:44): a line told to an app as
+/// one of its phrases ("end workout") offers none of that app's tools on
+/// its turn, so the app's phrase and its tool never both end the session;
+/// the other apps' tools and the lamp's own stay, and the turn after is
+/// offered everything again.
+#[test]
+fn a_line_told_to_an_app_as_a_phrase_offers_none_of_its_tools() {
+    let listening = AppsTools {
+        phrases: vec!["end workout".into(), "next exercise".into()],
+        ..coach()
+    };
+    alone(vec![listening, lessons(20)], |fake| {
+        let notes = notes_for(
+            1,
+            "Hey Lamp, end workout.",
+            1_000,
+            false,
+            false,
+            false,
+            Some("owner-1"),
+        );
+        assert_eq!(notes.len(), 1, "{notes:?}");
+        assert!(!notes[0].contains("gym_coach"), "{}", notes[0]);
+        assert!(notes[0].contains("english_lessons"), "{}", notes[0]);
+        assert_eq!(
+            names(&declared(lamps(), 64, 1_000)),
+            ["set_volume", "use_skill", "english_lessons_next_word"]
+        );
+        assert!(!is_app_function("gym_coach_get_progress"));
+        // Called anyway: never sent to the app.
+        assert!(answer(1, "gym_coach_get_progress", &json!({}), false, 1_000)["not_done"] == true);
+        assert!(fake.calls.lock().unwrap().is_empty());
+        // The same request's next round: still none of its tools.
+        assert_eq!(
+            names(&declared(lamps(), 64, 1_100)),
+            ["set_volume", "use_skill", "english_lessons_next_word"]
+        );
+        // A line that holds no phrase: everything again.
+        notes_for(
+            2,
+            "How did my training go?",
+            2_000,
+            false,
+            false,
+            false,
+            Some("owner-1"),
+        );
+        assert_eq!(
+            names(&declared(lamps(), 64, 2_000)),
+            [
+                "set_volume",
+                "use_skill",
+                "gym_coach_set_plan",
+                "gym_coach_get_progress",
+                "english_lessons_next_word"
+            ]
+        );
+    });
+}
+
+/// The phrase is matched as lamp-control tells it (`lamp_msgs::phrase_in`):
+/// run together or apart, any case, inside a longer line; another app's
+/// phrase, or a line that only nears it, tells no app.
+#[test]
+fn the_told_apps_are_matched_as_lamp_control_tells_them() {
+    let coach = AppsTools {
+        phrases: vec!["end workout".into()],
+        ..coach()
+    };
+    let lessons = AppsTools {
+        phrases: vec!["good night lamp".into()],
+        ..lessons(20)
+    };
+    let running = [coach, lessons];
+    assert_eq!(told_apps(&running, "END WORKOUT!"), ["gym-coach"]);
+    assert_eq!(told_apps(&running, "ok endworkout now"), ["gym-coach"]);
+    assert_eq!(told_apps(&running, "Goodnight lamps"), ["english-lessons"]);
+    assert!(told_apps(&running, "end the workout").is_empty());
+    assert!(told_apps(&running, "Stop").is_empty());
+    assert!(told_apps(&running, "").is_empty());
+}
+
+/// With the switch off a phrase line changes nothing: no section, no
+/// function, as ever.
+#[test]
+fn with_the_switch_off_a_phrase_line_changes_nothing() {
+    let listening = AppsTools {
+        phrases: vec!["end workout".into()],
+        ..coach()
+    };
+    alone(vec![listening], |_| {
+        ON_FOR_TEST.with(|cell| cell.set(Some(false)));
+        let notes = notes_for(
+            1,
+            "end workout",
+            1_000,
+            false,
+            false,
+            false,
+            Some("owner-1"),
+        );
+        assert!(notes.is_empty());
+        assert_eq!(
+            names(&declared(lamps(), 64, 1_000)),
+            ["set_volume", "use_skill"]
+        );
+    });
 }

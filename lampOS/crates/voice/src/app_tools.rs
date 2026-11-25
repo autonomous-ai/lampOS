@@ -227,6 +227,9 @@ struct Narrowed {
 #[derive(Default)]
 struct State {
     offered_for: Option<u64>,
+    /// The apps the line of `offered_for` was told to as a phrase
+    /// ([`told_apps`]): none of their tools is offered on its turn.
+    told: Vec<String>,
     subsets: HashMap<String, (u64, Vec<String>)>,
     narrowed: Option<Narrowed>,
     calls: u64,
@@ -432,11 +435,38 @@ fn mark_called(name: &str) {
 
 /// The tools offered now from the running apps, and the apps left out.
 fn current() -> (Vec<Offered>, Vec<String>) {
+    let (offered, left_out, _) = current_with_running();
+    (offered, left_out)
+}
+
+/// [`current`], and the running apps it was read from.
+fn current_with_running() -> (Vec<Offered>, Vec<String>, Vec<AppsTools>) {
     let Some(apps) = apps() else {
-        return (Vec::new(), Vec::new());
+        return (Vec::new(), Vec::new(), Vec::new());
     };
+    let running = apps.running();
     let subsets = with_state(|state| state.subsets.clone()).unwrap_or_default();
-    offered(&apps.running(), &subsets)
+    let (offered, left_out) = offered(&running, &subsets);
+    (offered, left_out, running)
+}
+
+/// The running apps `line` is told to as a phrase: each whose listened
+/// phrases (`apps/tools`' `phrases`) the line holds, by the one match
+/// lamp-control tells `phrase.heard` with ([`lamp_msgs::phrase_in`]).
+/// The first builder's ruling on #8386: such a line's turn offers none of
+/// that app's tools, so "end workout" is ended once, by the phrase, never
+/// again by the app's tool; the other apps' tools and the lamp's own stay.
+/// Matched here on the line itself, so no turn waits on lamp-control.
+pub fn told_apps(running: &[AppsTools], line: &str) -> Vec<String> {
+    running
+        .iter()
+        .filter(|app| {
+            app.phrases
+                .iter()
+                .any(|phrase| lamp_msgs::phrase_in(line, phrase))
+        })
+        .map(|app| app.app.clone())
+        .collect()
 }
 
 /// The lamp's own functions a narrowed turn leaves out: a skill, which
@@ -472,6 +502,12 @@ pub fn declared(
         return declared;
     }
     let (offered, _) = current();
+    // An app the line was told to as a phrase offers no tool (#8386).
+    let told = with_state(|state| state.told.clone()).unwrap_or_default();
+    let offered: Vec<Offered> = offered
+        .into_iter()
+        .filter(|one| !told.contains(&one.app))
+        .collect();
     if offered.is_empty() {
         return declared;
     }
@@ -517,15 +553,18 @@ pub fn declared(
     declared
 }
 
-/// The turn's notes for `request`: the app tools' section, on the owner's
-/// turn only (as `app_context::notes_for` judges it: in the private room
-/// always, else only when `person`, the known person in view, is the
-/// owner), never while private, in the care hold, or for a line let in
+/// The turn's notes for `request`, whose words are `line`: the app tools'
+/// section, on the owner's turn only (as `app_context::notes_for` judges
+/// it: in the private room always, else only when `person`, the known
+/// person in view, is the owner), never while private, in the care hold, or for a line let in
 /// only as the conversation going on; and on the turn after an app's
-/// result, the note that it is narrowed. Marks whether this request is
-/// offered the tools, which [`declared`] and [`answer`] read.
+/// result, the note that it is narrowed. None of an app's tools is in it
+/// when `line` was told to that app as a phrase ([`told_apps`]). Marks
+/// whether this request is offered the tools, and the apps told, which
+/// [`declared`] and [`answer`] read.
 pub fn notes_for(
     request: u64,
+    line: &str,
     now_ms: u64,
     private: bool,
     care_holds: bool,
@@ -537,13 +576,19 @@ pub fn notes_for(
     }
     let owners_turn = crate::person::private_room()
         || person.is_some_and(|person| owners().iter().any(|id| id == person));
-    let (offered, left_out) = current();
+    let (offered, left_out, running) = current_with_running();
     let offer =
         owners_turn && !private && !care_holds && !conversation_alone && !offered.is_empty();
+    let told = if offer {
+        told_apps(&running, line)
+    } else {
+        Vec::new()
+    };
     // The one turn after a result: the next request's notes take it, and
     // the one after that is not narrowed.
     let narrowed = with_state(|state| {
         state.offered_for = offer.then_some(request);
+        state.told = told.clone();
         if let Some(narrowed) = state.narrowed.as_mut() {
             let past = now_ms.saturating_sub(narrowed.at_ms) >= NARROWED_FOR_MS;
             let spent = narrowed.next.is_some_and(|next| next != request);
@@ -565,6 +610,16 @@ pub fn notes_for(
             "lamp-voice second: request {request}: the app {app}'s tools not offered: they don't fit beside the apps running longer ({ENVIRONMENT})"
         );
     }
+    for app in &told {
+        // By name only: never the phrase, nor the line.
+        eprintln!(
+            "lamp-voice second: request {request}: the app {app}'s tools not offered: the line was told to it as a phrase ({ENVIRONMENT})"
+        );
+    }
+    let offered: Vec<Offered> = offered
+        .into_iter()
+        .filter(|one| !told.contains(&one.app))
+        .collect();
     let offered: Vec<Offered> = match &narrowed {
         Some(app) => offered.into_iter().filter(|one| &one.app == app).collect(),
         None => offered,

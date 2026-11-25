@@ -895,49 +895,17 @@ impl Watch {
 /// The phrases of `phrases` that `heard` holds, whole words, ignoring case
 /// and punctuation: "Lights please!" holds "lights please".
 pub fn phrases_in<'a>(heard: &str, phrases: &'a [String]) -> Vec<&'a str> {
-    // Each word without its apostrophes, so "it's" and "its" are one.
-    let words = |text: &str| -> Vec<String> {
-        crate::protocol::phrase_words(text)
-            .into_iter()
-            .map(|word| word.replace('\'', ""))
-            .filter(|word| !word.is_empty())
-            .collect()
-    };
-    let heard = words(heard);
+    // The one match the voice reads too, so the line it tells an app is the
+    // line whose turn offers none of that app's tools (#8386). A run of
+    // whole heard words that spells the phrase, its words' letters joined
+    // ("goodnight" for "good night", lamp-75c9, 9 Nov), and may end in one
+    // "s" more (lamp-75c9 run13b, 10 Nov); "goodnights lamp" or "good
+    // knight lamp" never match.
     phrases
         .iter()
-        .filter(|phrase| {
-            let wanted: String = words(phrase).concat();
-            !wanted.is_empty() && spells(&heard, &wanted)
-        })
+        .filter(|phrase| lamp_msgs::phrase_in(heard, phrase))
         .map(String::as_str)
         .collect()
-}
-
-/// Whether some run of whole `heard` words spells `wanted`, its words'
-/// letters joined: the recognizer may write "goodnight" where the phrase
-/// says "good night", or the other way round (lamp-75c9, 9 Nov: a line
-/// heard with the phrase in it, and nothing told). The heard run may also
-/// end in one "s" more than the phrase: the recognizer wrote "lamps" for a
-/// played "lamp" (lamp-75c9 run13b, 10 Nov). Only the heard side gains it,
-/// so a phrase is matched as written ("please press s" by itself, "yes"
-/// never by "ye"). Each run is compared at every word edge until it is
-/// longer than the phrase and one "s", so a short prefix never ends the
-/// search; "goodnights lamp" or "good knight lamp" never match.
-fn spells(heard: &[String], wanted: &str) -> bool {
-    (0..heard.len()).any(|start| {
-        let mut joined = String::new();
-        for word in &heard[start..] {
-            joined.push_str(word);
-            if joined == wanted || joined.strip_suffix('s') == Some(wanted) {
-                return true;
-            }
-            if joined.len() > wanted.len() {
-                return false;
-            }
-        }
-        false
-    })
 }
 
 #[cfg(test)]
