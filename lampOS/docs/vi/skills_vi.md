@@ -3685,7 +3685,7 @@ cả hai người viết.
   `format.md`, toàn bộ `docs/skill-format.md` của bản build này
   (`lamp_tasks::skill_make::FORMAT`), `sdk.md`, toàn bộ tài liệu SDK
   Python của đèn (`skill_make::SDK`, `sdk/python/README.md`, để code của
-  kỹ năng dùng được mọi hàm), và `examples/`, mười kỹ năng hoàn chỉnh
+  kỹ năng dùng được mọi hàm), và `examples/`, mười một kỹ năng hoàn chỉnh
   (`MAKE_EXAMPLES`, từ `crates/tasks/src/make_examples/`: đèn và câu nói
   theo `asks`, cử chỉ và câu nói khi ngồi lâu, tung đồng xu bằng code, câu
   nói lặp mỗi 30 phút khi có người, hẹn giờ nghỉ bằng `remind`, nhắc uống
@@ -3693,7 +3693,9 @@ cả hai người viết.
   và giọng nói; #7874: `agenda-count`, đọc lịch theo `asks`, `main.py` là
   dòng stub lamp-services; và, với grant `net` và `speak`, `exchange-rate`
   (#7742) và `sun-times`, mỗi cái là code urllib riêng qua `HTTPS_PROXY` của
-  lần chạy, nói một giá trị lấy được bằng `lamp.say`), mỗi cái được `lamp-skills pack` thật đóng gói trong một test; lời nhắc
+  lần chạy, nói một giá trị lấy được bằng `lamp.say`; #8610:
+  `morning-headline`, chỉ với grant `net`, một `task` do giờ khởi động có
+  script chỉ in tin hàng đầu cho câu trả lời được kể), mỗi cái được `lamp-skills pack` thật đóng gói trong một test; lời nhắc
   nêu cả hai (`GATEWAY_CAN`, khoảng 300 byte, giờ chỉ nói đọc gì và làm gì) và rằng show là một khối
   ```` ```shows/NAME.toml ```` của câu trả lời, trong giới hạn byte
   của Harness (`MAX_PROMPT_BYTES` 3.000, trước #7245 là 2.000). Thư mục và lời nhắc của Hermes không đổi.
@@ -4190,19 +4192,46 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   `crates/tasks/src/skill_make_guide.md`) dạy hai loại bước, chọn lúc tạo:
   bước `run`, viết đúng `run = "scripts/main.py"`, có script làm trọn việc
   và nói câu thành công lẫn câu thất bại bằng `lamp.say` (lamp-skills chạy
-  nó không cần agent; schema và runtime của khóa này thuộc #8158), và bước
-  `task` chỉ khi mỗi lần chạy cần agent tóm tắt hay suy luận, các script trợ
-  giúp của nó cũng được viết lúc tạo. Script được viết lúc tạo, không bao giờ
+  nó không cần agent; schema và runtime của khóa này thuộc #8158), chỉ trong
+  kỹ năng do chính lời người dùng khởi động, và bước `task` khi mỗi lần chạy
+  cần agent tóm tắt hay suy luận, và luôn luôn khi một trigger khởi động kỹ
+  năng, các script trợ giúp của nó cũng được viết lúc tạo. Script được viết lúc tạo, không bao giờ
   lúc chạy. Một dịch vụ liên kết được chính script đọc (`lamp.service_read`)
   hoặc bước `read` của đèn: script chuyển giao một dòng không còn được dạy cho
   agent (luật nó nhận cũng nói vậy, `make_skill_local::agents_own_scripts`;
   của DeepSeek như trước). Agent chỉ viết bản nháp nó được giao, không bao giờ
   sửa kỹ năng của đèn hay kỹ năng khác. Các ví dụ
   (`crates/tasks/src/make_examples/`) có bước `run` (`coin-flip`,
-  `breathing-coach`, `exchange-rate`, `sun-times`) và một `task` có script
-  trợ giúp đọc lịch (`agenda-count`). Mỗi câu được nói bằng
+  `breathing-coach`, `exchange-rate`, `sun-times`), một `task` có script
+  trợ giúp đọc lịch (`agenda-count`), và một `task` do giờ khởi động có
+  script chỉ in ra, chỉ được cấp `net` (`morning-headline`, #8610). Mỗi câu
+  được nói bằng
   `await lamp.say(text, wait=True)`, để script không bao giờ thoát trước khi
   câu được nói (câu bị bỏ không được đếm, và lần chạy thất bại).
+- **Kỹ năng tạo ra mà trigger khởi động chỉ nói qua câu trả lời được kể**
+  (#8610, 16:17 của builder đầu tiên): một kỹ năng tạo ra có `[trigger]`
+  (một giờ, một sự kiện, một lần lặp được giữ) và một bước `run`, hoặc một
+  bước code có `grants` gọi tên `speak` hay `speaker` (các grant của
+  lamp-control cho mọi thao tác phát tiếng, nên luật giữ ở mỗi lần chạy),
+  bị từ chối trong `made_skill::keep_asked` ngay sau khi các script được
+  phân tích cú pháp, trước khi đóng gói và chạy thử
+  (`made_skill::told_only`, `SPEAKS_ON_ITS_OWN`): nó không bao giờ nói
+  trong lúc tạo. Lời từ chối đến người viết trước, như thất bại của lần
+  chạy thử (`made_skill::TOLD_ONLY_REPAIR`: một bước `task`, không `speak`,
+  script in ra, câu trả lời của agent là phần tóm tắt nói ra), nên một lần
+  sửa định hình lại nó và không có gì được nói. Chỉ khi việc tạo kết thúc
+  mà không giữ được kỹ năng nào, người dùng mới nghe
+  `made_skill::TOLD_ONLY_TRY`, một lần (`plain_reason`, một dòng của #8454,
+  lời từ chối trước được giữ của #8612): "That one would speak on its own;
+  I can only keep it if it tells me and I say it when you're here." Câu trả
+  lời của agent khi đó là câu trả lời được kể ("Tác vụ của kỹ năng"):
+  nói một lần, chỉ khi chủ một mình trong khung hình, không nghe giọng nói
+  nào trong một phút và ngoài giờ yên tĩnh. Kỹ năng chỉ do lời người dùng
+  khởi động, và các bước `say` và `remind` cố định, như trước; kỹ năng đã
+  được giữ không đổi. Task riêng của đèn cho agent trên một trigger
+  (`make_no_cannot::skill_text`) không bao giờ được cấp `speak`. Không có
+  công tắc. Cùng phép kiểm đó trong `lamp-skills pack`, và phép kiểm không
+  bao giờ lặp lại cùng một câu, là việc tiếp theo.
 - **Giọng đọc bước `run` như đọc bước `task`**: code riêng, giữ theo grant
   của nó và script của nó phải nằm trong các file đã viết
   (`made_skill::code_step`, `task_run`), và được đọc lại để xin đồng ý một
