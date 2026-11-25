@@ -1121,12 +1121,16 @@ impl Gateway {
 
 /// `launch` run by `run`, an OpenClaw one only once the Gateway answers;
 /// not sent ([`NOT_READY`]) when it does not, with one journal line.
+/// OpenClaw on a computer found from the machines
+/// ([`crate::runtime::MACHINES_PROJECT`], rule 2a, 25 Nov) never waits for
+/// the lamp's Gateway.
 pub fn launch_with(
     gateway: Option<&mut Gateway>,
     launch: &Launch,
     run: impl FnOnce() -> LaunchOutcome,
 ) -> LaunchOutcome {
     if launch.target.engine == EngineKind::Openclaw
+        && launch.target.project != crate::runtime::MACHINES_PROJECT
         && let Some(gateway) = gateway
         && let Err(why) = gateway.before_launch()
     {
@@ -2080,6 +2084,24 @@ mod tests {
             }
         });
         assert_eq!(*other.looks.lock().unwrap(), 0);
+    }
+
+    /// Rule 2a (25 Nov): OpenClaw named for a computer that has it runs
+    /// there through Harness and never waits for the lamp's own Gateway,
+    /// which may be stopped (the lamp's agent is Hermes).
+    #[test]
+    fn an_openclaw_launch_on_a_computer_never_waits_for_the_lamps_gateway() {
+        let fake = Fake::default();
+        let mut stopped = gateway(&fake);
+        let mut on_a_computer = launch(EngineKind::Openclaw);
+        on_a_computer.target.project = crate::runtime::MACHINES_PROJECT.into();
+        let outcome = launch_with(Some(&mut stopped), &on_a_computer, || {
+            LaunchOutcome::Created {
+                agent_id: "y".into(),
+            }
+        });
+        assert!(matches!(outcome, LaunchOutcome::Created { .. }));
+        assert_eq!(*fake.looks.lock().unwrap(), 0);
     }
 
     /// #6226: a Gateway that never answers: no `new`, the hand-over not

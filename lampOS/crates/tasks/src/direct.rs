@@ -1717,15 +1717,18 @@ pub(crate) fn set_test_default(default: Option<Option<EngineKind>>) {
 }
 
 /// Whether `engine`'s direct session takes the lamp's work now: only while
-/// it is the lamp's default, OpenClaw as Hermes. lamp-update runs one
+/// it is the lamp's default, OpenClaw as Hermes. One agent per lamp: every
+/// lamp launch is prepared on the lamp's default engine (the engine the
+/// person names is not read), so this is only a guard for a launch
+/// prepared just before the app's default moved. lamp-update runs one
 /// agent's gateway at a time, the default's, and stops the other (it no
 /// longer keeps OpenClaw's up while it is "in use" on a Hermes lamp), so a
 /// task for the other agent would only wait for a gateway that never
-/// starts (60 s for a spoken task, 240 s for a skill run). A task named for
-/// Hermes on an OpenClaw lamp keeps Harness's path (its CLI needs no
-/// gateway); one named for OpenClaw on a Hermes lamp is refused at once
-/// ([`not_default_for`], [`NOT_DEFAULT`]). No reader set (no lamp side):
-/// as before, it does.
+/// starts (60 s for a spoken task, 240 s for a skill run). A Hermes launch
+/// left from before a move to OpenClaw keeps Harness's path (its CLI needs
+/// no gateway); an OpenClaw one left from before a move to Hermes is
+/// refused at once ([`not_default_for`], [`NOT_DEFAULT`]). No reader set
+/// (no lamp side): as before, it does.
 fn serves_now(engine: EngineKind) -> bool {
     default_is(engine)
 }

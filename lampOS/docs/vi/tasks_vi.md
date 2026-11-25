@@ -3507,11 +3507,17 @@ engine có phiên riêng, và cả hai có thể cùng bật (`direct::lamps`).
 Mỗi phiên nói thẳng, của Hermes và của OpenClaw, chỉ nhận việc khi engine của
 nó là engine mặc định của đèn (`direct::serves_now`, engine đầu tiên của
 `lamp_order`, đọc trực tiếp nên lựa chọn trong app có hiệu lực ngay), vì
-lamp-update mỗi lúc chỉ chạy gateway của một agent, agent mặc định. Trên đèn có
-mặc định là OpenClaw, việc gọi tên Hermes ("Hỏi Hermes ...",
-`LAMP_TASKS_NAMED_ONLY`) vẫn đi đường Harness và tiến độ của Harness như trước
-công tắc này, không chờ một gateway không bao giờ khởi động. Trên đèn có mặc
-định là Hermes, một việc nói ra cho OpenClaw bị từ chối ngay với
+lamp-update mỗi lúc chỉ chạy gateway của một agent, agent mặc định. Mỗi đèn một
+agent: Hermes và OpenClaw có cùng vai trò trên đèn và thay thế nhau; engine mặc
+định là lựa chọn của người dùng trong app, là Hermes khi chưa chọn (mặc định
+của bản build, `runtime::lamp_default`). Mọi việc cho target riêng của đèn đều
+được chuẩn bị trên engine mặc định đó, bất kể nêu engine nào (voice gửi agent
+không phải mặc định tới máy tính có nó, hoặc nói nó không có sẵn, không bao giờ
+tới đèn), nên đây chỉ là chốt chặn cho một lần giao việc được chuẩn bị ngay
+trước khi mặc định đổi. Một lần giao việc Hermes còn lại từ trước khi mặc định
+chuyển sang OpenClaw đi đường Harness và tiến độ của Harness, không chờ một
+gateway không bao giờ khởi động. Một lần giao việc OpenClaw nói ra còn lại từ
+trước khi mặc định chuyển sang Hermes bị từ chối ngay với
 `agent_not_lamp_default` (`direct::not_default_for`; Task news của voice nói nó
 bằng một câu ngắn, `failed_not_default`: "OpenClaw isn't the lamp's agent right
 now."), và một lượt chạy kỹ năng hay make cho nó thất bại ngay
@@ -4122,17 +4128,30 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   `targets` báo engine mặc định là `engine` của nó và liệt kê tất cả, mặc
   định đứng đầu:
   `{"alias":"lamp","engine":"claude","engines":["claude","hermes","openclaw"]}`
-  (không có `engines` khi không có engine nào). Một `prepare` cho target
-  `lamp` có thể mang `"engine"` với tên bất kỳ engine nào (không có thì
-  không ghi; target khác bỏ qua). Có nêu, việc chạy đúng trên engine đó khi
-  nó nằm trong các engine của đèn và không được biết là thiếu ở đó, được
-  chuyển cho Harness theo tên (`harness new <engine>` trong thư mục của
-  đèn, như Harness khởi động engine đó: không có runner riêng cho từng
-  engine ở đây; phần chờ Gateway và kiểm tra mất prompt đầu của OpenClaw,
-  #6226, vẫn theo tên nó vì đó là hành vi Harness đã ghi rõ); nếu không,
-  `prepare` bị từ chối với `engine_not_here` và không khởi chạy gì: không
-  bao giờ chuyển sang engine khác. Tên rỗng hoặc chỉ có khoảng trắng bị từ
-  chối với `engine_unknown`. Không nêu, việc chạy trên engine mặc định.
+  (không có `engines` khi không có engine nào). Một `prepare` có thể mang
+  `"engine"` với tên bất kỳ engine nào (không có thì không ghi), nhưng nó
+  không được đọc: mỗi đèn một agent (thiết kế của chủ sở hữu: Hermes và
+  OpenClaw có cùng vai trò và thay thế nhau), nên việc cho target `lamp` luôn
+  chạy trên engine mặc định của đèn (lựa chọn của người dùng trong app, là
+  Hermes khi chưa chọn), bất kể nêu engine
+  nào, đã cài hay chưa, rỗng hay không biết; tên không bao giờ bị từ chối
+  (`engine_not_here` không còn được trả về) và không bao giờ chuyển việc của
+  đèn sang engine khác, sang Harness hay sang máy tính. Target khác chạy
+  trên agent của chính máy tính đó, như trước. Engine mặc định được chuyển
+  cho Harness theo tên (`harness new <engine>` trong thư mục của đèn, như
+  Harness khởi động engine đó: không có runner riêng cho từng engine ở đây;
+  phần chờ Gateway và kiểm tra mất prompt đầu của OpenClaw, #6226, vẫn theo
+  tên nó vì đó là hành vi Harness đã ghi rõ). Target khác chạy agent riêng
+  của nó như trước, trừ khi `prepare` nêu một agent mà máy tính đó được biết
+  là đang có (`Engine::computer_agents`: đã cài theo lần xem engine, không
+  offline hay đã biết là chưa đăng nhập; quy tắc 2a, 25/11), khi đó agent đó
+  chạy ở đó; câu trả lời `targets` liệt kê chúng là `agents` của máy tính
+  (`{"alias":"office","engine":"claude","agents":["hermes","openclaw"]}`).
+  Lần giao việc OpenClaw trên máy tính tìm từ các máy (project
+  `MACHINES_PROJECT`) không bao giờ chờ Gateway của đèn (`gateway::launch_with`
+  và phần giữ cold-launch bỏ qua nó). Test:
+  `engine::tests::a_computer_runs_an_agent_named_only_while_it_is_known_to_have_it`,
+  `gateway::tests::an_openclaw_launch_on_a_computer_never_waits_for_the_lamps_gateway`.
   Thư mục của đèn chỉ nhận hướng dẫn của Hermes hoặc OpenClaw cho hai
   engine đó; engine khác đọc cài đặt riêng của nó, như Harness khởi động
   nó. App đặt engine mặc định trên route của app (`--app-socket`) với
@@ -4168,11 +4187,11 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   ghi tay hay do ghép đôi, các target khác và máy của target của đèn được
   giữ nguyên. Một dòng journal: `no app choice: the lamp's target written on
   its default engine, hermes`. Có trong test:
-  `engine::tests::a_named_engine_runs_the_lamps_work_on_it_even_when_not_first`,
-  `engine::tests::a_named_engine_not_in_the_lamps_order_is_refused_never_moved`,
+  `engine::tests::a_named_engine_still_runs_the_lamps_work_on_its_default`,
+  `engine::tests::a_named_engine_not_in_the_lamps_order_runs_on_the_default_never_refused`,
   `engine::tests::no_engine_named_runs_on_the_lamps_default_and_another_target_ignores_it`,
   `engine::tests::with_no_app_choice_and_no_look_yet_the_builds_default_wins_over_the_targets_file`,
-  `engine::tests::a_third_engine_harness_reports_on_the_lamp_can_be_named_and_be_the_default`,
+  `engine::tests::a_third_engine_harness_reports_on_the_lamp_can_be_the_default_but_not_named`,
   `runtime::tests::the_apps_engine_default_is_kept_used_at_once_and_read_again`,
   `runtime::tests::the_lamps_engines_are_harness_s_the_default_first_then_harness_s_order`,
   `runtime::tests::a_first_look_that_times_out_leaves_the_builds_default_hermes`,
@@ -4182,9 +4201,10 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   `protocol::tests::a_prepare_may_name_an_engine_and_the_app_sets_the_default`.
 - **Nêu trong lời nghe được, do code đặt (#6492, V2 của lead):** khi đèn
   có target riêng, voice đọc câu chính người nói trong request đó (câu do
-  đèn viết thì không) và tự đặt `where`/`engine`/`who`, để model bỏ sót
+  đèn viết thì không) và tự đặt `where`/`who` (và bỏ mọi `engine`), để model bỏ sót
   cũng không gửi việc đi nơi khác. Tên chỉ lấy từ những gì đèn này có: các
-  engine của đèn như lần đọc gần nhất (theo id hoặc tên gọi) và staff trên
+  engine của đèn như lần đọc gần nhất cùng Hermes và OpenClaw (theo id hoặc
+  tên gọi) và staff trên
   máy tính (Claude Code khi chưa đọc được); không bao giờ là danh sách agent
   cố định. Tên chỉ tính khi là người làm: sau "ask", "have", "tell", "get"
   hoặc "let", hoặc "with", "using", "via" hoặc "use" (không tính "don't ask
@@ -4193,8 +4213,44 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   sau ("Hey Lamp, Hermes, …") hoặc, như speech to text hay nghe, với một
   động từ làm việc (`WORK_VERBS`) ngay sau nó, kể cả sau "please" hay sau
   dấu chấm ("Hey Lamp Hermes look up …", "Hermes. Look up …", #7023); hoa thường gì cũng được, các chữ của tên viết liền hay rời
-  ("Open Claw"). Nêu một engine của đèn: `where` `lamp` và `engine` đó, bất
-  kể model gửi gì. Nêu một staff: `where` `computer`, `who` là họ, không có
+  ("Open Claw"). Nêu một engine của đèn: `where` `lamp` và `who` là agent đó,
+  bất kể model gửi gì; `prepare` cho đèn không bao giờ mang `engine`: mỗi đèn một
+  agent, engine mặc định của đèn làm việc đó, và câu đọc lại nói "the lamp", không
+  bao giờ nêu tên engine mặc định (lựa chọn trong app, là Hermes khi chưa
+  chọn). Các quy tắc dưới đây áp dụng như nhau theo cả hai chiều ("OpenClaw"
+  trên đèn Hermes, "Hermes" trên đèn OpenClaw).
+  Đường đi do code quyết định, không phải model (chủ sở hữu, 25/11):
+  `start_agent_task` không khai báo `engine`; model chỉ báo điều được nói
+  (`who`, `where`, `session`), và khi có target `lamp` thì `enum` của `who`
+  là mọi tên agent người dùng có thể nói (Claude Code, Codex, OpenCode,
+  Devin, Hermes, OpenClaw); `engine` model gửi kèm không bao giờ được đọc.
+  Agent được nêu mà không phải mặc định của đèn (`who`: một tên của đèn,
+  `lamp_names`, hoặc agent mà voice biết; `named_for_the_lamp`) không bao giờ
+  chạy trên đèn, kể cả khi đã cài trên đèn (`START` trong `agent_tasks.rs`):
+  (a) một máy tính ghép qua Harness nhận được (`computer_with`: Harness không
+  đăng xuất, máy tính có agent đó trong `agents` và không được biết là
+  offline, máy dùng gần nhất theo `used` nếu có nhiều; nếu không thì một staff
+  có agent đó là agent riêng) thì việc được chuẩn bị trên máy đó với
+  `"engine"`, câu đọc lại nói rõ ("Hermes on the office computer"), rồi chờ
+  đồng ý như thường; (b) không máy nào nhận được thì trả
+  `{"error":"Nothing was handed over: <Name> isn't available (<why>). ...",
+  "code":"agent_not_available","reason":<reason>}` (`not_available`), lý do
+  `none`, `computer_offline` hoặc `harness_signed_out`, và không chuẩn bị gì.
+  Câu trả lời `targets` của phần tasks mang theo từng máy tính `agents` (mọi
+  engine lần xem engine nói đã cài, gồm cả Hermes và OpenClaw), `status`
+  (`online`/`offline`) và `used` (id việc gần nhất), cùng `signed_in` của
+  Harness; voice giữ chúng (`computers_in`) và thêm một dòng vào ghi chú phiên
+  khi đèn có target riêng (`computers_note`): "Your computers: macbook-air
+  (online: Claude Code, Hermes)." Phiên được nêu tên và máy được nêu tên vẫn
+  được xét trước, như cũ. Nêu máy tính kèm một agent trên đó (`where`
+  `"computer"`, `who` là agent trong `agents` của máy tính đó mà không phải
+  staff): chạy ở đó với `engine` đó, như (a). Nêu engine mặc định, hoặc
+  không nêu gì: chạy trên đèn, không có `engine`, không nêu tên agent nào.
+  Test:
+  `agent_tasks::tests::a_named_agent_runs_on_the_lamp_only_as_its_default_else_on_a_computer_that_has_it`,
+  `agent_tasks::tests::a_named_agent_goes_to_the_most_recent_online_computer_that_has_it`,
+  `agent_tasks::tests::no_engine_is_declared_and_who_takes_every_agent_name_with_the_lamp`.
+  Nêu một staff: `where` `computer`, `who` là họ, không có
   `engine`. Tên có cả trên đèn và trên máy tính thì chạy trên đèn, trừ khi
   máy tính được nêu là nơi làm hoặc lời nói cần đồ của máy tính: "my" +
   repo, repository, codebase, code, project, folder, files hoặc branch,
@@ -4203,20 +4259,21 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   hoặc "PC" (có thể có một từ ở giữa: "my office computer") đặt `where`
   `computer` và bỏ `engine` (và `who` chỉ nêu engine của đèn); phủ định
   ("don't use my computer") hoặc "on the lamp", "yourself", "right here"
-  đặt `where` `lamp`, giữ `engine` của model. Chỉ nhắc tên thì không tính
+  đặt `where` `lamp`. Chỉ nhắc tên thì không tính
   ("what is Hermes?", "OpenClaw's update"), tên không có trong danh sách
   nào cũng không; lời mâu thuẫn (hai agent, đèn và máy tính, agent chỉ có
   trên đèn kèm "on my computer", agent chỉ có trên máy tính kèm "on the
   lamp") không đặt gì, giữ nguyên tham số của model. Mỗi lần ghi đè log một
   dòng nêu cái được đặt và cái model gửi, không bao giờ ghi lời nói. Câu
-  đọc lại vẫn nói nơi chạy như trước ("OpenClaw on the lamp", "Claude Code
-  on the office computer"). Lượt mà model không gọi `start_agent_task` thì
+  đọc lại nói nơi chạy ("the lamp", "Claude Code on the office
+  computer"). Lượt mà model không gọi `start_agent_task` thì
   được bắt ở route thứ hai (mục kế tiếp). Test:
   `agent_tasks::tests::the_heard_words_name_the_doer_and_the_place`,
   `agent_tasks::tests::a_name_called_first_is_the_doer_as_heard`,
   `agent_tasks::tests::an_agent_on_both_works_on_the_lamp_unless_the_computer_is_needed`,
-  `agent_tasks::tests::the_heard_words_set_where_engine_and_who`,
-  `agent_tasks::tests::the_heard_words_set_the_engine_and_place_over_the_model`.
+  `agent_tasks::tests::the_heard_words_set_where_and_who_never_an_engine`,
+  `agent_tasks::tests::the_heard_words_set_the_place_over_the_model`,
+  `agent_tasks::tests::a_named_lamp_engine_is_never_sent_and_the_lamps_default_does_it`.
 - **Có nêu tên mà không giao việc: hỏi lại một lần (#6547 (1b)).** Ở route
   thứ hai, khi có phần tasks, một câu nói mà chính lời người nói nêu một
   agent để làm việc, đọc đúng như trên (chỉ tính người làm, lấy từ các
