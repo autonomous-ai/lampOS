@@ -30529,7 +30529,10 @@ mod tests {
     /// its words, begun within 20 s of their end, skip its look; the second
     /// line after the same question, a first line 25 s after it, or
     /// request 132's shape (asked 423 s before) looking away is held. A line
-    /// looking at the lamp or naming it is let in; off, all as before.
+    /// looking at the lamp or naming it is let in; off, all as before. The
+    /// first builder's P2 on #8416: an answer the lamp cut and takes up again
+    /// (`continues_from`, `LAMP_CUT_KEEPS_NAME`) keeps the first line's pass,
+    /// and a new line after it is still held.
     #[test]
     fn with_asked_looks_only_the_first_line_soon_after_the_question_skips_its_look() {
         use lamp_msgs::SpeakingState::{No, Yes};
@@ -30539,9 +30542,10 @@ mod tests {
         let talk = "Then we ship it on Monday";
         // One heeding through `lines`, the lamp's question having ended
         // `ended_s` before the lines began; each line is (pose, words), said
-        // one after another. Whether each was let in.
+        // one after another. Whether each was let in. `run_on` marks lines
+        // that go on from the line before (`continues_from`).
         type Pose = (Option<f32>, Option<bool>);
-        let run = |on: bool, ended_s: u64, lines: &[(Pose, &str)]| {
+        let run_on = |on: bool, ended_s: u64, lines: &[(Pose, &str, bool)]| {
             let mut heeding = super::Heeding::new(true, false, None, None);
             heeding.as_the_only_voice(false, true, false);
             heeding.hearing_only_said_to_me();
@@ -30552,7 +30556,7 @@ mod tests {
             let verdicts: Vec<bool> = lines
                 .iter()
                 .enumerate()
-                .map(|(index, &(pose, words))| {
+                .map(|(index, &(pose, words, goes_on))| {
                     let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
                     let now = Instant::now();
                     turned_face_looks_posed(&eyes, now, 200, &[Some(Yes), Some(No)], &mut 0, pose);
@@ -30560,6 +30564,7 @@ mod tests {
                     let signs = super::Signs {
                         going_on: true,
                         lamp_asked: true,
+                        continues_from: goes_on.then(|| 9 + index as u64),
                         ..turned_signs(crate::room_told::Room::Unknown)
                     };
                     let began = monotonic_us();
@@ -30571,6 +30576,13 @@ mod tests {
                 .collect();
             *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
             verdicts
+        };
+        let run = |on: bool, ended_s: u64, lines: &[(Pose, &str)]| {
+            let lines: Vec<_> = lines
+                .iter()
+                .map(|&(pose, words)| (pose, words, false))
+                .collect();
+            run_on(on, ended_s, &lines)
         };
         // (a), (b): the first line 5 s after the question's end, then a
         // second, both looking away.
@@ -30586,6 +30598,20 @@ mod tests {
                 &[(away, talk), (looking, talk), (away, "Lamp, ship it.")]
             ),
             [true, true, true]
+        );
+        // (g) The first line cut and taken up again, both looking away: the
+        // part that goes on keeps the pass; a new line after it is held.
+        assert_eq!(
+            run_on(
+                true,
+                5,
+                &[
+                    (away, "Then we ship it", false),
+                    (away, "on Monday", true),
+                    (away, talk, false)
+                ]
+            ),
+            [true, true, false]
         );
         // Off: every line the question waits on is let in, as before.
         assert_eq!(run(false, 5, &[(away, talk), (away, talk)]), [true, true]);
