@@ -6,6 +6,11 @@ describes the work as it stands on 2026-11-25. How a builder works is in
 [joining.md](../docs/joining.md). The owner chose the name; it does not mark a
 place in a line. The first builder corrects it where needed.
 
+- **Works on:** the Flutter app's flows that talk to the lamp (setup, re-setup and
+  recovery; onboarding; lamp settings; own model keys and voice; Store apps; device
+  chat and SmartDesk); lamp-side onboarding line changes those flows need; the app
+  side of China; TestFlight and Play builds; app runs on lamp-0c89, including the
+  daily #7452 report. App screens and the SDK app side are App Only's.
 - **Name:** `mobile`
 - **Person:** a colleague on the mobile team who starts its sessions (named
   in the team's own channels, not in this public repository). Their sessions
