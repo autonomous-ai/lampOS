@@ -5,6 +5,7 @@ The role file of builder `thirteen` (display name: Thirteen), from
 [joining.md](../docs/joining.md). Rewritten on 2026-11-25 at its person's
 request; the first builder corrects it where it must be.
 
+- **Works on:** the agent runtime on the lamp, with Twelve and SubDarren: Hermes and OpenClaw spoken to directly in one kept session, off Harness (#8431, #8410; `crates/agent-gateway`, and the lamp-tasks direct path, gateway and engine in `crates/tasks`); routing a task to an agent, one default agent per lamp and a named non-default agent to a Harness computer that has it or "not available" (`crates/tasks`, `crates/voice/src/agent_tasks.rs`); a task waiting for the lamp's agent never lost in silence (#8601); what the lamp says while a handed-over task waits (#8445); `hermes_llm` in `crates/cloud`; Hermes's install and gateway in `crates/update`; and READs addressed to Thirteen. Not other OTA or lamp-update work (migrate, with fifth), not the OpenClaw gateway keeper and agent switch (subdarren), not the skill-make flow (twelve).
 - **Name:** `thirteen` (display name: Thirteen)
 - **Person:** the colleague who started it; no personal name or handle is
   kept in this public repository.
