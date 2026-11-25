@@ -399,11 +399,22 @@ impl SwitchFence {
         if self.no_slide {
             return Err(invalid("a no-slide privacy fence reads no slide"));
         }
-        let (h, state) = self.publication(message, now_us, unix_ms)?;
+        let (h, state, aged) = self.publication(message, now_us, unix_ms, ride)?;
         if state.no_privacy_slide {
             return Err(invalid(
                 "Controls says no slide is wired, but LAMP_PRIVACY_CONTROLS=on reads one",
             ));
+        }
+        // Ridden, a state stale by its age alone (#8466) is a lapsed
+        // reading: its envelope kept so the order goes on, its reading
+        // never taken, capture's gate closed by the caller.
+        if aged {
+            self.note_clock(&message.header);
+            self.session = Some(state.session_id);
+            self.header_sequence = h;
+            self.publication = Some(state.stamp);
+            self.resync = false;
+            return Ok(Acquired::Stale);
         }
         let value = state
             .privacy
@@ -465,7 +476,7 @@ impl SwitchFence {
         if !self.no_slide {
             return Err(invalid("a slide privacy fence reads the slide"));
         }
-        let (h, state) = self.publication(message, now_us, unix_ms)?;
+        let (h, state, _) = self.publication(message, now_us, unix_ms, false)?;
         if !state.no_privacy_slide || state.privacy.is_some() {
             return Err(invalid(
                 "Controls does not say this lamp has no slide (LAMP_PRIVACY_CONTROLS=no-slide)",
@@ -482,12 +493,22 @@ impl SwitchFence {
     /// A Controls state whose envelope, publisher, clock, order and freshness
     /// all hold, with its Bus sequence; nothing is kept until the caller's
     /// own checks pass.
+    ///
+    /// With `ride` (`LAMP_PRIVACY_GAP_RIDE`, #8466), a state whose only
+    /// fault is its age, [`PRIVACY_FRESH_US`] or more by now, is not fatal:
+    /// it comes back with `true`, for the caller to take as a lapsed
+    /// reading. A worker starved past 50 ms while Controls kept publishing
+    /// finds its queue's states that old (train 1198: 230 ms with no event,
+    /// then the worker ended and with it the voice's session); a lamp
+    /// under load does the same. Every other check stays fatal, and so does
+    /// age without the ride.
     fn publication(
         &self,
         message: &Message,
         now_us: u64,
         unix_ms: u64,
-    ) -> io::Result<(u64, ControlsState)> {
+        ride: bool,
+    ) -> io::Result<(u64, ControlsState, bool)> {
         let h = &message.header;
         // The bus's own rule: a header whose `clock` is the one Controls'
         // stamp names is judged by `at_us`, which a wall clock stepped by a
@@ -519,11 +540,12 @@ impl SwitchFence {
         }
         let state: ControlsState = message.parse()?;
         state.check().map_err(io::Error::other)?;
+        let aged = state.stamp.at_us <= now_us && now_us - state.stamp.at_us >= PRIVACY_FRESH_US;
         if state.session_id != h.boot
             || state.stamp.clock_id != self.clock
             || state.stamp.at_us != h.at_us
             || state.stamp.at_us > now_us
-            || now_us - state.stamp.at_us >= PRIVACY_FRESH_US
+            || (aged && !ride)
             || self
                 .session
                 .as_ref()
@@ -538,7 +560,7 @@ impl SwitchFence {
         {
             return Err(invalid("privacy Controls publisher/clock/order changed"));
         }
-        Ok((h.seq, state))
+        Ok((h.seq, state, aged))
     }
 }
 
@@ -2347,6 +2369,63 @@ pub(crate) mod tests {
     /// next state continues the order, and the last reading is not
     /// replaced. Read as before, it is refused, and the next state is then a
     /// gap. Another clock or a reading ahead of now is refused either way.
+    /// #8466: a state whose only fault is its age (a starved worker's
+    /// queue), ridden, is a lapsed reading: its envelope kept, its reading
+    /// never taken, the next state taken. Not ridden, it ends the worker as
+    /// before; ridden or not, another clock or a state out of order still
+    /// does.
+    #[test]
+    fn a_state_stale_by_age_alone_ridden_keeps_its_envelope_and_never_its_reading() {
+        let first = reading("boot", 100_000, 1, Some(false));
+        // Queued 60 ms ago: the state and its reading, the switch closed.
+        let aged = || slide_message(110_000, 2, reading("boot", 110_000, 2, Some(true)));
+        let next = || slide_message(175_000, 3, reading("boot", 175_000, 3, Some(true)));
+        let mut fence = SwitchFence::new("boot".into());
+        fence
+            .accept_riding(&slide_message(100_000, 1, first.clone()), 100_001, 1000)
+            .unwrap();
+        assert_eq!(
+            fence.accept_riding(&aged(), 170_000, 1000).unwrap(),
+            Acquired::Stale
+        );
+        assert_eq!(fence.header_sequence, 2);
+        assert_eq!(
+            fence.last,
+            Some(first.clone()),
+            "its reading is never taken"
+        );
+        assert_eq!(
+            fence.accept_riding(&next(), 175_001, 1000).unwrap(),
+            Acquired::Fresh(Some(reading("boot", 175_000, 3, Some(true))))
+        );
+        // Not ridden: the end, as before.
+        let mut fence = SwitchFence::new("boot".into());
+        fence
+            .accept(&slide_message(100_000, 1, first.clone()), 100_001, 1000)
+            .unwrap();
+        assert_eq!(
+            fence
+                .accept(&aged(), 170_000, 1000)
+                .unwrap_err()
+                .to_string(),
+            "privacy Controls publisher/clock/order changed"
+        );
+        // Ridden, an aged state of another clock, or one older than the
+        // last, still ends it.
+        let mut other = slide_message(110_000, 2, reading("boot", 110_000, 2, Some(true)));
+        let mut state: ControlsState = other.parse().unwrap();
+        state.stamp.clock_id = "other".into();
+        other.payload = serde_json::to_vec(&state).unwrap();
+        let backwards = slide_message(90_000, 2, reading("boot", 90_000, 2, Some(true)));
+        for message in [other, backwards] {
+            let mut fence = SwitchFence::new("boot".into());
+            fence
+                .accept_riding(&slide_message(100_000, 1, first.clone()), 100_001, 1000)
+                .unwrap();
+            assert!(fence.accept_riding(&message, 170_000, 1000).is_err());
+        }
+    }
+
     #[test]
     fn a_stale_acquisition_ridden_keeps_its_envelope_and_the_next_is_taken() {
         let first = reading("boot", 100_000, 1, Some(false));
@@ -2442,6 +2521,10 @@ pub(crate) mod tests {
         worker_held_us: u64,
         /// A send to the worker refused: it had closed its end, ending.
         refused_send: Option<String>,
+        /// States Controls published that were already
+        /// [`PRIVACY_FRESH_US`] old, as a starved worker finds its queue
+        /// ([`ride_run_aging`], #8466).
+        aged_published: usize,
     }
 
     impl Ridden {
@@ -2546,9 +2629,35 @@ pub(crate) mod tests {
         after: Option<bool>,
         done: impl Fn(&Ridden, u64) -> bool,
     ) -> Ridden {
+        ride_attempts(setup, ride, false, lapse_done, after, done)
+    }
+
+    /// [`ride_run`], and with `aging` the lapse's states are stamped as a
+    /// starved worker finds them queued (#8466): each a microsecond after
+    /// the last, so they keep their order and grow old by now, past
+    /// [`PRIVACY_FRESH_US`] within the lapse, their reading lapsed too.
+    fn ride_run_aging(
+        ride: bool,
+        aging: bool,
+        lapse_done: impl Fn(&Ridden, u64) -> bool,
+        after: Option<bool>,
+        done: impl Fn(&Ridden, u64) -> bool,
+    ) -> Ridden {
+        ride_attempts(Duration::ZERO, ride, aging, lapse_done, after, done)
+    }
+
+    /// The attempts of [`ride_run_set_up_in`] and [`ride_run_aging`].
+    fn ride_attempts(
+        setup: Duration,
+        ride: bool,
+        aging: bool,
+        lapse_done: impl Fn(&Ridden, u64) -> bool,
+        after: Option<bool>,
+        done: impl Fn(&Ridden, u64) -> bool,
+    ) -> Ridden {
         let mut held = Vec::new();
         for stalls in 1..=STALLED_ATTEMPTS {
-            let ridden = ride_once(setup, ride, &lapse_done, after, &done);
+            let ridden = ride_once(setup, ride, aging, &lapse_done, after, &done);
             if !ridden.held_up() {
                 return ridden;
             }
@@ -2560,10 +2669,11 @@ pub(crate) mod tests {
         );
     }
 
-    /// One attempt of [`ride_run_set_up_in`].
+    /// One attempt of [`ride_attempts`].
     fn ride_once(
         setup: Duration,
         ride: bool,
+        aging: bool,
         lapse_done: &impl Fn(&Ridden, u64) -> bool,
         after: Option<bool>,
         done: &impl Fn(&Ridden, u64) -> bool,
@@ -2640,12 +2750,14 @@ pub(crate) mod tests {
         };
         let (mut sequence, mut read) = (0, (started, 0));
         let mut phase = (1, started);
-        let mut stamped = started;
+        // When the last state was sent, for the hold-up at Controls' pace,
+        // and the time it was stamped, which an aging lapse keeps old.
+        let (mut paced, mut stamped) = (started, started);
         loop {
             take(&mut voice, &mut lease, &mut ridden);
             let now = lamp_ipc::monotonic_us();
             // Held up since the last state stamped, at Controls' 5 ms pace.
-            ridden.controls_held_us = ridden.controls_held_us.max(now.saturating_sub(stamped));
+            ridden.controls_held_us = ridden.controls_held_us.max(now.saturating_sub(paced));
             if worker.is_finished() || now.saturating_sub(phase.1) >= PHASE_MOST_US {
                 break;
             }
@@ -2703,13 +2815,22 @@ pub(crate) mod tests {
                 read = (now, sequence);
             }
             let physical = reading(&clock, read.0, read.1, muted);
-            let state = slide_state(controls.boot(), &clock, now, sequence, physical);
-            controls.publish_json(now, &state).unwrap();
+            let at = if aging && phase.0 == 2 {
+                stamped + 1
+            } else {
+                now
+            };
+            stamped = at;
+            if now.saturating_sub(at) >= PRIVACY_FRESH_US {
+                ridden.aged_published += 1;
+            }
+            let state = slide_state(controls.boot(), &clock, at, sequence, physical);
+            controls.publish_json(at, &state).unwrap();
             // Held up between stamping this state and sending it.
             ridden.controls_held_us = ridden
                 .controls_held_us
                 .max(lamp_ipc::monotonic_us().saturating_sub(now));
-            stamped = now;
+            paced = now;
             // Controls' own pace, not a wait for the worker.
             thread::sleep(Duration::from_millis(5));
         }
@@ -2808,6 +2929,56 @@ pub(crate) mod tests {
         );
         assert!(!ridden.running_at_end);
         assert_eq!(ridden.ended, Some(Ok(())));
+    }
+
+    /// #8466 (train 1198): a worker starved past 50 ms finds Controls'
+    /// queued states that old. With the ride on they are a lapsed reading,
+    /// never the end: the worker goes on, says unavailable once, and the
+    /// switch closed while it was starved reads closed in the first fresh
+    /// state, so capture is never granted in between or after. Without
+    /// the fix the worker ended on the first ("publisher/clock/order
+    /// changed").
+    #[test]
+    fn states_queued_past_fifty_ms_are_ridden_and_a_switch_closed_meanwhile_reads_closed() {
+        let ridden = ride_run_aging(
+            true,
+            true,
+            |ridden, now| {
+                ridden.aged_published >= 3
+                    && ridden
+                        .lapsed_us
+                        .is_some_and(|lapsed| now >= lapsed + 120_000)
+            },
+            Some(true),
+            |ridden, now| {
+                ridden
+                    .back_us
+                    .is_some_and(|back| now >= back + 2 * crate::privacy::REOPEN_STABLE_US)
+            },
+        );
+        assert!(ridden.aged_published >= 3, "{}", ridden.said());
+        assert!(ridden.fault().is_none(), "{}", ridden.said());
+        assert!(ridden.running_at_end, "{}", ridden.said());
+        assert_eq!(ridden.ended, Some(Ok(())));
+        assert_eq!(ridden.unavailable().len(), 1, "{}", ridden.said());
+        let lapsed = ridden.lapsed_us.unwrap();
+        let read_by = lapsed + 15_000;
+        let granted: Vec<u64> = ridden
+            .leases
+            .iter()
+            .filter(|(at, permitted, _)| *permitted && *at >= read_by)
+            .map(|(at, _, _)| *at)
+            .collect();
+        assert!(granted.is_empty(), "granted during or after: {granted:?}");
+        let back = ridden.back_us.unwrap();
+        assert!(
+            ridden
+                .leases
+                .iter()
+                .any(|(at, _, physical)| *at >= back && *physical == Some(true)),
+            "the first fresh state's closed switch is read: {:?}",
+            ridden.leases
+        );
     }
 
     /// Heron's P2 on #8013: the lease itself. A lapsed reading carries the
