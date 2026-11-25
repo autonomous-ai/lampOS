@@ -3760,9 +3760,13 @@ cả hai người viết.
   việc (#8079).** Trên lamp-9adf (20/11) "Lamp, if Bitcoin goes under
   ninety thousand dollars, tell me right away." bị đặt trên topic
   `price/bitcoin` mà đèn không có, rồi được trả lời `cannot:` là nhắc việc
-  và bị từ chối là bộ hẹn giờ của đèn. Giờ, sau câu từ chối nhắc việc, lần
-  gọi thêm được nói về việc theo dõi (`make_no_cannot::WATCH`, kèm một câu
-  trả lời đầy đủ cho "if it starts raining in Hanoi, tell me"): điều chỉ
+  và bị từ chối là bộ hẹn giờ của đèn. Quy tắc theo dõi là của chính dạng
+  giữa, có hiệu lực mỗi khi `LAMP_MAKE_NO_CANNOT` bật
+  (`make_no_cannot::watch_taught`; bật trong sản phẩm), bất kể công tắc
+  phản ứng, công tắc mà sản phẩm không đặt (lead đọc trên #8079): lần gọi
+  thêm được nói về việc theo dõi (`make_no_cannot::WATCH`, sau câu từ chối
+  nhắc việc khi phản ứng bật, sau phần grants khi không, kèm một câu trả
+  lời đầy đủ cho "if it starts raining in Hanoi, tell me"): điều chỉ
   internet biết, không có topic nào của đèn (giá, thời tiết, một trang
   web, một con số trên dịch vụ), chạy trên đồng hồ riêng của lamp-skills
   mỗi khoảng, `clock/local`, `known`, `true`, `cooldown = "90m"` (không bao

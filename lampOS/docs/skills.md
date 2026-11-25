@@ -7347,8 +7347,12 @@ the same code for both writers.
   On lamp-9adf (20 Nov) "Lamp, if Bitcoin goes under ninety thousand
   dollars, tell me right away." was put on a topic `price/bitcoin` the lamp
   doesn't have, then answered `cannot:` as a reminder and refused as the
-  lamp's timer. After the reminder's refusal the one more call is now told
-  a watch (`make_no_cannot::WATCH`, with a whole answer for "if it starts
+  lamp's timer. The watch rule is the middle form's own, live whenever
+  `LAMP_MAKE_NO_CANNOT` is on (`make_no_cannot::watch_taught`; on in the
+  product), whatever the reactions switch, which the product doesn't set
+  (the lead's read on #8079): the one more call is told a watch
+  (`make_no_cannot::WATCH`, after the reminder's refusal when reactions are
+  on, after the grants otherwise, with a whole answer for "if it starts
   raining in Hanoi, tell me"): what only the internet tells, with no topic
   of the lamp's (a price, the weather, a web page, a count on a service),
   runs on lamp-skills' own clock every while, `clock/local`, `known`,

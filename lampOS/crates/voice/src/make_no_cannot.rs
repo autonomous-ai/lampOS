@@ -441,8 +441,8 @@ cooldown = \"45m\"
 const SAT_EXAMPLE_ASKED: &str = "when I've sat at my desk a long while, remind me to stretch";
 
 /// A watch on outside data, told the one more call with
-/// `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on, after the reminder's refusal
-/// (#8079, lamp-9adf, 20 Nov: "Lamp, if Bitcoin goes under ninety thousand
+/// `LAMP_MAKE_NO_CANNOT` on ([`watch_taught`]), after the reminder's
+/// refusal when that is told (#8079, lamp-9adf, 20 Nov: "Lamp, if Bitcoin goes under ninety thousand
 /// dollars, tell me right away" was put on a topic `price/bitcoin` the lamp
 /// doesn't have, then answered as a reminder and refused as the lamp's own
 /// timer): what only the internet tells, with no topic of the lamp's, runs
@@ -461,7 +461,7 @@ is never a reminder: only a time or a while the request names for the person to 
 something is.";
 
 /// One whole answer for a watch on outside data ([`WATCH`]), shown to the
-/// model with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on.
+/// model with the watch taught ([`watch_taught`]).
 const WATCH_EXAMPLE: &str = "name: rain-watch
 grants: net, speak
 ```skill.toml
@@ -478,7 +478,7 @@ cooldown = \"90m\"
 /// The request [`WATCH_EXAMPLE`] is for.
 const WATCH_EXAMPLE_ASKED: &str = "if it starts raining in Hanoi, tell me";
 
-/// What a repair is told with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` on when
+/// What a repair is told with the watch taught ([`watch_taught`]) when
 /// the last answer's trigger was on a topic no part of the lamp carries
 /// (`made_skill::topic_lamp_lacks`), and again when a `cannot:` reminder
 /// follows such a trigger ([`made`], #8079): the condition is a watch on
@@ -504,22 +504,28 @@ const ASKED_EXAMPLE_ASKED: &str =
 /// where a make judged no quick reaction comes here first, it also refuses
 /// a reminder as the make's own brief does ([`reminder_rule`], the
 /// Reviewer-lead's P2 on #7764), and is told sip-of-water's sitting beside
-/// the triggers ([`SITTING`]) with a whole answer for it ([`SAT_EXAMPLE`]),
-/// and, after the reminder's refusal, a watch on outside data on the
-/// lamp's clock, never a reminder ([`WATCH`], [`WATCH_EXAMPLE`], #8079);
-/// off, as before.
+/// the triggers ([`SITTING`]) with a whole answer for it ([`SAT_EXAMPLE`]);
+/// off, as before. With `LAMP_MAKE_NO_CANNOT` on ([`watch_taught`]),
+/// whatever the reactions switch, it is told a watch on outside data on
+/// the lamp's clock, never a reminder, after the reminder's refusal when
+/// that is told ([`WATCH`], [`WATCH_EXAMPLE`], #8079); off, as before.
 pub fn system() -> String {
     let (reminder, sitting, sat_example) = if made_skill::reactions_on() {
         (
-            format!("{}{WATCH}", reminder_rule()),
+            reminder_rule(),
             SITTING,
-            format!(
-                "\nAnd for \"{SAT_EXAMPLE_ASKED}\":\n\n{SAT_EXAMPLE}\n\n\
-                 And for \"{WATCH_EXAMPLE_ASKED}\":\n\n{WATCH_EXAMPLE}\n"
-            ),
+            format!("\nAnd for \"{SAT_EXAMPLE_ASKED}\":\n\n{SAT_EXAMPLE}\n"),
         )
     } else {
         (String::new(), "", String::new())
+    };
+    let (watch, watch_example) = if watch_taught() {
+        (
+            WATCH,
+            format!("\nAnd for \"{WATCH_EXAMPLE_ASKED}\":\n\n{WATCH_EXAMPLE}\n"),
+        )
+    } else {
+        ("", String::new())
     };
     format!(
         "You choose, for a lamp, when a skill runs and what it needs. The lamp's agent, an AI \
@@ -539,9 +545,9 @@ pub fn system() -> String {
          request didn't name. The grants, each only when the task needs it: {grants}. speak \
          whenever the agent tells the person anything aloud. When the task needs something \
          none of these grants gives, answer only this one line: needs: and what, in a few plain \
-         words (\"needs: paying for things\").{reminder} A whole answer, \
+         words (\"needs: paying for things\").{reminder}{watch} A whole answer, \
          for \"{EXAMPLE_ASKED}\":\n\n{EXAMPLE}\n\nAnd for \"{ASKED_EXAMPLE_ASKED}\":\n\n\
-         {ASKED_EXAMPLE}\n{sat_example}",
+         {ASKED_EXAMPLE}\n{sat_example}{watch_example}",
         triggers = made_skill::TRIGGER_MEANINGS,
         grants = grants_told(),
     )
@@ -1275,13 +1281,24 @@ pub fn on_the_clock(block: &str) -> bool {
     })
 }
 
+/// Whether the middle form teaches a watch on outside data ([`WATCH`],
+/// [`WATCH_REPAIR`], #8079): its own switch, `LAMP_MAKE_NO_CANNOT`
+/// ([`on`]), on in the product, whatever the reactions switch
+/// (`LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK`), which the product doesn't set
+/// (the lead's read on #8079's round 1). Off, the form reached for what
+/// only the internet tells ([`net_by_agent`]) is byte for byte as before.
+fn watch_taught() -> bool {
+    on()
+}
+
 /// Whether `block`'s `[trigger]` is on a topic no part of the lamp carries
-/// (`made_skill::topic_lamp_lacks`), with `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK`
-/// on: the model judged the request a condition on something only the
-/// internet tells, a watch ([`WATCH`], #8079). A structural read of the
-/// model's own answer, never of the person's words. Off, never.
+/// (`made_skill::topic_lamp_lacks`), with the watch taught
+/// ([`watch_taught`]): the model judged the request a condition on
+/// something only the internet tells, a watch ([`WATCH`], #8079). A
+/// structural read of the model's own answer, never of the person's words.
+/// Off, never.
 fn outside_trigger(block: &str) -> bool {
-    made_skill::reactions_on()
+    watch_taught()
         && toml::from_str::<toml::Table>(block).is_ok_and(|table| {
             table
                 .get("trigger")
