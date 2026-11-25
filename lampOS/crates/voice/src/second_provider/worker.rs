@@ -8725,6 +8725,12 @@ pub(crate) struct Heeding {
     /// The faces the eyes saw speaking each of the last lines judged, newest
     /// last, at most [`SPOKE_KEPT`] ([`Self::same_speaker`]).
     spoke: std::collections::VecDeque<(u64, crate::speaking_faces::Speakers)>,
+    /// The last lines judged that called the lamp ([`crate::attention::Attention::called_for_itself`])
+    /// or that `LAMP_SAID_TO_ME` let through as said to it, newest last, at
+    /// most [`SPOKE_KEPT`]: in the voices' band with no face in view, cut
+    /// words join when their piece called the lamp ([`Self::same_speaker`],
+    /// #8555).
+    called_lately: std::collections::VecDeque<u64>,
     /// With `LAMP_NAME_NEAR=on` ([`Self::hearing_near`]): lamp-name's near
     /// hearings (`name/near`), and those read so far, when each reached its
     /// bar by this process's clock and its score, the last
@@ -9927,6 +9933,7 @@ impl Heeding {
             said_lately: std::collections::VecDeque::new(),
             let_out_lately: std::collections::VecDeque::new(),
             spoke: std::collections::VecDeque::new(),
+            called_lately: std::collections::VecDeque::new(),
             near: None,
             turned_near_speaks: false,
             near_looks: None,
@@ -10655,6 +10662,10 @@ impl Heeding {
         // person.
         let without = if one_face {
             Joined::Same(SAME_FACE_JOINS)
+        } else if let Some(why) =
+            likeness.and_then(|likeness| self.called_in_the_band(cut, request, likeness))
+        {
+            Joined::NoSecond(why)
         } else {
             match self.no_second_person(cut, request) {
                 Ok(why) => Joined::NoSecond(why),
@@ -10666,6 +10677,33 @@ impl Heeding {
         } else {
             without
         }
+    }
+
+    /// In the voices' band (`likeness` between
+    /// [`crate::same_voice::DIFFERENT_BELOW`] and
+    /// [`crate::same_voice::SAME_FROM`]) with no face in view at either
+    /// piece, whether `cut` called the lamp ([`Self::called_lately`]) and
+    /// nothing in the conversation showed a second person: someone who has
+    /// just called the lamp and keeps talking is the likeliest speaker of
+    /// the next words (the first builder's call on #8555, 25 Nov: kit-8022
+    /// r12's 19-word ask, cut at 0.49 with no face, lost its first 12). Why
+    /// they join, for the journal; joined, as [`Joined::NoSecond`], only
+    /// for a line let out. A face in view leaves it to the eyes.
+    fn called_in_the_band(&self, cut: u64, request: u64, likeness: f32) -> Option<String> {
+        let kept = |of: u64| {
+            self.rooms
+                .as_ref()?
+                .iter()
+                .rev()
+                .find(|(line, _)| *line == of)
+                .map(|(_, room)| *room)
+        };
+        let no_face = |of: u64| kept(of).is_some_and(|room| room.in_view.unwrap_or(0) == 0);
+        (self.called_lately.contains(&cut)
+            && self.another_person.is_none()
+            && no_face(cut)
+            && no_face(request))
+        .then(|| format!("the first piece called the lamp, cosine {likeness:.2}, no face in view"))
     }
 
     /// How the room was as `request` was judged, with
@@ -11496,6 +11534,7 @@ impl Heeding {
         // The lines' speaking faces too, for a join (`Self::same_speaker`),
         // and how the room was.
         self.spoke.clear();
+        self.called_lately.clear();
         if let Some(rooms) = self.rooms.as_mut() {
             rooms.clear();
         }
@@ -12311,6 +12350,12 @@ impl Heeding {
         // Every decision journaled with the pose, for a row to count
         // (#7721); the held line as before, the pose after it.
         let crate::said_to_me::Said::Held(held) = decision else {
+            if decision != crate::said_to_me::Said::Stands {
+                if self.called_lately.len() == SPOKE_KEPT {
+                    self.called_lately.pop_front();
+                }
+                self.called_lately.push_back(request);
+            }
             eprintln!(
                 "lamp-voice second: request {request}: said to me: let through: {}: {words} words, {}; {pose} (LAMP_SAID_TO_ME)",
                 decision.verdict(),
@@ -13704,6 +13749,12 @@ impl Heeding {
         // Its words or the name heard called the lamp, not a face alone.
         self.by_name =
             (played && (attention.called_for_itself() || seen.named_faced)).then_some(request);
+        if attention.called_for_itself() {
+            if self.called_lately.len() == SPOKE_KEPT {
+                self.called_lately.pop_front();
+            }
+            self.called_lately.push_back(request);
+        }
         // `LAMP_BUSY_FOLLOW_UP_RENEWS` (#7332): a line let out only as the
         // conversation going on, spoken by the caller (their face alone, or
         // with `LAMP_BUSY_NO_FACE_RENEWS` no face seen speaking it and no
@@ -31242,6 +31293,68 @@ mod tests {
         );
     }
 
+    /// #8555 (kit-8022 r12 on lamp-52e6, 25 Nov 02:13): "Hey Lamp, compare
+    /// the prices of three new laptops in five shops, then tell me which one
+    /// to buy." cut in two, no face in view, the pieces' voices at 0.49 (and
+    /// 0.67 on 23 Nov). In the band with no face, the pieces join when the
+    /// first called the lamp; not when it didn't, and never under 0.30.
+    #[test]
+    fn in_the_band_with_no_face_cut_words_join_when_the_first_piece_called_the_lamp() {
+        use crate::room_told::Room::Busy;
+        use crate::second_provider::Heard;
+        // A print at the line's first sample's hundredths of cosine to the
+        // first voice ([1, 0]); 100 is that voice.
+        struct Voice(std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>);
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let cosine = f32::from(samples[0]) / 100.0;
+                let print = vec![cosine, (1.0 - cosine * cosine).sqrt()];
+                self.0.push_back((request, Ok(print)));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                self.0.pop_front()
+            }
+        }
+        let first = "Hey Lamp, compare the prices of three new laptops in five shops,";
+        let tail = "then tell me which one to buy.";
+        let split = |name: &str, opening: &str, cosine: i16| {
+            let mut heeding = judged_saying(name, &[Some(0), Some(0)], Busy, &[opening, tail]);
+            heeding.checking_the_voice_for_the_join(Box::new(Voice(Default::default())));
+            for (request, voice) in (1..).zip([100, cosine]) {
+                heeding.hear_for_services(
+                    request,
+                    Heard::Began {
+                        over_the_lamps_voice: false,
+                    },
+                );
+                heeding.hear_for_services(request, Heard::Samples(&[voice; 48_000]));
+                heeding.hear_for_services(request, Heard::Ended);
+            }
+            heeding.same_speaker(1, 2)
+        };
+        let called = |cosine: &str| {
+            Joined::NoSecond(format!(
+                "the first piece called the lamp, cosine {cosine}, no face in view"
+            ))
+        };
+        assert_eq!(split("cb1", first, 49), called("0.49"), "r12's pair");
+        assert_eq!(split("cb2", first, 67), called("0.67"), "23 Nov's pair");
+        assert_eq!(
+            split("cb3", "compare the prices of three new laptops in five shops,", 49),
+            Joined::Not(
+                "a likeness between the bars (cosine 0.49), and no one face was seen speaking both; no face in view at request 1's end, no face in view at request 2's, in a busy room"
+                    .to_owned()
+            ),
+            "the first piece not addressed"
+        );
+        assert_eq!(
+            split("cb4", first, 25),
+            Joined::Not("two voices (cosine 0.25)".to_owned()),
+            "under 0.30, never"
+        );
+    }
+
     /// #8003 in the product's private room (`LAMP_PRIVATE_ROOM=on`), where
     /// the services' child is not started: with `LAMP_JOIN_SAME_VOICE` a
     /// child starts for the join alone, the same voice's pieces join with no
@@ -31357,6 +31470,21 @@ mod tests {
         in_view: &[Option<usize>],
         room: crate::room_told::Room,
     ) -> Heeding {
+        judged_saying(
+            name,
+            in_view,
+            room,
+            &vec!["What's the weather like"; in_view.len()],
+        )
+    }
+
+    /// [`judged_lines`], each line heard as its `words`.
+    fn judged_saying(
+        name: &str,
+        in_view: &[Option<usize>],
+        room: crate::room_told::Room,
+        words: &[&str],
+    ) -> Heeding {
         use lamp_msgs::{Face, Faces};
         // A short root: a Unix socket's address holds 103 bytes.
         let root = std::path::PathBuf::from(format!("/tmp/lj{name}-{}", std::process::id()));
@@ -31389,7 +31517,7 @@ mod tests {
             None,
         );
         heeding.keeping_line_rooms();
-        for (request, faces) in (1..).zip(in_view.iter().copied()) {
+        for ((request, faces), heard) in (1..).zip(in_view.iter().copied()).zip(words) {
             match faces {
                 Some(faces) => {
                     eyes.expires_after(Some(Duration::from_secs(10)));
@@ -31418,7 +31546,7 @@ mod tests {
             heeding.judge(
                 request,
                 line,
-                "What's the weather like",
+                heard,
                 Signs {
                     room,
                     going_on: true,

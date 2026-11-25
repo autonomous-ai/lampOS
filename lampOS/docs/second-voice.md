@@ -5421,7 +5421,19 @@ after a take-over, but now for every turn:
     review of #2620: 0.70 is 0.01 over the office set's highest two-person
     pair, and a family's voices may be closer). Prints under 0.30 are two
     people whatever the eyes saw, and a print still to come is waited for
-    up to 300 ms (`JOIN_WAIT`). A camera
+    up to 300 ms (`JOIN_WAIT`). **Between the bars with no face in view**
+    (#8555, the first builder's call on 25 Nov), a line let out joins the
+    piece it cut short when that piece called the lamp (its name heard, a
+    tap or words calling it, or `LAMP_SAID_TO_ME` letting it through as
+    said to the lamp) and no other voice or two faces were seen speaking
+    in the conversation, in any room: `... cut short D ms before it began:
+    the first piece called the lamp, cosine 0.49, no face in view; ...`
+    (`Heeding::called_in_the_band`, as `Joined::NoSecond`). Someone who has
+    just called the lamp and keeps talking is the likeliest speaker of the
+    next words; kit-8022 r12 on lamp-52e6 lost the first 12 words of a
+    19-word ask at 0.49 with no face. A face in view at either piece leaves
+    it to the eyes, and an unaddressed first piece in the band still does
+    not join. A camera
     closed or a mute forgets the lines' faces, as it does the caller's. Why: on lamp-4ace on 21 Oct cut-short words were let go 31
     times, most in two-person scenes, where answering the second person
     alone is right; Eighth's long request with a pause lost its first half
