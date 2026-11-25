@@ -948,6 +948,9 @@ const FRENCH: Lexicon = Lexicon {
         "fatiguée",
         "lamp",
         "lampe",
+        // The call as Deepgram `fr` writes it, as Korean's "헤이" (#8517).
+        "hey",
+        "hé",
         "euh",
         "hum",
         "merci",
