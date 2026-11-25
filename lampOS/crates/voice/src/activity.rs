@@ -427,7 +427,8 @@ impl TurnDetector {
 
     /// The next utterance to start is a yield's, said over the lamp: with
     /// first words kept, it begins at the earliest speech-like block of the
-    /// pre-roll. Only for the next block pushed.
+    /// line's own stretch of the pre-roll, the stretch since a pause as long
+    /// as the one that ends a line (#7569). Only for the next block pushed.
     pub fn reach_back(&mut self) {
         self.reach_back = self.first_words;
     }
@@ -827,11 +828,39 @@ impl TurnDetector {
         Ok(())
     }
 
+    /// Where the line's own stretch of the pre-roll begins: back from `usual`
+    /// to a pause as long as the one that ends a line (`end_silence_blocks` of
+    /// blocks scored under [`SILENCE_PROBABILITY`] or not heard), and no
+    /// earlier than `floor`. The canceller leaves the lamp's own last words
+    /// scored as speech now and then (#828's replay), and words before such a
+    /// pause aren't this line's (the reviewer's P3 on #2096).
+    fn stretch_start(&self, floor: usize, usual: usize) -> usize {
+        let pause = usize::from(self.end_silence_blocks);
+        let mut quiet = 0;
+        let mut stretch = floor;
+        for at in (floor..usual).rev() {
+            if self.scores[at].is_some_and(|score| score >= SILENCE_PROBABILITY) {
+                quiet = 0;
+            } else {
+                quiet += 1;
+                if quiet >= pause {
+                    stretch = at + quiet;
+                    break;
+                }
+            }
+        }
+        stretch
+    }
+
     /// Where an utterance starting now begins in the pre-roll: the last
     /// [`PRE_ROLL_BLOCKS`], or for a yield with first words kept,
     /// [`REACH_LEAD_BLOCKS`] before the earliest block scored
-    /// [`SILENCE_PROBABILITY`] or more, never past a block that was not heard.
-    /// As the lamp's sound ends (`reach_onset`), [`REACH_LEAD_BLOCKS`] before
+    /// [`SILENCE_PROBABILITY`] or more in the line's own stretch (since a
+    /// pause as long as the one that ends a line, [`Self::stretch_start`]),
+    /// never past a block that was not heard. Cost, said once (#7569): a
+    /// word of the line, such as the lamp's name, said before such a pause
+    /// and followed by quiet scored under that bar is left out of the
+    /// request. As the lamp's sound ends (`reach_onset`), [`REACH_LEAD_BLOCKS`] before
     /// the earliest onset the same way, so the lamp's own last words, which
     /// the canceller leaves scored under [`START_PROBABILITY`], aren't taken;
     /// and only in the line's own stretch, since a pause.
@@ -851,25 +880,7 @@ impl TurnDetector {
             .rposition(Option::is_none)
             .map_or(0, |at| at + 1);
         if reach_onset && !reach_back {
-            // The line's own stretch: back from the usual start to a pause
-            // as long as the one that ends a line. The canceller leaves the
-            // lamp's own last words scored as an onset now and then (#828's
-            // replay), and words before such a pause aren't this line's
-            // (the reviewer's P3 on #2096).
-            let pause = usize::from(self.end_silence_blocks);
-            let mut quiet = 0;
-            let mut stretch = floor;
-            for at in (floor..usual).rev() {
-                if self.scores[at].is_some_and(|score| score >= SILENCE_PROBABILITY) {
-                    quiet = 0;
-                } else {
-                    quiet += 1;
-                    if quiet >= pause {
-                        stretch = at + quiet;
-                        break;
-                    }
-                }
-            }
+            let stretch = self.stretch_start(floor, usual);
             let onset = usize::from(START_BLOCKS);
             let mut run = 0;
             for (at, score) in self.scores.iter().enumerate().take(usual).skip(stretch) {
@@ -887,11 +898,18 @@ impl TurnDetector {
             }
             return usual;
         }
+        // A yield's reach back: only in the line's own stretch, since a pause
+        // as long as the one that ends a line (#7569). The canceller leaves the
+        // lamp's own last words scored over [`SILENCE_PROBABILITY`], and a
+        // pause between them and the person's words means they are not this
+        // line's. The person's own words, which it may attenuate to the same
+        // scores, are kept: nothing here raises the bar.
+        let stretch = self.stretch_start(floor, usual);
         self.scores
             .iter()
             .enumerate()
             .take(usual)
-            .skip(floor)
+            .skip(stretch)
             .find(|(_, score)| score.is_some_and(|score| score >= SILENCE_PROBABILITY))
             .map_or(usual, |(earliest, _)| {
                 earliest
