@@ -657,7 +657,10 @@ fn service(
     // From zero, so a late startup black write in GuardedRing::new is said too.
     let mut late_said = LateSaid::default();
     let mut lapse = Lapse::default();
-    let mut cap_ceiling = if caps.is_some() { 0 } else { 120 };
+    // Dark until a cap snapshot arrives, then eased to it, as every change
+    // after (#8615).
+    let mut cap = CapEase::new(if caps.is_some() { 0 } else { 120 });
+    let mut cap_ceiling = cap.now(monotonic_us());
     // With LAMP_STALLS=on: a pass of this loop, or a gap between two, of
     // 50 ms or more is recorded, against its lease (#1178).
     let mut stalls = crate::stalls::Stalls::from_environment("ring");
@@ -706,14 +709,13 @@ fn service(
             face.hand(head.tick(at));
         }
         if let Some(caps) = caps.as_mut() {
-            let next = caps.tick(at);
-            if next < cap_ceiling {
-                // A tighter cap must not leave an earlier bright frame
-                // latched while no new turn frame arrives. This is an
-                // explicit protective blank, not lost turn authority.
-                ring.off().map_err(io::Error::other)?;
-            }
-            cap_ceiling = next;
+            cap.toward(caps.tick(at), at);
+            cap_ceiling = cap.now(at);
+            // A tighter cap must not leave an earlier bright frame latched
+            // while no new turn frame arrives: the strip is dimmed to it as
+            // it eases, never blanked (#8615).
+            ring.dim(ChannelCeiling::new(cap_ceiling).map_err(io::Error::other)?)
+                .map_err(io::Error::other)?;
         }
         if budget > 0 && pending.is_none() {
             pending = link.receive_frame()?;
@@ -957,6 +959,43 @@ fn service(
         if let Some(wait) = TICK_US.checked_sub(monotonic_us().saturating_sub(tick)) {
             std::thread::sleep(Duration::from_micros(wait));
         }
+    }
+}
+
+/// A cap change is eased over this long, up or down, instead of stepping
+/// the ring's light (#8615).
+const CAP_EASE_US: u64 = 200_000;
+
+/// The output cap as the ring applies it: from where it was to the newest
+/// cap over [`CAP_EASE_US`], linearly.
+struct CapEase {
+    from: u16,
+    to: u16,
+    since_us: u64,
+}
+
+impl CapEase {
+    fn new(value: u16) -> Self {
+        Self {
+            from: value,
+            to: value,
+            since_us: 0,
+        }
+    }
+
+    fn toward(&mut self, target: u16, at_us: u64) {
+        if target != self.to {
+            self.from = self.now(at_us);
+            self.to = target;
+            self.since_us = at_us;
+        }
+    }
+
+    fn now(&self, at_us: u64) -> u16 {
+        let elapsed = at_us.saturating_sub(self.since_us).min(CAP_EASE_US);
+        let (from, to) = (i64::from(self.from), i64::from(self.to));
+        let value = from + (to - from) * elapsed as i64 / CAP_EASE_US as i64;
+        value as u16
     }
 }
 

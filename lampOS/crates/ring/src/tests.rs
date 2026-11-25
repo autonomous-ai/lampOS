@@ -217,14 +217,13 @@ fn turn_revocation_blanks_without_another_paint_and_old_packets_cannot_erase_new
         .admit(clock(), AdmittedInput::Interruption)
         .unwrap();
     let fresh = permit(&mut controller, owner, OutputKind::Light, 250_000);
+    // Another turn taking the lamp is no safety cut: the old cue fades
+    // (#8615) and is no longer the displayed cue.
     let revoked = ring
         .install_authority(controller.snapshot(clock()).unwrap())
         .unwrap();
-    assert!(matches!(
-        revoked.unwrap().reason,
-        BlankReason::AuthorityLost(_)
-    ));
-    assert!(is_black(ring.sink.frames.last().unwrap()));
+    assert!(revoked.is_none());
+    assert!(paint(&mut ring, old).is_err());
     paint(&mut ring, fresh).unwrap();
     let count = ring.sink.frames.len();
     assert!(paint(&mut ring, old).is_err());
@@ -645,11 +644,14 @@ fn a_cue_is_painted_over_a_resting_frame_with_no_dark_frame_between() {
             .skip(1)
             .all(|frame| !is_black(frame))
     );
-    // From here it is a cue like any other: its own permit ends it.
+    // From here it is a cue like any other: its own permit ends it, with
+    // a fade (#8615), then black.
     assert!(rest(&mut ring).is_none());
     advance_to(100_030);
-    let blank = ring.tick().unwrap().unwrap();
-    assert!(matches!(blank.reason, BlankReason::AuthorityLost(_)));
+    assert!(ring.tick().unwrap().is_none());
+    let blanks = tick_until(&mut ring, 100_030 + FADE_US);
+    assert_eq!(blanks.len(), 1);
+    assert!(matches!(blanks[0].reason, BlankReason::AuthorityLost(_)));
 }
 
 #[test]
@@ -894,4 +896,152 @@ fn privacy_writer_handoff_requires_destruction_even_after_shutdown_black() {
     next.shutdown().unwrap();
     drop(next);
     assert!(!held.get());
+}
+
+/// The brightest channel a frame puts on the wire.
+fn peak(frame: &EncodedFrame) -> u8 {
+    frame.bytes()[PRIMER_BYTES..PRIMER_BYTES + PIXEL_COUNT * 24]
+        .chunks(8)
+        .map(decode_channel)
+        .max()
+        .unwrap()
+}
+
+/// Ticks every 2 ms, as the voice's ring worker does, until `until_us`;
+/// the blank receipts it returned.
+fn tick_until(ring: &mut GuardedRing<Sink>, until_us: u64) -> Vec<BlankReceipt> {
+    let mut blanks = Vec::new();
+    while TIME.get() < until_us {
+        advance_to(TIME.get() + 2_000);
+        blanks.extend(ring.tick().unwrap());
+    }
+    blanks
+}
+
+#[test]
+fn a_cue_whose_permit_runs_out_fades_to_black_with_no_lit_frame_going_straight_to_black() {
+    let (mut ring, mut controller, owner, _) = setup();
+    // Short enough that the fade ends before the authority (250 ms) does.
+    let light = permit(&mut controller, owner, OutputKind::Light, 20_000);
+    paint(&mut ring, light).unwrap();
+    let lit = ring.sink.frames.len() - 1;
+    assert_eq!(peak(&ring.sink.frames[lit]), 60);
+    let blanks = tick_until(&mut ring, 20_010 + FADE_US + FADE_STEP_US);
+    assert_eq!(
+        blanks.iter().map(|blank| blank.reason).collect::<Vec<_>>(),
+        [BlankReason::AuthorityLost(
+            lamp_turn_owner::Error::ExpiredPermit
+        )]
+    );
+    // Black once, at the end, once the fade has dimmed to nothing.
+    assert!(blanks[0].write.started_at().as_micros() >= 20_010 + FADE_US * 3 / 4);
+    let faded: Vec<u8> = ring.sink.frames[lit..].iter().map(peak).collect();
+    assert_eq!(*faded.last().unwrap(), 0);
+    assert_eq!(faded.iter().filter(|peak| **peak == 0).count(), 1);
+    assert!(faded.len() >= 6, "{faded:?}");
+    assert!(faded.windows(2).all(|pair| pair[1] < pair[0]), "{faded:?}");
+    // The last lit frame before black is a glow, not the cue.
+    assert!(faded[faded.len() - 2] <= 60 / 8, "{faded:?}");
+    assert!(ring.tick().unwrap().is_none());
+}
+
+#[test]
+fn a_turn_that_ends_goes_into_the_resting_frame_with_no_dark_frame_between() {
+    let (mut ring, mut controller, owner, light) = setup();
+    paint(&mut ring, light).unwrap();
+    advance_to(20);
+    controller.complete_turn(clock(), owner).unwrap();
+    // The turn's end is no blank: the cue fades and the rest takes over.
+    assert!(
+        ring.install_authority(controller.snapshot(clock()).unwrap())
+            .unwrap()
+            .is_none()
+    );
+    advance_to(20 + FADE_STEP_US);
+    assert!(ring.tick().unwrap().is_none());
+    assert!(rest(&mut ring).is_some());
+    assert!(tick_until(&mut ring, 20 + FADE_US + FADE_STEP_US).is_empty());
+    assert!(
+        ring.sink
+            .frames
+            .iter()
+            .skip(1)
+            .all(|frame| !is_black(frame))
+    );
+}
+
+#[test]
+fn a_safety_cut_is_still_one_black_frame_at_once_even_during_a_fade() {
+    // Privacy closing over a displayed cue: black in the same call.
+    let (mut ring, mut controller, _, light) = setup();
+    paint(&mut ring, light).unwrap();
+    advance_to(20);
+    controller
+        .set_microphone_permission(clock(), Permission::Denied)
+        .unwrap();
+    let blank = ring
+        .install_authority(controller.snapshot(clock()).unwrap())
+        .unwrap()
+        .unwrap();
+    assert!(matches!(blank.reason, BlankReason::AuthorityLost(_)));
+    assert!(is_black(ring.sink.frames.last().unwrap()));
+
+    // Privacy closing while an ended cue fades: black at once, not faded.
+    let (mut ring, mut controller, owner, _) = setup();
+    let short = permit(&mut controller, owner, OutputKind::Light, 20_000);
+    paint(&mut ring, short).unwrap();
+    tick_until(&mut ring, 20_010 + FADE_STEP_US + 2_000);
+    let fading = ring.sink.frames.len();
+    assert!(peak(ring.sink.frames.last().unwrap()) > 0);
+    controller
+        .set_microphone_permission(clock(), Permission::Denied)
+        .unwrap();
+    let blank = ring
+        .install_authority(controller.snapshot(clock()).unwrap())
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        blank.reason,
+        BlankReason::AuthorityLost(lamp_turn_owner::Error::PrivacyClosed)
+    );
+    assert_eq!(ring.sink.frames.len(), fading + 1);
+    assert!(is_black(ring.sink.frames.last().unwrap()));
+
+    // A stop while one fades: black at once.
+    let (mut ring, mut controller, owner, _) = setup();
+    let short = permit(&mut controller, owner, OutputKind::Light, 20_000);
+    paint(&mut ring, short).unwrap();
+    tick_until(&mut ring, 20_010 + FADE_STEP_US + 2_000);
+    assert!(ring.shutdown().unwrap().is_some());
+    assert!(is_black(ring.sink.frames.last().unwrap()));
+    // A lost control channel: black at once too.
+    let (mut ring, _, _, light) = setup();
+    paint(&mut ring, light).unwrap();
+    ring.control_lost().unwrap();
+    assert!(is_black(ring.sink.frames.last().unwrap()));
+}
+
+#[test]
+fn a_tighter_cap_dims_the_shown_cue_under_its_permit_and_never_blanks_or_brightens() {
+    let (mut ring, _, _, light) = setup();
+    paint(&mut ring, light).unwrap();
+    let count = ring.sink.frames.len();
+    // Not yet one step since the paint, and a looser cap: nothing written.
+    assert!(ring.dim(ceiling(30)).unwrap().is_none());
+    advance_to(10 + FADE_STEP_US);
+    assert!(ring.dim(ceiling(120)).unwrap().is_none());
+    assert_eq!(ring.sink.frames.len(), count);
+    assert!(ring.dim(ceiling(30)).unwrap().is_some());
+    assert_eq!(peak(ring.sink.frames.last().unwrap()), 30);
+    // Already under it: nothing more.
+    advance_to(10 + 2 * FADE_STEP_US);
+    assert!(ring.dim(ceiling(30)).unwrap().is_none());
+    assert_eq!(ring.sink.frames.len(), count + 1);
+    assert!(
+        ring.sink
+            .frames
+            .iter()
+            .skip(1)
+            .all(|frame| !is_black(frame))
+    );
 }

@@ -99,7 +99,8 @@ twice):
   its Stop, Authority and expiry.
 - The test `a_flood_of_head_requests_never_holds_back_revocation_or_expiry`
   floods `controls/touch` from four senders. While it goes on, a 50 ms
-  permit must blank within 150 ms, and a Stop sent then must end the worker
+  permit must blank within 150 ms plus its 200 ms fade (#8615), and a Stop
+  sent then must end the worker
   within 50 ms. Since 17 Oct nothing in the ring receives `controls/touch`;
   the test stays as a guard.
 - It failed on the first head, which read the bus before the controls. On
@@ -334,6 +335,14 @@ appearing does not blank it: the last resting frame stays until the first cue
 frame is painted over it, so a turn begins with no dark frame. The coordinator
 receives no receipt for a resting frame; a blank that ends one is reported
 like any other.
+
+A cue that ends for no safety reason, its permit run out, its turn ended or
+taken by another, or its presentation changed, fades out over 200 ms instead
+of going black in one frame (#8615). The resting frame, or the next cue,
+paints over the fade, so a turn ends with no dark frame. A stop, privacy,
+input loss, a fault or lost authority still blanks at once. An output cap
+(`LAMP_OUTPUT_CAPS`) that changes is eased over 200 ms, and a tighter one dims
+the frame already shown instead of blanking it.
 
 So the resting face means one thing: the lamp is on and able to hear. It is
 dark when the privacy switch is closed.

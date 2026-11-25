@@ -22,8 +22,9 @@ pub enum SetupLook {
     Unplug,
 }
 
-/// The brightest any channel gets: the product voice's own ring ceiling
-/// (`--ring-channel-ceiling 24`), so setup is no brighter than the lamp after it.
+/// The brightest any channel gets: the night's light cap (24), under the
+/// product voice's day ring ceiling (`--ring-channel-ceiling` in
+/// `lamp-voice.service`), so setup is no brighter than the lamp after it.
 pub const PEAK_CHANNEL: u8 = 24;
 
 impl SetupLook {

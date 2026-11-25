@@ -52,7 +52,17 @@ physical-mute evidence and denied authority, never an electrical microphone
 power cut or optically verified state.
 
 Rejected old permits or stale/duplicate snapshots preserve a newer valid cue.
-The displayed cue's own expiry/revocation causes one black frame. Malformed
+A displayed cue that ends for no safety reason (its permit runs out, its turn
+ends, another turn takes the lamp or its presentation changes) fades out over
+`FADE_US` (200 ms), at most one frame every `FADE_STEP_US` (25 ms), squared so
+it eases out as an eye sees it, then sends one black frame (#8615). It fades
+only while a resting frame could be shown (fresh authority, a permitted
+microphone, input available, no fault) and its own camera grant is current; a
+resting frame or a new cue paints over it with no dark frame between. Any other
+revocation of the displayed cue (privacy, input, camera, expired authority, a
+fault) and a refused paint still cause one black frame at once. `dim` brings
+the lit cue or resting frame down to a tighter output cap in the same steps,
+never brighter and never black. Malformed
 trusted control, transport loss or an I/O fault latches the writer fault and
 blanks. Report both the original write error and any failed cleanup. There are
 no automatic retries: one primary frame and at most one cleanup frame per fault.
