@@ -2190,7 +2190,15 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   `missing_secret` "<Skill>
   couldn't run: it needs a key added
   in the app, on its page."; any other refusal before its agent began, or
-  lamp-tasks not reached, "<Skill> couldn't run this time."; `run_failed`,
+  lamp-tasks not reached, "<Skill> couldn't run this time."; OpenClaw's
+  Gateway not ready (`openclaw_gateway_not_ready`, any run nobody asked by
+  voice; a run asked by voice hears `NOT_READY_LINE` instead, whatever the
+  uptime, #8601) "<Skill> couldn't run this time: the lamp is still
+  getting ready. Ask me again in a minute."; Harness not running
+  (`harness_not_running`; past the 180 s start window, or any run nobody
+  asked by voice; a run asked by voice within it hears `NOT_READY_LINE`
+  instead) "<Skill> couldn't run this time: the lamp
+  couldn't get it started." (#6577); `run_failed`,
   no answer or anything else "<Skill> didn't finish this time.". As news,
   the journal says `do.task: what became of its run: told 1` (or the
   gate's outcome). Before the switch, only the journal had it, even after the voice said

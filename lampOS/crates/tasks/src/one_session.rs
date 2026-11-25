@@ -210,8 +210,9 @@ const STARTING_SPENT: &str = "the kept session did not take the words after its 
 /// The `not_sent` code of a spoken task waiting when #7906 sign 5 closed
 /// its stuck kept session: ended at once, never put back. A put-back past
 /// the store's confirm bound ([`crate::engine::CONFIRM_MS`], from the
-/// task's prepare) expires it silently, so it was left to its 480 s bound
-/// (lamp-c0a4, 19 Nov). Task news tells it once with its "ask me again in a
+/// task's prepare) expired it silently, so it was left to its 480 s bound
+/// (lamp-c0a4, 19 Nov); a queued task now lives
+/// [`crate::engine::QUEUED_MS`] (#8601). Task news tells it once with its "ask me again in a
 /// few minutes" line; the next ask goes to the reopened session.
 pub const STUCK_ENDED: &str = "one_session_stuck";
 /// [`Turn::send`]'s why for [`STUCK_ENDED`].
