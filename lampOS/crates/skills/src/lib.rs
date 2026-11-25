@@ -14741,6 +14741,57 @@ mod tests {
         );
     }
 
+    /// #8610 (the first builder's 16:17): `lamp-skills pack`, the agent's
+    /// own check mid-make, refuses a skill a trigger starts whose code would
+    /// speak on its own, by the voice's own rule at its keep
+    /// (`lamp_voice::made_skill::told_only`), and names the told answer's
+    /// form; the same skill told-only packs. `volume` is not speaking (El's
+    /// P2.2 on #8651): a trigger's skill granted it alone packs too.
+    #[test]
+    fn pack_refuses_a_trigger_skill_that_would_speak_and_packs_a_told_only_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("out");
+        let timed = |name: &str, grants: &str| {
+            task_skill(
+                &dir.path().join(name),
+                "evening-news",
+                &format!(
+                    "version = \"1.0.0\"\ngrants = {grants}\n[trigger]\n\
+                     topic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n\
+                     [ask]\npolicy = \"nudge\"\n[permissions]\ntopics = [\"voice/state\"]\n\
+                     [[do]]\ntask = {{ task = \"Sum up today's news\", run = \"scripts/main.py\" }}\n"
+                ),
+            )
+        };
+        for grants in [
+            r#"["speak"]"#,
+            r#"["light", "speak"]"#,
+            r#"["volume", "speak"]"#,
+        ] {
+            let folder = timed("speaks", grants);
+            load(&folder).unwrap();
+            assert_eq!(
+                package::pack(&folder, &out).unwrap_err(),
+                format!(
+                    "not packed: {}: {}",
+                    lamp_voice::made_skill::SPEAKS_ON_ITS_OWN,
+                    lamp_voice::made_skill::TOLD_ONLY_SHAPE
+                ),
+                "{grants}"
+            );
+        }
+        for grants in ["[]", r#"["light"]"#, r#"["volume"]"#] {
+            let folder = timed("told", grants);
+            package::pack(&folder, &out).unwrap_or_else(|why| panic!("{grants}: {why}"));
+        }
+        // The same skill started by a tool alone may still speak.
+        let speaks =
+            PHOTO_BOOTH.replace(r#"["camera", "light"]"#, r#"["camera", "light", "speak"]"#);
+        assert_ne!(speaks, PHOTO_BOOTH);
+        let tool = task_skill(&dir.path().join("tool"), "photo-booth", &speaks);
+        package::pack(&tool, &out).unwrap();
+    }
+
     const MORNING_MAIL: &str = "version = \"1.0.0\"\ngrants = [\"gmail-read\", \"gmail-write\"]\n\
         tool = \"morning_mail\"\n[permissions]\ntopics = [\"clock/local\"]\n\
         [[do]]\ntask = { task = \"Sum up this morning's mail and send it to me\", run = \"scripts/main.py\" }\n";

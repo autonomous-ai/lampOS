@@ -7942,13 +7942,20 @@ forces one), a skill it makes is made whole, with everything a run needs:
   a trigger (`make_no_cannot::skill_text`) is never granted `speak`. No
   switch. The check is by grant, not by what a script calls: a script that
   calls `lamp.say` with no `speak` grant is kept, and lamp-control refuses
-  its say at each run. Known limit: lamp-control's volume op needs `speak`
-  too, so a trigger skill that only sets the volume is refused as well. And
-  a pet or a bump on the pads also starts a touch-triggered skill, so its
-  line plays then too. `told_only` lets a `skill.toml` that doesn't parse
-  through, as the pack refuses it later. The
-  same check in `lamp-skills pack`, a never-the-same-twice check, and
-  letting a volume-only trigger skill through are follow-ups.
+  its say at each run. The volume is not speaking (El's P2.2 on #8651):
+  lamp-control's `volume` op, `volume` state and `volume.changed` need the
+  `volume` grant, which `speak` holds too ([control.md](control.md),
+  "Grants"), so a trigger skill granted `volume` alone, which only sets the
+  volume, is kept. A pet or a bump on the pads also
+  starts a touch-triggered skill, so its line plays then too. `told_only`
+  lets a `skill.toml` that doesn't parse through, as the pack refuses it. `lamp-skills pack`, the agent's own check mid-make,
+  refuses by the same rule (`made_skill::told_only`, called from
+  `package::pack_signed_by`), saying `SPEAKS_ON_ITS_OWN` and the told
+  answer's form (`made_skill::TOLD_ONLY_SHAPE`), so a make learns the shape
+  before the keep; it holds every package, as `Skill::made_refuses` does.
+  Tests: `pack_refuses_a_trigger_skill_that_would_speak_and_packs_a_told_only_one`,
+  `volume_needs_its_own_grant_or_speak`. A never-the-same-twice check is a
+  follow-up.
 - **The voice reads a `run` step as it reads a `task` step**: code of its
   own, held to its grants and its script among the files written
   (`made_skill::code_step`, `task_run`), and read back for the yes plainly,
