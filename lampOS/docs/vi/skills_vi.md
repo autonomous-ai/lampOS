@@ -3037,7 +3037,18 @@ a skill on the lamp uses, saying nothing first."). Sau đó, trong code
   dừng, và bao lâu sau khi nó bắt đầu; null khi không có lần nào chạy,
   không tới được lamp-tasks, hoặc không có `--tasks-socket`. Kỹ năng đó
   được đánh dấu đã dừng (`task::mark_stopped`), và một câu chuẩn bị cho nó
-  chưa bắt đầu thì được rút lại. Câu trả lời bàn giao của nó, của một
+  chưa bắt đầu thì được rút lại. Mỗi lần dừng có nêu tên còn được ghi lại
+  ngay khi tới, trước khi hỏi lamp-tasks (`task::mark_stop_asked`): một
+  bước `do.task` hay `run` của kỹ năng đó đã tới hạn trước lúc dừng (hoặc
+  muộn nhất 3 s sau, `task::STOP_BEFORE_DUE_MS`) mà chưa được gửi, còn chờ
+  trong hàng của lamp-skills sau tác vụ của kỹ năng khác
+  (`LAMP_SKILL_TASK_SURE`) hoặc chờ lời đồng ý, thì chưa giữ làn nào trong
+  lamp-tasks, nên lamp-tasks không dừng gì của nó; nó không bao giờ được
+  gửi, một cách yên lặng (`task::stop_asked_for`), và journal ghi
+  `lamp-skills: skill:SKILL: do.task: not handed over: stopped by the
+  person before its hand-over (#8475)` (`do.run` với bước `run`). Một bước
+  tới hạn sau đó, khi người dùng nhờ lại, vẫn chạy (P2 của SubDarren trên
+  #8535). Câu trả lời bàn giao của nó, của một
   `do.task` hay của một bước `run`, khi đó là một lần dừng yên lặng
   (`task::stopped_by_person`): câu có `"stopped": true`, hoặc bất kỳ câu
   trả lời nào không đạt `"ok": true` trong `task::STOPPED_FOR_MS` (30 s)
