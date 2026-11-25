@@ -159,6 +159,7 @@ fn verdict(case: &Case) -> String {
         | Said::PoseUnread
         | Said::AnswerNoLook
         | Said::CutInNoLook
+        | Said::FollowUp
         | Said::ToTheLamp => "answered".to_owned(),
     }
 }

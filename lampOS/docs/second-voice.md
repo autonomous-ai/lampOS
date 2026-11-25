@@ -6636,6 +6636,33 @@ after a take-over, but now for every turn:
   lamp-52e6. Risk: a reply said looking away to a question more than 20 s
   after the lamp's words ended, or a second reply looking away, needs a
   look or the name. The 0-word wake that opened the 16:17 run is #8114's.
+- **In a conversation no camera sign holds a line alone**
+  (`LAMP_FOLLOW_UPS=on`, the product owner's rules of 25 Nov 2026 on #7570;
+  on in the product's `lamp-voice`; inert without `LAMP_SAID_TO_ME`). On
+  lamp-74ff that evening, on stable 16031, the owner's follow-ups were held
+  `looking away in a conversation` at pitch -15, all 40 looks reading away,
+  while they looked straight at the lamp, and `no look in a conversation`
+  while the camera saw no face; Sixth's count that afternoon had 18
+  follow-ups held by the camera, 8 of them the first line after an answer.
+  The camera's look, pose and mouth are not reliable enough to decide alone.
+  With the switch, `said_to_me::judge` lets a line in the window out first,
+  as `said to the lamp, in a conversation, looking or not: no camera sign
+  holds it alone (LAMP_FOLLOW_UPS)` (`Said::FollowUp`), before the no-look,
+  pitch, look and short-and-silent checks above and `LAMP_ASKED_LOOKS`'s
+  pass; a second voice read from faces and looks alone holds nothing there.
+  Only another voice than the conversation's holds it
+  (`said_to_me::Line::another_voice`: the line's print under
+  `same_voice::DIFFERENT_BELOW` against the conversation's, or a line of it
+  that showed another person; a print not come yet is no other voice), and
+  such a line is judged by the checks above. In a busy room the
+  conversation then goes on 20 s from the end of the lamp's words
+  (`FOLLOW_UPS_GOING_ON_FOR`, `follows_on::WITHIN_US`; the owner's "about
+  20 s after the lamp answers"), not 15 (`BUSY_GOING_ON_FOR`), and the
+  journal's `no conversation going on` says `where it goes on 20 s`. A short
+  line let out so stands `by follow_ups`. Out of the window nothing changes.
+  Risk: talk by someone else in the window, short enough to have no print
+  yet or said in the conversation's own voice (the person on a phone), is
+  answered; the lead's two-way ROW on lamp-52e6 counts it (#7570, 18:25).
 - **Who spoke a line, from the looks its mouth was read**
   (`LAMP_SPEAKING_READ_LOOKS=on`, #7442, #7419). A face is a line's speaker
   when it read `yes` in at least half of the line's looks
