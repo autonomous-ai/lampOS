@@ -6212,6 +6212,8 @@ fn hand_task(
     };
     let (state, socket, skill) = (tasks.state.clone(), tasks.socket.clone(), skill.to_owned());
     let say_socket = tasks.say.clone();
+    // When it came due: a stop asked since drops it, never handed over.
+    let due_ms = unix_ms();
     std::thread::spawn(move || {
         // The owner's yes is lamp-control's, only asked here.
         let place = lamp_skills::task::Place {
@@ -6233,6 +6235,16 @@ fn hand_task(
         let stopped = std::cell::Cell::new(false);
         let tried = lamp_skills::task_sure::Tried::default();
         let send = |socket: &Path, line: &str| {
+            // Asked stopped while it waited in line or for its yes
+            // (SubDarren's P2 on #8535): never handed over, quietly.
+            if lamp_skills::task::stop_asked_for(&skill, due_ms) {
+                eprintln!(
+                    "lamp-skills: skill:{skill}: do.task: {}",
+                    lamp_skills::task::STOPPED_BEFORE_HANDED
+                );
+                stopped.set(true);
+                return Ok(STOPPED_BY_PERSON.to_owned());
+            }
             // With `LAMP_SKILL_RUNS_VOICE_SHARE` set (#7342), the relay's day
             // used and the agent's chat tokens around the run, for
             // measuring a run's share of the day on a lamp. Numbers only.
@@ -6421,6 +6433,8 @@ fn hand_run(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
     let (state, socket, skill) = (tasks.state.clone(), tasks.socket.clone(), skill.to_owned());
     let say_socket = tasks.say.clone();
     let fired = Instant::now();
+    // When it came due: a stop asked since drops it, never handed over.
+    let due_ms = unix_ms();
     std::thread::spawn(move || {
         let place = lamp_skills::task::Place {
             state: state.as_deref(),
@@ -6431,6 +6445,15 @@ fn hand_run(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
         let say_yes = || say(&say_socket, "say", &skill, ask.clone(), &[], || {});
         let outcome = std::cell::Cell::new(None);
         let send = |socket: &Path, line: &str| {
+            // Asked stopped while it waited for its yes (SubDarren's P2 on
+            // #8535): never handed over; no outcome, so nothing is said.
+            if lamp_skills::task::stop_asked_for(&skill, due_ms) {
+                eprintln!(
+                    "lamp-skills: skill:{skill}: do.run: {}",
+                    lamp_skills::task::STOPPED_BEFORE_HANDED
+                );
+                return Ok(STOPPED_BY_PERSON.to_owned());
+            }
             eprintln!(
                 "lamp-skills: skill:{skill}: do.run: handed over {} ms after it came due",
                 fired.elapsed().as_millis()
@@ -6830,6 +6853,10 @@ fn cancel_run(voice: bool, skill: Option<&str>, socket: Option<&Path>) -> serde_
         eprintln!("lamp-skills: a stop asked with no skill named: nothing stopped");
         return nothing;
     };
+    // Marked first: a run of it still in lamp-skills' line, or waiting for
+    // its yes, holds no lane in lamp-tasks, and is dropped at its hand-over
+    // ([`lamp_skills::task::stop_asked_for`], SubDarren's P2 on #8535).
+    lamp_skills::task::mark_stop_asked(skill, unix_ms());
     let Some(socket) = socket else {
         eprintln!(
             "lamp-skills: a stop asked: no lamp-tasks hand-over on this lamp (--tasks-socket)"
@@ -10375,8 +10402,10 @@ mod tests {
     }
 
     /// #8475 part 2: with no skill's run under way, lamp-tasks answers an
-    /// empty list and the voice `{"stopped":null,"ms":null}`; nothing is
-    /// marked stopped.
+    /// empty list and the voice `{"stopped":null,"ms":null}`; no hand-over
+    /// answer is marked a quiet stop, but the stop itself is kept, so a run
+    /// of it still in line or waiting for its yes is never handed over
+    /// (SubDarren's P2 on #8535).
     #[test]
     fn a_cancel_with_nothing_running_answers_null() {
         let dir = tempfile::Builder::new()
@@ -10385,6 +10414,8 @@ mod tests {
             .unwrap();
         let socket = dir.path().join("skill-task.sock");
         let tasks = fake_cancel_tasks(&socket, json!({"stopped": []}));
+        let due = unix_ms();
+        assert!(!lamp_skills::task::stop_asked_for("cancel-none", due));
         assert_eq!(
             cancel_run(true, Some("cancel-none"), Some(&socket)),
             json!({"stopped": null, "ms": null})
@@ -10393,6 +10424,13 @@ mod tests {
             serde_json::from_str::<serde_json::Value>(&tasks.join().unwrap()).unwrap(),
             json!({"op": "cancel", "skill": "cancel-none"})
         );
+        assert!(
+            lamp_skills::task::stop_asked_for("cancel-none", due),
+            "a run of it due before the stop is dropped at its hand-over"
+        );
+        // Not the voice: nothing kept.
+        let _ = cancel_run(false, Some("cancel-not-voice"), Some(&socket));
+        assert!(!lamp_skills::task::stop_asked_for("cancel-not-voice", due));
         // No lamp-tasks at all: the same.
         assert_eq!(
             cancel_run(
@@ -10445,6 +10483,45 @@ mod tests {
             skill,
             &Ok(json!({"ok": true, "id": 7}).to_string())
         ));
+    }
+
+    /// SubDarren's P2 on #8535: both hand-overs, a `do.task`'s (however long
+    /// it waited in lamp-skills' line or for its yes) and a `run` step's,
+    /// ask whether a stop was asked since the step came due before anything
+    /// is sent to lamp-tasks, and then send nothing, quietly; the due time is
+    /// taken as the step is handed to its thread.
+    #[test]
+    fn both_hand_overs_drop_a_step_asked_stopped_before_it_is_sent() {
+        let main = include_str!("main.rs");
+        let body = |from: &str, to: &str| {
+            let start = main.find(from).expect(from);
+            let end = start + main[start..].find(to).expect(to);
+            &main[start..end]
+        };
+        let check = "if lamp_skills::task::stop_asked_for(&skill, due_ms) {";
+        let task = body("fn hand_task(", "fn hand_run(");
+        let due = task
+            .find("let due_ms = unix_ms();")
+            .expect("due in hand_task");
+        let spawned = task.find("std::thread::spawn(").unwrap();
+        assert!(due < spawned, "taken before its thread");
+        let sent = task
+            .find("let send = |socket: &Path, line: &str| {")
+            .unwrap();
+        let checked = task[sent..].find(check).expect("do.task checks") + sent;
+        let metered = task
+            .find("let metered = lamp_skills::relay_share::on();")
+            .unwrap();
+        assert!(checked < metered, "checked first in do.task's send");
+        assert!(task[checked..metered].contains("stopped.set(true);"));
+        let run = body("fn hand_run(", "\n}\n");
+        let due = run
+            .find("let due_ms = unix_ms();")
+            .expect("due in hand_run");
+        assert!(due < run.find("std::thread::spawn(").unwrap());
+        let checked = run.find(check).expect("run step checks");
+        let handed = run.find("let sent = hand_over_run(socket, line);").unwrap();
+        assert!(checked < handed, "checked before the run step is sent");
     }
 
     /// #8475 part 2: a peer that is not the voice is refused the `cancel`

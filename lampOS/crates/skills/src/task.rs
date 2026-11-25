@@ -1618,6 +1618,44 @@ pub fn mark_stopped(skill: &str, at_ms: u64) {
         .insert(skill.to_owned(), at_ms);
 }
 
+/// How long before a run's `do.task` or `run` step came due a stop of its
+/// skill still counts for it ([`stop_asked_for`]): the voice notes the run
+/// as lamp-skills answers `ran`, a moment before its steps come due, so a
+/// stop said at once can land just before.
+pub const STOP_BEFORE_DUE_MS: u64 = 3_000;
+
+/// What the journal says of a step dropped by [`stop_asked_for`].
+pub const STOPPED_BEFORE_HANDED: &str =
+    "not handed over: stopped by the person before its hand-over (#8475)";
+
+/// The skills the person asked to stop, each with when (#8475 part 2):
+/// every named stop, whether or not lamp-tasks had a run of it in a lane.
+static STOP_ASKED: Mutex<BTreeMap<String, u64>> = Mutex::new(BTreeMap::new());
+
+/// The person asked `skill`'s run stopped at `at_ms` ([`CANCEL_OP`]), as the
+/// stop comes, before lamp-tasks is asked (SubDarren's P2 on #8535: a run
+/// still waiting in lamp-skills' line, or for its yes, holds no lane there,
+/// so lamp-tasks stops nothing of it).
+pub fn mark_stop_asked(skill: &str, at_ms: u64) {
+    STOP_ASKED
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .insert(skill.to_owned(), at_ms);
+}
+
+/// Whether a `do.task` or `run` step of `skill` that came due at `due_ms`
+/// and is not handed over yet was asked stopped since (or within
+/// [`STOP_BEFORE_DUE_MS`] before it came due): then it is never handed
+/// over, quietly, however long it waited in line or for its yes. A run
+/// that came due after that is not, so a later ask of the same skill runs.
+pub fn stop_asked_for(skill: &str, due_ms: u64) -> bool {
+    STOP_ASKED
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .get(skill)
+        .is_some_and(|at| at.saturating_add(STOP_BEFORE_DUE_MS) >= due_ms)
+}
+
 /// Whether lamp-tasks' answer `sent` to `skill`'s hand-over, read at
 /// `now_ms`, is its run stopped by the person (#8475 part 2): an answer
 /// that says `"stopped": true`, or any answer short of a run that ended
@@ -1765,6 +1803,25 @@ mod tests {
     }
     use super::*;
     use serde_json::json;
+
+    /// SubDarren's P2 on #8535: a stop asked of a skill drops its step that
+    /// came due before it (waiting in line or for its yes) or within
+    /// [`STOP_BEFORE_DUE_MS`] after it; a step that came due later (the
+    /// person asks again) is handed over; another skill's never dropped.
+    #[test]
+    fn a_stop_asked_drops_only_that_skills_steps_due_before_it() {
+        let skill = "stop-asked-melon";
+        let due = 1_000_000;
+        assert!(!stop_asked_for(skill, due), "nothing asked yet");
+        mark_stop_asked(skill, due + 240_000);
+        assert!(stop_asked_for(skill, due), "in line 4 min, then stopped");
+        assert!(stop_asked_for(skill, due + 240_000 + STOP_BEFORE_DUE_MS));
+        assert!(
+            !stop_asked_for(skill, due + 240_000 + STOP_BEFORE_DUE_MS + 1),
+            "asked again later: runs"
+        );
+        assert!(!stop_asked_for("stop-asked-other", due));
+    }
 
     /// A run the person asked for, refused as the lamp is still getting
     /// ready (its Gateway, Harness not running), is told the not-ready
