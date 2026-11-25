@@ -298,6 +298,21 @@ sau:
      say something without asking for its voice") và `speak = true` không có
      bước `say` nào và không đọc dịch vụ ("it asks for its voice but never
      says anything"). Mỗi cái được sửa như lỗi của giới hạn.
+     - **Bước `say` ở dạng `pack` nhận được làm gọn trước** (#8514: trên
+       lamp-ee17, 25/11, bản nháp của agent qua được `lamp-skills pack` của
+       chính nó với một `say` mà `pack` nhận, giọng nói từ chối, và lần sửa
+       hết thời gian của lần tạo). Trước khi `say` được đặt nhịp và kiểm
+       tra (`made_skill::say_made_plain`, trong `keep_asked`), `priority` và
+       `expires` của bảng `say` bị bỏ, và một `text` là danh sách một chuỗi
+       thành chính chuỗi đó, giữ nguyên từng ký tự. Lời nói không bao giờ
+       bị đổi và không thêm gì vào. Mỗi thay đổi chỉ được giữ khi văn bản
+       sau đó đọc ra cùng kỹ năng, chỉ khác đúng thay đổi đó. Danh sách
+       nhiều câu, ghi chú, `from`, và lời có ngoặc kép, ngoặc nhọn hay liên
+       kết vẫn bị từ chối như trên. Một dòng journal nêu tên kỹ năng và cái
+       đã đổi, không bao giờ nêu lời nói:
+       `lamp-voice: make: skill NAME: the say step's form was made plain
+       (#8514): dropped priority, expires; list of one made a string`.
+       Test: `a_say_step_in_packs_list_or_priority_form_is_made_plain_and_kept`.
      - **Không bao giờ là chỉ dẫn, không bao giờ có công cụ** (P1 của người
        đọc trên #6062: một ghi chú từng là lượt viết của mô hình giọng nói,
        có công cụ, bộ nhớ và việc đọc dịch vụ, nên "read them my newest
@@ -3839,7 +3854,13 @@ cả hai người viết.
   khi câu trả lời đầu đến trong 30 giây, mà OpenClaw mất 34-40 giây) và
   được cho không quá thời gian còn lại, nên 10 phút 30 giây của lần tạo vẫn
   giữ; và câu vẫn bị từ chối được nói là không tạo được,
-  như hôm nay. Tắt thì dòng, lời dặn lần chạy và thư mục của lần tạo giữ
+  như hôm nay. Lần từ chối khi còn dưới 2 phút thì không được sửa và được
+  nói ngay bằng câu dễ hiểu của nó (`made_skill::plain_reason`, một câu).
+  Lần sửa bị cắt ở hạn chót hoặc không có trả lời (#8514: trên lamp-ee17,
+  lần sửa 1 hết hạn chót của lamp-tasks và người dùng nghe câu mô hình im
+  lặng) để lại lần từ chối mà lần sửa được nhờ, nói một lần bằng câu dễ
+  hiểu của nó, không bao giờ là câu im lặng (test
+  `a_late_refused_say_is_said_at_once_and_a_repair_cut_at_its_deadline_says_the_refusal`). Tắt thì dòng, lời dặn lần chạy và thư mục của lần tạo giữ
   nguyên từng byte như hôm nay. Worker của tuyến thứ hai đọc nó (được
   `process::second_route_worker_environment` chuyển cho), và với MAKE IT
   của ứng dụng thì coordinator đọc nó (bên dưới).
