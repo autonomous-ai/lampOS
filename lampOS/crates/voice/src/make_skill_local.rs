@@ -16359,4 +16359,144 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             .unwrap()
             .retain(|ask| ask.directory != directory);
     }
+
+    /// Round 2's P3 1 on #7912: a change to a skill made a moment ago tells
+    /// the model to call `change_skill`, and until that make begins the
+    /// ask's record stands: the same ask asked again is still "already
+    /// made" (`ONE_ASK_WITHIN`). The record is let go only as the change's
+    /// make begins on this thread (`made_skill::ChangeAs`), never at the
+    /// note, so a model that calls nothing leaves the guard in place.
+    #[test]
+    fn a_change_skill_told_but_not_called_keeps_the_already_made_guard() {
+        let directory =
+            std::env::temp_dir().join(format!("one-ask-change-guard-{}", std::process::id()));
+        let first = "make a skill that dims the light at 10 pm";
+        let held = with_asked_by(by("ann", true), || {
+            OneAsk::begin_in(
+                &directory,
+                Some(first),
+                "dims the light at 10 pm",
+                NOW,
+                7_912_021,
+            )
+        })
+        .unwrap();
+        let id = format!("{MAKING_ID}{}", held.0);
+        held.made(
+            "evening-dim",
+            &json!({"made": "evening-dim", "on": true}),
+            NOW,
+        );
+        let Making::Told(told) = making_changed(
+            &id,
+            7_912_022,
+            (Some("dims the light at 10:50 pm"), "make it ten fifty"),
+            &by("ann", true),
+            free,
+        ) else {
+            panic!("told");
+        };
+        assert!(
+            told["next"]
+                .as_str()
+                .unwrap()
+                .contains(crate::made_change::FUNCTION),
+            "{told}"
+        );
+        let dropped = |directory: &Path| {
+            ASKS.lock()
+                .unwrap()
+                .iter()
+                .find(|ask| ask.directory == directory)
+                .map(|ask| ask.dropped)
+        };
+        assert_eq!(dropped(&directory), Some(false), "the record stands");
+        // The model called nothing: the same ask again is still made.
+        let again = OneAsk::begin_in(
+            &directory,
+            Some(first),
+            "dims the light at 10 pm",
+            NOW,
+            7_912_023,
+        );
+        let Err(told) = again else {
+            panic!("made again");
+        };
+        assert_eq!(told["already_made"], true, "{told}");
+        assert_eq!(dropped(&directory), Some(false));
+        // The change's make begins: the record is let go, and the merged
+        // ask is a make of its own.
+        let changing = made_skill::ChangeAs::set(made_skill::ChangeOf {
+            name: "evening-dim".to_owned(),
+            sha256: "cd".repeat(32),
+            was_off: false,
+        });
+        let merged = "dims the light at 10 pm\nChange to make to it now: at 10:50 pm.";
+        let remade = OneAsk::begin_in(
+            &directory,
+            Some("make it ten fifty"),
+            merged,
+            NOW,
+            7_912_024,
+        );
+        assert!(remade.is_ok(), "{:?}", remade.err());
+        assert_eq!(
+            dropped(&directory),
+            Some(true),
+            "let go as the change begins"
+        );
+        drop(changing);
+        drop(remade);
+        ASKS.lock()
+            .unwrap()
+            .retain(|ask| ask.directory != directory);
+    }
+
+    /// Round 2's P3 2 on #7912: a skill with code of its own whose yes wait
+    /// is gone (expired, or dropped) was never approved, so a change to it
+    /// is told it waits for their yes again, made again with the change and
+    /// read back (`change_skill`'s make asks the yes afresh), never that it
+    /// was made.
+    #[test]
+    fn a_change_to_a_code_skill_whose_yes_wait_is_gone_is_told_it_waits_again() {
+        let directory =
+            std::env::temp_dir().join(format!("one-ask-change-unyes-{}", std::process::id()));
+        let held = with_asked_by(by("ann", true), || {
+            OneAsk::begin_in(
+                &directory,
+                Some("make a skill: when I say start studying, remind me after forty five minutes"),
+                "when I say start studying, remind me after forty five minutes",
+                NOW,
+                7_912_031,
+            )
+        })
+        .unwrap();
+        let id = format!("{MAKING_ID}{}", held.0);
+        held.made(
+            "study-time",
+            &json!({"made": "study-time", "on": false, "code_waits_for_yes": true, "approve_id": "gone-7912"}),
+            NOW,
+        );
+        let Making::Told(told) = making_changed(
+            &id,
+            7_912_032,
+            (
+                Some("when I say start studying, remind me after fifty minutes"),
+                "make it fifty",
+            ),
+            &by("ann", true),
+            free,
+        ) else {
+            panic!("told");
+        };
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains(crate::made_change::FUNCTION), "{told}");
+        assert!(next.contains("waits for their yes"), "{told}");
+        assert!(next.contains("read back"), "{told}");
+        assert!(!next.contains("It was made a moment ago:"), "{told}");
+        assert!(next.contains("Never say it is on"), "{told}");
+        ASKS.lock()
+            .unwrap()
+            .retain(|ask| ask.directory != directory);
+    }
 }
