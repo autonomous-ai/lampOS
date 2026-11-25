@@ -3820,9 +3820,10 @@ gặp `ENGINE_NOT_READY` một lần, lượt được nhận sau 29.099 ms. Sau
 người dùng không nghe thấy gì nữa.
 
 Bây giờ, 20 s sau một lần giao việc được nhờ bằng giọng nói
-(`hand_wait::AFTER`), giọng nói đọc bản ghi của việc đó một lần
-(`{"op":"work"}` trên socket request, như khi giọng nói tự xem việc của
-mình, #7930). Nếu việc vẫn `queued` và vẫn là việc được giao gần nhất,
+(`hand_wait::AFTER`), giọng nói đọc các bản ghi việc một lần
+(`{"op":"work_list","limit":10}` trên socket request, như khi giọng nói tự
+xem việc của mình, #7930). Nếu việc vẫn `queued`, không có việc nào bắt
+đầu trước nó còn đang chạy (chưa `done`), và vẫn là việc được giao gần nhất,
 giọng nói nhờ dịch vụ say nói một câu, như câu của chính nó, ở mức ưu tiên
 thường; nếu không bắt đầu nói được trong 15 s thì bỏ:
 
@@ -3838,7 +3839,13 @@ không đánh dấu gì là đã kể. Khoảng chờ đã được nói ngay l�
 không có câu ở giây thứ 20 (`hand_wait::told_at_hand_over`): khi đèn biết
 ô của máy tính đang dừng, câu báo máy tính đang khởi động được nói ngay từ
 đầu, và chỉ câu đó (first builder trên #8445, 14:51: chỉ một câu về khoảng
-chờ, không bao giờ hai). Việc được nhờ bằng tin nhắn chữ thì không có
+chờ, không bao giờ hai). Việc đang xếp hàng sau một việc trước còn đang
+chạy thì không có câu này: lamp-tasks chạy từng việc một (OpenClaw direct
+"waiting for the task before it to end", `LAMP_TASKS_OPENCLAW_DIRECT=on`;
+hàng đợi của phiên duy nhất sau lượt đang chạy, `LAMP_TASKS_ONE_SESSION=on`),
+nên agent đang bận chứ không phải đang khởi động, và câu đó sẽ sai (P2 của
+Jarvis trên #8510). Các id được giữ để không nói lần hai chỉ là 8 id mới
+nhất (`hand_wait::SAID_KEPT`). Việc được nhờ bằng tin nhắn chữ thì không có
 câu này, và khi không có dịch vụ say (`LAMP_SAY` tắt) thì không đọc hay
 nói gì. Journal ghi `lamp-voice: tasks: work N still waits for its agent
 after 20 s: said it is starting`.
