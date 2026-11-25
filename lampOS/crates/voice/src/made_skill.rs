@@ -2736,7 +2736,7 @@ pub fn plain_reason(why: &str) -> String {
         || why.starts_with(ALREADY_HAVE)
         || why.starts_with(NAME_TAKEN_HEAD)
         || their_ask(why)
-        || [NOT_MADE_TRY, NOT_KEPT_TRY].contains(&why)
+        || [NOT_MADE_TRY, NOT_KEPT_TRY, TOLD_ONLY_TRY].contains(&why)
         || AGENT_TRIES.contains(&why)
         || PLAIN_REASONS.contains(&why)
         || crate::make_no_cannot::said_as_is(why)
@@ -2749,6 +2749,11 @@ pub fn plain_reason(why: &str) -> String {
     }
     if [NOT_KEPT_HERE, NOT_CHECKED, NOT_CHECKED_IN_TIME].contains(&why) {
         return NOT_KEPT_TRY.to_owned();
+    }
+    // A trigger's skill whose code would speak on its own (#8610), its
+    // repairs used up: why, plainly, once.
+    if why == SPEAKS_ON_ITS_OWN {
+        return TOLD_ONLY_TRY.to_owned();
     }
     NOT_MADE_TRY.to_owned()
 }
@@ -2769,7 +2774,14 @@ pub fn not_made_line(why: &str) -> String {
     if why.starts_with(CANT_YET)
         || why.starts_with(ALREADY_HAVE)
         || their_ask(why)
-        || [NOT_MADE_TRY, NOT_KEPT_TRY, NOT_READY_LINE, NOT_TRIED_LINE].contains(&why)
+        || [
+            NOT_MADE_TRY,
+            NOT_KEPT_TRY,
+            NOT_READY_LINE,
+            NOT_TRIED_LINE,
+            TOLD_ONLY_TRY,
+        ]
+        .contains(&why)
         || AGENT_TRIES.contains(&why)
         || crate::make_no_cannot::said_as_is(why)
     {
@@ -6418,8 +6430,8 @@ pub const SCRIPT_DOESNT_PARSE: &str = "its code isn't Python that parses";
 pub const SCRIPT_SDK: &str = "import asyncio; from lampos import Lamp; async def main(): lamp = \
      await Lamp.local(), then any lampos call (sdk.md has them all, when given), such as await lamp.device() (a dict; temperature_c maps each sensor to \
      degrees C; grant device), await lamp.air() (air), await lamp.light(colour, level, for_ms) (a \
-     light step's colour, level 1-5, for_ms in ms; light), await lamp.say(text) (speak), await \
-     lamp.gesture(name) (body), await lamp.close(); last, asyncio.run(main())";
+     light step's colour, level 1-5, for_ms in ms; light), await lamp.say(text) (speak; never \
+     on a trigger: print instead), await lamp.gesture(name) (body), await lamp.close(); last, asyncio.run(main())";
 
 /// The switch for a made skill's notes (#7245): `on` exactly, off unless
 /// set. On, the making model is told the lamp's notes calls
@@ -10347,6 +10359,11 @@ pub fn keep_asked(
     // Each .py it wrote Python that parses, before its check and its
     // say-back (#6749 E): one that doesn't goes to a repair.
     scripts_parse(&files.scripts)?;
+    // A skill a time, an event or a repeat starts tells the person only
+    // through the lamp's told answer (#8610): refused here, before its
+    // check and its try, so its code never speaks during the make; the
+    // repair is told to print instead.
+    told_only(&files.toml)?;
     // A skill the lamp's agent made with code says what it uses, where its
     // result is and what it answers (#8157): never a built-in, Store or
     // pushed skill's, nor the lamp's own model's.
@@ -11574,6 +11591,81 @@ fn packed_and_kept(
     result
 }
 
+/// Why a made skill is refused when a trigger starts it and its code
+/// would speak on its own (#8610), the lamp's reason, journaled and given
+/// its repair; the person hears [`TOLD_ONLY_TRY`] only when the make ends
+/// with no kept skill ([`plain_reason`]).
+pub const SPEAKS_ON_ITS_OWN: &str =
+    "its code would speak on its own when a time, an event or a repeat starts it";
+
+/// What the person hears, once, of a make refused as [`SPEAKS_ON_ITS_OWN`]
+/// whose repairs kept nothing (the first builder's 16:17 on #8610).
+pub const TOLD_ONLY_TRY: &str = "That one would speak on its own; I can only keep it if it tells \
+     me and I say it when you're here.";
+
+/// What a repair is told of a skill refused as [`SPEAKS_ON_ITS_OWN`], as
+/// the try's failure: the told answer's form.
+pub const TOLD_ONLY_REPAIR: &str = "When the lamp tried the skill once, it would speak on its \
+     own: a skill a time, an event or a repeat starts (any [trigger]) tells the person only \
+     through the lamp's told answer, said when they are there. Make its [[do]] a task step \
+     (task = { task, run }), never a run step; take speak and speaker out of its grants; have \
+     its scripts print what they found and never call lamp.say, lamp.sound, the speaker or \
+     control.sock; and end the agent's answer with the short spoken summary, never a dash.";
+
+/// The grants that let a skill's code speak through lamp-control: `say`,
+/// `sound` and `turn.start` need `speak`, a speaker stream `speaker`.
+const SPEAKING_GRANTS: [&str; 2] = ["speak", "speaker"];
+
+/// #8610: a made skill a time, an event or a repeat starts (any
+/// `[trigger]`) speaks only through the lamp's told answer, which waits
+/// for the owner alone in view and a quiet minute. Refused for a repair
+/// ([`SPEAKS_ON_ITS_OWN`], [`TOLD_ONLY_REPAIR`]) when such a skill has a
+/// `run` step (which succeeds only by speaking) or a code step whose
+/// `grants` name `speak` or `speaker` (lamp-control's grants for every op
+/// that sounds, so the rule holds at each run too). A skill only the
+/// person's words start, and fixed `say` and `remind` steps, are as before.
+fn told_only(toml: &str) -> Result<(), Refused> {
+    let Ok(table) = toml::from_str::<toml::Table>(toml) else {
+        return Ok(());
+    };
+    if !table.contains_key("trigger") {
+        return Ok(());
+    }
+    let steps: Vec<&toml::Value> = table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .into_iter()
+        .flatten()
+        .collect();
+    let runs = steps
+        .iter()
+        .any(|step| step.get("run").is_some_and(toml::Value::is_str));
+    let tasks = steps.iter().any(|step| step.get("task").is_some());
+    let speaking = table
+        .get("grants")
+        .and_then(toml::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(toml::Value::as_str)
+        .any(|grant| SPEAKING_GRANTS.contains(&grant));
+    if runs || (tasks && speaking) {
+        eprintln!(
+            "lamp-voice: a made skill was not kept: a trigger starts it and its code would speak \
+             on its own ({})",
+            if runs {
+                "a run step"
+            } else {
+                "a speaking grant"
+            }
+        );
+        return Err(Refused(
+            SPEAKS_ON_ITS_OWN.into(),
+            Some(TOLD_ONLY_REPAIR.into()),
+        ));
+    }
+    Ok(())
+}
+
 /// The sections a `SKILL.md` the lamp's agent made with code has (#8157),
 /// each a `## ` heading: what it uses (each script or lamp-services tool
 /// and its arguments), where each result is, and what is said aloud.
@@ -11613,8 +11705,9 @@ fn sections_held(card: &str) -> Result<(), Refused> {
             "SKILL.md needs these sections, each a heading with lines under it: {}. ## Uses: \
              each script and lamp-services tool it uses, with its arguments. ## Result: where \
              each script's result is (what it prints, a file). ## Answer: what is said aloud, \
-             in one to three plain sentences: a script says it with lamp.say and the agent \
-             answers a lone -, or the agent's final answer is only the spoken summary.",
+             in one to three plain sentences: the agent's final answer is only the spoken \
+             summary, or, only in a skill the person's words start, a script says it with \
+             lamp.say and the agent answers a lone -.",
             missing
                 .iter()
                 .map(|section| format!("## {section}"))
@@ -11780,8 +11873,9 @@ fn tried_said(tried: crate::make_skill_agent::Tried) -> Result<Option<Option<Str
                 NOT_TRIED_PASSED.into(),
                 Some(format!(
                     "When the lamp tried the skill once, {why}. Fix its scripts so each runs on \
-                     its own, with no arguments, and ends within 30 s; a run step's script says \
-                     its success line and its failure line with lamp.say."
+                     its own, with no arguments, and ends within 30 s; a run step's script (only \
+                     in a skill the person's words start) says its success line and its failure \
+                     line with lamp.say, and a task step's scripts print what they found."
                 )),
             ))
         }
@@ -19836,6 +19930,185 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         let unwritten =
             keep(&answer(CODE_TOML, CODE_CARD), false, "local:6", &keeping).unwrap_err();
         assert_eq!(unwritten.0, SCRIPTS_NOT_HELD);
+        set_scripts_here(None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A pack that keeps each skill it is asked to check, and marks that it
+    /// was asked (`packed` beside it): a made skill's try only comes after
+    /// its pack passed, so no mark means no try.
+    fn marking_keeping(name: &str) -> (PathBuf, Keeping) {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = scratch(name);
+        let program = dir.join("pack");
+        fs::write(
+            &program,
+            format!(
+                "#!/bin/sh\ntouch \"{}\"\nname=$(basename \"$4\")\ncat \"$4/skill.toml\" \
+                 \"$4\"/scripts/*.py > \"$3/$name-1.0.0.tar\" 2>/dev/null\nexit 0\n",
+                dir.join("packed").display()
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+        let keeping = Keeping {
+            directory: dir.join("made"),
+            program,
+            manage: dir.join("manage.sock"),
+            installed: dir.join("skills"),
+        };
+        (dir, keeping)
+    }
+
+    /// A trigger's task script that prints what it found (#8610).
+    const PRINTS_PY: &str = "print('Bitcoin is 90,000 US dollars.')\n";
+    /// A script that says its own line through the lamp (#8610).
+    const SAYS_PY: &str = "import asyncio\nfrom lampos import Lamp\n\n\nasync def main():\n    \
+        lamp = await Lamp.local()\n    await lamp.say('Bitcoin is up.', wait=True)\n    \
+        await lamp.close()\n\n\nasyncio.run(main())\n";
+
+    /// #8610: a made skill a trigger starts whose code would speak on its
+    /// own (a `run` step, or a task granted `speak`, its script calling
+    /// `lamp.say` or not) is refused right after its scripts parse: never
+    /// packed, so never tried, and nothing said during the make. Its repair
+    /// is told to print; the person hears [`TOLD_ONLY_TRY`], whole, only
+    /// when the make ends unkept.
+    #[test]
+    fn a_made_skill_started_by_a_trigger_whose_code_speaks_on_its_own_is_refused_before_its_try() {
+        if a_python_here().is_none() {
+            eprintln!("skipped: no python3 here to parse a made script with");
+            return;
+        }
+        set_scripts_here(Some(true));
+        let run = CODE_TOML.replace(
+            "task = { task = \"take a photo and send it to the app\", run = \"scripts/main.py\" }",
+            "run = \"scripts/main.py\"",
+        );
+        let speak = CODE_TOML.replace(
+            "grants = [\"camera\", \"light\"]",
+            "grants = [\"camera\", \"light\", \"speak\"]",
+        );
+        let run_speak = run.replace(
+            "grants = [\"camera\", \"light\"]",
+            "grants = [\"light\", \"speak\"]",
+        );
+        for (at, (toml, script)) in [
+            (&run, MAIN_PY),
+            (&run_speak, SAYS_PY),
+            (&speak, MAIN_PY),
+            (&speak, SAYS_PY),
+            (&speak, PRINTS_PY),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            assert_ne!(toml.as_str(), CODE_TOML);
+            let (dir, keeping) = marking_keeping(&format!("made-told-only-{at}"));
+            let refused = keep(
+                &code_answer(toml, &[("scripts/main.py", script)]),
+                false,
+                &format!("local:{at}"),
+                &keeping,
+            )
+            .unwrap_err();
+            assert_eq!(refused.0, SPEAKS_ON_ITS_OWN, "{at}: {toml}");
+            let repair = refused.1.expect("lines for a repair");
+            assert!(repair.contains("print what they found"), "{repair}");
+            assert!(repair.contains("take speak and speaker out"), "{repair}");
+            assert!(repair.len() <= MOST_REPAIR_BYTES, "{}", repair.len());
+            // Never packed, so never tried: nothing spoke during the make.
+            assert!(!dir.join("packed").exists(), "{at}: packed");
+            assert!(index(&keeping.directory).is_empty(), "{at}");
+            let _ = fs::remove_dir_all(&dir);
+        }
+        // `speaker` alone is refused the same way, wherever it is checked.
+        let speaker = CODE_TOML.replace("\"light\"]", "\"speaker\"]");
+        assert_eq!(
+            told_only(&speaker).unwrap_err().0,
+            SPEAKS_ON_ITS_OWN,
+            "{speaker}"
+        );
+        // Said plainly, once, as a whole line of its own.
+        assert_eq!(plain_reason(SPEAKS_ON_ITS_OWN), TOLD_ONLY_TRY);
+        assert_eq!(plain_reason(TOLD_ONLY_TRY), TOLD_ONLY_TRY);
+        assert_eq!(not_made_line(TOLD_ONLY_TRY), TOLD_ONLY_TRY);
+        set_scripts_here(None);
+    }
+
+    /// #8610: a made skill a trigger starts whose task's script prints what
+    /// it found, with no `speak`, is kept (packed, and so tried); the same
+    /// skill granted `speak` is not.
+    #[test]
+    fn a_made_tell_me_skill_that_prints_for_the_told_answer_is_kept() {
+        if a_python_here().is_none() {
+            eprintln!("skipped: no python3 here to parse a made script with");
+            return;
+        }
+        set_scripts_here(Some(true));
+        let prints = CODE_TOML.replace("grants = [\"camera\", \"light\"]", "grants = [\"light\"]");
+        let (dir, keeping) = marking_keeping("made-told-prints");
+        let made = keep(
+            &code_answer(&prints, &[("scripts/main.py", PRINTS_PY)]),
+            false,
+            "local:1",
+            &keeping,
+        )
+        .unwrap();
+        assert!(made.uses.code, "{made:?}");
+        assert_eq!(made.uses.grants, ["light"]);
+        assert!(dir.join("packed").exists());
+        let speaking = prints.replace("[\"light\"]", "[\"light\", \"speak\"]");
+        let refused = keep(
+            &code_answer(&speaking, &[("scripts/main.py", PRINTS_PY)]),
+            false,
+            "local:2",
+            &keeping,
+        )
+        .unwrap_err();
+        assert_eq!(refused.0, SPEAKS_ON_ITS_OWN);
+        assert_eq!(index(&keeping.directory).len(), 1);
+        set_scripts_here(None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// #8610's scope (the first builder's 16:17): a skill only the
+    /// person's own words start may still say its line from a `run` step
+    /// (#8158's coin flip, granted `speak`); the same skill with a trigger
+    /// beside its words may not.
+    #[test]
+    fn a_skill_started_by_its_words_alone_may_still_say_its_line_from_a_run_step() {
+        if a_python_here().is_none() {
+            eprintln!("skipped: no python3 here to parse a made script with");
+            return;
+        }
+        set_scripts_here(Some(true));
+        set_asks_here(Some(true));
+        const COIN: &str = "asks = [\"flip a coin\"]\nkind = \"installable\"\n\
+            version = \"1.0.0\"\ngrants = [\"speak\"]\n\n[[do]]\nrun = \"scripts/main.py\"\n";
+        let (dir, keeping) = marking_keeping("made-told-words");
+        let asked = Asked {
+            request: "when I say flip a coin, flip a coin and say heads or tails",
+            heard: Some("when I say flip a coin, flip a coin and say heads or tails"),
+            ..Asked::default()
+        };
+        let made = keep_asked(
+            &code_answer(COIN, &[("scripts/main.py", SAYS_PY)]),
+            false,
+            "local:1",
+            &keeping,
+            &asked,
+        )
+        .unwrap();
+        assert_eq!(made.uses.grants, ["speak"]);
+        assert!(dir.join("packed").exists());
+        assert_eq!(told_only(COIN), Ok(()));
+        let timed = format!(
+            "{COIN}\n[permissions]\ntopics = [\"clock/local\"]\n\n[trigger]\n\
+             topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
+             during = {{ from = \"08:00\", to = \"08:01\" }}\n"
+        );
+        assert_eq!(told_only(&timed).unwrap_err().0, SPEAKS_ON_ITS_OWN);
+        set_asks_here(None);
         set_scripts_here(None);
         let _ = fs::remove_dir_all(&dir);
     }

@@ -166,7 +166,7 @@ fn the_gateway_makes_inline_skill_toml_packs() {
 /// (`lamp_tasks::skill_make::MAKE_EXAMPLES`) packs with the real
 /// `lamp-skills pack`, as a skill made on this lamp with
 /// `LAMP_MADE_SKILL_ASKS` on: an example can never be one the check
-/// refuses. It names each of its ten skills once, in order.
+/// refuses. It names each of its eleven skills once, in order.
 #[test]
 fn every_gateway_make_example_packs() {
     let dir = tempfile::tempdir().unwrap();
@@ -195,11 +195,12 @@ fn every_gateway_make_example_packs() {
             "water-breaks",
             "agenda-count",
             "sun-times",
+            "morning-headline",
         ]
     );
     // With the internet switch too, as a gateway make whose agent may
-    // write net code is checked (#7742): the exchange-rate and sun-times
-    // examples are granted `net`; and a linked service's read with the
+    // write net code is checked (#7742): the exchange-rate, sun-times and
+    // morning-headline examples are granted `net`; and a linked service's read with the
     // voice's switch for one on (agenda-count).
     let asks = (lamp_voice::made_skill::ASKS_ENVIRONMENT, "on".to_owned());
     let on = [

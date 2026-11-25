@@ -2579,7 +2579,9 @@ mod tests {
         set_made_here(Some(true));
         lamp_voice::skill_task_yes::set_net_here(Some(true));
         let skill = crate::load(&folder).unwrap();
-        assert_eq!(skill.grants, grants);
+        // On its trigger it tells only through the told answer (#8610):
+        // `speak` is never granted.
+        assert_eq!(skill.grants, ["net"]);
         assert_eq!(skill.triggers.len(), 1);
         assert_eq!(skill.task_step().unwrap().run, no_cannot::RUN);
         assert!(made_with_code(&folder, false));
