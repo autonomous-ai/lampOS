@@ -6682,20 +6682,27 @@ after a take-over, but now for every turn:
   (`same_voice::LEAST_SAMPLES`) or begun over the lamp's voice has no print,
   so it is no other voice. Nothing else reads these prints for whom the lamp
   answers: memory and the services are as before.
-  In a room not busy that window is the thread's 45 s from the answer's
-  start or 20 s after its words end (`crate::thread::GOING_ON_FOR`), and
-  the answer to a line let out so renews it, since the product sets neither
+  The window is then 20 s from the end of the lamp's words in a room not
+  busy as in a busy one (the owner's "about 20 s after the lamp answers";
+  `thread_window_kept`): the thread's 45 s from the answer's start
+  (`crate::thread::GOING_ON_FOR`) counts only where the lamp said no words,
+  or while a skill's yes is awaited (from its say-back's end, #6749), and
+  the journal says `the thread's 45 s from the answer's start don't count,
+  only 20 s from the end of the lamp's words (LAMP_FOLLOW_UPS)` where they
+  would have. On lamp-74ff after #8656, "And of Argentina?" 35 s after a
+  short answer was answered by the thread's 45 s. The answer to a line let
+  out renews the window, since the product sets neither
   `LAMP_GOING_ON_NOT_OWN` nor `LAMP_UNTIED_GOING_ON`. In a busy room the
-  conversation then goes on 20 s from the end of the lamp's words
-  (`FOLLOW_UPS_GOING_ON_FOR`, `follows_on::WITHIN_US`; the owner's "about
-  20 s after the lamp answers"), not 15 (`BUSY_GOING_ON_FOR`), and the
-  journal's `no conversation going on` says `where it goes on 20 s`. A short
-  line let out so stands `by follow_ups`. Out of the window nothing changes.
-  Risk: on the product unit, talk by someone else in the window (TV, a
-  third person, the person on a phone) reaches the model, and an answer to
-  it keeps the window open. The row counts it: the lead's two-way legs
-  (#7570, 18:25), and Twelve's quiet-room legs on #8656 (TV or a third voice
-  25 to 40 s after an answer, and a two-turn TV exchange).
+  conversation goes on 20 s from the end of the lamp's words
+  (`FOLLOW_UPS_GOING_ON_FOR`, `follows_on::WITHIN_US`), not 15
+  (`BUSY_GOING_ON_FOR`), and the journal's `no conversation going on` says
+  `where it goes on 20 s`. A short line let out so stands `by follow_ups`.
+  Out of the window nothing changes. Risk: talk in the person's own voice
+  to someone else in the window reaches the model, and so does a line under
+  1.5 s by someone else; an answer to it keeps the window open. The row
+  counts it: the lead's two-way legs (#7570, 18:25), and Twelve's quiet-room
+  legs on #8656 (TV or a third voice 25 to 40 s after an answer, and a
+  two-turn TV exchange).
 - **Who spoke a line, from the looks its mouth was read**
   (`LAMP_SPEAKING_READ_LOOKS=on`, #7442, #7419). A face is a line's speaker
   when it read `yes` in at least half of the line's looks
