@@ -3269,6 +3269,9 @@ fn second_route_worker_environment(
         crate::second_provider::NEWS_REPLY_HEEDS_HELD_ENVIRONMENT,
         crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT,
         crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT,
+        // "Hey, Lynn. …" keeps a sure hearing in a busy room (the owner's
+        // first rule, 25 Nov 2026).
+        crate::second_provider::NAME_GREETED_STAND_IN_ENVIRONMENT,
         crate::second_provider::NAME_STAYS_ENVIRONMENT,
         // A repeat of the line before's end is no call by its text (#3923).
         crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT,
@@ -3768,6 +3771,7 @@ mod tests {
             crate::second_provider::NEWS_REPLY_HEEDS_HELD_ENVIRONMENT,
             crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT,
             crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT,
+            crate::second_provider::NAME_GREETED_STAND_IN_ENVIRONMENT,
             crate::second_provider::NAME_STAYS_ENVIRONMENT,
             crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT,
             crate::attention::ONE_AS_LAMP_ENVIRONMENT,
@@ -4993,6 +4997,7 @@ mod tests {
                     || name == crate::second_provider::NEWS_REPLY_HEEDS_HELD_ENVIRONMENT
                     || name == crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT
                     || name == crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT
+                    || name == crate::second_provider::NAME_GREETED_STAND_IN_ENVIRONMENT
                     || name == crate::second_provider::NAME_STAYS_ENVIRONMENT
                     || name == crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT
                     || name == crate::attention::ONE_AS_LAMP_ENVIRONMENT
@@ -5351,6 +5356,7 @@ mod tests {
                     "LAMP_NAMES_RENAME_YES=on",
                     "LAMP_NAME_AS_A_SENTENCE=on",
                     "LAMP_NAME_FACE_OR_WORDS=on",
+                    "LAMP_NAME_GREETED_STAND_IN=on",
                     "LAMP_NAME_LEARN_FIX=on",
                     "LAMP_NAME_NEAR=on",
                     "LAMP_NAME_NOT_ANOTHERS=on",
