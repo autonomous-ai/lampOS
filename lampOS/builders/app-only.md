@@ -6,6 +6,7 @@ owner's ask that every builder state clearly what it owns. How a builder
 works is in [joining.md](../docs/joining.md). Its posts begin "App Only".
 The first builder corrects it where it must be.
 
+- **Works on:** Store apps on the lamp, from install to the conversation: app tools (the model calling an app like a skill, #8386, switch-on #8602, then `use_app`), app memory and live context (#8603), app help, `LAMP_STORE_APPS`, the SDK's app checks (#8506), the apps it ships to the Store (Gym Coach and its beta) with their rows and evals, and the developer's and user's A-to-Z checklist (#8363).
 - **Name:** `app-only`
 - **Person:** a colleague on the BFF (backend-for-frontend) team who starts
   its sessions (named in the team's own channels, not in this public
@@ -30,14 +31,14 @@ Store apps on the lamp, from install to the conversation:
 
 - **App tools** (#8386, design `docs/app-tools.md` #8406): the manifest's
   `tools` reader and `apps/tools` (`crates/apps`, #8491), the switch-on
-  `LAMP_APP_TOOLS` (#8504), and next, `use_app` when the running apps'
+  `LAMP_APP_TOOLS` (#8602, rebuilt from #8504), and next, `use_app` when the running apps'
   tools overflow the function room (#8386 item 7, the first builder's
   10:20 on 25 Nov). The voice side (`crates/voice/src/app_tools.rs`) is
   Heron's; `app.call` is Eighth's.
 - **App memory and context:** `crates/voice/src/app_context.rs` (an app's
   live line and what it said aloud, `apps/said`, #8422 / #8561),
   `crates/voice/src/app_remember.rs`, `crates/msgs/src/app_fact.rs`, and
-  the switch `LAMP_APP_REMEMBER` (#8331).
+  the switch `LAMP_APP_REMEMBER` (#8603, rebuilt from #8331).
 - **App help:** "what apps do you have", "how do I use X"
   (`crates/voice/src/app_help.rs`, `crates/msgs/src/app_help.rs`,
   `LAMP_APP_HELP`, #8536).
