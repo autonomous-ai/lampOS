@@ -7,9 +7,10 @@ Cho bảng số liệu theo vùng B10 của Backend (đèn ở Trung Quốc so v
 lại): một trường thêm vào dưới `lamp-report/1`, `metrics`, trên báo cáo sức
 khoẻ, theo đúng dạng Backend đăng trên #6256 (12/11, cùng khối `mqtt` của
 Twelve). Tắt trừ khi `LAMP_REPORT_COUNTERS=on`; khi bật vẫn chỉ đi qua ba
-cổng của báo cáo và lời đồng ý của người dùng. Khi tắt, báo cáo giống hệt
-trước từng byte (không có khoá `metrics`). Chỉ có số: không dữ liệu từng sự
-kiện, không id, không lời nói, không vùng (cloud tự chia theo vùng).
+cổng của báo cáo, nên không bao giờ gửi sau khi người dùng nói không. Khi
+tắt, báo cáo giống hệt trước từng byte (không có khoá `metrics`). Chỉ có
+số: không dữ liệu từng sự kiện, không id, không lời nói, không vùng (cloud
+tự chia theo vùng).
 
 ```json
 "metrics": {

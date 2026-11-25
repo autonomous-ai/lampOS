@@ -1,7 +1,8 @@
-//! Health and crash reports to the company, opt-in at setup (#1683,
-//! `docs/cloud.md`, "Health and crash reports"). Three gates must all be open for anything to go:
-//! `LAMP_CLOUD=on`, `LAMP_REPORTS=on`, and the person's yes, read at each
-//! send.
+//! Health and crash reports to the company, on unless a person kept a no
+//! (#1683, the product owner on 25 Nov 2026, `docs/cloud.md`, "Health and
+//! crash reports"). Three gates must all be open for anything to go:
+//! `LAMP_CLOUD=on`, `LAMP_REPORTS=on`, and the person's choice, read at
+//! each send: a kept yes, or no record at all.
 //!
 //! A report carries numbers, booleans, enums and names from fixed lists
 //! only. Every field is typed so: a part's or a unit's name is one of
@@ -903,10 +904,10 @@ fn unknown_field<'a>(
 }
 
 /// The person's choice: `lamp-cloud`'s own record when there is one, else
-/// setup's, else no. Only a JSON `true` is a yes, and setup's only for a
-/// wording no newer than [`ASKED`]. Read at each send, never kept. With
-/// `LAMP_NOTICING_BY_DEFAULT=on` (#7767, `lamp_msgs::consent`'s one place
-/// for it), [`read_consent_or`]'s default.
+/// setup's, else on (`lamp_msgs::consent::reports_by_default`, the product
+/// owner on 25 Nov 2026: health and crash reports are on unless a person
+/// kept a no). Only a JSON `true` is a yes, and setup's only for a wording
+/// no newer than [`ASKED`]. Read at each send, never kept.
 ///
 /// One release forward (#2052), for privacy: a record this build can't
 /// read, a field it doesn't know or a `by` it doesn't know reads as **no**,
@@ -914,14 +915,14 @@ fn unknown_field<'a>(
 /// sharing on here. Such a record is left as it is (a roll forward reads it
 /// again); the line that says so comes back beside the choice.
 fn read_consent(places: &Places) -> (Consent, Option<String>) {
-    read_consent_or(places, lamp_msgs::consent::noticing_by_default())
+    read_consent_or(places, lamp_msgs::consent::reports_by_default())
 }
 
 /// [`read_consent`] with the default given (#7767), `lamp_msgs::consent`'s
 /// rule for a `share` boolean: neither record there (both not found) is
 /// `by_default`'s answer, a yes nobody gave (no `by`, no time); a kept
 /// `false`, a later wording, a record that can't be read and a newer
-/// build's field are still no. With `by_default` false, as before.
+/// build's field are still no.
 fn read_consent_or(places: &Places, by_default: bool) -> (Consent, Option<String>) {
     match read_choice(&places.own) {
         Choice::Absent => {}
@@ -2526,6 +2527,7 @@ pub(crate) mod tests {
         }
 
         let places = places("failed-cache");
+        no(&places);
         let root = places.own.parent().unwrap();
         let program = root.join("systemctl");
         let called = root.join("called");
@@ -2554,7 +2556,7 @@ pub(crate) mod tests {
         let start = Instant::now();
         let mut timing = Timing::new(start);
 
-        // No consent, even when due: neither bus health nor systemd is read.
+        // A kept no, even when due: neither bus health nor systemd is read.
         assert!(!step(
             &shared,
             &mut source,
@@ -2929,22 +2931,20 @@ pub(crate) mod tests {
         let _ = fs::remove_dir_all(places.own.parent().unwrap());
     }
 
-    /// #7767: with `LAMP_NOTICING_BY_DEFAULT` on, no record at all is a
-    /// yes nobody gave; setup's or the lamp's own `false` stays no, and a
-    /// record that can't be read stays off, either way. Off, no record is
-    /// no, as before.
+    /// #7767's rule: with the default on, no record at all is a yes nobody
+    /// gave; setup's or the lamp's own `false` stays no, and a record that
+    /// can't be read stays off, either way. With it off, no record is no.
+    /// The product reads with it on, whatever `LAMP_NOTICING_BY_DEFAULT`
+    /// says (`reports_by_default`, the product owner on 25 Nov 2026).
     #[test]
-    fn no_reports_record_is_the_default_only_with_the_switch() {
+    fn no_reports_record_is_the_default_and_a_kept_no_stays_off() {
         let places = places("default");
         let share = |by_default| read_consent_or(&places, by_default).0.share;
         assert!(!share(false), "none, off");
         assert!(share(true), "none, on");
         let none = read_consent_or(&places, true).0;
         assert_eq!((none.by, none.since, none.held), (None, None, false));
-        assert_eq!(
-            read_consent(&places).0.share,
-            lamp_msgs::consent::noticing_by_default()
-        );
+        assert!(read_consent(&places).0.share, "none, the product's");
         // Setup's no, then setup's unreadable answer.
         for text in [
             r#"{"share":false,"asked":1,"at":"2026-11-18T00:00:00Z"}"#,
@@ -2965,6 +2965,47 @@ pub(crate) mod tests {
         assert!(!share(true), "own no");
         fs::write(&places.own, "not json").unwrap();
         assert!(!share(true), "own unreadable");
+        let _ = fs::remove_dir_all(places.own.parent().unwrap());
+    }
+
+    /// The product owner's call of 25 Nov 2026, as the product reads it
+    /// (`consent`, the driver's own `Reports::consent`): no record is on, a
+    /// yes nobody gave; setup's kept no and the lamp's own kept no stay off,
+    /// and a later yes in the app turns them back on.
+    #[test]
+    fn reports_are_on_with_no_record_and_off_for_a_kept_no() {
+        let places = places("on-by-default");
+        let mut reports = Reports::open(places.clone());
+        let none = consent(&places);
+        assert!(none.share, "no record");
+        assert_eq!((none.by, none.since, none.held), (None, None, false));
+        assert!(reports.consent().share, "no record, the driver's");
+        // Setup's kept no.
+        fs::write(
+            &places.setup,
+            r#"{"share":false,"asked":1,"at":"2026-11-25T00:00:00Z"}"#,
+        )
+        .unwrap();
+        assert!(!consent(&places).share, "setup's no");
+        assert!(!reports.consent().share, "setup's no, the driver's");
+        // Setup's yes, then the lamp's own no over it.
+        fs::write(
+            &places.setup,
+            r#"{"share":true,"asked":1,"at":"2026-11-25T00:00:00Z"}"#,
+        )
+        .unwrap();
+        assert!(consent(&places).share, "setup's yes");
+        fs::write(
+            &places.own,
+            r#"{"share":false,"at":"2026-11-25T00:00:00Z","by":"app","held":false}"#,
+        )
+        .unwrap();
+        assert!(!consent(&places).share, "the app's no");
+        // The lamp's own no with no setup record: still off.
+        fs::remove_file(&places.setup).unwrap();
+        assert!(!consent(&places).share, "the app's no, no setup record");
+        reports.set(true, NOW).unwrap();
+        assert!(reports.consent().share, "the app's yes again");
         let _ = fs::remove_dir_all(places.own.parent().unwrap());
     }
 
@@ -3008,6 +3049,7 @@ pub(crate) mod tests {
         assert_eq!(metrics_of(&mut reports), None);
         let _ = fs::remove_dir_all(off.own.parent().unwrap());
         let no_yes = places("counters-no-yes");
+        no(&no_yes);
         let mut reports = Reports::open(no_yes.clone()).counting(Some(wifi_file(&no_yes)));
         reports.voice_turn(900);
         reports.link(counters::Link::TcpFailed);
@@ -3137,6 +3179,7 @@ pub(crate) mod tests {
     #[test]
     fn the_voices_waits_and_a_download_come_off_the_bus_and_count_only_with_the_yes() {
         let places = places("counters-bus");
+        no(&places);
         let root = places.own.parent().unwrap().join("bus");
         fs::create_dir_all(&root).unwrap();
         let bus = lamp_bus::Bus::new(&root).unwrap();
@@ -3178,7 +3221,7 @@ pub(crate) mod tests {
                 "round": {"started_at_unix_ms": 1_000, "step_started_at_unix_ms": step_ms},
             })
         };
-        // No yes: the wait is taken off the bus and not counted.
+        // A kept no: the wait is taken off the bus and not counted.
         turns
             .publish_json(
                 lamp_ipc::monotonic_us(),
@@ -3210,6 +3253,16 @@ pub(crate) mod tests {
         fs::write(
             &places.setup,
             r#"{"share":true,"asked":1,"at":"2026-10-19T04:00:00Z"}"#,
+        )
+        .unwrap();
+    }
+
+    /// Setup's kept no: with no record reports are on (the product owner,
+    /// 25 Nov 2026), so "without the yes" is a person's no.
+    fn no(places: &Places) {
+        fs::write(
+            &places.setup,
+            r#"{"share":false,"asked":1,"at":"2026-10-19T04:00:00Z"}"#,
         )
         .unwrap();
     }
@@ -3762,10 +3815,10 @@ pub(crate) mod tests {
         ] {
             assert!(!gates(cloud, reports), "{cloud:?} {reports:?}");
         }
-        // The person's yes: none, a no, an unreadable file, a JSON "true",
-        // a newer wording.
+        // The person's choice: a no, an unreadable file, a JSON "true", a
+        // newer wording. No record at all is not among them: it is on
+        // (the product owner, 25 Nov 2026), below.
         for setup in [
-            None,
             Some(r#"{"share":false,"asked":1}"#),
             Some("nonsense"),
             Some(r#"{"share":"true","asked":1}"#),
@@ -3787,6 +3840,11 @@ pub(crate) mod tests {
             assert!(reports.due(ID).is_empty(), "{setup:?}");
             assert!(!places.queue.join("1.json").exists());
         }
+        // No record: a yes nobody gave, so a health goes.
+        let none = places("gates-none");
+        let mut reports = Reports::open(none.clone());
+        assert!(reports.health(NOW, None, &planted()).is_some());
+        let _ = fs::remove_dir_all(none.own.parent().unwrap());
         // A no of its own wins over setup's yes, and is read at each send.
         let places = places("gates-own");
         yes(&places);
@@ -3932,6 +3990,8 @@ pub(crate) mod tests {
             }
         }
         let places = places("bus");
+        // From a kept no: the bus's yes turns nothing on.
+        no(&places);
         let shared = Shared::new(Reports::open(places.clone()));
         let now = Instant::now();
         let mut timing = Timing::new(now);
@@ -4480,6 +4540,7 @@ pub(crate) mod tests {
     #[test]
     fn a_local_template_exit_note_cannot_grant_consent_to_send() {
         let places = places("template-no");
+        no(&places);
         let note = exit_note(
             "lamp-setup-change@private-instance.service",
             "signal",
@@ -4493,11 +4554,7 @@ pub(crate) mod tests {
         write_exit_note(&places.exits, &note).unwrap();
         let mut reports = Reports::open(places.clone());
         let notes = reports.new_notes();
-        assert_eq!(
-            notes.len(),
-            1,
-            "local notes are consumed even without a yes"
-        );
+        assert_eq!(notes.len(), 1, "local notes are consumed even with a no");
         assert!(reports.crash(NOW, None, &notes[0]).is_none());
         assert_eq!(reports.queued(), 0);
         assert!(reports.due(ID).is_empty());

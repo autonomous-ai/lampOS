@@ -1,4 +1,4 @@
-//! Skills, counted, in the opt-in health report (`docs/cloud.md`, "Skills,
+//! Skills, counted, in the health report (`docs/cloud.md`, "Skills,
 //! counted"; the owner's ask on #4710, 3 Nov). An added field under
 //! `lamp-report/1`, `skills`, agreed with the backend on #4710: numbers,
 //! enums and a Store package's SHA-256 only, never a skill's name, words or
