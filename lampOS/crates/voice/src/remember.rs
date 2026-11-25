@@ -9513,6 +9513,47 @@ pub const HITS_NOTE: &str = "From your memory, things that may fit what was just
 /// (the reviewer's P3 4 on #2251, as the session note's room part says).
 pub const HITS_ROOM_NOTE: &str =
     "These were said in this room. You cannot tell who said them, or who is asking now.";
+
+/// [`HITS_ROOM_NOTE`] with [`HITS_ROOM_NOT_ASKER_ENVIRONMENT`], in the words
+/// of [`ROOM_NOT_ASKER_ENVIRONMENT`]'s own rule.
+pub const HITS_ROOM_NOT_ASKER_NOTE: &str = "These were said in this room by whoever was here then, not necessarily the one asking now: never tell them as the asker's own, and never say 'you told me' about them. If one comes up, say someone here said it.";
+
+/// Only the exact value `on` (#8570, S15): the room's things a turn's hits
+/// tell ([`hits_note`]) end with [`HITS_ROOM_NOT_ASKER_NOTE`], so they are
+/// told as the session note's room part tells them, never as the asker's
+/// own. On lamp-06c1 (25 Nov, req 484) the only ask whose hits told the
+/// room's "the coffee here is made with oat milk and honey" answered "You
+/// take it the way the room keeps it"; the two asks with none told it as
+/// said in the room. A note, never a guard: the model judges what fits.
+/// Off, [`HITS_ROOM_NOTE`] byte for byte. Read once.
+pub const HITS_ROOM_NOT_ASKER_ENVIRONMENT: &str = "LAMP_MEMORY_HITS_ROOM_NOT_ASKER";
+static HITS_ROOM_NOT_ASKER: OnceLock<bool> = OnceLock::new();
+
+#[cfg(test)]
+thread_local! {
+    /// [`HITS_ROOM_NOT_ASKER_ENVIRONMENT`] for one test's own thread.
+    static HITS_ROOM_NOT_ASKER_FOR_TEST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether [`HITS_ROOM_NOT_ASKER_ENVIRONMENT`] is on in this process.
+fn hits_room_not_asker_on() -> bool {
+    #[cfg(test)]
+    if HITS_ROOM_NOT_ASKER_FOR_TEST.with(std::cell::Cell::get) {
+        return true;
+    }
+    *HITS_ROOM_NOT_ASKER.get_or_init(|| {
+        std::env::var(HITS_ROOM_NOT_ASKER_ENVIRONMENT)
+            .ok()
+            .as_deref()
+            == Some("on")
+    })
+}
+
+/// [`hits_room_not_asker_on`] on or off for the calling test's thread alone.
+#[cfg(test)]
+fn set_hits_room_not_asker_for_test(on: bool) {
+    HITS_ROOM_NOT_ASKER_FOR_TEST.with(|cell| cell.set(on));
+}
 /// Said with a known person's own kept things (#3504, N9): they are the
 /// one asking now (`hits_scope`: the eyes' face and the session's person
 /// agree), so they are told as theirs. On lamp-06c1 on 27 Oct a hit from
@@ -9769,6 +9810,7 @@ pub fn hits_note_counted(
     }
     let note = match person {
         Some(_) => format!("{told}\n{HITS_OWN_NOTE}"),
+        None if hits_room_not_asker_on() => format!("{told}\n{HITS_ROOM_NOT_ASKER_NOTE}"),
         None => format!("{told}\n{HITS_ROOM_NOTE}"),
     };
     Some((note, count))
@@ -27424,7 +27466,8 @@ mod tests {
     #[test]
     fn a_room_hit_is_told_never_as_the_askers_own() {
         const NOW: u64 = 1_792_000_000_000;
-        let (socket, served) = memory("hits-room-not-asker", 1, |_| {
+        set_hits_room_not_asker_for_test(true);
+        let (socket, served) = memory("hits-room-not-asker", 2, |_| {
             json!({"ok":true,"entries":[
                 {"id":1,"at_unix_ms":NOW,"text":"The coffee here is made with oat milk and honey."}
             ]})
@@ -27435,6 +27478,15 @@ mod tests {
             room.contains("not necessarily the one asking now")
                 && room.contains("as the asker's own"),
             "{room}"
+        );
+        assert!(room.ends_with(HITS_ROOM_NOT_ASKER_NOTE), "{room}");
+        // Off: byte for byte as before.
+        set_hits_room_not_asker_for_test(false);
+        let off = hits_note(&socket, None, "how do I take my coffee", NOW, None).unwrap();
+        assert_eq!(
+            off,
+            room.replace(HITS_ROOM_NOT_ASKER_NOTE, HITS_ROOM_NOTE),
+            "{off}"
         );
         served.join().unwrap();
         let _ = std::fs::remove_file(&socket);

@@ -78,6 +78,38 @@ pub const OFFERS: &[&str] = &[
     "if you like",
 ];
 
+/// Only the exact value `on` (#8570, S6; beside #7569 and #8478): a line
+/// that cut the lamp's answer as it began (`Start`'s `heard_of_cut` of that
+/// answer, [`Line::cut_it`]) has no run of the lamp's words taken from its
+/// end. The lamp's voice stopped where the line began, so the line's last
+/// words are the person's: on lamp-06c1 (25 Nov, req 416) "Cancel the
+/// reminder to water the plants." cut the reminders read out, lost "water
+/// the plants", and was asked "which reminder?". A run at its start, and
+/// every line that cut nothing, are judged as before. Read once.
+pub const CUT_END_ENVIRONMENT: &str = "LAMP_SECOND_OWN_ECHO_CUT_END";
+static CUT_END: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+#[cfg(test)]
+thread_local! {
+    /// [`CUT_END_ENVIRONMENT`] for one test's own thread.
+    static CUT_END_FOR_TEST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether [`CUT_END_ENVIRONMENT`] is on in this process.
+fn cut_end_on() -> bool {
+    #[cfg(test)]
+    if CUT_END_FOR_TEST.with(std::cell::Cell::get) {
+        return true;
+    }
+    *CUT_END.get_or_init(|| std::env::var(CUT_END_ENVIRONMENT).ok().as_deref() == Some("on"))
+}
+
+/// [`cut_end_on`] on or off for the calling test's thread alone.
+#[cfg(test)]
+pub(super) fn set_cut_end_for_test(on: bool) {
+    CUT_END_FOR_TEST.with(|cell| cell.set(on));
+}
+
 /// The heard line, as the turn knows it.
 pub(super) struct Line<'a> {
     pub request: u64,
@@ -88,6 +120,9 @@ pub(super) struct Line<'a> {
     pub over_the_lamps_voice: bool,
     /// Only the lamp's name was called (`ProviderInput::Called`).
     pub called: bool,
+    /// Its `Start` said it cut the lamp's answer it is judged against
+    /// (`heard_of_cut` of that request, [`CUT_END_ENVIRONMENT`]).
+    pub cut_it: bool,
 }
 
 /// The lamp's latest answer so far: its request, its words sent to the
@@ -297,6 +332,12 @@ pub(super) fn judge(line: &Line<'_>, said: Option<&Said<'_>>) -> Echo {
     } else if leading == m {
         Some((&words[m..], "start"))
     } else if trailing == m {
+        if line.cut_it && cut_end_on() {
+            return Echo::Answered(Some(format!(
+                "lamp-voice second: request {request}: of its {n} words, {m} at its end in the lamp's answer to request {}, but it cut that answer as it began: its end is the person's, sent as heard ({CUT_END_ENVIRONMENT})",
+                said.request
+            )));
+        }
         Some((&words[..n - m], "end"))
     } else {
         None
@@ -372,6 +413,7 @@ mod yes_tests {
             began_us,
             over_the_lamps_voice: over,
             called,
+            cut_it: false,
         }
     }
 
@@ -466,6 +508,7 @@ mod tests {
             began_us,
             over_the_lamps_voice,
             called: false,
+            cut_it: false,
         }
     }
 
@@ -776,26 +819,53 @@ mod tests {
     /// the plants", the line's own last words, were taken out as the lamp's
     /// echo, and the model, sent "Cancel the reminder to", asked "which
     /// reminder?". The lamp's voice stopped as the line began, so its end
-    /// is the person's: sent as heard.
+    /// is the person's: sent as heard, with `LAMP_SECOND_OWN_ECHO_CUT_END`.
+    /// Off, or a line that cut nothing, as before; a run at a cut line's
+    /// start is still taken out.
     #[test]
     fn a_cut_in_naming_what_the_lamp_read_keeps_its_last_words() {
         let read = Said {
-            words: "Three things are set: a timer, ringing at 14:36. Call the plumber at 20:00 tonight. Water the plants",
+            words: "Three things are set: a timer, ringing at 14:36. Call the plumber at 20:00 tonight. Water the plants at nine tonight.",
             ..said()
         };
-        // Begun 70 ms before the played words' end: the lamp's voice was cut
-        // there.
-        assert_eq!(
-            judge(
-                &line(
-                    "Cancel the reminder to water the plants.",
-                    UNTIL_US - 70_000,
-                    true
-                ),
-                Some(&read)
-            ),
-            Echo::Answered(None)
+        let heard = "Cancel the reminder to water the plants.";
+        // Begun over its voice, which was cut there.
+        let cut = Line {
+            cut_it: true,
+            ..line(heard, UNTIL_US - 70_000, true)
+        };
+        let stripped = Echo::Stripped(
+            "Cancel the reminder to".to_owned(),
+            "lamp-voice second: request 5: 3 of its 7 words, the lamp's own answer to request 3 at its end, are taken out of what the model is sent (LAMP_SECOND_OWN_ECHO)".to_owned(),
         );
+        assert_eq!(judge(&cut, Some(&read)), stripped, "off: as on the lamp");
+        set_cut_end_for_test(true);
+        assert_eq!(
+            judge(&cut, Some(&read)),
+            Echo::Answered(Some(
+                "lamp-voice second: request 5: of its 7 words, 3 at its end in the lamp's answer to request 3, but it cut that answer as it began: its end is the person's, sent as heard (LAMP_SECOND_OWN_ECHO_CUT_END)".to_owned()
+            ))
+        );
+        // A line that cut nothing: its end run taken out, as before.
+        assert_eq!(
+            judge(&line(heard, UNTIL_US - 70_000, true), Some(&read)),
+            stripped
+        );
+        // A cut line's own words first: still taken out.
+        let first = Line {
+            cut_it: true,
+            ..line(
+                "water the plants at nine please cancel that",
+                UNTIL_US - 70_000,
+                true,
+            )
+        };
+        assert!(
+            matches!(judge(&first, Some(&read)), Echo::Stripped(_, ref journal) if journal.contains("at its start")),
+            "{:?}",
+            judge(&first, Some(&read))
+        );
+        set_cut_end_for_test(false);
     }
 
     #[test]
