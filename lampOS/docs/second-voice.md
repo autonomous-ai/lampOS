@@ -5425,7 +5425,8 @@ after a take-over, but now for every turn:
     (#8555, the first builder's call on 25 Nov), a line let out joins the
     piece it cut short when that piece called the lamp (its name heard, a
     tap or words calling it, or `LAMP_SAID_TO_ME` letting it through as
-    said to the lamp) and no other voice or two faces were seen speaking
+    said to the lamp; a stand-in such as "Hey Man," that `LAMP_NAME_NEAR`
+    ruled not the name does not count) and no other voice or two faces were seen speaking
     in the conversation, in any room: `... cut short D ms before it began:
     the first piece called the lamp, cosine 0.49, no face in view; ...`
     (`Heeding::called_in_the_band`, as `Joined::NoSecond`). Someone who has

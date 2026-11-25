@@ -10679,6 +10679,17 @@ impl Heeding {
         }
     }
 
+    /// `request` called the lamp, kept once in [`Self::called_lately`].
+    fn called(&mut self, request: u64) {
+        if self.called_lately.contains(&request) {
+            return;
+        }
+        if self.called_lately.len() == SPOKE_KEPT {
+            self.called_lately.pop_front();
+        }
+        self.called_lately.push_back(request);
+    }
+
     /// In the voices' band (`likeness` between
     /// [`crate::same_voice::DIFFERENT_BELOW`] and
     /// [`crate::same_voice::SAME_FROM`]) with no face in view at either
@@ -12351,10 +12362,7 @@ impl Heeding {
         // (#7721); the held line as before, the pose after it.
         let crate::said_to_me::Said::Held(held) = decision else {
             if decision != crate::said_to_me::Said::Stands {
-                if self.called_lately.len() == SPOKE_KEPT {
-                    self.called_lately.pop_front();
-                }
-                self.called_lately.push_back(request);
+                self.called(request);
             }
             eprintln!(
                 "lamp-voice second: request {request}: said to me: let through: {}: {words} words, {}; {pose} (LAMP_SAID_TO_ME)",
@@ -13749,11 +13757,9 @@ impl Heeding {
         // Its words or the name heard called the lamp, not a face alone.
         self.by_name =
             (played && (attention.called_for_itself() || seen.named_faced)).then_some(request);
-        if attention.called_for_itself() {
-            if self.called_lately.len() == SPOKE_KEPT {
-                self.called_lately.pop_front();
-            }
-            self.called_lately.push_back(request);
+        // A stand-in `LAMP_NAME_NEAR` ruled not the name did not call it.
+        if attention.called_for_itself() && !attention.ruled_not_the_name() {
+            self.called(request);
         }
         // `LAMP_BUSY_FOLLOW_UP_RENEWS` (#7332): a line let out only as the
         // conversation going on, spoken by the caller (their face alone, or
