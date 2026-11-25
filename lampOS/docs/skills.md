@@ -2612,7 +2612,22 @@ it does not know).
 - **`remove`** renames an installable skill's folder aside, so it is gone
   at once for the program, then deletes it. First it takes the owner's
   yes to the skill's camera out of `--state-dir`'s `camera` (below), and
-  its seen_more out of `seen_more`.
+  its seen_more out of `seen_more`. A folder its run can't delete whole is
+  refused before anything is moved or taken back (#8505): `not removed:
+  NAME: PATH: …: this user can't delete its files, so nothing is moved`
+  (`package::undeletable`: each folder of its tree, no link followed, must
+  be readable, writable and searchable by the run's own user and
+  capabilities). **Who owns a skill's files:** every skill put on by root's
+  manage helper (made here by voice or in the app, from the Store, pushed)
+  is root's, folders 0755 and files 0644, as the skills folder itself is:
+  the parts run as `lampos` read them and never write them. So `lamp-skills
+  remove` run as `lampos` refuses a made skill and leaves it whole; before,
+  on lamp-06c1's skills folder that `lampos` could write (row-8469, 24 Nov),
+  it renamed it to `.removed-NAME-PID` and couldn't delete its files
+  (EACCES), and the folder stayed. A made skill is removed through the
+  manage helper (the app's skills page, or by voice), or as root. Tests:
+  `a_made_skill_its_remover_cannot_delete_is_refused_and_nothing_is_set_aside`,
+  `a_skill_its_remover_cannot_delete_is_refused_with_nothing_moved`.
   The app's skills page removes a skill the same way, through the manage
   helper below.
 - **`asked`** is the manage helper ("The manage helper", below): one
@@ -2821,9 +2836,22 @@ for it.
   - `{"remove": NAME}`, a string: it runs `remove` above, which refuses a
     name that is not a skill's (1 to 64 lowercase letters, digits and
     hyphens: no `/`, `..`, NUL, hidden name or more) and a core skill,
-    under the folder's lock. A skill renamed aside whose
-    `.removed-NAME-PID` was not then deleted is answered done (the next
-    install deletes it); that folder's path is in the journal only.
+    under the folder's lock. A skill whose folders it can't delete whole is
+    refused with nothing moved (#8505, `remove` above). A skill renamed
+    aside whose `.removed-NAME-PID` was still not then deleted (a fault
+    after the check) is answered done (the helper's next start, or the next
+    install, deletes it); that folder's path is in the journal only.
+  - **As it starts, on any request** (#8505), with the folder's lock free
+    (never waited for: a run under way keeps its own), the helper deletes
+    what an unfinished install or remove left: only a folder directly in
+    the skills folder named exactly `.install-NAME-PID` or
+    `.removed-NAME-PID` (a skill's name and 1 to 10 digits), never a link,
+    a file or another name, no link followed. It says so in one journal
+    line, `lamp-skills: asked: deleted N folders an unfinished install or
+    remove left in DIR: NAMES`, and nothing with none. A lamp's existing
+    ones (row-8469's on lamp-06c1) go at the helper's first request after
+    the update. Test:
+    `the_manage_helper_deletes_what_an_unfinished_remove_left_as_it_starts`.
   - `{"install": {"url", "sha256", "name", "version"}}`, strings, all but
     `url` optional (a Skills Store catalogue entry's fields): a package
     fetched and installed only signed with the Store's key, and

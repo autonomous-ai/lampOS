@@ -1228,61 +1228,41 @@ fn has_open(pid: u32, folder: &Path) -> bool {
         })
 }
 
-/// A skill renamed aside whose `.removed-NAME-PID` could not then be
-/// deleted is gone for the running program, so it is answered done; where
-/// it was set aside goes to the journal alone, never into the answer (the
-/// reviewer's P3 2 on #1890).
+/// A skill whose folders its remover can't delete is never renamed aside
+/// (#8505; before, its `.removed-NAME-PID` stayed and was answered done,
+/// the reviewer's P3 2 on #1890): through the helper and by hand, it is
+/// refused, nothing is moved, and the skill is still on and whole. The
+/// answer names the skill's own folder, never a `.removed-` one.
 #[test]
-fn a_skill_renamed_aside_but_not_deleted_is_answered_done_its_path_in_the_journal_only() {
+fn a_skill_its_remover_cannot_delete_is_refused_with_nothing_moved() {
     let dir = tempfile::tempdir().unwrap();
     let skills = dir.path().join("skills");
     fs::create_dir_all(&skills).unwrap();
     let skill = tutor(&skills, "1.0.0");
-    // A folder inside it whose file can't be deleted: the rename goes, the
-    // delete after it does not.
+    // A folder inside it whose file can't be deleted.
     let stuck = skill.join("stuck");
     fs::create_dir(&stuck).unwrap();
     fs::write(stuck.join("kept"), "x").unwrap();
     fs::set_permissions(&stuck, fs::Permissions::from_mode(0o555)).unwrap();
 
     let (answer, ok, journal) = ask_helper_journal(&skills, b"{\"remove\": \"desk-tutor\"}\n");
-    let names = left(&skills);
-    for name in &names {
-        let _ = fs::set_permissions(
-            skills.join(name).join("stuck"),
-            fs::Permissions::from_mode(0o755),
-        );
-    }
-    assert!(ok, "{answer}");
-    assert_eq!(
-        answer["done"],
-        "removed desk-tutor: a running lamp-skills lets it go within 2 s"
-    );
-    assert_eq!(answer.as_object().unwrap().len(), 1, "{answer}");
-    let said = answer.to_string();
-    assert!(
-        !said.contains(".removed-") && !said.contains(&*skills.to_string_lossy()),
-        "{said}"
-    );
-    assert_eq!(names.len(), 1, "{names:?}");
-    assert!(names[0].starts_with(".removed-desk-tutor-"), "{names:?}");
-    assert!(journal.contains(&names[0]), "{journal}");
-    assert!(journal.contains("was not deleted"), "{journal}");
-    // By hand, the same is said as not finished, its path with it.
-    let skill = tutor(&skills, "1.0.0");
-    let stuck = skill.join("stuck");
-    fs::create_dir(&stuck).unwrap();
-    fs::write(stuck.join("kept"), "x").unwrap();
-    fs::set_permissions(&stuck, fs::Permissions::from_mode(0o555)).unwrap();
+    assert!(!ok, "{answer}");
+    let why = answer["refused"].as_str().unwrap();
+    assert!(why.starts_with("not removed: desk-tutor: "), "{why}");
+    assert!(why.contains("nothing is moved"), "{why}");
+    assert!(!why.contains(".removed-"), "{why}");
+    assert!(!journal.contains(".removed-"), "{journal}");
+    assert_eq!(left(&skills), ["desk-tutor"]);
+    // By hand, the same.
     let why = package::remove(&skills, None, "desk-tutor").unwrap_err();
-    for name in left(&skills) {
-        let _ = fs::set_permissions(
-            skills.join(name).join("stuck"),
-            fs::Permissions::from_mode(0o755),
-        );
-    }
-    assert!(why.starts_with("removed desk-tutor, but "), "{why}");
-    assert!(why.contains(".removed-desk-tutor-"), "{why}");
+    assert!(why.starts_with("not removed: desk-tutor: "), "{why}");
+    assert_eq!(left(&skills), ["desk-tutor"]);
+    assert_eq!(fs::read(stuck.join("kept")).unwrap(), b"x");
+    lamp_skills::load(&skill).unwrap();
+    // Deletable again, it is removed and nothing is left.
+    fs::set_permissions(&stuck, fs::Permissions::from_mode(0o755)).unwrap();
+    package::remove(&skills, None, "desk-tutor").unwrap();
+    assert!(left(&skills).is_empty(), "{:?}", left(&skills));
 }
 
 /// The helper checks each request itself, whoever connects: a core skill
