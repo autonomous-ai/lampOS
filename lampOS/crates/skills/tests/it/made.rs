@@ -1782,3 +1782,152 @@ fn a_guarded_nudge_made_by_the_agent_passes_both_caps_with_its_maker() {
     assert!(refused.is_err(), "{refused:?}");
     lamp_voice::made_skill::set_reactions_here(None);
 }
+
+/// Every folder in `dir`'s tree, `dir` with them, given `mode`; no link
+/// followed.
+fn folders_to(dir: &Path, mode: u32) {
+    for entry in fs::read_dir(dir).unwrap().flatten() {
+        if entry.file_type().unwrap().is_dir() {
+            folders_to(&entry.path(), mode);
+        }
+    }
+    fs::set_permissions(dir, fs::Permissions::from_mode(mode)).unwrap();
+}
+
+/// #8505, row-8469 on lamp-06c1, 24 Nov 16:41: a skill made by voice is
+/// put on by root's manage helper, its folders root's and 0755, inside a
+/// skills folder `lampos` could write. `lamp-skills remove` run as
+/// `lampos` renamed it to `.removed-*`, then couldn't delete its files
+/// (EACCES), and the folder stayed. Made here as the helper makes it
+/// (`install_made`, through its one line), then its folders 0555, which is
+/// what `lampos` may do in root's 0755 ones; the remove run by this user
+/// sets nothing aside: refused, the skill still on and whole, and nothing
+/// beside it. Removed by one who may delete it (root's helper; here, its
+/// folders given back to this user), nothing is left in the folder.
+#[test]
+fn a_made_skill_its_remover_cannot_delete_is_refused_and_nothing_is_set_aside() {
+    lamp_voice::made_skill::set_asks_here(Some(true));
+    let dir = tempfile::tempdir().unwrap();
+    let keeping = keeping(dir.path());
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
+    let sha256 = kept_made(
+        dir.path(),
+        &keeping,
+        "pebble-chime",
+        &asked_toml("[\"pebble chime\"]"),
+    );
+    let mut answer = Vec::new();
+    let asked = format!("{{\"install_made\": \"{sha256}\"}}\n");
+    let ok = asked_helper(
+        &skills,
+        &keeping.directory,
+        &skills.join("no-state"),
+        std::time::Duration::from_millis(500),
+        None,
+        None,
+        asked.as_bytes(),
+        &mut answer,
+    )
+    .unwrap();
+    assert!(ok, "{}", String::from_utf8_lossy(&answer));
+    let made = skills.join("pebble-chime");
+    assert!(lamp_skills::load(&made).unwrap().made_here);
+    let names = |skills: &Path| {
+        let mut names: Vec<String> = fs::read_dir(skills)
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        names
+    };
+    assert_eq!(names(&skills), ["pebble-chime"]);
+
+    folders_to(&made, 0o555);
+    let refused = package::remove(&skills, None, "pebble-chime");
+    for name in names(&skills) {
+        folders_to(&skills.join(name), 0o755);
+    }
+    let why = refused.unwrap_err();
+    assert!(why.starts_with("not removed: pebble-chime:"), "{why}");
+    assert!(why.contains("manage helper"), "{why}");
+    assert!(!why.contains(".removed-"), "{why}");
+    assert_eq!(names(&skills), ["pebble-chime"]);
+    assert!(lamp_skills::load(&made).unwrap().made_here);
+
+    let said = package::remove(&skills, None, "pebble-chime").unwrap();
+    assert!(said.starts_with("removed pebble-chime"), "{said}");
+    assert!(names(&skills).is_empty(), "{:?}", names(&skills));
+    lamp_voice::made_skill::set_asks_here(None);
+}
+
+/// #8505: the `.removed-*` folders a lamp already has (row-8469's) are
+/// deleted once, by root's manage helper as it starts on any request, with
+/// the folder free: only a folder directly in the skills folder of exactly
+/// the shape a killed or unfinished run leaves, never a link, a file or
+/// another name, and the journal says how many in one line. With none
+/// left, it says nothing.
+#[test]
+fn the_manage_helper_deletes_what_an_unfinished_remove_left_as_it_starts() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(&skills).unwrap();
+    for left in [".removed-pebble-chime-4242", ".install-pebble-hello-7"] {
+        fs::create_dir_all(skills.join(left).join("scripts")).unwrap();
+        fs::write(skills.join(left).join("SKILL.md"), "made: here").unwrap();
+    }
+    let elsewhere = dir.path().join("elsewhere");
+    fs::create_dir(&elsewhere).unwrap();
+    fs::write(elsewhere.join("keep.txt"), "not the skills'").unwrap();
+    std::os::unix::fs::symlink(&elsewhere, skills.join(".removed-x-12")).unwrap();
+    fs::write(skills.join(".removed-y-7"), "a file").unwrap();
+    fs::create_dir(skills.join(".removed-notes")).unwrap();
+    let ask = |line: &[u8]| {
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args(["asked", "--dir"])
+            .arg(&skills)
+            .arg("--state-dir")
+            .arg(dir.path().join("state"))
+            .env(package::ANY_ASKER, "on")
+            .env_remove(package::STORE_SWITCH)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .and_then(|mut child| {
+                use std::io::Write;
+                child.stdin.take().unwrap().write_all(line)?;
+                child.wait_with_output()
+            })
+            .unwrap();
+        String::from_utf8_lossy(&output.stderr).into_owned()
+    };
+    let journal = ask(b"{\"task_asks\": \"pebble-chime\"}\n");
+    let lines: Vec<&str> = journal
+        .lines()
+        .filter(|line| line.contains("an unfinished install or remove left"))
+        .collect();
+    assert_eq!(
+        lines,
+        [format!(
+            "lamp-skills: asked: deleted 2 folders an unfinished install or remove left in {}: .install-pebble-hello-7, .removed-pebble-chime-4242",
+            skills.display()
+        )],
+        "{journal}"
+    );
+    let mut kept: Vec<String> = fs::read_dir(&skills)
+        .unwrap()
+        .flatten()
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect();
+    kept.sort();
+    assert_eq!(kept, [".removed-notes", ".removed-x-12", ".removed-y-7"]);
+    assert_eq!(
+        fs::read_to_string(elsewhere.join("keep.txt")).unwrap(),
+        "not the skills'"
+    );
+    let journal = ask(b"{\"task_asks\": \"pebble-chime\"}\n");
+    assert!(!journal.contains("left in"), "{journal}");
+}
