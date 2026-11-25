@@ -3374,7 +3374,13 @@ fn named_near(
         return (text, None);
     };
     let word = &text[start..end];
-    if word.eq_ignore_ascii_case(net::key_terms::NAME) || word.eq_ignore_ascii_case("lamb") {
+    // A greeting set off ("Hello? …", how speech to text wrote "Hey Lamp"
+    // on lamp-74ff, the P0 of 25 Nov) is no word in the name's place:
+    // nothing is ruled, and the hearing is weighed by its signs.
+    if word.eq_ignore_ascii_case(net::key_terms::NAME)
+        || word.eq_ignore_ascii_case("lamb")
+        || crate::attention::is_greeting(word)
+    {
         return (text, None);
     }
     // `LAMP_NAME_NOT_ANOTHERS` (#8114): another person's name stays theirs,
