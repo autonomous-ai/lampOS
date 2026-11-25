@@ -320,6 +320,13 @@ fn message_observed(
             let measured = width_share >= facing::LEAST_WIDTH
                 && facing::marks_seen(&face.marks, width, height);
             let turn = measured.then(|| facing::yaw_deg(&face.marks)).flatten();
+            // What the message says of the turn: none for a small face's
+            // turn past facing, which is noise (`facing::turn_read`); the
+            // mouth's judge still weighs the turn as measured.
+            let eyes_share = (face.marks[1].0 - face.marks[0].0)
+                .hypot(face.marks[1].1 - face.marks[0].1)
+                / width;
+            let told_turn = facing::turn_read(turn, eyes_share, from_middle);
             let to_the_right = face.marks[2].0 >= (face.marks[0].0 + face.marks[1].0) / 2.0;
             let speaking = ids.mouths.as_mut().map(|mouths| {
                 let open = opens.get(index).copied().flatten();
@@ -366,9 +373,10 @@ fn message_observed(
                 xmax: edges[2],
                 ymax: edges[3],
                 confidence: face.score.clamp(0.0, 1.0),
-                yaw: turn
+                yaw: told_turn
                     .map(|degrees| degrees.to_radians() * if to_the_right { 1.0 } else { -1.0 }),
-                facing: turn.map(|degrees| facing::facing(Some(degrees), width_share, from_middle)),
+                facing: told_turn
+                    .map(|degrees| facing::facing(Some(degrees), width_share, from_middle)),
             }
         })
         .collect();
@@ -1031,6 +1039,30 @@ mod tests {
         assert!(turned(0.95).faces[0].yaw.unwrap() > 1.0);
         assert!(turned(-0.95).faces[0].yaw.unwrap() < -1.0);
         assert_eq!(turned(-0.95).faces[0].facing, Some(false));
+    }
+
+    /// Friday's report on #7814 (lamp-74ff, 25 Nov): a face wide enough to
+    /// measure (`facing::LEAST_WIDTH`) with its eyes under
+    /// `facing::LEAST_EYES` apart, its nose at an eye, has no turn and no
+    /// facing, not a face turned away; facing it still faces; the same
+    /// turn on a larger face is still turned away.
+    #[test]
+    fn a_small_face_read_turned_past_facing_is_unread() {
+        let seen = |width: f32, nose: f32| {
+            message(
+                &[face(300.0, 200.0, width, width * 1.25, nose)],
+                &[],
+                PICTURE,
+                &mut Ids::default(),
+                0,
+            )
+            .faces[0]
+                .clone()
+        };
+        let small = seen(50.0, 0.95);
+        assert_eq!((small.yaw, small.facing), (None, None));
+        assert_eq!(seen(50.0, 0.0).facing, Some(true));
+        assert_eq!(seen(120.0, 0.95).facing, Some(false));
     }
 
     /// #7442: with the switch each measured face has a pitch, and the face

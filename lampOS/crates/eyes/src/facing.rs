@@ -26,6 +26,15 @@ pub const EDGE_SCALE: f32 = 1.8;
 /// A face narrower than this share of the picture's width has marks too
 /// close together to measure a turn from. V1: 48 pixels of 640.
 pub const LEAST_WIDTH: f32 = 0.075;
+/// Eyes closer together than this share of the picture's width (12 pixels
+/// of the 320-across working picture) are too close for a turn past facing
+/// to be a measure: the nose's mark wanders by a pixel or two, a turn read
+/// from it swings to 90 ([`turn_read`]). On lamp-74ff on 25 Nov, 17:20 to
+/// 18:30, one person at the desk facing the lamp, its recognition lines
+/// read the nose past an eye (90 degrees) in 54 of 64 looks under 8 pixels,
+/// 155 of 433 at 8 to 12, 9 of 251 at 12 to 16, 1 of 53 at 16 to 20 and
+/// none of 41 at 20 or more (Friday's report on #7814).
+pub const LEAST_EYES: f32 = 12.0 / 320.0;
 /// The vote looks this far back, needs this many looks, and this share of
 /// them facing.
 pub const WINDOW_US: u64 = 1_500_000;
@@ -182,6 +191,16 @@ pub fn facing(yaw: Option<f32>, width_share: f32, from_middle: f32) -> bool {
     yaw.is_some_and(|yaw| width_share >= LEAST_WIDTH && yaw <= allowed_deg(from_middle))
 }
 
+/// The turn one look reports for a face whose eyes are `eyes_share` of the
+/// picture's width apart, from its measured `yaw` ([`yaw_deg`]): as
+/// measured, but under [`LEAST_EYES`] a turn past what counts as facing
+/// ([`allowed_deg`]) is the marks' noise, not a head seen turned away, so
+/// it is not read (`None`): it counts neither for nor against. Such a face
+/// still reads facing, and a face large enough still reads turned away.
+pub fn turn_read(yaw: Option<f32>, eyes_share: f32, from_middle: f32) -> Option<f32> {
+    yaw.filter(|yaw| eyes_share >= LEAST_EYES || *yaw <= allowed_deg(from_middle))
+}
+
 /// The looks of the last moment, for the vote taken when someone begins to
 /// speak.
 #[derive(Default)]
@@ -233,6 +252,22 @@ mod tests {
             (35.0, 80.0),
             (65.0, 80.0),
         ]
+    }
+
+    /// Friday's report on #7814 (lamp-74ff, 25 Nov): a face with its eyes
+    /// about 10 pixels apart read 90 degrees in 205 of some 300 looks while
+    /// its person faced the lamp. Under [`LEAST_EYES`] a turn past facing
+    /// is not read; a turn within it is; a face large enough turned away
+    /// still reads turned away.
+    #[test]
+    fn a_small_faces_turn_past_facing_is_not_read_as_turned_away() {
+        let small = 10.0 / 320.0;
+        assert_eq!(turn_read(Some(90.0), small, 0.0), None);
+        assert_eq!(turn_read(Some(70.0), small, 0.0), None);
+        assert_eq!(turn_read(Some(20.0), small, 0.0), Some(20.0));
+        assert_eq!(turn_read(Some(90.0), LEAST_EYES, 0.0), Some(90.0));
+        assert_eq!(turn_read(Some(70.0), 0.1, 0.0), Some(70.0));
+        assert_eq!(turn_read(None, 0.1, 0.0), None);
     }
 
     #[test]
