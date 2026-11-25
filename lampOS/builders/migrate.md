@@ -1,9 +1,8 @@
 # Builder: migrate
 
-The role file of the builder `migrate`, first filled from
-[TEMPLATE.md](TEMPLATE.md) on 2026-10-20 for the V1-to-V2 move (migrate-P1,
-#1722), and written again on 2026-11-25 for the work its person gave it
-then. How a builder works is in [joining.md](../docs/joining.md). The name is
+The role file of the builder `migrate`, filled from
+[TEMPLATE.md](TEMPLATE.md) on 2026-11-25 for the work its person gave it.
+How a builder works is in [joining.md](../docs/joining.md). The name is
 the one the owner chose; it is not a place in a line. The first builder
 corrects it where it must be.
 
