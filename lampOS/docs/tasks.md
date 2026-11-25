@@ -8309,10 +8309,11 @@ reopened, `ENGINE_NOT_READY` once, the turn accepted in 29,099 ms. The
 person heard nothing after the first line.
 
 Now, 20 s after a hand-over asked by voice (`hand_wait::AFTER`), the voice
-reads the work's record once (`{"op":"work"}` on the request socket, as
+reads the work records once (`{"op":"work_list","limit":10}` on the
+request socket, as
 [the voice's own look at its work](#the-voice-asks-about-its-work-7930)
-does). If it is still `queued`, and it is still the work handed over last,
-one line is asked of the say service as the voice's own, at the normal
+does). If the work is still `queued`, no work started before it is still
+under way (not `done`), and it is still the work handed over last, one line is asked of the say service as the voice's own, at the normal
 priority, let go if not begun within 15 s:
 
 - "Your computer is waking up; it'll start in a moment.";
@@ -8327,7 +8328,13 @@ A wait already told at the hand-over gets no line at 20 s
 (`hand_wait::told_at_hand_over`): when the lamp knows the computer's
 pane is stopped, the waking line is said from the start, and only that
 one (the first builder on #8445, 14:51: one line about the wait, never
-two). Work asked by text gets no line, and without the say service
+two). Work queued behind earlier work still under way gets no line:
+lamp-tasks runs one at a time (OpenClaw direct's "waiting for the task
+before it to end", `LAMP_TASKS_OPENCLAW_DIRECT=on`; the one session's queue
+behind the running turn, `LAMP_TASKS_ONE_SESSION=on`), so the agent is busy,
+not waking, and the line would be false (Jarvis's P2 on #8510). The ids
+kept against a second line are the newest 8 only (`hand_wait::SAID_KEPT`).
+Work asked by text gets no line, and without the say service
 (`LAMP_SAY` off) nothing is read or said. The journal says
 `lamp-voice: tasks: work N still waits for its agent after 20 s: said it is
 starting`.
