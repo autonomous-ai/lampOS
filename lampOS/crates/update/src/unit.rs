@@ -228,6 +228,27 @@ mod tests {
         assert_eq!(ceiling(&generic), ceiling(&product), "{generic}");
     }
 
+    /// #8615: the ring's day ceiling is one value, the product unit's, raised
+    /// from 24 to 60; the hardware contract allows at most 120, and the
+    /// night stays under Actions' light cap of 24.
+    #[test]
+    fn the_product_ring_ceiling_is_the_day_default_within_the_contract() {
+        let exec = include_str!("../../../deploy/product/lamp-voice.service")
+            .lines()
+            .find_map(|line| line.strip_prefix("ExecStart="))
+            .unwrap();
+        let value: u16 = exec
+            .split_whitespace()
+            .skip_while(|word| *word != "--ring-channel-ceiling")
+            .nth(1)
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert_eq!(value, 60, "{exec}");
+        assert!(value <= 120);
+        assert_eq!(exec.matches("--ring-channel-ceiling").count(), 1, "{exec}");
+    }
+
     /// #2943: the generic voice unit names the recorded failure lines in the
     /// product's language, from the folder `lamp-keeper prepare` fills
     /// (`install::NOTICES_MOVED`), so a lamp moved from V1 says why it can't

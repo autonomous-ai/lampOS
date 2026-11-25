@@ -166,6 +166,18 @@ impl Rig {
             thread::sleep(Duration::from_millis(1));
         }
     }
+    /// Every event said so far, unread.
+    fn drain(&self) {
+        while self
+            .parent
+            .lock()
+            .unwrap()
+            .control
+            .receive::<WorkerEvent>()
+            .unwrap()
+            .is_some()
+        {}
+    }
     fn control(&self, command: Control) {
         self.parent.lock().unwrap().control.send(command).unwrap();
     }
@@ -246,8 +258,10 @@ fn present(rig: &Rig, frame: RingFrame) {
         snapshot: frame.snapshot,
     });
     rig.frame(frame);
+    let event = rig.event();
     assert!(
-        matches!(rig.event(), WorkerEvent::Ring { report: RingFeedback::Presented { requested_at_us, .. } } if requested_at_us == frame.requested_at_us)
+        matches!(event, WorkerEvent::Ring { report: RingFeedback::Presented { requested_at_us, .. } } if requested_at_us == frame.requested_at_us),
+        "{event:?}"
     );
 }
 
@@ -328,7 +342,7 @@ fn output_caps_start_dark_before_any_snapshot_even_with_a_valid_turn() {
 }
 
 #[test]
-fn output_caps_clamp_turn_frames_and_tightening_blanks_latched_pixels_without_a_new_frame() {
+fn output_caps_clamp_turn_frames_and_tightening_dims_latched_pixels_without_a_new_frame() {
     let (directory, mut publisher, caps) = cap_input(30);
     let mut rig = Rig::start_with_senses(Senses {
         caps: Some(caps),
@@ -339,33 +353,54 @@ fn output_caps_clamp_turn_frames_and_tightening_blanks_latched_pixels_without_a_
     let mut bright = frame(&mut controller, owner, 250_000);
     bright.ceiling = 120;
     present(&rig, bright);
-    thread::sleep(Duration::from_millis(90));
+    // Past the startup's ease up to the cap (#8615), and the face eased up
+    // again over a few frames.
+    thread::sleep(Duration::from_millis(250));
+    rig.drain();
+    for _ in 0..4 {
+        let mut bright = frame(&mut controller, owner, 250_000);
+        bright.ceiling = 120;
+        present(&rig, bright);
+        thread::sleep(Duration::from_millis(30));
+    }
     let mut original = frame(&mut controller, owner, 250_000);
     original.ceiling = 120;
     present(&rig, original);
     let before = rig.writes.lock().unwrap().frames.len();
     let peak = cap_peak(&rig.writes.lock().unwrap().frames[before - 1]);
-    assert!(peak > 0 && peak <= 30, "turn peak {peak}");
-    let began = Instant::now();
+    assert!(peak > 12 && peak <= 30, "turn peak {peak}");
     publish_cap(&mut publisher, 2, 12);
+    // The latched frame is dimmed toward the cap with no new turn frame,
+    // and never blanked: the cap eases (#8615).
     loop {
-        let blanked = {
+        let dimmed = {
             let writes = rig.writes.lock().unwrap();
-            writes.frames[before..].contains(&EncodedFrame::black())
+            writes.frames[before..]
+                .iter()
+                .any(|frame| (1..peak).contains(&cap_peak(frame)))
         };
-        if blanked {
+        if dimmed {
             break;
         }
+        // The cap eases over 200 ms, so the dim comes while the cue is
+        // still displayed under its own permit, not at once.
         assert!(
-            began.elapsed() < Duration::from_millis(150),
-            "tightening did not actively blank"
+            monotonic_us() < original.permit.expires_at().as_micros(),
+            "tightening did not dim the latched frame before its permit ended: {peak} then {:?}",
+            rig.writes.lock().unwrap().frames[before..]
+                .iter()
+                .map(cap_peak)
+                .collect::<Vec<_>>()
         );
         thread::sleep(Duration::from_millis(1));
     }
     assert!(
-        monotonic_us() < original.permit.expires_at().as_micros(),
-        "blank must precede permit expiry"
+        !rig.writes.lock().unwrap().frames[before..].contains(&EncodedFrame::black()),
+        "a tighter cap blanked the ring"
     );
+    // Once the ease is over, a new bright frame is under the new cap.
+    thread::sleep(Duration::from_millis(250));
+    rig.drain();
     let mut bright = frame(&mut controller, owner, 200_000);
     bright.ceiling = 120;
     present(&rig, bright);
@@ -730,12 +765,17 @@ fn stale_owner_or_phase_cannot_blank_a_newer_valid_cue() {
     rig.control(Control::Authority {
         snapshot: next.snapshot,
     });
+    // The old cue fades out (#8615), then is black.
     assert!(matches!(
         rig.event(),
         WorkerEvent::Ring {
             report: RingFeedback::Blanked { .. }
         }
     ));
+    let next = frame(&mut controller, successor, 200_000);
+    rig.control(Control::Authority {
+        snapshot: next.snapshot,
+    });
     rig.frame(next);
     assert!(matches!(
         rig.event(),
@@ -744,7 +784,11 @@ fn stale_owner_or_phase_cannot_blank_a_newer_valid_cue() {
         }
     ));
     let count = rig.writes.lock().unwrap().frames.len();
-    rig.frame(waiting);
+    // Asked for again now: the fade above outlasts a request's 100 ms.
+    rig.frame(RingFrame {
+        requested_at_us: monotonic_us(),
+        ..waiting
+    });
     assert!(matches!(
         rig.event(),
         WorkerEvent::Ring {
@@ -778,7 +822,25 @@ fn permit_expires_without_another_frame_then_stop_remains_available() {
     ));
     rig.control(Control::Stop);
     rig.finish().unwrap();
-    assert_eq!(rig.colored(), 1);
+    // The cue, then its fade (#8615): each lit frame dimmer, then black,
+    // and the stop's black.
+    let peaks: Vec<u8> = rig.writes.lock().unwrap().frames[1..]
+        .iter()
+        .map(cap_peak)
+        .collect();
+    assert!(peaks.len() > 3, "{peaks:?}");
+    assert_eq!(
+        peaks.iter().filter(|peak| **peak == 0).count(),
+        2,
+        "{peaks:?}"
+    );
+    assert!(
+        peaks[..peaks.len() - 2]
+            .windows(2)
+            .all(|pair| pair[1] <= pair[0])
+            && peaks[peaks.len() - 3] < peaks[0],
+        "{peaks:?}"
+    );
 }
 
 /// Stale repeats never renew the authority. When it runs out the cue is
@@ -805,17 +867,18 @@ fn repeated_stale_control_does_not_renew_authority_and_a_ring_run_out_waits_for_
             }
         }
     ));
-    // Alive and dark well past it.
+    // Alive and dark well past it: no lit frame after the cue and its fade.
+    let lit = rig.colored();
     thread::sleep(Duration::from_millis(300));
     assert!(rig.completion.try_recv().is_err(), "the ring went on");
-    assert_eq!(rig.colored(), 1);
+    assert_eq!(rig.colored(), lit);
     assert_eq!(
         rig.writes.lock().unwrap().frames.last(),
         Some(&EncodedFrame::black())
     );
     // A fresh authority: it paints again.
     present(&rig, frame(&mut controller, owner, 200_000));
-    assert_eq!(rig.colored(), 2);
+    assert_eq!(rig.colored(), lit + 1);
     rig.control(Control::Stop);
     rig.finish().unwrap();
 }
@@ -1058,12 +1121,17 @@ fn invalid_frame_bounds_reject_without_a_write_and_speaking_requires_playback() 
     rig.control(Control::Authority {
         snapshot: speaking.snapshot,
     });
+    // The listening cue fades out (#8615), then is black.
     assert!(matches!(
         rig.event(),
         WorkerEvent::Ring {
             report: RingFeedback::Blanked { .. }
         }
     ));
+    let speaking = frame(&mut controller, owner, 200_000);
+    rig.control(Control::Authority {
+        snapshot: speaking.snapshot,
+    });
     rig.frame(speaking);
     assert!(matches!(
         rig.event(),
@@ -1414,7 +1482,8 @@ fn a_flood_of_head_requests_never_holds_back_revocation_or_expiry() {
     });
     rig.ready();
     thread::sleep(Duration::from_millis(100));
-    // A colored frame whose permit lasts 50 ms is blanked when it expires.
+    // A colored frame whose permit lasts 50 ms fades when it expires, then
+    // is blanked.
     let (mut controller, owner) = conversation(rig.boot);
     let shown = Instant::now();
     present(&rig, frame(&mut controller, owner, 50_000));
@@ -1441,8 +1510,9 @@ fn a_flood_of_head_requests_never_holds_back_revocation_or_expiry() {
     let _ = std::fs::remove_dir_all(&root);
     assert!(still_flooding);
     assert!(sent > 1_000 || !cfg!(target_os = "linux"), "{sent}");
+    // Its fade (#8615) is the only time past the old bound.
     assert!(
-        expired_after < Duration::from_millis(150),
+        expired_after < Duration::from_millis(150) + Duration::from_micros(lamp_ring::FADE_US),
         "{expired_after:?}"
     );
     assert!(

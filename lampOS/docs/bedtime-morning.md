@@ -615,9 +615,10 @@ earlier failures.
 Native ARM64 results belong to the published PR head. These checks establish
 software behavior, not lamp qualification.
 
-A fake-sink test checks a tighter cap's bus publication to a black frame in
-less than 150 ms, before the prior permit expires. That boundary is host
-software and the fake sink, not optical darkness on a lamp.
+A fake-sink test checks that a tighter cap's bus publication dims the latched
+cue, with no black frame, before the prior permit expires: the ring eases every
+cap change over 200 ms instead of blanking (#8615). That boundary is host
+software and the fake sink, not optical brightness on a lamp.
 
 Designed boundaries are the existing Skills observation cycle, a 20 ms
 Expression planning cadence, 200 ms planning receipts, one-second rest

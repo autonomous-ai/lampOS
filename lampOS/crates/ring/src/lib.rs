@@ -44,6 +44,14 @@ pub const LATE_RUN_US: u64 = 2_000_000;
 /// dropped by the voice's ring worker anyway). A held cue or a dark ring writes
 /// nothing, so a late write after it starts a new run.
 pub const LATE_GAP_US: u64 = 100_000;
+/// A cue that ends for no safety reason fades out over this long instead of
+/// going black in one frame (#8615): its permit ran out, its turn ended or
+/// another turn took the lamp, while the lamp may still listen. A stop,
+/// privacy, a fault or lost authority still blanks at once.
+pub const FADE_US: u64 = 200_000;
+/// A fade, or a tighter cap's dimming, writes at most one frame this often:
+/// the resting face's forty a second.
+pub const FADE_STEP_US: u64 = 25_000;
 
 /// The newest late write that was kept as a frame, for the owner to say.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -67,9 +75,20 @@ impl Rgb {
         Self { red, green, blue }
     }
 
+    /// The brightest channel.
+    pub fn peak(self) -> u8 {
+        self.red.max(self.green).max(self.blue)
+    }
+
+    /// Scale all channels by `share` (0 to 1), rounding to nearest.
+    fn scaled(self, share: f32) -> Self {
+        let scale = |channel: u8| (f32::from(channel) * share).round() as u8;
+        Self::new(scale(self.red), scale(self.green), scale(self.blue))
+    }
+
     /// Scale all channels together; integer quantization rounds to nearest.
     pub fn capped(self, ceiling: ChannelCeiling) -> Self {
-        let peak = self.red.max(self.green).max(self.blue);
+        let peak = self.peak();
         if peak <= ceiling.0 {
             return self;
         }
@@ -304,8 +323,51 @@ pub struct GuardedRing<S: FrameSink> {
     late_writes: u64,
     /// The newest of them.
     last_late: Option<LateWrite>,
+    /// The cue or resting frame on the strip, as written, while it is lit.
+    lit: Option<Lit>,
+    /// A cue fading out after it ended for no safety reason (#8615).
+    fading: Option<Fade>,
     clock: fn() -> MonoTime,
     black: EncodedFrame,
+}
+
+/// What a lit frame on the strip was, as written: already under its ceiling.
+#[derive(Clone, Copy)]
+struct Lit {
+    pixels: [Rgb; PIXEL_COUNT],
+    written_at: MonoTime,
+}
+
+impl Lit {
+    /// `None` for a frame that is black under its ceiling.
+    fn written(pixels: &[Rgb; PIXEL_COUNT], ceiling: ChannelCeiling, at: MonoTime) -> Option<Self> {
+        let pixels = pixels.map(|color| color.capped(ceiling));
+        pixels.iter().any(|color| color.peak() > 0).then_some(Self {
+            pixels,
+            written_at: at,
+        })
+    }
+}
+
+/// An ended cue fading out: from its last frame, under its own permit's
+/// camera grant, to black with the reason it ended.
+#[derive(Clone, Copy)]
+struct Fade {
+    from: [Rgb; PIXEL_COUNT],
+    permit: OutputPermit,
+    reason: lamp_turn_owner::Error,
+    started_at: MonoTime,
+    written_at: MonoTime,
+}
+
+/// A cue that ended for one of these fades out ([`FADE_US`]); any other
+/// reason, privacy, input, camera, expiry or a fault among them, blanks it.
+fn fades(reason: lamp_turn_owner::Error) -> bool {
+    use lamp_turn_owner::Error as Denial;
+    matches!(
+        reason,
+        Denial::ExpiredPermit | Denial::StaleOwner | Denial::StalePresentation
+    )
 }
 
 impl<S: FrameSink> GuardedRing<S> {
@@ -331,6 +393,8 @@ impl<S: FrameSink> GuardedRing<S> {
             late_last: None,
             late_writes: 0,
             last_late: None,
+            lit: None,
+            fading: None,
             clock,
             black: EncodedFrame::black(),
         };
@@ -374,6 +438,8 @@ impl<S: FrameSink> GuardedRing<S> {
         self.resting = false;
         self.privacy = None;
         self.privacy_painted_at = None;
+        self.fading = None;
+        self.lit = Lit::written(pixels, ceiling, started_at);
         // A lease may expire while the kernel write is in flight. Do not leave
         // that completed but now unauthorized cue latched on the strip.
         if let Err(reason) = self.guard.check((self.clock)(), permit, OutputKind::Light) {
@@ -405,6 +471,8 @@ impl<S: FrameSink> GuardedRing<S> {
                 self.resting = true;
                 self.privacy = None;
                 self.privacy_painted_at = None;
+                self.fading = None;
+                self.lit = Lit::written(pixels, ceiling, started_at);
                 Ok(Some(receipt))
             }
             Err(failure) => Err(self.write_fault(failure)),
@@ -415,7 +483,7 @@ impl<S: FrameSink> GuardedRing<S> {
     /// unrelated rejected old message cannot clear a newer valid presentation.
     pub fn tick(&mut self) -> Result<Option<BlankReceipt>, Error> {
         self.ensure_live()?;
-        self.reconcile().map_err(|failure| {
+        self.reconcile(true).map_err(|failure| {
             self.latch_fault();
             Error {
                 cause: Failure::Write(failure),
@@ -480,6 +548,46 @@ impl<S: FrameSink> GuardedRing<S> {
                 cause: Failure::Write(failure),
                 cleanup_error: None,
             })
+    }
+
+    /// Bring the lit frame on the strip down to a tighter output cap
+    /// (#8615): it is written again under `ceiling`, at most once every
+    /// [`FADE_STEP_US`], instead of the ring going black. It never
+    /// brightens, and it writes only what is already authorized: the
+    /// displayed cue under its own valid permit, or the resting frame while
+    /// it may stay. Anything else is left to `tick`. A fade under way is
+    /// capped too. `None`: nothing written.
+    pub fn dim(&mut self, ceiling: ChannelCeiling) -> Result<Option<WriteReceipt>, Error> {
+        self.ensure_live()?;
+        if let Some(fade) = self.fading.as_mut() {
+            fade.from = fade.from.map(|color| color.capped(ceiling));
+            return Ok(None);
+        }
+        let Some(lit) = self.lit else {
+            return Ok(None);
+        };
+        let now = (self.clock)();
+        let peak = lit.pixels.iter().map(|color| color.peak()).max();
+        if peak <= Some(ceiling.0)
+            || now.as_micros().saturating_sub(lit.written_at.as_micros()) < FADE_STEP_US
+        {
+            return Ok(None);
+        }
+        let allowed = match self.active {
+            Some(permit) => self.guard.check(now, permit, OutputKind::Light).is_ok(),
+            None => self.resting && self.resting_denial(now, false).is_none(),
+        };
+        if !allowed {
+            return Ok(None);
+        }
+        let pixels = lit.pixels.map(|color| color.capped(ceiling));
+        match self.transfer(&encode(&pixels, ceiling), now) {
+            Ok(receipt) => {
+                self.lit = Lit::written(&pixels, ceiling, now);
+                Ok(Some(receipt))
+            }
+            Err(failure) => Err(self.write_fault(failure)),
+        }
     }
 
     pub fn is_faulted(&self) -> bool {
@@ -587,6 +695,8 @@ impl<S: FrameSink> GuardedRing<S> {
         self.resting = false;
         self.privacy = None;
         self.privacy_painted_at = None;
+        self.lit = None;
+        self.fading = None;
         // Copy a fixed 1,028-byte frame; no heap allocation or arbitrary retry.
         let frame = self.black.clone();
         let write = self.transfer(&frame, (self.clock)())?;
@@ -609,10 +719,18 @@ impl<S: FrameSink> GuardedRing<S> {
         }
     }
 
-    fn reconcile(&mut self) -> Result<Option<BlankReceipt>, WriteFailure> {
+    /// `soft`: a cue that ended for no safety reason may fade out (`tick`);
+    /// a refused paint (`reject`) still blanks it at once.
+    fn reconcile(&mut self, soft: bool) -> Result<Option<BlankReceipt>, WriteFailure> {
         let reason = if self.guard.is_faulted() {
             self.faulted = true;
             Some(lamp_turn_owner::Error::Faulted)
+        } else if let Some(fade) = self.fading {
+            let now = (self.clock)();
+            match self.fade_denial(fade.permit, now) {
+                None => return self.fade_step(now),
+                denial => denial,
+            }
         } else if let Some(permit) = self.active {
             self.guard
                 .check((self.clock)(), permit, OutputKind::Light)
@@ -629,13 +747,84 @@ impl<S: FrameSink> GuardedRing<S> {
         } else if self.guard.is_faulted() {
             self.faulted = true;
         }
+        if soft
+            && let (Some(reason), Some(permit), Some(lit)) = (reason, self.active, self.lit)
+            && fades(reason)
+        {
+            let now = (self.clock)();
+            if self.fade_denial(permit, now).is_none() {
+                self.active = None;
+                self.fading = Some(Fade {
+                    from: lit.pixels,
+                    permit,
+                    reason,
+                    started_at: now,
+                    written_at: now,
+                });
+                return Ok(None);
+            }
+        }
         reason
             .map(|reason| self.blank(BlankReason::AuthorityLost(reason)))
             .transpose()
     }
 
+    /// Why an ended cue may not fade on: what a resting frame needs (fresh
+    /// authority, a permitted microphone, input available, no fault), and
+    /// the cue's own camera grant still current.
+    fn fade_denial(
+        &mut self,
+        permit: OutputPermit,
+        now: MonoTime,
+    ) -> Option<lamp_turn_owner::Error> {
+        use lamp_turn_owner::Error as Denial;
+        if self.fading.is_some_and(|fade| now < fade.written_at) {
+            return Some(Denial::ClockRegression);
+        }
+        self.resting_denial(now, false).or_else(|| {
+            let grant = permit.camera()?;
+            match self.guard.current_camera_grant(now) {
+                Ok(current) if current == grant => None,
+                Ok(_) => Some(Denial::StaleCameraGrant),
+                Err(denial) => Some(denial),
+            }
+        })
+    }
+
+    /// One frame of the fade when its step is due, and black at its end,
+    /// with the reason the cue ended.
+    fn fade_step(&mut self, now: MonoTime) -> Result<Option<BlankReceipt>, WriteFailure> {
+        let Some(fade) = self.fading else {
+            return Ok(None);
+        };
+        let elapsed = now.as_micros().saturating_sub(fade.started_at.as_micros());
+        if elapsed < FADE_US
+            && now.as_micros().saturating_sub(fade.written_at.as_micros()) < FADE_STEP_US
+        {
+            return Ok(None);
+        }
+        // Squared, so it eases out as an eye sees it: no gamma correction
+        // is applied anywhere else.
+        let left = 1.0 - (elapsed.min(FADE_US) as f32 / FADE_US as f32);
+        let pixels = fade.from.map(|color| color.scaled(left * left));
+        let peak = pixels.iter().map(|color| color.peak()).max().unwrap_or(0);
+        // Its end, or a step that rounds to dark, is the one black frame.
+        if peak == 0 {
+            return self
+                .blank(BlankReason::AuthorityLost(fade.reason))
+                .map(Some);
+        }
+        let ceiling = ChannelCeiling(peak);
+        self.transfer(&encode(&pixels, ceiling), now)?;
+        self.fading = Some(Fade {
+            written_at: now,
+            ..fade
+        });
+        Ok(None)
+    }
+
     fn reject(&mut self, reason: lamp_turn_owner::Error) -> Error {
-        let cleanup_error = self.reconcile().err();
+        let cleanup_error = self.reconcile(false).err();
         if cleanup_error.is_some() {
             self.latch_fault();
         }

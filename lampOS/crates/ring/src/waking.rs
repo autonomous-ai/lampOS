@@ -22,8 +22,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-/// The brightest any channel gets: the product voice's ring ceiling, as the
-/// setup light's.
+/// The brightest any channel gets: the setup light's, under the product
+/// voice's day ring ceiling.
 pub const PEAK_CHANNEL: u8 = 24;
 /// The face fully open, at the bottom pixel and the top of a breath: the
 /// asleep face's warmth, twice as bright.
