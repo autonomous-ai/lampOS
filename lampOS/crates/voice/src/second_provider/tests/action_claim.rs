@@ -1659,6 +1659,41 @@ fn a_forget_said_done_with_no_forget_is_never_said() {
     assert_eq!((went.asked, went.ran.len()), (1, 0));
 }
 
+/// #8570, S13 (lamp-06c1, stable 15986, 25 Nov, req 467): "Yes, please
+/// forget it." just after a done forget was told it is done already, the
+/// model said "Forgotten.", and the claim check held it as a forget with no
+/// call and asked again; the next line cut that round, and the yes was
+/// never answered. With `LAMP_MEMORY_DONE_YES_AGAIN` the done forget backs
+/// it: said as it came, asked once. Off, held and asked again, as on the
+/// lamp.
+#[test]
+fn a_forget_said_on_a_done_forget_s_yes_stands_with_the_switch() {
+    use crate::remember::{MemoryDone, heard};
+    let heard_line = "Yes, please forget it.";
+    let forgotten = "Forgotten.";
+    heard::set_done_already_for_test(Some(MemoryDone::Forgotten));
+    heard::set_done_yes_again_for_test(true);
+    let went = claimed(true, heard_line, saying(forgotten), vec![saying(forgotten)]);
+    assert_eq!(went.said, said(&[forgotten]), "{went:?}");
+    assert_eq!((went.asked, went.ran.len()), (1, 0), "{went:?}");
+    assert!(
+        went.notes
+            .iter()
+            .any(|note| note.starts_with(heard::DONE_ALREADY_TOLD)),
+        "{:?}",
+        went.notes
+    );
+    heard::set_done_yes_again_for_test(false);
+    let went = claimed(true, heard_line, saying(forgotten), vec![saying(forgotten)]);
+    assert_eq!(
+        went.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{went:?}"
+    );
+    assert_eq!(went.asked, 2, "{went:?}");
+    heard::set_done_already_for_test(None);
+}
+
 /// Asked again, the model calls `forget`. One the memory refused (a
 /// one-face line's) removed nothing: a forget said done after it is still
 /// held, and what its answer told them to say goes on. One that removed

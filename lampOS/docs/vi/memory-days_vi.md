@@ -1927,6 +1927,32 @@ chỉ giữ trong bộ nhớ của voice, số thứ tự và tổng cùng đặ
 động lại (`remember::HitsDay`, C4), để đo ngân sách tiết lộ (C9) từ nhật ký.
 Chỉ là số đếm và số thứ tự, không tên, id hay lời.
 
+Với `LAMP_MEMORY_HITS_ROOM_NOT_ASKER=on` (tắt nếu không đặt, #8570), gợi ý của
+căn phòng kết thúc bằng chính quy tắc của `LAMP_MEMORY_ROOM_NOT_ASKER`
+(`remember::HITS_ROOM_NOT_ASKER_NOTE`): do ai đó ở đây lúc ấy nói, không nhất
+thiết là người đang hỏi, không bao giờ kể như của người hỏi, không bao giờ nói
+«bạn đã kể với tôi»; nếu nhắc đến thì nói là có người ở đây đã nói. Trên
+lamp-06c1 (25/11, S15 req 484), lần hỏi duy nhất có gợi ý kể ghi chú của phòng
+«cà phê ở đây pha với sữa yến mạch và mật ong» đã trả lời «Bạn uống theo cách
+căn phòng giữ»; hai lần không có gợi ý đều nói đó là điều được nói trong phòng.
+Chỉ là một ghi chú: mô hình tự đánh giá điều gì hợp.
+
+## Một lời «có» nói lại sau khi đã xong (`LAMP_MEMORY_DONE_YES_AGAIN`, #8570)
+
+Tắt nếu không đặt. Sau một lần ghi đã xong (giữ, thay hoặc quên), một lời chỉ là
+«có» được báo trước vòng 1 là việc đã xong (`heard::done_already`). Khi người ta
+nói lại đúng lời «có» ấy, lượt ở giữa (chỉ là một lời «có» với lần ghi ấy,
+`heard::yes_to_done`, không có lệnh ký ức nào chạy) không còn chấm dứt «lượt
+trước của bạn» (`heard::done_last_turn`, `Thread::answered_between_but`): lời
+«có» thứ hai cũng được báo là đã xong. Một lượt ở giữa nói nhiều hơn «có» vẫn
+chấm dứt nó (P2 của Reviewer-lead trên #5607). Cùng công tắc ấy, một lần quên đã
+xong được báo trên lời «có» sẽ đỡ cho câu «Đã quên.» của lượt đó
+(`heard::done_backs_a_forget`), nên `LAMP_ACTION_CLAIM_CHECKED` không giữ lại và
+hỏi lại; một lần giữ thì không bao giờ được đỡ như vậy. Trên lamp-06c1 (25/11,
+S13): req 454 nói lại «Yes, please keep that.» bị trả lời «tôi không có gì đang
+chờ để giữ», và req 467 nói «Forgotten.» bị giữ lại như một lời nhận làm mà
+không có lệnh. Tắt: y như trước.
+
 ## Lượt ban đêm B (kế hoạch trích xuất C, bước B, của người phụ trách trí nhớ, 3/11)
 
 Một lượt mô hình mà voice chạy mỗi đêm cho một người đã biết, sau công tắc

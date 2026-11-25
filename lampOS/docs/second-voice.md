@@ -1723,7 +1723,16 @@ order is kept. A written turn is the same from the chat on.
     request A at its start` (or `end`) `, are taken out of what the model
     is sent`. Its own words anywhere else, at both ends, or one alone
     ("so", "no"), leave the line as heard. The heard line is still told as
-    heard.
+    heard. With `LAMP_SECOND_OWN_ECHO_CUT_END=on` (off unless set, #8570,
+    beside #7569 and #8478), a line whose `Start` says it cut that very
+    answer (`heard_of_cut`, `own_echo::Line::cut_it`) has no run taken from
+    its **end**: the lamp's voice stopped where the line began, so its last
+    words are the person's, and the journal says `of its W words, K at its
+    end in the lamp's answer to request A, but it cut that answer as it
+    began: its end is the person's, sent as heard`. On lamp-06c1 (25 Nov,
+    req 416) "Cancel the reminder to water the plants." cut the reminders
+    read out, was sent as "Cancel the reminder to", and was asked "which
+    reminder?". A run at its start is taken out as before.
   - **A line that adds a word the lamp did not say is never held.** At
     most its own run at its start or end is taken out, as above.
   - **The person's line is sent as heard, never held nor cut,** when it

@@ -3300,6 +3300,11 @@ fn second_route_worker_environment(
         // A plain light or volume ask done at the usage limit (#7346).
         crate::second_provider::limit_local::ENVIRONMENT,
         crate::second_provider::OWN_ECHO_ENVIRONMENT,
+        // #8570's three: a yes said again after a done yes, the room's hits
+        // never as the asker's, and a cut-in's last words kept as the person's.
+        crate::remember::heard::DONE_YES_AGAIN_ENVIRONMENT,
+        crate::remember::HITS_ROOM_NOT_ASKER_ENVIRONMENT,
+        crate::second_provider::OWN_ECHO_CUT_END_ENVIRONMENT,
         crate::second_provider::FACE_NAME_ENVIRONMENT,
         crate::second_provider::STT_WARM_ENVIRONMENT,
         // Read by the speech-to-text stream in this worker (#2527): without
@@ -3847,6 +3852,9 @@ mod tests {
             crate::second_provider::wordless_call::ENVIRONMENT,
             crate::second_provider::limit_local::ENVIRONMENT,
             crate::second_provider::OWN_ECHO_ENVIRONMENT,
+            crate::remember::heard::DONE_YES_AGAIN_ENVIRONMENT,
+            crate::remember::HITS_ROOM_NOT_ASKER_ENVIRONMENT,
+            crate::second_provider::OWN_ECHO_CUT_END_ENVIRONMENT,
             crate::second_provider::FACE_NAME_ENVIRONMENT,
             crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
             crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT,
@@ -5082,6 +5090,9 @@ mod tests {
                     || name == crate::second_provider::wordless_call::ENVIRONMENT
                     || name == crate::second_provider::limit_local::ENVIRONMENT
                     || name == crate::second_provider::OWN_ECHO_ENVIRONMENT
+                    || name == crate::remember::heard::DONE_YES_AGAIN_ENVIRONMENT
+                    || name == crate::remember::HITS_ROOM_NOT_ASKER_ENVIRONMENT
+                    || name == crate::second_provider::OWN_ECHO_CUT_END_ENVIRONMENT
                     || name == crate::second_provider::FACE_NAME_ENVIRONMENT
                     || name == crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT
                     || name == crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT

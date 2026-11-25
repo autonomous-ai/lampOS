@@ -62,6 +62,48 @@ pub(crate) fn set_on_for_test(on: bool) {
     ON_FOR_TEST.with(|cell| cell.set(on));
 }
 
+/// Only the exact value `on` (#8570, S13). A yes said again after a yes
+/// told the write is done ([`done_already`]) is told it is done too: the
+/// turn between, only a yes answered with no memory call, does not end
+/// "your last turn" ([`done_last_turn`]). And a done forget's yes backs the
+/// "Forgotten." its turn says, so the action-claim check never asks it
+/// again (`second_provider`, lamp-06c1 req 467). Off, both as before.
+pub const DONE_YES_AGAIN_ENVIRONMENT: &str = "LAMP_MEMORY_DONE_YES_AGAIN";
+static DONE_YES_AGAIN: OnceLock<bool> = OnceLock::new();
+
+#[cfg(test)]
+thread_local! {
+    /// [`DONE_YES_AGAIN_ENVIRONMENT`] for one test's own thread.
+    static DONE_YES_AGAIN_FOR_TEST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// What [`done_already`] gives in one test's own thread, in place of the
+    /// memory's done write: the seam a turn-level test needs, since the
+    /// write lives in the process's one Days client.
+    static DONE_ALREADY_FOR_TEST: std::cell::Cell<Option<super::MemoryDone>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether [`DONE_YES_AGAIN_ENVIRONMENT`] is on in this process, read once.
+pub fn done_yes_again_on() -> bool {
+    #[cfg(test)]
+    if DONE_YES_AGAIN_FOR_TEST.with(std::cell::Cell::get) {
+        return true;
+    }
+    *DONE_YES_AGAIN
+        .get_or_init(|| std::env::var(DONE_YES_AGAIN_ENVIRONMENT).ok().as_deref() == Some("on"))
+}
+
+/// [`done_yes_again_on`] on or off for the calling test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_done_yes_again_for_test(on: bool) {
+    DONE_YES_AGAIN_FOR_TEST.with(|cell| cell.set(on));
+}
+
+/// [`done_already`]'s answer for the calling test's thread alone: `done`,
+/// its note told.
+#[cfg(test)]
+pub(crate) fn set_done_already_for_test(done: Option<super::MemoryDone>) {
+    DONE_ALREADY_FOR_TEST.with(|cell| cell.set(done));
+}
+
 /// Words nearly every sentence has, in [`fold`]'s form with accents kept:
 /// `lamp_memory::search::COMMON` (#2282, [`super::SEARCH_COMMON`]), with
 /// these: "an", and the words a model uses for whoever spoke.
@@ -428,6 +470,13 @@ pub(crate) fn done_already(
     request: u64,
     lease: Option<&crate::memory_scope::ScopeLease>,
 ) -> Option<(Option<String>, super::MemoryDone)> {
+    #[cfg(test)]
+    if let Some(done) = DONE_ALREADY_FOR_TEST.with(std::cell::Cell::get) {
+        return Some((
+            Some(format!("{DONE_ALREADY_TOLD} {})", done_note(done))),
+            done,
+        ));
+    }
     if !on() || released(lease).is_some() {
         return None;
     }
@@ -449,23 +498,13 @@ pub(super) fn done_already_in(
     (request, whose, now): (u64, Option<&str>, Instant),
     done: Option<super::DoneWrite>,
 ) -> Option<(Option<String>, super::MemoryDone)> {
-    use super::MemoryDone;
     let done = done_last_turn(thread, request, done)?;
     // A lamp's answer that asked nothing offers nothing to keep
     // ([`crate::thread::Thread::offered_line`] needs a question), so the
     // yes is a yes alone ([`Held::YesAlone`]); after "Anything else?" or
     // "Want me to keep that?" it answers that question instead.
     let said = thread.heard_for(request, now);
-    // After a done forget, "Yes. Please forget it." is that yes too (S13
-    // req 339): only a yes once its forget words are left out.
-    let yes = |line: &str| {
-        only_a_yes(line)
-            || (done == MemoryDone::Forgotten && words(line).any(|word| asks_to_forget(&word)) && {
-                let rest: Vec<String> = words(line).filter(|word| !asks_to_forget(word)).collect();
-                only_a_yes(&rest.join(" "))
-            })
-    };
-    let said = said.filter(|line| yes(line))?;
+    let said = said.filter(|line| yes_to_done(line, done))?;
     if thread.lamp_asked_by_its_end(request)
         || thread
             .offered_line(request, whose, now, offers_to_keep, only_a_yes)
@@ -480,13 +519,47 @@ pub(super) fn done_already_in(
     if !affirms(&said) {
         return Some((None, done));
     }
-    let note = match done {
+    eprintln!("{DONE_ALREADY_TOLD_LINE}");
+    Some((
+        Some(format!("{DONE_ALREADY_TOLD} {})", done_note(done))),
+        done,
+    ))
+}
+
+/// The done write's own note for [`done_already`]: [`DONE_ALREADY_KEPT`],
+/// [`DONE_ALREADY_CHANGED`] or [`DONE_ALREADY_FORGOTTEN`].
+fn done_note(done: super::MemoryDone) -> &'static str {
+    use super::MemoryDone;
+    match done {
         MemoryDone::Kept => DONE_ALREADY_KEPT,
         MemoryDone::Changed => DONE_ALREADY_CHANGED,
         MemoryDone::Forgotten => DONE_ALREADY_FORGOTTEN,
-    };
-    eprintln!("{DONE_ALREADY_TOLD_LINE}");
-    Some((Some(format!("{DONE_ALREADY_TOLD} {note})")), done))
+    }
+}
+
+/// Whether the person's `line` is only a yes to `done`, the scope's last
+/// memory write done ([`done_already_in`]): [`only_a_yes`], or after a done
+/// forget "Yes. Please forget it." too (S13 req 339), only a yes once its
+/// forget words are left out.
+fn yes_to_done(line: &str, done: super::MemoryDone) -> bool {
+    only_a_yes(line)
+        || (done == super::MemoryDone::Forgotten
+            && words(line).any(|word| asks_to_forget(&word))
+            && {
+                let rest: Vec<String> = words(line).filter(|word| !asks_to_forget(word)).collect();
+                only_a_yes(&rest.join(" "))
+            })
+}
+
+/// Whether a done forget backs what heard line's turn says, with
+/// [`DONE_YES_AGAIN_ENVIRONMENT`]: [`done_already`]'s answer was a forget,
+/// its note told. Then "Forgotten." on that yes's turn is true, and is no
+/// forget claimed with no call (lamp-06c1, 25 Nov, req 467: told it is done,
+/// it said so, and was asked again). A keep is never backed by it
+/// ([`done_backs_a_keep`]).
+pub(crate) fn done_backs_a_forget(done: Option<&(Option<String>, super::MemoryDone)>) -> bool {
+    done_yes_again_on()
+        && done.is_some_and(|(note, done)| note.is_some() && *done == super::MemoryDone::Forgotten)
 }
 
 /// What heard line `request`, only a yes, answers: the line the lamp's
@@ -582,7 +655,16 @@ fn done_last_turn(
 ) -> Option<super::MemoryDone> {
     let (done, done_for) = done?;
     let done_for = done_for.filter(|&done_for| done_for <= request)?;
-    (!thread.answered_between(done_for, request)).then_some(done)
+    // With [`DONE_YES_AGAIN_ENVIRONMENT`], a turn between that was itself
+    // only a yes to this write keeps it the last turn's: no memory call was
+    // sent in it, as one empties the done write (#8570, S13 reqs 453-454:
+    // "Yes, please keep that." said again was told nothing was kept).
+    let between = if done_yes_again_on() {
+        thread.answered_between_but(done_for, request, |person| yes_to_done(person, done))
+    } else {
+        thread.answered_between(done_for, request)
+    };
+    (!between).then_some(done)
 }
 
 /// How [`done_already`]'s note opens; it ends with the done write's own
@@ -1889,12 +1971,14 @@ mod tests {
     /// and the lamp asked "what would you like me to hold on to?". A turn
     /// between that was itself only a yes, answered as done already, keeps
     /// the done write the yes's last turn: told it is done already, never
-    /// asked again. The same for a done forget's repeated yes.
+    /// asked again. The same for a done forget's repeated yes. With
+    /// `LAMP_MEMORY_DONE_YES_AGAIN` only; off, as before.
     #[test]
     fn a_yes_said_again_after_a_done_yes_is_still_told_it_is_done() {
         use super::super::MemoryDone;
         use crate::thread::Thread;
         let now = Instant::now();
+        set_done_yes_again_for_test(true);
         let again = |line: &str, lamp: &str, yes: &str, done: &str| {
             let mut thread = Thread::new();
             thread.person(line, true, now);
@@ -1915,7 +1999,9 @@ mod tests {
         assert!(
             told.as_ref().is_some_and(|(note, done)| {
                 *done == MemoryDone::Changed
-                    && note.as_deref().is_some_and(|note| note.contains(DONE_ALREADY_CHANGED))
+                    && note
+                        .as_deref()
+                        .is_some_and(|note| note.contains(DONE_ALREADY_CHANGED))
             }),
             "{told:?}"
         );
@@ -1932,12 +2018,57 @@ mod tests {
             "Yes, please forget it.",
             "It's forgotten.",
         );
-        let held = yes_alone_in(&thread, (3, None, now), true, forgotten);
-        assert_eq!(
-            held.as_ref().map(|held| held["note"].clone()),
-            Some(json!(DONE_ALREADY_FORGOTTEN)),
-            "{held:?}"
+        // "Yes, please forget it." is that yes once its forget words are
+        // left out: told before round 1 that it is forgotten already.
+        let told = done_already_in(&thread, (3, None, now), forgotten);
+        assert!(
+            told.as_ref().is_some_and(|(note, done)| {
+                *done == MemoryDone::Forgotten
+                    && note
+                        .as_deref()
+                        .is_some_and(|note| note.contains(DONE_ALREADY_FORGOTTEN))
+            }),
+            "{told:?}"
         );
+        // A turn between that says more than yes still ends it (the
+        // Reviewer-lead's P2 on #5607, S13 req 469).
+        let mut thread = Thread::new();
+        thread.person("Actually, my water bottle is blue now.", true, now);
+        thread.lamp(1, "Blue now, not green.", now);
+        thread.person("What's the weather like?", true, now);
+        thread.lamp(2, "Sunny.", now);
+        thread.person("Yes, please keep that.", true, now);
+        assert_eq!(done_already_in(&thread, (3, None, now), changed), None);
+        // Off: the repeated yes is told nothing was kept, as on the lamp.
+        set_done_yes_again_for_test(false);
+        let thread = again(
+            "Actually, my water bottle is blue now.",
+            "Blue now, not green.",
+            "Yes, please keep that.",
+            "It's changed: blue now.",
+        );
+        assert_eq!(done_already_in(&thread, (3, None, now), changed), None);
+        assert_eq!(
+            yes_alone_in(&thread, (3, None, now), false, changed),
+            Some(json!({"remembered": false, "note": YES_ALONE}))
+        );
+    }
+
+    /// #8570, req 467: a done forget backs the turn's "Forgotten." only with
+    /// the switch, only when its note was told, and never a keep.
+    #[test]
+    fn a_done_forget_backs_a_forget_said_only_with_the_switch() {
+        use super::super::MemoryDone;
+        let told = |done| Some((Some("(note)".to_owned()), done));
+        set_done_yes_again_for_test(false);
+        assert!(!done_backs_a_forget(told(MemoryDone::Forgotten).as_ref()));
+        set_done_yes_again_for_test(true);
+        assert!(done_backs_a_forget(told(MemoryDone::Forgotten).as_ref()));
+        assert!(!done_backs_a_forget(told(MemoryDone::Kept).as_ref()));
+        assert!(!done_backs_a_forget(Some(&(None, MemoryDone::Forgotten))));
+        assert!(!done_backs_a_forget(None));
+        assert!(!done_backs_a_keep(told(MemoryDone::Forgotten).as_ref()));
+        set_done_yes_again_for_test(false);
     }
 
     /// C37 (lamp-06c1, 5 Nov): heard "renunculus", the model wrote
