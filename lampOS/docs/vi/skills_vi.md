@@ -4584,6 +4584,40 @@ lần tạo trên lamp-9adf: `loosened_a_silent_made_skill_keeps_the_cooldown_it
 `made::loosened_a_step_the_check_refuses_is_left_out_and_nothing_left_is_refused`
 và `made::loosened_a_trigger_the_check_refuses_is_never_loosened`.
 
+### Ai sở hữu tệp của một kỹ năng tự tạo, và việc gỡ nó (#8505)
+
+Mọi kỹ năng do trình trợ giúp quản lý của root (`lamp-skills asked`) bật
+lên (tự tạo bằng giọng nói hay trong ứng dụng, từ Store, được đẩy lên) đều
+là của root, thư mục 0755 và tệp 0644, như chính thư mục kỹ năng: các phần
+chạy dưới `lampos` đọc chúng và không bao giờ ghi.
+
+- **`lamp-skills remove` không bao giờ đổi tên sang một bên một thư mục mà
+  nó không xóa được trọn vẹn.** Mỗi thư mục trong cây (không theo liên kết
+  nào) phải đọc, ghi và duyệt được bằng chính người dùng và quyền của lần
+  chạy đó (`package::undeletable`); nếu không, nó từ chối trước khi di
+  chuyển hay lấy lại bất cứ gì: `not removed: NAME: PATH: …: this user
+  can't delete its files, so nothing is moved`. Trước đây, trên thư mục kỹ
+  năng mà `lampos` ghi được của lamp-06c1 (row-8469, 24/11), lệnh gỡ chạy
+  dưới `lampos` đổi tên kỹ năng tự tạo thành `.removed-NAME-PID` rồi không
+  xóa được tệp của nó (EACCES), và thư mục còn lại. Kỹ năng tự tạo được gỡ
+  qua trình trợ giúp quản lý (trang kỹ năng của ứng dụng, hoặc bằng giọng
+  nói), hoặc dưới root.
+- **Khi trình trợ giúp bắt đầu, ở mọi yêu cầu**, nếu khóa của thư mục đang
+  rảnh (không bao giờ chờ: một lần chạy đang diễn ra giữ phần của nó), nó
+  xóa những gì một lần cài hay gỡ chưa xong để lại: chỉ một thư mục nằm
+  ngay trong thư mục kỹ năng có tên đúng `.install-NAME-PID` hoặc
+  `.removed-NAME-PID` (tên kỹ năng và 1 đến 10 chữ số), không bao giờ là
+  liên kết, tệp hay tên khác, không theo liên kết nào. Nó ghi một dòng
+  journal, `lamp-skills: asked: deleted N folders an unfinished install or
+  remove left in DIR: NAMES`, và không ghi gì khi không có. Những thư mục
+  đã có trên đèn (của row-8469 trên lamp-06c1) bị xóa ở yêu cầu đầu tiên
+  gửi tới trình trợ giúp sau bản cập nhật.
+
+Test: `a_made_skill_its_remover_cannot_delete_is_refused_and_nothing_is_set_aside`,
+`the_manage_helper_deletes_what_an_unfinished_remove_left_as_it_starts`
+(`tests/it/made.rs`), `a_skill_its_remover_cannot_delete_is_refused_with_nothing_moved`
+(`tests/it/package.rs`).
+
 ## Gõ trong ứng dụng (#2813, `LAMP_APP_MAKE_SKILL=on`, bật trong sản phẩm)
 
 Cùng người tạo đó, từ chữ gõ trong ứng dụng; được bật như trên, ngay, không cần

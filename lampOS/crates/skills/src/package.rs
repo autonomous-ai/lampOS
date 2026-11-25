@@ -2750,7 +2750,9 @@ fn turned_off(toml: &str) -> String {
 /// [`remove`]'s steps, the folder's lock waited for at most `wait` (always,
 /// when `None`). Once the skill is renamed aside it is gone for the running
 /// program: `Some` says where it was set aside and why that was not then
-/// deleted (the next install deletes it, [`left_by_a_run`]).
+/// deleted (the manage helper's next start, or the next install, deletes
+/// it, [`left_by_a_run`]). A folder this run can't delete whole
+/// ([`undeletable`]) is refused before anything is moved.
 fn taken_off(
     skills: &Path,
     state: Option<&Path>,
@@ -2797,6 +2799,17 @@ fn taken_off(
             "{name} is a core skill: it comes with the lamp and can't be removed"
         ));
     }
+    // A folder this run can't delete whole is never renamed aside (#8505):
+    // a made skill is root's, put on by root's manage helper, and a remove
+    // run as `lampos` in a folder it could write renamed it to
+    // `.removed-NAME-PID`, then couldn't delete its files, and the folder
+    // stayed. Refused first, nothing is moved and nothing taken back.
+    if let Some(why) = undeletable(&target) {
+        return Err(format!(
+            "not removed: {name}: {why}: this user can't delete its files, so nothing is moved; \
+             the manage helper removes it (the app's skills page, or by voice), or remove it as root"
+        ));
+    }
     // The owner's yes to its camera goes with it, under the same lock and
     // before the folder: a skill put on again by this name, from the Store
     // or by hand, never inherits it (#3504's piece C). Not taken back,
@@ -2833,6 +2846,34 @@ fn taken_off(
     Ok(fs::remove_dir_all(&old)
         .err()
         .map(|error| format!("{} was not deleted: {error}", old.display())))
+}
+
+/// Why this run can't delete `folder` whole, if it can't: the first folder
+/// of its tree (`folder` itself among them, no link followed) it may not
+/// read, write or search with its own user and capabilities, as `lampos`
+/// may not root's 0755 folders (#8505). `None` when every one may be.
+fn undeletable(folder: &Path) -> Option<String> {
+    use rustix::fs::{Access, AtFlags, CWD, accessat};
+    let mut folders = vec![folder.to_path_buf()];
+    while let Some(at) = folders.pop() {
+        let said = |error: io::Error| Some(format!("{}: {error}", at.display()));
+        let mode = Access::READ_OK | Access::WRITE_OK | Access::EXEC_OK;
+        if let Err(error) = accessat(CWD, &at, mode, AtFlags::EACCESS) {
+            return said(error.into());
+        }
+        let entries = match fs::read_dir(&at) {
+            Ok(entries) => entries,
+            Err(error) => return said(error),
+        };
+        for entry in entries {
+            match entry.and_then(|entry| Ok((entry.file_type()?, entry.path()))) {
+                Ok((kind, path)) if kind.is_dir() => folders.push(path),
+                Ok(_) => {}
+                Err(error) => return said(error),
+            }
+        }
+    }
+    None
 }
 
 /// What is said of a URL that is not one a package is fetched from: the URL
@@ -3338,6 +3379,25 @@ pub fn asked(
     input: impl Read,
     mut output: impl io::Write,
 ) -> io::Result<bool> {
+    // What an unfinished install or remove left in the skills folder
+    // (#8505: a remove run by a user who couldn't delete), deleted as
+    // root's helper starts on any request, only with the folder free: it
+    // never waits for it, and a run under way keeps its own. Only
+    // [`left_by_a_run`]'s names directly in the folder, no link followed
+    // ([`swept`]); the journal says how many, once, and nothing with none.
+    if let Ok(folder) = fs::File::open(skills)
+        && folder.try_lock().is_ok()
+    {
+        let swept = swept(skills);
+        if !swept.is_empty() {
+            eprintln!(
+                "lamp-skills: asked: deleted {} folders an unfinished install or remove left in {}: {}",
+                swept.len(),
+                skills.display(),
+                swept.join(", ")
+            );
+        }
+    }
     let mut line = String::new();
     // A request past its bound, or not UTF-8, is no request.
     let _ = io::BufReader::new(input.take(ASKED_MOST)).read_line(&mut line);
