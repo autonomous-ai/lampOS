@@ -8704,6 +8704,9 @@ pub(crate) struct Heeding {
     /// after the same words is not the first (#8395).
     asked_looks: bool,
     asked_line_after: Option<u64>,
+    /// The request that took the first line's pass, so a line going on
+    /// from it keeps the pass (the first builder's P2 on #8416).
+    asked_first: Option<u64>,
     /// `LAMP_NAME_OR_FOLLOW_UP=on` ([`Self::needing_name_or_follow_up`]).
     name_or_follow_up: bool,
     /// `LAMP_TWO_FACES_HELD=on` ([`Self::holding_two_faces`]): the eyes'
@@ -9941,6 +9944,7 @@ impl Heeding {
             said_to_me_name_in_line: false,
             asked_looks: false,
             asked_line_after: None,
+            asked_first: None,
             face_not_speaking: None,
             name_or_follow_up: false,
             faces_held: None,
@@ -12253,10 +12257,14 @@ impl Heeding {
 
     /// [`crate::said_to_me::Line::first_after_asked`]: no line with words
     /// judged since the lamp's words last ended, and this one begun at
-    /// `began_us` within `follows_on::WITHIN_US` of that end (#8395).
-    fn first_after_asked(&self, began_us: u64) -> bool {
-        self.said_until_us != self.asked_line_after
-            && crate::follows_on::due(true, false, self.said_until_us, began_us)
+    /// `began_us` within `follows_on::WITHIN_US` of that end (#8395); or a
+    /// line going on from the one that took that pass (`continues_from`: an
+    /// answer the lamp cut and takes up again, `LAMP_CUT_KEEPS_NAME`), the
+    /// first builder's P2 on #8416.
+    fn first_after_asked(&self, began_us: u64, continues_from: Option<u64>) -> bool {
+        (self.said_until_us != self.asked_line_after
+            && crate::follows_on::due(true, false, self.said_until_us, began_us))
+            || continues_from.is_some_and(|from| self.asked_first == Some(from))
     }
 
     /// `LAMP_SAID_TO_ME=on` ([`crate::said_to_me::judge`]): whether the line
@@ -12326,7 +12334,7 @@ impl Heeding {
             // Begun over the lamp's own answer, which it cut (#8205).
             cut_in: self.began_over == Some(request),
             asked_looks: self.asked_looks,
-            first_after_asked: self.first_after_asked(said.0),
+            first_after_asked: self.first_after_asked(said.0, signs.continues_from),
             ..Default::default()
         };
         // The eyes' signs as the replay of saved journals reads them
@@ -12346,8 +12354,10 @@ impl Heeding {
         }
         let going_on = signs.going_on;
         let decision = crate::said_to_me::judge(line);
-        // The next line after the same words of the lamp's is not the first.
+        // The next line after the same words of the lamp's is not the first;
+        // the line that took the pass is kept for a line going on from it.
         if !heard.trim().is_empty() {
+            self.asked_first = line.first_after_asked.then_some(request);
             self.asked_line_after = self.said_until_us;
         }
         self.no_look_answer = matches!(
