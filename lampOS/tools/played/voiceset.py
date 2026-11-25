@@ -87,15 +87,16 @@ SCENES = [
                                'before dinner. How should I plan my afternoon?', 24, 'A')]),
     ('everyday', 'compliment', [(S, 'Hey Lamp, you are really helpful.', 10, 'A')]),
     # Not "good night": the model may take it as a sleep, which a lamp with no head touch can't be woken from.
-    ('everyday', 'goodbye', [(S, 'Hey Lamp, thanks for today. See you tomorrow.', 10, 'A')]),
+    ('everyday', 'goodbye', [(S, 'Hey Lamp, thanks for your help today.', 10, 'A')]),
     # The lamp's own light and sound, each a call; put back after.
     ('controls', 'warmer', [(S, 'Hey Lamp, make your light a little warmer.', 12, 'A')]),
     ('controls', 'brighter', [(S, 'Hey Lamp, make your light brighter.', 12, 'A')]),
     ('controls', 'dimmer', [(S, 'Hey Lamp, dim your light a bit.', 12, 'A')]),
     ('controls', 'colour', [(S, 'Hey Lamp, turn your light blue.', 12, 'A')]),
     ('controls', 'colour-back', [(S, 'Hey Lamp, set your light back to normal.', 12, 'A')]),
-    ('controls', 'quieter', [(S, 'Hey Lamp, speak a little quieter.', 12, 'A')]),
-    ('controls', 'louder', [(S, 'Hey Lamp, speak a little louder.', 12, 'A')]),
+    # Never the lamp's volume (Twelve's P2 on #8673: a person's own lamp's volume is never touched), only asked about.
+    ('controls', 'volume-asked', [(S, 'Hey Lamp, how loud is your voice set right now?', 12, 'A')]),
+    ('controls', 'light-asked', [(S, 'Hey Lamp, what colour is your light right now?', 12, 'A')]),
     # Timers and reminders, each a call.
     ('timers', 'timer-ring', [(S, 'Hey Lamp, set a timer for one minute.', 75, 'A')]),
     ('timers', 'timer-ask-cancel', [(S, 'Hey Lamp, set a timer for ten minutes.', 12, 'A'), (S, 'How much time is left on it?', 12, 'A'),
@@ -205,12 +206,15 @@ SCENES = [
     ('corrections', 'timer-change', [(S, 'Hey Lamp, set a timer for five minutes.', '6a', 'A'), (S, 'Actually, make it ten.', '6a', 'A'),
                                      (S, 'Cancel the timer.', '6a', 'A')]),
     ('corrections', 'colour-change', [(D, 'Hey Lamp, make the light blue.', '6a', 'A'), (D, 'No, I meant green.', '6a', 'A'),
-                                      (D, 'A bit brighter, please.', '6a', 'A')]),
+                                      (D, 'A bit brighter, please.', '6a', 'A'),
+                                      (D, 'Now set your light back to normal.', '6a', '-')]),
     ('corrections', 'are-you-sure', [(K, "Hey Lamp, what's the capital of Australia?", '6a', 'A'),
                                      (K, 'Are you sure? I thought it was Sydney.', '6a', 'A')]),
     # The lamp's light, by voice.
-    ('controls-2', 'warm-cool', [(S, 'Hey Lamp, make the light warmer.', '6a', 'A'), (S, 'Now cooler.', '6a', 'A')]),
-    ('controls-2', 'dim-bright', [(FU, 'Hey Lamp, dim the light to half.', '6a', 'A'), (FU, 'Brighter, please.', '6a', 'A')]),
+    ('controls-2', 'warm-cool', [(S, 'Hey Lamp, make the light warmer.', '6a', 'A'), (S, 'Now cooler.', '6a', 'A'),
+                                 (S, 'Now set your light back to normal.', '6a', '-')]),
+    ('controls-2', 'dim-bright', [(FU, 'Hey Lamp, dim the light to half.', '6a', 'A'), (FU, 'Brighter, please.', '6a', 'A'),
+                                  (FU, 'Now set your light back to normal.', '6a', '-')]),
     ('controls-2', 'purple', [(R, 'Hey Lamp, turn the light purple.', '6a', 'A'), (R, 'And back to white.', '6a', 'A')]),
     # Timers, rung out.
     ('timers-2', 'thirty-seconds', [(S, 'Hey Lamp, set a timer for thirty seconds.', 45, 'A')]),

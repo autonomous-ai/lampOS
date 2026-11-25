@@ -38,7 +38,9 @@ KEEP = ('listening_ready', 'input_candidate', 'input_admitted', 'local_endpoint'
         'provider_ownership_assumed', 'provider_turn_complete', 'provider_terminal', 'service_provider_ended', 'provider_first_audio')
 
 TAIL = r'''S=$(sudo -n ls -t /var/lib/lampOS/voice/sessions | head -1); F=$(sudo -n sh -c "ls -t /var/lib/lampOS/voice/sessions/$S/metadata/events-*.jsonl" | head -1); sudo -n tail -n 400 "$F"; python3 -c 'import time; print("NOW", time.monotonic_ns()//1000)' '''
-BUSY = ('speaker_first_write', 'provider_audio_enqueued', 'input_candidate', 'transcript', 'local_endpoint')
+# The lamp's own output only: what it hears (a noise bed, someone else) never keeps a scene waiting (Twelve's P3 on
+# #8673: under a bed, heard input kept pushing the wait to its cap, past the conversation's window).
+BUSY = ('speaker_first_write', 'provider_audio_enqueued')
 
 def lamp_done(since_us, most=90.0, quiet_us=2_000_000):
     """Until the lamp is done with the line played at `since_us` (the lamp's clock): a turn finished after it, nothing
@@ -62,6 +64,7 @@ def lamp_done(since_us, most=90.0, quiet_us=2_000_000):
             elif r.get('kind') in BUSY: busy = max(busy, at)
         if now and finished and busy <= finished and now - max(finished, busy) >= quiet_us:
             return True
+    print(f'scenario.py: the lamp was not done with the line in {most:.0f} s; going on', file=sys.stderr)
     return False
 
 def main():

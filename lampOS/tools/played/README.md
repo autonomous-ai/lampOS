@@ -457,7 +457,7 @@ the groups:
 |---|---|
 | `calls`, `calls-2` | "Hey Lamp" in every form and position, in about 20 voices and accents |
 | `follow-ups`, `multi-turn`, `corrections` | Conversations of 2 to 4 turns with the name only at the start, a change of mind, and a line 35 s after an answer (left alone) |
-| `questions`, `everyday`, `controls`, `controls-2`, `timers`, `timers-2` | Asks of each kind, the light by voice, and timers rung out |
+| `questions`, `everyday`, `controls`, `controls-2`, `timers`, `timers-2` | Asks of each kind, the light by voice (and back), and timers rung out; never the volume |
 | `delivery` | Quiet, fast, slow, hesitant and long asks |
 | `cut-ins` | Stopping the lamp, and a new ask over its answer |
 | `busy`, `room`, `room-2`, `two-people` | Colleagues' talk, phone calls, TV, greetings to people, another person's name, and two people at the lamp |
