@@ -4564,7 +4564,11 @@ mod tests {
             json!({"machine": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "agent": AGENT})
         );
         // The watch's read says idle once: the record says so.
-        board.tasks(&working, |_| Some((Some(State::Idle), Some(1_900))), 3_000);
+        board.tasks(
+            &working,
+            |_| Some((Some(State::Idle), Some(1_900), false)),
+            3_000,
+        );
         assert_eq!(board.get(&id, 3_000).unwrap()["state"], "idle");
         observe(&mut engine, prepared, "Reviewed: two typos.", 40);
         // Read as it settled: its end the store's, at this read.
@@ -4583,6 +4587,70 @@ mod tests {
             monotonic_ms: 1,
         };
         assert!(engine.works(&other, None).is_empty());
+    }
+
+    /// #8510, the computer path (Harness, not OpenClaw direct): a voice
+    /// hand-over is `queued` while its launch is under way (a cold pane,
+    /// `ENGINE_NOT_READY` retried), so the 20 s line finds it. Once Harness
+    /// accepted it, the record's state comes from the watch's `ps`, read at
+    /// once: an agent still `starting` or `installing` there reads `working`
+    /// with `waiting` true, so the line still fires; `working` there is with
+    /// its agent, `waiting` false.
+    #[test]
+    fn a_computer_hand_over_waits_until_harness_ps_reads_its_agent_working() {
+        use crate::harness::Listed;
+        use crate::progress::Tracker;
+        use crate::works::{Board, State, line_of};
+        let mut board = Board::new();
+        let (mut engine, _) = opened();
+        let prepared = prepare(&mut engine, 0);
+        engine
+            .handle(&confirmation(&engine, prepared), &clock(0), true)
+            .unwrap();
+        let id = prepared.to_string();
+        engine.begin_launch(&clock(1)).unwrap().unwrap();
+        // The launch under way on a cold pane: queued, the store's own.
+        let attempting = engine.works(&clock(5_000), None);
+        assert_eq!(attempting[0].state, Some(State::Queued));
+        board.tasks(&attempting, |_| None, 5_000);
+        let record = board.get(&id, 5_000).unwrap();
+        assert_eq!(
+            (record["state"].as_str(), record["waiting"].as_bool()),
+            (Some("queued"), Some(false))
+        );
+        engine
+            .finish_launch(
+                prepared,
+                LaunchOutcome::Created {
+                    agent_id: AGENT.into(),
+                },
+                &clock(15_000),
+            )
+            .unwrap();
+        let watched = engine.watched(&clock(16_000));
+        assert_eq!(watched.len(), 1);
+        let machine = watched[0].machine_id.clone();
+        let mut tracker = Tracker::started(1);
+        for (n, (listed, waiting)) in [("starting", true), ("installing", true), ("working", false)]
+            .into_iter()
+            .enumerate()
+        {
+            let at = 20_000 + n as u64 * 1_000;
+            let row = Listed {
+                agent_id: AGENT.into(),
+                state: listed.into(),
+                last_active_unix_ms: None,
+                about: None,
+                agent: None,
+            };
+            let _ = tracker.read(&machine, Ok(vec![row]), &watched, at, 10);
+            let accepted = engine.works(&clock(at), None);
+            assert_eq!(accepted[0].state, None, "{listed}");
+            board.tasks(&accepted, |task| line_of(Some(&tracker), task), at);
+            let record = board.get(&id, at).unwrap();
+            assert_eq!(record["state"], "working", "{listed}");
+            assert_eq!(record["waiting"], waiting, "{listed}");
+        }
     }
 
     /// #7930: a task's work record dates from when it was handed over, by

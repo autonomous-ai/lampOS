@@ -3705,8 +3705,9 @@ người dùng không nghe thấy gì nữa.
 Bây giờ, 20 s sau một lần giao việc được nhờ bằng giọng nói
 (`hand_wait::AFTER`), giọng nói đọc các bản ghi việc một lần
 (`{"op":"work_list","limit":10}` trên socket request, như khi giọng nói tự
-xem việc của mình, #7930). Nếu việc vẫn `queued`, không có việc nào bắt
-đầu trước nó còn đang chạy (chưa `done`), và vẫn là việc được giao gần nhất,
+xem việc của mình, #7930). Nếu việc vẫn chờ agent của nó (`queued`, hoặc
+`working` với `waiting` là true), không có việc nào bắt đầu trước nó còn
+đang chạy (chưa `done`), và vẫn là việc được giao gần nhất,
 giọng nói nhờ dịch vụ say nói một câu, như câu của chính nó, ở mức ưu tiên
 thường; nếu không bắt đầu nói được trong 15 s thì bỏ:
 
@@ -3727,10 +3728,25 @@ chạy thì không có câu này: lamp-tasks chạy từng việc một (OpenCla
 hàng đợi của phiên duy nhất sau lượt đang chạy, `LAMP_TASKS_ONE_SESSION=on`),
 nên agent đang bận chứ không phải đang khởi động, và câu đó sẽ sai (P2 của
 Jarvis trên #8510). Các id được giữ để không nói lần hai chỉ là 8 id mới
-nhất (`hand_wait::SAID_KEPT`). Việc được nhờ bằng tin nhắn chữ thì không có
+nhất (`hand_wait::SAID_KEPT`). OpenClaw direct đưa lượt vào hàng đợi ngay
+lúc giao, nên bản ghi đọc `working` ngay, trong khi gateway khởi động lạnh
+chưa nhận lượt (watch đọc `starting`); trường `waiting` của bản ghi
+(#8510, lamp-ee17) cho biết việc vẫn đang chờ ở đó. Trên máy tính
+(Harness, phiên duy nhất hoặc agent mới), việc đọc `queued` trong khi lần
+khởi chạy đang diễn ra (ô khởi động lạnh, `ENGINE_NOT_READY` được thử lại),
+và khi Harness đã nhận, đọc `working` với `waiting` trong khi `ps`, được đọc
+ngay sau lần giao, cho biết agent còn `starting` hoặc `installing`.
+`working` mà không có `waiting` là agent đã nhận: không có câu. Quy tắc việc trước không đổi:
+mọi việc trước chưa `done`, `waiting` hay không, đều giữ agent, nên việc
+sau chờ sau nó. Việc được nhờ bằng tin nhắn chữ thì không có
 câu này, và khi không có dịch vụ say (`LAMP_SAY` tắt) thì không đọc hay
 nói gì. Journal ghi `lamp-voice: tasks: work N still waits for its agent
-after 20 s: said it is starting`.
+after 20 s: said it is starting`; một lần xem kết thúc không có câu ghi một
+dòng lý do, `lamp-voice: tasks: work N after 20 s: no line: <reason>`, lý do
+là một trong `read failed`, `not on the records`, `with its agent`, `not
+queued or working`, `behind earlier work`, `not the last hand-over` hoặc
+`already said`; một lần giao khi không có dịch vụ say ghi `lamp-voice:
+tasks: work N: no line: no say service`.
 
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
@@ -5096,7 +5112,7 @@ Một bước đọc lại (kết quả của nó) hoặc một bước cũ hơn
 {"id":"7","kind":"task","who":"OpenClaw","words":"Find the cheapest flight to Hanoi",
  "state":"done","started_ms":1795000000000,"updated_ms":1795000060000,"elapsed_s":60,
  "last_active_ms":1795000058000,"tools":4,"step":{"n":9,"tool":"web_search"},
- "done":true,"answer":"The cheapest is …",
+ "done":true,"waiting":false,"answer":"The cheapest is …",
  "session":{"machine":"…","agent":"…"}}
 ```
 
@@ -5114,6 +5130,7 @@ Một bước đọc lại (kết quả của nó) hoặc một bước cũ hơn
 | `tools` | Số tool agent đã dùng: số lớn hơn giữa số đếm của `harness show` và số lần gọi tool đọc từ transcript (chỉ với `LAMP_TASKS_STEPS=on`) |
 | `step` | Lần gọi tool mới nhất, `{"n","tool"}`: chỉ số bước và tên tool, không bao giờ là đối số hay kết quả; null khi chưa đọc được (luôn null khi `LAMP_TASKS_STEPS` tắt) |
 | `done` | Việc đã kết thúc chưa (`stopped`, `failed`, `done`, `timed_out`, `cancelled`) |
+| `waiting` | Chưa được giao cho agent dù `state` đọc `working`: true khi lần đọc của watch là `starting` hoặc `installing` (lượt OpenClaw direct xếp hàng trên một gateway khởi động lạnh; agent Harness trên máy tính còn đang khởi động, `ps` của nó được đọc ngay sau lần giao) và store không có trạng thái riêng; nếu không thì false (#8510). Trường này không làm đổi `state` |
 | `answer` | Câu trả lời, nhiều nhất 1.200 ký tự, cắt ở ký tự trọn vẹn; chỉ khi `done` là true, nếu không thì null |
 | `session` | Nơi nó chạy, `{"machine","agent"}`: máy theo dõi nó và id agent Harness của nó, chỉ id (không bao giờ là token hay đường dẫn), mỗi id nhiều nhất 64 ký tự; null cho tới khi Harness tạo agent |
 
