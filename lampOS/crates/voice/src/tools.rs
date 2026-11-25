@@ -353,7 +353,7 @@ pub fn arguments_from_environment() -> Vec<String> {
     flags.extend(crate::without_a_tool::arguments(
         std::env::var(lamp_msgs::SHUTDOWN_SWITCH).ok().as_deref(),
     ));
-    flags.extend(crate::seen_yes::arguments(
+    flags.extend(crate::seen_yes::arguments_or(
         std::env::var(crate::seen_yes::ENVIRONMENT).ok().as_deref(),
         std::env::var(crate::seen_yes::POSTURE_ENVIRONMENT)
             .ok()
@@ -361,6 +361,7 @@ pub fn arguments_from_environment() -> Vec<String> {
         std::env::var(crate::seen_yes::OFFER_ENVIRONMENT)
             .ok()
             .as_deref(),
+        lamp_msgs::consent::noticing_by_default(),
     ));
     flags.extend(crate::services::arguments(
         std::env::var(crate::services::ENVIRONMENT).ok().as_deref(),
