@@ -109,6 +109,12 @@ run on a lamp.
   2,056. That window, 1,740 to 2,030 while the head is beside the base, is
   lamp-4ace's, in absolute counts; `--pitch-window LOW,HIGH` gives a lamp
   its own (below, "Running it", and "lamp-52e6").
+  A study of better limits, the reach map, is in `tools/reach/README.md`: it
+  marks which shoulder, elbow and pitch poses are safe, by the anti-tip rule and
+  the CAD's parts not touching each other or the table (V1's masses, lamp-4ace's
+  geometry, not measured on a lamp). Its plain-JSON maps and the guard that reads
+  them (`sdk/js/examples/twin/reach-map-4ace.json`, `reach-guard.js`, #7786) are
+  used by the try-it page only. The body itself still uses the fixed reach above.
 - The commanded pose moves at 50 counts a second at most (about 4 degrees a
   second). That is the speed the head was moved at when it was backed off the
   base on lamp-4ace on 2026-10-12 (47 counts a second at most), which it
