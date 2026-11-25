@@ -1420,6 +1420,11 @@ proposal on #828).
   - The speaker's `playback_gap` for those zeros is recorded with
     `listen_gap: true` and not counted as a delivery gap. Each gap is
     recorded as `listen_gap`.
+  - Each gap is a journal line too (#8615 item 3), its phase and its
+    zeros' length so far (a start's is its first 10 ms block):
+    `lamp-voice: request N: playback gap resumed: M ms of zeros`, with
+    `, the lamp's listening hold` for a hold's. A row counts the reply's
+    delivery gaps by the `resumed` and `cancelled` lines without it.
   - Zeros begun in a hold that run on more than 100 ms past its end
     (`OVERRUN_US`) waited for late words: a delivery stall begun in the
     hold. They are counted as a delivery gap when they resume, and recorded
