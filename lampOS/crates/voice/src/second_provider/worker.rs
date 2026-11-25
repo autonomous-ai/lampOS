@@ -11245,6 +11245,22 @@ impl Heeding {
         self.kept_voices()
     }
 
+    /// The prints `LAMP_SAID_TO_ME`'s window reads for another voice than the
+    /// conversation's ([`Self::not_said_to_me`]): those for every rule, and
+    /// with `LAMP_FOLLOW_UPS` ([`Self::taking_follow_ups`]) the join's too
+    /// ([`Self::join_voices`]), which are the product's prints (the services'
+    /// or the join's alone, Twelve's P2 on #8656). Nothing else reads them for
+    /// whom the lamp answers.
+    fn window_voices(
+        &mut self,
+    ) -> Option<&mut crate::same_voice::Voices<Box<dyn crate::same_voice::Printer>>> {
+        if self.follow_ups {
+            self.join_voices()
+        } else {
+            self.voices.as_mut()
+        }
+    }
+
     /// The prints the join reads ([`Self::same_speaker`]): those for every
     /// rule, else, with `LAMP_JOIN_SAME_VOICE`, the services' or its own.
     fn join_voices(
@@ -12367,12 +12383,18 @@ impl Heeding {
         // showed another person (`Self::another_person`). The lone face's
         // pose, none read speaking, then says nothing of who said the line
         // (the Reviewer-lead's HOLD on #7726). A print not come yet is no
-        // other voice.
+        // other voice. With `LAMP_FOLLOW_UPS` the prints the join reads count
+        // here too ([`Self::join_voices`]): the product's prints are the
+        // services' or the join's alone, so none reached this rule (Twelve's
+        // P2 on #8656). On lamp-74ff on 25 Nov, with prints read here, TV and
+        // other voices right after an answer were held (room 25 of 27 against
+        // 19 of 27) and none of the person's own follow-ups. Nothing else
+        // reads them for whom the lamp answers: memory and the services are
+        // as before.
         let another_voice = signs.going_on
             && (self.another_person.is_some()
                 || self
-                    .voices
-                    .as_mut()
+                    .window_voices()
                     .and_then(|voices| voices.likeness_so_far(request))
                     .is_some_and(|likeness| likeness < crate::same_voice::DIFFERENT_BELOW));
         // `LAMP_NAME_SIGN_TIED` (#8092): only with eyes to give a look.
@@ -30874,6 +30896,84 @@ mod tests {
         };
         assert!(judged(false).is_some(), "his own voice, head down");
         assert_eq!(judged(true), None, "another voice says it");
+    }
+
+    /// Twelve's P2 on #8656: the product's prints are the join's or the
+    /// services' alone (`LAMP_SAME_VOICE_FOR=services`), and `LAMP_FOLLOW_UPS`
+    /// read none, so TV and a third voice right after an answer were answered
+    /// as follow-ups. With the join's prints read in the window
+    /// ([`super::Heeding::window_voices`]): a line in another voice than the
+    /// conversation's is judged by its signs as before (no look: held), one
+    /// in the conversation's own voice is a follow-up, looking or not, and so
+    /// is one too short for a print. Without `LAMP_FOLLOW_UPS` the window
+    /// reads no such print, and no look holds the line, as before.
+    #[test]
+    fn with_follow_ups_the_joins_prints_tell_another_voice_in_the_window() {
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::second_provider::Heard;
+        /// Prints by a line's first sample, answered at once: over 0 is the
+        /// conversation's voice, under 0 another.
+        #[derive(Default)]
+        struct Voice(std::collections::VecDeque<(u64, Result<Vec<f32>, String>)>);
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let print = if samples[0] > 0 {
+                    vec![1.0, 0.0]
+                } else {
+                    vec![0.0, 1.0]
+                };
+                self.0.push_back((request, Ok(print)));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                self.0.pop_front()
+            }
+        }
+        let said = |heeding: &mut super::Heeding, request: u64, voice: i16, samples: usize| {
+            heeding.hear(
+                request,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            heeding.hear(request, Heard::Samples(&vec![voice; samples]));
+            heeding.hear(request, Heard::Ended);
+        };
+        // Whether line 9 is answered: `heed_signs` gives why it is held.
+        let answered = |follow_ups: bool, voice: i16, samples: usize| {
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let now_us = monotonic_us();
+            let mut heeding = product_heeding(eyes);
+            heeding.attention.tie_the_second_sign(true);
+            if follow_ups {
+                heeding.taking_follow_ups();
+            }
+            heeding.checking_the_voice_for_the_join(Box::new(Voice::default()));
+            // The conversation's call, answered: its voice is the
+            // conversation's.
+            said(&mut heeding, 8, 1, 48_000);
+            heeding
+                .for_services
+                .as_mut()
+                .expect("the join's prints")
+                .decided(8, true, false);
+            said(&mut heeding, 9, voice, samples);
+            let signs = super::Signs {
+                going_on: true,
+                turned: None,
+                ..turned_signs(crate::room_told::Room::Unknown)
+            };
+            let line = "And what about Spain?";
+            let held = heeding.heed_signs(9, (now_us, now_us + 2_200_000), line, signs);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            held.is_none()
+        };
+        assert!(answered(true, 1, 48_000), "the conversation's own voice, no look");
+        assert!(!answered(true, -1, 48_000), "another voice, no look");
+        assert!(answered(true, -1, 8_000), "too short for a print: no other voice");
+        assert!(!answered(false, 1, 48_000), "off: no look holds it, as before");
+        assert!(!answered(false, -1, 48_000), "off, another voice");
     }
 
     /// One face as [`product_looks`] gives it: its id, its mouth, its

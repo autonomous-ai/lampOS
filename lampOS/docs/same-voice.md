@@ -725,8 +725,10 @@ prints for the services alone:
   #829's check and the rules on `voice_going_on_in` (`LAMP_SPOKEN_TO`,
   `LAMP_GOING_ON_NOT_OWN`, `LAMP_QUIET_GOING_ON_SAME_ONE`, someone else's
   sign), joining a cut line (`same_speaker`, `LAMP_JOIN_CUT_WORDS`; with
-  `LAMP_JOIN_SAME_VOICE=on` the join reads the services' prints, the one
-  conversation decision that does, every heard line then printed, linked or
+  `LAMP_JOIN_SAME_VOICE=on` the join reads the services' prints, and with
+  `LAMP_FOLLOW_UPS=on` so does `LAMP_SAID_TO_ME`'s window, for another voice
+  than the conversation's (`Heeding::window_voices`, Twelve's P2 on #8656):
+  the two conversation decisions that do, every heard line then printed, linked or
   not, so those prints also reach the services' judge and the owner's
   enrolled print (`owner_voice::offer`) as the confirm's do; in the private
   room the join's own prints reach neither, #8003), the
