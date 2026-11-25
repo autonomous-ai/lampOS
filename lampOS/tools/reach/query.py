@@ -2,12 +2,18 @@
 
     python3 query.py MAP.npz SHOULDER ELBOW PITCH [--shrink COUNTS]
     python3 query.py MAP.npz --export OUT.json [--shrink COUNTS]
+    python3 query.py MAP.npz --export OUT.json --unit lamp-75c9 --folded 2076,2045 --head-home 1772
 
 Poses are servo counts (the bus's). `--shrink` takes that many counts off each
 end of a run of safe poses: a margin in position on top of the margin in the
 rules. An unsafe pose answers None for every joint. `--export` writes the whole
 map as plain JSON for a page or a test: the three axes and, for each
 shoulder x elbow, the safe pitch runs as [low, high] pairs.
+
+A per-lamp file (`--unit`, `--folded SHOULDER,ELBOW`, `--head-home PITCH`, the lamp's own folded arm and head home in its
+counts) keeps the map's axes as they are and adds `unit` and `frame`: the lamp's counts minus `frame.offset` are the map's
+counts (`to_map_counts`). The CAD, the masses and the geometry stay lamp-4ace's and V1's until a lamp's own are measured; only the
+encoder zero moves. A consumer takes the file only for the unit it names (`for_unit`).
 """
 from __future__ import annotations
 
@@ -47,13 +53,40 @@ def range_at(map_npz, pose: tuple[float, float, float], shrink: float = 0.0) -> 
     return answer
 
 
-def export(map_npz, shrink: float, label: str = "") -> dict:
+# The lamp the map's counts are laid out from: lamp-4ace's folded arm and head home (reach.py FOLDED / HOME).
+MAP_FRAME = {"shoulder": 2048.0, "elbow": 2047.0, "pitch": 1772.0}
+
+
+def frame_of(unit: str, folded: tuple[float, float], head_home: float) -> dict:
+    """A lamp's frame: where its own counts sit against the map's. Same sign, same scale; only the zero moves."""
+    own = {"shoulder": float(folded[0]), "elbow": float(folded[1]), "pitch": float(head_home)}
+    return {"unit": unit, "map": dict(MAP_FRAME), "lamp": own, "offset": {k: own[k] - MAP_FRAME[k] for k in MAP_FRAME}}
+
+
+def to_map_counts(frame: dict | None, pose: dict) -> dict:
+    """A lamp's pose (`shoulder`, `elbow`, `pitch` in its counts) in the map's counts; no frame = the map's own lamp."""
+    off = (frame or {}).get("offset", {})
+    return {k: pose[k] - off.get(k, 0.0) for k in ("shoulder", "elbow", "pitch")}
+
+
+def for_unit(map_json: dict, unit: str) -> bool:
+    """Whether a per-lamp file may be used on `unit`: only the lamp it names (a file with no unit is the page's lamp-4ace map)."""
+    return map_json.get("unit") == unit
+
+
+def export(map_npz, shrink: float, label: str = "", unit: str = "", folded=None, head_home=None) -> dict:
     shoulder, elbow, pitch = map_npz["shoulder"], map_npz["elbow"], map_npz["pitch"]
     ok = map_npz["why"] == 0
     pitch_runs = [[[list(r) for r in runs(pitch, ok[i, j, :])] for j in range(len(elbow))] for i in range(len(shoulder))]
-    return {"label": label, "axes": {"shoulder": shoulder.tolist(), "elbow": elbow.tolist(), "pitch": pitch.tolist()},
-            "shrink_counts": shrink, "safe_pitch_runs": pitch_runs,
-            "note": "safe_pitch_runs[i][j] = runs of safe head pitch (counts) at shoulder[i], elbow[j]; empty: no pitch is safe there"}
+    out = {"label": label, "axes": {"shoulder": shoulder.tolist(), "elbow": elbow.tolist(), "pitch": pitch.tolist()},
+           "shrink_counts": shrink, "safe_pitch_runs": pitch_runs,
+           "note": "safe_pitch_runs[i][j] = runs of safe head pitch (counts) at shoulder[i], elbow[j]; empty: no pitch is safe there"}
+    if unit:
+        if folded is None or head_home is None:
+            raise ValueError("a per-lamp export needs the lamp's folded arm and head home")
+        out["unit"] = unit
+        out["frame"] = frame_of(unit, folded, head_home)
+    return out
 
 
 def main() -> None:
@@ -62,11 +95,14 @@ def main() -> None:
     ap.add_argument("pose", nargs="*", type=float)
     ap.add_argument("--shrink", type=float, default=0.0)
     ap.add_argument("--export")
+    ap.add_argument("--unit", default="", help="a per-lamp export: the lamp this file is for (needs --folded and --head-home)")
+    ap.add_argument("--folded", help="the lamp's folded SHOULDER,ELBOW counts")
+    ap.add_argument("--head-home", type=float, help="the lamp's head pitch home, counts")
     ap.add_argument("--label", default="", help="what the map stands for (the masses it was judged with), kept in the export")
     args = ap.parse_args()
     data = np.load(args.map)
     if args.export:
-        json.dump(export(data, args.shrink, args.label), open(args.export, "w"), separators=(",", ":"))
+        json.dump(export(data, args.shrink, args.label, args.unit, tuple(float(v) for v in args.folded.split(",")) if args.folded else None, args.head_home), open(args.export, "w"), separators=(",", ":"))
         return
     if len(args.pose) != 3:
         ap.error("give SHOULDER ELBOW PITCH, or --export")

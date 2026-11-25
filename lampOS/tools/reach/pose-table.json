@@ -1,0 +1,531 @@
+{
+ "about": "The reach map as a table of answers, shared by every reader of reach-map-4ace.json: the page guard (sdk/js/examples/twin/reach-guard.js) and the Python reference (tools/reach/query.py) must give these answers, and so must the body when it reads a map (#7513). Poses are in the MAP's counts (shoulder, elbow, pitch; pitch up is fewer counts). safe = the pose itself is a safe grid pose; ranges_shrink_N = [low, high] counts the joint may go to with the others held, the run of safe grid poses holding the pose, N counts in from each end and never past the pose itself; null = the pose is not safe, so no range. Frame cases: a lamp's counts minus frame.offset are the map's counts. Made from the page guard; the Python test is the independent check. restrict_cases / restrict_all_cases: the page guard's answer to a goal in DEGREES (the page's unit: shoulder and elbow from folded, pitch up positive; the pose is where the lamp is and its goal), at the 48-count margin: deg = what is sent, kind = null (sent as asked), held_at_edge (a goal past the safe run is held at its inside edge) or refused_further (from a pose the map calls unsafe a goal no nearer safe is not sent: the lamp stays where it is); a goal toward safe is allowed. These move the lamp: the body's reader must give them.",
+ "map": "sdk/js/examples/twin/reach-map-4ace.json",
+ "margin_counts": 48,
+ "frame_cases": [
+  {
+   "unit": "lamp-75c9",
+   "folded": [
+    2076,
+    2045
+   ],
+   "head_home": 1772,
+   "lamp": {
+    "shoulder": 2639,
+    "elbow": 2570,
+    "pitch": 1772
+   },
+   "map": {
+    "shoulder": 2611,
+    "elbow": 2572,
+    "pitch": 1772
+   }
+  },
+  {
+   "unit": "lamp-4ace",
+   "folded": [
+    2048,
+    2047
+   ],
+   "head_home": 1772,
+   "lamp": {
+    "shoulder": 2657,
+    "elbow": 2602,
+    "pitch": 1772
+   },
+   "map": {
+    "shoulder": 2657,
+    "elbow": 2602,
+    "pitch": 1772
+   }
+  }
+ ],
+ "cases": [
+  {
+   "name": "stand",
+   "pose": {
+    "shoulder": 2611.2,
+    "elbow": 2571.516,
+    "pitch": 1772
+   },
+   "safe": true,
+   "safe_with_margin_48": true,
+   "ranges_shrink_0": {
+    "shoulder": [
+     2320,
+     2896
+    ],
+    "elbow": [
+     2095,
+     3247
+    ],
+    "pitch": [
+     1464,
+     2648
+    ]
+   },
+   "ranges_shrink_48": {
+    "shoulder": [
+     2368,
+     2848
+    ],
+    "elbow": [
+     2143,
+     3199
+    ],
+    "pitch": [
+     1512,
+     2600
+    ]
+   }
+  },
+  {
+   "name": "stand_head_down",
+   "pose": {
+    "shoulder": 2611.2,
+    "elbow": 2571.516,
+    "pitch": 2227.111
+   },
+   "safe": true,
+   "safe_with_margin_48": true,
+   "ranges_shrink_0": {
+    "shoulder": [
+     2256,
+     2896
+    ],
+    "elbow": [
+     2287,
+     3375
+    ],
+    "pitch": [
+     1464,
+     2648
+    ]
+   },
+   "ranges_shrink_48": {
+    "shoulder": [
+     2304,
+     2848
+    ],
+    "elbow": [
+     2335,
+     3327
+    ],
+    "pitch": [
+     1512,
+     2600
+    ]
+   }
+  },
+  {
+   "name": "half_up",
+   "pose": {
+    "shoulder": 2321.067,
+    "elbow": 2308.689,
+    "pitch": 1772
+   },
+   "safe": true,
+   "safe_with_margin_48": true,
+   "ranges_shrink_0": {
+    "shoulder": [
+     2192,
+     2864
+    ],
+    "elbow": [
+     2095,
+     2607
+    ],
+    "pitch": [
+     1464,
+     2296
+    ]
+   },
+   "ranges_shrink_48": {
+    "shoulder": [
+     2240,
+     2816
+    ],
+    "elbow": [
+     2143,
+     2559
+    ],
+    "pitch": [
+     1512,
+     2248
+    ]
+   }
+  },
+  {
+   "name": "half_up_head_down",
+   "pose": {
+    "shoulder": 2321.067,
+    "elbow": 2308.689,
+    "pitch": 2454.667
+   },
+   "safe": false,
+   "safe_with_margin_48": false,
+   "ranges_shrink_0": {
+    "shoulder": null,
+    "elbow": null,
+    "pitch": null
+   },
+   "ranges_shrink_48": {
+    "shoulder": null,
+    "elbow": null,
+    "pitch": null
+   }
+  },
+  {
+   "name": "folded",
+   "pose": {
+    "shoulder": 2048,
+    "elbow": 2047,
+    "pitch": 1885.778
+   },
+   "safe": false,
+   "safe_with_margin_48": false,
+   "ranges_shrink_0": {
+    "shoulder": null,
+    "elbow": null,
+    "pitch": null
+   },
+   "ranges_shrink_48": {
+    "shoulder": null,
+    "elbow": null,
+    "pitch": null
+   }
+  },
+  {
+   "name": "folded_head_up",
+   "pose": {
+    "shoulder": 2048,
+    "elbow": 2047,
+    "pitch": 1658.222
+   },
+   "safe": false,
+   "safe_with_margin_48": false,
+   "ranges_shrink_0": {
+    "shoulder": null,
+    "elbow": null,
+    "pitch": null
+   },
+   "ranges_shrink_48": {
+    "shoulder": null,
+    "elbow": null,
+    "pitch": null
+   }
+  },
+  {
+   "name": "elbow_folded_shoulder_up",
+   "pose": {
+    "shoulder": 2611.2,
+    "elbow": 2047,
+    "pitch": 1772
+   },
+   "safe": false,
+   "safe_with_margin_48": false,
+   "ranges_shrink_0": {
+    "shoulder": null,
+    "elbow": null,
+    "pitch": null
+   },
+   "ranges_shrink_48": {
+    "shoulder": null,
+    "elbow": null,
+    "pitch": null
+   }
+  },
+  {
+   "name": "shoulder_folded_elbow_up",
+   "pose": {
+    "shoulder": 2048,
+    "elbow": 2571.516,
+    "pitch": 1772
+   },
+   "safe": false,
+   "safe_with_margin_48": false,
+   "ranges_shrink_0": {
+    "shoulder": null,
+    "elbow": null,
+    "pitch": null
+   },
+   "ranges_shrink_48": {
+    "shoulder": null,
+    "elbow": null,
+    "pitch": null
+   }
+  },
+  {
+   "name": "past_stand",
+   "pose": {
+    "shoulder": 2844.444,
+    "elbow": 2729.667,
+    "pitch": 1772
+   },
+   "safe": true,
+   "safe_with_margin_48": true,
+   "ranges_shrink_0": {
+    "shoulder": [
+     2384,
+     2928
+    ],
+    "elbow": [
+     2095,
+     3439
+    ],
+    "pitch": [
+     1464,
+     2648
+    ]
+   },
+   "ranges_shrink_48": {
+    "shoulder": [
+     2432,
+     2880
+    ],
+    "elbow": [
+     2143,
+     3391
+    ],
+    "pitch": [
+     1512,
+     2600
+    ]
+   }
+  },
+  {
+   "name": "off_grid",
+   "pose": {
+    "shoulder": 3413.333,
+    "elbow": 3412.333,
+    "pitch": 1772
+   },
+   "safe": false,
+   "safe_with_margin_48": false,
+   "ranges_shrink_0": {
+    "shoulder": null,
+    "elbow": null,
+    "pitch": null
+   },
+   "ranges_shrink_48": {
+    "shoulder": null,
+    "elbow": null,
+    "pitch": null
+   }
+  },
+  {
+   "name": "stand_head_far_up",
+   "pose": {
+    "shoulder": 2611.2,
+    "elbow": 2571.516,
+    "pitch": 1316.889
+   },
+   "safe": false,
+   "safe_with_margin_48": false,
+   "ranges_shrink_0": {
+    "shoulder": null,
+    "elbow": null,
+    "pitch": null
+   },
+   "ranges_shrink_48": {
+    "shoulder": null,
+    "elbow": null,
+    "pitch": null
+   }
+  },
+  {
+   "name": "stand_head_far_down",
+   "pose": {
+    "shoulder": 2611.2,
+    "elbow": 2571.516,
+    "pitch": 2739.111
+   },
+   "safe": false,
+   "safe_with_margin_48": false,
+   "ranges_shrink_0": {
+    "shoulder": null,
+    "elbow": null,
+    "pitch": null
+   },
+   "ranges_shrink_48": {
+    "shoulder": null,
+    "elbow": null,
+    "pitch": null
+   }
+  },
+  {
+   "name": "stand_head_at_edge",
+   "pose": {
+    "shoulder": 2611.2,
+    "elbow": 2571.516,
+    "pitch": 2630
+   },
+   "safe": true,
+   "safe_with_margin_48": false,
+   "ranges_shrink_0": {
+    "shoulder": [
+     2192,
+     2896
+    ],
+    "elbow": [
+     2415,
+     3439
+    ],
+    "pitch": [
+     1464,
+     2648
+    ]
+   },
+   "ranges_shrink_48": {
+    "shoulder": [
+     2240,
+     2848
+    ],
+    "elbow": [
+     2463,
+     3391
+    ],
+    "pitch": [
+     1512,
+     2630
+    ]
+   }
+  }
+ ],
+ "restrict_cases": [
+  {
+   "name": "stand pitch inside: sent as asked",
+   "pose_deg": {
+    "shoulder": 49.5,
+    "elbow": 46.1,
+    "pitch": 0
+   },
+   "joint": "pitch",
+   "goal_deg": -40,
+   "deg": -40,
+   "kind": null
+  },
+  {
+   "name": "stand pitch past the up edge: held at the edge",
+   "pose_deg": {
+    "shoulder": 49.5,
+    "elbow": 46.1,
+    "pitch": 0
+   },
+   "joint": "pitch",
+   "goal_deg": 60,
+   "deg": 22.8,
+   "kind": "held_at_edge"
+  },
+  {
+   "name": "stand pitch past the down edge: held at the edge",
+   "pose_deg": {
+    "shoulder": 49.5,
+    "elbow": 46.1,
+    "pitch": 0
+   },
+   "joint": "pitch",
+   "goal_deg": -89,
+   "deg": -72.7,
+   "kind": "held_at_edge"
+  },
+  {
+   "name": "half way up, same pitch the stand allows: held",
+   "pose_deg": {
+    "shoulder": 24,
+    "elbow": 23,
+    "pitch": 0
+   },
+   "joint": "pitch",
+   "goal_deg": -60,
+   "deg": -41.8,
+   "kind": "held_at_edge"
+  },
+  {
+   "name": "stand elbow inside: sent",
+   "pose_deg": {
+    "shoulder": 49.5,
+    "elbow": 46.1,
+    "pitch": 0
+   },
+   "joint": "elbow",
+   "goal_deg": 40,
+   "deg": 40,
+   "kind": null
+  },
+  {
+   "name": "folded (unsafe), shoulder up toward safe: allowed",
+   "pose_deg": {
+    "shoulder": 0,
+    "elbow": 0,
+    "pitch": -10
+   },
+   "joint": "shoulder",
+   "goal_deg": 30,
+   "deg": 30,
+   "kind": null
+  },
+  {
+   "name": "folded (unsafe), pitch further down: refused, stays",
+   "pose_deg": {
+    "shoulder": 0,
+    "elbow": 0,
+    "pitch": -10
+   },
+   "joint": "pitch",
+   "goal_deg": -14,
+   "deg": -10,
+   "kind": "refused_further"
+  },
+  {
+   "name": "folded (unsafe), pitch toward safe: allowed",
+   "pose_deg": {
+    "shoulder": 0,
+    "elbow": 0,
+    "pitch": -10
+   },
+   "joint": "pitch",
+   "goal_deg": -4,
+   "deg": -4,
+   "kind": null
+  }
+ ],
+ "restrict_all_cases": [
+  {
+   "name": "yaw as asked, pitch held, one note",
+   "pose_deg": {
+    "shoulder": 49.5,
+    "elbow": 46.1,
+    "pitch": 0
+   },
+   "targets": {
+    "yaw": 25,
+    "pitch": 70
+   },
+   "out": {
+    "yaw": 25,
+    "pitch": 22.8
+   },
+   "notes": [
+    "held_at_edge"
+   ]
+  },
+  {
+   "name": "both inside: as asked, no note",
+   "pose_deg": {
+    "shoulder": 49.5,
+    "elbow": 46.1,
+    "pitch": 0
+   },
+   "targets": {
+    "yaw": 10,
+    "pitch": 5
+   },
+   "out": {
+    "yaw": 10,
+    "pitch": 5
+   },
+   "notes": []
+  }
+ ]
+}

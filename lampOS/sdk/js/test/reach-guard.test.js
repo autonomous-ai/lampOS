@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { WebSocket } from 'ws';
 import { CONTROLS, checked } from '../examples/twin/controls.js';
-import { countsOf, distance, isSafe, limits, loadReachMap, rangesDeg, restrict, restrictAll } from '../examples/twin/reach-guard.js';
+import { countsOf, distance, forUnit, isSafe, limits, loadReachMap, mapCountsOf, rangesDeg, restrict, restrictAll } from '../examples/twin/reach-guard.js';
 import { startTwin } from './twin-start.js';
 
 // The page's own clamp, taken out of index.html between its markers (as try-panel-load.test.js does for the loader).
@@ -262,4 +262,57 @@ test('the running virtual lamp offers both maps, says which masses the limits co
   ws.send(JSON.stringify({ type: 'reach_map', name: 'nope' }));
   await new Promise((r) => setTimeout(r, 300));
   assert.equal(reach.name, 'reach-map-4ace-base-heavy');
+});
+
+// The shared table (tools/reach/pose-table.json): the answers every reader of the map must give; tools/reach/test_reach.py checks the
+// same file against its own port, and the body's reader (#7513) is to check it too.
+const table = JSON.parse(readFileSync(new URL('../../../tools/reach/pose-table.json', import.meta.url), 'utf8'));
+const round = (range) => (range ? range.map((v) => Math.round(v * 1000) / 1000) : null);
+
+test('the guard gives the shared pose table\'s answers: safe or not, and each joint\'s range at 0 and at 48 counts of margin', () => {
+  assert.ok(table.cases.length >= 12);
+  for (const c of table.cases) {
+    assert.equal(isSafe(map, c.pose, 0), c.safe, `${c.name}: safe`);
+    assert.equal(isSafe(map, c.pose, table.margin_counts), c.safe_with_margin_48, `${c.name}: safe with the margin`);
+    for (const joint of ['shoulder', 'elbow', 'pitch']) {
+      assert.deepEqual(round(limits(map, c.pose, joint, 0)), c.ranges_shrink_0[joint], `${c.name}: ${joint} range`);
+      assert.deepEqual(round(limits(map, c.pose, joint, 48)), c.ranges_shrink_48[joint], `${c.name}: ${joint} range at the margin`);
+    }
+  }
+  // The table is not all one answer: it holds safe and unsafe poses, ranges and none.
+  assert.ok(table.cases.some((c) => c.safe) && table.cases.some((c) => !c.safe));
+});
+
+test('a per-lamp map names its lamp and lays the lamp\'s counts on the map\'s: counts minus the frame\'s offset, only for that unit', () => {
+  for (const f of table.frame_cases) {
+    const perLamp = { ...map, unit: f.unit, frame: { offset: { shoulder: f.folded[0] - 2048, elbow: f.folded[1] - 2047, pitch: f.head_home - 1772 } } };
+    assert.deepEqual(mapCountsOf(perLamp, f.lamp), f.map, f.unit);
+    assert.ok(forUnit(perLamp, f.unit));
+    assert.ok(!forUnit(perLamp, 'lamp-other'));
+  }
+  // 75c9's stand is a safe pose on the map once laid on it; a map with no frame is the map's own lamp and moves nothing.
+  const f = table.frame_cases[0];
+  assert.ok(isSafe(map, mapCountsOf({ ...map, frame: { offset: { shoulder: f.folded[0] - 2048, elbow: f.folded[1] - 2047, pitch: 0 } } }, f.lamp), 0));
+  assert.deepEqual(mapCountsOf(map, f.lamp), f.lamp);
+  assert.ok(!forUnit(map, 'lamp-75c9'));
+});
+
+test('the guard gives the shared table\'s restrict answers: sent as asked, held at the edge, unsafe-closer allowed, unsafe-further refused', () => {
+  const kindOf = (note) => (!note ? null : /past what the other joints allow/.test(note) ? 'held_at_edge' : /further from its safe poses/.test(note) ? 'refused_further' : 'other');
+  const joints = (d) => ({ shoulder: { deg: d.shoulder }, elbow: { deg: d.elbow }, pitch: { deg: d.pitch }, yaw: { deg: 0 } });
+  assert.ok(table.restrict_cases.length >= 8);
+  for (const c of table.restrict_cases) {
+    const r = restrict(map, joints(c.pose_deg), c.joint, c.goal_deg);
+    assert.equal(r.deg, c.deg, c.name);
+    assert.equal(kindOf(r.note), c.kind, c.name);
+  }
+  for (const k of ['held_at_edge', 'refused_further']) assert.ok(table.restrict_cases.some((c) => c.kind === k), k);
+  for (const c of table.restrict_all_cases) {
+    const r = restrictAll(map, joints(c.pose_deg), c.targets);
+    assert.deepEqual(r.targets, c.out, c.name);
+    assert.deepEqual(r.notes.map(kindOf), c.notes, c.name);
+  }
+  // The 48-count margin changes an answer: a pose that is safe is not safe with it (the table's edge pose).
+  const edge = table.cases.find((c) => c.name === 'stand_head_at_edge');
+  assert.ok(edge.safe && !edge.safe_with_margin_48);
 });
