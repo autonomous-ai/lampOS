@@ -1896,6 +1896,9 @@ pub struct Attention {
     /// Whether a hearing that counts for the request in hand began at the
     /// line's start ([`NAME_AT_THE_START_US`]).
     named_at_start: bool,
+    /// `LAMP_NAME_SURE_OVER_A_PERSON_WORD`
+    /// ([`Attention::keep_a_sure_start_past_a_person_word`]).
+    sure_past_a_person_word: bool,
     /// When the lamp's head was last tapped, and whether that counts for the
     /// request in hand ([`TAPPED_BEFORE_US`]).
     tapped_us: Option<u64>,
@@ -2133,12 +2136,57 @@ impl Attention {
 
     /// The word on [`SAID_TO_A_PERSON`] that takes the line's start from the
     /// name's second signs ([`Self::hold_a_start_said_to_a_person`]): only
-    /// with both switches on and the name heard at the line's start.
+    /// with both switches on and the name heard at the line's start. None
+    /// when a sure hearing began at the start and
+    /// `LAMP_NAME_SURE_OVER_A_PERSON_WORD` keeps it
+    /// ([`Self::keep_a_sure_start_past_a_person_word`]).
     pub fn start_said_to_a_person(&self) -> Option<&'static str> {
         if !(self.name_second_sign && self.name_said_to_a_person && self.named_at_start) {
             return None;
         }
+        if self.sure_past_a_person_word && self.sure_at_start() {
+            return None;
+        }
         said_to_a_person(&self.heard).or(self.cut_said_to_a_person)
+    }
+
+    /// `LAMP_NAME_SURE_OVER_A_PERSON_WORD`, the product owner's first rule (25
+    /// Nov 2026: a clear "Hey Lamp" counts, face or no face): a hearing at
+    /// [`SURE_SCORE`] or more that began at the line's start stays its second
+    /// sign though the line's first word, set off, is said to a person. On
+    /// lamp-74ff that night "Hey Lamp, good morning!" came back "Hey, ma'am.
+    /// Good morning." three times in about 200 played calls, its hearing at
+    /// the start not counted, and the whole conversation after it was held.
+    /// #3945's "Ma'am, could you pass me the salt please?", said to a person,
+    /// was heard at 0.996, under the sure score, and stays held.
+    pub fn keep_a_sure_start_past_a_person_word(&mut self, on: bool) {
+        self.sure_past_a_person_word = on;
+    }
+
+    /// The word said to a person a sure start was kept past
+    /// ([`Self::keep_a_sure_start_past_a_person_word`]), for the journal.
+    pub fn person_word_a_sure_start_passed(&self) -> Option<&'static str> {
+        (self.name_second_sign
+            && self.name_said_to_a_person
+            && self.named_at_start
+            && self.sure_past_a_person_word
+            && self.sure_at_start())
+        .then(|| said_to_a_person(&self.heard).or(self.cut_said_to_a_person))
+        .flatten()
+    }
+
+    /// Whether a hearing at [`SURE_SCORE`] or more counts for the line in
+    /// hand and began at its start ([`NAME_AT_THE_START_US`]), measured as
+    /// [`Self::name_heard_scored`] measures the start. The last sure hearing
+    /// is the one kept, so a later one leaves this false: never more than
+    /// the start's own hearing.
+    fn sure_at_start(&self) -> bool {
+        self.named_sure
+            && self.named_at_start
+            && self.named_sure_us.is_some_and(|at| {
+                self.start_in_hand()
+                    .is_some_and(|start| at <= start.saturating_add(NAME_AT_THE_START_US))
+            })
     }
 
     /// A hearing of the name that began inside the sound of the line before
@@ -8643,6 +8691,47 @@ mod tests {
         // Said to a person only set off: "Dad's car" is no call to a person.
         assert_eq!(said_to_a_person("Dad's car is outside."), None);
         assert_eq!(said_to_a_person("Sir Paul sang it."), None);
+    }
+
+    /// `LAMP_NAME_SURE_OVER_A_PERSON_WORD`, the product owner's first rule:
+    /// on lamp-74ff on 25 Nov at 23:44 (request 1) "Hey Lamp, good morning!"
+    /// came back "Hey, ma'am. Good morning.", lamp-name heard the name at its
+    /// start, and the start was not counted. With the switch a sure start
+    /// stays the second sign, and the journal names the word it was kept
+    /// past. #3945's "Ma'am, could you pass me the salt please?" at 0.996 is
+    /// still held, a sure hearing past the start keeps nothing, and off it is
+    /// as before.
+    #[test]
+    fn with_a_sure_start_a_word_said_to_a_person_takes_nothing() {
+        let began = 10_000_000;
+        let weighed = |line: &str, on: bool, score: f32, into_us: u64| {
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            attention.hold_a_start_said_to_a_person(true);
+            attention.keep_a_sure_start_past_a_person_word(on);
+            attention.began_at(1, 1, began);
+            attention.name_heard_scored(began + into_us, score);
+            attention.heard(line);
+            let passed = attention.person_word_a_sure_start_passed();
+            (attention.weigh_the_name(None, false), passed)
+        };
+        let call = "Hey, ma'am. Good morning.";
+        assert_eq!(weighed(call, true, 1.0, 200_000), (false, Some("ma'am")));
+        assert_eq!(
+            weighed(call, true, SURE_SCORE, 200_000),
+            (false, Some("ma'am"))
+        );
+        // Off: dropped, as at 23:44.
+        assert_eq!(weighed(call, false, 1.0, 200_000), (true, None));
+        // #3945's line, under the sure score: held, on or off.
+        let salt = "Ma'am, could you pass me the salt please?";
+        assert_eq!(weighed(salt, true, 0.996, 200_000), (true, None));
+        assert_eq!(weighed(call, true, 0.98, 200_000), (true, None));
+        // A sure hearing past the line's start is no start of its own.
+        assert_eq!(
+            weighed(call, true, 1.0, NAME_AT_THE_START_US + 1_000_000),
+            (true, None)
+        );
     }
 
     /// #3945, `LAMP_NAME_SAID_TO_A_PERSON=on`: "Ma'am, could you pass me the
