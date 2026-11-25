@@ -27,7 +27,7 @@
       "format": "date-time"
     },
     "grant": {
-      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream) and a person's pose in a picture of the computer's own (pose), never while the lamp is private; microphone: the microphone's sound (microphone.stream), never while the lamp is private; speaker: sound played through the lamp's speaker, any sound and not only the lamp's own voice (speaker.stream), never while the lamp is private; notes: its own small key/value notes kept on the lamp (notes.set, notes.get, notes.delete, notes.list), gone with its revoke; speech: every line the lamp says out loud (lamp.said), which can be personal, never what a person says to it.",
+      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream) and a person's pose in a picture of the computer's own (pose), never while the lamp is private; microphone: the microphone's sound (microphone.stream), never while the lamp is private; speaker: sound played through the lamp's speaker, any sound and not only the lamp's own voice (speaker.stream), never while the lamp is private; notes: its own small key/value notes kept on the lamp (notes.set, notes.get, notes.delete, notes.list), gone with its revoke; speech: every line the lamp says out loud (lamp.said), which can be personal, never what a person says to it; volume: the speaker's volume alone (volume, get volume, volume.changed), never a sound, which speak gives too.",
       "enum": [
         "body",
         "light",
@@ -42,7 +42,8 @@
         "microphone",
         "speaker",
         "notes",
-        "speech"
+        "speech",
+        "volume"
       ]
     },
     "part": {
@@ -1655,7 +1656,7 @@
                     "object",
                     "null"
                   ],
-                  "description": "get's volume (the speak grant): the level speaker/volume last said, as volume.changed tells it; null until lamp-actions has said it.",
+                  "description": "get's volume (the volume grant, or speak): the level speaker/volume last said, as volume.changed tells it; null until lamp-actions has said it.",
                   "properties": {
                     "level": {
                       "type": "integer",
@@ -3501,7 +3502,7 @@
       "additionalProperties": false
     },
     "volume": {
-      "description": "The speaker's volume, the person's own (the same the voice and the app set, through lamp-actions): exactly one of a level, a step or a mute. Needs the speak grant; no rate. The reply is the level it left, {level, muted}.",
+      "description": "The speaker's volume, the person's own (the same the voice and the app set, through lamp-actions): exactly one of a level, a step or a mute. Needs the volume grant, or speak; no rate. The reply is the level it left, {level, muted}.",
       "type": "object",
       "properties": {
         "id": {

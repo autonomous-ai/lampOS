@@ -1318,7 +1318,7 @@ impl Door {
         let missing: Vec<String> = op
             .needs()
             .into_iter()
-            .filter(|grant| !grants.contains(grant))
+            .filter(|grant| !grant.held_in(&grants))
             .map(|grant| json!(grant).as_str().unwrap_or_default().to_owned())
             .collect();
         if !missing.is_empty() {
@@ -4002,6 +4002,38 @@ mod tests {
         let (mut door, mut session, mut fake) = paired(&computer, &[Grant::Body]);
         let answered = door.handle(&mut session, get, &mut fake, 2 * S, 1);
         assert_eq!(code_of(&answered), None, "{answered:?}");
+    }
+
+    /// #8610, El's P2.2 on #8651: the volume is not speaking. `volume` alone
+    /// sets it and never says a line; `speak` still sets it, as before
+    /// `volume` was its own; neither one sets it for a computer granted
+    /// only the light.
+    #[test]
+    fn volume_needs_its_own_grant_or_speak() {
+        let volume = r#"{"id":3,"op":"volume","to":30}"#;
+        let say = r#"{"id":4,"op":"say","text":"Hi."}"#;
+        for (at, grants) in [
+            &[Grant::Volume][..],
+            &[Grant::Speak],
+            &[Grant::Light, Grant::Volume],
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let (mut door, mut session, mut fake) = paired(&Computer::new(60 + at as u8), grants);
+            let set = door.handle(&mut session, volume, &mut fake, 2 * S, 1);
+            assert_ne!(code_of(&set), Some("no_grant"), "{grants:?}: {set:?}");
+            let said = door.handle(&mut session, say, &mut fake, 2 * S, 1);
+            assert_eq!(
+                code_of(&said) == Some("no_grant"),
+                !grants.contains(&Grant::Speak),
+                "{grants:?}: {said:?}"
+            );
+        }
+        let (mut door, mut session, mut fake) = paired(&Computer::new(70), &[Grant::Light]);
+        let refused = door.handle(&mut session, volume, &mut fake, 2 * S, 1);
+        assert_eq!(code_of(&refused), Some("no_grant"));
+        assert_eq!(reply(&refused)["error"]["why"], "not granted: volume");
     }
 
     #[test]

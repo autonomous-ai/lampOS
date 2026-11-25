@@ -62,7 +62,7 @@ pairing keeps it for later connects.
 | `touch` | `kind`: `tap` or `pet` | a tap (shown from 11372) or a pet (not shown on a lamp yet) |
 | `button` | `press`: `long_press` | the button is held |
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `muted_after_fault` | one of them changes |
-| `volume.changed` (speak) | `level` (0–100 of what the lamp allows), `muted` | the speaker's volume changes, whoever changed it: the person by voice or in the app, or a computer |
+| `volume.changed` (volume, or speak) | `level` (0–100 of what the lamp allows), `muted` | the speaker's volume changes, whoever changed it: the person by voice or in the app, or a computer |
 | `lamp.said` (speech) | `text`, `by` (`lamp`, `computer`), `source` (`reply`, `exact`, `cached`), `cut` | a line the lamp said out loud: its fixed phrases, a computer's own say back to it, a reply only when said to the owner; never what a person says; what it sends can't be taken back |
 | `air.changed` (air) | `pm1_0`, `pm2_5`, `pm4_0`, `pm10`, `co2_ppm`, `humidity`, `temperature`, `feel` (`fresh`, `fine`, `stuffy`, `very_stuffy`, `unknown`); a value the sensor doesn't know is left out | the first reading, then a value moves by its step (particles 5, CO2 50 ppm, humidity 3, temperature 0.5 °C) or `feel` changes; at most every 5 s |
 | `time` | your schedule | accepted, not produced yet |
@@ -120,7 +120,7 @@ Parts: `body` (grant body), `light` (light), `voice` (speak). `for_ms` up to
 | your note keys | `await lamp.notes.list("mo")` or `notes_list(prefix)` | `lamp.notes.list('mo')` or `notesList(prefix)` | `lamp_notes_list(prefix)` | notes |
 | read a linked service (a skill's run on the control socket only) | `await lamp.service_read("gmail", {"what": "recent"})` | `lamp.serviceRead('gmail', { what: 'recent' })` | — | `<service>-read` |
 | prepare a write for the person's spoken yes (a skill's run only; never sent by the run) | `await lamp.service_write("gmail", {...})` | `lamp.serviceWrite('gmail', {...})` | — | `<service>-write` |
-| the speaker's volume, the person's own (one of `to` 0–100, `step` `up`/`down`, `mute`) | `await lamp.volume(to=30)`, `volume(step="down")`, `volume(mute=True)` | `lamp.volume({ to: 30 })` | `lamp_volume(to, step, mute)`, `lamp://state/volume` | speak |
+| the speaker's volume, the person's own (one of `to` 0–100, `step` `up`/`down`, `mute`) | `await lamp.volume(to=30)`, `volume(step="down")`, `volume(mute=True)` | `lamp.volume({ to: 30 })` | `lamp_volume(to, step, mute)`, `lamp://state/volume` | volume (or speak) |
 | start a turn (the lamp asks, the person answers) | `await lamp.start_turn("Shall we start?", wait=True)` | `lamp.startTurn('Shall we start?', { wait: true })` | `lamp_start_turn(prompt, wait)` | speak and hear |
 | end the turn you started | `await lamp.end_turn()` | `lamp.endTurn()` | `lamp_end_turn()` | speak |
 | your mute on, off | `await lamp.set_listening(False)`, `set_listening(True)` | `lamp.setListening(false)` | `lamp_set_listening(on)` | hear |

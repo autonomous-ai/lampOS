@@ -48,7 +48,9 @@ và thoát với mã 0.
   dựng xong trọn câu trong 5 s với câu đến 120 ký tự, thêm 1 s cho mỗi 30 ký
   tự bắt đầu sau đó, tối đa 20 s; quá thời hạn thì bị từ chối
   (`tts_cache::render_within`, #7742).
-- **Quyền:** `body`, `light`, `speak`, `look`, `hear`, `sound`.
+- **Quyền:** `body`, `light`, `speak`, `look`, `hear`, `sound`; và `volume`
+  (#8610): chỉ âm lượng loa (thao tác `volume`, trạng thái `volume`,
+  `volume.changed`), không bao giờ phát tiếng; `speak` cũng bao gồm nó.
 - **Không bao giờ qua cửa này:** khung hình camera, âm thanh, bản ghi lời
   nói, dấu khuôn mặt hay tên.
 
