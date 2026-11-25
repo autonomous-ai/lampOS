@@ -1315,6 +1315,88 @@ fn a_wider_reach_and_speed_can_be_chosen_only_inside_their_caps() {
     }
 }
 
+/// #7418, #8432's row on lamp-06c1 (25 Nov): over 115 s of a make's
+/// thinking the head's pitch moved 1.14 degrees, its roll none, and the
+/// lamp was still for 13.1 s once. A slow wander's joint came to rest at
+/// every step under `ARRIVED_SPEED` and woke only 20 counts behind. With a
+/// roll the reach lets the head take, a minute of thinking moves the head's
+/// pitch and roll by degrees and never leaves the joints still longer than
+/// `WANDER_STILL_MOST_S`.
+#[test]
+fn a_long_thinkings_joints_are_kept_awake_through_its_wander() {
+    let limits = Limits::folded_with(Tuning {
+        reach: [150, 15, 100, 250],
+        speed: 300,
+        servo_speed: 1_000,
+        servo_acceleration: 60,
+    })
+    .unwrap();
+    let (mut lamp, mut clock) = folded(Duration::from_secs(72));
+    lamp.servos[PITCH].position = 1_950.0;
+    lamp.servos[PITCH].goal = 1_950;
+    for servo in [PITCH, ROLL, YAW] {
+        lamp.servos[servo].speed = 1_000;
+        lamp.servos[servo].acceleration = 60;
+    }
+    let time = clock.time.clone();
+    let news = move || {
+        let at = time.get().as_millis() as u64;
+        Some(match at {
+            0..1_000 => (Mood::Resting, 0),
+            1_000..3_000 => (Mood::Listening, 120),
+            3_000..68_000 => (Mood::Thinking, 0),
+            _ => (Mood::Listening, 120),
+        })
+    };
+    let mut seen = Vec::new();
+    let report = run(&mut lamp, &mut clock, limits, None, news, |glimpse| {
+        seen.push(*glimpse)
+    });
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let degrees = |counts: u16| f32::from(counts) / lease::COUNTS_PER_DEGREE;
+    // Past the deep pose (3 s + 4.8 s) to the end of the thinking.
+    let thinking: Vec<&Glimpse> = seen
+        .iter()
+        .filter(|glimpse| glimpse.mood == Mood::Thinking && glimpse.step * 20 >= 8_000)
+        .collect();
+    assert!(thinking.len() > 2_500, "{}", thinking.len());
+    for (index, most) in [(0, 2.5), (1, 2.0)] {
+        let low = thinking.iter().map(|g| g.positions[index]).min().unwrap();
+        let high = thinking.iter().map(|g| g.positions[index]).max().unwrap();
+        assert!(
+            degrees(high - low) >= most,
+            "joint {index}: {low} to {high}"
+        );
+    }
+    // Kept awake through each move: the head follows what the pose wants
+    // within a few counts, never left resting until it is nearly
+    // `WAKE_COUNTS` behind (without it, 612 steps here were 14 or more).
+    let behind = thinking
+        .iter()
+        .flat_map(|glimpse| {
+            (0..2).map(|index| glimpse.wanted[index].abs_diff(glimpse.positions[index]))
+        })
+        .max()
+        .unwrap();
+    assert!(behind < 14, "{behind} counts behind");
+    // Still: every joint within half a degree (6 counts) of where it was.
+    let mut anchor = thinking[0].positions;
+    let mut from = thinking[0].step;
+    let mut longest = 0;
+    for glimpse in &thinking {
+        if (0..3).any(|index| glimpse.positions[index].abs_diff(anchor[index]) >= 6) {
+            anchor = glimpse.positions;
+            from = glimpse.step;
+        }
+        longest = longest.max(glimpse.step - from);
+    }
+    assert!(
+        (longest * 20) as f32 <= crate::gesture::WANDER_STILL_MOST_S * 1_000.0,
+        "still for {} ms",
+        longest * 20
+    );
+}
+
 #[test]
 fn every_step_can_be_watched_with_the_mood_it_acted_on() {
     let (mut lamp, mut clock) = folded(Duration::from_secs(8));

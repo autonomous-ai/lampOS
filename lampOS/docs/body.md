@@ -670,22 +670,43 @@ make thought on with no turn held one pose for 119 s, every joint still to
 a tenth of a degree: two minutes of that read as a machine stuck. A person
 thinking a while drifts and settles.
 
+The first wander (#8432: three slow sines an axis and a settle every
+12.7 s) was too small on the lamp. In #8432's row on lamp-06c1 (25 Nov,
+115 s) the head's pitch moved 1.14°, its roll 0.00°, only the base moved
+(about 0.5° a second), and the lamp was still for 13.1 s once. A drift
+that slow put each joint to rest at every step (under `ARRIVED_SPEED`, 15
+counts a second), and it woke only once it was `WAKE_COUNTS` (20) behind.
+The first builder asked for a few degrees of head pitch and roll and no
+stillness past about 6 s (17:35). The wander is now a chain of eased
+steps:
+
 | Value | Now | Why |
 |---|---|---|
-| Start | once the deep pose is reached, grown in from nothing over 3 s (`WANDER_EASE_US`) | the glance and the deepening stay as they were; a short thinking never wanders, and the head never jumps |
-| Amplitude | pitch ±3°, roll ±2°, the base's yaw ±4° (`WANDER_DEGREES`) | big enough to see across a room, small enough to stay thinking |
-| Shape | per axis three sines, periods 7.3 to 19 s, no two in a simple ratio (`WANDER_PERIODS_S`, weights 0.5, 0.3, 0.2) | slow, never a visible loop |
-| Settle | the drift's time slows to a stop and goes on every 12.7 s (`WANDER_SETTLE_S`) | the look drifts and rests, as a person's does |
-| Variety | each exchange's thinking starts the sines at other phases (`WANDER_PHASE_STEP`), from the exchange count, no chance | no two long thinkings drift alike, and the same time gives the same pose |
-| Speed | the body's own speed, acceleration and reach bounds, no new one | under about 8° a second asked, inside them |
+| Start | once the deep pose is reached, the first move eased from it | the glance and the deepening stay as they were; a short thinking never wanders, and the head never jumps |
+| Amplitude | pitch ±3.5°, roll ±2.5°, the base's yaw ±4° (`WANDER_DEGREES`; pitch and roll were 3 and 2) | big enough to see across a room, small enough to stay thinking |
+| Steps | each an eased move (smootherstep) to a new point, then a hold; 2 to 6 s each (`WANDER_STEP_S`), the length drawn anew each step | slow, with no beat to it |
+| Hold | a quarter of the step, 0.5 to 1.5 s (`WANDER_HOLD_SHARE`) | the look drifts and rests, as a person's does |
+| Longest still | 6 s (`WANDER_STILL_MOST_S`) | the first builder's "no stillness past about 6 s"; the holds and the moves' eased ends stay well under it |
+| Lead | one axis leads each step, drawn anew, and crosses to the other side of the deep pose, to at least 0.8 of its degrees (`WANDER_LEAD_SHARE`); the others go anywhere inside theirs | every step is a move the eye can see, and the joint starts for (2° or more, over 20 counts) |
+| Least move | an axis that would move under 2° in a step stays where it is (`WANDER_LEAST_MOVE_DEGREES`; 23 counts) | every move is one its joint starts for, over `WAKE_COUNTS`, never one it rests behind |
+| Speed | at most 3° a second at a move's middle (`WANDER_PEAK_DEGREES_S`): a move that would go faster takes longer | drifts, never jerks; inside the body's own speed bounds (`FOLDED`'s 50 counts, 4.4°, a second), which still apply |
+| Variety | the lead, the points and the lengths are drawn from the exchange count and the step (splitmix64), no chance | no two long thinkings drift alike, and the same time gives the same pose |
+| Awake | a joint whose step moves it 20 counts or more is woken once the move is 6 counts (`ARRIVED_COUNTS`) on and isn't put to rest until the move ends; in a hold it rests as before | the row's head that all but kept still; in the body test the head is then never 14 counts behind what the pose wants (612 steps were, without it) |
 
 The wander is an offset in degrees laid on the thinking pose's counts. A
 person's voice ends it at the next step (listening wins, as before), and
 while the lamp keeps still for someone (`{"quiet":true}`, the voice's care
-hold, #7689) there is none. A joint that has arrived rests as above, so the
-head moves on again once the wander has taken it 20 counts away. Test:
-`gesture.rs`'s `a_long_thinking_wanders_around_its_deep_pose_and_a_short_one_never`.
-The numbers wait on a camera rerun of #8432's long thinking, judged by a
+hold, #7689) there is none. Every bound the pose has holds it too: the
+reach, the speed and acceleration, a hand's hold, a glance. A joint at its
+bound isn't kept awake. At the product unit's `--reach 150,15,1,250` the
+head's roll reach is 1 count at levels 1 and 2 (`stand_roll` 0), so the
+roll wander shows only at levels 3 to 5 (106 to 200 counts). Giving the
+wander a roll of its own at levels 1 and 2 is the owner's call, and it
+isn't made here. Tests: `gesture.rs`'s
+`a_long_thinking_wanders_around_its_deep_pose_and_a_short_one_never` and
+`a_long_thinking_moves_the_heads_pitch_and_roll_and_is_never_still_for_long`,
+and `body/tests.rs`'s `a_long_thinkings_joints_are_kept_awake_through_its_wander`.
+The numbers wait on a camera rerun of the long thinking, judged by a
 person: if it reads as fidgeting, the amplitudes are halved first.
 
 ## Waking
