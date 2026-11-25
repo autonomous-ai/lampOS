@@ -16,6 +16,9 @@ After=local-fs.target
 # The first update after setup (#6284, docs/setup.md "The first update after setup"): the first-update file written
 # just before the marker. With lamp-update's and the voice's.
 Environment=LAMP_FIRST_UPDATE=on
+# LAMP_NOTICING_BY_DEFAULT: its why and rules are its row in docs/switches.md (#7767). The same line in lamp-seen,
+# lamp-eyes, lamp-ears, lamp-skills, lamp-cloud, lamp-setup, lamp-setup-change@ and lamp-voice.
+Environment=LAMP_NOTICING_BY_DEFAULT=on
 Type=simple
 # Root: the radio scripts, wpa_supplicant's file, /etc/localtime, nginx.
 User=root

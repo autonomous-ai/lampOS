@@ -31,6 +31,9 @@ Environment=LAMP_SEEN_ACTIVITY=on
 Environment=LAMP_SEEN_POSTURE=on
 # LAMP_SEEN_MORE_DOINGS: its why and rules are its row in docs/switches.md (#6543, #7529).
 Environment=LAMP_SEEN_MORE_DOINGS=on
+# LAMP_NOTICING_BY_DEFAULT: its why and rules are its row in docs/switches.md (#7767). The same line in lamp-seen,
+# lamp-eyes, lamp-ears, lamp-skills, lamp-cloud, lamp-setup, lamp-setup-change@ and lamp-voice.
+Environment=LAMP_NOTICING_BY_DEFAULT=on
 # Each connection leaves the broker a will saying the lamp `offline` on its own channel, 30 s
 # after the connection is lost (WILL_DELAY_S; the session is kept 60 s, longer, so the delay
 # holds): the lamp's record shows it gone about 30 s after a stop and within about 2 min of a

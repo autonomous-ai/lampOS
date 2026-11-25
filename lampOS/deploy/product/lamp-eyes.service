@@ -72,6 +72,9 @@ Environment=LAMP_FACE_FOLLOW_NEAR_NEW_ID=on
 Environment=LAMP_SESSION_PERSON=on
 # LAMP_FACE_TAKEOVER_SCORE: its why and rules are its row in docs/switches.md (#7933).
 Environment=LAMP_FACE_TAKEOVER_SCORE=on
+# LAMP_NOTICING_BY_DEFAULT: its why and rules are its row in docs/switches.md (#7767). The same line in lamp-seen,
+# lamp-eyes, lamp-ears, lamp-skills, lamp-cloud, lamp-setup, lamp-setup-change@ and lamp-voice.
+Environment=LAMP_NOTICING_BY_DEFAULT=on
 # The fast camera stream (#5894, #5956, #6027): a paired computer with the camera grant gets the camera's own frames
 # (about 21 of 25 a second at 640x480, lamp-75c9 10 Nov) at /run/lampos-eyes/frames.sock instead of the eyes' two a
 # second. The socket takes only lamp-control.service, and a stream's end stops its writer at once. Off for any

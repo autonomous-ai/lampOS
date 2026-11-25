@@ -26,6 +26,9 @@ Environment=LAMP_PRIVACY_CONTROLS=on
 # classes.rs and placed by models.json; a lamp without them publishes `invalid_model`.
 Environment=LAMP_EARS_CLASSES=on
 Environment=LAMP_EARS_CLASSES_MODEL=/opt/lampOS/ears/models/yamnet.onnx
+# LAMP_NOTICING_BY_DEFAULT: its why and rules are its row in docs/switches.md (#7767). The same line in lamp-seen,
+# lamp-eyes, lamp-ears, lamp-skills, lamp-cloud, lamp-setup, lamp-setup-change@ and lamp-voice.
+Environment=LAMP_NOTICING_BY_DEFAULT=on
 # mic1's capture level, pinned (#694, 21 Oct): --rise-db 30 and the quiet in docs/ears.md were measured at the C-Media
 # card's `Mic` capture 4 (-8 dB), lamp-4ace's. lamp-75c9 was left at 20 (+8 dB) and its quiet read 16 dB louder,
 # -37.6 against -53.6 at 4. Said once in the journal at each start; a lamp without the card starts ears all the same.
