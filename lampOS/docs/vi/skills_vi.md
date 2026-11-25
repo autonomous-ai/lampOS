@@ -4144,8 +4144,13 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   khởi động, và các bước `say` và `remind` cố định, như trước; kỹ năng đã
   được giữ không đổi. Task riêng của đèn cho agent trên một trigger
   (`make_no_cannot::skill_text`) không bao giờ được cấp `speak`. Không có
-  công tắc. Cùng phép kiểm đó trong `lamp-skills pack`, và phép kiểm không
-  bao giờ lặp lại cùng một câu, là việc tiếp theo.
+  công tắc. Phép kiểm dựa trên grant, không dựa trên việc script gọi gì:
+  script gọi `lamp.say` mà không có grant `speak` vẫn được giữ, và
+  lamp-control từ chối câu nói đó ở mỗi lần chạy. Giới hạn đã biết: thao
+  tác âm lượng của lamp-control cũng cần `speak`, nên một kỹ năng trigger
+  chỉ chỉnh âm lượng cũng bị từ chối. Cùng phép kiểm đó trong
+  `lamp-skills pack`, phép kiểm không bao giờ lặp lại cùng một câu, và cho
+  kỹ năng trigger chỉ chỉnh âm lượng đi qua, là việc tiếp theo.
 - **Giọng đọc bước `run` như đọc bước `task`**: code riêng, giữ theo grant
   của nó và script của nó phải nằm trong các file đã viết
   (`made_skill::code_step`, `task_run`), và được đọc lại để xin đồng ý một
