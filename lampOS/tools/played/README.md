@@ -116,7 +116,10 @@ These you can run on their own:
   stop." and 0.9 s of quiet first (more than the 600 ms that ends a line); C
   starts the line on the lamp's last word of a short answer, at waits that
   grow each round (a round counts only when the line began within 0.5 s of
-  the lamp's last sound). It changes nothing on the lamp: no drop-in, no
+  the lamp's last sound); D has the lamp say "your alarm is set for 7:30
+  tomorrow" and the person answer "No, for 7.", which passes when the heard
+  line keeps the correction whole (#8486's P1: a run ends where an answer word
+  ends). It changes nothing on the lamp: no drop-in, no
   restart. It refuses, with nothing played, unless the voice runs as the
   product's does (`--turn-taking duplex`, `--end-silence-ms 600`,
   `LAMP_FIRST_WORDS=kept`, `LAMP_REPLY_END_REACH=on`, `LAMP_SOFT_START=on`,

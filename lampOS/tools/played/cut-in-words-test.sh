@@ -28,9 +28,11 @@ case $leg in
   A) printf '#PLAY_US 1000000 v: ask\n#PLAY_US 11000000 v: line\n' ;;
   B) printf '#PLAY_US 1000000 v: ask\n#PLAY_US 11000000 v: stop\n#PLAY_US 13500000 v: line\n' ;;
   C) printf '#PLAY_US 1000000 v: ask\n#PLAY_US 4600000 v: line\n' ;;
+  D) printf '#PLAY_US 1000000 v: ask\n#PLAY_US 7000000 v: line\n' ;;
 esac >"$PLAYED_OUT/scenarios/20261124T000000Z-$1.txt"
-line=11000000; [[ $leg == B ]] && line=13500000; [[ $leg == C ]] && line=4600000
+line=11000000; [[ $leg == B ]] && line=13500000; [[ $leg == C ]] && line=4600000; [[ $leg == D ]] && line=7000000
 heard=${FAKE_HEARD:-"Lamp, make a skill called tech news."}
+[[ $leg == D ]] && heard=${FAKE_HEARD_D:-"No, for 7."}
 {
   echo '{"kind":"transcript","at_us":2000000,"role":"output","turn":5,"text":"The keeper climbed twenty four steps to the lamp every evening."}'
   echo '{"kind":"speech_final_sample_retired","at_us":'"${FAKE_LAST:-4500000}"',"owner":{"turn":5}}'
@@ -61,13 +63,17 @@ run normal 0 \
   'A round 1: heard "Lamp, make a skill called tech news.": none of the lamp'"'"'s words, first words kept  PASS' \
   'B round 1: heard "Lamp, make a skill called tech news.": none of the lamp'"'"'s words, first words kept  PASS' \
   'C round 1: heard "Lamp, make a skill called tech news.": none of the lamp'"'"'s words, first words kept  PASS' \
-  'A: trials 1 of 1; pass 1, fail 0' 'B: trials 1 of 1; pass 1, fail 0' 'C: trials 1 of 1; pass 1, fail 0'
+  'D round 1: heard "No, for 7.": the correction whole  PASS' \
+  'A: trials 1 of 1; pass 1, fail 0' 'B: trials 1 of 1; pass 1, fail 0' 'C: trials 1 of 1; pass 1, fail 0' 'D: trials 1 of 1; pass 1, fail 0'
 grep -qE 'tee |rm -f|systemctl (restart|daemon)' "$T/d/calls" && { echo "FAIL normal: the kit changed the lamp"; fail=1; }
 
 # The lamp's own words ahead of the line: FAIL with the words named.
 FAKE_HEARD="Twenty four steps. make a skill called tech news" run own 0 \
   'A round 1: heard "Twenty four steps. make a skill called tech news": own words "twenty four"' '  FAIL' \
   'A: trials 1 of 1; pass 0, fail 1'
+
+# D: the correction cut to "No,": FAIL.
+FAKE_HEARD_D="No," run dcut 0 'D round 1: heard "No,": the correction CUT  FAIL' 'D: trials 1 of 1; pass 0, fail 1'
 
 # The person's first words cut: FAIL.
 FAKE_HEARD="a skill called tech news" run cut 0 'first words NOT kept  FAIL' 'B: trials 1 of 1; pass 0, fail 1'

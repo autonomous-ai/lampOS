@@ -21,7 +21,12 @@
 #   C  the person starting on the lamp's last word: a short question, "Hey Lamp, how many steps does the lighthouse have?",
 #      and the line begun at a wait after it that grows each round (3.0 s, 3.6 s, 4.2 s, ...). A round counts as C only
 #      when the line began within 0.5 s of the lamp's last sound (the voice's speech_final_sample_retired); others are not trials.
-# What passes a trial: the heard line (the first input transcript after the line began) has no run of two or more words
+#   D  the person correcting a time the lamp just said (#8486's P1, the first builder's 10:12): "Hey Lamp, please say exactly:
+#      your alarm is set for 7:30 tomorrow.", then 6 s later (as or just after the lamp finishes) "No, for 7." A round passes
+#      when the heard line still has the person's correction whole: it begins with "no" and keeps "for" and "7" or "seven"
+#      (a build with the own-echo strip's old end rule sends "No," alone). Its own-words check is not used: "for 7" is the
+#      lamp's own words, said by the person.
+# What passes a trial (A, B, C): the heard line (the first input transcript after the line began) has no run of two or more words
 # in a row the lamp said (its output transcripts before it), and begins with the line's own first words, "make a" (a
 # leading "lamp" ignored). The heard lines are this kit's own scripted line, not a person's; they are printed.
 #
@@ -93,13 +98,14 @@ LINE="Lamp, make a skill called tech news."
 STORY="Hey Lamp, tell me a long story about a lighthouse keeper."
 SHORT="Hey Lamp, how many steps does the lighthouse have?"
 
-for leg in A B C; do
+for leg in A B C D; do
   for i in $(seq 1 "$ROUNDS"); do
     quiet
     name=$LABEL-words-$leg-$i
     case $leg in
       A) steps=("$VOICE|$STORY|10" "$VOICE|$LINE|20") ;;
       B) steps=("$VOICE|$STORY|10" "$VOICE|Lamp, stop.|0.9" "$VOICE|$LINE|20") ;;
+      D) steps=("$VOICE|Hey Lamp, please say exactly: your alarm is set for 7:30 tomorrow.|6" "$VOICE|No, for 7.|20") ;;
       C) wait=$(python3 -c "print(round(3.0 + 0.6 * ($i - 1), 1))")
          steps=("$VOICE|$SHORT|$wait" "$VOICE|$LINE|20") ;;
     esac
@@ -118,7 +124,7 @@ if scene:
 def say(text, ok='', verdict=''):
     print('%s round %s: %s' % (leg, i, text))
     with open(tally, 'a') as f: f.write('\t'.join([leg, ok, verdict]) + '\n')
-need = {'A': 2, 'B': 3, 'C': 2}[leg]
+need = {'A': 2, 'B': 3, 'C': 2, 'D': 2}[leg]
 if len(plays) != need:
     say('not played whole (%d of %d lines); not a trial' % (len(plays), need)); sys.exit()
 line_at = plays[-1]
@@ -138,6 +144,10 @@ for r in rows:
     if r.get('kind') == 'transcript' and r.get('role') != 'input' and r.get('at_us', 0) < line_at + 15_000_000:
         lamp_said += words(r.get('text'))
 h = words(text)
+if leg == 'D':
+    kept = h[:1] == ['no'] and 'for' in h and ('7' in h or 'seven' in h)
+    say('heard "%s": the correction %s%s' % (text[:90], 'whole' if kept else 'CUT', '  PASS' if kept else '  FAIL'),
+        'yes', 'PASS' if kept else 'FAIL'); sys.exit()
 own = next((' '.join(h[k:k + 2]) for k in range(len(h) - 1)
             if any(lamp_said[j:j + 2] == h[k:k + 2] for j in range(len(lamp_said) - 1))), None)
 first = h[1:] if h[:1] == ['lamp'] else h
@@ -162,7 +172,7 @@ done
 python3 - "$tally" <<'PY' | tee -a "$report"
 import sys
 rows = [l.rstrip('\n').split('\t') for l in open(sys.argv[1])]
-for leg in 'ABC':
+for leg in 'ABCD':
     mine = [r for r in rows if r[0] == leg]
     ok = [r for r in mine if r[1] == 'yes']
     print('%s: trials %d of %d; pass %d, fail %d' % (leg, len(ok), len(mine),
