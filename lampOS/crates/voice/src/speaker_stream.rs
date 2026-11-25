@@ -607,6 +607,16 @@ const GAIN_LEVEL_WINDOWS: f64 = 400.0;
 /// the full lift before the first speech.
 const GAIN_PAUSE_DBFS: f64 = -36.0;
 
+/// The expander: a pause is not lifted. The lift is held through the first
+/// windows of a pause, so a short gap between two syllables (30 ms) keeps it
+/// with no pumping, then released toward 0 dB at [`GAIN_RELEASE_DB`] a window
+/// (+6 dB in 80 ms), so the floor between words (a recording's hiss, a
+/// synthetic voice's floor) comes out at its own level (the person's buzz
+/// between words, #8399's row, 25 Nov). The attack is at once: the first
+/// window of a word has the full lift, so no first syllable is softened.
+const GAIN_HOLD_WINDOWS: u32 = 5;
+const GAIN_RELEASE_DB: f64 = 0.75;
+
 /// The long-form gain: a slow follower of a stream's own level. It keeps a
 /// running mean square of the windows that are not pauses (4 s time
 /// constant) and wants the gain that brings it to [`GAIN_TARGET_DBFS`],
@@ -627,6 +637,11 @@ struct Gain {
     taken: f64,
     /// The gain now, dB.
     db: f64,
+    /// The lift applied to the last window, dB: [`Gain::db`] in a word, released
+    /// toward 0 in a pause (the expander).
+    applied: f64,
+    /// Windows of pause since the last word.
+    quiet: u32,
 }
 
 impl Gain {
@@ -662,6 +677,16 @@ impl Gain {
     /// The linear factor for a window whose RMS is `rms`.
     fn window(&mut self, rms: f64) -> f64 {
         let pause = 32_767.0 * 10f64.powf(GAIN_PAUSE_DBFS / 20.0);
+        if self.taken > 0.0 && rms <= pause {
+            // The expander: held for the first windows of a pause, then
+            // released toward 0 dB (a gain below 0 is a loud stream brought
+            // down: left as it is).
+            self.quiet = self.quiet.saturating_add(1);
+            if self.quiet > GAIN_HOLD_WINDOWS {
+                self.applied = (self.applied - GAIN_RELEASE_DB).max(self.db.min(0.0));
+            }
+            return 10f64.powf(self.applied / 20.0);
+        }
         if self.taken > 0.0 && rms > pause {
             self.taken = (self.taken + 1.0).min(GAIN_LEVEL_WINDOWS);
             self.level += (rms * rms - self.level) / self.taken;
@@ -672,6 +697,9 @@ impl Gain {
                 self.db = (self.db - GAIN_DOWN_DB).max(wanted);
             }
         }
+        // A word: the full lift at once (the fast attack).
+        self.quiet = 0;
+        self.applied = self.db;
         10f64.powf(self.db / 20.0)
     }
 }
@@ -1311,6 +1339,89 @@ mod tests {
         // Not cut flat: the pulse stands well over the tone beside it.
         for window in played.chunks(240).skip(300) {
             assert!(window[100] > 10_000, "pulse cut to {}", window[100]);
+        }
+    }
+
+    /// The RMS (dBFS) of each 10 ms window of `samples`.
+    fn window_levels(samples: &[i16]) -> Vec<f64> {
+        samples
+            .chunks(240)
+            .filter(|window| window.len() == 240)
+            .map(|window| {
+                let (rms, _) = loudest(window);
+                20.0 * (rms.max(1.0) / 32_767.0).log10()
+            })
+            .collect()
+    }
+
+    /// Hiss at `dbfs` RMS, `count` samples (a fixed pseudo-random run).
+    fn hiss_at(dbfs: f64, count: usize) -> Vec<i16> {
+        let amplitude = 32_767.0 * 10f64.powf(dbfs / 20.0) * 3f64.sqrt();
+        let mut state = 0x2545_f491_u64;
+        (0..count)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                let unit = (state >> 11) as f64 / (1u64 << 53) as f64 * 2.0 - 1.0;
+                (unit * amplitude) as i16
+            })
+            .collect()
+    }
+
+    /// The gain's own held lift after `lead` of speech at -26 dBFS: +6 dB.
+    fn held_lift_then(tail: &[i16], lead: usize) -> Vec<i16> {
+        let mut input = tone_at(-26.0, lead);
+        input.extend_from_slice(tail);
+        lifted_through(&input).0
+    }
+
+    /// The first builder's 10:35 on #7814 (the person's buzz between words):
+    /// a pause is not lifted. A -50 dBFS hiss between words, with the gain
+    /// held at +6 dB, comes out at its own level.
+    #[test]
+    fn a_hiss_between_words_comes_out_at_its_own_level_under_a_held_lift() {
+        let hiss = hiss_at(-50.0, 24_000);
+        let played = held_lift_then(&hiss, 24_000 * 3);
+        let own = window_levels(&hiss);
+        let levels = window_levels(&played[24_000 * 3..]);
+        // After the hold and the release (about 130 ms), the rest of the pause
+        // is within half a dB of the hiss as it came in (the old code: +6 dB).
+        for (level, own) in levels.iter().zip(&own).skip(20) {
+            assert!((level - own).abs() < 0.5, "{level} against its own {own}");
+        }
+    }
+
+    /// A word after a pause has its full lift in its first window (the fast
+    /// attack: no first syllable is softened), so by its second at the latest.
+    #[test]
+    fn a_word_after_a_pause_has_its_full_lift_by_its_second_window() {
+        let mut tail = hiss_at(-50.0, 24_000);
+        tail.extend(tone_at(-26.0, 4_800));
+        let played = held_lift_then(&tail, 24_000 * 3);
+        let levels = window_levels(&played[24_000 * 4..]);
+        for level in &levels[..4] {
+            assert!((level - (-20.0)).abs() < 0.5, "{level}");
+        }
+    }
+
+    /// A 30 ms gap between two syllables keeps the lift, with no pumping.
+    #[test]
+    fn a_30_ms_gap_between_syllables_keeps_the_lift() {
+        let mut tail = tone_at(-26.0, 2_400);
+        tail.extend(hiss_at(-50.0, 720));
+        tail.extend(tone_at(-26.0, 2_400));
+        let played = held_lift_then(&tail, 24_000 * 3);
+        let levels = window_levels(&played[24_000 * 3..]);
+        // 10 windows of syllable, 3 of gap (lifted +6: -44), 10 of syllable.
+        for level in &levels[..10] {
+            assert!((level - (-20.0)).abs() < 0.5, "{level}");
+        }
+        for level in &levels[10..13] {
+            assert!((level - (-44.0)).abs() < 0.5, "{level}");
+        }
+        for level in &levels[13..23] {
+            assert!((level - (-20.0)).abs() < 0.5, "{level}");
         }
     }
 
