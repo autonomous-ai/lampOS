@@ -57,6 +57,8 @@ pub mod moves;
 #[cfg(any(unix, test))]
 pub mod poses;
 pub mod protocol;
+#[cfg(any(unix, test))]
+pub mod reach_map;
 pub mod readback;
 pub mod runtime;
 pub mod seat_say;
