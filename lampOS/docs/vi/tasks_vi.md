@@ -2489,7 +2489,17 @@ một byte (`crates/tasks/src/one_session.rs`).
   120 s của tiếng "có" (`CONFIRM_MS`): đủ cho các lần giữ trong hàng đợi
   (vị trí của đèn, tối đa 15 phút, rồi Gateway nguội của OpenClaw, tối đa
   480 s), mỗi lần kết thúc bằng `not_sent` với lý do được giọng nói báo
-  một lần. Tới 16031 nó cũng chỉ có 120 s, nên Gateway khởi động nguội
+  một lần. Chỉ việc đứng đầu hàng đợi được giữ, mỗi việc một lần chờ
+  riêng, nên một việc đứng sau các việc bị giữ vẫn có thể quá 30 phút
+  (bốn việc OpenClaw sau một Gateway không bao giờ trả lời: việc thứ tư ở
+  phút 30; vị trí biết được ở phút 15, rồi Gateway nguội: việc thứ hai).
+  Nó kết thúc `invalidated` `expired`, và task news báo một lần việc đã
+  được nói "có" mà hết hạn, như một lần giao việc không tới agent, kèm đề
+  nghị thử lại (`task_news::failed_hand_over`, P2 của El trên #8666); việc
+  mới prepare mà chưa được nói "có" thì hết hạn vẫn im lặng như trước.
+  Test: `runtime::tests::four_tasks_behind_a_gateway_that_never_answers_each_end_once`,
+  `two_tasks_held_for_the_place_then_a_cold_gateway_each_end_once`,
+  `task_news::tests::an_expired_hand_over_said_yes_to_is_told_once`. Tới 16031 nó cũng chỉ có 120 s, nên Gateway khởi động nguội
   khoảng 220 s (lamp-ee17) làm việc kết thúc `expired` mà không ai nghe.
   Store có việc được thử quá 120 s của nó được ghi là schema 9, mà bản
   build trước sẽ để sang một bên. **Quay lui:** quay về một bản build đọc

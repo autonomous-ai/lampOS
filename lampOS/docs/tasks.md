@@ -543,6 +543,17 @@ spoken yes, and a typed yes never confirms a spoken task.
    the 120 s of its yes: long enough for the runtime's queue holds (the
    lamp's place, at most 15 min, then OpenClaw's cold Gateway, at most
    480 s), which end it `not_sent` with a reason the voice tells once.
+   Only the queue's head is held, each for its own wait, so a task behind
+   held ones can still pass its 30 min (four OpenClaw tasks behind a
+   Gateway that never answers: the fourth at 30 min; the place known at
+   15 min, then a cold Gateway: the second). It ends `invalidated`
+   `expired`, and task news tells a task said yes to that expired once, as
+   a hand-over that did not reach its agent, with an offer to try again
+   (`task_news::failed_hand_over`, El's P2 on #8666); a prepared task never
+   said yes to that expires stays unsaid, as before. Tests:
+   `runtime::tests::four_tasks_behind_a_gateway_that_never_answers_each_end_once`,
+   `two_tasks_held_for_the_place_then_a_cold_gateway_each_end_once`,
+   `task_news::tests::an_expired_hand_over_said_yes_to_is_told_once`.
    Until 16031 it had 120 s too, so a Gateway cold-starting in about 220 s
    (lamp-ee17) let it end `expired`, unheard (`tasks: <task>: held for
    OpenClaw's gateway no longer`). A store holding a task attempted past
@@ -7336,7 +7347,9 @@ finished." (1.82 s). Three faults, all mended the same night:
   hand from the lamp with it at 00:55: `ok` in about 2 s). The voice is told
   that it is handing the work over now, not that it is done, and a hand-over
   the person said yes to that fails is told as news within ten minutes, in
-  plain words, with an offer to try again (`task_news::failed_hand_over`).
+  plain words, with an offer to try again (`task_news::failed_hand_over`);
+  so is one said yes to that expired before it was sent (`invalidated`
+  `expired`, #8601).
 - **News told to an empty office.** At 00:49:48, 11 s after the restart, the
   lamp told the 22:39 task's names with nobody there: the presence check took
   the start of the service for someone speaking. Now only something a person

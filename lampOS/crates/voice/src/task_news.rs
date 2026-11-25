@@ -1932,6 +1932,12 @@ fn failed_hand_over(item: &Value, now: &BootClock) -> Option<bool> {
         // Still being checked (#8170): never a failure ([`checking_hand_over`]).
         "uncertain" if dispatch["code"].as_str() == Some(START_CHECKING) => return None,
         "uncertain" => true,
+        // Said yes to, then never sent before its queued life ended
+        // (`expired`, #8601, El's P2 on #8666: a task behind held ones in
+        // the queue): told once as one that did not reach its agent. A
+        // prepared task never said yes to expires too, and stays unsaid
+        // (no `confirmed`, below); one invalidated by a restart is as before.
+        "invalidated" if dispatch["code"].as_str() == Some(EXPIRED) => false,
         _ => return None,
     };
     if dispatch["confirmed"].is_null() {
@@ -1942,6 +1948,10 @@ fn failed_hand_over(item: &Value, now: &BootClock) -> Option<bool> {
         && now.ms.saturating_sub(finished["monotonic_ms"].as_u64()?) <= JUST_MS)
         .then_some(unsure)
 }
+
+/// lamp-tasks' code for a task past its life before it was sent
+/// (`lamp_tasks::engine`'s `tick`).
+const EXPIRED: &str = "expired";
 
 /// lamp-tasks' code for a new start that timed out and is being checked
 /// (#8170): its dispatch stays `uncertain`, and it is never sent again.
@@ -3702,6 +3712,40 @@ mod tests {
         assert_eq!(keys, ["s1:2:2"]);
         drop(texts);
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// #8601 (El's P2 on #8666): a task said yes to that passed its queued
+    /// life before it was sent (`invalidated` `expired`: a task behind held
+    /// ones) is told once, as one that did not reach its agent, under its
+    /// one hand-over key; a prepared task never said yes to that expired,
+    /// or one invalidated by a restart, is not news.
+    #[test]
+    fn an_expired_hand_over_said_yes_to_is_told_once() {
+        let item = |state: &str, confirmed: bool, boot: &str, ms: u64| {
+            json!({"id":3,"observations":0,"dispatch":{"state":state,
+                "confirmed": if confirmed { json!({"boot_id":boot}) } else { Value::Null },
+                "finished":{"boot_id":boot,"monotonic_ms":ms}}})
+        };
+        // #8601 (El's P2 on #8666): said yes to and expired before it was
+        // sent, told once as not reaching its agent; prepared and never said
+        // yes to, or invalidated by a restart, not news.
+        let ended = |code: &str, confirmed: bool| {
+            let mut item = item("invalidated", confirmed, "boot-a", NOW - 5_000);
+            item["dispatch"]["code"] = json!(code);
+            item
+        };
+        assert_eq!(
+            failed_hand_over(&ended("expired", true), &now()),
+            Some(false)
+        );
+        assert_eq!(failed_hand_over(&ended("expired", false), &now()), None);
+        assert_eq!(failed_hand_over(&ended("restart", true), &now()), None);
+        let told =
+            note_failed(&own(), &task("openclaw", json!([])), false, Some("expired")).unwrap();
+        assert!(
+            told.contains("did not reach") && told.contains("offer to try again"),
+            "{told}"
+        );
     }
 
     #[test]
