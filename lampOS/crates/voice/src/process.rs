@@ -3485,6 +3485,9 @@ fn second_route_worker_environment(
         crate::said_to_me::NAME_IN_LINE_ENVIRONMENT,
         // Only the first quick reply to the lamp's question skips its look (#8395).
         crate::said_to_me::ASKED_LOOKS,
+        // In a conversation no camera sign holds a line alone (the product
+        // owner's rules, 25 Nov 2026).
+        crate::said_to_me::FOLLOW_UPS,
         crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
         // A line asking to remember the person's face, with their name,
         // calls remember_my_face (the owner's try on lamp-4ace, 23 Oct).
@@ -3883,6 +3886,7 @@ mod tests {
             crate::said_to_me::ENVIRONMENT,
             crate::said_to_me::NAME_IN_LINE_ENVIRONMENT,
             crate::said_to_me::ASKED_LOOKS,
+            crate::said_to_me::FOLLOW_UPS,
             crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
             crate::known_faces::ASKED_ENVIRONMENT,
             crate::known_faces::RECORD_TOLD_ENVIRONMENT,
@@ -5117,6 +5121,7 @@ mod tests {
                     || name == crate::said_to_me::ENVIRONMENT
                     || name == crate::said_to_me::NAME_IN_LINE_ENVIRONMENT
                     || name == crate::said_to_me::ASKED_LOOKS
+                    || name == crate::said_to_me::FOLLOW_UPS
                     || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
                     || name == crate::known_faces::ASKED_ENVIRONMENT
                     || name == crate::known_faces::RECORD_TOLD_ENVIRONMENT
@@ -5269,6 +5274,7 @@ mod tests {
                     "LAMP_FACE_SAVE_KNOWN_ONLY=on",
                     "LAMP_FACE_STICKY=on",
                     "LAMP_FIRST_SECONDS_QUIET=on",
+                    "LAMP_FOLLOW_UPS=on",
                     "LAMP_FORGET_ASKED=off",
                     "LAMP_GOING_ON_NOT_OWN=on",
                     "LAMP_HARD_ASKS_TO_AGENT=on",
