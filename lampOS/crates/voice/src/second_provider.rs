@@ -1072,6 +1072,19 @@ pub(crate) fn not_anothers_on() -> bool {
     })
 }
 
+/// `on` exactly, off unless set (the product owner's first rule of 25 Nov
+/// 2026: a clear "Hey Lamp" counts): in a busy room, a sure hearing at the
+/// line's start whose words open with a greeting and a word written for the
+/// lamp's name, set off ("Hey, Lynn. …", speech to text's "Hey Lamp"), is
+/// kept although `LAMP_NAME_NEAR` rules that word not the name
+/// ([`crate::attention::Attention::keep_greeted_stand_ins`]).
+pub const NAME_GREETED_STAND_IN_ENVIRONMENT: &str = "LAMP_NAME_GREETED_STAND_IN";
+
+/// [`NAME_GREETED_STAND_IN_ENVIRONMENT`] from this worker's environment.
+pub(crate) fn greeted_stand_in_on() -> bool {
+    std::env::var(NAME_GREETED_STAND_IN_ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
 /// Where the worker reads whether a hearing of the lamp's name inside one
 /// line's sound stays with that line, never counting for the one begun
 /// after it (`on`, and nothing else;
