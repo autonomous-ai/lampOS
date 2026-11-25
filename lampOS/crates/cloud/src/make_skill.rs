@@ -78,9 +78,11 @@ pub const MOST_WORDS_FIELD: &str = "make_skill_most_bytes";
 pub const MOST_CHARS_FIELD: &str = "make_skill_most_chars";
 
 /// What the app is told of words past [`MOST_WORDS_CHARS`]: plainly, with
-/// no number (#8630: the person meets no visible limit; the app reads the
-/// bound from `system.info` and tells them before it sends), never in
-/// silence.
+/// no number (#8630: the person meets no visible limit), never in silence.
+/// A fallback the app normally never shows: it reads the bound from
+/// `system.info` and tells the person in their own language before it
+/// sends anything (Mobile, 17:00 on #8630), so this English line reaches
+/// only an app that sends past the bound anyway.
 pub fn past_most_words() -> String {
     "what the skill should do is too long for the lamp to make as one skill: shorten it".to_owned()
 }

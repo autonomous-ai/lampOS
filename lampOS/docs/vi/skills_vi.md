@@ -47,21 +47,26 @@ sau:
      hơn thì bị từ chối bằng một câu rõ ràng không nêu con số ("That is too
      long for me to make as one skill: please say it more shortly.",
      `REQUEST_TOO_LONG`, mô hình được bảo nói câu đó bằng ngôn ngữ của cuộc
-     trò chuyện như các lời từ chối khác khi tạo kỹ năng; từ app là câu của
+     trò chuyện như các lời từ chối khác khi tạo kỹ năng, trừ một lần tạo
+     đang xếp hàng, câu của nó được nói nguyên văn (`make_queue::failed_line`,
+     như mọi câu thất bại của lần tạo xếp hàng); từ app là câu của
      lamp-cloud "what the skill should do is too long for the lamp to make
-     as one skill: shorten it"), không bao giờ bị cắt, không bao giờ bị từ
+     as one skill: shorten it", câu dự phòng app thường không bao giờ hiện,
+     vì app báo cho người dùng bằng ngôn ngữ của họ trước khi gửi bất cứ gì
+     quá giới hạn nó đã đọc), không bao giờ bị cắt, không bao giờ bị từ
      chối trong im lặng, và khi đó không hỏi mô hình gì cả. Vì sao là
      7.500: đường truyền duy nhất yêu cầu phải vừa là rules tạo kỹ năng của
      agent (`lamp_tasks::skill_make::MOST_RULES_BYTES`, 48 KiB, 49.152
-     byte), chứa system prompt dài nhất (15.270 byte khi mọi công tắc thêm
-     vào nó đều bật, đo bởi
-     `the_longest_repair_and_system_prompt_fit_the_agents_make_rules`), chữ
-     riêng của một lần sửa (1.488 byte: 960 của bản hướng dẫn, dấu sửa, 735
-     byte dòng kiểm tra và câu hỏi), ba ký tự xuống dòng, và yêu cầu tối đa
-     bốn byte mỗi chữ (`MOST_REQUEST_BYTES`, 30.000; một chữ tiếng Việt tối
-     đa 3 byte): 15.270 + 1.488 + 3 + 30.000 = 46.761, còn 2.391 byte cho
-     system prompt lớn thêm. Mức 20.000 đến 30.000 issue đề xuất không vừa
-     đường truyền này (chỗ trống là 32.391 byte, 8.097 chữ bốn byte). Mọi
+     byte), chứa system prompt dài nhất (15.708 byte khi mọi công tắc thêm
+     vào nó đều bật, năm tài khoản liên kết với địa chỉ dài và ngày hôm
+     nay, như một đèn sản phẩm thêm vào; 15.270 khi không có; đo bởi
+     `the_longest_repair_and_system_prompt_fit_the_agents_make_rules`, test
+     này giữ chắc 500 byte dư), chữ riêng của một lần sửa (1.488 byte: 960
+     của bản hướng dẫn, dấu sửa, 735 byte dòng kiểm tra và câu hỏi), ba ký
+     tự xuống dòng, và yêu cầu tối đa bốn byte mỗi chữ (`MOST_REQUEST_BYTES`,
+     30.000; một chữ tiếng Việt tối đa 3 byte): 15.708 + 1.488 + 3 + 30.000
+     = 47.199, còn 1.953 byte cho system prompt lớn thêm. Mức 20.000 đến 30.000 issue đề xuất không vừa
+     đường truyền này (chỗ trống là 31.953 byte, 7.988 chữ bốn byte). Mọi
      giới hạn khác đều lớn hơn nhiều: một dòng của socket app-make là 64
      KiB, gói MQTT của lamp-cloud hơn 1 MiB, và ngữ cảnh của mô hình tạo kỹ
      năng là 128k token (`lamp_tasks::one_session::CONTEXT_TOKENS`), phiên

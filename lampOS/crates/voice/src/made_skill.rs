@@ -51,11 +51,12 @@ pub const MAKE: &str = "make_skill";
 /// the lamp keeps one large safety bound no one meets in normal use). Why
 /// 7,500: the one wire the request must fit is the agent's make rules
 /// (`lamp_tasks::skill_make::MOST_RULES_BYTES`, 48 KiB, 49,152 bytes),
-/// which carry the longest system prompt (15,270 bytes with every switch
-/// that adds to it on), a repair's own words (1,488 bytes), three newlines
-/// and the request at four bytes a letter at most ([`MOST_REQUEST_BYTES`],
-/// 30,000): 15,270 + 1,488 + 3 + 30,000 = 46,761, 2,391 bytes short of the
-/// rules, room for the system prompt to grow
+/// which carry the longest system prompt (15,708 bytes with every switch
+/// that adds to it on, five linked accounts and today's date; 15,270 with
+/// none), a repair's own words (1,488 bytes), three newlines and the
+/// request at four bytes a letter at most ([`MOST_REQUEST_BYTES`],
+/// 30,000): 15,708 + 1,488 + 3 + 30,000 = 47,199, 1,953 bytes short of the
+/// rules, room for the system prompt to grow, 500 of it pinned
 /// (`make_skill_local::tests::the_longest_repair_and_system_prompt_fit_the_agents_make_rules`
 /// holds it). The app's MAKE IT (`crate::app_make`, held to it by
 /// lamp-cloud's own `make_skill::MOST_WORDS_CHARS`, equal by its test,
@@ -9297,8 +9298,12 @@ pub const MOST_WRITTEN_NAME_BYTES: usize = 40;
 /// it.
 pub const MOST_WHEN_CHARS: usize = 200;
 /// The most of what to do, a few lines, in characters (bytes until
-/// #7245), as the request is ([`MOST_REQUEST_CHARS`]): the note the model
-/// is told at each call, a plain string lamp-skills never cuts.
+/// #7245): the note the model is told at each call, a plain string
+/// lamp-skills never cuts. 2,000 on purpose, as a make's request was
+/// until #8630 raised [`MOST_REQUEST_CHARS`] to 7,500: a written skill's
+/// instructions go to the model whole at every call, within its call
+/// answer's bytes ([`MOST_WRITTEN_NOTE_BYTES`]), where a request is read
+/// once by the making model.
 pub const MOST_INSTRUCTIONS_CHARS: usize = 2_000;
 /// The most bytes of a written skill's call answer, `{"next": NOTE}` as
 /// JSON ([`Written::note`]): what the link carries back to the model

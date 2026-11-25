@@ -3519,21 +3519,27 @@ gone ([switches.md](switches.md)). What happens:
      that names no number ("That is too long for me to make as one skill:
      please say it more shortly.", `REQUEST_TOO_LONG`, told to the model
      to say in the conversation's language as the make's other refusals
-     are; from the app, lamp-cloud's own "what the skill should do is too
-     long for the lamp to make as one skill: shorten it"), never cut, never
+     are, except a queued make, whose line is said as it is
+     (`make_queue::failed_line`, as every failed line of a queued make);
+     from the app, lamp-cloud's own "what the skill should do is too long
+     for the lamp to make as one skill: shorten it", a fallback the app
+     normally never shows, since it tells the person in their own language
+     before it sends anything past the bound it read), never cut, never
      refused in silence, and the model is asked nothing then. Why 7,500:
      the one wire the request must fit is the agent's make rules
      (`lamp_tasks::skill_make::MOST_RULES_BYTES`, 48 KiB, 49,152 bytes),
-     which carry the longest system prompt (15,270 bytes with every switch
-     that adds to it on, measured by
-     `the_longest_repair_and_system_prompt_fit_the_agents_make_rules`), a
-     repair's own words (1,488 bytes: the brief's 960, the repair mark, 735
-     bytes of the check's lines and the ask), three newlines, and the
-     request at four bytes a letter at most (`MOST_REQUEST_BYTES`, 30,000;
-     a Vietnamese letter is at most 3): 15,270 + 1,488 + 3 + 30,000 =
-     46,761, leaving 2,391 bytes for the system prompt to grow. The 20,000
+     which carry the longest system prompt (15,708 bytes with every switch
+     that adds to it on, five linked accounts with long addresses and
+     today's date, as a product lamp adds them; 15,270 with none; measured
+     by `the_longest_repair_and_system_prompt_fit_the_agents_make_rules`,
+     which pins 500 bytes to spare), a repair's own words (1,488 bytes: the
+     brief's 960, the repair mark, 735 bytes of the check's lines and the
+     ask), three newlines, and the request at four bytes a letter at most
+     (`MOST_REQUEST_BYTES`, 30,000; a Vietnamese letter is at most 3):
+     15,708 + 1,488 + 3 + 30,000 = 47,199, leaving 1,953 bytes for the
+     system prompt to grow. The 20,000
      to 30,000 the issue proposed does not fit that wire (its room is
-     32,391 bytes, 8,097 letters of four bytes). Every other bound is far
+     31,953 bytes, 7,988 letters of four bytes). Every other bound is far
      larger: the app-make socket's line is 64 KiB, lamp-cloud's MQTT packet
      over 1 MiB, and the make model's context 128k tokens
      (`lamp_tasks::one_session::CONTEXT_TOKENS`), a make's session rotated
@@ -6652,8 +6658,8 @@ Tests:
   `own_echo::yes_tests::the_say_backs_own_words_in_its_tail_are_held`;
   `skill_writes_told::tests` (each send told once after the mark, said
   with its time).
-- `made_skill::tests`: the brief within 2,960 bytes with a 2,000-byte
-  request (`MOST_BRIEF_BYTES`, its repair within `MOST_REPAIR_BRIEF_BYTES`), `every_request_is_briefed_and_the_model_judges_it`
+- `made_skill::tests`: the brief within 30,960 bytes with a 30,000-byte
+  request, 7,500 characters of four bytes (`MOST_BRIEF_BYTES`, #8630; its repair within `MOST_REPAIR_BRIEF_BYTES`), `every_request_is_briefed_and_the_model_judges_it`
   (a service, a write or two services are briefed, never refused by a
   word list), `the_read_steps_are_the_catalogues_readable_services`,
   exactly two files, the

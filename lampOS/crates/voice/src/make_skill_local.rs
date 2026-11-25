@@ -359,17 +359,30 @@ fn printed_only(text: &str) -> Option<&str> {
 /// model's `cannot:` as before. The rules file the lamp's agent makes from
 /// is this same text, so it is told the same.
 fn system_net(reads: bool, agent: bool, net: bool) -> String {
+    // Today and the offset only for a write's calendar event (#6066).
+    let today = (made_skill::writes_on() && !(agent && made_skill::scripts_on()))
+        .then(crate::local_time::today_and_offset_here)
+        .flatten();
+    system_of(reads, agent, net, &own_accounts(), today.as_ref())
+}
+
+/// [`system_net`] with the linked accounts (`own`) and today's date and
+/// offset (`today`) given, so a test can hand it the longest a product
+/// lamp has (#8630's bound is sized by that).
+fn system_of(
+    reads: bool,
+    agent: bool,
+    net: bool,
+    own: &[(String, String)],
+    today: Option<&(String, String)>,
+) -> String {
     let (cannot, left_out) = (made_skill::CANNOT, made_skill::LEFT_OUT);
     let agent = agent && made_skill::scripts_on();
     let writes = made_skill::writes_on();
-    // Today and the offset only for a write's calendar event (#6066).
-    let today = (writes && !agent)
-        .then(crate::local_time::today_and_offset_here)
-        .flatten();
     let services = if agent {
         agent_services()
     } else {
-        services(reads, writes, &own_accounts(), today.as_ref())
+        services(reads, writes, own, today)
     };
     // A send through the lamp's agent is one of what a skill may do, as a
     // made write is.
@@ -10357,13 +10370,16 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     /// The longest request in bytes (7,500 characters of four bytes since
     /// #8630, 2,000 from #7245, [`made_skill::MOST_REQUEST_BYTES`]):
     /// its longest repair, with the longest system prompt this worker can
-    /// give (every switch that adds to it on; 15,270 bytes on 25 Nov, the
-    /// measure #8630's bound was set by), still fits the rules the
-    /// lamp's agent's make run takes (`lamp_tasks::skill_make`), and the
-    /// lamp's own chat is handed the same two. Nothing of a brief goes to
-    /// the tasks part's 2,000 bytes any more. This is the test that sizes
-    /// `MOST_REQUEST_CHARS`: a system prompt grown past the 2,391 bytes
-    /// left fails here, and the bound must come down with it.
+    /// give (every switch that adds to it on, five linked accounts with
+    /// long addresses and today's date, as a product lamp adds them: 15,708
+    /// bytes on 25 Nov, 15,270 with none, the measure #8630's bound was
+    /// set by; rules of 47,199 in all, 1,953 to spare),
+    /// still fits the rules the lamp's agent's make run takes
+    /// (`lamp_tasks::skill_make`) with 500 bytes to spare, and the lamp's
+    /// own chat is handed the same two. Nothing of a brief goes to the
+    /// tasks part's 2,000 bytes any more. This is the test that sizes
+    /// `MOST_REQUEST_CHARS`: a system prompt grown past the spare fails
+    /// here, and the bound must come down with it.
     #[test]
     fn the_longest_repair_and_system_prompt_fit_the_agents_make_rules() {
         let longest = made_skill::longest_request();
@@ -10371,6 +10387,21 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let repair = made_skill::repair_brief(&longest, &"y".repeat(5_000)).unwrap();
         assert!(repair.len() <= made_skill::MOST_REPAIR_BRIEF_BYTES);
         assert_eq!(made_skill::request_of(&repair), longest);
+        // The longest a product lamp adds: an `account (code)` line for each
+        // linked account, and today's date for a calendar write.
+        let own: Vec<(String, String)> =
+            ["gmail", "gmail-app", "google_calendar", "github", "linear"]
+                .iter()
+                .map(|code| {
+                    (
+                        (*code).to_owned(),
+                        format!(
+                            "a.rather.long.account.address.for.{code}@example-mail.example.com"
+                        ),
+                    )
+                })
+                .collect();
+        let today = ("Wednesday 2026-11-25".to_owned(), "+07:00".to_owned());
         made_skill::set_writes_here(Some(true));
         made_skill::set_said_here(Some(true));
         made_skill::set_asks_here(Some(true));
@@ -10384,11 +10415,13 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             ] {
                 // As the agent's make run is handed them, the refusal first
                 // too (#8651).
-                let rules =
-                    crate::make_skill_agent::rules_of(&system_net(reads, agent, net), &repair);
+                let rules = crate::make_skill_agent::rules_of(
+                    &system_of(reads, agent, net, &own, Some(&today)),
+                    &repair,
+                );
                 assert!(
-                    rules.len() <= lamp_tasks::skill_make::MOST_RULES_BYTES,
-                    "{} > {}",
+                    rules.len() + 500 <= lamp_tasks::skill_make::MOST_RULES_BYTES,
+                    "{} + 500 > {}",
                     rules.len(),
                     lamp_tasks::skill_make::MOST_RULES_BYTES
                 );
