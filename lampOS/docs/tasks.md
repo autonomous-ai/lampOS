@@ -8499,8 +8499,9 @@ Now, 20 s after a hand-over asked by voice (`hand_wait::AFTER`), the voice
 reads the work records once (`{"op":"work_list","limit":10}` on the
 request socket, as
 [the voice's own look at its work](#the-voice-asks-about-its-work-7930)
-does). If the work is still `queued`, no work started before it is still
-under way (not `done`), and it is still the work handed over last, one line is asked of the say service as the voice's own, at the normal
+does). If the work still waits for its agent (`queued`, or `working` with
+`waiting` true), no work started before it is still under way (not `done`),
+and it is still the work handed over last, one line is asked of the say service as the voice's own, at the normal
 priority, let go if not begun within 15 s:
 
 - "Your computer is waking up; it'll start in a moment.";
@@ -8520,10 +8521,25 @@ before it to end", `LAMP_TASKS_OPENCLAW_DIRECT=on`; the one session's queue
 behind the running turn, `LAMP_TASKS_ONE_SESSION=on`), so the agent is busy,
 not waking, and the line would be false (Jarvis's P2 on #8510). The ids
 kept against a second line are the newest 8 only (`hand_wait::SAID_KEPT`).
+OpenClaw direct enqueues the turn at the hand-over, so its record reads
+`working` at once, while a cold gateway has not taken the turn yet (the
+watch reads `starting`); the record's `waiting` (#8510, lamp-ee17) is what
+says it still waits there. On a computer (Harness, the one session or a
+new agent), the work reads `queued` while its launch is under way (a cold
+pane, `ENGINE_NOT_READY` tried again), and once Harness accepted it,
+`working` with `waiting` while `ps`, read at once after the hand-over, says
+its agent is `starting` or `installing`. `working` without `waiting` is
+with its agent: no line. The earlier-work rule is unchanged: any earlier work not `done`,
+`waiting` or not, holds the agent, so a later one waits behind it.
 Work asked by text gets no line, and without the say service
 (`LAMP_SAY` off) nothing is read or said. The journal says
 `lamp-voice: tasks: work N still waits for its agent after 20 s: said it is
-starting`.
+starting`; a look that ends with no line says one line why,
+`lamp-voice: tasks: work N after 20 s: no line: <reason>`, the reason one of
+`read failed`, `not on the records`, `with its agent`, `not queued or
+working`, `behind earlier work`, `not the last hand-over` or `already said`;
+a hand-over without the say service says `lamp-voice: tasks: work N: no
+line: no say service`.
 
 ### How the lamp's Harness is (#6061 part B, off unless `LAMP_TASKS_HARNESS_STATUS=on`)
 
@@ -9883,7 +9899,7 @@ nothing.
 {"id":"7","kind":"task","who":"OpenClaw","words":"Find the cheapest flight to Hanoi",
  "state":"done","started_ms":1795000000000,"updated_ms":1795000060000,"elapsed_s":60,
  "last_active_ms":1795000058000,"tools":4,"step":{"n":9,"tool":"web_search"},
- "done":true,"answer":"The cheapest is …",
+ "done":true,"waiting":false,"answer":"The cheapest is …",
  "session":{"machine":"…","agent":"…"}}
 ```
 
@@ -9901,6 +9917,7 @@ nothing.
 | `tools` | The tools the agent used: the larger of `harness show`'s count and the tool calls read from the transcript (with `LAMP_TASKS_STEPS=on` only) |
 | `step` | The latest tool call, `{"n","tool"}`: its step number and the tool's name only, never its arguments or result; null when none was read (always, with `LAMP_TASKS_STEPS` off) |
 | `done` | Whether the work is over (`stopped`, `failed`, `done`, `timed_out`, `cancelled`) |
+| `waiting` | Not yet handed to its agent though `state` reads `working`: true while the watch's read is `starting` or `installing` (OpenClaw direct's turn queued on a cold gateway; a Harness agent on a computer still coming up, its `ps` read at once after the hand-over) and the store says no state of its own; else false (#8510). `state` is unchanged by it |
 | `answer` | The answer, at most 1,200 characters, cut at a whole character; only when `done` is true, else null |
 | `session` | Where it runs, `{"machine","agent"}`: the machine it is followed on and its Harness agent id, ids only (never a token or a path), each at most 64 characters; null until Harness made its agent |
 

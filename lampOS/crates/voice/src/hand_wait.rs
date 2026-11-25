@@ -11,7 +11,10 @@
 //!
 //! So [`AFTER`] after the hand-over, the work records are read once
 //! (`{"op":"work_list","limit":10}` on lamp-tasks' request socket, as
-//! `agent_tasks` lists them). If the work is still `queued`, no earlier
+//! `agent_tasks` lists them). If the work is still waiting for its agent
+//! (`queued`, or `working` with `waiting` true: OpenClaw direct's turn
+//! queued on a cold gateway, which the watch reads `starting`, #8510), no
+//! earlier
 //! work on the records is still under way, and it is still the work this
 //! voice handed over last, one short line is
 //! asked of the say service ([`crate::say::OwnAsks`]), as the voice's own:
@@ -36,6 +39,10 @@
 //! the last turn. Not begun within [`EXPIRES_MS`], it is let go: the
 //! moment for it has passed. Without the say service (`LAMP_SAY` off) the
 //! voice has no own asks, and nothing is read or said.
+//!
+//! Every look that ends with no line leaves one journal line saying why
+//! (`lamp-voice: tasks: work N after 20 s: no line: <reason>`), and the
+//! hand-over without the say service one too.
 use crate::say::{Answer, OwnAsks};
 use serde_json::{Value, json};
 use std::{
@@ -102,6 +109,7 @@ pub fn start(own: Option<OwnAsks>) {
 /// thread of its own, never the turn's. Nothing without the say service.
 pub fn watch(directory: &Path, id: &str, on_lamp: bool) {
     let Some(own) = OWN.get().cloned() else {
+        eprintln!("lamp-voice: tasks: work {id}: no line: no say service");
         return;
     };
     let socket = directory.join("request.sock");
@@ -116,24 +124,52 @@ pub fn watch(directory: &Path, id: &str, on_lamp: bool) {
 }
 
 /// The line for work `id` by the records `answer` lists ([`watch`]'s one
-/// read, `None` unreached): `Some` only while it is still `queued`, no
-/// work started before it is still under way (not `done`: it waits its
-/// turn behind that one, on a busy agent), it is still the work handed
-/// over last (`still_last`), and none was asked for it before.
+/// read, `None` unreached): `Some` only while it still waits for its agent
+/// ([`still_waits`]), no work started before it is still under way (not
+/// `done`: it waits its turn behind that one, on a busy agent), it is
+/// still the work handed over last (`still_last`), and none was asked for
+/// it before. The tests' view of [`decide`], which [`check_once`] uses.
+#[cfg(test)]
 fn line_for(
     answer: Option<&Value>,
     id: &str,
     on_lamp: bool,
     still_last: bool,
 ) -> Option<&'static str> {
-    let answer = answer?;
+    decide(answer, id, on_lamp, still_last).ok()
+}
+
+/// Whether `work`'s record says it is not yet with its agent: `queued`, or
+/// `working` while `waiting` (#8510: OpenClaw direct's turn, enqueued at the
+/// hand-over, reads `working` in lamp-tasks while the gateway has not taken
+/// it, `starting` on the watch).
+fn still_waits(work: &Value) -> bool {
+    work["state"] == json!("queued")
+        || (work["state"] == json!("working") && work["waiting"] == json!(true))
+}
+
+/// [`line_for`], with why there is none: the reason its journal line names.
+fn decide(
+    answer: Option<&Value>,
+    id: &str,
+    on_lamp: bool,
+    still_last: bool,
+) -> Result<&'static str, &'static str> {
+    let answer = answer.ok_or("read failed")?;
     if answer.get("ok") != Some(&json!(true)) {
-        return None;
+        return Err("read failed");
     }
-    let works = answer["works"].as_array()?;
-    let work = works.iter().find(|work| work["id"] == json!(id))?;
-    if work["state"] != json!("queued") {
-        return None;
+    let works = answer["works"].as_array().ok_or("read failed")?;
+    let work = works
+        .iter()
+        .find(|work| work["id"] == json!(id))
+        .ok_or("not on the records")?;
+    if !still_waits(work) {
+        return Err(if work["state"] == json!("working") {
+            "with its agent"
+        } else {
+            "not queued or working"
+        });
     }
     let started = work["started_ms"].as_u64().unwrap_or(u64::MAX);
     let behind = works.iter().any(|other| {
@@ -142,12 +178,15 @@ fn line_for(
             && other["started_ms"].as_u64().unwrap_or(0) <= started
     });
     if behind {
-        return None;
+        return Err("behind earlier work");
     }
-    if !still_last || said().iter().any(|said| said == id) {
-        return None;
+    if !still_last {
+        return Err("not the last hand-over");
     }
-    Some(if on_lamp { LINE_OWN } else { LINE_COMPUTER })
+    if said().iter().any(|said| said == id) {
+        return Err("already said");
+    }
+    Ok(if on_lamp { LINE_OWN } else { LINE_COMPUTER })
 }
 
 /// [`watch`]'s one read of work `id` on `socket`, and its one line, asked
@@ -164,7 +203,16 @@ pub(crate) fn check_once(
         &json!({"op": "work_list", "limit": LISTED}),
         READ_DEADLINE,
     );
-    let line = line_for(answer.as_ref(), id, on_lamp, still_last())?;
+    let line = match decide(answer.as_ref(), id, on_lamp, still_last()) {
+        Ok(line) => line,
+        Err(why) => {
+            eprintln!(
+                "lamp-voice: tasks: work {id} after {} s: no line: {why}",
+                AFTER.as_secs()
+            );
+            return None;
+        }
+    };
     mark_said(id);
     eprintln!(
         "lamp-voice: tasks: work {id} still waits for its agent after {} s: said it is starting",
@@ -340,6 +388,67 @@ mod tests {
         assert_eq!(
             line_for(Some(&before_a_newer), "b-first", true, true),
             Some(LINE_OWN)
+        );
+    }
+
+    /// #8510, lamp-ee17: OpenClaw direct enqueues the turn at the
+    /// hand-over, so lamp-tasks reads it `working` while a cold gateway
+    /// has not taken it (`waiting` true). 20 s on, that work gets the line,
+    /// as `queued` work does; `working` without `waiting` is with its agent
+    /// and gets none; the earlier-work rule holds for it as for `queued`.
+    #[test]
+    fn work_working_but_still_waiting_gets_the_line_and_working_alone_none() {
+        let waiting = |id: &str, started_ms: u64| {
+            let mut work = record(id, "working", started_ms);
+            work["waiting"] = json!(true);
+            work
+        };
+        let cold = json!({"ok": true, "works": [waiting("w-cold", 1_000)]});
+        assert_eq!(line_for(Some(&cold), "w-cold", true, true), Some(LINE_OWN));
+        let mut taken = record("w-taken", "working", 1_000);
+        taken["waiting"] = json!(false);
+        let taken = json!({"ok": true, "works": [taken]});
+        assert_eq!(line_for(Some(&taken), "w-taken", true, true), None);
+        assert_eq!(
+            decide(Some(&taken), "w-taken", true, true),
+            Err("with its agent")
+        );
+        assert_eq!(
+            line_for(Some(&work("w-plain", "working")), "w-plain", true, true),
+            None
+        );
+        let behind = json!({"ok": true, "works": [
+            waiting("w-behind", 2_000),
+            record("w-earlier", "working", 1_000),
+        ]});
+        assert_eq!(
+            decide(Some(&behind), "w-behind", true, true),
+            Err("behind earlier work")
+        );
+    }
+
+    /// Every look with no line says why, one reason a look.
+    #[test]
+    fn a_look_with_no_line_names_its_reason() {
+        assert_eq!(decide(None, "r-1", false, true), Err("read failed"));
+        let gone = json!({"ok": false, "error": "no_such_work"});
+        assert_eq!(decide(Some(&gone), "r-1", false, true), Err("read failed"));
+        assert_eq!(
+            decide(Some(&work("r-other", "queued")), "r-1", false, true),
+            Err("not on the records")
+        );
+        assert_eq!(
+            decide(Some(&work("r-2", "done")), "r-2", false, true),
+            Err("not queued or working")
+        );
+        assert_eq!(
+            decide(Some(&work("r-3", "queued")), "r-3", false, false),
+            Err("not the last hand-over")
+        );
+        mark_said("r-4");
+        assert_eq!(
+            decide(Some(&work("r-4", "queued")), "r-4", false, true),
+            Err("already said")
         );
     }
 

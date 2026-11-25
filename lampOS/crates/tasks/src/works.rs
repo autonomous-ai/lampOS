@@ -230,6 +230,12 @@ struct Work {
     /// Where it runs, once its agent began: the machine and the agent, ids
     /// only.
     session: Option<(String, String)>,
+    /// Not yet handed to its agent: the watch's read says `starting` or
+    /// `installing` ([`AgentState::Starting`], [`AgentState::Installing`])
+    /// while nothing in the store says its state (#8510). Its `state` reads
+    /// `working` then, as before; the voice's 20 s line reads this
+    /// (`hand_wait.rs`).
+    waiting: bool,
 }
 
 impl Work {
@@ -249,6 +255,7 @@ impl Work {
             "tools": self.shown_tools.max(self.calls),
             "step": self.step.as_ref().map(|(n, tool)| json!({"n": n, "tool": tool})),
             "done": done,
+            "waiting": self.waiting,
             "answer": self.answer.as_ref().filter(|_| done),
             "session": self
                 .session
@@ -332,13 +339,14 @@ impl Board {
     }
 
     /// The store's tasks as they are now (`seen`), with the watch's read of
-    /// each (`line`: its state and when it was last active): each task's
-    /// record opened, or overwritten where it changed. A task whose record
-    /// went is not opened again.
+    /// each (`line`: its state, when it was last active, and whether it is
+    /// still starting, not yet handed to its agent): each task's record
+    /// opened, or overwritten where it changed. A task whose record went is
+    /// not opened again.
     pub fn tasks(
         &mut self,
         seen: &[TaskWork],
-        line: impl Fn(u64) -> Option<(Option<State>, Option<u64>)>,
+        line: impl Fn(u64) -> Option<(Option<State>, Option<u64>, bool)>,
         now_ms: u64,
     ) {
         for task in seen {
@@ -346,9 +354,12 @@ impl Board {
             let read = line(task.task_id);
             let state = task
                 .state
-                .or_else(|| read.and_then(|(state, _)| state))
+                .or_else(|| read.and_then(|(state, _, _)| state))
                 .unwrap_or(State::Working);
-            let last_active = read.and_then(|(_, at)| at);
+            let last_active = read.and_then(|(_, at, _)| at);
+            // Only while the watch's read gives the state: the store's own
+            // (queued, settled) says it then.
+            let waiting = task.state.is_none() && read.is_some_and(|(_, _, starting)| starting);
             let who = task.engine.spoken();
             if self.find(&id).is_none() {
                 if self.forgotten.contains(&task.task_id) {
@@ -371,6 +382,7 @@ impl Board {
                     step: None,
                     answer: None,
                     session: None,
+                    waiting,
                 });
             }
             let Some(work) = self.find(&id) else {
@@ -388,6 +400,7 @@ impl Board {
             if last_active.is_some() {
                 work.last_active_ms = last_active;
             }
+            work.waiting = waiting;
             work.shown_tools = task.tools;
             work.answer.clone_from(&task.answer);
             if let Some((machine, agent)) = &task.session {
@@ -489,10 +502,17 @@ pub fn forget_all() {
 }
 
 /// The watch's read of `task` ([`Tracker::line`]) as [`Board::tasks`]
-/// takes it: its state and when it was last active, never its words.
-pub fn line_of(tracker: Option<&Tracker>, task: u64) -> Option<(Option<State>, Option<u64>)> {
+/// takes it: its state, when it was last active, and whether it is still
+/// `starting` or `installing` (not yet handed to its agent: OpenClaw
+/// direct's queued turn, `direct.rs`'s `state_of`; a Harness agent on a
+/// computer still coming up), never its words.
+pub fn line_of(tracker: Option<&Tracker>, task: u64) -> Option<(Option<State>, Option<u64>, bool)> {
     let line = tracker?.line(task)?;
-    Some((State::of_agent(line.state), line.last_active_unix_ms))
+    Some((
+        State::of_agent(line.state),
+        line.last_active_unix_ms,
+        matches!(line.state, AgentState::Starting | AgentState::Installing),
+    ))
 }
 
 #[cfg(test)]
@@ -514,7 +534,7 @@ mod tests {
             ended_ago_ms: None,
         }
     }
-    fn none(_: u64) -> Option<(Option<State>, Option<u64>)> {
+    fn none(_: u64) -> Option<(Option<State>, Option<u64>, bool)> {
         None
     }
 
@@ -592,7 +612,7 @@ mod tests {
         // The watch's read: idle, last active 2 s before.
         board.tasks(
             &[task(3, None)],
-            |_| Some((Some(State::Idle), Some(T0 + 28_000))),
+            |_| Some((Some(State::Idle), Some(T0 + 28_000), false)),
             T0 + 30_000,
         );
         let read = board.get("3", T0 + 30_000).unwrap();
@@ -603,7 +623,7 @@ mod tests {
         // Nothing changed: the record isn't touched.
         board.tasks(
             &[task(3, None)],
-            |_| Some((Some(State::Idle), Some(T0 + 28_000))),
+            |_| Some((Some(State::Idle), Some(T0 + 28_000), false)),
             T0 + 31_000,
         );
         assert_eq!(
@@ -772,6 +792,30 @@ mod tests {
         // A task handed over after the forget has its record.
         board.tasks(&[task(10, None)], none, T0 + 2);
         assert!(board.get("10", T0 + 2).is_some());
+    }
+
+    /// #8510: OpenClaw direct's turn queued on a cold gateway reads
+    /// `starting` on the watch: its record says `working`, as before, and
+    /// `waiting` true, so the voice's 20 s line still finds it; once the
+    /// gateway has it, `waiting` is false. The store's own state (queued,
+    /// settled) is never `waiting`.
+    #[test]
+    fn a_task_the_watch_reads_starting_is_working_and_waiting_until_it_runs() {
+        let mut board = Board::new();
+        let starting = |_: u64| Some((State::of_agent(AgentState::Starting), None, true));
+        board.tasks(&[task(11, None)], starting, T0);
+        let record = board.get("11", T0).unwrap();
+        assert_eq!(record["state"], "working");
+        assert_eq!(record["waiting"], true);
+        let working = |_: u64| Some((State::of_agent(AgentState::Working), Some(T0 + 900), false));
+        board.tasks(&[task(11, None)], working, T0 + 1_000);
+        let record = board.get("11", T0 + 1_000).unwrap();
+        assert_eq!(record["state"], "working");
+        assert_eq!(record["waiting"], false);
+        board.tasks(&[task(12, Some(State::Queued))], starting, T0);
+        assert_eq!(board.get("12", T0).unwrap()["waiting"], false);
+        board.tasks(&[task(13, None)], none, T0);
+        assert_eq!(board.get("13", T0).unwrap()["waiting"], false);
     }
 
     #[test]
