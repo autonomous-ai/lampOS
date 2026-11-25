@@ -4337,14 +4337,22 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   (`make_no_cannot::skill_text`) không bao giờ được cấp `speak`. Không có
   công tắc. Phép kiểm dựa trên grant, không dựa trên việc script gọi gì:
   script gọi `lamp.say` mà không có grant `speak` vẫn được giữ, và
-  lamp-control từ chối câu nói đó ở mỗi lần chạy. Giới hạn đã biết: thao
-  tác âm lượng của lamp-control cũng cần `speak`, nên một kỹ năng trigger
-  chỉ chỉnh âm lượng cũng bị từ chối. Và một lần vuốt ve hay va chạm vào
-  các miếng cảm ứng cũng khởi động một kỹ năng có trigger chạm, nên câu của
-  nó cũng được phát khi đó. `told_only` cho một `skill.toml` không phân
-  tích được đi qua, vì bước đóng gói sẽ từ chối nó sau. Cùng phép kiểm đó trong
-  `lamp-skills pack`, phép kiểm không bao giờ lặp lại cùng một câu, và cho
-  kỹ năng trigger chỉ chỉnh âm lượng đi qua, là việc tiếp theo.
+  lamp-control từ chối câu nói đó ở mỗi lần chạy. Âm lượng không phải là
+  nói (P2.2 của El trên #8651): thao tác `volume`, trạng thái `volume` và
+  `volume.changed` của lamp-control cần grant `volume`, mà `speak` cũng
+  bao gồm ([control.md](../control.md), "Grants"), nên một kỹ năng trigger
+  chỉ được cấp `volume`, chỉ chỉnh âm lượng, được giữ. Một lần vuốt ve
+  hay va chạm vào các miếng cảm ứng cũng khởi động một kỹ năng có trigger
+  chạm, nên câu của nó cũng được phát khi đó. `told_only` cho một
+  `skill.toml` không phân tích được đi qua, vì bước đóng gói từ chối nó. `lamp-skills pack`,
+  phép kiểm của chính agent giữa lúc tạo, từ chối theo cùng luật
+  (`made_skill::told_only`, gọi từ `package::pack_signed_by`), nói
+  `SPEAKS_ON_ITS_OWN` và dạng câu trả lời được kể
+  (`made_skill::TOLD_ONLY_SHAPE`), để việc tạo biết dạng đó trước khi giữ;
+  nó áp cho mọi gói, như `Skill::made_refuses`. Test:
+  `pack_refuses_a_trigger_skill_that_would_speak_and_packs_a_told_only_one`,
+  `volume_needs_its_own_grant_or_speak`. Phép kiểm không bao giờ lặp lại
+  cùng một câu là việc tiếp theo.
 - **Giọng đọc bước `run` như đọc bước `task`**: code riêng, giữ theo grant
   của nó và script của nó phải nằm trong các file đã viết
   (`made_skill::code_step`, `task_run`), và được đọc lại để xin đồng ý một
