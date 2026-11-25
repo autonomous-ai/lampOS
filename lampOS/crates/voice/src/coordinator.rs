@@ -18825,6 +18825,15 @@ fn cut_after_speaker_lapse<T>(
     Ok(true)
 }
 
+/// A playback gap's journal line (#8615 item 3).
+fn playback_gap_line(
+    _gap: &crate::wire::PlaybackGap,
+    _phase: PlaybackGapPhase,
+    _listening: bool,
+) -> String {
+    String::new()
+}
+
 /// The speaker's accepted zeros while a reply was unfinished: a delivery
 /// gap, unless they are a listening gap's (`listening`, #828). One whose
 /// zeros ran on past its hold (`overran_us`) is counted once it resumes,
@@ -21633,6 +21642,49 @@ mod tests {
             assert_eq!(reply.as_ref().unwrap().playback_gaps, 0);
             assert_eq!(reply.as_ref().unwrap().pcm, vec![7; 240]);
         }
+    }
+
+    /// #8615 item 3: a playback gap went to events.jsonl only; each is a
+    /// journal line too, with its phase and its zeros' length, so a row
+    /// counts the reply's gaps from the journal. The lamp's own listening
+    /// hold at a sentence's end (#828) says so.
+    #[test]
+    fn a_playback_gap_is_journalled_with_its_phase_and_length() {
+        let (_, current, _) = active_reply();
+        let turn = current.owner.turn();
+        let gap = crate::wire::PlaybackGap {
+            owner: current.owner,
+            first_sample: lamp_audio::ownership::PlaybackCursor { epoch: 1, frame: 0 },
+            end_sample: lamp_audio::ownership::PlaybackCursor {
+                epoch: 1,
+                frame: 28_800,
+            },
+            started_at_us: 100,
+            last_zero_accepted_at_us: 1_200_100,
+            zero_frames: 28_800,
+        };
+        assert_eq!(
+            playback_gap_line(&gap, PlaybackGapPhase::Resumed, false),
+            format!("lamp-voice: request {turn}: playback gap resumed: 1200 ms of zeros")
+        );
+        assert_eq!(
+            playback_gap_line(&gap, PlaybackGapPhase::Cancelled, true),
+            format!(
+                "lamp-voice: request {turn}: playback gap cancelled: 1200 ms of zeros, the lamp's listening hold"
+            )
+        );
+        let started = crate::wire::PlaybackGap {
+            end_sample: lamp_audio::ownership::PlaybackCursor {
+                epoch: 1,
+                frame: 240,
+            },
+            zero_frames: 240,
+            ..gap
+        };
+        assert_eq!(
+            playback_gap_line(&started, PlaybackGapPhase::Started, false),
+            format!("lamp-voice: request {turn}: playback gap started: 10 ms of zeros")
+        );
     }
 
     #[test]

@@ -5120,6 +5120,101 @@ async fn tool_round_past_cue_after_makes_one_sound() {
     );
 }
 
+/// #8615 item 2 (a customer: "speech pauses at random"): on 70 journals of
+/// 24-25 Nov the gaps of 300 ms or more were nearly all a new chat round
+/// after a lead-in the lamp had said (p50 1.4 s, p90 4.0 s), each of its
+/// waits under the wait sound's own 1.5 s. A lead-in whose next round is
+/// still out `GAP_CUE_AFTER` after its audio ended makes the wait sound
+/// once; a round back in time makes none, a long one never two, nor with
+/// `LAMP_BUSY_FOLLOW_UP_RENEWS`'s own; with no lead-in, none of this.
+#[tokio::test(start_paused = true)]
+async fn a_lead_in_whose_next_round_is_out_makes_one_sound() {
+    /// The wait sounds after the reply's first spoken audio: the tool runs
+    /// `tool_ms`, the round after it begins `round_ms` after it is asked.
+    async fn sounds(every: bool, lead_in: bool, tool_ms: u64, round_ms: u64) -> usize {
+        let mut first = Vec::new();
+        if lead_in {
+            first.push(text("Let me check the news."));
+        }
+        first.push(Ok(ChatEvent::ToolCalls(vec![call(
+            "c1",
+            "get_news",
+            json!({}),
+        )])));
+        first.push(Ok(ChatEvent::Done));
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("What's in the news today?".to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    first,
+                    vec![text("Here is the news."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            round_after: Mutex::new([Duration::ZERO, Duration::from_millis(round_ms)].into()),
+            ..Script::default()
+        });
+        let tools: ToolRunner = Arc::new(move |_, _, _, _| {
+            Box::pin(async move {
+                tokio::time::sleep(Duration::from_millis(tool_ms)).await;
+                json!({"ok": true})
+            })
+        });
+        let mut engine = Engine::with_clock(
+            script,
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        )
+        .waiting_with_a_sound(true)
+        .announcing(false);
+        if every {
+            engine = engine.cueing_every_tool();
+        }
+        wait_clip_ready(&engine, true);
+        spoken_turn(&mut engine);
+        let mut spoke = false;
+        let mut cues = 0;
+        loop {
+            match tokio::time::timeout(Duration::from_secs(20), engine.next())
+                .await
+                .expect("the turn ends")
+            {
+                ProviderOutput::Audio {
+                    request: 1, spoken, ..
+                } => {
+                    cues += usize::from(spoke && !spoken);
+                    spoke |= spoken;
+                }
+                ProviderOutput::TurnComplete { request: 1, .. }
+                | ProviderOutput::TurnFailed { request: 1, .. } => return cues,
+                _ => {}
+            }
+        }
+    }
+    assert_eq!(sounds(false, true, 3_000, 0).await, 1, "a slow tool");
+    assert_eq!(sounds(false, true, 0, 3_000).await, 1, "a slow round");
+    assert_eq!(sounds(false, true, 300, 300).await, 0, "back in time");
+    assert_eq!(sounds(false, true, 3_000, 3_000).await, 1, "never twice");
+    assert_eq!(
+        sounds(true, true, 3_000, 3_000).await,
+        1,
+        "with the busy room's sounds, never twice"
+    );
+    assert_eq!(sounds(false, false, 3_000, 0).await, 0, "no lead-in");
+}
+
+/// #8615 item 3: each spoken piece is journalled with its audio's length
+/// once all of it went to the speaker, so a row can tell the reply's gaps
+/// from its pieces.
+#[test]
+fn a_spoken_piece_is_journalled_with_its_audio_length() {
+    assert_eq!(
+        piece_audio_line(7, 2, 36_000),
+        "lamp-voice second: request 7 piece 2 handed to the speaker: 1500 ms of audio"
+    );
+}
+
 /// Keep rendering out of the timing tests: either a sound is already in
 /// memory, or its background render has not produced one yet.
 fn wait_clip_ready(engine: &Engine, ready: bool) {

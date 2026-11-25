@@ -18449,6 +18449,11 @@ enum Stop {
     Gone,
 }
 
+/// A spoken piece's journal line (#8615 item 3).
+fn piece_audio_line(_request: u64, _piece: usize, _samples: usize) -> String {
+    String::new()
+}
+
 /// One wait sound for `request`, as audio only: no words, so nothing of it
 /// is kept in the thread, and it does not count as an answer for the
 /// announcement's spell.
