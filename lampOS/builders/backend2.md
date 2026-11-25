@@ -5,6 +5,7 @@ on 2026-11-25, when the person asked every builder to say plainly what it
 owns. How a builder works is in [joining.md](../docs/joining.md). The name is
 not a place in a line. The first builder corrects it where it must be.
 
+- **Works on:** the cloud side of the lamp's live message link (the link, the settings a lamp gets to join it, reconnects); the commands, reads and events over it, including the lamp driving other devices (#7470, parked); the backend half of any lamp change that needs the link.
 - **Name:** `backend2`
 - **Person:** a colleague on the backend team (named in the team's own
   channels, not in this public repository). The same person starts the
