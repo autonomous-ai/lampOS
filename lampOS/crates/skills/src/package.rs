@@ -547,6 +547,19 @@ pub fn pack_signed_by(
     if let Some(why) = skill.made_refuses() {
         return Err(format!("not packed: {why}"));
     }
+    // #8610: a skill a trigger starts tells the person only through the
+    // lamp's told answer, by the voice's own rule at its keep
+    // (`lamp_voice::made_skill::told_only`), so the agent's check mid-make
+    // learns the shape before the keep refuses it.
+    let toml = fs::read_to_string(dir.join("skill.toml"))
+        .map_err(|error| format!("not packed: skill.toml: {error}"))?;
+    if let Err(refused) = lamp_voice::made_skill::told_only(&toml) {
+        return Err(format!(
+            "not packed: {}: {}",
+            refused.0,
+            lamp_voice::made_skill::TOLD_ONLY_SHAPE
+        ));
+    }
     if skill.kind == SkillKind::Core {
         return Err(format!(
             "not packed: {} is a core skill: it comes with the lamp (lamp-update install), never as a package",

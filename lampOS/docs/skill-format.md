@@ -79,9 +79,11 @@ task"). The voice refuses such a made skill by what it may do, a `run`
 step or a code step granted `speak` or `speaker`, before its check and its
 try (`made_skill::told_only`), so a repair reshapes it. A script that calls
 `lamp.say` with neither grant is not refused at the make; lamp-control
-refuses its say at each run. Known limit: lamp-control's volume op needs
-`speak` too, so a trigger skill that only sets the volume is refused as
-well (a follow-up). A `run` step,
+refuses its say at each run. The volume is not speaking: a trigger skill
+whose code only sets the volume is granted `volume`, which lamp-control's
+`volume` op needs (`speak` holds it too), and is kept. `lamp-skills pack`
+refuses by the same rule, so the agent's own check learns the shape before
+the keep. A `run` step,
 and code that says its own line, are only for a skill the person's own
 words start, or one only a hand on the lamp starts: every trigger on
 `controls/touch`, `controls/pet` or `controls/gesture` (a touch, a pat, a
