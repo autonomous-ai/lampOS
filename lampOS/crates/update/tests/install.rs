@@ -2837,10 +2837,16 @@ fn the_product_keeps_handed_tasks_only_beside_the_service_records() {
             "{unit} sets {CHILD}=on once"
         );
         assert_eq!(child, 1, "{unit} names {CHILD} on one line only");
+        // The parent set once, and on: a later `=off` would leave the child
+        // doing nothing (Twelve's nit on #8564).
+        let parents: Vec<&&str> = service
+            .iter()
+            .filter(|line| line.starts_with("Environment=LAMP_SERVICE_RECORDS="))
+            .collect();
         assert_eq!(
-            service.iter().filter(|line| **line == PARENT).count(),
-            1,
-            "{unit} sets {CHILD} without {PARENT}"
+            parents,
+            [&PARENT],
+            "{unit} sets {CHILD} without {PARENT}, once"
         );
     }
     assert_eq!(seen, 1, "lamp-voice.service is a product unit");
