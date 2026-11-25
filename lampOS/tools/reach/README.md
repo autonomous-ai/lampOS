@@ -175,6 +175,13 @@ fits a 20 ms tick.
   guard on the page of a real lamp: the page only, the body's own limits unchanged; the first map is the one in use.
 - The try-it page's guard (`sdk/js/examples/twin/reach-guard.js`, `server.js --reach-map reach-map-4ace.json`) checks the
   page's own goals against such a file before sending them. The page only; the body's limits are unchanged.
+- `pose-table.json` is the map as a table of answers (safe or not, each joint's range at 0 and at the 48-count margin, and a lamp's counts laid on the map's):
+  the page guard, `test_reach.py`'s port and, when it reads a map, the body (#7513) must all give them. A per-lamp file is
+  `query.py MAP.npz --export OUT.json --unit lamp-75c9 --folded SHOULDER,ELBOW --head-home PITCH`: the same map with the lamp's `unit`
+  and `frame` (the lamp's counts minus `frame.offset` are the map's); only the lamp it names may use it. Only the encoder zero moves: the
+  CAD and masses stay V1's until that lamp's own are measured.
+  `python3 -m unittest test_reach` (from this folder) checks it; no CI job runs `test_reach.py` yet. The Python port follows the guard's rules
+  (it is a consistency check against a second writing, not a second source of the rules).
 - The map is lamp-4ace's geometry and home, with V1's estimated masses, until each lamp's own are measured.
 - `lean-base-heavy-estimate.json` is a second set of masses, plainly an ESTIMATE and not measured: the base 6.0 kg and the arm and
   head 1.0 kg (7 kg in all, the spec's figure), as `reach-map-4ace-base-heavy.json` was judged with
