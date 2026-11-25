@@ -228,6 +228,10 @@ Environment=LAMP_LIGHT_TOLD=on
 # A reply claiming a light, volume or timer action no call made is asked again once, then said not done: on lamp-52e6
 # "Timer set. It rings at 9:39 am." (9928) and "Louder."/"Brighter."/"Cooler." came with no call (#5215).
 Environment=LAMP_ACTION_CLAIM_CHECKED=on
+# A line said with the lamp's name whose answer has no words and calls nothing is asked once more, then said a short
+# sorry, never left in silence (#3704): on lamp-74ff on 25 Nov at 21:33 "Hey Lamp, what is 17% of 200?" got a 2-token
+# answer and nothing was said. Its why and rules are its row in docs/switches.md.
+Environment=LAMP_NO_WORDS_AGAIN=on
 # #7730, docs/switches.md; first builder, 18 Nov ("Space facts is off." with no call on lamp-9adf)
 Environment=LAMP_SKILL_CLAIM_CHECKED=on
 # LAMP_LIVE_FACT_CHECKED: its why and rules are its row in docs/switches.md (#7605, #7719). A live figure (a price,
