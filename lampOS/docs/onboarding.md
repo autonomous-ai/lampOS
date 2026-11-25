@@ -693,7 +693,8 @@ The record, for lamp-ears (`onboarding/storage.rs`, `room_sounds`):
   first builder's c7003588081 on #7767). Once it is there, a "no" in the
   walk and the voice's stop keep a no even with the switch off, and a
   start off leaves a kept no, so on, off, on still reads it as no; the
-  app's off with the switch off still removes the file (slice 6). Off on a
+  app's offs (`consent.set` and desk noticing) keep a no then too (slice
+  6). Off on a
   lamp never switched on (no done mark), all of it is as above, byte for
   byte, and nothing is written.
 - Shape: `{"version":1,"room_sounds":"yes","at_unix_s":<when the yes was kept>,"by":"voice"}`

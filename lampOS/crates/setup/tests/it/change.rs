@@ -1318,11 +1318,82 @@ fn with_the_switch_on_the_apps_desk_off_keeps_a_no() {
     fs::remove_file(&file).unwrap();
     assert!(desk(true, 400, true).unwrap().said.ends_with("already"));
     assert!(!file.exists());
-    // Off: the off removes the file, as before.
+    // Off, once the old nos are kept (on, off, on; slice 6): an off is
+    // still a kept no, so the next on reads it as no, as the voice's stop.
     desk(true, 500, false).unwrap();
-    assert!(file.exists());
+    assert!(lamp_msgs::consent::read(&file, key).yes);
     desk(false, 600, false).unwrap();
+    assert!(lamp_msgs::consent::kept_no(&file, key));
+    // Off with no done mark: the off removes the file, as before.
+    fs::remove_file(folder.join(lamp_msgs::consent::OLD_NOS_DONE)).unwrap();
+    desk(true, 700, false).unwrap();
+    assert!(file.exists());
+    desk(false, 800, false).unwrap();
     assert!(!file.exists());
+}
+
+/// #7767, slice 6: the app's `consent.set` off keeps a no (`"by":"app"`)
+/// where a missing file is on, as desk noticing's off does: with the switch
+/// on, and once the old nos are kept with it off too. A yes with no file
+/// there, on by default already, writes nothing; a yes over a kept no keeps
+/// a yes. With neither, an off removes the file, as before.
+#[test]
+fn with_the_switch_on_the_apps_consent_off_keeps_a_no() {
+    let root = Root::new();
+    let config = root.config();
+    let folder = &config.consent;
+    fs::create_dir_all(folder).unwrap();
+    let set = |key: &'static str, yes: bool, by_default: bool| {
+        change::apply_or(&Change::Consent(key, yes), &config, by_default).unwrap()
+    };
+    for key in [
+        lamp_msgs::consent::FACE_EXPRESSIONS,
+        lamp_msgs::consent::ROOM_SOUNDS,
+        lamp_msgs::consent::SEEN_ACTIVITY,
+    ] {
+        let file = lamp_msgs::consent::file_in(folder, key).unwrap();
+        // No done mark: an off removes with the switch off, as before, and
+        // keeps a no with it on (a missing file is no there anyway).
+        for (by_default, kept) in [(false, false), (true, true)] {
+            set(key, true, by_default);
+            assert!(lamp_msgs::consent::read(&file, key).yes, "{key}");
+            assert_eq!(set(key, false, by_default).data, json!({key: false}));
+            assert_eq!(file.exists(), kept, "{key} {by_default}");
+            let _ = fs::remove_file(&file);
+        }
+        fs::write(folder.join(lamp_msgs::consent::OLD_NOS_DONE), b"{}").unwrap();
+        // On by default with no file: an off is the app's kept no.
+        let done = set(key, false, true);
+        assert!(!done.said.ends_with("already"), "{key}: {}", done.said);
+        assert!(!done.restart_ears);
+        let text = fs::read_to_string(&file).unwrap();
+        let at = serde_json::from_str::<Value>(&text).unwrap()["at_unix_s"]
+            .as_u64()
+            .unwrap();
+        assert_eq!(
+            text.into_bytes(),
+            lamp_msgs::consent::no_bytes(key, at, lamp_msgs::consent::BY_APP),
+            "{key}"
+        );
+        assert!(!lamp_msgs::consent::allowed(&file, key, true));
+        // A yes over it keeps a yes; an off again, a no, never a removal.
+        assert!(!set(key, true, true).said.ends_with("already"));
+        assert!(lamp_msgs::consent::read(&file, key).yes, "{key}");
+        set(key, false, true);
+        assert!(lamp_msgs::consent::kept_no(&file, key), "{key}");
+        // A yes with no file, on by default already: nothing written, and
+        // lamp-ears, already hearing by default, is not restarted.
+        fs::remove_file(&file).unwrap();
+        let done = set(key, true, true);
+        assert!(done.said.ends_with("already"), "{key}: {}", done.said);
+        assert!(!done.restart_ears);
+        assert!(!file.exists());
+        // The switch since turned off, the old nos kept: still a no.
+        set(key, false, false);
+        assert!(lamp_msgs::consent::kept_no(&file, key), "{key}");
+        fs::remove_file(&file).unwrap();
+        fs::remove_file(folder.join(lamp_msgs::consent::OLD_NOS_DONE)).unwrap();
+    }
 }
 
 /// #6543, Heron's P2 on #7551: a desk noticing yes lands only with a
