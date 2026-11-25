@@ -46,6 +46,13 @@ impl CloudAvailability {
             .map(|link| link.session)
     }
 
+    /// The last session the link had, ready or not: a ring played from its
+    /// clip with no link is proved under it (`LAMP_OFFLINE_RINGS`, #8632).
+    /// None before any link was seen.
+    pub(super) fn last_session(&self) -> Option<u64> {
+        self.latest.map(|link| link.session)
+    }
+
     pub(super) fn available(&self) -> bool {
         self.ready_session().is_some()
     }

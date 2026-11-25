@@ -1490,6 +1490,19 @@ impl Reply {
     }
 
     fn complete_reminder(&mut self, speaker_pending: &Option<PendingSpeaker>, snapshot: Snapshot) {
+        // An offline ring's clip (#8632): said once all of it retired,
+        // nobody's turn taken over it and the microphones open.
+        if self.notice.origin() == SpeechOrigin::OfflineRing {
+            if self.settled(speaker_pending)
+                && self.notice.retired()
+                && snapshot.owner().is_none()
+                && snapshot.microphone_permission() == Permission::Allowed
+                && let Some(reminder) = &mut self.reminder
+            {
+                reminder.completed();
+            }
+            return;
+        }
         let through_gaps = self.said_through_gaps(speaker_pending, snapshot);
         if (through_gaps || self.heard_whole(speaker_pending, snapshot))
             && let Some(reminder) = &mut self.reminder
@@ -4185,7 +4198,7 @@ fn service_speaker_control(
                     }
                     let token = current.retire_playback(sequence, final_sample.frame)?;
                     owner.playback_ended(now(), token)?;
-                    if origin == SpeechOrigin::Provider
+                    if matches!(origin, SpeechOrigin::Provider | SpeechOrigin::OfflineRing)
                         && let Some(reminder) = &mut current.reminder
                     {
                         reminder.retired(token.sequence(), final_sample.epoch, final_sample.frame);
@@ -6699,6 +6712,17 @@ fn conversation_with_gate_inner(
     let offline_voice = lifetime.continuous()
         && std::env::var(OFFLINE_VOICE_ENVIRONMENT).ok().as_deref() == Some("on");
     let mut outage = Outage::default();
+    // A due timer or reminder rings from its clip with no link, and a scrap
+    // after the outage's line gets no second line (`LAMP_OFFLINE_RINGS`,
+    // #8632). Off unless exactly `on`.
+    let offline_rings = lifetime.continuous() && crate::offline_rings::on();
+    let ring_clips = if offline_rings {
+        crate::say::tts_cache::from_environment()
+    } else {
+        None
+    };
+    // The item last said to have no clip, so the journal says it once.
+    let mut ring_missing_told: Option<String> = None;
     // With `LAMP_REACH_PROBE=on`: a link down while the internet answers is
     // not the home's outage, and the voice waits for the probe's verdict
     // before it says one (#830).
@@ -12008,6 +12032,30 @@ fn conversation_with_gate_inner(
                         if local.signed_out && !signed_out.may_say_heard(monotonic_us()) {
                             local.speech = false;
                         }
+                        // A short scrap just after the outage's line (the
+                        // lamp's own tail, the room) gets no second line
+                        // (`LAMP_OFFLINE_RINGS`, #8632).
+                        let speech_ms = detector.last_endpoint().and_then(|end| end.speech_ms);
+                        if local.speech
+                            && !local.signed_out
+                            && crate::offline_rings::scrap_after_line(
+                                offline_rings,
+                                speech_ms,
+                                outage.line_heard_at(),
+                                monotonic_us(),
+                            )
+                        {
+                            local.speech = false;
+                            eprintln!(
+                                "lamp-voice: offline, a {} ms scrap just after the outage's line gets no line of its own (LAMP_OFFLINE_RINGS)",
+                                speech_ms.unwrap_or_default()
+                            );
+                            record(
+                                trace,
+                                json!({"kind":"offline_scrap_no_line","turn":current.owner.turn(),"speech_ms":speech_ms,
+                                    "line_heard_at_us":outage.line_heard_at(),"at_us":monotonic_us()}),
+                            )?;
+                        }
                     }
                     if sent.is_none() {
                         // Only the lamp's name, and nothing more in its
@@ -12363,6 +12411,9 @@ fn conversation_with_gate_inner(
             )?;
         }
         outage.note_delivery(reply);
+        if offline_rings {
+            outage.follow(reply, monotonic_us());
+        }
         signed_out.note_delivery(reply, monotonic_us());
         select_failure_notice_in(notices, reply, &speaker_pending, &mut outage, trace)?;
         if let Some((request, why)) = reply.as_ref().and_then(|current| {
@@ -13587,6 +13638,92 @@ fn conversation_with_gate_inner(
             last_reminder_turn = reply.as_ref().map(|current| current.owner.turn());
             last_publish = monotonic_us();
             begun_for(ticket, reply);
+        }
+        // With no link, a due timer or reminder rings on time from its clip
+        // (`LAMP_OFFLINE_RINGS`, #8632): the same gates as above but the
+        // session, and no wait for a skill's ask, whose words need the model.
+        if let Some(reminders) = reminders.as_mut()
+            && crate::offline_rings::rings_offline(
+                offline_rings,
+                cloud.ready_session(),
+                link_down_since,
+                reminder_now_us,
+                unasked_paused,
+            )
+            && reply.is_none()
+            && provider_queue.is_empty()
+            && speaker_pending.is_none()
+            && admission.idle_for_reminder()
+            && !submission_draining
+            && snapshot.listening_ready(MonoTime::from_micros(reminder_now_us))
+            && reminder_quiet(
+                reminder_now_us,
+                reminder_cycle_started_us,
+                last_speech_us,
+                last_capture,
+            )
+            && playback_mask.available(reminder_now_us)
+            && let Some(offer) = idle_reminder_offer(
+                reminders,
+                reply,
+                look_wanted,
+                &mut second_look,
+                reminder_now_us,
+            )
+            && overdue_may_begin
+        {
+            let key = reminder_key(&offer);
+            let clip = ring_clips
+                .as_ref()
+                .and_then(|cache| cache.ring_clip(offer.timer));
+            match (clip, cloud.last_session()) {
+                (Some(clip), Some(session)) => {
+                    let (timer, late_by_ms, frames) = (offer.timer, offer.late_by_ms, clip.len());
+                    snapshot = commit_offline_ring(
+                        owner,
+                        reply,
+                        clip,
+                        rig.playout_start_now(),
+                        trace,
+                        |state| rig.publish(state),
+                    )?;
+                    let current = reply
+                        .as_mut()
+                        .ok_or_else(|| io::Error::other("offline ring owner missing"))?;
+                    current.reminder = Some(reminders.admitted(
+                        offer,
+                        current.owner,
+                        snapshot.microphone_generation(),
+                        session,
+                    ));
+                    eprintln!(
+                        "lamp-voice: a {} came due with no link: rung from its clip (LAMP_OFFLINE_RINGS)",
+                        if timer { "timer" } else { "reminder" }
+                    );
+                    record(
+                        trace,
+                        json!({"kind":"offline_ring","turn":current.owner.turn(),"timer":timer,
+                            "late_by_ms":late_by_ms,"frames":frames,"provider_session":session,"at_us":reminder_now_us}),
+                    )?;
+                    last_reminder_turn = Some(current.owner.turn());
+                    reminder_held = None;
+                    ring_missing_told = None;
+                    last_publish = monotonic_us();
+                }
+                (clip, _) if ring_missing_told.as_deref() != Some(key.as_str()) => {
+                    eprintln!(
+                        "lamp-voice: a {} came due with no link and {}: it waits for the link (LAMP_OFFLINE_RINGS)",
+                        if offer.timer { "timer" } else { "reminder" },
+                        if clip.is_none() {
+                            "no clip kept"
+                        } else {
+                            "no link seen yet to prove it under"
+                        }
+                    );
+                    ring_missing_told = Some(key);
+                }
+                _ => {}
+            }
         }
         // A reminder held for its skill, and still offered, is said before
         // anything else the lamp would say unasked: the say service and the
@@ -16663,6 +16800,33 @@ fn commit_reminder_turn(
     Ok(snapshot)
 }
 
+/// A due timer or reminder rung with no link (`LAMP_OFFLINE_RINGS`,
+/// #8632): its clip played as a turn of the lamp's own, nothing sent to the
+/// provider. The caller attaches the item's receipt to the turn
+/// (`Reply::reminder`); played whole, the turn's end completes it
+/// ([`Reply::complete_reminder`]).
+fn commit_offline_ring(
+    owner: &mut Controller,
+    reply: &mut Option<Reply>,
+    clip: Vec<i16>,
+    playout_start: PlayoutStart,
+    trace: &mut SessionState,
+    publish: impl FnMut(Snapshot) -> io::Result<()>,
+) -> Result<Snapshot> {
+    let (snapshot, _) = speaker_tone::commit_sound_turn(
+        owner,
+        reply,
+        NoticeDelivery::sound(SpeechOrigin::OfflineRing, clip),
+        "offline_ring",
+        "a timer or reminder due with no link: its clip, nothing sent to the provider",
+        0,
+        playout_start,
+        trace,
+        publish,
+    )?;
+    Ok(snapshot)
+}
+
 /// A turn held as unclear, to be asked again once it is over (#926).
 #[derive(Debug, Default)]
 struct AskAgainState {
@@ -17871,6 +18035,16 @@ fn dispatch_speaker_chunk(
         // A computer's exact line is shown speaking, by its own level.
         if origin == SpeechOrigin::ExactLine {
             current.voice_level = crate::ring_face::level_of(&reserved.0);
+        }
+        // An offline ring (#8632): shown speaking, and its first chunk
+        // handed to the speaker is its item's audio, as a model ring's is.
+        if origin == SpeechOrigin::OfflineRing {
+            current.voice_level = crate::ring_face::level_of(&reserved.0);
+            if reserved.2
+                && let Some(reminder) = current.reminder.as_mut()
+            {
+                reminder.audio();
+            }
         }
         reserved
     } else {

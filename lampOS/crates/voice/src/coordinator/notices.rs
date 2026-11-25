@@ -303,6 +303,9 @@ pub(super) struct Outage {
     /// What was said was the service's line, not the internet's: no "back
     /// online" follows it, since the internet never left.
     pub(super) service: bool,
+    /// The last pass the outage's line was heard playing
+    /// (`LAMP_OFFLINE_RINGS`, #8632, [`Self::follow`]).
+    pub(super) line_heard_at_us: Option<u64>,
 }
 
 impl Outage {
@@ -327,6 +330,27 @@ impl Outage {
             self.said = true;
             self.service = local.service;
         }
+    }
+    /// With `LAMP_OFFLINE_RINGS=on` (#8632), called each pass after
+    /// [`Self::note_delivery`]: while the outage's line (not "back online",
+    /// not signed out) plays, `at_us` is when it was last heard, so a scrap
+    /// after it is timed from about its end.
+    pub(super) fn follow(&mut self, reply: &Option<Reply>, at_us: u64) {
+        let Some(current) = reply.as_ref() else {
+            return;
+        };
+        let line = current
+            .local_only
+            .is_some_and(|local| !local.back && !local.signed_out);
+        let playing = matches!(current.notice, NoticeDelivery::Selected { .. })
+            && (current.playback.is_some() || current.notice.retired());
+        if line && playing {
+            self.line_heard_at_us = Some(at_us);
+        }
+    }
+    /// When the outage's line was last heard ([`Self::follow`]).
+    pub(super) fn line_heard_at(&self) -> Option<u64> {
+        self.line_heard_at_us
     }
     /// The line is owed: not said yet this outage, or, with
     /// `LAMP_OUTAGE_LINE_AGAIN=on`, on every speech turn of it (#8235).
@@ -373,6 +397,10 @@ pub(super) enum SpeechOrigin {
     /// local PCM that comes as it is sent, no answer. Shown as an exact line
     /// is: unshown to the head, the room and the voice's state, on the ring.
     ComputerStream,
+    /// A due timer's or reminder's clip from the speech cache, rung with no
+    /// link (`LAMP_OFFLINE_RINGS`, #8632): the lamp's own words, shown
+    /// speaking. Played whole, it completes the item as said.
+    OfflineRing,
 }
 impl SpeechOrigin {
     /// Played from a recording held here, not from the provider.
@@ -411,6 +439,7 @@ impl SpeechOrigin {
             Self::ExactLine => "exact_line",
             Self::RequestedAudio => "requested_audio",
             Self::ComputerStream => "computer_stream",
+            Self::OfflineRing => "offline_ring",
         }
     }
 }

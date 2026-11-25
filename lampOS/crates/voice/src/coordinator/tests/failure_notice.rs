@@ -1336,6 +1336,7 @@ fn signed_out_says_its_own_line_for_speech_every_time_and_is_no_outages_line() {
     let mut outage = Outage {
         said: true,
         service: false,
+        ..Outage::default()
     };
     for _ in 0..3 {
         let (_owner, mut reply) = signed_out_turn(true, false);
@@ -1698,4 +1699,45 @@ fn a_lost_provider_turn_says_turn_lost_from_the_speech_cache_with_the_switch() {
     assert!(!selected(&reply, NoticeKind::TurnLost));
     assert!(trace.iter().any(|e| e["fallback_for"] == "no_directory"));
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// #8632 (`LAMP_OFFLINE_RINGS`): the outage's line is heard at each pass
+/// its turn plays, so a scrap is timed from about the line's end. A line
+/// only chosen, a sound's turn, or the "back online" line is not heard as
+/// the outage's line.
+#[test]
+fn the_outages_line_is_followed_to_the_last_pass_it_played() {
+    let catalog = FailureNotices::synthetic_offline();
+    let mut outage = Outage::default();
+    let mut trace = SessionState::default();
+    let (mut owner, mut line) = offline_reply(true);
+    select_failure_notice_in(&catalog, &mut line, &None, &mut outage, &mut trace).unwrap();
+    outage.follow(&line, 1_000);
+    assert_eq!(outage.line_heard_at(), None, "chosen, not yet taken");
+    speaker_took(&mut owner, &mut line);
+    outage.follow(&line, 2_000);
+    outage.follow(&line, 3_500);
+    assert_eq!(outage.line_heard_at(), Some(3_500));
+    // The turn gone: the time stays where the line was last heard.
+    outage.follow(&None, 9_000);
+    assert_eq!(outage.line_heard_at(), Some(3_500));
+    // A sound's turn, played: not the line.
+    let mut sound = Outage::default();
+    let (mut owner, mut cough) = offline_reply(false);
+    speaker_took(&mut owner, &mut cough);
+    sound.follow(&cough, 4_000);
+    assert_eq!(sound.line_heard_at(), None);
+    // "Back online" playing: not the outage's line.
+    let (mut owner, mut back) = offline_reply(true);
+    back.as_mut().unwrap().local_only = Some(notices::LocalOnly {
+        speech: true,
+        back: true,
+        service: false,
+        signed_out: false,
+    });
+    let mut after = Outage::default();
+    select_failure_notice_in(&catalog, &mut back, &None, &mut after, &mut trace).unwrap();
+    speaker_took(&mut owner, &mut back);
+    after.follow(&back, 5_000);
+    assert_eq!(after.line_heard_at(), None);
 }

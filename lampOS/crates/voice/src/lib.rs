@@ -164,6 +164,7 @@ pub use termination::{exits_clean, is_sigterm_stop};
 pub mod head_cue;
 pub mod name_or_follow_up;
 pub mod not_speech;
+pub mod offline_rings;
 pub mod onboarding;
 pub mod opens_further;
 // Used by the Linux audio workers, and by tests anywhere.
