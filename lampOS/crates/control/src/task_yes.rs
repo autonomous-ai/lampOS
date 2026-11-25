@@ -870,7 +870,9 @@ mod tests {
     /// Before the owner's yes, lamp-tasks' check for its run (`net_agreed`,
     /// the only way its egress socket is made) is not agreed; a yes without
     /// `net` is not one to it; the kept yes with `net` is, and the run's
-    /// token still never names `net`.
+    /// token still never names `net`. On its trigger it tells only through
+    /// the lamp's told answer (#8610, El's P3.1 on #8651): granted `net`
+    /// alone, never `speak`, so its token names nothing.
     #[test]
     fn a_timed_made_tasks_net_is_agreed_only_after_its_kept_yes() {
         use crate::runs::SkillYes as _;
@@ -885,7 +887,7 @@ mod tests {
                      rearm = \"ends\"\nduring = { from = \"09:00\", to = \"09:01\" }";
         let text = lamp_voice::make_no_cannot::skill_text(
             "bitcoin-daily",
-            &["net".to_owned(), "speak".to_owned()],
+            &["net".to_owned()],
             block,
             "check the Bitcoin price every day at 9 and tell me",
         );
@@ -902,7 +904,7 @@ mod tests {
             answer(
                 Path::new("/nonexistent-skills"),
                 st,
-                &asked(CHECK, line(json!(["net", "speak"]))),
+                &asked(CHECK, line(json!(["net"]))),
                 false,
                 true,
                 0,
@@ -919,12 +921,9 @@ mod tests {
             )
         };
         assert_eq!(check(), Some(json!({"agreed": false, "why": "waiting"})));
-        assert_eq!(record(json!(["speak"])), Some(json!({"recorded": true})));
+        assert_eq!(record(json!([])), Some(json!({"recorded": true})));
         assert_eq!(check(), Some(json!({"agreed": false, "why": "changed"})));
-        assert_eq!(
-            record(json!(["net", "speak"])),
-            Some(json!({"recorded": true}))
-        );
+        assert_eq!(record(json!(["net"])), Some(json!({"recorded": true})));
         assert_eq!(check(), Some(json!({"agreed": true})));
         let kept = KeptYes {
             state: state.clone(),
@@ -933,10 +932,7 @@ mod tests {
             write_agent: false,
             services_to_agent: false,
         };
-        assert_eq!(
-            kept.grants("bitcoin-daily").unwrap(),
-            BTreeSet::from([Grant::Speak])
-        );
+        assert_eq!(kept.grants("bitcoin-daily").unwrap(), BTreeSet::new());
         lamp_voice::skill_task_yes::set_net_here(None);
     }
 
