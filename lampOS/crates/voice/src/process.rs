@@ -1942,6 +1942,10 @@ fn worker_command(
             role,
             var(crate::task_news::TOLD_ENVIRONMENT).as_deref(),
         ))
+        .envs(say_socket_worker_environment(
+            role,
+            var(crate::say::SOCKET_ENVIRONMENT).as_deref(),
+        ))
         .envs(credentials_worker_environment(
             role,
             var(crate::second_config::CREDENTIALS_ENV).as_deref(),
@@ -3241,6 +3245,20 @@ fn tasks_told_worker_environment(
         .map(|path| (crate::task_news::TOLD_ENVIRONMENT, path.to_owned()))
 }
 
+// The say socket set for the voice (`LAMP_SAY_SOCKET`), to the two workers
+// whose task tools ask the 20 s line on it as a client
+// (`hand_wait::check_once`, `say::socket_path`, #8510): the same socket the
+// coordinator binds. A path, passed only when absolute; unset, the workers
+// keep the default, as the coordinator does.
+fn say_socket_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, std::ffi::OsString)> {
+    value
+        .filter(|path| matches!(role, "provider" | "second") && Path::new(path).is_absolute())
+        .map(|path| (crate::say::SOCKET_ENVIRONMENT, path.to_owned()))
+}
+
 // The voice unit's credentials (`LoadCredential=`, systemd's
 // `CREDENTIALS_DIRECTORY`), to the one worker that reads them: the second
 // route's, for OpenRouter's and DeepSeek's keys. A path, passed only when
@@ -4146,6 +4164,37 @@ mod tests {
         ] {
             assert_eq!(
                 tasks_told_worker_environment(role, Some(absolute)),
+                None,
+                "{role}"
+            );
+        }
+    }
+
+    /// The say socket goes to the provider and second workers only, and
+    /// only as an absolute path (#8510): their task tools ask the 20 s line
+    /// on the coordinator's own socket.
+    #[test]
+    fn the_say_socket_reaches_only_the_workers_that_ask_the_waiting_line() {
+        let absolute = std::ffi::OsStr::new("/run/lampOS/voice/say.sock");
+        for role in ["provider", "second"] {
+            assert_eq!(
+                say_socket_worker_environment(role, Some(absolute)),
+                Some((crate::say::SOCKET_ENVIRONMENT, absolute.to_owned()))
+            );
+            assert_eq!(say_socket_worker_environment(role, None), None);
+            for unfit in ["say.sock", "", "on"] {
+                assert_eq!(
+                    say_socket_worker_environment(role, Some(std::ffi::OsStr::new(unfit))),
+                    None,
+                    "{unfit:?}"
+                );
+            }
+        }
+        for role in [
+            "capture", "speaker", "denoise", "echo", "ring", "camera", "privacy",
+        ] {
+            assert_eq!(
+                say_socket_worker_environment(role, Some(absolute)),
                 None,
                 "{role}"
             );
