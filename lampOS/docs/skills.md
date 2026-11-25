@@ -6543,7 +6543,17 @@ first."). Then, in code (`made_run::asked`):
   stopped, and how long after its start; null when none ran, lamp-tasks
   wasn't reached, or no `--tasks-socket` was given. That skill is marked
   stopped (`task::mark_stopped`), and a getting-ready line for it not yet
-  begun is taken back. Its hand-over's answer, a `do.task`'s or a `run`
+  begun is taken back. Every named stop is also kept as it comes, before
+  lamp-tasks is asked (`task::mark_stop_asked`): a `do.task` or `run` step
+  of that skill that came due before it (or at most 3 s after,
+  `task::STOP_BEFORE_DUE_MS`) and is not sent yet, still waiting in
+  lamp-skills' line behind another skill's task (`LAMP_SKILL_TASK_SURE`)
+  or for its yes, holds no lane in lamp-tasks, so lamp-tasks stops nothing
+  of it; it is never sent, quietly (`task::stop_asked_for`), and the journal
+  says `lamp-skills: skill:SKILL: do.task: not handed over: stopped by the
+  person before its hand-over (#8475)` (`do.run` for a `run` step). A step
+  that comes due later, the person asking again, runs (SubDarren's P2 on
+  #8535). Its hand-over's answer, a `do.task`'s or a `run`
   step's, is then a quiet stop (`task::stopped_by_person`): one that says
   `"stopped": true`, or any answer short of `"ok": true` within
   `task::STOPPED_FOR_MS` (30 s) of the mark. No failed line is said and
