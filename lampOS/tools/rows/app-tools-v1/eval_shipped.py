@@ -200,6 +200,35 @@ def functions(name, title, tools):
         "parameters": t.get("parameters") or {"type": "object", "properties": {}}}} for t in tools]
 
 
+def phrase_words(text):
+    """lamp_msgs::app_tools::phrase_match_words: split on anything not a letter, digit or apostrophe, lowercased,
+    apostrophes dropped."""
+    return [w.lower().replace("'", "") for w in re.split(r"[^\w']|_", text) if w.replace("'", "")]
+
+
+def phrase_in(heard, phrase):
+    """lamp_msgs::phrase_in (#8643): some run of whole heard words spells the phrase's words, letters joined; the
+    run may end in one "s" more."""
+    wanted = "".join(phrase_words(phrase))
+    if not wanted:
+        return False
+    words = phrase_words(heard)
+    for start in range(len(words)):
+        joined = ""
+        for word in words[start:]:
+            joined += word
+            if joined == wanted or (joined.endswith("s") and joined[:-1] == wanted):
+                return True
+            if len(joined) > len(wanted):
+                break
+    return False
+
+
+def listened(phrases, state, lang):
+    """The phrases the app listens for in this state (`running` its session set, any other its idle set)."""
+    return phrases.get("running" if state == "running" else "idle", {}).get(lang, [])
+
+
 def matches(expect, call):
     if expect == "none":
         return call is None
@@ -242,6 +271,8 @@ def main(argv=None):
     parser.add_argument("--tar-sha256", required=True, help="the sha256 of the package tar installed for this run")
     parser.add_argument("--phrasings", default=str(HERE / "phrasings.jsonl"))
     parser.add_argument("--app-dir", default="/opt/lampOS/apps/gym-coach-beta/current")
+    parser.add_argument("--phrases", help="JSON {idle|running: {en|vi: [phrase]}}: the app's listened phrases; a "
+                        "line holding one gets none of the app's tools, as lamp-voice does since #8643")
     args = parser.parse_args(argv)
     if not re.fullmatch(r"[0-9a-f]{64}", args.tar_sha256):
         print("--tar-sha256 is not a sha256 (64 lowercase hex)")
@@ -272,10 +303,17 @@ def main(argv=None):
     print(f"package tar sha256 {args.tar_sha256}; installed {name} {version}; "
           f"functions {', '.join(d['function']['name'] for d in declared)}")
     print(f"phrasings {len(items)} lines, sha256 {sha[:16]}; route {model} at {url} (from {second}); key (set)")
+    phrases = json.loads(Path(args.phrases).read_text(encoding="utf-8")) if args.phrases else {}
+    if phrases:
+        print(f"phrases {hashlib.sha256(Path(args.phrases).read_bytes()).hexdigest()[:16]}: a line holding one "
+              "is asked with none of the app's tools (#8643)")
     stats = {}
     for row in items:
-        system = SYSTEM.format(state=STATES[row["state"]]) + "\n\n" + told
-        call = ask(url, model, key, system, declared, prefix, row["say"])
+        if any(phrase_in(row["say"], p) for p in listened(phrases, row["state"], row["lang"])):
+            system, offered = SYSTEM.format(state=STATES[row["state"]]), []
+        else:
+            system, offered = SYSTEM.format(state=STATES[row["state"]]) + "\n\n" + told, declared
+        call = ask(url, model, key, system, offered, prefix, row["say"]) if offered else None
         ok = any(matches(e, call) for e in [row["expect"]] + list(row.get("also_ok") or []))
         s = stats.setdefault(row["lang"], {"rule_fails": 0, "hits": 0, "others": 0})
         if row.get("rule"):

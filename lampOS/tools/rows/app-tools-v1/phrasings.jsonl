@@ -57,7 +57,7 @@
 {"lang": "vi", "state": "plan", "say": "Tháng này mình tập được bao nhiêu?", "expect": {"tool": "get_progress", "args": {"range": "month"}}}
 {"lang": "vi", "state": "no_plan", "say": "Từ trước tới giờ mình tập tổng cộng bao nhiêu buổi?", "expect": {"tool": "get_progress", "args": {"range": "all"}}}
 {"lang": "vi", "state": "plan", "say": "Tuần này mình tập được bao nhiêu phút?", "expect": {"tool": "get_progress", "args": {"range": "week"}}}
-{"lang": "vi", "state": "plan", "say": "Mình tập liên tục mấy ngày rồi?", "expect": {"tool": "get_progress", "args": {"range": "week"}}}
+{"lang": "vi", "state": "plan", "say": "Mình tập liên tục mấy ngày rồi?", "expect": {"tool": "get_progress", "args": {"range": "week"}}, "also_ok": [{"tool": "get_progress", "args": {"range": "all"}}, {"tool": "get_progress", "args": {"range": "month"}}], "note": "days in a row: streak_days counts every entry, whatever the range"}
 {"lang": "en", "state": "running", "say": "stop workout", "expect": "none", "rule": 3, "note": "stop: the app's exact stop phrase ends it"}
 {"lang": "en", "state": "running", "say": "end workout", "expect": "none", "rule": 3, "note": "stop: the app's exact stop phrase ends it"}
 {"lang": "en", "state": "running", "say": "finish workout", "expect": "none", "rule": 3, "note": "stop: the app's exact stop phrase ends it"}
