@@ -140,7 +140,17 @@ exception after it published an allowed capture lease: its own missing-acquisiti
 expiry becomes `PrivacyUnavailable`, and it keeps reading while publishing
 only denied/unknown privacy leases. A state that holds but carries a stale or
 level-less acquisition is that expiry too (`SwitchFence::accept_riding`,
-#7224), its envelope kept for the order and its acquisition not taken. The deadline is one second from the last
+#7224), its envelope kept for the order and its acquisition not taken. So is
+a state whose only fault is its own age, 50 ms or more when the worker reads
+it (#8466: a worker starved past 50 ms while Controls kept publishing finds
+its queue that old; on train 1198 it ended on the first, and with it the
+voice's session): an open or level-less reading in it is never taken,
+capture's gate closes as for a lapsed reading, and a switch closed meanwhile
+is read closed in the first fresh state. A closed reading in an aged state is
+never passed over: it ends the worker, as before, so a slide closed and opened
+again inside one stall is never missed (the first builder's P2 on #8489). Its publisher, clock, session, order and envelope must all
+hold, as for any state; a state past its 300 ms header life still ends the
+worker, and so does age without the ride or before capture was allowed. The deadline is one second from the last
 accepted acquisition's 50 ms expiry, including the fresh-open gate's 60 ms
 stabilization. A late-publication notice may be ridden inside that deadline;
 publisher loss/replacement, invalid evidence and sequence discontinuity still
