@@ -105,6 +105,8 @@ pub struct TtsCache {
     hears_name: bool,
     /// [`Self::keeping_outage_lines`].
     outage_lines: bool,
+    /// [`Self::keeping_offline_rings`].
+    offline_rings: bool,
     /// One render at a time, so a line asked while it warms is rendered once.
     /// Held while rendering, so a line asked while it warms is rendered
     /// once. It holds the lines that rendered empty or past [`MOST_FRAMES`]:
@@ -135,6 +137,7 @@ impl TtsCache {
             owners: None,
             hears_name: false,
             outage_lines: false,
+            offline_rings: false,
             rendering: Mutex::new(std::collections::HashSet::new()),
         }
     }
@@ -169,6 +172,28 @@ impl TtsCache {
         self
     }
 
+    /// `LAMP_OFFLINE_RINGS=on` (#8632): the offline ring's two lines,
+    /// "Your timer is done." and "You have a reminder.", are warmed in the
+    /// owner's words ([`crate::language::ring_words`]), so a timer or
+    /// reminder due with no link rings from here ([`Self::ring_clip`]).
+    pub fn keeping_offline_rings(mut self, on: bool) -> Self {
+        self.offline_rings = on;
+        self
+    }
+
+    /// The offline ring's line for a timer (`timer`) or a reminder, if it
+    /// is kept: the owner's words, else the English; never rendered here,
+    /// so a ring never waits on the network (#8632). None without
+    /// [`Self::keeping_offline_rings`].
+    pub fn ring_clip(&self, timer: bool) -> Option<Vec<i16>> {
+        if !self.offline_rings {
+            return None;
+        }
+        let words = crate::language::ring_words(self.owners, timer);
+        self.kept(words)
+            .or_else(|| self.kept(crate::language::ring_words(None, timer)))
+    }
+
     /// The lines warmed at start: the owner's fixed lines first, when the
     /// owner's language is not English, then [`WARM`], the English fallback,
     /// and with [`Self::hearing_its_name`] the wake's English on an English
@@ -185,6 +210,14 @@ impl TtsCache {
                         crate::language::TURN_LOST,
                         crate::second_provider::DOWN_LINE,
                     ])
+                    .into_iter()
+                    .flatten(),
+            )
+            .chain(
+                self.offline_rings
+                    .then(|| {
+                        [true, false].map(|timer| crate::language::ring_words(self.owners, timer))
+                    })
                     .into_iter()
                     .flatten(),
             )
@@ -726,7 +759,8 @@ fn made_from_environment() -> Option<Arc<TtsCache>> {
                     .ok()
                     .as_deref()
                     == Some("on"),
-            ),
+            )
+            .keeping_offline_rings(crate::offline_rings::on()),
     );
     let warming = Arc::clone(&cache);
     let _ = std::thread::Builder::new()
@@ -887,6 +921,63 @@ mod tests {
             );
             assert_eq!(cache.owners_kept("Hello."), None, "not a fixed line");
         }
+    }
+
+    /// #8632: the offline ring's lines are warmed only with the switch, in
+    /// the owner's words; off, the lines warmed are exactly as before. A
+    /// ring reads its clip, never renders it: the owner's words, else the
+    /// English, else none.
+    #[test]
+    fn the_offline_rings_lines_are_warmed_only_with_the_switch_and_read_not_rendered() {
+        use crate::language::{RING_REMINDER_DUE, RING_TIMER_DONE, ring_words};
+        let dir = scratch("rings-en");
+        let (english, calls) = counted(&dir, "Rachel");
+        assert_eq!(english.warm_lines(), WARM, "off: as before");
+        english.warm(&[RING_TIMER_DONE]).unwrap();
+        assert_eq!(english.ring_clip(true), None, "off: no ring clip");
+        let (english, calls_on) = counted(&dir, "Rachel");
+        let english = english.keeping_offline_rings(true);
+        assert_eq!(
+            english.warm_lines()[WARM.len()..],
+            [RING_TIMER_DONE, RING_REMINDER_DUE]
+        );
+        assert_eq!(
+            english.ring_clip(true),
+            Some(vec![RING_TIMER_DONE.len() as i16; 2_400])
+        );
+        assert_eq!(english.ring_clip(false), None, "not kept: none");
+        assert_eq!(calls_on.load(Ordering::SeqCst), 0, "a ring never renders");
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        let dir = scratch("rings-vi");
+        let (off, _) = counted(&dir, "Rachel");
+        let off = off.speaking(Some(Language::Vietnamese));
+        let before = off.warm_lines();
+        assert_eq!(
+            before.len(),
+            Language::Vietnamese.fixed_lines().count() + WARM.len()
+        );
+        let (vietnamese, _) = counted(&dir, "Rachel");
+        let vietnamese = vietnamese
+            .speaking(Some(Language::Vietnamese))
+            .keeping_offline_rings(true);
+        let words = ring_words(Some(Language::Vietnamese), false);
+        assert_eq!(vietnamese.warm_lines()[..before.len()], *before);
+        assert_eq!(
+            vietnamese.warm_lines()[before.len()..],
+            [ring_words(Some(Language::Vietnamese), true), words]
+        );
+        // The English only, kept by an English voice before: said, rather
+        // than a timer silent.
+        vietnamese.warm(&[RING_REMINDER_DUE]).unwrap();
+        assert_eq!(
+            vietnamese.ring_clip(false),
+            Some(vec![RING_REMINDER_DUE.len() as i16; 2_400])
+        );
+        vietnamese.warm(&[words]).unwrap();
+        assert_eq!(
+            vietnamese.ring_clip(false),
+            Some(vec![words.len() as i16; 2_400])
+        );
     }
 
     /// migrate-P2: the wake's line is warmed only for a lamp that hears its

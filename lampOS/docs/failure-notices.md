@@ -204,6 +204,19 @@ call on #8235, 22 November). No time limit is added and no words are new:
 A turn still says one failure line at most (#4332). A sound let through still
 gets nothing. Off, every turn is as above, the release's files only.
 
+**A scrap just after the line gets no second one (#8632,
+`LAMP_OFFLINE_RINGS=on`, off unless set).** On lamp-06c1 on 25 Nov, about
+3 s after 6 of 10 offline lines, a 100 to 330 ms scrap (the lamp's own tail
+or the room, `silence_fallback` on a short endpoint) was admitted into the
+still-open conversation and said the internet line again. With the switch, a
+local-only speech turn whose endpoint counted less than
+`offline_rings::SCRAP_NO_LINE_MS` (400 ms) of speech (`speech_ms`), ending
+within `offline_rings::SCRAP_AFTER_LINE_US` (8 s) of the last pass the
+outage's line was heard (`Outage::follow`), gets no line: the breath alone,
+and `offline_scrap_no_line` in the session records. Its length unknown, or
+the line not yet said this outage, it is as above. Such a turn only exists
+offline, so online nothing changes; off, every turn is as above.
+
 **Back online.** When the link is ready again after an outage in which the
 line was said, "I'm back online." (`back_online`) is owed for 60 s
 (`BACK_ONLINE_OWED_US`). It is said once by a turn the lamp takes for itself

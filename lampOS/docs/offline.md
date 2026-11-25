@@ -355,6 +355,31 @@ voice side, silent until the recordings exist.
   outage in which the line was said, when the lamp is free and the room
   quiet, within a minute or not at all.
 
+## Timers and reminders with no link (`LAMP_OFFLINE_RINGS`, #8632)
+
+Off unless exactly `on`. Found on lamp-06c1 on 25 Nov (#8632's row): a
+timer set before a 10-minute cut came due with the link down and was silent
+for 409 s, then rang 5 s after the link came back. A ring is a model turn,
+and its gate needs a ready session.
+
+- **A due timer or reminder rings on time:** with the link down past its
+  5 s grace, from a clip in the speech cache, "Your timer is done." or "You
+  have a reminder." in the owner's language, warmed at start while the
+  internet answers ([schedule.md](schedule.md), "With no link"). Played
+  whole, the item is completed as said: nothing about it is said again
+  when the link returns. With no clip kept, it waits for the link as
+  before.
+- **No second line for a scrap:** a follow-up with under 400 ms of speech,
+  ending within 8 s of the outage's line, gets no line of its own
+  ([failure-notices.md](failure-notices.md)).
+- **Not built:** a reminder said in its own words offline, rendered when it
+  is set. A reminder rings with the generic line.
+- **Limit:** the second route's link reads down only once a turn fails on
+  the network. A ring due in an outage nobody has spoken in is first tried
+  as a model turn; it fails with no audio and is offered again after the
+  consumer's pace, now offline, from its clip, so it may ring a few seconds
+  past due.
+
 ## Smaller mends
 
 - **The updater's name lookup** (`crates/update/src/fetch.rs`,
