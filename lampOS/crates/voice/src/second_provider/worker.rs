@@ -31318,8 +31318,9 @@ mod tests {
         }
         let first = "Hey Lamp, compare the prices of three new laptops in five shops,";
         let tail = "then tell me which one to buy.";
-        let split = |name: &str, opening: &str, cosine: i16| {
-            let mut heeding = judged_saying(name, &[Some(0), Some(0)], Busy, &[opening, tail]);
+        let split_ruled = |name: &str, opening: &str, cosine: i16, ruled: Option<u64>| {
+            let mut heeding =
+                judged_saying(name, &[Some(0), Some(0)], Busy, &[opening, tail], ruled);
             heeding.checking_the_voice_for_the_join(Box::new(Voice(Default::default())));
             for (request, voice) in (1..).zip([100, cosine]) {
                 heeding.hear_for_services(
@@ -31333,6 +31334,8 @@ mod tests {
             }
             heeding.same_speaker(1, 2)
         };
+        let split =
+            |name: &str, opening: &str, cosine: i16| split_ruled(name, opening, cosine, None);
         let called = |cosine: &str| {
             Joined::NoSecond(format!(
                 "the first piece called the lamp, cosine {cosine}, no face in view"
@@ -31352,6 +31355,28 @@ mod tests {
             split("cb4", first, 25),
             Joined::Not("two voices (cosine 0.25)".to_owned()),
             "under 0.30, never"
+        );
+        // A first word `LAMP_NAME_NEAR` ruled not the name ("Hey Man," a
+        // stand-in the text alone takes for the lamp's) did not call the
+        // lamp: no join by the band rule.
+        let stand_in = "Hey Man, compare the prices of three new laptops in five shops,";
+        assert_eq!(
+            split("cb6", stand_in, 49),
+            called("0.49"),
+            "a stand-in, not ruled"
+        );
+        assert_eq!(
+            split_ruled(
+                "cb5",
+                stand_in,
+                49,
+                Some(1)
+            ),
+            Joined::Not(
+                "a likeness between the bars (cosine 0.49), and no one face was seen speaking both; no face in view at request 1's end, no face in view at request 2's, in a busy room"
+                    .to_owned()
+            ),
+            "the first piece ruled not the name"
         );
     }
 
@@ -31475,15 +31500,18 @@ mod tests {
             in_view,
             room,
             &vec!["What's the weather like"; in_view.len()],
+            None,
         )
     }
 
-    /// [`judged_lines`], each line heard as its `words`.
+    /// [`judged_lines`], each line heard as its `words`; `ruled`, the line
+    /// `LAMP_NAME_NEAR` ruled not the name before it was judged.
     fn judged_saying(
         name: &str,
         in_view: &[Option<usize>],
         room: crate::room_told::Room,
         words: &[&str],
+        ruled: Option<u64>,
     ) -> Heeding {
         use lamp_msgs::{Face, Faces};
         // A short root: a Unix socket's address holds 103 bytes.
@@ -31517,6 +31545,9 @@ mod tests {
             None,
         );
         heeding.keeping_line_rooms();
+        if let Some(request) = ruled {
+            heeding.attention.near_not_the_name(request, 0.99);
+        }
         for ((request, faces), heard) in (1..).zip(in_view.iter().copied()).zip(words) {
             match faces {
                 Some(faces) => {
