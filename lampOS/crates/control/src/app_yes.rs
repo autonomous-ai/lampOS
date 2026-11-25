@@ -84,6 +84,14 @@ pub const MOST_OFFERED: usize = 16;
 /// taken here always reaches the voice in time, the bus hop included (the
 /// Reviewer-lead's P3 on #8496).
 pub const CALL_FOR: Duration = Duration::from_millis(4_500);
+/// The `app.answer` frames one app may send in any second (Twelve's P3 2 on
+/// #8496): one call is in flight an app, so ten is far over any fair use,
+/// and a loop cannot keep the apps lock busy.
+pub const ANSWERS_A_SECOND: usize = 10;
+/// What [`Live::begin_call`] says for the call already in flight with the
+/// same id: a bus publisher sent it twice. It is never told to the voice,
+/// whose answer is the first call's (Twelve's P3 3 on #8496).
+pub const ALREADY: &str = "already in flight";
 
 /// Who is asking, by cgroup.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -319,6 +327,9 @@ pub struct Live {
     /// [`crate::app_remember::MOST_A_MINUTE`] in a minute: kept across its
     /// runs, as the panel's minute is. Only a remove forgets it.
     remembered: BTreeMap<String, std::collections::VecDeque<Instant>>,
+    /// Each app's `app.answer` frames in the last second
+    /// ([`Live::may_answer`]).
+    answers: BTreeMap<String, std::collections::VecDeque<Instant>>,
     /// When each app last told a context line (`apps.context`), one a
     /// [`crate::app_context::EVERY`]: kept across its runs. Only a remove
     /// forgets it.
@@ -402,6 +413,27 @@ impl Live {
             && let Some(first) = sent.front()
         {
             return Err(minute - now.saturating_duration_since(*first));
+        }
+        sent.push_back(now);
+        Ok(())
+    }
+
+    /// An app's `app.answer` frame at `now`: `Ok`, or how long until one may
+    /// be ([`ANSWERS_A_SECOND`] in any second). Every frame counts, a bad one
+    /// too, as each takes the apps lock alike.
+    pub fn may_answer(&mut self, name: &str, now: Instant) -> Result<(), Duration> {
+        let second = Duration::from_secs(1);
+        let sent = self.answers.entry(name.to_owned()).or_default();
+        while sent
+            .front()
+            .is_some_and(|at| now.saturating_duration_since(*at) >= second)
+        {
+            sent.pop_front();
+        }
+        if sent.len() >= ANSWERS_A_SECOND
+            && let Some(first) = sent.front()
+        {
+            return Err(second - now.saturating_duration_since(*first));
         }
         sent.push_back(now);
         Ok(())
@@ -558,14 +590,15 @@ impl Live {
 
     /// The voice's tool call `call` is sent to app `name` at `now`, or the
     /// lamp's word for why not: `not running` with no socket up, `busy` with
-    /// another of its calls in flight (one an app).
+    /// another of its calls in flight (one an app), or [`ALREADY`] for this
+    /// very call in flight again, which is no word for the voice.
     pub fn begin_call(&mut self, name: &str, call: &str, now: Instant) -> Result<(), &'static str> {
         self.expire_calls(now);
         if !self.socket(name) {
             return Err("not running");
         }
-        if self.calls.contains_key(name) {
-            return Err("busy");
+        if let Some((held, _)) = self.calls.get(name) {
+            return Err(if held == call { ALREADY } else { "busy" });
         }
         self.calls.insert(name.to_owned(), (call.to_owned(), now));
         Ok(())
@@ -601,16 +634,16 @@ impl Live {
     }
 
     /// The calls past [`CALL_FOR`] at `now`, ended as `timeout` for the
-    /// voice and kept for their app's `app.call.stopped`
-    /// ([`Live::drain_stopped`]): each app and call.
-    pub fn expire_calls(&mut self, now: Instant) -> Vec<(String, String)> {
+    /// voice ([`Live::drain_called`]) and kept for their app's
+    /// `app.call.stopped` ([`Live::drain_stopped`]), which are where every
+    /// path reads them.
+    pub fn expire_calls(&mut self, now: Instant) {
         let late: Vec<String> = self
             .calls
             .iter()
             .filter(|(_, (_, at))| now.saturating_duration_since(*at) >= CALL_FOR)
             .map(|(name, _)| name.clone())
             .collect();
-        let mut ended = Vec::new();
         for name in late {
             if let Some((call, _)) = self.calls.remove(&name) {
                 self.called_out.push(lamp_msgs::AppCalled {
@@ -619,11 +652,9 @@ impl Live {
                     result: None,
                     error: Some("timeout".to_owned()),
                 });
-                self.stopped_out.push((name.clone(), call.clone()));
-                ended.push((name, call));
+                self.stopped_out.push((name, call));
             }
         }
-        ended
     }
 
     /// The calls ended since the last drain, for the voice.
@@ -652,6 +683,7 @@ impl Live {
         self.panel_last.remove(name);
         self.revs.remove(name);
         self.remembered.remove(name);
+        self.answers.remove(name);
         // `context_told` stays for the remove's own `context_ends`, which
         // tells the voice the clear.
         self.context_last.remove(name);

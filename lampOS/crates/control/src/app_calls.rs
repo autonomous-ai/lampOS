@@ -80,6 +80,11 @@ pub fn answer_op(
     if !on {
         return refuse(re, ErrorCode::Off, OFF);
     }
+    if let Err(wait) = live.may_answer(name, now) {
+        let mut error = Error::new(ErrorCode::Rate, "ten answers a second");
+        error.retry_ms = Some(wait.as_millis().max(1) as u64);
+        return crate::protocol::refused(Some(re), &error);
+    }
     let shape = "app.answer takes call and one of result (an object) or error (one line)";
     if frame
         .keys()
@@ -119,6 +124,17 @@ pub fn answer_op(
     };
     let taken = live.answer_call(name, call, answer, now);
     crate::protocol::ok(re, json!({"taken": taken}))
+}
+
+/// A call's end as its journal line says it: `answered`, the lamp's word,
+/// or `the app's error`. Never the result or the app's words, which may be
+/// the person's.
+pub fn outcome(called: &AppCalled) -> &str {
+    match called.error.as_deref() {
+        None => "answered",
+        Some(word) if AppCalled::LAMP_WORDS.contains(&word) => word,
+        Some(_) => "the app's error",
+    }
 }
 
 /// Whether `tools`, read at `read_at`, lists `name` for `app` at `now`.
@@ -213,13 +229,21 @@ pub fn start(bus: &lamp_bus::Bus, shared: Arc<Shared>) {
                                         &call.name,
                                         now,
                                     );
-                                    let sent = shared.send_call(&call, listed, now);
-                                    eprintln!(
-                                        "lamp-control: app {}: call {}: {}",
-                                        call.app,
-                                        call.call,
-                                        sent.err().unwrap_or("sent")
-                                    );
+                                    // A call ended at once has its line
+                                    // where it is told (`tell_called`).
+                                    let said = match shared.send_call(&call, listed, now) {
+                                        Ok(()) => Some("sent"),
+                                        Err(crate::app_yes::ALREADY) => {
+                                            Some("already in flight, passed over")
+                                        }
+                                        Err(_) => None,
+                                    };
+                                    if let Some(said) = said {
+                                        eprintln!(
+                                            "lamp-control: app {}: call {}: {said}",
+                                            call.app, call.call
+                                        );
+                                    }
                                 }
                                 // Unfit but naming its call and app: ended
                                 // at once, not left to the voice's 5 s.
