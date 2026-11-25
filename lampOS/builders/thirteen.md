@@ -31,8 +31,10 @@ they read each other's work and run each other's rows when asked.
     Harness computer that has it, or the lamp says it isn't available;
   - a computer plus an agent goes through Harness.
 - **What the lamp says while a handed-over task waits** (#8445).
-- **lamp-update's own switch:** a new lamp-update confirms itself only on a
-  signed manifest it parsed (#8509, for #8472).
+- **What it built and still carries in lamp-update:** a new lamp-update
+  confirms itself only on a signed manifest it parsed (#8509). New OTA work
+  goes to Migrate, who leads it with Fifth as backup (the lead's rule in
+  #8583).
 - **READs addressed to Thirteen:** READ ASKs, restates and second reads,
   each with `READ-OK <full sha>` on its first line.
 
@@ -48,9 +50,9 @@ they read each other's work and run each other's rows when asked.
 - `lampOS/crates/cloud/`: `hermes_llm.rs` and `hermes_llm/`.
 - `lampOS/crates/update/`: Hermes's install and gateway
   (`hermes_gateway.rs`, `hermes_gateway/`, `hermes_install.rs`,
-  `writer_unit.rs`) and lamp-update's own switch (`own.rs`, `round.rs`,
-  `manifest.rs`, `tests/round.rs`). The OpenClaw gateway keeper there is
-  SubDarren's.
+  `writer_unit.rs`), and the confirm rule it carries from #8509 (`own.rs`,
+  `round.rs`, `manifest.rs`, `tests/round.rs`). Other OTA work there is
+  Migrate's, and the OpenClaw gateway keeper is SubDarren's.
 - `lampOS/crates/voice/`: `agent_tasks.rs`, and `hand_wait.rs` once #8510 lands.
 - `lampOS/deploy/product/`: `lamp-tasks.service`, `settings/update.env`
   and its `README.md`, where its switches are.
