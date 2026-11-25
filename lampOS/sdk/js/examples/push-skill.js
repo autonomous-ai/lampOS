@@ -4,6 +4,10 @@
 //   node push-skill.js path/to/my-skill
 import { Lamp } from 'lampos';
 
+if (process.argv.length !== 3) {
+  console.error('usage: node push-skill.js path/to/my-skill');
+  process.exit(2);
+}
 const lamp = await Lamp.connect();
 const skill = await lamp.pushSkill(process.argv[2]);
 if (skill.held) console.log(`${skill.name} ${skill.version} waits for the owner's yes: ${skill.held}`);

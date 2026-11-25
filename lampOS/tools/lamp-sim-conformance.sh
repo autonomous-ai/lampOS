@@ -10,6 +10,8 @@
 #   sdk/js's dependencies (npm install there).
 set -u
 BIN=${1:?usage: lamp-sim-conformance.sh BIN_DIR}
+# Absolute: the scripts change folder, and a relative BIN_DIR would then point nowhere.
+BIN=$(cd -- "$BIN" 2>/dev/null >/dev/null && pwd) || { echo "lamp-sim-conformance.sh: no such folder: $1" >&2; exit 2; }
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 # A free port from the kernel unless LAMP_SIM_CONFORMANCE_PORT names one, so two
 # runs on one machine do not collide.

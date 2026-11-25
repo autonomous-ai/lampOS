@@ -22,4 +22,6 @@ async def main(folder: str):
             print(f"  {kept['name']} {kept['version']}{'' if kept['on'] else ' (off)'}")
 
 
+if len(sys.argv) != 2:
+    sys.exit("usage: python push_skill.py path/to/my-skill")
 asyncio.run(main(sys.argv[1]))

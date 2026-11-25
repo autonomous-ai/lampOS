@@ -118,6 +118,7 @@ one, the virtual desktop lamp, or the SDK's own fake.
 node conformance/conformance.js            # the paired lamp (LAMPOS_HOME)
 node conformance/conformance.js --fake     # the SDK's fake
 node conformance/conformance.js --compare  # the paired lamp against the fake; exit 1 if a step differs
+# the first and third need a paired lamp (LAMPOS_HOME); without one they say so and exit 2
 ```
 
 Against a real lamp the script acts: `say hello` speaks aloud, `gesture nod` and the
