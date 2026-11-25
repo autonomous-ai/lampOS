@@ -101,6 +101,25 @@ pub fn follow_ups_on() -> bool {
     std::env::var(FOLLOW_UPS).ok().as_deref() == Some("on")
 }
 
+/// Where the second route's worker reads `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER`:
+/// `on` only. With [`FOLLOW_UPS`], a line begun over the lamp's own answer
+/// takes no follow-up pass ([`Line::follow_ups`] is off for it), and it is
+/// judged as it was before `LAMP_FOLLOW_UPS`. The product owner's rule 2 of
+/// 25 Nov 2026 is for follow-ups after the lamp's answer. A line said over
+/// the answer gets no voice print (the worker prints only lines begun with
+/// the lamp quiet), so the window could never tell another voice there. On
+/// lamp-74ff on 26 Nov, from 01:55 to 02:05, October's two-person battery
+/// let 41 lines of two people's talk over the lamp's answers out as
+/// follow-ups, and 40 were answered. Their talk was left alone 11 times in
+/// 29, against 74.7% in October.
+pub const FOLLOW_UPS_AFTER_THE_ANSWER: &str = "LAMP_FOLLOW_UPS_AFTER_THE_ANSWER";
+
+/// Whether `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER` is on in this process's
+/// environment.
+pub fn follow_ups_after_the_answer_on() -> bool {
+    std::env::var(FOLLOW_UPS_AFTER_THE_ANSWER).ok().as_deref() == Some("on")
+}
+
 /// A line of this many words or fewer is a short line.
 pub const SHORT_WORDS: usize = 2;
 
