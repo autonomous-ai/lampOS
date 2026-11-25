@@ -75,7 +75,7 @@ RuntimeDirectoryPreserve=yes
 # builder's DEFAULT-ON (#8367); its rules are its row in docs/switches.md and docs/own-keys.md.
 # The keys helper's folder (root's, 0700), loaded whole: each file is the credential own_<file> in
 # $CREDENTIALS_DIRECTORY. ConfigurationDirectory makes it if missing (a new or reset lamp), so an empty one is no
-# credential, never a failed start. Never LAMP_OWN_ELEVENLABS_URL here: test lamps only.
+# credential, never a failed start. Never the test lamps' own-voice address here.
 Environment=LAMP_OWN_KEYS=on
 ConfigurationDirectory=lampOS/voice/own
 ConfigurationDirectoryMode=0700
