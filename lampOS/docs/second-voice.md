@@ -5928,7 +5928,12 @@ after a take-over, but now for every turn:
     (0.95) or more that counts for the line was said, from 1.5 s before
     the hearing began to 0.3 s after (`worker::near_at_a_hearing`). The
     line is then judged as one with no name. A word taken as the name, the
-    name in its words, and a line with no near hearing are as before.
+    name in its words, and a line with no near hearing are as before. A
+    greeting set off as the first word ("Hello? …",
+    `attention::is_greeting`) is no word in the name's place: nothing is
+    ruled, and the hearing is weighed by its signs (the P0 of 25 Nov:
+    lamp-74ff's speech to text wrote "Hey Lamp" so, lamp-name near at
+    1.00, and in a busy room the ruling held the call).
     **A sure hearing at the start** (the first builder's rulings at 14:29
     and 14:47 on #8092: "a pet answers a clear call even when it couldn't
     spell the word"): the engine tells the rule the near score with the
@@ -6000,7 +6005,7 @@ after a take-over, but now for every turn:
     unasked, and that opened the window the room's next lines were
     answered in (shapes 6 and 7). The first builder's two rules at 17:36 on
     #8114, under one switch:
-    - **A hearing under `attention::SURE_SCORE` (0.999)**, only in the
+    - **A hearing under `attention::NEAR_SCORE` (0.95)**, only in the
       room's sound, counts only with a face turned to the lamp or the
       line's words calling it (`attention::called`, or `called_by_name`
       with `LAMP_NAME_IN_PASSING=ignored`), busy room or not; its place at
@@ -6010,10 +6015,17 @@ after a take-over, but now for every turn:
       room's sound under a sure hearing (began N ms into the line), counts
       for nothing: no face is turned to the lamp and its words don't call
       it; its start or closeness is not enough; the model is not told it
-      was heard (LAMP_NAME_FACE_OR_WORDS, #8136)`. A sure hearing is
-      weighed as before. Known cost: a real call heard under 0.999 whose
-      words speech to text didn't write as the name, with no face turned,
-      is not answered.
+      was heard (LAMP_NAME_FACE_OR_WORDS, #8136)`. A hearing of 0.95 or
+      more is weighed by its second signs as before. The bar was
+      `attention::SURE_SCORE` (0.999) until the P0 of 25 Nov: plain
+      "Hey Lamp, …" calls whose words came back without the name, with no
+      face turned, were held at 0.980 to 0.997 on lamp-74ff (stable 16031)
+      and at 0.997 on lamp-52e6. A hearing drained before the line began
+      is weighed at its own score (`Attention::began_at_led`). Known cost:
+      a real call heard under 0.95 whose words speech to text didn't
+      write as the name, with no face turned, is not answered; a false
+      hearing of 0.95 to 0.998 at a line's start, or with a tied rise,
+      counts again.
     - **A hearing the faint floor turned away, in a request with no
       words**, owes no second look (`SecondLook::holding_a_faint_wordless_call`):
       the coordinator marks a hearing over speech blocks the floor turned

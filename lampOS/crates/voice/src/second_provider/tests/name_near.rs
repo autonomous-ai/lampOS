@@ -462,6 +462,29 @@ async fn told_not_the_name(heard: &str, near: Option<f32>, turned: bool) -> Vec<
     told.lock().unwrap().clone()
 }
 
+/// The P0 of 25 Nov (lamp-74ff, stable 16031, 16:48:51 and 17:03:40):
+/// "Hey Lamp" written as a greeting set off, lamp-name near at 1.00 by the
+/// line's start, was ruled not the name, and in a busy room that held the
+/// call. A greeting is no word in the name's place: nothing is ruled, and
+/// the hearing is weighed by its signs. Another first word still is.
+#[tokio::test]
+async fn a_greeting_set_off_is_not_ruled_not_the_name() {
+    for heard in [
+        "Hello? What is the capital of France?",
+        "Hello, can you hear me?",
+        "Oh. What time is it?",
+    ] {
+        assert!(
+            told_not_the_name(heard, Some(1.0), false).await.is_empty(),
+            "{heard}"
+        );
+    }
+    assert_eq!(
+        told_not_the_name("Yeah? What time is it?", Some(1.0), false).await,
+        [(1, 1.0)]
+    );
+}
+
 /// #8092 (lamp-74ff, build 14967, 20 Nov): request 4's and request 5's
 /// lines, lamp-name near at 0.86 and 1.00 by the line's start, their first
 /// word, set off, not the name: `LAMP_NAME_NEAR` ruled each not the name,
