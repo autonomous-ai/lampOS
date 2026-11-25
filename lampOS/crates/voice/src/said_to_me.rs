@@ -300,6 +300,13 @@ pub struct Line<'a> {
     /// (`Heeding::began_over`); a line begun over only the lamp's wait
     /// sound is not one (#8205).
     pub cut_in: bool,
+    /// With [`FOLLOW_UPS_AFTER_THE_ANSWER`], a [`Self::cut_in`] line with no
+    /// look takes no [`Said::CutInNoLook`]: it is held unless it answers the
+    /// lamp's waiting question. On lamp-74ff on 26 Nov, with the switch's
+    /// first head, 19 lines of two people's talk over the lamp's answers
+    /// still came through as that one look-free cut-in, each named call
+    /// giving it back.
+    pub cut_in_held: bool,
     /// `LAMP_FOLLOW_UPS=on` ([`FOLLOW_UPS`]): in the window, only
     /// [`Self::another_voice`] holds the line.
     pub follow_ups: bool,
@@ -443,7 +450,7 @@ pub fn judge(line: Line<'_>) -> Said {
                 Said::Held(Held::NoLook)
             } else if line.lamp_asked && line.question_waits {
                 Said::AnswerNoLook
-            } else if line.cut_in {
+            } else if line.cut_in && !line.cut_in_held {
                 Said::CutInNoLook
             } else {
                 Said::Held(Held::NoLook)
