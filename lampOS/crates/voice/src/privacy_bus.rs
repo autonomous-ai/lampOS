@@ -622,7 +622,7 @@ fn authority(
     guard: &mut BoundaryGuard,
     lapse: &mut DeniedLapse,
 ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
-    for _ in 0..16 {
+    for _ in 0..AUTHORITY_DRAIN_MOST {
         match channels.control.receive()? {
             Some(Control::Stop) => return Ok(false),
             Some(Control::Authority { snapshot }) => {
@@ -656,6 +656,10 @@ fn authority(
     }
     Err(invalid("privacy authority drain overflow").into())
 }
+
+/// The most control messages one drain reads before it says the queue
+/// overflowed (#8466).
+pub(crate) const AUTHORITY_DRAIN_MOST: usize = 16;
 
 /// The longest a lapsed Denied-only authority is ridden (#4332): capture's
 /// own bound on a closed microphone, as the speaker's lapse.
@@ -1656,6 +1660,215 @@ pub(crate) mod tests {
         drop(_input);
         let _ = coordinator.shutdown();
         let _ = std::fs::remove_dir(&directory.path);
+    }
+
+    /// `count` renewals from `controller`, the first at `from_us + every_us`
+    /// and each `every_us` after, as the conversation loop issues one every
+    /// [`crate::coordinator::AUTHORITY_RENEW_US`] (#8466).
+    fn renewals(
+        controller: &mut lamp_turn_owner::Controller,
+        from_us: u64,
+        every_us: u64,
+        count: u64,
+    ) -> Vec<Snapshot> {
+        (1..=count)
+            .map(|k| {
+                controller
+                    .snapshot(MonoTime::from_micros(from_us + every_us * k))
+                    .unwrap()
+            })
+            .collect()
+    }
+
+    /// Queues each of `snapshots` on the worker's control queue, in order,
+    /// as the voice does while the worker alone is stalled; a full socket
+    /// fails the test, saying how many it took.
+    fn queue(coordinator: &mut crate::process::Worker, snapshots: &[Snapshot]) {
+        for (sent, snapshot) in snapshots.iter().enumerate() {
+            coordinator
+                .channels
+                .control
+                .send(Control::Authority {
+                    snapshot: *snapshot,
+                })
+                .unwrap_or_else(|error| panic!("the queue took only {sent}: {error}"));
+        }
+    }
+
+    /// The #8608 row on lamp-06c1, 25 Nov (#8466): a 300 ms `SIGSTOP` of
+    /// the privacy worker alone, the voice renewing every 20 ms, left more
+    /// than 16 renewals queued, and the drain's 16 ended the worker, exit 1,
+    /// and the voice with it. The whole queue is read now, in order: the
+    /// lapsed ones ridden, the current ones installed, the newest held, and
+    /// the next look re-arms.
+    #[test]
+    fn a_stall_of_renewals_past_sixteen_is_drained_and_the_newest_installed() {
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let (mut coordinator, mut worker, _input) =
+            crate::process::Worker::cooperative_fixture(&directory.path, "privacy");
+        let stalled = lamp_ipc::monotonic_us().saturating_sub(805_000);
+        let (mut granting, boot) = controller(stalled, Permission::Allowed, Permission::Allowed);
+        let mut guard = BoundaryGuard::new(boot, MonoTime::from_micros(stalled));
+        let mut lapse = DeniedLapse::riding_granting(true);
+        let held = granting.snapshot(MonoTime::from_micros(stalled)).unwrap();
+        guard.install(MonoTime::from_micros(stalled), held).unwrap();
+        let queued = renewals(&mut granting, stalled, 20_000, 40);
+        queue(&mut coordinator, &queued);
+        assert!(authority(&mut worker, &mut guard, &mut lapse).unwrap());
+        assert_eq!(guard.state(), queued.last().copied(), "the newest is held");
+        assert_eq!(lapse.since_us, Some(held.expires_at().as_micros()));
+        assert!(matches!(
+            lapse
+                .look(guard.state(), stalled, lamp_ipc::monotonic_us())
+                .unwrap(),
+            Held::Rearmed(ms) if ms >= 300
+        ));
+        let _ = coordinator.channels.control.send(Control::Stop);
+        drop(_input);
+        let _ = coordinator.shutdown();
+        let _ = std::fs::remove_dir(&directory.path);
+    }
+
+    /// Past [`AUTHORITY_DRAIN_MOST`] the queue is the switch unreadable
+    /// (#8466): a clean fault, the microphones closed and a fresh worker,
+    /// never the worker's exit 1 that ended the voice. Exactly that many
+    /// still drain.
+    #[test]
+    fn a_drain_past_its_bound_is_the_switch_unreadable_never_a_crash() {
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let (mut coordinator, mut worker, _input) =
+            crate::process::Worker::cooperative_fixture(&directory.path, "privacy");
+        let began = lamp_ipc::monotonic_us().saturating_sub(5_000);
+        let (mut denied, boot) = controller(began, Permission::Denied, Permission::Denied);
+        let mut guard = BoundaryGuard::new(boot, MonoTime::from_micros(began));
+        let mut lapse = DeniedLapse::default();
+        let over = AUTHORITY_DRAIN_MOST as u64 + 1;
+        let queued = renewals(&mut denied, began, 1, over);
+        queue(&mut coordinator, &queued);
+        let error = authority(&mut worker, &mut guard, &mut lapse).unwrap_err();
+        assert!(error.is::<Unreadable>(), "not a clean fault: {error}");
+        assert_eq!(error.to_string(), "privacy authority drain overflow");
+        let queued = renewals(&mut denied, began + over, 1, AUTHORITY_DRAIN_MOST as u64);
+        queue(&mut coordinator, &queued);
+        assert!(authority(&mut worker, &mut guard, &mut lapse).unwrap());
+        assert_eq!(guard.state(), queued.last().copied());
+        let _ = coordinator.channels.control.send(Control::Stop);
+        drop(_input);
+        let _ = coordinator.shutdown();
+        let _ = std::fs::remove_dir(&directory.path);
+    }
+
+    /// A mute the voice queued behind a stall of renewals is installed
+    /// before any lease (#8466): the drain reads to the end, so an older
+    /// Allowed is never what the worker publishes from, and it grants
+    /// nothing.
+    #[test]
+    fn a_revocation_queued_behind_a_stall_of_renewals_is_installed_before_any_lease() {
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let (mut coordinator, mut worker, _input) =
+            crate::process::Worker::cooperative_fixture(&directory.path, "privacy");
+        let stalled = lamp_ipc::monotonic_us().saturating_sub(810_000);
+        let (mut granting, boot) = controller(stalled, Permission::Allowed, Permission::Denied);
+        let mut guard = BoundaryGuard::new(boot, MonoTime::from_micros(stalled));
+        let mut lapse = DeniedLapse::riding_granting(true);
+        let held = granting.snapshot(MonoTime::from_micros(stalled)).unwrap();
+        guard.install(MonoTime::from_micros(stalled), held).unwrap();
+        let mut queued = renewals(&mut granting, stalled, 20_000, 40);
+        let muted_at = MonoTime::from_micros(stalled + 805_000);
+        granting
+            .set_microphone_permission(muted_at, Permission::Denied)
+            .unwrap();
+        let mute = granting.snapshot(muted_at).unwrap();
+        assert_eq!(mute.microphone_permission(), Permission::Denied);
+        queued.push(mute);
+        queue(&mut coordinator, &queued);
+        assert!(authority(&mut worker, &mut guard, &mut lapse).unwrap());
+        let state = guard.state().unwrap();
+        assert_eq!(state, mute, "the mute is held, not an Allowed before it");
+        assert_eq!(state.microphone_permission(), Permission::Denied);
+        let now = lamp_ipc::monotonic_us();
+        let mut gate = CaptureLeaseGate::default();
+        let observed = Observation::NoSlide(read_open(&mut gate, now - 100_000, now));
+        assert!(
+            !grants(&gate, state, Some(&observed), true, now),
+            "the microphones opened behind a queued mute"
+        );
+        let _ = coordinator.channels.control.send(Control::Stop);
+        drop(_input);
+        let _ = coordinator.shutdown();
+        let _ = std::fs::remove_dir(&directory.path);
+    }
+
+    /// A Stop the voice queued behind a stall of renewals, when it ended the
+    /// conversation in the stall, still stops the worker (#8466): read past
+    /// the renewals, not an overflow exit.
+    #[test]
+    fn a_stop_queued_behind_a_stall_of_renewals_still_stops() {
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let (mut coordinator, mut worker, _input) =
+            crate::process::Worker::cooperative_fixture(&directory.path, "privacy");
+        let stalled = lamp_ipc::monotonic_us().saturating_sub(805_000);
+        let (mut granting, boot) = controller(stalled, Permission::Allowed, Permission::Allowed);
+        let mut guard = BoundaryGuard::new(boot, MonoTime::from_micros(stalled));
+        let mut lapse = DeniedLapse::riding_granting(true);
+        let held = granting.snapshot(MonoTime::from_micros(stalled)).unwrap();
+        guard.install(MonoTime::from_micros(stalled), held).unwrap();
+        queue(
+            &mut coordinator,
+            &renewals(&mut granting, stalled, 20_000, 40),
+        );
+        coordinator.channels.control.send(Control::Stop).unwrap();
+        assert!(!authority(&mut worker, &mut guard, &mut lapse).unwrap());
+        drop(_input);
+        let _ = coordinator.shutdown();
+        let _ = std::fs::remove_dir(&directory.path);
+    }
+
+    /// Reading the whole queue does not weaken the guard's latch (#8466): a
+    /// snapshot that goes back a revision, deep in a drained queue, still
+    /// ends the worker, as one near the front always did.
+    #[test]
+    fn a_regressing_snapshot_deep_in_a_drained_queue_still_ends_the_worker() {
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let (mut coordinator, mut worker, _input) =
+            crate::process::Worker::cooperative_fixture(&directory.path, "privacy");
+        let began = lamp_ipc::monotonic_us().saturating_sub(70_000);
+        let (mut granting, boot) = controller(began, Permission::Allowed, Permission::Denied);
+        let mut guard = BoundaryGuard::new(boot, MonoTime::from_micros(began));
+        let mut lapse = DeniedLapse::riding_granting(true);
+        let mut queued = renewals(&mut granting, began, 2_000, 30);
+        queued[24] = queued[10];
+        queue(&mut coordinator, &queued);
+        let error = authority(&mut worker, &mut guard, &mut lapse).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "authority revision is not newer than the installed revision"
+        );
+        assert_eq!(guard.state(), Some(queued[23]), "nothing past it installed");
+        let _ = coordinator.channels.control.send(Control::Stop);
+        drop(_input);
+        let _ = coordinator.shutdown();
+        let _ = std::fs::remove_dir(&directory.path);
+    }
+
+    /// The drain's bound covers the longest ride (#8466): a worker stalled
+    /// alone through a lease and the whole lapse ride finds about one
+    /// renewal per [`crate::coordinator::AUTHORITY_RENEW_US`] queued, and
+    /// the bound holds twice that, room for the event publishes on top.
+    #[test]
+    fn the_authority_drain_covers_the_longest_ridden_lapse() {
+        use crate::coordinator::AUTHORITY_RENEW_US;
+        use lamp_turn_owner::MAX_AUTHORITY_LEASE_US;
+        assert_eq!(AUTHORITY_RENEW_US, 20_000);
+        assert!(
+            AUTHORITY_DRAIN_MOST as u64 * AUTHORITY_RENEW_US
+                >= 2 * (DENIED_LAPSE_MOST_US + MAX_AUTHORITY_LEASE_US),
+            "the drain of {AUTHORITY_DRAIN_MOST} is shorter than the ride"
+        );
+        assert_eq!(
+            AUTHORITY_DRAIN_MOST as u64,
+            4 * (DENIED_LAPSE_MOST_US + MAX_AUTHORITY_LEASE_US).div_ceil(AUTHORITY_RENEW_US)
+        );
     }
 
     /// A gate read open, steady past the gate's 60 ms, from `from_us` to

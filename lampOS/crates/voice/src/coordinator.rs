@@ -136,6 +136,11 @@ const UNIT_STOP_TIMEOUT: Duration = Duration::from_secs(5);
 /// well inside the unit's 5 s `TimeoutStopSec`.
 const ENDPOINT_EXIT_WAIT: Duration = Duration::from_millis(1_500);
 const INPUT_LEASE_US: u64 = 100_000;
+/// How often the conversation loop renews every worker's authority when
+/// nothing else has published one: each renewal is one `Control::Authority`
+/// on each worker's control queue, so a worker stalled alone finds one
+/// queued every this many us, event publishes on top (#8466).
+pub(crate) const AUTHORITY_RENEW_US: u64 = 20_000;
 
 /// Only explicitly scoped unit-test scenarios replace this clock. Child
 /// startup/shutdown deadlines continue using Instant::now directly.
@@ -12310,7 +12315,7 @@ fn conversation_with_gate_inner(
         if let Some(event) = endpoint_watch.observe(&detector, monitor) {
             record(trace, event)?;
         }
-        if clock.saturating_sub(last_publish) >= 20_000 {
+        if clock.saturating_sub(last_publish) >= AUTHORITY_RENEW_US {
             snapshot = owner.snapshot(now())?;
             rig.publish(snapshot)?;
             last_publish = clock;
