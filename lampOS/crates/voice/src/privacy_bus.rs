@@ -2857,6 +2857,16 @@ pub(crate) mod tests {
                 now
             };
             stamped = at;
+            // A lapse's level is published only in a state already past the
+            // fresh window, never in one the worker could read fresh: on a
+            // slow runner a fresh closed reading took the plain close and
+            // never the aged one (El's HOLD on #8489, ARM64). Until then the
+            // state carries no level, as the open lapse does.
+            let muted = if aging && phase.0 == 2 && now.saturating_sub(at) < PRIVACY_FRESH_US {
+                None
+            } else {
+                muted
+            };
             // A lapse's own level is read when its state was queued, so it
             // ages with it.
             if muted.is_some() {
