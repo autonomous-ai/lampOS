@@ -1091,3 +1091,76 @@ fn the_read_back_after_a_start_answered_is_said_and_the_start_runs_once() {
     assert_eq!(went.said, off.said);
     assert!(!went.said.is_empty() && !went.said.concat().contains(COULD_NOT));
 }
+
+const STORY: &str = "Lamp, tell me a short story about a cat.";
+const STORY_START: &str = "Once upon a time, a cat named Mo lived by the sea.";
+const STORY_WEATHER: &str = "It's sunny in Da Nang today.";
+
+/// #8615 (the lead's choice (d'), 25 Nov 17:50): on lamp-52e6 (kit-10824,
+/// journal-06) "tell me a short story about a cat" said its first piece,
+/// then held a weather figure in the story and asked again with `weather`
+/// required: 3.3 s of silence inside the story. On a line that asked no
+/// live fact, once words are out, a figure with no number in it ("sunny
+/// in Da Nang") is said as it is, with no ask again and no extra round;
+/// one with a number ("20°C") is held and asked again, and so is a line
+/// that asked the weather, as before.
+#[test]
+fn a_numberless_figure_in_a_line_that_asked_none_is_said_once_words_are_out() {
+    let went = lines(
+        true,
+        false,
+        vec![(
+            STORY,
+            vec![
+                saying(&format!("{STORY_START} {STORY_WEATHER}")),
+                calling("weather"),
+                saying("It's 27 degrees with light rain in Da Nang."),
+            ],
+        )],
+    );
+    assert_eq!(
+        went.said,
+        said(&[STORY_START, &format!(" {STORY_WEATHER}")]),
+        "{went:?}"
+    );
+    assert_eq!((went.asked, went.ran.len()), (1, 0), "{went:?}");
+    assert!(went.notes.is_empty(), "{went:?}");
+    // The same shape with a number: held and asked again, as before.
+    let went = lines(
+        true,
+        false,
+        vec![(
+            STORY,
+            vec![
+                saying(&format!("{STORY_START} It's 20°C in Da Nang today.")),
+                calling("weather"),
+                saying("It's 27 degrees with light rain in Da Nang."),
+            ],
+        )],
+    );
+    assert_eq!(went.asked, 3, "{went:?}");
+    assert_eq!(went.ran, ["weather"]);
+    assert!(
+        went.said.iter().all(|said| !said.contains("20°C")),
+        "{went:?}"
+    );
+    // Asked for the weather: held and asked again, as before.
+    let went = lines(
+        true,
+        false,
+        vec![(
+            "Lamp, what's the weather in Da Nang today?",
+            vec![
+                saying(&format!("Sure. {STORY_WEATHER}")),
+                calling("weather"),
+                saying("It's 27 degrees with light rain in Da Nang."),
+            ],
+        )],
+    );
+    assert_eq!(went.asked, 3, "{went:?}");
+    assert_eq!(went.ran, ["weather"]);
+    assert!(
+        went.said.iter().all(|said| !said.contains("sunny")),
+        "{went:?}"
+    );
+}
