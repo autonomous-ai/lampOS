@@ -12490,8 +12490,11 @@ impl Heeding {
             }),
             looks_needed,
             look_free_answered: self.look_free_used,
-            // Begun over the lamp's own answer, which it cut (#8205).
+            // Begun over the lamp's own answer, which it cut (#8205). With
+            // `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER`, no look-free cut-in either:
+            // two people's talk over the answer came through as it.
             cut_in: self.began_over == Some(request),
+            cut_in_held: self.over_the_answer_no_follow_up(request),
             asked_looks: self.asked_looks,
             first_after_asked: self.first_after_asked(said.0, signs.continues_from),
             // `LAMP_FOLLOW_UPS`: in the window only another voice than the
@@ -31111,10 +31114,11 @@ mod tests {
     /// that night, October's two-person battery let 41 lines said over the
     /// lamp's answers out as follow-ups: a line begun over the lamp's voice
     /// gets no print, so the window could never tell another voice there.
-    /// With the switch such a line is judged as before `LAMP_FOLLOW_UPS`:
-    /// with no look, the first is let out once as a cut-in (#8205) and the
-    /// next is held. A line begun after the answer is still a follow-up,
-    /// looking or not. Without the switch every such line is a follow-up.
+    /// With the switch such a line takes no follow-up pass, and with no look
+    /// it is held, the first too: no look-free cut-in (#8205), which let 19
+    /// such lines through on that lamp, each named call giving it back. A
+    /// line begun after the answer is still a follow-up, looking or not.
+    /// Without the switch every such line is a follow-up.
     #[test]
     fn with_follow_ups_after_the_answer_a_line_over_the_answer_is_judged_as_before() {
         let _one = crate::provider_worker::tests::one_thread();
@@ -31154,8 +31158,8 @@ mod tests {
             "LAMP_FOLLOW_UPS alone: over the answer, a follow-up"
         );
         assert!(
-            answered(true, true, false),
-            "over the answer, the first with no look: let out once as a cut-in"
+            !answered(true, true, false),
+            "over the answer, the first with no look: held, no look-free cut-in"
         );
         assert!(
             !answered(true, true, true),

@@ -6716,8 +6716,9 @@ after a take-over, but now for every turn:
   two-turn TV exchange). With `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER=on` (the
   product owner, 26 Nov 2026), a line begun over the lamp's own answer
   takes no follow-up pass and is judged as before
-  (`Heeding::over_the_answer_no_follow_up`). With no look, the first such
-  line is let out once as a cut-in (#8205) and the next is held. Such a line
+  (`Heeding::over_the_answer_no_follow_up`). With no look it is held, the
+  first such line too (no look-free cut-in, `said_to_me::Line::cut_in_held`),
+  unless it answers the lamp's waiting question. Such a line
   has no voice print, so the window could never call it another voice. On
   lamp-74ff on 26 Nov, October's two-person battery let 41 lines of two
   people's talk over the lamp's answers through as follow-ups, and 40 were
