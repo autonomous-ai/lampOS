@@ -1278,8 +1278,8 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         // turn may be a no or unclear, never only a yes; a change of a
         // voice make under way or waiting for its yes (#7912) is its own
         // answer, never a no, given with `request`, the whole ask as it is
-        // now (the notes say so; no argument of its own, as the tool's JSON
-        // is held to `lamp_gemini::MAX_TOOL_JSON_BYTES`).
+        // now (the notes say so; no argument of its own, as the product's
+        // parameters are held to [`PRODUCT_MOST_PARAMETERS_BYTES`]).
         let answers: Vec<&str> = crate::skill_write_yes::ANSWERS
             .into_iter()
             .chain([CHANGE])
@@ -12648,6 +12648,14 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(
             request.ends_with(crate::skill_recurring::REQUEST_TOLD),
             "{request}"
+        );
+        // A voice make's change (#7912) is among the answers, held within
+        // the same bytes (Twelve's P3 on #7936 at 2f5400c8c3).
+        assert!(
+            parameters["properties"][crate::skill_write_yes::ANSWER]["enum"]
+                .as_array()
+                .is_some_and(|answers| answers.contains(&json!(CHANGE))),
+            "{parameters}"
         );
         assert!(all.description.len() <= 1_024, "{}", all.description.len());
         let bytes = parameters.to_string().len();
