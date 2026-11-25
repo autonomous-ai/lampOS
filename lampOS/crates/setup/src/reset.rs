@@ -24,10 +24,15 @@ use std::{
     process::Command,
 };
 
+mod engine_homes;
+mod logs;
 pub(crate) mod query;
 #[cfg(test)]
 mod skill_reset_tests;
 mod skill_staging;
+
+pub use engine_homes::{ENGINE_HOMES, forget_engine_homes, plan_engine_homes};
+pub use logs::{COPY_JOURNAL, LOG_FOLDERS, LogStep, TEXT_LOGS, forget_logs, plan_logs};
 
 /// The product plan's journal, read by Wi-Fi's restore of an old network
 /// ([`wifi_restore_allowed`]).
@@ -318,6 +323,12 @@ pub trait Effects {
     /// Hermes's and OpenClaw's per-person files removed and both programs
     /// kept, [`forget_agents`] in [`AGENT_FOLDERS`] (#6343); how many.
     fn forget_agents(&mut self) -> io::Result<usize>;
+    /// Every other engine's home emptied, [`forget_engine_homes`] in
+    /// [`ENGINE_HOMES`] (#7771); how many.
+    fn forget_engine_homes(&mut self) -> io::Result<usize>;
+    /// The text logs and the eMMC log copy emptied, files only,
+    /// [`forget_logs`] (#7771); how many.
+    fn forget_logs(&mut self) -> io::Result<usize>;
     /// [`AGENT_USER`]'s own systemd manager, `user@<uid>.service`, its uid
     /// read from [`PASSWD`] at the reset ([`agent_manager_unit`]); none when
     /// there is no such user or the file can't be read (#6343).
@@ -1397,6 +1408,12 @@ impl Effects for System {
     fn forget_agents(&mut self) -> io::Result<usize> {
         forget_agents(Path::new("/"))
     }
+    fn forget_engine_homes(&mut self) -> io::Result<usize> {
+        forget_engine_homes(Path::new("/"))
+    }
+    fn forget_logs(&mut self) -> io::Result<usize> {
+        forget_logs(Path::new("/"))
+    }
 }
 
 /// `argv` run and killed with its children once `most` has passed
@@ -1429,6 +1446,12 @@ pub enum Step {
     /// Hermes's and OpenClaw's per-person files removed, [`forget_agents`]
     /// (#6343): by count, never by name.
     AgentsForgotten,
+    /// Every other engine's home emptied, [`forget_engine_homes`] (#7771):
+    /// by count, never by name.
+    EngineHomesEmptied,
+    /// The text logs and the eMMC log copy emptied, [`forget_logs`]
+    /// (#7771): by count.
+    LogsForgotten,
     /// Setup and what a boot starts, started in place of a reboot (#4500).
     Started,
     Rebooting,
@@ -2134,6 +2157,20 @@ fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io:
             "lamp-setup: reset: removed {forgotten} of Hermes's and OpenClaw's per-person files"
         );
         steps.push(Step::AgentsForgotten);
+    }
+    // Right after (#7771): Claude Code's, Codex's and any other engine's
+    // home, which the step above does not reach.
+    let homes = effects.forget_engine_homes()?;
+    if homes > 0 {
+        eprintln!("lamp-setup: reset: emptied {homes} entries of the engines' homes");
+        steps.push(Step::EngineHomesEmptied);
+    }
+    // The text logs and the eMMC log copy (#7771), files only: no log
+    // service is restarted.
+    let logs = effects.forget_logs()?;
+    if logs > 0 {
+        eprintln!("lamp-setup: reset: emptied {logs} log entries");
+        steps.push(Step::LogsForgotten);
     }
     for path in &plan.wipe {
         if path.file_name() == Some(WIFI_FILE.as_ref()) {

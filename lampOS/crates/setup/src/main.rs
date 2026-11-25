@@ -84,6 +84,18 @@ usage: lamp-setup COMMAND [OPTIONS]
       one line an entry, `keep PATH`, `remove PATH`, `empty PATH`, or
       `cut PATH (keys: kept …; dropped …)` for a kept settings file, key
       names only, never values. The reset's own walk, only not acted on.
+  forget-engine-homes --dry-run [--root DIR]
+      List what a reset would do to the other engines' homes in
+      /var/lib/lampos-agents under DIR (/ by default), changing nothing and
+      following no link (#7771): `empty PATH` for each engine's home, which
+      is kept, `remove PATH` for anything else there. Paths only.
+  forget-logs --dry-run [--root DIR]
+      List what a reset would do to the text logs and the eMMC log copy
+      under DIR (/ by default), changing nothing and following no link
+      (#7771): `truncate PATH` for syslog, user.log, kern.log and auth.log
+      in /var/log.hdd and /var/log, kept in place; `remove PATH` for their
+      rotated copies; `empty PATH` for each folder of /var/log.hdd/journal.
+      Paths only, never a line.
   wake
       From power-on until the voice asks for the ring: the waking face
       (#1681). Only with LAMP_WAKING_FACE=on; otherwise it exits at once.
@@ -160,10 +172,13 @@ fn clock_id(given: Option<&String>) -> io::Result<String> {
     }
 }
 
-/// `forget-agents --dry-run [--root DIR]`: [`reset::plan_agents`] printed,
-/// one step a line. Without `--dry-run` it is refused: the reset itself
-/// runs only as part of a reset.
-fn forget_agents_dry_run(
+/// `forget-agents`, `forget-engine-homes` or `forget-logs`, each
+/// `--dry-run [--root DIR]`: [`reset::plan_agents`],
+/// [`reset::plan_engine_homes`] or [`reset::plan_logs`] printed, one step a
+/// line. Without `--dry-run` it is refused: the step itself runs only as
+/// part of a reset.
+fn forget_dry_run(
+    command: &str,
     mut given: impl Iterator<Item = String>,
 ) -> Result<bool, Box<dyn std::error::Error>> {
     let mut dry_run = false;
@@ -172,14 +187,28 @@ fn forget_agents_dry_run(
         match option.as_str() {
             "--dry-run" => dry_run = true,
             "--root" => root = PathBuf::from(given.next().ok_or("--root takes a folder")?),
-            _ => return Err("forget-agents takes --dry-run and --root DIR".into()),
+            _ => return Err(format!("{command} takes --dry-run and --root DIR").into()),
         }
     }
     if !dry_run {
-        return Err("forget-agents runs only with --dry-run".into());
+        return Err(format!("{command} runs only with --dry-run").into());
     }
-    for step in reset::plan_agents(&root)? {
-        println!("{step}");
+    let lines: Vec<String> = match command {
+        "forget-agents" => reset::plan_agents(&root)?
+            .iter()
+            .map(ToString::to_string)
+            .collect(),
+        "forget-engine-homes" => reset::plan_engine_homes(&root)?
+            .iter()
+            .map(ToString::to_string)
+            .collect(),
+        _ => reset::plan_logs(&root)?
+            .iter()
+            .map(ToString::to_string)
+            .collect(),
+    };
+    for line in lines {
+        println!("{line}");
     }
     Ok(true)
 }
@@ -197,8 +226,11 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         }
         return wake();
     }
-    if command == "forget-agents" {
-        return forget_agents_dry_run(given);
+    if matches!(
+        command.as_str(),
+        "forget-agents" | "forget-engine-homes" | "forget-logs"
+    ) {
+        return forget_dry_run(&command, given);
     }
     if command == "change" {
         return change(given);

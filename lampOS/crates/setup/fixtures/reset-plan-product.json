@@ -45,6 +45,8 @@
     "/var/lib/lampOS/voice/tasks-told",
     "/var/lib/lampOS/voice/near-call.json",
     "/var/lib/lampOS/voice/made-skills",
+    "/var/lib/lampOS/voice/marked",
+    "/var/lib/lampOS/voice/history-marks.json",
     "/var/lib/lampOS/light",
     "/var/lib/lamp-journal",
     "/var/lib/lampOS/voice/mute",
