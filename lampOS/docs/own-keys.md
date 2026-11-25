@@ -404,10 +404,18 @@ on the same `keys.*` path and the same switch, with the contract agreed on
   - **The first word, not the head:** the answer is read to its first text
     or call. A 200 whose stream then carries only an error, or ends with no
     word, gives way too.
-  - **A hung endpoint:** the turn's second try (`LAMP_SECOND_CHAT_SECOND_TRY`,
-    2.5 s with no head) asks the lamp's own model at the relay, not the
-    person's again. So an endpoint that never answers is answered within the
-    turn's wait, which its own 10 and 40 s timeouts never reached.
+  - **A hung endpoint:** the person's own model has 4 s for its answer's
+    head (`OWN_HEAD_WITHIN`, the same 4 s the person's own voice has for its
+    first sound). An endpoint that takes the connection and never answers
+    then gives way to the lamp's own model at the relay, told as no answer.
+    Before, it held the turn until the link's 30 s read timeout, past the
+    turn's wait, and the turn ended unanswered. This is the Reviewer-lead's must-fix on
+    #8543, before the switch-on, and it holds with or without the second try.
+    A head that comes in time keeps the answer with the person's model, and
+    the wait for its first word is the stream's own. Where the turn's second
+    try is on (`LAMP_SECOND_CHAT_SECOND_TRY`, 2.5 s with no head, in no
+    product unit), it asks the lamp's own model at the relay, not the
+    person's again.
   - **The warning:** it clears when the person's own model answers again. A
     failure with no HTTP status is told only once the relay has answered, so
     a lamp off its own Wi-Fi never blames the person's model.

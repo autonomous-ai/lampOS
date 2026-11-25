@@ -410,8 +410,20 @@ async fn to_first_word(
     }
 }
 
+/// How long the person's own model has for its answer's head before the turn
+/// gives way to the lamp's own at the relay (the Reviewer-lead's must-fix on
+/// #8543, before `LAMP_OWN_KEYS` goes on). An endpoint that takes the
+/// connection and never answers would otherwise hold the turn until the
+/// client's read timeout (`net::STALL`, 30 s with no byte, inside the
+/// request's 40 s bound), and the turn would end unanswered. The same 4 s
+/// the person's own voice has for its first sound (`START_WITHIN`). A head that comes in time keeps the answer
+/// with the person's model; only its first word's wait is left to the
+/// stream's own bound.
+pub const OWN_HEAD_WITHIN: std::time::Duration = std::time::Duration::from_secs(4);
+
 /// The person's own model asked, given way to the lamp's own at the relay
-/// on any failure before its first word ([`gives_way`]). A status the
+/// on any failure before its first word ([`gives_way`]), and when its
+/// answer's head doesn't come within [`OWN_HEAD_WITHIN`]. A status the
 /// person's endpoint answered with is told at once. No answer at all may be
 /// the lamp's own link, so it's told only once the relay has answered: a lamp
 /// off its Wi-Fi never blames the person's model (Fifth's P2 on #8543).
@@ -423,9 +435,14 @@ async fn own_or_relay(
     without: &'static [&'static str],
     watch: Option<&net::Watch>,
 ) -> net::Result<(Vec<ChatEvent>, net::ChatStream)> {
-    let own = match chat.send_watched(messages, only, without, watch).await {
-        Ok(answer) => to_first_word(answer).await,
-        Err(error) => Err(error),
+    let head = tokio::time::timeout(
+        OWN_HEAD_WITHIN,
+        chat.send_watched(messages, only, without, watch),
+    );
+    let own = match head.await {
+        Ok(Ok(answer)) => to_first_word(answer).await,
+        Ok(Err(error)) => Err(error),
+        Err(_) => Err(net::Error::Timeout("the person's own model's answer head")),
     };
     let error = match own {
         Ok(read) => {
@@ -2549,6 +2566,45 @@ pub(crate) mod tests {
             assert_eq!(*told.lock().unwrap(), [NO_HTTP_ANSWER], "{name}");
             assert_eq!(*cleared.lock().unwrap(), 0, "{name}");
         }
+    }
+
+    /// The Reviewer-lead's must-fix on #8543, before `LAMP_OWN_KEYS` goes on:
+    /// with no second try (`LAMP_SECOND_CHAT_SECOND_TRY` is in no product
+    /// unit), an own endpoint that takes the connection and never answers
+    /// gives way to the lamp's own once [`OWN_HEAD_WITHIN`] passes, not after
+    /// the client's 30 s read timeout. It is told as no answer once the relay
+    /// has answered, and the person's model is never counted as having
+    /// answered. Fails on the old `own_or_relay`, which waited out the 30 s
+    /// (seen: failed at 30.0 s with the deadline removed).
+    #[tokio::test]
+    async fn a_hung_own_model_gives_way_to_the_lamps_own_in_time() {
+        // Takes every connection and never writes a byte back.
+        let hung = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = hung.local_addr().unwrap().port();
+        let _held = tokio::spawn(async move {
+            let mut kept = Vec::new();
+            while let Ok((socket, _)) = hung.accept().await {
+                kept.push(socket);
+            }
+        });
+        let relay = stub("relay-key-8420", vec![(CHAT, answered("lamp's own"))]).await;
+        let (net, (told, cleared)) = own_with_fallback(
+            "own-hung",
+            format!("http://127.0.0.1:{port}/v1beta"),
+            &relay.url,
+        );
+        let started = std::time::Instant::now();
+        let events: Vec<_> = net.chat(vec![Message::user("hello")]).collect().await;
+        let took = started.elapsed();
+        assert_eq!(words_of(events), "lamp's own");
+        assert_eq!(relay.asked(CHAT), 1);
+        assert!(took >= OWN_HEAD_WITHIN, "{took:?}");
+        assert!(
+            took < OWN_HEAD_WITHIN + std::time::Duration::from_secs(3),
+            "{took:?}"
+        );
+        assert_eq!(*told.lock().unwrap(), [NO_HTTP_ANSWER]);
+        assert_eq!(*cleared.lock().unwrap(), 0);
     }
 
     /// Fifth's P2 on #8543: a hung endpoint never reached its 10 or 40 s
