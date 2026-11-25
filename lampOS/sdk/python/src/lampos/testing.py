@@ -1396,11 +1396,11 @@ class FakeLamp:
         "hand": "look",
         "phrase.heard": "hear", "name.heard": "hear", "sound.heard": "sound",
         "air.changed": "air",
-        "volume.changed": "speak",
+        "volume.changed": "volume",
         "body.state": "body",
         "lamp.said": "speech",
     }
-    STATE_GRANT = {"presence": "look", "air": "air", "device": "device", "volume": "speak", "body": "body"}
+    STATE_GRANT = {"presence": "look", "air": "air", "device": "device", "volume": "volume", "body": "body"}
 
     def _needs(self, op: str, request: dict) -> list[str]:
         if op == "phrases.set":
@@ -1442,7 +1442,7 @@ class FakeLamp:
             "turn.start": ["speak", "hear"],
             "turn.end": ["speak"],
             "listen.set": ["hear"],
-            "volume": ["speak"],
+            "volume": ["volume"],
             "microphone.stream": ["microphone"],
             "speaker.stream": ["speaker"],
         }.get(op, [])
@@ -1857,7 +1857,8 @@ class FakeLamp:
     async def _op(self, ws, client: str, request: dict) -> None:
         op, id_ = request["op"], request["id"]
         grants = self.clients[client]["grants"]
-        missing = [g for g in self._needs(op, request) if g not in grants]
+        # `speak` holds `volume` too, as lamp-control's `Grant::held_in` (#8610).
+        missing = [g for g in self._needs(op, request) if g not in grants and not (g == "volume" and "speak" in grants)]
         if missing:
             await self._refuse(ws, id_, "no_grant", _not_granted(missing))
             return

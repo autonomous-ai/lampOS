@@ -1231,10 +1231,10 @@ export class FakeLamp {
     hand: 'look',
     'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound',
     'air.changed': 'air',
-    'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound', 'volume.changed': 'speak', 'lamp.said': 'speech',
+    'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound', 'volume.changed': 'volume', 'lamp.said': 'speech',
     'body.state': 'body', // the real lamp refuses it without the body grant (a try-it run paired for speech alone died on it, 13 Nov)
   };
-  static STATE_GRANT = { presence: 'look', air: 'air', device: 'device', volume: 'speak', body: 'body' };
+  static STATE_GRANT = { presence: 'look', air: 'air', device: 'device', volume: 'volume', body: 'body' };
 
   needs(op, request) {
     if (op === 'phrases.set') return ['hear'];
@@ -1244,7 +1244,8 @@ export class FakeLamp {
     if (op === 'look') return ['face', 'hand'].includes(request.at) ? ['body', 'look'] : ['body'];
     if (['gesture', 'move', 'play', 'joints'].includes(op)) return ['body'];
     if (op === 'lease.take') return (request.parts ?? []).map((p) => ({ body: 'body', light: 'light', voice: 'speak' })[p]);
-    const speak = ['say', 'sound', 'sound.upload', 'sound.list', 'sound.remove', 'turn.end', 'volume'];
+    const speak = ['say', 'sound', 'sound.upload', 'sound.list', 'sound.remove', 'turn.end'];
+    if (op === 'volume') return ['volume'];
     if (op.startsWith('skill.') || ['app.push', 'app.list', 'app.remove'].includes(op)) return ['skills'];
     if (op.startsWith('notes.')) return ['notes'];
     if (speak.includes(op)) return ['speak'];
@@ -1480,7 +1481,9 @@ export class FakeLamp {
 
   op(ws, client, request) {
     const { op, id } = request;
-    const missing = this.needs(op, request).filter((g) => !this.clients.get(client).grants.includes(g));
+    // `speak` holds `volume` too, as lamp-control's `Grant::held_in` (#8610).
+    const held = this.clients.get(client).grants;
+    const missing = this.needs(op, request).filter((g) => !held.includes(g) && !(g === 'volume' && held.includes('speak')));
     if (missing.length) return this.refuse(ws, id, 'no_grant', notGranted(missing));
     const queued = this.refusals.get(op);
     if (queued?.length) {

@@ -223,6 +223,7 @@ pub const CONTROL_GRANTS: &[&str] = &[
     "microphone",
     "notes",
     "speech",
+    "volume",
 ];
 /// The lamp's linked services a run may be granted (#6432), each as
 /// `<code>-read` and `<code>-write`: lamp-services' catalog codes
@@ -6618,7 +6619,7 @@ mod tests {
             &runner,
         );
         assert_eq!(answer, json!({"ok": true, "id": 5}));
-        assert_eq!(MOST_GRANTS, 12 + 2 * 14 + 1);
+        assert_eq!(MOST_GRANTS, 13 + 2 * 14 + 1);
     }
 
     /// Every service in lamp-services' catalog has its grants here, a

@@ -40,7 +40,7 @@ READ_ON_THE_LAMP = ("SKILL.md", "skill.toml", "moves", "sounds", "lights", "show
 # lamp_voice::skill_task_yes::GRANTS and NEVER).
 TASK_SCRIPTS = "scripts"
 TASK_MOST_BYTES = 500
-TASK_GRANTS = ("body", "light", "speak", "look", "hear", "sound", "air", "device", "camera", "microphone", "notes", "speech")
+TASK_GRANTS = ("body", "light", "speak", "look", "hear", "sound", "air", "device", "camera", "microphone", "notes", "speech", "volume")
 # A linked service's grants (`gmail-read`, `github-write`): a Store or made skill's task may name them with
 # `LAMP_AGENT_SERVICES=on` (lamp_voice::made_skill SERVICE_GRANT_CODES, service_grant); a push from a computer is
 # always refused for one (package.rs, #6432), by `asks_beyond`. The check itself only warns: the folder is a valid
