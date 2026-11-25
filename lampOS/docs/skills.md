@@ -5082,7 +5082,12 @@ gone ([switches.md](switches.md)). What happens:
     said). A make done and on is told its change is `change_skill`'s
     (#8008, `made_change`): that skill by its name, the change in their
     words, changed in place under its name, never a new make of the whole
-    ask beside it (`made_change_next`). That is where #7912's change meets
+    ask beside it (`made_change_next`); its record stands until that make
+    begins on the thread (`made_skill::ChangeAs`, read in `OneAsk::begin_in`),
+    so a model that calls nothing keeps "already made" and the yes asked
+    again in place. One with code of its own whose yes wait is gone was
+    never put on: told it waits for their yes again, made again with the
+    change and read back, never "made". That is where #7912's change meets
     #8008's: `make_skill`'s `approve_id` branch is read first, so `answer:
     "change"` with a make's id is a make under way's or one waiting for its
     yes, and a change to a skill already made is `change_skill`'s call,
@@ -5108,6 +5113,8 @@ gone ([switches.md](switches.md)). What happens:
     first, on lamp-voice before the fix),
     `a_never_mind_said_while_made_still_ends_it`,
     `a_change_to_a_skill_made_a_moment_ago_is_change_skills`,
+    `a_change_skill_told_but_not_called_keeps_the_already_made_guard`,
+    `a_change_to_a_code_skill_whose_yes_wait_is_gone_is_told_it_waits_again`,
     `an_unrelated_line_while_made_leaves_the_make_alone`.
 
     The `request` parameter says never to

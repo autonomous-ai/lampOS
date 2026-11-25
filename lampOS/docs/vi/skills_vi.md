@@ -1802,7 +1802,12 @@ sau:
     tạo lại không bao giờ được nói). Một lần tạo đã xong và đã bật được báo rằng thay
     đổi của nó là của `change_skill` (#8008, `made_change`): kỹ năng đó theo
     tên, thay đổi bằng lời của họ, đổi tại chỗ dưới tên của nó, không bao giờ
-    là một lần tạo mới cả lời nhờ bên cạnh nó (`made_change_next`). Đó là
+    là một lần tạo mới cả lời nhờ bên cạnh nó (`made_change_next`); bản ghi
+    của nó còn cho tới khi lần tạo đó bắt đầu trên luồng (`made_skill::ChangeAs`,
+    đọc trong `OneAsk::begin_in`), nên mô hình không gọi gì vẫn giữ "đã làm
+    rồi" và lần hỏi lại "có". Một kỹ năng có mã riêng mà lần chờ "có" đã mất
+    thì chưa từng được bật: được báo là chờ "có" của họ lần nữa, làm lại với
+    thay đổi và đọc lại, không bao giờ là "đã làm". Đó là
     chỗ thay đổi của #7912 gặp #8008: nhánh `approve_id` của `make_skill`
     được đọc trước, nên `answer: "change"` với id của một lần tạo là của lần
     tạo đang làm hoặc đang chờ "có", còn thay đổi một kỹ năng đã làm xong là
@@ -1828,6 +1833,8 @@ sau:
     trước, trên lamp-voice trước khi sửa),
     `a_never_mind_said_while_made_still_ends_it`,
     `a_change_to_a_skill_made_a_moment_ago_is_change_skills`,
+    `a_change_skill_told_but_not_called_keeps_the_already_made_guard`,
+    `a_change_to_a_code_skill_whose_yes_wait_is_gone_is_told_it_waits_again`,
     `an_unrelated_line_while_made_leaves_the_make_alone`.
 
     Tham số `request` nói không

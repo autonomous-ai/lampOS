@@ -2225,6 +2225,21 @@ impl OneAsk {
         // Read from the folder before the lock, held by every voice make.
         let kept = made_skill::kept_names(directory);
         let mut asks = ASKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        // A change of a skill made a moment ago begins on this thread
+        // (`change_skill`, `made_skill::ChangeAs`): that make's record is
+        // let go now, never at the note that told the model to call it, so
+        // the changed ask is a make of its own and never "already made".
+        if let Some(change) = made_skill::change_as() {
+            for ask in asks.iter_mut().filter(|ask| {
+                ask.directory == directory
+                    && ask
+                        .made
+                        .as_ref()
+                        .is_some_and(|(name, _, _)| *name == change.name)
+            }) {
+                ask.dropped = true;
+            }
+        }
         asks.retain(|ask| match &ask.made {
             Some((name, _, at)) => {
                 now_unix_ms.saturating_sub(*at) <= ONE_ASK_WITHIN.as_millis() as u64
@@ -2631,14 +2646,24 @@ const CHANGE_UNSAID_NEXT: &str = "Nothing was changed yet: their change wasn't c
 /// a skill they made, `change_skill`'s (`crate::made_change`, #8008),
 /// changed in place under its name, never a new make of the whole ask
 /// beside it. Where #7912's change of a make under way meets #8008's
-/// change of a skill made.
-fn made_change_next(name: &str) -> String {
+/// change of a skill made. One with code of its own whose yes wait is
+/// gone (`unapproved`) was never put on: it waits for their yes again,
+/// made again with the change and read back, never "made".
+fn made_change_next(name: &str, unapproved: bool) -> String {
     let name = made_skill::spoken_name(name);
+    let function = crate::made_change::FUNCTION;
+    if unapproved {
+        return format!(
+            "It was made a moment ago and never put on: {name} waits for their yes. Their change \
+             is a change of that skill: call {function} now with name: {name} and request: their \
+             change, in their words; it is made again with the change and read back for their \
+             yes. Never say it is on, or that it won't be made."
+        );
+    }
     format!(
-        "It was made a moment ago: {name}. Their change is a change of that skill: call {} now \
-         with name: {name} and request: their change, in their words. Never say it won't be \
-         made.",
-        crate::made_change::FUNCTION
+        "It was made a moment ago: {name}. Their change is a change of that skill: call {function} \
+         now with name: {name} and request: their change, in their words. Never say it won't be \
+         made."
     )
 }
 
@@ -2891,13 +2916,19 @@ pub fn making_changed(
         .filter(|waits| crate::skill_write_yes::waits(waits))
         .map(str::to_owned);
     let Some(waits) = waits else {
-        // Its record for the same ask asked again let go: the change is
-        // `change_skill`'s, in place, never "you already have that skill".
-        ask.dropped = true;
+        // The change is `change_skill`'s, in place. Its record stands until
+        // that make begins ([`OneAsk::begin_in`]): a model that calls
+        // nothing leaves "already made" and the yes asked again
+        // (`LAMP_MAKE_NO_CANNOT`) in place (round 2's P3 1 on #7912). With
+        // code of its own and its wait gone, it was never put on.
+        let unapproved = told["code_waits_for_yes"] == true;
         eprintln!(
-            "lamp-voice: request {request}: the person changed {name}, made a moment ago: change_skill's, in place (#7912, #8008)"
+            "lamp-voice: request {request}: the person changed {name}, made a moment ago{}: change_skill's, in place (#7912, #8008)",
+            if unapproved { " and never put on" } else { "" }
         );
-        return Making::Told(json!({ "approved": false, "next": made_change_next(&name) }));
+        return Making::Told(
+            json!({ "approved": false, "next": made_change_next(&name, unapproved) }),
+        );
     };
     // The queue's slot first, before the wait goes (Heron's HOLD 2 on
     // #7936): nothing waiting starts beside the remake.
@@ -16382,6 +16413,14 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         })
         .unwrap();
         let id = format!("{MAKING_ID}{}", held.0);
+        // Kept on the lamp, as a made skill is: its record stands only
+        // while its name is kept here.
+        std::fs::create_dir_all(&directory).unwrap();
+        made_skill::write_entries(
+            &directory,
+            &[json!({"name": "evening-dim", "sha256": "cd".repeat(32), "on": true})],
+        )
+        .unwrap();
         held.made(
             "evening-dim",
             &json!({"made": "evening-dim", "on": true}),
@@ -16450,6 +16489,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         ASKS.lock()
             .unwrap()
             .retain(|ask| ask.directory != directory);
+        let _ = std::fs::remove_dir_all(&directory);
     }
 
     /// Round 2's P3 2 on #7912: a skill with code of its own whose yes wait
