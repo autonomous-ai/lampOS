@@ -88,8 +88,8 @@ def request_def(op: str) -> dict[str, Any]:
 
 
 def app_ops() -> tuple[str, ...]:
-    """The ops only an installed app's socket takes (#7415): `phrases.set`, `app.took`, `app.settings.get` and
-    `app.panel.set`, kept apart from `ops()` (the door's) in the schema's `app_request`."""
+    """The ops only an installed app's socket takes (#7415): `phrases.set`, `app.took`, `app.settings.get`,
+    `app.panel.set`, `apps.remember`, `apps.context` and `app.answer` (#8406), kept apart from `ops()` (the door's) in the schema's `app_request`."""
     defs = schema()["$defs"]
     return tuple(
         defs[ref["$ref"].rsplit("/", 1)[1]]["properties"]["op"]["const"]
@@ -98,5 +98,6 @@ def app_ops() -> tuple[str, ...]:
 
 
 def app_events() -> tuple[str, ...]:
-    """The events only an installed app's socket sends: `app.trigger` and `app.settings`."""
+    """The events only an installed app's socket sends: `app.trigger`, `app.settings`, and the model's tool calls
+    `app.call` and `app.call.stopped` (#8406)."""
     return tuple(schema()["$defs"]["app_event"]["properties"]["ev"]["enum"])

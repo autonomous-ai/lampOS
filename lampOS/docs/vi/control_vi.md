@@ -157,3 +157,12 @@ từ app của chủ nhân: `{"v": 1, "clients": {"c_…": {"by": "app", "paired
 `clients.json`; mã `lamp-control code` của người giữ máy là `"keeper"` hoặc
 không có trong tệp. Bản dựng này chỉ đọc tệp; phía ghép đôi ghi nó. Chi tiết ở
 [control.md](../control.md), "Notes", và memory-days.md.
+
+## Công cụ của app (`app.call`, #8406)
+
+Khi `LAMP_APP_TOOLS=on`, `hello` trên socket của app trả thêm `"tools": true`. Lệnh gọi của model tới một công cụ của app
+đến dưới dạng sự kiện `{"ev":"app.call","call","name","args"}`; app trả lời bằng op `app.answer` (`{"call", "result"}`, một
+object JSON tối đa 2.048 byte, hoặc `{"call", "error"}`, một dòng tối đa 200 ký tự), được đáp `{"ok":true,"taken":bool}`.
+Sau 4,5 s không có trả lời, lamp-control gửi `{"ev":"app.call.stopped","call","why":"timeout"}`. Schema
+(`control.schema.json`: `app_event`, `app_request`, `tools` và `taken` của reply) liệt kê chúng, nên hai SDK nhận
+`lamp.on("app.call")`, `lamp.answer(...)` và `lamp.tools` ([control.md](../control.md), [apps.md](../apps.md)).
