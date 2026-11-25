@@ -482,9 +482,10 @@ Environment=LAMP_SAME_VOICE_FOR=services
 # The join of cut words (LAMP_JOIN_CUT_WORDS above) also reads the voice: two pieces in one person's voice join with
 # no face in view, so a request said in the dark is asked whole (#8003, lamp-9adf, 19 Nov: a 21 s request heard as
 # five lines, only the last asked). In the private room (LAMP_PRIVATE_ROOM below) a check starts for the join alone,
-# its prints in RAM and read by nothing else. Outside it, with the services on, every heard line is printed for the
-# services' judge, linked or not (likeness numbers only, the prints kept in RAM). Needs LAMP_SAME_VOICE_FOR=services
-# above and the same voice's confirm switch left unset, as here; its why and rules are its row in docs/switches.md.
+# its prints in RAM, read by the join and by LAMP_FOLLOW_UPS's window (another voice than the conversation's) alone.
+# Outside it, with the services on, every heard line is printed for the services' judge, linked or not (likeness
+# numbers only, the prints kept in RAM), and read by those two too. Needs LAMP_SAME_VOICE_FOR=services above and the
+# same voice's confirm switch left unset, as here; its why and rules are its row in docs/switches.md.
 Environment=LAMP_JOIN_SAME_VOICE=on
 # A made skill reads a linked service to its owner alone (#5288, #5303): the made-skill brief lets one read
 # through, passed to the provider and second routes. Played on lamp-9adf 5 Nov.
