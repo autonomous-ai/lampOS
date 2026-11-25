@@ -1292,8 +1292,15 @@ its only way back once its package carries the unit.
   leave the lamp on its hotspot for good. The retry then goes on as for a
   lost network, a phone on the hotspot holding it its own 10 min past due,
   and the try is not taken by the run, so it runs out and the hotspot opens
-  again. A live run's longest step is well inside the bound (the join's
-  60 s, `device-sta-mode`'s 45 s, `device-ap-mode`'s 4 min), and a person
+  again. A step is a run coming on, so a live run must fit inside the bound
+  whole. A page run is about 6 min at most: the 2 s pause,
+  `device-sta-mode`'s 45 s, the join's 60 s and `device-ap-mode`'s 4 min
+  back. A Wi-Fi change is about 7 min at most when its radio commands
+  answer: its 60 s join, 60 s for the link to come up, 120 s for the app's
+  confirmation and three 60 s waits back. Only if every radio command also
+  runs to its bound (45 s each, and 10 s for each reload on the way back)
+  does it reach about 10.5 min, past the bound. Even then, the Lost arm's
+  90 s after the bound ends after that run. A person
   setting it up starts a new run at each try, so a phone really setting it
   up keeps the hold. The phone count is not part of it: during a run's join
   the radio is a station, so the count can read none under a live run. Off
