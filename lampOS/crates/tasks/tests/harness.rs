@@ -4260,6 +4260,29 @@ fn observation_bounds_wrong_identity_and_invented_completion_are_rejected() {
     assert_eq!(rig.calls().len(), 1);
 }
 
+/// Twelve's P2 on #8666: a `show` refused because Harness has no such
+/// agent (`UNKNOWN_HARNESS`, `GONE`) reads `observe_gone`, the only refusal
+/// the store counts as a run gone; a computer offline (`DISCONNECTED`) or
+/// any other refusal stays `observe_failed` and is waited out.
+#[test]
+fn a_show_refused_for_no_such_agent_reads_gone_and_an_offline_one_does_not() {
+    for (error, code) in [
+        ("UNKNOWN_HARNESS", "observe_gone"),
+        ("GONE", "observe_gone"),
+        ("DISCONNECTED", "observe_failed"),
+    ] {
+        let rig = Rig::new();
+        rig.show_step(
+            json!({"exit":1,"stdout":json!({"error":error}).to_string(),"stderr_bytes":0}),
+        );
+        assert_eq!(
+            rig.cli().observe(MACHINE, AGENT),
+            Err(code.into()),
+            "{error}"
+        );
+    }
+}
+
 #[test]
 fn read_failure_codes_do_not_echo_private_cli_details() {
     let rig = Rig::new();

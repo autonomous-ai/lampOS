@@ -547,6 +547,14 @@ spoken yes, and a typed yes never confirms a spoken task.
    (lamp-ee17) let it end `expired`, unheard (`tasks: <task>: held for
    OpenClaw's gateway no longer`). A store holding a task attempted past
    its 120 s is written as schema 9, which a build before sets aside.
+   **Rollback:** going back to a build that reads schema 8 after a task
+   was held past 120 s sets the whole store aside
+   (`tasks.sqlite3.newer-9-<secs>`, named in the summary's `set_aside`)
+   and starts an empty one: tasks still watched and answers not yet told
+   are lost to that build, and it tells no one (seen on a lamp, 25 Nov).
+   Rolling forward again does not merge it back; only renaming the file
+   by hand does. Remembered yeses and made skills live in lamp-control and
+   lamp-skills and are not touched.
    Tests: `runtime::tests::a_task_held_for_a_cold_gateway_runs_once_it_serves_or_is_told_not_ready_once`,
    `a_task_held_for_the_lamps_place_goes_on_once_known_or_is_told_busy_once`,
    `a_queued_tasks_life_covers_the_runtimes_holds`,
@@ -2646,8 +2654,16 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
   - **Its run gone, told and ended** (#8601's family, lamp-ee17 task 85,
     read `working` for 3.75 h across restarts, every later hand-over held
     behind it): a task whose reads find its agent's run gone
-    (`observe_failed`: Harness never had it, or the direct path's run is
-    pruned or from before a restart) `GONE_READS` (3) times in a row, the
+    (`observe_gone`: `harness show` refused `UNKNOWN_HARNESS` or `GONE`,
+    Harness has no such agent; or, on the lamp's direct path only,
+    `observe_failed`, its run pruned or from before a restart)
+    `GONE_READS` (3) times in a row (a computer's agent read
+    `observe_failed` any other way, its computer `DISCONNECTED`, asleep or
+    off its network, or a timeout, is never counted: it is waited out, and
+    its answer told once it is back; Twelve's P2 on #8666, tests
+    `engine::tests::a_computer_offline_for_long_is_waited_out_and_its_answer_kept_once`
+    and `a_show_refused_for_no_such_agent_reads_gone_and_an_offline_one_does_not`
+    in `tests/harness.rs`), the
     first `GONE_AFTER_MS` (5 min) ago or in an earlier boot, is kept as
     `failed` at the next such read (`engine::gone_past_bound`, one journal
     line): settled, so it is no longer watched nor counted as work under

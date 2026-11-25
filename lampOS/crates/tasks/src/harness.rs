@@ -3742,9 +3742,23 @@ impl Cli {
         parse_engines(&reply.stdout, machine).map_err(str::to_string)
     }
 
-    /// The agent's last turn, read on the machine it was started on.
+    /// The agent's last turn, read on the machine it was started on. A
+    /// `show` refused as Harness has no such agent (`UNKNOWN_HARNESS` or
+    /// `GONE`, as [`Cli::observe_pane`] tells it) is
+    /// [`crate::engine::HARNESS_GONE`]; any other refusal (a computer
+    /// `DISCONNECTED`, asleep or off its network) stays `observe_failed`,
+    /// waited out, never counted as gone (#8601, Twelve's P2 on #8666).
     pub fn observe(&self, machine: &str, agent_id: &str) -> Result<Observation, String> {
-        self.observe_within(machine, agent_id, self.config.read_timeout)
+        let reply = self.show_reply(machine, agent_id, self.config.read_timeout)?;
+        if !reply.success {
+            return Err(if gone(&reply.stdout) {
+                crate::engine::HARNESS_GONE
+            } else {
+                "observe_failed"
+            }
+            .into());
+        }
+        parse_reading(&reply.stdout, agent_id).map_err(str::to_string)
     }
 
     /// The agent's last turn, read just before it is closed (#1390): the
@@ -3769,16 +3783,6 @@ impl Cli {
             Ok((observation, None)) => Ok(observation),
             Err(code) => Err(code.into()),
         }
-    }
-
-    fn observe_within(
-        &self,
-        machine: &str,
-        agent_id: &str,
-        timeout: Duration,
-    ) -> Result<Observation, String> {
-        let bytes = self.show_within(machine, agent_id, timeout)?;
-        parse_reading(&bytes, agent_id).map_err(str::to_string)
     }
 
     /// `harness show --json` of one agent, its stdout once it exits 0.
