@@ -23,6 +23,11 @@ fn each_moment_is_a_spoke_did_with_fixed_words_and_nothing_said() {
             "lamp-voice:update-line",
             "the lamp's software is being updated",
         ),
+        (
+            Moment::AgentSwitch,
+            "lamp-voice:agent-switch",
+            "the lamp's agent is being switched",
+        ),
     ] {
         let told = did(moment, 7);
         assert_eq!(told.who, who);

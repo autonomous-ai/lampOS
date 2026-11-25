@@ -88,6 +88,17 @@
 //!    ([`DirectSession::rotation_counts`]) go on where they were. A
 //!    rotation names a new id. OpenClaw's kept session is its gateway's
 //!    fixed key (`agent:main:lamp`).
+//! 8. **The agent switch.** The lamp runs one agent's gateway at a time,
+//!    its default's (lamp-update stops the other before it starts the
+//!    default's), so each engine's session takes work only while its engine
+//!    is the lamp's default ([`serves_now`], OpenClaw as Hermes). When the
+//!    default changes (the app's `app_engine_default`, or any other change
+//!    of the lamp's order, [`switch_check`]) the old agent's turns, queued
+//!    or running, are ended with [`SWITCHED`], told as a stopped task, and
+//!    the new default's session looks at its gateway at once and every
+//!    [`RETRY_WAITING_MOST`] until it answers. Until then the engines'
+//!    default read says `"gateway":"switching"`, then `"ready"`
+//!    ([`gateway_said`]).
 use crate::engine::{MAX_ANSWER_BYTES, MAX_ASK_BYTES, Watched};
 use crate::harness::{EngineKind, Launch, LaunchOutcome, Listed, Observation};
 use lamp_agent_gateway::{AgentSession, Error, Outcome, Phase, Progress, RunId, Turn, TurnKind};
@@ -275,8 +286,25 @@ pub const WAIT_SLICE: Duration = Duration::from_millis(250);
 pub const RETRY_FIRST: Duration = Duration::from_millis(500);
 /// The longest pause between readiness looks with nothing waiting...
 pub const RETRY_MOST: Duration = Duration::from_secs(30);
-/// ...and with a turn waiting.
+/// ...and with a turn waiting, a run in flight, or the session's engine the
+/// lamp's default ([`retry_most`]).
 pub const RETRY_WAITING_MOST: Duration = Duration::from_secs(2);
+
+/// The longest pause between two readiness looks of a session not ready:
+/// [`RETRY_WAITING_MOST`] while something waits on it (`waited_on`: a turn
+/// queued, a launch waiting for readiness, a run whose end is owed) or
+/// while its engine is the lamp's default (`default`), so the lamp's own
+/// agent is ready within about 2 s of its gateway coming up (after an agent
+/// switch, a boot or a gateway restart), whatever asks first; else
+/// [`RETRY_MOST`]: the other agent's gateway is not run by lamp-update, and
+/// looking at it every 2 s would only spend the lamp's CPU.
+pub fn retry_most(waited_on: bool, default: bool) -> Duration {
+    if waited_on || default {
+        RETRY_WAITING_MOST
+    } else {
+        RETRY_MOST
+    }
+}
 /// While ready and idle, readiness is looked at again this often, so a
 /// gateway gone between tasks is known before the next ask.
 pub const IDLE_READY_EVERY: Duration = Duration::from_secs(30);
@@ -329,6 +357,18 @@ pub const QUEUED_MOST: Duration = Duration::from_secs(2 * 60);
 /// A queued turn that waited [`QUEUED_MOST`] ends with this.
 pub const QUEUED_NOT_READY: &str =
     "the agent's gateway was not ready in time (openclaw_gateway_not_ready)";
+/// What a turn of the old agent ends with when the lamp's default agent is
+/// switched ([`switch_check`]): the owner's rule is that the switch stops
+/// the old agent's work rather than letting it run on a gateway lamp-update
+/// is stopping. Carried as the observation's answer, as the drop's words
+/// are ([`lamp_agent_gateway::DROPPED`]), so the voice's news of a stopped
+/// task says it; a skill run fails with it.
+pub const SWITCHED: &str =
+    "This task ended because the lamp switched to another agent. Please ask again.";
+/// The code a task for an agent that is not the lamp's default is refused
+/// with at once ([`not_default_for`]): its gateway is not run, so waiting
+/// for it would only end in "not ready" minutes later.
+pub const NOT_DEFAULT: &str = "agent_not_lamp_default";
 /// Sends failed in a row that make the session broken: reset, then the
 /// waiting turn tried once more.
 pub const BROKEN_SENDS: u32 = 2;
@@ -456,6 +496,10 @@ struct Inner {
     resets: u64,
     /// Sends failed in a row ([`BROKEN_SENDS`]).
     failed_sends: u32,
+    /// Set when the lamp's default agent was switched to this session's
+    /// engine ([`Direct::look_again_for_switch`]), until its gateway next
+    /// answers ready: the switch is under way ([`gateway_said`]).
+    switch_since: Option<Instant>,
 }
 
 impl Inner {
@@ -614,12 +658,92 @@ impl Direct {
 
     /// [`lamp_path`] for this session: a task of its engine on the lamp's
     /// machine while it serves ([`serves_now`]), or one of its own turns
-    /// whatever the default now, so a task keeps the path it started on
-    /// when the app's default changes under it.
+    /// that has ended, so the end an agent switch gave it ([`SWITCHED`]) is
+    /// read from here, never asked of Harness, which never had it. A turn
+    /// still running does not keep the path when the default changes under
+    /// it (#8431 kept it; the owner's switch rule ends it instead,
+    /// [`switch_check`]).
     fn path(&self, engine: &str, machine: &str, agent: &str) -> bool {
         engine == self.engine.bus_name()
-            && (serves_now(self.engine) || self.owns(agent))
+            && (serves_now(self.engine) || self.ended(agent))
             && self.lamp_machine().as_deref() == Some(machine)
+    }
+
+    /// Whether `agent` is one of this session's turns and has ended.
+    fn ended(&self, agent: &str) -> bool {
+        self.lock().find(agent).is_some_and(|run| run.end.is_some())
+    }
+
+    /// Whether an agent switch to this session's engine is under way: its
+    /// gateway has not answered ready since ([`gateway_said`]).
+    pub fn switching(&self) -> bool {
+        self.lock().switch_since.is_some()
+    }
+
+    /// The lamp's default agent was switched to this session's engine: its
+    /// gateway is looked at again at once (the pump woken, the last "ready"
+    /// it found no longer trusted: lamp-update is starting it now), and
+    /// the switch is under way until it answers ([`Self::became_ready`]).
+    fn look_again_for_switch(&self) {
+        let mut inner = self.lock();
+        inner.ready = false;
+        inner.not_ready_since = Some(Instant::now());
+        inner.told_getting_ready = false;
+        inner.not_ready_why = format!(
+            "{}'s gateway is starting after the agent switch",
+            label(self.engine)
+        );
+        inner.switch_since = Some(Instant::now());
+        drop(inner);
+        self.changed.notify_all();
+    }
+
+    /// The lamp's default agent was switched away from this session's
+    /// engine (to `to`): every turn not yet ended, queued or running, ends
+    /// at once with [`SWITCHED`] (told as a stopped task); a running one is
+    /// also aborted on its gateway, best effort, on a thread of its own so
+    /// the caller (lamp-tasks' main loop) never waits behind the session.
+    /// The number of turns ended.
+    fn end_for_switch(self: &Arc<Self>, to: Option<EngineKind>) -> usize {
+        let mut inner = self.lock();
+        inner.switch_since = None;
+        let mut aborts = Vec::new();
+        let mut names = Vec::new();
+        for run in inner.runs.iter_mut().filter(|run| run.end.is_none()) {
+            if let Some(id) = run.run.clone() {
+                aborts.push(id);
+            }
+            run.end = Some(End::Failed(SWITCHED.into()));
+            names.push(run.name.clone());
+        }
+        drop(inner);
+        self.changed.notify_all();
+        for name in &names {
+            eprintln!(
+                "tasks: {name}: ended: the lamp's default agent was switched from {} to {}",
+                label(self.engine),
+                to.map_or("none", label)
+            );
+        }
+        if !aborts.is_empty() {
+            let me = self.clone();
+            let spawned = std::thread::Builder::new()
+                .name(format!("{}-switch", self.engine.argument()))
+                .spawn(move || {
+                    for run in aborts {
+                        if let Err(error) = me.session().abort(&run) {
+                            eprintln!(
+                                "tasks: direct: run {} not aborted at the agent switch: {error}",
+                                run.0
+                            );
+                        }
+                    }
+                });
+            if let Err(error) = spawned {
+                eprintln!("tasks: direct: the switch's aborts not started: {error}");
+            }
+        }
+        names.len()
     }
 
     /// The agents of this session's turns whose run has ended (answered,
@@ -686,12 +810,9 @@ impl Direct {
                         let waiting = self.not_ready(&error);
                         self.expire_queued();
                         // A run in flight waits too: never a long retry
-                        // while its end is owed.
-                        let most = if waiting || busy {
-                            RETRY_WAITING_MOST
-                        } else {
-                            RETRY_MOST
-                        };
+                        // while its end is owed; nor while this is the
+                        // lamp's own agent, whose gateway lamp-update runs.
+                        let most = retry_most(waiting || busy, default_is(self.engine));
                         self.rest(backoff.min(most));
                         backoff = backoff.saturating_mul(2).min(most);
                         continue;
@@ -766,9 +887,17 @@ impl Direct {
         }
     }
 
-    /// Waits up to `pause` for a change (a turn queued, a stop).
+    /// Waits up to `pause` for a change (a turn queued, a launch waiting
+    /// for readiness, a switch, a stop); at most [`RETRY_WAITING_MOST`]
+    /// when something waits already (one that came after the pump last
+    /// counted the waiters, before it rests, whose wake-up it missed).
     fn rest(&self, pause: Duration) {
         let inner = self.lock();
+        let pause = if inner.waiting() {
+            pause.min(RETRY_WAITING_MOST)
+        } else {
+            pause
+        };
         let _ = self
             .changed
             .wait_timeout(inner, pause)
@@ -786,6 +915,16 @@ impl Direct {
         inner.ready = true;
         inner.not_ready_since = None;
         inner.told_getting_ready = false;
+        // The agent switch's end: the new default's gateway answers. This
+        // line is the "is ready" event (step 4's voice line keys on the
+        // `gateway` field going `ready`, [`gateway_said`]).
+        if let Some(since) = inner.switch_since.take() {
+            eprintln!(
+                "tasks: direct: agent switch: {} is ready, {} ms after the switch",
+                label(self.engine),
+                since.elapsed().as_millis()
+            );
+        }
         drop(inner);
         self.changed.notify_all();
     }
@@ -864,6 +1003,10 @@ impl Direct {
     fn wait_ready(&self, until: Instant, cancelled: &dyn Fn() -> bool) -> bool {
         let mut inner = self.lock();
         inner.waiting_ready += 1;
+        // The pump may be resting through a long back-off (nothing waited
+        // before): woken, so it looks at once and every
+        // [`RETRY_WAITING_MOST`] while this waits, not at its next retry.
+        self.changed.notify_all();
         let result = loop {
             if inner.ready {
                 break true;
@@ -1470,6 +1613,12 @@ pub fn skill_turn(
     until: Instant,
     stopped: &dyn Fn() -> bool,
 ) -> Result<u64, String> {
+    // Not the lamp's default agent (now, or after the wait: a switch under
+    // it): its gateway is not run, so never waited for and never handed
+    // to; refused at once, in words that say why.
+    if !serves_now(direct.engine) {
+        return Err(not_default_words(direct.engine));
+    }
     if let Err(why) = direct.before_hand_over(until, stopped) {
         eprintln!("tasks: {}: {why}; the hand-over is not sent", run.run);
         return Err(format!(
@@ -1479,6 +1628,9 @@ pub fn skill_turn(
     }
     if stopped() || Instant::now() >= until {
         return Err("the skill run ended before hand-over".into());
+    }
+    if !serves_now(direct.engine) {
+        return Err(not_default_words(direct.engine));
     }
     let kind = if makes {
         TurnKind::Make
@@ -1563,17 +1715,161 @@ pub(crate) fn set_test_default(default: Option<Option<EngineKind>>) {
     TEST_DEFAULT.with(|cell| cell.set(default));
 }
 
-/// Whether `engine`'s direct session takes the lamp's work now. OpenClaw's
-/// always (its gateway follows "in use", #8105). Any other engine's only
-/// while it is the lamp's default: lamp-update runs Hermes's gateway only
-/// then, so a task named for Hermes on an OpenClaw lamp keeps Harness's
-/// path instead of waiting for a gateway that never starts. No reader set
-/// (no lamp side): as before, it does.
+/// Whether `engine`'s direct session takes the lamp's work now: only while
+/// it is the lamp's default, OpenClaw as Hermes. lamp-update runs one
+/// agent's gateway at a time, the default's, and stops the other (it no
+/// longer keeps OpenClaw's up while it is "in use" on a Hermes lamp), so a
+/// task for the other agent would only wait for a gateway that never
+/// starts (60 s for a spoken task, 240 s for a skill run). A task named for
+/// Hermes on an OpenClaw lamp keeps Harness's path (its CLI needs no
+/// gateway); one named for OpenClaw on a Hermes lamp is refused at once
+/// ([`not_default_for`], [`NOT_DEFAULT`]). No reader set (no lamp side):
+/// as before, it does.
 fn serves_now(engine: EngineKind) -> bool {
-    if engine == EngineKind::Openclaw {
-        return true;
-    }
     default_is(engine)
+}
+
+/// The words a run for `engine`, not the lamp's default agent now, is
+/// refused with ([`NOT_DEFAULT`] in them).
+fn not_default_words(engine: EngineKind) -> String {
+    format!(
+        "{} is not the lamp's default agent now, so the run was not handed over ({NOT_DEFAULT})",
+        label(engine)
+    )
+}
+
+/// A spoken `launch` for OpenClaw on the lamp's own machine, no session
+/// named, while OpenClaw has a direct session but is not the lamp's
+/// default: not sent, at once, with [`NOT_DEFAULT`], in place of the
+/// Gateway's 60 s wait for a gateway lamp-update does not run (and of
+/// Harness's `openclaw` pane, which needs that gateway too). `None`: not
+/// such a launch, so the worker goes on as before. Hermes's on an OpenClaw
+/// lamp keeps Harness's path (#8431), which runs it without its gateway.
+pub fn not_default_for(launch: &Launch) -> Option<LaunchOutcome> {
+    if launch.target.engine != EngineKind::Openclaw || launch.session.is_some() {
+        return None;
+    }
+    let direct = lamp_for(EngineKind::Openclaw)?;
+    if serves_now(EngineKind::Openclaw)
+        || direct.lamp_machine().as_deref() != Some(launch.target.machine_id.as_str())
+    {
+        return None;
+    }
+    eprintln!(
+        "tasks: {}: OpenClaw is not the lamp's default agent now; not sent ({NOT_DEFAULT})",
+        launch.name
+    );
+    Some(LaunchOutcome::NotSent {
+        code: NOT_DEFAULT.into(),
+    })
+}
+
+/// The lamp's default as the runtime reads it now: `None` with no reader
+/// set (no lamp side), `Some(None)` with no default.
+#[cfg(not(test))]
+fn current_default() -> Option<Option<EngineKind>> {
+    LAMP_DEFAULT.get().map(|read| read())
+}
+
+/// In the crate's tests, a test's own default only ([`set_test_default`]).
+#[cfg(test)]
+fn current_default() -> Option<Option<EngineKind>> {
+    TEST_DEFAULT.with(std::cell::Cell::get)
+}
+
+/// The default [`switch_check`] last saw: `None` before its first look.
+#[cfg(not(test))]
+static LAST_DEFAULT: Mutex<Option<Option<EngineKind>>> = Mutex::new(None);
+
+/// `now` kept as the default last seen; the one before it.
+#[cfg(not(test))]
+fn last_default_swap(now: Option<EngineKind>) -> Option<Option<EngineKind>> {
+    LAST_DEFAULT
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .replace(now)
+}
+
+#[cfg(test)]
+thread_local! {
+    /// A test's last default seen by [`switch_check`], on its thread only.
+    static TEST_LAST_DEFAULT: std::cell::Cell<Option<Option<EngineKind>>> =
+        const { std::cell::Cell::new(None) };
+}
+
+#[cfg(test)]
+fn last_default_swap(now: Option<EngineKind>) -> Option<Option<EngineKind>> {
+    TEST_LAST_DEFAULT.with(|cell| cell.replace(Some(now)))
+}
+
+/// The lamp's default agent switched: from `from` to `to`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Switched {
+    pub from: Option<EngineKind>,
+    pub to: Option<EngineKind>,
+}
+
+/// Looks whether the lamp's default agent changed since the last look, and
+/// when it did, runs the switch (the owner's rule): every direct session of
+/// another engine ends its turns, queued or running, with [`SWITCHED`]
+/// ([`Direct::end_for_switch`]), and the new default's session looks at its
+/// gateway again at once ([`Direct::look_again_for_switch`]), so
+/// [`gateway_said`] says `switching` until it answers. The first look only
+/// notes the default (a start is no switch); no reader set: nothing. Called
+/// by the app's `app_engine_default` at once, and by lamp-tasks' main loop
+/// every [`SWITCH_LOOK_EVERY`] for any other change of the lamp's order.
+/// The journal's "agent switch started" line is the "switch started" event
+/// (step 4's voice line keys on the `gateway` field going `switching`).
+pub fn switch_check() -> Option<Switched> {
+    // No default read (none chosen yet, or Harness's first engine report
+    // not in at start-up) is never a switch, and is not kept as the last
+    // default: only one engine to another ends the old agent's work, so a
+    // start-up or a passing gap in the read never ends a running task.
+    let now = current_default()?;
+    now?;
+    let from = last_default_swap(now)?;
+    if from == now || from.is_none() {
+        return None;
+    }
+    let lamps = lamps();
+    let ending: usize = lamps
+        .iter()
+        .filter(|direct| Some(direct.engine) != now)
+        .map(|direct| direct.end_for_switch(now))
+        .sum();
+    let to_session = lamps.iter().find(|direct| Some(direct.engine) == now);
+    if let Some(direct) = to_session {
+        direct.look_again_for_switch();
+    }
+    eprintln!(
+        "tasks: direct: agent switch started: {} to {}; {ending} running task(s) of the old agent ended; {}",
+        from.map_or("none", label),
+        now.map_or("none", label),
+        if to_session.is_some() {
+            "waiting for the new agent's gateway"
+        } else {
+            "the new agent has no direct session here, ready as Harness's path"
+        }
+    );
+    Some(Switched { from, to: now })
+}
+
+/// How often lamp-tasks' main loop looks for a change of the lamp's default
+/// agent that did not come through `app_engine_default` ([`switch_check`]).
+pub const SWITCH_LOOK_EVERY: Duration = Duration::from_secs(1);
+
+/// The agent switch's state for the app, on the engines' default read
+/// (`app_engine_default`, `app_engine_default_state`): `switching` from the
+/// moment the lamp's default agent changed until its direct session's
+/// gateway next answers ready, then `ready`. `ready` also when the default
+/// has no direct session (Harness's path waits on its own) or no default is
+/// read.
+pub fn gateway_said() -> &'static str {
+    let switching = current_default()
+        .flatten()
+        .and_then(lamp_for)
+        .is_some_and(|direct| direct.switching());
+    if switching { "switching" } else { "ready" }
 }
 
 /// Whether `engine` is the lamp's default now, or none is read.
@@ -1630,7 +1926,9 @@ pub(crate) fn set_test_lamp(direct: Option<Arc<Direct>>) {
 
 /// Whether a task of `engine` (its bus name, `openclaw`, `hermes`) on
 /// `machine`, agent `agent`, is the direct path's: that engine's switch on,
-/// the lamp's own machine, and the session serving now or the turn its own. Its progress and looks come from the gateway only, never from
+/// the lamp's own machine, and the session serving now ([`serves_now`]) or
+/// the turn its own and ended (an agent switch's end, [`SWITCHED`]). Its
+/// progress and looks come from the gateway only, never from
 /// Harness's `ps` or `show` (each ~2 s on the lamp, on the one worker a
 /// hand-over waits behind). Other engines, other machines and the switch
 /// off: `false`.
@@ -1866,8 +2164,10 @@ fn observation_of_run(run: &Run) -> Observation {
         Some(End::Answered(text)) => cut_bytes(text, MAX_ANSWER_BYTES),
         // A drop's failure carries the person's "try again" words as its
         // last words: the voice's news of a stopped task says them, in the
-        // person's language.
-        Some(End::Failed(why)) if why == lamp_agent_gateway::DROPPED => (why.clone(), false),
+        // person's language. An agent switch's end is told the same way.
+        Some(End::Failed(why)) if why == lamp_agent_gateway::DROPPED || why == SWITCHED => {
+            (why.clone(), false)
+        }
         _ => (String::new(), false),
     };
     Observation {

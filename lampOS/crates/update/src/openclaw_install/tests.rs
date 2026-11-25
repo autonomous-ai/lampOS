@@ -453,7 +453,8 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
             remove: false,
             skills: true,
             tasks: false,
-            one_path: false
+            one_path: false,
+            by_default: false,
         })
     );
     assert_eq!(round(&lamp, &mut systemd, true, 11), None, "one at a time");
@@ -1247,7 +1248,6 @@ fn a_round_starts_a_gateway_left_down_only_while_it_is_wanted() {
     );
     let hermes = Said {
         default: Some("hermes".to_owned()),
-        openclaw_in_use: Some(false),
     };
     let at = |gateway: Gateway, state: &'static str, at: u64| {
         let mut systemd = Fake {
@@ -1260,6 +1260,7 @@ fn a_round_starts_a_gateway_left_down_only_while_it_is_wanted() {
             &lamp.records(),
             sk(true),
             gateway,
+            true,
             &mut systemd,
             &mut Runs::new(&lamp).runner(),
             at,
@@ -1288,7 +1289,7 @@ fn a_round_starts_a_gateway_left_down_only_while_it_is_wanted() {
     );
     let (asked, _) = at(off, "active", 5);
     assert!(!asked.contains(&"start-gateway"), "{asked:?}");
-    // The switch on, OpenClaw neither the default nor in use: left down.
+    // The switch on, OpenClaw not the default: left down.
     let (asked, _) = at(gateway_wanted(true, Some(hermes)), "inactive", 6);
     assert!(!asked.contains(&"start-gateway"), "{asked:?}");
     let (asked, _) = at(gateway_wanted(true, None), "failed", 7);
@@ -1314,7 +1315,6 @@ fn only_a_round_resets_a_failed_gateway() {
         true,
         Some(Said {
             default: Some("openclaw".to_owned()),
-            openclaw_in_use: Some(false),
         }),
     );
     assert_eq!(wanted, Gateway::Wanted);
@@ -1345,6 +1345,7 @@ fn only_a_round_resets_a_failed_gateway() {
         &lamp.records(),
         sk(true),
         wanted,
+        true,
         &mut systemd,
         &mut Runs::new(&lamp).runner(),
         4,
@@ -4129,56 +4130,42 @@ fn a_gateway_unit_written_anew_with_the_control_socket_restarts_it_once() {
 }
 
 /// #8105: lamp-tasks' answer read, and the rule: the switch off is always
-/// wanted; on, OpenClaw the default or in use is wanted, another default
-/// with OpenClaw not in use is not, and anything less known leaves the
-/// gateway as it is.
+/// wanted; on, OpenClaw the default is wanted, another default is not, and
+/// no answer or no default leaves the gateway as it is. An older
+/// lamp-tasks' `openclaw_in_use` is not read: the default alone decides,
+/// so no hold keeps OpenClaw's gateway up beside Hermes's.
 #[test]
-fn the_gateway_is_wanted_while_openclaw_is_the_lamps_agent_or_in_use() {
-    let said = |default: Option<&str>, in_use: Option<bool>| Said {
+fn the_gateway_is_wanted_while_openclaw_is_the_lamps_agent() {
+    let said = |default: Option<&str>| Said {
         default: default.map(str::to_owned),
-        openclaw_in_use: in_use,
     };
     assert_eq!(
         default_of(r#"{"ok":true,"default":"openclaw","chosen_in_app":true}"#),
-        Some(said(Some("openclaw"), None))
+        Some(said(Some("openclaw")))
     );
     assert_eq!(
-        default_of(r#"{"ok":true,"default":"hermes","openclaw_in_use":false}"#),
-        Some(said(Some("hermes"), Some(false)))
+        default_of(r#"{"ok":true,"default":"hermes","openclaw_in_use":true}"#),
+        Some(said(Some("hermes"))),
+        "an older lamp-tasks' in-use field is not read"
     );
     assert_eq!(
         default_of(r#"{"ok":true,"default":null,"openclaw_in_use":true}"#),
-        Some(said(None, Some(true)))
+        Some(said(None))
     );
-    assert_eq!(
-        default_of(r#"{"ok":true,"default":" "}"#),
-        Some(said(None, None))
-    );
+    assert_eq!(default_of(r#"{"ok":true,"default":" "}"#), Some(said(None)));
     assert_eq!(default_of(r#"{"ok":false,"error":"busy"}"#), None);
     assert_eq!(default_of("not json"), None);
 
-    let rule = |default, in_use| gateway_wanted(true, Some(said(default, in_use)));
+    let rule = |default| gateway_wanted(true, Some(said(default)));
     assert_eq!(
-        gateway_wanted(false, Some(said(Some("hermes"), Some(false)))),
+        gateway_wanted(false, Some(said(Some("hermes")))),
         Gateway::Wanted
     );
     assert_eq!(gateway_wanted(false, None), Gateway::Wanted);
-    assert_eq!(rule(Some("openclaw"), Some(false)), Gateway::Wanted);
-    assert_eq!(rule(Some("openclaw"), None), Gateway::Wanted);
-    assert_eq!(rule(Some("hermes"), Some(true)), Gateway::Wanted, "in use");
-    assert_eq!(
-        rule(None, Some(true)),
-        Gateway::Wanted,
-        "in use, no default"
-    );
-    assert_eq!(rule(Some("hermes"), Some(false)), Gateway::NotWanted);
-    assert_eq!(rule(Some("claude"), Some(false)), Gateway::NotWanted);
-    assert_eq!(
-        rule(Some("hermes"), None),
-        Gateway::Unknown,
-        "an older lamp-tasks"
-    );
-    assert_eq!(rule(None, Some(false)), Gateway::Unknown);
+    assert_eq!(rule(Some("openclaw")), Gateway::Wanted);
+    assert_eq!(rule(Some("hermes")), Gateway::NotWanted);
+    assert_eq!(rule(Some("claude")), Gateway::NotWanted);
+    assert_eq!(rule(None), Gateway::Unknown);
     assert_eq!(gateway_wanted(true, None), Gateway::Unknown);
 }
 
@@ -4206,7 +4193,6 @@ fn lamp_tasks_is_asked_for_the_default_on_its_app_socket() {
         said_default(&socket),
         Some(Said {
             default: Some("hermes".to_owned()),
-            openclaw_in_use: Some(false),
         })
     );
     assert_eq!(
@@ -4238,6 +4224,7 @@ fn a_round_on_a_lamp_whose_agent_is_not_openclaw_stops_the_gateway() {
             &lamp.records(),
             sk(true),
             gateway,
+            true,
             systemd,
             &mut runs.runner(),
             at,
@@ -4342,7 +4329,26 @@ fn between_rounds_the_gateway_follows_the_lamps_agent_and_is_quiet_when_settled(
     assert!(asked.contains(&"start-gateway"), "{asked:?}");
     assert!(fs::symlink_metadata(lamp.at(WANTS)).is_ok());
     assert!(said.iter().any(|line| line.contains("started")), "{said:?}");
-    // Harness's one-shot at work: the gateway is left to it.
+    // Harness's one-shot at work: a wanted gateway is left to it...
+    let mut systemd = Fake {
+        gateway: Some("inactive"),
+        active: Some("activating"),
+        ..Fake::default()
+    };
+    fs::remove_file(lamp.at(WANTS)).unwrap();
+    keep_between_rounds(
+        lamp.root(),
+        &mut systemd,
+        Gateway::Wanted,
+        false,
+        &mut Runs::new(&lamp).runner(),
+        &mut quiet(),
+    );
+    assert_eq!(systemd.asked, ["state"]);
+    assert!(fs::symlink_metadata(lamp.at(WANTS)).is_err());
+    // ...but one not wanted is still stopped and disabled: another engine's
+    // gateway waits for it (one agent gateway at a time).
+    fs::write(lamp.at(WANTS), "").unwrap();
     let mut systemd = Fake {
         gateway: Some("active"),
         active: Some("activating"),
@@ -4356,8 +4362,12 @@ fn between_rounds_the_gateway_follows_the_lamps_agent_and_is_quiet_when_settled(
         &mut Runs::new(&lamp).runner(),
         &mut quiet(),
     );
-    assert_eq!(systemd.asked, ["state"]);
-    assert!(fs::symlink_metadata(lamp.at(WANTS)).is_ok());
+    assert!(
+        systemd.asked.contains(&"stop-gateway"),
+        "{:?}",
+        systemd.asked
+    );
+    assert!(fs::symlink_metadata(lamp.at(WANTS)).is_err());
 }
 
 /// Twelve's P2 on #8116: a gateway started between rounds because OpenClaw
@@ -4509,4 +4519,142 @@ fn the_wrappers_no_gateway_words_are_the_ones_the_retry_looks_for() {
             .expect("the wrapper's no-gateway line");
         assert!(line.contains(lamp_checked_replace::NO_GATEWAY), "{line}");
     }
+}
+
+/// The commands of `runs` that start or restart OpenClaw's gateway.
+fn gateway_starts(runs: &Runs) -> Vec<String> {
+    runs.lines()
+        .into_iter()
+        .filter(|line| {
+            line.starts_with("systemctl ")
+                && line.ends_with(UNIT)
+                && [" start ", " restart ", " try-restart "]
+                    .iter()
+                    .any(|verb| line.contains(verb))
+        })
+        .collect()
+}
+
+fn said_is(default: &str) -> Option<Said> {
+    Some(Said {
+        default: Some(default.to_owned()),
+    })
+}
+
+/// One agent gateway at a time: the install a round asks with the gateway
+/// following the default (`by_default`, handed in the ask) never starts or
+/// restarts OpenClaw's gateway while lamp-tasks says another engine is the
+/// lamp's agent (Harness's one-shot used to restart it whatever the
+/// default); it still does while OpenClaw is, and always with the switch
+/// off, as before.
+#[test]
+fn an_install_starts_the_gateway_only_while_openclaw_is_wanted() {
+    for (by_default, default, starts) in [
+        (true, "hermes", false),
+        (true, "openclaw", true),
+        (false, "hermes", true),
+    ] {
+        let lamp = Lamp::new();
+        lamp.harness_there();
+        let mut systemd = Fake::default();
+        after_round_with(
+            lamp.root(),
+            &lamp.records(),
+            sk(true),
+            gateway_wanted(by_default, said_is(default)),
+            by_default,
+            &mut systemd,
+            &mut Runs::new(&lamp).runner(),
+            1,
+            Ok(crate::hermes_schedule::Window::Reached),
+            &mut quiet(),
+        );
+        assert_eq!(lamp.asked().map(|ask| ask.by_default), Some(by_default));
+        let runs = Runs::new(&lamp);
+        let said = install_said(
+            lamp.root(),
+            &lamp.records(),
+            &mut runs.runner(),
+            &mut || 2,
+            &mut quiet(),
+            &kit(),
+            &mut || said_is(default),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(said.install, "installed", "{by_default}/{default}");
+        assert_eq!(
+            !gateway_starts(&runs).is_empty(),
+            starts,
+            "{by_default}/{default}: {:#?}",
+            runs.lines()
+        );
+    }
+}
+
+/// One agent gateway at a time, an OpenClaw there: a round that doesn't
+/// want the gateway asks no one-shot for the gateway block (written and
+/// checked through the running gateway, then restarted on it); one that
+/// does, does. And a one-shot asked while OpenClaw was wanted, run after
+/// the default moved to another engine, writes the block but never
+/// restarts the gateway.
+#[test]
+fn the_gateway_block_restarts_no_gateway_that_is_not_wanted() {
+    let block_gone = |lamp: &Lamp| {
+        let mut config = config_of(lamp);
+        config.as_object_mut().unwrap().remove("gateway");
+        fs::write(lamp.at(CONFIG), config.to_string()).unwrap();
+    };
+    let lamp = installed_openclaw();
+    block_gone(&lamp);
+    let round = |gateway: Gateway| {
+        let mut systemd = Fake {
+            gateway: Some("inactive"),
+            ..Fake::default()
+        };
+        after_round_with(
+            lamp.root(),
+            &lamp.records(),
+            sk(true),
+            gateway,
+            true,
+            &mut systemd,
+            &mut Runs::new(&lamp).runner(),
+            30,
+            Ok(crate::hermes_schedule::Window::Reached),
+            &mut quiet(),
+        );
+        systemd.asked
+    };
+    let asked = round(Gateway::NotWanted);
+    assert!(
+        lamp.asked().is_none(),
+        "no one-shot for a gateway not wanted"
+    );
+    assert!(!asked.contains(&"start"), "{asked:?}");
+    round(Gateway::Wanted);
+    assert!(lamp.asked().is_some_and(|ask| ask.by_default));
+
+    // The default moved to Hermes before the one-shot ran.
+    let runs = Runs {
+        main_pid: "4242",
+        ..Runs::new(&lamp)
+    };
+    let mut said = Vec::new();
+    install_said(
+        lamp.root(),
+        &lamp.records(),
+        &mut runs.runner(),
+        &mut || 40,
+        &mut |line: &str| said.push(line.to_owned()),
+        &Kit::BUILT,
+        &mut || said_is("hermes"),
+    )
+    .unwrap();
+    assert!(
+        said.iter()
+            .any(|line| line.contains("gateway block") && line.contains("not restarted")),
+        "{said:#?}"
+    );
+    assert_eq!(gateway_starts(&runs), Vec::<String>::new());
 }

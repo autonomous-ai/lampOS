@@ -2039,6 +2039,15 @@ fn note_joined(words: &NewsWords, task: &Value, session: &Value) -> Option<Strin
     })
 }
 
+/// lamp-tasks' code for a task refused at once because its agent is not the
+/// lamp's default now (`lamp_tasks::direct::NOT_DEFAULT`; lamp-tasks is
+/// only a dev-dependency here, so a test holds the two the same).
+const NOT_DEFAULT_CODE: &str = "agent_not_lamp_default";
+/// lamp-tasks' last words for a task its agent switch ended
+/// (`lamp_tasks::direct::SWITCHED`, held the same by a test).
+const SWITCHED_WORDS: &str =
+    "This task ended because the lamp switched to another agent. Please ask again.";
+
 /// The refusal code a failed hand-over is told by: Harness not running
 /// only when it was refused within
 /// [`crate::skill_words::NOT_READY_WITHIN_MS`] of the lamp's start, at
@@ -2096,6 +2105,10 @@ fn note_failed(
         // The lamp's kept session got stuck under it and is being restarted
         // (#7906 sign 5): ended at once, the person asks again later.
         Some("one_session_stuck") => Some(&words.failed_stuck),
+        // OpenClaw is not the lamp's agent now (the lamp runs Hermes):
+        // refused at once by lamp-tasks, told as that, never as a
+        // hand-over that failed.
+        Some(NOT_DEFAULT_CODE) => Some(&words.failed_not_default),
         // A start that timed out, checked, and never begun (#8170).
         Some("not_started") => Some(&words.failed_not_started),
         _ => None,
@@ -2292,6 +2305,16 @@ fn note(words: &NewsWords, task: &Value, data: &Value, age_ms: u64) -> Option<St
         state @ ("needs-input" | "stopped" | "failed") => state,
         _ => return None,
     };
+    // Stopped or failed by the lamp's agent switch: lamp-tasks gives its
+    // fixed words as the task's last (`direct::SWITCHED`).
+    let switched = matches!(state, "stopped" | "failed")
+        && data["answer"].as_str().map(str::trim) == Some(SWITCHED_WORDS);
+    // Said as the lamp's exact line in its language, never a prompt the chat
+    // model words (`agent_switch_told::ended_note`), as the switch's own
+    // lines are.
+    if switched {
+        return crate::agent_switch_told::ended_note(crate::language::at_start());
+    }
     let say = |asked: &str, answer: &str, more: &str| {
         let said = format!("{answer}{more}");
         let (line, no_question, waiting) = match state {
@@ -3895,6 +3918,61 @@ mod tests {
             "I can't handle that right now; please ask me again in a few minutes."
         );
         assert_ne!(Some(told), note_failed(&own(), &task, false, None));
+    }
+
+    /// A task for OpenClaw refused at once because OpenClaw is not the
+    /// lamp's agent now (lamp-tasks' `agent_not_lamp_default`) is told the
+    /// lamp's short line, never as a hand-over that did not reach its agent.
+    #[test]
+    fn a_task_for_an_agent_not_the_lamps_now_is_told_so() {
+        assert_eq!(NOT_DEFAULT_CODE, lamp_tasks::direct::NOT_DEFAULT);
+        assert_eq!(SWITCHED_WORDS, lamp_tasks::direct::SWITCHED);
+        let task = task("openclaw", json!([]));
+        let code = told_code(Some(lamp_tasks::direct::NOT_DEFAULT), Some(3_600_000));
+        let told = note_failed(&own(), &task, false, code).unwrap();
+        assert!(
+            told.contains(crate::skill_words::NOT_DEFAULT_LINE)
+                && !told.contains("did not reach")
+                && !told.contains("offer to try again"),
+            "{told}"
+        );
+        assert_eq!(
+            crate::skill_words::NOT_DEFAULT_LINE,
+            "OpenClaw isn't the lamp's agent right now."
+        );
+        assert_ne!(Some(told), note_failed(&own(), &task, false, None));
+    }
+
+    /// A task ended by the lamp's agent switch (its last words lamp-tasks'
+    /// `direct::SWITCHED`, stopped or failed) is told the lamp's short line,
+    /// never as a plain stop; another stop keeps the plain words.
+    #[test]
+    fn a_task_ended_by_the_agent_switch_is_told_to_ask_again() {
+        let task = task("openclaw", json!([]));
+        for state in ["stopped", "failed"] {
+            let data =
+                json!({"state":state,"answer":lamp_tasks::direct::SWITCHED,"truncated":false});
+            let told = super::note(&own(), &task, &data, 0).unwrap();
+            // The lamp's exact line, said as written: never a prompt for
+            // the chat model to word (lamp, Hermes to OpenClaw: the model
+            // answered with its own small talk).
+            assert_eq!(
+                crate::onboarding::own_words(&told),
+                Some(crate::skill_words::SWITCHED_LINE),
+                "{state}: {told}"
+            );
+            assert_eq!(
+                Some(told),
+                crate::agent_switch_told::ended_note(crate::language::at_start())
+            );
+        }
+        let other = json!({"state":"stopped","answer":"I could not reach the repository.","truncated":false});
+        let plain = super::note(&own(), &task, &other, 0).unwrap();
+        assert!(
+            !plain.contains(crate::skill_words::SWITCHED_LINE),
+            "{plain}"
+        );
+        assert!(plain.contains("stopped without finishing"), "{plain}");
     }
 
     /// `LAMP_TASKS_RESUME_CLOSED` (openharness#3606): a named session that was

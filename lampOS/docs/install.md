@@ -2731,8 +2731,19 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      lamp-tasks says it on its app socket: `serve` asks every 10 s and
      each round once, enables and starts it for `openclaw`, disables and
      stops it for another engine, and leaves it as it is while lamp-tasks
-     says nothing, a round runs, or this one-shot is at work (docs/switches.md,
-     its row). Its unit is written by a round only, never by the one-shot:
+     says nothing or a round runs (docs/switches.md, its row). One agent
+     gateway at a time (`gateway_keeper`): one thread keeps both gateways,
+     reads the default once per look, stops the unwanted gateway first and
+     starts the wanted one only once the other is down (a stop that failed
+     holds the start, said once, tried again at the next look); a round
+     does the same before its own steps. While this one-shot is at work a
+     wanted gateway is left to it, but an unwanted one is still stopped.
+     The one-shot itself starts or restarts the gateway only while OpenClaw
+     is wanted: the round hands `by_default` in its ask, and the one-shot
+     then asks lamp-tasks right before; another default, it installs the
+     files and starts nothing; no answer, it restarts only a running one
+     (`try-restart`). A round asks it for no `gateway` block while OpenClaw
+     isn't wanted. Its unit is written by a round only, never by the one-shot:
      a one-shot that finds an earlier build's unit (a lamp-update ahead
      of its units) changes nothing and takes nothing out, journals
      "OpenClaw's install waits: lamp-openclaw-gateway.service is not

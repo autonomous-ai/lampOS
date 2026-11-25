@@ -6991,6 +6991,10 @@ fn conversation_with_gate_inner(
     let mut signed_out = signed_out::SignedOut::from_environment();
     // The owner's Update now (#7517): lamp-update's moment for the voice.
     let mut give_way = give_way::GiveWay::from_environment();
+    // The lamp's agent switch (OpenClaw or Hermes), said only in a
+    // conversation: "Switching to Hermes.", then "Hermes is ready."
+    // (`agent_switch_told`). On whenever the tasks part is.
+    let mut agent_switch = crate::agent_switch_told::AgentSwitchTold::from_environment();
     // When the lamp was last speaking, and the turn that took the place of
     // another: neither a word after its own nor one that cut in is a sound.
     let mut last_spoke_us: Option<u64> = None;
@@ -13607,6 +13611,62 @@ fn conversation_with_gate_inner(
             did_voice_line = lamp_began.map(|turn| (turn, crate::did_voice::Moment::UpdateLine));
             give_way.said();
             record(trace, json!({"kind":"update_give_way_said","at_us":clock}))?;
+        }
+        // The lamp's agent switch (`agent_switch_told`): read only while a
+        // conversation is open (a turn, or the thread's conversation going
+        // on), and its two lines said only then, once each, when nothing
+        // holds the lamp and the person has paused. A switch made in the
+        // app to a quiet room is never spoken.
+        if let Some(switch) = agent_switch.as_mut() {
+            let talking = crate::agent_switch_told::in_conversation(
+                reply.is_some() || admission.owns_stream(),
+                || {
+                    crate::thread::THREAD
+                        .lock()
+                        .is_ok_and(|thread| thread.going_on(std::time::Instant::now()))
+                },
+            );
+            switch.conversation(talking, clock);
+            if talking
+                && reply.is_none()
+                && provider_queue.is_empty()
+                && speaker_pending.is_none()
+                && !admission.owns_stream()
+                && !submission_draining
+                && !paused
+                && clock.saturating_sub(last_speech_us) >= crate::task_news::PAUSE_US
+                && playback_mask.available(clock)
+                && snapshot.listening_ready(now())
+                && owner.snapshot(now())?.microphone_permission() == Permission::Allowed
+                && let Some((moment, note)) = switch.owed()
+                && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
+            {
+                snapshot = commit_written_turn(
+                    owner,
+                    reply,
+                    &mut provider_queue,
+                    &note,
+                    false,
+                    "agent_switch",
+                    provider_session,
+                    rig.playout_start_now(),
+                    trace,
+                    |state| rig.publish(state),
+                )?;
+                last_publish = monotonic_us();
+                lamp_began = reply.as_ref().map(|current| current.owner.turn());
+                did_voice_line =
+                    lamp_began.map(|turn| (turn, crate::did_voice::Moment::AgentSwitch));
+                switch.said(moment);
+                let moment = match moment {
+                    crate::agent_switch_told::Moment::Switching => "switching",
+                    crate::agent_switch_told::Moment::Ready => "ready",
+                };
+                record(
+                    trace,
+                    json!({"kind":"agent_switch_said","moment":moment,"at_us":clock}),
+                )?;
+            }
         }
         // "I've been signed out." (`LAMP_SIGNED_OUT`): once a spell, unasked,
         // to someone at the lamp, when nothing holds it and the room is quiet.
