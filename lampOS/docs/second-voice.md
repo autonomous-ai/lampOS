@@ -5859,7 +5859,13 @@ after a take-over, but now for every turn:
     lower case, apostrophe kept, a curly one as straight), and, for that
     start only, counts a conversation with the lamp going on
     (`Signs::going_on`) as a second sign, never for other lines; a face turned to the lamp, closeness and its words calling it
-    count as before. The journal says `is said to a person ("ma'am"), and
+    count as before. With `LAMP_NAME_SURE_OVER_A_PERSON_WORD=on` (the
+    product owner's first rule of 25 Nov 2026: a clear "Hey Lamp" counts) a
+    hearing at `attention::SURE_SCORE` or more that began at the start
+    stays its second sign past such a word: on lamp-74ff that night "Hey
+    Lamp, good morning!" came back "Hey, ma'am. Good morning." three times
+    in about 200 played calls, and each lost the conversation after it.
+    #3945's line, at 0.996, stays held. The journal says `is said to a person ("ma'am"), and
     nothing else shows it was called: not counted
     (LAMP_NAME_SAID_TO_A_PERSON)`, counts and the list's word only. Never
     on the list: the lamp's name, "lamb", `STAND_INS`, `STAND_ALONE_INS`,

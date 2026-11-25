@@ -3272,6 +3272,8 @@ fn second_route_worker_environment(
         // "Hey, Lynn. …" keeps a sure hearing in a busy room (the owner's
         // first rule, 25 Nov 2026).
         crate::second_provider::NAME_GREETED_STAND_IN_ENVIRONMENT,
+        // A sure start past a word said to a person, the same rule.
+        crate::second_provider::NAME_SURE_OVER_A_PERSON_WORD_ENVIRONMENT,
         crate::second_provider::NAME_STAYS_ENVIRONMENT,
         // A repeat of the line before's end is no call by its text (#3923).
         crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT,
@@ -3772,6 +3774,7 @@ mod tests {
             crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT,
             crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT,
             crate::second_provider::NAME_GREETED_STAND_IN_ENVIRONMENT,
+            crate::second_provider::NAME_SURE_OVER_A_PERSON_WORD_ENVIRONMENT,
             crate::second_provider::NAME_STAYS_ENVIRONMENT,
             crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT,
             crate::attention::ONE_AS_LAMP_ENVIRONMENT,
@@ -4998,6 +5001,7 @@ mod tests {
                     || name == crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT
                     || name == crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT
                     || name == crate::second_provider::NAME_GREETED_STAND_IN_ENVIRONMENT
+                    || name == crate::second_provider::NAME_SURE_OVER_A_PERSON_WORD_ENVIRONMENT
                     || name == crate::second_provider::NAME_STAYS_ENVIRONMENT
                     || name == crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT
                     || name == crate::attention::ONE_AS_LAMP_ENVIRONMENT
@@ -5366,6 +5370,7 @@ mod tests {
                     "LAMP_NAME_SIGN_TIED=on",
                     "LAMP_NAME_START_USUAL=on",
                     "LAMP_NAME_STAYS_IN_ITS_LINE=on",
+                    "LAMP_NAME_SURE_OVER_A_PERSON_WORD=on",
                     "LAMP_NAME_WORDLESS_BAR=on",
                     "LAMP_NEWS_REPLY_HEEDS_HELD=on",
                     "LAMP_NOT_FOR_ME_WORDS=on",
