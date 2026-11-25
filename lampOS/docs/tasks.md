@@ -8511,11 +8511,10 @@ It is said at most once per hand-over, and never a third line: nothing
 more is read or said for that work. Taken up, finished, failed, gone, or
 another hand-over since: nothing is said. A hand-over that then fails is
 still told as the task news tells one: this line marks nothing told.
-A wait already told at the hand-over gets no line at 20 s
-(`hand_wait::told_at_hand_over`): when the lamp knows the computer's
-pane is stopped, the waking line is said from the start, and only that
-one (the first builder on #8445, 14:51: one line about the wait, never
-two). Work queued behind earlier work still under way gets no line:
+The line is picked by where the work runs, not by who it was handed to:
+work on the lamp, by its own engine or one the person named, gets the
+first-person line, never "your computer" (the first builder's P3 on
+#8510). Work queued behind earlier work still under way gets no line:
 lamp-tasks runs one at a time (OpenClaw direct's "waiting for the task
 before it to end", `LAMP_TASKS_OPENCLAW_DIRECT=on`; the one session's queue
 behind the running turn, `LAMP_TASKS_ONE_SESSION=on`), so the agent is busy,

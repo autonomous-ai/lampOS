@@ -15,16 +15,14 @@
 //! work on the records is still under way, and it is still the work this
 //! voice handed over last, one short line is
 //! asked of the say service ([`crate::say::OwnAsks`]), as the voice's own:
-//! "Your computer is waking up; it'll start in a moment.", or, for the
-//! lamp's own engine, "I'm still getting ready; I'll start in a moment."
+//! "Your computer is waking up; it'll start in a moment.", or, for work
+//! that runs on the lamp (its own engine, or one the person named), "I'm
+//! still getting ready; I'll start in a moment."
 //! At most once per hand-over, and never a third line: nothing more is
 //! read or said for it. Taken up, finished, failed, gone, or another
 //! hand-over since: nothing is said. A hand-over that then fails is still
 //! told as the task news tells one (`task_news`, `failed_hand_over`): this
-//! line marks nothing told. A wait already told at the hand-over (the
-//! waking line, when the computer's pane is known to be stopped:
-//! [`told_at_hand_over`]) gets no line at [`AFTER`]: one line about the
-//! wait, never two.
+//! line marks nothing told.
 //!
 //! Work queued behind earlier work still under way gets no line: lamp-tasks
 //! runs one at a time (`direct.rs`'s `QUEUED_ABOUT`, "waiting for the task
@@ -50,8 +48,9 @@ use std::{
 pub const AFTER: Duration = Duration::from_secs(20);
 /// The line for work handed to an agent on the person's computer.
 pub const LINE_COMPUTER: &str = "Your computer is waking up; it'll start in a moment.";
-/// The line for the lamp's own engine (`agent_tasks::OWN_ENGINE`), said in
-/// the first person as its hand-over is (#7930).
+/// The line for work that runs on the lamp, by its own engine or one the
+/// person named, said in the first person as its hand-over is (#7930; the
+/// first builder's P3 on #8510: never "your computer" for the lamp's work).
 pub const LINE_OWN: &str = "I'm still getting ready; I'll start in a moment.";
 /// The say service's skill name for it.
 pub const SKILL: &str = "voice-tasks";
@@ -98,18 +97,10 @@ pub fn start(own: Option<OwnAsks>) {
     }
 }
 
-/// Work `id`'s wait was already told at its hand-over: the waking line,
-/// said from the start when the computer's pane is known to be stopped
-/// (the first builder on #8445, 14:51). No line comes for it at [`AFTER`]:
-/// one line about the wait, never two.
-pub fn told_at_hand_over(id: &str) {
-    mark_said(id);
-}
-
 /// Work `id` was just handed over through lamp-tasks at `directory`: one
 /// line [`AFTER`] from now while it still waits ([`check_once`]), on a
 /// thread of its own, never the turn's. Nothing without the say service.
-pub fn watch(directory: &Path, id: &str, own_engine: bool) {
+pub fn watch(directory: &Path, id: &str, on_lamp: bool) {
     let Some(own) = OWN.get().cloned() else {
         return;
     };
@@ -120,7 +111,7 @@ pub fn watch(directory: &Path, id: &str, own_engine: bool) {
         .spawn(move || {
             std::thread::sleep(AFTER);
             let still_last = || crate::agent_tasks::handed_last_is(&id);
-            check_once(&socket, &id, own_engine, &own, still_last);
+            check_once(&socket, &id, on_lamp, &own, still_last);
         });
 }
 
@@ -132,7 +123,7 @@ pub fn watch(directory: &Path, id: &str, own_engine: bool) {
 fn line_for(
     answer: Option<&Value>,
     id: &str,
-    own_engine: bool,
+    on_lamp: bool,
     still_last: bool,
 ) -> Option<&'static str> {
     let answer = answer?;
@@ -156,7 +147,7 @@ fn line_for(
     if !still_last || said().iter().any(|said| said == id) {
         return None;
     }
-    Some(if own_engine { LINE_OWN } else { LINE_COMPUTER })
+    Some(if on_lamp { LINE_OWN } else { LINE_COMPUTER })
 }
 
 /// [`watch`]'s one read of work `id` on `socket`, and its one line, asked
@@ -164,7 +155,7 @@ fn line_for(
 pub(crate) fn check_once(
     socket: &Path,
     id: &str,
-    own_engine: bool,
+    on_lamp: bool,
     own: &OwnAsks,
     still_last: impl FnOnce() -> bool,
 ) -> Option<(&'static str, std::sync::mpsc::Receiver<Answer>)> {
@@ -173,7 +164,7 @@ pub(crate) fn check_once(
         &json!({"op": "work_list", "limit": LISTED}),
         READ_DEADLINE,
     );
-    let line = line_for(answer.as_ref(), id, own_engine, still_last())?;
+    let line = line_for(answer.as_ref(), id, on_lamp, still_last())?;
     mark_said(id);
     eprintln!(
         "lamp-voice: tasks: work {id} still waits for its agent after {} s: said it is starting",
@@ -296,27 +287,6 @@ mod tests {
         );
         assert_eq!(
             line_for(Some(&work("t-queued", "queued")), "t-queued", false, true),
-            Some(LINE_COMPUTER)
-        );
-    }
-
-    /// A wait already told at the hand-over (the computer's pane known to
-    /// be stopped) gets no line at 20 s, though the work is still queued.
-    #[test]
-    fn a_wait_told_at_the_hand_over_gets_no_line_at_20_s() {
-        told_at_hand_over("t-told");
-        told_at_hand_over("t-told");
-        assert_eq!(
-            line_for(Some(&work("t-told", "queued")), "t-told", false, true),
-            None
-        );
-        assert_eq!(
-            line_for(
-                Some(&work("t-not-told", "queued")),
-                "t-not-told",
-                false,
-                true
-            ),
             Some(LINE_COMPUTER)
         );
     }
