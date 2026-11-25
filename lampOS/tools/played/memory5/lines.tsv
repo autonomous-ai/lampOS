@@ -1,0 +1,49 @@
+# memory5 (kit-q-memory5): the memory gate set's steps, in play order. One voice for every line (the test face's).
+# The runner (off-repo) reads this file top to bottom: it sets the face first (talk|still|hide; - leaves it), then
+# says the line (say: played, misheard wake word replayed once; mem: a memory line, gated on the face read speaking
+# and checked seen after, replayed at most once in all), waits `wait` s; quiet waits with nothing said; snap reads
+# the memory (test face, room, owner and rule scopes) into snap_<text>.json. All names and facts are made up.
+#step	scene	face	kind	wait	text
+q0	pre	hide	quiet	50	
+s9_name	S9	hide	say	18	Lamp, what's my name?
+s3g_q	S3g	hide	quiet	50	
+s3g_01	S3g	talk	say	15	Lamp, I'm planning to repaint my kitchen next week.
+s3g_02	S3g	-	say	15	Lamp, what do you think of teal for the kitchen walls?
+s3g_03	S3g	-	say	15	Lamp, I have a dentist appointment tomorrow at ten, so I'll paint after that.
+s3g_04	S3g	-	say	12	Lamp, quiz me: what's the capital of Sweden?
+s3g_05	S3g	-	say	12	Lamp, quiz me: what's the capital of Ghana?
+s3g_06	S3g	-	say	12	Lamp, quiz me: what's the capital of Nepal?
+s3g_rest	S3g	still	quiet	80	
+s3g_snap	S3g	-	snap	0	s3g
+s0g_name	S0g	talk	mem	16	Lamp, what's my name?
+s0g_k1	S0g	-	mem	18	Lamp, please remember that my cousin is called Ferdinand.
+s0g_k1_yes	S0g	-	mem	12	Yes, please keep that.
+s0g_k2	S0g	-	mem	18	Lamp, please remember that my favourite jam is apricot.
+s0g_k2_yes	S0g	-	mem	12	Yes, please keep that.
+s0g_t1	S0g	-	mem	18	Lamp, from now on, please keep your answers to me to one short sentence.
+s0g_snap	S0g	-	snap	0	s0g
+s13g_keep	S13g	-	mem	18	Lamp, please remember that my water bottle is green.
+s13g_keep_yes	S13g	-	mem	12	Yes, please keep that.
+s13g_ask_face	S13g	-	mem	18	Lamp, what colour is my water bottle?
+s13g_hide	S13g	hide	quiet	8	
+s13g_keep_hidden	S13g	-	say	18	Lamp, please remember that my scooter is orange.
+s13g_ask_hidden	S13g	-	say	18	Lamp, what colour is my water bottle?
+s13g_snap_hidden	S13g	-	snap	0	s13g_hidden
+s13g_fix	S13g	talk	mem	18	Lamp, actually, my water bottle is blue now.
+s13g_fix_yes	S13g	-	mem	12	Yes, please keep that.
+s13g_snap_fix	S13g	-	snap	0	s13g_fix
+s13g_forget_about	S13g	-	mem	18	Lamp, forget what I said about my water bottle.
+s13g_forget_yes	S13g	-	mem	14	Yes, please forget it.
+s13g_snap_forget	S13g	-	snap	0	s13g_forget
+s13g_after	S13g	-	mem	18	Lamp, what colour is my water bottle?
+s0g_r1	S0g	-	mem	16	Lamp, what's my cousin called?
+s0g_r2	S0g	-	mem	16	Lamp, what's my favourite jam?
+s2g_q	S2g	still	quiet	50	
+s2g_t2	S2g	talk	mem	20	Lamp, tell me about the moon.
+s2g_blood	S2g	-	mem	20	Lamp, what is my blood type?
+s2g_hide	S2g	hide	quiet	8	
+s2g_room_plant	S2g	-	say	20	Lamp, remember that the office plant gets watered on Fridays.
+s2g_snap_room	S2g	-	snap	0	s2g_room
+s2g_show	S2g	talk	quiet	6	
+s2g_room_ask	S2g	-	mem	22	Lamp, what do you know about the office plant?
+s2g_snap	S2g	-	snap	0	s2g
