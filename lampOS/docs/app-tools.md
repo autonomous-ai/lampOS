@@ -463,6 +463,11 @@ Migrate's part.
   run answered, so a repeated `app.call` never does the work twice.
 - **JavaScript:** `app.tool(name, description, params, handler)`, with
   `params` given as the same schema subset, checked by `lamp app check`.
+- **Built underneath (#8386):** the schema lists `app.call`, `app.call.stopped`,
+  `app.answer` and hello's `tools`, and both SDKs take them: `lamp.on("app.call",
+  handler)`, `await lamp.answer(call, result)` (Python, `error=` for one line;
+  JS `lamp.answer(call, { result | error })`) returning `taken`, and
+  `lamp.tools`. The decorator above is built on these; it is not yet.
 - **`lamp fake`:** the fake lamp serves `app.call` and `app.answer`, and
   `lamp fake call <tool> '{"days": 2}'` (or typed text, `lamp fake say "two
   short workouts a week"`, with a stand-in model) calls a tool and prints the

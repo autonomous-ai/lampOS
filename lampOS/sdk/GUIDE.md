@@ -400,6 +400,15 @@ is the owner's yes: there is no yes at the lamp. A re-push of the name replaces 
 | `lamp.apps()`; CLI `lamp app list` | `lamp.apps()` | `lamp_apps()` | Op `app.list`: this computer's own pushed apps | `skills` | as `skill.list` | `{apps: [{name, title, version, sha256, grants, net, logs, stopped}, ...]}` | the switch refusals of `app.push` | in development |
 | `lamp.remove_app(name)`; CLI `lamp app remove NAME` | `lamp.removeApp(name)` | `lamp_app_remove(name)` | Op `app.remove`: takes one of this computer's own pushed apps off the lamp | `skills` | as `skill.list` | `{removed: NAME}` | as `app.list`; `refused` for an app that is not this computer's | in development |
 
+### An installed app's tools (app socket only)
+
+Lamp's model calls one of the app's tools (its manifest's tools file, [docs/app-tools.md](../docs/app-tools.md)) only with
+`LAMP_APP_TOOLS` on; hello then says `tools: true`.
+
+| Python | JavaScript | MCP tool | What it does | Grant | Limits | Answer | Refusals | Status |
+|---|---|---|---|---|---|---|---|---|
+| `lamp.tools`; `lamp.on("app.call", handler)`, `lamp.on("app.call.stopped", handler)`; `await lamp.answer(call, result=None, *, error=None)` | `lamp.tools`; `lamp.on('app.call', handler)`, `lamp.on('app.call.stopped', handler)`; `await lamp.answer(call, { result, error })` | — | The event `app.call` `{call, name, args}` comes unasked; op `app.answer` `{call, result}` or `{call, error}` answers it; `app.call.stopped` `{call, why: "timeout"}` when the lamp stopped waiting | none (the manifest's tools file) | one call in flight an app; answer within 4.5 s; `result` an object of at most 2,048 bytes, `error` one line of at most 200 characters (over either, the call ends `too_long`); ten answers a second | `taken`: true once for the call in flight, false late, stopped or answered already | `off` "app tools are off on this lamp"; `bad_request` another shape, or one of the lamp's words as `error`; `rate` "ten answers a second" | lamp side built behind `LAMP_APP_TOOLS`; SDKs fake-tested (25 Nov 2026) |
+
 ### A skill run's linked services (control socket only)
 
 A skill's task run on the lamp's own Hermes (#6432) holds a one-run token on the control

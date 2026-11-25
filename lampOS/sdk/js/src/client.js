@@ -484,6 +484,9 @@ export class Lamp {
     // The installed app this connection is and its version, when the lamp says (an app socket's hello or welcome).
     this.app = hello.app ?? welcome.app ?? null;
     this.appVersion = hello.version ?? welcome.version ?? null;
+    // Whether the lamp sends this app the model's tool calls (`app.call`): an app socket's hello says `tools: true` only
+    // with LAMP_APP_TOOLS on (#8406); false otherwise, and from a lamp built before it.
+    this.tools = hello.tools === true;
     this.nextId = 1;
     // The hand this connection's head follows, if any (`followHand`).
     this.following = null;
@@ -895,6 +898,21 @@ export class Lamp {
   // Take the turn an `app.trigger` named (its `turn`): the voice keeps quiet. A say, gesture or light within 3 s
   // counts as well; with neither, the voice answers itself.
   took(turn) { return this.request('app.took', { turn }); }
+
+  // Answer the model's call of one of the app's tools: an `app.call` event's `call` (`lamp.on('app.call', ...)`, with
+  // `name` and `args`), and exactly one of `result`, a JSON object of at most 2,048 bytes, or `error`, one line of the
+  // app's own words (at most 200 characters, never one of the lamp's: `timeout`, `too_long`, `busy`, `private`,
+  // `stopped`, `unknown tool`, `not running`). Answer within 4.5 s: after that the lamp sends `app.call.stopped` and
+  // takes no answer. Resolves true when the lamp took it, false when the call was not in flight (late, stopped,
+  // answered already). Only when `lamp.tools` is true; a lamp with app tools off refuses it `off`.
+  async answer(call, { result, error } = {}) {
+    const bad = (why) => new LampError(`answer: ${why}`, { code: 'bad_request' });
+    if ((result === undefined) === (error === undefined)) throw bad('exactly one of result (an object) or error (one line)');
+    if (result !== undefined && (result === null || typeof result !== 'object' || Array.isArray(result))) throw bad('result is a JSON object');
+    if (error !== undefined && (typeof error !== 'string' || error === '' || /\p{Cc}/u.test(error))) throw bad('error is one line of text, no control characters');
+    const fields = result !== undefined ? { call, result } : { call, error };
+    return Boolean((await this.request('app.answer', fields)).taken);
+  }
 
   // The owner's value for every key of the manifest's settings, by key. A change comes as the event `app.settings`
   // (`changed`, and every value now); lamp-control checked each value against the schema first.

@@ -21,6 +21,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { WebSocketServer } from './ws.js';
 import * as schema from './schema.js';
+
+// The lamp's own words for a call with no answer of the app's (lamp_msgs::AppCalled::LAMP_WORDS).
+const LAMP_WORDS = ['timeout', 'too_long', 'busy', 'private', 'stopped', 'unknown tool', 'not running'];
 import { HELLO, b64, pinOf, proof, unb64 } from './keys.js';
 import { LAMP_FARTHEST, MOVE_FARTHEST, MOVE_FRAMES_MIN, MOVE_STEP_MS, moveWhy } from './moves.js';
 
@@ -444,7 +447,7 @@ export class FakeLamp {
   // no `done` follows them.
   // `refuses`: ops refused `refused` with this why, as a lamp that doesn't
   // route them yet does (LAMP_CONTROL_REFUSES); none by default.
-  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', language = 'en', build = null, autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null, appReach = false, local = false, app = false, appName = 'fake-app', appGrants = ['speak', 'hear', 'light'], appVersion = '1.0.0', appSettings = {}, panelRateS = 60, storeApps = true, appsHelper = true } = {}) {
+  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', language = 'en', build = null, autoDone = true, refuses = {}, followsHand = true, motionDone = true, faceLook = true, face = null, appReach = false, local = false, app = false, appName = 'fake-app', appGrants = ['speak', 'hear', 'light'], appVersion = '1.0.0', appSettings = {}, appTools = false, panelRateS = 60, storeApps = true, appsHelper = true } = {}) {
     // `local`: also serve lamp-control's control socket (a unix socket, `localPath`) for a skill's run, where a
     // one-run token from `mintToken` is what lets a connection in (`Lamp.local`).
     this.local = local;
@@ -457,6 +460,13 @@ export class FakeLamp {
     this.appName = appName;
     this.appVersion = appVersion;
     this.appGrants = [...appGrants];
+    // `appTools`: LAMP_APP_TOOLS on (#8406): hello says `tools: true`, `callTool` sends the model's call as `app.call`,
+    // and `app.answer` is taken (refused `off` without it). The calls in flight, and each call's end as the voice would
+    // be told it (`{ result }`, or `{ error }` with the app's words or the lamp's).
+    this.appTools = appTools;
+    this.appCalls = new Map();
+    this.appAnswers = new Map();
+    this.callN = 0;
     this.appPath = null;
     this.appWs = new Set();
     // The owner's values for the manifest's settings (`setAppSetting`), the phrases each connection listens for
@@ -1184,7 +1194,7 @@ export class FakeLamp {
     const client = `app_${this.appName}`;
     this.clients.set(client, { key: Buffer.alloc(0), name: `app ${this.appName}`, grants: [...this.appGrants] });
     const limits = this.motionDone ? { ...LIMITS, motion_done: true } : LIMITS;
-    this.ok(ws, request.id, { lamp: this.lamp, grants: [...this.appGrants], limits, app: this.appName, version: this.appVersion });
+    this.ok(ws, request.id, { lamp: this.lamp, grants: [...this.appGrants], limits, app: this.appName, version: this.appVersion, ...(this.appTools ? { tools: true } : {}) });
     return client;
   }
 
@@ -1346,6 +1356,7 @@ export class FakeLamp {
       return this.ok(ws, id);
     }
     if (op === 'app.settings.get') return this.ok(ws, id, { settings: { ...this.appSettings } });
+    if (op === 'app.answer') return this.appAnswer(ws, request);
     // app.panel.set: text only, one a minute an app.
     const { title, lines } = request;
     if (typeof title !== 'string' || [...title].length < 1 || [...title].length > 40 || !Array.isArray(lines) || lines.length > 6
@@ -1398,6 +1409,47 @@ export class FakeLamp {
     this.rememberedAt.push(at);
     this.appFacts.push(text);
     return this.ok(ws, id, { kept: true });
+  }
+
+  // `app.answer`, as lamp-control's app_calls.rs takes it: refused `off` with app tools off; the lamp's own words
+  // refused; a result over 2,048 bytes or an error over 200 characters ends the call as `too_long`; `taken` once, for
+  // the call in flight.
+  appAnswer(ws, request) {
+    const { id, call, result, error } = request;
+    if (!this.appTools) return this.refuse(ws, id, 'off', 'app tools are off on this lamp');
+    const shape = 'app.answer takes call and one of result (an object) or error (one line)';
+    const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+    if (typeof call !== 'string' || (result === undefined) === (error === undefined)) return this.refuse(ws, id, 'bad_request', shape);
+    if (result !== undefined && !isObject(result)) return this.refuse(ws, id, 'bad_request', shape);
+    if (error !== undefined && (typeof error !== 'string' || error === '' || /\p{Cc}/u.test(error))) return this.refuse(ws, id, 'bad_request', shape);
+    if (error !== undefined && LAMP_WORDS.includes(error)) return this.refuse(ws, id, 'bad_request', "error: the app's own words, never one of the lamp's");
+    let end;
+    if (error !== undefined) end = { error: [...error].length > 200 ? 'too_long' : error };
+    else end = Buffer.byteLength(JSON.stringify(result)) > 2048 ? { error: 'too_long' } : { result };
+    const taken = this.appCalls.delete(call);
+    if (taken) this.appAnswers.set(call, end);
+    return this.ok(ws, id, { taken });
+  }
+
+  // The voice's model calls the app's tool `name`: each app connection is told `app.call` with a call id (the lamp's
+  // `app-<boot>-<request>-<n>` shape), the name and `args`. Returns the call's id; its end is in `appAnswers` once the
+  // app answers.
+  callTool(name, args = {}, { call } = {}) {
+    if (!this.appTools) throw new Error('callTool: new FakeLamp({ appTools: true }) first');
+    this.callN += 1;
+    call ??= `app-1-${this.callN}-1`;
+    this.appCalls.set(call, { name, args: { ...args } });
+    const frame = JSON.stringify({ ev: 'app.call', call, name, args: { ...args } });
+    for (const ws of this.appWs) ws.send(frame);
+    return call;
+  }
+
+  // The lamp stops waiting for `call` (its 4.5 s): the voice is told `why`, the app `app.call.stopped`, and a later
+  // answer is not taken.
+  stopCall(call, why = 'timeout') {
+    if (this.appCalls.delete(call)) this.appAnswers.set(call, { error: why });
+    const frame = JSON.stringify({ ev: 'app.call.stopped', call, why });
+    for (const ws of this.appWs) ws.send(frame);
   }
 
   tellApps(event, fields = {}, { phrase } = {}) {
