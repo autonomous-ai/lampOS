@@ -67,12 +67,11 @@ pub enum Request {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         session: Option<String>,
         /// The engine the person named for the work (#6492), by any name
-        /// Harness gives an engine (`hermes`, `openclaw`, `claude`, …), read
-        /// only for the lamp's own target ([`crate::runtime::LAMP_TARGET`]):
-        /// the work runs on exactly that one while it is among the lamp's
-        /// engines, else the prepare is refused (`engine_not_here`,
-        /// `engine_unknown`), never moved to another.
-        /// Another target ignores it. Absent: the lamp's default.
+        /// Harness gives an engine (`hermes`, `openclaw`, `claude`, …).
+        /// Accepted but not read: one agent per lamp, so the lamp's own
+        /// target ([`crate::runtime::LAMP_TARGET`]) always runs on the
+        /// lamp's default engine, never refused for the name and never
+        /// moved elsewhere; another target runs on that computer's own.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         engine: Option<String>,
     },
