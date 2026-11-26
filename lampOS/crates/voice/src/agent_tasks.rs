@@ -1315,7 +1315,7 @@ fn set_by_the_words(
 
 /// The words the person said in the line `request` answers, when a person
 /// said it (`heard`); a test sets its own, on its own thread.
-fn heard_words(request: u64, heard: bool) -> Option<String> {
+pub(crate) fn heard_words(request: u64, heard: bool) -> Option<String> {
     if !heard {
         return None;
     }
@@ -3472,7 +3472,7 @@ fn yes_in_the_same_turn_now(pending: &Pending, request: u64, heard: bool) -> boo
 /// nothing prepared, [`CONFIRM`] then says to prepare the task said back
 /// and confirm again ([`NOTHING_PREPARED`]), and only
 /// [`yes_in_the_same_turn`] lets that yes start it.
-fn yes_to_a_question(
+pub(crate) fn yes_to_a_question(
     heard: bool,
     words: Option<&str>,
     last: Option<(&str, Duration, bool)>,
@@ -3675,7 +3675,7 @@ fn same_work(waiting: &str, task: &str) -> bool {
 }
 
 /// Lower-case words of letters and digits; an apostrophe stays inside one.
-fn plain_words(text: &str) -> Vec<String> {
+pub(crate) fn plain_words(text: &str) -> Vec<String> {
     text.split(|c: char| !(c.is_alphanumeric() || c == '\'' || c == '’'))
         .map(|word| {
             word.trim_matches(|c: char| c == '\'' || c == '’')
