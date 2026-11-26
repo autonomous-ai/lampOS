@@ -112,7 +112,10 @@ says its own line, are only for a skill the person's own words start, or
 one whose every trigger is a touch or a press (`controls/touch`,
 `controls/pet`, `controls/gesture`): that is the person at the lamp asking,
 answered at once. The lamp refuses any other way;
-examples/morning-headline.
+examples/morning-headline. A fixed `say` is said the same every time, so
+in such a skill its words never hold a number or a date (a count, a day, a
+price): that answer changes, so compute it when the skill runs, a task
+step whose script prints it. "Time to stretch!" stays a `say`.
 
 How a skill runs, so its code fits:
 
