@@ -2286,6 +2286,12 @@ pub struct Attention {
     /// A hearing that counts for the request in hand began within
     /// [`HEY_AT_THE_START_US`] of the line's start.
     named_near_the_start: bool,
+    /// The best score of the hearings that began within
+    /// [`HEY_AT_THE_START_US`] of the line's start: what `LAMP_NAME_HEY_ONLY`
+    /// weighs against [`NEAR_SCORE`], never a later hearing's (Reviewer-three's
+    /// P2 on #8781: a 0.905 hearing at the start and a 0.99 one 5 s in made a
+    /// room line "Hey Lamp").
+    start_score: f32,
     /// `LAMP_ONE_REPLY_WINDOW` ([`Attention::one_reply_window`]).
     one_reply_window: bool,
     /// `LAMP_NAME_NOT_ANOTHERS=on` (#8114, [`Self::hold_anothers_name`]).
@@ -2749,7 +2755,7 @@ impl Attention {
         // "Hey Lamp" and heard nothing of a bare "Lamp, what time is it?"
         // that night. A bare "Lamp" heard under it stays out.
         let greeting_lost = self.named_near_the_start
-            && self.best_score >= NEAR_SCORE
+            && self.start_score >= NEAR_SCORE
             && opens_with_the_name(&self.heard);
         // A greeting whose words don't name the lamp ("Hey man, …", "Hey,
         // Lynn.", "Hello?", "Hey, I need …") is "Hey Lamp" only on a hearing
@@ -2759,7 +2765,7 @@ impl Attention {
         // plain calls written without the name were heard at 0.980 to 0.997
         // (the P0 of 25 Nov). "Hey Lamp, …" and "Hello, Lamp. …" name it.
         let greeted = opens_with_hey(&self.heard);
-        let greeted_sure = greets_the_lamp_by_name(&self.heard) || self.best_score >= NEAR_SCORE;
+        let greeted_sure = greets_the_lamp_by_name(&self.heard) || self.start_score >= NEAR_SCORE;
         self.hey_kept = weighed
             && self.hey_only
             && !in_conversation
@@ -3279,6 +3285,11 @@ impl Attention {
             && self
                 .named_us
                 .is_some_and(|named| named <= start.saturating_add(HEY_AT_THE_START_US));
+        self.start_score = if self.named_near_the_start {
+            self.named_score
+        } else {
+            0.0
+        };
         self.cut_said_to_a_person = cut_said_to_a_person.filter(|_| self.named_at_start);
         self.tapped = self.tapped_us.is_some_and(|tapped| {
             tapped <= now_us && tapped.saturating_add(TAPPED_BEFORE_US) >= now_us
@@ -3340,7 +3351,7 @@ impl Attention {
             (
                 (self.named, self.named_at_start),
                 self.named_sure,
-                self.best_score,
+                (self.best_score, self.start_score),
                 std::mem::take(&mut self.heard),
                 self.near,
                 self.addressed,
@@ -3364,7 +3375,7 @@ impl Attention {
         if let Some((
             (named, named_at_start),
             named_sure,
-            best_score,
+            (best_score, start_score),
             heard,
             near,
             addressed,
@@ -3374,6 +3385,7 @@ impl Attention {
             self.named |= named;
             self.named_sure |= named_sure;
             self.best_score = self.best_score.max(best_score);
+            self.start_score = self.start_score.max(start_score);
             self.heard = heard;
             self.near |= near;
             self.addressed |= addressed;
@@ -3457,7 +3469,10 @@ impl Attention {
             self.named_sure |= sure;
             let start = self.start_in_hand().unwrap_or(began);
             self.named_at_start |= at_us <= start.saturating_add(NAME_AT_THE_START_US);
-            self.named_near_the_start |= at_us <= start.saturating_add(HEY_AT_THE_START_US);
+            if at_us <= start.saturating_add(HEY_AT_THE_START_US) {
+                self.named_near_the_start = true;
+                self.start_score = self.start_score.max(score);
+            }
             self.best_score = self.best_score.max(score);
         }
     }
@@ -3523,6 +3538,7 @@ impl Attention {
         self.opened = false;
         self.in_name_wake = false;
         self.best_score = 0.0;
+        self.start_score = 0.0;
         self.near = false;
         self.near_at_the_name = false;
         self.addressed = false;
@@ -8728,6 +8744,73 @@ mod tests {
             ),
             (true, false, true),
             "a greeting to someone named"
+        );
+    }
+
+    /// `LAMP_NAME_HEY_ONLY`'s near score is a start hearing's
+    /// (`Attention::start_score`, Reviewer-three's P2 on #8781), with the
+    /// product's switches: in "Hey man, could you move the lamp on that
+    /// table?", a 0.905 hearing 210 ms in and a 0.99 one 5 s in make no "Hey
+    /// Lamp", whichever is told first. A 0.97 hearing at the start does, with
+    /// a weak one later. "Hey Lamp, …" in its words needs no score. A greeting
+    /// that speech to text lost needs its start hearing's score too.
+    #[test]
+    fn with_hey_only_the_near_score_is_a_start_hearings() {
+        let weigh = |heard: &str, hearings: &[(u64, f32)]| {
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            attention.tie_the_second_sign(true);
+            attention.need_a_face_or_words(true);
+            attention.keep_greeted_stand_ins(true);
+            attention.hold_anothers_name(true);
+            attention.hold_a_start_said_to_a_person(true);
+            attention.only_hey_lamp(true);
+            attention.began_at(1, 1, 10_000_000);
+            for &(at_us, score) in hearings {
+                attention.name_heard_scored(at_us, score);
+            }
+            attention.heard(heard);
+            (
+                attention.weigh_the_name(None, false),
+                attention.name_kept_as_hey(),
+            )
+        };
+        let room = "Hey man, could you move the lamp on that table?";
+        let (weak, strong) = ((10_210_000, 0.905), (15_000_000, 0.99));
+        assert_eq!(
+            weigh(room, &[weak, strong]),
+            (true, false),
+            "weak early, strong late"
+        );
+        assert_eq!(
+            weigh(room, &[strong, weak]),
+            (true, false),
+            "told the other way round"
+        );
+        assert_eq!(weigh(room, &[weak]), (true, false), "weak early alone");
+        assert_eq!(
+            weigh(
+                "Hey man, what time is it?",
+                &[(10_210_000, 0.97), (15_000_000, 0.6)]
+            ),
+            (false, true),
+            "strong at the start"
+        );
+        assert_eq!(
+            weigh("Hey Lamp, what time is it?", &[weak]),
+            (false, true),
+            "named in its words"
+        );
+        let lost = "Lamp, how far is it to Paris?";
+        assert_eq!(
+            weigh(lost, &[weak, strong]),
+            (true, false),
+            "lost, weak at the start"
+        );
+        assert_eq!(
+            weigh(lost, &[(10_210_000, 0.99)]),
+            (false, true),
+            "lost, strong at the start"
         );
     }
 
