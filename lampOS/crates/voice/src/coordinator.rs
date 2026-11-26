@@ -2470,13 +2470,29 @@ fn sleep_light(bus: Option<&lamp_bus::Bus>) -> Option<crate::ring_face::Lit> {
     bus.and_then(crate::ring_asleep::persons_light)
 }
 
+/// Whether the person's light is off now (#8634), from the bus and the
+/// light kept on disk (Linux, where the ring is).
+#[cfg(target_os = "linux")]
+fn lights_off() -> bool {
+    let bus = lamp_bus::Bus::from_environment().ok();
+    crate::ring_asleep::persons_light_off(
+        bus.as_ref(),
+        std::path::Path::new(crate::ring_light::KEEP_PATH),
+    )
+}
+
 /// What a hand's sleep shows on the lamp's own ring (Linux): the person's
-/// own light, if their ring said one was on, and the asleep face otherwise
-/// (#1362, the first builder on #1362, 21 Oct 15:1x).
+/// own light, if their ring said one was on, the asleep face otherwise
+/// (#1362, the first builder on #1362, 21 Oct 15:1x), and nothing when
+/// their light is off (#8634).
 fn sleeping_face(ceiling: u16) -> Option<crate::ring_asleep::Asleep> {
     #[cfg(target_os = "linux")]
     {
         let bus = lamp_bus::Bus::from_environment().ok();
+        let kept = std::path::Path::new(crate::ring_light::KEEP_PATH);
+        if crate::ring_asleep::persons_light_off(bus.as_ref(), kept) {
+            return None;
+        }
         crate::ring_asleep::Asleep::sleeping(ceiling, sleep_light(bus.as_ref()))
     }
     #[cfg(not(target_os = "linux"))]
@@ -3686,7 +3702,8 @@ fn run_source(
                 termination,
                 |trace, cues| {
                     #[cfg(target_os = "linux")]
-                    let asleep = asleep_ceiling.and_then(crate::ring_asleep::Asleep::start);
+                    let asleep = crate::ring_asleep::face_ceiling(asleep_ceiling, lights_off())
+                        .and_then(crate::ring_asleep::Asleep::start);
                     #[cfg(not(target_os = "linux"))]
                     let _ = asleep_ceiling;
                     let tap_face = tap_face_ceiling.map(|ceiling| {
