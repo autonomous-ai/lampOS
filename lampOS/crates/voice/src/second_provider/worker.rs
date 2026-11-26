@@ -12514,12 +12514,16 @@ impl Heeding {
         // `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER`: over the answer, whether the
         // line's words tie it to the conversation, so that with no look it
         // may still be let out (Sixth's row on #8689: a blanket hold held
-        // the asker's own follow-ups and corrections).
+        // the asker's own follow-ups and corrections). A question about
+        // what the lamp is saying ties by its form: until the answer ends
+        // the thread holds none of its words (Sixth's second row, 26 Nov:
+        // all three of the asker's questions about the story were held).
         let over_held = self.over_the_answer_no_follow_up(request);
         let asked = signs.lamp_asked || crate::services::answer_awaited(heard);
         let cut_in_tied = over_held
             && (self.tied_to_the_lamp(request, heard, false)
                 || crate::untied_going_on::corrects(heard)
+                || crate::untied_going_on::asks_about_it(heard)
                 || (asked && crate::untied_going_on::a_short_reply(heard)));
         let line = crate::said_to_me::Line {
             heard,
@@ -31207,6 +31211,9 @@ mod tests {
         use crate::second_provider::Heard;
         const CORRECTION: &str = "No, I meant Spain.";
         const FOLLOW_UP: &str = "And how many people live there?";
+        // A question about the answer that shares none of its words (Sixth's
+        // second row: "Sorry, how old was he then?").
+        const QUESTION: &str = "Wait, how old is it?";
         const ROOM: &str = "Don't stop now, you're almost done.";
         // Whether line 9 is answered after the asker's question 8; with
         // `asked` the lamp's answer asked a question it still waits on.
@@ -31262,6 +31269,14 @@ mod tests {
         assert!(
             answered(true, true, false, false, FOLLOW_UP),
             "over the answer, a follow-up its words tie: the one cut-in"
+        );
+        assert!(
+            answered(true, true, false, false, QUESTION),
+            "over the answer, a question about it, no word shared: the one cut-in"
+        );
+        assert!(
+            answered(true, true, false, true, QUESTION),
+            "over the answer, a question about it: the one answer to the waiting question"
         );
         assert!(
             !answered(true, true, false, false, ROOM),
