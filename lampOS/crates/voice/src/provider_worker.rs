@@ -1859,6 +1859,11 @@ pub async fn run_with_continuation(
     if let Some(place) = &files.tools.tasks {
         crate::agent_tasks::start(place);
     }
+    // A reply claiming a stop of the desk noticing with none called runs it
+    // (#7767), with it on by default and its functions declared.
+    crate::seen_yes::arm_live(
+        files.tools.seen_activity && lamp_msgs::consent::noticing_by_default(),
+    );
     // The watches of the cycle before (a mute or a sleep ended that worker),
     // and the watcher that tells them.
     if files.tools.watch {
@@ -5069,6 +5074,10 @@ fn forward_origin(
             if let Ok(mut thread) = crate::thread::THREAD.lock() {
                 thread.lamp(lineage.request.get(), &text, std::time::Instant::now());
             }
+            // A claim to have stopped looking with desk noticing on and no
+            // stop called runs the stop as it is said (#7767,
+            // `seen_yes::arm_live`); the thread's lock is let go first.
+            crate::seen_yes::live_piece(lineage.request.get(), &text);
             push_text(&mut push, Some(lineage.request.get()), text, finished)
         }
         Event::UncorrelatedInputTranscript { text, finished, .. } => {
