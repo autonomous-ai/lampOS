@@ -201,6 +201,21 @@ pub const OWN_VOICE_LOST_LINE: &str =
 /// it never was in this run (#8367): what `voice-keys` tells lamp-health.
 pub static OWN_VOICE_REFUSED: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
 
+/// Whether [`OWN_VOICE_REFUSED`] is Gemini's refusal of the person's own
+/// Gemini voice (#8754), not ElevenLabs': what `voice-keys` names.
+pub static OWN_VOICE_REFUSED_GEMINI: AtomicBool = AtomicBool::new(false);
+
+/// [`OWN_VOICE_LOST_LINE`] for the person's own voice at `provider`
+/// (`ElevenLabs`, `Gemini`, #8754): ElevenLabs' is that line exactly.
+pub(crate) fn own_voice_lost_line(provider: &str) -> String {
+    match provider {
+        "ElevenLabs" => OWN_VOICE_LOST_LINE.to_owned(),
+        provider => {
+            format!("Your {provider} voice isn't working right now, so I'm back to my own voice.")
+        }
+    }
+}
+
 /// The person's own voice refused, once per process (#8394's lamp row: one
 /// 401 logged by three pieces at once): every [`Tts`] of the process routes
 /// through the one [`own_voice_lost`], so the refusal is journalled once and
@@ -227,12 +242,24 @@ impl OwnVoiceLost {
     /// ElevenLabs refused the person's voice with `status`: the lamp's own
     /// voice from now on, journalled by the first piece to see it only.
     fn refused(&self, status: u16) {
+        self.refused_by(status, "ElevenLabs");
+    }
+
+    /// [`Self::refused`] by `provider`, the person's own voice's (#8754).
+    pub(crate) fn refused_by(&self, status: u16, provider: &str) {
+        OWN_VOICE_REFUSED_GEMINI.store(provider == "Gemini", Ordering::Relaxed);
         OWN_VOICE_REFUSED.store(status, Ordering::Relaxed);
         if !self.lost.swap(true, Ordering::AcqRel) {
             self.say(format!(
-                "lamp-voice second: ElevenLabs refused the person's own key or voice (HTTP {status}); the lamp's own voice from now on (LAMP_OWN_KEYS)"
+                "lamp-voice second: {provider} refused the person's own key or voice (HTTP {status}); the lamp's own voice from now on (LAMP_OWN_KEYS)"
             ));
         }
+    }
+
+    /// Whether the person's own voice was refused or gave way: every piece
+    /// goes to the lamp's own from then on.
+    pub(crate) fn is_lost(&self) -> bool {
+        self.lost.load(Ordering::Acquire)
     }
 
     /// The person's voice failed a piece twice for another reason than a
@@ -241,9 +268,14 @@ impl OwnVoiceLost {
     /// on, as after a refusal, journalled by the first piece to see it only.
     /// `voice-keys` warns for a refusal alone.
     fn failed(&self, why: &Error) {
+        self.failed_by(why, "ElevenLabs");
+    }
+
+    /// [`Self::failed`] by `provider`, the person's own voice's (#8754).
+    pub(crate) fn failed_by(&self, why: &Error, provider: &str) {
         if !self.lost.swap(true, Ordering::AcqRel) {
             self.say(format!(
-                "lamp-voice second: the person's own ElevenLabs voice failed a sentence twice ({why}); the lamp's own voice from now on (LAMP_OWN_KEYS)"
+                "lamp-voice second: the person's own {provider} voice failed a sentence twice ({why}); the lamp's own voice from now on (LAMP_OWN_KEYS)"
             ));
         }
     }
@@ -251,14 +283,18 @@ impl OwnVoiceLost {
     /// `text` as the lamp's own voice says it: after [`OWN_VOICE_LOST_LINE`]
     /// for the first piece of the process only, with its own journal line.
     fn told(&self, text: &str) -> String {
+        self.told_by(text, "ElevenLabs")
+    }
+
+    /// [`Self::told`] by `provider`, the person's own voice's (#8754).
+    pub(crate) fn told_by(&self, text: &str, provider: &str) -> String {
         if self.told.swap(true, Ordering::AcqRel) {
             return text.to_owned();
         }
-        self.say(
-            "lamp-voice second: the person's ElevenLabs voice isn't working: told once, in the lamp's own voice (LAMP_OWN_KEYS)"
-                .to_owned(),
-        );
-        format!("{OWN_VOICE_LOST_LINE} {text}")
+        self.say(format!(
+            "lamp-voice second: the person's {provider} voice isn't working: told once, in the lamp's own voice (LAMP_OWN_KEYS)"
+        ));
+        format!("{} {text}", own_voice_lost_line(provider))
     }
 
     /// The journal lines said, in order: tests only.

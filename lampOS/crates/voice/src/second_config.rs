@@ -151,6 +151,19 @@ pub struct Hosted {
     pub lamps_own: Option<Box<Hosted>>,
     /// Which chat the person's own model is asked as, with [`Self::lamps_own`].
     pub own_chat: Option<OwnChat>,
+    /// The person's own Gemini voice ([`OWN_KEYS_ENV`], #8754): their key
+    /// and voice name, spoken at Google's own API ([`GEMINI_BASE_URL`]) in
+    /// [`GEMINI_SPEECH_MODEL`]. The configured voice (`tts_*`) is left as it
+    /// is: the lamp's own, which a piece their voice can't say is said in.
+    pub own_gemini_voice: Option<OwnGeminiVoice>,
+}
+
+/// The person's own Gemini voice (#8754): never the relay's key or address.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OwnGeminiVoice {
+    pub key: Key,
+    /// A Gemini voice name, letters and digits.
+    pub voice: String,
 }
 
 /// The chat a person's own model is asked as (#8362, #8420).
@@ -202,7 +215,7 @@ pub const GEMINI_BASE_URL: &str = lamp_msgs::own_model::GEMINI_API;
 pub const GEMINI_CHAT_MODEL: &str = "gemini-3.6-flash";
 /// The voice `LAMP_SECOND_SPEECH=gemini` asks: half ElevenLabs Flash's
 /// price a minute of speech, rated above it (the research of 19 Oct).
-pub const GEMINI_SPEECH_MODEL: &str = "gemini-3.8-flash-lite-tts";
+pub const GEMINI_SPEECH_MODEL: &str = lamp_msgs::own_voice::GEMINI_SPEECH_MODEL;
 /// The Gemini endpoint and voice from the voice unit's environment, over
 /// `second.json`'s (the first builder on #1712: the configuration file is
 /// the owner's, a unit's drop-in the battery's). Passed to the second
@@ -556,6 +569,7 @@ fn load_reporting(path: &Path) -> io::Result<(SecondConfig, Option<String>)> {
         lamps_voice: None,
         lamps_own: None,
         own_chat: None,
+        own_gemini_voice: None,
     };
     let config = SecondConfig {
         search,
@@ -661,6 +675,7 @@ impl SecondConfig {
                 let mut config = self.clone();
                 config.hosted = Hosted {
                     lamps_voice: self.hosted.lamps_voice.clone(),
+                    own_gemini_voice: self.hosted.own_gemini_voice.clone(),
                     lamps_own: None,
                     own_chat: None,
                     ..(**hosted).clone()
@@ -676,6 +691,10 @@ pub const OWN_ELEVENLABS_KEY: &str = "own_elevenlabs.key";
 pub const OWN_ELEVENLABS_VOICE: &str = "own_elevenlabs.voice";
 /// ElevenLabs' own API, where the person's voice is asked for.
 pub const ELEVENLABS_API: &str = "https://api.elevenlabs.io/v1";
+/// The person's Gemini key and voice name (#8754), beside the others: root's
+/// keys helper keeps them as `gemini_voice.key` and `gemini_voice.voice`.
+pub const OWN_GEMINI_VOICE_KEY: &str = "own_gemini_voice.key";
+pub const OWN_GEMINI_VOICE_VOICE: &str = "own_gemini_voice.voice";
 
 impl SecondConfig {
     /// With the person's own keys when `on` and the unit has them: DeepSeek's
@@ -830,11 +849,42 @@ impl SecondConfig {
                 "Deepgram: the relay, the person's key could not be read ({kind}) (LAMP_OWN_KEYS)"
             ),
         });
+        // The person's Gemini voice (#8754): their key and voice name straight
+        // at Google, over the language's and the chosen voice, whatever the
+        // configured voice is; that one is left as it is, the lamp's own, for
+        // the fallback. Said only when its key is there. One own voice is
+        // kept at a time; were both there, Gemini's speaks (a fixed order).
+        let gemini_voice = own(OWN_GEMINI_VOICE_KEY).and_then(|key| {
+            let Some(key) = key else { return Ok(None) };
+            let voice = own(OWN_GEMINI_VOICE_VOICE)?
+                .map(|voice| voice.expose().trim().to_owned())
+                .filter(|voice| {
+                    !voice.is_empty()
+                        && voice.len() <= 64
+                        && voice.bytes().all(|b| b.is_ascii_alphanumeric())
+                })
+                .ok_or(io::ErrorKind::InvalidData)?;
+            Ok(Some(OwnGeminiVoice { key, voice }))
+        });
+        let gemini_voice_line = match gemini_voice {
+            Ok(Some(voice)) => {
+                self.hosted.own_gemini_voice = Some(voice);
+                Some(
+                    "Gemini voice: the person's own key and voice, the lamp's own voice kept for when it fails (LAMP_OWN_KEYS)"
+                        .to_owned(),
+                )
+            }
+            Ok(None) => None,
+            Err(kind) => Some(format!(
+                "Gemini voice: the lamp's own voice, the person's key or voice could not be read ({kind}) (LAMP_OWN_KEYS)"
+            )),
+        };
         // The person's voice (#8367): their key and voice ID straight at
         // ElevenLabs, over the language's and the chosen voice; the lamp's
-        // kept for the fallback. Only when the route speaks with ElevenLabs.
+        // kept for the fallback. Only when the route speaks with ElevenLabs,
+        // and not beside the person's Gemini voice.
         let mut switched_line = None;
-        if self.tts_provider == TtsProvider::ElevenLabs {
+        if self.tts_provider == TtsProvider::ElevenLabs && self.hosted.own_gemini_voice.is_none() {
             let voice = own(OWN_ELEVENLABS_KEY).and_then(|key| {
                 let Some(key) = key else { return Ok(None) };
                 let id = own(OWN_ELEVENLABS_VOICE)?
@@ -863,6 +913,7 @@ impl SecondConfig {
                 ),
             });
         }
+        lines.extend(gemini_voice_line);
         lines.extend(compatible_line);
         lines.extend(switched_line);
         (self, lines)
@@ -1523,6 +1574,7 @@ mod tests {
                 lamps_voice: None,
                 lamps_own: None,
                 own_chat: None,
+                own_gemini_voice: None,
             }
         );
         let (_, config) = written(
@@ -1856,6 +1908,101 @@ mod tests {
             (&alone.tts_base_url, &alone.tts_key, &alone.tts_voice),
             (&relay.tts_base_url, &relay.tts_key, &relay.tts_voice)
         );
+    }
+
+    /// #8754: the person's own Gemini key and voice name, kept by root's
+    /// helper as `gemini_voice.key` and `gemini_voice.voice`, become the
+    /// route's own Gemini voice with one journal line that names neither the
+    /// key nor the voice; the configured voice (`tts_*`) is left as it is,
+    /// the lamp's own, kept for the fallback. Off, the same files change
+    /// nothing; a voice name without its key, or a bad name, is no voice.
+    #[test]
+    fn the_persons_gemini_voice_key_and_voice_are_kept_beside_the_lamps_voice() {
+        let planted = "AIza-planted-8754-gemini-fake";
+        for provider in [r#","tts_provider":"elevenlabs""#, ""] {
+            let (_, config) = written("own-gemini-voice", provider);
+            let relay = load_from_path(&config).unwrap();
+            let units = directory("own-gemini-voice-units");
+            let dir = Some(units.as_os_str());
+            private(&units.join("own_gemini_voice.key"), &format!("{planted}\n"));
+            private(&units.join("own_gemini_voice.voice"), "Kore\n");
+            let (own, lines) = relay.clone().with_own_keys(true, dir);
+            assert_eq!(
+                own.hosted.own_gemini_voice,
+                Some(OwnGeminiVoice {
+                    key: Key::for_test(planted),
+                    voice: "Kore".into()
+                })
+            );
+            // The lamp's own voice as it was: the fallback.
+            assert_eq!(
+                (
+                    &own.tts_base_url,
+                    &own.tts_key,
+                    &own.tts_voice,
+                    own.tts_provider
+                ),
+                (
+                    &relay.tts_base_url,
+                    &relay.tts_key,
+                    &relay.tts_voice,
+                    relay.tts_provider
+                )
+            );
+            assert_eq!(own.hosted.lamps_voice, None);
+            assert!(
+                lines.contains(&"Gemini voice: the person's own key and voice, the lamp's own voice kept for when it fails (LAMP_OWN_KEYS)".to_owned()),
+                "{lines:?}"
+            );
+            for line in &lines {
+                assert!(!line.contains(planted) && !line.contains("Kore"), "{line}");
+            }
+            assert!(!format!("{own:?}").contains(planted));
+            // Off: never read.
+            let (off, lines) = relay.clone().with_own_keys(false, dir);
+            assert_eq!(off, relay);
+            assert!(lines.is_empty());
+            // A bad name: no voice, said by its kind.
+            private(&units.join("own_gemini_voice.voice"), "../x\n");
+            let (bad, lines) = relay.clone().with_own_keys(true, dir);
+            assert_eq!(bad.hosted.own_gemini_voice, None);
+            assert!(
+                lines.iter().any(|line| line.starts_with("Gemini voice: the lamp's own voice, the person's key or voice could not be read")),
+                "{lines:?}"
+            );
+            // A voice name without its key: no line, nothing changed.
+            private(&units.join("own_gemini_voice.voice"), "Kore\n");
+            fs::remove_file(units.join("own_gemini_voice.key")).unwrap();
+            let (alone, lines) = relay.clone().with_own_keys(true, dir);
+            assert_eq!(alone.hosted.own_gemini_voice, None);
+            assert!(
+                !lines.iter().any(|line| line.starts_with("Gemini voice")),
+                "{lines:?}"
+            );
+        }
+    }
+
+    /// #8754: were both own voices' files there (the helper keeps one at a
+    /// time), the person's Gemini voice speaks and ElevenLabs' is not put
+    /// in the lamp's place: one own voice, never a guess. The model and
+    /// voice of the Gemini voice are Google's own, the ones the helper's
+    /// check asks.
+    #[test]
+    fn with_both_own_voices_there_the_gemini_one_speaks() {
+        let (_, config) = written("own-both-voices", r#","tts_provider":"elevenlabs""#);
+        let relay = load_from_path(&config).unwrap();
+        let units = directory("own-both-voices-units");
+        let dir = Some(units.as_os_str());
+        private(&units.join("own_elevenlabs.key"), "sk-planted-8754\n");
+        private(&units.join("own_elevenlabs.voice"), "PersonVoice8754\n");
+        private(&units.join("own_gemini_voice.key"), "AIza-planted-8754\n");
+        private(&units.join("own_gemini_voice.voice"), "Puck\n");
+        let (own, _) = relay.clone().with_own_keys(true, dir);
+        assert!(own.hosted.own_gemini_voice.is_some());
+        assert_eq!(own.hosted.lamps_voice, None);
+        assert_eq!(own.tts_key, relay.tts_key);
+        assert_eq!(GEMINI_BASE_URL, lamp_msgs::own_voice::GEMINI_API);
+        assert_eq!(GEMINI_SPEECH_MODEL, "gemini-3.8-flash-lite-tts");
     }
 
     /// #8362 step 1b: the person's own OpenAI-compatible model (Grok and the

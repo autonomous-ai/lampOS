@@ -1083,15 +1083,27 @@ pub fn own_key_health(own: bool, refused: u16) -> lamp_msgs::Diagnostic {
 /// The warning lamp-health shows once the person's own ElevenLabs voice was
 /// refused (#8367).
 pub const OWN_VOICE_REFUSED_WORDS: &str = "your ElevenLabs key was refused, using the lamp's own";
+/// The same for the person's own Gemini voice (#8754).
+pub const OWN_GEMINI_VOICE_REFUSED_WORDS: &str =
+    "your Gemini voice key was refused, using the lamp's own";
 
 /// `voice-keys`' warning once ElevenLabs refused the person's own voice
 /// with `status` (#8367); none while it never was.
 pub fn own_voice_health(status: u16) -> Option<lamp_msgs::Diagnostic> {
+    own_voice_health_of(status, false)
+}
+
+/// [`own_voice_health`], naming Gemini's voice when `gemini` (#8754).
+pub fn own_voice_health_of(status: u16, gemini: bool) -> Option<lamp_msgs::Diagnostic> {
     (status != 0).then(|| {
         lamp_msgs::Diagnostic::new(
             lamp_msgs::Level::Warn,
             OWN_KEY_HEALTH,
-            OWN_VOICE_REFUSED_WORDS,
+            if gemini {
+                OWN_GEMINI_VOICE_REFUSED_WORDS
+            } else {
+                OWN_VOICE_REFUSED_WORDS
+            },
         )
         .with("status", status)
     })
@@ -1188,7 +1200,9 @@ fn report_own_key(
         loop {
             let refused = refused.load(std::sync::atomic::Ordering::Relaxed);
             let voice = voice.load(std::sync::atomic::Ordering::Relaxed);
-            let report = match (refused, own_voice_health(voice)) {
+            let gemini =
+                super::net::OWN_VOICE_REFUSED_GEMINI.load(std::sync::atomic::Ordering::Relaxed);
+            let report = match (refused, own_voice_health_of(voice, gemini)) {
                 (0, Some(voice)) => voice,
                 _ => own_key_health(own, refused),
             };
@@ -1391,6 +1405,19 @@ pub fn services(
             provider.voice()
         );
     }
+    // The person's own Gemini voice over the lamp's one voice (#8754): from
+    // `hosted`, which the unit's LAMP_SECOND_SPEECH above never clears, at
+    // Google's own API with the model the keys helper checked.
+    let (with_own, persons) = net
+        .speaking_in_the_persons_gemini_voice()
+        .map_err(io::Error::other)?;
+    net = with_own;
+    if persons {
+        eprintln!(
+            "lamp-voice second: the voice is the person's own Gemini voice ({}), at Google with their key; the lamp's one voice says what it can't (LAMP_OWN_KEYS)",
+            crate::second_config::GEMINI_SPEECH_MODEL
+        );
+    }
     // The chat's connection opened as a line begins (#1712).
     let warm = std::env::var(super::services::CHAT_WARM_ENVIRONMENT)
         .ok()
@@ -1500,6 +1527,7 @@ pub(crate) fn relay_routable(
         speech: !route.gemini_speech()
             && config.tts_key == config.llm_key
             && config.hosted.lamps_voice.is_none()
+            && config.hosted.own_gemini_voice.is_none()
             && !config.pinned.speech,
         listening: matches!(&config.stt, crate::second_config::Stt::Autonomous { key, .. } if *key == config.llm_key)
             && !config.pinned.listening,
@@ -36632,6 +36660,73 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// #8754: the person's own Gemini voice is taken from `hosted`, so a
+    /// unit's `LAMP_SECOND_SPEECH` that clears the configured voice's name
+    /// (another provider than the file's) leaves it as it is, whichever
+    /// voice is the lamp's; and with it the relay's near addresses never
+    /// take the speech. Without it, nothing of it.
+    #[test]
+    fn the_persons_gemini_voice_survives_the_units_speech_route() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-second-own-gemini-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let private = |path: std::path::PathBuf, text: &str| {
+            std::fs::write(&path, text).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            path
+        };
+        let llm = private(dir.join("llm.key"), "relay-key");
+        let live = private(dir.join("live.key"), "live-google-key\n");
+        let config = private(
+            dir.join("second.json"),
+            &format!(
+                r#"{{"llm_base_url":"https://relay.example.invalid/v1","llm_model":"m","llm_credential_file":"{}","tts_provider":"elevenlabs","tts_voice":"Kanna"}}"#,
+                llm.display()
+            ),
+        );
+        let provider: crate::config::ProviderConfig = serde_json::from_str(&format!(
+            r#"{{"endpoint":"{}","model":"m","voice":"Kore","credential_file":"{}"}}"#,
+            lamp_gemini::GOOGLE_ENDPOINT,
+            live.display()
+        ))
+        .unwrap();
+        let none: super::super::net::Declare = std::sync::Arc::new(Vec::new);
+        let with_voice = || {
+            let mut config = crate::second_config::load_from_path(&config).unwrap();
+            config.hosted.own_gemini_voice = Some(crate::second_config::OwnGeminiVoice {
+                key: crate::second_config::Key::for_test("AIza-planted-8754"),
+                voice: "Puck".into(),
+            });
+            config
+        };
+        for speech in [
+            None,
+            Some(super::SpeechRoute::OpenAi),
+            Some(super::SpeechRoute::ElevenLabs),
+            Some(super::SpeechRoute::Gemini),
+        ] {
+            let route = super::RouteFlags {
+                speech,
+                ..super::RouteFlags::default()
+            };
+            let net = super::services(with_voice(), &provider, route, None, none.clone()).unwrap();
+            assert!(net.has_the_persons_gemini_voice(), "{speech:?}");
+            assert!(
+                !super::relay_routable(&with_voice(), route, None).speech,
+                "{speech:?}"
+            );
+            let lamps = crate::second_config::load_from_path(&config).unwrap();
+            let net = super::services(lamps, &provider, route, None, none.clone()).unwrap();
+            assert!(!net.has_the_persons_gemini_voice(), "{speech:?}");
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
     /// OpenRouter's and DeepSeek's keys are the voice unit's credentials:
     /// with them the chat starts, without them the worker does not, saying
     /// which credential it lacks and nothing of a key; DeepSeek's search the
@@ -36985,6 +37080,27 @@ mod tests {
         let well = serde_json::to_string(&super::own_key_health(true, 0)).unwrap();
         assert!(well.contains("\"ok\""), "{well}");
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// #8754: once Google refused the person's own Gemini voice,
+    /// `voice-keys` warns naming Gemini's voice, with the status, never a
+    /// key; ElevenLabs' warning is as it was.
+    #[test]
+    fn a_refused_own_gemini_voice_is_warned_to_lamp_health() {
+        assert!(super::own_voice_health_of(0, true).is_none());
+        let warned = super::own_voice_health_of(403, true).unwrap();
+        assert_eq!(warned.level, lamp_msgs::Level::Warn);
+        let said = serde_json::to_string(&warned).unwrap();
+        assert!(
+            said.contains(super::OWN_GEMINI_VOICE_REFUSED_WORDS),
+            "{said}"
+        );
+        assert!(!said.contains(super::OWN_VOICE_REFUSED_WORDS), "{said}");
+        assert!(said.contains("403") && !said.contains("AIza"), "{said}");
+        assert_eq!(
+            serde_json::to_string(&super::own_voice_health_of(401, false).unwrap()).unwrap(),
+            serde_json::to_string(&super::own_voice_health(401).unwrap()).unwrap()
+        );
     }
 
     /// #8367: once ElevenLabs refused the person's own voice, `voice-keys`
