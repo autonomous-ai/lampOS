@@ -1,7 +1,7 @@
 # lampOS a person's own keys (#2094, lampOS/docs/own-keys.md): one request from lamp-cloud on
 # lamp-setup-keys.socket, as standard input and output. A peer outside lamp-cloud.service is
 # refused before its line is read. A key is checked with one request to its service (5 s, no
-# redirect) and kept only if it works, root's, 0600, in the folder the voice loads whole; then the
+# redirect) and kept only if it works, root:lampos 0640, in the folder the voice loads whole; then the
 # voice is restarted once the lamp is quiet (45 s, an update's rule) and no update is at work
 # (holding lamp-update's lock through the restart), waiting at most 30 minutes.
 # A key is never journalled.
@@ -20,10 +20,12 @@ SyslogIdentifier=lamp-setup-keys
 RuntimeMaxSec=35min
 NoNewPrivileges=yes
 ProtectSystem=strict
-# The keys' folder, made 0700 if it is missing, is the one place it writes; the bus, read to
-# judge quiet; lamp-update's records, only for its lock, held through the voice's restart.
+# The keys' folder, made 0750 if it is missing, is the one place it writes; the bus, read to
+# judge quiet; lamp-update's records, only for its lock, held through the voice's restart. systemd
+# never changes an existing configuration folder's mode or group (it only warns): the helper sets
+# root:lampos 0750 and 0640 on each write, and lampos.conf's tmpfiles lines at each boot (#8735).
 ConfigurationDirectory=lampOS/voice/own
-ConfigurationDirectoryMode=0700
+ConfigurationDirectoryMode=0750
 ReadWritePaths=/run/lampos-bus -/var/lib/lampos-update
 ProtectHome=yes
 PrivateTmp=yes
