@@ -773,6 +773,7 @@ impl FixtureProvider {
                 Some(Control::ProviderOutputCapacity { through }) => {
                     self.output_flow.grant(through)?;
                 }
+                Some(Control::CheckLink) => {}
                 Some(
                     Control::StartCapture
                     | Control::ConnectReference { .. }

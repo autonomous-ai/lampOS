@@ -2423,3 +2423,76 @@ fn an_on_time_one_joins_nothing() {
     assert!(offer.also.is_empty());
     assert!(!offer.late_line());
 }
+
+fn upcoming_told<P: Persistence>(
+    consumer: &mut Consumer<P>,
+) -> Vec<Option<super::super::Upcoming>> {
+    assert!(
+        !consumer
+            .outgoing
+            .iter()
+            .any(|m| matches!(m, FromWorker::Upcoming { .. })),
+        "told only in the idle slot"
+    );
+    let mut told = Vec::new();
+    while let Some(message) = consumer.upcoming_owed() {
+        match message {
+            FromWorker::Upcoming { soonest } => told.push(soonest),
+            other => panic!("expected the soonest, got {other:?}"),
+        }
+    }
+    told
+}
+
+/// #8632: with `LAMP_OFFLINE_RINGS=on` the voice is told the soonest ring
+/// set and not yet due, for the link's check before it, by its id and time
+/// alone, and again only when it changes. A due one is not it.
+#[test]
+fn with_offline_rings_the_soonest_ring_not_yet_due_is_told_once_and_never_its_words() {
+    let (engine, socket) = served(1);
+    let now = 50_000_000;
+    // Off: nothing is told.
+    let mut off = consumer(Disk::default());
+    let report = due(&engine.lock().unwrap(), now);
+    off.tick(&socket.path(), Some(&report), now).unwrap();
+    assert!(upcoming_told(&mut off).is_empty());
+    // On, with only a due one: none, told once.
+    let mut on = consumer(Disk::default());
+    on.upcoming = Some(UpcomingWalk::default());
+    on.tick(&socket.path(), Some(&report), now).unwrap();
+    assert_eq!(upcoming_told(&mut on), vec![None]);
+    on.tick(&socket.path(), Some(&report), now).unwrap();
+    assert!(
+        upcoming_told(&mut on).is_empty(),
+        "unchanged: not told again"
+    );
+    // Two set: the sooner, due in 9 s of the store's clock.
+    for (name, seconds) in [("later", 30), ("sooner", 9)] {
+        let mut engine = engine.lock().unwrap();
+        let request = Request::Set {
+            person: None,
+            guard: guard(&engine, name),
+            text: TEXT.into(),
+            when: When::After { seconds },
+        };
+        assert_eq!(answer(&mut engine, &request)["ok"], true);
+    }
+    let report = due(&engine.lock().unwrap(), now);
+    on.tick(&socket.path(), Some(&report), now).unwrap();
+    let told = upcoming_told(&mut on);
+    assert_eq!(told.len(), 1);
+    let soonest = told[0].expect("the sooner one");
+    assert_eq!((soonest.id, soonest.delivery), (3, 1));
+    assert_eq!(soonest.due_at_us, now + 9_000_000);
+    let packet = serde_json::to_string(&FromWorker::Upcoming {
+        soonest: Some(soonest),
+    })
+    .unwrap();
+    assert!(!packet.contains("private"), "{packet}");
+    on.tick(&socket.path(), Some(&report), now + 200_000)
+        .unwrap();
+    assert!(
+        upcoming_told(&mut on).is_empty(),
+        "unchanged: not told again"
+    );
+}

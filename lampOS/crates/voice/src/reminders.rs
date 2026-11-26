@@ -535,12 +535,37 @@ pub(crate) enum ToWorker {
     /// [`RING_STOP_SWITCH`] on.
     RingStopped { token: PreparedToken },
 }
+/// The soonest ring not yet due (`LAMP_OFFLINE_RINGS`, #8632): its Schedule
+/// identity and when it is due on the machine's monotonic clock, as the
+/// consumer read it. Never its words.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Upcoming {
+    pub id: u64,
+    pub delivery: u64,
+    pub due_at_us: u64,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub(crate) enum FromWorker {
-    Offer { offer: Offer },
-    Withdraw { token: PreparedToken },
-    Settled { token: PreparedToken },
+    Offer {
+        offer: Offer,
+    },
+    /// With `LAMP_OFFLINE_RINGS=on` (#8632), each time it changes: the
+    /// soonest timer or reminder set and not yet due, for the link's check
+    /// before it rings ([`crate::offline_rings::asks_link_check`]). None
+    /// when nothing is set.
+    Upcoming {
+        #[serde(default)]
+        soonest: Option<Upcoming>,
+    },
+    Withdraw {
+        token: PreparedToken,
+    },
+    Settled {
+        token: PreparedToken,
+    },
     Idle {},
 }
 
@@ -817,6 +842,9 @@ pub(crate) struct Reminders {
     cut_last: Option<(PreparedToken, u64, Option<u64>)>,
     /// A [`ToWorker::RingStopped`] still to be sent.
     stop_owed: Option<PreparedToken>,
+    /// The soonest ring not yet due, as the consumer last told it
+    /// (`LAMP_OFFLINE_RINGS`, #8632).
+    upcoming: Option<Upcoming>,
 }
 impl Reminders {
     pub fn from_environment() -> io::Result<Option<Self>> {
@@ -841,6 +869,7 @@ impl Reminders {
             notice_owed: false,
             cut_last: None,
             stop_owed: None,
+            upcoming: None,
         }))
     }
 
@@ -975,6 +1004,7 @@ impl Reminders {
                         self.sent = false;
                     }
                 }
+                FromWorker::Upcoming { soonest } => self.upcoming = soonest,
                 FromWorker::Idle {} => {}
             }
         }
@@ -1012,6 +1042,11 @@ impl Reminders {
             self.sent = self.transport.send(settlement)?;
         }
         Ok(())
+    }
+    /// The soonest ring not yet due (`LAMP_OFFLINE_RINGS`, #8632), none
+    /// once the consumer failed.
+    pub fn upcoming(&self) -> Option<Upcoming> {
+        self.upcoming.filter(|_| !self.failed)
     }
     pub fn offer(&self, now_us: u64) -> Option<Offer> {
         if self.failed

@@ -405,7 +405,8 @@ impl State {
                 Control::StartCapture
                 | Control::ConnectReference { .. }
                 | Control::ProviderOutputCapacity { .. }
-                | Control::NameGrant { .. } => {
+                | Control::NameGrant { .. }
+                | Control::CheckLink => {
                     return Err(io::Error::other("invalid privacy ring control command"));
                 }
             }

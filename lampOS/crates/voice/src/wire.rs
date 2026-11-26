@@ -41,6 +41,11 @@ pub enum Control {
     NameGrant {
         grant: NameGrant,
     },
+    /// A ring is due soon with `LAMP_OFFLINE_RINGS=on` (#8632): the second
+    /// route, as the lamp's only voice, runs its link's check once
+    /// (`second_provider::link::Watch::ask`). Every other provider takes
+    /// nothing from it. Never sent with the switch off.
+    CheckLink,
     Stop,
 }
 
@@ -64,6 +69,7 @@ impl<'de> Deserialize<'de> for Control {
             StartCapture {},
             ProviderOutputCapacity { through: u64 },
             NameGrant { grant: NameGrant },
+            CheckLink {},
             Stop {},
         }
         Ok(match StrictControl::deserialize(deserializer)? {
@@ -74,6 +80,7 @@ impl<'de> Deserialize<'de> for Control {
                 Self::ProviderOutputCapacity { through }
             }
             StrictControl::NameGrant { grant } => Self::NameGrant { grant },
+            StrictControl::CheckLink {} => Self::CheckLink,
             StrictControl::Stop {} => Self::Stop,
         })
     }

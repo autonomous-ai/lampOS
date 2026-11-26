@@ -18,6 +18,16 @@
 //! own tail or the room after 6 of 10 lines was answered with the line
 //! again. Such a turn only exists offline, so online nothing changes.
 //!
+//! On the second route as the lamp's only voice, the link reads down only
+//! once a turn fails on the network, so in an outage where nobody spoke a
+//! ring was first tried as a model turn and rang late. With the switch,
+//! [`PROBE_BEFORE_DUE_US`] before the soonest ring is due, the voice asks
+//! the worker once for the existing check (no service host answers,
+//! `second_provider::link`), skipped when a turn or a check found the link
+//! within [`LINK_CONFIRMED_WITHIN_US`]. It reads down before the due time,
+//! so the ring plays from its clip then. Nothing is checked with no ring
+//! due.
+//!
 //! Off (anything but exactly `on`), every path is as before.
 
 /// Exactly `on` turns it on; anything else, or unset, is off.
@@ -34,6 +44,37 @@ pub const SCRAP_NO_LINE_MS: u64 = 400;
 /// for its tail: the scraps on lamp-06c1 came about 3 to 4.5 s after the
 /// line, and ended under a second later. For the owner's table.
 pub const SCRAP_AFTER_LINE_US: u64 = 8_000_000;
+
+/// How long before the soonest ring is due the link is checked, once: the
+/// check waits up to `second_provider::link::PROBE_WITHIN` (4 s) and the
+/// link must then be down past its grace
+/// ([`crate::bus_out::LINK_GRACE_US`], 5 s), both before the due time. For
+/// the owner's table.
+pub const PROBE_BEFORE_DUE_US: u64 = 10_000_000;
+
+/// A turn completed, or a check that found a host answering, within this
+/// long needs no check before a ring: the link was just seen. For the
+/// owner's table.
+pub const LINK_CONFIRMED_WITHIN_US: u64 = 60_000_000;
+
+/// Whether the worker is asked now to check the link, for the soonest ring
+/// not yet due (`soonest`: its key and when it is due): the switch on, it
+/// due within [`PROBE_BEFORE_DUE_US`] and not yet, and not asked already
+/// for it (`asked_for`). The worker skips the check within
+/// [`LINK_CONFIRMED_WITHIN_US`] of the link found.
+pub fn asks_link_check<K: PartialEq>(
+    switch: bool,
+    soonest: Option<(&K, u64)>,
+    asked_for: Option<&K>,
+    now_us: u64,
+) -> bool {
+    switch
+        && soonest.is_some_and(|(key, due_at_us)| {
+            now_us < due_at_us
+                && due_at_us - now_us <= PROBE_BEFORE_DUE_US
+                && asked_for != Some(key)
+        })
+}
 
 /// Whether `value` turns the switch on: exactly `on`.
 pub fn on_from(value: Option<&str>) -> bool {
@@ -113,6 +154,73 @@ mod tests {
         assert!(!rings_offline(true, None, down, past - 1, false));
         // Paused by the keeper or signed out: nothing unasked begins.
         assert!(!rings_offline(true, None, down, past, true));
+    }
+
+    /// #8632, the first builder's call: once, about 10 s before a due ring,
+    /// and nothing with no ring due.
+    #[test]
+    fn the_link_is_checked_once_ten_seconds_before_a_due_ring_and_never_with_none_due() {
+        assert_eq!(PROBE_BEFORE_DUE_US, 10_000_000);
+        let due = 100_000_000;
+        let item = (4_u64, 1_u64);
+        let soonest = Some((&item, due));
+        // No ring due: never.
+        assert!(!asks_link_check::<(u64, u64)>(true, None, None, due - 1));
+        // Not yet within 10 s; then at 10 s and up to the due time.
+        assert!(!asks_link_check(
+            true,
+            soonest,
+            None,
+            due - PROBE_BEFORE_DUE_US - 1
+        ));
+        assert!(asks_link_check(
+            true,
+            soonest,
+            None,
+            due - PROBE_BEFORE_DUE_US
+        ));
+        assert!(asks_link_check(true, soonest, None, due - 1));
+        // Due already: the ring's own path, no check.
+        assert!(!asks_link_check(true, soonest, None, due));
+        // Once for each ring.
+        assert!(!asks_link_check(
+            true,
+            soonest,
+            Some(&item),
+            due - 5_000_000
+        ));
+        let next = (5_u64, 1_u64);
+        assert!(asks_link_check(
+            true,
+            Some((&next, due)),
+            Some(&item),
+            due - 5_000_000
+        ));
+        // Off: never.
+        assert!(!asks_link_check(false, soonest, None, due - 5_000_000));
+    }
+
+    /// #8632: nobody spoke in the outage. The check asked 10 s before the
+    /// ring reads down, and the ring plays from its clip at the due time.
+    #[test]
+    fn a_ring_whose_check_reads_down_plays_from_its_clip_at_due() {
+        use crate::provider_link::ProviderLinkState;
+        use crate::second_provider::link::{Link, PROBE_WITHIN};
+        let due = 400_000_000;
+        let item = (4_u64, 1_u64);
+        let asked_at = due - PROBE_BEFORE_DUE_US;
+        assert!(asks_link_check(true, Some((&item, due)), None, asked_at));
+        let (mut link, _) = Link::initial(1_000_000, 1_000_010);
+        assert!(link.ask(asked_at));
+        // The slowest check: no host answers in all of its wait.
+        let read = asked_at + PROBE_WITHIN.as_micros() as u64;
+        let down = link.probed(asked_at, read, false).expect("down");
+        assert!(matches!(down.state, ProviderLinkState::Unavailable { .. }));
+        // The voice sees it down from then, and at the due time it is past
+        // its grace: rung from the clip, not tried as a model turn.
+        let since = Some(down.observed_at_us);
+        assert!(rings_offline(true, None, since, due, false));
+        assert!(PROBE_WITHIN.as_micros() as u64 + LINK_GRACE_US <= PROBE_BEFORE_DUE_US);
     }
 
     /// #8632: after 6 of 10 offline lines a 100 to 330 ms scrap 3 to 4.5 s

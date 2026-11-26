@@ -372,13 +372,22 @@ and its gate needs a ready session.
 - **No second line for a scrap:** a follow-up with under 400 ms of speech,
   ending within 8 s of the outage's line, gets no line of its own
   ([failure-notices.md](failure-notices.md)).
-- **Not built:** a reminder said in its own words offline, rendered when it
-  is set. A reminder rings with the generic line.
-- **Limit:** the second route's link reads down only once a turn fails on
-  the network. A ring due in an outage nobody has spoken in is first tried
-  as a model turn; it fails with no audio and is offered again after the
-  consumer's pace, now offline, from its clip, so it may ring a few seconds
-  past due.
+- **Clip C (the first builder, 26 Nov):** a reminder rings offline with the
+  generic line, never its own words. Its own words, rendered while online
+  and removed when its id leaves Schedule, are a later follow-up with their
+  own privacy read.
+- **The link checked once before a ring:** the second route's link reads
+  down only once a turn fails on the network, so a ring due in an outage
+  nobody had spoken in was first tried as a model turn and rang late. Now,
+  10 s before the soonest ring is due (`offline_rings::PROBE_BEFORE_DUE_US`),
+  the existing "no service host answers" check runs once, skipped within
+  60 s (`LINK_CONFIRMED_WITHIN_US`) of a completed turn or a check that
+  found a host. Read down, the ring plays from its clip at the due time
+  ([schedule.md](schedule.md), "With no link"). Nothing is checked with no
+  ring due.
+- **Limit:** a turn completed less than a minute before the due time skips
+  the check. If the link went down after that turn, the ring is first tried
+  as a model turn, as before, and may ring a few seconds past due.
 
 ## Smaller mends
 

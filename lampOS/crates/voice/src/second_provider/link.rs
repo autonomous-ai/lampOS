@@ -117,6 +117,10 @@ pub struct Link {
     state: State,
     /// How often a down link checks again: [`PROBE_EVERY_US`].
     every_us: u64,
+    /// When a turn completed or a check found a host answering last: a
+    /// check asked before a ring ([`Self::ask`]) is skipped within
+    /// [`crate::offline_rings::LINK_CONFIRMED_WITHIN_US`] of it (#8632).
+    confirmed_at_us: Option<u64>,
 }
 
 impl Link {
@@ -127,6 +131,7 @@ impl Link {
             session: 1,
             state: State::Up,
             every_us: PROBE_EVERY_US,
+            confirmed_at_us: None,
         };
         let ready = ProviderLink {
             revision: 1,
@@ -157,6 +162,31 @@ impl Link {
         true
     }
 
+    /// A turn completed at `now_us`: the link answered then (#8632).
+    pub fn confirmed(&mut self, now_us: u64) {
+        self.confirmed_at_us = Some(now_us);
+    }
+
+    /// A ring is due soon (`LAMP_OFFLINE_RINGS`, #8632): true when a check
+    /// should run now, once, as for a turn failed on the network. Only while
+    /// the link is up with no check running, and not within
+    /// [`crate::offline_rings::LINK_CONFIRMED_WITHIN_US`] of a turn or a
+    /// check that found it. A check finding no host takes it down as such a
+    /// turn's would, with `ConnectTimeout`: no host took a connection.
+    pub fn ask(&mut self, now_us: u64) -> bool {
+        let fresh = self.confirmed_at_us.is_some_and(|at| {
+            now_us.saturating_sub(at) < crate::offline_rings::LINK_CONFIRMED_WITHIN_US
+        });
+        if self.state != State::Up || fresh {
+            return false;
+        }
+        self.state = State::Checking {
+            since_us: now_us,
+            fault: Fault::ConnectTimeout,
+        };
+        true
+    }
+
     /// The network's route came back while down: the next check is now.
     pub fn route_back(&mut self, now_us: u64) {
         if let State::Down { probe_at_us, .. } = &mut self.state {
@@ -180,6 +210,7 @@ impl Link {
         match (self.state, answered) {
             (State::Checking { .. }, true) => {
                 self.state = State::Up;
+                self.confirmed_at_us = Some(now_us);
                 None
             }
             (State::Checking { since_us, fault }, false) => {
@@ -204,6 +235,7 @@ impl Link {
                 true,
             ) => {
                 self.state = State::Up;
+                self.confirmed_at_us = Some(now_us);
                 self.revision += 1;
                 self.session += 1;
                 Some(ProviderLink {
@@ -268,6 +300,10 @@ impl Watch {
     /// An output the worker is about to send: a turn failed on the network
     /// starts a check.
     pub fn output(&mut self, now_us: u64, event: &ProviderOutput) {
+        // A turn completed: the link answered (#8632).
+        if matches!(event, ProviderOutput::TurnComplete { .. }) {
+            self.link.confirmed(now_us);
+        }
         if let ProviderOutput::TurnFailed { reason, .. } = event
             && self.targets.is_some()
             && self.probing.is_none()
@@ -275,6 +311,17 @@ impl Watch {
         {
             self.check(now_us);
         }
+    }
+
+    /// A ring is due soon (`LAMP_OFFLINE_RINGS`, #8632): the same check a
+    /// turn failed on the network starts, begun now, once ([`Link::ask`]).
+    /// True when it began. Without targets (a standby) never.
+    pub fn ask(&mut self, now_us: u64) -> bool {
+        if self.targets.is_none() || self.probing.is_some() || !self.link.ask(now_us) {
+            return false;
+        }
+        self.check(now_us);
+        true
     }
 
     /// While down, every [`ROUTE_EVERY_US`]: a default route that wasn't
@@ -470,6 +517,70 @@ mod tests {
         watch.watch_routes(12 * S + ROUTE_EVERY_US);
         assert!(watch.link.probe_due(12 * S + ROUTE_EVERY_US));
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// #8632: a ring due with nobody speaking in the outage was first tried
+    /// as a model turn. The check runs once before it, and not within a
+    /// minute of a turn or a check that found the link.
+    #[test]
+    fn a_check_before_a_ring_runs_once_and_not_within_a_minute_of_the_link_found() {
+        use crate::offline_rings::LINK_CONFIRMED_WITHIN_US as FRESH;
+        assert_eq!(FRESH, 60 * S);
+        let (mut link, _) = Link::initial(S, S + 10);
+        // Never confirmed: the check runs, once.
+        assert!(link.ask(100 * S));
+        assert!(!link.ask(100 * S), "one check at a time");
+        assert!(
+            !link.failed(100 * S, Fault::Transport),
+            "one check at a time"
+        );
+        // A host answered: the link was found, and no change is told.
+        assert_eq!(link.probed(100 * S, 101 * S, true), None);
+        assert!(!link.down());
+        assert!(!link.ask(101 * S + FRESH - 1), "found by the check");
+        assert!(link.ask(101 * S + FRESH));
+        assert_eq!(link.probed(161 * S, 161 * S + 300_000, true), None);
+        // A turn completed: found then.
+        link.confirmed(300 * S);
+        assert!(!link.ask(300 * S));
+        assert!(!link.ask(300 * S + FRESH - 1), "a turn found it");
+        assert!(link.ask(300 * S + FRESH));
+        // No host answered: down, as a turn failed on the network takes it.
+        let down = link
+            .probed(360 * S, 360 * S + PROBE_WITHIN.as_micros() as u64, false)
+            .expect("down");
+        down.validate(365 * S).unwrap();
+        assert_eq!(
+            down.state,
+            ProviderLinkState::Unavailable {
+                reason: Fault::ConnectTimeout
+            }
+        );
+        assert!(link.down());
+        assert!(!link.ask(370 * S), "down: the existing checks run");
+    }
+
+    /// A turn completed confirms the link through the worker's watch.
+    #[tokio::test]
+    async fn the_watch_skips_the_check_within_a_minute_of_a_turn_completed() {
+        use crate::offline_rings::LINK_CONFIRMED_WITHIN_US as FRESH;
+        let (mut watch, _) = Watch::new(Some(Vec::new()), S, S + 10);
+        watch.output(
+            100 * S,
+            &ProviderOutput::TurnComplete {
+                request: 3,
+                idle: true,
+            },
+        );
+        assert!(!watch.ask(100 * S + FRESH - 1));
+        assert!(watch.probing.is_none());
+        assert!(watch.ask(100 * S + FRESH));
+        assert!(watch.probing.is_some());
+        assert!(!watch.ask(100 * S + FRESH), "once");
+        // A standby (no targets) never checks.
+        let (mut standby, _) = Watch::new(None, S, S + 10);
+        assert!(!standby.ask(100 * S));
+        assert!(standby.probing.is_none());
     }
 
     #[test]
