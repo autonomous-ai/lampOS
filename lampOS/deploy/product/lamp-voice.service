@@ -164,6 +164,8 @@ Environment=LAMP_NAME_FACE_OR_WORDS=on
 # Off until each sensor is measured on the body with real people, 95% or more (the product owner, 26 Nov 2026: no
 # sensor holds a line until then): LAMP_ROOM_HELD_TALK, LAMP_NO_FACE_FOLLOW_UP_BY_VOICE, LAMP_TURNED_FACE_SPEAKS and
 # the voice's own LAMP_EYES_SPEAKING. Their rows in docs/switches.md.
+# LAMP_NAME_HEY_ONLY: the product owner, 26 Nov 2026; a call is "Hey Lamp" at a line's start. Its rules are its row in docs/switches.md.
+Environment=LAMP_NAME_HEY_ONLY=on
 # LAMP_NAME_GREETED_STAND_IN: "Hey, Lynn. …" keeps a sure hearing in a busy room (the product owner's first rule,
 # 25 Nov 2026). Its why and rules are its row in docs/switches.md. DEFAULT-ON asked of its readers.
 Environment=LAMP_NAME_GREETED_STAND_IN=on
