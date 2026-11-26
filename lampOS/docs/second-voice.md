@@ -6149,13 +6149,18 @@ after a take-over, but now for every turn:
     (on in the product's lamp-voice.service; the product owner's ruling of
     26 Nov 2026: "remove 'Lamp'. must say 'Hey Lamp'. 'Lamp' alone creates so
     many issues."). Out of a conversation, a hearing of the name is a call
-    only when it is heard at the line's start (`NAME_AT_THE_START_US`, 1.3 s)
-    and the line's first word, past one filler ("um", "uh", "oh", "ah",
-    "so"), is "hey", "hi" or "hello" (`attention::opens_with_hey`). Such a
+    only when it is heard within `attention::HEY_AT_THE_START_US` (2.5 s) of
+    the line's start, the line's first word, past one filler ("um", "uh",
+    "oh", "ah", "so"), is "hey", "hi" or "hello" (`opens_with_hey`), and the
+    word after it is the name or like it ("Hey man", "Hey, Lynn.",
+    `greeted_word_like_the_name`) or the greeting stands alone in its
+    sentence ("Hello? Do you know my face?", `greeting_set_off`). Such a
     hearing is the call whatever the rules above ruled of its word, since
-    speech to text writes "Hey Lamp" as "Hey man", "Hey, Lynn." or "Hello?";
-    only a word that is another person's name ("Hey, Lance.", #8114) still
-    makes it theirs. Any other hearing, a bare "Lamp" or the name inside a
+    speech to text writes "Hey Lamp" in those ways; a word that is another
+    person's name ("Hey, Lance.", #8114) still makes it theirs, and "Hi Mark,
+    did you move the lamp?", heard at its start on lamp-74ff (26 Nov,
+    20:51), is no call. The window is wider than `NAME_AT_THE_START_US`'s
+    1.3 s: a played "Hey, Lamp. What day is it today?" was heard 1.93 s in. Any other hearing, a bare "Lamp" or the name inside a
     sentence, counts for nothing, and a line's words call the lamp only when
     they open with such a greeting (`called_in_text`). In a conversation the
     name is not needed, and the rule holds nothing. "Ok" and "okay" are no
