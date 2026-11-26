@@ -6051,6 +6051,14 @@ pub fn serve(
                     .is_ok_and(|heeding| heeding.surely_someone_elses(request))
             }));
         }
+        // The first line after the lamp's own news may be new work, not a
+        // reply to it: told so, where work can be handed over (#8701).
+        if has_tasks {
+            let noting = heeding.clone();
+            engine = engine.noting_after_news(Arc::new(move |request| {
+                noting.lock().ok()?.after_news_note_for(request)
+            }));
+        }
         // `LAMP_UNTIED_GOING_ON`: such a line with no tie to the lamp is not
         // told it cut in (#3882).
         if declines && crate::untied_going_on::on() {
@@ -8753,6 +8761,9 @@ pub(crate) struct Heeding {
     fired: Option<u64>,
     /// The request last let out only as the conversation going on.
     alone: Option<u64>,
+    /// The request last let out as the first thing said after the lamp's
+    /// own news (`attention::AFTER_NEWS`), for [`AFTER_NEWS_NOTE`] (#8701).
+    after_news: Option<u64>,
     /// The request last judged in a busy room ([`Self::judged_busy`]).
     busy: Option<u64>,
     /// The requests judged where talk not for the lamp may be, newest
@@ -9874,6 +9885,15 @@ pub(crate) const CONVERSATION_ALONE: &str = "(For you to know, not to answer: no
 /// the other note, the owner's follow-ups on lamp-74ff got `not_for_me`.
 pub(crate) const FOLLOW_UP_NOTE: &str = "(For you to know, not to answer: nobody said your name this time, but this is the person you were just talking with, speaking again. Take it as a follow-up to your conversation and answer it. Only if it is plainly said to someone else, call not_for_me and say nothing.)";
 
+/// Told beside the first line said after the lamp's own news
+/// (`attention::AFTER_NEWS`, [`Heeding::after_news_note_for`]): the news's
+/// words, still in the model's context, made a new request right after them
+/// read as a follow-up to that result. On #8701 "Hey Lamp, plan a simple
+/// three-day trip to Hoi An and write it up as a short list." was answered by
+/// the lamp itself, nothing handed over, 2 times in 5. A reply to the news is
+/// answered as before; the model, not code, tells the two apart.
+pub(crate) const AFTER_NEWS_NOTE: &str = "(For you to know, not to answer: this is the first thing said after your news. If it replies to that news, a thanks or a question about that result, answer it. If it asks for new work, to plan, research, write or make something, it is a new request: hand it over with start_agent_task as you would any other.)";
+
 /// How the rule saw a line when it judged it, kept for a verdict given
 /// once the Policy decides ([`Heeding::policy_now`]).
 struct Seen {
@@ -10174,6 +10194,7 @@ impl Heeding {
             noted: None,
             fired: None,
             alone: None,
+            after_news: None,
             busy: None,
             others_may_talk: std::collections::VecDeque::new(),
             policy: None,
@@ -13952,6 +13973,7 @@ impl Heeding {
             );
         }
         let alone = attention.played_on_the_conversation_alone();
+        let after_news = attention.played_after_news();
         // Or just after its answer ended (Sixth's item 6 on #4710).
         let stop_over_the_lamp = self.spoken_stops
             && (self.began_over == Some(request) || self.began_just_after == Some(request))
@@ -14235,6 +14257,10 @@ impl Heeding {
         }
         self.alone = (alone && matches!(verdict, Some(crate::attention::Verdict::Play(_))))
             .then_some(request);
+        // #8701: the news's reply, still played, is told it may be new work.
+        self.after_news = (after_news
+            && matches!(verdict, Some(crate::attention::Verdict::Play(_))))
+        .then_some(request);
         self.someone_elses_line = (self.alone.is_some() && someone_else).then_some(request);
         // `LAMP_GOING_ON_NOT_OWN`: the answer to a line let out only as the
         // conversation going on renews nothing when it is surely someone
@@ -14504,6 +14530,12 @@ impl Heeding {
         } else {
             CONVERSATION_ALONE
         })
+    }
+
+    /// [`AFTER_NEWS_NOTE`] for `request` when it was let out as the first
+    /// thing said after the lamp's own news and is still played (#8701).
+    pub(crate) fn after_news_note_for(&self, request: u64) -> Option<&'static str> {
+        (self.after_news == Some(request)).then_some(AFTER_NEWS_NOTE)
     }
 
     /// Whether `request` was let out only as the conversation going on and
@@ -35147,6 +35179,62 @@ mod tests {
         let answered = judged(Did::Spoke(at(0)), "I'm busy.");
         assert!(!answered.attention.played_on_no_call());
         assert!(!answered.holds_said_start(9), "after its own news");
+    }
+
+    /// #8701: the first line after the lamp's own news, let out as
+    /// `AFTER_NEWS`, earns [`super::AFTER_NEWS_NOTE`] whether it asks for new
+    /// work or replies to the news; the line after it, a line with no news
+    /// before it, and a held line do not.
+    #[test]
+    fn the_first_line_after_the_news_earns_the_after_news_note() {
+        use crate::second_provider::Did;
+        let signs = |going_on: bool| super::Signs {
+            room: crate::room_told::Room::Quiet,
+            going_on,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+            soft_lead_us: 0,
+        };
+        let at = |seconds: u64| 1_000_000_000 + seconds * 1_000_000;
+        let ask =
+            "Hey Lamp, plan a simple three-day trip to Hoi An and write it up as a short list.";
+        for first in [ask, "Thanks, that's great."] {
+            let mut heeding = Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.lamp_did(Did::Spoke(at(0)));
+            let line = (at(13), at(13) + 1_500_000);
+            assert_eq!(heeding.judge(9, line, first, signs(false)), None, "{first}");
+            assert_eq!(
+                heeding.after_news_note_for(9),
+                Some(super::AFTER_NEWS_NOTE),
+                "{first}"
+            );
+            assert_eq!(heeding.after_news_note_for(8), None, "{first}");
+            let next = (at(20), at(20) + 1_500_000);
+            heeding.judge(10, next, ask, signs(true));
+            assert_eq!(heeding.after_news_note_for(10), None, "{first}");
+        }
+        // No news before it: held as not spoken to, and no note.
+        let mut heeding = Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        let line = (at(13), at(13) + 1_500_000);
+        assert_eq!(
+            heeding.judge(9, line, "What time is it?", signs(false)),
+            Some(crate::attention::NOT_SPOKEN_TO)
+        );
+        assert_eq!(heeding.after_news_note_for(9), None);
+        // After the news, a line `said_to_me` held is no reply to it
+        // (`LAMP_NEWS_REPLY_HEEDS_HELD`): no note.
+        let mut heeding = Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        heeding.attention.heed_held_in_news_reply(true);
+        heeding.lamp_did(Did::Spoke(at(0)));
+        heeding.attention.said_held(9);
+        heeding.judge(9, line, "Thanks, that's great.", signs(false));
+        assert_eq!(heeding.after_news_note_for(9), None);
     }
 
     /// #1712, lamp-4ace's busy room: colleagues' talk just after a named
