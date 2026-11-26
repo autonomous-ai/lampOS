@@ -2508,3 +2508,212 @@ fn with_offline_rings_the_soonest_ring_not_yet_due_is_told_once_and_never_its_wo
         "unchanged: not told again"
     );
 }
+
+/// A walk's end handed to the clips: what the consumer found for them.
+fn clips_walk<P: Persistence>(
+    consumer: &mut Consumer<P>,
+    engine: &Arc<Mutex<Engine<Disk>>>,
+    socket: &Socket,
+    now: u64,
+) -> crate::ring_clips::Wanted {
+    let report = due(&engine.lock().unwrap(), now);
+    consumer.tick(&socket.path(), Some(&report), now).unwrap();
+    let wanted = consumer.clips_owed().expect("a walk's end for the clips");
+    // The voice is told ids and times, never a reminder's words.
+    for message in &consumer.outgoing {
+        if let FromWorker::Upcoming { .. } = message {
+            let packet = serde_json::to_string(message).unwrap();
+            assert!(
+                !packet.contains("pills") && !packet.contains("mum"),
+                "{packet}"
+            );
+        }
+    }
+    if let Some(told) = consumer.upcoming_owed() {
+        let packet = serde_json::to_string(&told).unwrap();
+        assert!(
+            !packet.contains("pills") && !packet.contains("mum"),
+            "{packet}"
+        );
+    }
+    wanted
+}
+
+fn set_reminder(
+    engine: &Arc<Mutex<Engine<Disk>>>,
+    name: &str,
+    text: &str,
+    person: Option<&str>,
+) -> u64 {
+    let mut engine = engine.lock().unwrap();
+    let request = Request::Set {
+        person: person.map(str::to_owned),
+        guard: guard(&engine, name),
+        text: text.into(),
+        // A daily one: a reminder, not a timer.
+        when: When::Daily {
+            time: "23:30".into(),
+            zone: None,
+        },
+    };
+    let reply = answer(&mut engine, &request);
+    assert_eq!(reply["ok"], true, "{reply}");
+    reply["id"].as_u64().unwrap()
+}
+
+/// A speech service for the clips that renders each line as 2,400 samples
+/// of its length.
+fn clip_service(voice: &str) -> crate::say::tts_cache::TtsCache {
+    let render: crate::say::tts_cache::Render =
+        Box::new(|text: &str| Ok(vec![text.len() as i16; 2_400]));
+    crate::say::tts_cache::TtsCache::new(
+        std::env::temp_dir().join("lamp-ring-clips-unused-cache"),
+        voice,
+        "eleven_v4_turbo",
+        "en",
+        render,
+    )
+}
+
+/// #8708: each walk's end hands the clips every id in Schedule and each
+/// reminder's words, never to the voice. A clip goes at the next walk's end
+/// once its id leaves Schedule (cancelled, the person forgotten), and every
+/// one goes for a store that is no longer the lamp's.
+#[test]
+fn a_clip_goes_when_its_id_leaves_schedule_or_the_store_changes() {
+    let (engine, socket) = served(0);
+    let pills = set_reminder(&engine, "pills", "Take your pills.", None);
+    let mum = set_reminder(&engine, "mum", "Call mum.", Some("p-0123456789abcdef"));
+    let gone = set_reminder(&engine, "gone", "Water the plants.", None);
+    let root = Temp::new();
+    let clips = crate::ring_clips::Clips::new(root.0.join("ring-clips"));
+    let mut renderer = crate::ring_clips::Renderer::new(clips.clone(), clip_service("Rachel"));
+    let mut on = consumer(Disk::default());
+    on.upcoming = Some(UpcomingWalk {
+        clips: true,
+        ..UpcomingWalk::default()
+    });
+    let now = 50_000_000;
+    let wanted = clips_walk(&mut on, &engine, &socket, now);
+    assert_eq!(wanted.store_id, STORE_ID);
+    assert_eq!(wanted.live, BTreeSet::from([pills, mum, gone]));
+    assert_eq!(wanted.reminders.len(), 3);
+    renderer.pass(&wanted, Instant::now());
+    assert_eq!(clips.kept(STORE_ID), BTreeSet::from([pills, mum, gone]));
+    // Cancelled, and the person who set "Call mum." forgotten: both go at
+    // the next walk's end, a second later.
+    {
+        let mut engine = engine.lock().unwrap();
+        let request = Request::Cancel {
+            guard: guard(&engine, "cancel"),
+            id: gone,
+            asker: None,
+        };
+        assert_eq!(answer(&mut engine, &request)["ok"], true);
+        let request = Request::Forget {
+            guard: guard(&engine, "forget"),
+            person: "p-0123456789abcdef".into(),
+        };
+        assert_eq!(answer(&mut engine, &request)["ok"], true);
+    }
+    let later = now + UPCOMING_WALK_EVERY_US;
+    let wanted = clips_walk(&mut on, &engine, &socket, later);
+    assert_eq!(wanted.live, BTreeSet::from([pills]));
+    renderer.pass(&wanted, Instant::now());
+    assert_eq!(clips.kept(STORE_ID), BTreeSet::from([pills]));
+    // Another store: every clip of this one goes.
+    let other = crate::ring_clips::Wanted {
+        store_id: OTHER_STORE.into(),
+        ..crate::ring_clips::Wanted::default()
+    };
+    renderer.pass(&other, Instant::now());
+    assert!(clips.kept(STORE_ID).is_empty());
+    // Off, or with no speech service: nothing for the clips.
+    let mut off = consumer(Disk::default());
+    off.upcoming = Some(UpcomingWalk::default());
+    let report = due(&engine.lock().unwrap(), later);
+    off.tick(&socket.path(), Some(&report), later).unwrap();
+    assert!(off.clips_owed().is_none());
+}
+
+/// #8708: a reminder rung offline from the generic line, its words never
+/// told, is marked "rung, not told" in the ledger and offered again with
+/// the mark, so the voice does not ring it offline again; once the link is
+/// back it is said in its words, once, and the mark goes.
+#[test]
+fn a_generic_ring_stays_rung_not_told_and_is_told_once_when_the_link_is_back() {
+    let (engine, socket) = served(1);
+    let disk = Disk::default();
+    let mut first = consumer(disk.clone());
+    let offered = begin(&mut first, &engine, &socket);
+    assert!(!offered.rung_offline);
+    let packet = serde_json::to_value(&offered).unwrap();
+    assert!(
+        packet.get("rung_offline").is_none(),
+        "sent as before: {packet}"
+    );
+    // Rung offline from the generic line, played whole.
+    first
+        .command(
+            ToWorker::RungOffline {
+                token: offered.token.clone(),
+            },
+            lamp_ipc::monotonic_us(),
+        )
+        .unwrap();
+    assert!(matches!(
+        first.outgoing.pop_back(),
+        Some(FromWorker::Settled { .. })
+    ));
+    assert!(first.ledger.rung_untold(&offered.token.key));
+    assert!(
+        first
+            .ledger
+            .view(&offered.token.key)
+            .unwrap()
+            .unwrap()
+            .completion
+            .is_none()
+    );
+    // Offered again after the pacing, with the mark: offline, it waits.
+    assert!(first.next_offer_us >= PACE_US);
+    first.next_offer_us = 0;
+    let paced = lamp_ipc::monotonic_us();
+    let report = due(&engine.lock().unwrap(), paced);
+    first.tick(&socket.path(), Some(&report), paced).unwrap();
+    let again = take_offer(&mut first);
+    assert!(again.rung_offline);
+    assert_eq!(again.token.key, offered.token.key);
+    let clips = crate::ring_clips::Clips::new(std::env::temp_dir().join("lamp-no-ring-clips"));
+    assert_eq!(
+        crate::offline_rings::ring_for(&again, Some(&clip_service("Rachel")), &clips),
+        crate::offline_rings::Ring::Wait(crate::offline_rings::RUNG_WAITS)
+    );
+    // A restart: the next consumer offers it with the mark too.
+    drop(first);
+    let mut restarted = Consumer::new(
+        DeliveryLedger::open(disk.clone(), LEDGER_ID).unwrap(),
+        "consumer-two".into(),
+    );
+    restarted.retire_earlier_voices().unwrap();
+    let after = lamp_ipc::monotonic_us();
+    let report = due(&engine.lock().unwrap(), after);
+    restarted
+        .tick(&socket.path(), Some(&report), after)
+        .unwrap();
+    let told = take_offer(&mut restarted);
+    assert!(told.rung_offline);
+    // The link back: said in its words, as a model ring, once.
+    restarted
+        .command(
+            ToWorker::Complete {
+                token: told.token.clone(),
+                proof: completion(&told.token),
+            },
+            after,
+        )
+        .unwrap();
+    assert!(!restarted.ledger.rung_untold(&told.token.key));
+    let view = restarted.ledger.view(&told.token.key).unwrap().unwrap();
+    assert!(view.completion.is_some(), "said once, to be acknowledged");
+}

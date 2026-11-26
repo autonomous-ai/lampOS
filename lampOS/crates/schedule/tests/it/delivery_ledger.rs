@@ -1578,13 +1578,86 @@ fn an_abandoned_attempts_record_is_written_as_schema_2_only_while_kept() {
     assert_eq!(disk.writes(), writes);
 }
 
+/// #8708 (`LAMP_OFFLINE_RINGS`): a reminder rung with no link from the
+/// generic line, "You have a reminder.", is marked "rung, not told", so its
+/// words are told once when the link is back. The mark is the ledger's, so
+/// it survives a restart and a retried attempt, and goes when the item is
+/// said. A ledger holding one is written as schema 3, and only then: a
+/// build from before reads every other ledger as it always did, and sets a
+/// schema 3 one aside as a newer build's (the ledger's own rule).
+#[test]
+fn rung_not_told_survives_a_restart() {
+    let (_, pending) = timer();
+    let disk = Disk::default();
+    let mut first = ledger(disk.clone());
+    let rung = first.prepare(&pending, correlation(1)).unwrap();
+    assert!(!first.rung_untold(pending.key()));
+    first.mark_rung_untold(&rung).unwrap();
+    assert!(first.rung_untold(pending.key()));
+    let saved = disk.json();
+    assert_eq!(saved["schema"], 3);
+    assert_eq!(saved["entries"][0]["rung_untold"], true);
+    assert!(
+        !disk
+            .bytes()
+            .windows(PRIVATE_TEXT.len())
+            .any(|w| w == PRIVATE_TEXT.as_bytes())
+    );
+    // A restart: read back as it was, not rewritten, still marked.
+    let before = disk.bytes();
+    let mut reopened = ledger(disk.clone());
+    assert!(reopened.set_aside().is_none());
+    assert_eq!(disk.bytes(), before);
+    assert!(reopened.rung_untold(pending.key()));
+    // Offered again under a new attempt (the generic ring retired as
+    // abandoned): still marked.
+    let abandoned = QualifiedRetirement {
+        correlation: rung.correlation.clone(),
+        retired_by_session: "consumer-two".into(),
+        basis: RetirementBasis::Abandoned {},
+    };
+    let again = reopened
+        .retry_interrupted(&rung, &pending, &abandoned, correlation(2))
+        .unwrap();
+    assert!(reopened.rung_untold(pending.key()));
+    assert_eq!(disk.json()["schema"], 3);
+    // Its words said: the mark goes, and with it schema 3.
+    reopened.complete(&again, &proof(&again)).unwrap();
+    assert!(!reopened.rung_untold(pending.key()));
+    assert_eq!(disk.json()["schema"], 2, "the abandoned record stays");
+    assert!(disk.json()["entries"][0].get("rung_untold").is_none());
+    // A completed attempt can't be marked.
+    assert!(reopened.mark_rung_untold(&again).is_err());
+    // A ledger marked 2 that holds the mark is not one any build wrote:
+    // refused, untouched.
+    let mut wrong = saved.clone();
+    wrong["schema"] = json!(2);
+    disk.replace(&wrong);
+    let before = disk.bytes();
+    assert!(DeliveryLedger::open(disk.clone(), LEDGER).is_err());
+    assert_eq!(disk.bytes(), before);
+    // A schema 2 ledger from before (2026-11-04) opens as it was, nothing
+    // in it marked.
+    let kept = include_str!("../fixtures/stores/delivery-2026-11-04.json");
+    let disk = Disk::default();
+    disk.0.lock().unwrap().bytes = Some(kept.as_bytes().to_vec());
+    let old = DeliveryLedger::open(disk.clone(), OTHER).unwrap();
+    assert!(old.set_aside().is_none());
+    assert!(
+        old.entries()
+            .unwrap()
+            .iter()
+            .all(|view| !old.rung_untold(&view.prepared.key))
+    );
+}
+
 #[test]
 fn failed_preservation_or_wrong_ledger_kind_never_overwrites_a_newer_snapshot() {
     for wrong_kind in [false, true] {
         let disk = Disk::default();
         let _ = ledger(disk.clone());
         let mut snapshot = disk.json();
-        snapshot["schema"] = json!(3);
+        snapshot["schema"] = json!(4);
         if wrong_kind {
             snapshot["kind"] = json!("other_store");
         } else {
@@ -1606,7 +1679,7 @@ fn failed_fresh_commit_keeps_the_newer_ledger_and_returns_no_usable_owner() {
         let disk = Disk::default();
         let _ = ledger(disk.clone());
         let mut snapshot = disk.json();
-        snapshot["schema"] = json!(3);
+        snapshot["schema"] = json!(4);
         disk.replace(&snapshot);
         let newer_bytes = disk.bytes();
         disk.fail(failure);
@@ -1631,7 +1704,7 @@ fn real_sqlite_preserves_newer_ledger_before_starting_a_reopenable_current_one()
     let root = tempfile::tempdir().unwrap();
     let directory = root.path().join("consumer-ledger");
     let bytes =
-        br#"{"kind":"lamp_schedule_delivery_ledger","schema":3,"later_metadata":{"keep":"whole"}}"#;
+        br#"{"kind":"lamp_schedule_delivery_ledger","schema":4,"later_metadata":{"keep":"whole"}}"#;
     let mut store = Store::open(&directory).unwrap();
     store.commit(bytes).unwrap();
     drop(store);
@@ -1666,7 +1739,7 @@ fn real_sqlite_preserves_newer_ledger_before_starting_a_reopenable_current_one()
 /// V5").
 #[test]
 fn each_kept_delivery_ledger_opens_with_every_delivery_where_it_was() {
-    let kept: [(&str, &str); 2] = [
+    let kept: [(&str, &str); 3] = [
         (
             "2026-10-21",
             include_str!("../fixtures/stores/delivery-2026-10-21.json"),
@@ -1674,6 +1747,10 @@ fn each_kept_delivery_ledger_opens_with_every_delivery_where_it_was() {
         (
             "2026-11-04",
             include_str!("../fixtures/stores/delivery-2026-11-04.json"),
+        ),
+        (
+            "2026-11-26",
+            include_str!("../fixtures/stores/delivery-2026-11-26.json"),
         ),
     ];
     for (day, text) in kept {
@@ -1733,6 +1810,13 @@ fn each_kept_delivery_ledger_opens_with_every_delivery_where_it_was() {
                 .is_some(),
             "{day}"
         );
+        // Since 2026-11-26 (#8708, schema 3): the retried one was rung
+        // offline from the generic line, its words not told.
+        assert_eq!(
+            ledger.rung_untold(&views[1].prepared.key),
+            day >= "2026-11-26",
+            "{day}"
+        );
     }
 }
 
@@ -1765,8 +1849,10 @@ fn missing(kept: &serde_json::Value, read: &serde_json::Value, path: &str) -> Op
 /// `LAMP_SCHEDULE_DELIVERY_FIXTURE`: three timers at three stages, one said
 /// with its acknowledgement planned, one tried again after an attempt given
 /// up with nothing proven (abandoned, schema 2, since 2026-11-04; retired as
-/// its voice's exit before), and one only prepared. Run by hand when the
-/// ledger's shape changes, keeping the ones kept.
+/// its voice's exit before) after it rang offline from the generic line, its
+/// words not told (schema 3, since 2026-11-26, #8708), and one only
+/// prepared. Run by hand when the ledger's shape changes, keeping the ones
+/// kept.
 #[test]
 #[ignore = "writes a delivery ledger fixture: run by hand with LAMP_SCHEDULE_DELIVERY_FIXTURE set"]
 fn write_a_delivery_ledger_fixture() {
@@ -1788,6 +1874,7 @@ fn write_a_delivery_ledger_fixture() {
     ledger.plan_ack(&done, &due[0]).unwrap();
     // An attempt given up with nothing proven, retired and tried again.
     let cut = ledger.prepare(&due[1], correlation(2)).unwrap();
+    ledger.mark_rung_untold(&cut).unwrap();
     let abandoned = QualifiedRetirement {
         basis: RetirementBasis::Abandoned {},
         ..retirement(&cut)

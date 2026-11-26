@@ -427,6 +427,13 @@ pub(crate) struct Offer {
     /// (`LAMP_LIMIT_LOCAL_ASKS`, #7642). Sent only when true.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub timer: bool,
+    /// Rung already with no link from the generic line, "You have a
+    /// reminder.", its own words never told (`LAMP_OFFLINE_RINGS`, #8708):
+    /// not rung offline again, and said in its own words once the link is
+    /// back. The consumer's ledger keeps the mark across a restart. Sent
+    /// only when true.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub rung_offline: bool,
 }
 impl Offer {
     /// Said late enough to be kept as said and to wait for a pause in the
@@ -534,6 +541,11 @@ pub(crate) enum ToWorker {
     /// more (the Reviewer-lead's P2 on #5351). Only with
     /// [`RING_STOP_SWITCH`] on.
     RingStopped { token: PreparedToken },
+    /// The ring `token` was rung with no link from the generic line, "You
+    /// have a reminder.", played whole, and its own words were never told
+    /// (`LAMP_OFFLINE_RINGS`, #8708): it is kept "rung, not told" and
+    /// offered again, said in its words once the link is back.
+    RungOffline { token: PreparedToken },
 }
 /// The soonest ring not yet due (`LAMP_OFFLINE_RINGS`, #8632): its Schedule
 /// identity and when it is due on the machine's monotonic clock, as the
@@ -588,6 +600,9 @@ struct Progress {
     /// A real share of it was heard before a line cut it in
     /// ([`Receipt::share_heard_at_cut`]).
     heard_share: bool,
+    /// Rung offline from the generic line ([`Receipt::untold`]): played
+    /// whole, it is [`ToWorker::RungOffline`], not a completion.
+    untold: bool,
     settlement: Option<ToWorker>,
 }
 impl Progress {
@@ -661,6 +676,12 @@ impl Receipt {
         else {
             return;
         };
+        if state.untold {
+            state.settlement = Some(ToWorker::RungOffline {
+                token: state.token.clone(),
+            });
+            return;
+        }
         let proof = QualifiedCompletion {
             correlation: state.token.correlation.clone(),
             owner_boot: state.owner.boot().bytes(),
@@ -680,6 +701,14 @@ impl Receipt {
     /// The result already recorded by `completed`, read after the whole-reply
     /// join. A skill's say must not infer success from playback after a reset
     /// invalidated the receipt. This does not claim the worker durably Acked it.
+    /// This ring is the generic offline line, "You have a reminder.", not
+    /// the reminder's own words (`LAMP_OFFLINE_RINGS`, #8708): played whole
+    /// or mostly heard, it is settled as [`ToWorker::RungOffline`], so its
+    /// words are told once the link is back.
+    pub fn untold(&mut self) {
+        // Red stub (#8708).
+        let _ = &self.0;
+    }
     pub fn completion_recorded(&self) -> bool {
         matches!(self.0.borrow().settlement, Some(ToWorker::Complete { .. }))
     }
@@ -728,6 +757,12 @@ impl Receipt {
             || frames == 0
         {
             return false;
+        }
+        if state.untold {
+            state.settlement = Some(ToWorker::RungOffline {
+                token: state.token.clone(),
+            });
+            return true;
         }
         let proof = QualifiedCompletion {
             correlation: state.token.correlation.clone(),
@@ -813,6 +848,7 @@ pub(crate) fn receipt_for_test(owner: TurnOwner, privacy: u64, session: u64) -> 
         stopped: false,
         cut_by: None,
         heard_share: false,
+        untold: false,
         settlement: None,
     }));
     (Receipt(Rc::clone(&state)), Probe(state))
@@ -1114,6 +1150,7 @@ impl Reminders {
             stopped: false,
             cut_by: None,
             heard_share: false,
+            untold: false,
             settlement: None,
         }));
         self.active = Some(Rc::clone(&state));
@@ -1122,7 +1159,11 @@ impl Reminders {
     }
 }
 
-/// Internal child entry. It opens no provider, microphone, speaker or actuator.
+/// Internal child entry. It opens no model provider, microphone, speaker or
+/// actuator. With `LAMP_OFFLINE_RINGS=on` it renders the reminders' offline
+/// clips through the speech service, on a thread of its own
+/// (`crate::ring_clips`, #8708): it is the one process that reads their
+/// words, and its packets to the voice still carry none.
 pub fn run_consumer() -> io::Result<()> {
     if !speaking(std::env::var(SPEAK_VARIABLE).as_deref()) {
         return Err(io::Error::other("Schedule speech is disabled"));

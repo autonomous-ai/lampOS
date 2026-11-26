@@ -937,6 +937,16 @@ impl<P: Persistence> DeliveryLedger<P> {
         self.save(next)?;
         Ok(completed)
     }
+    /// Stub (#8708 red): not marked yet.
+    pub fn mark_rung_untold(&mut self, prepared: &PreparedToken) -> Result<(), Error> {
+        let _ = prepared;
+        Ok(())
+    }
+    /// Stub (#8708 red): nothing is marked yet.
+    pub fn rung_untold(&self, key: &DeliveryKey) -> bool {
+        let _ = key;
+        false
+    }
     pub fn plan_ack(
         &mut self,
         completed: &CompletedToken,
