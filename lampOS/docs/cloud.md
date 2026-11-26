@@ -3593,7 +3593,11 @@ adds the key itself (`lamp_cloud::hermes_llm`).
     (`DRAIN_ON_STOP`, well inside the 90 s stop timeout; the unit sets no
     `TimeoutStopSec=`) to end, then lamp-cloud exits 0. Each one still
     running is cut and said: `lamp-cloud: the Hermes forwarder: a chat in
-    flight was cut by a stop (N ms in)`. Before #8735 lamp-cloud had no
+    flight was cut by a stop (N ms in)`, after one line `the Hermes
+    forwarder: stopped, N chats in flight ended, M cut; a chat sent before
+    lamp-cloud is back is refused`. The agent's next round, sent while
+    lamp-cloud is down, is refused at the closed port (docs/own-keys.md,
+    "An agent task across that restart"). Before #8735 lamp-cloud had no
     SIGTERM handler and exited at once. Tests:
     `a_stop_drains_a_chat_in_flight`, `a_chat_past_the_drain_is_cut_and_said`.
   - **Who can read the key:** lamp-cloud's credentials are readable by its

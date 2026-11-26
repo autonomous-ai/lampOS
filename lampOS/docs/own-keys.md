@@ -649,6 +649,19 @@ the person's own model too, through lamp-cloud's forwarder
   so **the cloud link drops for a few seconds on purpose**, and the agent
   uses the new route from then. An agent chat in flight is drained first,
   for up to 10 s; one still running then is cut, said in the journal.
+- **An agent task across that restart:** a task is many chat rounds. The
+  round in flight at the stop ends within the drain, or is cut, said. A
+  round the agent sends in the few seconds before lamp-cloud listens again
+  is refused by the system (the port is closed), and lamp-cloud can't count
+  it. Then the task depends on the runtime. The settings lampOS writes for
+  OpenClaw and Hermes (`crates/tasks/src/openclaw_config.rs`,
+  `hermes_config.rs`) set no model retry. Whether OpenClaw or Hermes
+  retries a refused model request is their own code's, not verified here.
+  If it doesn't retry, the task fails, and lamp-tasks ends the run as
+  failed with the runtime's reason (`direct.rs`, `after_wait`), which the
+  person hears. At the stop, the journal says `the Hermes forwarder:
+  stopped, N chats in flight ended, M cut; a chat sent before lamp-cloud is
+  back is refused`.
 - **Who can read the key:** lamp-cloud's credentials are readable by its
   user, `lampos`, as the relay's key is. The agent runtimes run as
   `lampos` too, so they can read the person's model key, as they can read
