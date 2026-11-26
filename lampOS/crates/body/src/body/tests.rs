@@ -14903,7 +14903,11 @@ fn an_asked_dance_ends_a_fill_and_a_fill_never_ends_an_asked_gesture() {
     let asks = vec![
         (secs(8), &crate::clips::CURIOUS, Priority::Conversation),
         (secs(9), &crate::clips::DANCE_GROOVE, Priority::Skill),
-        (secs(9) + Duration::from_millis(20), &crate::clips::NOD, Priority::Conversation),
+        (
+            secs(9) + Duration::from_millis(20),
+            &crate::clips::NOD,
+            Priority::Conversation,
+        ),
     ];
     let (_, fates, _) = arbitrated_run(false, asks, 14);
     assert!(
