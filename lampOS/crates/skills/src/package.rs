@@ -569,7 +569,13 @@ pub fn pack_signed_by(
         return Err(format!(
             "{TOLD_ONLY_REFUSED}{}: {}",
             refused.0,
-            lamp_voice::made_skill::TOLD_ONLY_SHAPE
+            // A fixed say with a number or a date (#8651) is told its own
+            // repair, a task step that computes the line; any other, the
+            // told answer's form.
+            match refused.1.as_deref() {
+                Some(repair) if repair == lamp_voice::made_skill::CHANGING_SAY_REPAIR => repair,
+                _ => lamp_voice::made_skill::TOLD_ONLY_SHAPE,
+            }
         ));
     }
     if skill.kind == SkillKind::Core {

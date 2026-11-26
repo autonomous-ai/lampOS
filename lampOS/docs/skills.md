@@ -7952,7 +7952,9 @@ forces one), a skill it makes is made whole, with everything a run needs:
   refuses by the same rule (`made_skill::told_only`, called from
   `package::pack_signed_by`), saying `not packed: told_only: `
   (`package::TOLD_ONLY_REFUSED`), `SPEAKS_ON_ITS_OWN` and the told
-  answer's form (`made_skill::TOLD_ONLY_SHAPE`), so a make learns the shape
+  answer's form (`made_skill::TOLD_ONLY_SHAPE`; for a fixed say with a
+  number or a date, its own repair, `made_skill::CHANGING_SAY_REPAIR`),
+  so a make learns the shape
   before the keep; it holds every package, as `Skill::made_refuses` does.
   So a skill kept before #8651 that a trigger starts and whose code would
   speak still runs, but the Store's share and its preview
@@ -7961,7 +7963,9 @@ forces one), a skill it makes is made whole, with everything a run needs:
   agent's repair text: the refusal is told by its marker
   (`package::refused_told_only`), and the app shows
   `cloud::share::SPEAKS_ON_ITS_OWN`, "This skill speaks when it starts on
-  its own, so it can't be shared yet." `lamp-skills pack` keeps the repair
+  its own, so it can't be shared yet.", in Vietnamese for a Vietnamese
+  share (`SPEAKS_ON_ITS_OWN_VI`); other languages get the English line.
+  `lamp-skills pack` keeps the repair
   text. Tests:
   `pack_refuses_a_trigger_skill_that_would_speak_and_packs_a_told_only_one`,
   `a_kept_trigger_skill_that_would_speak_is_refused_in_a_plain_line`,
