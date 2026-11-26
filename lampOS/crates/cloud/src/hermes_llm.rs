@@ -26,11 +26,24 @@
 //! skills' runs (`lamp_skills::relay_share`), and each chat answer has one
 //! journal line of its numbers. Only read: every request is forwarded as
 //! before. Off, nothing is read, kept or said.
+//!
+//! With `LAMP_OWN_KEYS=on` and a person's own model key ([`OwnKeys`],
+//! #8735, `docs/own-keys.md`), a chat goes to their model in place of the
+//! relay: the one the voice uses, in `lamp_msgs::own_model::PRECEDENCE`, and
+//! only once its check at `keys.set` saw it make a tool call. The agent
+//! still asks for [`MODEL`]; `model` is changed to theirs, the body and the
+//! stream pass as they are, `/models` is answered here with [`MODEL`], and
+//! the relay's day is not counted. A hearing or voice key alone, no model
+//! key, or no tool call: the relay, as before. Their endpoint refusing the
+//! key (401, 403) before anything is passed: that request goes to the
+//! relay, said once. Each route chosen is one journal line, never a key.
+use lamp_msgs::own_model::{self, Model};
 use serde_json::Value;
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -209,6 +222,139 @@ impl Started {
     }
 }
 
+/// Where the person's own keys are read (#8735): root's own folder
+/// (`/etc/lampOS/voice/own`) as lamp-cloud's unit hands it in
+/// (`LoadCredential=own:<folder>`, each file `own_<name>`), read again at
+/// each request.
+///
+/// systemd copies a credential once, as the unit starts, so that copy never
+/// changes while lamp-cloud runs. A `keys.set` or `keys.remove` of a model
+/// key that lamp-cloud relays to root's helper therefore marks it out of
+/// date ([`OwnKeys::changed`]): from then until lamp-cloud's next start the
+/// agent is on the relay, so a key the person removed is never used.
+#[derive(Debug, Clone)]
+pub struct OwnKeys {
+    dir: PathBuf,
+    prefix: &'static str,
+    changed: Arc<AtomicBool>,
+}
+
+impl OwnKeys {
+    /// The unit's credentials folder, `own_<name>` each.
+    pub fn credentials(dir: &Path) -> Self {
+        Self {
+            dir: dir.to_path_buf(),
+            prefix: "own_",
+            changed: Arc::default(),
+        }
+    }
+
+    /// The own folder itself, `<name>` each.
+    pub fn folder(dir: &Path) -> Self {
+        Self {
+            prefix: "",
+            ..Self::credentials(dir)
+        }
+    }
+
+    /// Set when lamp-cloud has relayed a change of a model key: its copy is
+    /// out of date until its next start.
+    pub fn changed(&self) -> Arc<AtomicBool> {
+        self.changed.clone()
+    }
+
+    /// One file's text, trimmed; `None` when there is none.
+    fn read(&self, name: &str) -> Result<Option<String>, ()> {
+        match std::fs::read_to_string(self.dir.join(format!("{}{name}", self.prefix))) {
+            Ok(text) => Ok(Some(text.trim().to_owned())),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(_) => Err(()),
+        }
+    }
+
+    /// The person's own model the agent chats with, or why the relay.
+    fn route(&self) -> Result<OwnRoute, String> {
+        if self.changed.load(Ordering::Acquire) {
+            return Err("the person's model key changed after lamp-cloud started; \
+                        it is read again at lamp-cloud's next start"
+                .into());
+        }
+        let Some(model) = own_model::PRECEDENCE
+            .into_iter()
+            .find(|model| !matches!(self.read(&format!("{}.key", model.id())), Ok(None)))
+        else {
+            return Err("no model key of the person's".into());
+        };
+        let id = model.id();
+        let unread = |what: &str| format!("the person's {id} {what} can't be read");
+        let key = self
+            .read(&format!("{id}.key"))
+            .ok()
+            .flatten()
+            .filter(|key| !key.is_empty())
+            .ok_or_else(|| unread("key"))?;
+        let kept_url = self
+            .read(&format!("{id}.url"))
+            .map_err(|()| unread("URL"))?;
+        let base = match (model.base(), kept_url) {
+            (_, Some(url)) if url_taken(&url) => url,
+            (_, Some(_)) | (None, None) => return Err(unread("URL")),
+            (Some(base), None) => base.to_owned(),
+        };
+        let name = if model.has_model_file() {
+            self.read(&format!("{id}.model"))
+                .ok()
+                .flatten()
+                .filter(|name| own_model::fits_model(name))
+                .ok_or_else(|| unread("model"))?
+        } else {
+            MODEL.to_owned()
+        };
+        // The agent's tool check at `keys.set` (#8735): the `.checked`
+        // record's second line, `tools` when the model made a tool call.
+        let checked = self.read(&format!("{id}.checked")).ok().flatten();
+        if checked.as_deref().and_then(|text| text.lines().nth(1)) != Some("tools") {
+            return Err(format!(
+                "the person's {id} model made no tool call at its check"
+            ));
+        }
+        Ok(OwnRoute {
+            model,
+            chat_base: model.chat_base(&base),
+            name,
+            key,
+        })
+    }
+}
+
+/// An own model's URL as the voice takes one; in this file's tests, their
+/// local plain server too.
+fn url_taken(url: &str) -> bool {
+    own_model::https_url(url) || (cfg!(test) && url.starts_with("http://127.0.0.1:"))
+}
+
+/// The person's own model, as the agent's chat is sent to it.
+struct OwnRoute {
+    model: Model,
+    chat_base: String,
+    name: String,
+    key: String,
+}
+
+impl OwnRoute {
+    /// Its journal line: the service, the model and the host, never a key.
+    fn told(&self) -> String {
+        let host = self
+            .chat_base
+            .split_once("://")
+            .map_or(self.chat_base.as_str(), |(_, rest)| rest)
+            .split('/')
+            .next()
+            .unwrap_or_default();
+        format!("own {} {} at {host}", self.model.id(), self.name)
+    }
+}
+
 /// The forwarder: the relay's DeepSeek, the key, and the local token.
 pub struct Forwarder {
     base: String,
@@ -219,6 +365,11 @@ pub struct Forwarder {
     unread: Arc<Semaphore>,
     started: Mutex<Started>,
     meter: Option<Meter>,
+    /// The person's own keys, with `LAMP_OWN_KEYS=on` (#8735).
+    own: Option<OwnKeys>,
+    /// The route last said, and the own route whose refusal was said.
+    said_route: Mutex<String>,
+    said_refused: Mutex<String>,
 }
 
 /// The relay's day as its answers say it, kept for lamp-skills
@@ -406,6 +557,7 @@ enum Refusal {
     LengthRequired,
     TooMany,
     Unreachable,
+    OwnUnreachable,
     NotThisModel,
 }
 
@@ -420,6 +572,11 @@ impl Refusal {
             Self::LengthRequired => (411, "Length Required", "a Content-Length is needed"),
             Self::TooMany => (429, "Too Many Requests", "too many requests now"),
             Self::Unreachable => (502, "Bad Gateway", "the relay can't be reached now"),
+            Self::OwnUnreachable => (
+                502,
+                "Bad Gateway",
+                "the person's model can't be reached now",
+            ),
             Self::NotThisModel => (400, "Bad Request", "only the model deepseek-flash"),
         }
     }
@@ -454,7 +611,92 @@ impl Forwarder {
             unread: Arc::new(Semaphore::new(UNREAD_AT_ONCE)),
             started: Mutex::new(Started::default()),
             meter: None,
+            own: None,
+            said_route: Mutex::default(),
+            said_refused: Mutex::default(),
         })
+    }
+
+    /// The person's own model keys read from `own` at each request (#8735).
+    pub fn with_own(mut self, own: OwnKeys) -> Self {
+        self.own = Some(own);
+        self
+    }
+
+    /// The route for this request: the person's own model, or the relay
+    /// (`None`). Said in the journal when it differs from the last said.
+    fn own_route(&self) -> Option<OwnRoute> {
+        let own = self.own.as_ref()?;
+        let route = own.route();
+        let line = match &route {
+            Ok(route) => route.told(),
+            Err(why) => format!("relay ({why})"),
+        };
+        let mut said = self
+            .said_route
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        if *said != line {
+            eprintln!("lamp-cloud: the Hermes forwarder: the agent's model: {line}");
+            *said = line;
+        }
+        route.ok()
+    }
+
+    /// A chat sent to the person's own model, `model` made theirs. `None`
+    /// when it refused their key (401, 403) before any of it was passed:
+    /// the caller sends it to the relay, said once for this route.
+    async fn ask_own(
+        &self,
+        route: &OwnRoute,
+        body: &[u8],
+    ) -> Result<Option<reqwest::Response>, Refusal> {
+        let mut asked: Value = serde_json::from_slice(body).map_err(|_| Refusal::Bad)?;
+        asked["model"] = Value::String(route.name.clone());
+        let answer = self
+            .client
+            .post(format!("{}/chat/completions", route.chat_base))
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(asked.to_string())
+            .bearer_auth(&route.key)
+            .send()
+            .await
+            .map_err(|_| Refusal::OwnUnreachable)?;
+        let status = answer.status().as_u16();
+        if !matches!(status, 401 | 403) {
+            return Ok(Some(answer));
+        }
+        let told = route.told();
+        let mut said = self
+            .said_refused
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        if *said != told {
+            eprintln!(
+                "lamp-cloud: the Hermes forwarder: the agent's model: relay for this chat, \
+                 the person's {} key was refused ({status})",
+                route.model.id()
+            );
+            *said = told;
+        }
+        Ok(None)
+    }
+
+    /// `/models` on the person's own model: [`MODEL`] alone, answered here.
+    async fn models_here(stream: &mut TcpStream) -> io::Result<()> {
+        let body = serde_json::json!({
+            "object": "list",
+            "data": [{"id": MODEL, "object": "model", "owned_by": "lampos"}]
+        })
+        .to_string();
+        let head = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\
+             Content-Length: {}\r\nConnection: close\r\n\r\n",
+            body.len()
+        );
+        send(stream, head.as_bytes()).await?;
+        send(stream, body.as_bytes()).await?;
+        stream.shutdown().await
     }
 
     /// The relay's day used and the chats' tokens kept in `dir`'s
@@ -659,6 +901,24 @@ impl Forwarder {
             Err(refusal) => return Self::refuse(&mut stream, &refusal).await,
         };
         let chat = request.path == CHAT_PATH;
+        // The person's own model (#8735): no relay, so no meter.
+        if let Some(route) = self.own_route() {
+            if !chat {
+                return Self::models_here(&mut stream).await;
+            }
+            match self.ask_own(&route, &request.body).await {
+                Ok(Some(mut answer)) => {
+                    let head = Self::head(&answer).1;
+                    return match Self::pass(&mut stream, &mut answer, head, None).await {
+                        Ok(true) => stream.shutdown().await,
+                        Ok(false) => Ok(()),
+                        Err(error) => Err(error),
+                    };
+                }
+                Ok(None) => {}
+                Err(refusal) => return Self::refuse(&mut stream, &refusal).await,
+            }
+        }
         let upstream = match (request.method.as_str(), request.path.as_str()) {
             ("POST", CHAT_PATH) => self
                 .client
@@ -672,19 +932,7 @@ impl Forwarder {
             Err(_) => return Self::refuse(&mut stream, &Refusal::Unreachable).await,
         };
         let status = answer.status();
-        let kind = answer
-            .headers()
-            .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|kind| kind.to_str().ok())
-            .filter(|kind| !kind.contains(['\r', '\n']))
-            .unwrap_or("application/json")
-            .to_owned();
-        let head = format!(
-            "HTTP/1.1 {} {}\r\nContent-Type: {kind}\r\nCache-Control: no-cache\r\n\
-             Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n",
-            status.as_u16(),
-            status.canonical_reason().unwrap_or("Answer"),
-        );
+        let (kind, head) = Self::head(&answer);
         // The relay's day used, read only with the switch set (#7342).
         let header = self.meter.as_ref().and_then(|_| {
             answer
@@ -705,6 +953,25 @@ impl Forwarder {
             Ok(false) => Ok(()),
             Err(error) => Err(error),
         }
+    }
+
+    /// An upstream answer's `Content-Type` and the head passed on for it.
+    fn head(answer: &reqwest::Response) -> (String, String) {
+        let status = answer.status();
+        let kind = answer
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|kind| kind.to_str().ok())
+            .filter(|kind| !kind.contains(['\r', '\n']))
+            .unwrap_or("application/json")
+            .to_owned();
+        let head = format!(
+            "HTTP/1.1 {} {}\r\nContent-Type: {kind}\r\nCache-Control: no-cache\r\n\
+             Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n",
+            status.as_u16(),
+            status.canonical_reason().unwrap_or("Answer"),
+        );
+        (kind, head)
     }
 
     /// The answer's `head`, then each piece as it comes, so an SSE stream
@@ -741,16 +1008,27 @@ impl Forwarder {
 /// Runs the forwarder when `LAMP_HERMES_ON_LAMP=on` or
 /// `LAMP_OPENCLAW_ON_LAMP=on`: the token kept in
 /// `state` (lamp-cloud's state folder), the relay from `second_json` (the
-/// voice's `second.json`, when handed in) and the voice's `key`. Never
-/// returns; with the switch off, or when it can't start, it says why once
-/// and waits forever, so the rest of lamp-cloud goes on.
+/// voice's `second.json`, when handed in) and the voice's `key`, and the
+/// person's `own` keys with `LAMP_OWN_KEYS=on` (#8735). Never returns; with
+/// the switch off, or when it can't start, it says why once and waits
+/// forever, so the rest of lamp-cloud goes on.
 pub async fn run(
     state: Option<&Path>,
     second_json: Option<&str>,
     key: &str,
+    own: Option<OwnKeys>,
     say: &mut dyn FnMut(&str),
 ) {
-    serve_when(on_from_environment(), PORT, state, second_json, key, say).await
+    serve_when(
+        on_from_environment(),
+        PORT,
+        state,
+        second_json,
+        key,
+        own,
+        say,
+    )
+    .await
 }
 
 /// [`run`] with the switches already read (`on`, [`on_from`]) and the port
@@ -762,6 +1040,7 @@ pub async fn serve_when(
     state: Option<&Path>,
     second_json: Option<&str>,
     key: &str,
+    own: Option<OwnKeys>,
     say: &mut dyn FnMut(&str),
 ) {
     if !on {
@@ -773,6 +1052,9 @@ pub async fn serve_when(
         let mut forwarder = Forwarder::new(&relay_base(second_json), key, &token)?;
         if lamp_skills::relay_share::on() {
             forwarder = forwarder.with_meter(state);
+        }
+        if let Some(own) = own {
+            forwarder = forwarder.with_own(own);
         }
         let listener = Forwarder::bind(port)
             .await

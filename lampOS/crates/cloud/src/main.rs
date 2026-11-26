@@ -194,6 +194,14 @@ fn main() -> ExitCode {
     })
     .and_then(|rater| rater.map_err(|why| say(&why)).ok());
     let hermes_state = std::env::var_os("STATE_DIRECTORY").map(PathBuf::from);
+    // The person's own model for the agent too (#8735), with LAMP_OWN_KEYS=on:
+    // their folder as the unit hands it in (`LoadCredential=own`), marked out
+    // of date by a change relayed below.
+    let hermes_own = (std::env::var(lamp_cloud::settings::KEYS_ENVIRONMENT).as_deref() == Ok("on"))
+        .then(|| lamp_cloud::hermes_llm::OwnKeys::credentials(&credentials));
+    let own_changed = hermes_own
+        .as_ref()
+        .map(lamp_cloud::hermes_llm::OwnKeys::changed);
     let build = std::fs::read_to_string(credentials.join("build"))
         .map(|state| lamp::build(&state))
         .unwrap_or_default();
@@ -311,6 +319,7 @@ fn main() -> ExitCode {
                 lamp_cloud::settings::wifi_on_from_environment(),
                 lamp_cloud::settings::keys_on_from_environment(),
             )
+            .telling_the_forwarder(own_changed)
             .taking_the_place(lamp_cloud::settings::place_on_from_environment())
             .taking_the_voice(lamp_cloud::settings::voice_on_from_environment())
         }),
@@ -572,6 +581,7 @@ fn main() -> ExitCode {
                 hermes_state.as_deref(),
                 hermes_second.as_deref(),
                 &hermes_key,
+                hermes_own,
                 &mut said_hermes,
             )
             .await
