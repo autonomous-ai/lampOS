@@ -1321,6 +1321,10 @@ fn serve(
     #[cfg(test)]
     tests::worker_seen(began);
     channels.control.send(WorkerEvent::Ready)?;
+    // A test can hold this worker up once just after its Ready
+    // ([`tests::STALL_AFTER_READY`]).
+    #[cfg(test)]
+    tests::stall_after_ready();
     loop {
         #[cfg(test)]
         tests::worker_seen(lamp_ipc::monotonic_us());
@@ -1527,6 +1531,11 @@ pub(crate) mod tests {
         /// setup in [`serve`]: none unless a test says so.
         pub(super) static SETUP_TAKES: std::cell::Cell<Duration> =
             const { std::cell::Cell::new(Duration::ZERO) };
+        /// How long the privacy worker run on this thread is held up once,
+        /// just after its Ready in [`serve`]: none unless a test says so.
+        /// Per thread, so only that test's own worker stalls (#8466).
+        pub(super) static STALL_AFTER_READY: std::cell::Cell<Duration> =
+            const { std::cell::Cell::new(Duration::ZERO) };
         /// When the worker on this thread was last seen running in [`serve`]'s
         /// loop (a pass begun, a state read), and the longest it was held up
         /// between two such moments.
@@ -1537,6 +1546,15 @@ pub(crate) mod tests {
     /// The worker's own setup taking [`SETUP_TAKES`].
     pub(super) fn pause_setup() {
         let takes = SETUP_TAKES.with(std::cell::Cell::get);
+        if !takes.is_zero() {
+            thread::sleep(takes);
+        }
+    }
+
+    /// The worker on this thread held up once after its Ready
+    /// ([`STALL_AFTER_READY`]).
+    pub(super) fn stall_after_ready() {
+        let takes = STALL_AFTER_READY.with(|stall| stall.replace(Duration::ZERO));
         if !takes.is_zero() {
             thread::sleep(takes);
         }
@@ -2869,6 +2887,15 @@ pub(crate) mod tests {
     /// runs that passed, and twice in 20 runs a worker so ended mid-run.
     const HELD_UP_US: u64 = PRIVACY_FRESH_US / 2;
 
+    /// How a [`ride_once`]'s worker takes its time: its own setup
+    /// ([`SETUP_TAKES`]) and a stall once just after its Ready
+    /// ([`STALL_AFTER_READY`]), each on that worker's thread alone.
+    #[derive(Clone, Copy, Default)]
+    struct WorkerTakes {
+        setup: Duration,
+        after_ready: Duration,
+    }
+
     /// The real privacy worker, [`run`], on a real Bus, with `ride`, the
     /// controller granting the microphones from the worker's Ready on, and a
     /// Controls publishing `controls/state` at its pace (every 5 ms) from
@@ -2901,7 +2928,11 @@ pub(crate) mod tests {
         after: Option<bool>,
         done: impl Fn(&Ridden, u64) -> bool,
     ) -> Ridden {
-        ride_attempts(setup, ride, false, None, lapse_done, after, done)
+        let takes = WorkerTakes {
+            setup,
+            ..WorkerTakes::default()
+        };
+        ride_attempts(takes, ride, false, None, lapse_done, after, done)
     }
 
     /// [`ride_run`], and with `aging` the lapse's states are stamped as a
@@ -2917,7 +2948,7 @@ pub(crate) mod tests {
         done: impl Fn(&Ridden, u64) -> bool,
     ) -> Ridden {
         ride_attempts(
-            Duration::ZERO,
+            WorkerTakes::default(),
             ride,
             aging,
             lapse_level,
@@ -2927,9 +2958,11 @@ pub(crate) mod tests {
         )
     }
 
-    /// The attempts of [`ride_run_set_up_in`] and [`ride_run_aging`].
+    /// The attempts of [`ride_run_set_up_in`] and [`ride_run_aging`]. The
+    /// first attempt's worker stalls after its Ready as `takes` says; the
+    /// attempts after it do not.
     fn ride_attempts(
-        setup: Duration,
+        takes: WorkerTakes,
         ride: bool,
         aging: bool,
         lapse_level: Option<bool>,
@@ -2939,7 +2972,15 @@ pub(crate) mod tests {
     ) -> Ridden {
         let mut held = Vec::new();
         for stalls in 1..=STALLED_ATTEMPTS {
-            let ridden = ride_once(setup, ride, aging, lapse_level, &lapse_done, after, &done);
+            let takes = if stalls == 1 {
+                takes
+            } else {
+                WorkerTakes {
+                    after_ready: Duration::ZERO,
+                    ..takes
+                }
+            };
+            let ridden = ride_once(takes, ride, aging, lapse_level, &lapse_done, after, &done);
             if !ridden.held_up() {
                 return ridden;
             }
@@ -2953,7 +2994,7 @@ pub(crate) mod tests {
 
     /// One attempt of [`ride_attempts`].
     fn ride_once(
-        setup: Duration,
+        takes: WorkerTakes,
         ride: bool,
         aging: bool,
         lapse_level: Option<bool>,
@@ -3005,7 +3046,8 @@ pub(crate) mod tests {
         let (mut controller, boot) = controller(started, Permission::Allowed, Permission::Denied);
         let bus_root = root.0.clone();
         let worker = thread::spawn(move || {
-            SETUP_TAKES.with(|takes| takes.set(setup));
+            SETUP_TAKES.with(|setup| setup.set(takes.setup));
+            STALL_AFTER_READY.with(|stall| stall.set(takes.after_ready));
             let ended =
                 run(child, boot, &bus_root, Route::Slide, ride).map_err(|error| error.to_string());
             (ended, worker_held_us())
@@ -3155,6 +3197,42 @@ pub(crate) mod tests {
                 .first()
                 .is_some_and(|(index, _)| ridden.privacy_after(*index).contains(&muted))
         }
+    }
+
+    /// #8466, the first builder's 16:17 run: five ride tests panicked
+    /// `authority to the worker: No buffer space available (os error 55)`. A
+    /// worker the host held up past its control queue (about 118 messages)
+    /// found the ride's next authority refused `WouldBlock`, which panicked.
+    /// Held up 3 s once after its Ready, past 118 authorities even at the
+    /// product's 20 ms, the attempt is a held-up one, and the ride's next
+    /// attempt, its worker not stalled, is judged as any other.
+    #[test]
+    fn a_worker_stalled_past_its_control_queue_is_a_held_up_attempt() {
+        let takes = WorkerTakes {
+            after_ready: Duration::from_millis(3_000),
+            ..WorkerTakes::default()
+        };
+        let stalled = ride_once(
+            takes,
+            true,
+            false,
+            None,
+            &sixty_ms_past_unavailable,
+            Some(false),
+            &said_after_unavailable(false),
+        );
+        assert!(stalled.held_up(), "{}", stalled.said());
+        let ridden = ride_attempts(
+            takes,
+            true,
+            false,
+            None,
+            sixty_ms_past_unavailable,
+            Some(false),
+            said_after_unavailable(false),
+        );
+        assert!(ridden.fault().is_none(), "{}", ridden.said());
+        assert!(ridden.running_at_end, "{}", ridden.said());
     }
 
     /// #7224, Twelve's ROW FAIL on lamp-c0a4: Controls kept publishing while
