@@ -3721,8 +3721,17 @@ adds the key itself (`lamp_cloud::hermes_llm`).
   - **When a change takes effect:** the forwarder reads the credentials
     once, at lamp-cloud's start, and says the route then. After a model
     key's `keys.set` or `keys.remove`, the keys helper restarts lamp-cloud
-    (#8741), so the change takes effect then, at the cost of a few seconds
-    of the cloud link.
+    (#8741), so the change takes effect then. **The cloud link drops for a
+    few seconds on purpose** while lamp-cloud restarts.
+  - **A chat in flight at the stop:** on systemd's stop (SIGTERM), the
+    forwarder stops taking connections and new chats (a 503, "the lamp's
+    link is restarting") and gives the chats in flight up to 10 s
+    (`DRAIN_ON_STOP`, well inside the 90 s stop timeout; the unit sets no
+    `TimeoutStopSec=`) to end, then lamp-cloud exits 0. Each one still
+    running is cut and said: `lamp-cloud: the Hermes forwarder: a chat in
+    flight was cut by a stop (N ms in)`. Before #8735 lamp-cloud had no
+    SIGTERM handler and exited at once. Tests:
+    `a_stop_drains_a_chat_in_flight`, `a_chat_past_the_drain_is_cut_and_said`.
   - **Who can read the key:** lamp-cloud's credentials are readable by its
     user, `lampos`, as the relay's key is. The agent runtimes run as
     `lampos` too, so they can read the person's model key, as they can read

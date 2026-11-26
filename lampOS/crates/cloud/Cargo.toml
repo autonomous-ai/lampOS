@@ -26,7 +26,8 @@ rumqttc = { version = "=0.25.1", default-features = false, features = ["use-rust
 tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
 futures-util = { version = "=0.3.34", default-features = false, features = ["std", "sink"] }
 # `io-util`: the Hermes forwarder's own reads and writes (src/hermes_llm.rs).
-tokio = { version = "=1.53.1", features = ["rt", "time", "macros", "net", "sync", "io-util"] }
+# `signal`: systemd's stop (SIGTERM), after which the forwarder drains its chats in flight (#8735).
+tokio = { version = "=1.53.1", features = ["rt", "time", "macros", "net", "sync", "io-util", "signal"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 # The backend's ping, as the voice's second provider makes its requests.
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
