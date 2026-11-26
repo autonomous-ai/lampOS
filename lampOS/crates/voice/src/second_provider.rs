@@ -1082,6 +1082,11 @@ pub const NAME_HEY_ONLY_ENVIRONMENT: &str = "LAMP_NAME_HEY_ONLY";
 /// ([`crate::attention::Attention::one_reply_window`]).
 pub const ONE_REPLY_WINDOW_ENVIRONMENT: &str = "LAMP_ONE_REPLY_WINDOW";
 
+/// `on` exactly, off unless set (#8772, the product owner's rule of 26 Nov
+/// 2026): in a conversation a reply of a word or two carries as any line
+/// does, never held as stray words (`second_provider::worker::LONE_WORDS`).
+pub const SHORT_REPLIES_CARRY_ENVIRONMENT: &str = "LAMP_SHORT_REPLIES_CARRY";
+
 /// `on` exactly, off unless set (#8114, the first builder's 08:54 and 08:57):
 /// a line whose call word is another person's name ("Hey, Lance.", "Dan,
 /// are you done?") is never the lamp's call, however sure lamp-name is,
