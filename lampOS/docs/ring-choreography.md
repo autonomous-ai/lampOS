@@ -66,6 +66,43 @@ It never makes the ring dark: what is shown still says the lamp hears. The
 sleep that follows at three seconds is not drawn here yet (#711): the ring
 worker is gone while the voice is muted.
 
+### A hand on the head: the warm glow (#8635)
+
+Same switch, same worker, same reading of the head's `held_us`. From the
+hand's first qualified touch (Controls gives it a time from its `Touch`, at
+20 ms) the whole face warms and brightens: it adds 35 % of the ceiling in
+the offline breath's amber (`OFFLINE_TINT`, `HAND_GLOW`), rising fast (50 ms
+to two thirds, `HAND_GLOW_RISE_US`) and fading slowly once the hand is gone
+(350 ms to two thirds, `HAND_GLOW_FALL_US`). So a tap is a short warm
+brightening, before the hum's listening face, and a hand that stays glows
+while it stays and fades when it leaves. It is in every mood's frame, so a
+tap that stops the lamp's speech lights the speaking face too. The
+countdown above dims it with the rest of the face, so the hold to sleep
+reads as before. A hand a push spoiled has no time and no glow; a pet's
+glow fades once Controls tells it apart, since a pet has no time either.
+
+- **Within the caps:** it is a share of the ceiling each frame is drawn
+  under, which is already the output cap's (the night's 24, the day's 60,
+  #8615), so it never passes either. A pat at night is a glow within the
+  night cap, not a flash.
+- **Never over privacy or a mute:** it is the face's, drawn only where the
+  face is. With the privacy switch closed the ring refuses it as any face,
+  and the red breath is the privacy worker's; muted, the ring worker is
+  gone.
+- **How fast:** Controls qualifies the touch at 20 ms, read at most every
+  50 ms (`docs/controls.md`), and says the head's state when it changes;
+  the head's thread looks every 50 ms; a resting frame is drawn every
+  25 ms; the face is plainly brighter within 100 ms of its first frame with
+  the hand. About 250 ms from the touch at the worst, under the 300 ms
+  target. On a lamp: the first `ring` peak line or `Presented` write after
+  the head's `touch_state` with a `held_us`. Not measured yet.
+- **Tests:** `ring_face`'s
+  `a_hand_on_the_head_warms_the_face_at_once_and_fades_when_it_leaves`,
+  `the_hands_glow_never_passes_the_ceiling_by_day_or_at_night` and
+  `a_hand_kept_on_the_head_dims_the_face_from_one_second_to_three` (the
+  countdown, from the glow); `ring_worker`'s
+  `a_hands_glow_is_never_drawn_over_privacy_or_a_turn`.
+
 ### A tap on the head at rest: the listening face (#711)
 
 Same switch and same worker. **The face follows the voice's "hm?", not the

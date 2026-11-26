@@ -268,6 +268,10 @@ pub struct Settings {
     /// shutdown.md): only then is a model with no `prepare_to_unplug` told
     /// to say so ([`crate::without_a_tool`], #4595).
     pub shutdown_from_app: bool,
+    /// What touching this lamp's head does, for the one line the model is
+    /// told of it ([`crate::without_a_tool::Head`], #8635): set from the
+    /// worker's `--head-touch` and `--head-sleep`, never by these flags.
+    pub head: crate::without_a_tool::Head,
     /// `lamp-services`' tools folder (`LAMP_SERVICES=on`,
     /// [`crate::services`]): its three functions, read and called as the
     /// skills' folder is, held to the voice's own rules.

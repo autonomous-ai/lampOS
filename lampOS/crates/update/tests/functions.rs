@@ -194,7 +194,8 @@ fn the_product_voice_s_functions_in_a_process_of_their_own() {
     for skill in cut.named_alone.iter().chain(&cut.left_out) {
         println!("{CUT}{skill}");
     }
-    let told = lamp_voice::without_a_tool::for_declared(&chat, settings.shutdown_from_app);
+    let told =
+        lamp_voice::without_a_tool::for_declared(&chat, settings.shutdown_from_app, settings.head);
     let unplug = if told.contains(lamp_voice::without_a_tool::NO_UNPLUG_APP) {
         "app"
     } else if told.contains(lamp_voice::without_a_tool::NO_UNPLUG) {

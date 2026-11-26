@@ -1355,6 +1355,28 @@ mod drawn_tests {
         assert!(open.show_resting(&pixels, ceiling).unwrap().is_some());
     }
 
+    /// #8635, the First builder's addition: a hand's warm glow is the face's,
+    /// so with the privacy switch closed (the privacy worker's red breath is
+    /// the one shown then) or a turn owning the lamp the ring writes nothing
+    /// of it at rest; open, it is drawn.
+    #[test]
+    fn a_hands_glow_is_never_drawn_over_privacy_or_a_turn() {
+        let mut face = Face::default();
+        face.hand(Some(200_000));
+        let pixels = (0..10)
+            .map(|frame| face.render(Mood::Resting, 0, 1_000_000 + frame * 20_000, 60))
+            .last()
+            .unwrap();
+        assert!(pixels.iter().any(|pixel| pixel.red > 0));
+        let ceiling = ChannelCeiling::new(60).unwrap();
+        let mut muted = ring_with(Permission::Denied, false);
+        assert!(muted.show_resting(&pixels, ceiling).unwrap().is_none());
+        let mut owned = ring_with(Permission::Allowed, true);
+        assert!(owned.show_resting(&pixels, ceiling).unwrap().is_none());
+        let mut open = ring_with(Permission::Allowed, false);
+        assert!(open.show_resting(&pixels, ceiling).unwrap().is_some());
+    }
+
     /// #4521's camera mark over a computer's pixels (#4943's fourth before
     /// ready): the resting frame draws the computer's pixels, and the mark
     /// goes over them with the pixels beside it dark, so a ring painted red

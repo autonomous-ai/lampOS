@@ -540,6 +540,8 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (name_note, name_note_busy_face, flags) = crate::called::take(flags);
     let (name_note_heard_as, flags) = crate::called::take_heard_as(flags);
     let (head_touch, flags) = crate::attention::take_head_touch(flags);
+    let (head_sleep, flags) = crate::without_a_tool::take_head_sleep(flags);
+    tools.head = crate::without_a_tool::Head::of(head_touch, head_sleep);
     let (bus_root, flags) = crate::bus_out::take_root(flags)?;
     let (first_output, flags) = crate::first_output::take(flags)?;
     let (patient_writes, flags) = crate::config::take_writes(flags);

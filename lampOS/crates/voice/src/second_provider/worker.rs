@@ -27954,8 +27954,12 @@ mod tests {
                 // Told as a spoken turn is how to put the lamp to sleep or
                 // unplug it, with neither function (#4595).
                 assert!(
-                    told.text
-                        .ends_with(&crate::without_a_tool::told(false, false, false)),
+                    told.text.ends_with(&crate::without_a_tool::told(
+                        false,
+                        false,
+                        false,
+                        crate::without_a_tool::Head::None
+                    )),
                     "{}",
                     told.text
                 );

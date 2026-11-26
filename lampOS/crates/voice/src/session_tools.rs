@@ -412,6 +412,7 @@ pub fn told_after(tools: &[Tool], settings: &Settings) -> Option<String> {
     told.push_str(&crate::without_a_tool::for_declared(
         tools,
         settings.shutdown_from_app,
+        settings.head,
     ));
     (!told.is_empty()).then_some(told)
 }

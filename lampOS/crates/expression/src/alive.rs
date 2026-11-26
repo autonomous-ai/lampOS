@@ -451,16 +451,17 @@ pub const HAND_FRESH_US: u64 = 500_000;
 
 /// Looking up at a tap on the head (#711, First on #711 at 05:05): "are you
 /// there?" answered with all of itself at once, beside the voice's "hm?" and
-/// the ring's listening face. A small lift of the head, more toward a face
-/// seen high in the picture and less toward one low; no face, the lift
-/// alone. Only the head: never a turn of the body. Authored, to be looked
-/// at on a lamp.
+/// the ring's listening face. A lift of the head, more toward a face seen
+/// high in the picture and less toward one low; no face, the lift alone.
+/// Only the head: never a turn of the body. Made plain by #8635 (0.035 was
+/// not noticed), under the wake's 0.065. Authored, to be looked at on a
+/// lamp.
 pub const LOOK_UP: BodyOffsets = BodyOffsets {
     base_yaw: 0.0,
     shoulder: 0.0,
     elbow: 0.0,
     head_roll: 0.0,
-    head_pitch: -0.035,
+    head_pitch: -0.06,
 };
 /// A face at the top of the picture adds this much lift, one at the bottom
 /// takes it away (the face's centre, -1 top to 1 bottom).
@@ -1246,12 +1247,23 @@ impl Life {
             TouchGesture::Stroke if self.muted() && self.asleep() => {}
             // Asleep, a tap or a stroke wakes it; awake, it looks up at a tap.
             TouchGesture::Tap | TouchGesture::Stroke if self.asleep() => self.called(),
+            // The first qualified touch of an awake, open lamp (#8635): it
+            // looks up at once, not only when the tap is let go, so a tap
+            // held half a second is seen within 300 ms of the touch. A tap
+            // that follows holds the look from its own release; a hand that
+            // stays becomes the lean at the stroke.
+            TouchGesture::Touch if !self.muted() && !self.asleep() => {
+                self.supersede_routine();
+                self.looking_until_us = Some(stamp_us + LOOK_UP_FOR_US);
+            }
             TouchGesture::Tap => {
                 self.supersede_routine();
                 self.looking_until_us = Some(stamp_us + LOOK_UP_FOR_US);
             }
             TouchGesture::Stroke if !self.asleep() => {
                 self.supersede_routine();
+                // The touch's look up gives way to the lean (#8635).
+                self.looking_until_us = None;
                 self.hand = Some(event.contact_id);
                 self.hand_seen_us = Some(stamp_us);
             }
@@ -1599,12 +1611,14 @@ impl Life {
             // A fifth of a second on from each step heard: the longest step.
             *until = (*until).max(now_us + 200_000);
         }
-        let looking = self.looking_until_us.is_some_and(|until| now_us < until)
+        let may_look = self.looking_until_us.is_some_and(|until| now_us < until)
             && self.phase == Phase::Awake
             && context.free
-            && !self.muted()
-            && !matches!(context.voice, Some(Voice::Thinking | Voice::Speaking));
-        if !looking {
+            && !self.muted();
+        let looking = may_look && !matches!(context.voice, Some(Voice::Thinking | Voice::Speaking));
+        // A touch that stops the lamp's speech keeps its look (#8635): it is
+        // shown once the voice has stopped, within the look's time.
+        if !looking && !(may_look && context.voice == Some(Voice::Speaking)) {
             self.looking_until_us = None;
         }
         self.look_up = if looking {

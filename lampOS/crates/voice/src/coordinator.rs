@@ -5093,6 +5093,11 @@ fn spawn_rig(
         &mut arguments,
         controls.as_ref().is_some_and(HandControls::head_sleep),
     );
+    // What the model is told its head does, true for this lamp (#8635).
+    crate::without_a_tool::mark_head_sleep(
+        &mut arguments,
+        controls.as_ref().is_some_and(HandControls::head_sleep),
+    );
     let second::Workers {
         role,
         arguments,
