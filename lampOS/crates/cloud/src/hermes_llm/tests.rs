@@ -275,6 +275,7 @@ async fn either_switch_alone_starts_the_listener() {
             Some(dir.path()),
             None,
             KEY,
+            None,
             &mut say,
         );
         let look = async {
