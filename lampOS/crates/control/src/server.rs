@@ -4797,6 +4797,41 @@ mod tests {
         );
     }
 
+    /// #8610, El's P2.1 on #8688: `volume.changed` needs the `volume`
+    /// grant, which `speak` holds too, so a computer granted only `speak`
+    /// still receives it; one granted only the light does not.
+    #[test]
+    fn volume_changed_goes_with_volume_or_speak() {
+        let (shared, _, mut inbox, _newest) = stalled();
+        let volume = || {
+            Out::Event(
+                EventKind::VolumeChanged,
+                json!({"level": 30, "muted": false}),
+            )
+        };
+        for (grants, receives) in [
+            (vec![Grant::Speak], true),
+            (vec![Grant::Volume], true),
+            (vec![Grant::Light], false),
+        ] {
+            {
+                let mut open = shared.open.lock().unwrap();
+                let open = open.get_mut(&1).unwrap();
+                open.grants = grants.iter().copied().collect();
+                open.events = [EventKind::VolumeChanged].into();
+            }
+            shared.deliver(vec![volume()]);
+            match inbox.try_recv() {
+                Ok(event) => {
+                    assert!(receives, "{grants:?}: {event:?}");
+                    assert_eq!(event["ev"], "volume.changed");
+                    assert_eq!(event["level"], 30);
+                }
+                Err(_) => assert!(!receives, "{grants:?}: none received"),
+            }
+        }
+    }
+
     /// The Reviewer-lead's P2 on #4564: `body.state` writes no journal line,
     /// so a computer's lines a second are all left for the rest.
     #[test]
