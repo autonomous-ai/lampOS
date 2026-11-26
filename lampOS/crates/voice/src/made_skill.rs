@@ -11643,9 +11643,8 @@ pub const CHANGING_SAY_REPAIR: &str = "Not kept: its say step's words hold a num
 /// ([`says_what_changes`]): English number words, zero to ninety-nine, a
 /// hundred and a thousand, the ordinals of a month's days (twenty-first is
 /// twenty and first), and the weekdays and months.
-const CHANGING_WORDS: [&str; 68] = [
+const CHANGING_WORDS: [&str; 65] = [
     "zero",
-    "one",
     "two",
     "three",
     "four",
@@ -11674,8 +11673,6 @@ const CHANGING_WORDS: [&str; 68] = [
     "ninety",
     "hundred",
     "thousand",
-    "first",
-    "second",
     "third",
     "fourth",
     "fifth",
@@ -11714,9 +11711,25 @@ const CHANGING_WORDS: [&str; 68] = [
     "december",
 ];
 
-/// The months that are also plain words ("you may", "a march"): a month
-/// only when capitalised.
+/// The months that are also plain words ("you may", "a march", "May your
+/// day be bright!"): a month only when capitalised and read as a date,
+/// after "of" or "in" or beside a digit or another changing word (the first
+/// builder's P3 on #8651).
 const CAPITAL_MONTHS: [&str; 2] = ["May", "March"];
+
+/// Number words common in constant lines ("Take a second to breathe.",
+/// "One more glass of water.", "Your first break of the day!"): a count
+/// only beside a count or date word ([`COUNT_WORDS`], a digit, or another
+/// changing word), as in "one day left" or "the first of May" (the first
+/// builder's P3 on #8651).
+const PLAIN_NUMBER_WORDS: [&str; 3] = ["one", "second", "first"];
+
+/// The words that make a plain number word or a capitalised month a count
+/// or a date ([`PLAIN_NUMBER_WORDS`], [`CAPITAL_MONTHS`]).
+const COUNT_WORDS: [&str; 16] = [
+    "day", "days", "week", "weeks", "month", "months", "year", "years", "hour", "hours", "minute",
+    "minutes", "left", "until", "since", "ago",
+];
 
 /// Whether a `say` step's own words (`say = "a note"`, or `{ text }` or
 /// `{ note }`, one line or a list) hold a number or a date: a digit, or a
@@ -11741,14 +11754,36 @@ fn says_what_changes(say: &toml::Value) -> bool {
         say => lines_of(say),
     };
     lines.iter().any(|line| {
-        line.chars().any(|c| c.is_ascii_digit())
-            || line
-                .split(|c: char| !c.is_alphanumeric())
-                .filter(|word| !word.is_empty())
-                .any(|word| {
-                    CHANGING_WORDS.contains(&word.to_lowercase().as_str())
-                        || CAPITAL_MONTHS.contains(&word)
-                })
+        if line.chars().any(|c| c.is_ascii_digit()) {
+            return true;
+        }
+        let words: Vec<&str> = line
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|word| !word.is_empty())
+            .collect();
+        let changing = |word: &str| CHANGING_WORDS.contains(&word.to_lowercase().as_str());
+        // A count or a date beside the word at `at`: a count word, or
+        // another changing word.
+        let beside_a_count = |at: usize| {
+            [at.checked_sub(1), Some(at + 1)]
+                .into_iter()
+                .flatten()
+                .filter_map(|near| words.get(near))
+                .any(|near| changing(near) || COUNT_WORDS.contains(&near.to_lowercase().as_str()))
+        };
+        words.iter().enumerate().any(|(at, word)| {
+            changing(word)
+                || (PLAIN_NUMBER_WORDS.contains(&word.to_lowercase().as_str())
+                    && beside_a_count(at))
+                || (CAPITAL_MONTHS.contains(word)
+                    && (at
+                        .checked_sub(1)
+                        .and_then(|before| words.get(before))
+                        .is_some_and(|before| {
+                            ["of", "in"].contains(&before.to_lowercase().as_str())
+                        })
+                        || beside_a_count(at)))
+        })
     })
 }
 
@@ -20379,6 +20414,8 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             say("99 days to go."),
             say("Happy Monday!"),
             say("It's the first of May."),
+            say("One day left."),
+            say("Only a second week to go."),
             "[[do]]\nsay = \"Tell them it's the twenty-first.\"\n".into(),
             "[[do]]\nsay = { text = [\"Hi.\", \"Only three left.\"] }\n".into(),
         ] {
@@ -20397,6 +20434,12 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             say("Time to stretch!"),
             say("Drink some water."),
             say("You may want a break."),
+            // The first builder's P3: plain number words and "May" in
+            // constant lines.
+            say("Take a second to breathe."),
+            say("One more glass of water."),
+            say("Your first break of the day!"),
+            say("May your day be bright!"),
         ] {
             let toml = format!("{kept}{timed}");
             assert_eq!(told_only(&toml), Ok(()), "{toml}");

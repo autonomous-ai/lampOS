@@ -4243,7 +4243,12 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   số, một từ chỉ số tiếng Anh (zero đến ninety-nine, hundred, thousand, số
   thứ tự first đến thirty-first) hay tên một ngày trong tuần hoặc một tháng
   (nguyên từ, mọi kiểu chữ hoa thường, dấu gạch dưới hay gạch nối tách từ;
-  "May" và "March" chỉ khi viết hoa, vì "you may" không phải là tháng) bị
+  "May" và "March" chỉ khi viết hoa và được đọc như một ngày, sau "of" hay
+  "in" hoặc cạnh một từ chỉ số đếm, nên "May your day be bright!" vẫn được
+  giữ; "one", "second" và "first" chỉ khi đứng cạnh một từ chỉ số đếm hay
+  ngày như "day", "week", "left" hoặc một số khác, nên "One more glass of
+  water.", "Take a second to breathe." và "Your first break of the day!"
+  vẫn được giữ, còn "One day left." bị từ chối) bị
   từ chối như một bước `run`, với lời sửa `made_skill::CHANGING_SAY_REPAIR`:
   "this answer changes, so compute it when the skill runs: a task step
   whose script prints it." Một câu không đổi ("Time to stretch!") vẫn là
