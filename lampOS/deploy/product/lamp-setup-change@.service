@@ -30,8 +30,9 @@ ProtectSystem=strict
 # for the voice's state, read to judge quiet; lamp-update's lock (0700), taken for the app's
 # restart and shutdown (#3697), which then run systemctl and systemd-run; the owner's face expressions
 # and room sounds yeses from the app (#5500, root:lampos 0640 in the 0750 folder lampos.conf makes),
-# and after a new room sounds yes lamp-ears' try-restart under the same lock.
-ReadWritePaths=/etc /run/lampos-bus -/var/lib/lampos-update -/var/lib/lampOS/consent
+# and after a new room sounds yes lamp-ears' try-restart under the same lock; the privacy light's look
+# from the app (#8696, root's 0600 in the 0700 light folder lampos.conf makes), only from lamp-cloud.
+ReadWritePaths=/etc /run/lampos-bus -/var/lib/lampos-update -/var/lib/lampOS/consent -/var/lib/lampOS/light
 ProtectHome=yes
 PrivateTmp=yes
 PrivateNetwork=yes

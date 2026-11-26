@@ -2167,3 +2167,210 @@ fn the_owners_yeses_from_the_app_are_kept_as_the_voice_keeps_them() {
         );
     }
 }
+
+/// The privacy light's look from the app (#8696): `{"privacy_light":
+/// "red"|"dim"|"off"}` kept whole in its file, root's, 0600 in the light
+/// folder that stays 0700, and `{"privacy_light_get": true}` read through
+/// the helper too; red with no file. Anything else is refused with the file
+/// as it was. Nothing restarts: the ring worker follows the file.
+#[test]
+fn the_privacy_light_line_writes_the_look_whole_and_refuses_others() {
+    let root = Root::new();
+    let config = root.config();
+    let path = config.privacy_light.clone();
+    let get = r#"{"privacy_light_get": true}"#;
+    let (reply, done) = answer(get, &config, true);
+    assert_eq!(reply, json!({"done": {"look": "red"}}), "no file is red");
+    assert!(!path.exists(), "a get writes nothing");
+    let done = done.unwrap();
+    assert!(!done.restart_voice && !done.restart_schedule && !done.restart_ears);
+    for look in ["dim", "off", "red", "dim"] {
+        let (reply, done) = answer(&format!(r#"{{"privacy_light": "{look}"}}"#), &config, true);
+        assert_eq!(reply, json!({"done": {"look": look}}), "{look}");
+        let done = done.unwrap();
+        assert!(
+            !done.restart_voice
+                && !done.restart_schedule
+                && !done.restart_control
+                && !done.restart_ears
+                && !done.restart_peek
+        );
+        assert_eq!(done.said, format!("the privacy light is now {look}"));
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            format!("{{\"look\":\"{look}\"}}\n")
+        );
+        assert_eq!(mode(&path), 0o600);
+        assert_eq!(mode(path.parent().unwrap()), 0o700);
+        assert_eq!(
+            lamp_msgs::privacy_light::read(&path).name(),
+            look,
+            "the readers' own reader agrees"
+        );
+        let (reply, _) = answer(get, &config, true);
+        assert_eq!(reply, json!({"done": {"look": look}}));
+    }
+    for refused in [
+        r#"{"privacy_light": "blue"}"#,
+        r#"{"privacy_light": "Dim"}"#,
+        r#"{"privacy_light": 1}"#,
+        r#"{"privacy_light": null}"#,
+        r#"{"privacy_light": {"look": "off"}}"#,
+        r#"{"privacy_light": "off", "privacy_light_get": true}"#,
+        r#"{"privacy_light_get": false}"#,
+        r#"{"privacy_light_get": "off"}"#,
+    ] {
+        let (reply, done) = answer(refused, &config, true);
+        assert!(reply.get("refused").is_some(), "{refused}: {reply}");
+        assert!(done.is_none());
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            "{\"look\":\"dim\"}\n",
+            "{refused} left the file as it was"
+        );
+    }
+    let (reply, _) = answer(r#"{"privacy_light": "off"}"#, &config, false);
+    assert_eq!(reply, json!({"refused": change::OFF}));
+    // Nothing left beside it.
+    let left: Vec<_> = fs::read_dir(path.parent().unwrap())
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    assert_eq!(left, ["privacy.json"]);
+    // Where the product keeps it, the unit may write there, and the folder
+    // stays root's alone (the first builder's answer 2).
+    let own: Config =
+        serde_json::from_str(include_str!("../../fixtures/serve-own-page.json")).unwrap();
+    assert_eq!(
+        own.privacy_light,
+        std::path::Path::new(lamp_msgs::privacy_light::PATH)
+    );
+    let unit = include_str!("../../../../deploy/product/lamp-setup-change@.service");
+    assert!(unit.lines().any(
+        |line| line.starts_with("ReadWritePaths=") && line.contains(" -/var/lib/lampOS/light")
+    ));
+    let tmpfiles = include_str!("../../../../deploy/product/lampos.conf");
+    assert!(
+        tmpfiles
+            .lines()
+            .any(|line| line == "d /var/lib/lampOS/light 0700 root root -")
+    );
+}
+
+/// The first builder's rule on #8696: the helper takes the privacy light's
+/// set and get only from lamp-cloud's own process, by the kernel's peer
+/// credentials (`SO_PEERCRED`): its uid is `lampos`'s and its cgroup is
+/// lamp-cloud's unit where the system's manager puts it, both, whatever
+/// else connects to the 0660 socket. lamp-skills, the one other unit the
+/// socket takes, is refused it, as is any other `lampos` process. Root run
+/// by hand (standard input not a socket) may, as for every change.
+#[test]
+fn only_lamp_clouds_own_process_may_ask_the_privacy_light() {
+    use lamp_setup::keys::Peer;
+    const LAMPOS: u32 = 990;
+    let peer = |uid, cgroup: &str| Peer {
+        uid,
+        cgroup: cgroup.into(),
+    };
+    let cloud = peer(
+        LAMPOS,
+        "0::/lampos.slice/lampos-parts.slice/lamp-cloud.service\n",
+    );
+    assert!(change::privacy_light_asker_may(Some(&cloud), Some(LAMPOS)));
+    assert!(change::privacy_light_asker_may(
+        Some(&peer(
+            LAMPOS,
+            "1:name=systemd:/lampos.slice/lampos-parts.slice/lamp-cloud.service\n0::/\n"
+        )),
+        Some(LAMPOS)
+    ));
+    let others = [
+        // lamp-skills, which may ask the turn-off alone.
+        peer(
+            LAMPOS,
+            "0::/lampos.slice/lampos-parts.slice/lamp-skills.service\n",
+        ),
+        // Any other lampos part, the agent's actions among them.
+        peer(
+            LAMPOS,
+            "0::/lampos.slice/lampos-parts.slice/lamp-actions.service\n",
+        ),
+        // lamp-cloud's unit name under a login user's own manager.
+        peer(
+            LAMPOS,
+            "0::/user.slice/user-990.slice/user@990.service/app.slice/lamp-cloud.service\n",
+        ),
+        peer(LAMPOS, "0::/system.slice/lamp-cloud.service\n"),
+        peer(
+            LAMPOS,
+            "0::/lampos.slice/lampos-parts.slice/lamp-cloud.service2\n",
+        ),
+        // lamp-cloud's cgroup with another user's uid.
+        peer(
+            0,
+            "0::/lampos.slice/lampos-parts.slice/lamp-cloud.service\n",
+        ),
+        peer(
+            LAMPOS + 1,
+            "0::/lampos.slice/lampos-parts.slice/lamp-cloud.service\n",
+        ),
+        peer(LAMPOS, ""),
+    ];
+    for other in &others {
+        assert!(
+            !change::privacy_light_asker_may(Some(other), Some(LAMPOS)),
+            "{other:?}"
+        );
+    }
+    assert!(!change::privacy_light_asker_may(None, Some(LAMPOS)));
+    assert!(!change::privacy_light_asker_may(Some(&cloud), None));
+
+    let skills = &others[0];
+    for line in [
+        r#"{"privacy_light": "off"}"#,
+        r#"{"privacy_light":"dim"}"#,
+        r#"{"privacy_light_get": true}"#,
+        " {\"privacy_light\": \"red\"}\n",
+        // A line the helper would refuse anyway is still not taken from
+        // another peer.
+        r#"{"privacy_light": "blue"}"#,
+    ] {
+        assert!(
+            change::privacy_light_refused(line, true, Some(skills), Some(LAMPOS)),
+            "{line}"
+        );
+        assert!(
+            change::privacy_light_refused(line, true, None, Some(LAMPOS)),
+            "{line}"
+        );
+        assert!(
+            !change::privacy_light_refused(line, true, Some(&cloud), Some(LAMPOS)),
+            "{line}"
+        );
+        assert!(
+            !change::privacy_light_refused(line, false, None, None),
+            "{line}: root by hand"
+        );
+    }
+    // Other changes are left to the checks they already have.
+    for line in [
+        r#"{"person_name": "Lan"}"#,
+        r#"{"shutdown":"lamp"}"#,
+        "garbage",
+    ] {
+        assert!(!change::privacy_light_refused(
+            line,
+            true,
+            Some(skills),
+            Some(LAMPOS)
+        ));
+    }
+    // The helper asks it of every line it reads from the socket, before the
+    // line is answered.
+    let main = include_str!("../../src/main.rs");
+    let checked = main
+        .find("change::privacy_light_refused(")
+        .expect("main.rs checks the privacy light's asker");
+    let answered = main.find("change::answer_holding(").unwrap();
+    assert!(checked < answered);
+}
