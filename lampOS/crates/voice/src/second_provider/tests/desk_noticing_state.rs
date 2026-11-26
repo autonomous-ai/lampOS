@@ -291,7 +291,10 @@ fn turned_off(path: &Path) {
 /// #8683's ROW (c7200527698, F4's first try on lamp-06c1, 27 Nov): with
 /// desk noticing off, "Lamp, desk noticing on." got "I'm noticing your
 /// desk again." with `calls=none`. The reply is said, then corrected with
-/// the existing not-done line (`action_claim::NOT_DONE_LINE`), and nothing
+/// the existing not-done line's first sentence
+/// (`action_claim::NOT_DONE_FIRST`, "Sorry, I didn't do that."), as this
+/// line is nobody's known as the owner's (the first builder's c7203862036
+/// on #8804: the owner keeps the whole `NOT_DONE_LINE`), and nothing
 /// is turned on: `look_at_my_desk` never runs (the Reviewer-lead's
 /// c7202262971 and the first builder's c7202392079 on #7767). With it on,
 /// the same reply is true and said alone.
@@ -310,7 +313,7 @@ fn a_claimed_start_with_noticing_off_is_corrected_after_the_reply() {
         [
             format!("said:{REPLY}"),
             // Each piece after the first is said after a space.
-            format!("said: {}", crate::action_claim::NOT_DONE_LINE),
+            format!("said: Sorry, I didn't do that."),
         ]
     );
     assert!(!allowed(&path, SEEN_ACTIVITY, true));

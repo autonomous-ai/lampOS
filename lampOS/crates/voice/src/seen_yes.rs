@@ -2626,6 +2626,26 @@ mod tests {
         ] {
             assert!(!claims_started(reply, heard), "{reply} to {heard:?}");
         }
+        // Another thing watched or on, to a line not naming the noticing
+        // (Twelve's P2 on #8804, c7203889421): no desk start, no line.
+        let oven = Some("Lamp, remind me about the oven.");
+        for reply in [
+            "Okay, I'm watching the timer again.",
+            "Sure, I'll watch the oven again.",
+            "I'm noticing the noise again.",
+            "The camera is on the shelf.",
+        ] {
+            assert!(!claims_started(reply, oven), "{reply} to {oven:?}");
+        }
+        // The desk's own looking still claims to that line.
+        for reply in [
+            "Okay, I'm noticing your desk again.",
+            "Desk noticing is on now.",
+            "Noticing is on.",
+            "My camera's on.",
+        ] {
+            assert!(claims_started(reply, oven), "{reply} to {oven:?}");
+        }
     }
 
     /// The ROW's turn whole: noticing off, "Lamp, desk noticing on.",
