@@ -42,6 +42,8 @@ impl Test {
             cut_last: None,
             stop_owed: None,
             upcoming: None,
+            link_waits: false,
+            link_back_owed: false,
         };
         Self {
             parent,

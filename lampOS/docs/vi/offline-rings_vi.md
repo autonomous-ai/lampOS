@@ -37,8 +37,11 @@ vốn là một lượt của mô hình, và cổng của nó cần một phiên
   chưa nói" trong sổ giao của tiến trình con (`delivery::SCHEMA` 3, còn giữ
   sau khi khởi động lại). Nó không reo lại khi mất mạng, và khi mạng trở lại
   nó được nói bằng lời của nó một lần, như một lượt của mô hình; rồi dấu đó
-  bị xoá. Đây là điểm 5 của first builder (c7183858037), sửa lỗ hổng đã biết
-  của #8632. Không có đoạn âm thanh nào cả thì nó chờ mạng như trước.
+  bị xoá. Trong lúc chờ, nó không chặn gì: tiến trình con bỏ qua nó, nên một
+  hẹn giờ hay lời nhắc đến hạn sau trong cùng lần mất mạng vẫn reo đúng giờ,
+  và không gì được gộp vào nó; giọng nói báo cho tiến trình con khi mạng trở
+  lại (`LinkBack`, P2 của Reviewer-lead trên #8800). Đây là điểm 5 của first
+  builder (c7183858037), sửa lỗ hổng đã biết của #8632. Không có đoạn âm thanh nào cả thì nó chờ mạng như trước.
 - **Giới hạn dung lượng (điểm thêm 2 của first builder):** thư mục giữ tối
   đa 122.918.400 byte (`ring_clips::MOST_BYTES`, khoảng 123 MB): một đoạn âm
   thanh và tệp kèm cho mỗi mục trong tối đa 128 mục của Schedule, mỗi đoạn
