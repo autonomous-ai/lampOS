@@ -1835,14 +1835,20 @@ each round reads the owner's mark, `/etc/lampOS/setup/auto-update-off`
   `asked` `auto`. By day the voice says "I'm updating now. I'll be back in a
   minute." once even with nobody near, and the ring breathes while the
   build comes and swells once it is kept (`LAMP_RING_UPDATE`, on with this).
+  Once the round has switched and kept the build (`last.outcome`
+  `switched`), by day the new build's voice says "I'm back. The update is
+  done." once, in the owner's language, and the ring is back to normal.
   In the lamp's quiet hours (22:00 to 07:00 local,
-  `lamp_local_time::quiet_hours`) the voice says it only to someone near,
-  and the ring shows nothing; a line heard during the give-way is answered
-  with the same words, day or night.
+  `lamp_local_time::quiet_hours`) nothing is said before or after and the
+  ring shows nothing; only someone who speaks during the round (a turn
+  under way, or speech since the voice saw the round) is told it is
+  updating, and a line heard during the give-way is answered with the same
+  words, day or night.
 - **The mark there (off):** the round fetches and checks as before but does
   not switch: it ends `not-quiet` with "Auto update is off: the new build
-  waits for the owner's Update now". The owner's Update now (above)
-  switches as before.
+  waits for the owner's Update now", and its end's `sequence` is the build
+  that waits, which lamp-cloud gives as `update.status`'s `available`. The
+  owner's Update now (above) switches as before.
 
 The first update after setup, the setup walk's hold, a reset's hold and
 the first 180 s after a boot, and the watch with its put-back are as

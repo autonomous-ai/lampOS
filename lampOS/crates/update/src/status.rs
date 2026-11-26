@@ -374,6 +374,14 @@ impl Telling {
             self.phase.take(),
             self.began_unix_ms.take(),
         ));
+        // Auto update off (#8769): the build that waits for the owner's
+        // Update now is the end's `sequence`, so the app's banner can show it.
+        if let (Some(last), Outcome::NotQuiet(why), Some(target)) =
+            (self.last.as_mut(), outcome, self.target.as_ref())
+            && why == crate::auto::OFF_WAITS
+        {
+            last.sequence = Some(target.sequence);
+        }
         self.target = None;
         self.waiting = None;
         self.asked_now = false;
@@ -719,6 +727,14 @@ mod tests {
         assert_eq!((before, kept().round), (after, None));
         telling.phase_at("checking", 30_000);
         assert_eq!(kept().round.and_then(|round| round.target), None);
+        // Auto update off (#8769): the end gives the build that waits.
+        telling.target(&two);
+        telling.ended(&Outcome::NotQuiet(crate::auto::OFF_WAITS.into()), 31_000);
+        assert_eq!(kept().last.and_then(|last| last.sequence), Some(10_580));
+        telling.phase_at("checking", 40_000);
+        telling.target(&two);
+        telling.ended(&Outcome::NotQuiet("someone talked".into()), 41_000);
+        assert_eq!(kept().last.and_then(|last| last.sequence), None);
     }
 
     /// #5197: Harness's record, written between rounds by its one-shot, is

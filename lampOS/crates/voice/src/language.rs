@@ -204,6 +204,24 @@ pub fn updating_now(language: Option<Language>) -> &'static str {
     })
 }
 
+/// What the lamp says once its owner's Auto update (#8769) has switched it,
+/// by day, from the new build's voice: once, unasked.
+pub const UPDATE_DONE: &str = "I'm back. The update is done.";
+
+/// [`UPDATE_DONE`] in the languages of [`UPDATING_NOW_WORDS`], said the same way.
+const UPDATE_DONE_WORDS: [&str; 5] = [
+    "Mình quay lại rồi, cập nhật xong rồi nhé.",
+    "戻りました。更新が終わりました。",
+    "我回来了，更新完成了。",
+    "다시 왔어요. 업데이트가 끝났어요.",
+    "Je suis de retour. La mise à jour est terminée.",
+];
+
+/// [`UPDATE_DONE`] in `language`, English for none.
+pub fn update_done(language: Option<Language>) -> &'static str {
+    language.map_or(UPDATE_DONE, |language| UPDATE_DONE_WORDS[language.column()])
+}
+
 /// What a lamp woken by its name says in place of its "hm?"
 /// (`LAMP_SLEEP_HEARS_NAME=on`, migrate-P2, the design owner on #4877): only
 /// from the speech cache ([`crate::say::tts_cache::TtsCache::wake_line`]).
