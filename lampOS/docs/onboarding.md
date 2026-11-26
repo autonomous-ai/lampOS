@@ -604,8 +604,10 @@ Then the model is told, on that reply, to answer the greeting in a few words
 and, in place of any question of its own, ask only what to call them
 (`learn_later::GREETING_NOTE`): one reply, one question, "Hello! I don't
 think we've met. What should I call you?", never "How are you? What should I
-call you?" (rule 8, #8471's lamp run). The worker tells the walk it asked
-(`{"learn_later":"asked"}`), which counts it in the bounds. There is no
+call you?" (rule 8, #8471's lamp run). Once that reply's first sound is
+out (`learn_later::sounded`), the worker tells the walk it asked
+(`{"learn_later":"asked"}`), which counts it in the bounds; a reply gone
+before it sounds asked nothing. There is no
 second utterance: before #8471 the walk said the ask as its own line 1.5 to
 10 s after the reply, 8 to 13 s from the greeting heard to the ask's audio
 on the lamp; now the ask is in the reply's own audio, so it comes with the
@@ -616,15 +618,16 @@ as the greeting is said, since it arms before the line.
 
 It is getting to know someone, never a consent question. The model judges
 the answer, never a list of words (the owner's rule, 13 Nov): on the next
-line from anyone, heard within 60 s of the asking turn
+line from anyone, heard within 60 s of the asking reply's first sound
 (`learn_later::ANSWER_WITHIN_US`, 30 s until #8471's run missed a name 30.7 s
 on), the second route tells it it just asked (`learn_later::ANSWER_NOTE`,
 which also says the face is kept only if `remember_my_face`'s result says so)
 and declares `not_telling_their_name` (`learn_later::DECLINED`, with the
 switch passed to the worker). That call, only on the ask's answer, tells the
 walk by its mailbox to stop for good (`{"learn_later":"declined"}`);
-`remember_my_face` then or later in that conversation tells it the ask was
-answered (`{"learn_later":"answered"}`). Past the window, after another line
+`remember_my_face` then or later in that conversation, once the eyes kept
+the face, tells it the ask was answered (`{"learn_later":"answered"}`); a
+save they refused tells it nothing and keeps the not-kept note below. Past the window, after another line
 between, or with the answer's turn gone by and nothing called, every later
 line of that conversation (until 60 s of quiet) tells the model their face
 was not kept and never to say it will know them
@@ -636,7 +639,8 @@ proves the face in view said its own name, unchanged (#7787). On a lamp whose pr
 while the eyes know nobody and, after that, while the owner's face is not
 yet seen again (`Progress::owner_face_unseen`, [second-voice.md](second-voice.md)):
 learn later's first save under another name never drops it, and the owner
-answering with their own name is the owner again. Only when the
+a face kept under the owner's own name (matched against the eyes' list,
+never speech) is the owner again. Only when the
 eyes answer `remembered` is the model told to say "I'll know you next time.
 Say 'forget my face' to undo." (`KEPT_NO_ASK`); the eyes refusing (two
 faces, none, too far), nothing is kept and nothing said of it. The setup

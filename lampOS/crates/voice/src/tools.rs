@@ -2875,16 +2875,20 @@ fn run_call_with_scope(
             )
         }
         Route::Faces(socket, switches, onboarding) => 'faces: {
-            // A name given to "What should I call you?" (#7876): answered.
-            if call.name == crate::known_faces::REMEMBER {
-                crate::onboarding::learn_later::remembered(onboarding.as_deref());
-            }
             // The owner's "I'm <the typed name>" from their own face kept
             // under another name links that face as the owner in place of a
             // rename (`LAMP_OWNER_LINK`, #7501); anything else goes on.
             if let Some(told) =
                 crate::owner_link::taken(call, request, heard, lease, onboarding.as_deref())
             {
+                // Their face known, linked: a name given to "What should
+                // I call you?" (#7876) answered.
+                if call.name == crate::known_faces::REMEMBER {
+                    crate::onboarding::learn_later::remembered(
+                        onboarding.as_deref(),
+                        told.0["ok"] == true,
+                    );
+                }
                 break 'faces ("the owner link", told);
             }
             let person = lease
@@ -2933,6 +2937,14 @@ fn run_call_with_scope(
             );
             if let Some(renaming) = renaming {
                 renaming.answered(&told.0, replaced.as_deref());
+            }
+            // A name given to "What should I call you?" (#7876): answered
+            // only once the eyes kept the face (Twelve's P3 1 on #8471).
+            if call.name == crate::known_faces::REMEMBER {
+                crate::onboarding::learn_later::remembered(
+                    onboarding.as_deref(),
+                    told.0["remembered"].is_string(),
+                );
             }
             // "Forget my face" by the known person whose line it is: their
             // memory goes with it (`LAMP_MEMORY_FORGET_ALL`, #2850).

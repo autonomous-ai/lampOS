@@ -4457,7 +4457,11 @@ fn refresh_owner(file: Option<&Path>, socket: Option<&Path>) {
             }
             None
         }
-        (Some(_), Some(Some(_))) if file.is_some_and(owner_face_unknown) => None,
+        (Some(owner), Some(Some(_)))
+            if file.is_some_and(|file| owner_face_unknown(file, &owner)) =>
+        {
+            None
+        }
         (Some(owner), Some(Some(_))) => {
             if let Some(file) = file {
                 let now = renames_of(file);
@@ -4486,21 +4490,30 @@ fn refresh_owner(file: Option<&Path>, socket: Option<&Path>) {
     }
 }
 
-/// Walks' files whose owner's face the eyes have not known since they knew
-/// nobody, as this process saw it: the walk's file keeps it too
-/// ([`crate::onboarding::owner_face_unseen`]), read once the walk takes
-/// its mailbox, so a refresh before then drops nothing either.
-static OWNER_FACE_UNKNOWN: std::sync::Mutex<Vec<PathBuf>> = std::sync::Mutex::new(Vec::new());
+/// Walks' files, each with the owner whose face the eyes have not known
+/// since they knew nobody, as this process saw it: the walk's file keeps it
+/// too ([`crate::onboarding::owner_face_unseen`]), read once the walk takes
+/// its mailbox, so a refresh before then drops nothing either. Kept by
+/// owner, so a redo, a reset or an owner dropped or renamed (the walk's
+/// file mark cleared) leaves the next owner as #4290 has it (El's and
+/// Twelve's P3 on #8471).
+static OWNER_FACE_UNKNOWN: std::sync::Mutex<Vec<(PathBuf, String)>> =
+    std::sync::Mutex::new(Vec::new());
 
-/// Whether the owner of the walk's file at `file` has had no face the eyes
-/// know since they knew nobody.
-fn owner_face_unknown(file: &Path) -> bool {
+/// Whether this process holds `owner`'s face unknown for the walk's file at
+/// `file`, the owner matched as the eyes' names are ([`among`]).
+fn owner_face_held_unknown(file: &Path, owner: &str) -> bool {
     OWNER_FACE_UNKNOWN
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .iter()
-        .any(|kept| kept == file)
-        || crate::onboarding::owner_face_unseen(file)
+        .any(|(kept, held)| kept == file && held.to_lowercase() == owner.to_lowercase())
+}
+
+/// Whether `owner`, the owner of the walk's file at `file`, has had no face
+/// the eyes know since they knew nobody.
+fn owner_face_unknown(file: &Path, owner: &str) -> bool {
+    owner_face_held_unknown(file, owner) || crate::onboarding::owner_face_unseen(file)
 }
 
 /// The eyes know nobody: `owner`'s face is unknown until seen again, told
@@ -4509,10 +4522,15 @@ fn owner_face_lost(file: &Path, owner: &str) {
     let mut unknown = OWNER_FACE_UNKNOWN
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if unknown.iter().any(|kept| kept == file) {
+    if unknown
+        .iter()
+        .any(|(kept, held)| kept == file && held.to_lowercase() == owner.to_lowercase())
+    {
         return;
     }
-    unknown.push(file.to_owned());
+    // Another owner held for this file is the walk's past owner: let go.
+    unknown.retain(|(kept, _)| kept != file);
+    unknown.push((file.to_owned(), owner.to_owned()));
     drop(unknown);
     if !crate::onboarding::owner_face_unseen(file) {
         eprintln!(
@@ -4527,7 +4545,7 @@ fn owner_face_seen(file: &Path, owner: &str) {
     OWNER_FACE_UNKNOWN
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .retain(|kept| kept != file);
+        .retain(|(kept, _)| kept != file);
     if crate::onboarding::owner_face_unseen(file) {
         eprintln!("lamp-voice: the eyes know the owner's face again");
         crate::onboarding::owner_face(file, owner, false);
@@ -6544,7 +6562,7 @@ mod tests {
         OWNER_FACE_UNKNOWN
             .lock()
             .unwrap()
-            .retain(|kept| kept != &file);
+            .retain(|(kept, _)| kept != &file);
         let mut walk = crate::onboarding::Onboarding::at(file.clone());
         walk_settles(&mut walk, &mut at);
         refresh_owner(Some(&file), Some(&socket));
@@ -6574,6 +6592,62 @@ mod tests {
             walk_settles(&mut walk, &mut at);
         }
         assert_eq!(crate::onboarding::owner_of(&file), None);
+    }
+
+    /// The mailbox lines at `file`'s walk, read as JSON.
+    fn mailbox_lines(file: &Path) -> Vec<Value> {
+        std::fs::read_to_string(crate::onboarding::mailbox_of(file))
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|line| serde_json::from_str(line).ok())
+            .collect()
+    }
+
+    /// El's P3 on #8471: the prints lost under one owner, then a redo
+    /// names another (the walk's file mark cleared): this process's mark
+    /// was the past owner's, so a list without the new owner is the owner
+    /// gone, as #4290 has it.
+    #[test]
+    fn a_new_owner_after_the_prints_were_lost_is_dropped_as_4290_has_it() {
+        let (socket, _asked) = eyes(vec![
+            serde_json::json!({"people": []}),
+            serde_json::json!({"people": ["Robin"]}),
+        ]);
+        let file = socket.with_file_name("progress.json");
+        std::fs::write(&file, r#"{"steps":{},"owner":"Example Name"}"#).unwrap();
+        refresh_owner(Some(&file), Some(&socket));
+        // The redo's walk file: a new owner, no face-unseen mark.
+        std::fs::write(&file, r#"{"steps":{},"owner":"Kim"}"#).unwrap();
+        refresh_owner(Some(&file), Some(&socket));
+        assert!(
+            mailbox_lines(&file)
+                .contains(&serde_json::json!({"face_forgotten": true, "owner": "Kim"})),
+            "the new owner, not seen, is dropped: {:?}",
+            mailbox_lines(&file)
+        );
+    }
+
+    /// Twelve's P3 on #8471: the prints lost twice in one process with an
+    /// owner change between; the second loss marks the new owner's face
+    /// unknown in the walk's file too, so a restart keeps them.
+    #[test]
+    fn the_prints_lost_again_under_a_new_owner_mark_that_owner() {
+        let (socket, _asked) = eyes(vec![
+            serde_json::json!({"people": []}),
+            serde_json::json!({"people": []}),
+        ]);
+        let file = socket.with_file_name("progress.json");
+        std::fs::write(&file, r#"{"steps":{},"owner":"Example Name"}"#).unwrap();
+        refresh_owner(Some(&file), Some(&socket));
+        std::fs::write(&file, r#"{"steps":{},"owner":"Kim"}"#).unwrap();
+        refresh_owner(Some(&file), Some(&socket));
+        assert!(
+            mailbox_lines(&file).contains(&serde_json::json!(
+                {"owner_face": {"owner": "Kim", "unseen": true}}
+            )),
+            "the new owner's face told unknown: {:?}",
+            mailbox_lines(&file)
+        );
     }
 
     /// An onboarding file whose setup owner is `owner`, beside a fresh

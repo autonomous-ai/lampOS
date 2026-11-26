@@ -337,15 +337,34 @@ pub fn declined(_call: &ToolCall, onboarding: Option<&Path>) -> (Value, bool) {
     )
 }
 
-/// `remember_my_face` called on the ask's answer, or later in that
-/// conversation: the walk told it was answered
-/// (`{"learn_later":"answered"}`), whatever the eyes then do.
-pub fn remembered(onboarding: Option<&Path>) {
+/// `remember_my_face` answered on the ask's answer, or later in that
+/// conversation. Only a face the eyes kept (`kept`, their `remembered`)
+/// tells the walk it was answered (`{"learn_later":"answered"}`) and ends
+/// the not-kept note; a save they refused (two faces, a voice off camera)
+/// leaves later lines of that conversation told nothing was kept, so the
+/// model never says it will know them (Twelve's P3 1 on #8471).
+pub fn remembered(onboarding: Option<&Path>, kept: bool) {
+    if !kept {
+        keep_unkept(Instant::now());
+        return;
+    }
     if take_asked()
         && let Some(file) = onboarding
         && let Err(error) = super::post(file, &json!({"learn_later": "answered"}))
     {
         eprintln!("lamp-voice: onboarding: the name ask's answer not noted: {error}");
+    }
+}
+
+/// A save the eyes refused on the ask's answer, or later in that
+/// conversation: the answer is spent and the conversation, as of `now`,
+/// is still told nothing was kept.
+fn keep_unkept(now: Instant) {
+    if let Ok(mut asking) = asking().lock() {
+        let answer = asking.answer.take().is_some();
+        if answer || asking.unkept.is_some() {
+            asking.unkept = Some(now);
+        }
     }
 }
 
@@ -551,6 +570,35 @@ mod tests {
         sounded_at(request, None, at);
     }
 
+    /// Twelve's P3 1 on #8471: a name answered but the face the eyes
+    /// refused (two faces, a voice off camera): the walk is not told it was
+    /// answered, and later lines of that conversation are still told
+    /// nothing was kept, until a save the eyes keep.
+    #[test]
+    fn a_save_the_eyes_refused_keeps_the_not_kept_note() {
+        let home = crate::process::SessionDirectory::create().unwrap();
+        let file = home.path.join("onboarding.json");
+        let mailbox =
+            || std::fs::read_to_string(crate::onboarding::mailbox_of(&file)).unwrap_or_default();
+        let at = Instant::now();
+        set_armed(false);
+        set_armed(true);
+        assert_eq!(turn_at(80, true, "Hello, how are you?", at), Turn::Ask);
+        sounded_at(80, Some(&file), at);
+        assert_eq!(turn_at(81, true, "Juniper.", at + S_D), Turn::Answer);
+        remembered(Some(&file), false);
+        assert!(!answering());
+        assert_eq!(mailbox(), "{\"learn_later\":\"asked\"}\n", "not answered");
+        assert_eq!(
+            turn_at(82, true, "So you know me now?", at + 2 * S_D),
+            Turn::NotKept,
+            "a refused save never ends the not-kept note"
+        );
+        remembered(Some(&file), true);
+        assert!(mailbox().ends_with("{\"learn_later\":\"answered\"}\n"));
+        assert_eq!(turn_at(83, true, "Thanks.", at + 3 * S_D), Turn::Other);
+    }
+
     /// El's P2 on #8471: an asking turn whose reply is gone before its
     /// first sound (`Stop::Gone`: revoked, a barge-in) posts nothing to
     /// the walk, and the next line gets no answer note for a question never
@@ -576,7 +624,7 @@ mod tests {
         sounded_at(62, Some(&file), at + 2 * S_D);
         assert_eq!(mailbox(), "{\"learn_later\":\"asked\"}\n");
         assert_eq!(turn_at(63, true, "Juniper.", at + 3 * S_D), Turn::Answer);
-        remembered(None);
+        remembered(None, true);
     }
 
     /// Rule 8 (#8471's lamp run: "...How are you?" then the name question):
@@ -601,7 +649,7 @@ mod tests {
         // Answered; a greeting later on the same arm asks nothing more.
         sounded_at(4, None, at);
         assert_eq!(turn_at(5, true, "Sam.", at), Turn::Answer);
-        remembered(None);
+        remembered(None, true);
         assert_eq!(
             turn_at(6, true, "Hi.", at + Duration::from_secs(120)),
             Turn::Other
@@ -610,7 +658,7 @@ mod tests {
         set_armed(false);
         set_armed(true);
         assert_eq!(turn_at(7, true, "Hi.", at), Turn::Ask);
-        remembered(None);
+        remembered(None, true);
     }
 
     /// #8471's lamp run: the name came 30.7 s after the ask, with no line
@@ -627,7 +675,7 @@ mod tests {
         assert!(answering(), "30.7 s after the ask is its answer");
         assert!(ANSWER_NOTE.contains("remember_my_face"));
         assert!(ANSWER_NOTE.contains("never say you'll know"));
-        remembered(None);
+        remembered(None, true);
         assert!(!answering());
     }
 
@@ -668,7 +716,7 @@ mod tests {
         assert_eq!(turn_at(42, true, "So?", at + 2 * S_D), Turn::NotKept);
         assert!(!answering());
         // `remember_my_face` called late: its result tells; no note after.
-        remembered(None);
+        remembered(None, true);
         assert_eq!(turn_at(43, true, "Thanks.", at + 3 * S_D), Turn::Other);
     }
 
@@ -709,7 +757,7 @@ mod tests {
         assert_eq!(turn(52, true, "Hello."), Turn::Ask);
         sounded_at(52, Some(&file), Instant::now());
         assert_eq!(turn(53, true, "I don't mind, call me Sam"), Turn::Answer);
-        remembered(Some(&file));
+        remembered(Some(&file), true);
         assert!(mailbox().ends_with("{\"learn_later\":\"answered\"}\n"));
         assert!(!answering());
         assert!(ANSWER_NOTE.contains(DECLINED));
