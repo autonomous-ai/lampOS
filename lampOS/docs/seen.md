@@ -91,8 +91,10 @@ lamp also says once when the opt-in is turned off.
    stop the music"), nor a "not" or "off" with no lamp in it ("Try not to
    look at the screen.", "Take your eyes off the screen and stretch."), nor
    a question, with its "?" or opening as one ("Should I stop watching?"),
-   nor an offer anywhere in the sentence ("you can turn it off any time",
-   "If you ask, my camera goes off", "I'll stop watching if you'd like"),
+   nor an offer before the claim ("you can turn it off any time", "If you
+   ask, my camera goes off", "I'll stop watching if you'd like"); an offer
+   after the claim's clause is only how to undo it, so "I've stopped
+   watching your desk, but you can turn it back on any time" still claims;
    nor a stop with a negation before it, past the lamp or an auxiliary
    ("I haven't stopped watching your desk", "No, I never stopped
    watching"), which says the lamp is still looking: where the claim is
