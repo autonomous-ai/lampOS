@@ -303,6 +303,83 @@ pub fn names_the_looking(heard: &str) -> bool {
     stop_looking || (0..words.len()).any(|start| at(&words, start, NOTICING_NAME))
 }
 
+/// The words that bring the desk noticing's state into a heard line's
+/// notes ([`state_note`]): the looking's ([`LOOKING_WORDS`]), their past,
+/// and the desk's ("keep an eye on my desk").
+pub const STATE_WORDS: [&str; 11] = [
+    "looking", "look", "looked", "watching", "watch", "watched", "noticing", "notice", "noticed",
+    "desk", "eye",
+];
+
+/// Whether `heard` names the lamp's looking or the desk, any one of
+/// [`STATE_WORDS`] as a whole word, any case: the lines told the state.
+pub fn names_the_noticing(heard: &str) -> bool {
+    words(heard)
+        .iter()
+        .any(|word| STATE_WORDS.contains(&word.as_str()))
+}
+
+/// With `LAMP_NOTICING_BY_DEFAULT` on (#7767), the note beside a heard line
+/// that names the looking ([`names_the_noticing`]): the desk noticing's
+/// state read just then from `path` ([`state_note_at`]). `None` without
+/// `path` (the switch off, or seen activity not declared) or for any other
+/// line. On lamp-06c1's re-row of #8674 (26 Nov) the model, never told the
+/// state, answered from earlier turns: "not watching right now" while bursts
+/// ran, and "I've stopped" with no call. The read is the two consent files
+/// (two small opens and reads, and a stat of the done mark for a missing
+/// one), only on such a line, never cached.
+pub fn state_note(path: Option<&Path>, heard: &str) -> Option<String> {
+    let path = path.filter(|_| names_the_noticing(heard))?;
+    Some(state_note_at(path, true))
+}
+
+/// The state at `path` (seen activity's file; face expressions' beside
+/// it), by lamp-seen's and lamp-eyes' own rule (`lamp_msgs::consent::read_or`
+/// with `by_default`: a kept record, else the default), in words for the
+/// model, with the function to call.
+pub fn state_note_at(path: &Path, by_default: bool) -> String {
+    use lamp_msgs::consent::{FACE_EXPRESSIONS, SEEN_ACTIVITY, allowed, file_in, read_or};
+    let seen = read_or(path, SEEN_ACTIVITY, by_default);
+    let face = path
+        .parent()
+        .and_then(|folder| file_in(folder, FACE_EXPRESSIONS))
+        .is_some_and(|face| allowed(&face, FACE_EXPRESSIONS, by_default));
+    let head = "(For you to know, read just now, not to answer: desk noticing is";
+    let stands =
+        "This is how it is now, whatever earlier turns said; say nothing of it unless they ask.";
+    if seen.yes {
+        let how = if seen.by_default {
+            "on by default (nobody turned it off)"
+        } else {
+            "on (they said yes)"
+        };
+        let what = if face {
+            "what they do at the desk and how their face seems"
+        } else {
+            "what they do at the desk"
+        };
+        format!(
+            "{head} {how}: you are noticing {what}, sending a few pictures from your camera to be \
+             labelled. {stands} If they ask whether you are watching or noticing, say it is on. If \
+             they ask you to stop looking at them or at their desk, call {STOP}, and never say you \
+             stopped without calling it.)"
+        )
+    } else if face {
+        format!(
+            "{head} off: you are not noticing what they do at the desk, but you still notice how \
+             their face seems. {stands} If they ask you to stop looking at them, call {STOP}, and \
+             never say you stopped without calling it. If they ask you to start looking at their \
+             desk again, call {LOOK}.)"
+        )
+    } else {
+        format!(
+            "{head} off: you are not looking at their desk or their face, as they asked. {stands} \
+             If they ask whether you are watching, say you are not. If they ask you to start \
+             looking again, call {LOOK}.)"
+        )
+    }
+}
+
 /// The stop of the desk noticing itself ([`STOP`], with the call's id), for
 /// `call`, a snooze or off of the seen reactions' remarks ([`REMARKS`]),
 /// when the person's own line `heard` names the looking, not the remarks
@@ -623,7 +700,9 @@ fn run_at(
 /// missing file is on: `owners`, the call's line is the owner's own spoken
 /// yes; `at`, now in Unix seconds; `group`, the reader group's id.
 ///
-/// - `look_at_my_desk`: the owner's line alone, with no offer before it (the
+/// - `look_at_my_desk`: with both on already, anyone's, told it is on
+///   already and nothing written (lamp-06c1's re-row of #8674, Q9: nothing
+///   is turned on). Else the owner's line alone, with no offer before it (the
 ///   model judged it a "start looking again"). A file that is not on, a
 ///   kept no (or one that can't be read), is made a yes, for seen activity
 ///   and face expressions both; a missing one is on already and stays
@@ -652,6 +731,12 @@ fn run_by_default(
     let both = std::iter::once((path.to_path_buf(), SEEN_ACTIVITY))
         .chain(face.map(|face| (face, FACE_EXPRESSIONS)));
     if name == LOOK {
+        // On already, both: nothing is turned on, so anyone's ask is told
+        // so, never `OWNER_ONLY`'s "couldn't turn that on" (lamp-06c1's
+        // re-row of #8674, 26 Nov, Q9). Only a change to on is the owner's.
+        if seen_was && face_was {
+            return json!({"ok": true, "note": LOOKING_ALREADY});
+        }
         if !owners {
             eprintln!("lamp-voice: a start looking again not the owner's own line: not kept");
             return json!({"ok": false, "note": OWNER_ONLY});
@@ -673,7 +758,6 @@ fn run_by_default(
                 eprintln!("lamp-voice: start looking again was not kept: {error}");
                 json!({"ok": false, "note": NOT_KEPT})
             }
-            Ok(()) if seen_was && face_was => json!({"ok": true, "note": LOOKING_ALREADY}),
             Ok(()) => {
                 eprintln!("lamp-voice: the owner's start looking again is kept");
                 json!({"ok": true, "note": if seen_was { LOOKING_FACES } else { LOOKING }})
@@ -1378,6 +1462,98 @@ mod tests {
         assert_eq!(
             run_at(&path, LOOK, false, false, true, 9, || panic!("no write")),
             json!({"ok": false, "note": APP_FIRST})
+        );
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// lamp-06c1's re-row of #8674 (26 Nov, Q9): with `LAMP_NOTICING_BY_DEFAULT`
+    /// on and noticing on already, a guest's (or a television's) "keep an
+    /// eye on my desk" turns nothing on, so it is told it is on already, not
+    /// `OWNER_ONLY`'s "couldn't turn that on", and nothing is written. With a
+    /// kept no, a guest's line is still refused, and anyone's stop still
+    /// keeps a no, as before: only the owner changes the consent to on.
+    #[test]
+    fn with_the_switch_on_a_guests_look_when_on_already_is_on_already() {
+        use lamp_msgs::consent::{BY_VOICE, FACE_EXPRESSIONS, SEEN_ACTIVITY, allowed, no_bytes};
+        let folder = folder("look-guest-on");
+        let path = file_in(&folder);
+        let face = crate::onboarding::face_expressions_beside(&folder.join("room-sounds.json"));
+        // No file: on by default, both.
+        assert_eq!(
+            run_by_default(&path, LOOK, false, 7, || panic!("no write")),
+            json!({"ok": true, "note": LOOKING_ALREADY})
+        );
+        assert!(!path.exists() && !face.exists());
+        // Faces a kept no: not all on, so a guest's line is the owner's to give.
+        std::fs::write(&face, no_bytes(FACE_EXPRESSIONS, 5, BY_VOICE)).unwrap();
+        assert_eq!(
+            run_by_default(&path, LOOK, false, 8, || panic!("no write")),
+            json!({"ok": false, "note": OWNER_ONLY})
+        );
+        assert!(!allowed(&face, FACE_EXPRESSIONS, true) && !path.exists());
+        // A guest's stop still keeps a no for both.
+        std::fs::remove_file(&face).unwrap();
+        assert_eq!(
+            run_by_default(&path, STOP, false, 9, || None),
+            json!({"ok": true, "note": STOPPED})
+        );
+        assert!(!allowed(&path, SEEN_ACTIVITY, true) && !allowed(&face, FACE_EXPRESSIONS, true));
+        assert_eq!(
+            run_by_default(&path, LOOK, false, 10, || panic!("no write")),
+            json!({"ok": false, "note": OWNER_ONLY})
+        );
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// lamp-06c1's re-row of #8674 (26 Nov, Q2, Q4, Q7b, Q10, Q10b, Q8b):
+    /// every state line of the row names the noticing, an ordinary line
+    /// doesn't, and the state is read as lamp-seen reads it: no file on by
+    /// default, a kept no off, faces alone said apart, a kept yes on.
+    #[test]
+    fn the_state_note_names_the_state_read_and_what_to_call() {
+        use lamp_msgs::consent::{
+            BY_APP, BY_VOICE, FACE_EXPRESSIONS, SEEN_ACTIVITY, bytes, no_bytes,
+        };
+        for heard in [
+            "Lamp, can you keep an eye on my desk?",
+            "Lamp, are you watching my desk?",
+            "Lamp, stop looking at my desk.",
+            "Lamp, stop watching me.",
+            "Lamp, stop looking.",
+            "Lamp, what can you notice about my desk?",
+        ] {
+            assert!(names_the_noticing(heard), "{heard}");
+        }
+        assert!(!names_the_noticing("What's the weather in Hanoi?"));
+        let folder = folder("state-note");
+        let path = file_in(&folder);
+        let face = crate::onboarding::face_expressions_beside(&folder.join("room-sounds.json"));
+        assert_eq!(state_note(None, "Lamp, are you watching my desk?"), None);
+        assert_eq!(state_note(Some(&path), "What's the weather?"), None);
+        let on = state_note(Some(&path), "Lamp, are you watching my desk?").unwrap();
+        assert!(on.contains("on by default") && on.contains("face"), "{on}");
+        assert!(
+            on.contains(STOP) && on.contains("never say you stopped"),
+            "{on}"
+        );
+        std::fs::write(&path, no_bytes(SEEN_ACTIVITY, 5, BY_VOICE)).unwrap();
+        let faces = state_note_at(&path, true);
+        assert!(
+            faces.contains("is off") && faces.contains("face seems"),
+            "{faces}"
+        );
+        assert!(faces.contains(STOP) && faces.contains(LOOK), "{faces}");
+        std::fs::write(&face, no_bytes(FACE_EXPRESSIONS, 5, BY_VOICE)).unwrap();
+        let off = state_note_at(&path, true);
+        assert!(
+            off.contains("is off") && off.contains(LOOK) && !off.contains(STOP),
+            "{off}"
+        );
+        std::fs::write(&path, bytes(SEEN_ACTIVITY, 5, BY_APP)).unwrap();
+        let yes = state_note_at(&path, true);
+        assert!(
+            yes.contains("on (they said yes)") && !yes.contains("face"),
+            "{yes}"
         );
         let _ = std::fs::remove_dir_all(folder);
     }

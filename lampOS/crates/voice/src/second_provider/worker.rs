@@ -2911,6 +2911,9 @@ pub fn serve(
     crate::day_tally::start_from_environment();
     let checked = checks_sounds(&files);
     let tools = files.tools;
+    // Read before `tools` moves (#7767): whether the desk noticing's
+    // functions are declared.
+    let seen_activity = tools.seen_activity;
     start_tasks(&tools);
     // As the Live route says them, when this route is the only voice.
     let reminders = route.only_voice && tools.schedule_speak;
@@ -5143,6 +5146,15 @@ pub fn serve(
         );
     }
     engine = engine.telling_made_not_on(made_not_on);
+    // The desk noticing's state told beside a line naming the looking, with
+    // it on by default and its functions declared (#7767).
+    let desk_noticing = seen_activity && lamp_msgs::consent::noticing_by_default();
+    if desk_noticing {
+        eprintln!(
+            "lamp-voice second: a line naming the looking is told the desk noticing's state, read then (LAMP_NOTICING_BY_DEFAULT)"
+        );
+    }
+    engine = engine.telling_desk_noticing(desk_noticing.then(crate::seen_yes::path));
     // The same for a light act told as under way ("Warming that up.";
     // `LAMP_ACTION_CLAIM_DOING=on`, #7285), only beside the check above.
     let doing_claims = crate::action_claim::doing_on();
