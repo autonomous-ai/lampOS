@@ -6767,7 +6767,15 @@ after a take-over, but now for every turn:
   the journal says `the thread's 45 s from the answer's start don't count,
   only 20 s from the end of the lamp's words (LAMP_FOLLOW_UPS)` where they
   would have. On lamp-74ff after #8656, "And of Argentina?" 35 s after a
-  short answer was answered by the thread's 45 s. The answer to a line let
+  short answer was answered by the thread's 45 s. A cut answer's words end
+  where it was cut: a line that cut it, or the first line after a stop,
+  tells the rule before it is judged (`Did::Cut`), and the 20 s run from the
+  cut, not from the end of the audio sent ahead of its playing. On lamp-74ff
+  on 27 Nov at 00:25, a 125-word answer was cut after 10.8 s of it, and a
+  line in two people's talk about 30 s later was taken as the conversation
+  going on. Tests: `a_cut_answers_words_end_where_it_was_cut`,
+  `a_line_that_cut_the_lamp_or_followed_a_stop_tells_the_rule_its_words_ended`.
+  The answer to a line let
   out renews the window, since the product sets neither
   `LAMP_GOING_ON_NOT_OWN` nor `LAMP_UNTIED_GOING_ON`. In a busy room the
   conversation goes on 20 s from the end of the lamp's words

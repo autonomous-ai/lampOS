@@ -12183,6 +12183,17 @@ impl Heeding {
                     before.carry_ended();
                 }
             }
+            // A cut answer's words end at the cut: the conversation's 20 s
+            // run from there, not from the end of the audio it had sent.
+            crate::second_provider::Did::Cut(at_us) => {
+                let cut = |until: &mut Option<u64>| *until = until.map(|until| until.min(at_us));
+                cut(&mut self.said_until_us);
+                cut(&mut self.said_until_free_us);
+                if let Some(before) = self.before_let_out.as_mut() {
+                    cut(&mut before.said_until_us);
+                    cut(&mut before.said_until_free_us);
+                }
+            }
         }
     }
 
@@ -18302,6 +18313,46 @@ mod tests {
             judged(false, 50, 50, 10).is_some(),
             "off, 40 s into the thread"
         );
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    }
+
+    /// A cut answer's words end where it was cut ([`Did::Cut`]): on
+    /// lamp-74ff on 27 Nov at 00:25, a 125-word answer was cut after 10.8 s
+    /// of it, its audio sent ahead to well past that, and a line in two
+    /// people's talk about 30 s after the cut was taken as the conversation
+    /// going on. Here the answer's sent audio plays until 5 s from now: uncut,
+    /// a nameless line now is in the conversation; cut 30 s ago, it is held,
+    /// past the 20 s after the lamp's words; cut 10 s ago, still in it.
+    #[test]
+    fn a_cut_answers_words_end_where_it_was_cut() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let s = Duration::from_secs;
+        let judged = |cut_ago_s: Option<u64>| {
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            let mut thread = crate::thread::Thread::new();
+            let answered = Instant::now() - s(60);
+            thread.person("Hey Lamp, explain how airplanes fly.", true, answered);
+            thread.lamp(1, "Air moves faster over the top of the wing.", answered);
+            *crate::thread::THREAD.lock().unwrap() = thread;
+            let mut heeding = Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            let now_us = monotonic_us();
+            heeding.lamp_did(crate::second_provider::Did::Said(1, now_us + 5_000_000));
+            if let Some(ago) = cut_ago_s {
+                heeding.lamp_did(crate::second_provider::Did::Cut(
+                    now_us.saturating_sub(ago * 1_000_000),
+                ));
+            }
+            heeding.heed(
+                2,
+                (now_us.saturating_sub(2_000_000), now_us),
+                "And what about the rest of the week, will it rain on the weekend?",
+                None,
+            )
+        };
+        assert_eq!(judged(None), None, "uncut: its words still play");
+        assert!(judged(Some(30)).is_some(), "cut 30 s ago: held");
+        assert_eq!(judged(Some(10)), None, "cut 10 s ago: in the window");
         *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
     }
 
