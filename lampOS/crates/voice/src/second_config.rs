@@ -80,7 +80,7 @@ struct Raw {
 }
 
 /// OpenRouter's OpenAI-compatible API.
-pub const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
+pub const OPENROUTER_BASE_URL: &str = lamp_msgs::own_model::OPENROUTER_API;
 /// The owner's pick (19 Oct): DeepSeek V4.1 Flash, its dated 17 October
 /// snapshot, pinned by OpenRouter's own slug for it, read from
 /// `GET https://openrouter.ai/api/v1/models` on 19 Oct (text and image in,
@@ -93,7 +93,7 @@ pub const OPENROUTER_SECOND_MODEL: &str = "google/gemini-3.6-flash";
 /// `/v1/tools/search`, `/v1/tools/fetch`). Its peak hours, 01:00 to 04:00
 /// and 06:00 to 10:00 UTC on weekdays, cost double (DeepSeek's pricing page,
 /// 19 Oct); there is no switch for them.
-pub const DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com";
+pub const DEEPSEEK_BASE_URL: &str = lamp_msgs::own_model::DEEPSEEK_API;
 /// The company relay's host: a route whose `llm_base_url` is on it reaches
 /// DeepSeek through it too, with no `deepseek_base_url` ([`relay_deepseek`]).
 pub(crate) const COMPANY_RELAY_HOST: &str = "campaign-api.autonomous.ai";
@@ -195,7 +195,7 @@ pub struct SearchService {
 }
 
 /// Google's Gemini API, called directly.
-pub const GEMINI_BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta";
+pub const GEMINI_BASE_URL: &str = lamp_msgs::own_model::GEMINI_API;
 /// The text model `LAMP_SECOND_CHAT=gemini` asks, with thinking at its
 /// floor (the research of 19 Oct: the fastest first token among the
 /// sub-second models with the higher score).
@@ -645,17 +645,10 @@ pub const OWN_ANTHROPIC_KEY: &str = "own_anthropic.key";
 pub const OWN_ANTHROPIC_MODEL: &str = "own_anthropic.model";
 /// Anthropic's API, whose OpenAI-compatible chat the person's own
 /// Anthropic model is asked at (#8420).
-pub const ANTHROPIC_BASE_URL: &str = "https://api.anthropic.com/v1";
+pub const ANTHROPIC_BASE_URL: &str = lamp_msgs::own_model::ANTHROPIC_API;
 
-/// A model's name as it goes in a request's body: 1 to 128 letters,
-/// digits, `-`, `.`, `_`, `/` and `:`.
-fn fits_model(name: &str) -> bool {
-    !name.is_empty()
-        && name.len() <= 128
-        && name
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '.' | '_' | '/' | ':'))
-}
+/// A model's name as it goes in a request's body (`lamp_msgs::own_model`).
+use lamp_msgs::own_model::fits_model;
 
 impl SecondConfig {
     /// The route as it is without the person's own OpenAI-compatible model:
@@ -750,31 +743,28 @@ impl SecondConfig {
             })
         };
         let (chat, found) = match compatible {
-            // The first named provider with a key, in this order.
-            Ok(None) => [
-                (
-                    OwnChat::OpenRouter,
-                    OWN_OPENROUTER_KEY,
-                    OPENROUTER_BASE_URL,
-                    OWN_OPENROUTER_MODEL,
-                ),
-                (
-                    OwnChat::Gemini,
-                    OWN_GEMINI_KEY,
-                    GEMINI_BASE_URL,
-                    OWN_GEMINI_MODEL,
-                ),
-                (
-                    OwnChat::Anthropic,
-                    OWN_ANTHROPIC_KEY,
-                    ANTHROPIC_BASE_URL,
-                    OWN_ANTHROPIC_MODEL,
-                ),
-            ]
-            .into_iter()
-            .map(|(chat, key, url, model)| (chat, named(key, url, model)))
-            .find(|(_, found)| !matches!(found, Ok(None)))
-            .unwrap_or((OwnChat::OpenRouter, Ok(None))),
+            // The first named provider with a key, in the order every user of
+            // the person's keys takes (`lamp_msgs::own_model::PRECEDENCE`).
+            Ok(None) => lamp_msgs::own_model::PRECEDENCE
+                .into_iter()
+                .filter_map(|service| {
+                    use lamp_msgs::own_model::Model;
+                    let chat = match service {
+                        Model::OpenRouter => OwnChat::OpenRouter,
+                        Model::Gemini => OwnChat::Gemini,
+                        Model::Anthropic => OwnChat::Anthropic,
+                        Model::OpenAiCompatible | Model::DeepSeek => return None,
+                    };
+                    let id = service.id();
+                    let found = named(
+                        &format!("own_{id}.key"),
+                        service.base()?,
+                        &format!("own_{id}.model"),
+                    );
+                    Some((chat, found))
+                })
+                .find(|(_, found)| !matches!(found, Ok(None)))
+                .unwrap_or((OwnChat::OpenRouter, Ok(None))),
             found => (OwnChat::OpenAiCompatible, found),
         };
         let compatible_line = match found {
@@ -1134,10 +1124,7 @@ fn checked_service_url_with(url: String, loopback_on: bool) -> io::Result<String
 /// A service URL as the file's are taken: https, a host, no `?`, `#` or `@`,
 /// at most 2048 bytes; the relay's near addresses are checked the same (#2882).
 pub(crate) fn checked_url(url: String) -> io::Result<String> {
-    let host = url
-        .strip_prefix("https://")
-        .map(|rest| rest.split('/').next().unwrap_or(""));
-    if url.len() > 2048 || url.contains(['?', '#', '@']) || host.is_none_or(str::is_empty) {
+    if !lamp_msgs::own_model::https_url(&url) {
         return Err(invalid(
             io::ErrorKind::InvalidInput,
             "service URL must be https with a host",
