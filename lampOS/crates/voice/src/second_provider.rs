@@ -19889,6 +19889,9 @@ async fn answer(
     // Whether the line asks for a live fact: only the first-words wait of
     // `LAMP_LIVE_FACT_CHECKED` reads it (the first builder on #8224).
     let asks_live = crate::live_fact::asks_live(&said);
+    // And whether it asked one for #8615's (d'): a condition alone only
+    // in a question.
+    let asks_live_fact = crate::live_fact::asks_live_fact(&said);
     let reminded = said.to_lowercase().contains("remind");
     // Whether the worded claims judge this turn (`LAMP_ACTION_CLAIM_WORDED`,
     // #5215): never a line the person asked as a question, whose reply may
@@ -20765,7 +20768,7 @@ async fn answer(
             request,
             &rounds,
         )
-        .asking_live(asks_live);
+        .asking_live(asks_live, asks_live_fact);
         let mut live_note: Option<String> = None;
         // Whether a claim with no call (or a step word alone, with the
         // switch) was asked again once already, and whether the next round
