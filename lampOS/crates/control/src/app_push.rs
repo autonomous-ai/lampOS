@@ -46,15 +46,7 @@ pub fn checked(
             ),
         ));
     }
-    let beyond: Vec<&str> = manifest
-        .grants
-        .iter()
-        .map(String::as_str)
-        .filter(|asked| {
-            *asked == REMEMBER_GRANT
-                || Grant::from_wire(asked).is_none_or(|grant| !grants.contains(&grant))
-        })
-        .collect();
+    let beyond = beyond(&manifest.grants, grants);
     if !beyond.is_empty() {
         return Err(Error::new(
             ErrorCode::NoGrant,
@@ -85,9 +77,42 @@ pub fn said_on(title: &str, net: bool) -> String {
     }
 }
 
+/// The grants of `asked` the pairing's `grants` don't give: `remember` (an
+/// app's own, never a computer's), an unknown one, or one not held, where a
+/// grant another holds counts (`volume` by `speak`, [`Grant::held_in`],
+/// #8610), as every other grant check reads it.
+fn beyond<'a>(asked: &'a [String], grants: &BTreeSet<Grant>) -> Vec<&'a str> {
+    asked
+        .iter()
+        .map(String::as_str)
+        .filter(|asked| {
+            *asked == REMEMBER_GRANT
+                || Grant::from_wire(asked).is_none_or(|grant| !grant.held_in(grants))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The Reviewer-lead's P3 on #8688: an app asking `volume`, pushed by a
+    /// computer paired with `speak` alone (as before `volume` was its own
+    /// grant), is pushed; `remember` and an unknown grant never are.
+    #[test]
+    fn a_pushed_apps_volume_is_held_by_speak() {
+        let asked = |list: &[&str]| list.iter().map(|g| (*g).to_owned()).collect::<Vec<_>>();
+        let speak = BTreeSet::from([Grant::Speak]);
+        assert!(beyond(&asked(&["volume", "speak"]), &speak).is_empty());
+        assert_eq!(
+            beyond(&asked(&["volume"]), &BTreeSet::from([Grant::Light])),
+            ["volume"]
+        );
+        assert_eq!(
+            beyond(&asked(&[REMEMBER_GRANT, "nonsense"]), &speak),
+            [REMEMBER_GRANT, "nonsense"]
+        );
+    }
 
     #[test]
     fn the_line_says_the_internet_only_for_an_app_that_can_use_it() {
