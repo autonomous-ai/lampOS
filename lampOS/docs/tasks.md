@@ -2187,8 +2187,9 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     (`the_lamps_own_work_is_handed_over_in_the_first_person`).
   - **A make is `make_skill`'s (#8022 case 2).** While `make_skill` is
     declared, `start_agent_task`'s description ends "Making a skill is make_skill's, never this." (`agent_tasks::MAKE_TOLD`, added in `tools::core_tools`), only
-    when the two still fit the link's 1,024 bytes; one that would not is
-    left as it was. Without `make_skill` it is never said. A make whose
+    when the two still fit each route's own bound for a description: Live's 1,024 (`lamp_gemini::MOST_DESCRIPTION_BYTES`) on a Live session, the second route's (`second_provider::MOST_DESCRIPTION_BYTES`, #8756) on its chat requests; one that would not is
+    left as it was. The second route's is 16,384 bytes, from one probe through the relay
+    (lamp-52e6, build 16345, 26 Nov 20:35, 56 tools a request, DeepSeek through the relay with thinking off, `probe.sh` 049beb521f7c, [#8756](https://github.com/autonomous-ai/lampOS/issues/8756#issuecomment-7193573590)): every size was taken (HTTP 200) at 1,024, 2,048, 4,096, 8,192 and 16,384 bytes; the first byte came 192, 177, 204, 223 and 224 ms after the ask, the whole answer 1,361, 919, 1,267, 1,178 and 1,210 ms: flat, no growth with size. 16,384 is the largest measured; nothing above it was tried. Without `make_skill` it is never said. A make whose
     first word is the lamp's name heard as another word is forced to
     `make_skill` on a line that names the lamp, past that word. See
     [skills.md](skills.md), "A make is never a task" and "Past the lamp's

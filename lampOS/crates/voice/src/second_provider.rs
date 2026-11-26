@@ -337,6 +337,15 @@ pub const JOIN_WAIT: Duration = Duration::from_millis(300);
 /// the weather (lamp-9adf's bound line on #7448, #7433). 64 keeps them with
 /// room for what is switched on next, within DeepSeek's 128.
 pub const MAX_TOOLS: usize = 64;
+/// The most bytes of a function's description this route is held to, its
+/// own and not Gemini Live's 1,024 ([`lamp_gemini::MOST_DESCRIPTION_BYTES`]):
+/// DeepSeek through the relay is told the descriptions as they are
+/// (`net::chat`), and CI holds every description this route declares to
+/// this (the first builder's ruling on #8756). One probe through the relay
+/// (lamp-52e6, build 16345, 26 Nov 20:35, 56 tools a request, thinking off)
+/// had every size taken, 1,024 to 16,384 bytes, its first byte at 177 to
+/// 224 ms with no growth with size; 16,384 is the largest measured.
+pub const MOST_DESCRIPTION_BYTES: usize = 16_384;
 /// How often it asks again meanwhile.
 const JOIN_POLL: Duration = Duration::from_millis(25);
 /// How soon after the cut line's end a line must begin to be joined with

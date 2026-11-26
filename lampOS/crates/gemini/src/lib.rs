@@ -69,6 +69,10 @@ pub const MAX_IMAGE_AGE: Duration = Duration::from_secs(2);
 pub const MAX_TEXT_BYTES: usize = 8_192;
 /// Functions one session may be told of.
 pub const MAX_TOOLS: usize = 32;
+/// The most bytes of a function's description Gemini Live is told
+/// ([`Tool::validate`]). Another route holds its own
+/// ([`Tool::validate_within`], #8756).
+pub const MOST_DESCRIPTION_BYTES: usize = 1_024;
 /// Calls the service may make in one message, and that one request may have
 /// unanswered at once.
 pub const MAX_TOOL_CALLS: usize = 8;
@@ -149,7 +153,8 @@ pub enum VoiceActivity {
 pub struct Tool {
     /// A lower-case letter, then up to 47 of `a-z`, `0-9` and `_`.
     pub name: String,
-    /// What it does and when to call it, for the model. At most 1,024 bytes.
+    /// What it does and when to call it, for the model. At most
+    /// [`MOST_DESCRIPTION_BYTES`] on Gemini Live.
     pub description: String,
     /// A JSON Schema object for the arguments. Absent: it takes none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -163,13 +168,21 @@ pub struct Tool {
     pub silent: bool,
 }
 impl Tool {
+    /// Whether Gemini Live takes it: a description of at most
+    /// [`MOST_DESCRIPTION_BYTES`].
     pub fn validate(&self) -> Result<()> {
+        self.validate_within(MOST_DESCRIPTION_BYTES)
+    }
+
+    /// [`Tool::validate`] with a description of at most `most` bytes: a
+    /// route's own bound, not Live's (#8756).
+    pub fn validate_within(&self, most: usize) -> Result<()> {
         let mut name = self.name.bytes();
         let named = name.next().is_some_and(|first| first.is_ascii_lowercase())
             && self.name.len() <= 48
             && name.all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_');
         let described = !self.description.trim().is_empty()
-            && self.description.len() <= 1_024
+            && self.description.len() <= most
             && !self.description.contains('\0');
         let shaped = self.parameters.as_ref().is_none_or(|parameters| {
             parameters.is_object() && parameters.to_string().len() <= MAX_TOOL_JSON_BYTES

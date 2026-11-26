@@ -844,7 +844,11 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   the search, and never a core skill's
   function, `use_skill`, `reports_stop` or the actions part's (#2614,
   #2644, `worker::chat_tools`). What is cut is said once, on a plain
-  journal line (`past the bound of 64, left out: …`). On lamp-4ace on 22 Oct the lamp's own,
+  journal line (`past the bound of 64, left out: …`). A description has this route's own
+  bound too, not Live's 1,024: `second_provider::MOST_DESCRIPTION_BYTES`, 16,384 bytes,
+  the largest one probe through the relay measured (lamp-52e6, build 16345, 26 Nov 20:35, 56 tools a request, DeepSeek through the relay with thinking off, `probe.sh` 049beb521f7c, [#8756](https://github.com/autonomous-ai/lampOS/issues/8756#issuecomment-7193573590); first byte 177 to
+  224 ms at 1,024 to 16,384 bytes, no growth with size; [tools.md](tools.md), "Each route
+  has its own bound for a description"). On lamp-4ace on 22 Oct the lamp's own,
   its skills' and the search's came to 37, and Live's bound had left out the time, the
   light scenes and the search; at 37 the chat's first answer began a median 856 ms after
   it was asked against 1031 ms at 32 (6 and 210 requests, the request 5% larger, its
