@@ -1164,3 +1164,61 @@ fn a_numberless_figure_in_a_line_that_asked_none_is_said_once_words_are_out() {
         "{went:?}"
     );
 }
+
+/// kit-8646 on lamp-52e6, 26 Nov 17:56, build 16293, request 3: "tell me
+/// a short story about a cat who goes to the beach in Da Nang when it's
+/// sunny." said its first piece (its audio began), then held the story's
+/// "sunny" figure at round 1's end and asked again with `weather`
+/// required: half a story, then 4.3 s of silence. The line's "sunny" is
+/// the story's setting, not a question: it asked no live fact, so once
+/// the first piece is out the numberless figure is said as it is, in the
+/// same round, with no ask again. "Will it be sunny in Hanoi?" still asks.
+#[test]
+fn a_story_line_naming_a_condition_says_its_numberless_figure_after_the_first_piece() {
+    let story = "Hey Lamp, tell me a short story about a cat who goes to the beach in Da Nang when it's sunny.";
+    let went = lines(
+        true,
+        false,
+        vec![(
+            story,
+            vec![
+                vec![
+                    text(STORY_START),
+                    text(&format!(" {STORY_WEATHER}")),
+                    Ok(ChatEvent::Done),
+                ],
+                calling("weather"),
+                saying("It's 27 degrees with light rain in Da Nang."),
+            ],
+        )],
+    );
+    assert_eq!(
+        went.said,
+        said(&[STORY_START, &format!(" {STORY_WEATHER}")]),
+        "{went:?}"
+    );
+    assert_eq!((went.asked, went.ran.len()), (1, 0), "{went:?}");
+    assert!(went.notes.is_empty(), "{went:?}");
+    // A question naming the condition asks it: held and asked again.
+    let went = lines(
+        true,
+        false,
+        vec![(
+            "Lamp, will it be sunny in Da Nang?",
+            vec![
+                vec![
+                    text(STORY_START),
+                    text(&format!(" {STORY_WEATHER}")),
+                    Ok(ChatEvent::Done),
+                ],
+                calling("weather"),
+                saying("It's 27 degrees with light rain in Da Nang."),
+            ],
+        )],
+    );
+    assert_eq!(went.ran, ["weather"], "{went:?}");
+    assert!(
+        went.said.iter().all(|said| !said.contains("sunny")),
+        "{went:?}"
+    );
+}
