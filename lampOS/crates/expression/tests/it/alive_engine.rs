@@ -1967,6 +1967,47 @@ mod head {
         assert!(named(&woken, "waking") && !named(&woken, "looking up at a tap"));
     }
 
+    /// #8635: the first qualified touch looks up at once, not only the
+    /// tap's release: all the way within 160 ms of it, inside the 300 ms
+    /// the touch must be seen in. A hand that stays to the stroke lets the
+    /// look go, eased, for the lean.
+    #[test]
+    fn a_touch_on_the_head_looks_up_within_300_ms_and_a_kept_hand_lets_it_go() {
+        let (mut tapped, mut plain) = twins(vec![]);
+        tapped.head(TouchGesture::Touch, 5, 20_000);
+        let pitch = lamp_expression::LOOK_UP.head_pitch;
+        let first = looks(&mut tapped, &mut plain, 8);
+        assert!(first.iter().all(|(_, _, named)| *named), "{first:?}");
+        assert!((first[7].0 - pitch).abs() < 1e-9, "{first:?}");
+        looks(&mut tapped, &mut plain, 42);
+        tapped.head(TouchGesture::Stroke, 5, SECOND);
+        let after = looks(&mut tapped, &mut plain, 30);
+        assert!(after[0].0 > pitch, "eased out: {after:?}");
+        assert!(after[29].0.abs() < 1e-9 && !after[29].2, "{after:?}");
+    }
+
+    /// #8635, the First builder's row leg: a touch while the lamp speaks
+    /// stops it (the voice's), and the look up comes once the voice has
+    /// stopped, within the 300 ms, not lost to the speech it stopped.
+    #[test]
+    fn a_touch_that_stops_speech_looks_up_once_the_voice_has_stopped() {
+        let (mut tapped, mut plain) = twins(vec![]);
+        for lamp in [&mut tapped, &mut plain] {
+            lamp.voice(Voice::Speaking);
+        }
+        tapped.head(TouchGesture::Touch, 5, 20_000);
+        // The voice stops within 150 ms of the touch (creature.md).
+        let speaking = looks(&mut tapped, &mut plain, 5);
+        assert!(speaking.iter().all(|(up, _, named)| !named && *up == 0.0));
+        for lamp in [&mut tapped, &mut plain] {
+            lamp.voice(Voice::Listening);
+        }
+        let up = looks(&mut tapped, &mut plain, 8);
+        assert!(up.iter().all(|(_, _, named)| *named), "{up:?}");
+        let pitch = lamp_expression::LOOK_UP.head_pitch;
+        assert!((up[7].0 - pitch).abs() < 1e-9, "{up:?}");
+    }
+
     /// First on #711, 17 Oct 10:18: muted for privacy, by the voice's own
     /// mute or by the privacy switch, a tap gets no look up, since looking
     /// up says "I'm listening". Open again, it looks up as before. A mute
@@ -1987,10 +2028,17 @@ mod head {
         tapped.head(TouchGesture::Tap, 5, 200_000);
         let looked = looks(&mut tapped, &mut plain, 20);
         assert!(none(&looked), "{looked:?}");
+        // Nor its first touch (#8635).
+        tapped.head(TouchGesture::Touch, 7, 20_000);
+        let looked = looks(&mut tapped, &mut plain, 20);
+        assert!(none(&looked), "{looked:?}");
         // The privacy switch closed, as `voice/privacy` said at the tap.
         let (mut tapped, mut plain) = twins(vec![]);
         tapped.engine.set_privacy_muted(true);
         tapped.head(TouchGesture::Tap, 5, 200_000);
+        let looked = looks(&mut tapped, &mut plain, 20);
+        assert!(none(&looked), "{looked:?}");
+        tapped.head(TouchGesture::Touch, 7, 20_000);
         let looked = looks(&mut tapped, &mut plain, 20);
         assert!(none(&looked), "{looked:?}");
         // Open again: a tap looks up as before.
