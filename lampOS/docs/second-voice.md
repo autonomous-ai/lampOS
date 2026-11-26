@@ -6745,13 +6745,19 @@ after a take-over, but now for every turn:
   two-turn TV exchange). With `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER=on` (the
   product owner, 26 Nov 2026), a line begun over the lamp's own answer
   takes no follow-up pass and is judged as before
-  (`Heeding::over_the_answer_no_follow_up`). With no look it is held, the
-  first such line too (no look-free cut-in, `said_to_me::Line::cut_in_held`),
-  unless it answers the lamp's waiting question. Such a line
-  has no voice print, so the window could never call it another voice. On
-  lamp-74ff on 26 Nov, October's two-person battery let 41 lines of two
-  people's talk over the lamp's answers through as follow-ups, and 40 were
-  answered.
+  (`Heeding::over_the_answer_no_follow_up`). With no look, its words decide
+  both look-free doors, the one cut-in and the one answer to the lamp's
+  waiting question: a line tied to the exchange under way
+  (`untied_going_on::tied_read`), a correction of what was asked
+  (`untied_going_on::corrects`: "No, I meant Spain."), or, with the lamp's
+  question asked, a short reply (`untied_going_on::a_short_reply`) may take
+  them (`said_to_me::Line::cut_in_tied`); any other is held, the first such
+  line too (`said_to_me::Line::cut_in_held`). Such a line has no voice
+  print, so the window could never call it another voice. On lamp-74ff on
+  26 Nov, October's two-person battery let 41 lines of two people's talk
+  over the lamp's answers through as follow-ups, and 40 were answered; with
+  every look-free line over the answer held, the asker's own follow-ups and
+  corrections were held too (Sixth's row on lamp-52e6, 0 of 3 and 0 of 2).
 - **Who spoke a line, from the looks its mouth was read**
   (`LAMP_SPEAKING_READ_LOOKS=on`, #7442, #7419). A face is a line's speaker
   when it read `yes` in at least half of the line's looks
