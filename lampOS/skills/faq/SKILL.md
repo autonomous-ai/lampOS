@@ -1,7 +1,7 @@
 ---
 name: faq
 description: How to use this lamp. Call when someone asks "how do I...?", "how do reminders work?", "what can you do?", "where do I link Gmail or my calendar?", "what does the button do?", "who made you?", "where can I buy you?", "what's your website?", "help"; not for their own reminders or timers (list_reminders). Answer only from what it tells you.
-when: When asked how to use it, what it can do, where to link Gmail, its button, agent or model, who made it, where to buy it, or for help; not their own reminders or timers (list_reminders).
+when: When asked how to use it, what it can do, where to link Gmail, its button, agent or model, who made it, where to buy it, or for help; not for their own reminders or timers (list_reminders).
 ---
 
 # How to use the lamp
