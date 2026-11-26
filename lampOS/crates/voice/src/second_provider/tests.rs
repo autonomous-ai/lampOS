@@ -1816,6 +1816,197 @@ fn a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route() {
     );
 }
 
+/// #8701: right after the lamp's news, "Hey Lamp, plan a simple three-day
+/// trip to Hoi An …" was answered by the lamp itself, nothing handed over,
+/// 2 times in 5. The first line after the news is asked with
+/// `worker::AFTER_NEWS_NOTE` right before its words, and its hand-over
+/// reaches the tasks part and its read-back is said. The model's choice is
+/// scripted here: this shows the note reaches it and the path after it,
+/// not that the model takes it (that is the lamp's row).
+#[test]
+fn a_new_request_right_after_the_news_is_told_the_note_and_handed_over() {
+    let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let directory = std::env::temp_dir().join(format!("second-after-news-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&directory);
+    std::fs::create_dir_all(&directory).unwrap();
+    let seen = crate::agent_tasks::tests::tasks_part(
+        &directory,
+        vec![
+            (
+                "request.sock",
+                json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}}),
+            ),
+            (
+                "request.sock",
+                json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1}),
+            ),
+        ],
+    );
+    let place = crate::agent_tasks::Place {
+        directory: directory.clone(),
+        target: crate::agent_tasks::DEFAULT_TARGET.into(),
+        who: false,
+        lead_in: false,
+        asked: false,
+        needs: None,
+        staff_note: false,
+        accounts: false,
+        machine_names: false,
+        named_only: false,
+        correct: false,
+        questions: false,
+        now: false,
+        one_yes: false,
+        reply_named: false,
+        harness_status: false,
+        sign_in: false,
+        sign_in_app: false,
+    };
+    let settings = crate::tools::Settings {
+        tasks: Some(place),
+        ..crate::tools::Settings::default()
+    };
+    let task = "Plan a simple three-day trip to Hoi An as a short list";
+    let heard = "Hey Lamp, plan a simple three-day trip to Hoi An and write it up as a short list.";
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(heard.to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    text("Claude Code says the report is done."),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        crate::agent_tasks::START,
+                        json!({ "task": task }),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Shall I start it?"), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        worker::tool_runner(settings, None, None, false),
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .noting_after_news(Arc::new(|request| {
+        (request == 2).then_some(worker::AFTER_NEWS_NOTE)
+    }));
+    let labels = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            engine.submit(written(
+                1,
+                "(Nobody has spoken. News from work you handed over.)",
+            ));
+            assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+            engine.submit(start(2));
+            engine.submit(audio(2, 1));
+            engine.submit(end(2));
+            turn(&mut engine).await
+        });
+    let _ = std::fs::remove_dir_all(&directory);
+    assert!(
+        labels.iter().any(|label| label == "said:Shall I start it?"),
+        "{labels:?}"
+    );
+    let asked = script.asked.lock().unwrap();
+    // The news's own turn is told no such note.
+    assert!(
+        !asked[0]
+            .iter()
+            .any(|message| message == &Message::system(worker::AFTER_NEWS_NOTE)),
+        "{:?}",
+        asked[0]
+    );
+    // The line after it: the note right before its words.
+    assert_eq!(
+        asked[1][asked[1].len() - 2..],
+        [
+            Message::system(worker::AFTER_NEWS_NOTE),
+            Message::user(heard),
+        ]
+    );
+    let ops: Vec<Value> = seen.try_iter().collect();
+    assert_eq!(ops.len(), 2, "{ops:?}");
+    assert_eq!(
+        (&ops[1]["op"], &ops[1]["text"]),
+        (&json!("prepare"), &json!(task))
+    );
+}
+
+/// #8701: a thanks right after the lamp's news is asked with the same note
+/// and answered in words; nothing is handed over (the script answers, as
+/// the note asks the model to for a reply to the news). A line with no
+/// note for it is asked as before.
+#[tokio::test]
+async fn a_reply_right_after_the_news_is_told_the_note_and_answered() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Thanks, that's great.".to_owned()),
+                Ok("What time is it?".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![
+                    text("Claude Code says the report is done."),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("You're welcome."), Ok(ChatEvent::Done)],
+                vec![text("Noon."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, calls, _) = scripted(script.clone());
+    let mut engine = engine.noting_after_news(Arc::new(|request| {
+        (request == 2).then_some(worker::AFTER_NEWS_NOTE)
+    }));
+    engine.submit(written(
+        1,
+        "(Nobody has spoken. News from work you handed over.)",
+    ));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    for request in 2..=3 {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    }
+    assert!(calls.lock().unwrap().is_empty());
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(
+        asked[1][asked[1].len() - 2..],
+        [
+            Message::system(worker::AFTER_NEWS_NOTE),
+            Message::user("Thanks, that's great."),
+        ]
+    );
+    assert!(
+        !asked[2]
+            .iter()
+            .any(|message| message == &Message::system(worker::AFTER_NEWS_NOTE)),
+        "{:?}",
+        asked[2]
+    );
+}
+
 /// #4333 on the second route: with `LAMP_OWNER_PLACE=on` and a place kept,
 /// a line that needs a place is asked with the owner's place beside its
 /// words, and a line that doesn't is asked as before; without the switch

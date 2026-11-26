@@ -2882,6 +2882,16 @@ impl Attention {
         self.news_reply_held
     }
 
+    /// Whether the line last weighed was let out as the first thing said
+    /// after the lamp's own news ([`AFTER_NEWS`]). The news's words are
+    /// still in the model's context, so such a line is told it may be a
+    /// reply or a new request (#8701: "plan a three-day trip …", said right
+    /// after the news, was answered by the lamp itself, nothing handed over,
+    /// 2 times in 5).
+    pub fn played_after_news(&self) -> bool {
+        self.verdict == Some(Verdict::Play(AFTER_NEWS))
+    }
+
     /// Whether the voice rose close to the lamp
     /// ([`Self::set_near`]'s rise) while a hearing of the name of
     /// [`NEAR_SCORE`] or more counted for the request in hand was said.
@@ -6248,6 +6258,13 @@ mod tests {
             }
             attention.heard(heard);
             let verdict = attention.first_output(22, Room::Quiet, false).unwrap();
+            // #8701: the marker the second route's after-news note is read
+            // from follows the verdict.
+            assert_eq!(
+                attention.played_after_news(),
+                verdict == Verdict::Play(AFTER_NEWS),
+                "{heard}"
+            );
             (verdict, attention.news_reply_held())
         };
         let (verdict, journaled) = reply(true, Some(22), "Okay then.");
@@ -6269,6 +6286,42 @@ mod tests {
             reply(true, Some(22), "How is that task going?").0,
             Verdict::Play(ABOUT_ITS_WORK)
         );
+    }
+
+    /// #8701: the first line after the lamp's news, a new request or a
+    /// reply alike, is let out as [`AFTER_NEWS`] and marked so
+    /// ([`Attention::played_after_news`]), for the second route's note; the
+    /// rule does not read its words. The line after it, and a line with no
+    /// news before it, are not marked.
+    #[test]
+    fn the_first_line_after_the_news_is_marked_whatever_it_asks() {
+        const S: u64 = 1_000_000;
+        let ask =
+            "Hey Lamp, plan a simple three-day trip to Hoi An and write it up as a short list.";
+        for first in [ask, "Thanks, that's great."] {
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.news_told(100 * S);
+            attention.began_at(22, 4, 113 * S);
+            attention.heard(first);
+            assert_eq!(
+                attention.first_output(22, Room::Quiet, false),
+                Some(Verdict::Play(AFTER_NEWS)),
+                "{first}"
+            );
+            assert!(attention.played_after_news(), "{first}");
+            // The news has one reply: the next line is no longer marked.
+            attention.began_at(23, 4, 120 * S);
+            attention.heard(ask);
+            attention.first_output(23, Room::Quiet, true);
+            assert!(!attention.played_after_news(), "{first}");
+        }
+        let mut attention = Attention::default();
+        attention.speak_when_spoken_to(true);
+        attention.began_at(22, 4, 113 * S);
+        attention.heard(ask);
+        attention.first_output(22, Room::Quiet, false);
+        assert!(!attention.played_after_news());
     }
 
     /// The Second on #1378 (20:29): with `AFTER_NEWS` taken on timing alone,

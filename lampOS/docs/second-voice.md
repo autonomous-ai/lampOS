@@ -6868,6 +6868,26 @@ after a take-over, but now for every turn:
   `said_to_me` holds (no name, no look, no question waiting) goes
   unanswered. The replay (`crate::replay`) reads only `said_to_me`, so it
   is the same either way.
+- **The news's reply may be new work** (#8701; no switch, wherever work
+  can be handed over, `tools.tasks`). Right after the lamp told a finished
+  task's news, "Hey Lamp, plan a simple three-day trip to Hoi An and write
+  it up as a short list." was let out as `AFTER_NEWS` and answered by the
+  lamp itself, with no `start_agent_task`, 2 times in 5: the news's words,
+  still in this route's history, made it read as a follow-up to that
+  result. A line let out as `AFTER_NEWS` and still played
+  (`Attention::played_after_news`, `Heeding::after_news_note_for`) is asked
+  with `worker::AFTER_NEWS_NOTE` beside its words
+  (`Engine::noting_after_news`): a reply to the news (a thanks, a question
+  about that result) is answered as before; new work (plan, research,
+  write, make) is a new request, handed over with `start_agent_task` as any
+  other. The verdict is unchanged and the code reads no words: the model
+  tells the two apart. The journal says `request N: the first thing said
+  after the lamp's own news: the model is told a new request in it is
+  handed over as any other`. Tests:
+  `a_new_request_right_after_the_news_is_told_the_note_and_handed_over`,
+  `a_reply_right_after_the_news_is_told_the_note_and_answered`,
+  `the_first_line_after_the_news_earns_the_after_news_note`; the model's
+  choice itself is shown only on a lamp.
 - **Only the first line after the lamp's question skips its look**
   (`LAMP_ASKED_LOOKS=on`, #8395; inert without `LAMP_SAID_TO_ME`). On
   lamp-74ff on 23 Nov 16:09-16:21, in a meeting, lines looking away were

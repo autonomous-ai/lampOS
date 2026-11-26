@@ -2392,6 +2392,9 @@ struct Shared {
     name_note: Option<NameNote>,
     /// The note for a line let out only as the conversation going on.
     conversation_alone: Option<NameNote>,
+    /// The note for the first line said after the lamp's own news
+    /// ([`Engine::noting_after_news`], #8701).
+    after_news: Option<NameNote>,
     /// With `LAMP_UNTIED_GOING_ON=on`: whether such a line has no tie to the
     /// lamp, so the spoken cut-in note is not told beside that note
     /// ([`Engine::telling_the_untied`]).
@@ -5723,6 +5726,7 @@ impl Engine {
                 note_ahead: None,
                 name_note: None,
                 conversation_alone: None,
+                after_news: None,
                 untied: None,
                 someone_elses: None,
                 named_ask: None,
@@ -8023,6 +8027,19 @@ impl Engine {
     pub fn noting_the_conversation_alone(mut self, note: NameNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.conversation_alone = Some(note);
+        }
+        self
+    }
+
+    /// The first line said after the lamp's own news is asked with `note`'s
+    /// words beside it (`worker::AFTER_NEWS_NOTE`): the news's words, still
+    /// in this route's history, made a new request read as a follow-up to
+    /// that result, answered by the lamp with nothing handed over (#8701).
+    /// Asked after the request is judged, with its request. Before any turn
+    /// only.
+    pub fn noting_after_news(mut self, note: NameNote) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.after_news = Some(note);
         }
         self
     }
@@ -13280,6 +13297,18 @@ async fn spoken(
         .as_ref()
         .and_then(|note| note(request))
         .map(str::to_owned);
+    // The first line after the lamp's own news: a reply to it, or new work
+    // to hand over (#8701).
+    let after_news = shared
+        .after_news
+        .as_ref()
+        .and_then(|note| note(request))
+        .map(str::to_owned);
+    if after_news.is_some() {
+        eprintln!(
+            "lamp-voice second: request {request}: the first thing said after the lamp's own news: the model is told a new request in it is handed over as any other"
+        );
+    }
     // `LAMP_UNTIED_GOING_ON`: desk talk begun over the lamp's answer, with
     // no tie to it, is told it may be people's talk, not that it cut in
     // (#3882).
@@ -13496,6 +13525,7 @@ async fn spoken(
         .chain(wake)
         .chain(call)
         .chain(alone)
+        .chain(after_news)
         .chain(waiting)
         .chain(spelled)
         .chain(follows_on)
