@@ -283,6 +283,13 @@ pub trait Lamp {
         None
     }
 
+    /// The privacy light's look from the app (#8696,
+    /// `crate::privacy_light`): there only with `LAMP_PRIVACY_LIGHT=on` and
+    /// the settings change, on a lamp with a slide.
+    fn privacy_light(&self) -> Option<crate::privacy_light::Place> {
+        None
+    }
+
     /// The person's own services linked from the app (`LAMP_SERVICES=on`,
     /// Queue #4710, `crate::services`): there only with the switch.
     fn services(&self) -> Option<std::sync::Arc<crate::services::Services>> {
@@ -427,7 +434,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 90] = [
+pub const KINDS: [(&str, Switch); 92] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -438,6 +445,10 @@ pub const KINDS: [(&str, Switch); 90] = [
     ("led.resting.get", ALWAYS),
     ("led.resting.set", ALWAYS),
     ("led.resting.preview", ALWAYS),
+    // The privacy light's look (#8696), beside the person's own light:
+    // named only with its switch, on a lamp with a slide.
+    (crate::privacy_light::KINDS[0], PRIVACY_LIGHT),
+    (crate::privacy_light::KINDS[1], PRIVACY_LIGHT),
     ("chat.send", |lamp| lamp.texting()),
     ("reports.get", |lamp| lamp.reports().is_some()),
     ("reports.set", |lamp| lamp.reports().is_some()),
@@ -551,6 +562,7 @@ pub const KINDS: [(&str, Switch); 90] = [
     (crate::apps::KINDS[6], APPS),
 ];
 
+const PRIVACY_LIGHT: Switch = |lamp| lamp.privacy_light().is_some();
 const CONSENT: Switch = |lamp| lamp.consent().is_some();
 const DESK: Switch = |lamp| lamp.desk_noticing().is_some();
 const HARNESS_SIGN_IN: Switch = |lamp| lamp.harness_sign_in().is_some();
@@ -766,6 +778,17 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 shared.wake.notify_one();
             }
             some(shared.with(|reports| reports.answer()))
+        }
+        // The privacy light's look (#8696): both through root's helper,
+        // which takes them from this process alone; the reply is the look
+        // the file then says, red when it says none.
+        kind if crate::privacy_light::KINDS.contains(&kind) && on(lamp, kind) => {
+            let place = lamp.privacy_light().ok_or_else(|| not_here(kind))?;
+            if kind == crate::privacy_light::KINDS[0] {
+                crate::privacy_light::get(&place).map(Some)
+            } else {
+                crate::privacy_light::set(&place, data).map(Some)
+            }
         }
         // The owner's two yeses from the app (#5500): read where they are
         // kept, and set through root's helper, which answers at once; the
@@ -1226,6 +1249,8 @@ pub mod tests {
         pub consent: Option<crate::consent::Place>,
         /// The owner's desk noticing switch (#6543), with lamp-seen's.
         pub desk_noticing: Option<crate::consent::Place>,
+        /// The privacy light's look (#8696), with its switch.
+        pub privacy_light: Option<crate::privacy_light::Place>,
         /// What `onboarding` says, and the switch's file (#5812).
         pub onboarding: Option<u64>,
         pub onboarding_done: Option<std::path::PathBuf>,
@@ -1375,6 +1400,9 @@ pub mod tests {
         fn desk_noticing(&self) -> Option<crate::consent::Place> {
             self.desk_noticing.clone()
         }
+        fn privacy_light(&self) -> Option<crate::privacy_light::Place> {
+            self.privacy_light.clone()
+        }
         fn update_events(&self) -> Option<std::path::PathBuf> {
             self.update_events.clone()
         }
@@ -1512,6 +1540,93 @@ pub mod tests {
             }
         });
         lines
+    }
+
+    /// #8696: the privacy light's look, get and set both through root's
+    /// helper (a stand-in here, keeping the file as `lamp-setup change`
+    /// does); red with no file; a look it does not know refused before the
+    /// helper, which is never asked.
+    #[test]
+    fn led_privacy_get_and_set_answer_the_look() {
+        use std::io::{BufRead, Write};
+        let folder = std::path::PathBuf::from(format!("/tmp/lcpl-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let socket = folder.join("change.sock");
+        let file = folder.join("privacy.json");
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let lines = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        {
+            let (lines, file) = (lines.clone(), file.clone());
+            std::thread::spawn(move || {
+                for stream in listener.incoming() {
+                    let Ok(mut stream) = stream else { return };
+                    let mut line = String::new();
+                    let _ = std::io::BufReader::new(&stream).read_line(&mut line);
+                    lines.lock().unwrap().push(line.trim().to_owned());
+                    let asked: Value = serde_json::from_str(&line).unwrap_or_default();
+                    let look = match asked["privacy_light"].as_str() {
+                        Some(name) => {
+                            let look = lamp_msgs::privacy_light::Look::named(name).unwrap();
+                            std::fs::write(&file, lamp_msgs::privacy_light::bytes(look)).unwrap();
+                            look
+                        }
+                        None => lamp_msgs::privacy_light::read(&file),
+                    };
+                    let _ = writeln!(stream, "{}", json!({"done": {"look": look.name()}}));
+                }
+            });
+        }
+        let mut off = lamp();
+        let can_now = can(&off);
+        for kind in crate::privacy_light::KINDS {
+            assert!(!can_now.contains(&kind));
+            assert_eq!(
+                answer(&mut off, kind, &json!({"look": "off"})),
+                Err(not_here(kind))
+            );
+        }
+        let mut lamp = Fake {
+            privacy_light: Some(crate::privacy_light::Place {
+                socket: socket.clone(),
+                wait: crate::privacy_light::WAIT,
+            }),
+            ..lamp()
+        };
+        assert_eq!(
+            answer(&mut lamp, "led.privacy.get", &json!({})),
+            Ok(Some(json!({"look": "red"})))
+        );
+        for look in ["dim", "off", "red"] {
+            assert_eq!(
+                answer(&mut lamp, "led.privacy.set", &json!({ "look": look })),
+                Ok(Some(json!({ "look": look })))
+            );
+            assert_eq!(
+                answer(&mut lamp, "led.privacy.get", &Value::Null),
+                Ok(Some(json!({ "look": look })))
+            );
+        }
+        let asked = lines.lock().unwrap().len();
+        for data in [
+            json!({"look": "blue"}),
+            json!({"look": "dim", "x": 1}),
+            json!({}),
+        ] {
+            assert_eq!(
+                answer(&mut lamp, "led.privacy.set", &data),
+                Err(crate::privacy_light::REFUSED.to_owned())
+            );
+        }
+        assert_eq!(lines.lock().unwrap().len(), asked, "never handed on");
+        assert_eq!(
+            lines.lock().unwrap()[..2],
+            [
+                r#"{"privacy_light_get":true}"#.to_owned(),
+                r#"{"privacy_light":"dim"}"#.to_owned()
+            ]
+        );
+        let _ = std::fs::remove_dir_all(&folder);
     }
 
     /// #5500: the owner's two yeses, with `LAMP_APP_CONSENT=on` only.
@@ -2622,6 +2737,18 @@ pub mod tests {
                     ))
                 },
                 &["services", "services.list"],
+            ),
+            (
+                // The privacy light's look (#8696): its own switch, the
+                // settings change and a slide make the place.
+                "privacy light",
+                |f| {
+                    f.privacy_light = Some(crate::privacy_light::Place {
+                        socket: "/nowhere/change.sock".into(),
+                        wait: crate::privacy_light::WAIT,
+                    })
+                },
+                &crate::privacy_light::KINDS,
             ),
             (
                 // lamp-control's admin socket there: a path that is.

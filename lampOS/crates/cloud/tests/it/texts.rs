@@ -48,6 +48,7 @@ fn lamp(name: &str, texting: bool) -> (Real, PathBuf) {
         control: None,
         consent: None,
         desk_noticing: None,
+        privacy_light: None,
         monitor: None,
         devices: None,
         apps: None,

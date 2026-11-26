@@ -140,6 +140,10 @@ pub struct Real {
     /// The owner's desk noticing switch from the app, with
     /// `LAMP_SEEN_ACTIVITY=on` (#6543, `crate::consent::DESK_KINDS`).
     pub desk_noticing: Option<crate::consent::Place>,
+    /// The privacy light's look from the app, with
+    /// `LAMP_PRIVACY_LIGHT=on` on a lamp with a slide (#8696,
+    /// `crate::privacy_light`).
+    pub privacy_light: Option<crate::privacy_light::Place>,
     /// The owner's dev monitor, with `LAMP_APP_MONITOR=on` (#5883,
     /// `crate::monitor`).
     pub monitor: Option<crate::monitor::Place>,
@@ -908,6 +912,9 @@ impl Lamp for Real {
     fn desk_noticing(&self) -> Option<crate::consent::Place> {
         self.desk_noticing.clone()
     }
+    fn privacy_light(&self) -> Option<crate::privacy_light::Place> {
+        self.privacy_light.clone()
+    }
 
     fn monitor(&self) -> Option<crate::monitor::Place> {
         self.monitor.clone()
@@ -1205,6 +1212,7 @@ mod tests {
             control: None,
             consent: None,
             desk_noticing: None,
+            privacy_light: None,
             monitor: None,
             devices: None,
             apps: None,
@@ -1295,6 +1303,7 @@ mod tests {
             control: None,
             consent: None,
             desk_noticing: None,
+            privacy_light: None,
             monitor: None,
             devices: None,
             apps: None,
@@ -1394,6 +1403,7 @@ mod tests {
             control: None,
             consent: None,
             desk_noticing: None,
+            privacy_light: None,
             monitor: None,
             devices: None,
             apps: None,
@@ -1506,6 +1516,7 @@ mod tests {
             control: None,
             consent: None,
             desk_noticing: None,
+            privacy_light: None,
             monitor: None,
             devices: None,
             apps: None,
