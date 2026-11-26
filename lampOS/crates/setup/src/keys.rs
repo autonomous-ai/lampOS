@@ -41,21 +41,21 @@ pub const KEY_MOST: usize = 512;
 /// How long one check may take, its connection included.
 pub const CHECK_WITHIN: Duration = Duration::from_secs(5);
 /// DeepSeek's own API, when the person names no endpoint.
-pub const DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com";
+pub const DEEPSEEK_BASE_URL: &str = lamp_msgs::own_model::DEEPSEEK_API;
 /// Deepgram's call that answers 200 for a key it takes, and nothing more.
 pub const DEEPGRAM_CHECK_URL: &str = "https://api.deepgram.com/v1/auth/token";
 /// ElevenLabs' API: the check asks `<it>/voices/<voice_id>` (#8367).
 pub const ELEVENLABS_API: &str = "https://api.elevenlabs.io/v1";
 /// OpenRouter's API (#8420): fixed, so its key goes nowhere else. The check
 /// asks `<it>/key` and then `<it>/models/<model>/endpoints`.
-pub const OPENROUTER_API: &str = "https://openrouter.ai/api/v1";
+pub const OPENROUTER_API: &str = lamp_msgs::own_model::OPENROUTER_API;
 /// Gemini's OpenAI-compatible API (#8420): fixed, so its key goes nowhere
 /// else. The check asks `<it>/models/<model>`.
-pub const GEMINI_API: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
+pub const GEMINI_API: &str = lamp_msgs::own_model::GEMINI_OPENAI_API;
 /// Anthropic's API (#8420): fixed, so its key goes nowhere else. The check
 /// asks `<it>/models/<model>` with [`ANTHROPIC_VERSION`]; the voice chats at
 /// its OpenAI-compatible `<it>/chat/completions`.
-pub const ANTHROPIC_API: &str = "https://api.anthropic.com/v1";
+pub const ANTHROPIC_API: &str = lamp_msgs::own_model::ANTHROPIC_API;
 /// The `anthropic-version` its model read is asked with.
 pub const ANTHROPIC_VERSION: &str = "2023-06-01";
 /// The most an OpenAI-compatible endpoint's model list is read (#8362).
@@ -227,7 +227,9 @@ impl Service {
     ];
 
     /// The services that are the lamp's model: one own key among them is
-    /// kept at a time, so the model in use is never a guess (#8362).
+    /// kept at a time, so the model in use is never a guess (#8362). In
+    /// `lamp_msgs::own_model::PRECEDENCE`'s order, which the voice and
+    /// lamp-cloud's forwarder take (a test holds them the same, #8735).
     pub const MODELS: [Service; 5] = [
         Service::OpenAiCompatible,
         Service::OpenRouter,
@@ -1259,6 +1261,18 @@ fn set(given: Given, store: &Store, check: &mut impl Check) -> (Value, Option<Do
 mod tests {
     use super::*;
     use std::io::{Read, Write};
+
+    /// The model in use is the one the voice and lamp-cloud's forwarder
+    /// take (#8735): the same services in the same order.
+    #[test]
+    fn the_models_are_in_the_shared_precedence() {
+        let ours: Vec<_> = Service::MODELS.iter().map(|service| service.id()).collect();
+        let shared: Vec<_> = lamp_msgs::own_model::PRECEDENCE
+            .iter()
+            .map(|model| model.id())
+            .collect();
+        assert_eq!(ours, shared);
+    }
 
     /// A local server that answers `status` once; what it was asked.
     fn answering(status: u16) -> (String, Served) {
