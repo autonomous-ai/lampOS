@@ -1864,7 +1864,10 @@ rides the turn as a model ring's does: its first chunk handed to the
 speaker counts as its audio, its retirement as its generation, and played
 whole with the microphones open it is completed as said
 (`Reply::complete_reminder`), so the consumer acknowledges it and nothing
-about it is said again when the link returns. This is a known gap, not the intent: a reminder's own words are never told after its generic ring, so the switch stays off until the first builder's call 5 (c7183858037) lands with #8708: an offline ring is not the reminder told, and its words are told once the link is back. Cut before any of it
+about it is said again when the link returns. A reminder rung from the
+generic line is the exception (#8708, call 5, c7183858037): it is not the
+reminder told, so it is marked "rung, not told" and its words are told once
+the link is back (below). Cut before any of it
 sounded, it is `no_audio` and offered again; cut after, it keeps the
 once-more rule. With no clip kept (the cache never warmed, or no speech
 cache), the item waits for the link as before, said once per item in the
@@ -1878,10 +1881,59 @@ for the link. Off, nothing changes. Tests:
 `the_offline_rings_lines_are_warmed_only_with_the_switch_and_read_not_rendered`
 (`say/tts_cache.rs`) and
 `the_offline_rings_lines_have_their_words_in_each_language` (`language.rs`).
-A reminder rings with the generic line, never its own words (clip C, the
-first builder's call on #8687, 26 Nov). Its own words as its clip, rendered
-while online and removed when its id leaves Schedule, is a later follow-up
-with its own privacy read.
+A reminder rings in its own words (#8708, the first builder's yes on 26 Nov,
+c7196552760). The consumer child, the one process that already reads each
+reminder's text, renders each reminder (never a timer) with no current clip
+at a walk's end, on a thread of its own (`ring_clips::spawn`), never in its
+tick: `ring_clips::words`, the offline ring's reminder line
+(`language::ring_words`, "You have a reminder." in the owner's language)
+and its text, through the second route's speech service
+(`TtsCache::render_once`, the cache built with nothing warmed,
+`tts_cache::built_from_environment`). Its packets to the voice keep carrying
+ids and times only, never words: the pipe's test from #8687 stands
+unchanged. A clip is kept at `ring_clips::DIR`,
+`/var/lib/lampOS/voice/ring-clips/<store_id>-<id>.wav` (0700), with a
+sidecar `<store_id>-<id>.json` of its words' SHA-256 and the
+`voice|model|language` it was rendered in; a change in either renders it
+again. It is keyed by id, so a repeat or a snooze keeps it. At each walk's
+end (at most once a second) a clip whose id is no longer in Schedule goes
+(said, cancelled, an edit's old id, its person forgotten by `Forget`), and
+every clip of another `store_id`. A failed render is tried again after
+`WARM_EVERY` (60 s), then twice as long each time, at most
+`WARM_EVERY_MOST` (1 h). The folder holds at most `ring_clips::MOST_BYTES`,
+122,918,400 bytes (128 items × (a 20 s clip at 24 kHz, 16-bit, 960,044
+bytes, and a 256-byte sidecar)): past it nothing more is rendered, and the
+journal says so once. A render past 20 s is not kept.
+
+Offline, the voice reads the due item's clip by its id and checks it
+against the offer's text, which it is given when the item is due, and the
+voice it speaks in (`offline_rings::ring_for`, `Clips::own`): the clip
+plays, and late ones joined into one ring (`Offer::also`) play each clip in
+turn. A timer, or a reminder with any clip missing or stale, rings the
+generic line. A reminder rung from the generic line, played whole or mostly
+heard, is settled `ToWorker::RungOffline` (`Receipt::untold`), not
+completed: the consumer marks it "rung, not told" in its ledger
+(`DeliveryLedger::mark_rung_untold`, `delivery::SCHEMA` 3, written as 3
+only while an item is marked, so a build from before sets it aside as a
+newer build's and every other ledger reads as before) and offers it again
+with `Offer::rung_offline`. Such an offer is never rung offline again; once
+the link is back it rings as a model turn, in its words, once, and its
+completion clears the mark. The mark survives a restart. With no session
+seen yet, no clip is read, and an item found waiting is not read again on
+later passes (`offline_rings::OfflineRinger`, Twelve's P3 1 on #8687). A
+factory reset wipes the folder (`reset-plan-product.json`). Tests:
+`a_reminder_rings_offline_in_its_own_words_from_its_clip`
+(`offline_rings.rs`),
+`a_clip_is_rendered_once_while_online_and_again_when_text_or_voice_changes`,
+`the_clips_stop_rendering_at_their_bound_with_one_journal_line` and
+`a_sweep_keeps_only_the_live_ids_of_the_store` (`ring_clips.rs`),
+`a_clip_goes_when_its_id_leaves_schedule_or_the_store_changes` and
+`a_generic_ring_stays_rung_not_told_and_is_told_once_when_the_link_is_back`
+(`reminders/consumer/tests.rs`),
+`a_generic_offline_ring_played_whole_is_settled_rung_not_told`
+(`coordinator/tests/reminders.rs`), `rung_not_told_survives_a_restart`
+(lamp-schedule's `tests/it/delivery_ledger.rs`) and
+`a_product_reset_leaves_no_ring_clips` (lamp-setup's `tests/it/reset.rs`).
 
 The link is checked once before a ring (the first builder's call 2). On the
 second route as the only voice, the link read down only once a turn failed
@@ -1895,7 +1947,13 @@ changes and in the tick's `Idle` slot. From
 coordinator sends the provider worker one `Control::CheckLink` for that
 item (`offline_rings::asks_link_check`); a full control socket
 (`WouldBlock`, the worker stuck in a slow call, #8204) leaves it unasked and
-the next pass asks again, never ending the voice (`ask_link_check`). The second route runs the check it
+the next pass asks again, never ending the voice (`ask_link_check`). So
+does a stall going on (the worker's renewals being skipped,
+`RenewalStall::skipped`): a check queued behind a stale renewal could end
+the second route's worker, so it is asked once a renewal is taken again
+(Twelve's P3 2 on #8687; with the passes' choices,
+`offline_ring_passes_read_no_disk_without_a_session_and_ask_no_check_in_a_stall`
+in `coordinator/renewal_stall_tests.rs`). The second route runs the check it
 already runs after a network fault (`second_provider::link::Watch::ask`,
 `Link::ask`: a bare connection to each service host, bounded at
 `PROBE_WITHIN`, 4 s), skipped while a check runs, while down, without

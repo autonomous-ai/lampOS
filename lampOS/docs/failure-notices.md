@@ -217,6 +217,14 @@ and `offline_scrap_no_line` in the session records. Its length unknown, or
 the line not yet said this outage, it is as above. Such a turn only exists
 offline, so online nothing changes; off, every turn is as above.
 
+**A timer's or reminder's ring offline is no failure line (#8632, #8708,
+`LAMP_OFFLINE_RINGS=on`).** A due one rings from its clip as a turn of the
+lamp's own, a reminder in its own words when its clip was rendered while
+online ([schedule.md](schedule.md), "With no link"). A reminder that rang
+with the generic "You have a reminder." instead is said in its words once
+the link is back, as a model ring when the lamp is free; that is the
+reminder told, not a line of this table.
+
 **Back online.** When the link is ready again after an outage in which the
 line was said, "I'm back online." (`back_online`) is owed for 60 s
 (`BACK_ONLINE_OWED_US`). It is said once by a turn the lamp takes for itself
