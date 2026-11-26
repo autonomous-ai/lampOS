@@ -4347,12 +4347,25 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   `skill.toml` không phân tích được đi qua, vì bước đóng gói từ chối nó. `lamp-skills pack`,
   phép kiểm của chính agent giữa lúc tạo, từ chối theo cùng luật
   (`made_skill::told_only`, gọi từ `package::pack_signed_by`), nói
+  `not packed: told_only: ` (`package::TOLD_ONLY_REFUSED`),
   `SPEAKS_ON_ITS_OWN` và dạng câu trả lời được kể
   (`made_skill::TOLD_ONLY_SHAPE`), để việc tạo biết dạng đó trước khi giữ;
-  nó áp cho mọi gói, như `Skill::made_refuses`. Test:
+  nó áp cho mọi gói, như `Skill::made_refuses`. Vì vậy một kỹ năng được
+  giữ trước #8651 mà trigger khởi động và code của nó sẽ tự nói vẫn chạy,
+  nhưng việc chia sẻ lên Store và bản xem trước của nó
+  (`cloud::share::pack`, `seen`), vốn cũng đóng gói nó, từ chối nó (quyết
+  định 2 của builder đầu tiên trên #8688). Chủ được báo một dòng đơn giản,
+  không bao giờ là lời hướng dẫn sửa của agent: lời từ chối được nhận ra
+  qua dấu của nó (`package::refused_told_only`), và app hiện
+  `cloud::share::SPEAKS_ON_ITS_OWN`, "This skill speaks when it starts on
+  its own, so it can't be shared yet." `lamp-skills pack` giữ lời hướng
+  dẫn sửa. Test:
   `pack_refuses_a_trigger_skill_that_would_speak_and_packs_a_told_only_one`,
-  `volume_needs_its_own_grant_or_speak`. Phép kiểm không bao giờ lặp lại
-  cùng một câu là việc tiếp theo.
+  `a_kept_trigger_skill_that_would_speak_is_refused_in_a_plain_line`,
+  `volume_needs_its_own_grant_or_speak`,
+  `volume_changed_goes_with_volume_or_speak` (một máy tính chỉ được cấp
+  `speak` vẫn nhận `volume.changed`). Phép kiểm không bao giờ lặp lại cùng
+  một câu là việc tiếp theo.
 - **Giọng đọc bước `run` như đọc bước `task`**: code riêng, giữ theo grant
   của nó và script của nó phải nằm trong các file đã viết
   (`made_skill::code_step`, `task_run`), và được đọc lại để xin đồng ý một
