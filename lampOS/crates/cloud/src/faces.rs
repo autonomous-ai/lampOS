@@ -667,6 +667,48 @@ mod tests {
         );
     }
 
+    /// Thirteen's P2 on #8253: a remove `entirely` of a face already gone
+    /// whose name's id another person holds (Mai, renamed from "Lan") is
+    /// refused, and memory is never asked, even with its socket given: a
+    /// by-name forget would take Mai's memory.
+    #[test]
+    fn a_remove_entirely_of_a_gone_face_whose_id_is_held_never_asks_memory() {
+        use std::io::{BufRead, BufReader, Write};
+        let dir = std::env::temp_dir().join(format!("cloud-faces-held-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let (who, memory) = (dir.join("who.sock"), dir.join("memory.sock"));
+        let eyes_listener = std::os::unix::net::UnixListener::bind(&who).unwrap();
+        let eyes_side = std::thread::spawn(move || {
+            let (stream, _) = eyes_listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            writeln!(
+                &stream,
+                "{}",
+                json!({"forgot": false, "name_id_free": false})
+            )
+            .unwrap();
+            serde_json::from_str::<Value>(line.trim()).unwrap()
+        });
+        let memory_listener = std::os::unix::net::UnixListener::bind(&memory).unwrap();
+        memory_listener.set_nonblocking(true).unwrap();
+        let eyes = Eyes {
+            socket: who,
+            memory: Some(memory),
+        };
+        assert_eq!(
+            remove(&eyes, &json!({"name": "Lan", "entirely": true}), None),
+            Err("the lamp doesn't know that face".to_owned())
+        );
+        assert_eq!(eyes_side.join().unwrap(), json!({"forget": "Lan"}));
+        assert!(
+            memory_listener.accept().is_err(),
+            "memory was asked for a gone face whose name's id another person holds"
+        );
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
     /// A remove of "Lan" against eyes that answer `told`, and a memory that
     /// keeps the scopes `kept`: what memory keeps after.
     fn kept_after_removing_lan(
