@@ -7880,8 +7880,9 @@ forces one), a skill it makes is made whole, with everything a run needs:
   left in the year.", the count dropped, its card ending "The maker notes
   what it couldn't do: …"): on the voice's DeepSeek path, a first answer
   whose skill a time, an event or a repeat starts (any trigger but a
-  hand's alone), whose only speaking is a fixed `say` (no `run` or `task`
-  step) and which carries a `left out:` line
+  hand's alone), whose only speaking is a fixed `say` (its words a line, a
+  list or `{ text }`; no `say = { note }`, which the model answers at run
+  time, and no `run` or `task` step) and which carries a `left out:` line
   (`made_skill::says_fixed_with_left_out`) is never kept. It is handed to
   the lamp's agent, as a make that needs the internet is, to write as a
   task step whose script prints the line, its answer told. The agent is
@@ -7897,7 +7898,12 @@ forces one), a skill it makes is made whole, with everything a run needs:
   DeepSeek's". The note is not read for whether it is about the say: a
   note about something else on such a skill costs one agent make, never a
   skill kept wrong. The same say with no note ("Time to stretch!"), or
-  asked aloud, is kept as before. Test
+  asked aloud, or a `say = { note }`, is kept as before. The note quoted
+  to the agent is cut at 120 characters. Limits: a `remind` step's words
+  are the person's reminder (as told-only keeps them), so a reminder
+  beside a `left out:` note is never held; and an answer, DeepSeek's or
+  the agent's, that deletes only the note but keeps the fixed say is not
+  caught. Test
   `a_timed_fixed_say_with_a_couldnt_do_note_goes_to_the_agent`.
   The refusal goes to the writer first, as the
   try's failure (`made_skill::TOLD_ONLY_REPAIR`: a `task` step, no

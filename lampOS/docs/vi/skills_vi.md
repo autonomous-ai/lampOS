@@ -4270,8 +4270,9 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   nó kết thúc bằng "The maker notes what it couldn't do: …"): trên đường
   DeepSeek của giọng nói, câu trả lời đầu tiên có kỹ năng do một thời
   điểm, một sự kiện hay một lần lặp khởi động (bất kỳ trigger nào trừ khi
-  chỉ có bàn tay), mà cách nói duy nhất là một `say` cố định (không có bước
-  `run` hay `task`) và có dòng `left out:`
+  chỉ có bàn tay), mà cách nói duy nhất là một `say` cố định (lời của nó là
+  một dòng, một danh sách hay `{ text }`; không có `say = { note }`, thứ mô
+  hình trả lời lúc chạy, và không có bước `run` hay `task`) và có dòng `left out:`
   (`made_skill::says_fixed_with_left_out`) không bao giờ được giữ. Nó được
   giao cho agent của đèn, như một lần tạo cần internet, để viết thành một
   bước task có script in ra câu đó, câu trả lời được kể lại. Agent được
@@ -4289,7 +4290,12 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   `say` hay không: một ghi chú về điều khác trên kỹ năng như vậy chỉ tốn
   một lần tạo của agent, không bao giờ giữ một kỹ năng sai. Cùng câu `say`
   đó mà không có ghi chú ("Time to stretch!"), hay được hỏi bằng lời, vẫn
-  được giữ như trước. Test
+  được giữ như trước, và một `say = { note }` cũng vậy. Ghi chú được trích
+  cho agent bị cắt ở 120 ký tự. Giới hạn: lời của một bước `remind` là lời
+  nhắc của người dùng (như told-only giữ chúng), nên một lời nhắc cạnh ghi
+  chú `left out:` không bao giờ bị giữ lại; và một câu trả lời, của
+  DeepSeek hay của agent, chỉ xoá ghi chú mà vẫn giữ `say` cố định thì không
+  bị bắt. Test
   `a_timed_fixed_say_with_a_couldnt_do_note_goes_to_the_agent`.
   Lời từ chối đến người viết trước, như thất bại của lần
   chạy thử (`made_skill::TOLD_ONLY_REPAIR`: một bước `task`, không `speak`,
