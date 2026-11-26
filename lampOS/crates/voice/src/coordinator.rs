@@ -13619,12 +13619,19 @@ fn conversation_with_gate_inner(
         }
         // The lamp's agent switch (`agent_switch_told`): read only while a
         // conversation is open (a turn, or the thread's conversation going
-        // on), and its two lines said only then, once each, when nothing
-        // holds the lamp and the person has paused. A switch made in the
-        // app to a quiet room is never spoken.
+        // on with someone at the lamp), and its two lines said only then,
+        // once each, when nothing holds the lamp and the person has paused.
+        // A switch made in the app to a quiet or empty room is never spoken.
         if let Some(switch) = agent_switch.as_mut() {
             let talking = crate::agent_switch_told::in_conversation(
                 reply.is_some() || admission.owns_stream(),
+                crate::reminders::someone_here(
+                    presence
+                        .as_ref()
+                        .is_some_and(|presence| presence.present(clock)),
+                    said_at_us,
+                    clock,
+                ),
                 || {
                     crate::thread::THREAD
                         .lock()
