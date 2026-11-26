@@ -330,6 +330,8 @@ where
                         samples_sent += bytes.len() / 2;
                         // Counted for the day, with LAMP_VOICE_DAY_TALLY=on (#7347).
                         crate::day_tally::heard(bytes.len() / 2);
+                        // And its level, for the line's end (#8776).
+                        replies.sent(&bytes);
                         chunk.extend_from_slice(&bytes);
                         if chunk.len() >= CHUNK_BYTES {
                             write.send(Message::binary(std::mem::take(&mut chunk))).await.map_err(failed)?;
@@ -371,6 +373,7 @@ where
                     samples_sent += CHUNK_BYTES / 2;
                     // Quiet sent to keep the line is sound sent too (#7347).
                     crate::day_tally::heard(CHUNK_BYTES / 2);
+                    replies.sent(&QUIET);
                     QUIET.to_vec()
                 } else {
                     std::mem::take(&mut chunk)

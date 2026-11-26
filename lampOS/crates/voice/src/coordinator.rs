@@ -5037,6 +5037,11 @@ fn provider_arguments(
     arguments.extend(crate::said_as_heard::arguments_from_environment());
     arguments.extend(crate::scoped_session::arguments_from_environment());
     arguments.extend(crate::name_or_follow_up::arguments_from_environment());
+    // The faint floor, for the share of each line's sound over it in the
+    // journal (#8776).
+    arguments.extend(crate::second_provider::net::sent_floor_arguments(
+        options.faint_level,
+    ));
     if let Some(camera) = camera {
         arguments.extend(camera.source.arguments());
     }
