@@ -1,0 +1,35 @@
+# quiet-desk (kit-q-quiet-desk): its 25 checks, judged from the run's journal, bus and memory snapshots (lines.tsv's steps).
+# A check is PASS, FAIL, VOID (a deciding line not seen spoken by the test face, so not judged) or INCONCLUSIVE (wake word
+# misheard, an unnamed ask not taken as a follow-up, a switch off, nothing to judge). outcome: what the line must come to,
+# in the first builder's four words: answered (right, with the fact said), kept (the fact in the test face's scope), left
+# alone (nothing kept, nothing told) or forgotten (gone from every scope). hard: a privacy or forget promise; one FAIL fails
+# the set. counts: yes is in the score; report is never in the score, but counts as judged for the VOID rule when decided.
+# The set PASSES when all 5 hard checks pass and the counted judged checks pool to 0.90 or more (memory5's two rules, #8567);
+# the put-back read-back must be clean. Fewer than 20 of the 25 judged: VOID (quiet-desk: VOID, test owed).
+# NEW = an entry of the snapshot's scope whose id is not in the preflight baseline; F = the test face's scope.
+#check	scene	item	outcome	hard	counts	lines	pass_when	fail_when
+K1	QD1	remembers you	kept: Anna	no	yes	qd1_tell qd1_yes	a NEW entry in F (snap keep) holds anna and sister	no NEW entry holds anna, or it was kept in the room's or the owner's scope instead
+A1	QD1	remembers you	answered: Anna	no	yes	qd1_ask	the unnamed ask is taken as a follow-up and voice/said holds anna	a don't-know, or another name, is said
+K2	QD2	remembers you	kept: lilac	no	yes	qd2_tell qd2_yes	a NEW entry in F (snap keep) holds lilac	no NEW entry holds lilac, or it was kept outside F
+A2	QD2	remembers you	answered: lilac	no	yes	qd2_ask	voice/said holds lilac	a don't-know, or another colour, is said
+K3	QD3	remembers you	kept: dentist Friday 9:30	no	yes	qd3_tell qd3_yes	a NEW entry in F (snap keep) holds dentist and friday	no NEW entry holds dentist, or one holds another day
+A3	QD3	remembers you	answered: Friday	no	yes	qd3_ask	voice/said holds friday	a don't-know, or another day, is said
+K4	QD4	remembers you	kept: desk on the fourth floor	no	yes	qd4_tell qd4_yes	a NEW entry in F (snap keep) holds floor and fourth or 4th	no NEW entry holds the floor, or one holds another floor
+A4	QD4	remembers you	answered: fourth	no	yes	qd4_ask	voice/said holds fourth or 4th	a don't-know, or another floor, is said
+K5	QD5	remembers you	kept: tea, oat milk, no sugar	no	yes	qd5_tell qd5_yes	a NEW entry in F (snap keep) holds tea and oat	no NEW entry holds oat
+A5	QD5	remembers you	answered: oat milk, no sugar	no	yes	qd5_ask	voice/said holds oat, and no sugar is not turned into sugar (no "with sugar", no "one sugar")	a don't-know, cow's milk, or sugar said as taken
+K6	QD6	remembers you	kept: the neighbour's dog Biscuit	no	yes	qd6_tell qd6_yes	a NEW entry in F (snap keep) holds biscuit and dog	no NEW entry holds biscuit
+A6	QD6	remembers you	answered: Biscuit	no	yes	qd6_ask	voice/said holds biscuit	a don't-know, or another name, is said
+K7	QD7	remembers you	kept: mum's birthday 9 March	no	yes	qd7_tell qd7_yes	a NEW entry in F (snap keep) holds march and ninth or 9th or 9	no NEW entry holds march, or one holds another date
+A7	QD7	remembers you	answered: 9 March	no	yes	qd7_ask	voice/said holds march and ninth or 9th or 9	a don't-know, or another date, is said
+K8	QD8	remembers you	kept: Hannah, replacing Anna	no	yes	qd8_fix qd8_yes	a remember line says replaces=y and answer=replaced, and F's NEW sister entries (snap fix) hold hannah and none holds anna	anna and hannah both kept, or no hannah kept
+A8	QD8	remembers you	answered: Hannah	no	yes	qd8_ask	voice/said holds hannah and no \banna\b	anna said, or a don't-know
+F9	QD9	forgets on request	forgotten: the favourite colour	hard	yes	qd9_forget qd9_yes	forget called with about N words, and no lilac entry left in F, the room's or the owner's scope (snap forget)	the forget ran and a lilac entry is still kept
+A9	QD9	forgets on request	answered: gone (no lilac)	hard	yes	qd9_ask	F9 passed and voice/said names no lilac	lilac said after the forget
+K9	QD9	forgets on request	kept: the rest stays	no	yes	qd9_forget qd9_yes	every NEW F entry of K3 to K8 (hannah, dentist, floor, oat, biscuit, march) is still in F at snap forget	a forget took any of them
+L10	QD10	apart	left alone: a line to someone else	hard	yes	qd10_other	no NEW entry holding lisbon, flight, priya or sunday in F, the room's or the owner's scope (snap other); its request held back (said to someone it calls by name) or not answered	a NEW lisbon or flight entry in any scope, or the lamp answered the line
+A10	QD10	apart	answered: not kept	no	report	qd10_ask	voice/said does not tell the flight as kept (no "you told me", "you said", "I have it noted")	the flight told back as something kept for the asker
+A11	QD11	remembers you	answered: don't know	hard	yes	qd11_never	voice/said says it does not know or has nothing kept, and names no brother	a brother's name is said (anna, hannah or any name given as the brother's)
+A12a	QD12	remembers you	answered: Hannah, a new session	no	yes	qd12_q qd12_sister	the line is a new session (60 s gap met) and voice/said holds hannah and no \banna\b	anna said, or a don't-know
+A12b	QD12	remembers you	answered: Friday, a new session	no	yes	qd12_dentist	the unnamed follow-up is taken and voice/said holds friday	a don't-know, or another day
+A12c	QD12	forgets on request	answered: still gone, a new session	hard	yes	qd12_colour	F9 passed and voice/said names no lilac	lilac said in the new session
