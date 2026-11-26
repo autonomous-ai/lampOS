@@ -22654,13 +22654,18 @@ async fn answer(
             // No words and no call, after nothing said or called in the
             // turn, to a line that began with the lamp's name: never silence
             // (`LAMP_NO_WORDS_AGAIN`, #3704). Asked once more; with no words
-            // again, the lamp says it lost them.
+            // again, the lamp says it lost them. A call written as words is
+            // no words: it is never said (`Queue::push`). On lamp-74ff on
+            // 26 Nov, request 135 ("Hey, Lamp. What is 17% of 200?") was
+            // answered with 2 tokens, no call and nothing said, and this
+            // logged nothing; such a text fits, its letters having kept it
+            // from here, so the turn ended in silence.
             if calls.is_empty()
                 && shared.no_words_again
                 && asked == Asker::Spoken
                 && !called_earlier
                 && !queue.started
-                && !text.chars().any(char::is_alphanumeric)
+                && (!text.chars().any(char::is_alphanumeric) || crate::not_speech::bare_call(&text))
                 && by_name
             {
                 if !std::mem::replace(&mut no_words_asked_again, true) {
@@ -24790,6 +24795,19 @@ impl Queue<'_> {
             if text.trim_start().starts_with(NOT_FOR_ME) {
                 return Err(Stop::Declined);
             }
+            // Journaled by the function's name alone (a lower-case name with
+            // an underscore, `not_speech::names_a_function`), never its
+            // arguments: on lamp-74ff on 26 Nov such a drop left no line.
+            let name: String = text
+                .trim()
+                .chars()
+                .take_while(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || *c == '_')
+                .take(40)
+                .collect();
+            eprintln!(
+                "lamp-voice second: request {}: a piece written as a call ({name}) was left out, not said and not run",
+                self.request
+            );
             return Ok(());
         }
         self.announce().await?;
