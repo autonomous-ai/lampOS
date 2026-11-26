@@ -729,16 +729,23 @@ start; the folder stays root's alone, 0700, each file 0600.
   voice. #8742's forwarder finishes an agent turn in flight before it stops.
   In detail: after a `keys.set` that kept a model key, or a
   `keys.remove` of one, the helper restarts lamp-cloud
-  (`systemctl try-restart lamp-cloud.service`) right after the voice, at the
-  same quiet moment and under the same update lock (`keys::restart_after`),
-  so the forwarder loads the change. That is after the voice has rested 1 s
+  (`systemctl try-restart lamp-cloud.service`) after the voice, under the
+  same update lock (`keys::restart_after`), so the forwarder loads the
+  change. The voice restarts once it has rested 1 s
   (`change::KEY_CHANGE_QUIET`, #8710), the reply already written and
-  flushed to lamp-cloud before the wait starts. Its journal line: "lamp-cloud
+  flushed to lamp-cloud before the wait starts. lamp-cloud waits an update's
+  `QUIET` (45 s) of rest after that: it holds the reply only in memory until
+  its online loop publishes it (only while connected, owed again if the
+  publish fails), so a link down or a slow publish within 1 s would lose it
+  (Sixth's P2 on #8741). Someone speaking to the new voice pushes it on; not
+  quiet within the 30 minutes in all, lamp-cloud is not restarted and loads
+  the key at its next start. Its journal line: "lamp-cloud
   restarted to load the person's model key for the agent (its
   LoadCredential= is copied only at its start, #8742)". Never for an
   ElevenLabs or Deepgram key. Restarting lamp-cloud drops the app's link
   until it reconnects. Tested in `tests/update_lock.rs`
-  (`a_model_key_change_restarts_the_voice_then_lamp_cloud_once_quiet`).
+  (`a_model_key_change_restarts_the_voice_then_lamp_cloud_once_quiet`,
+  `lamp_cloud_restarts_only_after_quiet_of_rest_past_the_voice`).
 - **`lamp-cloud`** passes the helper's `done` through as it is
   (`settings::ask_keys`), under its 4096-byte read of a reply.
 - **Tests:** `src/keys.rs` (`a_model_check_asks_once_for_a_tool_call`) and

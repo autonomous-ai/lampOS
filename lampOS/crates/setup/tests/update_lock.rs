@@ -1044,8 +1044,9 @@ fn a_model_key_change_restarts_the_voice_then_lamp_cloud_once_quiet() {
             stop_fails: false,
         };
         let said = keys::restart_after(&done, &mut ears, &records, &mut units);
-        // After 1 s of quiet (#8710), the reply already out to lamp-cloud.
-        assert_eq!(ears.now, S, "{line}");
+        // The voice after 1 s of quiet (#8710); lamp-cloud 45 s after it, its
+        // reply relayed by then (#8741).
+        assert_eq!(ears.now, if cloud { 46 * S } else { S }, "{line}");
         let mut want = vec![("try-restart lamp-voice.service".to_owned(), true)];
         if cloud {
             want.push(("try-restart lamp-cloud.service".to_owned(), true));
@@ -1084,5 +1085,70 @@ fn a_model_key_change_restarts_the_voice_then_lamp_cloud_once_quiet() {
         "{said:?}"
     );
     drop(update);
+    let _ = fs::remove_dir_all(folder);
+}
+
+/// Sixth's P2 on #8741: lamp-cloud holds the key's reply only in memory
+/// until its online loop relays it, so its restart waits an update's
+/// `QUIET` (45 s) of rest after the voice's, under the same lock; the voice
+/// still restarts after 1 s. Someone speaking to the new voice pushes
+/// lamp-cloud's restart on.
+#[test]
+fn lamp_cloud_restarts_only_after_quiet_of_rest_past_the_voice() {
+    use lamp_setup::keys::{self, Check, Given, Store, Verdict};
+    use std::{cell::Cell, rc::Rc};
+    struct Works;
+    impl Check for Works {
+        fn check(&mut self, _: &Given) -> Verdict {
+            Verdict::Works
+        }
+    }
+    struct Timed<'a> {
+        clock: Rc<Cell<u64>>,
+        records: &'a lamp_update::records::Records,
+        calls: Vec<(String, u64, bool)>,
+    }
+    impl change::Systemd for Timed<'_> {
+        fn systemctl(&mut self, args: &[&str]) -> Result<(), String> {
+            let held = self.records.lock().is_err();
+            self.calls.push((args.join(" "), self.clock.get(), held));
+            Ok(())
+        }
+    }
+    let (folder, records) = records_folder("keys-cloud-quiet");
+    let store = Store(folder.join("own"));
+    let (_, done) = keys::answer(
+        r#"{"set":"deepseek","key":"sk-planted-8741-aaaaaaaaaaaaaaaa"}"#,
+        &store,
+        &mut Works,
+        true,
+    );
+    let clock = Rc::new(Cell::new(0));
+    let seen = clock.clone();
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(move |now| {
+            seen.set(now);
+            if now == 10 * S {
+                vec![Heard::Speech]
+            } else {
+                vec![Heard::State(Voice::Resting)]
+            }
+        }),
+    };
+    let mut units = Timed {
+        clock,
+        records: &records,
+        calls: Vec::new(),
+    };
+    let said = keys::restart_after(&done.unwrap(), &mut ears, &records, &mut units);
+    assert_eq!(
+        units.calls,
+        vec![
+            ("try-restart lamp-voice.service".to_owned(), S, true),
+            ("try-restart lamp-cloud.service".to_owned(), 55 * S, true),
+        ],
+        "{said:?}"
+    );
     let _ = fs::remove_dir_all(folder);
 }
