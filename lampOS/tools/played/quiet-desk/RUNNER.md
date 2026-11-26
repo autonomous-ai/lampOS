@@ -2,7 +2,7 @@
 
 Written 26 Nov 2026 for the first builder's #7814 ask (10:46): memory as one person alone at a quiet desk meets it. The set is played on lamp-06c1, booked on #6831, in two legs back to back: stable 16102, then `lamp-voice`'s head, with the switches as the product unit has them. Scores per scene go on #7814, as machine lines only (§3).
 
-The runner and judge are off-repo, like memory5's. Their mechanics are memory5's (`lampOS/tools/played/memory5/RUNNER.md`): the sockets, the gap gate, the face-in-view check, the speak gate, line-seen, heard-ok, the turn of a line, the shared regexes and the pitfalls. **That file is only in open PR #8650: this set is not played until #8650 has merged.** This file says only where quiet-desk differs, and what it scores. The put-back (§4) is written out in full here and uses none of memory5's U2 or U3.
+The runner and judge are off-repo, like memory5's. Their mechanics are memory5's (`lampOS/tools/played/memory5/RUNNER.md`): the sockets, the gap gate, the face-in-view check, the speak gate, line-seen, heard-ok, the turn of a line, the shared regexes and the pitfalls. It uses memory5's voices format (`voices.tsv` + `SHA256SUMS`, PR #8650), with no gate on that PR. This file says only where quiet-desk differs, and what it scores. The put-back (§4) is written out in full here and uses none of memory5's U2 or U3.
 
 **Data (the only inputs in git):**
 
@@ -62,7 +62,7 @@ Line kinds, the speak gate, line-seen, marks and the bus recording are memory5's
 | QD11 | qd11_never | a brother never told |
 | QD12 | qd12_q, _sister, _dentist, _colour, qd12_snap | a new session, about 10.5 min after QD8: Hannah, Friday, and the colour still gone; `snap_end.json` |
 
-The waits sum to about 18 min a leg. Cap a leg's play at **20 min**; the cap always ends in the put-back. A scene that would start past the cap is skipped, and its checks read INCONCLUSIVE `SKIPPED: … test owed`.
+The waits sum to about 18 min a leg; with the gap gates, face waits and snapshots, `qd8_ask` ends at about 560 s and QD12 plays at about 1190–1250 s. Cap a leg's play at **22 min**: QD12 must wait out the thread's history window (`REMEMBERED_FOR` 600 s past the last of the 12 exchanges that held Hannah), so a 20 min cap would skip QD12 and leave A12c, a hard check, unjudged (VOID); the cap always ends in the put-back. A scene that would start past the cap is skipped, and its checks read INCONCLUSIVE `SKIPPED: … test owed`.
 
 ## 3. Scoring and the report
 
