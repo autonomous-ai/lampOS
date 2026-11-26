@@ -2387,8 +2387,23 @@ order is kept. A written turn is the same from the chat on.
   the service <C> ms after finalize, before its answer: settled=…, finals
   cover … of … ms sent, …, <W> words][, finalize answered in <A> ms to <E>
   ms|, finalize unanswered], results <N> with words, <M> without, words
-  from=<settled|flush|finalize|close_stream|closed_early>[+interim]",
-  the last naming which path gave the words. `closed_early` is the service
+  from=<settled|flush|finalize|close_stream|closed_early>[+interim][, the
+  rest quiet: sound to <S> ms], peak <X.X> dBFS, rms <Y.Y> dBFS, clipped
+  <K>, over the floor <P%|none>", the words naming which path gave them.
+  The last four, on every request's line, `results 0 with words` ones
+  too, are the level of the audio sent to speech to text for that request
+  (#8776): the 16 kHz samples after the canceller that the service got,
+  counted where each block goes out (quiet held back after a pause is not
+  sent and not counted). The peak is the loudest sample and the rms is over
+  all of them, both against full scale (-120.0 for none); clipped counts
+  samples at 32767, -32767 or -32768; over the floor is the share of the
+  samples sent that were in 20 ms blocks whose level
+  (`ring_face::level_of`, by rms) was at or over the faint floor that
+  `--faint-floor-db` sets (its lowest, -28 in the product unit), as the
+  coordinator judges each capture block, given to the worker as
+  `--sent-floor-level <level>`; `none` without that option. A
+  running peak, sum of squares and counts, kept from the stream's start,
+  told once at its end. `closed_early` is the service
   ending the stream after `Finalize` and before its answer, with no
   `CloseStream` asked: the turn goes on with the words so far, and the
   part in `;` says when, how far the finals reached at the close and how

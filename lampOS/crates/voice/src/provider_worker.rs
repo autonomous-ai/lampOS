@@ -569,6 +569,8 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     if let Some(window) = follow_up_for {
         crate::name_or_follow_up::set_follow_up_for(window);
     }
+    // The faint floor, for each line's end in the journal (#8776).
+    let flags = crate::second_provider::net::take_sent_floor(flags);
     // `start_agent_task` says what the staff's note asks, when it is sent.
     if let Some(place) = tools.tasks.as_mut() {
         place.staff_note = staff_note;
