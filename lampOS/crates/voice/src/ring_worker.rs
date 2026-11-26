@@ -606,7 +606,8 @@ fn controls(
             Control::StartCapture
             | Control::ConnectReference { .. }
             | Control::ProviderOutputCapacity { .. }
-            | Control::NameGrant { .. } => {
+            | Control::NameGrant { .. }
+            | Control::CheckLink => {
                 return Err(io::Error::other("invalid ring control command"));
             }
         }

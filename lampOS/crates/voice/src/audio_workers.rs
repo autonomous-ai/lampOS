@@ -855,6 +855,9 @@ fn capture_loop<D: CaptureDevice>(
                 Control::NameGrant { .. } => {
                     return Err(io::Error::other("a name grant sent to capture").into());
                 }
+                Control::CheckLink => {
+                    return Err(io::Error::other("a link check sent to capture").into());
+                }
                 Control::Stop => {
                     microphone.revoke()?;
                     channels.control.send(WorkerEvent::CaptureStopped)?;
@@ -2311,7 +2314,8 @@ fn wait_for_speaker(
                 }
                 Control::StartCapture
                 | Control::ProviderOutputCapacity { .. }
-                | Control::NameGrant { .. } => {
+                | Control::NameGrant { .. }
+                | Control::CheckLink => {
                     return Err(io::Error::other("invalid speaker command").into());
                 }
             }
@@ -2497,7 +2501,8 @@ fn speaker_passes(
                 }
                 Control::StartCapture
                 | Control::ProviderOutputCapacity { .. }
-                | Control::NameGrant { .. } => {
+                | Control::NameGrant { .. }
+                | Control::CheckLink => {
                     return Err(io::Error::other("invalid speaker command").into());
                 }
             }

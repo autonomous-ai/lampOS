@@ -41,6 +41,7 @@ impl Test {
             notice_owed: false,
             cut_last: None,
             stop_owed: None,
+            upcoming: None,
         };
         Self {
             parent,

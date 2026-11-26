@@ -292,6 +292,21 @@ struct Consumer<P: Persistence> {
     /// [`Self::cannot_ring`]: after [`REARM_US`] the re-fence is armed again,
     /// so a store put back while this voice runs is not refused for good.
     refusing_since: Option<u64>,
+    /// With `LAMP_OFFLINE_RINGS=on` (#8632): the store walked for the
+    /// soonest ring not yet due ([`Self::upcoming`]).
+    upcoming: Option<UpcomingWalk>,
+}
+
+/// The walk for the soonest ring not yet due: a page of the store a tick,
+/// what the walk found so far, what the voice was last told, by identity
+/// and due time (`None` before anything was told), and a change still to
+/// tell, sent in the tick's idle slot so it never fills the queue.
+#[derive(Default)]
+struct UpcomingWalk {
+    cursor: u64,
+    soonest: Option<(super::Upcoming, i64)>,
+    told: Option<Option<(u64, u64, i64)>>,
+    owed: Option<Option<super::Upcoming>>,
 }
 impl<P: Persistence> Consumer<P> {
     fn new(ledger: DeliveryLedger<P>, session: String) -> Self {
@@ -313,6 +328,70 @@ impl<P: Persistence> Consumer<P> {
             notice_owed: false,
             cannot_ring: None,
             refusing_since: None,
+            upcoming: None,
+        }
+    }
+    /// With `LAMP_OFFLINE_RINGS=on` (#8632): one page of the store, at most
+    /// 8 items, for the soonest timer or reminder set and not yet due; once
+    /// the walk reaches the store's end, the voice is told it if it changed.
+    /// Only the items' ids and times are read out, never their words.
+    /// The change is told by [`Self::upcoming_owed`].
+    fn upcoming(&mut self, socket: &Path, due: &ScheduleDue, now: u64, deadline: Instant) {
+        let Some(walk) = &mut self.upcoming else {
+            return;
+        };
+        let request = Request::List {
+            after_id: walk.cursor,
+            limit: 8,
+            pending_only: false,
+        };
+        let Ok(page) = exchange(socket, &request, deadline) else {
+            return;
+        };
+        if page["ok"] != true || page["store_id"].as_str() != Some(&due.store_id) {
+            return;
+        }
+        let Some(items) = page["items"].as_array().filter(|items| items.len() <= 8) else {
+            return;
+        };
+        for item in items {
+            let (Some(id), Some(delivery), Some(due_unix_ms), Some(remaining_ms)) = (
+                item["id"].as_u64(),
+                item["delivery"].as_u64(),
+                item["due_unix_ms"].as_i64(),
+                item["remaining_ms"].as_u64(),
+            ) else {
+                continue;
+            };
+            if item["state"] != "scheduled" {
+                continue;
+            }
+            let due_at_us = now.saturating_add(remaining_ms.saturating_mul(1_000));
+            if walk
+                .soonest
+                .is_none_or(|(soonest, _)| due_at_us < soonest.due_at_us)
+            {
+                walk.soonest = Some((
+                    super::Upcoming {
+                        id,
+                        delivery,
+                        due_at_us,
+                    },
+                    due_unix_ms,
+                ));
+            }
+        }
+        match page["next_after_id"].as_u64() {
+            Some(next) if next > walk.cursor => walk.cursor = next,
+            _ => {
+                walk.cursor = 0;
+                let found = walk.soonest.take();
+                let key = found.map(|(soonest, at)| (soonest.id, soonest.delivery, at));
+                if walk.told != Some(key) {
+                    walk.told = Some(key);
+                    walk.owed = Some(found.map(|(soonest, _)| soonest));
+                }
+            }
         }
     }
     /// Keeps [`Self::cannot_ring`]'s file exactly while an item at the
@@ -392,6 +471,12 @@ impl<P: Persistence> Consumer<P> {
         }
         self.outgoing.push_back(message);
         Ok(())
+    }
+    /// The soonest ring's change still to tell the voice, if any: sent in
+    /// place of the tick's `Idle`, with nothing else queued.
+    fn upcoming_owed(&mut self) -> Option<FromWorker> {
+        let soonest = self.upcoming.as_mut()?.owed.take()?;
+        Some(FromWorker::Upcoming { soonest })
     }
     fn withdraw(&mut self) -> io::Result<()> {
         if let Some(current) = &self.current {
@@ -905,6 +990,7 @@ impl<P: Persistence> Consumer<P> {
             return self.withdraw();
         };
         self.judge_cannot_ring(due, now)?;
+        self.upcoming(socket, due, now, deadline);
         if let Some(current) = &self.current {
             let key = current.token.key.clone();
             if let Err(error) = self.offer(socket, due, &key, now, deadline) {
@@ -1132,6 +1218,9 @@ pub(super) fn run(ledger_dir: &Path, socket: &Path, root: &Path) -> io::Result<(
     // One left by an earlier consumer is never this one's judgement.
     let _ = std::fs::remove_file(ledger_dir.join(super::CANNOT_RING_FILE));
     let mut consumer = Consumer::new(ledger, session);
+    if crate::offline_rings::on() {
+        consumer.upcoming = Some(UpcomingWalk::default());
+    }
     if refence {
         consumer.cannot_ring = Some((ledger_dir.join(super::CANNOT_RING_FILE), None));
     }
@@ -1163,7 +1252,8 @@ pub(super) fn run(ledger_dir: &Path, socket: &Path, root: &Path) -> io::Result<(
             };
             consumer.tick(socket, due.as_ref(), now)?;
             if consumer.outgoing.is_empty() {
-                consumer.push(FromWorker::Idle {})?;
+                let message = consumer.upcoming_owed().unwrap_or(FromWorker::Idle {});
+                consumer.push(message)?;
             }
             next = Instant::now() + TICK;
         }

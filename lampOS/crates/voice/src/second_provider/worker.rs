@@ -74,6 +74,10 @@ struct Gate {
     rides_stall: bool,
     /// Since when it holds closed, the last authority's install.
     held_since: Option<u64>,
+    /// The coordinator asked for the link's check before a ring
+    /// (`Control::CheckLink`, `LAMP_OFFLINE_RINGS`, #8632), taken by the
+    /// loop for its watch (`link::Watch::ask`).
+    link_asked: bool,
     /// The last retired request whose dropped input was journalled
     /// ([`Gate::admits`]): one line per request, not one per audio frame.
     retired_logged: Cell<u64>,
@@ -97,6 +101,7 @@ impl Gate {
             held_up_from_us: now_us,
             rides_stall: false,
             held_since: None,
+            link_asked: false,
             retired_logged: Cell::new(0),
         }
     }
@@ -406,6 +411,7 @@ impl Gate {
                     self.install(monotonic_us(), snapshot, engine)?
                 }
                 Some(Control::ProviderOutputCapacity { through }) => self.flow.grant(through)?,
+                Some(Control::CheckLink) => self.link_asked = true,
                 Some(
                     Control::StartCapture
                     | Control::ConnectReference { .. }
@@ -16389,6 +16395,13 @@ pub async fn run(
             if let Some(event) = &pending {
                 link.output(monotonic_us(), event);
             }
+        }
+        // A ring is due soon (`LAMP_OFFLINE_RINGS`, #8632): the link's
+        // check, once, unless a turn or a check found it within a minute.
+        if std::mem::take(&mut gate.link_asked) && link.ask(monotonic_us()) {
+            eprintln!(
+                "lamp-voice second: a ring is due soon and the link was not found in the last minute: checking that a service host answers (LAMP_OFFLINE_RINGS)"
+            );
         }
         // The lamp's only voice tells the coordinator its link (#1844).
         if let Some((changed, was_down)) = link.tick(monotonic_us()).await {

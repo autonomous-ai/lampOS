@@ -5504,6 +5504,8 @@ impl ProviderIntake {
                 Control::ProviderOutputCapacity { through } => {
                     self.output_flow.grant(through)?;
                 }
+                // Only the second route checks its link (#8632).
+                Control::CheckLink => {}
                 Control::StartCapture
                 | Control::ConnectReference { .. }
                 | Control::NameGrant { .. } => {
