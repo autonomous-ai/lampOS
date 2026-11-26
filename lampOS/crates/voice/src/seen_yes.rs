@@ -397,7 +397,9 @@ const STOPPED_WORDS: [&str; 8] = [
 const STOP_PROMISED: [&str; 2] = ["i'll", "will"];
 
 /// The words of a sentence that offers a way off rather than saying it is
-/// off ("you can turn it off any time"): with one, "off" is no claim.
+/// off ("you can turn it off any time", "If you ask, my camera goes off",
+/// "I'll stop watching if you'd like"): with one anywhere in the sentence,
+/// not only in the clause, neither "off" nor a stop word is a claim.
 const OFFERING_WORDS: [&str; 6] = ["can", "could", "if", "whenever", "anytime", "any"];
 
 /// The words that, directly before a looking verb ([`LOOKING_VERBS`]) or
@@ -408,6 +410,23 @@ const NOT_WORDS: [&str; 7] = ["not", "won't", "wont", "never", "isn't", "aren't"
 /// The words that may come between one of [`NOT_WORDS`] and the looking
 /// verb ("I won't be looking", "I'm not still watching").
 const NOT_GAP: [&str; 4] = ["be", "keep", "still", "ever"];
+
+/// The words that, directly before a stop word or with only the lamp
+/// ([`LAMP_SUBJECT`]) or one of [`STOP_NOT_GAP`] between, negate it ("I
+/// haven't stopped watching", "No, I never stopped", "I have not
+/// stopped"): the lamp says it is still looking, no claim. Curly
+/// apostrophes are straight ones by then ([`words`]).
+const STOP_NOT_WORDS: [&str; 22] = [
+    "not", "won't", "wont", "never", "isn't", "aren't", "haven't", "havent", "hasn't", "hasnt",
+    "hadn't", "hadnt", "didn't", "didnt", "don't", "dont", "can't", "cant", "cannot", "wasn't",
+    "weren't", "nor",
+];
+
+/// The auxiliaries that may come between one of [`STOP_NOT_WORDS`] and the
+/// stop word ("I have not stopped", "never have I stopped").
+const STOP_NOT_GAP: [&str; 9] = [
+    "have", "has", "had", "been", "ever", "am", "was", "really", "even",
+];
 
 /// The looking's verbs and the camera, for [`STOPPED_WORDS`],
 /// [`NOT_WORDS`] and "off": not "see" or "desk", which a reply describing
@@ -459,13 +478,17 @@ const CLAUSE_BREAKS: [&str; 6] = ["and", "but", "so", "while", "because", "then"
 /// - one of [`STOPPED_WORDS`], or "stop" after one of [`STOP_PROMISED`] or
 ///   "going to", with one of [`LOOKING_VERBS`] directly after it or one
 ///   word later ("I've stopped watching", "I'll stop noticing", "stopped my
-///   camera"), the lamp as subject ([`LAMP_SUBJECT`] before it, or none);
+///   camera"), the lamp as subject ([`LAMP_SUBJECT`] before it, or none),
+///   no negation before it ([`STOP_NOT_WORDS`]: "I haven't stopped
+///   watching") and none of [`OFFERING_WORDS`] in the sentence ("I'll stop
+///   watching if you'd like");
 /// - one of [`NOT_WORDS`] directly before one of [`LOOKING_VERBS`], or with
 ///   one of [`NOT_GAP`] between, the lamp as subject before it ("I'm not
 ///   looking at your desk", "I won't watch", "I'm no longer watching");
 /// - "off" with one of [`OFF_LOOKING`], said of the lamp ([`LAMP_SUBJECT`],
-///   or an "is"/"are"/"'s"), none of [`PERSON_WORDS`] and none of
-///   [`OFFERING_WORDS`] ("noticing is off", "my camera is off");
+///   or an "is"/"are"/"'s"), none of [`PERSON_WORDS`] in the clause and
+///   none of [`OFFERING_WORDS`] in the sentence ("noticing is off", "my
+///   camera is off"; never "If you ask, my camera goes off");
 /// - a stop word alone ("I've stopped.", "Okay, stopping now."), only to a
 ///   person's line asking to stop the looking ([`names_the_looking`]).
 ///
@@ -481,13 +504,17 @@ pub fn claims_stopped(reply: &str, heard: Option<&str>) -> bool {
         .split_inclusive(['.', '!', '?', ';', '\n'])
         .filter(|sentence| !sentence.trim_end().ends_with('?'))
         .filter(|sentence| !opens_a_question(&words(sentence)))
-        .flat_map(|sentence| {
+        .any(|sentence| {
+            // An offer anywhere in the sentence makes its "off" and its stop
+            // no claim (Friday's P2-a and P3 on #8780, c7194711313).
+            let offering = words(sentence)
+                .iter()
+                .any(|word| OFFERING_WORDS.contains(&word.as_str()));
             sentence
                 .split([',', ':', '\u{2014}', '\u{2013}'])
                 .flat_map(|part| clauses(words(part)))
-                .collect::<Vec<_>>()
+                .any(|clause| clause_claims(&clause, asked_to_stop, offering))
         })
-        .any(|clause| clause_claims(&clause, asked_to_stop))
 }
 
 /// Whether a sentence's words open as a question ([`QUESTION_OPENERS`]),
@@ -514,8 +541,9 @@ fn clauses(words: Vec<String>) -> Vec<Vec<String>> {
 }
 
 /// One clause of [`claims_stopped`]'s: whether it claims the lamp stopped
-/// looking, `asked_to_stop` where the person's line asked it to.
-fn clause_claims(words: &[String], asked_to_stop: bool) -> bool {
+/// looking, `asked_to_stop` where the person's line asked it to,
+/// `offering` where its sentence has one of [`OFFERING_WORDS`].
+fn clause_claims(words: &[String], asked_to_stop: bool, offering: bool) -> bool {
     let has = |set: &[&str], word: &str| set.contains(&word);
     let lamp_before = |at: usize| words[..at].iter().any(|word| has(&LAMP_SUBJECT, word));
     let looking_at = |at: usize| words.get(at).is_some_and(|word| has(&LOOKING_VERBS, word));
@@ -527,9 +555,23 @@ fn clause_claims(words: &[String], asked_to_stop: bool) -> bool {
                 && (before(1).is_some_and(|word| STOP_PROMISED.contains(&word))
                     || (before(2) == Some("going") && before(1) == Some("to"))))
     };
-    let stopped = (0..words.len()).any(|at| {
-        stop_at(at) && (looking_at(at + 1) || looking_at(at + 2)) && (at == 0 || lamp_before(at))
-    });
+    // A negation before the stop, past the lamp or an auxiliary ("I
+    // haven't stopped", "No, I never stopped"): the lamp is still looking
+    // (Friday's P2-b on #8780).
+    let negated = |at: usize| {
+        words[..at]
+            .iter()
+            .rev()
+            .find(|word| !has(&LAMP_SUBJECT, word) && !has(&STOP_NOT_GAP, word))
+            .is_some_and(|word| has(&STOP_NOT_WORDS, word))
+    };
+    let stopped = !offering
+        && (0..words.len()).any(|at| {
+            stop_at(at)
+                && !negated(at)
+                && (looking_at(at + 1) || looking_at(at + 2))
+                && (at == 0 || lamp_before(at))
+        });
     let not_looking = (0..words.len()).any(|at| {
         let word = words[at].as_str();
         has(&NOT_WORDS, word)
@@ -539,11 +581,10 @@ fn clause_claims(words: &[String], asked_to_stop: bool) -> bool {
                     && looking_at(at + 2)))
             && (lamp_before(at) || (word == "longer" && at == 1))
     });
-    let off = words.iter().any(|word| word == "off")
+    let off = !offering
+        && words.iter().any(|word| word == "off")
         && words.iter().any(|word| has(&OFF_LOOKING, word))
-        && !words
-            .iter()
-            .any(|word| has(&OFFERING_WORDS, word) || has(&PERSON_WORDS, word))
+        && !words.iter().any(|word| has(&PERSON_WORDS, word))
         && words.iter().any(|word| {
             has(&LAMP_SUBJECT, word) || word == "is" || word == "are" || word.ends_with("'s")
         });

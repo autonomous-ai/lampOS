@@ -91,8 +91,12 @@ lamp also says once when the opt-in is turned off.
    stop the music"), nor a "not" or "off" with no lamp in it ("Try not to
    look at the screen.", "Take your eyes off the screen and stretch."), nor
    a question, with its "?" or opening as one ("Should I stop watching?"),
-   nor an offer of a way off ("you can turn it off any time"): where the
-   claim is unclear, it is none. Live's transcript pieces are joined as
+   nor an offer anywhere in the sentence ("you can turn it off any time",
+   "If you ask, my camera goes off", "I'll stop watching if you'd like"),
+   nor a stop with a negation before it, past the lamp or an auxiliary
+   ("I haven't stopped watching your desk", "No, I never stopped
+   watching"), which says the lamp is still looking: where the claim is
+   unclear, it is none. Live's transcript pieces are joined as
    given (a word split across two is still the word), and a sentence is
    judged only once it has ended, or at the turn's end
    (`GenerationComplete`, or the transcript's `finished`); the second
