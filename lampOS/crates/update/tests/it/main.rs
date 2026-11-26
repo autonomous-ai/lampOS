@@ -8,6 +8,7 @@
 mod ci_paths;
 mod climb_from_7071;
 mod image_journal;
+mod image_journal_fault;
 // GNU `stat -c`, as on the lamp: Linux only (Twelve's P3 on #5342).
 #[cfg(target_os = "linux")]
 mod image_journal_setup;

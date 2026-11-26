@@ -46,7 +46,8 @@
         "3466654f4331b42d659b68bdf61cfde8657529ccd6aac5334c50b8e796e7c140",
         "82d1da7dbd1ee504a536848e65417bfb4b34424be577fbec92c37e4bd1ed00df",
         "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15",
-        "b8395bce1018d32ee2e3a1f781542193666ae773621bb227e3537215b0605bce"
+        "b8395bce1018d32ee2e3a1f781542193666ae773621bb227e3537215b0605bce",
+        "d25957c0f3ad4d5902c71a10d18d499d0681de5553c4862ab7ccbe1e99177c3c"
       ],
       "/usr/local/libexec/lamp-ramlog-postrotate": [
         "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
@@ -56,6 +57,9 @@
       ],
       "/etc/systemd/system/lamp-journal-setup.timer": [
         "6da0aa1964d2bc5d7b2ee087e669001ec5f0b0f69c00594348c0ef1eec1a6b6f"
+      ],
+      "/etc/systemd/system/lamp-voice.service.d/lamp-fault-keep.conf": [
+        "2543c96ac961514dfd9222d563981be62c9ecb4f87d8b1cab960ef6997c6aabf"
       ]
     },
     "pro": {
@@ -110,7 +114,8 @@
         "3466654f4331b42d659b68bdf61cfde8657529ccd6aac5334c50b8e796e7c140",
         "82d1da7dbd1ee504a536848e65417bfb4b34424be577fbec92c37e4bd1ed00df",
         "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15",
-        "b8395bce1018d32ee2e3a1f781542193666ae773621bb227e3537215b0605bce"
+        "b8395bce1018d32ee2e3a1f781542193666ae773621bb227e3537215b0605bce",
+        "d25957c0f3ad4d5902c71a10d18d499d0681de5553c4862ab7ccbe1e99177c3c"
       ],
       "/usr/local/libexec/lamp-ramlog-postrotate": [
         "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
@@ -120,6 +125,9 @@
       ],
       "/etc/systemd/system/lamp-journal-setup.timer": [
         "6da0aa1964d2bc5d7b2ee087e669001ec5f0b0f69c00594348c0ef1eec1a6b6f"
+      ],
+      "/etc/systemd/system/lamp-voice.service.d/lamp-fault-keep.conf": [
+        "2543c96ac961514dfd9222d563981be62c9ecb4f87d8b1cab960ef6997c6aabf"
       ]
     },
     "pro-respeaker-lite": {
@@ -176,7 +184,8 @@
         "3466654f4331b42d659b68bdf61cfde8657529ccd6aac5334c50b8e796e7c140",
         "82d1da7dbd1ee504a536848e65417bfb4b34424be577fbec92c37e4bd1ed00df",
         "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15",
-        "b8395bce1018d32ee2e3a1f781542193666ae773621bb227e3537215b0605bce"
+        "b8395bce1018d32ee2e3a1f781542193666ae773621bb227e3537215b0605bce",
+        "d25957c0f3ad4d5902c71a10d18d499d0681de5553c4862ab7ccbe1e99177c3c"
       ],
       "/usr/local/libexec/lamp-ramlog-postrotate": [
         "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
@@ -186,6 +195,9 @@
       ],
       "/etc/systemd/system/lamp-journal-setup.timer": [
         "6da0aa1964d2bc5d7b2ee087e669001ec5f0b0f69c00594348c0ef1eec1a6b6f"
+      ],
+      "/etc/systemd/system/lamp-voice.service.d/lamp-fault-keep.conf": [
+        "2543c96ac961514dfd9222d563981be62c9ecb4f87d8b1cab960ef6997c6aabf"
       ]
     },
     "pro-xvf3800": {
@@ -234,7 +246,8 @@
         "3466654f4331b42d659b68bdf61cfde8657529ccd6aac5334c50b8e796e7c140",
         "82d1da7dbd1ee504a536848e65417bfb4b34424be577fbec92c37e4bd1ed00df",
         "b19bb5a5f11799200be71d8d90c870a5bd6374c75b2ffed9cdd8b73feb250c15",
-        "b8395bce1018d32ee2e3a1f781542193666ae773621bb227e3537215b0605bce"
+        "b8395bce1018d32ee2e3a1f781542193666ae773621bb227e3537215b0605bce",
+        "d25957c0f3ad4d5902c71a10d18d499d0681de5553c4862ab7ccbe1e99177c3c"
       ],
       "/usr/local/libexec/lamp-ramlog-postrotate": [
         "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
@@ -244,6 +257,9 @@
       ],
       "/etc/systemd/system/lamp-journal-setup.timer": [
         "6da0aa1964d2bc5d7b2ee087e669001ec5f0b0f69c00594348c0ef1eec1a6b6f"
+      ],
+      "/etc/systemd/system/lamp-voice.service.d/lamp-fault-keep.conf": [
+        "2543c96ac961514dfd9222d563981be62c9ecb4f87d8b1cab960ef6997c6aabf"
       ]
     }
   }
