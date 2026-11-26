@@ -20397,7 +20397,7 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             let toml = format!("{kept}{timed}");
             assert_eq!(told_only(&toml), Ok(()), "{toml}");
         }
-        // Asked aloud, with no trigger: worked out when asked, it's kept.
+        // Asked aloud, with no trigger: no trigger starts it, so it isn't checked, and it's kept.
         assert_eq!(
             told_only(&format!("asks = [\"year count\"]\n{count}")),
             Ok(())
