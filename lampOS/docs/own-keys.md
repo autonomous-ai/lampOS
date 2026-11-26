@@ -659,18 +659,13 @@ the person's own model too, through lamp-cloud's forwarder
   used, which bounds skills' runs (the lead on #8735).
 - **A refused key:** 401 or 403 from the person's endpoint before anything
   is passed back sends that chat to the relay, said once in the journal.
-- **When a change takes effect:** lamp-cloud loads the folder with
-  `LoadCredential=own:/etc/lampOS/voice/own`, which systemd copies once, at
-  its start. A model key's `keys.set` or `keys.remove` from the app puts
-  the agent on the relay until lamp-cloud's next start, so a removed key is
-  never used. A new key takes effect at lamp-cloud's next start (a reboot
-  or an update), not at once: restarting lamp-cloud would drop the app's
-  link. A live switch needs lamp-cloud to read the folder itself, a
-  follow-up.
-- **Who can read the key:** the copy is readable by `lampos`, lamp-cloud's
-  user. The agent runtimes run as `lampos` too, so they could read the
-  person's key, as they can read the relay's key today. Moving both keys
-  out of the agent's reach is a follow-up (#8735).
+- **When a change takes effect:** at the agent's next chat. lamp-cloud
+  reads the folder itself at each request, with no restart: the helper
+  keeps it `root:lampos` 0750 and its files 0640 for that (#8735's setup
+  part). No folder, or one lamp-cloud can't list: the relay, said once.
+- **Who can read the key:** lamp-cloud reads the folder as group `lampos`.
+  The agent runtimes run as `lampos` too, so they can read the person's
+  key, as they can read the relay's key today.
 
 ## Updates
 
