@@ -1941,11 +1941,18 @@ fn failed_hand_over(item: &Value, now: &BootClock) -> Option<bool> {
         // Said yes to, still queued when lamp-tasks restarted (an update),
         // so never sent (`restart`): told once the same way. Only when the
         // yes was in this boot as well: across a reboot how long ago it was
-        // asked is not known, and "just now" could be hours late. A task
-        // that was being sent at the restart is `uncertain`, above.
+        // asked is not known, and "just now" could be hours late. And only
+        // when the yes is at most a queued life plus "just now" old
+        // ([`YES_MS`]): a lamp-tasks that stayed down for hours (its start
+        // limit) and came back in the same boot ends the task at that late
+        // start, and it is not told then. A task that was being sent at the
+        // restart is `uncertain`, above.
         "invalidated"
             if dispatch["code"].as_str() == Some(RESTART)
-                && dispatch["confirmed"]["boot_id"].as_str() == Some(now.boot_id.as_str()) =>
+                && dispatch["confirmed"]["boot_id"].as_str() == Some(now.boot_id.as_str())
+                && dispatch["confirmed"]["monotonic_ms"]
+                    .as_u64()
+                    .is_some_and(|ms| now.ms.saturating_sub(ms) <= YES_MS) =>
         {
             false
         }
@@ -1967,6 +1974,15 @@ const EXPIRED: &str = "expired";
 /// lamp-tasks' code for work a restart of it ended (`Engine::open`): a
 /// queued task is `invalidated`, one being sent `uncertain`.
 const RESTART: &str = "restart";
+
+/// lamp-tasks' queued life (`lamp_tasks::engine::QUEUED_MS`, never linked
+/// here; a test keeps the two the same).
+const QUEUED_MS: u64 = 30 * 60_000;
+
+/// The oldest yes a task that a restart ended is told for: a task waits in
+/// the queue at most [`QUEUED_MS`], and it is told within [`JUST_MS`] of
+/// the restart.
+const YES_MS: u64 = QUEUED_MS + JUST_MS;
 
 /// lamp-tasks' code for a new start that timed out and is being checked
 /// (#8170): its dispatch stays `uncertain`, and it is never sent again.
@@ -3807,10 +3823,26 @@ mod tests {
                 "code":code,"confirmed":confirmed,
                 "finished":{"boot_id":"boot-a","monotonic_ms":NOW - 5_000}}})
         };
-        let yes = json!({"boot_id":"boot-a"});
+        assert_eq!(QUEUED_MS, lamp_tasks::engine::QUEUED_MS);
+        let yes = json!({"boot_id":"boot-a","monotonic_ms":NOW - 60_000});
         assert_eq!(
             failed_hand_over(&ended(yes.clone(), "restart"), &now()),
             Some(false)
+        );
+        // A yes a whole queued life plus "just now" old is still told.
+        let edge = json!({"boot_id":"boot-a","monotonic_ms":NOW - YES_MS});
+        assert_eq!(
+            failed_hand_over(&ended(edge, "restart"), &now()),
+            Some(false)
+        );
+        // A yes in this boot but older (lamp-tasks stayed down past its
+        // start limit, then started hours later): silent.
+        let old = json!({"boot_id":"boot-a","monotonic_ms":NOW - YES_MS - 1});
+        assert_eq!(failed_hand_over(&ended(old, "restart"), &now()), None);
+        // A yes with no time on it: silent.
+        assert_eq!(
+            failed_hand_over(&ended(json!({"boot_id":"boot-a"}), "restart"), &now()),
+            None
         );
         assert_eq!(
             failed_hand_over(&ended(Value::Null, "restart"), &now()),
@@ -3838,7 +3870,10 @@ mod tests {
         std::fs::create_dir_all(&root).unwrap();
         let socket = root.join("request.sock");
         let listener = UnixListener::bind(&socket).unwrap();
-        let item = ended(json!({"boot_id":"boot-a"}), "restart");
+        let item = ended(
+            json!({"boot_id":"boot-a","monotonic_ms":NOW - 60_000}),
+            "restart",
+        );
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 let mut stream = stream.unwrap();
