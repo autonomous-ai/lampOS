@@ -357,6 +357,10 @@ pub const WORK_ASKED_US: u64 = 600_000_000;
 /// (`LAMP_FOLLOW_UPS`' window after the lamp's words), not [`NEWS_REPLY_US`];
 /// and a line about its work opens nothing of its own ([`WORK_ASKED_US`]).
 pub const ONE_REPLY_WINDOW_US: u64 = 20_000_000;
+
+/// With `LAMP_ONE_REPLY_WINDOW`, the longest the lamp's own news may play
+/// and still move its reply window to its end ([`Attention::lamp_words_until`]).
+pub const NEWS_LONGEST_US: u64 = 60_000_000;
 pub(crate) const ABOUT_ITS_WORK: &str = "a question about the lamp's own task, reminder or timer";
 
 /// With the switch, a line that follows, by at most this long, one that
@@ -1088,17 +1092,53 @@ fn greeting_set_off(heard: &str) -> bool {
         .starts_with(['?', '.', '!'])
 }
 
+/// The word after `heard`'s opening greeting, past one filler, when it is
+/// set off by a comma, a stop, a question mark or an exclamation right after
+/// it: "Hi, Mark. …", "Hey John, …". None for a word running on into the
+/// sentence ("Hey, I need a timer.", "Hey, Can you …").
+fn word_set_off_after_the_greeting(heard: &str) -> Option<&str> {
+    let mut spans = Vec::with_capacity(3);
+    let mut start = None;
+    for (at, c) in heard.char_indices() {
+        let in_word = c.is_alphanumeric() || c == '\'';
+        match (in_word, start) {
+            (true, None) => start = Some(at),
+            (false, Some(from)) => {
+                spans.push((from, at));
+                start = None;
+                if spans.len() == 3 {
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    if spans.len() < 3
+        && let Some(from) = start
+    {
+        spans.push((from, heard.len()));
+    }
+    const FILLERS: [&str; 5] = ["um", "uh", "oh", "ah", "so"];
+    let skip = spans.first().is_some_and(|(from, to)| {
+        FILLERS
+            .iter()
+            .any(|filler| heard[*from..*to].eq_ignore_ascii_case(filler))
+    });
+    let &(from, to) = spans.get(usize::from(skip) + 1)?;
+    heard[to..]
+        .trim_start()
+        .starts_with([',', '.', '?', '!'])
+        .then_some(&heard[from..to])
+}
+
 /// Whether `heard`'s words show that a hearing at its start was not "Hey
 /// Lamp": an "ok" or "okay" opening it ("OK Lamp" is not the call the
-/// product owner named), or a greeting followed, in the same sentence, by a
-/// word written as a name and not like the lamp's ("Hi, Mark. Did you move
-/// the lamp?", "Hey John, …"). Anything else leaves the hearing to stand:
-/// `lamp-name` is trained on "Hey Lamp" and not on a bare "Lamp", and speech
-/// to text often drops or mangles the call ("Galam. What is …", "Hang Tell
-/// me …", "What is one plus one?").
+/// product owner named), or a greeting followed by a word written as a name,
+/// set off as one addresses a person, and not like the lamp's ("Hi, Mark.
+/// Did you move the lamp?", "Hey John, …"). Never "I" and its forms ("Hey,
+/// I need a timer."), nor a word running on (the Reviewer-lead's P2 on #8781).
 fn words_rule_out_hey(heard: &str) -> bool {
-    let mut words = past_a_filler(heard);
-    let Some(first) = words.next() else {
+    let Some(first) = past_a_filler(heard).next() else {
         return false;
     };
     if first.eq_ignore_ascii_case("ok") || first.eq_ignore_ascii_case("okay") {
@@ -1111,10 +1151,11 @@ fn words_rule_out_hey(heard: &str) -> bool {
     {
         return false;
     }
-    words.next().is_some_and(|second| {
-        second.chars().next().is_some_and(char::is_uppercase)
-            && !written_for_the_name(second)
-            && !crate::second_provider::sounds_like_the_name(second)
+    word_set_off_after_the_greeting(heard).is_some_and(|word| {
+        word.chars().next().is_some_and(char::is_uppercase)
+            && !["I", "I'm", "I'd", "I'll", "I've"].contains(&word)
+            && !written_for_the_name(word)
+            && !crate::second_provider::sounds_like_the_name(word)
     })
 }
 
@@ -2669,17 +2710,27 @@ impl Attention {
         // "Hello?". Not a word that is another person's name ("Hey, Lance.",
         // #8114). Any other hearing, a bare "Lamp" or the name inside a
         // sentence, is no call. In a conversation the name is not needed.
+        // The override, clearing the drops above, only for a line whose words
+        // open with a greeting (the Reviewer-lead's P1 on #8781: without one
+        // it reopened #8136, #3945, #7891 and #8092). A start hearing with no
+        // greeting in its words ("Galam. What is …") is left to the rules
+        // above, with every drop of theirs; the switch only adds its own: a
+        // late hearing, a line opening with the name itself (a bare "Lamp,
+        // …"), "OK Lamp" or a greeting to someone named ("Hi, Mark. …").
         self.hey_kept = weighed
             && self.hey_only
             && !in_conversation
             && self.named_near_the_start
-            // `lamp-name` heard "Hey Lamp" at the line's start, and its words
-            // don't say otherwise: "OK Lamp", or "Hi, Mark. Did you move the
-            // lamp?", heard at its start on lamp-74ff (26 Nov, 20:51), are
-            // no call.
+            && opens_with_hey(&self.heard)
             && !words_rule_out_hey(&self.heard)
             && !self.name_anothers_dropped;
-        self.name_unhey_dropped = weighed && self.hey_only && !in_conversation && !self.hey_kept;
+        self.name_unhey_dropped = weighed
+            && self.hey_only
+            && !in_conversation
+            && !self.hey_kept
+            && (!self.named_near_the_start
+                || begins_with_the_name(&self.heard)
+                || words_rule_out_hey(&self.heard));
         if self.hey_kept {
             self.name_short_dropped = false;
             self.name_near_dropped = false;
@@ -2884,6 +2935,21 @@ impl Attention {
     /// after the stuffy-air skill's remark was answered as its reply.
     pub fn one_reply_window(&mut self, on: bool) {
         self.one_reply_window = on;
+    }
+
+    /// The lamp's words sent so far will have played by `until_us`. With
+    /// `LAMP_ONE_REPLY_WINDOW` the reply window of its news runs from the
+    /// news's end, not its first audio (the Reviewer-lead's P2 on #8781: a
+    /// 15 s summary left about 5 s, news past 20 s none): words that end
+    /// within [`NEWS_LONGEST_US`] of the news's start move it there.
+    pub fn lamp_words_until(&mut self, until_us: u64) {
+        if self.one_reply_window
+            && let Some(news) = self.news_us
+            && until_us > news
+            && until_us - news <= NEWS_LONGEST_US
+        {
+            self.news_us = Some(until_us);
+        }
     }
 
     /// Whether the name heard for the line last weighed, though dropped, is
@@ -6050,6 +6116,40 @@ mod tests {
         assert_eq!(super::ONE_REPLY_WINDOW_US, 20 * S);
     }
 
+    /// The Reviewer-lead's P2 on #8781: with `LAMP_ONE_REPLY_WINDOW` the
+    /// reply window runs from the news's end. A 15 s news line (100 s to
+    /// 115 s): a reply 15 s after its end is taken, 25 s after it not; off,
+    /// the 3 min from its first audio as before.
+    #[test]
+    fn with_one_reply_window_a_long_news_line_is_replied_to_from_its_end() {
+        const S: u64 = 1_000_000;
+        let reply = |on: bool, after_end_s: u64| {
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.one_reply_window(on);
+            attention.news_told(100 * S);
+            attention.lamp_words_until(115 * S);
+            attention.began_at(22, 4, (115 + after_end_s) * S);
+            attention.heard("Okay, thanks.");
+            attention.first_output(22, Room::Quiet, false).unwrap()
+        };
+        assert_eq!(
+            reply(true, 15),
+            Verdict::Play(AFTER_NEWS),
+            "15 s after its end"
+        );
+        assert_ne!(
+            reply(true, 25),
+            Verdict::Play(AFTER_NEWS),
+            "25 s after its end"
+        );
+        assert_eq!(
+            reply(false, 25),
+            Verdict::Play(AFTER_NEWS),
+            "off: 3 min as before"
+        );
+    }
+
     /// `LAMP_ONE_REPLY_WINDOW`: a line about the lamp's work opens no window
     /// of its own; past the reply's 20 s it is "Hey Lamp", as any line is.
     /// Off, "How is that task going?" 46.8 s after a task began is let out as
@@ -8391,15 +8491,15 @@ mod tests {
             )
         };
         let start = 10_400_000;
+        // Greeted: "Hey Lamp" as speech to text writes it, kept by the rule.
         for heard in [
             "Hey, Lamp. What time is it?",
             "Hey man, what time is it?",
             "Hello? Do you know my face?",
             "Um, hey lamp, are you there?",
-            "Galam. What is the capital of France?",
-            "Hang Tell me a long story about a dragon.",
-            "What is one plus one?",
             "Hey what time is it?",
+            "Hey, I need a timer.",
+            "Hey, Can you hear me?",
         ] {
             assert_eq!(
                 weigh(heard, start, true, false),
@@ -8407,9 +8507,25 @@ mod tests {
                 "{heard}"
             );
         }
+        // No greeting in its words: left to the rules before it, which keep
+        // a start hearing here with no other switch on.
+        for heard in [
+            "Galam. What is the capital of France?",
+            "Hang Tell me a long story about a dragon.",
+            "What is one plus one?",
+        ] {
+            assert_eq!(
+                weigh(heard, start, true, false),
+                (false, false, false),
+                "{heard}"
+            );
+        }
+        // Dropped by the rule: "OK Lamp", a bare "Lamp", a greeting to
+        // someone named.
         for heard in [
             "OK Lamp, what is two plus two?",
             "Okay. Fine. Exactly.",
+            "Lamp, what time is it?",
             "Hi, Mark. Did you move the lamp this morning?",
             "Hey John, come here.",
         ] {
@@ -8438,6 +8554,32 @@ mod tests {
             ),
             (true, false, true)
         );
+        // With the product's switches (the Reviewer-lead's P1 on #8781): with
+        // no greeting the older drops stand: #8136's 0.921 hearing in two
+        // people's talk, #3945's "Ma'am, …", #7891's short "Yeah."; a greeted
+        // call is kept over them.
+        let product = |heard: &str, score: f32| {
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            attention.need_a_face_or_words(true);
+            attention.hold_a_start_said_to_a_person(true);
+            attention.only_hey_lamp(true);
+            attention.began_at(1, 1, 10_000_000);
+            attention.name_heard_scored(10_210_000, score);
+            attention.heard(heard);
+            (
+                attention.weigh_the_name(None, false),
+                attention.name_kept_as_hey(),
+            )
+        };
+        assert!(product("Yes, we should go now.", 0.921).0, "#8136");
+        assert!(
+            product("Ma'am, could you pass me the salt please?", 0.97).0,
+            "#3945"
+        );
+        assert!(product("Yeah.", 0.97).0, "#7891");
+        assert_eq!(product("Hey man, what time is it?", 0.93), (false, true));
+        assert_eq!(product("Hey, I need a timer.", 0.97), (false, true));
         assert!(super::greeting_set_off("Hello? Do you know my face?"));
         assert!(super::greeting_set_off("Um, hey! What time is it?"));
         assert!(!super::greeting_set_off("Hey, Mark, come here."));
