@@ -756,7 +756,8 @@ impl Forwarder {
 
     /// [`Self::serve`] until `stop` ends (SIGTERM, #8735), then no new
     /// connection or chat is taken and the chats in flight are given
-    /// `within` to end. Returns a journal line for each one cut.
+    /// `within` to end. Returns the journal's lines: how many ended and how
+    /// many were cut, then one for each one cut.
     pub async fn serve_until(
         self: Arc<Self>,
         listener: TcpListener,
@@ -776,10 +777,11 @@ impl Forwarder {
                 .unwrap_or_else(|poison| poison.into_inner())
                 .clone()
         };
+        let at_stop = flying().len();
         while !flying().is_empty() && Instant::now() < until {
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
-        flying()
+        let cut: Vec<String> = flying()
             .into_iter()
             .map(|(_, began)| {
                 format!(
@@ -787,7 +789,17 @@ impl Forwarder {
                     began.elapsed().as_millis()
                 )
             })
-            .collect()
+            .collect();
+        // Until lamp-cloud listens again, the port is closed: the agent's
+        // next chats are refused by the system, which no part counts.
+        let mut lines = vec![format!(
+            "the Hermes forwarder: stopped, {} chats in flight ended, {} cut; \
+             a chat sent before lamp-cloud is back is refused",
+            at_stop - cut.len(),
+            cut.len()
+        )];
+        lines.extend(cut);
+        lines
     }
 
     /// A chat taken in flight, or `None` once a stop has begun.

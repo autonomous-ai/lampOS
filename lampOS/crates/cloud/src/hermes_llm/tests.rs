@@ -1028,7 +1028,13 @@ async fn stopped_during_a_chat(gap: Duration, within: Duration) -> (Vec<u8>, Vec
 async fn a_stop_drains_a_chat_in_flight() {
     let (answer, cut) =
         stopped_during_a_chat(Duration::from_millis(100), Duration::from_secs(5)).await;
-    assert!(cut.is_empty(), "{cut:?}");
+    assert_eq!(
+        cut,
+        [
+            "the Hermes forwarder: stopped, 1 chats in flight ended, 0 cut; \
+          a chat sent before lamp-cloud is back is refused"
+        ]
+    );
     let answer = String::from_utf8_lossy(&answer);
     assert!(
         answer.contains("[DONE]") && answer.ends_with("0\r\n\r\n"),
@@ -1041,11 +1047,16 @@ async fn a_stop_drains_a_chat_in_flight() {
 #[tokio::test]
 async fn a_chat_past_the_drain_is_cut_and_said() {
     let (_, cut) = stopped_during_a_chat(Duration::from_secs(3), Duration::from_millis(200)).await;
-    assert_eq!(cut.len(), 1, "{cut:?}");
+    assert_eq!(cut.len(), 2, "{cut:?}");
     assert!(
-        cut[0].starts_with("the Hermes forwarder: a chat in flight was cut by a stop (")
-            && cut[0].ends_with(" ms in)"),
+        cut[0].contains("0 chats in flight ended, 1 cut"),
         "{}",
         cut[0]
+    );
+    assert!(
+        cut[1].starts_with("the Hermes forwarder: a chat in flight was cut by a stop (")
+            && cut[1].ends_with(" ms in)"),
+        "{}",
+        cut[1]
     );
 }
