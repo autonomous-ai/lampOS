@@ -2189,6 +2189,18 @@ pub(crate) mod tests {
         }
     }
 
+    /// A loopback port that refuses every connection for as long as the
+    /// returned socket is kept: it is bound but never listens, so no other
+    /// test can take the port. A listener bound and dropped frees its port,
+    /// and under a full run another test's stub took it and answered 404
+    /// (ARM64 job 139804348272 on #8745).
+    pub(crate) fn refusing_port() -> (tokio::net::TcpSocket, std::net::SocketAddr) {
+        let socket = tokio::net::TcpSocket::new_v4().unwrap();
+        socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+        let at = socket.local_addr().unwrap();
+        (socket, at)
+    }
+
     pub(crate) type Answers = Vec<(&'static str, Option<(&'static str, Vec<u8>)>)>;
 
     pub(crate) async fn stub(key: &'static str, answers: Answers) -> Stub {
@@ -2457,10 +2469,8 @@ pub(crate) mod tests {
     async fn a_held_line_and_an_unreached_model_give_way_to_the_lamps_own() {
         const REFUSED: &str = "HTTP/1.1 401 Unauthorized\r\ncontent-type: application/json\r\nconnection: close\r\n\r\n";
         // A port nothing listens on: the connection is refused.
-        let closed = {
-            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-            listener.local_addr().unwrap().port()
-        };
+        let (_refusing, closed) = refusing_port();
+        let closed = closed.port();
         for (name, refused) in [("held", true), ("unreached", false)] {
             let own = stub(
                 "AIza-own-8393",
@@ -2653,10 +2663,8 @@ pub(crate) mod tests {
         assert!(told.lock().unwrap().is_empty());
         assert_eq!(relay.asked(CHAT), 0);
         // Neither the person's endpoint nor the relay answers: nothing told.
-        let closed = {
-            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-            listener.local_addr().unwrap().port()
-        };
+        let (_refusing, closed) = refusing_port();
+        let closed = closed.port();
         let no_relay = stub("relay-key-8420", vec![]).await;
         let (net, (told, cleared)) = own_with_fallback(
             "own-unreached",
@@ -3103,10 +3111,8 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn a_near_chat_failing_on_the_link_goes_to_its_own_for_the_turn() {
         let relay = stub("k-routes-fall", vec![(CHAT, answered("relay"))]).await;
-        let closed = {
-            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-            format!("http://{}", listener.local_addr().unwrap())
-        };
+        let (_refusing, closed) = refusing_port();
+        let closed = format!("http://{closed}");
         for (head, why) in [
             (None, "closed"),
             (Some(UNAVAILABLE), "503"),
