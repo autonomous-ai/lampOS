@@ -211,6 +211,9 @@ Environment=LAMP_STOP_WORDS_KEYTERM=on
 # An answer cut by a line or a stop is kept as the words that were played, so "go on" picks up from the cut
 # (#3997): probe-cut-in on lamp-06c1 on 30 Oct, resume 19/20 to 20/20 with LAMP_CUT_IN_TOLD; two played demos, 2 of 2.
 Environment=LAMP_SAID_AS_HEARD=on
+# LAMP_SECOND_OWN_ECHO_CUT_END: its why and rules are its row in docs/switches.md (#8680, #8570; beside #7569 and
+# #8478). Needs LAMP_SAID_AS_HEARD above, whose Start alone says a line cut the answer.
+Environment=LAMP_SECOND_OWN_ECHO_CUT_END=on
 # A cough, beep or knock that cuts the lamp's answer with no words is asked "Um, excuse me, did anyone say
 # something?", rendered ahead, so the lamp is not left quiet mid-story (#4710): on by the memory owner's call, 4 Nov.
 # Known gap, accepted: the lamp's own echo can commit as a cut-in with 0 words and be asked (7 of 15 stories on
@@ -656,6 +659,8 @@ Environment=LAMP_KEEP_QUIETLY_ONE_FACE=on
 # and in none of 2 with it ("nobody's told me how you take it"); a played name in a new session was never given back
 # either way (names.sh) (#2176).
 Environment=LAMP_MEMORY_ROOM_NOT_ASKER=on
+# LAMP_MEMORY_HITS_ROOM_NOT_ASKER: its why and rules are its row in docs/switches.md (#8680, #8570).
+Environment=LAMP_MEMORY_HITS_ROOM_NOT_ASKER=on
 # LAMP_MEMORY_FORGET_ASKS: its why and rules are its row in docs/switches.md.
 Environment=LAMP_MEMORY_FORGET_ASKS=on
 # LAMP_MEMORY_FOLLOWS_FACE: its why and rules are its row in docs/switches.md (#2176).
@@ -672,6 +677,8 @@ Environment=LAMP_SESSION_PERSON=on
 Environment=LAMP_MEMORY_STABLE_ID=on
 # LAMP_MEMORY_KEEP_HEARD: its why and rules are its row in docs/switches.md (#2176, #5276).
 Environment=LAMP_MEMORY_KEEP_HEARD=on
+# LAMP_MEMORY_DONE_YES_AGAIN: its why and rules are its row in docs/switches.md (#8680, #8570).
+Environment=LAMP_MEMORY_DONE_YES_AGAIN=on
 # LAMP_MEMORY_DONT_KNOW_RECALLS: its why and rules are its row in docs/switches.md.
 Environment=LAMP_MEMORY_DONT_KNOW_RECALLS=on
 # A correction replaces the kept thing (#2510): on lamp-06c1 on 4 Nov (build 10012) "my favourite colour is green

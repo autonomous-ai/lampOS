@@ -1927,7 +1927,8 @@ chỉ giữ trong bộ nhớ của voice, số thứ tự và tổng cùng đặ
 động lại (`remember::HitsDay`, C4), để đo ngân sách tiết lộ (C9) từ nhật ký.
 Chỉ là số đếm và số thứ tự, không tên, id hay lời.
 
-Với `LAMP_MEMORY_HITS_ROOM_NOT_ASKER=on` (tắt nếu không đặt, #8570), gợi ý của
+Với `LAMP_MEMORY_HITS_ROOM_NOT_ASKER=on` (tắt nếu không đặt, bật trong
+`lamp-voice` của sản phẩm, #8570), gợi ý của
 căn phòng kết thúc bằng chính quy tắc của `LAMP_MEMORY_ROOM_NOT_ASKER`
 (`remember::HITS_ROOM_NOT_ASKER_NOTE`): do ai đó ở đây lúc ấy nói, không nhất
 thiết là người đang hỏi, không bao giờ kể như của người hỏi, không bao giờ nói
@@ -1939,7 +1940,7 @@ Chỉ là một ghi chú: mô hình tự đánh giá điều gì hợp.
 
 ## Một lời «có» nói lại sau khi đã xong (`LAMP_MEMORY_DONE_YES_AGAIN`, #8570)
 
-Tắt nếu không đặt. Sau một lần ghi đã xong (giữ, thay hoặc quên), một lời chỉ là
+Tắt nếu không đặt; bật trong `lamp-voice` của sản phẩm (#8570). Sau một lần ghi đã xong (giữ, thay hoặc quên), một lời chỉ là
 «có» được báo trước vòng 1 là việc đã xong (`heard::done_already`). Khi người ta
 nói lại đúng lời «có» ấy, lượt ở giữa (chỉ là một lời «có» với lần ghi ấy,
 `heard::yes_to_done`, không có lệnh ký ức nào chạy) không còn chấm dứt «lượt
@@ -1947,8 +1948,11 @@ trước của bạn» (`heard::done_last_turn`, `Thread::answered_between_but`)
 «có» thứ hai cũng được báo là đã xong. Một lượt ở giữa nói nhiều hơn «có» vẫn
 chấm dứt nó (P2 của Reviewer-lead trên #5607). Cùng công tắc ấy, một lần quên đã
 xong được báo trên lời «có» sẽ đỡ cho câu «Đã quên.» của lượt đó
-(`heard::done_backs_a_forget`), nên `LAMP_ACTION_CLAIM_CHECKED` không giữ lại và
-hỏi lại; một lần giữ thì không bao giờ được đỡ như vậy. Trên lamp-06c1 (25/11,
+(`heard::done_backs_a_forget`, trạng thái `forget` có `forgotten` và `already`,
+`after_forget::done_already`), nên `LAMP_ACTION_CLAIM_CHECKED` không giữ lại và
+hỏi lại; một lần giữ thì không bao giờ được đỡ như vậy. Lời «có» ấy không chạy
+lệnh quên nào, nên một lệnh quên chạy sau đó trong cùng lượt bắt đầu cuộc trò
+chuyện mới mà không có trạng thái ấy (`after_forget::context`, các P3 trên #8680). Trên lamp-06c1 (25/11,
 S13): req 454 nói lại «Yes, please keep that.» bị trả lời «tôi không có gì đang
 chờ để giữ», và req 467 nói «Forgotten.» bị giữ lại như một lời nhận làm mà
 không có lệnh. Tắt: y như trước.

@@ -20476,12 +20476,12 @@ async fn answer(
         // A done forget told on this yes backs the turn's "Forgotten." as a
         // forget that removed something would (`LAMP_MEMORY_DONE_YES_AGAIN`,
         // #8570, lamp-06c1 req 467: told it is done, it said so, and the
-        // claim check asked it again). Outcome fields only, as every status.
+        // claim check asked it again). Outcome fields only, as every status,
+        // marked `already`: a forget run later in this turn starts its chat
+        // without it (`after_forget::context`), since no forget ran on this
+        // yes (the Reviewer-lead's and Jarvis's P3s on #8680).
         if crate::remember::heard::done_backs_a_forget(done_already.as_ref()) {
-            call_statuses.push(after_forget::status(
-                crate::remember::FORGET,
-                &serde_json::json!({"forgotten": true, "already": true}),
-            ));
+            call_statuses.push(after_forget::done_already());
         }
         // The done write backs the turn whether or not its note was told: a
         // bare "Okay." gets no note, yet its "Pip is kept." is true
