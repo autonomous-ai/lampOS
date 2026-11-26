@@ -4293,10 +4293,24 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   được giữ như trước, và một `say = { note }` cũng vậy. Ghi chú được trích
   cho agent bị cắt ở 120 ký tự. Giới hạn: lời của một bước `remind` là lời
   nhắc của người dùng (như told-only giữ chúng), nên một lời nhắc cạnh ghi
-  chú `left out:` không bao giờ bị giữ lại; và một câu trả lời, của
-  DeepSeek hay của agent, chỉ xoá ghi chú mà vẫn giữ `say` cố định thì không
-  bị bắt. Test
-  `a_timed_fixed_say_with_a_couldnt_do_note_goes_to_the_agent`.
+  chú `left out:` không bao giờ bị giữ lại. Khi không có ghi chú, một yêu
+  cầu hỏi một giá trị mà chỉ lúc chạy mới biết cũng bị giữ lại như vậy
+  (`made_skill::value_left_out`, ROW của #8732 trên lamp-ee17, 26/11:
+  DeepSeek giữ "There are days left in the year." cho "how many days are
+  left in the year" mà không có ghi chú): yêu cầu chứa một cụm trong
+  `VALUE_ASKS` ("how many", "how much", "how long", "how far", "how old",
+  "what time", "what day", "what date", "which day", "days left", "days
+  until", và tiếng Việt "bao nhiêu", "bao lâu", "mấy giờ", "mấy ngày",
+  "còn mấy", "ngày nào", tính như một từ trọn vẹn), và mọi câu `say` cố
+  định của kỹ năng hẹn giờ đều không có chữ số và không lặp lại cụm đó.
+  Agent được báo phần lời yêu cầu từ cụm đó tới hết câu, làm ghi chú. Một
+  câu `say` có chữ số thuộc về told-only (`CHANGING_SAY_REPAIR`); một câu
+  lặp lại yêu cầu ("Time to check how much you spent today.") là lời nhắc
+  và được giữ; một yêu cầu không hỏi giá trị nào ("remind me to stretch")
+  vẫn được giữ như trước. Cố ý giữ đơn giản: một danh sách cụm từ, không
+  gọi mô hình. Test
+  `a_timed_fixed_say_with_a_couldnt_do_note_goes_to_the_agent`,
+  `a_timed_fixed_say_dropping_an_asked_value_goes_to_the_agent_with_no_note`.
   Lời từ chối đến người viết trước, như thất bại của lần
   chạy thử (`made_skill::TOLD_ONLY_REPAIR`: một bước `task`, không `speak`,
   script in ra, câu trả lời của agent là phần tóm tắt nói ra), nên một lần
