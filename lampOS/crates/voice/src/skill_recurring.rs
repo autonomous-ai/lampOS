@@ -66,19 +66,20 @@ pub const READ_TOLD: &str = "This reads now. When the person wants it read later
 /// The reminders told, by name.
 const REMINDERS: [&str; 2] = ["set_reminder", "repeat_reminder"];
 
-/// The link's most for a description.
-const MOST_DESCRIPTION_BYTES: usize = 1_024;
+/// Live's most for a description, which the tests hold a told reminder to.
+#[cfg(test)]
+const MOST_DESCRIPTION_BYTES: usize = lamp_gemini::MOST_DESCRIPTION_BYTES;
 
 /// Each of `tools`' reminders told [`REMINDER_TOLD`] after its own words,
-/// when the two still fit the link's most; one that would not is left as
-/// it was.
-pub fn tell_reminders(tools: &mut [Tool]) {
+/// when the two still fit `most`, the route's bound for a description
+/// (#8756); one that would not is left as it was.
+pub fn tell_reminders(tools: &mut [Tool], most: usize) {
     for tool in tools
         .iter_mut()
         .filter(|tool| REMINDERS.contains(&tool.name.as_str()))
     {
         if !tool.description.contains(REMINDER_TOLD.trim())
-            && tool.description.len() + REMINDER_TOLD.len() <= MOST_DESCRIPTION_BYTES
+            && tool.description.len() + REMINDER_TOLD.len() <= most
         {
             tool.description.push_str(REMINDER_TOLD);
         }
@@ -106,8 +107,8 @@ mod tests {
             tool("set_timer", "Time one."),
             tool("repeat_reminder", &"x".repeat(MOST_DESCRIPTION_BYTES - 10)),
         ];
-        tell_reminders(&mut tools);
-        tell_reminders(&mut tools);
+        tell_reminders(&mut tools, MOST_DESCRIPTION_BYTES);
+        tell_reminders(&mut tools, MOST_DESCRIPTION_BYTES);
         assert_eq!(tools[0].description, format!("Set one.{REMINDER_TOLD}"));
         assert_eq!(tools[1].description, format!("Repeat one.{REMINDER_TOLD}"));
         assert_eq!(tools[2].description, "Time one.");
@@ -123,7 +124,7 @@ mod tests {
                 .into_iter()
                 .map(|function| tool(function.name, function.description))
                 .collect();
-            tell_reminders(&mut tools);
+            tell_reminders(&mut tools, MOST_DESCRIPTION_BYTES);
             for name in REMINDERS {
                 let told = tools.iter().find(|tool| tool.name == name).unwrap();
                 assert!(told.description.ends_with(REMINDER_TOLD), "{name}");

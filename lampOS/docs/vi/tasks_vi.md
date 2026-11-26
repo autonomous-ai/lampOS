@@ -4000,8 +4000,15 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
 - **Tạo kỹ năng là việc của `make_skill` (#8022 case 2).** Khi
   `make_skill` được khai báo, mô tả của `start_agent_task` kết thúc bằng
   "Making a skill is make_skill's, never this." (`agent_tasks::MAKE_TOLD`, thêm trong
-  `tools::core_tools`), chỉ khi cả hai vẫn vừa 1.024 byte của link; mô tả
-  nào không vừa thì giữ nguyên. Không có `make_skill` thì câu này không
+  `tools::core_tools`), chỉ khi cả hai vẫn vừa giới hạn mô tả riêng của từng tuyến: 1.024 byte của Live (`lamp_gemini::MOST_DESCRIPTION_BYTES`) trong một phiên Live, của tuyến thứ hai (`second_provider::MOST_DESCRIPTION_BYTES`, #8756) trong các yêu cầu chat của nó; mô tả
+  nào không vừa thì giữ nguyên. Giới hạn của tuyến thứ hai là 16.384 byte, từ một lần đo qua
+  relay (lamp-52e6, build 16345, 20:35 ngày 26/11, 56 tool mỗi yêu cầu, DeepSeek qua relay
+  với thinking tắt, `probe.sh` 049beb521f7c,
+  [#8756](https://github.com/autonomous-ai/lampOS/issues/8756#issuecomment-7193573590)): mọi
+  kích thước đều được nhận (HTTP 200) ở 1.024, 2.048, 4.096, 8.192 và 16.384 byte; byte đầu
+  tiên đến sau 192, 177, 204, 223 và 224 ms, toàn bộ câu trả lời 1.361, 919, 1.267, 1.178 và
+  1.210 ms: phẳng, không tăng theo kích thước. 16.384 là mức lớn nhất đã đo; chưa thử mức nào
+  lớn hơn. Không có `make_skill` thì câu này không
   bao giờ được nói. Một yêu cầu tạo kỹ năng mà từ đầu tiên là tên đèn bị
   nghe thành từ khác được ép gọi `make_skill` trên một dòng gọi đèn, bỏ
   qua từ đó. Xem [skills_vi.md](skills_vi.md), "Tạo kỹ năng không bao giờ

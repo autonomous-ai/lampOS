@@ -1073,10 +1073,26 @@ and made up what became of the work. Two causes, both mended:
   the session, which the link would refuse, keeping the other N:
   start_agent_task (1036 bytes described)`, `tools::admitted`; a name given
   twice and a function past 32 are left out the same way). A test holds
-  every description under the limit for every combination of the switches
+  every description under the product route's limit for every combination of the switches
   with none, one, two, three or four of the staff (the fourth Devin)
   (`every_description_fits_the_service_whatever_the_switches`), and another
-  every function of the voice's own with all its switches on. The lead-in
+  every function of the voice's own with all its switches on.
+  **Each route has its own bound for a description (#8756, the first
+  builder's ruling).** Gemini Live keeps 1,024 bytes
+  (`lamp_gemini::MOST_DESCRIPTION_BYTES`, `Tool::validate`): in a Live
+  session one longer is left out, with its line at start, as above. The
+  second route, the product's since 19 Oct, tells DeepSeek through the relay
+  the descriptions as they are (`second_provider::net::chat`), held to its
+  own bound, `second_provider::MOST_DESCRIPTION_BYTES`
+  (`Tool::validate_within`), 16,384 bytes, from one probe through the relay
+  (lamp-52e6, build 16345, 26 Nov 20:35, 56 tools a request, DeepSeek through the relay with thinking off, `probe.sh` 049beb521f7c, [#8756](https://github.com/autonomous-ai/lampOS/issues/8756#issuecomment-7193573590)):
+  every size was taken (HTTP 200) at 1,024, 2,048, 4,096, 8,192 and 16,384 bytes; the first byte came 192, 177, 204, 223 and 224 ms after the ask, the whole answer 1,361, 919, 1,267, 1,178 and 1,210 ms: flat, no growth with size. 16,384 is the largest measured; nothing above it was tried. CI holds
+  the hand-over's descriptions (`agent_tasks`' tests) to the second route's
+  bound; a description a rule grows (`agent_tasks::tell_make`,
+  `skill_recurring::tell_reminders`) grows only within the route's own
+  (`tools::uncut_within`). The executive's and the skills' files
+  (`tools.json`, above) are read alike on both routes and stay held to
+  1,024. The lead-in
   sentence is the shortest that says it (1,005 bytes with three of the staff, and 1,014 with the staff's note,
   `LAMP_STAFF_NOTE`, as `agent_tasks::CHOSE_NOTED` says).
 - The read-back and its question were asked for before the call. Now only

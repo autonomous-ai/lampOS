@@ -759,11 +759,17 @@ pub fn declared(settings: &Settings) -> Vec<Tool> {
 /// `LAMP_USE_SKILL=on`, `use_skill` carries every core skill, so it is a
 /// core name (the first builder on #2644).
 pub fn uncut(settings: &Settings) -> (Vec<Tool>, Vec<String>, BTreeSet<String>) {
-    uncut_within(settings, lamp_gemini::MAX_TOOLS)
+    uncut_within(
+        settings,
+        lamp_gemini::MAX_TOOLS,
+        lamp_gemini::MOST_DESCRIPTION_BYTES,
+    )
 }
 
 /// [`uncut`] with the executive's functions taken up to `bound`, not
-/// Live's: the second route's own ([`crate::second_provider::MAX_TOOLS`]).
+/// Live's: the second route's own ([`crate::second_provider::MAX_TOOLS`]);
+/// and a description grown only within `described` bytes, the route's own
+/// ([`crate::second_provider::MOST_DESCRIPTION_BYTES`], #8756).
 /// Taken up to Live's 32 there, each function more of the voice's own
 /// pushed one of the lamp's own actions out of every chat request, with
 /// room to spare (25 Oct: `LAMP_MEMORY_FORGET_ALL`'s `forget_everything`
@@ -771,8 +777,9 @@ pub fn uncut(settings: &Settings) -> (Vec<Tool>, Vec<String>, BTreeSet<String>) 
 pub fn uncut_within(
     settings: &Settings,
     bound: usize,
+    described: usize,
 ) -> (Vec<Tool>, Vec<String>, BTreeSet<String>) {
-    let mut tools = core_tools_within(settings, bound);
+    let mut tools = core_tools_within(settings, bound, described);
     let skills = skills_after(settings, &tools);
     let mut core = core_skills(settings);
     let mut cut: Vec<String> = Vec::new();
@@ -945,11 +952,16 @@ fn skills_after(settings: &Settings, told: &[Tool]) -> Vec<Tool> {
 
 /// The voice's own functions and the executive's.
 pub(crate) fn core_tools(settings: &Settings) -> Vec<Tool> {
-    core_tools_within(settings, lamp_gemini::MAX_TOOLS)
+    core_tools_within(
+        settings,
+        lamp_gemini::MAX_TOOLS,
+        lamp_gemini::MOST_DESCRIPTION_BYTES,
+    )
 }
 
-/// [`core_tools`] with the executive's taken up to `bound` ([`uncut_within`]).
-fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
+/// [`core_tools`] with the executive's taken up to `bound` and a
+/// description grown only within `described` bytes ([`uncut_within`]).
+fn core_tools_within(settings: &Settings, bound: usize, described: usize) -> Vec<Tool> {
     let mut tools = Vec::new();
     if settings.decline {
         tools.push(not_for_me());
@@ -978,7 +990,7 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     if settings.make_skill {
         tools.push(crate::make_skill_local::tool());
         // A make is make_skill's, never a task's (#8022 case 2).
-        crate::agent_tasks::tell_make(&mut tools);
+        crate::agent_tasks::tell_make(&mut tools, described);
         // A change to a skill the person made, its own function beside it
         // (#8008, [`crate::made_change::FUNCTION`]).
         tools.push(crate::made_change::tool());
@@ -1053,7 +1065,7 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
         );
     }
     if recurring {
-        crate::skill_recurring::tell_reminders(&mut tools);
+        crate::skill_recurring::tell_reminders(&mut tools, described);
     }
     tools
 }
@@ -6638,11 +6650,15 @@ mod tests {
         let names = |tools: &[Tool]| -> Vec<String> {
             tools.iter().map(|tool| tool.name.clone()).collect()
         };
-        let own: Vec<String> = core_tools_within(&settings, crate::second_provider::MAX_TOOLS)
-            .iter()
-            .map(|tool| tool.name.clone())
-            .chain(search.iter().map(|tool| tool.name.clone()))
-            .collect();
+        let own: Vec<String> = core_tools_within(
+            &settings,
+            crate::second_provider::MAX_TOOLS,
+            crate::second_provider::MOST_DESCRIPTION_BYTES,
+        )
+        .iter()
+        .map(|tool| tool.name.clone())
+        .chain(search.iter().map(|tool| tool.name.clone()))
+        .collect();
         for name in [
             THE_TIME,
             crate::reports_stop::NAME,
@@ -9091,12 +9107,22 @@ mod tests {
             start_with("Hand it over.".into()),
             start_with("x".repeat(1_000)),
         ];
-        crate::agent_tasks::tell_make(&mut tools);
-        crate::agent_tasks::tell_make(&mut tools);
+        let live = lamp_gemini::MOST_DESCRIPTION_BYTES;
+        crate::agent_tasks::tell_make(&mut tools, live);
+        crate::agent_tasks::tell_make(&mut tools, live);
         assert_eq!(
             tools[0].description,
             format!("Hand it over.{}", crate::agent_tasks::MAKE_TOLD)
         );
         assert_eq!(tools[1].description.len(), 1_000);
+        // The second route's own bound (#8756): the same 1,000 bytes are
+        // told it there, once.
+        let second = crate::second_provider::MOST_DESCRIPTION_BYTES;
+        crate::agent_tasks::tell_make(&mut tools, second);
+        crate::agent_tasks::tell_make(&mut tools, second);
+        assert_eq!(
+            tools[1].description.len(),
+            1_000 + crate::agent_tasks::MAKE_TOLD.len()
+        );
     }
 }

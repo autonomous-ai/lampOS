@@ -4369,7 +4369,7 @@ gone ([switches.md](switches.md)). What happens:
    - **A make is never a task** (#8022 case 2, the first builder's yes at
      11:05): while `make_skill` is declared, `start_agent_task`'s
      description ends "Making a skill is make_skill's, never this." (`agent_tasks::MAKE_TOLD`), only
-     when the two still fit the link's 1,024 bytes; one that would not is
+     when the two still fit each route's own bound for a description: Live's 1,024 (`lamp_gemini::MOST_DESCRIPTION_BYTES`) on a Live session, the second route's (`second_provider::MOST_DESCRIPTION_BYTES`, #8756) on its chat requests; one that would not is
      left as it was. Without `make_skill` it is never said. The model still
      judges; no word is matched. Host test:
      `a_make_is_told_make_skills_only_while_make_skill_is_declared`.
