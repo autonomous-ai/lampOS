@@ -4223,7 +4223,14 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   nút, đế hoặc một miếng cảm ứng trên đầu), giữ bước `run` và `speak` của
   nó, vì đó là người dùng ở bên đèn đang hỏi, và phút yên lặng của câu trả
   lời được kể sẽ trả lời một cái vỗ nhẹ trễ một phút
-  (`made_skill::HAND_TOPICS`). Một trigger trên bất cứ thứ gì khác (một
+  (`made_skill::HAND_TOPICS`). Một lần bấm Stop hay tắt tiếng (một lần
+  chạm hay một lần nhấn giữ, `controls/gesture` với `intent` là `stop` hoặc
+  `software_mute`) không bắt đầu lần chạy kỹ năng nào, dù kỹ năng được tạo
+  hay viết tay (phán quyết của builder đầu tiên trên #8651): người bấm để
+  đèn im lặng thì đèn im lặng, mọi lần, nên một kỹ năng `controls/gesture`
+  chỉ chạy khi được vuốt ve. lamp-skills ghi journal "lamp-skills: a Stop
+  press starts no skill run (#8651)". Test
+  `a_stop_press_starts_no_skill_run_and_a_pet_does`. Một trigger trên bất cứ thứ gì khác (một
   giờ, một sự kiện, một cảm biến khác, `controls/state` hay
   `controls/touch_state`) làm cả kỹ năng chỉ được nói qua câu trả lời được
   kể, nếu không trigger đó vẫn có thể chạy bước `run` của nó. Test
