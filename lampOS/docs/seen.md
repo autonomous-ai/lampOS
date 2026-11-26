@@ -68,7 +68,20 @@ lamp also says once when the opt-in is turned off.
    a stop from the conversation's history (the same row: 0 of 4 state
    answers right, and two stops said with no call). The two consent files
    are read on that line only, never cached, so a change to them between
-   turns reaches the next one; the Live route has no such note yet. And
+   turns reaches the next one. The Live route tells the same note
+   (`seen_yes::LiveState`, the Reviewer-lead's c7203343369, item 3): the
+   input transcript's pieces of a heard request are matched as they come,
+   by the same words, and once they name the looking the state is read
+   (the same two small file reads, once per request, on that piece only)
+   and given as the request's note (`Session::try_note`, as the staff's
+   and the name's notes are), which is sent inside the request's activity
+   just before its end, so the model has it before its reply starts and
+   the reply waits for nothing. Words naming it only after the input was
+   closed are late: nothing is told, and the journal says `not told:
+   late`. A written turn or a reminder's hears no person and is told
+   nothing. The note goes to the model only, never said to the person;
+   with any other note due in the same request it gives up its room under
+   the service's 1024-byte cap (`seen_yes::without_state_note`). And
    the reply is checked as it is said, on both routes
    (`seen_yes::claims_stopped`, `seen_yes::ClaimWatch`), for a person's
    spoken turn only (the second route's `Asker::Spoken`, Live's heard

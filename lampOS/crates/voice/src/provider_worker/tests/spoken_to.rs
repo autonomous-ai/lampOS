@@ -35,6 +35,7 @@ fn options(
         follows_run: false,
         wait_for_room: false,
         staff_note: false,
+        desk_noticing: None,
         ask_unclear: false,
         spoken_to,
         voices: None,
