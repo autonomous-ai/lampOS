@@ -567,6 +567,13 @@ impl Serve<'_> {
             .cloned()
             .collect();
         let mut health = parts::health(self.parts.reports(), now, &expected, options.stale_after);
+        parts::mark_stopped(
+            &mut health,
+            self.parts.stopped(),
+            now,
+            &expected,
+            options.stale_after,
+        );
         parts::mark_off(&mut health, &off);
         if let Some(item) = self.selftest.item(unix_now()) {
             parts::mark_selftest(&mut health, item);
