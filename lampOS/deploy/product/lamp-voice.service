@@ -350,6 +350,9 @@ Environment=LAMP_OFFLINE_VOICE=on
 # LAMP_OUTAGE_LINE_AGAIN: with LAMP_OFFLINE_VOICE, its why and rules are its row in docs/switches.md (#8235).
 Environment=LAMP_OUTAGE_LINE_AGAIN=on
 Environment=LAMP_RING_ASLEEP=on
+# LAMP_LIGHT_KEEP: the person's light kept in /var/lib/lampOS/light across a restart, so sleep keeps following the
+# app's "Keep a light on while resting" switch after one (#8634, #1464); its row in docs/switches.md.
+Environment=LAMP_LIGHT_KEEP=on
 # LAMP_HEAD_TOUCH: its why and rules are its row in docs/switches.md (#711, #1798).
 Environment=LAMP_HEAD_TOUCH=on
 # A hand's 3 s hold says "Going to sleep. Tap my head to wake me." in the owner's language before the mute (#3748,
