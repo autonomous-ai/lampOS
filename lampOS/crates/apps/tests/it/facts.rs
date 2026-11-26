@@ -82,7 +82,7 @@ fn the_door_list_matches_lamp_controls_own() {
     ))
     .unwrap();
     let from = source
-        .find("const PLAIN_WIRE: [&str; 14] = [")
+        .find("const PLAIN_WIRE: [&str; 15] = [")
         .expect("PLAIN_WIRE");
     let block = &source[from..];
     let block = &block[..block.find("];").unwrap()];
