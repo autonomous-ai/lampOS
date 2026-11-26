@@ -5,7 +5,9 @@
 //! (#8394's P2, the first builder). Read here for both its users, root's
 //! keys helper (`lamp-setup keys`, the check) and the voice (the speech),
 //! so they never disagree. Unset, or without the gate, both use
-//! [`ELEVENLABS_API`] exactly as before.
+//! [`ELEVENLABS_API`] exactly as before. A person's own Gemini voice
+//! (#8754) has no switch of this kind: its address, model and voices are
+//! fixed here for the same two users.
 
 /// The test lamps' switch: an https address the person's own ElevenLabs key
 /// and voice ID are sent to in place of ElevenLabs' own API, under [`GATE`].
@@ -90,6 +92,52 @@ pub const ELEVENLABS_HOSTS: &[&str] = &[
     "api.elevenlabs.io",
     "api.us.elevenlabs.io",
     "api.eu.elevenlabs.io",
+];
+
+/// Google's native Gemini API, where a person's own Gemini voice (#8754) is
+/// checked by root's keys helper and spoken by the voice: fixed, so their
+/// key goes to Google alone, never a relay.
+pub const GEMINI_API: &str = "https://generativelanguage.googleapis.com/v1beta";
+
+/// The Gemini speech model the voice speaks in (`lamp-voice`'s
+/// `second_config::GEMINI_SPEECH_MODEL`) and the keys helper's check asks
+/// for its one word, so the two never disagree (#8754).
+pub const GEMINI_SPEECH_MODEL: &str = "gemini-3.8-flash-lite-tts";
+
+/// Gemini's prebuilt speech voices, as Google's speech-generation guide
+/// lists them ("Voice options", read 26 Nov 2026: 30 voices): what the app
+/// offers for a person's own Gemini voice (#8754).
+pub const GEMINI_VOICES: [&str; 30] = [
+    "Zephyr",
+    "Puck",
+    "Charon",
+    "Kore",
+    "Fenrir",
+    "Leda",
+    "Orus",
+    "Aoede",
+    "Callirrhoe",
+    "Autonoe",
+    "Enceladus",
+    "Iapetus",
+    "Umbriel",
+    "Algieba",
+    "Despina",
+    "Erinome",
+    "Algenib",
+    "Rasalgethi",
+    "Laomedeia",
+    "Achernar",
+    "Alnilam",
+    "Schedar",
+    "Gacrux",
+    "Pulcherrima",
+    "Achird",
+    "Zubenelgenubi",
+    "Vindemiatrix",
+    "Sadachbia",
+    "Sadaltager",
+    "Sulafat",
 ];
 
 #[cfg(test)]
@@ -182,5 +230,18 @@ mod tests {
             check(Some("https://api.eu.elevenlabs.io/v1"), "Voice8367").1,
             "https://api.eu.elevenlabs.io/v1/text-to-speech/Voice8367/stream?output_format=pcm_24000"
         );
+    }
+
+    /// #8754: every Gemini voice offered is a name the voice and the check
+    /// take as a path-free word, and none is offered twice.
+    #[test]
+    fn the_gemini_voices_are_thirty_plain_names_once_each() {
+        let mut seen = std::collections::BTreeSet::new();
+        for voice in GEMINI_VOICES {
+            assert!(!voice.is_empty() && voice.bytes().all(|b| b.is_ascii_alphanumeric()));
+            assert!(seen.insert(voice), "{voice} twice");
+        }
+        assert_eq!(seen.len(), 30);
+        assert!(GEMINI_API.starts_with("https://") && !GEMINI_API.ends_with('/'));
     }
 }

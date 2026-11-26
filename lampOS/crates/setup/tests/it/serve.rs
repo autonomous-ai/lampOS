@@ -853,6 +853,8 @@ fn a_leftover_temporary_key_is_removed() {
             tmp(&config.own_keys.join("gemini.key")),
             // Anthropic's key and model (#8420).
             tmp(&config.own_keys.join("anthropic.key")),
+            // Gemini's voice key and voice name (#8754).
+            tmp(&config.own_keys.join("gemini_voice.key")),
             tmp(&config.own_keys.join("deepseek.url")),
         ]
     );
