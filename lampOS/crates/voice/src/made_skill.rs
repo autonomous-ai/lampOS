@@ -10378,6 +10378,23 @@ pub fn keep_asked(
     // check and its try, so its code never speaks during the make; the
     // repair is told to print instead.
     told_only(&files.toml)?;
+    // The lamp's agent never keeps a timed fixed say with what it says
+    // left out (El's P2 on #8732): refused with a repair that tells it the
+    // task step, as DeepSeek's first answer is held for the agent
+    // ([`says_fixed_with_left_out`]). DeepSeek's own, with no agent to
+    // write it, is kept as before.
+    if request.made_with != MadeWith::DeepSeek
+        && let Some(note) = fixed_say_left_out(&files)
+    {
+        eprintln!(
+            "lamp-voice: a made skill was not kept: the agent's fixed say has what it says left \
+             out"
+        );
+        return Err(Refused(
+            VALUE_LEFT_OUT_HELD.into(),
+            Some(value_left_out_told(note)),
+        ));
+    }
     // A skill the lamp's agent made with code says what it uses, where its
     // result is and what it answers (#8157): never a built-in, Store or
     // pushed skill's, nor the lamp's own model's.
@@ -11876,20 +11893,16 @@ pub const VALUE_LEFT_OUT_HELD: &str =
 /// make, never a skill kept wrong. A skill asked aloud or only a hand
 /// starts, or with no note, is as before.
 pub fn says_fixed_with_left_out(answer: &str) -> bool {
-    let Ok(files) = files(answer) else {
-        return false;
-    };
-    if files.left_out.is_none() {
-        return false;
-    }
-    let Ok(table) = toml::from_str::<toml::Table>(&files.toml) else {
-        return false;
-    };
-    let Some(trigger) = table.get("trigger") else {
-        return false;
-    };
-    if started_by_a_hand_alone(trigger) {
-        return false;
+    files(answer).is_ok_and(|files| fixed_say_left_out(&files).is_some())
+}
+
+/// [`says_fixed_with_left_out`] of a skill's `files`: its `left out:`
+/// note when it holds, else `None`.
+fn fixed_say_left_out(files: &Files) -> Option<&str> {
+    let note = files.left_out.as_deref()?;
+    let table = toml::from_str::<toml::Table>(&files.toml).ok()?;
+    if started_by_a_hand_alone(table.get("trigger")?) {
+        return None;
     }
     let steps: Vec<&toml::Value> = table
         .get("do")
@@ -11897,10 +11910,37 @@ pub fn says_fixed_with_left_out(answer: &str) -> bool {
         .into_iter()
         .flatten()
         .collect();
-    steps.iter().any(|step| step.get("say").is_some())
+    (steps.iter().any(|step| step.get("say").is_some())
         && !steps
             .iter()
-            .any(|step| step.get("run").is_some() || step.get("task").is_some())
+            .any(|step| step.get("run").is_some() || step.get("task").is_some()))
+    .then_some(note)
+}
+
+/// The maker's `left out:` note of DeepSeek's `answer`, when it has one.
+pub fn left_out_of(answer: &str) -> Option<String> {
+    files(answer).ok()?.left_out
+}
+
+/// What the lamp's agent is told of a make held as [`VALUE_LEFT_OUT_HELD`]
+/// (beside its brief) and of its own answer refused for the same (its
+/// repair's lines): the maker's dropped `note`, quoted, and that the line
+/// is a task step whose script prints it, as the internet's hand-over
+/// tells the agent what it may write (El's P2 on #8732).
+pub fn value_left_out_told(note: &str) -> String {
+    let note: String = note
+        .chars()
+        .filter(|letter| !matches!(letter, '"' | '\n'))
+        .collect();
+    format!(
+        "Not kept as a fixed say: a time, an event or a repeat starts it, and its maker left \
+         out \"{}\", which no fixed say can know when the skill is made. Compute it when the \
+         skill runs: make its [[do]] a task step (task = {{ task, run }}) in place of the say, \
+         whose script works out the line and prints it; take speak and speaker out of its \
+         grants; and end the agent's answer with that line, which the lamp tells. No left out \
+         line for it.",
+        note.trim()
+    )
 }
 
 /// [`speaks_on_its_own`]'s name for a fixed say whose words change.
