@@ -1049,6 +1049,9 @@ const PERSON_STORES: [&str; 49] = [
     // from a clock far ahead would refuse every app yes after the reset.
     "/var/lib/lampOS/consent/seen-activity-mark.json",
     "/var/lib/lampOS/voice/schedule-delivery",
+    // Each reminder's offline clip, its words as sound (`LAMP_OFFLINE_RINGS`,
+    // #8708): `ring_clips::DIR` in crates/voice/src/ring_clips.rs.
+    "/var/lib/lampOS/voice/ring-clips",
     "/var/lib/lampOS/voice/first-output",
     "/run/lampos-voice/thread.json",
     // The voice's default for the task news it has told (reviewer, #817):
@@ -1171,6 +1174,44 @@ fn a_product_reset_removes_the_photo_faces_staging_copy() {
         );
     }
     assert_eq!(fs::read(kept).unwrap(), b"unrelated synthetic setting");
+}
+
+/// #8708, the first builder's add 1: the offline ring clips are the
+/// person's reminders as sound, so a product reset takes them all, the
+/// folder emptied and kept, and leaves the speech cache's own lines beside
+/// them (the lamp's fixed lines, nobody's words).
+#[test]
+fn a_product_reset_leaves_no_ring_clips() {
+    let plan: Plan =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    plan.check().unwrap();
+    let root = Root::new();
+    let voice = root.0.join("var/lib/lampOS/voice");
+    let clips = voice.join("ring-clips");
+    fs::create_dir_all(&clips).unwrap();
+    let store = "0123456789abcdef0123456789abcdef";
+    for name in [
+        format!("{store}-4.wav"),
+        format!("{store}-4.json"),
+        format!("{store}-7.wav"),
+        format!("{store}-7.tmp"),
+    ] {
+        fs::write(clips.join(name), b"RIFF synthetic: Take your pills.").unwrap();
+    }
+    let cache = voice.join("tts-cache");
+    fs::create_dir_all(&cache).unwrap();
+    fs::write(cache.join("line.wav"), b"RIFF the lamp's own line").unwrap();
+    for path in &plan.wipe {
+        reset::wipe(&root.0.join(path.strip_prefix("/").unwrap())).unwrap();
+    }
+    let left: Vec<_> = fs::read_dir(&clips)
+        .map(|entries| entries.flatten().map(|entry| entry.file_name()).collect())
+        .unwrap_or_default();
+    assert!(left.is_empty(), "{left:?}");
+    assert!(
+        cache.join("line.wav").is_file(),
+        "the speech cache is the lamp's"
+    );
 }
 
 /// Harness's real layout under the tasks part's home (Nine on #1016, from

@@ -73,10 +73,10 @@ pub const WARM: &[&str] = &[
 ];
 /// How soon an unrendered warm line is first tried again (offline at
 /// start); each later try waits twice as long, up to [`WARM_EVERY_MOST`].
-const WARM_EVERY: Duration = Duration::from_secs(60);
+pub(crate) const WARM_EVERY: Duration = Duration::from_secs(60);
 /// The longest wait between tries: a lamp offline for days asks the speech
 /// service at most once an hour.
-const WARM_EVERY_MOST: Duration = Duration::from_secs(3_600);
+pub(crate) const WARM_EVERY_MOST: Duration = Duration::from_secs(3_600);
 
 /// Why a line that rendered empty or too long is not played.
 const REFUSED: &str = "not in the speech cache, and rendered empty or too long";
@@ -140,6 +140,17 @@ impl TtsCache {
             offline_rings: false,
             rendering: Mutex::new(std::collections::HashSet::new()),
         }
+    }
+
+    /// `voice|model|language`, what a line is rendered in: an offline
+    /// ring's clip is kept with it (`crate::ring_clips`, #8708).
+    pub fn identity(&self) -> &str {
+        &self.identity
+    }
+
+    /// The owner's language, `None` for English ([`Self::speaking`]).
+    pub fn owners(&self) -> Option<Language> {
+        self.owners
     }
 
     /// The owner's language, `None` for English: the fixed lines it warms
@@ -507,6 +518,18 @@ impl TtsCache {
     }
 }
 
+/// A kept clip's format: 24 kHz mono 16-bit, as the speech cache keeps its
+/// lines (an offline ring's clip too, `crate::ring_clips`).
+pub(crate) fn clip_spec() -> hound::WavSpec {
+    spec()
+}
+
+/// A kept clip at `path`, or none: missing, not one of ours, or past
+/// [`MOST_FRAMES`] (`crate::ring_clips`, #8708).
+pub(crate) fn read_clip(path: &Path) -> Option<Vec<i16>> {
+    read(path)
+}
+
 fn spec() -> hound::WavSpec {
     hound::WavSpec {
         channels: 1,
@@ -712,6 +735,33 @@ fn render_with(
 }
 
 fn made_from_environment() -> Option<Arc<TtsCache>> {
+    let cache = Arc::new(built_from_environment()?);
+    let warming = Arc::clone(&cache);
+    let _ = std::thread::Builder::new()
+        .name("say-tts-warm".into())
+        .spawn(move || {
+            let lines = warming.warm_lines();
+            let mut told = false;
+            let mut every = WARM_EVERY;
+            while let Err(why) = warming.warm(&lines) {
+                if !told {
+                    eprintln!("lamp-voice: the speech cache's lines are not rendered yet, tried again after a minute, then less often, at most hourly: {why}");
+                    told = true;
+                }
+                std::thread::sleep(every);
+                every = (every * 2).min(WARM_EVERY_MOST);
+            }
+            eprintln!("lamp-voice: the speech cache holds its {} line(s)", lines.len());
+        });
+    Some(cache)
+}
+
+/// The cache over the second route's speech service, when it is
+/// configured, as [`from_environment`] makes it but on its own and with
+/// nothing warmed: for the Schedule consumer, which renders the offline
+/// rings' clips through it (`crate::ring_clips`, #8708) and keeps no line
+/// of the speech cache.
+pub fn built_from_environment() -> Option<TtsCache> {
     use crate::second_provider::net::{default_model, voice_name};
     let config = match crate::second_config::load_from_env().and_then(|config| {
         config
@@ -748,7 +798,7 @@ fn made_from_environment() -> Option<Arc<TtsCache>> {
         Some(render_in) => cache.speaking_in(render_in),
         None => cache,
     };
-    let cache = Arc::new(
+    Some(
         cache
             .speaking(crate::language::at_start())
             .hearing_its_name(
@@ -761,25 +811,7 @@ fn made_from_environment() -> Option<Arc<TtsCache>> {
                     == Some("on"),
             )
             .keeping_offline_rings(crate::offline_rings::on()),
-    );
-    let warming = Arc::clone(&cache);
-    let _ = std::thread::Builder::new()
-        .name("say-tts-warm".into())
-        .spawn(move || {
-            let lines = warming.warm_lines();
-            let mut told = false;
-            let mut every = WARM_EVERY;
-            while let Err(why) = warming.warm(&lines) {
-                if !told {
-                    eprintln!("lamp-voice: the speech cache's lines are not rendered yet, tried again after a minute, then less often, at most hourly: {why}");
-                    told = true;
-                }
-                std::thread::sleep(every);
-                every = (every * 2).min(WARM_EVERY_MOST);
-            }
-            eprintln!("lamp-voice: the speech cache holds its {} line(s)", lines.len());
-        });
-    Some(cache)
+    )
 }
 
 #[cfg(test)]
