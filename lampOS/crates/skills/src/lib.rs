@@ -11436,12 +11436,17 @@ impl Engine {
     /// when that run began, with none of its entries among the whole words
     /// of the newest thing heard (its pieces joined, as the voice joins
     /// them) if it began after that run began; the model reads its `told`.
+    /// The run is taken as made: [`Engine::tool_ran`] is marked.
     pub fn tool(&mut self, name: &str, args: &Value, now_us: u64) -> Result<Run, String> {
-        self.tool_with_requested_audio(name, args, now_us, false)
+        let run = self.tool_with_requested_audio(name, args, now_us, false)?;
+        self.tool_ran(&run.skill, now_us);
+        Ok(run)
     }
 
     /// The runtime's explicit opt-in; the private spoken context is still
     /// required by the offer authority before the result can leave Skills.
+    /// Nothing is marked: once the run really starts (past the program's
+    /// own refusals, such as a body that is down), [`Engine::tool_ran`].
     pub fn tool_with_requested_audio(
         &mut self,
         name: &str,
@@ -11523,7 +11528,6 @@ impl Engine {
                 return Err(again.told.clone());
             }
         }
-        self.tool_ran.insert(skill.name.clone(), now_us);
         Ok(Run {
             held: None,
             generation: skill.scheduled_run(None).then(|| self.generation.clone()),
@@ -11635,6 +11639,15 @@ impl Engine {
             from: None,
         };
         Ok(run)
+    }
+
+    /// The tool run of skill `name` started at `now_us`: its `[again]`
+    /// while counts from here. A call refused after the engine let it
+    /// through (the body is down, no measured gaze) is no run, so a dance
+    /// refused while the body was down is not "just danced" (#8640's row
+    /// on lamp 16345).
+    pub fn tool_ran(&mut self, name: &str, now_us: u64) {
+        self.tool_ran.insert(name.to_owned(), now_us);
     }
 
     /// [`Engine::run_now`]'s run of `name` made at `now_us`: a read is
