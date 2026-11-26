@@ -48,9 +48,6 @@ use std::{
 
 /// Where the clips are kept: the voice's own state (root's, 0700). A
 /// factory reset wipes it (`crates/setup/fixtures/reset-plan-product.json`).
-/// Red stub (#8708): not built yet.
-const RED: bool = true;
-
 pub const DIR: &str = "/var/lib/lampOS/voice/ring-clips";
 
 /// A WAV file's header, as `hound` writes a mono 16-bit one.
@@ -157,9 +154,6 @@ impl Clips {
     /// never waits on the network. None for a clip missing, stale (other
     /// words, another voice) or not one of ours.
     pub fn own(&self, store_id: &str, id: u64, words: &str, voice: &str) -> Option<Vec<i16>> {
-        if RED {
-            return None;
-        }
         if self.read_sidecar(store_id, id)? != Sidecar::of(words, voice) {
             return None;
         }
@@ -324,9 +318,6 @@ impl Renderer {
     /// without a current clip rendered and kept, unless a failed render's
     /// backoff still runs or the folder would pass its bound.
     pub fn pass(&mut self, wanted: &Wanted, now: Instant) -> Pass {
-        if RED {
-            return Pass::default();
-        }
         let mut pass = Pass {
             swept: self.clips.sweep(&wanted.store_id, &wanted.live),
             ..Pass::default()
