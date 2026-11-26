@@ -73,6 +73,13 @@ pub const DEEPSEEK_MODEL: &str = "deepseek-flash";
 pub const VOICE_ID_MOST: usize = 64;
 /// The person's ElevenLabs voice ID, kept beside its key.
 pub const ELEVENLABS_VOICE_FILE: &str = "elevenlabs.voice";
+/// The person's Gemini voice name (#8754), kept beside its key.
+pub const GEMINI_VOICE_FILE: &str = "gemini_voice.voice";
+/// Google's native Gemini API, where a person's own Gemini voice is checked
+/// (#8754): `POST <it>/models/<`[`GEMINI_SPEECH_MODEL`]`>:generateContent`.
+pub const GEMINI_VOICE_API: &str = lamp_msgs::own_voice::GEMINI_API;
+/// The speech model the check asks, the one the voice speaks in.
+pub const GEMINI_SPEECH_MODEL: &str = lamp_msgs::own_voice::GEMINI_SPEECH_MODEL;
 /// The unit the helper restarts at a quiet moment, so the voice takes it.
 pub const VOICE_UNIT: &str = "lamp-voice.service";
 
@@ -222,10 +229,14 @@ pub enum Service {
     /// A person's own Anthropic model, by name (#8420): a key and a model,
     /// at [`ANTHROPIC_API`] alone.
     Anthropic,
+    /// The lamp's voice in Gemini's (#8754): a key and a voice name, at
+    /// [`GEMINI_VOICE_API`] alone. Apart from [`Service::Gemini`], the
+    /// model, so neither removes the other.
+    GeminiVoice,
 }
 
 impl Service {
-    pub const ALL: [Service; 7] = [
+    pub const ALL: [Service; 8] = [
         Service::DeepSeek,
         Service::Deepgram,
         Service::ElevenLabs,
@@ -233,6 +244,7 @@ impl Service {
         Service::OpenRouter,
         Service::Gemini,
         Service::Anthropic,
+        Service::GeminiVoice,
     ];
 
     /// The services that are the lamp's model: one own key among them is
@@ -247,6 +259,15 @@ impl Service {
         Service::DeepSeek,
     ];
 
+    /// The services that are the lamp's voice (#8754): one own voice among
+    /// them is kept at a time, as for [`Self::MODELS`].
+    pub const VOICES: [Service; 2] = [Service::ElevenLabs, Service::GeminiVoice];
+
+    /// Whether it is one of [`Self::VOICES`]: a key and a voice ID.
+    pub fn is_voice(self) -> bool {
+        Self::VOICES.contains(&self)
+    }
+
     /// The name the app and the reply use.
     pub fn id(self) -> &'static str {
         match self {
@@ -257,6 +278,7 @@ impl Service {
             Self::OpenRouter => "openrouter",
             Self::Gemini => "gemini",
             Self::Anthropic => "anthropic",
+            Self::GeminiVoice => "gemini_voice",
         }
     }
 
@@ -270,6 +292,16 @@ impl Service {
             Self::OpenRouter => "OpenRouter",
             Self::Gemini => "Gemini",
             Self::Anthropic => "Anthropic",
+            Self::GeminiVoice => "Gemini",
+        }
+    }
+
+    /// The name the journal's line gives it: [`Self::name`], with Gemini's
+    /// voice told apart from Gemini's model.
+    pub fn said_name(self) -> &'static str {
+        match self {
+            Self::GeminiVoice => "Gemini voice",
+            service => service.name(),
         }
     }
 
@@ -287,6 +319,7 @@ impl Service {
             Self::OpenRouter => "openrouter.key",
             Self::Gemini => "gemini.key",
             Self::Anthropic => "anthropic.key",
+            Self::GeminiVoice => "gemini_voice.key",
         }
     }
 
@@ -299,7 +332,17 @@ impl Service {
             | Self::ElevenLabs
             | Self::OpenRouter
             | Self::Gemini
-            | Self::Anthropic => None,
+            | Self::Anthropic
+            | Self::GeminiVoice => None,
+        }
+    }
+
+    /// The voice's file beside the key, for a voice service.
+    pub fn voice_file(self) -> Option<&'static str> {
+        match self {
+            Self::ElevenLabs => Some(ELEVENLABS_VOICE_FILE),
+            Self::GeminiVoice => Some(GEMINI_VOICE_FILE),
+            _ => None,
         }
     }
 
@@ -310,7 +353,7 @@ impl Service {
             Self::OpenRouter => Some("openrouter.model"),
             Self::Gemini => Some("gemini.model"),
             Self::Anthropic => Some("anthropic.model"),
-            Self::DeepSeek | Self::Deepgram | Self::ElevenLabs => None,
+            Self::DeepSeek | Self::Deepgram | Self::ElevenLabs | Self::GeminiVoice => None,
         }
     }
 
@@ -335,22 +378,24 @@ impl Service {
             Self::OpenRouter => "openrouter.checked",
             Self::Gemini => "gemini.checked",
             Self::Anthropic => "anthropic.checked",
+            Self::GeminiVoice => "gemini_voice.checked",
         }
     }
 
     /// `keys.get`'s `offers` entry (#8362, #8367): `kind` sets the model
     /// services and the voice apart, `fields` the plain fields beside the
     /// key. No model list yet: the service's default. A named provider's
-    /// fixed `endpoint` (#8420), for the app to show as it is.
+    /// fixed `endpoint` (#8420), for the app to show as it is. Gemini's
+    /// voice also lists the `voices` it takes (#8754).
     pub fn offer(self) -> Value {
         let mut offer = json!({
             "service": self.id(),
             "name": self.name(),
-            "kind": if self == Self::ElevenLabs { "voice" } else { "model" },
+            "kind": if self.is_voice() { "voice" } else { "model" },
             "models": [],
             "base_url": self.url_file().is_some(),
             "fields": match self {
-                Self::ElevenLabs => json!(["voice_id"]),
+                Self::ElevenLabs | Self::GeminiVoice => json!(["voice_id"]),
                 Self::OpenAiCompatible | Self::OpenRouter | Self::Gemini | Self::Anthropic => {
                     json!(["model"])
                 }
@@ -359,6 +404,9 @@ impl Service {
         });
         if let Some(endpoint) = self.endpoint() {
             offer["endpoint"] = json!(endpoint);
+        }
+        if self == Self::GeminiVoice {
+            offer["voices"] = json!(lamp_msgs::own_voice::GEMINI_VOICES);
         }
         offer
     }
@@ -374,8 +422,8 @@ pub struct Given {
     pub key: String,
     /// DeepSeek's endpoint; Deepgram has none.
     pub base_url: Option<String>,
-    /// ElevenLabs' voice ID (#8367), 1 to 64 letters and digits; the
-    /// others have none.
+    /// ElevenLabs' voice ID (#8367) or Gemini's voice name (#8754), 1 to 64
+    /// letters and digits; the others have none.
     pub voice_id: Option<String>,
     /// The OpenAI-compatible or OpenRouter model (#8362, #8420); the others
     /// are given none.
@@ -399,8 +447,8 @@ impl fmt::Debug for Given {
 pub enum Asked {
     /// Check the key and keep it if it works.
     Set(Given),
-    /// ElevenLabs' voice alone, beside the key kept (#8367).
-    Voice(String),
+    /// A voice service's voice alone, beside the key kept (#8367, #8754).
+    Voice(Service, String),
     /// "Use the lamp's own again": the key removed.
     Remove(Service),
     /// Whose key each service uses.
@@ -514,6 +562,8 @@ pub fn given(service: Service, key: &str, base_url: Option<&str>) -> Result<Give
         (Service::Deepgram, Some(_)) => return Err("Deepgram takes no endpoint"),
         (Service::ElevenLabs, None) => None,
         (Service::ElevenLabs, Some(_)) => return Err("ElevenLabs takes no endpoint"),
+        (Service::GeminiVoice, None) => None,
+        (Service::GeminiVoice, Some(_)) => return Err("Gemini takes no endpoint"),
         (
             Service::OpenAiCompatible | Service::OpenRouter | Service::Gemini | Service::Anthropic,
             url,
@@ -531,7 +581,8 @@ pub fn given(service: Service, key: &str, base_url: Option<&str>) -> Result<Give
 }
 
 /// The one line `lamp-cloud` sends: `{"set": service, "key", "base_url"?,
-/// "voice_id"?}`, ElevenLabs' `{"set": "elevenlabs", "voice_id"}` alone,
+/// "voice_id"?}`, a voice service's `{"set": "elevenlabs" | "gemini_voice",
+/// "voice_id"}` alone,
 /// `{"remove": service}` or `{"which": true}`. Never echoes a key or a
 /// voice ID.
 pub fn parse(line: &str) -> Result<Asked, String> {
@@ -546,7 +597,7 @@ pub fn parse(line: &str) -> Result<Asked, String> {
             .and_then(Value::as_str)
             .and_then(Service::from_id)
             .ok_or_else(|| {
-                "the service is deepseek, deepgram, elevenlabs, openai_compatible, openrouter, gemini or anthropic"
+                "the service is deepseek, deepgram, elevenlabs, openai_compatible, openrouter, gemini, anthropic or gemini_voice"
                     .to_owned()
             })
     };
@@ -563,15 +614,15 @@ pub fn parse(line: &str) -> Result<Asked, String> {
         }
         let voice_id = match (set, object.get("voice_id")) {
             (_, None | Some(Value::Null)) => None,
-            (Service::ElevenLabs, Some(Value::String(id))) => Some(fit_voice(id)?),
-            (Service::ElevenLabs, Some(_)) => {
+            (voice, Some(Value::String(id))) if voice.is_voice() => Some(fit_voice(id)?),
+            (voice, Some(_)) if voice.is_voice() => {
                 return Err("a voice ID is 1 to 64 letters and digits".into());
             }
             (_, Some(_)) => return Err("only ElevenLabs takes a voice ID".into()),
         };
-        if set == Service::ElevenLabs && !object.contains_key("key") {
+        if set.is_voice() && !object.contains_key("key") {
             return voice_id
-                .map(Asked::Voice)
+                .map(|id| Asked::Voice(set, id))
                 .ok_or_else(|| "the key must be text".into());
         }
         let key = object
@@ -616,7 +667,8 @@ pub enum Verdict {
     /// The service refused it (401 or 403): it is not kept.
     Refused,
     /// ElevenLabs took the key but has no such voice on its account (400
-    /// or 404, #8367): nothing is kept.
+    /// or 404, #8367), or Gemini answered a 400 not about the key, its
+    /// voice name not one it has (#8754): nothing is kept.
     VoiceRefused,
     /// No answer that says either: it is not kept, and nothing changes.
     Unreached,
@@ -639,7 +691,7 @@ impl Verdict {
     pub fn words(self, given: &Given) -> String {
         let service = given.service;
         match self {
-            Self::Works if service == Service::ElevenLabs => {
+            Self::Works if service.is_voice() => {
                 format!("that key and voice work: {}", goes_where(given))
             }
             Self::Works => format!("that key works: {}", goes_where(given)),
@@ -648,6 +700,9 @@ impl Verdict {
                 goes_where(given)
             ),
             Self::Refused => "that key was refused".into(),
+            Self::VoiceRefused if service == Service::GeminiVoice => {
+                "that key works, but Gemini has no voice by that name; nothing changed".into()
+            }
             Self::VoiceRefused => {
                 "that key works, but that voice ID isn't on its ElevenLabs account; nothing changed"
                     .into()
@@ -716,6 +771,7 @@ pub fn goes_where(given: &Given) -> String {
             "your speech now goes to Deepgram under your account and its retention terms".into()
         }
         Service::ElevenLabs => "the lamp now speaks in your ElevenLabs voice, and what it says goes to ElevenLabs under your account and its terms".into(),
+        Service::GeminiVoice => "the lamp now speaks in your Gemini voice, and what it says goes to Google's Gemini API under your account and its terms".into(),
     }
 }
 
@@ -744,12 +800,17 @@ fn tls() -> Option<rustls::ClientConfig> {
 /// DeepSeek: `GET <endpoint>/models` with the key as the bearer; Deepgram:
 /// `GET` [`DEEPGRAM_CHECK_URL`] with `Token <key>`; ElevenLabs: `GET`
 /// [`ELEVENLABS_API`]`/voices/<voice_id>` with `xi-api-key`, which tries
-/// the key and the voice at once (#8367).
+/// the key and the voice at once (#8367); Gemini's voice: `POST`
+/// [`GEMINI_VOICE_API`]`/models/<model>:generateContent` with
+/// `x-goog-api-key`, one word said in that voice (#8754).
 pub struct HttpCheck {
     /// Deepgram's address, a test's local server in place of it.
     pub deepgram: String,
     /// ElevenLabs' API root, a test's local server in place of it.
     pub elevenlabs: String,
+    /// Gemini's native API root for the voice's check, a test's local
+    /// server in place of it.
+    pub gemini_voice: String,
     /// A test lamp's `LAMP_OWN_ELEVENLABS_URL`, read only under its gate
     /// (`lamp_msgs::own_voice`, #8394's P2): the check goes there, as the
     /// voice's speech will.
@@ -764,6 +825,7 @@ impl Default for HttpCheck {
         Self {
             deepgram: DEEPGRAM_CHECK_URL.to_owned(),
             elevenlabs: ELEVENLABS_API.to_owned(),
+            gemini_voice: GEMINI_VOICE_API.to_owned(),
             switched: lamp_msgs::own_voice::switched_from_environment(),
             https_only: true,
             tools: true,
@@ -777,6 +839,7 @@ impl HttpCheck {
     fn local(deepgram: String) -> Self {
         Self {
             elevenlabs: deepgram.clone(),
+            gemini_voice: deepgram.clone(),
             deepgram,
             switched: None,
             https_only: false,
@@ -810,7 +873,8 @@ impl HttpCheck {
         if !response.status().is_success() {
             return Some(false);
         }
-        let reply: Value = serde_json::from_slice(&read_most(response).await?).ok()?;
+        let reply: Value =
+            serde_json::from_slice(&read_within(response, MODELS_MOST).await?).ok()?;
         Some(
             reply["choices"][0]["message"]["tool_calls"]
                 .as_array()
@@ -875,6 +939,16 @@ impl HttpCheck {
                 }
                 .header("xi-api-key", &given.key)
             }
+            // One word said in the person's voice, in the model the voice
+            // speaks in: the key and the voice name at once (#8754).
+            Service::GeminiVoice => client
+                .post(format!(
+                    "{}/models/{GEMINI_SPEECH_MODEL}:generateContent",
+                    self.gemini_voice
+                ))
+                .header("x-goog-api-key", &given.key)
+                .header("content-type", "application/json")
+                .body(gemini_voice_body(given.voice_id.as_deref().unwrap_or_default()).to_string()),
         };
         // The error is dropped whole: reqwest's names the URL.
         let response = tokio::time::timeout(CHECK_WITHIN, request.send())
@@ -882,6 +956,21 @@ impl HttpCheck {
             .ok()?
             .ok()?;
         let status = response.status().as_u16();
+        // Gemini's voice (#8754): a bad key is a 400 there too, told by its
+        // body; any other 400 is the voice name's. The audio of a 2xx is
+        // never read.
+        if given.service == Service::GeminiVoice {
+            if status != 400 {
+                return Some(Verdict::of_status(status));
+            }
+            let body = read_within(response, MODELS_MOST).await?;
+            let said: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
+            return Some(if gemini_key_invalid(&said) {
+                Verdict::Refused
+            } else {
+                Verdict::VoiceRefused
+            });
+        }
         let model = match (given.service, status, given.model.as_deref()) {
             (Service::ElevenLabs, 400 | 404, _) => return Some(Verdict::VoiceRefused),
             // The key taken, then the model (#8420): its endpoints, a public
@@ -914,7 +1003,8 @@ impl HttpCheck {
         };
         // The endpoint's own list decides the model (#8362): read within
         // the same bound and at most [`MODELS_MOST`], never said back.
-        let listed: Value = serde_json::from_slice(&read_most(response).await?).ok()?;
+        let body = read_within(response, MODELS_MOST).await?;
+        let listed: Value = serde_json::from_slice(&body).ok()?;
         if given.service == Service::Gemini {
             // The model's own id, `models/<id>` or `<id>`.
             let id = listed["id"].as_str().unwrap_or_default();
@@ -937,13 +1027,13 @@ impl HttpCheck {
     }
 }
 
-/// A reply's body, within [`CHECK_WITHIN`] a chunk and at most
-/// [`MODELS_MOST`]; `None` past it.
-async fn read_most(mut response: reqwest::Response) -> Option<Vec<u8>> {
+/// A response's body, each chunk within [`CHECK_WITHIN`], at most `most`
+/// bytes: `None` past it. Never said back.
+async fn read_within(mut response: reqwest::Response, most: usize) -> Option<Vec<u8>> {
     let mut body = Vec::new();
     while let Ok(Ok(Some(chunk))) = tokio::time::timeout(CHECK_WITHIN, response.chunk()).await {
         body.extend_from_slice(&chunk);
-        if body.len() > MODELS_MOST {
+        if body.len() > most {
             return None;
         }
     }
@@ -987,6 +1077,18 @@ pub fn tools_asked(given: &Given) -> (String, Value) {
         body["reasoning_effort"] = json!("minimal");
     }
     (format!("{base}/chat/completions"), body)
+}
+
+/// The check's one request body for Gemini's voice (#8754): "Hi." said in
+/// `voice`, as the voice asks for a sentence (`net::gemini_tts::body`).
+pub fn gemini_voice_body(voice: &str) -> Value {
+    json!({
+        "contents": [{"role": "user", "parts": [{"text": "Hi."}]}],
+        "generationConfig": {
+            "responseModalities": ["AUDIO"],
+            "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice}}},
+        },
+    })
 }
 
 /// Whether Gemini's error body refuses the key (#8420): it answers a bad key
@@ -1061,11 +1163,8 @@ impl Store {
             remove(&self.0.join(service.key_file()))?;
             write_private(&self.0.join(file), format!("{url}\n").as_bytes())?;
         }
-        if let Some(id) = &given.voice_id {
-            write_private(
-                &self.0.join(ELEVENLABS_VOICE_FILE),
-                format!("{id}\n").as_bytes(),
-            )?;
+        if let (Some(id), Some(file)) = (&given.voice_id, service.voice_file()) {
+            write_private(&self.0.join(file), format!("{id}\n").as_bytes())?;
         }
         // An OpenAI-compatible model's name, before its key (#8362).
         if let (Some(model), Some(file)) = (&given.model, service.model_file()) {
@@ -1076,6 +1175,15 @@ impl Store {
         // takes the other's away, so the model in use is never a guess.
         if Service::MODELS.contains(&service) {
             for other in Service::MODELS
+                .into_iter()
+                .filter(|other| *other != service)
+            {
+                self.remove(other)?;
+            }
+        }
+        // One own voice at a time (#8754), as for the models.
+        if service.is_voice() {
+            for other in Service::VOICES
                 .into_iter()
                 .filter(|other| *other != service)
             {
@@ -1105,12 +1213,12 @@ impl Store {
         }
     }
 
-    /// ElevenLabs' kept key with `voice_id` in place of the kept voice, for
-    /// a voice changed alone; `None` with no key kept.
-    pub fn with_kept_key(&self, voice_id: String) -> Option<Given> {
-        let key = fs::read_to_string(self.0.join(Service::ElevenLabs.key_file())).ok()?;
+    /// A voice service's kept key with `voice_id` in place of the kept
+    /// voice, for a voice changed alone; `None` with no key kept.
+    pub fn with_kept_key(&self, service: Service, voice_id: String) -> Option<Given> {
+        let key = fs::read_to_string(self.0.join(service.key_file())).ok()?;
         Some(Given {
-            service: Service::ElevenLabs,
+            service,
             key,
             base_url: None,
             voice_id: Some(voice_id),
@@ -1118,9 +1226,9 @@ impl Store {
         })
     }
 
-    /// The kept ElevenLabs voice ID, if any.
-    pub fn voice_id(&self) -> Option<String> {
-        fs::read_to_string(self.0.join(ELEVENLABS_VOICE_FILE))
+    /// A voice service's kept voice ID, if any.
+    pub fn voice_id(&self, service: Service) -> Option<String> {
+        fs::read_to_string(self.0.join(service.voice_file()?))
             .ok()
             .map(|id| id.trim().to_owned())
             .filter(|id| !id.is_empty())
@@ -1130,14 +1238,15 @@ impl Store {
     /// One that is not there is removed already.
     pub fn remove(&self, service: Service) -> io::Result<()> {
         remove(&self.0.join(service.key_file()))?;
-        for file in [service.url_file(), service.model_file()]
-            .into_iter()
-            .flatten()
+        for file in [
+            service.url_file(),
+            service.model_file(),
+            service.voice_file(),
+        ]
+        .into_iter()
+        .flatten()
         {
             remove(&self.0.join(file))?;
-        }
-        if service == Service::ElevenLabs {
-            remove(&self.0.join(ELEVENLABS_VOICE_FILE))?;
         }
         remove(&self.0.join(service.checked_file()))?;
         Ok(())
@@ -1194,11 +1303,11 @@ impl Store {
         which.insert("deepseek_host".into(), json!(host));
         // #8367: the voice ID in use beside its key; a voice ID isn't a
         // secret, the key never comes back.
-        let voice = self
-            .has(Service::ElevenLabs)
-            .then(|| self.voice_id())
-            .flatten();
-        which.insert("voice_id".into(), json!({"elevenlabs": voice}));
+        let voice = |service: Service| self.has(service).then(|| self.voice_id(service)).flatten();
+        which.insert(
+            "voice_id".into(),
+            json!({"elevenlabs": voice(Service::ElevenLabs), "gemini_voice": voice(Service::GeminiVoice)}),
+        );
         // #8362: the OpenAI-compatible endpoint's host, the model and the
         // last check by service, and which own model is in use. Never a key.
         let read = |service: Service, file: Option<&str>| {
@@ -1235,6 +1344,11 @@ impl Store {
         let in_use = Service::MODELS
             .into_iter()
             .find(|service| self.has(*service));
+        // #8754: the own voice in use, one at a time as the model is.
+        let voice_in_use = Service::VOICES
+            .into_iter()
+            .find(|service| self.has(*service))
+            .map(Service::id);
         // #8735: what the agent uses, `own` only for an in-use model key whose
         // chat made a tool call, and why not, by a short code.
         let why = match in_use.map(|service| self.checked_lines(service)) {
@@ -1243,7 +1357,7 @@ impl Store {
             Some((Some(code), _)) if code == "refused" => Some("refused"),
             // Kept before the tool check was asked: set again to check it.
             Some(_) => Some("unchecked"),
-            None if self.has(Service::ElevenLabs) => Some("tts_only"),
+            None if voice_in_use.is_some() => Some("tts_only"),
             None => Some("no_model_key"),
         };
         which.insert(
@@ -1252,6 +1366,7 @@ impl Store {
                 "model": in_use.map(Service::id),
                 "agent": if why.is_none() { "own" } else { "relay" },
                 "agent_why": why,
+                "voice": voice_in_use,
             }),
         );
         which.insert(
@@ -1413,7 +1528,7 @@ pub fn answer(
                 Some(Done {
                     restart_voice: true,
                     restart_cloud: Service::MODELS.contains(&service),
-                    said: format!("the person's {} key was removed", service.name()),
+                    said: format!("the person's {} key was removed", service.said_name()),
                 }),
             ),
             Err(error) => (
@@ -1424,22 +1539,33 @@ pub fn answer(
                 None,
             ),
         },
-        Asked::Voice(id) => match store.with_kept_key(id) {
+        Asked::Voice(service, id) => match store.with_kept_key(service, id) {
             Some(given) => set(given, store, check),
             None => (
                 refused(
-                    "a voice ID is changed beside a kept ElevenLabs key: give the key too",
+                    if service == Service::GeminiVoice {
+                        "a voice is changed beside a kept Gemini voice key: give the key too"
+                    } else {
+                        "a voice ID is changed beside a kept ElevenLabs key: give the key too"
+                    },
                     "bad_field",
                 ),
                 None,
             ),
         },
         Asked::Set(mut given) => {
-            if given.service == Service::ElevenLabs && given.voice_id.is_none() {
-                given.voice_id = store.voice_id();
+            if given.service.is_voice() && given.voice_id.is_none() {
+                given.voice_id = store.voice_id(given.service);
                 if given.voice_id.is_none() {
                     return (
-                        refused("ElevenLabs needs a voice ID with its key", "bad_field"),
+                        refused(
+                            if given.service == Service::GeminiVoice {
+                                "Gemini's voice needs a voice name with its key"
+                            } else {
+                                "ElevenLabs needs a voice ID with its key"
+                            },
+                            "bad_field",
+                        ),
                         None,
                     );
                 }
@@ -1455,7 +1581,7 @@ fn set(given: Given, store: &Store, check: &mut impl Check) -> (Value, Option<Do
     let service = given.service;
     let said = format!(
         "the person's {} key: {}",
-        service.name(),
+        service.said_name(),
         match verdict {
             Verdict::Works => "it works, kept",
             Verdict::WorksNoTools =>
@@ -1738,6 +1864,82 @@ mod tests {
         for bad in ["", "../x", "a b", &"v".repeat(65)] {
             assert!(fit_voice(bad).is_err(), "{bad}");
         }
+    }
+
+    /// #8754: Gemini's voice check is one request to Google's native API,
+    /// `POST /models/<the voice's speech model>:generateContent` with the key
+    /// in `x-goog-api-key` alone and "Hi." said in the voice named: 2xx works
+    /// (its audio never read), 401 or 403 refuses the key, a 400 refuses
+    /// the key only by its body (`API_KEY_INVALID`, "valid API key") and the
+    /// voice name otherwise, and 404, 429 and 5xx are not reached. The key is
+    /// never said back.
+    #[test]
+    fn the_gemini_voice_check_says_one_word_in_the_voice_with_the_key_in_its_header() {
+        fn reply(status: u16, body: &str) -> String {
+            format!(
+                "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            )
+        }
+        let native_400 = r#"{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com"}]}}"#;
+        let voice_400 = r#"{"error":{"code":400,"message":"Voice name Nobody is not supported.","status":"INVALID_ARGUMENT"}}"#;
+        for (served, verdict) in [
+            (reply(200, r#"{"candidates":[]}"#), Verdict::Works),
+            (reply(401, ""), Verdict::Refused),
+            (reply(403, ""), Verdict::Refused),
+            (reply(400, native_400), Verdict::Refused),
+            (reply(400, voice_400), Verdict::VoiceRefused),
+            (reply(400, ""), Verdict::VoiceRefused),
+            (reply(404, ""), Verdict::Unreached),
+            (reply(429, ""), Verdict::Unreached),
+            (reply(503, ""), Verdict::Unreached),
+        ] {
+            let (base, server) = answering_with(&served);
+            let voice = Given {
+                voice_id: Some("Kore".into()),
+                ..given(Service::GeminiVoice, "AIza-planted-8754", None).unwrap()
+            };
+            let mut check = HttpCheck::local(format!("{base}/v1beta"));
+            assert_eq!(check.check(&voice), verdict, "{served}");
+            let asked = server.join().unwrap();
+            assert!(
+                asked.starts_with(&format!(
+                    "post /v1beta/models/{GEMINI_SPEECH_MODEL}:generatecontent http/1.1"
+                )),
+                "{asked}"
+            );
+            assert!(
+                asked.contains("x-goog-api-key: aiza-planted-8754"),
+                "{asked}"
+            );
+            assert!(!asked.contains("authorization"), "{asked}");
+            assert!(asked.contains(r#""voicename":"kore""#), "{asked}");
+            assert!(asked.contains(r#""text":"hi.""#), "{asked}");
+        }
+        // A redirect is never followed: one request, not reached.
+        let (base, server) = answering_with(
+            "HTTP/1.1 302 Found\r\nlocation: http://127.0.0.1:9/steal\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+        );
+        let voice = Given {
+            voice_id: Some("Kore".into()),
+            ..given(Service::GeminiVoice, "AIza-planted-8754", None).unwrap()
+        };
+        assert_eq!(
+            HttpCheck::local(format!("{base}/v1beta")).check(&voice),
+            Verdict::Unreached
+        );
+        server.join().unwrap();
+        // Google's own API, and the model the voice speaks in.
+        assert_eq!(
+            HttpCheck::default().gemini_voice,
+            "https://generativelanguage.googleapis.com/v1beta"
+        );
+        assert_eq!(GEMINI_SPEECH_MODEL, "gemini-3.8-flash-lite-tts");
+        assert_eq!(
+            Verdict::VoiceRefused.words(&voice),
+            "that key works, but Gemini has no voice by that name; nothing changed"
+        );
+        assert!(given(Service::GeminiVoice, "k", Some("https://x.invalid")).is_err());
     }
 
     /// #8362 step 1b: an OpenAI-compatible key's one check is

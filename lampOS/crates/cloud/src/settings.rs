@@ -504,21 +504,23 @@ pub fn keys_line(kind: &str, data: &Value) -> Result<(String, Option<String>), S
                         | "openrouter"
                         | "gemini"
                         | "anthropic"
+                        | "gemini_voice"
                 )
             })
             .ok_or(
-                "service must be deepseek, deepgram, elevenlabs, openai_compatible, openrouter, gemini or anthropic",
+                "service must be deepseek, deepgram, elevenlabs, openai_compatible, openrouter, gemini, anthropic or gemini_voice",
             )
     };
     let line = match kind {
         "keys.set" => {
             let service = service()?;
-            // ElevenLabs' voice ID (#8367); with no key, the voice alone,
-            // which the helper changes only beside a kept key.
+            // ElevenLabs' voice ID (#8367) or Gemini's voice name (#8754);
+            // with no key, the voice alone, which the helper changes only
+            // beside a kept key.
             let voice_id = match data.get("voice_id") {
                 None | Some(Value::Null) => None,
                 Some(Value::String(id))
-                    if service == "elevenlabs"
+                    if matches!(service, "elevenlabs" | "gemini_voice")
                         && (1..=VOICE_ID_MOST).contains(&id.len())
                         && id.bytes().all(|b| b.is_ascii_alphanumeric()) =>
                 {
@@ -1527,7 +1529,7 @@ mod tests {
         let reply = changes.take()[0].reply(&identity, "t");
         assert_eq!(
             reply["error"],
-            "service must be deepseek, deepgram, elevenlabs, openai_compatible, openrouter, gemini or anthropic"
+            "service must be deepseek, deepgram, elevenlabs, openai_compatible, openrouter, gemini, anthropic or gemini_voice"
         );
         assert_eq!(
             reply["data"],
@@ -1790,6 +1792,44 @@ mod tests {
             let why = keys_line("keys.set", &data).unwrap_err();
             assert!(
                 !why.contains("sk-planted") && !why.contains("xxxx"),
+                "{why}"
+            );
+        }
+    }
+
+    /// #8754: `keys.set` takes Gemini's voice with a key and a voice name,
+    /// or a voice name alone, by the same 1-64 letters and digits rule;
+    /// `keys.remove` takes it too. The Gemini model's service takes no voice.
+    #[test]
+    fn keys_line_passes_a_gemini_voice_key_and_voice_or_a_voice_alone() {
+        let line = |data: Value| {
+            serde_json::from_str::<Value>(&keys_line("keys.set", &data).unwrap().0).unwrap()
+        };
+        assert_eq!(
+            line(
+                json!({"service": "gemini_voice", "key": "AIza-planted", "voice_id": "Kore", "request_id": "r3"})
+            ),
+            json!({"set": "gemini_voice", "key": "AIza-planted", "voice_id": "Kore"})
+        );
+        assert_eq!(
+            line(json!({"service": "gemini_voice", "voice_id": "Puck"})),
+            json!({"set": "gemini_voice", "voice_id": "Puck"})
+        );
+        assert_eq!(
+            keys_line("keys.remove", &json!({"service": "gemini_voice"}))
+                .unwrap()
+                .0,
+            r#"{"remove":"gemini_voice"}"#
+        );
+        for data in [
+            json!({"service": "gemini", "key": "AIza-planted", "voice_id": "Kore"}),
+            json!({"service": "gemini_voice", "key": "AIza-planted", "voice_id": "../x"}),
+            json!({"service": "gemini_voice", "key": "AIza-planted", "voice_id": "x".repeat(65)}),
+            json!({"service": "gemini_voice"}),
+        ] {
+            let why = keys_line("keys.set", &data).unwrap_err();
+            assert!(
+                !why.contains("AIza-planted") && !why.contains("xxxx") && !why.contains("../x"),
                 "{why}"
             );
         }
