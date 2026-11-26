@@ -1804,10 +1804,10 @@ fn the_product_writes_a_weekly_chapter() {
 /// What a caller said before their face was known becomes theirs once it is
 /// (`LAMP_MEMORY_FOLLOWS_FACE`, #2176): the memory owner's call on 4 Nov. It
 /// moves nothing without the Days memory, the second route and the eyes'
-/// speaking faces, so the unit sets all four. The product's voice print is
-/// for the linked services only (`LAMP_SAME_VOICE_FOR=services`), so no
-/// print reaches this rule: only a line seen spoken by the caller's one
-/// known face moves.
+/// speaking faces, which the voice reads through `LAMP_SECOND_SPEAKING_FACE`,
+/// so the unit sets all four. The product's voice print is for the linked
+/// services only (`LAMP_SAME_VOICE_FOR=services`), so no print reaches this
+/// rule: only a line seen spoken by the caller's one known face moves.
 #[test]
 fn the_product_lets_what_a_caller_said_follow_their_face() {
     let voice = install::PRODUCT
@@ -1820,7 +1820,7 @@ fn the_product_lets_what_a_caller_said_follow_their_face() {
         "Environment=LAMP_MEMORY_FOLLOWS_FACE=on",
         "Environment=LAMP_MEMORY_DAYS=on",
         "Environment=LAMP_VOICE_ROUTE=second",
-        "Environment=LAMP_EYES_SPEAKING=on",
+        "Environment=LAMP_SECOND_SPEAKING_FACE=on",
     ] {
         assert!(service.contains(&line), "the voice lacks {line}");
     }
@@ -3462,7 +3462,6 @@ fn the_product_names_a_known_face_only_on_its_own_seen_line() {
         "Environment=LAMP_PERSON_SCOPE_SEEN=on",
         "Environment=LAMP_SECOND_SPEAKING_FACE=on",
         "Environment=LAMP_SECOND_SCOPED_CONTEXT=on",
-        "Environment=LAMP_EYES_SPEAKING=on",
     ] {
         assert!(service.contains(&line), "the voice lacks {line}");
     }
@@ -4223,16 +4222,48 @@ fn the_product_sees_who_speaks() {
             "lamp-voice.service",
             "Environment=LAMP_SECOND_SPEAKING_FACE=on",
         ),
-        // The voice reads the eyes' switch too: a room's forget needs the
-        // face seen saying it, and without it every one is NOT_THEIRS
-        // (#3037, #3038).
-        ("lamp-voice.service", "Environment=LAMP_EYES_SPEAKING=on"),
     ] {
         assert!(
             section(unit(name), "Service").contains(&line),
             "{name} lacks {line}"
         );
     }
+}
+
+/// No sensor holds a person's line until it is measured on the body with
+/// real people, 95% or more (the product owner, 26 Nov 2026, after
+/// lamp-74ff's new body: gaze read looking away on half the lines where the
+/// head faced the lamp, the mouth was seen speaking 2 of 88 lines, and the
+/// owner's own follow-ups matched their voice at 0.26 and 0.29). So the
+/// product sets none of the rules that held a line on gaze, the mouth, a
+/// turned face or a voice match, nor the voice's own copy of the eyes'
+/// speaking switch (a held forget's yes is a plain yes; every room's
+/// "forget my face" is told NOT_THEIRS, #3038), nor the eyes' pitch and
+/// gaze. The eyes still read each face's speaking: a line seen spoken is
+/// still kept as that person's.
+#[test]
+fn the_product_holds_no_line_on_an_unmeasured_sensor() {
+    let set = |name: &str, switch: &str| {
+        let unit = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap_or_else(|| panic!("no {name}"))
+            .1;
+        section(unit, "Service")
+            .iter()
+            .any(|line| line.starts_with(&format!("Environment={switch}=")))
+    };
+    for (name, switch) in [
+        ("lamp-voice.service", "LAMP_NAME_FACE_OR_WORDS"),
+        ("lamp-voice.service", "LAMP_ROOM_HELD_TALK"),
+        ("lamp-voice.service", "LAMP_NO_FACE_FOLLOW_UP_BY_VOICE"),
+        ("lamp-voice.service", "LAMP_TURNED_FACE_SPEAKS"),
+        ("lamp-voice.service", "LAMP_EYES_SPEAKING"),
+        ("lamp-eyes.service", "LAMP_EYES_PITCH_GAZE"),
+    ] {
+        assert!(!set(name, switch), "{name} sets {switch}");
+    }
+    assert!(set("lamp-eyes.service", "LAMP_EYES_SPEAKING"));
 }
 
 /// #4710: the memory owner's yes (4 Nov), after Sixth's lamp-52e6 check,
