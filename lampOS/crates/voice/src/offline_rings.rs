@@ -28,6 +28,14 @@
 //! so the ring plays from its clip then. Nothing is checked with no ring
 //! due.
 //!
+//! With #8708, a reminder (never a timer) rings in its own words: its clip
+//! is rendered while the link is up (`crate::ring_clips`), and offline it
+//! plays ([`ring_for`]). Late ones joined into one ring play each clip in
+//! turn. One with no clip of its own (set offline, or its render failed)
+//! rings with the generic line and is marked "rung, not told": it is not
+//! rung offline again, and once the link is back it is said in its words,
+//! once. The mark is kept across a restart (the consumer's ledger).
+//!
 //! Off (anything but exactly `on`), every path is as before.
 
 /// Exactly `on` turns it on; anything else, or unset, is off.
@@ -74,6 +82,105 @@ pub fn asks_link_check<K: PartialEq>(
                 && due_at_us - now_us <= PROBE_BEFORE_DUE_US
                 && asked_for != Some(key)
         })
+}
+
+/// What a due timer or reminder rings with no link (#8708).
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum Ring {
+    /// Its own words, and those of the late ones joined to it, in turn.
+    Own(Vec<i16>),
+    /// The generic line, "Your timer is done." or "You have a reminder.".
+    Generic(Vec<i16>),
+    /// Nothing rings yet, and why: it waits for the link.
+    Wait(&'static str),
+}
+
+/// Why a reminder rung offline from the generic line is not rung again.
+pub(crate) const RUNG_WAITS: &str =
+    "rung already from the generic line: its words wait for the link";
+/// Why a ring with no clip at all waits.
+pub(crate) const NO_CLIP: &str = "no clip kept";
+/// Why a ring before any session was seen waits: no session to prove it under.
+pub(crate) const NO_SESSION: &str = "no link seen yet to prove it under";
+
+/// What `offer` rings with no link: a reminder's own clip, and each joined
+/// one's in turn, when every one is kept for its words in `cache`'s voice
+/// (`clips`); else the generic line, if kept; else nothing. A reminder rung
+/// from the generic line before ([`crate::reminders::Offer::rung_offline`])
+/// waits for the link. Reads only files, never renders.
+pub(crate) fn ring_for(
+    offer: &crate::reminders::Offer,
+    cache: Option<&crate::say::tts_cache::TtsCache>,
+    clips: &crate::ring_clips::Clips,
+) -> Ring {
+    // Red stub (#8708): the generic line only.
+    let Some(cache) = cache else {
+        return Ring::Wait(NO_CLIP);
+    };
+    if false && !offer.timer {
+        let (voice, owners) = (cache.identity(), cache.owners());
+        let store = &offer.token.key.store_id;
+        let own = std::iter::once((offer.token.key.id, offer.text.as_str()))
+            .chain(
+                offer
+                    .also
+                    .iter()
+                    .map(|joined| (joined.token.key.id, joined.text.as_str())),
+            )
+            .try_fold(Vec::new(), |mut all, (id, text)| {
+                let words = crate::ring_clips::words(owners, text);
+                all.extend(clips.own(store, id, &words, voice)?);
+                Some(all)
+            });
+        if let Some(own) = own {
+            return Ring::Own(own);
+        }
+    }
+    cache
+        .ring_clip(offer.timer)
+        .map_or(Ring::Wait(NO_CLIP), Ring::Generic)
+}
+
+/// The coordinator's offline ring, pass by pass (#8708, Twelve's P3 1 on
+/// #8687): which item was last found waiting, so its wait is said once and
+/// nothing is read from the disk for it again while it waits.
+#[derive(Debug, Default)]
+pub(crate) struct OfflineRinger {
+    waiting: Option<String>,
+}
+
+impl OfflineRinger {
+    /// For the due item `key`: with no session seen yet (`session`), it
+    /// waits, and no clip is read; else `read` says what it rings. Once
+    /// found waiting, the item is not read again until another is due or
+    /// one rang ([`Self::rang`]). The wait's reason is returned the first
+    /// time only, for the journal.
+    pub(crate) fn choose(
+        &mut self,
+        key: &str,
+        session: Option<u64>,
+        read: impl FnOnce() -> Ring,
+    ) -> Result<(u64, Ring), Option<&'static str>> {
+        // Red stub (#8708): read every pass.
+        let _ = &self.waiting;
+        let ring = match session.or(Some(0)) {
+            None => Ring::Wait(NO_SESSION),
+            Some(session) => match read() {
+                Ring::Wait(why) => Ring::Wait(why),
+                ring => return Ok((session, ring)),
+            },
+        };
+        let _ = key;
+        match ring {
+            Ring::Wait(why) => Err(Some(why)),
+            _ => Err(None),
+        }
+    }
+
+    /// A ring was played: the next item's wait is said again.
+    pub(crate) fn rang(&mut self) {
+        self.waiting = None;
+    }
 }
 
 /// Whether `value` turns the switch on: exactly `on`.
@@ -221,6 +328,111 @@ mod tests {
         let since = Some(down.observed_at_us);
         assert!(rings_offline(true, None, since, due, false));
         assert!(PROBE_WITHIN.as_micros() as u64 + LINK_GRACE_US <= PROBE_BEFORE_DUE_US);
+    }
+
+    fn offer(id: u64, text: &str, timer: bool) -> crate::reminders::Offer {
+        use lamp_schedule::delivery::{Correlation, DeliveryKey, PreparedToken};
+        let token = |id| PreparedToken {
+            key: DeliveryKey {
+                store_id: "0123456789abcdef0123456789abcdef".into(),
+                id,
+                delivery: 1,
+            },
+            attempt: 1,
+            correlation: Correlation {
+                consumer_session: "test-consumer".into(),
+                sequence: id,
+            },
+        };
+        crate::reminders::Offer {
+            token: token(id),
+            text: text.into(),
+            late: false,
+            late_by_ms: Some(0),
+            observed_at_us: 1,
+            expires_at_us: 2,
+            also: Vec::new(),
+            again: false,
+            timer,
+            rung_offline: false,
+        }
+    }
+
+    /// #8708: offline, a reminder rings in its own words from the clip
+    /// rendered while online, checked against its words and the voice; a
+    /// timer, or a reminder with no current clip, rings the generic line;
+    /// late ones joined into one ring play each clip in turn.
+    #[test]
+    fn a_reminder_rings_offline_in_its_own_words_from_its_clip() {
+        use crate::ring_clips::{Clips, Renderer, Wanted, words};
+        use crate::say::tts_cache::{Render, TtsCache};
+        let dir = std::env::temp_dir().join(format!("lamp-own-words-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let cache = |voice: &str| {
+            let render: Render = Box::new(|text: &str| Ok(vec![text.len() as i16; 2_400]));
+            TtsCache::new(dir.join("cache"), voice, "eleven_v4_turbo", "en", render)
+                .keeping_offline_rings(true)
+        };
+        let rachel = cache("Rachel");
+        rachel.warm(&rachel.warm_lines()).unwrap();
+        let clips = Clips::new(dir.join("ring-clips"));
+        let store = "0123456789abcdef0123456789abcdef";
+        let wanted = Wanted {
+            store_id: store.into(),
+            live: [4, 5].into(),
+            reminders: vec![(4, "Take your pills.".into()), (5, "Call mum.".into())],
+        };
+        Renderer::new(clips.clone(), cache("Rachel")).pass(&wanted, std::time::Instant::now());
+        let pills = words(None, "Take your pills.");
+        let own = vec![pills.len() as i16; 2_400];
+        let generic = rachel.ring_clip(false).expect("the generic line is kept");
+        assert_ne!(own, generic);
+        // Its own words.
+        assert_eq!(
+            ring_for(&offer(4, "Take your pills.", false), Some(&rachel), &clips),
+            Ring::Own(own.clone())
+        );
+        // Late ones joined: each clip in turn.
+        let mut joined = offer(4, "Take your pills.", false);
+        joined.also.push(crate::reminders::Joined {
+            token: offer(5, "Call mum.", false).token,
+            text: "Call mum.".into(),
+        });
+        let mum = vec![words(None, "Call mum.").len() as i16; 2_400];
+        assert_eq!(
+            ring_for(&joined, Some(&rachel), &clips),
+            Ring::Own([own.clone(), mum].concat())
+        );
+        // A timer: the generic line, never a clip of its own.
+        assert_eq!(
+            ring_for(&offer(4, "Take your pills.", true), Some(&rachel), &clips),
+            Ring::Generic(rachel.ring_clip(true).unwrap())
+        );
+        // Another text under its id, another voice, or no clip: generic.
+        assert_eq!(
+            ring_for(
+                &offer(4, "Take your vitamins.", false),
+                Some(&rachel),
+                &clips
+            ),
+            Ring::Generic(generic.clone())
+        );
+        let sarah = cache("Sarah");
+        sarah.warm(&sarah.warm_lines()).unwrap();
+        assert!(matches!(
+            ring_for(&offer(4, "Take your pills.", false), Some(&sarah), &clips),
+            Ring::Generic(_)
+        ));
+        assert_eq!(
+            ring_for(&offer(9, "Feed the cat.", false), Some(&rachel), &clips),
+            Ring::Generic(generic)
+        );
+        // No speech cache: nothing to ring.
+        assert_eq!(
+            ring_for(&offer(4, "Take your pills.", false), None, &clips),
+            Ring::Wait(NO_CLIP)
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// #8632: after 6 of 10 offline lines a 100 to 330 ms scrap 3 to 4.5 s

@@ -30,6 +30,9 @@ use std::{
 };
 
 const DUE_AGE_US: u64 = 3_000_000;
+/// An item rung offline from the generic line, its words not told (#8708).
+const RUNG_UNTOLD: &str = "rung with no link from the generic line, its words not told: \
+                           offered again, said in its words once the link is back";
 const TICK: Duration = Duration::from_millis(200);
 /// How long the ledger may refuse every item, with `LAMP_LEDGER_REFENCE`
 /// on, before its re-fence is armed again (#5560).
@@ -316,6 +319,13 @@ struct UpcomingWalk {
     /// When the last walk ended: the next begins
     /// [`UPCOMING_WALK_EVERY_US`] after it.
     ended_at: Option<u64>,
+    /// With a speech service to render through (#8708): every id the walk
+    /// found and each reminder's text, handed at its end to the clips'
+    /// thread ([`Consumer::clips_owed`]), never to the voice.
+    clips: bool,
+    live: BTreeSet<u64>,
+    reminders: Vec<(u64, String)>,
+    wanted: Option<crate::ring_clips::Wanted>,
 }
 impl<P: Persistence> Consumer<P> {
     fn new(ledger: DeliveryLedger<P>, session: String) -> Self {
@@ -372,6 +382,18 @@ impl<P: Persistence> Consumer<P> {
             return;
         };
         for item in items {
+            // Every item for the clips' sweep, and each reminder's words
+            // for its clip (#8708): kept here, never sent to the voice.
+            if walk.clips
+                && let Some(id) = item["id"].as_u64()
+            {
+                walk.live.insert(id);
+                if item["kind"] != "timer"
+                    && let Some(text) = item["text"].as_str()
+                {
+                    walk.reminders.push((id, text.to_owned()));
+                }
+            }
             let (Some(id), Some(delivery), Some(due_unix_ms), Some(remaining_ms)) = (
                 item["id"].as_u64(),
                 item["delivery"].as_u64(),
@@ -403,6 +425,13 @@ impl<P: Persistence> Consumer<P> {
             _ => {
                 walk.cursor = 0;
                 walk.ended_at = Some(now);
+                if walk.clips {
+                    walk.wanted = Some(crate::ring_clips::Wanted {
+                        store_id: due.store_id.clone(),
+                        live: std::mem::take(&mut walk.live),
+                        reminders: std::mem::take(&mut walk.reminders),
+                    });
+                }
                 let found = walk.soonest.take();
                 let key = found.map(|(soonest, at)| (soonest.id, soonest.delivery, at));
                 if walk.told != Some(key) {
@@ -496,6 +525,12 @@ impl<P: Persistence> Consumer<P> {
         let soonest = self.upcoming.as_mut()?.owed.take()?;
         Some(FromWorker::Upcoming { soonest })
     }
+    /// What the last walk found for the clips' thread (#8708), once.
+    fn clips_owed(&mut self) -> Option<crate::ring_clips::Wanted> {
+        // Red stub (#8708).
+        let _ = self.upcoming.as_mut()?.wanted.take();
+        None
+    }
     fn withdraw(&mut self) -> io::Result<()> {
         if let Some(current) = &self.current {
             let token = current.token.clone();
@@ -510,7 +545,8 @@ impl<P: Persistence> Consumer<P> {
         let token = match &command {
             ToWorker::Complete { token, .. }
             | ToWorker::Retire { token, .. }
-            | ToWorker::Abandon { token, .. } => token,
+            | ToWorker::Abandon { token, .. }
+            | ToWorker::RungOffline { token } => token,
             ToWorker::Noticed {} => {
                 self.notice_owed = true;
                 return Ok(());
@@ -595,6 +631,12 @@ impl<P: Persistence> Consumer<P> {
                 }
                 self.abandoned(token.clone(), no_audio, stopped);
             }
+            ToWorker::RungOffline { .. } => {
+                for joined in joined {
+                    self.rung_offline(joined.token);
+                }
+                self.rung_offline(token.clone());
+            }
             ToWorker::Noticed {} | ToWorker::RingStopped { .. } => {
                 unreachable!("answered above")
             }
@@ -638,6 +680,24 @@ impl<P: Persistence> Consumer<P> {
                 self.journal.item(&cut.key, STOPPED_HELD);
             }
         }
+    }
+    /// `token`'s attempt rang with no link from the generic line and its
+    /// words were never told (#8708): the ledger marks it "rung, not told",
+    /// kept across a restart, and it is offered again as a retired one is,
+    /// counting toward no hold. Offered with the mark ([`Offer::rung_offline`]),
+    /// the voice rings it again only once the link is back, in its words.
+    fn rung_offline(&mut self, token: PreparedToken) {
+        let line = match self.ledger.mark_rung_untold(&token) {
+            Ok(()) => RUNG_UNTOLD.to_owned(),
+            Err(error) => format!("{RUNG_UNTOLD} (not marked: {error})"),
+        };
+        let proof = QualifiedRetirement {
+            correlation: token.correlation.clone(),
+            retired_by_session: self.session.clone(),
+            basis: RetirementBasis::Abandoned {},
+        };
+        self.journal.item(&token.key, line);
+        self.retry.insert(token.key.clone(), (token, proof));
     }
     /// Only items still waiting to be said are counted, so the counts stay
     /// within the ledger's bound.
@@ -827,6 +887,9 @@ impl<P: Persistence> Consumer<P> {
         let again = std::iter::once(&token.key)
             .chain(also.iter().map(|joined| &joined.token.key))
             .any(|key| self.abandoned.contains(key));
+        // Rung offline from the generic line before (#8708): said in its
+        // words once the link is back, never rung offline again.
+        let rung_offline = self.ledger.rung_untold(&token.key);
         let offer = Offer {
             token,
             text,
@@ -837,6 +900,7 @@ impl<P: Persistence> Consumer<P> {
             also,
             again,
             timer,
+            rung_offline,
         };
         // Disk latency cannot refresh the observation that preceded it.
         if !offer.fresh(monotonic_us()) {
@@ -1236,9 +1300,27 @@ pub(super) fn run(ledger_dir: &Path, socket: &Path, root: &Path) -> io::Result<(
     // One left by an earlier consumer is never this one's judgement.
     let _ = std::fs::remove_file(ledger_dir.join(super::CANNOT_RING_FILE));
     let mut consumer = Consumer::new(ledger, session);
-    if crate::offline_rings::on() {
-        consumer.upcoming = Some(UpcomingWalk::default());
-    }
+    // With the switch and a speech service, each reminder's own clip is
+    // rendered on a thread of its own (#8708); the tick only hands it each
+    // walk's end, never waiting on it.
+    let clips = if crate::offline_rings::on() {
+        let renderer = crate::ring_clips::renderer_from_environment();
+        consumer.upcoming = Some(UpcomingWalk {
+            clips: renderer.is_some(),
+            ..UpcomingWalk::default()
+        });
+        match renderer.map(crate::ring_clips::spawn).transpose() {
+            Ok(clips) => clips,
+            Err(error) => {
+                consumer
+                    .journal
+                    .say(format!("the offline ring clips are not rendered: {error}"));
+                None
+            }
+        }
+    } else {
+        None
+    };
     if refence {
         consumer.cannot_ring = Some((ledger_dir.join(super::CANNOT_RING_FILE), None));
     }
@@ -1269,6 +1351,11 @@ pub(super) fn run(ledger_dir: &Path, socket: &Path, root: &Path) -> io::Result<(
                 }
             };
             consumer.tick(socket, due.as_ref(), now)?;
+            if let (Some(clips), Some(wanted)) = (&clips, consumer.clips_owed()) {
+                // One already waiting: this one is dropped, the next walk's
+                // taken in a second.
+                let _ = clips.try_send(wanted);
+            }
             if consumer.outgoing.is_empty() {
                 let message = consumer.upcoming_owed().unwrap_or(FromWorker::Idle {});
                 consumer.push(message)?;

@@ -104,6 +104,7 @@ fn offer() -> Offer {
         also: Vec::new(),
         again: false,
         timer: false,
+        rung_offline: false,
     }
 }
 

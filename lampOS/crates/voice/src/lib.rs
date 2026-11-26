@@ -169,6 +169,7 @@ pub mod not_speech;
 pub mod offline_rings;
 pub mod onboarding;
 pub mod opens_further;
+pub mod ring_clips;
 // Used by the Linux audio workers, and by tests anywhere.
 #[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
 pub(crate) mod open_at_start;

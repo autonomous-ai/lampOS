@@ -2548,6 +2548,10 @@ fn send_authority(worker: &mut Worker, snapshot: Snapshot) -> io::Result<()> {
 /// waiting on a slow call, #8204, as in an outage) is no error: false,
 /// `asked` left as it was, so the next pass asks again (the Reviewer-lead's
 /// P2 on #8687). Any other error is returned, as for every other send.
+/// While the worker's renewals are being skipped (`renewal_stall`, a stall
+/// going on), nothing is sent either, and the next pass asks again: a
+/// check queued behind a stale renewal could end the second route's worker
+/// (Twelve's P3 2 on #8687).
 fn ask_link_check(
     worker: &mut Worker,
     key: (u64, u64),
@@ -6752,8 +6756,12 @@ fn conversation_with_gate_inner(
     } else {
         None
     };
-    // The item last said to have no clip, so the journal says it once.
-    let mut ring_missing_told: Option<String> = None;
+    // Each reminder's own clip, rendered by the Schedule consumer while
+    // the link is up (#8708), read by its id when it rings offline.
+    let own_clips = crate::ring_clips::Clips::at_dir();
+    // The item last found waiting, so the journal says it once and its
+    // clips are not read again each pass (Twelve's P3 1 on #8687).
+    let mut offline_ringer = crate::offline_rings::OfflineRinger::default();
     // The ring the link's check was last asked for, by its Schedule id and
     // delivery, so it is asked once (`offline_rings::asks_link_check`).
     let mut link_check_asked: Option<(u64, u64)> = None;
@@ -13775,11 +13783,23 @@ fn conversation_with_gate_inner(
             && overdue_may_begin
         {
             let key = reminder_key(&offer);
-            let clip = ring_clips
-                .as_ref()
-                .and_then(|cache| cache.ring_clip(offer.timer));
-            match (clip, cloud.last_session()) {
-                (Some(clip), Some(session)) => {
+            // No session seen yet: nothing read from the disk (Twelve's P3
+            // 1 on #8687). A reminder's own clip, else the generic line.
+            let chosen = offline_ringer.choose(&key, cloud.last_session(), || {
+                crate::offline_rings::ring_for(&offer, ring_clips.as_deref(), &own_clips)
+            });
+            match chosen {
+                Ok((session, ring)) => {
+                    let (own, clip) = match ring {
+                        crate::offline_rings::Ring::Own(clip) => (true, clip),
+                        crate::offline_rings::Ring::Generic(clip) => (false, clip),
+                        crate::offline_rings::Ring::Wait(_) => {
+                            unreachable!("a wait is no ring")
+                        }
+                    };
+                    // A reminder rung from the generic line: its words are
+                    // told once the link is back (#8708).
+                    let untold = !own && !offer.timer;
                     let (timer, late_by_ms, frames) = (offer.timer, offer.late_by_ms, clip.len());
                     snapshot = commit_offline_ring(
                         owner,
@@ -13792,39 +13812,45 @@ fn conversation_with_gate_inner(
                     let current = reply
                         .as_mut()
                         .ok_or_else(|| io::Error::other("offline ring owner missing"))?;
-                    current.reminder = Some(reminders.admitted(
+                    let mut receipt = reminders.admitted(
                         offer,
                         current.owner,
                         snapshot.microphone_generation(),
                         session,
-                    ));
+                    );
+                    if untold {
+                        receipt.untold();
+                    }
+                    current.reminder = Some(receipt);
                     eprintln!(
-                        "lamp-voice: a {} came due with no link: rung from its clip (LAMP_OFFLINE_RINGS)",
-                        if timer { "timer" } else { "reminder" }
+                        "lamp-voice: a {} came due with no link: rung from {} (LAMP_OFFLINE_RINGS)",
+                        if timer { "timer" } else { "reminder" },
+                        if own {
+                            "its own clip, in its words"
+                        } else if untold {
+                            "the generic line; its words are told once the link is back"
+                        } else {
+                            "its clip"
+                        }
                     );
                     record(
                         trace,
                         json!({"kind":"offline_ring","turn":current.owner.turn(),"timer":timer,
+                            "own_words":own,"untold":untold,
                             "late_by_ms":late_by_ms,"frames":frames,"provider_session":session,"at_us":reminder_now_us}),
                     )?;
                     last_reminder_turn = Some(current.owner.turn());
                     reminder_held = None;
-                    ring_missing_told = None;
+                    offline_ringer.rang();
                     last_publish = monotonic_us();
                 }
-                (clip, _) if ring_missing_told.as_deref() != Some(key.as_str()) => {
+                Err(Some(why)) => {
                     eprintln!(
-                        "lamp-voice: a {} came due with no link and {}: it waits for the link (LAMP_OFFLINE_RINGS)",
+                        "lamp-voice: a {} came due with no link and {why}: it waits for the link (LAMP_OFFLINE_RINGS)",
                         if offer.timer { "timer" } else { "reminder" },
-                        if clip.is_none() {
-                            "no clip kept"
-                        } else {
-                            "no link seen yet to prove it under"
-                        }
                     );
-                    ring_missing_told = Some(key);
                 }
-                _ => {}
+                Err(None) => {}
             }
         }
         // About 10 s before the soonest ring is due, the provider worker is

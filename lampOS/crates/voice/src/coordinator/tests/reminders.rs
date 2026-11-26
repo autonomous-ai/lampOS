@@ -2563,3 +2563,32 @@ fn an_offline_ring_played_whole_completes_its_item_and_one_never_sounded_is_not_
         test.probe.settlement()
     );
 }
+
+/// #8708: a reminder rung offline from the generic line, played whole, is
+/// settled "rung, not told", not completed, so its words are told once the
+/// link is back. Mostly heard before a cut, the same.
+#[test]
+fn a_generic_offline_ring_played_whole_is_settled_rung_not_told() {
+    let clock = crate::scenario_clock::Scope::enter(Duration::from_secs(24)).unwrap();
+    clock.set_pump(|_| Ok(())).unwrap();
+    let mut test = Test::new();
+    test.offline_ring(vec![9; 480]);
+    test.reply
+        .as_mut()
+        .unwrap()
+        .reminder
+        .as_mut()
+        .unwrap()
+        .untold();
+    let first = test.ring_chunk();
+    test.accept(&first, 240);
+    let last = test.ring_chunk();
+    test.accept(&last, 240);
+    test.retire(&last);
+    assert!(test.finish_if_settled());
+    assert!(
+        matches!(test.probe.settlement(), Some(ToWorker::RungOffline { .. })),
+        "{:?}",
+        test.probe.settlement()
+    );
+}

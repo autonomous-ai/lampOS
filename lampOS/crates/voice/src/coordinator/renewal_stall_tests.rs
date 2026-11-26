@@ -129,6 +129,13 @@ fn a_link_check_on_a_full_control_socket_waits_for_room_and_is_asked_once() {
     ] {
         read_backlog(peer);
     }
+    // The stall is over once a renewal is taken again (Twelve's P3 2 on
+    // #8687): only then is the check asked.
+    rig.publish(controller.snapshot(now()).unwrap()).unwrap();
+    assert!(matches!(
+        second.control.receive().unwrap(),
+        Some(Control::Authority { .. })
+    ));
     assert!(ask_link_check(&mut rig.provider, key, &mut asked).unwrap());
     assert_eq!(asked, Some(key));
     assert!(matches!(
@@ -153,4 +160,84 @@ fn a_link_check_on_a_closed_control_socket_still_ends_the_voice() {
         .expect_err("a peer gone is no full socket");
     assert_ne!(error.kind(), io::ErrorKind::WouldBlock);
     assert!(asked.is_none());
+}
+
+/// #8708, Twelve's P3s 1 and 2 and the loop test owed on #8687: the offline
+/// ring's choices pass by pass. With no session seen, nothing is read from
+/// the disk, and an item found waiting is not read again on later passes;
+/// a ring played lets the next item be read. While the second worker's
+/// renewals are skipped, no link check is sent, and it is asked once the
+/// stall is over. Off, nothing rings and nothing is asked.
+#[test]
+fn offline_ring_passes_read_no_disk_without_a_session_and_ask_no_check_in_a_stall() {
+    use crate::offline_rings::{OfflineRinger, Ring, asks_link_check, rings_offline};
+    use std::cell::Cell;
+    let reads = Cell::new(0);
+    let read = |ring: Ring| {
+        reads.set(reads.get() + 1);
+        ring
+    };
+    let mut ringer = OfflineRinger::default();
+    // No session seen: ten passes, no read, the wait said once.
+    for pass in 0..10 {
+        let chosen = ringer.choose("s/4/1", None, || read(Ring::Generic(vec![1])));
+        assert_eq!(
+            chosen,
+            Err((pass == 0).then_some(crate::offline_rings::NO_SESSION)),
+            "pass {pass}"
+        );
+    }
+    assert_eq!(reads.get(), 0, "no disk read without a session");
+    // Another item with a session but no clip: read once, then not again.
+    for _ in 0..10 {
+        let _ = ringer.choose("s/5/1", Some(3), || read(Ring::Wait("no clip kept")));
+    }
+    assert_eq!(reads.get(), 1);
+    // A ring: read, played, and the next item read again.
+    let rung = ringer.choose("s/6/1", Some(3), || read(Ring::Own(vec![2])));
+    assert_eq!(rung, Ok((3, Ring::Own(vec![2]))));
+    ringer.rang();
+    let _ = ringer.choose("s/5/1", Some(3), || read(Ring::Wait("no clip kept")));
+    assert_eq!(reads.get(), 3);
+    // Off: never rung offline, never checked.
+    assert!(!rings_offline(false, None, Some(0), u64::MAX / 2, false));
+    assert!(!asks_link_check(
+        false,
+        Some((&(4_u64, 1_u64), 20_000_000)),
+        None,
+        15_000_000
+    ));
+    // A stall: no check sent while renewals are skipped, even with room.
+    let directory = SessionDirectory::create().unwrap();
+    let (mut rig, mut peers, mut second) = second_only(&directory);
+    let (mut controller, _, _) = super::tests::active_reply();
+    fill(&mut rig, &mut controller);
+    for peer in [
+        &mut second,
+        &mut peers.speaker,
+        &mut peers.capture,
+        &mut peers.privacy,
+    ] {
+        read_backlog(peer);
+    }
+    let key = (4, 1);
+    let mut asked = None;
+    for _ in 0..3 {
+        assert!(!ask_link_check(&mut rig.provider, key, &mut asked).unwrap());
+    }
+    assert!(asked.is_none(), "not asked while the stall goes on");
+    assert!(second.control.receive::<Control>().unwrap().is_none());
+    // A renewal delivered: the stall is over, and the check is asked once.
+    rig.publish(controller.snapshot(now()).unwrap()).unwrap();
+    assert!(matches!(
+        second.control.receive().unwrap(),
+        Some(Control::Authority { .. })
+    ));
+    assert!(ask_link_check(&mut rig.provider, key, &mut asked).unwrap());
+    assert_eq!(asked, Some(key));
+    assert!(matches!(
+        second.control.receive().unwrap(),
+        Some(Control::CheckLink)
+    ));
+    rig.running().unwrap();
 }
