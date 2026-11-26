@@ -2627,8 +2627,11 @@ mod tests {
     fn the_guide_says_a_made_tell_me_skill_speaks_only_through_the_told_answer() {
         let flat = GUIDE.split_whitespace().collect::<Vec<_>>().join(" ");
         for told in [
-            "**A skill a time, an event or a repeat starts (any `[trigger]`) speaks only \
-             through the lamp's told answer.**",
+            "**A skill a time, an event or a repeat starts (any `[trigger]` but a touch or a \
+             press) speaks only through the lamp's told answer.**",
+            "or one whose every trigger is a touch or a press (`controls/touch`, \
+             `controls/pet`, `controls/gesture`): that is the person at the lamp asking, \
+             answered at once.",
             "Its scripts print what they found and never call `lamp.say`, `lamp.sound`, the \
              speaker or `control.sock`, and its grants never name `speak` or `speaker`.",
             "only when the owner is alone in view, no one has spoken for a minute, and it \

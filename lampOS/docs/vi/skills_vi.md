@@ -4216,7 +4216,19 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   bị từ chối trong `made_skill::keep_asked` ngay sau khi các script được
   phân tích cú pháp, trước khi đóng gói và chạy thử
   (`made_skill::told_only`, `SPEAKS_ON_ITS_OWN`): nó không bao giờ nói
-  trong lúc tạo. Lời từ chối đến người viết trước, như thất bại của lần
+  trong lúc tạo. **Một lần chạm hay một lần bấm được miễn** (phán quyết
+  của builder đầu tiên trên #8651): một kỹ năng mà mọi trigger đều là một
+  bàn tay trên đèn, `controls/touch`, `controls/pet` hoặc
+  `controls/gesture` (một lần chạm, một lần vuốt ve hay một lần nhấn giữ
+  nút, đế hoặc một miếng cảm ứng trên đầu), giữ bước `run` và `speak` của
+  nó, vì đó là người dùng ở bên đèn đang hỏi, và phút yên lặng của câu trả
+  lời được kể sẽ trả lời một cái vỗ nhẹ trễ một phút
+  (`made_skill::HAND_TOPICS`). Một trigger trên bất cứ thứ gì khác (một
+  giờ, một sự kiện, một cảm biến khác, `controls/state` hay
+  `controls/touch_state`) làm cả kỹ năng chỉ được nói qua câu trả lời được
+  kể, nếu không trigger đó vẫn có thể chạy bước `run` của nó. Test
+  `a_skill_a_touch_or_a_press_starts_may_say_its_line_and_a_timed_one_may_not`.
+  Lời từ chối đến người viết trước, như thất bại của lần
   chạy thử (`made_skill::TOLD_ONLY_REPAIR`: một bước `task`, không `speak`,
   script in ra, câu trả lời của agent là phần tóm tắt nói ra), nên một lần
   sửa định hình lại nó và không có gì được nói. Chỉ khi việc tạo kết thúc
@@ -4234,7 +4246,10 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   script gọi `lamp.say` mà không có grant `speak` vẫn được giữ, và
   lamp-control từ chối câu nói đó ở mỗi lần chạy. Giới hạn đã biết: thao
   tác âm lượng của lamp-control cũng cần `speak`, nên một kỹ năng trigger
-  chỉ chỉnh âm lượng cũng bị từ chối. Cùng phép kiểm đó trong
+  chỉ chỉnh âm lượng cũng bị từ chối. Và một lần vuốt ve hay va chạm vào
+  các miếng cảm ứng cũng khởi động một kỹ năng có trigger chạm, nên câu của
+  nó cũng được phát khi đó. `told_only` cho một `skill.toml` không phân
+  tích được đi qua, vì bước đóng gói sẽ từ chối nó sau. Cùng phép kiểm đó trong
   `lamp-skills pack`, phép kiểm không bao giờ lặp lại cùng một câu, và cho
   kỹ năng trigger chỉ chỉnh âm lượng đi qua, là việc tiếp theo.
 - **Giọng đọc bước `run` như đọc bước `task`**: code riêng, giữ theo grant
