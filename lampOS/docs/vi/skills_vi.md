@@ -4155,7 +4155,11 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   "this answer changes, so compute it when the skill runs: a task step
   whose script prints it." Một câu không đổi ("Time to stretch!") vẫn là
   `say` cố định, cùng những lời đó trong kỹ năng chỉ do lời người dùng hay
-  một bàn tay khởi động cũng vậy, và các bước `remind` cũng vậy. Nhật ký
+  một bàn tay khởi động cũng vậy, và các bước `remind` cũng vậy. Giới hạn
+  đã biết: một câu không đổi có chứa số ("Drink 2 glasses of water.") trên
+  một trigger cũng bị từ chối và thành một bước task in ra câu đó, và chỉ
+  từ tiếng Anh được đọc, nên một từ chỉ số tiếng Việt ("chín mươi chín")
+  vẫn lọt qua. Nhật ký
   gọi tên nó là "(a say with a number or a date)" bên cạnh "(a run step)"
   và "(a speaking grant)". Brief của mô hình riêng của đèn cũng nói điều
   này (`make_skill_local::CHANGING_LINE`). Test
