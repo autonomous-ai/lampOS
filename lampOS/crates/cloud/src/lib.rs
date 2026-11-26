@@ -28,6 +28,7 @@ pub mod onboarding_page;
 pub mod onboarding_step;
 pub mod online;
 pub mod photos;
+pub mod privacy_light;
 pub mod ping;
 pub mod reports;
 pub mod schedule;
