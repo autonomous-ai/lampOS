@@ -2815,13 +2815,17 @@ pub(crate) mod tests {
         /// [`PRIVACY_FRESH_US`] old, as a starved worker finds its queue
         /// ([`ride_run_aging`], #8466).
         aged_published: usize,
+        /// An authority to the worker refused `WouldBlock`: its control
+        /// queue was full, the worker held up past it (#8466).
+        queue_full: bool,
     }
 
     impl Ridden {
         /// Whether the host held this Controls or the worker up for
-        /// [`HELD_UP_US`] or more: then the run says nothing either way.
+        /// [`HELD_UP_US`] or more, or the worker past its control queue:
+        /// then the run says nothing either way.
         fn held_up(&self) -> bool {
-            self.controls_held_us.max(self.worker_held_us) >= HELD_UP_US
+            self.queue_full || self.controls_held_us.max(self.worker_held_us) >= HELD_UP_US
         }
 
         fn fault(&self) -> Option<(u64, &str)> {
@@ -2861,10 +2865,11 @@ pub(crate) mod tests {
 
         fn said(&self) -> String {
             format!(
-                "ended {:?}, receive errors {:?}, refused send {:?}, held up {} us (Controls) and {} us (worker), events {:?}",
+                "ended {:?}, receive errors {:?}, refused send {:?}, queue full {}, held up {} us (Controls) and {} us (worker), events {:?}",
                 self.ended,
                 self.receive_errors,
                 self.refused_send,
+                self.queue_full,
                 self.controls_held_us,
                 self.worker_held_us,
                 self.events
@@ -3133,6 +3138,12 @@ pub(crate) mod tests {
                         ridden.refused_send = Some(error.to_string());
                         break;
                     }
+                    // The worker held up past its control queue (about 118
+                    // messages): a held-up attempt, made again (#8466).
+                    Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                        ridden.queue_full = true;
+                        break;
+                    }
                     Err(error) => panic!("authority to the worker: {error}"),
                 }
             }
@@ -3221,6 +3232,7 @@ pub(crate) mod tests {
             Some(false),
             &said_after_unavailable(false),
         );
+        assert!(stalled.queue_full, "{}", stalled.said());
         assert!(stalled.held_up(), "{}", stalled.said());
         let ridden = ride_attempts(
             takes,
