@@ -367,7 +367,7 @@ and its gate needs a ready session.
   have a reminder." in the owner's language, warmed at start while the
   internet answers ([schedule.md](schedule.md), "With no link"). Played
   whole, the item is completed as said: nothing about it is said again
-  when the link returns. With no clip kept, it waits for the link as
+  when the link returns. This is a known gap, not the intent: a reminder's own words are never told after its generic ring, so the switch stays off until the first builder's call 5 (c7183858037) lands with #8708: an offline ring is not the reminder told, and its words are told once the link is back. With no clip kept, it waits for the link as
   before.
 - **No second line for a scrap:** a follow-up with under 400 ms of speech,
   ending within 8 s of the outage's line, gets no line of its own

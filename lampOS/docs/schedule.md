@@ -1864,7 +1864,7 @@ rides the turn as a model ring's does: its first chunk handed to the
 speaker counts as its audio, its retirement as its generation, and played
 whole with the microphones open it is completed as said
 (`Reply::complete_reminder`), so the consumer acknowledges it and nothing
-about it is said again when the link returns. Cut before any of it
+about it is said again when the link returns. This is a known gap, not the intent: a reminder's own words are never told after its generic ring, so the switch stays off until the first builder's call 5 (c7183858037) lands with #8708: an offline ring is not the reminder told, and its words are told once the link is back. Cut before any of it
 sounded, it is `no_audio` and offered again; cut after, it keeps the
 once-more rule. With no clip kept (the cache never warmed, or no speech
 cache), the item waits for the link as before, said once per item in the
