@@ -1028,30 +1028,52 @@ const GREETINGS: &[&str] = &["hey", "hi", "ok", "okay", "oh", "hello"];
 /// "ok" or "okay": said all day, and not the call the product owner named.
 const HEY_GREETINGS: &[&str] = &["hey", "hi", "hello"];
 
+/// How far into a line a hearing of the name may begin and still be "Hey
+/// Lamp" at its start, with `LAMP_NAME_HEY_ONLY`, when the word after the
+/// greeting is the name or like it: the greeting, a pause of up to about a
+/// second, and the name, with the soft lead. Wider than
+/// [`NAME_AT_THE_START_US`] (1.3 s), which needs no such word: on lamp-74ff
+/// on 26 Nov a played "Hey, Lamp. What day is it today?" was heard 1.93 s in.
+pub const HEY_AT_THE_START_US: u64 = 2_500_000;
+
 /// The second sign a call kept as "Hey Lamp" at its start counts by.
 const HEY_AT_THE_START: &str = "\"Hey Lamp\" at the line's start";
+
+/// `heard`'s words past one opening filler ("um", "uh", "oh", "ah", "so").
+fn past_a_filler(heard: &str) -> impl Iterator<Item = &str> {
+    const FILLERS: [&str; 5] = ["um", "uh", "oh", "ah", "so"];
+    let mut words = heard
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty())
+        .peekable();
+    if words.peek().is_some_and(|word| {
+        FILLERS
+            .iter()
+            .any(|filler| word.eq_ignore_ascii_case(filler))
+    }) {
+        words.next();
+    }
+    words
+}
 
 /// Whether `heard` opens with one of [`HEY_GREETINGS`], past one filler
 /// ("um", "uh", "oh", "ah", "so"): "Hey Lamp, …", "Um, hey Lamp", "Hello?".
 pub(crate) fn opens_with_hey(heard: &str) -> bool {
-    const FILLERS: [&str; 5] = ["um", "uh", "oh", "ah", "so"];
-    let mut words = heard
-        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
-        .filter(|word| !word.is_empty());
-    let first = match words.next() {
-        Some(word)
-            if FILLERS
-                .iter()
-                .any(|filler| word.eq_ignore_ascii_case(filler)) =>
-        {
-            words.next()
-        }
-        first => first,
-    };
-    first.is_some_and(|word| {
+    past_a_filler(heard).next().is_some_and(|word| {
         HEY_GREETINGS
             .iter()
             .any(|greeting| word.eq_ignore_ascii_case(greeting))
+    })
+}
+
+/// Whether the word after `heard`'s opening greeting is the lamp's name, or
+/// a word written or sounding like it: "Hey, Lamp.", "Hey man", "Hi, Lynn".
+/// Not "Hi Mark, the lamp is …": there the name comes later, in a sentence.
+fn greeted_word_like_the_name(heard: &str) -> bool {
+    let mut words = past_a_filler(heard);
+    words.next();
+    words.next().is_some_and(|word| {
+        written_for_the_name(word) || crate::second_provider::sounds_like_the_name(word)
     })
 }
 
@@ -2157,6 +2179,9 @@ pub struct Attention {
     hey_only: bool,
     hey_kept: bool,
     name_unhey_dropped: bool,
+    /// A hearing that counts for the request in hand began within
+    /// [`HEY_AT_THE_START_US`] of the line's start.
+    named_near_the_start: bool,
     /// `LAMP_ONE_REPLY_WINDOW` ([`Attention::one_reply_window`]).
     one_reply_window: bool,
     /// `LAMP_NAME_NOT_ANOTHERS=on` (#8114, [`Self::hold_anothers_name`]).
@@ -2606,8 +2631,9 @@ impl Attention {
         self.hey_kept = weighed
             && self.hey_only
             && !in_conversation
-            && self.named_at_start
             && opens_with_hey(&self.heard)
+            && (self.named_at_start
+                || self.named_near_the_start && greeted_word_like_the_name(&self.heard))
             && !self.name_anothers_dropped;
         self.name_unhey_dropped = weighed && self.hey_only && !in_conversation && !self.hey_kept;
         if self.hey_kept {
@@ -3095,6 +3121,10 @@ impl Attention {
             && self
                 .named_us
                 .is_some_and(|named| named <= start.saturating_add(NAME_AT_THE_START_US));
+        self.named_near_the_start = self.named
+            && self
+                .named_us
+                .is_some_and(|named| named <= start.saturating_add(HEY_AT_THE_START_US));
         self.cut_said_to_a_person = cut_said_to_a_person.filter(|_| self.named_at_start);
         self.tapped = self.tapped_us.is_some_and(|tapped| {
             tapped <= now_us && tapped.saturating_add(TAPPED_BEFORE_US) >= now_us
@@ -3273,6 +3303,7 @@ impl Attention {
             self.named_sure |= sure;
             let start = self.start_in_hand().unwrap_or(began);
             self.named_at_start |= at_us <= start.saturating_add(NAME_AT_THE_START_US);
+            self.named_near_the_start |= at_us <= start.saturating_add(HEY_AT_THE_START_US);
             self.best_score = self.best_score.max(score);
         }
     }
@@ -8346,6 +8377,17 @@ mod tests {
             ),
             (true, false, true),
             "the name heard late in a sentence"
+        );
+        // "Hey, ... Lamp." with a pause: heard 1.93 s in on lamp-74ff, kept
+        // when the word after the greeting is like the name; past
+        // HEY_AT_THE_START_US, or with another word there, not.
+        assert_eq!(
+            weigh("Hey man. What day is it today?", 11_930_000, true, false),
+            (false, true, false)
+        );
+        assert_eq!(
+            weigh("Hey man. What day is it today?", 12_600_000, true, false),
+            (true, false, true)
         );
         assert!(
             !weigh("Lamp, and Spain?", start, true, true).2,
