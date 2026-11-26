@@ -919,3 +919,68 @@ fn the_dev_monitor_starts_once_unlocked_and_stops_before_the_reply() {
     assert!(!config.monitor_dropin.exists());
     let _ = fs::remove_dir_all(folder);
 }
+
+/// A person's key saved or removed (#8710, the lead's call, 26 Nov): the
+/// voice restarts to take it after 1 s of quiet, not an update's 45 s, so
+/// the next words already go the new way; never in a turn. At rest: the
+/// lock after 1 s. A turn in flight until 20 s: waited out, then 1 s. A
+/// zone's `lamp-schedule` restart still waits the update's 45 s.
+#[test]
+fn a_key_change_restarts_the_voice_after_one_second_of_quiet() {
+    let folder = std::env::temp_dir().join(format!(
+        "lsc-keyquiet-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    let records = lamp_update::records::Records::new(folder.clone());
+    assert_eq!(change::KEY_CHANGE_QUIET, Duration::from_secs(1));
+    // At rest: the lock after 1 s of quiet.
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|_| vec![Heard::State(Voice::Resting)]),
+    };
+    let held = change::quiet_and_unlocked(
+        &mut ears,
+        &records,
+        change::KEY_CHANGE_QUIET,
+        change::QUIET_MOST,
+    )
+    .unwrap();
+    assert_eq!(ears.now, S);
+    drop(held);
+    // A turn in flight (heard, thought, spoken) until 20 s: never cut, and
+    // 1 s of rest after it.
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|now| match now {
+            ..=5_000 => vec![Heard::State(Voice::Listening), Heard::Speech],
+            ..=9_000 => vec![Heard::State(Voice::Thinking)],
+            ..=20_000 => vec![Heard::State(Voice::Speaking), Heard::Speech],
+            _ => vec![Heard::State(Voice::Resting)],
+        }),
+    };
+    let held = change::quiet_and_unlocked(
+        &mut ears,
+        &records,
+        change::KEY_CHANGE_QUIET,
+        change::QUIET_MOST,
+    )
+    .unwrap();
+    assert_eq!(ears.now, 21 * S);
+    drop(held);
+    // The zone's restart, the same voice at rest: still 45 s.
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|_| vec![Heard::State(Voice::Resting)]),
+    };
+    let held = change::quiet_and_unlocked(
+        &mut ears,
+        &records,
+        lamp_update::quiet::QUIET,
+        change::QUIET_MOST,
+    )
+    .unwrap();
+    assert_eq!(ears.now, 45 * S);
+    drop(held);
+    let _ = fs::remove_dir_all(folder);
+}
