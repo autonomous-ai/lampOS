@@ -9871,9 +9871,8 @@ its web pages. `skills/faq/` is a core skill in the product's install
 (`install::PRODUCT_SKILLS`), reached through `use_skill` (`lamp_help`,
 with a `topic`); its description names the asks it is for ("how do I...?",
 "how do reminders work?", "what can you do?", "where do I link Gmail or my calendar?", "what does
-the button do?", "which agent or model do you use?",
-"can I switch you to another agent?", "who made you?", "where can I buy you?", "what's your
-website?", "help"), so a request for help is a call and not the
+the button do?", "who made you?", "where can I buy you?", "what's your
+website?", "help"; its `when` also names its agent or model), so a request for help is a call and not the
 model's own guess. Its description and its `when` also say it is "not for
 their own reminders or timers", which are `list_reminders`' (#8181: on
 lamp-52e6 in gate 1126 the core reminders line, the 2nd line of a
