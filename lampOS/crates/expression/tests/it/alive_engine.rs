@@ -1869,6 +1869,32 @@ mod head {
             .collect()
     }
 
+    /// As [`looks`], with the pitch a look of `want` may reach on each tick:
+    /// the catalogue's head limit clamps the look and the breath's dip
+    /// together (#8635's larger look reaches it). Each tick is the pitch
+    /// difference, the difference the limit allows, the yaw difference and
+    /// whether it says it is looking up.
+    fn limited(
+        tapped: &mut Lamp,
+        plain: &mut Lamp,
+        ticks: usize,
+        want: f64,
+    ) -> Vec<(f64, f64, f64, bool)> {
+        let limit = catalogue().limits.head_pitch;
+        (0..ticks)
+            .map(|_| {
+                let (a, b) = (tapped.step(), plain.step());
+                let (a_at, b_at) = (asked(&a), asked(&b));
+                (
+                    a_at.head_pitch - b_at.head_pitch,
+                    (b_at.head_pitch + want).max(-limit) - b_at.head_pitch,
+                    a_at.base_yaw - b_at.base_yaw,
+                    named(&a, "looking up at a tap"),
+                )
+            })
+            .collect()
+    }
+
     fn twins(faces: Vec<Face>) -> (Lamp, Lamp) {
         let (mut tapped, mut plain) = (Lamp::new(catalogue()), Lamp::new(catalogue()));
         for lamp in [&mut tapped, &mut plain] {
@@ -1889,10 +1915,13 @@ mod head {
         assert!((first[7].0 - pitch).abs() < 1e-9, "{first:?}");
         assert!(first[0].0 < 0.0 && first[0].0 > pitch);
         // Held for two seconds from the tap; only the head, never the body.
-        let held = looks(&mut tapped, &mut plain, 90);
+        let held = limited(&mut tapped, &mut plain, 90, pitch);
         assert!(
             held.iter()
-                .all(|(up, yaw, _)| (up - pitch).abs() < 1e-9 && *yaw == 0.0)
+                .all(|(up, allowed, yaw, named)| (up - allowed).abs() < 1e-9
+                    && *yaw == 0.0
+                    && *named),
+            "{held:?}"
         );
         // Then, two seconds from the tap, down, eased over half a second:
         // never a snap.
@@ -1915,10 +1944,10 @@ mod head {
         // A face near the top of the picture (its centre at -0.8).
         let (mut tapped, mut plain) = twins(vec![face(0.4, 0.0, 0.2)]);
         tapped.head(TouchGesture::Tap, 5, 200_000);
-        let up = looks(&mut tapped, &mut plain, 20);
         let wanted = lamp_expression::LOOK_UP.head_pitch - 0.8 * lamp_expression::LOOK_UP_TOWARD;
-        assert!((up[19].0 - wanted).abs() < 1e-6, "{up:?}");
-        assert!(up.iter().all(|(_, yaw, _)| *yaw == 0.0));
+        let up = limited(&mut tapped, &mut plain, 20, wanted);
+        assert!((up[19].0 - up[19].1).abs() < 1e-6, "{up:?}");
+        assert!(up.iter().all(|(_, _, yaw, _)| *yaw == 0.0));
     }
 
     #[test]
@@ -1983,7 +2012,8 @@ mod head {
         tapped.head(TouchGesture::Stroke, 5, SECOND);
         let after = looks(&mut tapped, &mut plain, 30);
         assert!(after[0].0 > pitch, "eased out: {after:?}");
-        assert!(after[29].0.abs() < 1e-9 && !after[29].2, "{after:?}");
+        // The look is gone; the lean, still easing, is the stroke's own.
+        assert!(!after[29].2, "{after:?}");
     }
 
     /// #8635, the First builder's row leg: a touch while the lamp speaks
@@ -2002,10 +2032,10 @@ mod head {
         for lamp in [&mut tapped, &mut plain] {
             lamp.voice(Voice::Listening);
         }
-        let up = looks(&mut tapped, &mut plain, 8);
-        assert!(up.iter().all(|(_, _, named)| *named), "{up:?}");
         let pitch = lamp_expression::LOOK_UP.head_pitch;
-        assert!((up[7].0 - pitch).abs() < 1e-9, "{up:?}");
+        let up = limited(&mut tapped, &mut plain, 8, pitch);
+        assert!(up.iter().all(|(_, _, _, named)| *named), "{up:?}");
+        assert!((up[7].0 - up[7].1).abs() < 1e-9, "{up:?}");
     }
 
     /// First on #711, 17 Oct 10:18: muted for privacy, by the voice's own
