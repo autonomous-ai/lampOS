@@ -1001,3 +1001,88 @@ fn a_key_change_restarts_the_voice_after_one_second_of_quiet() {
     drop(held);
     let _ = fs::remove_dir_all(folder);
 }
+
+/// #8735: a key change is answered first, then the voice restarts once the
+/// lamp is quiet and no update is at work, under lamp-update's lock; a model
+/// key's change restarts lamp-cloud after it, which #8742's forwarder needs
+/// to load the key, and the journal says why. Never for ElevenLabs or
+/// Deepgram.
+#[test]
+fn a_model_key_change_restarts_the_voice_then_lamp_cloud_once_quiet() {
+    use lamp_setup::keys::{self, Check, Given, Store, Verdict};
+    struct Works;
+    impl Check for Works {
+        fn check(&mut self, _: &Given) -> Verdict {
+            Verdict::Works
+        }
+    }
+    let (folder, records) = records_folder("keys-restart");
+    let store = Store(folder.join("own"));
+    let key = "sk-planted-8735-aaaaaaaaaaaaaaaa";
+    for (line, cloud) in [
+        (format!(r#"{{"set":"deepseek","key":"{key}"}}"#), true),
+        (r#"{"remove":"deepseek"}"#.to_owned(), true),
+        (format!(r#"{{"set":"deepgram","key":"{key}"}}"#), false),
+        (
+            format!(r#"{{"set":"elevenlabs","key":"{key}","voice_id":"Voice8735"}}"#),
+            false,
+        ),
+        (r#"{"remove":"elevenlabs"}"#.to_owned(), false),
+    ] {
+        let (reply, done) = keys::answer(&line, &store, &mut Works, true);
+        assert!(reply.get("done").is_some(), "{reply}");
+        let done = done.unwrap();
+        assert!(done.restart_voice, "{line}");
+        assert_eq!(done.restart_cloud, cloud, "{line}");
+        let mut ears = Script {
+            now: 0,
+            at: Box::new(|_| vec![Heard::State(Voice::Resting)]),
+        };
+        let mut units = Units {
+            records: &records,
+            calls: Vec::new(),
+            stop_fails: false,
+        };
+        let said = keys::restart_after(&done, &mut ears, &records, &mut units);
+        // After 1 s of quiet (#8710), the reply already out to lamp-cloud.
+        assert_eq!(ears.now, S, "{line}");
+        let mut want = vec![("try-restart lamp-voice.service".to_owned(), true)];
+        if cloud {
+            want.push(("try-restart lamp-cloud.service".to_owned(), true));
+        }
+        assert_eq!(units.calls, want, "{line}");
+        assert_eq!(said.len(), want.len(), "{said:?}");
+        if cloud {
+            assert!(
+                said[1].starts_with("lamp-cloud restarted to load the person's model key"),
+                "{said:?}"
+            );
+        }
+        assert!(!said.concat().contains(key));
+    }
+    // An update holding the lock all along: nothing restarted, said why.
+    let (_, done) = keys::answer(
+        &format!(r#"{{"set":"deepseek","key":"{key}"}}"#),
+        &store,
+        &mut Works,
+        true,
+    );
+    let update = records.lock().unwrap();
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|_| vec![Heard::State(Voice::Resting)]),
+    };
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    let said = keys::restart_after(&done.unwrap(), &mut ears, &records, &mut units);
+    assert!(units.calls.is_empty());
+    assert!(
+        said[0].contains("the voice and lamp-cloud take them at its next start"),
+        "{said:?}"
+    );
+    drop(update);
+    let _ = fs::remove_dir_all(folder);
+}
