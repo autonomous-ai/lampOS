@@ -14898,6 +14898,19 @@ fn an_asked_dance_ends_a_fill_and_a_fill_never_ends_an_asked_gesture() {
         ],
         "{fates:?}"
     );
+    // A nod asked while the curious eases out and the dance waits for it
+    // (Sixth's P2 on #8711): the dance still plays, the nod is dropped.
+    let asks = vec![
+        (secs(8), &crate::clips::CURIOUS, Priority::Conversation),
+        (secs(9), &crate::clips::DANCE_GROOVE, Priority::Skill),
+        (secs(9) + Duration::from_millis(20), &crate::clips::NOD, Priority::Conversation),
+    ];
+    let (_, fates, _) = arbitrated_run(false, asks, 14);
+    assert!(
+        fates.contains(&("dance_groove", "taken: it plays"))
+            && fates.contains(&("nod", "dropped: another gesture plays")),
+        "{fates:?}"
+    );
     let asks = vec![
         (secs(8), &crate::clips::DANCE_GROOVE, Priority::Skill),
         (secs(9), &crate::clips::CURIOUS, Priority::Conversation),
