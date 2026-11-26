@@ -4517,7 +4517,9 @@ mod tests {
     /// (an update), ends `invalidated` `restart` with its yes kept and the
     /// end stamped at the restart, never sent: what the voice tells once as
     /// one that did not reach its agent. A second restart leaves it as it
-    /// was, so the end the voice reads never moves.
+    /// was, so the end the voice reads never moves. This pins what `open`
+    /// already did before #8715; the voice's test is the one that fails
+    /// without the change.
     #[test]
     fn a_queued_task_said_yes_to_ends_restart_with_its_yes_kept() {
         let (mut engine, memory) = opened();
