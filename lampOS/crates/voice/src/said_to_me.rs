@@ -301,12 +301,21 @@ pub struct Line<'a> {
     /// sound is not one (#8205).
     pub cut_in: bool,
     /// With [`FOLLOW_UPS_AFTER_THE_ANSWER`], a [`Self::cut_in`] line with no
-    /// look takes no [`Said::CutInNoLook`]: it is held unless it answers the
-    /// lamp's waiting question. On lamp-74ff on 26 Nov, with the switch's
-    /// first head, 19 lines of two people's talk over the lamp's answers
-    /// still came through as that one look-free cut-in, each named call
-    /// giving it back.
+    /// look takes neither [`Said::CutInNoLook`] nor [`Said::AnswerNoLook`]
+    /// unless its words tie it to the conversation ([`Self::cut_in_tied`]):
+    /// over the lamp's answer there is no print and here no face, so the
+    /// words are what tell the asker from the room. On lamp-74ff on 26 Nov,
+    /// with the switch's first head, 19 lines of two people's talk over the
+    /// lamp's answers came through as that one look-free cut-in, each named
+    /// call giving it back. With a blanket hold (its second head), the
+    /// asker's own follow-ups and corrections over the answer were held too
+    /// (Sixth's row on lamp-52e6: 0 of 3, 0 of 2).
     pub cut_in_held: bool,
+    /// With [`Self::cut_in_held`]: the line's words tie it to the exchange
+    /// under way (`untied_going_on::tied_read`), correct what was asked
+    /// (`untied_going_on::corrects`), or are a short reply to the lamp's
+    /// question.
+    pub cut_in_tied: bool,
     /// `LAMP_FOLLOW_UPS=on` ([`FOLLOW_UPS`]): in the window, only
     /// [`Self::another_voice`] holds the line.
     pub follow_ups: bool,
@@ -446,11 +455,14 @@ pub fn judge(line: Line<'_>) -> Said {
         // to the lamp's waiting question, or one line that cut in over the
         // lamp's own answer (#8205), only.
         if line.looks_needed && !line.turned && line.pitch.is_none() && line.looking.is_none() {
+            // `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER`: over the answer, only a
+            // line its words tie to the conversation.
+            let untied_over = line.cut_in_held && !line.cut_in_tied;
             return if line.look_free_answered {
                 Said::Held(Held::NoLook)
-            } else if line.lamp_asked && line.question_waits {
+            } else if line.lamp_asked && line.question_waits && !untied_over {
                 Said::AnswerNoLook
-            } else if line.cut_in && !line.cut_in_held {
+            } else if line.cut_in && !untied_over {
                 Said::CutInNoLook
             } else {
                 Said::Held(Held::NoLook)

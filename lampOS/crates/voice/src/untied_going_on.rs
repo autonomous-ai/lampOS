@@ -457,6 +457,74 @@ pub fn desk_talk_read(heard: &str, no_name_set_off: bool) -> bool {
         || tells_a_name
 }
 
+/// Words that, anywhere in a line, correct what the person just asked the
+/// lamp ([`corrects`]): "No, I meant Spain.", "No, not that one, the other
+/// story." (the Reviewer-lead's row condition on #8689, 26 Nov 2026).
+const CORRECTS: &[&str] = &["i meant", "not that one", "the other story"];
+
+/// Words a correction may open with before what it changes: "Wait, make it
+/// about a dog instead.", "No, make it two." ([`CORRECT_OPENERS`]).
+const CORRECT_LEADS: &[&str] = &[
+    "no", "wait", "actually", "oh", "sorry", "um", "uh", "okay", "ok",
+];
+
+/// What a correction opens with, after any of [`CORRECT_LEADS`]: "Make it
+/// shorter.", "Wait, make it about a dog.", "No, not that, the weather.".
+/// Only at the start: "We can't make it tonight." is desk talk.
+const CORRECT_OPENERS: &[&str] = &[
+    "make it",
+    "change it",
+    "change that",
+    "not that",
+    "the other",
+    "i meant",
+];
+
+/// Whether `heard` corrects or changes what the person just asked:
+/// [`CORRECTS`] anywhere, or after any of [`CORRECT_LEADS`] it opens with
+/// one of [`CORRECT_OPENERS`]. Read only for a line said over the lamp's
+/// own answer, where such words are the asker's and the room's talk mostly
+/// isn't. A line opening "No," alone is not one: "No, it's fine, I'll do it
+/// later." is desk talk.
+pub fn corrects(heard: &str) -> bool {
+    let words = plain_words(heard);
+    let says = |phrase: &&str| words.contains(&format!(" {phrase} "));
+    let mut rest = words.as_str();
+    while let Some(lead) = CORRECT_LEADS
+        .iter()
+        .find(|lead| rest.starts_with(&format!(" {lead} ")))
+    {
+        rest = &rest[lead.len() + 1..];
+    }
+    CORRECTS.iter().any(says)
+        || CORRECT_OPENERS
+            .iter()
+            .any(|opener| rest.starts_with(&format!(" {opener} ")))
+}
+
+/// Words that open a short reply to the lamp's question: "Yes, keep
+/// going.", "No thanks.", "Sure, go ahead." ([`a_short_reply`]).
+const REPLY_OPENERS: &[&str] = &[
+    "yes", "yeah", "yep", "yup", "sure", "no", "nope", "okay", "ok", "please", "go", "keep",
+];
+
+/// Most words of a short reply opening with one of [`REPLY_OPENERS`].
+const SHORT_REPLY_WORDS: usize = 5;
+
+/// Whether `heard` is short enough to be a reply to the lamp's question:
+/// at most three words ("Spain.", "The second one."), or at most
+/// [`SHORT_REPLY_WORDS`] opening with one of [`REPLY_OPENERS`] ("Yeah, tell
+/// me more."). "Don't stop now, you're almost done." is neither.
+pub fn a_short_reply(heard: &str) -> bool {
+    let words = plain_words(heard);
+    let count = words.split_whitespace().count();
+    let opens = words
+        .split_whitespace()
+        .next()
+        .is_some_and(|first| REPLY_OPENERS.contains(&first));
+    count > 0 && (count <= 3 || (count <= SHORT_REPLY_WORDS && opens))
+}
+
 /// Whether `heard` refers back to what was just said: [`REFERS_BACK`]
 /// anywhere, [`REFERS_BACK_SHORT`] in a short line, or a short question
 /// opening with [`FOLLOWS_ON`].
@@ -790,6 +858,54 @@ mod tests {
         assert!(on_for(Some("held")) && held_for(Some("held")));
         for value in [None, Some("on"), Some("off"), Some("HELD"), Some("hold")] {
             assert!(!held_for(value), "{value:?}");
+        }
+    }
+
+    /// The asker's corrections over the lamp's answer (the Reviewer-lead's
+    /// row condition on #8689) correct; desk talk opening "No," or saying
+    /// "make it" further in does not.
+    #[test]
+    fn a_correction_of_what_was_asked_corrects() {
+        for line in [
+            "No, I meant Spain.",
+            "No, not that one, the other story.",
+            "Wait, make it about a dog instead.",
+            "Make it shorter.",
+            "Actually, change it to ten minutes.",
+            "Sorry, I meant tomorrow.",
+        ] {
+            assert!(corrects(line), "{line}");
+        }
+        for line in [
+            "No, it's fine, I'll do it later.",
+            "We can't make it tonight.",
+            "Don't stop now, you're almost done.",
+            "Did you finish the report?",
+            "",
+        ] {
+            assert!(!corrects(line), "{line}");
+        }
+    }
+
+    /// A short reply to the lamp's question, not a room line of more words.
+    #[test]
+    fn a_short_reply_is_short() {
+        for line in [
+            "Spain.",
+            "The second one.",
+            "Yes please.",
+            "Yeah, tell me more.",
+            "Sure, go ahead with it.",
+        ] {
+            assert!(a_short_reply(line), "{line}");
+        }
+        for line in [
+            "Don't stop now, you're almost done.",
+            "Did you finish the report?",
+            "Yeah, I'll call you back after lunch.",
+            "",
+        ] {
+            assert!(!a_short_reply(line), "{line}");
         }
     }
 
