@@ -82,16 +82,20 @@ pub fn line(data: &Value) -> Result<String, String> {
     Ok(json!({ "privacy_light": look.name() }).to_string())
 }
 
-/// The reply for what the helper said: `{"look": ..}`, red for anything it
-/// did not name as a look (the fail safe the ring keeps too).
-fn reply(done: Option<Value>) -> Value {
+/// The reply for what the helper said: `{"look": ..}`, the look it names
+/// (the first builder's P3 on #8733). When it names none, a set it said
+/// done to answers the request's own look, `asked`, and a get answers
+/// [`NAMED_NO_LOOK`], so the app never shows red while the ring shows the
+/// person's pick.
+fn reply(done: Option<Value>, asked: Option<Look>) -> Result<Value, String> {
     let look = done
         .as_ref()
         .and_then(|data| data.get("look"))
         .and_then(Value::as_str)
         .and_then(Look::named)
-        .unwrap_or_default();
-    json!({ "look": look.name() })
+        .or(asked)
+        .ok_or(NAMED_NO_LOOK)?;
+    Ok(json!({ "look": look.name() }))
 }
 
 /// `led.privacy.get`: read by the helper, writing nothing.
@@ -101,15 +105,17 @@ pub fn get(place: &Place) -> Result<Value, String> {
         &json!({"privacy_light_get": true}).to_string(),
         place.wait,
     )?;
-    Ok(reply(done))
+    reply(done, None)
 }
 
 /// `led.privacy.set`: checked here, kept by the helper, and answered with
-/// what the file then says.
+/// what the file then says, or the request's own look when the helper said
+/// done but named none.
 pub fn set(place: &Place, data: &Value) -> Result<Value, String> {
     let line = line(data)?;
     let done = crate::settings::ask(&place.socket, &line, place.wait)?;
-    Ok(reply(done))
+    let asked = data["look"].as_str().and_then(Look::named);
+    reply(done, asked)
 }
 
 #[cfg(test)]
@@ -178,10 +184,26 @@ mod tests {
         ] {
             assert_eq!(line(&data), Err(REFUSED.to_owned()), "{data}");
         }
-        // What the helper names, or red.
-        assert_eq!(reply(Some(json!({"look": "off"}))), json!({"look": "off"}));
-        assert_eq!(reply(Some(json!({"look": "blue"}))), json!({"look": "red"}));
-        assert_eq!(reply(None), json!({"look": "red"}));
+        // What the helper names, else the set's own look, else an error.
+        let off = Some(Look::named("off").unwrap());
+        assert_eq!(
+            reply(Some(json!({"look": "off"})), None),
+            Ok(json!({"look": "off"}))
+        );
+        assert_eq!(
+            reply(Some(json!({"look": "red"})), off),
+            Ok(json!({"look": "red"}))
+        );
+        assert_eq!(
+            reply(Some(json!({"look": "blue"})), off),
+            Ok(json!({"look": "off"}))
+        );
+        assert_eq!(reply(None, off), Ok(json!({"look": "off"})));
+        assert_eq!(
+            reply(Some(json!({"look": "blue"})), None),
+            Err(NAMED_NO_LOOK.to_owned())
+        );
+        assert_eq!(reply(None, None), Err(NAMED_NO_LOOK.to_owned()));
     }
 
     /// The first builder's P3 on #8733: a helper answer that names no look
