@@ -1712,6 +1712,15 @@ the news. It is judged by the rules after it, `ABOUT_ITS_WORK` included
 ([second-voice.md](second-voice.md)). Test:
 `a_line_said_to_me_held_is_no_reply_to_the_news_with_the_switch`.
 
+The rule lets the first line after the news out as `AFTER_NEWS` whatever
+it asks, and does not read whether it replies to the news or asks for new
+work. On the second route such a line is marked
+(`Attention::played_after_news`) and the model is told that a new request
+in it is handed over as any other (`worker::AFTER_NEWS_NOTE`, #8701:
+"plan a simple three-day trip to Hoi An …", right after the news, was
+answered by the lamp itself 2 times in 5; [second-voice.md](second-voice.md)).
+Test: `the_first_line_after_the_news_is_marked_whatever_it_asks`.
+
 Without it the rule holds answers only in a busy room. In a room not known
 to be busy, and in a session it trusts, every answer is played, whatever
 was said and to whom. On lamp-4ace at 02:16 on 16 October, "Did you get my
