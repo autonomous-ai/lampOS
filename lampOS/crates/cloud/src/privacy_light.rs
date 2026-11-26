@@ -65,6 +65,10 @@ pub const SETTINGS_ENVIRONMENT: &str = "LAMP_SETTINGS_CHANGE";
 /// Why a set is refused before the helper.
 pub const REFUSED: &str = "led.privacy.set takes exactly {\"look\": \"red\" | \"dim\" | \"off\"}";
 
+/// Why a get is answered with an error: the helper said done but named no
+/// look, so the app is not shown a look the ring may not have.
+pub const NAMED_NO_LOOK: &str = "the lamp's settings named no privacy light look";
+
 /// The helper's line for `led.privacy.set`'s `data`, or why not: exactly
 /// one key, `look`, one of the three names.
 pub fn line(data: &Value) -> Result<String, String> {
@@ -178,5 +182,47 @@ mod tests {
         assert_eq!(reply(Some(json!({"look": "off"}))), json!({"look": "off"}));
         assert_eq!(reply(Some(json!({"look": "blue"}))), json!({"look": "red"}));
         assert_eq!(reply(None), json!({"look": "red"}));
+    }
+
+    /// The first builder's P3 on #8733: a helper answer that names no look
+    /// is never shown as red. A set the helper said done to answers the
+    /// request's own look; a get answers an error, so the app and the ring
+    /// stay in step.
+    #[test]
+    fn an_answer_naming_no_look_is_not_red() {
+        use std::io::{BufRead, Write};
+        let folder = std::path::PathBuf::from(format!("/tmp/lcpn-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let socket = folder.join("change.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        std::thread::spawn(move || {
+            for (n, stream) in listener.incoming().enumerate() {
+                let Ok(mut stream) = stream else { return };
+                let mut line = String::new();
+                let _ = std::io::BufReader::new(&stream).read_line(&mut line);
+                let done = if n % 2 == 0 {
+                    json!({})
+                } else {
+                    json!({"look": "blue"})
+                };
+                let _ = writeln!(stream, "{}", json!({ "done": done }));
+            }
+        });
+        let place = Place { socket, wait: WAIT };
+        for _ in 0..2 {
+            assert_eq!(
+                set(&place, &json!({"look": "dim"})),
+                Ok(json!({"look": "dim"}))
+            );
+            assert_eq!(
+                set(&place, &json!({"look": "off"})),
+                Ok(json!({"look": "off"}))
+            );
+        }
+        for _ in 0..2 {
+            assert_eq!(get(&place), Err(NAMED_NO_LOOK.to_owned()));
+        }
+        let _ = std::fs::remove_dir_all(&folder);
     }
 }
