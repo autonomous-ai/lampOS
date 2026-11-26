@@ -270,6 +270,10 @@ def run_scene(label, group, scene, lines):
 ROW = re.compile(r'^\s*(-?[0-9.]+)s (PLAY |LAMP |HEARD|UNPLD|     ) (.*)$')
 
 
+# A left-alone line the lamp never heard ([`score`]): neither a pass nor a miss.
+UNHEARD = 'unheard'
+
+
 def score(out, lines):
     played = [line for line in lines if line[1] != 'pause' and line[0] not in ('pause', 'bg')]
     segments = []
@@ -298,7 +302,9 @@ def score(out, lines):
         if expected == 'A':
             ok = answered
         elif expected == 'Q':
-            ok = not answered
+            # Left alone only when the lamp heard it (the Reviewer-lead's P2 on #8673): a line the mic missed, a
+            # bed drowned or a muted speaker is "unheard", counted apart and never a pass. Answered is a miss.
+            ok = False if answered else (True if seg['heard'] else UNHEARD)
         elif expected == 'S':
             ok = seg['stopped']
         else:
@@ -347,19 +353,25 @@ def main():
     tsv.close()
     card = [f'voiceset {label}  {time.strftime("%Y-%m-%d %H:%M")}  {len(results)} played lines']
     total_ok = total = 0
+    total_unheard = 0
     for group in groups:
-        rows = [r for r in results if r[0] == group and r[7] is not None]
-        if not rows:
+        unheard = sum(1 for r in results if r[0] == group and r[7] == UNHEARD)
+        rows = [r for r in results if r[0] == group and r[7] not in (None, UNHEARD)]
+        total_unheard += unheard
+        if not rows and not unheard:
             continue
         ok = sum(1 for r in rows if r[7])
         total_ok += ok
         total += len(rows)
-        card.append(f'{group:12s} {ok:3d} of {len(rows):3d} as they should')
+        card.append(f'{group:12s} {ok:3d} of {len(rows):3d} as they should' + (f', {unheard} unheard' if unheard else ''))
         for r in rows:
             if not r[7]:
                 card.append(f'    MISS {r[1]}: "{r[3]}" expected {r[4]}, answered={r[5]} stopped={r[6]}; heard "{r[9]}"')
+        for r in results:
+            if r[0] == group and r[7] == UNHEARD:
+                card.append(f'    UNHEARD {r[1]}: "{r[3]}": the lamp heard nothing of it, so it is no pass')
     waits = [r[8] for r in results if r[8] is not None]
-    card.append(f'all          {total_ok:3d} of {total:3d} as they should')
+    card.append(f'all          {total_ok:3d} of {total:3d} as they should' + (f', {total_unheard} unheard' if total_unheard else ''))
     if waits:
         waits.sort()
         p90 = waits[min(len(waits) - 1, int(0.9 * len(waits)))]
@@ -375,7 +387,7 @@ def main():
         if new_file:
             f.write('when\tlabel\tlamp\tgroup\tok\tlines\n')
         for group in groups:
-            rows = [r for r in results if r[0] == group and r[7] is not None]
+            rows = [r for r in results if r[0] == group and r[7] not in (None, UNHEARD)]
             if rows:
                 f.write(f'{time.strftime("%Y-%m-%d %H:%M")}\t{label}\t{os.environ.get("LAMP_HOST", "")}\t{group}\t'
                         f'{sum(1 for r in rows if r[7])}\t{len(rows)}\n')
