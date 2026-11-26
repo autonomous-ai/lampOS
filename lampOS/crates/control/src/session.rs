@@ -4022,7 +4022,13 @@ mod tests {
         {
             let (mut door, mut session, mut fake) = paired(&Computer::new(60 + at as u8), grants);
             let set = door.handle(&mut session, volume, &mut fake, 2 * S, 1);
-            assert_ne!(code_of(&set), Some("no_grant"), "{grants:?}: {set:?}");
+            assert_eq!(reply(&set)["ok"], true, "{grants:?}: {set:?}");
+            assert_eq!(fake.did.len(), 1, "{grants:?}: {:?}", fake.did);
+            assert!(
+                fake.did[0].ends_with(" volume"),
+                "{grants:?}: {:?}",
+                fake.did
+            );
             let said = door.handle(&mut session, say, &mut fake, 2 * S, 1);
             assert_eq!(
                 code_of(&said) == Some("no_grant"),
