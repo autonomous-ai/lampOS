@@ -135,7 +135,10 @@ fn a_link_check_on_a_full_control_socket_waits_for_room_and_is_asked_once() {
         second.control.receive().unwrap(),
         Some(Control::CheckLink)
     ));
-    assert!(second.control.receive::<Control>().unwrap().is_none(), "asked once");
+    assert!(
+        second.control.receive::<Control>().unwrap().is_none(),
+        "asked once"
+    );
     rig.running().unwrap();
 }
 
