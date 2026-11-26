@@ -11854,6 +11854,55 @@ fn told_only(toml: &str) -> Result<(), Refused> {
     Err(Refused(SPEAKS_ON_ITS_OWN.into(), Some(repair.into())))
 }
 
+/// What a make is held as whose answer [`says_fixed_with_left_out`] while
+/// the lamp's agent writes it: never said, as the agent's outcome takes
+/// its place (or, with no answer from it, the agent's own reason).
+pub const VALUE_LEFT_OUT_HELD: &str =
+    "it says a line its maker couldn't work out, which the lamp's agent writes as a task step";
+
+/// The first builder's ruling on #8651 (lamp-ee17, 26 Nov: "year count",
+/// every day at 6 AM, kept as a clock trigger and the fixed say "There
+/// are days left in the year.", the count dropped, with the maker's
+/// [`LEFT_OUT`] note): whether `answer` is a skill a time, an event or a
+/// repeat starts (any trigger but a hand's alone, [`started_by_a_hand_alone`])
+/// whose only speaking is a fixed `say` (no `run` or `task` step) and that
+/// carries a `left out:` note, the card's "The maker notes what it couldn't
+/// do". Such a make goes to the lamp's agent to write as a task step whose
+/// script prints the line, its answer told, as a make that needs the
+/// internet does. Kept simple on purpose: the note is not read for whether
+/// it is about what is said. A note beside a fixed say on a timed skill is
+/// taken to be the say's value dropped, the likeliest case; a note about
+/// something else (a light it couldn't dim slowly) costs only one agent
+/// make, never a skill kept wrong. A skill asked aloud or only a hand
+/// starts, or with no note, is as before.
+pub fn says_fixed_with_left_out(answer: &str) -> bool {
+    let Ok(files) = files(answer) else {
+        return false;
+    };
+    if files.left_out.is_none() {
+        return false;
+    }
+    let Ok(table) = toml::from_str::<toml::Table>(&files.toml) else {
+        return false;
+    };
+    let Some(trigger) = table.get("trigger") else {
+        return false;
+    };
+    if started_by_a_hand_alone(trigger) {
+        return false;
+    }
+    let steps: Vec<&toml::Value> = table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .into_iter()
+        .flatten()
+        .collect();
+    steps.iter().any(|step| step.get("say").is_some())
+        && !steps
+            .iter()
+            .any(|step| step.get("run").is_some() || step.get("task").is_some())
+}
+
 /// [`speaks_on_its_own`]'s name for a fixed say whose words change.
 const A_CHANGING_SAY: &str = "a say with a number or a date";
 

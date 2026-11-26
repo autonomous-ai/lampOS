@@ -3919,8 +3919,25 @@ fn made_and_journaled_by(
     };
     // Never left unasked here: a route with no draft returned above.
     let first = first.unwrap_or_else(first_ask);
+    // A timed skill whose only speaking is a fixed say beside the maker's
+    // "couldn't do" note (the first builder's ruling on #8651): never kept
+    // with its value dropped while an agent can write it as a task step
+    // ([`made_skill::says_fixed_with_left_out`]); with none, kept as
+    // before, and journaled.
+    let value_left_out = matches!(&first, Ok(text) if made_skill::says_fixed_with_left_out(text));
     web_task_held.set(net_code);
-    let mut made = kept(first);
+    let mut made = match engine {
+        Some(_) if value_left_out => Err(Refused(made_skill::VALUE_LEFT_OUT_HELD.into(), None)),
+        _ => {
+            if value_left_out {
+                eprintln!(
+                    "lamp-voice: a skill made here: DeepSeek couldn't work out what it says: no \
+                     agent to hand it to: kept as DeepSeek's"
+                );
+            }
+            kept(first)
+        }
+    };
     web_task_held.set(false);
     // Judged not what was asked (#7621): no repair, no agent, asked again.
     if matches!(&made, Err(Refused(why, _)) if why == made_skill::UNRELATED) {
@@ -3961,6 +3978,25 @@ fn made_and_journaled_by(
                  to the agent to write"
             );
             made
+        }
+        // A fixed say with its value dropped (held above): handed to the
+        // agent as the internet's is, to write as a task step whose script
+        // prints the line, its answer told (#8610).
+        Some((agent, engine)) if matches!(&made, Err(Refused(why, _)) if why == made_skill::VALUE_LEFT_OUT_HELD) =>
+        {
+            eprintln!(
+                "lamp-voice: a skill made here: DeepSeek couldn't work out what it says: handed \
+                 to the agent ({engine}) to write as a task step"
+            );
+            handed_to_agent(
+                Before::Asked(Box::new(made)),
+                request,
+                &brief,
+                (agent, engine),
+                &agent_kept,
+                &models_cannot,
+                &deepseek_repaired,
+            )
         }
         // The person's own words for its start breaking a rule no writer
         // can change (#8451): told at once, never handed to the agent to
@@ -8331,6 +8367,92 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(tasks.hand_overs(), 2);
         assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// DeepSeek's answer for "year count" (lamp-ee17, 26 Nov): a fixed say
+    /// `words`, started by the clock at 6 AM when `timed` (else asked
+    /// aloud), with the maker's "couldn't do" note when `note`.
+    fn year_count(words: &str, timed: bool, note: bool) -> String {
+        let start = if timed {
+            "[permissions]\nspeak = true\ntopics = [\"clock/local\"]\n\n[trigger]\n\
+             topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
+             during = { from = \"06:00\", to = \"06:01\" }\n"
+        } else {
+            "[permissions]\nspeak = true\n"
+        };
+        let asks = if timed {
+            ""
+        } else {
+            "asks = [\"year count\"]\n"
+        };
+        let note = if note {
+            "left out: the exact count of days left spoken, as a dynamic count which is not \
+             possible\n"
+        } else {
+            ""
+        };
+        format!(
+            "```skill.toml\n{asks}kind = \"installable\"\nversion = \"1.0.0\"\n\n{start}\n\
+             [[do]]\nsay = {{ text = \"{words}\" }}\n```\n\n```SKILL.md\n---\nname: year-count\n\
+             description: Tells me the days left in the year.\n---\n\n# Year count\n\nIt says \
+             the days left.\n```\n{note}"
+        )
+    }
+
+    /// The first builder's ruling on #8651 (lamp-ee17, 26 Nov): a timed
+    /// skill whose only speaking is a fixed say beside the maker's
+    /// "couldn't do" note is never kept with its value dropped: handed to
+    /// the agent to write as a task step, as a make that needs the
+    /// internet is. The same say with no note, or asked aloud, is kept as
+    /// DeepSeek's, the agent never asked.
+    #[test]
+    fn a_timed_fixed_say_with_a_couldnt_do_note_goes_to_the_agent() {
+        let days = "There are days left in the year.";
+        let dropped = year_count(days, true, true);
+        assert!(made_skill::says_fixed_with_left_out(&dropped), "{dropped}");
+        let (root, kept_in) = keeping("value-left-out");
+        let tasks = agent_answering(vec![Some(good())]);
+        let (url, served) = service(vec![(200, dropped)]);
+        let told = made_by(&kept_in, url, Some(&tasks.agent()), NOW);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!((served.join().unwrap(), tasks.hand_overs()), (1, 1));
+        let entries = made_skill::entries(&kept_in.directory);
+        assert_eq!(entries.len(), 1, "{entries:?}");
+        let _ = std::fs::remove_dir_all(&root);
+        // With no agent to hand it to: kept as DeepSeek's, as before.
+        let (root, kept_in) = keeping("value-left-out-no-agent");
+        let (url, served) = service(vec![(200, year_count(days, true, true))]);
+        let told = made_by(&kept_in, url, None, NOW);
+        assert_eq!(told["made"], "year-count", "{told}");
+        assert_eq!(served.join().unwrap(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+        // The same make as `answer` would be, its hand-overs and what was
+        // made, with an agent on the lamp.
+        let make_of = |case: &str, answer: String| {
+            let (root, kept_in) = keeping(&format!("value-left-out-{case}"));
+            let tasks = agent_answering(vec![Some(good())]);
+            let (url, served) = service(vec![(200, answer)]);
+            let told = made_by(&kept_in, url, Some(&tasks.agent()), NOW);
+            let _ = std::fs::remove_dir_all(&root);
+            (
+                served.join().unwrap(),
+                tasks.hand_overs(),
+                told["made"].clone(),
+            )
+        };
+        // No note ("Time to stretch!"): kept as DeepSeek's, the agent not
+        // asked.
+        let stretch = year_count("Time to stretch!", true, false);
+        assert!(!made_skill::says_fixed_with_left_out(&stretch));
+        assert_eq!(make_of("no-note", stretch), (1, 0, json!("year-count")));
+        // Asked aloud, no trigger: the note changes nothing, the make goes
+        // as the same answer with no note goes.
+        let aloud = year_count(days, false, true);
+        assert!(!made_skill::says_fixed_with_left_out(&aloud), "{aloud}");
+        assert_eq!(
+            make_of("aloud-note", aloud),
+            make_of("aloud", year_count(days, false, false))
+        );
     }
 
     /// #7926's row on lamp-9adf (build bede187d81): "make a skill called
