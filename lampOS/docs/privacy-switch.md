@@ -305,9 +305,9 @@ switch on:
   event publishes; each is installed in order, or ridden as above if it
   lapsed in the queue, so a mute or a Stop queued behind them lands before
   anything is published, and the newest is the one held. A drain reads up
-  to 352 (`AUTHORITY_DRAIN_MOST`, 4 × (1.5 s + 250 ms) / 20 ms, the bound
-  awaiting the owner's call); a queue longer than that is the switch
-  unreadable (the microphones closed, a fresh worker), never an exit.
+  to 352 (`AUTHORITY_DRAIN_MOST`, 4 × (1.5 s + 250 ms) / 20 ms, a named
+  backstop, the first builder's yes on 26 Nov); a queue longer than that
+  is the switch unreadable (the microphones closed, a fresh worker), never an exit.
   The control socket holds fewer than that (117-119 authorities in a Mac
   test, its 64 KiB buffer; not measured on a lamp), and past what it holds
   the voice skips renewals (#8204), so the bound is a backstop.
