@@ -3096,7 +3096,8 @@ mod tests {
         );
         // Neither `go_to_sleep` nor `prepare_to_unplug` is declared: how
         // instead is told after the skills (#4595).
-        let none = crate::without_a_tool::told(false, false, false);
+        let none =
+            crate::without_a_tool::told(false, false, false, crate::without_a_tool::Head::None);
         let recalling = Recalling::new(config.clone()).tools(settings.clone());
         let equipped = recalling.equipped(config.clone());
         assert_eq!(
@@ -3165,7 +3166,8 @@ mod tests {
         };
         // Neither `go_to_sleep` nor `prepare_to_unplug` is declared: how
         // instead is told after it (#4595).
-        let none = crate::without_a_tool::told(false, false, false);
+        let none =
+            crate::without_a_tool::told(false, false, false, crate::without_a_tool::Head::None);
         catalog(&["volume_up"]);
         assert_eq!(
             told(&recalling),
@@ -3340,7 +3342,7 @@ mod tests {
         assert!(open(&recalling, &thread).ends_with(&format!(
             "{}{}",
             crate::session_tools::NO_LIGHT,
-            crate::without_a_tool::told(false, false, false)
+            crate::without_a_tool::told(false, false, false, crate::without_a_tool::Head::None)
         )));
         assert!(!has_light());
         // Asked, and the lamp said it can't.

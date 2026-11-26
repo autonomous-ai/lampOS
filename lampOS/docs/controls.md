@@ -220,7 +220,20 @@ three seconds puts it to sleep and a tap wakes it. With it the rule that it
 never agrees to something it has no function for (`lamp-voice`'s
 `without_a_tool`, #4595).
 On the Live route it follows the session's functions, on the second route
-the flag; with `go_to_sleep` declared it is not told.
+the flag; with `go_to_sleep` declared it is not told. A lamp without head
+sleep is never told the hold: it says it cannot go to sleep (#8635).
+
+**What touching its head does (#8635).** Every session, on both routes, is
+told one line of fact after that section (`without_a_tool::Head`), true for
+that lamp, so "what does touching your head do?" is answered from it in one
+short line of its own: with head sleep, a tap stops it if it speaks and
+makes it listen, a hand resting on it makes it lean in, and a hand kept
+still three seconds puts it to sleep, a tap waking it; with
+`LAMP_HEAD_TOUCH=on` but no durable mute, the tap and the resting hand
+only; without `LAMP_HEAD_TOUCH`, that its head has no touch sensor and
+touching it does nothing. The voice passes head sleep to its provider
+workers as `--head-sleep`, right after their `--head-touch`. Not a function
+and no switch of its own.
 
 **The hold says the line (#3748 part 1, `LAMP_SLEEP_LINE=on`, off unless
 on; on in the product unit since #6028).** At the hold's 2 s mark the voice plays the line "Going to sleep. Tap

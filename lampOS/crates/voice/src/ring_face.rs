@@ -268,6 +268,20 @@ const BLINK_LOW: f32 = 0.25;
 const COUNTDOWN_FROM_US: f32 = 1_000_000.0;
 const COUNTDOWN_TO_US: f32 = 3_000_000.0;
 const COUNTDOWN_LOW: f32 = 0.15;
+/// A hand on the head, from its first qualified touch (#8635): the ring
+/// warms and brightens by this share of the ceiling in [`OFFLINE_TINT`]'s
+/// amber, so a tap is seen at once and a kept hand glows while it stays.
+/// It rises fast ([`HAND_GLOW_RISE_US`], most of the way within 150 ms of
+/// the first frame that has the hand) and fades slowly once the hand is
+/// gone ([`HAND_GLOW_FALL_US`]): a tap is a short warm brightening, a
+/// stroke a glow that fades when the hand leaves. A share of the ceiling,
+/// so it stays under every cap the frame is drawn under, the night's
+/// included, and it is drawn only where the face is: the ring's guard
+/// refuses it as it refuses any face while privacy is closed. The
+/// countdown above dims it with the rest of the face.
+const HAND_GLOW: f32 = 0.35;
+const HAND_GLOW_RISE_US: f32 = 50_000.0;
+const HAND_GLOW_FALL_US: f32 = 350_000.0;
 /// After a tap's listening face at rest (#711), the face settles back to its
 /// own light this slowly: most of the way in about half a second, so that it
 /// eases and does not snap (First, #711).
@@ -321,6 +335,8 @@ pub struct Face {
     blinks: u64,
     /// How long a hand has been kept on the head ([`Face::hand`]).
     held_us: Option<u64>,
+    /// The hand's warm glow as shown, from 0 to 1 ([`HAND_GLOW`]).
+    hand_glow: f32,
     /// Until when a tap on the head is listened for at rest, and the turn
     /// of the hum that answered it ([`Face::hum_frame`]).
     tapped_until_us: Option<u64>,
@@ -380,6 +396,7 @@ impl Face {
             next_blink_us: None,
             blinks: 0,
             held_us: None,
+            hand_glow: 0.0,
             tapped_until_us: None,
             hum_turn: None,
             accent: 0,
@@ -398,9 +415,10 @@ impl Face {
     }
 
     /// How long a hand has been kept on the head, as Controls counts it, or
-    /// `None` (#711, [`crate::ring_head`]): from one second to three the face
-    /// dims, a countdown to sleep; a hand let go before then lets it brighten
-    /// again, eased like any other change.
+    /// `None` (#711, [`crate::ring_head`]): from its first touch the face
+    /// warms and brightens ([`HAND_GLOW`], #8635); from one second to three
+    /// it dims, a countdown to sleep; a hand let go before then lets it
+    /// brighten again, eased like any other change, and its glow fades.
     pub fn hand(&mut self, held_us: Option<u64>) {
         self.held_us = held_us;
     }
@@ -762,6 +780,14 @@ impl Face {
                 .clamp(0.0, 1.0)
         });
         let open = open * blink * (1.0 - (1.0 - COUNTDOWN_LOW) * countdown);
+        // A hand on the head warms the face (#8635): fast in, slow out.
+        let (wanted_glow, glow_pace) = if self.held_us.is_some() {
+            (1.0, HAND_GLOW_RISE_US)
+        } else {
+            (0.0, HAND_GLOW_FALL_US)
+        };
+        self.hand_glow += (wanted_glow - self.hand_glow) * follow(step_us, glow_pace);
+        let glow = OFFLINE_TINT.map(|tint| tint * HAND_GLOW * self.hand_glow);
         let seconds = (now_us % 3_600_000_000) as f32 / 1_000_000.0;
         // The resting breath, from 0 to 1: the lamp's one breath where its
         // inner state keeps it, else the plain one on the boot clock.
@@ -807,8 +833,10 @@ impl Face {
                 ),
             };
             let scale = accent_t.map_or([1.0; 3], |t| accent_scale(self.accent, t, angle));
-            for ((channel, target), scale) in shown.iter_mut().zip(wanted).zip(scale) {
-                *channel += (target * brighten * open * scale - *channel) * ease;
+            for (((channel, target), scale), glow) in
+                shown.iter_mut().zip(wanted).zip(scale).zip(glow)
+            {
+                *channel += ((target + glow) * brighten * open * scale - *channel) * ease;
             }
             // A share of the ceiling rarely lands on a whole step. Each pixel
             // rounds at its own fixed point, so a level between two steps is
@@ -1116,21 +1144,24 @@ mod tests {
     }
 
     /// #711: a hand kept on the head dims the face from one second to three,
-    /// a countdown to sleep, and letting go brightens it again. Two faces with
-    /// the same light, one with the hand, are compared frame by frame.
+    /// a countdown to sleep, and letting go brightens it again. The face
+    /// with the hand kept is compared frame by frame with one whose hand has
+    /// been there under a second, so both have the hand's glow (#8635) and
+    /// only the countdown differs.
     #[test]
     fn a_hand_kept_on_the_head_dims_the_face_from_one_second_to_three() {
         let at = |seconds: f32| 4_000_000_000 + (seconds * 1e6) as u64;
-        let mut lit = Face::new();
-        lit.light(Lit::of(true, "warm", 5).unwrap());
-        let mut held = lit.clone();
+        let mut touched = Face::new();
+        touched.light(Lit::of(true, "warm", 3).unwrap());
+        let mut held = touched.clone();
         let mut ratio = |hand: Option<u64>, from: f32| {
+            touched.hand(hand.map(|hand| hand.min(800_000)));
             held.hand(hand);
-            let plain = play(&mut lit, Mood::Resting, 0, at(from), 50);
+            let plain = play(&mut touched, Mood::Resting, 0, at(from), 50);
             let dimmed = play(&mut held, Mood::Resting, 0, at(from), 50);
             brightness(dimmed.last().unwrap()) as f32 / brightness(plain.last().unwrap()) as f32
         };
-        // Under a second it is only a touch: nothing changes.
+        // Under a second it is only a touch: no countdown.
         assert!((ratio(Some(800_000), 0.0) - 1.0).abs() < 0.02);
         // Half way, about half way down; at three seconds, the low glow.
         let half = ratio(Some(2_000_000), 1.0);
@@ -1140,6 +1171,91 @@ mod tests {
         assert!(low > 0.0, "never dark: the face still shows it hears");
         // Let go: back to the light.
         assert!((ratio(None, 3.0) - 1.0).abs() < 0.02);
+    }
+
+    fn reds_and_blues(frame: &[Rgb; PIXEL_COUNT]) -> (u32, u32) {
+        frame.iter().fold((0, 0), |(red, blue), pixel| {
+            (red + u32::from(pixel.red), blue + u32::from(pixel.blue))
+        })
+    }
+
+    /// #8635: a hand on the head, from its first qualified touch, warms and
+    /// brightens the resting face at once: plainly brighter within 100 ms
+    /// of the first frame that has it (the face's share of the 300 ms from
+    /// the touch, after Controls, the bus and the head's 50 ms look), and
+    /// warmer, more red than blue added. A tap let go fades back slowly,
+    /// not at once: a short warm brightening. A hand that stays keeps its
+    /// glow, which fades once it leaves. On the lamp's first light, as
+    /// most people leave it.
+    #[test]
+    fn a_hand_on_the_head_warms_the_face_at_once_and_fades_when_it_leaves() {
+        let at = |ms: u64| 4_000_000_000 + ms * 1_000;
+        let mut plain = Face::new();
+        plain.light(Lit::first());
+        play(&mut plain, Mood::Resting, 0, at(0), 100);
+        let mut touched = plain.clone();
+        let start = at(2_000);
+        // A tap: there for 200 ms, from its touch at 20 ms.
+        touched.hand(Some(20_000));
+        let tap = play(&mut touched, Mood::Resting, 0, start, 10);
+        let calm = play(&mut plain, Mood::Resting, 0, start, 10);
+        let lift = |frame: usize, of: &[[Rgb; PIXEL_COUNT]]| {
+            brightness(&of[frame]) as f32 / brightness(&calm[frame]).max(1) as f32
+        };
+        // Visible in the first frame, plainly so by the fifth (100 ms).
+        assert!(lift(0, &tap) > 1.05, "{}", lift(0, &tap));
+        assert!(lift(5, &tap) > 1.5, "{}", lift(5, &tap));
+        let (red, blue) = reds_and_blues(&tap[9]);
+        let (calm_red, calm_blue) = reds_and_blues(&calm[9]);
+        assert!(
+            red.saturating_sub(calm_red) > 2 * blue.saturating_sub(calm_blue),
+            "warm"
+        );
+        // Let go: still brighter 100 ms on, back within two seconds.
+        touched.hand(None);
+        let after = play(&mut touched, Mood::Resting, 0, start + 200_000, 100);
+        let calm = play(&mut plain, Mood::Resting, 0, start + 200_000, 100);
+        let lift = |frame: usize| {
+            brightness(&after[frame]) as f32 / brightness(&calm[frame]).max(1) as f32
+        };
+        assert!(lift(5) > 1.2, "a fade, not a snap: {}", lift(5));
+        assert!((lift(99) - 1.0).abs() < 0.05, "{}", lift(99));
+        // A hand that stays (under the countdown's second): its glow holds.
+        let mut kept = plain.clone();
+        kept.hand(Some(20_000));
+        play(&mut kept, Mood::Resting, 0, at(10_000), 20);
+        kept.hand(Some(900_000));
+        let staying = play(&mut kept, Mood::Resting, 0, at(10_400), 25);
+        let calm = play(&mut plain, Mood::Resting, 0, at(10_400), 25);
+        assert!(
+            staying
+                .iter()
+                .zip(&calm)
+                .all(|(kept, calm)| brightness(kept) as f32 > 1.5 * brightness(calm) as f32)
+        );
+    }
+
+    /// #8635, the First builder's addition: the hand's glow stays within the
+    /// ring's caps. Under a night cap of 24 and the day's 60, at the
+    /// brightest light and in every mood, with a hand on the head, no
+    /// channel of any frame passes the ceiling it is drawn under.
+    #[test]
+    fn the_hands_glow_never_passes_the_ceiling_by_day_or_at_night() {
+        for ceiling in [24, 60] {
+            for light in [Lit::of(true, "warm", 5).unwrap(), Lit::first()] {
+                for mood in [Mood::Resting, Mood::Listening, Mood::Speaking] {
+                    let mut face = Face::new();
+                    face.light(light);
+                    face.hand(Some(500_000));
+                    for frame in 0..100u64 {
+                        for pixel in face.render(mood, 255, frame * 20_000, ceiling) {
+                            let most = pixel.red.max(pixel.green).max(pixel.blue);
+                            assert!(most <= ceiling, "{mood:?} at {ceiling}: {pixel:?}");
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// #711: a tap the voice answers with its hum shows the listening face

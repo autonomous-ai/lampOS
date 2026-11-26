@@ -360,17 +360,27 @@ Off unless `lamp-expression serve --head-touch`, and Controls runs with
   lost input, a turn's end) left without its speech to count it: the sleep
   is kept, only that name is let go (#6028).
 - **A tap**, or a hand kept a second, wakes it when asleep (#3747). Awake, a tap is "are you there?" (First,
-  #711, 05:05). It looks up: the head lifts a little (`LOOK_UP`, pitch
-  -0.035 rad), and toward a face the eyes saw in the last second, more for
-  one high in the picture and less for one low (`LOOK_UP_TOWARD`, 0.025 rad
-  at the edge).
+  #711, 05:05). It looks up: the head lifts (`LOOK_UP`, pitch -0.06 rad,
+  made plain by #8635 from 0.035, under the wake's 0.065), and toward a face
+  the eyes saw in the last second, more for one high in the picture and
+  less for one low (`LOOK_UP_TOWARD`, 0.025 rad at the edge).
+  - **From the first touch (#8635):** the look starts at the head's first
+    qualified touch (Controls' `Touch`, at 20 ms), not only at the tap's
+    release, so a tap held half a second is seen within 300 ms of the
+    touch; the tap then holds it from its release. A hand that stays to
+    the stroke (1 s) lets the look go, eased, for the lean. Tests:
+    `alive_engine`'s
+    `a_touch_on_the_head_looks_up_within_300_ms_and_a_kept_hand_lets_it_go`
+    and `a_touch_that_stops_speech_looks_up_once_the_voice_has_stopped`.
   - **Timing:** in over 150 ms, the moment of the voice's "hm?" and the ring's
     listening face; held 2 s, as long as a call waits; held on while someone
     is speaking (the voice says Listening); out over 0.5 s. It follows the
-    tap itself. The ring's face follows the hum, so it is shown only when
-    the hum plays (17 Oct).
+    touch itself. The ring's listening face follows the hum, so it is shown
+    only when the hum plays (17 Oct); its warm brightening follows the hand
+    (ring-choreography.md).
   - **Only:** awake, with the body free, and not while the lamp thinks or
-    speaks.
+    speaks. A touch that stops the lamp's speech keeps its look, shown once
+    the voice no longer says Speaking, within the look's 2 s (#8635).
   - **Never while muted for privacy** (First on #711, 17 Oct 10:18). Looking
     up says "I'm listening", which a muted lamp must not seem to do. Such a
     tap neither looks up nor wakes a lamp asleep. A mute that begins while
