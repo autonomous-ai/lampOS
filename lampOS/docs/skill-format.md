@@ -35,9 +35,12 @@ A packaged skill adds `lamp-skill.json`, with `format: 1`, the skill's
 shares, the author's own, carrying their public key (`lamp-skills pack
 --key-file KEY --author`; skills.md, "A shared package"). A folder with a `run.py`, or any script,
 is refused: script skills are a later format, except the `scripts/` of a skill whose `[[do]]` has a
-`task = { task, run }` or a `run = "scripts/main.py"` step (format 2, with its top-level `grants`;
-skills.md, "A skill's task" and "A skill's `run` step"): `lamp skill check` holds that as the lamp
-does, and a push may carry it. `lamp-skills pack` refuses a
+`task = { task, run }` (with an optional `tell = "once_while_holding"`: what the agent found is
+told once while it holds and again only after a run finds it not holding, the agent answering a
+lone dash; written by a voice make for a watch on the lamp's clock, and any skill may write it,
+#8079; skills.md, "Told once until it stops holding") or a `run = "scripts/main.py"` step
+(format 2, with its top-level `grants`; skills.md, "A skill's task" and "A skill's `run` step"):
+`lamp skill check` holds that as the lamp does, and a push may carry it. `lamp-skills pack` refuses a
 task whose words are empty, longer than 120 characters or not plain (#7874).
 
 **`SKILL.md`** starts with front matter between two `---` lines. Two keys
@@ -66,7 +69,8 @@ whole"):
 Its code is in one of two step kinds: `run = "scripts/main.py"`, a script
 that does the whole job and says its own lines, run with no agent (the key
 is #8158's), or `task = { task, run }` when each start needs the agent to
-sum up.
+sum up (`tell = "once_while_holding"` beside them for a watch told once
+while it holds, as above).
 
 **A made skill a time, an event or a repeat starts (any `[trigger]` but a
 hand's) speaks only through the lamp's told answer** (#8610): its `[[do]]` is a

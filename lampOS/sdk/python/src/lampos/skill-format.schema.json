@@ -1638,6 +1638,13 @@
             "run": {
               "type": "string",
               "description": "The script, a plain file inside the skill's own scripts/ (at most four parts, none hidden)."
+            },
+            "tell": {
+              "type": "string",
+              "enum": [
+                "once_while_holding"
+              ],
+              "description": "Optional (#8079): what the agent found is told once while it holds, again only after a run finds it not holding (the agent answers a lone dash); a voice make writes it for a watch on the lamp's clock, and any skill may. Left out, every run's words are said."
             }
           },
           "description": "A task handed to the lamp's agent, alone in its [[do]] table, one a skill, in an installable skill (do.task, docs/skills.md)."
