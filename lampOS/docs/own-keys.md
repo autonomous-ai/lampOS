@@ -644,9 +644,11 @@ the person's own model too, through lamp-cloud's forwarder
   `.model` and `.checked` from this folder, each as `own_<file>` with a
   blank fallback, so lamp-cloud starts on a lamp with none. The folder
   stays root's, 0700.
-- **When a change takes effect:** lamp-cloud reads them at its start. The
-  helper restarts lamp-cloud after a model key's change (#8741), a few
-  seconds of the cloud link, and the agent uses the new route from then.
+- **When a change takes effect:** lamp-cloud reads them at its start. After
+  a person changes their model key, the helper restarts lamp-cloud (#8741),
+  so **the cloud link drops for a few seconds on purpose**, and the agent
+  uses the new route from then. An agent chat in flight is drained first,
+  for up to 10 s; one still running then is cut, said in the journal.
 - **Who can read the key:** lamp-cloud's credentials are readable by its
   user, `lampos`, as the relay's key is. The agent runtimes run as
   `lampos` too, so they can read the person's model key, as they can read

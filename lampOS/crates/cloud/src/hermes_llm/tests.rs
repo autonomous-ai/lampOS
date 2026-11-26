@@ -276,6 +276,7 @@ async fn either_switch_alone_starts_the_listener() {
             None,
             KEY,
             None,
+            std::future::pending(),
             &mut say,
         );
         let look = async {
@@ -955,4 +956,97 @@ fn the_unit_hands_in_only_the_model_keys_each_with_a_blank_fallback() {
             .any(|file| file.starts_with("deepgram") || file.starts_with("elevenlabs"))
     );
     assert!(!unit.contains(&format!("ReadOnlyPaths=-{OWN_FOLDER}")));
+}
+
+/// A stand-in relay that streams one chat answer in two pieces, `gap`
+/// apart.
+async fn slow_relay(gap: Duration) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut bytes = Vec::new();
+        let mut chunk = [0u8; 4096];
+        while !String::from_utf8_lossy(&bytes).ends_with(ASKED) {
+            let read = stream.read(&mut chunk).await.unwrap();
+            assert!(read > 0);
+            bytes.extend_from_slice(&chunk[..read]);
+        }
+        let head = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\
+                    Transfer-Encoding: chunked\r\n\r\n";
+        stream.write_all(head.as_bytes()).await.unwrap();
+        for piece in ["data: {\"a\":1}\n\n", "data: [DONE]\n\n"] {
+            let framed = format!("{:x}\r\n{piece}\r\n", piece.len());
+            stream.write_all(framed.as_bytes()).await.unwrap();
+            stream.flush().await.unwrap();
+            tokio::time::sleep(gap).await;
+        }
+        let _ = stream.write_all(b"0\r\n\r\n").await;
+    });
+    format!("http://{address}/v1")
+}
+
+/// A stop while `gap` holds a streamed chat, drained `within`: the chat's
+/// answer as the agent saw it, and the forwarder's lines.
+async fn stopped_during_a_chat(gap: Duration, within: Duration) -> (Vec<u8>, Vec<String>) {
+    let base = slow_relay(gap).await;
+    let listener = Forwarder::bind(0).await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let forwarder = Arc::new(Forwarder::new(&base, KEY, TOKEN).unwrap());
+    let (stop, stopped) = oneshot::channel::<()>();
+    let serving = tokio::spawn(forwarder.clone().serve_until(
+        listener,
+        async {
+            let _ = stopped.await;
+        },
+        within,
+    ));
+    let asking = tokio::spawn(async move {
+        let mut stream = TcpStream::connect(address).await.unwrap();
+        stream.write_all(&chat(Some(TOKEN), ASKED)).await.unwrap();
+        let mut bytes = Vec::new();
+        let _ = stream.read_to_end(&mut bytes).await;
+        bytes
+    });
+    while forwarder.flights.lock().unwrap().is_empty() {
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    stop.send(()).unwrap();
+    let cut = serving.await.unwrap();
+    // A new chat once the stop began is refused, never half-answered.
+    assert!(forwarder.take_off().is_none());
+    drop(forwarder);
+    let answer = tokio::time::timeout(Duration::from_secs(5), asking)
+        .await
+        .map(Result::unwrap)
+        .unwrap_or_default();
+    (answer, cut)
+}
+
+/// #8735: lamp-cloud's stop (the keys helper's restart) lets a streamed
+/// chat in flight end within the drain, its answer whole.
+#[tokio::test]
+async fn a_stop_drains_a_chat_in_flight() {
+    let (answer, cut) =
+        stopped_during_a_chat(Duration::from_millis(100), Duration::from_secs(5)).await;
+    assert!(cut.is_empty(), "{cut:?}");
+    let answer = String::from_utf8_lossy(&answer);
+    assert!(
+        answer.contains("[DONE]") && answer.ends_with("0\r\n\r\n"),
+        "{answer}"
+    );
+}
+
+/// #8735: a chat past the drain's bound is cut, said with how long it had
+/// run.
+#[tokio::test]
+async fn a_chat_past_the_drain_is_cut_and_said() {
+    let (_, cut) = stopped_during_a_chat(Duration::from_secs(3), Duration::from_millis(200)).await;
+    assert_eq!(cut.len(), 1, "{cut:?}");
+    assert!(
+        cut[0].starts_with("the Hermes forwarder: a chat in flight was cut by a stop (")
+            && cut[0].ends_with(" ms in)"),
+        "{}",
+        cut[0]
+    );
 }
