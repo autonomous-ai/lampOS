@@ -118,6 +118,31 @@ lamp also says once when the opt-in is turned off.
    route's pieces are whole sentences or clauses with the space between
    them given back (the Reviewer-lead's three must-fixes on #8674,
    c7185816145).
+   The mirror, a claimed start, is only corrected, never run (#7767, the
+   Reviewer-lead's c7202262971 and the first builder's c7202392079): a
+   spoken turn's reply that says the lamp is looking again by the same
+   rules (`seen_yes::claims_started`: one clause, the lamp as subject, a
+   negation cancels it, an offer or a time it waits for governs only what
+   follows; "I'm noticing your desk again", "Watching again.", "noticing
+   is on", "I've turned it back on" to a line naming the noticing; never
+   "I'll start looking again whenever you want", "Once you say so, I'm
+   noticing your desk again", "I've turned the light back on" or a
+   question), with seen activity still off at the turn's end, so no
+   `look_at_my_desk` turned it on, is followed on the second route by the
+   existing not-done line, `action_claim::NOT_DONE_LINE` ("Sorry, I didn't
+   do that. Could you ask me again?"), once, for the owner and anyone else
+   alike: the owner's ask again runs `look_at_my_desk`, and anyone else's
+   is refused by it. The camera goes on only from that call; the
+   correction reads the files and writes nothing, with one journal line
+   (`the reply says it is looking again with desk noticing off and no
+   start called`). Live says no fixed line of its own, so there the claim
+   is journalled only. On #8683's ROW (c7200527698, F4's first try, 27
+   Nov) "Lamp, desk noticing on." with noticing off got "I'm noticing your
+   desk again." with `calls=none`; that line names the noticing, so it is
+   told the state, off, and to call `look_at_my_desk` (the journal of that
+   try had rotated out; a chat begun on the line's early words now
+   journals its note too: `told the desk noticing's state on its early
+   words`).
    Once both are off (a stop called first), nothing more is written. It
    adds a word check on a sentence already in hand, and on a claim the
    stop's own two small writes. The

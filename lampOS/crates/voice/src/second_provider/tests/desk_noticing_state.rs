@@ -309,7 +309,8 @@ fn a_claimed_start_with_noticing_off_is_corrected_after_the_reply() {
         said_to(&path, Some(HEARD), REPLY),
         [
             format!("said:{REPLY}"),
-            format!("said:{}", crate::action_claim::NOT_DONE_LINE),
+            // Each piece after the first is said after a space.
+            format!("said: {}", crate::action_claim::NOT_DONE_LINE),
         ]
     );
     assert!(!allowed(&path, SEEN_ACTIVITY, true));

@@ -15655,8 +15655,15 @@ fn prepared_on(
             // Its notes as round 1 tells them: the quiet note
             // (`LAMP_KEEP_QUIETLY`) before the cut-in's, the opening last.
             // The cut-in's note as these words choose it (#7285).
+            // Journalled as the final words' note is, so a row can read
+            // whether a chat begun early was told the state (#7767).
             let notes: Vec<String> =
                 crate::seen_yes::state_note(shared.desk_noticing.as_deref(), &words)
+                    .inspect(|_| {
+                        eprintln!(
+                            "lamp-voice second: request {request}: told the desk noticing's state on its early words, read now"
+                        );
+                    })
                     .into_iter()
                     .chain(crate::keep_quietly::note_for(scope, request))
                     .chain(
@@ -25380,6 +25387,17 @@ impl Drop for Queue<'_> {
             self.request,
             self.heard_line.as_deref(),
         );
+        // A claim to be looking again with desk noticing still off and no
+        // start called (#8683's ROW, c7200527698: "I'm noticing your desk
+        // again." with `calls=none`): corrected after the reply with the
+        // existing not-done line, never by running `look_at_my_desk`
+        // (`seen_yes::ClaimWatch::start_correction`, #7767).
+        if let Some(line) = self
+            .claimed_stop
+            .start_correction(self.shared.desk_noticing.as_deref(), self.request)
+        {
+            self.say_after(self.shared.fixed(line));
+        }
         if let Some(tags) = &mut self.tags
             && self.started
         {
@@ -25392,6 +25410,34 @@ impl Drop for Queue<'_> {
     }
 }
 impl Queue<'_> {
+    /// `line`, said after the reply's last piece from its drop, where
+    /// nothing can be awaited: its speech and its hand-over to the saying
+    /// half go on the turn's speech tasks, so the saying half ends only
+    /// after it. Nothing when the saying half stopped already.
+    fn say_after(&mut self, line: &'static str) {
+        eprintln!(
+            "lamp-voice second: request {}: said \"{line}\" after the reply (LAMP_NOTICING_BY_DEFAULT)",
+            self.request
+        );
+        self.shared.wrote_piece(self.request, line);
+        if let Ok(mut said) = self.shared.lamp_said.lock() {
+            if said.0 != self.request {
+                *said = (self.request, String::new());
+            }
+            said.1.push(' ');
+            said.1.push_str(line);
+        }
+        let turn = net::Turn {
+            request: self.request,
+            heard_at: self.heard_at,
+        };
+        let packets = start_speech(self.shared, self.speech, line.to_owned(), turn);
+        let sentences = self.sentences.clone();
+        self.speech.spawn(async move {
+            let _ = sentences.send((line.to_owned(), packets, false)).await;
+        });
+    }
+
     async fn announce(&mut self) -> Result<(), Stop> {
         match self.announcement.take() {
             Some(packets) => self.send(ANNOUNCEMENT.to_owned(), packets, false).await,
