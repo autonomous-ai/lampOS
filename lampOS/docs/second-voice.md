@@ -6148,31 +6148,33 @@ after a take-over, but now for every turn:
   - **A call is "Hey Lamp" at the line's start, with `LAMP_NAME_HEY_ONLY=on`**
     (on in the product's lamp-voice.service; the product owner's ruling of
     26 Nov 2026: "remove 'Lamp'. must say 'Hey Lamp'. 'Lamp' alone creates so
-    many issues."). Out of a conversation, a hearing of the name is a call
-    only when it is heard within `attention::HEY_AT_THE_START_US` (2.5 s) of
-    the line's start, the line's first word, past one filler ("um", "uh",
-    "oh", "ah", "so"), is "hey", "hi" or "hello" (`opens_with_hey`), and the
-    word after it is the name or like it ("Hey man", "Hey, Lynn.",
-    `greeted_word_like_the_name`) or the greeting stands alone in its
-    sentence ("Hello? Do you know my face?", `greeting_set_off`). Such a
-    hearing is the call whatever the rules above ruled of its word, since
-    speech to text writes "Hey Lamp" in those ways; a word that is another
-    person's name ("Hey, Lance.", #8114) still makes it theirs, and "Hi Mark,
-    did you move the lamp?", heard at its start on lamp-74ff (26 Nov,
-    20:51), is no call. The window is wider than `NAME_AT_THE_START_US`'s
-    1.3 s: a played "Hey, Lamp. What day is it today?" was heard 1.93 s in. Any other hearing, a bare "Lamp" or the name inside a
-    sentence, counts for nothing, and a line's words call the lamp only when
-    they open with such a greeting (`called_in_text`). In a conversation the
-    name is not needed, and the rule holds nothing. "Ok" and "okay" are no
-    greeting here: said all day, and not the call the product owner named.
-    Journal at start: `out of a conversation a call is "Hey Lamp" at a
-    line's start`; per line, `counts for nothing: a call is "Hey Lamp" at the
-    line's start (LAMP_NAME_HEY_ONLY)`, and a kept call's second sign is
-    `"Hey Lamp" at the line's start`. Latency: none, a word check at the
-    verdict. Tests (both fail with the rule taken out):
+    many issues."). Out of a conversation, a hearing of the name counts only
+    within `attention::HEY_AT_THE_START_US` (2.5 s) of the line's start.
+    `lamp-name` is trained on "Hey Lamp" and not on a bare "Lamp"
+    ([bare-name.md](bare-name.md): 12 of 12 "Hey Lamp, …" heard, "Lamp," alone
+    not), and speech to text writes the call in few of its lines (242 of
+    1,415 "Hey Lamp, …" in October; on lamp-74ff on 26 Nov "Galam. What is
+    the capital of France?" and "Hang Tell me a long story …"). So a hearing
+    at the start is the call whatever the rules above ruled of its word,
+    unless the words say otherwise (`words_rule_out_hey`): an "ok" or "okay"
+    opening them ("OK Lamp" is not the call the product owner named), or a
+    greeting followed in its sentence by a word written as another's name,
+    not like the lamp's ("Hi, Mark. Did you move the lamp?", heard at its
+    start on lamp-74ff at 20:51 and answered on the first test build), or
+    another person's name as the call word (#8114). A greeting set off alone
+    ("Hello? Do you know my face?") leaves the hearing to stand. A hearing
+    later in the line, the name inside a sentence, is no call; and a line's
+    words with no hearing call the lamp only when they open with "hey", "hi"
+    or "hello" (`called_in_text`). In a conversation the name is not needed,
+    and the rule holds nothing. Journal at start: `out of a conversation a
+    call is "Hey Lamp" at a line's start`; per line, `counts for nothing: a
+    call is "Hey Lamp" at the line's start (LAMP_NAME_HEY_ONLY)`, and a kept
+    call's second sign is `"Hey Lamp" at the line's start`. Latency: none, a
+    word check at the verdict. Tests (both fail with the rule taken out):
     `with_hey_only_a_call_is_hey_lamp_at_the_lines_start`,
-    `with_hey_only_words_call_the_lamp_only_after_a_greeting`. Not yet played
-    on a lamp.
+    `with_hey_only_words_call_the_lamp_only_after_a_greeting`. Played on
+    lamp-74ff on 26 Nov, first test build: calls 7 of 10, non-calls 9 of 10;
+    the rule as it now stands, the second pass.
   - **One reply window, with `LAMP_ONE_REPLY_WINDOW=on`** (on in the
     product's lamp-voice.service; the product owner's ruling of 26 Nov 2026:
     "ok 20s make sense"). A reply to the lamp's own news (a turn it began
