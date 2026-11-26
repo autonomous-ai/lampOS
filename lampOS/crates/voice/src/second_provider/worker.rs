@@ -1156,7 +1156,15 @@ pub fn own_key_dropped_from_environment() {
 /// runs, with the person's DeepSeek key (`own`) or without it. A key kept
 /// and then removed restarts the voice without one, and the part goes on
 /// reporting, so it is never stale for good. Without a bus, nothing.
-fn report_own_key(bus_root: Option<&Path>, own: bool) {
+/// `refused` and `voice` are the counters it reads: the process-wide
+/// `OWN_KEY_REFUSED` and `OWN_VOICE_REFUSED` in the voice, a test's own in
+/// a test binary where other tests write those (#8711's flake).
+fn report_own_key(
+    bus_root: Option<&Path>,
+    own: bool,
+    refused: &'static std::sync::atomic::AtomicU16,
+    voice: &'static std::sync::atomic::AtomicU16,
+) {
     let Some(mut health) = bus_root
         .and_then(|root| lamp_bus::Bus::new(root).ok())
         .and_then(|bus| {
@@ -1172,8 +1180,8 @@ fn report_own_key(bus_root: Option<&Path>, own: bool) {
     };
     std::thread::spawn(move || {
         loop {
-            let refused = OWN_KEY_REFUSED.load(std::sync::atomic::Ordering::Relaxed);
-            let voice = super::net::OWN_VOICE_REFUSED.load(std::sync::atomic::Ordering::Relaxed);
+            let refused = refused.load(std::sync::atomic::Ordering::Relaxed);
+            let voice = voice.load(std::sync::atomic::Ordering::Relaxed);
             let report = match (refused, own_voice_health(voice)) {
                 (0, Some(voice)) => voice,
                 _ => own_key_health(own, refused),
@@ -2881,6 +2889,8 @@ pub fn serve(
         report_own_key(
             files.bus_root.as_deref(),
             config.hosted.own_deepseek.is_some(),
+            &OWN_KEY_REFUSED,
+            &super::net::OWN_VOICE_REFUSED,
         );
     } else if let Some(stopping) = own_key_stopping_at_start(own_keys_on) {
         say_own_key_once(files.bus_root.as_deref(), &stopping);
@@ -36229,7 +36239,9 @@ mod tests {
         // Another test's refused voice in this binary (#8711's flake): this
         // reporter reads its own counters, never the process-wide ones.
         super::super::net::OWN_VOICE_REFUSED.store(401, std::sync::atomic::Ordering::Relaxed);
-        super::report_own_key(Some(&root), false);
+        static REFUSED: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
+        static VOICE: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
+        super::report_own_key(Some(&root), false, &REFUSED, &VOICE);
         let mut heard = Vec::new();
         while heard.len() < 2 {
             let said = hears
