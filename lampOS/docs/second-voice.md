@@ -6720,8 +6720,10 @@ after a take-over, but now for every turn:
   both look-free doors, the one cut-in and the one answer to the lamp's
   waiting question: a line tied to the exchange under way
   (`untied_going_on::tied_read`), a correction of what was asked
-  (`untied_going_on::corrects`: "No, I meant Spain."), or, with the lamp's
-  question asked, a short reply (`untied_going_on::a_short_reply`) may take
+  (`untied_going_on::corrects`: "No, I meant Spain."), a question about what
+  is said (`untied_going_on::asks_about_it`: "Hold on, why did she leave the
+  village?"), or, with the lamp's question asked, a short reply
+  (`untied_going_on::a_short_reply`) may take
   them (`said_to_me::Line::cut_in_tied`); any other is held, the first such
   line too (`said_to_me::Line::cut_in_held`). Such a line has no voice
   print, so the window could never call it another voice. On lamp-74ff on
@@ -6729,6 +6731,11 @@ after a take-over, but now for every turn:
   over the lamp's answers through as follow-ups, and 40 were answered; with
   every look-free line over the answer held, the asker's own follow-ups and
   corrections were held too (Sixth's row on lamp-52e6, 0 of 3 and 0 of 2).
+  With the words alone, the asker's questions about the story were held (0
+  of 3), sharing no word with the thread before the answer ends, and a room
+  line about "the store" was let out by the stem of "story"; hence the
+  question form, and a prefix tie only for a word that runs on two letters
+  or more (`untied_going_on::PREFIX_RUNS_ON`).
 - **Who spoke a line, from the looks its mouth was read**
   (`LAMP_SPEAKING_READ_LOOKS=on`, #7442, #7419). A face is a line's speaker
   when it read `yes` in at least half of the line's looks

@@ -525,6 +525,138 @@ pub fn a_short_reply(heard: &str) -> bool {
     count > 0 && (count <= 3 || (count <= SHORT_REPLY_WORDS && opens))
 }
 
+/// Words a question about what the lamp is saying may open with before its
+/// question words: "Wait, what was the keeper's name?", "Hold on, why did
+/// she leave the village?", "Sorry, how old was he then?" (Sixth's row on
+/// #8689, lamp-52e6, 26 Nov 2026).
+const ABOUT_LEADS: &[&str] = &[
+    "wait",
+    "hold on",
+    "hang on",
+    "sorry",
+    "oh",
+    "um",
+    "uh",
+    "hmm",
+    "and",
+    "but",
+    "so",
+    "okay",
+    "ok",
+    "actually",
+    "excuse me",
+];
+
+/// Question words that ask about what is said: what, why, how, who, where,
+/// when or which, "what's" as [`words_of`] keeps it.
+const ASKS_ABOUT: &[&str] = &[
+    "what", "what's", "why", "how", "how's", "who", "who's", "whose", "where", "where's", "when",
+    "when's", "which",
+];
+
+/// Words after one of [`ASKS_ABOUT`] that make it a question with no "?",
+/// which speech to text may leave off: "what was …", "why did …", "how
+/// old …".
+const ASK_ON: &[&str] = &[
+    "is", "was", "are", "were", "do", "does", "did", "can", "could", "will", "would", "should",
+    "has", "have", "had", "old", "many", "much", "long", "far", "big", "tall", "come", "often",
+];
+
+/// The opening of a yes-or-no question about a thing or someone in what is
+/// said, read with a "?": "Was he the keeper?", "Did she find it?". Not of
+/// the one asked ("Did you lock the car?", "Are you coming?"), who in the
+/// room may be anyone.
+const ASKS_IF: &[&str] = &[
+    "is it",
+    "is that",
+    "is this",
+    "is he",
+    "is she",
+    "are they",
+    "was it",
+    "was that",
+    "was he",
+    "was she",
+    "were they",
+    "did it",
+    "did he",
+    "did she",
+    "did they",
+    "does it",
+    "does he",
+    "does she",
+    "do they",
+    "will it",
+    "will he",
+    "will she",
+    "will they",
+    "would it",
+    "would he",
+    "would she",
+    "can it",
+    "can he",
+    "can she",
+    "could it",
+    "could he",
+    "could she",
+    "has it",
+    "has he",
+    "has she",
+    "have they",
+    "had he",
+    "had she",
+];
+
+/// Questions of the room's own, not of what the lamp is saying: "Where's my
+/// phone?", "Who wants coffee?", "What do you want for dinner?".
+const ASKS_OF_THE_ROOM: &[&str] = &[
+    "where's my",
+    "where is my",
+    "where are my",
+    "where did i",
+    "where did my",
+    "who wants",
+    "who's coming",
+    "what do you want",
+    "what are you doing",
+    "what are we",
+    "where are we",
+    "when are we",
+];
+
+/// Whether `heard` is a question about what is said: after any of
+/// [`ABOUT_LEADS`], one of [`ASKS_ABOUT`] in a question (with a "?", a
+/// "'s", or one of [`ASK_ON`] after it), or one of [`ASKS_IF`] with a "?";
+/// not one of [`ASKS_OF_THE_ROOM`], and with no sign of desk talk
+/// ([`desk_talk`]). Read only for a line said over the lamp's own answer,
+/// where a question is the asker's about it and the room's talk is mostly
+/// not a question: Sixth's row on #8689 held all three of the asker's
+/// questions about the story it was telling, which share no word with what
+/// the thread holds before the answer ends.
+pub fn asks_about_it(heard: &str) -> bool {
+    let question = heard.contains('?');
+    let words = words_of(heard);
+    let opens = |text: &str, phrase: &str| text.starts_with(&format!(" {phrase} "));
+    let mut rest = words.as_str();
+    while let Some(lead) = ABOUT_LEADS
+        .iter()
+        .filter(|lead| opens(rest, lead))
+        .max_by_key(|lead| lead.len())
+    {
+        rest = &rest[lead.len() + 1..];
+    }
+    if ASKS_OF_THE_ROOM.iter().any(|phrase| opens(rest, phrase)) || desk_talk(heard) {
+        return false;
+    }
+    let mut words = rest.split_whitespace();
+    let (first, second) = (words.next(), words.next());
+    let asks_about = first.is_some_and(|word| {
+        ASKS_ABOUT.contains(&word)
+            && (question || word.ends_with("'s") || second.is_some_and(|on| ASK_ON.contains(&on)))
+    });
+    asks_about || (question && ASKS_IF.iter().any(|phrase| opens(rest, phrase)))
+}
+
 /// Whether `heard` refers back to what was just said: [`REFERS_BACK`]
 /// anywhere, [`REFERS_BACK_SHORT`] in a short line, or a short question
 /// opening with [`FOLLOWS_ON`].
@@ -606,15 +738,28 @@ fn content_words(text: &str) -> Vec<String> {
 /// begins "rainfall", but "car" is no part of "card".
 const PREFIX_CHARS: usize = 4;
 
+/// How many letters a word must run on past a stem it begins for the two to
+/// be one word: "rainfall" runs on four past "rain", but "store" runs on one
+/// past "stor", the stem of "story", and is another word, as "plane" is of
+/// "plan" and "start" of "star" (Sixth's row on #8689, lamp-52e6, 26 Nov
+/// 2026: "We should stop at the store on the way home.", said over the
+/// lamp's story, was tied to "tell me a long story").
+const PREFIX_RUNS_ON: usize = 2;
+
 /// Whether two stems are of one word: the same, or the shorter, of
-/// [`PREFIX_CHARS`] or more, begins the longer.
+/// [`PREFIX_CHARS`] or more, begins the longer, which runs on past it by
+/// [`PREFIX_RUNS_ON`] letters or more.
 fn same_word(one: &str, other: &str) -> bool {
     let (short, long) = if one.len() <= other.len() {
         (one, other)
     } else {
         (other, one)
     };
-    short == long || (short.chars().count() >= PREFIX_CHARS && long.starts_with(short))
+    let short_chars = short.chars().count();
+    short == long
+        || (short_chars >= PREFIX_CHARS
+            && long.chars().count() >= short_chars + PREFIX_RUNS_ON
+            && long.starts_with(short))
 }
 
 /// Whether `heard` shares a content word with any of `said`: the lamp's
@@ -909,6 +1054,43 @@ mod tests {
         }
     }
 
+    /// Sixth's row on #8689 (lamp-52e6, 26 Nov 2026): the asker's questions
+    /// about the story the lamp is telling, said over it, ask about it by
+    /// their form, with or without the "?" speech to text may leave off.
+    /// The room's talk does not, nor a question of the room's own or of the
+    /// one asked, nor one to a name.
+    #[test]
+    fn a_question_about_what_is_said_asks_about_it() {
+        for line in [
+            "Wait, what was the keeper's name?",
+            "Hold on, why did she leave the village?",
+            "Sorry, how old was he then?",
+            "Wait, what's the fox called",
+            "hold on why did she go",
+            "And how many people live there?",
+            "Was he the keeper?",
+            "Um, did she find her way home?",
+            "Who's the old man in the boat?",
+        ] {
+            assert!(asks_about_it(line), "{line}");
+        }
+        for line in [
+            "We should stop at the store on the way home.",
+            "Don't stop now, you're almost done.",
+            "Oh, what a twist.",
+            "Where's my phone?",
+            "Wait, who wants coffee?",
+            "Did you lock the car?",
+            "Sorry, did you send the slides to Sam?",
+            "Are you coming to lunch?",
+            "Hey Helen, what time is the meeting?",
+            "Was he",
+            "",
+        ] {
+            assert!(!asks_about_it(line), "{line}");
+        }
+    }
+
     /// #5124's grace: `on` only, and a line begun from the answer's end to
     /// 3 s after it, never over the answer or with none played.
     #[test]
@@ -1128,6 +1310,16 @@ mod tests {
         for (one, other) in [("car", "card"), ("son", "song"), ("sam", "saigon")] {
             assert!(!shares_a_word(one, &[other]), "{one} {other}");
         }
+        // Nor a word a letter longer (Sixth's row on #8689): "store" is no
+        // form of "story" ("stor").
+        for (one, other) in [("store", "story"), ("plane", "plan"), ("start", "star")] {
+            assert!(!shares_a_word(one, &[other]), "{one} {other}");
+            assert!(!shares_a_word(other, &[one]), "{other} {one}");
+        }
+        assert!(!tied(
+            "We should stop at the store on the way home.",
+            &["Tell me a long story about a fox."]
+        ));
         assert_eq!(stem("ngày"), "ngày");
         assert!(tied(
             "Will it be this hot again?",
