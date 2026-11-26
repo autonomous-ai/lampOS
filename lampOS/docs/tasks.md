@@ -591,8 +591,19 @@ a Harness idempotency key. A receipt with an already-bound agent or creation
 ID on a different task becomes uncertain. The adapter validates the expected
 machine, label, engine and ask-mode receipt before accepting a new binding.
 
-At startup, old prepared/queued tasks become `invalidated`; they are never
-automatically dispatched. An interrupted `attempting` record becomes
+At startup, old prepared/queued tasks become `invalidated` (code `restart`,
+ended at the new start); they are never automatically dispatched. A queued
+one the person said yes to in this boot (an update restarts lamp-tasks and
+lamp-voice) is told once by task news within ten minutes of that start, as
+a hand-over that did not reach its agent, with an offer to try again
+(`task_news::failed_hand_over`, the `failed` words); a prepared one never
+said yes to stays unsaid, and so does one said yes to before a reboot, as
+how long ago is not known. Told is kept in the voice's told file, so a
+voice that starts again does not tell it twice, and a later restart of
+lamp-tasks leaves its end as it was. Tests:
+`engine::tests::a_queued_task_said_yes_to_ends_restart_with_its_yes_kept`,
+`task_news::tests::a_hand_over_said_yes_to_that_a_restart_ended_is_told_once`.
+An interrupted `attempting` record becomes
 `uncertain`. An interrupted observation becomes a failed read, without a new
 launch. An outstanding speech claim becomes uncertain. Accepted, pending,
 uncertain and reported-spoken history remains. Old confirmations and speech
@@ -7379,7 +7390,8 @@ finished." (1.82 s). Three faults, all mended the same night:
   the person said yes to that fails is told as news within ten minutes, in
   plain words, with an offer to try again (`task_news::failed_hand_over`);
   so is one said yes to that expired before it was sent (`invalidated`
-  `expired`, #8601).
+  `expired`, #8601), or that a restart of lamp-tasks ended still queued
+  (`invalidated` `restart`, said yes to in this boot).
 - **News told to an empty office.** At 00:49:48, 11 s after the restart, the
   lamp told the 22:39 task's names with nobody there: the presence check took
   the start of the service for someone speaking. Now only something a person

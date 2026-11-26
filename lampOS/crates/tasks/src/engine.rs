@@ -4513,6 +4513,49 @@ mod tests {
         }
     }
 
+    /// A task the person said yes to, still queued when lamp-tasks restarts
+    /// (an update), ends `invalidated` `restart` with its yes kept and the
+    /// end stamped at the restart, never sent: what the voice tells once as
+    /// one that did not reach its agent. A second restart leaves it as it
+    /// was, so the end the voice reads never moves.
+    #[test]
+    fn a_queued_task_said_yes_to_ends_restart_with_its_yes_kept() {
+        let (mut engine, memory) = opened();
+        let id = queued(&mut engine, 1);
+        let prepared = prepare(&mut engine, 2);
+        drop(engine);
+        let recovered =
+            Engine::open(memory.clone(), targets(), STORE, RESTART, &clock(60_000)).unwrap();
+        let ended = |engine: &Engine<Memory>, id: u64| {
+            engine.state.tasks[find(&engine.state, id).unwrap()]
+                .dispatch
+                .clone()
+        };
+        let task = ended(&recovered, id);
+        assert_eq!(task.state, DispatchState::Invalidated);
+        assert_eq!(task.code.as_deref(), Some("restart"));
+        assert!(task.confirmed.is_some());
+        assert!(task.attempted.is_none());
+        let finished = task.finished.clone().unwrap();
+        assert_eq!(finished.monotonic_ms, 60_000);
+        assert_eq!(finished.session_id, RESTART);
+        // Never said yes to: no yes on record, so the voice keeps it unsaid.
+        let unsaid = ended(&recovered, prepared);
+        assert_eq!(unsaid.state, DispatchState::Invalidated);
+        assert_eq!(unsaid.code.as_deref(), Some("restart"));
+        assert!(unsaid.confirmed.is_none());
+        drop(recovered);
+        let again = Engine::open(
+            memory,
+            targets(),
+            STORE,
+            "55555555555555555555555555555555",
+            &clock(120_000),
+        )
+        .unwrap();
+        assert_eq!(ended(&again, id).finished, Some(finished));
+    }
+
     #[test]
     fn final_dispatch_outcomes_never_automatically_resend() {
         for outcome in [

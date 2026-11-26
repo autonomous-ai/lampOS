@@ -2501,6 +2501,17 @@ một byte (`crates/tasks/src/one_session.rs`).
   `two_tasks_held_for_the_place_then_a_cold_gateway_each_end_once`,
   `task_news::tests::an_expired_hand_over_said_yes_to_is_told_once`. Tới 16031 nó cũng chỉ có 120 s, nên Gateway khởi động nguội
   khoảng 220 s (lamp-ee17) làm việc kết thúc `expired` mà không ai nghe.
+  Khi lamp-tasks khởi động lại (một bản cập nhật khởi động lại cả
+  lamp-tasks và lamp-voice), việc còn trong hàng đợi thành `invalidated`
+  `restart`, kết thúc lúc khởi động mới. Việc đã được nói "có" trong lần
+  bật máy này được task news báo một lần trong mười phút sau đó, như một
+  lần giao việc không tới agent, kèm đề nghị thử lại (lời `failed`); việc
+  chưa được nói "có", hoặc được nói "có" trước một lần khởi động lại máy
+  (không biết đã bao lâu), vẫn im lặng. Những gì đã báo được giữ trong file
+  told của giọng nói, nên giọng nói khởi động lại không báo lần nữa, và
+  lần khởi động lại sau của lamp-tasks không đổi lúc kết thúc của nó. Test:
+  `engine::tests::a_queued_task_said_yes_to_ends_restart_with_its_yes_kept`,
+  `task_news::tests::a_hand_over_said_yes_to_that_a_restart_ended_is_told_once`.
   Store có việc được thử quá 120 s của nó được ghi là schema 9, mà bản
   build trước sẽ để sang một bên. **Quay lui:** quay về một bản build đọc
   schema 8 sau khi có việc được giữ quá 120 s sẽ để cả store sang một bên
