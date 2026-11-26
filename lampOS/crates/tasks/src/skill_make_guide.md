@@ -56,7 +56,8 @@ What a skill can do, all of it in format.md and examples/:
   several steps in order, and Python's own standard library. Code runs in
   one of two step kinds, chosen now, at the make:
   - **`run`**: a `[[do]]` step written exactly `run = "scripts/main.py"`,
-    only in a skill the person's own words start (`asks`, no trigger).
+    only in a skill the person's own words start (`asks`, no trigger), or
+    one only a touch or a press starts.
     The script does the whole job and calls `lamp.say` for its success
     line and for its failure line (the fetch failed, nothing was found, a
     service isn't linked). The lamp runs it with no agent at all. This is
@@ -100,15 +101,18 @@ What a skill can do, all of it in format.md and examples/:
   minutes with the web: the same held trigger and cooldown, its `[[do]]` the
   `task` step. When rules.md doesn't allow `net`, answer its internet line.
 
-**A skill a time, an event or a repeat starts (any `[trigger]`) speaks
-only through the lamp's told answer.** Its `[[do]]` is a `task` step. Its
+**A skill a time, an event or a repeat starts (any `[trigger]` but a
+touch or a press) speaks only through the lamp's told answer.** Its `[[do]]` is a `task` step. Its
 scripts print what they found and never call `lamp.say`, `lamp.sound`, the
 speaker or `control.sock`, and its grants never name `speak` or `speaker`.
 The agent's last answer, one to three plain sentences, is what the lamp
 tells the owner, once: only when the owner is alone in view, no one has
 spoken for a minute, and it isn't quiet hours. A `run` step, and code that
-says its own line, are only for a skill the person's own words start. The
-lamp refuses any other way; examples/morning-headline.
+says its own line, are only for a skill the person's own words start, or
+one whose every trigger is a touch or a press (`controls/touch`,
+`controls/pet`, `controls/gesture`): that is the person at the lamp asking,
+answered at once. The lamp refuses any other way;
+examples/morning-headline.
 
 How a skill runs, so its code fits:
 
