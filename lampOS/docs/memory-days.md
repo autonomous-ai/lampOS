@@ -906,8 +906,8 @@ own legs owed (#7960's ROW passed the connector legs beside them). The
 reminder rows (`LAMP_SERVICE_RECORDS_REMINDERS`) are on too, since #7970, the
 Harness task rows (`LAMP_SERVICE_RECORDS_TASKS`) since 20 Nov by the same rule,
 their ROW owed on lamp-06c1, and the source tool (`LAMP_SERVICE_RECORDS_SOURCE`)
-since 20 Nov by the same rule, its ROW on lamp-06c1 in its switch-on pull
-request. The sdk rows stay off until their own ROWs; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`)
+since 20 Nov by the same rule, its ROW owed on lamp-06c1 in its switch-on
+pull request. The sdk rows stay off until their own ROWs; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`)
 stays off: nothing writes to it yet, and the installer doesn't make
 `lampos-linked`.
 

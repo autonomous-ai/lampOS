@@ -666,7 +666,7 @@ còn nợ (ROW của #7960 đạt các bước bản ghi kết nối bên cạnh
 (`LAMP_SERVICE_RECORDS_REMINDERS`) cũng bật, từ #7970, dòng việc Harness
 (`LAMP_SERVICE_RECORDS_TASKS`) bật từ 20/11 theo cùng quy tắc, ROW của nó còn
 nợ trên lamp-06c1, và công cụ tìm nguồn (`LAMP_SERVICE_RECORDS_SOURCE`) từ 20/11
-theo cùng quy tắc, ROW của nó trên lamp-06c1 trong pull request bật nó. Dòng sdk
+theo cùng quy tắc, ROW của nó còn nợ trên lamp-06c1 trong pull request bật nó. Dòng sdk
 vẫn tắt cho tới ROW riêng; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`) vẫn
 tắt: chưa có gì ghi vào nó, và trình cài đặt chưa tạo nhóm `lampos-linked`.
 
