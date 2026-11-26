@@ -389,6 +389,20 @@ pub fn count_only(request: Option<u64>) {
 
 /// Text of at most `most` bytes, with every run of whitespace or control
 /// characters one space.
+/// Whether lines `a` and `b` say the same words, in order: lower case, any
+/// run of what is not a letter or a digit between words
+/// ([`Thread::answered_between_but_in_place`]).
+fn same_words(a: &str, b: &str) -> bool {
+    let words = |line: &str| {
+        line.split(|c: char| !c.is_alphanumeric())
+            .filter(|word| !word.is_empty())
+            .map(str::to_lowercase)
+            .collect::<Vec<_>>()
+    };
+    let a = words(a);
+    !a.is_empty() && a == words(b)
+}
+
 fn add(to: &mut String, text: &str, most: usize) {
     for c in text.chars() {
         let c = if c.is_control() || c.is_whitespace() {
@@ -1483,6 +1497,30 @@ impl Thread {
     ) -> bool {
         self.exchanges.iter().any(|exchange| {
             exchange.request > after && exchange.request < before && !skip(&exchange.person)
+        })
+    }
+
+    /// [`Self::answered_between`], leaving out an exchange that answered
+    /// request `after`'s own line in its place ([`Self::heard_in_own_line`]):
+    /// its own line, or its person's words, the same words as `after`'s, in
+    /// [`same_words`]'s fold (`remember::heard`'s done write answered in a
+    /// later request's place, #8570), and one whose person's line `skip`
+    /// takes, as [`Self::answered_between_but`].
+    pub fn answered_between_but_in_place(
+        &self,
+        after: u64,
+        before: u64,
+        skip: impl Fn(&str) -> bool,
+    ) -> bool {
+        let own = self.heard_in_own_line(after);
+        self.exchanges.iter().any(|exchange| {
+            exchange.request > after
+                && exchange.request < before
+                && !skip(&exchange.person)
+                && !own.as_deref().is_some_and(|own| {
+                    let line = self.heard_in_own_line(exchange.request);
+                    same_words(line.as_deref().unwrap_or(&exchange.person), own)
+                })
         })
     }
 

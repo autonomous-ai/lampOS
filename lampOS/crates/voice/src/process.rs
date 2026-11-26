@@ -3346,6 +3346,8 @@ fn second_route_worker_environment(
         crate::remember::heard::DONE_YES_AGAIN_ENVIRONMENT,
         crate::remember::HITS_ROOM_NOT_ASKER_ENVIRONMENT,
         crate::second_provider::OWN_ECHO_CUT_END_ENVIRONMENT,
+        // A done write answered in a later request's place (#8570, S8).
+        crate::remember::heard::DONE_IN_PLACE_ENVIRONMENT,
         crate::second_provider::FACE_NAME_ENVIRONMENT,
         crate::second_provider::STT_WARM_ENVIRONMENT,
         // Read by the speech-to-text stream in this worker (#2527): without
@@ -3899,6 +3901,7 @@ mod tests {
             crate::remember::heard::DONE_YES_AGAIN_ENVIRONMENT,
             crate::remember::HITS_ROOM_NOT_ASKER_ENVIRONMENT,
             crate::second_provider::OWN_ECHO_CUT_END_ENVIRONMENT,
+            crate::remember::heard::DONE_IN_PLACE_ENVIRONMENT,
             crate::second_provider::FACE_NAME_ENVIRONMENT,
             crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
             crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT,
@@ -5175,6 +5178,7 @@ mod tests {
                     || name == crate::remember::heard::DONE_YES_AGAIN_ENVIRONMENT
                     || name == crate::remember::HITS_ROOM_NOT_ASKER_ENVIRONMENT
                     || name == crate::second_provider::OWN_ECHO_CUT_END_ENVIRONMENT
+                    || name == crate::remember::heard::DONE_IN_PLACE_ENVIRONMENT
                     || name == crate::second_provider::FACE_NAME_ENVIRONMENT
                     || name == crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT
                     || name == crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT
@@ -5406,6 +5410,7 @@ mod tests {
                     "LAMP_MAKE_SKILL_ASKED=on",
                     "LAMP_MEMORY_ASK_NEAR_HEARD=on",
                     "LAMP_MEMORY_DAYS=on",
+                    "LAMP_MEMORY_DONE_IN_PLACE=on",
                     "LAMP_MEMORY_DONE_YES_AGAIN=on",
                     "LAMP_MEMORY_DONT_KNOW_RECALLS=on",
                     "LAMP_MEMORY_DOUBT_UNDOES=on",

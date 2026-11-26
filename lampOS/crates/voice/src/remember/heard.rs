@@ -104,6 +104,37 @@ pub(crate) fn set_done_already_for_test(done: Option<super::MemoryDone>) {
     DONE_ALREADY_FOR_TEST.with(|cell| cell.set(done));
 }
 
+/// Only the exact value `on` (#8570, S8 req 144). A done write whose
+/// request's answer was cut, its words answered in a later request's place
+/// (`second_provider`: "request N is held, so request M's words, cut short
+/// by it, are answered in its place"), stays "your last turn"'s for a yes
+/// after that answer ([`done_last_turn`]): the turn between answered the
+/// done write's own line, so it is the same turn. Off, as before.
+pub const DONE_IN_PLACE_ENVIRONMENT: &str = "LAMP_MEMORY_DONE_IN_PLACE";
+static DONE_IN_PLACE: OnceLock<bool> = OnceLock::new();
+
+#[cfg(test)]
+thread_local! {
+    /// [`DONE_IN_PLACE_ENVIRONMENT`] for one test's own thread.
+    static DONE_IN_PLACE_FOR_TEST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether [`DONE_IN_PLACE_ENVIRONMENT`] is on in this process, read once.
+pub fn done_in_place_on() -> bool {
+    #[cfg(test)]
+    if DONE_IN_PLACE_FOR_TEST.with(std::cell::Cell::get) {
+        return true;
+    }
+    *DONE_IN_PLACE
+        .get_or_init(|| std::env::var(DONE_IN_PLACE_ENVIRONMENT).ok().as_deref() == Some("on"))
+}
+
+/// [`done_in_place_on`] on or off for the calling test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_done_in_place_for_test(on: bool) {
+    DONE_IN_PLACE_FOR_TEST.with(|cell| cell.set(on));
+}
+
 /// Words nearly every sentence has, in [`fold`]'s form with accents kept:
 /// `lamp_memory::search::COMMON` (#2282, [`super::SEARCH_COMMON`]), with
 /// these: "an", and the words a model uses for whoever spoke.
@@ -659,7 +690,17 @@ fn done_last_turn(
     // only a yes to this write keeps it the last turn's: no memory call was
     // sent in it, as one empties the done write (#8570, S13 reqs 453-454:
     // "Yes, please keep that." said again was told nothing was kept).
-    let between = if done_yes_again_on() {
+    // With [`DONE_IN_PLACE_ENVIRONMENT`], a turn between that answered the
+    // done write's own line in its place, its answer cut, is that write's
+    // turn too (#8570, S8 reqs 141-144: "Lily visits on Saturday after
+    // all." changed in 141, answered by 142, then "Yes. Please keep that."
+    // was told nothing was waiting and asked again).
+    let again = done_yes_again_on();
+    let between = if done_in_place_on() {
+        thread.answered_between_but_in_place(done_for, request, |person| {
+            again && yes_to_done(person, done)
+        })
+    } else if again {
         thread.answered_between_but(done_for, request, |person| yes_to_done(person, done))
     } else {
         thread.answered_between(done_for, request)
@@ -761,7 +802,20 @@ pub fn heard_instead(model: &str, heard: Option<&str>, on: bool) -> Option<Strin
         return None;
     }
     let said: Vec<String> = words(&heard).map(|word| bare(&word)).collect();
-    if key_words(model).iter().all(|word| said.contains(word)) {
+    // A number key word ("441") is heard when every number the model names
+    // is among the heard line's, in the fold C81 and the memory's `once`
+    // already compare them in ([`super::numbers`]: "four four one" is
+    // "441"), however the speech to text spelled it (#8570, S8 req 147).
+    let numbers_heard = || {
+        let heard_numbers = super::numbers(&heard);
+        super::numbers(model)
+            .iter()
+            .all(|number| heard_numbers.contains(number))
+    };
+    if key_words(model)
+        .iter()
+        .all(|word| said.contains(word) || (!super::numbers(word).is_empty() && numbers_heard()))
+    {
         return None;
     }
     let mut kept = String::from(SAID);
@@ -2071,6 +2125,56 @@ mod tests {
         set_done_yes_again_for_test(false);
     }
 
+    /// #8570 F1 (lamp-06c1, 26 Nov, S8 reqs 141-144): "Lily visits on
+    /// Saturday after all." was changed in request 1, whose answer was cut;
+    /// request 2 heard nothing and answered request 1's words in its place
+    /// ("Kept: Lily visits on Saturday after all…"); request 3 was thrown
+    /// away with no answer; "Yes. Please keep that." (request 4) is told it
+    /// is changed already, never [`YES_ALONE`]: the turn between answered
+    /// the done write's own words. With `LAMP_MEMORY_DONE_IN_PLACE` only.
+    #[test]
+    fn a_yes_after_a_done_write_answered_in_a_later_requests_place_is_done_already() {
+        use super::super::MemoryDone;
+        use crate::thread::Thread;
+        let now = Instant::now();
+        let lily = "Lily visits on Saturday after all.";
+        let in_place = |between: &str| {
+            let mut thread = Thread::new();
+            // Request 1's own line, held at its first call; it ended before
+            // its answer, and request 2 answers its words in its place.
+            thread.line_of(1, lily);
+            thread.person(between, true, now);
+            thread.line_of(2, between);
+            thread.lamp(
+                2,
+                "Kept: Lily visits on Saturday after all, that replaces the Sunday one.",
+                now,
+            );
+            // Request 3 heard nothing and left no exchange.
+            thread.person("Yes. Please keep that.", true, now);
+            thread
+        };
+        let changed = Some((MemoryDone::Changed, Some(1)));
+        set_done_in_place_for_test(true);
+        let thread = in_place(lily);
+        let told = yes_alone_in(&thread, (4, None, now), false, changed).unwrap();
+        assert_eq!(told["already"], true, "{told}");
+        assert_eq!(told["note"], DONE_ALREADY_CHANGED, "{told}");
+        assert!(done_already_in(&thread, (4, None, now), changed).is_some());
+        // A turn between with words of its own still ends it (the
+        // Reviewer-lead's P2 on #5607).
+        let thread = in_place("My goldfish is called Pip.");
+        let told = yes_alone_in(&thread, (4, None, now), false, changed).unwrap();
+        assert_eq!(told["note"], YES_ALONE, "{told}");
+        assert!(done_already_in(&thread, (4, None, now), changed).is_none());
+        // Off: as on the lamp, told nothing was waiting.
+        set_done_in_place_for_test(false);
+        let thread = in_place(lily);
+        let told = yes_alone_in(&thread, (4, None, now), false, changed).unwrap();
+        assert_eq!(told["note"], YES_ALONE, "{told}");
+        assert!(done_already_in(&thread, (4, None, now), changed).is_none());
+    }
+
     /// C37 (lamp-06c1, 5 Nov): heard "renunculus", the model wrote
     /// "ranunculus". Its words not heard are each a near spelling of a heard
     /// one, so the keep is asked about; with the same words heard nothing
@@ -2212,5 +2316,29 @@ mod tests {
         ] {
             assert_eq!(yes_line(line), line);
         }
+    }
+
+    /// #8570 F3 (lamp-06c1, 26 Nov, S8 req 147): the model wrote "441" for
+    /// a line the STT spelled "four four one". The number was heard, so the
+    /// model's own words are kept, as when the STT gave digits (25 Nov).
+    #[test]
+    fn digits_heard_as_number_words_keep_the_models_words() {
+        assert_eq!(
+            heard_instead(
+                "Their gym locker code is 441.",
+                Some("remember that my gym locker code is four four one"),
+                true,
+            ),
+            None
+        );
+        // Another number heard is not the model's: the heard line is kept.
+        assert!(
+            heard_instead(
+                "Their gym locker code is 441.",
+                Some("remember that my gym locker code is four four two"),
+                true,
+            )
+            .is_some()
+        );
     }
 }

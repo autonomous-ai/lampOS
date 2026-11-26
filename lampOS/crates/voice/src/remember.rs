@@ -12937,7 +12937,8 @@ impl DaysClient {
                     lease,
                 )
             {
-                let notes = talk_found(&answer, false);
+                let taken = told.to_string().len();
+                let notes = talk_fitting(talk_found(&answer, false), taken);
                 if !notes.is_empty()
                     && let Some(found) = told["found"].as_array_mut()
                 {
@@ -13049,7 +13050,13 @@ impl DaysClient {
                 ) else {
                     continue;
                 };
-                for (item, id) in talk_found(&answer, scope.is_some()) {
+                // Within what the recall's answer has room for (#8570, S8
+                // req 146: 6 entries and 2 notes past 4,096 bytes were told
+                // as the memory not answering).
+                let taken = json!({"found":found,"untrusted":true,"scope":BOTH_SCOPE})
+                    .to_string()
+                    .len();
+                for (item, id) in talk_fitting(talk_found(&answer, scope.is_some()), taken) {
                     found.push(item);
                     ids.push((scope.map(str::to_owned), id));
                 }
@@ -15012,6 +15019,35 @@ fn chapters_found(answer: &Value) -> Vec<(Value, u64)> {
             Some((item, id))
         })
         .collect()
+}
+
+/// Of a recall's talk notes `notes` (`talk_found`), in order, those that
+/// fit what is left of the answer's room past `taken` bytes, as
+/// `records_recalled` sizes its records: [`lamp_gemini::MAX_TOOL_JSON_BYTES`]
+/// less the same 64 bytes. A note that does not fit is left out, never cut,
+/// and the journal counts them; a recall's own entries are never left out.
+/// All of them when they fit, as before.
+fn talk_fitting(notes: Vec<(Value, u64)>, taken: usize) -> Vec<(Value, u64)> {
+    let room = lamp_gemini::MAX_TOOL_JSON_BYTES.saturating_sub(64);
+    let mut used = taken;
+    let mut left_out = 0;
+    let mut fitting = Vec::with_capacity(notes.len());
+    for (item, id) in notes {
+        // The item and the comma before it.
+        let bytes = item.to_string().len() + 1;
+        if used + bytes > room {
+            left_out += 1;
+            continue;
+        }
+        used += bytes;
+        fitting.push((item, id));
+    }
+    if left_out > 0 {
+        eprintln!(
+            "lamp-voice provider: a recall's talk notes past its answer's room are left out ({left_out}), its own entries told"
+        );
+    }
+    fitting
 }
 
 /// The found items of a `talk_notes` answer, `theirs` or the room's, and
@@ -35356,6 +35392,161 @@ mod tests {
         assert!(room[0].0.get("theirs").is_none());
         assert_eq!(room[0].0["about"], super::TALK_ROOM);
         assert!(super::talk_found(&json!({"ok":false}), true).is_empty());
+    }
+
+    const TALK_FIT_CHILD: &str = "LAMP_MEMORY_TALK_FIT_TEST_CHILD";
+
+    /// #8570 F2 (lamp-06c1, 26 Nov, S8 req 146, and 25 Nov req 437): a
+    /// known person's recall got its 6 entries and 2 talk notes, every part
+    /// answered in 56 ms, yet the lamp said its memory was not answering:
+    /// together they passed the 4,096-byte tool answer, so the whole recall
+    /// was not sendable and was told [`gone`]. The recall is told with all
+    /// its own entries and the talk notes that fit, and is sendable. In a
+    /// process of its own, with `LAMP_CONVERSATION_SUMMARY` on.
+    #[test]
+    fn a_recall_past_the_answers_room_keeps_its_entries_and_the_notes_that_fit() {
+        if std::env::var(TALK_FIT_CHILD).ok().as_deref() != Some("1") {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "remember::tests::a_recall_past_the_answers_room_keeps_its_entries_and_the_notes_that_fit",
+                    "--nocapture",
+                ])
+                .env(TALK_FIT_CHILD, "1")
+                .env(crate::conversation_summary::ENVIRONMENT, "on")
+                .output()
+                .unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(
+                output.status.success() && stdout.contains("1 passed"),
+                "{stdout}\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+        const MAI: &str = "p-0123456789abcdef";
+        // Six kept things of 400 bytes (the recall's 2,400), and two talk
+        // notes of 600 bytes, as the snapshot's 261 to 610.
+        fn answer(request: &Value) -> Value {
+            if request["op"] == "talk_notes" {
+                let notes: Vec<Value> = (0..2)
+                    .map(|n| json!({"id":6291 - n,"day":"2026-11-26","text":"n".repeat(600)}))
+                    .collect();
+                return json!({"ok":true,"talk_notes":notes});
+            }
+            let entries: Vec<Value> = (0..6)
+                .map(|n| json!({"kind":"kept","id":6280 + n,"at_unix_ms":NOW - n * 60_000,"text":"k".repeat(400),"active":true}))
+                .collect();
+            json!({"ok":true,"entries":entries})
+        }
+        let (socket, served) = memory_within("talk-fit", 2, answer);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let (told, _) = client.run_at(
+            &call(
+                RECALL,
+                json!({"day_from":"2026-11-20","day_to":"2026-11-26"}),
+            ),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            Some(MAI),
+        );
+        let read = served.join().unwrap();
+        assert_eq!(read.len(), 2, "{read:?}");
+        assert_eq!(read[1]["op"], "talk_notes", "{read:?}");
+        assert_ne!(told, gone(), "the memory answered every part");
+        assert!(
+            crate::tools::sendable(&told),
+            "{} bytes",
+            told.to_string().len()
+        );
+        let found = told["found"].as_array().unwrap();
+        let ids: Vec<u64> = found
+            .iter()
+            .filter_map(|item| item["source_id"].as_u64())
+            .collect();
+        for id in 6280..6286 {
+            assert!(ids.contains(&id), "entry {id} kept: {ids:?}");
+        }
+        assert!(found.len() <= 8, "{ids:?}");
+        drop(client);
+        let _ = std::fs::remove_file(&socket);
+    }
+
+    const TALK_UNDER_CHILD: &str = "LAMP_MEMORY_TALK_UNDER_TEST_CHILD";
+
+    /// #8570 F2, beside [`a_recall_past_the_answers_room_keeps_its_entries_and_the_notes_that_fit`]:
+    /// a recall whose entries and talk notes fit the 4,096-byte answer is
+    /// asked and told byte for byte as before: the talk-note ask keeps its
+    /// 6,400 bytes, and every note is told whole, as `talk_found` gives it.
+    /// In a process of its own, with `LAMP_CONVERSATION_SUMMARY` on.
+    #[test]
+    fn a_recall_under_the_answers_room_is_told_its_notes_byte_for_byte() {
+        if std::env::var(TALK_UNDER_CHILD).ok().as_deref() != Some("1") {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "remember::tests::a_recall_under_the_answers_room_is_told_its_notes_byte_for_byte",
+                    "--nocapture",
+                ])
+                .env(TALK_UNDER_CHILD, "1")
+                .env(crate::conversation_summary::ENVIRONMENT, "on")
+                .output()
+                .unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(
+                output.status.success() && stdout.contains("1 passed"),
+                "{stdout}\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+        const MAI: &str = "p-0123456789abcdef";
+        fn notes() -> Value {
+            let notes: Vec<Value> = (0..2)
+                .map(|n| json!({"id":6291 - n,"day":"2026-11-26","text":"n".repeat(300)}))
+                .collect();
+            json!({"ok":true,"talk_notes":notes})
+        }
+        fn answer(request: &Value) -> Value {
+            if request["op"] == "talk_notes" {
+                return notes();
+            }
+            // Six, the recall's whole limit, so the room is not asked.
+            let entries: Vec<Value> = (0..6)
+                .map(|n| json!({"kind":"kept","id":6280 + n,"at_unix_ms":NOW - n * 60_000,"text":"k".repeat(60),"active":true}))
+                .collect();
+            json!({"ok":true,"entries":entries})
+        }
+        let (socket, served) = memory_within("talk-under", 2, answer);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let (told, _) = client.run_at(
+            &call(
+                RECALL,
+                json!({"day_from":"2026-11-20","day_to":"2026-11-26"}),
+            ),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            Some(MAI),
+        );
+        let read = served.join().unwrap();
+        assert_eq!(read.len(), 2, "{read:?}");
+        assert_eq!(read[1]["op"], "talk_notes", "{read:?}");
+        assert_eq!(read[1]["max_bytes"], super::TALK_RECALL_BYTES, "{read:?}");
+        let found = told["found"].as_array().unwrap();
+        let notes: Vec<String> = super::talk_found(&notes(), true)
+            .into_iter()
+            .map(|(item, _)| item.to_string())
+            .collect();
+        let told_notes: Vec<String> = found[found.len() - 2..]
+            .iter()
+            .map(Value::to_string)
+            .collect();
+        assert_eq!(told_notes, notes);
+        assert_eq!(found.len(), 8, "{told}");
+        drop(client);
+        let _ = std::fs::remove_file(&socket);
     }
 }
 
