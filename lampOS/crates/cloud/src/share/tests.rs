@@ -954,6 +954,15 @@ fn a_kept_trigger_skill_that_would_speak_is_refused_in_a_plain_line() {
             "en",
         );
         assert_eq!(refused, Err(SPEAKS_ON_ITS_OWN.into()), "{at}");
+        // In Vietnamese for a Vietnamese owner (El's P3 on #8688).
+        let refused = share(
+            &store,
+            &places,
+            &data,
+            &scratch(&format!("told-{at}-vi")),
+            "vi",
+        );
+        assert_eq!(refused, Err(SPEAKS_ON_ITS_OWN_VI.into()), "{at} vi");
     }
     assert!(sent.try_recv().is_err(), "nothing was sent");
     // The repair text stays the agent's, from `lamp-skills pack` itself.
