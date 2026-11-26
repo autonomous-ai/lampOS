@@ -832,6 +832,8 @@ pub const CANNOT_TURN: &str = "I can't turn toward it: my turn isn't measured ye
 /// What the model is told, before why, of a call that would move the body
 /// while the body is down (#6834: a customer lamp's body stopped, every
 /// gesture dropped, and the voice still said it was dancing).
+/// lamp-voice knows this refusal by its start (`CANNOT_MOVE_SAID`, #8640):
+/// keep "I can't move right now" first.
 pub const CANNOT_MOVE: &str = "I can't move right now, so I did nothing. Say so in a few words; never say you are moving or dancing. Why:";
 
 /// What the model is told, before why, of a call whose whole run is a
@@ -852,6 +854,11 @@ pub fn body_down(health: Option<&lamp_msgs::Health>, stands: Option<bool>) -> Op
         }
         if let Some(body) = health.items.iter().find(|item| item.name == "body") {
             match body.level {
+                // A body stopped on purpose (`lamp-health`'s "stopped; down
+                // for N s", #8640) is said as a person would.
+                Level::Error if body.message.starts_with("stopped") => {
+                    return Some("my body has stopped.".into());
+                }
                 Level::Error if !body.message.is_empty() => return Some(body.message.clone()),
                 Level::Error => return Some("my body has stopped.".into()),
                 Level::Stale => return Some("my body is not running.".into()),
