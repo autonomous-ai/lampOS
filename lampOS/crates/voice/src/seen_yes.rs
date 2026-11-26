@@ -1841,6 +1841,8 @@ mod tests {
             ("I'm going to stop looking now.", None),
             ("Desk noticing is off now.", None),
             ("Done, my camera is off.", None),
+            ("Got it, I'm not watching anymore.", None),
+            ("I'm not looking at your desk anymore.", None),
         ] {
             assert!(claims_stopped(reply, heard), "{reply} to {heard:?}");
         }
@@ -1861,6 +1863,20 @@ mod tests {
             ("I stopped the timer.", Some("Stop the timer.")),
             ("Your desk looks tidy.", None),
             (SEEN_DISCLOSURE, None),
+            // Friday's P2-a on #8780 (c7194711313): an offer in an earlier
+            // clause of the sentence is still an offer.
+            ("If you ask, my camera goes off.", None),
+            ("Whenever you want, I'll turn my camera off.", None),
+            // P2-b: a negated stop says the lamp is still watching.
+            (
+                "I haven't stopped watching your desk.",
+                Some("Lamp, are you still watching my desk?"),
+            ),
+            ("No, I never stopped watching.", None),
+            ("I haven\u{2019}t stopped watching your desk.", None),
+            ("I have not stopped watching.", None),
+            // P3: a stop on offer is no claim either.
+            ("I'll stop watching if you'd like.", None),
         ] {
             assert!(!claims_stopped(reply, heard), "{reply} to {heard:?}");
         }
