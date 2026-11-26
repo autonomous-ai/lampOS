@@ -7874,6 +7874,25 @@ forces one), a skill it makes is made whole, with everything a run needs:
   model's brief says it too (`make_skill_local::CHANGING_LINE`). Tests
   `a_timed_fixed_say_with_a_number_or_a_date_is_refused_and_a_constant_one_kept`,
   `the_brief_says_a_line_that_changes_is_never_a_fixed_say`.
+  **A fixed say beside the maker's "couldn't do" note goes to the agent**
+  (the first builder's ruling on #8651, lamp-ee17, 26 Nov: "year count",
+  every day at 6 AM, kept as the clock and the fixed `say` "There are days
+  left in the year.", the count dropped, its card ending "The maker notes
+  what it couldn't do: …"): on the voice's DeepSeek path, a first answer
+  whose skill a time, an event or a repeat starts (any trigger but a
+  hand's alone), whose only speaking is a fixed `say` (no `run` or `task`
+  step) and which carries a `left out:` line
+  (`made_skill::says_fixed_with_left_out`) is never kept. It is handed to
+  the lamp's agent, as a make that needs the internet is, to write as a
+  task step whose script prints the line, its answer told; the journal
+  says "a skill made here: DeepSeek couldn't work out what it says: handed
+  to the agent (<engine>) to write as a task step". With no agent engine
+  set it is kept as before, journaled "… no agent to hand it to: kept as
+  DeepSeek's". The note is not read for whether it is about the say: a
+  note about something else on such a skill costs one agent make, never a
+  skill kept wrong. The same say with no note ("Time to stretch!"), or
+  asked aloud, is kept as before. Test
+  `a_timed_fixed_say_with_a_couldnt_do_note_goes_to_the_agent`.
   The refusal goes to the writer first, as the
   try's failure (`made_skill::TOLD_ONLY_REPAIR`: a `task` step, no
   `speak`, scripts that print, the agent's answer the spoken summary), so

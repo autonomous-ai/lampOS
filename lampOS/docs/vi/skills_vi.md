@@ -4263,6 +4263,27 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   này (`make_skill_local::CHANGING_LINE`). Test
   `a_timed_fixed_say_with_a_number_or_a_date_is_refused_and_a_constant_one_kept`,
   `the_brief_says_a_line_that_changes_is_never_a_fixed_say`.
+  **Một `say` cố định đi kèm ghi chú "couldn't do" của người viết được giao
+  cho agent** (phán quyết của builder đầu tiên trên #8651, lamp-ee17, 26/11:
+  "year count", mỗi ngày lúc 6 giờ sáng, được giữ với trigger đồng hồ và
+  `say` cố định "There are days left in the year.", con số bị bỏ, thẻ của
+  nó kết thúc bằng "The maker notes what it couldn't do: …"): trên đường
+  DeepSeek của giọng nói, câu trả lời đầu tiên có kỹ năng do một thời
+  điểm, một sự kiện hay một lần lặp khởi động (bất kỳ trigger nào trừ khi
+  chỉ có bàn tay), mà cách nói duy nhất là một `say` cố định (không có bước
+  `run` hay `task`) và có dòng `left out:`
+  (`made_skill::says_fixed_with_left_out`) không bao giờ được giữ. Nó được
+  giao cho agent của đèn, như một lần tạo cần internet, để viết thành một
+  bước task có script in ra câu đó, câu trả lời được kể lại; nhật ký ghi
+  "a skill made here: DeepSeek couldn't work out what it says: handed to
+  the agent (<engine>) to write as a task step". Khi không có engine agent
+  nào được đặt, nó được giữ như trước, nhật ký ghi "… no agent to hand it
+  to: kept as DeepSeek's". Ghi chú không được đọc để xem nó có nói về câu
+  `say` hay không: một ghi chú về điều khác trên kỹ năng như vậy chỉ tốn
+  một lần tạo của agent, không bao giờ giữ một kỹ năng sai. Cùng câu `say`
+  đó mà không có ghi chú ("Time to stretch!"), hay được hỏi bằng lời, vẫn
+  được giữ như trước. Test
+  `a_timed_fixed_say_with_a_couldnt_do_note_goes_to_the_agent`.
   Lời từ chối đến người viết trước, như thất bại của lần
   chạy thử (`made_skill::TOLD_ONLY_REPAIR`: một bước `task`, không `speak`,
   script in ra, câu trả lời của agent là phần tóm tắt nói ra), nên một lần
