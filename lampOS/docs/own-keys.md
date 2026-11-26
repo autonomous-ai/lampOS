@@ -10,7 +10,7 @@ the first builder 09:44, Third's privacy read 09:50).
 **`LAMP_OWN_KEYS=on`, on in the product (#8367)** on three units:
 `lamp-setup.service`, `lamp-cloud.service` and `lamp-voice.service`, the
 voice's with the keys' folder (`ConfigurationDirectory=lampOS/voice/own`,
-mode 0700, and `LoadCredential=own:/etc/lampOS/voice/own`, the lines
+mode 0750, and `LoadCredential=own:/etc/lampOS/voice/own`, the lines
 `deploy/product/own-keys-voice.conf` gave test lamps by hand, which a lamp
 no longer needs). `lamp-cloud` also needs `LAMP_CLOUD=on` and
 `LAMP_SETTINGS_CHANGE=on`, both on in the product. `install` places the
@@ -109,8 +109,24 @@ followed, and the only request setup or the helper makes with the key:
 
 `/etc/lampOS/voice/own/`: `deepseek.key`, `deepseek.url` (the endpoint,
 the old key removed first, so a key never sits beside another key's endpoint) and
-`deepgram.key`. The folder is root's, 0700, each file 0600, written whole and
-renamed into place. The voice's drop-in loads the folder whole
+`deepgram.key`. The folder is root:lampos 0750, each file root:lampos 0640
+(#8735), written whole and renamed into place, the file's group set before
+the rename. The helper reads `lampos`'s gid from `/etc/group` at each write
+and, at each `keys.set`, brings the folder and every file in it to those
+modes, so a folder kept 0700 with 0600 files before #8735 is changed at the
+next set. systemd never changes an existing configuration folder's mode or
+group (it only warns), so the product's tmpfiles (`lampos.conf`: `z
+/etc/lampOS/voice/own 0750 root lampos -` and `z /etc/lampOS/voice/own/*
+0640 root lampos -`) bring an older folder to the same at each boot and an
+update's switch.
+
+**Who can read it:** root, and every process running as the `lampos`
+group. That is `lamp-cloud`, whose forwarder reads the person's model key
+there to send the agent's chat to the person's model (#8735), and the
+agent runtimes (OpenClaw, Hermes), which run as `lampos` too. So the agent
+runtimes can read the person's keys, as they can read the relay key
+today. The voice runs as root and loads the folder as its credentials
+(`LoadCredential=`), which the group's mode doesn't change. The voice's drop-in loads the folder whole
 (`LoadCredential=own:/etc/lampOS/voice/own`), so each file is the credential
 `own_<file>` in its `CREDENTIALS_DIRECTORY`; `ConfigurationDirectory=` makes
 the folder if it's missing, so an empty one is no credential, never a failed
@@ -218,7 +234,7 @@ service.
   key too". A voice ID is 1 to 64
   letters and digits. `keys.remove` takes `elevenlabs`.
 - **Where it's kept:** beside the others, `elevenlabs.key` and
-  `elevenlabs.voice` in `/etc/lampOS/voice/own/`, root's, 0600, so the
+  `elevenlabs.voice` in `/etc/lampOS/voice/own/`, root:lampos 0640, so the
   voice reads them as `own_elevenlabs.key` and `own_elevenlabs.voice`. Never
   in a reply, an error, a journal line or a report.
 - **The check:** one request, `GET https://api.elevenlabs.io/v1/voices/<voice_id>`
@@ -387,7 +403,7 @@ on the same `keys.*` path and the same switch, with the contract agreed on
   endpoint has no model by that name" (`bad_field`), and the list itself is
   never said back. A list that can't be read is `unreached`, "the lamp
   couldn't reach that endpoint to check that key; nothing changed".
-- **Kept:** `openai_compatible.key`, `.url` and `.model`, 0600, as
+- **Kept:** `openai_compatible.key`, `.url` and `.model`, 0640, as
   DeepSeek's are. **One own model at a time:** keeping one takes the other
   model service's own key away, so `in_use.model` is the one kept and the
   voice never guesses.
@@ -494,7 +510,7 @@ own provider (#2094's rule). The tests that pin it:
   nothing changed". Seen live on 24 Nov: a made-up key's `/key` is 401, a
   made-up model's endpoints 404.
 - **Kept:** `openrouter.key`, `openrouter.model` and `openrouter.checked`,
-  0600, with no endpoint file. It is one of the model services
+  0640, with no endpoint file. It is one of the model services
   (`Service::MODELS`): keeping it takes DeepSeek's own and the
   OpenAI-compatible key away, with their endpoint and model files, and
   keeping either of those takes it away. `keys.get` adds `openrouter`
@@ -553,7 +569,7 @@ endpoint, fixed. The tests that pin it: `setup/tests/it/keys.rs`
   `models/<id>` or `<id>`; 404 is "Gemini has no model by that name"
   (`bad_field`). Seen live too: a made-up model asked with no key is 404.
   A real key with a made-up model isn't seen yet; the row reads it.
-- **Kept:** `gemini.key`, `gemini.model` and `gemini.checked`, 0600, no
+- **Kept:** `gemini.key`, `gemini.model` and `gemini.checked`, 0640, no
   endpoint file. One of the model services: keeping it takes DeepSeek's own,
   the OpenAI-compatible and OpenRouter's away, and keeping any of them takes
   it away. `keys.get` adds `gemini`, `since.gemini`, `model.gemini`,
@@ -608,7 +624,7 @@ tests that pin it: `setup/tests/it/keys.rs`
   "that key was refused"; anything else is "couldn't reach Anthropic". A
   real key with a made-up model isn't seen yet; the row reads it.
 - **Kept:** `anthropic.key`, `anthropic.model` and `anthropic.checked`,
-  0600, no endpoint file. One of the model services: keeping it takes
+  0640, no endpoint file. One of the model services: keeping it takes
   DeepSeek's own, the OpenAI-compatible, OpenRouter's and Gemini's away,
   and keeping any of them takes it away. `keys.get` adds `anthropic`,
   `since.anthropic`, `model.anthropic`, `checked.anthropic`, and
@@ -691,9 +707,9 @@ the person's own model too, through lamp-cloud's forwarder
 
 The lamp's agent (OpenClaw, Hermes) breaks on a model that makes no tool
 calls, so a model key is checked for them once, at `keys.set` and at setup
-(the lead's answer to Q3 on #8735). The forwarder that would send the agent
-to the person's model is not built yet (PR1, waiting on Q1): today the agent
-stays on the relay whatever `keys.get` says.
+(the lead's answer to Q3 on #8735). lamp-cloud's forwarder (#8742) reads
+the person's model key in the folder, as "Who can read it" above says; this
+check is what `keys.get` reports, and the forwarder's own rule is its PR's.
 
 - **When:** after a model service's key check works (DeepSeek,
   OpenAI-compatible, OpenRouter, Gemini, Anthropic; never Deepgram or

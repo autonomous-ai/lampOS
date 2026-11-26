@@ -83,11 +83,11 @@ fn a_key_absent_present_and_removed() {
             .unwrap()
             .permissions()
             .mode();
-        assert_eq!(mode & 0o777, 0o600, "{file}");
+        assert_eq!(mode & 0o777, 0o640, "{file}");
     }
     assert_eq!(
         fs::metadata(&store.0).unwrap().permissions().mode() & 0o777,
-        0o700
+        0o750
     );
     assert_eq!(
         fs::read_to_string(store.0.join("deepseek.key")).unwrap(),
@@ -418,7 +418,24 @@ fn the_helpers_units_are_as_the_helper_reads_them() {
     )));
     assert!(unit.contains("User=root\n"));
     assert!(unit.contains("ConfigurationDirectory=lampOS/voice/own\n"));
-    assert!(unit.contains("ConfigurationDirectoryMode=0700\n"));
+    assert!(unit.contains("ConfigurationDirectoryMode=0750\n"));
+    // #8735: systemd leaves an existing folder's mode and group, so the
+    // product's tmpfiles bring a folder kept before to root:lampos 0750, 0640.
+    let tmpfiles = include_str!("../../../../deploy/product/lampos.conf");
+    for line in [
+        "z /etc/lampOS/voice/own 0750 root lampos -",
+        "z /etc/lampOS/voice/own/* 0640 root lampos -",
+    ] {
+        assert!(tmpfiles.lines().any(|have| have == line), "{line}");
+    }
+    for name in ["lamp-voice.service", "own-keys-voice.conf"] {
+        let text = fs::read_to_string(format!(
+            "{}/../../deploy/product/{name}",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+        assert!(text.contains("ConfigurationDirectoryMode=0750\n"), "{name}");
+    }
     assert!(unit.contains("RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6\n"));
     assert!(!unit.contains("PrivateNetwork=yes"));
     assert!(!unit.contains("ReadWritePaths=/etc"));
@@ -513,7 +530,7 @@ fn an_elevenlabs_key_and_voice_are_checked_kept_and_never_said() {
             .unwrap()
             .permissions()
             .mode();
-        assert_eq!(mode & 0o777, 0o600, "{file}");
+        assert_eq!(mode & 0o777, 0o640, "{file}");
     }
     let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
     never_said(&reply, &None);
@@ -643,7 +660,7 @@ fn an_openai_compatible_model_is_kept_with_its_endpoint_and_model() {
             .unwrap_or_else(|error| panic!("{file}: {error}"))
             .permissions()
             .mode();
-        assert_eq!(mode & 0o777, 0o600, "{file}");
+        assert_eq!(mode & 0o777, 0o640, "{file}");
     }
     assert_eq!(
         fs::read_to_string(store.0.join("openai_compatible.model"))
@@ -823,7 +840,7 @@ fn an_openrouter_model_is_kept_with_its_model_at_openrouters_own_endpoint() {
             .unwrap_or_else(|error| panic!("{file}: {error}"))
             .permissions()
             .mode();
-        assert_eq!(mode & 0o777, 0o600, "{file}");
+        assert_eq!(mode & 0o777, 0o640, "{file}");
     }
     // No endpoint file: OpenRouter's is fixed.
     assert!(!store.0.join("openrouter.url").exists());
@@ -954,7 +971,7 @@ fn a_gemini_model_is_kept_with_its_model_at_geminis_own_endpoint() {
             .unwrap_or_else(|error| panic!("{file}: {error}"))
             .permissions()
             .mode();
-        assert_eq!(mode & 0o777, 0o600, "{file}");
+        assert_eq!(mode & 0o777, 0o640, "{file}");
     }
     assert!(!store.0.join("gemini.url").exists());
     for file in ["openrouter.key", "openrouter.model", "openrouter.checked"] {
@@ -1068,7 +1085,7 @@ fn an_anthropic_model_is_kept_with_its_model_at_anthropics_own_endpoint() {
             .unwrap_or_else(|error| panic!("{file}: {error}"))
             .permissions()
             .mode();
-        assert_eq!(mode & 0o777, 0o600, "{file}");
+        assert_eq!(mode & 0o777, 0o640, "{file}");
     }
     assert!(!store.0.join("anthropic.url").exists());
     for file in ["gemini.key", "gemini.model", "gemini.checked"] {
@@ -1219,4 +1236,48 @@ fn the_agent_uses_an_own_model_key_only_once_it_made_a_tool_call() {
         json!({"model": "deepseek", "agent": "relay", "agent_why": "unchecked"})
     );
     let _ = fs::remove_dir_all(store.0.parent().unwrap());
+}
+
+/// #8735: the folder is root:lampos 0750 and each file 0640, so lamp-cloud
+/// (lampos) reads the person's model key; a folder kept 0700 with 0600 files
+/// before is brought to the same at the next set, the files it did not write
+/// included.
+#[test]
+fn a_set_leaves_the_folder_0750_and_every_file_0640_an_old_one_too() {
+    let store = Store(folder("modes"));
+    let mode = |path: &std::path::Path| fs::metadata(path).unwrap().permissions().mode() & 0o777;
+    fs::create_dir_all(&store.0).unwrap();
+    fs::set_permissions(&store.0, fs::Permissions::from_mode(0o700)).unwrap();
+    let old = store.0.join("deepgram.key");
+    fs::write(&old, PLANTED).unwrap();
+    fs::set_permissions(&old, fs::Permissions::from_mode(0o600)).unwrap();
+    let (reply, _) = keys::answer(
+        &set("deepseek", ""),
+        &store,
+        &mut Told(Verdict::Works, vec![]),
+        true,
+    );
+    assert_eq!(reply["done"]["code"], "works", "{reply}");
+    assert_eq!(mode(&store.0), 0o750);
+    for file in [
+        "deepgram.key",
+        "deepseek.key",
+        "deepseek.url",
+        "deepseek.checked",
+    ] {
+        assert_eq!(mode(&store.0.join(file)), 0o640, "{file}");
+    }
+    // A new folder the same.
+    let fresh = Store(folder("modes-fresh"));
+    keys::answer(
+        &set("deepgram", ""),
+        &fresh,
+        &mut Told(Verdict::Works, vec![]),
+        true,
+    );
+    assert_eq!(mode(&fresh.0), 0o750);
+    assert_eq!(mode(&fresh.0.join("deepgram.key")), 0o640);
+    for store in [store, fresh] {
+        let _ = fs::remove_dir_all(store.0.parent().unwrap());
+    }
 }
