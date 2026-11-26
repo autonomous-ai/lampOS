@@ -1017,6 +1017,38 @@ fn stand_alone(counted: bool) -> &'static [&'static str] {
 /// Greetings that may come before the name of a call ("Hey Lamp,").
 const GREETINGS: &[&str] = &["hey", "hi", "ok", "okay", "oh", "hello"];
 
+/// The greetings "Hey Lamp" opens with as speech to text writes it ("Hey,
+/// Lamp.", "Hey man", "Hi, Lynn", "Hello?"), for `LAMP_NAME_HEY_ONLY`. Not
+/// "ok" or "okay": said all day, and not the call the product owner named.
+const HEY_GREETINGS: &[&str] = &["hey", "hi", "hello"];
+
+/// The second sign a call kept as "Hey Lamp" at its start counts by.
+const HEY_AT_THE_START: &str = "\"Hey Lamp\" at the line's start";
+
+/// Whether `heard` opens with one of [`HEY_GREETINGS`], past one filler
+/// ("um", "uh", "oh", "ah", "so"): "Hey Lamp, …", "Um, hey Lamp", "Hello?".
+pub(crate) fn opens_with_hey(heard: &str) -> bool {
+    const FILLERS: [&str; 5] = ["um", "uh", "oh", "ah", "so"];
+    let mut words = heard
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty());
+    let first = match words.next() {
+        Some(word)
+            if FILLERS
+                .iter()
+                .any(|filler| word.eq_ignore_ascii_case(filler)) =>
+        {
+            words.next()
+        }
+        first => first,
+    };
+    first.is_some_and(|word| {
+        HEY_GREETINGS
+            .iter()
+            .any(|greeting| word.eq_ignore_ascii_case(greeting))
+    })
+}
+
 /// Whether `word` is a greeting a call may open with ([`GREETINGS`]).
 pub(crate) fn is_greeting(word: &str) -> bool {
     GREETINGS
@@ -2113,6 +2145,12 @@ pub struct Attention {
     /// weighed as under a sure hearing with no face turned and no words
     /// calling the lamp, for the journal (#8136).
     name_unsure_dropped: bool,
+    /// `LAMP_NAME_HEY_ONLY` ([`Attention::only_hey_lamp`]): a call is "Hey
+    /// Lamp" at a line's start; and, for the line last weighed, whether its
+    /// hearing was kept as one, or dropped for want of it.
+    hey_only: bool,
+    hey_kept: bool,
+    name_unhey_dropped: bool,
     /// `LAMP_NAME_NOT_ANOTHERS=on` (#8114, [`Self::hold_anothers_name`]).
     not_anothers: bool,
     /// `LAMP_NAME_GREETED_STAND_IN=on` ([`Self::keep_greeted_stand_ins`]).
@@ -2549,13 +2587,41 @@ impl Attention {
             && self.not_anothers
             && turned != Some(true)
             && called_by_another_name(&self.heard);
+        // `LAMP_NAME_HEY_ONLY` (the product owner, 26 Nov 2026): out of a
+        // conversation a call is "Hey Lamp" at the line's start, nothing
+        // else. A hearing at the line's start in a line that opens with a
+        // greeting is the call, whatever the rules above ruled of its word:
+        // speech to text writes "Hey Lamp" as "Hey man", "Hey, Lynn." or
+        // "Hello?". Not a word that is another person's name ("Hey, Lance.",
+        // #8114). Any other hearing, a bare "Lamp" or the name inside a
+        // sentence, is no call. In a conversation the name is not needed.
+        self.hey_kept = weighed
+            && self.hey_only
+            && !in_conversation
+            && self.named_at_start
+            && opens_with_hey(&self.heard)
+            && !self.name_anothers_dropped;
+        self.name_unhey_dropped = weighed && self.hey_only && !in_conversation && !self.hey_kept;
+        if self.hey_kept {
+            self.name_short_dropped = false;
+            self.name_near_dropped = false;
+            self.name_unsure_dropped = false;
+        }
         let alone = weighed
+            && !self.hey_kept
             && (signs.is_empty()
                 || self.name_short_dropped
                 || self.name_near_dropped
                 || self.name_unsure_dropped
-                || self.name_anothers_dropped);
-        self.name_signs = if weighed && !alone { signs } else { Vec::new() };
+                || self.name_anothers_dropped
+                || self.name_unhey_dropped);
+        self.name_signs = if self.hey_kept {
+            vec![HEY_AT_THE_START]
+        } else if weighed && !alone {
+            signs
+        } else {
+            Vec::new()
+        };
         if alone {
             self.named = false;
             self.named_sure = false;
@@ -2705,6 +2771,29 @@ impl Attention {
     /// lamp ([`Self::need_a_face_or_words`], #8136).
     pub fn name_dropped_as_unsure(&self) -> bool {
         self.name_unsure_dropped
+    }
+
+    /// With `LAMP_NAME_HEY_ONLY` (`second_provider::NAME_HEY_ONLY_ENVIRONMENT`,
+    /// the product owner on 26 Nov 2026: "remove 'Lamp'. must say 'Hey
+    /// Lamp'. 'Lamp' alone creates so many issues."), from now on: out of a
+    /// conversation, a hearing of the name is a call only as "Hey Lamp" at
+    /// the line's start ([`Self::weigh_the_name`]), and a line's words call
+    /// the lamp only when they open with a greeting ([`Self::called_in_text`]).
+    /// In a conversation the name is not needed, and nothing here holds a line.
+    pub fn only_hey_lamp(&mut self, on: bool) {
+        self.hey_only = on;
+    }
+
+    /// Whether the name heard for the line last weighed counted for nothing
+    /// with `LAMP_NAME_HEY_ONLY`: not "Hey Lamp" at the line's start.
+    pub fn name_dropped_without_hey(&self) -> bool {
+        self.name_unhey_dropped
+    }
+
+    /// Whether the name heard for the line last weighed was kept as "Hey
+    /// Lamp" at the line's start, with `LAMP_NAME_HEY_ONLY`.
+    pub fn name_kept_as_hey(&self) -> bool {
+        self.hey_kept
     }
 
     /// Whether the name heard for the line last weighed, though dropped, is
@@ -3849,6 +3938,8 @@ impl Attention {
             called(heard)
         };
         read && !(self.call_narrowed && !self.named && !begins_with_the_name(heard))
+            // `LAMP_NAME_HEY_ONLY`: words call the lamp only as "Hey Lamp".
+            && (!self.hey_only || opens_with_hey(heard))
     }
 
     /// With `LAMP_BUSY_CALLED_STRICT=on`, in a busy room with nobody turned
@@ -8113,6 +8204,92 @@ mod tests {
     /// "Lamp's here." is "lamp's" to that list. The owner's language is read
     /// once per process (`language::at_start`), so English stands in for it
     /// here; the same `text_calls` passes its forms. "Okay." is still dropped.
+    /// `LAMP_NAME_HEY_ONLY` (the product owner, 26 Nov 2026): out of a
+    /// conversation a call is "Hey Lamp" at the line's start. A hearing there
+    /// with a greeting before it is kept, as speech to text writes it ("Hey
+    /// man", "Hello?"); a bare "Lamp", a line with no greeting, or the name
+    /// heard late in a sentence is no call. In a conversation the rule holds
+    /// nothing. Off, a bare "Lamp" at the start counts as before.
+    #[test]
+    fn with_hey_only_a_call_is_hey_lamp_at_the_lines_start() {
+        let weigh = |heard: &str, hearing_at_us: u64, hey_only: bool, going_on: bool| {
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            attention.only_hey_lamp(hey_only);
+            attention.began_at(1, 1, 10_000_000);
+            attention.name_heard_scored(hearing_at_us, 0.97);
+            attention.heard(heard);
+            let dropped = attention.weigh_the_name(None, going_on);
+            (
+                dropped,
+                attention.name_kept_as_hey(),
+                attention.name_dropped_without_hey(),
+            )
+        };
+        let start = 10_400_000;
+        for heard in [
+            "Hey, Lamp. What time is it?",
+            "Hey man, what time is it?",
+            "Hello? Do you know my face?",
+            "Um, hey lamp, are you there?",
+        ] {
+            assert_eq!(
+                weigh(heard, start, true, false),
+                (false, true, false),
+                "{heard}"
+            );
+        }
+        for heard in [
+            "Lamp, what time is it?",
+            "Okay. Fine. Exactly.",
+            "What is one plus one?",
+        ] {
+            assert_eq!(
+                weigh(heard, start, true, false),
+                (true, false, true),
+                "{heard}"
+            );
+        }
+        assert_eq!(
+            weigh(
+                "Hi Mark, the lamp is too bright today.",
+                12_000_000,
+                true,
+                false
+            ),
+            (true, false, true),
+            "the name heard late in a sentence"
+        );
+        assert!(
+            !weigh("Lamp, and Spain?", start, true, true).2,
+            "in a conversation"
+        );
+        assert_eq!(
+            weigh("Lamp, what time is it?", start, false, false),
+            (false, false, false),
+            "off: as before"
+        );
+    }
+
+    /// `LAMP_NAME_HEY_ONLY`: a line's words call the lamp only when they
+    /// open with a greeting ("Hey Lamp, …"), not "Lamp, …" or "the lamp".
+    #[test]
+    fn with_hey_only_words_call_the_lamp_only_after_a_greeting() {
+        let calls = |heard: &str, hey_only: bool| {
+            let mut attention = Attention::default();
+            attention.only_hey_lamp(hey_only);
+            attention.heard(heard);
+            attention.called_in_text()
+        };
+        assert!(calls("Hey Lamp, what time is it?", true));
+        assert!(!calls("Lamp, what time is it?", true));
+        assert!(calls("Lamp, what time is it?", false), "off: as before");
+        assert!(super::opens_with_hey("Hello?"));
+        assert!(super::opens_with_hey("Um, hey lamp"));
+        assert!(!super::opens_with_hey("Okay, hey"));
+        assert!(!super::opens_with_hey("They said hi"));
+    }
+
     #[test]
     fn a_short_line_whose_words_call_the_lamp_keeps_a_name_heard_in_the_sound() {
         let dropped = |heard: &str, passing: bool| {

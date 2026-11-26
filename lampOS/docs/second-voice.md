@@ -6145,6 +6145,29 @@ after a take-over, but now for every turn:
     room" (`LAMP_CUT_IN_WORDLESS_RESUMES`, shape 7's second half), and a
     short line standing in a conversation's window by a hearing under the
     sure score (`said_to_me`'s `named`).
+  - **A call is "Hey Lamp" at the line's start, with `LAMP_NAME_HEY_ONLY=on`**
+    (on in the product's lamp-voice.service; the product owner's ruling of
+    26 Nov 2026: "remove 'Lamp'. must say 'Hey Lamp'. 'Lamp' alone creates so
+    many issues."). Out of a conversation, a hearing of the name is a call
+    only when it is heard at the line's start (`NAME_AT_THE_START_US`, 1.3 s)
+    and the line's first word, past one filler ("um", "uh", "oh", "ah",
+    "so"), is "hey", "hi" or "hello" (`attention::opens_with_hey`). Such a
+    hearing is the call whatever the rules above ruled of its word, since
+    speech to text writes "Hey Lamp" as "Hey man", "Hey, Lynn." or "Hello?";
+    only a word that is another person's name ("Hey, Lance.", #8114) still
+    makes it theirs. Any other hearing, a bare "Lamp" or the name inside a
+    sentence, counts for nothing, and a line's words call the lamp only when
+    they open with such a greeting (`called_in_text`). In a conversation the
+    name is not needed, and the rule holds nothing. "Ok" and "okay" are no
+    greeting here: said all day, and not the call the product owner named.
+    Journal at start: `out of a conversation a call is "Hey Lamp" at a
+    line's start`; per line, `counts for nothing: a call is "Hey Lamp" at the
+    line's start (LAMP_NAME_HEY_ONLY)`, and a kept call's second sign is
+    `"Hey Lamp" at the line's start`. Latency: none, a word check at the
+    verdict. Tests (both fail with the rule taken out):
+    `with_hey_only_a_call_is_hey_lamp_at_the_lines_start`,
+    `with_hey_only_words_call_the_lamp_only_after_a_greeting`. Not yet played
+    on a lamp.
 - **A hearing of the name stays with its own line**
   (`LAMP_NAME_STAYS_IN_ITS_LINE=on`, on in the product unit). On lamp-4ace on
   2026-10-26 at 06:21 (build 6919, the busy scene played) `lamp-name` heard
