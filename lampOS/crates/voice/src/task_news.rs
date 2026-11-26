@@ -2836,7 +2836,7 @@ mod tests {
         assert!(ON_THE_LAMP.contains(crate::agent_tasks::NO_AGENT_NAME));
         // #8729: news keeps the strict rule; only the hand-over's
         // description has the exception for a person asking.
-        assert!(!ON_THE_LAMP.contains("unless they ask"));
+        assert!(!ON_THE_LAMP.contains("unless asked"));
         assert!(!ON_THE_LAMP.contains(crate::agent_tasks::NO_AGENT_NAME_UNLESS_ASKED));
         assert!(!ON_THE_LAMP.contains("OpenClaw") && !ON_THE_LAMP.contains("Hermes"));
         let (asked, _) = quoted(asked_text(&task).unwrap(), MOST_TASK_CHARS);
