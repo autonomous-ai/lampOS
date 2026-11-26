@@ -2478,19 +2478,31 @@ fn with_offline_rings_the_soonest_ring_not_yet_due_is_told_once_and_never_its_wo
         assert_eq!(answer(&mut engine, &request)["ok"], true);
     }
     let report = due(&engine.lock().unwrap(), now);
-    on.tick(&socket.path(), Some(&report), now).unwrap();
+    // The walk begins at most once a second: not yet 200 ms on.
+    on.tick(&socket.path(), Some(&report), now + 200_000)
+        .unwrap();
+    assert!(
+        upcoming_told(&mut on).is_empty(),
+        "not a second since the last walk"
+    );
+    let walked = now + UPCOMING_WALK_EVERY_US;
+    on.tick(&socket.path(), Some(&report), walked).unwrap();
     let told = upcoming_told(&mut on);
     assert_eq!(told.len(), 1);
     let soonest = told[0].expect("the sooner one");
     assert_eq!((soonest.id, soonest.delivery), (3, 1));
-    assert_eq!(soonest.due_at_us, now + 9_000_000);
+    assert_eq!(soonest.due_at_us, walked + 9_000_000);
     let packet = serde_json::to_string(&FromWorker::Upcoming {
         soonest: Some(soonest),
     })
     .unwrap();
     assert!(!packet.contains("private"), "{packet}");
-    on.tick(&socket.path(), Some(&report), now + 200_000)
-        .unwrap();
+    on.tick(
+        &socket.path(),
+        Some(&report),
+        walked + UPCOMING_WALK_EVERY_US,
+    )
+    .unwrap();
     assert!(
         upcoming_told(&mut on).is_empty(),
         "unchanged: not told again"

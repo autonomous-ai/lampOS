@@ -1887,13 +1887,15 @@ The link is checked once before a ring (the first builder's call 2). On the
 second route as the only voice, the link read down only once a turn failed
 on the network, so a ring due in an outage nobody had spoken in was first
 tried as a model turn and rang late. With the switch the consumer child
-walks the store one page (8 items) a tick for the soonest item set and not
-yet due, and tells the voice its id, delivery and due time on the
+walks the store for the soonest item set and not yet due, a walk begun at
+most once a second (`UPCOMING_WALK_EVERY_US`) and one page (8 items) a tick, and tells the voice its id, delivery and due time on the
 monotonic clock (`FromWorker::Upcoming`), never its words, only when it
 changes and in the tick's `Idle` slot. From
 `offline_rings::PROBE_BEFORE_DUE_US` (10 s) before that due time, the
 coordinator sends the provider worker one `Control::CheckLink` for that
-item (`offline_rings::asks_link_check`). The second route runs the check it
+item (`offline_rings::asks_link_check`); a full control socket
+(`WouldBlock`, the worker stuck in a slow call, #8204) leaves it unasked and
+the next pass asks again, never ending the voice (`ask_link_check`). The second route runs the check it
 already runs after a network fault (`second_provider::link::Watch::ask`,
 `Link::ask`: a bare connection to each service host, bounded at
 `PROBE_WITHIN`, 4 s), skipped while a check runs, while down, without
