@@ -262,15 +262,15 @@ export const CONTROLS = [
     hintReal: 'a real lamp answers aloud through its own voice; it may say lamp.changed when its turn starts',
     run: async ({ lamp }, a) => { await lamp.startTurn(a.prompt); return `lamp.startTurn(${q(a.prompt)})`; } },
   { id: 'turn_end', group: 'Voice', needs: ['speak'], ops: ['turn.end'], shows: [], label: 'End my turn', fields: [], run: async ({ lamp }) => { await lamp.endTurn(); return 'lamp.endTurn()'; } },
-  { id: 'volume_to', group: 'Voice', needs: ['speak'], changes: "the lamp's volume", ops: ['volume'], shows: ['volume.changed'], hint: "sets the speaker volume to this level (0 to 100); it is not put back", hintReal: "sets the REAL lamp's volume to this level (0 to 100) and leaves it there", label: 'Volume to', fields: [number('to', 0, 100, 40, { integer: true })],
+  { id: 'volume_to', group: 'Voice', needs: ['volume'], changes: "the lamp's volume", ops: ['volume'], shows: ['volume.changed'], hint: "sets the speaker volume to this level (0 to 100); it is not put back", hintReal: "sets the REAL lamp's volume to this level (0 to 100) and leaves it there", label: 'Volume to', fields: [number('to', 0, 100, 40, { integer: true })],
     run: async ({ lamp }, a) => answered(`lamp.volume({ to: ${a.to} })`, await lamp.volume({ to: a.to })) },
-  { id: 'volume_step', group: 'Voice', needs: ['speak'], changes: "the lamp's volume", ops: ['volume'], shows: ['volume.changed'], hint: "steps the speaker volume once; it is not put back", hintReal: "steps the REAL lamp's volume once and leaves it there", label: 'Volume step', fields: [select('step', ['up', 'down'])],
+  { id: 'volume_step', group: 'Voice', needs: ['volume'], changes: "the lamp's volume", ops: ['volume'], shows: ['volume.changed'], hint: "steps the speaker volume once; it is not put back", hintReal: "steps the REAL lamp's volume once and leaves it there", label: 'Volume step', fields: [select('step', ['up', 'down'])],
     run: async ({ lamp }, a) => answered(`lamp.volume({ step: ${q(a.step)} })`, await lamp.volume({ step: a.step })) },
-  { id: 'volume_mute', group: 'Voice', needs: ['speak'], changes: "the lamp's volume", ops: ['volume'], shows: [], hint: "mutes or unmutes the speaker; it is not put back", hintReal: "mutes or unmutes the REAL lamp's speaker and leaves it so", label: 'Mute', fields: [select('mute', ['on', 'off'], 'off')],
+  { id: 'volume_mute', group: 'Voice', needs: ['volume'], changes: "the lamp's volume", ops: ['volume'], shows: [], hint: "mutes or unmutes the speaker; it is not put back", hintReal: "mutes or unmutes the REAL lamp's speaker and leaves it so", label: 'Mute', fields: [select('mute', ['on', 'off'], 'off')],
     run: async ({ lamp }, a) => answered(`lamp.volume({ mute: ${a.mute === 'on'} })`, await lamp.volume({ mute: a.mute === 'on' })) },
   // The person's own volume, so this row puts it back: it reads the level, takes the one step (or the mute), then
   // restores the level and the mute it found, even when the step is refused. Nothing is left changed.
-  { id: 'volume', group: 'Voice', needs: ['speak'], ops: ['volume', 'get'], shows: ['volume.changed'], label: 'Volume (then back)',
+  { id: 'volume', group: 'Voice', needs: ['volume'], ops: ['volume', 'get'], shows: ['volume.changed'], label: 'Volume (then back)',
     hint: 'steps the volume once and puts it back (level and mute)', fields: [select('how', ['step down', 'step up', 'mute'], 'step down')],
     run: async ({ lamp }, a) => {
       const before = (await lamp.get('volume')).volume;
@@ -439,10 +439,15 @@ export const STIMULI = [
 // `grants` (the lamp's, from hello) and `flags` (`{ camera, microphone }`, the run's, only in real mode) make a row's
 // `disabled`: why the lamp or the run cannot do it. Without `grants` the table is static, as before. In real mode there
 // are no stimuli (they are lamp-sim verbs).
+// The grants another grant holds too, as lamp-control's `Grant::held_in`: `speak` holds `volume` (#8610), so a client
+// granted `speak` alone, as before `volume` was its own grant, still sets the volume.
+export const HELD_BY = { volume: ['speak'] };
+
 export function describe(mode = 'lamp-sim', { grants, flags } = {}) {
+  const has = (g) => grants.includes(g) || (HELD_BY[g] ?? []).some((h) => grants.includes(h));
   const why = (entry) => {
     if (!grants) return undefined;
-    const missing = (entry.needs ?? []).filter((g) => !grants.includes(g));
+    const missing = (entry.needs ?? []).filter((g) => !has(g));
     if (missing.length) return `the lamp did not grant ${missing.join(', ')}`;
     const off = (entry.needs ?? []).filter((g) => flags && g in flags && !flags[g]);
     return off.length ? `start the run with ${off.map((g) => `--${g}`).join(' and ')}` : undefined;

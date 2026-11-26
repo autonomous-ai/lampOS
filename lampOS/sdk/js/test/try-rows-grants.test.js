@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { startTwin } from './twin-start.js';
 import { WebSocket } from 'ws';
-import { CONTROLS, checked, describe } from '../examples/twin/controls.js';
+import { CONTROLS, HELD_BY, checked, describe } from '../examples/twin/controls.js';
 import { FakeLamp } from '../src/testing.js';
 
 // The lamp's own refusals of a row run with its defaults, which the page says in its words.
@@ -18,7 +18,7 @@ import { FakeLamp } from '../src/testing.js';
 const ANSWERS = { turn_end: /not this computer's turn/, play: /no move small-nod in your pushed skills/ };
 // Rows that, pressed with their defaults on a fresh run, answer without a call to the lamp.
 const ASKS_NOTHING = ['sound_remove'];
-const ALL = ['body', 'light', 'speak', 'look', 'hear', 'sound', 'air', 'device', 'notes', 'camera', 'microphone', 'skills', 'speech', 'speaker'];
+const ALL = ['body', 'light', 'speak', 'volume', 'look', 'hear', 'sound', 'air', 'device', 'notes', 'camera', 'microphone', 'skills', 'speech', 'speaker'];
 
 async function scenario(mode, granted) {
   const fake = await FakeLamp.start({ grants: granted });
@@ -81,7 +81,9 @@ for (const mode of ['lamp-sim']) {
       assert.deepEqual(stricter, [], `without ${removed}: no row is stricter than the lamp`);
       // And the rows that needed it are the ones that say so.
       for (const row of table.controls) {
-        if ((row.needs ?? []).includes(removed)) assert.match(row.disabled ?? '', new RegExp(`did not grant .*${removed}`), `${row.id} without ${removed}`);
+        // A grant another still granted holds (`volume` by `speak`) is no want of it.
+        const held = (HELD_BY[removed] ?? []).some((g) => g !== removed);
+        if ((row.needs ?? []).includes(removed) && !held) assert.match(row.disabled ?? '', new RegExp(`did not grant .*${removed}`), `${row.id} without ${removed}`);
       }
     }
   });
