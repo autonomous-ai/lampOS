@@ -14770,10 +14770,13 @@ mod tests {
         ] {
             let folder = timed("speaks", grants);
             load(&folder).unwrap();
+            let refused = package::pack(&folder, &out).unwrap_err();
+            assert!(package::refused_told_only(&refused), "{grants}: {refused}");
             assert_eq!(
-                package::pack(&folder, &out).unwrap_err(),
+                refused,
                 format!(
-                    "not packed: {}: {}",
+                    "{}{}: {}",
+                    package::TOLD_ONLY_REFUSED,
                     lamp_voice::made_skill::SPEAKS_ON_ITS_OWN,
                     lamp_voice::made_skill::TOLD_ONLY_SHAPE
                 ),

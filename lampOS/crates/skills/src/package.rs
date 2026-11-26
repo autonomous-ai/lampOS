@@ -532,6 +532,18 @@ pub fn pack_signed(
     pack_signed_by(dir, out, key, false)
 }
 
+/// How [`pack`]'s refusal of a skill a trigger starts whose code would speak
+/// on its own begins (#8610, `lamp_voice::made_skill::told_only`): the one
+/// marker a caller that is no agent, the Store's share and preview, tells it
+/// by ([`refused_told_only`]), never by the repair text after it.
+pub const TOLD_ONLY_REFUSED: &str = "not packed: told_only: ";
+
+/// Whether `why`, a [`pack`] refusal, is the told-only one
+/// ([`TOLD_ONLY_REFUSED`]).
+pub fn refused_told_only(why: &str) -> bool {
+    why.starts_with(TOLD_ONLY_REFUSED)
+}
+
 /// As [`pack_signed`]; with `author`, the signature is an author's
 /// ([`author_signature_for`]), carrying their public key, for a package
 /// they share.
@@ -555,7 +567,7 @@ pub fn pack_signed_by(
         .map_err(|error| format!("not packed: skill.toml: {error}"))?;
     if let Err(refused) = lamp_voice::made_skill::told_only(&toml) {
         return Err(format!(
-            "not packed: {}: {}",
+            "{TOLD_ONLY_REFUSED}{}: {}",
             refused.0,
             lamp_voice::made_skill::TOLD_ONLY_SHAPE
         ));

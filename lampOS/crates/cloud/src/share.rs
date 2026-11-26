@@ -321,6 +321,24 @@ fn copy_skill(from: &Path, to: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// What the owner is told of a skill kept before #8651 that a trigger
+/// starts and whose code would speak on its own: it still runs, but the
+/// pack's told-only rule refuses it (#8610, the first builder's call 2 on
+/// #8688), and the agent's repair text is not for the person.
+pub const SPEAKS_ON_ITS_OWN: &str =
+    "This skill speaks when it starts on its own, so it can't be shared yet.";
+
+/// A pack refusal as the owner is told it: the told-only one
+/// (`lamp_skills::package::refused_told_only`) as [`SPEAKS_ON_ITS_OWN`],
+/// any other as it is.
+fn plain(why: String) -> String {
+    if lamp_skills::package::refused_told_only(&why) {
+        SPEAKS_ON_ITS_OWN.to_owned()
+    } else {
+        why
+    }
+}
+
 /// The package of the skill in `folder`, as the Store takes it: its own
 /// files, `made: here` taken out, packed unsigned in a fresh folder under
 /// `scratch` that is removed after, whatever happens. Its file name and
@@ -330,7 +348,7 @@ pub fn pack(folder: &Path, scratch: &Path) -> Result<(String, Vec<u8>), String> 
     let _ = fs::remove_dir_all(&work);
     let packed = (|| {
         let copy = prepared(folder, &work)?;
-        let tar = lamp_skills::package::pack(&copy, &work.join("out"))?;
+        let tar = lamp_skills::package::pack(&copy, &work.join("out")).map_err(plain)?;
         let bytes = fs::read(&tar).map_err(|error| format!("the package: {error}"))?;
         let file_name = tar
             .file_name()
@@ -423,7 +441,7 @@ pub(crate) fn seen(
         let copy = prepared(folder, &work)?;
         copied();
         let files = shown(&copy)?;
-        let tar = lamp_skills::package::pack(&copy, &work.join("out"))?;
+        let tar = lamp_skills::package::pack(&copy, &work.join("out")).map_err(plain)?;
         let bytes = fs::read(&tar).map_err(|error| format!("the package: {error}"))?;
         Ok((lamp_skills::package::sha256_hex(&bytes), files))
     })();

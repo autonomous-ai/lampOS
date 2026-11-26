@@ -890,3 +890,78 @@ fn the_share_kinds_are_the_four_and_visibility_is_the_one_that_says_the_field_is
         ]
     );
 }
+
+/// #8610, El's P2.2 and the first builder's call 2 on #8688: a skill made
+/// with code and kept before #8651 that a trigger starts and whose code
+/// would speak still runs, but its preview and its send are refused in the
+/// owner's plain line, never the agent's repair text; the same skill
+/// told-only previews.
+#[test]
+fn a_kept_trigger_skill_that_would_speak_is_refused_in_a_plain_line() {
+    lamp_skills::task::set_made_here(Some(true));
+    let places = places("share-told-only");
+    let timed = |name: &str, grants: &str| {
+        let dir = places.folder.join(name);
+        fs::create_dir_all(dir.join("scripts")).unwrap();
+        fs::write(
+            dir.join("SKILL.md"),
+            format!(
+                "---\nname: {name}\ndescription: Today's news.\nmade: here\n---\n\n# News\n\nMore.\n"
+            ),
+        )
+        .unwrap();
+        fs::write(
+            dir.join("skill.toml"),
+            format!(
+                "version = \"1.0.0\"\ngrants = {grants}\n[trigger]\n\
+                 topic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n\
+                 [ask]\npolicy = \"nudge\"\n[permissions]\ntopics = [\"voice/state\"]\n\
+                 [[do]]\ntask = {{ task = \"Sum up today's news\", run = \"scripts/main.py\" }}\n"
+            ),
+        )
+        .unwrap();
+        fs::write(dir.join("scripts/main.py"), "print('news')\n").unwrap();
+        // Kept by the manage helper as a made package, not from the Store.
+        fs::write(
+            dir.join(lamp_skills::package::INSTALLED_FROM),
+            serde_json::to_vec(&lamp_skills::package::Installed {
+                sha256: "ab".repeat(32),
+                manifest: lamp_skills::package::Manifest {
+                    format: lamp_skills::package::FORMAT,
+                    name: name.into(),
+                    version: "1.0.0".into(),
+                    files: Vec::new(),
+                },
+                from_store: false,
+            })
+            .unwrap(),
+        )
+        .unwrap();
+        dir
+    };
+    let speaks = timed("speaks", r#"["speak"]"#);
+    timed("told", r#"["volume"]"#);
+    let (store, sent) = store(201, r#"{"status":1,"data":{"id":"s1"}}"#);
+    for (at, data) in [
+        ("preview", json!({"name": "speaks", "preview": true})),
+        ("send", json!({"name": "speaks", "sha256": "ab".repeat(32)})),
+    ] {
+        let refused = share(
+            &store,
+            &places,
+            &data,
+            &scratch(&format!("told-{at}")),
+            "en",
+        );
+        assert_eq!(refused, Err(SPEAKS_ON_ITS_OWN.into()), "{at}");
+    }
+    assert!(sent.try_recv().is_err(), "nothing was sent");
+    // The repair text stays the agent's, from `lamp-skills pack` itself.
+    let why = lamp_skills::package::pack(&speaks, &scratch("told-agent").join("out")).unwrap_err();
+    assert!(
+        why.contains(lamp_voice::made_skill::TOLD_ONLY_SHAPE),
+        "{why}"
+    );
+    assert_eq!(previewed(&places, "told", "told-ok").len(), 64);
+    lamp_skills::task::set_made_here(None);
+}
