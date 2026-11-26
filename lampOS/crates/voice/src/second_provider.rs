@@ -19487,7 +19487,7 @@ async fn answer(
             Instant::now(),
         ),
         choice_held: None,
-        heard_line: said.clone(),
+        heard_line: heard.then(|| said.clone()),
         claimed_stop: crate::seen_yes::ClaimWatch::default(),
     };
     let began = Instant::now();
@@ -25119,16 +25119,26 @@ struct Queue<'a> {
     /// candidates wait for the model's choice (`LAMP_MADE_SKILL_OFF_SAID`,
     /// [`crate::made_turn::unchosen_note`]); `None`, said as they come.
     choice_held: Option<Vec<String>>,
-    /// The person's line, and the reply watched for a claim to have stopped
-    /// looking with desk noticing on and no stop called
-    /// ([`crate::seen_yes::ClaimWatch`], #7767): the stop is run before the
-    /// piece that claims it is said.
-    heard_line: String,
+    /// The person's line, for a turn they spoke (`Asker::Spoken`) alone, and
+    /// the reply watched for a claim to have stopped looking with desk
+    /// noticing on and no stop called ([`crate::seen_yes::ClaimWatch`],
+    /// #7767): the stop is run before the piece that claims it is said.
+    /// `None` for a written turn or a reminder, where the stop call never
+    /// runs: nothing is watched (the Reviewer-lead's must-fix 2 on #8674).
+    heard_line: Option<String>,
     claimed_stop: crate::seen_yes::ClaimWatch,
 }
 impl Drop for Queue<'_> {
-    /// The reply's tags in the journal, counts only, once it said something.
+    /// The reply's end: its last piece judged for a claimed stop, and its
+    /// tags in the journal, counts only, once it said something.
     fn drop(&mut self) {
+        // A last piece with no stop of its own is judged for a claimed stop
+        // now ([`crate::seen_yes::ClaimWatch::end`]).
+        self.claimed_stop.end(
+            self.shared.desk_noticing.as_deref(),
+            self.request,
+            self.heard_line.as_deref(),
+        );
         if let Some(tags) = &mut self.tags
             && self.started
         {
@@ -25195,11 +25205,13 @@ impl Queue<'_> {
         // A claim to have stopped looking, with desk noticing still on and
         // no stop called (lamp-06c1's third re-row of #8674, 26 Nov, Q3):
         // the stop is run now, before the words are said, so they are true.
+        // The pieces are sentences and clauses with the whitespace between
+        // them trimmed off (`Sentences`), so it is given back.
         self.claimed_stop.piece(
             self.shared.desk_noticing.as_deref(),
             self.request,
-            &text,
-            Some(&self.heard_line),
+            &format!(" {text}"),
+            self.heard_line.as_deref(),
         );
         self.announce().await?;
         if !self.started {

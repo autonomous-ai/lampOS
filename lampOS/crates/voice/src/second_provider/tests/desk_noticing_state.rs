@@ -202,3 +202,45 @@ fn a_reply_claiming_a_stop_with_no_call_keeps_the_no() {
     assert!(allowed(&path, SEEN_ACTIVITY, true) && !path.exists() && !face.exists());
     let _ = std::fs::remove_dir_all(folder);
 }
+
+/// The Reviewer-lead's must-fix 2 on #8674 (c7185816145): the backstop
+/// runs only for a person's spoken turn (`Asker::Spoken`), where the stop
+/// call would. A written turn (a skill's say, a look's prompt) whose reply
+/// says "I've stopped watching your desk" keeps desk noticing on.
+#[test]
+fn a_written_turn_claiming_a_stop_runs_nothing() {
+    use lamp_msgs::consent::{FACE_EXPRESSIONS, SEEN_ACTIVITY, allowed, file_in};
+    let path = consent("claimed-written");
+    let folder = path.parent().unwrap().to_path_buf();
+    let face = file_in(&folder, FACE_EXPRESSIONS).unwrap();
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            vec![vec![
+                text("I've stopped watching your desk."),
+                Ok(ChatEvent::Done),
+            ]]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) })),
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .telling_desk_noticing(Some(path.clone()));
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            engine.submit(written(1, "Say that you stopped watching their desk."));
+            turn_within(&mut engine, Duration::from_secs(5)).await;
+        });
+    assert_eq!(script.asked.lock().unwrap().len(), 1);
+    assert!(allowed(&path, SEEN_ACTIVITY, true) && !path.exists());
+    assert!(allowed(&face, FACE_EXPRESSIONS, true) && !face.exists());
+    let _ = std::fs::remove_dir_all(folder);
+}
