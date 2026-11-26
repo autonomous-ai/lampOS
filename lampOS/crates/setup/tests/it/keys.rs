@@ -900,10 +900,12 @@ fn with_the_switch_off_a_gemini_voice_key_changes_nothing() {
 
 /// #8754 (the first builder's rule on #7814): a person's own voice keys,
 /// ElevenLabs' and Gemini's, live only in root's 0700 folder, which only
-/// the voice loads (`LoadCredential=own:`) and only root's keys helper
-/// writes: no other product unit names the folder, so no agent runtime and
-/// no other part running as `lampos` (`lamp-cloud`, `lamp-tasks`, the
-/// skills) can read them.
+/// the voice loads whole (`LoadCredential=own:`) and only root's keys helper
+/// writes: no other product unit loads the folder whole or names a voice's
+/// file, so no agent runtime and no other part running as `lampos`
+/// (`lamp-cloud`, `lamp-tasks`, the skills) can read them. Another unit may
+/// load a model service's own files one by one (#8742, lamp-cloud), never a
+/// voice's.
 #[test]
 fn the_own_voice_keys_are_read_by_the_voice_alone() {
     for service in Service::VOICES {
@@ -923,10 +925,15 @@ fn the_own_voice_keys_are_read_by_the_voice_alone() {
         }
         let text = fs::read_to_string(&path).unwrap();
         let name = path.file_name().unwrap().to_str().unwrap().to_owned();
-        if text.contains(keys::FOLDER)
-            || text.contains("voice/own")
-            || text.contains("gemini_voice")
-            || text.contains("elevenlabs.key")
+        let voice_files = Service::VOICES.iter().flat_map(|service| {
+            [
+                service.key_file(),
+                service.voice_file().unwrap(),
+                service.checked_file(),
+            ]
+        });
+        if voice_files.into_iter().any(|file| text.contains(file))
+            || text.contains(&format!("own:{}", keys::FOLDER))
         {
             naming.push(name.clone());
         }
@@ -938,14 +945,7 @@ fn the_own_voice_keys_are_read_by_the_voice_alone() {
         }
     }
     naming.sort();
-    assert_eq!(
-        naming,
-        [
-            "lamp-setup-keys@.service",
-            "lamp-voice.service",
-            "own-keys-voice.conf"
-        ]
-    );
+    assert_eq!(naming, ["lamp-voice.service", "own-keys-voice.conf"]);
     let keys_unit = include_str!("../../../../deploy/product/lamp-setup-keys@.service");
     assert!(keys_unit.contains("User=root\n"));
     assert!(keys_unit.contains("ConfigurationDirectoryMode=0700\n"));
