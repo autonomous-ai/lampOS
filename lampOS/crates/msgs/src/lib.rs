@@ -162,6 +162,11 @@ pub mod local_agent;
 /// ears, given by voice or in the app (#5500, `docs/onboarding.md`).
 pub mod consent;
 
+/// The privacy light's look, red, dim or off (#8696,
+/// `docs/ring-choreography.md`): kept by root's change helper, read by the
+/// privacy ring worker, red whenever it cannot be read.
+pub mod privacy_light;
+
 /// Whether Harness's own self-update is held: on the stable feed and any
 /// other, not on the lamp-voice feed (the canary, #6300). Decided here for
 /// lamp-tasks and lamp-update both.
