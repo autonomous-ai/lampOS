@@ -134,6 +134,41 @@ fn peer_cgroup() -> Option<String> {
     None
 }
 
+/// The peer on standard input as the kernel names it (`SO_PEERCRED`): its
+/// uid, and its cgroup's text read now from `/proc/<pid>/cgroup`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Peer {
+    pub uid: u32,
+    pub cgroup: String,
+}
+
+/// [`Peer`] of standard input, when it is a socket with a peer whose
+/// cgroup can still be read. Linux only; elsewhere none.
+pub fn socket_peer() -> Option<Peer> {
+    #[cfg(target_os = "linux")]
+    {
+        let stdin = std::io::stdin();
+        let peer = rustix::net::sockopt::socket_peercred(&stdin).ok()?;
+        let cgroup =
+            fs::read_to_string(format!("/proc/{}/cgroup", peer.pid.as_raw_nonzero())).ok()?;
+        Some(Peer {
+            uid: peer.uid.as_raw(),
+            cgroup,
+        })
+    }
+    #[cfg(not(target_os = "linux"))]
+    None
+}
+
+/// Whether standard input is a socket (a helper on a socket systemd hands
+/// over), not the helper run by hand.
+pub fn stdin_is_socket() -> bool {
+    let stdin = std::io::stdin();
+    rustix::fs::fstat(&stdin).is_ok_and(|stat| {
+        rustix::fs::FileType::from_raw_mode(stat.st_mode) == rustix::fs::FileType::Socket
+    })
+}
+
 /// Whether the peer on standard input is in [`ASKER_UNIT`], by its
 /// credentials and its cgroup.
 pub fn peer_is_asker() -> bool {

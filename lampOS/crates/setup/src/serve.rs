@@ -79,6 +79,9 @@ fn default_monitor_dropin() -> PathBuf {
 fn default_consent() -> PathBuf {
     lamp_msgs::consent::FOLDER.into()
 }
+fn default_privacy_light() -> PathBuf {
+    lamp_msgs::privacy_light::PATH.into()
+}
 
 /// The server's written configuration.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -180,6 +183,11 @@ pub struct Config {
     /// onboarding. The reset's plan removes both files.
     #[serde(default = "default_consent")]
     pub consent: PathBuf,
+    /// The privacy light's look (`lamp_msgs::privacy_light::PATH`, #8696):
+    /// written and read from the app through `crate::change`, root's, 0600
+    /// in the light folder (0700). The reset's plan wipes the folder.
+    #[serde(default = "default_privacy_light")]
+    pub privacy_light: PathBuf,
     /// Run once the hotspot is up and once serving ends: V1's nginx, which
     /// serves V1's page and passes `/api/` here, is on only during setup.
     #[serde(default)]
@@ -201,7 +209,7 @@ pub struct Config {
 }
 
 /// The configuration's fields, as [`read`] knows them.
-pub const FIELDS: [&str; 28] = [
+pub const FIELDS: [&str; 29] = [
     "listen",
     "marker",
     "credential",
@@ -226,6 +234,7 @@ pub const FIELDS: [&str; 28] = [
     "agent_folder",
     "monitor_dropin",
     "consent",
+    "privacy_light",
     "web_start",
     "web_stop",
     "free_port",
