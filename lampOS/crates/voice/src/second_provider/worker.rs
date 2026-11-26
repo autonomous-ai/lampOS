@@ -15888,8 +15888,44 @@ fn thread_and_history_summed(
     };
     (
         summary + &thread,
-        recent.into_iter().flat_map(messages).collect(),
+        history_told(
+            recent,
+            HISTORY_KEEPS_CALLS.load(std::sync::atomic::Ordering::Acquire),
+        ),
     )
+}
+
+/// `recent` (oldest first) as messages ([`messages_told`]). A down spell
+/// starts at an exchange with a move kept as could not move then
+/// (`second_provider::COULD_NOT_MOVE_THEN`) and lasts until an exchange
+/// with a call that ran; an exchange of the spell answered in words alone
+/// ("I can't dance just now", no call) is told
+/// `second_provider::MOVE_THEN_NOTE` after its words too, as the refused
+/// one is. #8640's row on lamp 16345: after a few such refusals the model
+/// copied the words-only answers and never called `dance` again once the
+/// body was up (0 of 20 dances).
+fn history_told(recent: Vec<crate::thread::Recent>, keeps_calls: bool) -> Vec<Message> {
+    use crate::second_provider::{COULD_NOT_MOVE_THEN, FAILED_THEN, MOVE_THEN_NOTE};
+    let mut down = false;
+    recent
+        .into_iter()
+        .flat_map(|exchange| {
+            let words_only = exchange.calls.is_empty();
+            let refused = exchange
+                .calls
+                .iter()
+                .any(|call| call.result == Some(COULD_NOT_MOVE_THEN));
+            let ran = exchange.calls.iter().any(|call| {
+                call.result != Some(FAILED_THEN) && call.result != Some(COULD_NOT_MOVE_THEN)
+            });
+            let mut told = messages_told(exchange, keeps_calls);
+            if keeps_calls && down && words_only {
+                told.push(Message::system(MOVE_THEN_NOTE.to_owned()));
+            }
+            down = refused || (down && !ran);
+            told
+        })
+        .collect()
 }
 
 /// What a text's answer (#1673) is told, and how its functions run. It is
@@ -16045,6 +16081,7 @@ pub(super) fn keep_heard(
 /// A room's exchange given to a person's turn (`LAMP_CONVERSATION_ROOM_LINES_TOLD`)
 /// has its words marked [`SAID_IN_THE_ROOM`], or with none, a note before
 /// the lamp's.
+#[cfg(test)]
 fn messages(exchange: crate::thread::Recent) -> Vec<Message> {
     messages_told(
         exchange,
@@ -26544,6 +26581,65 @@ mod tests {
                 Message::assistant("I can't move right now."),
                 Message::system(note.to_owned()),
             ]
+        );
+    }
+
+    /// #8640's row on lamp 16345: after a dance refused while the body was
+    /// down, the next asks were answered in words alone, and once the body
+    /// was up the model copied them (0 of 20 dances). Those words-only
+    /// exchanges of the down spell are told the move-then note too; one
+    /// after a call that ran is not, and without kept calls nothing is.
+    #[test]
+    fn words_only_answers_of_a_down_spell_are_told_as_that_moment_only() {
+        let exchange = |person: &str, lamp: &str, result: Option<Option<&'static str>>| {
+            crate::thread::Recent {
+                person: person.into(),
+                lamp: lamp.into(),
+                calls: result
+                    .map(|result| crate::thread::KeptCall {
+                        id: "kept-1-0".into(),
+                        name: crate::use_skill::NAME.into(),
+                        args: serde_json::json!({}),
+                        result,
+                    })
+                    .into_iter()
+                    .collect(),
+                ..crate::thread::Recent::default()
+            }
+        };
+        let note = Message::system(crate::second_provider::MOVE_THEN_NOTE.to_owned());
+        let spell = || {
+            vec![
+                exchange(
+                    "Hey Lamp, dance.",
+                    "I can't move right now.",
+                    Some(Some(crate::second_provider::COULD_NOT_MOVE_THEN)),
+                ),
+                exchange("Dance, please.", "I can't dance just now.", None),
+                exchange("Lamp, dance!", "Sorry, I still can't dance.", None),
+                exchange("Turn it down.", "Done.", Some(None)),
+                exchange("How are you?", "I'm well.", None),
+            ]
+        };
+        // Each exchange as it is told alone, the note after the words of
+        // the spell's two words-only answers too (the refused one has its
+        // own); none after the call that ran, or the chat after it.
+        let mut expected = Vec::new();
+        for (at, exchange) in spell().into_iter().enumerate() {
+            expected.extend(messages_told(exchange, true));
+            if at == 1 || at == 2 {
+                expected.push(note.clone());
+            }
+        }
+        let told = history_told(spell(), true);
+        assert_eq!(told, expected);
+        assert_eq!(told.iter().filter(|message| **message == note).count(), 3);
+        assert_eq!(
+            history_told(spell(), false),
+            spell()
+                .into_iter()
+                .flat_map(|exchange| messages_told(exchange, false))
+                .collect::<Vec<_>>()
         );
     }
 

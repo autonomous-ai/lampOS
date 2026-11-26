@@ -2485,7 +2485,13 @@ order is kept. A written turn is the same from the chat on.
   told after the words as `second_provider::MOVE_THEN_NOTE`: that moment
   only, call it again when asked (#8640: on lamp-52e6, 26 Nov 07:51, after
   ten such refusals and the body back, seven "dance" asks got
-  `calls=none`). The calls go with
+  `calls=none`). The refusal's words reach the voice as lamp-skills
+  wrote them (`use_skill` adds nothing to an error), so the match is on
+  their start. The exchanges after it that were answered in words alone,
+  until one with a call that ran, are the same down spell and are told
+  the same note after their words (`worker::history_told`; #8640's row on
+  lamp 16345: the model copied those words-only answers and called no
+  dance once the body was up, 0 of 20). The calls go with
   the exchange the lamp's words were filed under, so they are told only
   to that scope's turns; a request with no kept words keeps none, and a
   forget drops them. They are not written to the thread file (an older
