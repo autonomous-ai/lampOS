@@ -1,8 +1,8 @@
 //! The journal the image keeps on the eMMC (`lamp-journal-keep`,
 //! `docs/install.md`): a first-time setup's (#5144, "A first-time setup's
-//! journal") and the last two boots' (#2602). Their lines can hold what the
-//! person said, so the owner's own "forget everything about me" deletes them
-//! all, on the same mark and rule as their place and their voice print (the
+//! journal"), the last two boots' (#2602) and a fault's last lines (#8713,
+//! `fault/`). Their lines can hold what the person said, so the owner's own
+//! "forget everything about me" deletes them all, on the same mark and rule as their place and their voice print (the
 //! PM's privacy calls on #5342 and #5358). They also go by themselves 72
 //! hours on, and at a reset.
 //!
@@ -23,8 +23,9 @@ pub const BOOT_ID: &str = "/proc/sys/kernel/random/boot_id";
 /// The setup's folder in [`KEPT`], and its mark.
 const SETUP: &str = "setup";
 const FORGOTTEN: &str = ".forgotten";
-/// The boots' folders in [`KEPT`]: kept, and the keep's own in-between ones.
-const BOOTS: [&str; 4] = ["last", "previous", ".old", ".new"];
+/// The boots' folders in [`KEPT`]: kept, the keep's own in-between ones, and
+/// a fault's last lines (`lamp-journal-keep fault`, #8713), removed whole.
+const BOOTS: [&str; 5] = ["last", "previous", ".old", ".new", "fault"];
 /// The mark for the keep at this boot's shutdown.
 const FORGOTTEN_BOOT: &str = ".forgotten-boot";
 /// The keep's links' names begin so: the setup's and the boots'.
@@ -152,7 +153,7 @@ mod tests {
 
     /// A lamp's kept journal: the setup's copies, the last two boots', and
     /// every one linked where journalctl reads, plus a link that isn't the
-    /// keep's.
+    /// keep's, and a fault's last lines (never linked).
     struct Lamp {
         kept: PathBuf,
         links: PathBuf,
@@ -195,6 +196,9 @@ mod tests {
             }
         }
         std::fs::write(lamp.kept.join("setup/.started"), "").unwrap();
+        let fault = lamp.kept.join("fault");
+        std::fs::create_dir_all(&fault).unwrap();
+        std::fs::write(fault.join("0123-boot.1.lamp-voice.service.log"), "l").unwrap();
         // journald's own folder in /run is never the keep's.
         std::fs::create_dir_all(lamp.links.join("0123456789abcdef")).unwrap();
         lamp
@@ -226,7 +230,7 @@ mod tests {
 
     /// The PM's privacy calls on #5342 and #5358 (#5186's rule): the owner's
     /// own forget everything, once their memory is emptied, removes the
-    /// setup's kept journal and the last two boots', with their links;
+    /// setup's kept journal, the last two boots' and a fault's, with their links;
     /// leaves the keep its marks (this walk forgotten, this boot's shutdown
     /// to keep nothing); and says so.
     #[test]
@@ -287,7 +291,7 @@ mod tests {
             let told = forget(&lamp, told, admitted);
             assert_eq!(told.0["kept_logs"], Value::Null);
         }
-        assert_eq!(names(&lamp.kept), ["last", "previous", "setup"]);
+        assert_eq!(names(&lamp.kept), ["fault", "last", "previous", "setup"]);
         assert_eq!(names(&lamp.links).len(), 5);
     }
 
