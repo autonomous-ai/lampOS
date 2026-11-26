@@ -184,7 +184,8 @@ pub mod policy_holds;
 pub mod privacy;
 pub mod privacy_bus;
 pub mod privacy_gap;
-#[cfg(any(target_os = "linux", test))]
+// Built everywhere for its worker flags (#8696, `ring_arguments`), which the
+// muted wait names on every target; the writer itself runs on Linux.
 pub mod privacy_indicator;
 pub mod process;
 pub(crate) mod provider_flow;
