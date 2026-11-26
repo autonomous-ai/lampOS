@@ -9,6 +9,7 @@ mod chat;
 mod gemini_tts;
 pub mod history;
 pub mod key_terms;
+mod phonon_tts;
 mod public;
 pub mod routes;
 pub mod search;
@@ -23,6 +24,7 @@ pub use chat::{
     Narrow, ToolCall, cache_counts,
 };
 pub use gemini_tts::{GeminiSpeech, GeminiTts};
+pub use phonon_tts::PhononTts;
 pub(crate) use public::{DOH_ENVIRONMENT, get_public_json_within};
 pub use sentences::Sentences;
 pub use stt::{

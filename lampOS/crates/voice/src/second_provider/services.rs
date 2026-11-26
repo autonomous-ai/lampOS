@@ -216,6 +216,10 @@ pub struct Net {
     /// the lamp's one voice ([`Self::gemini_tts`] or the configured one)
     /// says what it can't, from its refusal or second failure on.
     own_gemini: Option<(Arc<GeminiTts>, Arc<net::OwnVoiceLost>)>,
+    /// Phonon, the voice on the lamp (`own_phonon.voice`, #8754): first for
+    /// every piece, at `lamp-phonon`'s socket; the lamp's one voice says a
+    /// piece it can't (not ready, stopped, failed).
+    phonon: Option<Arc<net::PhononTts>>,
     declare: net::Declare,
     /// `LAMP_SECOND_CHAT_WARM=on`: the chat's connection is opened as a line
     /// begins ([`Chat::warm`]).
@@ -553,6 +557,7 @@ impl Net {
             tts: Arc::new(Tts::new(&config)?),
             gemini_tts: None,
             own_gemini: None,
+            phonon: None,
             declare,
             warm_chat: false,
             warm_speech: false,
@@ -1002,6 +1007,26 @@ impl Net {
 
     /// Speech is Gemini's, in `voice` (`LAMP_SECOND_SPEECH=gemini`); a
     /// sentence it cannot say goes to the configured voice.
+    /// Speech is Phonon's, on the lamp, in `voice` (#8754), over the lamp's
+    /// one voice, which says what Phonon can't.
+    pub fn speaking_on_the_lamp(mut self, voice: lamp_msgs::phonon::Voice) -> Self {
+        self.phonon = Some(Arc::new(net::PhononTts::new(
+            lamp_msgs::phonon::SOCKET,
+            voice,
+        )));
+        self
+    }
+
+    /// [`Self::speaking_on_the_lamp`] at `socket`: tests only.
+    #[cfg(test)]
+    fn speaking_on_the_lamp_at(mut self, socket: &std::path::Path) -> Self {
+        self.phonon = Some(Arc::new(net::PhononTts::new(
+            socket,
+            lamp_msgs::phonon::VOICES[0],
+        )));
+        self
+    }
+
     pub fn speaking_with_gemini(
         mut self,
         gemini: &GeminiCall<'_>,
@@ -1045,10 +1070,15 @@ enum Voice {
     /// The person's own Gemini voice, the lamp's own voice for what it
     /// can't say, and the process's one refusal ([`net::OwnVoiceLost`]).
     OwnGemini(Arc<GeminiTts>, Box<Voice>, Arc<net::OwnVoiceLost>),
+    /// Phonon on the lamp (#8754), and the lamp's one voice for a piece it
+    /// can't say.
+    Phonon(Arc<net::PhononTts>, Box<Voice>),
 }
 
 /// The person's own Gemini voice's name in its journal lines (#8754).
 const OWN_GEMINI: &str = "Gemini";
+/// Whether a piece Phonon could not say was journalled: once a process.
+static PHONON_PASSED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 impl Voice {
     fn name(&self) -> &'static str {
@@ -1057,6 +1087,7 @@ impl Voice {
             Self::Configured(_, name) => name,
             Self::OwnGemini(_, lamps, lost) if lost.is_lost() => lamps.name(),
             Self::OwnGemini(..) => "the person's Gemini voice",
+            Self::Phonon(..) => "Phonon",
         }
     }
 
@@ -1091,6 +1122,19 @@ impl Voice {
                 };
                 Box::pin(lamps.first(&text, turn)).await
             }
+            // #8754: Phonon says it if it can start; else the lamp's one
+            // voice does, with no notice (the model may still be fetching).
+            Self::Phonon(phonon, lamps) => match phonon.speak(text).await {
+                Ok(speech) => Ok(speech),
+                Err(why) => {
+                    if !PHONON_PASSED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                        eprintln!(
+                            "lamp-voice second: Phonon could not say a sentence ({why}); the lamp's one voice said it (first time only)"
+                        );
+                    }
+                    Box::pin(lamps.first(text, turn)).await
+                }
+            },
             Self::Configured(tts, _) => {
                 let mut speech = match turn {
                     Some(turn) => tts.speak_for(text, turn).await?,
@@ -1152,7 +1196,7 @@ impl Voice {
         match self {
             Self::Configured(tts, _) => tts.speaks_the_persons(),
             Self::OwnGemini(_, _, lost) => !lost.is_lost(),
-            Self::Gemini(_) => false,
+            Self::Gemini(_) | Self::Phonon(..) => false,
         }
     }
 
@@ -1162,7 +1206,7 @@ impl Voice {
         match self {
             Self::Configured(tts, _) => tts.give_way(why),
             Self::OwnGemini(_, _, lost) => lost.failed_by(why, OWN_GEMINI),
-            Self::Gemini(_) => {}
+            Self::Gemini(_) | Self::Phonon(..) => {}
         }
     }
 }
@@ -1346,6 +1390,9 @@ impl Net {
             Some(gemini) => Voice::Gemini(gemini.clone()),
             None => Voice::Configured(self.tts.clone(), self.config.tts_provider.name()),
         };
+        if let Some(phonon) = &self.phonon {
+            return Voice::Phonon(phonon.clone(), Box::new(lamps));
+        }
         match &self.own_gemini {
             Some((own, lost)) => Voice::OwnGemini(own.clone(), Box::new(lamps), lost.clone()),
             None => lamps,
@@ -1356,7 +1403,9 @@ impl Net {
     /// near (#2882). The person's own Gemini voice is never near: their key
     /// goes to Google alone (#8754).
     fn turn_voice(&self) -> (Voice, Option<(Voice, Taken, Service)>) {
-        if self.own_gemini.is_some() {
+        // Phonon is on the lamp, and the person's own Gemini voice goes to
+        // Google alone: neither is near, nor at another address.
+        if self.own_gemini.is_some() || self.phonon.is_some() {
             return (self.voice(), None);
         }
         if let Some((gemini, taken)) = self.near_gemini_tts() {
@@ -1557,8 +1606,12 @@ impl Services for Net {
 
     fn open_speech_ahead(&self, request: u64) {
         // The configured voice only when it is the lamp's one voice, and
-        // not while the person's Gemini voice speaks (#8754).
-        if !self.speech_socket || self.gemini_tts.is_some() || self.speaks_the_persons_gemini() {
+        // not while the person's Gemini voice or Phonon speaks (#8754).
+        if !self.speech_socket
+            || self.gemini_tts.is_some()
+            || self.speaks_the_persons_gemini()
+            || self.phonon.is_some()
+        {
             return;
         }
         let tts = self.turn_tts();
@@ -2440,6 +2493,179 @@ pub(crate) mod tests {
         lost.refused_by(401, "Gemini");
         assert!(!net.voice().speaks_the_persons());
         assert_eq!(net.voice().name(), net.config.tts_provider.name());
+    }
+
+    /// A `lamp-phonon` of the test's own at a socket in a fresh folder,
+    /// answering each connection with `samples` then the end; what it was
+    /// asked. The folder is removed by the caller's [`PhononFolder`].
+    async fn phonon_service(samples: Vec<i16>) -> (PhononFolder, Arc<Mutex<Vec<String>>>) {
+        use tokio::io::AsyncBufReadExt;
+        let folder = PhononFolder::new();
+        let listener = tokio::net::UnixListener::bind(folder.socket()).unwrap();
+        let asked = Arc::new(Mutex::new(Vec::new()));
+        let kept = asked.clone();
+        tokio::spawn(async move {
+            while let Ok((connection, _)) = listener.accept().await {
+                let (kept, samples) = (kept.clone(), samples.clone());
+                tokio::spawn(async move {
+                    let mut connection = tokio::io::BufReader::new(connection);
+                    let mut line = String::new();
+                    connection.read_line(&mut line).await.unwrap();
+                    kept.lock().unwrap().push(line);
+                    let mut connection = connection.into_inner();
+                    let _ = connection
+                        .write_all(&lamp_msgs::phonon::frame(&samples))
+                        .await;
+                    let _ = connection.write_all(&lamp_msgs::phonon::END).await;
+                });
+            }
+        });
+        (folder, asked)
+    }
+
+    /// A folder short enough for a socket's path, removed when dropped.
+    struct PhononFolder(std::path::PathBuf);
+
+    impl PhononFolder {
+        fn new() -> Self {
+            static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let path = std::env::temp_dir().join(format!(
+                "phs{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            ));
+            std::fs::create_dir_all(&path).unwrap();
+            Self(path)
+        }
+
+        fn socket(&self) -> std::path::PathBuf {
+            self.0.join("p.sock")
+        }
+    }
+
+    impl Drop for PhononFolder {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    /// #8754: with Phonon chosen, every sentence is Phonon's while its
+    /// service answers, in the chosen voice and with no tags, and the
+    /// lamp's one voice is never asked.
+    #[tokio::test]
+    async fn phonon_says_each_sentence_and_the_lamps_voice_is_not_asked() {
+        let (folder, asked) = phonon_service(vec![3, 4]).await;
+        let (lamps_url, lamps_asked) = recording(
+            answer_head(200, 4),
+            bytes(&[5, 6]),
+            LAMPS_KEY,
+            std::time::Duration::ZERO,
+        )
+        .await;
+        let lamps = Tts::with(TtsProvider::ElevenLabs, &lamps_url, LAMPS_KEY, None).unwrap();
+        let voice = Voice::Phonon(
+            Arc::new(net::PhononTts::new(
+                folder.socket(),
+                lamp_msgs::phonon::voice("Toby").unwrap(),
+            )),
+            Box::new(Voice::Configured(Arc::new(lamps), "ElevenLabs")),
+        );
+        assert_eq!(voice.name(), "Phonon");
+        assert!(!voice.speaks_the_persons());
+        for text in ["Hello there.", "[warmly] And again."] {
+            assert_eq!(
+                spoken(in_one_voice(voice.clone(), text.into(), turn_of(8754))).await,
+                Ok(vec![3, 4]),
+                "{text}"
+            );
+        }
+        let asked: Vec<_> = asked
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|line| lamp_msgs::phonon::parse_request(line).unwrap())
+            .map(|(text, voice)| (text, voice.name))
+            .collect();
+        assert_eq!(
+            asked,
+            [
+                ("Hello there.".to_owned(), "Toby"),
+                ("And again.".to_owned(), "Toby")
+            ]
+        );
+        assert!(lamps_asked.lock().unwrap().is_empty());
+    }
+
+    /// #8754: with no service (not ready yet, stopped, crashed), a sentence
+    /// is said in the lamp's one voice, as it is, and the next one asks
+    /// Phonon again.
+    #[tokio::test]
+    async fn without_phonon_the_lamps_voice_says_the_sentence() {
+        let folder = PhononFolder::new();
+        let (lamps_url, lamps_asked) = recording(
+            answer_head(200, 4),
+            bytes(&[5, 6]),
+            LAMPS_KEY,
+            std::time::Duration::ZERO,
+        )
+        .await;
+        let lamps = Tts::with(TtsProvider::ElevenLabs, &lamps_url, LAMPS_KEY, None).unwrap();
+        let voice = Voice::Phonon(
+            Arc::new(net::PhononTts::new(
+                folder.socket(),
+                lamp_msgs::phonon::VOICES[0],
+            )),
+            Box::new(Voice::Configured(Arc::new(lamps), "ElevenLabs")),
+        );
+        assert_eq!(
+            spoken(in_one_voice(
+                voice.clone(),
+                "Hello there.".into(),
+                turn_of(8754)
+            ))
+            .await,
+            Ok(vec![10, 12])
+        );
+        assert_eq!(texts(&lamps_asked), ["Hello there."]);
+        // The service comes up: the next sentence is Phonon's.
+        drop(folder);
+        let (folder, _asked) = phonon_service(vec![7]).await;
+        let voice = match voice {
+            Voice::Phonon(_, lamps) => Voice::Phonon(
+                Arc::new(net::PhononTts::new(
+                    folder.socket(),
+                    lamp_msgs::phonon::VOICES[0],
+                )),
+                lamps,
+            ),
+            _ => unreachable!(),
+        };
+        assert_eq!(
+            spoken(in_one_voice(voice, "Next.".into(), turn_of(8755))).await,
+            Ok(vec![7])
+        );
+        assert_eq!(lamps_asked.lock().unwrap().len(), 1);
+    }
+
+    /// #8754: Phonon is the turn's voice at its own socket, never a near
+    /// one, with the lamp's one voice kept behind it.
+    #[test]
+    fn phonon_is_never_near_and_keeps_the_lamps_voice_behind_it() {
+        let config = config_at(
+            "phonon",
+            "k-relay",
+            "http://127.0.0.1:9",
+            "http://127.0.0.1:9",
+        );
+        let folder = PhononFolder::new();
+        let net = Net::new(config, Arc::new(Vec::new))
+            .unwrap()
+            .speaking_on_the_lamp_at(&folder.socket());
+        let (voice, near) = net.turn_voice();
+        assert!(near.is_none());
+        assert!(
+            matches!(&voice, Voice::Phonon(_, lamps) if matches!(**lamps, Voice::Configured(..)))
+        );
     }
 
     /// Nothing to say asks no voice at all.

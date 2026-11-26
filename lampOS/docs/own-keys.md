@@ -927,6 +927,22 @@ start; the folder stays root's alone, 0700, each file 0600.
   (`the_agent_uses_an_own_model_key_only_once_it_made_a_tool_call`). Not yet
   run against a real service.
 
+## Phonon on the lamp (#8754, built, off until a person chooses it)
+
+A voice with no key: `{"service":"phonon","voice_id":"<name>"}` keeps only
+the voice's name, as `phonon.voice` in this folder, and is offered only
+while the lamp speaks English. Choosing it removes a person's own
+ElevenLabs voice, and keeping an ElevenLabs voice removes it: one own voice
+at a time. Its `offers[]` entry has `"runs": "lamp"`, its `voices`, and
+`"agent": false`. Choosing or removing it restarts `lamp-phonon.service`
+before the voice, in the same quiet moment and under the same update lock
+(`keys::restart_after`, `Done::restart_phonon`): lamp-phonon starts only
+while the choice exists, so a removed choice stops it. A lamp without the
+unit says so in the journal and the voice still restarts. Never restarts
+lamp-cloud. Tested in `tests/update_lock.rs`
+(`a_phonon_choice_restarts_lamp_phonon_then_the_voice_once_quiet`). The
+model, the service and the fallback are in [phonon.md](phonon.md).
+
 ## Updates
 
 Read one version ahead (#1680): `serve.json`'s `own_keys` field (the

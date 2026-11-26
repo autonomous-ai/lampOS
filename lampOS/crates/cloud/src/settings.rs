@@ -505,22 +505,28 @@ pub fn keys_line(kind: &str, data: &Value) -> Result<(String, Option<String>), S
                         | "gemini"
                         | "anthropic"
                         | "gemini_voice"
+                        | "phonon"
                 )
             })
             .ok_or(
-                "service must be deepseek, deepgram, elevenlabs, openai_compatible, openrouter, gemini, anthropic or gemini_voice",
+                "service must be deepseek, deepgram, elevenlabs, openai_compatible, openrouter, gemini, anthropic, gemini_voice or phonon",
             )
     };
     let line = match kind {
         "keys.set" => {
             let service = service()?;
-            // ElevenLabs' voice ID (#8367) or Gemini's voice name (#8754);
-            // with no key, the voice alone, which the helper changes only
-            // beside a kept key.
+            // Phonon runs on the lamp (#8754): a voice's name, never a key.
+            if service == "phonon" && data.get("key").is_some_and(|key| !key.is_null()) {
+                return Err("phonon takes no key".into());
+            }
+            // ElevenLabs' voice ID (#8367), Gemini's voice name or Phonon's
+            // voice name (#8754); with no key, the voice alone, which the
+            // helper changes only beside a kept key (ElevenLabs, Gemini) or by
+            // itself (Phonon).
             let voice_id = match data.get("voice_id") {
                 None | Some(Value::Null) => None,
                 Some(Value::String(id))
-                    if matches!(service, "elevenlabs" | "gemini_voice")
+                    if matches!(service, "elevenlabs" | "gemini_voice" | "phonon")
                         && (1..=VOICE_ID_MOST).contains(&id.len())
                         && id.bytes().all(|b| b.is_ascii_alphanumeric()) =>
                 {
@@ -1529,7 +1535,7 @@ mod tests {
         let reply = changes.take()[0].reply(&identity, "t");
         assert_eq!(
             reply["error"],
-            "service must be deepseek, deepgram, elevenlabs, openai_compatible, openrouter, gemini, anthropic or gemini_voice"
+            "service must be deepseek, deepgram, elevenlabs, openai_compatible, openrouter, gemini, anthropic, gemini_voice or phonon"
         );
         assert_eq!(
             reply["data"],
@@ -3313,5 +3319,36 @@ mod tests {
             let took = took.expect("the kept level is said");
             assert!(took < Duration::from_secs(1), "said after {took:?}");
         });
+    }
+
+    /// #8754: `keys.set` takes Phonon with a voice's name and no key, and
+    /// `keys.remove` takes it; a key, a voice in another shape, or no voice
+    /// at all is refused without saying what was sent.
+    #[test]
+    fn keys_line_passes_phonon_with_a_voice_and_no_key() {
+        let line = |data: Value| {
+            serde_json::from_str::<Value>(&keys_line("keys.set", &data).unwrap().0).unwrap()
+        };
+        assert_eq!(
+            line(json!({"service": "phonon", "voice_id": "Freya", "request_id": "p1"})),
+            json!({"set": "phonon", "voice_id": "Freya"})
+        );
+        assert_eq!(
+            keys_line("keys.remove", &json!({"service": "phonon"}))
+                .unwrap()
+                .0,
+            r#"{"remove":"phonon"}"#
+        );
+        for data in [
+            json!({"service": "phonon", "key": "sk-planted-8754", "voice_id": "Freya"}),
+            json!({"service": "phonon", "voice_id": "../x"}),
+            json!({"service": "phonon"}),
+        ] {
+            let why = keys_line("keys.set", &data).unwrap_err();
+            assert!(
+                !why.contains("sk-planted") && !why.contains("../x"),
+                "{why}"
+            );
+        }
     }
 }
