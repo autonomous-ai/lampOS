@@ -1230,7 +1230,10 @@ pub(crate) fn text_model_said(
                 }
             ),
             None if hosted.own_deepseek.is_some() => {
-                format!("DeepSeek's {}, with the owner's own key", hosted.deepseek_model)
+                format!(
+                    "DeepSeek's {}, with the owner's own key",
+                    hosted.deepseek_model
+                )
             }
             None if hosted.deepseek_base_url.is_some() => format!(
                 "DeepSeek's {}, through Autonomous's relay",
