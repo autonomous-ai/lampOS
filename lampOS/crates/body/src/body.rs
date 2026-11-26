@@ -855,6 +855,15 @@ pub const LIVELY_FOR: Duration = Duration::from_secs(2 * 60);
 
 /// A gesture asked on the mood socket, not one the body makes of itself:
 /// a shift at rest (`crate::idle`, `IDLE` among them) or the turn to a call.
+/// The conversation's small fills (the voice's `body_link::FILLS`) and the
+/// look when the lamp is called: a gesture of attention, never one a person
+/// asked for (#8640).
+const FILLS: [&str; 4] = ["nod", "acknowledge", "curious", clips::CALLED.name];
+
+fn is_fill(clip: &Clip) -> bool {
+    FILLS.contains(&clip.name)
+}
+
 fn from_outside(clip: &Clip) -> bool {
     !idle::is_move(clip) && clip.name != clips::CALLED.name
 }
@@ -8286,7 +8295,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 {
                     Some((crate::moves::PERSON_USING, by.1))
                 } else if !limits.arbitration {
-                    Some(("dropped: another gesture plays", None))
+                    // A fill (a nod, an acknowledge, a curious or the
+                    // called look) gives way to any other gesture: a dance
+                    // a person asked for is never dropped for one (#8640).
+                    // A fill never takes the body from another gesture.
+                    let over_a_fill =
+                        playing.is_some_and(|(old, _)| is_fill(old)) && !is_fill(clip);
+                    (!over_a_fill).then_some(("dropped: another gesture plays", None))
                 } else if asked_by > by.0 {
                     None
                 } else {

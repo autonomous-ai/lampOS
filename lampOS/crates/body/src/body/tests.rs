@@ -14876,6 +14876,43 @@ fn a_gesture_asked_higher_ends_the_one_playing_and_one_asked_no_higher_is_droppe
     );
 }
 
+/// #8640 (lamp-52e6, 26 Nov 07:5x, no `--arbitration` as in the product): a
+/// dance a person asked for was dropped, "another gesture plays", for the
+/// conversation's curious fill. A fill gives way to any other gesture, and
+/// never takes the body from one: a dance asked over a curious ends it and
+/// plays; a curious asked over a dance is dropped.
+#[test]
+fn an_asked_dance_ends_a_fill_and_a_fill_never_ends_an_asked_gesture() {
+    let secs = Duration::from_secs;
+    let asks = vec![
+        (secs(8), &crate::clips::CURIOUS, Priority::Conversation),
+        (secs(9), &crate::clips::DANCE_GROOVE, Priority::Skill),
+    ];
+    let (_, fates, _) = arbitrated_run(false, asks, 14);
+    assert_eq!(
+        &fates[..3],
+        [
+            ("curious", "taken: it plays"),
+            ("curious", crate::moves::ended(Priority::Skill)),
+            ("dance_groove", "taken: it plays"),
+        ],
+        "{fates:?}"
+    );
+    let asks = vec![
+        (secs(8), &crate::clips::DANCE_GROOVE, Priority::Skill),
+        (secs(9), &crate::clips::CURIOUS, Priority::Conversation),
+    ];
+    let (_, fates, _) = arbitrated_run(false, asks, 14);
+    assert_eq!(
+        &fates[..2],
+        [
+            ("dance_groove", "taken: it plays"),
+            ("curious", "dropped: another gesture plays"),
+        ],
+        "{fates:?}"
+    );
+}
+
 /// Under arbitration, a gesture asked of a lamp a hand put to sleep (#1362)
 /// is dropped as asleep however high it is asked: it does not end the one
 /// already playing and play on a sleeping lamp.
