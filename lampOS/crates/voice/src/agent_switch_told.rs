@@ -454,10 +454,17 @@ impl Drop for AgentSwitchTold {
 
 /// Whether the lamp is in a conversation: a turn open (`turn_open`), or the
 /// thread's conversation going on (`thread_going_on`, the lamp's words
-/// within 45 s, not closed since). Nothing else: a face in view or the
-/// room's talk is no conversation with the lamp.
-pub fn in_conversation(turn_open: bool, thread_going_on: impl FnOnce() -> bool) -> bool {
-    turn_open || thread_going_on()
+/// within 45 s, not closed since) with someone at the lamp
+/// (`someone_here`, `reminders::someone_here`): the lamp's own unasked
+/// words (task news, say) to an empty room are no conversation. Nothing
+/// else: a face in view or the room's talk is no conversation with the
+/// lamp.
+pub fn in_conversation(
+    turn_open: bool,
+    someone_here: bool,
+    thread_going_on: impl FnOnce() -> bool,
+) -> bool {
+    turn_open || (someone_here && thread_going_on())
 }
 
 #[cfg(test)]

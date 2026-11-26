@@ -2742,7 +2742,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      is wanted: the round hands `by_default` in its ask, and the one-shot
      then asks lamp-tasks right before; another default, it installs the
      files and starts nothing; no answer, it restarts only a running one
-     (`try-restart`). A round asks it for no `gateway` block while OpenClaw
+     (`try-restart`). Wanted, it asks lamp-tasks again right before the
+     restart, after its wait for a gateway still starting (up to 300 s),
+     and restarts nothing when the default moved meanwhile or Hermes's
+     gateway (`lamp-hermes-gateway.service`) is not down (`inactive` or
+     `failed`), journaling "lamp-openclaw-gateway.service not restarted:
+     …" once; a round starts it once both hold. A round asks it for no `gateway` block while OpenClaw
      isn't wanted. Its unit is written by a round only, never by the one-shot:
      a one-shot that finds an earlier build's unit (a lamp-update ahead
      of its units) changes nothing and takes nothing out, journals

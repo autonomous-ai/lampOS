@@ -569,10 +569,13 @@ fn gateway_idle(root: &Path, systemd: &mut dyn Systemd, say: &mut dyn FnMut(&str
 /// `failed`): a state not read, or any other (`active`, `activating`,
 /// `deactivating`, `reloading`), is not down.
 pub fn gateway_down(systemd: &mut dyn Systemd) -> bool {
-    matches!(
-        gateway_state(systemd).as_deref(),
-        Some("inactive" | "failed")
-    )
+    down(gateway_state(systemd).as_deref())
+}
+
+/// [`gateway_down`]'s rule on an `ActiveState` already read (OpenClaw's
+/// one-shot reads it through its runner): `inactive` or `failed` only.
+pub fn down(state: Option<&str>) -> bool {
+    matches!(state, Some("inactive" | "failed"))
 }
 
 /// The gateway's `ActiveState` as systemd says it, `None` when it can't.
