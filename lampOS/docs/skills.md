@@ -7856,7 +7856,12 @@ forces one), a skill it makes is made whole, with everything a run needs:
   hold a digit, an English number word (zero to ninety-nine, hundred,
   thousand, the ordinals first to thirty-first) or a weekday or month name
   (whole words, any case, an underscore or a hyphen splitting words; "May"
-  and "March" only capitalised, as "you may" is no month) is refused like a
+  and "March" only capitalised and read as a date, after "of" or "in" or
+  beside a count word, so "May your day be bright!" stays; "one", "second"
+  and "first" only beside a count or date word such as "day", "week",
+  "left" or another number, so "One more glass of water.", "Take a second
+  to breathe." and "Your first break of the day!" stay, while "One day
+  left." is refused) is refused like a
   `run` step, its repair `made_skill::CHANGING_SAY_REPAIR`: "this answer
   changes, so compute it when the skill runs: a task step whose script
   prints it." A constant line ("Time to stretch!") stays a fixed `say`, and
