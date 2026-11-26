@@ -5379,7 +5379,9 @@ struct Marks {
 
 /// What a line that was only the lamp's name is asked as when no words of
 /// it came back: the name the coordinator heard, as Live's model hears it.
-const CALLED_WORDS: &str = "Lamp.";
+/// The attention judges such a line by these words too
+/// (`attention::opens_with_the_name`, `LAMP_NAME_HEY_ONLY`).
+pub(crate) const CALLED_WORDS: &str = "Lamp.";
 
 /// A line's words past a "hey" or "ok" before them, any case and
 /// punctuation aside, an apostrophe kept in its word ("what's", "Lamp's")
