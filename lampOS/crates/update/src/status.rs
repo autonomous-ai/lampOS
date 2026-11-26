@@ -165,6 +165,8 @@ pub struct Telling {
     /// the owner's Update now asked for it.
     waiting: Option<&'static str>,
     asked_now: bool,
+    /// The owner's Auto update took this round (#8769).
+    asked_auto: bool,
     /// The lamp's agents (#6240), with `LAMP_APP_ENGINES=on`.
     engines: Option<Engines>,
 }
@@ -270,6 +272,7 @@ impl Telling {
             target: None,
             waiting: None,
             asked_now: false,
+            asked_auto: false,
             engines,
         }
     }
@@ -315,6 +318,17 @@ impl Telling {
         self.tell_round();
     }
 
+    /// The owner's Auto update took this round's switch (#8769): said at
+    /// once as `asked` `auto`, kept to the round's end; an Update now says
+    /// `now` instead.
+    pub fn asked_auto(&mut self) {
+        if self.phase.is_none() || self.asked_auto || self.asked_now {
+            return;
+        }
+        self.asked_auto = true;
+        self.tell_round();
+    }
+
     /// The owner's Update now asked for this round, or took it over while it
     /// waited (#7517): said at once, and kept to the round's end.
     pub fn asked_now(&mut self) {
@@ -336,7 +350,11 @@ impl Telling {
             step_started_at_unix_ms: self.step_began_unix_ms.max(began),
             target: self.target.clone(),
             waiting: self.waiting.map(str::to_owned),
-            asked: self.asked_now.then(|| UpdateRound::ASKED_NOW.to_owned()),
+            asked: if self.asked_now {
+                Some(UpdateRound::ASKED_NOW.to_owned())
+            } else {
+                self.asked_auto.then(|| UpdateRound::ASKED_AUTO.to_owned())
+            },
         };
         let status = status_with(
             &self.records,
@@ -359,6 +377,7 @@ impl Telling {
         self.target = None;
         self.waiting = None;
         self.asked_now = false;
+        self.asked_auto = false;
         let status = status_with(
             &self.records,
             "idle",
@@ -378,6 +397,7 @@ impl Telling {
         self.target = None;
         self.waiting = None;
         self.asked_now = false;
+        self.asked_auto = false;
         let status = status(&self.records, "idle", self.last.as_ref(), None);
         self.tell(status);
     }

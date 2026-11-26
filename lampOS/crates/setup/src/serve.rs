@@ -73,6 +73,9 @@ fn default_agent_group_file() -> PathBuf {
 fn default_agent_folder() -> PathBuf {
     lamp_msgs::local_agent::SOCKET_DIR.into()
 }
+fn default_auto_update_off() -> PathBuf {
+    lamp_msgs::AUTO_UPDATE_OFF.into()
+}
 fn default_monitor_dropin() -> PathBuf {
     crate::change::MONITOR_DROPIN.into()
 }
@@ -177,6 +180,11 @@ pub struct Config {
     /// is there, root's, 0644. The reset's plan removes it.
     #[serde(default = "default_monitor_dropin")]
     pub monitor_dropin: PathBuf,
+    /// The owner's Auto update turned off (`update.auto`, #8769,
+    /// `lamp_msgs::AUTO_UPDATE_OFF`): there while off, root's, 0644, which
+    /// lamp-update reads each round. The reset's plan removes it.
+    #[serde(default = "default_auto_update_off")]
+    pub auto_update_off: PathBuf,
     /// The folder of the owner's face expressions and room sounds yeses
     /// (`lamp_msgs::consent::FOLDER`, 0750 `root:lampos`), written from the
     /// app's `consent.set` (`crate::change`, #5500) and by the voice's
@@ -233,6 +241,7 @@ pub const FIELDS: [&str; 29] = [
     "agent_group_file",
     "agent_folder",
     "monitor_dropin",
+    "auto_update_off",
     "consent",
     "privacy_light",
     "web_start",
@@ -276,6 +285,7 @@ impl Config {
             &self.agent_group_file,
             &self.agent_folder,
             &self.monitor_dropin,
+            &self.auto_update_off,
             &self.consent,
         ] {
             if !path.is_absolute() {

@@ -8,6 +8,13 @@
 //! the lamp asleep or muted (the conversation's cycle has ended then):
 //! nothing is said, and lamp-update switches as soon as it is quiet.
 //!
+//! The owner's Auto update (#8769): a round it switches gives way the same
+//! (`round.asked == "auto"`). By day the line is said once even with nobody
+//! near, so the room hears the lamp is updating; in the lamp's quiet hours
+//! (`lamp_local_time::quiet_hours`, the one definition lamp-control and
+//! lamp-skills keep) only to someone near, as Update now's, and a line heard
+//! is answered with it as above.
+//!
 //! No switch of its own: lamp-update says this only with `LAMP_UPDATE_NOW`
 //! on, and lamp-cloud asks for it only with its own.
 use lamp_msgs::UpdateStatus;
@@ -20,11 +27,30 @@ const READ_EVERY_US: u64 = 250_000;
 pub(super) const NEAR_US: u64 = 45_000_000;
 
 /// The round giving way to the voice, by when it began, as `status` says it:
-/// fresh, switching, asked now and giving way. None otherwise.
+/// fresh, switching, asked now (or by Auto update, #8769) and giving way.
+/// None otherwise.
 pub(super) fn giving_way(status: &UpdateStatus) -> Option<u64> {
     let round = status.round.as_ref()?;
-    (status.now == "switching" && round.asked_now() && round.giving_way())
+    (status.now == "switching" && (round.asked_now() || round.asked_auto()) && round.giving_way())
         .then_some(round.started_at_unix_ms)
+}
+
+/// Whether the round giving way is Auto update's (#8769).
+fn auto(status: &UpdateStatus) -> bool {
+    status
+        .round
+        .as_ref()
+        .is_some_and(lamp_msgs::UpdateRound::asked_auto)
+}
+
+/// Whether it is the lamp's quiet hours now; a local time that can't be
+/// read is not.
+fn quiet_hours_now() -> bool {
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64);
+    crate::local_time::system()
+        .is_some_and(|zone| lamp_local_time::quiet_hours(zone.minute_of_day(now_ms)))
 }
 
 /// Whether someone is near at `clock`: a turn under way, or speech heard or
@@ -41,6 +67,10 @@ pub(super) struct GiveWay {
     round: Option<u64>,
     /// The round whose line was said (or ended a reply for), so it is said once.
     said_round: Option<u64>,
+    /// The round giving way is Auto update's (#8769).
+    auto: bool,
+    /// The lamp's quiet hours, as read with the status.
+    quiet_hours: bool,
 }
 
 impl GiveWay {
@@ -66,14 +96,24 @@ impl GiveWay {
             .and_then(|bus| bus.latest(UpdateStatus::TOPIC).ok().flatten())
             .filter(|message| !message.expired)
             .and_then(|message| message.parse::<UpdateStatus>().ok());
-        self.take(status.as_ref());
+        let quiet_hours = status.as_ref().is_some_and(auto) && quiet_hours_now();
+        self.take(status.as_ref(), quiet_hours);
     }
 
     /// Takes what was read.
-    pub(super) fn take(&mut self, status: Option<&UpdateStatus>) {
+    pub(super) fn take(&mut self, status: Option<&UpdateStatus>, quiet_hours: bool) {
         let round = status.and_then(giving_way);
+        self.auto = round.is_some() && status.is_some_and(auto);
+        self.quiet_hours = quiet_hours;
         if round.is_some() && round != self.round {
-            eprintln!("lamp-voice: the owner's Update now: giving way before the switch");
+            eprintln!(
+                "lamp-voice: {}: giving way before the switch",
+                if self.auto {
+                    "Auto update"
+                } else {
+                    "the owner's Update now"
+                }
+            );
         }
         self.round = round;
     }
@@ -91,8 +131,11 @@ impl GiveWay {
 
     /// Whether the line is owed now: a round giving way, someone near, and
     /// not said for this round yet.
+    /// Auto update's round by day (#8769) is owed with nobody near too.
     pub(super) fn owed(&self, near: bool) -> bool {
-        near && self.round.is_some() && self.round != self.said_round
+        (near || (self.auto && !self.quiet_hours))
+            && self.round.is_some()
+            && self.round != self.said_round
     }
 
     /// The line was said (or a reply ended for it) in this round.
@@ -143,13 +186,40 @@ mod tests {
     }
 
     #[test]
+    fn auto_updates_round_gives_way_and_by_day_is_told_with_nobody_near() {
+        let auto = Some(UpdateRound::ASKED_AUTO);
+        let give = Some(UpdateRound::WAITING_GIVE_WAY);
+        assert_eq!(giving_way(&switching(auto, give, 9)), Some(9));
+        let mut way = GiveWay::default();
+        way.take(Some(&switching(auto, give, 9)), false);
+        assert!(way.owed(false), "by day, said with nobody near");
+        assert!(way.active_line().is_some());
+        way.said();
+        assert!(!way.owed(true), "said once a round");
+    }
+
+    #[test]
+    fn auto_updates_round_in_the_quiet_hours_is_said_only_to_someone_near() {
+        let auto = Some(UpdateRound::ASKED_AUTO);
+        let give = Some(UpdateRound::WAITING_GIVE_WAY);
+        let mut way = GiveWay::default();
+        way.take(Some(&switching(auto, give, 9)), true);
+        assert!(!way.owed(false), "at night, nothing to an empty room");
+        assert!(way.owed(true), "someone talking is told");
+        assert!(
+            way.active_line().is_some(),
+            "a line heard is answered with it"
+        );
+    }
+
+    #[test]
     fn the_line_is_owed_once_a_round_and_only_to_someone_near() {
         let mut way = GiveWay::default();
         let now = Some(UpdateRound::ASKED_NOW);
         let give = Some(UpdateRound::WAITING_GIVE_WAY);
         assert!(!way.owed(true));
         assert_eq!(way.active_line(), None);
-        way.take(Some(&switching(now, give, 7)));
+        way.take(Some(&switching(now, give, 7)), false);
         // Nobody near: not owed, but a line heard is still answered with it.
         assert!(!way.owed(false));
         assert!(way.active_line().is_some());
@@ -157,11 +227,11 @@ mod tests {
         way.said();
         assert!(!way.owed(true), "said once a round");
         // The give-way over: nothing more, and nothing told.
-        way.take(None);
+        way.take(None, false);
         assert!(!way.owed(true));
         assert_eq!(way.active_line(), None);
         // A later round's Update now is its own.
-        way.take(Some(&switching(now, give, 9)));
+        way.take(Some(&switching(now, give, 9)), false);
         assert!(way.owed(true));
     }
 

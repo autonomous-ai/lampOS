@@ -148,6 +148,16 @@ pub fn status(kept: Option<lamp_bus::Message>, engines: bool) -> Result<Option<V
     Ok(Some(reply))
 }
 
+/// The owner's Auto update (#8769) in `update.status`'s answer: `auto`
+/// true unless the off mark setup's change helper keeps
+/// (`lamp_msgs::AUTO_UPDATE_OFF`, under `root`) is a plain file, as
+/// lamp-update reads it.
+pub fn add_auto(status: &mut Value, root: &std::path::Path) {
+    let off = root.join(lamp_msgs::AUTO_UPDATE_OFF.trim_start_matches('/'));
+    let on = !std::fs::symlink_metadata(off).is_ok_and(|meta| meta.is_file());
+    status["auto"] = json!(on);
+}
+
 /// Whether `engine` may be installed by the app, as `status` (as [`status`]
 /// answers it) says: `not_installed` or `failed`. Refused with
 /// [`NO_ENGINE`] when it is not said, [`NOT_INSTALLABLE`] for one this
@@ -391,6 +401,22 @@ impl Checks {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn auto_update_is_on_unless_the_off_mark_is_there() {
+        let root = tempfile::tempdir().unwrap();
+        let mut status = json!({"now": "idle"});
+        add_auto(&mut status, root.path());
+        assert_eq!(status["auto"], json!(true));
+        let off = root
+            .path()
+            .join(lamp_msgs::AUTO_UPDATE_OFF.trim_start_matches('/'));
+        std::fs::create_dir_all(off.parent().unwrap()).unwrap();
+        std::fs::write(&off, "off\n").unwrap();
+        add_auto(&mut status, root.path());
+        assert_eq!(status["auto"], json!(false));
+        assert_eq!(status["now"], json!("idle"));
+    }
 
     #[test]
     fn update_now_starts_a_round_or_takes_over_a_wait_for_quiet_and_nothing_else() {

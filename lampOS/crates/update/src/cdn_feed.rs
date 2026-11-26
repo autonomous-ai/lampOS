@@ -532,6 +532,7 @@ mod tests {
             product_settings: false,
             image: false,
             first_update: false,
+            auto_update: false,
             writer_from: None,
         }
     }

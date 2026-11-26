@@ -2010,6 +2010,12 @@ impl UpdateStatus {
     }
 }
 
+/// The owner's Auto update turned off (#8769): setup's change helper writes
+/// it (`update.auto` off from the app) and removes it (on); lamp-update reads
+/// it each round, and lamp-cloud says it to the app. Absent, on a new lamp
+/// and after a reset, Auto update is on.
+pub const AUTO_UPDATE_OFF: &str = "/etc/lampOS/setup/auto-update-off";
+
 /// A round under way (#5473): when it began (its `checking`), when the step
 /// `now` names began, and the build it is going to, once the round has read
 /// it from the channel and found it newer (absent before, and in a round
@@ -2033,7 +2039,9 @@ pub struct UpdateRound {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub waiting: Option<String>,
     /// [`UpdateRound::ASKED_NOW`] for a round the owner's Update now asked
-    /// for, or took over while it waited (#7517); absent otherwise.
+    /// for, or took over while it waited (#7517), and
+    /// [`UpdateRound::ASKED_AUTO`] for one the owner's Auto update switches
+    /// (#8769); absent otherwise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asked: Option<String>,
 }
@@ -2045,10 +2053,18 @@ impl UpdateRound {
     pub const WAITING_GIVE_WAY: &str = "give_way";
     /// `asked` for a round of the owner's Update now (#7517).
     pub const ASKED_NOW: &str = "now";
+    /// `asked` for a round the owner's Auto update switches (#8769): it
+    /// gives way to the voice as Update now does, unasked.
+    pub const ASKED_AUTO: &str = "auto";
 
     /// Whether this round is one the owner's Update now asked for.
     pub fn asked_now(&self) -> bool {
         self.asked.as_deref() == Some(Self::ASKED_NOW)
+    }
+
+    /// Whether this round is one the owner's Auto update switches (#8769).
+    pub fn asked_auto(&self) -> bool {
+        self.asked.as_deref() == Some(Self::ASKED_AUTO)
     }
 
     /// Whether this round is giving way to the voice before its switch.

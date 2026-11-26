@@ -73,6 +73,7 @@ impl Root {
             agent_group_file: self.0.join("etc/group"),
             agent_folder: self.0.join("run/lampos-agent"),
             monitor_dropin: self.0.join("etc/lamp-peek.service.d/monitor.conf"),
+            auto_update_off: self.0.join("etc/auto-update-off"),
             consent: self.0.join("var/consent"),
             privacy_light: self.0.join("var/light/privacy.json"),
             web_start: vec![],

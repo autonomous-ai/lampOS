@@ -434,7 +434,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 92] = [
+pub const KINDS: [(&str, Switch); 93] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -486,6 +486,7 @@ pub const KINDS: [(&str, Switch); 92] = [
     (crate::settings::KINDS[3], SETTINGS),
     (crate::settings::KINDS[4], SETTINGS),
     (crate::settings::KINDS[5], SETTINGS),
+    (crate::settings::KINDS[6], SETTINGS),
     (crate::settings::PLACE_KINDS[0], PLACE),
     (crate::settings::PLACE_KINDS[1], PLACE),
     (crate::settings::VOICE_KINDS[0], VOICE),
@@ -1058,6 +1059,9 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             // says one; never a failure of the status.
             if let Some(status) = status.as_mut() {
                 crate::engine_default::add_to(status, &lamp.tasks_app_socket());
+                // The owner's Auto update (#8769), for the app's switch:
+                // on unless setup's change helper kept the off mark.
+                crate::update::add_auto(status, std::path::Path::new("/"));
             }
             Ok(status)
         }
@@ -2531,6 +2535,7 @@ pub mod tests {
                     "language.set",
                     "control.set",
                     "control.set_agent",
+                    "update.auto",
                     "wifi.set",
                     "wifi.confirm",
                 ],
@@ -2545,6 +2550,7 @@ pub mod tests {
                     "language.set",
                     "control.set",
                     "control.set_agent",
+                    "update.auto",
                     "keys.set",
                     "keys.remove",
                     "keys.get",
@@ -2563,6 +2569,7 @@ pub mod tests {
                     "language.set",
                     "control.set",
                     "control.set_agent",
+                    "update.auto",
                     "owner.place",
                     "owner.place.clear",
                 ],
@@ -2580,6 +2587,7 @@ pub mod tests {
                     "language.set",
                     "control.set",
                     "control.set_agent",
+                    "update.auto",
                     "voice.set",
                     "character.set",
                     "voice.get",

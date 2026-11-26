@@ -64,6 +64,7 @@
     "/etc/systemd/system/lamp-control.service.d/developer.conf",
     "/etc/systemd/system/lamp-control.service.d/agent.conf",
     "/etc/systemd/system/lamp-peek.service.d/monitor.conf",
+    "/etc/lampOS/setup/auto-update-off",
     "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
   ],
   "stop": [

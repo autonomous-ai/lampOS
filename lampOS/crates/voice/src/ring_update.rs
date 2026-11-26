@@ -90,6 +90,10 @@ pub enum Can {
     Wait,
     /// A light someone asked for holds the ring: a look is dropped.
     Held,
+    /// The lamp's quiet hours (#8769, the product owner's rule): an update
+    /// changes nothing on the ring at night, so no breath, and a look is
+    /// dropped, never drawn in the morning.
+    Night,
 }
 
 /// What the resting frame shows now.
@@ -209,6 +213,9 @@ impl Cues {
                 line = Some(format!(
                     "update look: {name} dropped, a light holds the ring"
                 ));
+            } else if can == Can::Night {
+                self.drop_owed(owed, &mut keep);
+                line = Some(format!("update look: {name} dropped, the quiet hours"));
             } else if can == Can::Draw {
                 if kept == Some(owed.key) {
                     self.owed = None;
@@ -331,6 +338,14 @@ pub fn scaled(pixels: &[Rgb; PIXEL_COUNT], share: f32, ceiling: u8) -> [Rgb; PIX
 }
 
 /// The end kept in `path`, if one can be read.
+/// Whether it is the lamp's quiet hours now (`lamp_local_time::quiet_hours`,
+/// the one definition lamp-control and lamp-skills keep); a local time that
+/// can't be read is not.
+fn quiet_hours_now() -> bool {
+    crate::local_time::system()
+        .is_some_and(|zone| lamp_local_time::quiet_hours(zone.minute_of_day(unix_ms())))
+}
+
 fn read_kept(path: &Path) -> Option<u64> {
     let text = std::fs::read_to_string(path).ok()?;
     let value: serde_json::Value = serde_json::from_str(&text).ok()?;
@@ -354,6 +369,8 @@ fn unix_ms() -> u64 {
 struct Found {
     status: Mutex<Option<UpdateStatus>>,
     asleep: AtomicBool,
+    /// The lamp's quiet hours, as last read (#8769).
+    night: AtomicBool,
     /// The end asked to be kept, and the end the file holds (or that could
     /// not be written, which is said and drawn all the same).
     keep: Mutex<(Option<u64>, Option<u64>)>,
@@ -404,6 +421,7 @@ impl RingUpdate {
                             crate::ring_night::asleep_in(&message, lamp_ipc::monotonic_us())
                         });
                     reading.asleep.store(asleep, Ordering::Release);
+                    reading.night.store(quiet_hours_now(), Ordering::Release);
                     let asked = reading.keep.lock().ok().and_then(|keep| {
                         let (asked, kept) = *keep;
                         asked.filter(|asked| Some(*asked) != kept)
@@ -435,6 +453,12 @@ impl RingUpdate {
     /// Call from the ring's loop with its clock: what the resting frame
     /// shows now. It reads no bus or file and never waits.
     pub fn tick(&mut self, now_us: u64, can: Can) -> Look {
+        // The quiet hours (#8769): nothing on the ring for an update.
+        let can = if self.found.night.load(Ordering::Acquire) {
+            Can::Night
+        } else {
+            can
+        };
         let status = self
             .found
             .status
@@ -692,6 +716,22 @@ mod tests {
             run.lines,
             ["update look: done dropped, a light holds the ring"]
         );
+    }
+
+    /// The quiet hours (#8769): no breath while a build comes, and the
+    /// round's look is dropped, not drawn once the night is over.
+    #[test]
+    fn in_the_quiet_hours_an_update_changes_nothing_on_the_ring() {
+        let switched = status("idle", Some(("switched", Some(ROUND))));
+        let mut run = Run::new(None);
+        run.steps(&switched, Can::Night, END, 100_000);
+        let after = run.steps(&switched, Can::Draw, END, 5_000_000);
+        assert!(after.iter().all(|look| *look == Look::Plain));
+        assert_eq!(run.kept, Some(END));
+        assert_eq!(run.lines, ["update look: done dropped, the quiet hours"]);
+        let mut run = Run::new(None);
+        let looks = run.steps(&status("fetching", None), Can::Night, ROUND, 1_000_000);
+        assert!(looks.iter().all(|look| *look == Look::Plain), "{looks:?}");
     }
 
     /// The breath and the dip never go over the person's light, the swell

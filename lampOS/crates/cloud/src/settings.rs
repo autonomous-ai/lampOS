@@ -41,7 +41,7 @@ pub const ENVIRONMENT: &str = "LAMP_SETTINGS_CHANGE";
 /// the same helper writes or removes lamp-control's second drop-in, fixed
 /// text, and only while developer access is on (`docs/control.md`, "The
 /// local agent").
-pub const KINDS: [&str; 6] = [
+pub const KINDS: [&str; 7] = [
     "timezone.set",
     "person.name.set",
     "device.rename",
@@ -50,7 +50,14 @@ pub const KINDS: [&str; 6] = [
     "language.set",
     CONTROL_KIND,
     AGENT_KIND,
+    // The owner's Auto update (#8769): `{"on": bool}`, kept by the helper as
+    // lamp-update's off mark (`lamp_msgs::AUTO_UPDATE_OFF`).
+    AUTO_UPDATE_KIND,
 ];
+
+/// The owner's Auto update (#8769): on by default; off, lamp-update switches
+/// only for Update now (`{"on": bool}`).
+pub const AUTO_UPDATE_KIND: &str = "update.auto";
 
 /// The owner's developer setting: lamp-control on or off (`{"on": bool}`).
 pub const CONTROL_KIND: &str = "control.set";
@@ -608,6 +615,9 @@ pub fn line(kind: &str, data: &Value) -> Result<String, String> {
     if kind == AGENT_KIND {
         return agent_line(data);
     }
+    if kind == AUTO_UPDATE_KIND {
+        return auto_update_line(data);
+    }
     let (field, key, why) = match kind {
         "timezone.set" => ("timezone", "timezone", "timezone must be text"),
         "person.name.set" => ("name", "person_name", "name must be text"),
@@ -644,6 +654,17 @@ fn agent_line(data: &Value) -> Result<String, String> {
         .ok_or_else(why)?;
     let on = object.get("on").and_then(Value::as_bool).ok_or_else(why)?;
     Ok(json!({ "local_agent": on }).to_string())
+}
+
+/// `update.auto`'s line: exactly one field, `on`, true or false.
+fn auto_update_line(data: &Value) -> Result<String, String> {
+    let why = || "on must be true or false, and the only field".to_owned();
+    let object = data
+        .as_object()
+        .filter(|object| object.len() == 1)
+        .ok_or_else(why)?;
+    let on = object.get("on").and_then(Value::as_bool).ok_or_else(why)?;
+    Ok(json!({ "auto_update": on }).to_string())
 }
 
 /// What the helper's reply line says: its `data`, or why not.
@@ -1971,6 +1992,31 @@ mod tests {
         ] {
             assert_eq!(
                 line("control.set_agent", &data),
+                Err("on must be true or false, and the only field".to_owned()),
+                "{data}"
+            );
+        }
+    }
+
+    #[test]
+    fn update_auto_takes_exactly_one_boolean_on() {
+        assert!(KINDS.contains(&"update.auto"));
+        assert_eq!(
+            line("update.auto", &json!({"on": false})),
+            Ok(r#"{"auto_update":false}"#.to_owned())
+        );
+        assert_eq!(
+            line("update.auto", &json!({"on": true})),
+            Ok(r#"{"auto_update":true}"#.to_owned())
+        );
+        for data in [
+            json!({}),
+            json!({"on": "off"}),
+            json!({"on": true, "x": 1}),
+            Value::Null,
+        ] {
+            assert_eq!(
+                line("update.auto", &data),
                 Err("on must be true or false, and the only field".to_owned()),
                 "{data}"
             );

@@ -59,6 +59,9 @@ mod asleep_quiet;
 #[path = "round/update_now.rs"]
 mod update_now;
 
+#[path = "round/auto_update.rs"]
+mod auto_update;
+
 #[path = "round/cut_short.rs"]
 mod cut_short;
 #[path = "round/product_adds.rs"]
@@ -765,6 +768,7 @@ impl Lamp {
             writer_from: None,
             image: false,
             first_update: false,
+            auto_update: false,
         };
         Self {
             _folder: folder,

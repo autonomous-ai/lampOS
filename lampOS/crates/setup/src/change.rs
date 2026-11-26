@@ -166,6 +166,9 @@ pub enum Change {
     LocalAgent(bool),
     /// The owner's dev monitor: lamp-peek in monitor mode or off (#5883).
     Monitor(bool),
+    /// The owner's Auto update (#8769): on removes the off mark, off writes
+    /// it. Nothing restarts: lamp-update reads it at its next round.
+    AutoUpdate(bool),
     /// The owner's chosen voice's name; `None` goes back to the default.
     Voice(Option<String>),
     /// The owner's words for the character; `None` clears them, and the
@@ -299,7 +302,8 @@ pub fn fit_name(name: &str) -> Result<String, &'static str> {
 /// `{"language": s}`, `{"voice": s}`, `{"character": s}` (`""` clears
 /// either; or `{"character": {"text": s, "energy"?: 1..5}}`, #6893, or
 /// `{"character": {"energy": 1..5}}` alone, the words kept, #7566), or `{"owner_place": {"name", "lat", "lon", "set_at"}}`
-/// (`null` clears it), or `{"control": bool}`, `{"local_agent": bool}`, `{"monitor": bool}`, or `{"consent": {KEY: bool}, "if": REV}`
+/// (`null` clears it), or `{"control": bool}`, `{"local_agent": bool}`, `{"monitor": bool}`,
+/// `{"auto_update": bool}` (#8769), or `{"consent": {KEY: bool}, "if": REV}`
 /// with exactly one key of [`lamp_msgs::consent::FILES`] and the revision
 /// the app saw (`if` goes with `consent` alone), or
 /// `{"desk_noticing": {"allow": bool, "request_id": N}}` (N a positive
@@ -397,6 +401,9 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
         }
         "monitor" => Ok(Change::Monitor(
             given.as_bool().ok_or("monitor must be true or false")?,
+        )),
+        "auto_update" => Ok(Change::AutoUpdate(
+            given.as_bool().ok_or("auto_update must be true or false")?,
         )),
         // Checked again here, whatever lamp-cloud sent (#5500).
         "consent" => {
@@ -653,6 +660,22 @@ pub fn apply_or(change: &Change, config: &Config, by_default: bool) -> io::Resul
                 restart_peek: *on && changed,
                 said: format!(
                     "the dev monitor is {}{}",
+                    if *on { "on" } else { "off" },
+                    if changed { "" } else { " already" }
+                ),
+            })
+        }
+        Change::AutoUpdate(on) => {
+            let changed = keep_line(&config.auto_update_off, (!*on).then_some("off"))?;
+            Ok(Done {
+                data: json!({"on": on}),
+                restart_schedule: false,
+                restart_voice: false,
+                restart_control: false,
+                restart_ears: false,
+                restart_peek: false,
+                said: format!(
+                    "Auto update is {}{}",
                     if *on { "on" } else { "off" },
                     if changed { "" } else { " already" }
                 ),
