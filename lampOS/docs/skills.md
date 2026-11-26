@@ -7843,6 +7843,23 @@ forces one), a skill it makes is made whole, with everything a run needs:
   the whole skill told-only, or that trigger could still run its `run`
   step. Test
   `a_skill_a_touch_or_a_press_starts_may_say_its_line_and_a_timed_one_may_not`.
+  **A fixed say that changes is refused too** (the first builder's call on
+  #8651 after leg M, "There are ninety nine days left in the year" written
+  into a 6 AM `say`, wrong from the next day): in such a skill, a `say`
+  step whose own words (`say = "…"`, `text` or `note`, one line or a list)
+  hold a digit, an English number word (zero to ninety-nine, hundred,
+  thousand, the ordinals first to thirty-first) or a weekday or month name
+  (whole words, any case, an underscore or a hyphen splitting words; "May"
+  and "March" only capitalised, as "you may" is no month) is refused like a
+  `run` step, its repair `made_skill::CHANGING_SAY_REPAIR`: "this answer
+  changes, so compute it when the skill runs: a task step whose script
+  prints it." A constant line ("Time to stretch!") stays a fixed `say`, and
+  so do the same words in a skill only the person's words or a hand start,
+  and `remind` steps. The journal names it "(a say with a number or a
+  date)" beside "(a run step)" and "(a speaking grant)". The lamp's own
+  model's brief says it too (`make_skill_local::CHANGING_LINE`). Tests
+  `a_timed_fixed_say_with_a_number_or_a_date_is_refused_and_a_constant_one_kept`,
+  `the_brief_says_a_line_that_changes_is_never_a_fixed_say`.
   The refusal goes to the writer first, as the
   try's failure (`made_skill::TOLD_ONLY_REPAIR`: a `task` step, no
   `speak`, scripts that print, the agent's answer the spoken summary), so

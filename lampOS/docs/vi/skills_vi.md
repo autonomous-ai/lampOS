@@ -4228,6 +4228,25 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   `controls/touch_state`) làm cả kỹ năng chỉ được nói qua câu trả lời được
   kể, nếu không trigger đó vẫn có thể chạy bước `run` của nó. Test
   `a_skill_a_touch_or_a_press_starts_may_say_its_line_and_a_timed_one_may_not`.
+  **Một câu `say` cố định mà thay đổi cũng bị từ chối** (quyết định của
+  builder đầu tiên trên #8651 sau leg M, "There are ninety nine days left
+  in the year" được viết vào một `say` lúc 6 giờ sáng, sai từ ngày hôm
+  sau): trong một kỹ năng như vậy, một bước `say` mà lời của chính nó
+  (`say = "…"`, `text` hay `note`, một dòng hay một danh sách) chứa một chữ
+  số, một từ chỉ số tiếng Anh (zero đến ninety-nine, hundred, thousand, số
+  thứ tự first đến thirty-first) hay tên một ngày trong tuần hoặc một tháng
+  (nguyên từ, mọi kiểu chữ hoa thường, dấu gạch dưới hay gạch nối tách từ;
+  "May" và "March" chỉ khi viết hoa, vì "you may" không phải là tháng) bị
+  từ chối như một bước `run`, với lời sửa `made_skill::CHANGING_SAY_REPAIR`:
+  "this answer changes, so compute it when the skill runs: a task step
+  whose script prints it." Một câu không đổi ("Time to stretch!") vẫn là
+  `say` cố định, cùng những lời đó trong kỹ năng chỉ do lời người dùng hay
+  một bàn tay khởi động cũng vậy, và các bước `remind` cũng vậy. Nhật ký
+  gọi tên nó là "(a say with a number or a date)" bên cạnh "(a run step)"
+  và "(a speaking grant)". Brief của mô hình riêng của đèn cũng nói điều
+  này (`make_skill_local::CHANGING_LINE`). Test
+  `a_timed_fixed_say_with_a_number_or_a_date_is_refused_and_a_constant_one_kept`,
+  `the_brief_says_a_line_that_changes_is_never_a_fixed_say`.
   Lời từ chối đến người viết trước, như thất bại của lần
   chạy thử (`made_skill::TOLD_ONLY_REPAIR`: một bước `task`, không `speak`,
   script in ra, câu trả lời của agent là phần tóm tắt nói ra), nên một lần
