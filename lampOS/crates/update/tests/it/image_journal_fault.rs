@@ -185,7 +185,7 @@ fn a_fault_keeps_the_units_last_lines_and_a_success_nothing() {
     assert_eq!(lamp.asked(), Vec::<String>::new());
     let said = lamp.stop(Some("signal"));
     let name = format!("boot-1.1.{UNIT}.log");
-    assert_eq!(lamp.kept(), [name.clone()]);
+    assert_eq!(lamp.kept(), std::slice::from_ref(&name));
     assert!(said.contains(&name), "{said}");
     assert_eq!(
         lamp.asked(),
