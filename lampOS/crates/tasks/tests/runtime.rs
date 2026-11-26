@@ -2729,6 +2729,27 @@ fn prepare_office(s: &Running) -> Value {
     )
 }
 
+/// The id of the last task for `alias`, read from `list` (#8664: what a
+/// computer's `used` in the targets answer says). A prepare polled until
+/// a refusal may have prepared tasks before the refusal was known, so the
+/// tests read it rather than count.
+fn last_task_for(s: &Running, alias: &str) -> Value {
+    let mut after_id = 0;
+    let mut last = Value::Null;
+    loop {
+        let page = s.ask(json!({"op":"list","after_id":after_id,"limit":8}));
+        for item in page["items"].as_array().unwrap() {
+            if item["target_alias"] == alias {
+                last = item["id"].clone();
+            }
+        }
+        match page["next_after_id"].as_u64() {
+            Some(next) => after_id = next,
+            None => return last,
+        }
+    }
+}
+
 /// Prepares to `office` until the answer's `error` is `code` (`None`: until
 /// one is prepared), within 5 s.
 fn prepared_until(s: &Running, code: Option<&str>) -> Value {
@@ -2756,6 +2777,9 @@ fn prepared_until(s: &Running, code: Option<&str>) -> Value {
 /// beside the targets. A `prepare` is refused at once when that engine is
 /// known not signed in, or the computer known offline; a failed look keeps
 /// what was known; once it is signed in and awake, the work is prepared.
+/// #8664: the target says the computer's `status` and, as its `agents`,
+/// only the engines installed there and not known signed out (Codex once
+/// signed in), and, after a hand-over, its last task as `used`.
 #[test]
 fn engines_from_machines_choose_an_engine_there_and_refuse_early() {
     let (mut s, path) = engines_running(true);
@@ -2768,8 +2792,9 @@ fn engines_from_machines_choose_an_engine_there_and_refuse_early() {
     );
     s.start();
     let start = Instant::now();
+    // Codex installed but not signed in: no `agents`; Claude Code unknown.
     while s.ask(json!({"op":"targets"}))["targets"]
-        != json!([{"alias":"office","engine":"codex","name":"Office iMac"}])
+        != json!([{"alias":"office","engine":"codex","name":"Office iMac","status":"online"}])
     {
         assert!(start.elapsed() < Duration::from_secs(5), "no codex target");
         thread::sleep(Duration::from_millis(10));
@@ -2798,12 +2823,17 @@ fn engines_from_machines_choose_an_engine_there_and_refuse_early() {
     // Asleep: refused, with nothing prepared; awake again: prepared.
     s.counts.machines.lock().unwrap()[1].status = Some("offline".into());
     prepared_until(&s, Some("computer_offline"));
+    assert_eq!(
+        s.ask(json!({"op":"targets"}))["targets"],
+        json!([{"alias":"office","engine":"codex","name":"Office iMac","agents":["codex"],"status":"offline","used":last_task_for(&s, "office")}])
+    );
     s.counts.machines.lock().unwrap()[1].status = Some("running".into());
     prepared_until(&s, None);
-    // Nothing known not to be there, so the targets say nothing of it.
+    // Nothing known not to be there, so the targets say nothing of it
+    // (no `installed`); Codex signed in is its agent, its last task said.
     assert_eq!(
-        s.ask(json!({"op":"targets"}))["targets"][0].get("installed"),
-        None
+        s.ask(json!({"op":"targets"}))["targets"],
+        json!([{"alias":"office","engine":"codex","name":"Office iMac","agents":["codex"],"status":"online","used":last_task_for(&s, "office")}])
     );
 }
 
@@ -2855,7 +2885,9 @@ fn prepared_for(s: &Running, target: &str, done: impl Fn(&Value) -> bool) -> Val
 /// installed; off, or Hermes missing there, it is left out as before. A
 /// `prepare` for the office computer goes there while it is not known
 /// offline, and to the lamp, saying so, once it is; one asking for the
-/// lamp goes there whatever the computers.
+/// lamp goes there whatever the computers. #8664: the computer's entry
+/// says its `agents`, `status` and, once handed work, `used`; the lamp's
+/// own entry never does.
 #[test]
 fn the_lamp_is_a_target_with_hermes_only_when_on_and_installed_there() {
     let lamp_engines = |s: &Running, rows: Vec<EngineRow>| {
@@ -2865,8 +2897,8 @@ fn the_lamp_is_a_target_with_hermes_only_when_on_and_installed_there() {
             .unwrap()
             .insert("a".repeat(32), Ok(rows));
     };
-    let office = json!([{"alias":"office","engine":"claude","name":"Office iMac"}]);
-    let both = json!([{"alias":"lamp","engine":"hermes","engines":["hermes"]},{"alias":"office","engine":"claude","name":"Office iMac"}]);
+    let office = json!([{"alias":"office","engine":"claude","name":"Office iMac","agents":["claude"],"status":"online"}]);
+    let both = json!([{"alias":"lamp","engine":"hermes","engines":["hermes"]},{"alias":"office","engine":"claude","name":"Office iMac","agents":["claude"],"status":"online"}]);
     // Off: Hermes installed on the lamp changes nothing.
     let (mut off, _) = engines_running(true);
     office_engines(&off, Ok(vec![row("claude", Some(true), Some(true))]));
@@ -2918,6 +2950,12 @@ fn the_lamp_is_a_target_with_hermes_only_when_on_and_installed_there() {
     // to the lamp quietly.
     s.counts.machines.lock().unwrap()[1].status = Some("offline".into());
     prepared_for(&s, "office", |answer| answer["error"] == "computer_offline");
+    // Told offline, its agents still listed, its last task (the first
+    // prepare) said; the lamp's own task is not the computer's.
+    assert_eq!(
+        s.ask(json!({"op":"targets"}))["targets"],
+        json!([{"alias":"lamp","engine":"hermes","engines":["hermes"]},{"alias":"office","engine":"claude","name":"Office iMac","agents":["claude"],"status":"offline","used":last_task_for(&s, "office")}])
+    );
     // The lamp's task is followed as a computer's: started, shown on the
     // lamp's own machine, its answer read.
     s.counts.idle.store(true, Ordering::SeqCst);
@@ -3415,7 +3453,8 @@ fn with_hermes_on_lamp_off_work_naming_no_machine_goes_to_the_computer() {
             .unwrap()
             .insert("a".repeat(32), Ok(vec![row("hermes", Some(true), None)]));
         s.start();
-        let office = json!([{"alias":"office","engine":"claude","name":"Office iMac"}]);
+        // The computer's agents are its own; the lamp's Hermes is not one.
+        let office = json!([{"alias":"office","engine":"claude","name":"Office iMac","agents":["claude"],"status":"online"}]);
         targets_until(&s, office.clone());
         // Looked at again, the lamp is still left out.
         let looks = s.counts.engine_looks.load(Ordering::SeqCst);
@@ -3491,10 +3530,15 @@ fn an_engine_known_not_there_is_refused_and_told_and_unknown_proceeds() {
     );
     s.start();
     prepared_until(&s, Some("engine_missing"));
-    assert_eq!(
-        s.ask(json!({"op":"targets"}))["targets"],
-        json!([{"alias":"office","engine":"codex","installed":false}])
-    );
+    // Claude Code installed and signed in there: its agent (#8664). A
+    // prepare polled before Codex was known missing may have prepared a
+    // task there: then its last one is said as `used`.
+    let mut office = json!({"alias":"office","engine":"codex","installed":false,"agents":["claude"],"status":"online"});
+    let last = last_task_for(&s, "office");
+    if !last.is_null() {
+        office["used"] = last;
+    }
+    assert_eq!(s.ask(json!({"op":"targets"}))["targets"], json!([office]));
     assert_eq!(fs::read(&path).unwrap(), by_hand);
     // The computer can't say any more: unknown, so it goes as before.
     office_engines(&s, Ok(vec![row("codex", None, None)]));
@@ -3530,7 +3574,9 @@ fn an_engine_harness_does_not_say_is_installed_is_unknown_never_missing() {
     );
     office_engines(&s, Ok(rows));
     s.start();
-    let office = json!([{"alias":"office","engine":"claude","name":"Office iMac"}]);
+    // Unknown is not installed either: no `agents` (#8664), only `status`.
+    let office =
+        json!([{"alias":"office","engine":"claude","name":"Office iMac","status":"online"}]);
     targets_until(&s, office.clone());
     // The engines file as Friday's capture had it: `claude:
     // {installable: true}`, no `installed`.
