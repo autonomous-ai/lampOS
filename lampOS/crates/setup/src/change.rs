@@ -89,7 +89,17 @@
 //!   missing file is on, an off keeps a no (`"by":"app"`) in place of the
 //!   removal, under the same lock and mark ([`apply_or`]). Each write
 //!   holds the consent folder too, after the mark's lock, with a fresh
-//!   revision first, as `consent`'s.
+//!   revision first, as `consent`'s;
+//! - the privacy light's look (`privacy_light`, #8696,
+//!   `docs/ring-choreography.md`, "The person's look"): red, dim or off, kept
+//!   whole in [`Config::privacy_light`] (`lamp_msgs::privacy_light::PATH`),
+//!   root's, 0600, in the light folder that stays 0700; and read back with
+//!   `{"privacy_light_get": true}`, since `lamp-cloud` cannot read that
+//!   folder. The voice's privacy ring worker looks at the file every 100 ms,
+//!   so nothing restarts. Both lines are taken only from lamp-cloud's own
+//!   process, by its peer credentials ([`privacy_light_refused`]). The
+//!   reset's plan wipes the folder, so a reset gives red. `lamp-cloud` sends
+//!   them only with `LAMP_PRIVACY_LIGHT=on` on a lamp with a slide.
 use crate::serve::{Config, Files, Save, write_private};
 use lamp_update::quiet::{Heard, QUIET, Quiet};
 use serde_json::{Value, json};
@@ -169,7 +179,52 @@ pub enum Change {
     /// activity's yes kept or removed, with the app's `request_id`, checked
     /// against the mark when a yes.
     DeskNoticing(bool, u64),
+    /// The privacy light's look from the app (#8696): kept.
+    PrivacyLight(lamp_msgs::privacy_light::Look),
+    /// The privacy light's look, read back for the app (#8696).
+    PrivacyLightGet,
 }
+
+/// The user lamp-cloud runs as (`User=lampos` in its unit): its uid is half
+/// of [`privacy_light_asker_may`]'s check.
+pub const PRIVACY_LIGHT_ASKER_USER: &str = "lampos";
+
+/// Whether `line` asks for the privacy light: a JSON object with a key
+/// that begins `privacy_light`, whatever its value or other keys, so a line
+/// the helper would refuse anyway is still held to its asker.
+pub fn is_privacy_light(line: &str) -> bool {
+    serde_json::from_str::<Value>(line.trim()).is_ok_and(|value| {
+        value
+            .as_object()
+            .is_some_and(|object| object.keys().any(|key| key.starts_with("privacy_light")))
+    })
+}
+
+/// Whether `peer` is lamp-cloud's own process (the first builder's rule on
+/// #8696): the kernel's uid is `lampos_uid` and its cgroup is lamp-cloud's
+/// unit where the system's manager puts it ([`crate::keys::from_asker`]),
+/// both. No peer, or no uid known for `lampos`, is never it.
+pub fn privacy_light_asker_may(peer: Option<&crate::keys::Peer>, lampos_uid: Option<u32>) -> bool {
+    peer.is_some_and(|peer| {
+        lampos_uid.is_some_and(|uid| peer.uid == uid) && crate::keys::from_asker(&peer.cgroup)
+    })
+}
+
+/// Whether the helper refuses `line` before answering it: a privacy light
+/// line on a socket from any peer but lamp-cloud's own process
+/// ([`privacy_light_asker_may`]). Root running the helper by hand
+/// (`socket` false) may, as for every change: it can write the file anyway.
+pub fn privacy_light_refused(
+    line: &str,
+    socket: bool,
+    peer: Option<&crate::keys::Peer>,
+    lampos_uid: Option<u32>,
+) -> bool {
+    socket && is_privacy_light(line) && !privacy_light_asker_may(peer, lampos_uid)
+}
+
+/// The privacy light's refusal for a look it does not know.
+pub const PRIVACY_LIGHT_REFUSED: &str = "look must be red, dim or off";
 
 /// A desk noticing yes whose `request_id` is not above the mark: sent
 /// before the lamp's last change, or resent.
@@ -378,6 +433,13 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
             }
             Ok(Change::DeskNoticing(allow, id))
         }
+        // Checked again here, whatever lamp-cloud sent (#8696).
+        "privacy_light" => text
+            .and_then(lamp_msgs::privacy_light::Look::named)
+            .map(Change::PrivacyLight)
+            .ok_or_else(|| PRIVACY_LIGHT_REFUSED.into()),
+        "privacy_light_get" if given == &Value::Bool(true) => Ok(Change::PrivacyLightGet),
+        "privacy_light_get" => Err("privacy_light_get must be true".into()),
         _ => Err("the request names no change this lamp makes".into()),
     }
 }
@@ -807,6 +869,42 @@ pub fn apply_or(change: &Change, config: &Config, by_default: bool) -> io::Resul
                 ),
             })
         }
+        // Kept whole (beside, then renamed), root's, 0600: only the voice's
+        // ring worker (root) reads it, and lamp-cloud asks here for it.
+        Change::PrivacyLight(look) => {
+            let path = &config.privacy_light;
+            if let Some(folder) = path.parent()
+                && !folder.exists()
+            {
+                use std::os::unix::fs::DirBuilderExt;
+                fs::DirBuilder::new()
+                    .recursive(true)
+                    .mode(0o700)
+                    .create(folder)?;
+            }
+            let temporary =
+                crate::serve::stage(path, &lamp_msgs::privacy_light::bytes(*look), 0o600)?;
+            crate::serve::put_in_place(&temporary, path)?;
+            let kept = lamp_msgs::privacy_light::read(path);
+            Ok(Done {
+                data: json!({"look": kept.name()}),
+                restart_schedule: false,
+                restart_voice: false,
+                restart_control: false,
+                restart_ears: false,
+                restart_peek: false,
+                said: format!("the privacy light is now {}", kept.name()),
+            })
+        }
+        Change::PrivacyLightGet => Ok(Done {
+            data: json!({"look": lamp_msgs::privacy_light::read(&config.privacy_light).name()}),
+            restart_schedule: false,
+            restart_voice: false,
+            restart_control: false,
+            restart_ears: false,
+            restart_peek: false,
+            said: "the privacy light was read".into(),
+        }),
         Change::OwnerPlace(None) => {
             remove(&lamp_msgs::owner_place::beside_name(&config.name))?;
             Ok(Done {

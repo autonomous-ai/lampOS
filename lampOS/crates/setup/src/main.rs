@@ -668,6 +668,24 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
         );
         return Ok(true);
     }
+    // The privacy light's look (#8696, the first builder's rule): its set
+    // and get only from lamp-cloud's own process, by the peer's uid and
+    // cgroup, whatever else connects to the socket.
+    if change::privacy_light_refused(
+        &line,
+        lamp_setup::keys::stdin_is_socket(),
+        lamp_setup::keys::socket_peer().as_ref(),
+        lamp_ipc::caller::uid_named(change::PRIVACY_LIGHT_ASKER_USER),
+    ) {
+        let mut out = io::stdout().lock();
+        writeln!(out, "{}", serde_json::json!({"refused": NOT_THE_CLOUD}))?;
+        out.flush()?;
+        eprintln!(
+            "lamp-setup: change refused: the privacy light is {}'s alone",
+            lamp_setup::keys::ASKER_UNIT
+        );
+        return Ok(true);
+    }
     let records = lamp_update::records::Records::new(PathBuf::from(lamp_update::install::RECORDS));
     if let Some((power, reply, lock)) = change::power(&line, enabled, &records) {
         {

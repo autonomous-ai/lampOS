@@ -3911,3 +3911,34 @@ fn the_cuts_check_joins_a_running_gateway_and_runs_alone_with_none() {
         "{alone}"
     );
 }
+
+/// #8696: the privacy light's look is kept in a folder every reset plan
+/// already wipes, so a factory reset gives red again (a missing file is
+/// red) with no slot of its own.
+#[test]
+fn the_privacy_look_is_wiped_by_the_reset() {
+    let look = Path::new(lamp_msgs::privacy_light::PATH);
+    for source in [
+        include_str!("../../fixtures/reset-plan-product.json"),
+        include_str!("../../fixtures/reset-plan-example.json"),
+        include_str!("../../../../deploy/lamp-06c1/reset-plan.json"),
+    ] {
+        let plan: Plan = serde_json::from_str(source).unwrap();
+        plan.check().unwrap();
+        assert!(
+            plan.wipe.iter().any(|wiped| look.starts_with(wiped)),
+            "{} is not wiped",
+            look.display()
+        );
+        assert!(
+            !plan.wipe.iter().any(|wiped| wiped == look),
+            "no slot of its own: its folder is wiped"
+        );
+    }
+    // The change helper's default is that path.
+    let config: lamp_setup::serve::Config = serde_json::from_value(
+        serde_json::json!({"listen": "127.0.0.1:1", "marker": "/m", "name": "/n", "country": "VN"}),
+    )
+    .unwrap();
+    assert_eq!(config.privacy_light, look);
+}
