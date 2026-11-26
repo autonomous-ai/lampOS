@@ -455,7 +455,7 @@ fn main() -> ExitCode {
         attachments: None,
         shutdown: None,
     };
-    runtime.block_on(async move {
+    let stopped = runtime.block_on(async move {
         let looks = async move {
             loop {
                 tokio::time::sleep(IDENTITY_EVERY).await;
@@ -571,29 +571,45 @@ fn main() -> ExitCode {
             }
         };
         let mut said_hermes = |line: &str| say(line);
+        // systemd's stop (SIGTERM, as at the keys helper's restart after a
+        // model key's change, #8735): the forwarder drains the agent's chats
+        // in flight, then lamp-cloud exits. Without a handler, it exits at once.
+        let stop = async {
+            match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+                Ok(mut terminate) => {
+                    terminate.recv().await;
+                }
+                Err(_) => std::future::pending().await,
+            }
+        };
         let forwarding = async move {
             lamp_cloud::hermes_llm::run(
                 hermes_state.as_deref(),
                 hermes_second.as_deref(),
                 &hermes_key,
                 hermes_own,
+                stop,
                 &mut said_hermes,
             )
             .await
         };
         tokio::select! {
-            () = forwarding => {}
-            () = alerting => {}
-            () = wiping => {}
-            () = pinging => {}
-            () = staying => {}
-            () = looks => {}
-            () = reporting => {}
-            () = telling => {}
-            () = energy => {}
+            () = forwarding => true,
+            () = alerting => false,
+            () = wiping => false,
+            () = pinging => false,
+            () = staying => false,
+            () = looks => false,
+            () = reporting => false,
+            () = telling => false,
+            () = energy => false,
         }
     });
-    ExitCode::from(1)
+    if stopped {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(1)
+    }
 }
 
 #[cfg(test)]

@@ -86,6 +86,10 @@ pub const MODEL: &str = "deepseek-flash";
 /// The head, then the body, must arrive within these.
 const HEAD_WITHIN: Duration = Duration::from_secs(10);
 const BODY_WITHIN: Duration = Duration::from_secs(30);
+/// At a stop (SIGTERM), how long the chats in flight are given to end
+/// before lamp-cloud exits: well inside systemd's stop timeout (90 s, the
+/// default: `lamp-cloud.service` sets no `TimeoutStopSec=`).
+pub const DRAIN_ON_STOP: Duration = Duration::from_secs(10);
 /// A refused request's unread rest is drained at most this long.
 const DRAIN_WITHIN: Duration = Duration::from_secs(1);
 /// Each write to the caller must be taken within this.
@@ -370,6 +374,26 @@ pub struct Forwarder {
     own: Option<OwnRoute>,
     /// The own route's refusal was said.
     said_refused: Mutex<String>,
+    /// The chats in flight, by number, and when each began; and set once a
+    /// stop has begun, so no new chat is taken.
+    flights: Arc<Mutex<Vec<(u64, Instant)>>>,
+    next_flight: std::sync::atomic::AtomicU64,
+    stopping: std::sync::atomic::AtomicBool,
+}
+
+/// A chat in flight, taken off [`Forwarder::flights`] when it ends.
+struct Flight {
+    flights: Arc<Mutex<Vec<(u64, Instant)>>>,
+    number: u64,
+}
+
+impl Drop for Flight {
+    fn drop(&mut self) {
+        self.flights
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .retain(|(number, _)| *number != self.number);
+    }
 }
 
 /// The relay's day as its answers say it, kept for lamp-skills
@@ -559,6 +583,7 @@ enum Refusal {
     Unreachable,
     OwnUnreachable,
     NotThisModel,
+    Stopping,
 }
 
 impl Refusal {
@@ -578,6 +603,7 @@ impl Refusal {
                 "the person's model can't be reached now",
             ),
             Self::NotThisModel => (400, "Bad Request", "only the model deepseek-flash"),
+            Self::Stopping => (503, "Service Unavailable", "the lamp's link is restarting"),
         }
     }
 }
@@ -613,6 +639,9 @@ impl Forwarder {
             meter: None,
             own: None,
             said_refused: Mutex::default(),
+            flights: Arc::default(),
+            next_flight: Default::default(),
+            stopping: Default::default(),
         })
     }
 
@@ -723,6 +752,60 @@ impl Forwarder {
                 let _ = forwarder.answer(stream, unread).await;
             });
         }
+    }
+
+    /// [`Self::serve`] until `stop` ends (SIGTERM, #8735), then no new
+    /// connection or chat is taken and the chats in flight are given
+    /// `within` to end. Returns a journal line for each one cut.
+    pub async fn serve_until(
+        self: Arc<Self>,
+        listener: TcpListener,
+        stop: impl std::future::Future<Output = ()>,
+        within: Duration,
+    ) -> Vec<String> {
+        tokio::select! {
+            () = self.clone().serve(listener) => {}
+            () = stop => {}
+        }
+        self.stopping
+            .store(true, std::sync::atomic::Ordering::Release);
+        let until = Instant::now() + within;
+        let flying = || {
+            self.flights
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner())
+                .clone()
+        };
+        while !flying().is_empty() && Instant::now() < until {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        flying()
+            .into_iter()
+            .map(|(_, began)| {
+                format!(
+                    "the Hermes forwarder: a chat in flight was cut by a stop ({} ms in)",
+                    began.elapsed().as_millis()
+                )
+            })
+            .collect()
+    }
+
+    /// A chat taken in flight, or `None` once a stop has begun.
+    fn take_off(&self) -> Option<Flight> {
+        if self.stopping.load(std::sync::atomic::Ordering::Acquire) {
+            return None;
+        }
+        let number = self
+            .next_flight
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.flights
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .push((number, Instant::now()));
+        Some(Flight {
+            flights: self.flights.clone(),
+            number,
+        })
     }
 
     async fn read(&self, stream: &mut TcpStream) -> Result<Request, Refusal> {
@@ -887,6 +970,11 @@ impl Forwarder {
             Err(refusal) => return Self::refuse(&mut stream, &refusal).await,
         };
         let chat = request.path == CHAT_PATH;
+        // Held to the answer's end, so a stop drains it (#8735).
+        let _flight = match chat.then(|| self.take_off()) {
+            Some(None) => return Self::refuse(&mut stream, &Refusal::Stopping).await,
+            flight => flight.flatten(),
+        };
         // The person's own model (#8735): no relay, so no meter.
         if let Some(route) = &self.own {
             if !chat {
@@ -995,14 +1083,16 @@ impl Forwarder {
 /// `LAMP_OPENCLAW_ON_LAMP=on`: the token kept in
 /// `state` (lamp-cloud's state folder), the relay from `second_json` (the
 /// voice's `second.json`, when handed in) and the voice's `key`, and the
-/// person's `own` keys with `LAMP_OWN_KEYS=on` (#8735). Never returns; with
-/// the switch off, or when it can't start, it says why once and waits
-/// forever, so the rest of lamp-cloud goes on.
+/// person's `own` keys with `LAMP_OWN_KEYS=on` (#8735). Returns only once
+/// `stop` ends (SIGTERM), after the chats in flight are drained, each one
+/// cut said; with the switch off, or when it can't start, it says why once
+/// and waits for `stop`, so the rest of lamp-cloud goes on.
 pub async fn run(
     state: Option<&Path>,
     second_json: Option<&str>,
     key: &str,
     own: Option<OwnKeys>,
+    stop: impl std::future::Future<Output = ()>,
     say: &mut dyn FnMut(&str),
 ) {
     serve_when(
@@ -1012,6 +1102,7 @@ pub async fn run(
         second_json,
         key,
         own,
+        stop,
         say,
     )
     .await
@@ -1027,10 +1118,11 @@ pub async fn serve_when(
     second_json: Option<&str>,
     key: &str,
     own: Option<OwnKeys>,
+    stop: impl std::future::Future<Output = ()>,
     say: &mut dyn FnMut(&str),
 ) {
     if !on {
-        return std::future::pending().await;
+        return stop.await;
     }
     let started = async {
         let state = state.ok_or("no state folder for the local token")?;
@@ -1060,11 +1152,13 @@ pub async fn serve_when(
                     lamp_skills::relay_share::SWITCH
                 ));
             }
-            forwarder.serve(listener).await;
+            for cut in forwarder.serve_until(listener, stop, DRAIN_ON_STOP).await {
+                say(&cut);
+            }
         }
         Err(why) => {
             say(&format!("no Hermes forwarder: {why}"));
-            std::future::pending().await
+            stop.await
         }
     }
 }
