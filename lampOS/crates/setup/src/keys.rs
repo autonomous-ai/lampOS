@@ -1323,8 +1323,55 @@ pub fn refused(why: &str, code: &str) -> Value {
 pub struct Done {
     /// The voice must take the change at its next start.
     pub restart_voice: bool,
+    /// `lamp-cloud` must take it too: a model key changed (#8735), which
+    /// #8742's forwarder loads by `LoadCredential=`, copied only at its start.
+    pub restart_cloud: bool,
     /// The journal's line: which service and what happened, never a key.
     pub said: String,
+}
+
+/// After a key change is answered: the voice, and `lamp-cloud` when
+/// `done.restart_cloud`, restarted once the voice has rested 1 s, a turn in
+/// flight waited out ([`crate::change::KEY_CHANGE_QUIET`], #8710; the reply is
+/// out before), and no update is at work, lamp-update's lock held through
+/// both. The journal's lines.
+pub fn restart_after(
+    done: &Done,
+    ears: &mut impl crate::change::Ears,
+    records: &lamp_update::records::Records,
+    systemd: &mut impl crate::change::Systemd,
+) -> Vec<String> {
+    use crate::change;
+    let _held = match change::quiet_and_unlocked(
+        ears,
+        records,
+        change::KEY_CHANGE_QUIET,
+        change::QUIET_MOST,
+    ) {
+        Ok(lock) => lock,
+        Err(why) => {
+            return vec![format!(
+                "the lamp was not quiet with no update at work within {} min ({why}); {} at its next start",
+                change::QUIET_MOST.as_secs() / 60,
+                if done.restart_cloud {
+                    "the voice and lamp-cloud take them"
+                } else {
+                    "the voice takes them"
+                }
+            )];
+        }
+    };
+    let mut said = vec![match systemd.systemctl(&["try-restart", VOICE_UNIT]) {
+        Ok(()) => "the voice restarted to take them, at a quiet moment".to_owned(),
+        Err(why) => format!("the voice could not be restarted: {why}"),
+    }];
+    if done.restart_cloud {
+        said.push(match systemd.systemctl(&["try-restart", ASKER_UNIT]) {
+            Ok(()) => "lamp-cloud restarted to load the person's model key for the agent (its LoadCredential= is copied only at its start, #8742)".to_owned(),
+            Err(why) => format!("lamp-cloud could not be restarted to load the person's model key: {why}"),
+        });
+    }
+    said
 }
 
 /// The helper's reply line to one request: `{"done": data}` or
@@ -1352,6 +1399,7 @@ pub fn answer(
                 json!({"done": {"service": service.id(), "uses": "lamp"}}),
                 Some(Done {
                     restart_voice: true,
+                    restart_cloud: Service::MODELS.contains(&service),
                     said: format!("the person's {} key was removed", service.name()),
                 }),
             ),
@@ -1408,6 +1456,7 @@ fn set(given: Given, store: &Store, check: &mut impl Check) -> (Value, Option<Do
     );
     let done = Some(Done {
         restart_voice: changed,
+        restart_cloud: changed && Service::MODELS.contains(&service),
         said,
     });
     if matches!(verdict, Verdict::Works | Verdict::WorksNoTools) {

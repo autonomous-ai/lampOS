@@ -109,7 +109,7 @@ followed, and the only request setup or the helper makes with the key:
 
 `/etc/lampOS/voice/own/`: `deepseek.key`, `deepseek.url` (the endpoint,
 the old key removed first, so a key never sits beside another key's endpoint) and
-`deepgram.key`. The folder is root's, 0700, each file 0600, written whole and
+`deepgram.key`. The folder is root's alone, 0700, each file 0600 (no group or other reads it), written whole and
 renamed into place. The voice's drop-in loads the folder whole
 (`LoadCredential=own:/etc/lampOS/voice/own`), so each file is the credential
 `own_<file>` in its `CREDENTIALS_DIRECTORY`; `ConfigurationDirectory=` makes
@@ -691,9 +691,9 @@ the person's own model too, through lamp-cloud's forwarder
 
 The lamp's agent (OpenClaw, Hermes) breaks on a model that makes no tool
 calls, so a model key is checked for them once, at `keys.set` and at setup
-(the lead's answer to Q3 on #8735). The forwarder that would send the agent
-to the person's model is not built yet (PR1, waiting on Q1): today the agent
-stays on the relay whatever `keys.get` says.
+(the lead's answer to Q3 on #8735). lamp-cloud's forwarder (#8742) gets the
+person's model key by `LoadCredential=`, which systemd copies only at its
+start; the folder stays root's alone, 0700, each file 0600.
 
 - **When:** after a model service's key check works (DeepSeek,
   OpenAI-compatible, OpenRouter, Gemini, Anthropic; never Deepgram or
@@ -723,6 +723,18 @@ stays on the relay whatever `keys.get` says.
   before the tool check: set it again). Each `offers[]` entry adds `agent`:
   `false` for Deepgram and ElevenLabs and for a kept model key whose tool
   check failed, `true` otherwise. Never a key.
+- **lamp-cloud restarted:** after a `keys.set` that kept a model key, or a
+  `keys.remove` of one, the helper restarts lamp-cloud
+  (`systemctl try-restart lamp-cloud.service`) right after the voice, at the
+  same quiet moment and under the same update lock (`keys::restart_after`),
+  so the forwarder loads the change. That is after the voice has rested 1 s
+  (`change::KEY_CHANGE_QUIET`, #8710), the reply already written and
+  flushed to lamp-cloud before the wait starts. Its journal line: "lamp-cloud
+  restarted to load the person's model key for the agent (its
+  LoadCredential= is copied only at its start, #8742)". Never for an
+  ElevenLabs or Deepgram key. Restarting lamp-cloud drops the app's link
+  until it reconnects. Tested in `tests/update_lock.rs`
+  (`a_model_key_change_restarts_the_voice_then_lamp_cloud_once_quiet`).
 - **`lamp-cloud`** passes the helper's `done` through as it is
   (`settings::ask_keys`), under its 4096-byte read of a reply.
 - **Tests:** `src/keys.rs` (`a_model_check_asks_once_for_a_tool_call`) and
