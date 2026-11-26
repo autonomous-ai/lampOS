@@ -93,6 +93,11 @@ pub struct Request {
     /// The image's files are written too (`LAMP_UPDATE_IMAGE=on`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub image: bool,
+    /// Only the journal's files among the image's are written, with
+    /// `image` off (#7254, [`manifest::JOURNAL_FILES`]). A writer older
+    /// than this field ignores it and writes no image file.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub image_journal: bool,
 }
 
 /// One file as it was before an apply wrote it.
@@ -449,6 +454,19 @@ pub fn stage(
     envelope: Option<&[u8]>,
     image: bool,
 ) -> io::Result<()> {
+    stage_journal(records, op, sequence, envelope, image, false)
+}
+
+/// [`stage`], and with `journal` the image's journal files alone are asked
+/// for (`image` off).
+pub fn stage_journal(
+    records: &Path,
+    op: Op,
+    sequence: u64,
+    envelope: Option<&[u8]>,
+    image: bool,
+    journal: bool,
+) -> io::Result<()> {
     let folder = folder(records);
     fs::DirBuilder::new()
         .recursive(true)
@@ -465,6 +483,7 @@ pub fn stage(
             op,
             sequence,
             image,
+            image_journal: journal,
         },
     )
 }
@@ -713,10 +732,14 @@ fn apply(
         );
     }
     let of_settings = steps.len();
-    if request.image && !signed.image.is_empty() {
+    if (request.image || request.image_journal) && !signed.image.is_empty() {
         match image::variant(root).map_err(|error| format!("{}: {error}", image::PROFILE))? {
             Some(variant) => {
-                let (files, shipped) = image::for_variant(&signed.image, &variant);
+                let (mut files, shipped) = image::for_variant(&signed.image, &variant);
+                // With `image` off, the journal's files alone (#7254).
+                if !request.image {
+                    files.retain(|file| manifest::JOURNAL_FILES.contains(&file.path.as_str()));
+                }
                 if files
                     .iter()
                     .any(|file| signed.settings.iter().any(|s| s.path == file.path))
@@ -1055,6 +1078,8 @@ mod tests {
         commands: Vec<String>,
         /// The request asks for the image's files.
         image: bool,
+        /// The request asks for the image's journal files alone.
+        journal: bool,
         /// A command that fails, by its start.
         failing: Option<String>,
     }
@@ -1075,6 +1100,7 @@ mod tests {
                 tmpfiles: Vec::new(),
                 commands: Vec::new(),
                 image: false,
+                journal: false,
                 failing: None,
             }
         }
@@ -1147,7 +1173,15 @@ mod tests {
         }
 
         fn run(&mut self, op: Op, sequence: u64, envelope: Option<&[u8]>) -> Result<(), String> {
-            stage(&self.records, op, sequence, envelope, self.image).unwrap();
+            stage_journal(
+                &self.records,
+                op,
+                sequence,
+                envelope,
+                self.image,
+                self.journal,
+            )
+            .unwrap();
             let key: [u8; 32] = self.key.public_key().as_ref().try_into().unwrap();
             let said = &mut self.said;
             let tmp = &mut self.tmpfiles;
@@ -1825,6 +1859,131 @@ mod tests {
         lamp.commands.clear();
         lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
         assert!(lamp.commands.is_empty(), "{:?}", lamp.commands);
+    }
+
+    const KEEP: &str = "/usr/local/libexec/lamp-journal-keep";
+
+    /// A build of the image's files: the journal's two and one that is not.
+    fn journal_build(lamp: &Lamp) -> Vec<u8> {
+        lamp.envelope_with(
+            2,
+            Vec::new(),
+            vec![
+                image_file(
+                    "standard",
+                    JOURNAL,
+                    "journal 2",
+                    &["journal 1", "journal 2"],
+                ),
+                image_file("standard", KEEP, "keep 2", &["keep 1", "keep 2"]),
+                image_file("standard", ASOUND, "asound 2", &["asound 1", "asound 2"]),
+            ],
+        )
+    }
+
+    fn journal_lamp() -> Lamp {
+        let lamp = Lamp::new();
+        lamp.installed(&[]);
+        lamp.write(JOURNAL, "journal 1");
+        lamp.write(KEEP, "keep 1");
+        lamp.write(ASOUND, "asound 1");
+        lamp
+    }
+
+    #[test]
+    fn the_journal_request_writes_the_journal_files_and_no_other_image_file() {
+        let mut lamp = journal_lamp();
+        lamp.journal = true;
+        let envelope = journal_build(&lamp);
+        lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        assert_eq!(lamp.read(JOURNAL).as_deref(), Some("journal 2"));
+        assert_eq!(lamp.read(KEEP).as_deref(), Some("keep 2"));
+        assert_eq!(lamp.read(ASOUND).as_deref(), Some("asound 1"));
+        assert!(!lamp.commands.iter().any(|c| c.contains("journald")));
+    }
+
+    #[test]
+    fn the_journal_request_keeps_a_file_the_lamp_changed_by_hand() {
+        let mut lamp = journal_lamp();
+        lamp.write(JOURNAL, "journal by hand");
+        lamp.journal = true;
+        let envelope = journal_build(&lamp);
+        lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        assert_eq!(lamp.read(JOURNAL).as_deref(), Some("journal by hand"));
+        assert_eq!(lamp.read(KEEP).as_deref(), Some("keep 2"));
+    }
+
+    #[test]
+    fn the_journal_request_applied_again_changes_nothing() {
+        let mut lamp = journal_lamp();
+        lamp.journal = true;
+        let envelope = journal_build(&lamp);
+        lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        lamp.commands.clear();
+        lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        assert!(lamp.commands.is_empty(), "{:?}", lamp.commands);
+        assert_eq!(lamp.read(JOURNAL).as_deref(), Some("journal 2"));
+    }
+
+    #[test]
+    fn with_neither_request_no_image_file_is_written_and_with_the_image_all_are() {
+        let mut lamp = journal_lamp();
+        let envelope = journal_build(&lamp);
+        lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        assert_eq!(lamp.read(JOURNAL).as_deref(), Some("journal 1"));
+        assert_eq!(lamp.read(ASOUND).as_deref(), Some("asound 1"));
+        let mut all = journal_lamp();
+        all.image = true;
+        let envelope = journal_build(&all);
+        all.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        assert_eq!(all.read(JOURNAL).as_deref(), Some("journal 2"));
+        assert_eq!(all.read(ASOUND).as_deref(), Some("asound 2"));
+    }
+
+    #[test]
+    fn the_journal_files_are_among_the_images() {
+        for path in manifest::JOURNAL_FILES {
+            assert!(manifest::IMAGE_FILES.contains(path), "{path}");
+        }
+    }
+
+    #[test]
+    fn a_request_from_a_writer_before_the_field_reads_the_same_and_writes_no_image_file() {
+        // The field's absence is false, and a request with it set reads as
+        // the earlier shape, which has `image` alone.
+        #[derive(Deserialize)]
+        struct Earlier {
+            #[serde(default)]
+            image: bool,
+        }
+        let json = serde_json::to_vec(&Request {
+            version: VERSION,
+            op: Op::Apply,
+            sequence: 2,
+            image: false,
+            image_journal: true,
+        })
+        .unwrap();
+        assert!(!serde_json::from_slice::<Earlier>(&json).unwrap().image);
+        let none: Request =
+            serde_json::from_str(r#"{"version":1,"op":"apply","sequence":2}"#).unwrap();
+        assert!(!none.image_journal);
+    }
+
+    #[test]
+    fn put_back_restores_the_journal_files_a_journal_request_wrote() {
+        let mut lamp = journal_lamp();
+        lamp.journal = true;
+        let envelope = journal_build(&lamp);
+        lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        assert_eq!(lamp.read(JOURNAL).as_deref(), Some("journal 2"));
+        lamp.commands.clear();
+        lamp.run(Op::Back, 2, None).unwrap();
+        assert_eq!(lamp.read(JOURNAL).as_deref(), Some("journal 1"));
+        assert_eq!(lamp.read(KEEP).as_deref(), Some("keep 1"));
+        assert_eq!(lamp.read(ASOUND).as_deref(), Some("asound 1"));
+        assert!(!lamp.commands.iter().any(|c| c.contains("journald")));
+        assert!(lamp.state().settings.is_empty());
     }
 
     #[test]
