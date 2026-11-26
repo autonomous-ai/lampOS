@@ -4529,7 +4529,11 @@ là phần của một coder khác trong #6226; thiết kế:
   forwarder), `api` `"openai-completions"`, và một model, `deepseek-flash`
   (model duy nhất của forwarder). Target loopback có thể cần
   `request.allowPrivateNetwork: true` trên provider.
-- `agents.defaults.model.primary`: `"lampos/deepseek-flash"`.
+- `agents.defaults.model.primary`: `"lampos/deepseek-flash"`. Tên đó là
+  bí danh của forwarder: khi người dùng có key model riêng mà lần kiểm tra
+  đã gọi được tool, forwarder gửi chat tới model của họ, dưới tên model của
+  họ, và các cài đặt này không đổi (#8735, docs/cloud.md, "The person's own
+  model"). `deepseek-flash` của Hermes ở trên cũng vậy.
 - `agents.defaults.workspace`: thư mục làm việc riêng của đèn
   (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, `LAMP_PROJECT` trong
   home của `lampos`), nơi các khóa skill của đèn trỏ tới và hướng dẫn

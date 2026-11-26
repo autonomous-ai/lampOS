@@ -3173,7 +3173,11 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   forwarder's token file), `api` `"openai-completions"`, and one model,
   `deepseek-flash` (the forwarder's only model). A loopback target may
   need `request.allowPrivateNetwork: true` on the provider.
-- `agents.defaults.model.primary`: `"lampos/deepseek-flash"`.
+- `agents.defaults.model.primary`: `"lampos/deepseek-flash"`. That name is
+  the forwarder's alias: with a person's own model key whose check made a
+  tool call, the forwarder sends the chat to their model under their model's
+  name, and these settings don't change (#8735, docs/cloud.md, "The
+  person's own model"). The same holds for Hermes' `deepseek-flash` above.
 - `agents.defaults.workspace`: the lamp's own work folder
   (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, `LAMP_PROJECT` under
   `lampos`'s home), where the lamp's skills keys point and the guidance

@@ -172,6 +172,17 @@ Nice=5
 LoadCredential=account:/etc/lampOS/setup/backend.json
 LoadCredential=key:/etc/lampOS/voice/credential
 LoadCredential=build:/var/lib/lampos-update/state.json
+# The person's own keys (#8735, docs/own-keys.md "The lamp's agent"), with LAMP_OWN_KEYS=on: root's keys helper's
+# folder, loaded whole as the voice loads it (each file the credential own_<file>), so the Hermes forwarder sends the
+# agent's chat to their model. systemd copies it once, at this unit's start: a model key's keys.set or keys.remove
+# relayed from the app puts the agent back on the relay until the next start, so a removed key is never used. This
+# unit's user, lampos, can read this copy, and the agent runtimes run as lampos, so they could read the person's key,
+# as they can the relay's `key` above; moving both out of the agent's reach is a follow-up (#8735). A blank fallback
+# when the folder is missing (a new or reset lamp), never the unit refused: SetCredential= is LoadCredential='s
+# default (systemd 252), one newline, never empty. Never ConfigurationDirectory= here: as lampos it would chown root's
+# folder.
+SetCredential=own:\n
+LoadCredential=own:/etc/lampOS/voice/own
 # lamp-control's admin socket, for the app's Add a developer computer (`control.code`, sealed;
 # `control.clients`, `control.revoke`, docs/cloud.md "The developer door"). This is the first time
 # the cloud-facing part can mint pairing codes and revoke pairings. It is gated by the owner's

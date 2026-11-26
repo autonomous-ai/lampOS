@@ -679,3 +679,234 @@ fn a_streams_usage_is_found_across_its_pieces_and_a_chats_line_is_numbers() {
     whole.feed(WHOLE.as_bytes());
     assert_eq!(whole.end().unwrap()["completion_tokens"], 5);
 }
+
+// The person's own model for the agent (#8735).
+
+const OWN_KEY: &str = "own-key-for-the-test";
+
+/// A stand-in endpoint that answers each of `answers` (status, body) on a
+/// connection of its own, in order; each request it took, whole, sent on.
+async fn endpoint(
+    answers: Vec<(u16, &'static str)>,
+) -> (String, tokio::sync::mpsc::UnboundedReceiver<String>) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let (took, taken) = tokio::sync::mpsc::unbounded_channel();
+    tokio::spawn(async move {
+        for (status, body) in answers {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut bytes = Vec::new();
+            let mut chunk = [0u8; 4096];
+            let end = loop {
+                if let Some(end) = find_head_end(&bytes) {
+                    break end;
+                }
+                let read = stream.read(&mut chunk).await.unwrap();
+                assert!(read > 0);
+                bytes.extend_from_slice(&chunk[..read]);
+            };
+            let head = String::from_utf8_lossy(&bytes[..end]).to_ascii_lowercase();
+            let length: usize = head
+                .lines()
+                .find_map(|line| line.strip_prefix("content-length:"))
+                .map(|value| value.trim().parse().unwrap())
+                .unwrap_or(0);
+            while bytes.len() < end + 4 + length {
+                let read = stream.read(&mut chunk).await.unwrap();
+                bytes.extend_from_slice(&chunk[..read]);
+            }
+            let _ = took.send(String::from_utf8(bytes).unwrap());
+            let head = format!(
+                "HTTP/1.1 {status} Answer\r\nContent-Type: application/json\r\n\
+                 Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(head.as_bytes()).await.unwrap();
+        }
+    });
+    (format!("http://{address}/v1"), taken)
+}
+
+/// The person's OpenAI-compatible key kept in `dir` as root's helper keeps
+/// it, at `url` with `model`, its check's second line `tools`.
+fn keep_compatible(dir: &Path, url: &str, model: &str, tools: &str) {
+    for (name, text) in [
+        ("openai_compatible.key", OWN_KEY),
+        ("openai_compatible.url", url),
+        ("openai_compatible.model", model),
+        ("openai_compatible.checked", &format!("works\n{tools}")),
+    ] {
+        std::fs::write(dir.join(name), text).unwrap();
+    }
+}
+
+/// The forwarder to the relay at `base`, with the person's keys in `own`
+/// and the relay's day in `meter` when given.
+async fn own_forwarder(base: &str, own: OwnKeys, meter: Option<&Path>) -> SocketAddr {
+    let listener = Forwarder::bind(0).await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let mut forwarder = Forwarder::new(base, KEY, TOKEN).unwrap().with_own(own);
+    if let Some(meter) = meter {
+        forwarder = forwarder.with_meter(meter);
+    }
+    tokio::spawn(Arc::new(forwarder).serve(listener));
+    address
+}
+
+fn models() -> Vec<u8> {
+    format!("GET {MODELS_PATH} HTTP/1.1\r\nAuthorization: Bearer {TOKEN}\r\n\r\n").into_bytes()
+}
+
+/// The agent's chat goes to the person's model with their key, `model`
+/// made theirs and the rest as sent, and `/models` is answered here; once
+/// the key is removed, the relay, with no restart. The relay's day is not
+/// counted for the own route.
+#[tokio::test]
+async fn an_own_model_takes_the_agents_chat_and_a_removed_one_gives_it_back() {
+    let own = tempfile::tempdir().unwrap();
+    let meter = tempfile::tempdir().unwrap();
+    let (url, mut asked) = endpoint(vec![(200, WHOLE)]).await;
+    let (relay_base, mut relayed) = endpoint(vec![(200, WHOLE)]).await;
+    keep_compatible(own.path(), &url, "their-model-1", "tools");
+    let address = own_forwarder(&relay_base, OwnKeys::folder(own.path()), Some(meter.path())).await;
+    let body = r#"{"model":"deepseek-flash","stream":false,"messages":[],"tools":[]}"#;
+    let (status, _, answer) = ask(address, &chat(Some(TOKEN), body)).await;
+    assert_eq!((status, answer.as_slice()), (200, WHOLE.as_bytes()));
+    let upstream = asked.recv().await.unwrap();
+    assert!(upstream.starts_with("POST /v1/chat/completions HTTP/1.1\r\n"));
+    let lower = upstream.to_ascii_lowercase();
+    assert!(lower.contains(&format!("authorization: bearer {OWN_KEY}")));
+    assert!(!upstream.contains(KEY) && !upstream.contains(TOKEN));
+    let sent: Value = serde_json::from_str(upstream.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+    assert_eq!(sent["model"], "their-model-1");
+    assert_eq!(
+        (sent["stream"].clone(), sent["tools"].clone()),
+        (Value::Bool(false), serde_json::json!([]))
+    );
+    let (status, _, listed) = ask(address, &models()).await;
+    assert_eq!(status, 200);
+    let listed: Value = serde_json::from_slice(&listed).unwrap();
+    assert_eq!(listed["data"][0]["id"], MODEL);
+    assert!(
+        lamp_skills::relay_share::read(meter.path()).is_none(),
+        "the person's own spend is not the relay's day"
+    );
+    assert!(relayed.try_recv().is_err(), "the relay was never asked");
+    // Removed: the relay, read again at this request.
+    std::fs::remove_file(own.path().join("openai_compatible.key")).unwrap();
+    let (status, _, _) = ask(address, &chat(Some(TOKEN), ASKED)).await;
+    assert_eq!(status, 200);
+    let upstream = relayed.recv().await.unwrap();
+    assert!(
+        upstream
+            .to_ascii_lowercase()
+            .contains(&format!("authorization: bearer {KEY}"))
+    );
+    assert!(
+        upstream.ends_with(ASKED),
+        "the relay's chat as the agent sent it"
+    );
+}
+
+/// A key that fails at the person's endpoint (401) sends that chat to the
+/// relay, as the agent sent it.
+#[tokio::test]
+async fn an_own_401_falls_back_to_the_relay() {
+    let own = tempfile::tempdir().unwrap();
+    let (url, mut asked) = endpoint(vec![(401, r#"{"error":"bad key"}"#)]).await;
+    let (relay_base, mut relayed) = endpoint(vec![(200, WHOLE)]).await;
+    keep_compatible(own.path(), &url, "their-model-1", "tools");
+    let address = own_forwarder(&relay_base, OwnKeys::folder(own.path()), None).await;
+    let (status, _, answer) = ask(address, &chat(Some(TOKEN), ASKED)).await;
+    assert_eq!((status, answer.as_slice()), (200, WHOLE.as_bytes()));
+    assert!(
+        asked.recv().await.is_some(),
+        "the person's model was asked first"
+    );
+    let upstream = relayed.recv().await.unwrap();
+    assert!(
+        upstream
+            .to_ascii_lowercase()
+            .contains(&format!("authorization: bearer {KEY}"))
+    );
+    assert!(upstream.ends_with(ASKED));
+}
+
+/// A forged model is still refused with an own route, before anything is
+/// asked.
+#[tokio::test]
+async fn a_forged_model_is_still_a_400_on_the_own_route() {
+    let own = tempfile::tempdir().unwrap();
+    let (url, mut asked) = endpoint(vec![(200, WHOLE)]).await;
+    keep_compatible(own.path(), &url, "their-model-1", "tools");
+    let address = own_forwarder("http://127.0.0.1:9/none", OwnKeys::folder(own.path()), None).await;
+    let forged = r#"{"model":"their-model-1","messages":[]}"#;
+    assert_eq!(ask(address, &chat(Some(TOKEN), forged)).await.0, 400);
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert!(asked.try_recv().is_err());
+}
+
+/// The route chosen from the folder: the voice's precedence; hearing and
+/// voice keys alone, a failed or missing tool check, or a changed copy: the
+/// relay.
+#[test]
+fn the_route_is_the_voices_model_and_only_with_its_tool_check() {
+    let own = tempfile::tempdir().unwrap();
+    let keys = OwnKeys::folder(own.path());
+    let write = |name: &str, text: &str| std::fs::write(own.path().join(name), text).unwrap();
+    write("deepgram.key", "dg");
+    write("elevenlabs.key", "el");
+    write("elevenlabs.voice", "abc");
+    assert_eq!(keys.route().err().unwrap(), "no model key of the person's");
+    write("deepseek.key", "ds");
+    write("deepseek.checked", "works");
+    assert!(
+        keys.route().err().unwrap().contains("no tool call"),
+        "kept before the check"
+    );
+    write("deepseek.checked", "works\ntools");
+    assert_eq!(
+        keys.route().unwrap().told(),
+        "own deepseek deepseek-flash at api.deepseek.com"
+    );
+    // OpenRouter over DeepSeek; its tool check failed: the relay, not DeepSeek.
+    write("openrouter.key", "or");
+    write("openrouter.model", "google/gemini-3.6-flash");
+    write("openrouter.checked", "works\nno_tools");
+    assert!(
+        keys.route()
+            .err()
+            .unwrap()
+            .contains("openrouter model made no tool call")
+    );
+    write("openrouter.checked", "works\ntools");
+    assert_eq!(
+        keys.route().unwrap().told(),
+        "own openrouter google/gemini-3.6-flash at openrouter.ai"
+    );
+    std::fs::remove_file(own.path().join("openrouter.key")).unwrap();
+    write("gemini.key", "gm");
+    write("gemini.model", "gemini-3.6-flash");
+    write("gemini.checked", "works\ntools");
+    let route = keys.route().unwrap();
+    assert_eq!(route.chat_base, own_model::GEMINI_OPENAI_API);
+    // An endpoint not https is never given the key.
+    write("openai_compatible.key", "oc");
+    write("openai_compatible.url", "http://models.example.com/v1");
+    write("openai_compatible.model", "m");
+    write("openai_compatible.checked", "works\ntools");
+    assert!(
+        keys.route()
+            .err()
+            .unwrap()
+            .contains("openai_compatible URL")
+    );
+    // The unit's copy, `own_<name>`, marked out of date by a relayed change.
+    let copy = tempfile::tempdir().unwrap();
+    std::fs::write(copy.path().join("own_deepseek.key"), "ds").unwrap();
+    std::fs::write(copy.path().join("own_deepseek.checked"), "works\ntools").unwrap();
+    let unit = OwnKeys::credentials(copy.path());
+    assert!(unit.route().is_ok());
+    unit.changed().store(true, Ordering::Release);
+    assert!(unit.route().err().unwrap().contains("next start"));
+}

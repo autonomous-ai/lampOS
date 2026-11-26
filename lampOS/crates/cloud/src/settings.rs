@@ -1059,6 +1059,10 @@ pub struct Changes {
     wifi_link: Arc<WifiLink>,
     /// A keys request is under way: a second fails `busy` (#2094).
     keys_busy: Arc<AtomicBool>,
+    /// The Hermes forwarder's mark that its copy of the person's keys is out
+    /// of date (`hermes_llm::OwnKeys::changed`, #8735): set once a model
+    /// key's `keys.set` or `keys.remove` has gone to the helper.
+    own_changed: Option<Arc<AtomicBool>>,
     /// [`PLACE_KINDS`] are taken, with `LAMP_OWNER_PLACE=on` (#4333).
     place: bool,
     /// [`VOICE_KINDS`] are taken, with `LAMP_CHOSEN_VOICE=on` (#5394).
@@ -1104,6 +1108,7 @@ impl Changes {
             wifi_busy: Arc::default(),
             wifi_link: Arc::default(),
             keys_busy: Arc::default(),
+            own_changed: None,
             place: false,
             voice: false,
             say_socket: std::env::var_os("LAMP_SAY_SOCKET")
@@ -1138,6 +1143,18 @@ impl Changes {
             wifi.then(|| (PathBuf::from(WIFI_SOCKET), WIFI_WAIT)),
             keys.then(|| (PathBuf::from(KEYS_SOCKET), KEYS_WAIT)),
         )
+    }
+
+    /// The same, setting the forwarder's `changed` mark (#8735) after a model
+    /// key's change, as [`Changes::taking_the_place`].
+    pub fn telling_the_forwarder(
+        mut self: Arc<Self>,
+        changed: Option<Arc<AtomicBool>>,
+    ) -> Arc<Self> {
+        if let Some(changes) = Arc::get_mut(&mut self) {
+            changes.own_changed = changed;
+        }
+        self
     }
 
     /// The same, taking [`PLACE_KINDS`] too when `on`. Only on changes just
@@ -1244,8 +1261,24 @@ impl Changes {
             return Ok(());
         }
         let (done, busy, kind) = (self.done.clone(), self.keys_busy.clone(), kind.to_owned());
+        // A model key set or removed: the forwarder's copy is out of date,
+        // whatever the helper answers (a kept key may have removed another).
+        let model = data
+            .get("service")
+            .and_then(Value::as_str)
+            .is_some_and(|service| {
+                lamp_msgs::own_model::PRECEDENCE
+                    .iter()
+                    .any(|model| model.id() == service)
+            });
+        let own_changed = (kind != "keys.get" && model)
+            .then(|| self.own_changed.clone())
+            .flatten();
         std::thread::spawn(move || {
             let (result, code) = ask_keys(&socket, &line, wait);
+            if let Some(changed) = own_changed {
+                changed.store(true, Ordering::Release);
+            }
             busy.store(false, Ordering::Release);
             if let Ok(mut done) = done.lock() {
                 done.push(Outcome {
@@ -1475,6 +1508,36 @@ pub fn display_name(text: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+
+    /// #8735: a model key's `keys.set` or `keys.remove` sent to the helper
+    /// marks the forwarder's copy of the person's keys out of date, answered
+    /// or not; a hearing key's change, `keys.get` or a refused shape do not.
+    #[test]
+    fn a_model_keys_change_marks_the_forwarders_copy() {
+        let gone = std::env::temp_dir().join(format!("lco-{}-keys-mark.sock", std::process::id()));
+        let _ = std::fs::remove_file(&gone);
+        for (kind, data, marked) in [
+            ("keys.get", json!({}), false),
+            ("keys.remove", json!({"service": "deepgram"}), false),
+            ("keys.set", json!({"service": "openrouter"}), false),
+            ("keys.remove", json!({"service": "openrouter"}), true),
+        ] {
+            let changed = Arc::new(AtomicBool::new(false));
+            let changes = Changes::with_helpers(
+                "/nowhere.sock",
+                Duration::from_secs(1),
+                None,
+                Some((gone.clone(), Duration::from_secs(1))),
+            )
+            .telling_the_forwarder(Some(changed.clone()));
+            changes.start_keys(kind, &data).unwrap();
+            let started = Instant::now();
+            while changes.take().is_empty() && started.elapsed() < Duration::from_secs(5) {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            assert_eq!(changed.load(Ordering::Acquire), marked, "{kind} {data}");
+        }
+    }
 
     /// #2094, the contract on #2094 (11:1x): every keys request but one on
     /// a lamp without the switch gets a result, a failure with its code
