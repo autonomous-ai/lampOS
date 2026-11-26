@@ -11953,7 +11953,10 @@ fn timed_fixed_says(toml_text: &str) -> Option<Vec<String>> {
 /// The words of a person's ask that want a value worked out when the skill
 /// runs ("how many days are left in the year", "bao nhiêu ngày"): from the
 /// first such phrase to the end of its sentence, cut at
-/// [`MOST_CANNOT_CHARS`]. `None` when the ask names none.
+/// [`MOST_CANNOT_CHARS`]. `None` when the ask names none. A phrase
+/// followed by "cũng" ("bao lâu cũng được", any length is fine) or after
+/// "dù" ("dù mấy giờ", whatever time) asks for no value (El's and the
+/// Reviewer-lead's P2 on #8732).
 fn value_asked(words: &str) -> Option<String> {
     let lower = words.to_lowercase();
     let at = VALUE_ASKS
@@ -11962,10 +11965,13 @@ fn value_asked(words: &str) -> Option<String> {
             lower
                 .match_indices(ask)
                 .find(|(at, _)| {
-                    !lower[..*at]
+                    let before = &lower[..*at];
+                    !before
                         .chars()
                         .next_back()
                         .is_some_and(char::is_alphanumeric)
+                        && !before.trim_end().ends_with("dù")
+                        && !lower[at + ask.len()..].trim_start().starts_with("cũng")
                 })
                 .map(|(at, _)| at)
         })
@@ -11977,7 +11983,9 @@ fn value_asked(words: &str) -> Option<String> {
 
 /// The phrases of an ask for a value only a run can know: a count, an
 /// amount, a time or a day, in English and Vietnamese ([`value_asked`]).
-const VALUE_ASKS: [&str; 17] = [
+/// No "ngày nào": "ngày nào cũng …" is the plain Vietnamese "every day
+/// …", and the counts of days are `mấy ngày`, `còn mấy` and `bao nhiêu`.
+const VALUE_ASKS: [&str; 16] = [
     "how many",
     "how much",
     "how long",
@@ -11994,7 +12002,6 @@ const VALUE_ASKS: [&str; 17] = [
     "mấy giờ",
     "mấy ngày",
     "còn mấy",
-    "ngày nào",
 ];
 
 /// A timed fixed say made for an ask of a value ([`value_asked`]) whose
