@@ -270,8 +270,7 @@ async fn either_switch_alone_starts_the_listener() {
         // The forwarder never returns: it is driven beside the look, on
         // this task, and dropped with it.
         let serving = serve_when(
-            on_from(hermes, openclaw),
-            0,
+            on_from(hermes, openclaw).then_some(0),
             Some(dir.path()),
             None,
             KEY,
