@@ -7863,7 +7863,15 @@ forces one), a skill it makes is made whole, with everything a run needs:
   The refusal goes to the writer first, as the
   try's failure (`made_skill::TOLD_ONLY_REPAIR`: a `task` step, no
   `speak`, scripts that print, the agent's answer the spoken summary), so
-  a repair reshapes it and nothing is said. Only when the make ends with
+  a repair reshapes it and nothing is said. It begins "Not kept:" and names
+  the shape refused (a run step, or speaking itself) and the change (a task
+  step whose script prints the answer), never "when the lamp tried" it, as
+  it was never run. A repair's rules for the lamp's agent begin with the
+  check's refusal whole, "FIX THIS FIRST." and then the brief as before
+  (`make_skill_agent::rules_of`, `made_skill::repair_lead`; M5 on lamp-ee17,
+  #8651: the agent read only rules.md's last line and the request, so a
+  refusal in the middle was never read, and the same run step was refused
+  three times). Test `a_repairs_rules_begin_with_the_checks_refusal`. Only when the make ends with
   no kept skill does the person hear `made_skill::TOLD_ONLY_TRY`, once
   (`plain_reason`, #8454's one line, #8612's kept earlier refusal): "That
   one would speak on its own; I can only keep it if it tells me and I say

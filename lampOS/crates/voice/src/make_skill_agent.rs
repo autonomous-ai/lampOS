@@ -486,6 +486,16 @@ pub const ONE_PATH_ENVIRONMENT: &str = "LAMP_MAKE_AGENT_ONE_PATH";
 /// lamp-tasks takes each through the one run path (#7133).
 pub const ONE_PATH_ENGINES: [&str; 2] = [MAKE_ENGINE, "OpenClaw"];
 
+/// The rules of a make run: `system` and `brief`; for a repair, the
+/// check's refusal first too ([`crate::made_skill::repair_lead`], M5 on lamp-ee17,
+/// #8651), so an agent that reads only the top of rules.md still reads it.
+pub(crate) fn rules_of(system: &str, brief: &str) -> String {
+    match crate::made_skill::repair_lead(brief) {
+        Some(lead) => format!("{lead}\n\n{system}\n\n{brief}\n"),
+        None => format!("{system}\n\n{brief}\n"),
+    }
+}
+
 /// Whether the switch is on.
 pub fn on() -> bool {
     on_with(std::env::var(ENVIRONMENT).ok().as_deref())
@@ -1000,7 +1010,7 @@ impl Agent {
         let grace = (self.within / 2).min(Duration::from_secs(5));
         let mut line = json!({
             "op": "skill_make",
-            "rules": format!("{system}\n\n{brief}\n"),
+            "rules": rules_of(system, brief),
             "within_ms": self.within.as_millis() as u64,
         });
         // The guide asked for only with its switch: off, the line is
@@ -1393,6 +1403,29 @@ pub(crate) mod tests {
             ["op", "rules", "within_ms"]
         );
         assert!(!sent.iter().any(|line| line["op"] == "prepare"));
+    }
+
+    /// M5 on lamp-ee17 (#8651): a repair's rules begin with the check's
+    /// refusal, whole, so the told-only repair is the first thing in
+    /// rules.md; a first make's rules are as before.
+    #[test]
+    fn a_repairs_rules_begin_with_the_checks_refusal() {
+        let request = "every morning at 8 tell me the top headline";
+        let repair =
+            crate::made_skill::repair_brief(request, crate::made_skill::TOLD_ONLY_REPAIR).unwrap();
+        let rules = rules_of("SYSTEM", &repair);
+        let first = rules.lines().next().unwrap();
+        assert!(first.starts_with("FIX THIS FIRST. "), "{first}");
+        assert!(
+            first.contains(crate::made_skill::TOLD_ONLY_REPAIR),
+            "{first}"
+        );
+        assert!(rules.ends_with(&format!("SYSTEM\n\n{repair}\n")));
+        assert!(crate::made_skill::TOLD_ONLY_REPAIR.starts_with("Not kept: "));
+        assert!(!crate::made_skill::TOLD_ONLY_REPAIR.contains("tried"));
+        let brief = crate::made_skill::brief(request).unwrap();
+        assert_eq!(crate::made_skill::repair_lead(&brief), None);
+        assert_eq!(rules_of("SYSTEM", &brief), format!("SYSTEM\n\n{brief}\n"));
     }
 
     /// Fourteen on lamp-9adf (12958, #6749): a make with code ran out at
