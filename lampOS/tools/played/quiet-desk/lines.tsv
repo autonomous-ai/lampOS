@@ -1,0 +1,47 @@
+# quiet-desk (kit-q-quiet-desk): one person alone at a quiet desk meets memory (#7814, first builder, 26 Nov 10:46). One voice
+# for every line (the test face's). The runner (off-repo, RUNNER.md) reads this file top to bottom: it sets the face first
+# (talk|still|hide; - leaves it), then says the line (say: played, misheard wake word replayed once; mem: a memory line, gated
+# on the face read speaking and checked seen after, replayed at most once in all), waits `wait` s; quiet waits with nothing
+# said; snap reads the memory (test face, room, owner and rule scopes) into snap_<text>.json. Each tell is said by name; its
+# ask comes back without the name, inside the conversation, 30 to 60 s after the tell. All names and facts are made up.
+#step	scene	face	kind	wait	text
+q0	pre	hide	quiet	50	
+qd1_tell	QD1	talk	mem	14	Hey Lamp, my sister's name is Anna.
+qd1_yes	QD1	-	mem	22	Yes, please remember that.
+qd1_ask	QD1	-	mem	16	What's my sister's name?
+qd2_tell	QD2	-	mem	14	Hey Lamp, my favourite colour is lilac.
+qd2_yes	QD2	-	mem	22	Yes, please remember that.
+qd2_ask	QD2	-	mem	16	What's my favourite colour?
+qd3_tell	QD3	-	mem	14	Hey Lamp, I've got the dentist on Friday at half past nine.
+qd3_yes	QD3	-	mem	22	Yes, please remember that.
+qd3_ask	QD3	-	mem	16	What day is my dentist?
+qd4_tell	QD4	-	mem	14	Hey Lamp, my desk at work is on the fourth floor.
+qd4_yes	QD4	-	mem	22	Yes, please remember that.
+qd4_ask	QD4	-	mem	16	Which floor is my desk on?
+qd5_tell	QD5	-	mem	14	Hey Lamp, I take my tea with oat milk and no sugar.
+qd5_yes	QD5	-	mem	22	Yes, please remember that.
+qd5_ask	QD5	-	mem	16	How do I take my tea?
+qd6_tell	QD6	-	mem	14	Hey Lamp, my neighbour's dog is called Biscuit.
+qd6_yes	QD6	-	mem	22	Yes, please remember that.
+qd6_ask	QD6	-	mem	16	What's the neighbour's dog called?
+qd7_tell	QD7	-	mem	14	Hey Lamp, my mum's birthday is on the ninth of March.
+qd7_yes	QD7	-	mem	22	Yes, please remember that.
+qd7_ask	QD7	-	mem	16	When's my mum's birthday?
+qd_snap_keep	QD7	-	snap	0	keep
+qd8_fix	QD8	-	mem	14	Hey Lamp, no, it's Hannah, not Anna. My sister's name is Hannah.
+qd8_yes	QD8	-	mem	22	Yes, please change it.
+qd8_snap	QD8	-	snap	0	fix
+qd8_ask	QD8	-	mem	16	So what's my sister called?
+qd9_forget	QD9	-	mem	14	Hey Lamp, forget my favourite colour.
+qd9_yes	QD9	-	mem	22	Yes, please forget it.
+qd9_snap	QD9	-	snap	0	forget
+qd9_ask	QD9	-	mem	16	What's my favourite colour?
+qd10_other	QD10	-	say	30	Priya, my flight to Lisbon leaves at six on Sunday, so I'm off on Monday.
+qd10_snap	QD10	-	snap	0	other
+qd10_ask	QD10	-	mem	18	Lamp, when does my flight leave?
+qd11_never	QD11	-	mem	18	Lamp, what's my brother's name?
+qd12_q	QD12	still	quiet	50	
+qd12_sister	QD12	talk	mem	16	Hey Lamp, what's my sister's name?
+qd12_dentist	QD12	-	mem	16	And when's my dentist?
+qd12_colour	QD12	-	mem	18	Do you know my favourite colour?
+qd12_snap	QD12	-	snap	0	end
