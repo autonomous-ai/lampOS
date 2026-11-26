@@ -2632,6 +2632,8 @@ mod tests {
             "or one whose every trigger is a touch or a press (`controls/touch`, \
              `controls/pet`, `controls/gesture`): that is the person at the lamp asking, \
              answered at once.",
+            "that answer changes, so compute it when the skill runs, a task step whose \
+             script prints it.",
             "Its scripts print what they found and never call `lamp.say`, `lamp.sound`, the \
              speaker or `control.sock`, and its grants never name `speak` or `speaker`.",
             "only when the owner is alone in view, no one has spoken for a minute, and it \
