@@ -97,7 +97,8 @@ fn setter(lease: Option<&ScopeLease>) -> Option<String> {
 /// every reminder set by voice under `LAMP_PRIVATE_ROOM`, on in the product,
 /// kept no row). The Schedule's own item stays everyone's.
 pub fn record_caller(lease: Option<&ScopeLease>, name: &str, caller: &Value) -> Value {
-    if !crate::person::private_room() {
+    // A visitor line (#8639) is the caller it is outside the private room.
+    if !crate::remember::visitor::private_room(lease) {
         return caller.clone();
     }
     private_room_record_caller(lease, name, &crate::person::owner_ids())
@@ -120,8 +121,10 @@ pub(crate) fn private_room_record_caller(
 /// `{"asker":{"person","owner"},"setter"}` (`lamp_actions::schedule::Caller`).
 pub fn caller(lease: Option<&ScopeLease>, name: &str) -> Value {
     // The private room (`person::private_room`): this line sees every item,
-    // as the app's calls do, and what it sets is everyone's.
-    if crate::person::private_room() {
+    // as the app's calls do, and what it sets is everyone's. Not a visitor
+    // line's (`LAMP_MEMORY_VISITOR_NOT_KEPT`, #8639): it is the caller it
+    // is outside the private room.
+    if crate::remember::visitor::private_room(lease) {
         return json!({"everyone":true});
     }
     caller_among(lease, name, &crate::person::owner_ids(), one_face_on())

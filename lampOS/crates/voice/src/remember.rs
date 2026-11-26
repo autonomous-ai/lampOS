@@ -68,6 +68,7 @@ pub mod on;
 #[path = "memory_probe.rs"]
 pub mod probe;
 pub mod role;
+pub mod visitor;
 
 /// Where the coordinator reads the memory's socket: an absolute path.
 pub const ENVIRONMENT: &str = "LAMP_MEMORY_SOCKET";

@@ -490,7 +490,8 @@ pub fn off_note_here(request: u64, heard: bool) -> Option<String> {
         return None;
     }
     let keeping = Keeping::when(true)?;
-    let named = crate::person::private_room();
+    // Never by name to a visitor line (#8639).
+    let named = crate::remember::visitor::private_room_for_request(request);
     let note = off_note(&keeping, Path::new(crate::skill_about::STATE_DIR), named)?;
     eprintln!(
         "lamp-voice: request {request}: told that a skill they made or added is turned off{}",

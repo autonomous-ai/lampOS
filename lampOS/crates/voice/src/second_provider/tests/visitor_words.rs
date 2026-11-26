@@ -22,20 +22,21 @@ use crate::memory_scope::{FaceCache, Gap, ScopeLease};
 /// The owner's name, as the eyes' known file names them.
 const OWNER: &str = "A";
 
-/// `LAMP_MEMORY_VISITOR_NOT_KEPT` on for this thread. The switch is not
-/// built yet: the build makes this set its test override, so every test
-/// here runs with it on. Until then, a no-op.
-fn visitor_switch_on() {}
-
-/// The private room on and `OWNER` the lamp's owner, for this thread, put
-/// back when dropped (a red assertion included).
+/// The private room on and `OWNER` the lamp's owner, for this thread, with
+/// `LAMP_MEMORY_VISITOR_NOT_KEPT` as `visitor_switch` sets it; put back
+/// when dropped (a red assertion included).
 struct OwnersRoom;
 
 impl OwnersRoom {
+    /// With the switch on, as every test here but the off pin runs.
     fn on() -> Self {
+        Self::with_switch(true)
+    }
+
+    fn with_switch(visitor_switch: bool) -> Self {
         crate::person::set_private_room_for_test(Some(true));
         crate::known_faces::owner_for_test(Some(Some(OWNER.to_owned())));
-        visitor_switch_on();
+        crate::remember::visitor::set_on_for_test(Some(visitor_switch));
         Self
     }
 }
@@ -44,6 +45,7 @@ impl Drop for OwnersRoom {
     fn drop(&mut self) {
         crate::person::set_private_room_for_test(None);
         crate::known_faces::owner_for_test(None);
+        crate::remember::visitor::set_on_for_test(None);
     }
 }
 
@@ -105,7 +107,7 @@ fn reminder_setter(lease: &ScopeLease) -> Value {
         .clone()
 }
 
-/// RED until the build. A visitor asking is told nothing of the owner's:
+/// A visitor asking is told nothing of the owner's:
 /// not their memory (the line is the room's, never theirs), and not their
 /// service records, linked reads or private read-backs (`services::owner_of`
 /// is the one gate for `records_noting`, `linked_noting`,
@@ -139,7 +141,7 @@ async fn a_visitor_is_told_nothing_of_the_owners_memory_or_service_records() {
     );
 }
 
-/// RED until the build. Nothing a visitor says is kept as the owner's: a
+/// Nothing a visitor says is kept as the owner's: a
 /// keep runs in no person's scope, and a reminder they set is not kept as
 /// the owner's record (`schedule_whose::private_room_record_caller` falls
 /// back to the owner today).
@@ -213,4 +215,76 @@ async fn the_owners_known_face_beside_an_unknown_one_keeps_todays_behaviour() {
         Some(&lease)
     ));
     assert_eq!(reminder_setter(&lease), json!(owner()));
+}
+
+/// A visitor at the lamp: the private room's other checks yield too. Their
+/// reminders list asks as nobody's (`schedule_whose::caller`, not
+/// everyone's), the records are never told in full, no yes of theirs is
+/// the owner's by the private room, and the app's lines and tools are not
+/// theirs (`remember::visitor::private_room`).
+#[tokio::test]
+async fn a_visitor_gets_no_reminders_records_or_app_lines_of_the_owners() {
+    let _room = OwnersRoom::on();
+    let (_engine, lease) = visitor();
+    let request = lease.key().request;
+    assert!(crate::remember::visitor::of(Some(&lease)));
+    assert!(!crate::remember::visitor::private_room(Some(&lease)));
+    assert!(!crate::remember::visitor::private_room_for_request(request));
+    assert_ne!(
+        crate::tools::schedule_whose::caller(Some(&lease), "list_reminders"),
+        json!({"everyone": true}),
+        "a visitor never lists everyone's reminders"
+    );
+    assert!(!crate::services::records_in_full(request, &owner()));
+    assert!(!crate::services::owners_yes_of(request, true, None));
+    // The newest line is the visitor's: a run's write is not read back.
+    assert!(!crate::services::owner_sees_alone_now());
+    assert!(!crate::run_write_yes::read_back_allowed_now());
+}
+
+/// PIN: the switch off, a visitor's line is as stock: the private room
+/// makes it the owner's for the services and the reminders.
+#[tokio::test]
+async fn with_the_switch_off_a_visitors_line_is_as_stock() {
+    let _room = OwnersRoom::with_switch(false);
+    let (_engine, lease) = visitor();
+    assert_eq!(lease.scope().unwrap().person(), None, "memory: the room's");
+    assert!(!crate::remember::visitor::of(Some(&lease)));
+    assert!(crate::remember::visitor::private_room(Some(&lease)));
+    assert_eq!(crate::services::owner_of(Some(&lease)), Some(owner()));
+    assert!(crate::services::owner_hears(
+        lease.key().request,
+        true,
+        Some(&lease)
+    ));
+    assert_eq!(reminder_setter(&lease), json!(owner()));
+    assert_eq!(
+        crate::tools::schedule_whose::caller(Some(&lease), "list_reminders"),
+        json!({"everyone": true})
+    );
+    assert!(crate::services::records_in_full(
+        lease.key().request,
+        &owner()
+    ));
+}
+
+/// PIN: nobody in view and the misread are never visitor lines, so the
+/// other checks keep the private room too.
+#[tokio::test]
+async fn nobody_in_view_and_a_misread_are_never_visitor_lines() {
+    let _room = OwnersRoom::on();
+    for refreshes in [
+        vec![(None, 0)],
+        vec![(Some(owner_seen("never-visitor")), 1), (None, 1)],
+    ] {
+        let (_engine, lease) = admitted(refreshes);
+        assert!(!crate::remember::visitor::of(Some(&lease)));
+        assert!(crate::remember::visitor::private_room_for_request(
+            lease.key().request
+        ));
+        assert_eq!(
+            crate::tools::schedule_whose::caller(Some(&lease), "list_reminders"),
+            json!({"everyone": true})
+        );
+    }
 }

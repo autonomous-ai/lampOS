@@ -5646,6 +5646,52 @@ look that saw the face (row 5 on lamp-06c1, 20 Nov: covered faces were lost
 A new face sitting down there later is not named, and its line is the
 room's. Off, any gap within the sticky hold follows, as before.
 
+### A visitor at the lamp (#8639, common part)
+
+Only with `LAMP_MEMORY_VISITOR_NOT_KEPT=on` (off unless set, in no product
+unit; the second route only, `remember::visitor`). Under `LAMP_PRIVATE_ROOM`
+(on in the product) every line is the owner's for the services, so a
+stranger alone at the lamp was told the owner's service records, calendar,
+mail, app lines and reminders, and a reminder they set was kept as the
+owner's record.
+
+A **visitor line** is a heard line admitted as the room's with the camera
+allowed, at least one face in view at the face cache's last refresh, no known
+face freshly seen within `NO_FACE_QUIET` (120 s, `RoomReason::NeverKnown`),
+not held by a gap, and not carried, read or kept as anyone's since
+(`FaceCache::visitor`, read in the same pass as the snapshot with no lock
+waited for; `ScopeLease::visitor`). With the switch, the private room yields
+to it (`remember::visitor::private_room`): the line is judged as outside the
+private room, where a room line is nobody's.
+
+- `services::owner_of` gives no owner, so no service records, linked reads
+  or read ids; `owner_hears`, `records_in_full`, `owners_yes_of` and
+  `services::run` read it as outside.
+- The Schedule asks as nobody's (`schedule_whose::caller`, not
+  `{"everyone":true}`), and a reminder they set is not kept as the owner's
+  record (`schedule_whose::record_caller`).
+- The app's lines and tools are not offered (`app_context::notes_for_line`,
+  `app_tools::notes_for_line`); a made skill turned off is not named
+  (`made_turn::off_note_here`); a yes is never the owner's by the private
+  room (`seen_yes`); the shared-words skill note and the one-face forget's
+  yes and subject read it as outside.
+- Checks with no line of their own (a run's write read back,
+  `run_write_yes::read_back_allowed_now`; a made skill's code said back,
+  `services::owner_sees_alone_now`) read whether the newest line admitted
+  was a visitor's.
+- Recall is unchanged: a room line already reads the room's alone, never the
+  owner's own memory.
+
+Not visitor lines, so unchanged: nobody in view (the owner, by the private
+room), a known face seen within the 120 s (a misread, by the owner's 23 Nov
+rule), and the owner's known face beside an unknown one. No new spoken
+wording: the model is told what it is told outside the private room. No new
+cap, window or rate. The journal's room line adds `, a visitor: the private
+room yields (LAMP_MEMORY_VISITOR_NOT_KEPT)`, never a name. Whether a
+visitor's own words are kept in the room's memory is the memory owner's
+ruling on #8639 (options A, B and C), and is not changed. Tests:
+`second_provider::tests::visitor_words`, `remember::visitor`. Off, as before.
+
 ### Live route session scope
 
 With `LAMP_LIVE_SCOPED_SESSION=on` (off unless set), a spoken line on the Live

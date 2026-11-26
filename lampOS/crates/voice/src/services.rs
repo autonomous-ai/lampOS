@@ -1752,8 +1752,9 @@ pub fn brief(told: &mut Value) {
 
 /// The owner's memory id when `lease` is theirs ([`Turn::owner`]).
 pub(crate) fn owner_of(lease: Option<&crate::memory_scope::ScopeLease>) -> Option<String> {
-    // The private room (`person::private_room`): whoever speaks is the owner.
-    if crate::person::private_room() {
+    // The private room (`person::private_room`): whoever speaks is the owner,
+    // but a visitor (`LAMP_MEMORY_VISITOR_NOT_KEPT`, #8639).
+    if crate::remember::visitor::private_room(lease) {
         return Some(
             crate::person::owner_ids()
                 .into_iter()
@@ -1847,7 +1848,8 @@ pub(crate) fn owner_sees_alone(
 /// [`owner_alone`]. A made skill with code from the app is said back only
 /// then (#6307, `make_skill_local::app_code_asked`).
 pub(crate) fn owner_sees_alone_now() -> bool {
-    let private_room = crate::person::private_room();
+    // The newest line a visitor's (#8639): as outside the private room.
+    let private_room = crate::remember::visitor::private_room_now();
     // A name the eyes hold, not match, is never the owner in view
     // (`LAMP_FACE_STICKY`, `known_faces::known_for_owner_checks`).
     let owner_in_view = !private_room
@@ -1892,7 +1894,8 @@ pub(crate) fn owners_yes_now(
 /// (`make_skill_local`'s make with `LAMP_MAKE_NO_ASKS`, asked only for one
 /// that runs its own code).
 pub(crate) fn owners_yes_of(request: u64, heard: bool, owner: Option<String>) -> bool {
-    let private_room = crate::person::private_room();
+    // A visitor line's yes is never the owner's by the private room (#8639).
+    let private_room = crate::remember::visitor::private_room_for_request(request);
     let seen_owner = owner_seen_saying(heard, private_room, owner.as_deref(), |owner| {
         seen_saying_owner(request, owner).0
     });
@@ -1996,7 +1999,8 @@ pub(crate) fn owner_hears(
     heard: bool,
     lease: Option<&crate::memory_scope::ScopeLease>,
 ) -> bool {
-    let private_room = crate::person::private_room();
+    // A visitor line is judged as outside the private room (#8639).
+    let private_room = crate::remember::visitor::private_room(lease);
     if private_room {
         return true;
     }
@@ -2030,7 +2034,8 @@ pub(crate) fn told_in_full(
 /// made yet tells the brief form; no judge, brief.
 pub(crate) fn records_in_full(request: u64, owner: &str) -> bool {
     told_in_full(
-        crate::person::private_room(),
+        // Never for a visitor line (#8639), whose `owner_of` is none anyway.
+        crate::remember::visitor::private_room_for_request(request),
         owner_alone(),
         seen_saying_owner(request, owner).0,
         || judge().and_then(|judge| judge(owner_ask(request, Some(owner)))),
@@ -2241,7 +2246,8 @@ pub fn run(
     let (call, attempt) = take_attempt(call);
     let call = &call;
     let now = Instant::now();
-    let private_room = crate::person::private_room();
+    // A visitor line is held as outside the private room (#8639).
+    let private_room = crate::remember::visitor::private_room(lease);
     let owner = owner_of(lease);
     let judge = judge();
     // A write redone from a record made before the voice started: read from

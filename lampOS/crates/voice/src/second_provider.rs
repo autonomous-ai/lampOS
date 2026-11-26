@@ -6060,9 +6060,14 @@ impl Engine {
             // the eyes saw in view as it began; a warm cache with no change
             // through the line arms nothing (El's P2 on #3108).
             let late = heard && self.memory_camera_allowed && self.scopes_context();
+            // A visitor line (#8639, `LAMP_MEMORY_VISITOR_NOT_KEPT`): heard
+            // with the camera allowed, an unknown face in view and no known
+            // face seen this conversation. Read in the same pass, no wait.
+            let mut visitor = false;
             let scope = if heard && self.memory_camera_allowed {
                 let now = std::time::Instant::now();
                 let scope = cache.snapshot(now);
+                visitor = !scope.held() && cache.visitor(now);
                 // With `LAMP_FACE_GAP_HOLD`, why the line is or isn't
                 // held: counts and ms only (c0a4's run on #2449).
                 if let Some(told) = cache.gap_told(now) {
@@ -6078,7 +6083,8 @@ impl Engine {
                 // reason, ms and counts, never a name.
                 if let Some(told) = cache.room_told(now) {
                     eprintln!(
-                        "lamp-voice second: request {request}: memory scope the room's: {told}"
+                        "lamp-voice second: request {request}: memory scope the room's: {told}{}",
+                        crate::remember::visitor::journal(visitor)
                     );
                 }
                 // A line held only by a gap is never journalled, whether or
@@ -6098,11 +6104,16 @@ impl Engine {
                 session,
                 request,
             };
-            if late {
+            let admitted = if late {
                 crate::memory_scope::RequestScope::looking_later(key, scope, cache.clone())
             } else {
                 crate::memory_scope::RequestScope::new(key, scope)
+            };
+            if visitor {
+                admitted.mark_visitor();
             }
+            crate::remember::visitor::mark_line(request, visitor);
+            admitted
         })
     }
 
@@ -13178,7 +13189,7 @@ async fn spoken(
         // for this turn only, never kept; nothing while Lamp is private.
         // Only on the owner's turn, by the known-person gate above: never a
         // guest's or the room's (the Reviewer-lead's P3 on #8313).
-        .chain(crate::app_context::notes_for(
+        .chain(crate::app_context::notes_for_line(
             crate::app_context::now_ms(),
             shared.private_now.load(Ordering::SeqCst),
             scope
@@ -13186,31 +13197,37 @@ async fn spoken(
                 .and_then(crate::memory_scope::ScopeLease::scope)
                 .filter(|_| known_in_view)
                 .and_then(|scope| scope.person()),
+            // Never a visitor line's (#8639).
+            crate::remember::visitor::private_room(scope.as_ref()),
         ))
         // An installed app's tools (`LAMP_APP_TOOLS`, #8406): their section,
         // on the owner's turn by the same gate, never while private, in the
         // care hold or for a line let in only as the conversation going on;
         // this also marks the request the tools are offered on. An app the
         // line was told to as a phrase offers none on it (#8386).
-        .chain(crate::app_tools::notes_for(
+        .chain(crate::app_tools::notes_for_line(
             request,
             &text,
             crate::app_tools::now_ms(),
-            shared.private_now.load(Ordering::SeqCst),
-            shared
-                .care
-                .as_ref()
-                .is_some_and(|care| care.holds(Instant::now()) || care.is_turn(request)),
-            shared
-                .conversation_alone
-                .as_ref()
-                .and_then(|note| note(request))
-                == Some(worker::CONVERSATION_ALONE),
+            (
+                shared.private_now.load(Ordering::SeqCst),
+                shared
+                    .care
+                    .as_ref()
+                    .is_some_and(|care| care.holds(Instant::now()) || care.is_turn(request)),
+                shared
+                    .conversation_alone
+                    .as_ref()
+                    .and_then(|note| note(request))
+                    == Some(worker::CONVERSATION_ALONE),
+            ),
             scope
                 .as_ref()
                 .and_then(crate::memory_scope::ScopeLease::scope)
                 .filter(|_| known_in_view)
                 .and_then(|scope| scope.person()),
+            // Never a visitor line's (#8639).
+            crate::remember::visitor::private_room(scope.as_ref()),
         ))
         .chain(records)
         .chain(read_ids)
@@ -17163,8 +17180,8 @@ fn kept_line_clip(shared: &Shared) -> Option<Vec<i16>> {
 /// private read-backs' gate (`services::owner_sees_alone`: the private
 /// room, or the one face the eyes see; the person is already theirs here);
 /// otherwise nothing.
-fn kept_subject(held: &net::ToolCall) -> Option<&str> {
-    (crate::person::private_room() || crate::services::owner_alone())
+fn kept_subject(held: &net::ToolCall, request: u64) -> Option<&str> {
+    (crate::remember::visitor::private_room_for_request(request) || crate::services::owner_alone())
         .then(|| held.args["about"].as_str())
         .flatten()
 }
@@ -17274,7 +17291,9 @@ fn take_held_forget(
             &held.asker,
         ) {
             Some(why)
-        } else if seen || (by_one_face && crate::person::private_room()) {
+        } else if seen
+            || (by_one_face && crate::remember::visitor::private_room_for_request(request))
+        {
             None
         } else {
             eprintln!(
@@ -17316,7 +17335,7 @@ fn take_held_forget(
                             "lamp-voice second: request {request}: dropped a held one-face forget (held in request {}): their line is only a no ({how}); it is kept, and the lamp says so itself (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
                             held.request
                         );
-                        let note = crate::remember::said_no_told(kept_subject(&held.call));
+                        let note = crate::remember::said_no_told(kept_subject(&held.call, request));
                         Taken::KeptAtOnce(held.call, note)
                     }
                     OneFaceAnswer::ModelsCall => {
@@ -17331,7 +17350,7 @@ fn take_held_forget(
                             "lamp-voice second: request {request}: dropped a held one-face forget (held in request {}): they said no ({how}); it is kept, whatever the model calls (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
                             held.request
                         );
-                        let note = crate::remember::said_no_told(kept_subject(&held.call));
+                        let note = crate::remember::said_no_told(kept_subject(&held.call, request));
                         Taken::OnForget(held.call, note)
                     }
                     OneFaceAnswer::Unclear if held.asked_again => {
@@ -17339,7 +17358,8 @@ fn take_held_forget(
                             "lamp-voice second: request {request}: dropped a held one-face forget (held in request {}): asked once more, its answer still said forget and took it back ({how}); it is kept (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
                             held.request
                         );
-                        let note = crate::remember::still_unclear_told(kept_subject(&held.call));
+                        let note =
+                            crate::remember::still_unclear_told(kept_subject(&held.call, request));
                         Taken::OnForget(held.call, note)
                     }
                     OneFaceAnswer::Unclear => {
@@ -20084,7 +20104,7 @@ async fn answer(
             named => (named, None),
         };
         if let Some(args) = shared_words.filter(|_| !forgot_before_question && !awaits) {
-            let owner_hears = crate::person::private_room() || {
+            let owner_hears = crate::remember::visitor::private_room(scope.as_ref()) || {
                 let lease = scope.clone();
                 tokio::task::spawn_blocking(move || {
                     crate::services::owner_hears(request, heard, lease.as_ref())

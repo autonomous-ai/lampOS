@@ -402,6 +402,26 @@ impl FaceCache {
         ))
     }
 
+    /// Whether a line admitted now is a visitor's (#8639,
+    /// `LAMP_MEMORY_VISITOR_NOT_KEPT`): the cache names nobody, at least one
+    /// face was in view at the last refresh, and no known face was freshly
+    /// seen within [`NO_FACE_QUIET`] ([`RoomReason::NeverKnown`], as
+    /// [`Self::room_told`] reads it). Nobody in view, or not known, is no
+    /// visitor. No lock is waited for: a busy lock reads as no visitor.
+    pub fn visitor(&self, now: Instant) -> bool {
+        if self.snapshot(now).person().is_some() {
+            return false;
+        }
+        // `in_view` holds the faces plus one; 0 when not known.
+        if self.in_view.load(Ordering::Acquire) < 2 {
+            return false;
+        }
+        let Ok(seen) = self.last_seen_until.try_lock() else {
+            return false;
+        };
+        seen.is_none_or(|until| now.saturating_duration_since(until) >= NO_FACE_QUIET)
+    }
+
     /// Acquire before starting the source read, never after it completes.
     pub fn begin_refresh(&self) -> RefreshToken {
         RefreshToken {
@@ -716,6 +736,9 @@ struct RequestContext {
     /// Set once the line is found to be someone else's
     /// ([`ScopeLease::narrow_to_room`]): the room from then on, never wider.
     narrowed: AtomicBool,
+    /// Admitted as a visitor line ([`FaceCache::visitor`],
+    /// [`RequestScope::mark_visitor`]), for [`ScopeLease::visitor`].
+    visitor: AtomicBool,
     room: ScopeSnapshot,
     active: AtomicBool,
     /// A line admitted as the room's with the camera allowed: its late look
@@ -992,6 +1015,7 @@ impl RequestScope {
                 one_face_reads: AtomicBool::new(one_face_reads),
                 carried_reads: OnceLock::new(),
                 narrowed: AtomicBool::new(false),
+                visitor: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 own_keep_undone: AtomicU64::new(0),
                 forget_agreed: AtomicU64::new(0),
@@ -1050,6 +1074,7 @@ impl RequestScope {
                 one_face_reads: AtomicBool::new(one_face_reads),
                 carried_reads: OnceLock::new(),
                 narrowed: AtomicBool::new(false),
+                visitor: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 own_keep_undone: AtomicU64::new(0),
                 forget_agreed: AtomicU64::new(0),
@@ -1068,6 +1093,12 @@ impl RequestScope {
         ScopeLease {
             context: self.context.clone(),
         }
+    }
+    /// Marks the line a visitor's (`LAMP_MEMORY_VISITOR_NOT_KEPT`,
+    /// [`FaceCache::visitor`] at admission): only the admitting route sets
+    /// it, once, before any lease of it is handed out.
+    pub fn mark_visitor(&self) {
+        self.context.visitor.store(true, Ordering::Release);
     }
     pub fn revoke(&self) {
         self.context.active.store(false, Ordering::Release);
@@ -1638,6 +1669,21 @@ impl ScopeLease {
     /// ([`Self::kept_by_one_face`]): a held forget's yes on it is never one.
     pub fn by_one_face(&self) -> bool {
         self.kept_by_one_face().is_some()
+    }
+
+    /// Whether this line is a visitor's (#8639): admitted as one
+    /// ([`RequestScope::mark_visitor`]), still current, still the room's,
+    /// and not carried, read or kept as anyone's since. A line admitted as
+    /// someone's and narrowed to the room is never one: a known face was
+    /// there. Read through `remember::visitor`, which adds the switch.
+    pub fn visitor(&self) -> bool {
+        self.is_current()
+            && self.context.visitor.load(Ordering::Acquire)
+            && self.scope().is_some_and(|scope| scope.person().is_none())
+            && self.context.carried.get().is_none()
+            && self.context.carried_reads.get().is_none()
+            && self.context.seen_words.get().is_none()
+            && self.kept_by_one_face().is_none()
     }
 
     /// The admitted person whose name a narrowed line's reply is told

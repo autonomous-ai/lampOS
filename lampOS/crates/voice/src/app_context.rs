@@ -586,11 +586,23 @@ fn owners() -> Vec<String> {
 /// ids. A guest's or the room's turn outside the private room never hears
 /// the owner's app line (the Reviewer-lead's P3 on #8313).
 pub fn notes_for(now: u64, private: bool, person: Option<&str>) -> Vec<String> {
+    notes_for_line(now, private, person, crate::person::private_room())
+}
+
+/// [`notes_for`] with the private room as the line reads it
+/// (`remember::visitor::private_room`: off for a visitor line with
+/// `LAMP_MEMORY_VISITOR_NOT_KEPT`, #8639).
+pub fn notes_for_line(
+    now: u64,
+    private: bool,
+    person: Option<&str>,
+    private_room: bool,
+) -> Vec<String> {
     if !on() || private {
         return Vec::new();
     }
-    let owners_turn = crate::person::private_room()
-        || person.is_some_and(|person| owners().iter().any(|id| id == person));
+    let owners_turn =
+        private_room || person.is_some_and(|person| owners().iter().any(|id| id == person));
     if owners_turn {
         notes(now, private)
     } else {

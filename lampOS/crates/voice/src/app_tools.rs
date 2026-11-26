@@ -571,11 +571,33 @@ pub fn notes_for(
     conversation_alone: bool,
     person: Option<&str>,
 ) -> Vec<String> {
+    notes_for_line(
+        request,
+        line,
+        now_ms,
+        (private, care_holds, conversation_alone),
+        person,
+        crate::person::private_room(),
+    )
+}
+
+/// [`notes_for`] with the private room as the line reads it
+/// (`remember::visitor::private_room`: off for a visitor line with
+/// `LAMP_MEMORY_VISITOR_NOT_KEPT`, #8639). The tuple is `private`,
+/// `care_holds` and `conversation_alone`.
+pub fn notes_for_line(
+    request: u64,
+    line: &str,
+    now_ms: u64,
+    (private, care_holds, conversation_alone): (bool, bool, bool),
+    person: Option<&str>,
+    private_room: bool,
+) -> Vec<String> {
     if !on() {
         return Vec::new();
     }
-    let owners_turn = crate::person::private_room()
-        || person.is_some_and(|person| owners().iter().any(|id| id == person));
+    let owners_turn =
+        private_room || person.is_some_and(|person| owners().iter().any(|id| id == person));
     let (offered, left_out, running) = current_with_running();
     let offer =
         owners_turn && !private && !care_holds && !conversation_alone && !offered.is_empty();

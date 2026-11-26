@@ -467,7 +467,7 @@ fn owners_spoken_yes(
     lease: Option<&crate::memory_scope::ScopeLease>,
 ) -> bool {
     heard
-        && if crate::person::private_room() {
+        && if crate::remember::visitor::private_room(lease) {
             crate::services::owners_voice_now(request)
         } else {
             crate::services::owners_yes_now(request, heard, lease)

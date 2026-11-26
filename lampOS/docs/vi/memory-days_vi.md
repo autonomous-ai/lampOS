@@ -948,7 +948,22 @@ phần của kho nằm ở `crates/memory/src/app_facts.rs`.
     lượt là một người quen đang trong tầm nhìn (cổng mà các ghi chú bên cạnh
     dùng, không bao giờ là của phòng hay của khoảng hở) và là một trong các id
     trí nhớ của chủ (`app_remember::owners_face_first`): lượt của khách hay
-    của phòng không bao giờ nghe dòng app của chủ.
+    của phòng không bao giờ nghe dòng app của chủ. Với
+    `LAMP_MEMORY_VISITOR_NOT_KEPT=on` (tắt nếu không đặt, #8639,
+    `app_context::notes_for_line`), phòng riêng nhường cho một câu của khách
+    lạ (một khuôn mặt lạ trong tầm nhìn, không có khuôn mặt quen nào được
+    thấy trong 120 s của `NO_FACE_QUIET`, `FaceCache::visitor`): câu đó được
+    xét như ở ngoài phòng riêng, nên người lạ đứng một mình ở đèn không nghe
+    dòng app nào. Không ai trong tầm nhìn, hay một khuôn mặt quen vừa được
+    thấy, thì không đổi. Cùng công tắc đó, phòng riêng cũng nhường cho câu
+    của khách lạ ở các dịch vụ: `services::owner_of` không trả về chủ (không
+    kể bản ghi dịch vụ, lịch, thư), Lịch hỏi như không phải của ai (không
+    phải của mọi người), và lời nhắc khách đặt không được giữ như bản ghi
+    của chủ. Việc lời của chính khách có được giữ trong trí nhớ của phòng
+    hay không là quyết định của người phụ trách trí nhớ trên #8639 (phương án
+    A, B, C), và không đổi ở đây. Không có câu nói mới, không có giới hạn
+    mới. Tắt thì như trước. Xem mục "A visitor at the lamp" trong
+    `docs/memory.md` (chỉ có bản tiếng Anh).
   - **Quên hết sẽ xoá chúng** (`app_context::forget_with_everything`, nơi
     `forget_everything` chạy trong `tools.rs`), và một `forget` nghe được
     mà `about` nêu tên một app đang có dòng ("forget what Gym Coach said",

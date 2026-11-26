@@ -249,7 +249,8 @@ pub fn read_back_allowed(
 /// read it (`person::private_room`), the eyes' known face one of the
 /// owner's memory ids, and the most faces lately.
 pub fn read_back_allowed_now() -> bool {
-    let private_room = crate::person::private_room();
+    // The newest line a visitor's (#8639): as outside the private room.
+    let private_room = crate::remember::visitor::private_room_now();
     // A held name is never the owner in view (`LAMP_FACE_STICKY`).
     let owner_in_view = !private_room
         && crate::known_faces::known_for_owner_checks()

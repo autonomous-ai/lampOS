@@ -1191,7 +1191,20 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
     turn's scope is a known person in view (the gate the neighbouring notes
     use, never the room's or a gap's) who is one of the owner's memory ids
     (`app_remember::owners_face_first`): a guest's or the room's turn never
-    hears the owner's app line.
+    hears the owner's app line. With `LAMP_MEMORY_VISITOR_NOT_KEPT=on` (off
+    unless set, #8639, `app_context::notes_for_line`) the private room yields
+    to a visitor line (an unknown face in view, no known face seen within
+    `NO_FACE_QUIET`'s 120 s, `FaceCache::visitor`): it is judged as outside
+    it, so a stranger alone at the lamp hears no app line. Nobody in view,
+    or a known face seen moments ago, is unchanged. With the same switch the
+    private room yields to a visitor line for the services too:
+    `services::owner_of` gives no owner (no service records, calendar or
+    mail told), the Schedule asks as nobody's (not everyone's), and a
+    reminder the visitor sets is not kept as the owner's record. Whether a
+    visitor's own words are kept in the room's memory is the memory owner's
+    ruling on #8639 (options A, B and C), and is not changed here. No new
+    spoken wording, no new limit. Off, as before. See `docs/memory.md`'s "A
+    visitor at the lamp" (English only).
   - **Forget everything clears them** (`app_context::forget_with_everything`,
     where `forget_everything` runs in `tools.rs`), and a heard `forget`
     whose `about` names an app holding a line ("forget what Gym Coach
