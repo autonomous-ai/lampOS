@@ -6148,33 +6148,31 @@ after a take-over, but now for every turn:
   - **A call is "Hey Lamp" at the line's start, with `LAMP_NAME_HEY_ONLY=on`**
     (on in the product's lamp-voice.service; the product owner's ruling of
     26 Nov 2026: "remove 'Lamp'. must say 'Hey Lamp'. 'Lamp' alone creates so
-    many issues."). Out of a conversation, a hearing of the name counts only
-    within `attention::HEY_AT_THE_START_US` (2.5 s) of the line's start.
-    `lamp-name` is trained on "Hey Lamp" and not on a bare "Lamp"
-    ([bare-name.md](bare-name.md): 12 of 12 "Hey Lamp, …" heard, "Lamp," alone
-    not), and speech to text writes the call in few of its lines (242 of
-    1,415 "Hey Lamp, …" in October; on lamp-74ff on 26 Nov "Galam. What is
-    the capital of France?" and "Hang Tell me a long story …"). So a hearing
-    at the start is the call whatever the rules above ruled of its word,
-    unless the words say otherwise (`words_rule_out_hey`): an "ok" or "okay"
-    opening them ("OK Lamp" is not the call the product owner named), or a
-    greeting followed in its sentence by a word written as another's name,
-    not like the lamp's ("Hi, Mark. Did you move the lamp?", heard at its
-    start on lamp-74ff at 20:51 and answered on the first test build), or
-    another person's name as the call word (#8114). A greeting set off alone
-    ("Hello? Do you know my face?") leaves the hearing to stand. A hearing
-    later in the line, the name inside a sentence, is no call; and a line's
-    words with no hearing call the lamp only when they open with "hey", "hi"
-    or "hello" (`called_in_text`). In a conversation the name is not needed,
-    and the rule holds nothing. Journal at start: `out of a conversation a
-    call is "Hey Lamp" at a line's start`; per line, `counts for nothing: a
-    call is "Hey Lamp" at the line's start (LAMP_NAME_HEY_ONLY)`, and a kept
-    call's second sign is `"Hey Lamp" at the line's start`. Latency: none, a
-    word check at the verdict. Tests (both fail with the rule taken out):
-    `with_hey_only_a_call_is_hey_lamp_at_the_lines_start`,
-    `with_hey_only_words_call_the_lamp_only_after_a_greeting`. Played on
-    lamp-74ff on 26 Nov, first test build: calls 7 of 10, non-calls 9 of 10;
-    the rule as it now stands, the second pass.
+    many issues."). Out of a conversation, a hearing of the name within
+    `attention::HEY_AT_THE_START_US` (2.5 s) of a line's start, in a line
+    whose first word, past one filler, is "hey", "hi" or "hello"
+    (`opens_with_hey`), is the call whatever the rules above ruled of its
+    word: speech to text writes "Hey Lamp" as "Hey man", "Hey, Lynn." or
+    "Hello? …". Unless the words say otherwise (`words_rule_out_hey`): a word
+    written as a name and set off right after the greeting ("Hi, Mark. Did
+    you move the lamp?", "Hey John, …"; never "I", "Hey, I need a timer."),
+    or another person's name as the call word (#8114). With no greeting in
+    its words the switch keeps no hearing: a start hearing ("Galam. What is
+    the capital of France?", lamp-74ff 26 Nov) is left to the rules above,
+    with every drop of theirs (#8136's 0.921 hearing in two people's talk,
+    #3945's "Ma'am, …", #7891's short line, #8092's near ruling; the
+    Reviewer-lead's P1 on #8781). The switch only adds drops: a hearing past
+    the 2.5 s, a line opening with the name itself (a bare "Lamp, …", which
+    `lamp-name`, trained on "Hey Lamp", seldom hears at all), and "OK Lamp".
+    A line's words with no hearing call the lamp only when they open with
+    such a greeting (`called_in_text`). In a conversation the name is not
+    needed, and the rule holds nothing. Journal at start: `out of a
+    conversation a call is "Hey Lamp" at a line's start`; per line, `counts
+    for nothing: a call is "Hey Lamp" at the line's start
+    (LAMP_NAME_HEY_ONLY)`, and a kept call's second sign is `"Hey Lamp" at
+    the line's start`. Latency: none. Tests:
+    `with_hey_only_a_call_is_hey_lamp_at_the_lines_start` (with the
+    product's switches too), `with_hey_only_words_call_the_lamp_only_after_a_greeting`.
   - **One reply window, with `LAMP_ONE_REPLY_WINDOW=on`** (on in the
     product's lamp-voice.service; the product owner's ruling of 26 Nov 2026:
     "ok 20s make sense"). A reply to the lamp's own news (a turn it began
@@ -6185,8 +6183,11 @@ after a take-over, but now for every turn:
     10 min, opened by every unprompted turn): past the 20 s it is "Hey
     Lamp", as any line is. On lamp-74ff that day a goodbye to colleagues
     2 min 53 s after the stuffy-air skill's remark was answered as its
-    reply. Journal at start: `a reply to the lamp's own news counts within
-    20 s`. Latency: none. Tests (both fail with the rule taken out):
+    reply. The 20 s run from the news's end: the window moves from its first
+    audio as its words are sent (`Attention::lamp_words_until`, up to
+    `NEWS_LONGEST_US`, 60 s; the Reviewer-lead's P2 on #8781: a 15 s summary
+    left about 5 s). Journal at start: `a reply to the lamp's own news
+    counts within 20 s`. Latency: none. Tests (both fail with the rule taken out):
     `with_one_reply_window_the_lamps_news_is_replied_to_within_twenty_seconds`,
     `with_one_reply_window_a_line_about_its_work_opens_no_window_of_its_own`.
     Not yet played on a lamp.
@@ -6201,7 +6202,11 @@ after a take-over, but now for every turn:
     words a question or not (`Engine::carrying_short_sounds_in_conversation`,
     its own hook, so an empty answer is asked again only after the lamp's
     question, as before): a played "Two." after "Ready when you are!" was
-    held as a short sound, and each held number let the 20 s lapse. The cost: a mishearing of one or
+    held as a short sound, and each held number let the 20 s lapse. Only
+    within 20 s of the lamp's words (`follows_on::WITHIN_US`), and never a
+    filler ("Uh.", `filler_only`; the Reviewer-lead's P2s on #8781). The
+    known cost, by the owner's rule that no sensor holds a line until
+    measured: another voice's short line in the window can be answered. The cost: a mishearing of one or
     two words in the window is answered (#1712's "Surprise"). Journal at
     start: `in a conversation a reply of a word or two carries`. Test:
     `with_short_replies_carry_a_word_or_two_in_the_conversation_is_not_held`.

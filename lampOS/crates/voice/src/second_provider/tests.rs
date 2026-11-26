@@ -6163,45 +6163,75 @@ async fn a_short_sound_not_heard_as_a_short_word_is_held_when_sounds_are_checked
 /// #8772, `LAMP_SHORT_REPLIES_CARRY` (lamp-74ff, 26 Nov 21:00, a doubling
 /// game): "Two." after the lamp's "Ready when you are!" ended as a short
 /// sound and was held, the lamp's last words no question. With a
-/// conversation going on (`carrying_short_sounds_in_conversation`) it is
-/// judged as a line and answered; with none going on, it is held as before.
+/// conversation going on (`carrying_short_sounds_in_conversation`), within
+/// the 20 s after the lamp's words, it is judged as a line and answered; a
+/// filler ("Uh.") stays held, and so does a sound with no lamp's words before
+/// it, or with no conversation going on (the Reviewer-lead's P2s on #8781).
 #[tokio::test]
 async fn with_short_replies_carry_a_short_sound_in_a_conversation_is_judged_as_a_line() {
-    let run = |going_on: bool| async move {
+    let run = |going_on: bool, answered_first: bool, sound: &'static str| async move {
+        let mut heard = Vec::new();
+        let mut chats = Vec::new();
+        if answered_first {
+            heard.push(Ok("Let's play a doubling game.".to_owned()));
+            chats.push(vec![text("Ready when you are!"), Ok(ChatEvent::Done)]);
+        }
+        heard.push(Ok(sound.to_owned()));
+        chats.push(vec![text("Four."), Ok(ChatEvent::Done)]);
         let script = Arc::new(Script {
-            heard: Mutex::new([Ok("Two.".to_owned())].into()),
-            chats: Mutex::new([vec![text("Four."), Ok(ChatEvent::Done)]].into()),
+            heard: Mutex::new(heard.into()),
+            chats: Mutex::new(chats.into()),
             ..Script::default()
         });
         let (engine, _, _) = scripted(script.clone());
+        // Told what it did, as the worker is, so its words' end is kept.
         let mut engine = engine
             .checking_sounds(true)
+            .telling_what_it_did(Arc::new(|_| {}))
             .answering_the_lamp(Arc::new(|_| false))
-            .carrying_short_sounds_in_conversation(Arc::new(move |request| {
-                assert_eq!(request, 1);
-                going_on
-            }));
-        engine.submit(start(1));
-        engine.submit(audio(1, 1));
+            .carrying_short_sounds_in_conversation(Arc::new(move |_| going_on));
+        let mut request = 1;
+        if answered_first {
+            engine.submit(start(request));
+            engine.submit(audio(request, 1));
+            engine.submit(end(request));
+            let first = turn(&mut engine).await;
+            assert!(
+                first.iter().any(|label| label.starts_with("audio:")),
+                "{first:?}"
+            );
+            engine.retire_through(request);
+            request += 1;
+        }
+        let asked_before = script.asked.lock().unwrap().len();
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
         engine.submit(ProviderInput::End {
-            request: 1,
+            request,
             privacy_generation: 1,
             sound: true,
             cut_in: false,
         });
         let labels = turn(&mut engine).await;
-        let asked = script.asked.lock().unwrap().len();
+        let asked = script.asked.lock().unwrap().len() - asked_before;
         (labels, asked)
     };
-    let (labels, asked) = run(true).await;
+    let (labels, asked) = run(true, true, "Two.").await;
     assert!(
         labels.iter().any(|label| label.starts_with("audio:")),
         "{labels:?}"
     );
-    assert_eq!(asked, 1);
-    let (held, asked) = run(false).await;
-    assert_eq!(held, ["started:1", "heard:Two.", "complete"]);
-    assert_eq!(asked, 0);
+    assert_eq!(asked, 1, "carried in the window");
+    for (going_on, answered_first, sound) in [
+        (false, true, "Two."),
+        (true, false, "Two."),
+        (true, true, "Uh."),
+    ] {
+        let (labels, asked) = run(going_on, answered_first, sound).await;
+        assert_eq!(asked, 0, "{going_on} {answered_first} {sound}: {labels:?}");
+    }
+    assert!(super::filler_only("Hmm, um."));
+    assert!(!super::filler_only("Two."));
 }
 
 /// #7834: on lamp-9adf on 19 Nov "Lamp, put it back." ended as a short
