@@ -2177,17 +2177,17 @@ fn on_the_lamp_description(place: &Place, staff: &[Member]) -> String {
 /// still judges; no word is matched.
 pub const MAKE_TOLD: &str = " Making a skill is make_skill's, never this.";
 
-/// The link's most for a description (`lamp_gemini::Tool::validate`).
-const MOST_DESCRIPTION_BYTES: usize = 1_024;
-
 /// `tools`' [`START`] told [`MAKE_TOLD`] after its own words, when the two
-/// still fit the link's most; one that would not is left as it was, so the
-/// function is never refused for it. Only while `make_skill` is declared,
-/// so it never names a function that isn't offered.
-pub fn tell_make(tools: &mut [Tool]) {
+/// still fit `most`, the route's bound for a description (Live's
+/// [`lamp_gemini::MOST_DESCRIPTION_BYTES`], the second route's
+/// [`crate::second_provider::MOST_DESCRIPTION_BYTES`], #8756); one that
+/// would not is left as it was, so the function is never refused for it.
+/// Only while `make_skill` is declared, so it never names a function that
+/// isn't offered.
+pub fn tell_make(tools: &mut [Tool], most: usize) {
     for tool in tools.iter_mut().filter(|tool| tool.name == START) {
         if !tool.description.contains(MAKE_TOLD.trim())
-            && tool.description.len() + MAKE_TOLD.len() <= MOST_DESCRIPTION_BYTES
+            && tool.description.len() + MAKE_TOLD.len() <= most
         {
             tool.description.push_str(MAKE_TOLD);
         }
@@ -2337,9 +2337,10 @@ fn asked_of(whom: &str, examples: &str, noted: bool, computer: &str) -> String {
 /// Who does the work is the person's choice, and the model's never.
 const CHOSE: &str = "The person chose who does it: never do the work yourself instead, never begin it, and never offer to.";
 /// The same, saying that the staff's note ([`crate::staff_note`]) names who:
-/// 9 bytes more, which every description has room for. The longest, three
-/// of the staff with the lead-in, is 1,014 of the 1,024 bytes with it
-/// (`every_description_fits_the_service_whatever_the_switches`).
+/// 9 bytes more. The longest, three of the staff with the lead-in, is 1,014
+/// bytes with it, within Live's 1,024; CI holds these descriptions to the
+/// product route's own bound
+/// (`every_description_fits_the_service_whatever_the_switches`, #8756).
 const CHOSE_NOTED: &str = "The person chose who does it (a note may name them): never do the work yourself, never begin it, nor offer to.";
 
 /// "\"ask Claude Code to …\", \"get Codex to …\"" for the staff. With all
@@ -6930,6 +6931,14 @@ pub(crate) mod tests {
         sync::mpsc,
     };
 
+    /// Whether the product route takes `tool`: the second route's own bound
+    /// for a description, not Live's 1,024 (#8756; on Live one past it is
+    /// left out with its line, `tools::admitted`).
+    fn fits(tool: &Tool) -> bool {
+        tool.validate_within(crate::second_provider::MOST_DESCRIPTION_BYTES)
+            .is_ok()
+    }
+
     /// The voice and the tasks part bound a task alike.
     #[test]
     fn a_task_is_bounded_as_the_tasks_part_bounds_it() {
@@ -10953,9 +10962,9 @@ pub(crate) mod tests {
     /// `LAMP_TASKS_WHO`, `_ASKED`, `_NAMED_ONLY`, `_CORRECT`, `_SIGN_IN`,
     /// `_SIGN_IN_APP`, `_REPLY_NAMED`, `_HARNESS_STATUS`, `LAMP_STAFF_NOTE`,
     /// `LAMP_MAKE_SKILL`), the lamp's own target and one paired computer
-    /// (the `who` read-back), `start_agent_task` as `core_tools` declares it
-    /// still says a make is make_skill's, within the link's 1,024 bytes,
-    /// whichever of the lamp's engines is its default.
+    /// (the `who` read-back), `start_agent_task` as the product's second
+    /// route declares it still says a make is make_skill's, within that
+    /// route's bound (#8756), whichever of the lamp's engines is its default.
     #[test]
     fn with_the_product_switches_and_a_computer_paired_the_make_still_fits() {
         let _staff = STAFF_HELD
@@ -10981,10 +10990,15 @@ pub(crate) mod tests {
         let defaults: [&[&str]; 3] = [&[], &["openclaw"], &["claude"]];
         for engines in defaults {
             lamp_engines_here(Some(engines));
-            let start = crate::tools::core_tools(&settings)
-                .into_iter()
-                .find(|tool| tool.name == START)
-                .unwrap();
+            let start = crate::tools::uncut_within(
+                &settings,
+                crate::second_provider::MAX_TOOLS,
+                crate::second_provider::MOST_DESCRIPTION_BYTES,
+            )
+            .0
+            .into_iter()
+            .find(|tool| tool.name == START)
+            .unwrap();
             assert!(
                 start.description.contains("person's office computer"),
                 "{}",
@@ -10996,7 +11010,7 @@ pub(crate) mod tests {
                 start.description.len()
             );
             assert!(
-                start.description.len() <= MOST_DESCRIPTION_BYTES,
+                start.description.len() <= crate::second_provider::MOST_DESCRIPTION_BYTES,
                 "{engines:?}: {} bytes",
                 start.description.len()
             );
@@ -11040,7 +11054,7 @@ pub(crate) mod tests {
         assert!(!unread.description.contains("Hermes"));
         lamp_engines_here(Some(&["openclaw"]));
         let openclaw = start(true);
-        assert!(openclaw.validate().is_ok());
+        assert!(fits(&openclaw));
         assert!(
             openclaw
                 .description
@@ -11054,7 +11068,7 @@ pub(crate) mod tests {
         lamp_engines_here(Some(&["hermes", "openclaw"]));
         let (off, on) = (start(false), start(true));
         assert_eq!(off, declared(&at, &staff)[0]);
-        assert!(on.validate().is_ok());
+        assert!(fits(&on));
         for words in [
             "the lamp's own, or Claude Code on the person's office computer",
             "what takes you over 10 s (research, code, files, several steps)",
@@ -12553,7 +12567,9 @@ pub(crate) mod tests {
     /// 2026-10-16, with work asked of the staff, two of them to choose from
     /// and the lead-in, `start_agent_task` was 1,036 bytes, and nothing was
     /// called in either round. Every combination of the switches fits, with
-    /// none, one, two, three or four of the staff (the fourth Devin).
+    /// none, one, two, three or four of the staff (the fourth Devin), within
+    /// the product route's own bound (the second's, #8756); on Live one past
+    /// 1,024 is left out with its line (`tools::admitted`).
     #[test]
     fn every_description_fits_the_service_whatever_the_switches() {
         let three = vec![
@@ -12617,7 +12633,7 @@ pub(crate) mod tests {
                                 staff.len()
                             ));
                         }
-                        if tool.validate().is_err() {
+                        if !fits(&tool) {
                             refused.push(format!(
                                 "{} with {} of the staff, lamp {lamp}, asked {asked}, lead-in {lead_in}, noted {noted}, accounts {accounts}, named only {named_only}, correct {correct}, now {now}, one yes {one_yes}: {} bytes",
                                 tool.name,
@@ -12901,7 +12917,7 @@ pub(crate) mod tests {
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let on = place(Path::new("/run/t"), true);
         let told = declared(&on, &two());
-        assert!(told.iter().all(|tool| tool.validate().is_ok()));
+        assert!(told.iter().all(fits));
         let start = told[0].parameters.as_ref().unwrap();
         assert_eq!(
             start["properties"]["who"]["enum"],
@@ -12919,11 +12935,7 @@ pub(crate) mod tests {
         );
         // All three the tasks part takes still fit what the link carries.
         let three = [two(), vec![member("office-opencode", "opencode")]].concat();
-        assert!(
-            declared(&on, &three)
-                .iter()
-                .all(|tool| tool.validate().is_ok())
-        );
+        assert!(declared(&on, &three).iter().all(fits));
 
         for (tag, who, target, name) in [
             ("codex", json!("Codex"), "office-codex", "Codex"),
@@ -13492,7 +13504,7 @@ pub(crate) mod tests {
 
         // What the model is told: every name it may hear, and who is set up.
         let told = declared(&on, &alone);
-        assert!(told.iter().all(|tool| tool.validate().is_ok()));
+        assert!(told.iter().all(fits));
         let who = &told[0].parameters.as_ref().unwrap()["properties"]["who"];
         assert_eq!(
             who["enum"],
@@ -14463,7 +14475,7 @@ pub(crate) mod tests {
             .into_iter()
             .find(|tool| tool.name == START)
             .expect("start_agent_task declared");
-        assert!(start.validate().is_ok(), "{}", start.description.len());
+        assert!(fits(&start), "{}", start.description.len());
         assert!(
             !start.description.contains("on the person's"),
             "{}",
@@ -14899,7 +14911,7 @@ pub(crate) mod tests {
             None
         );
         let on = start(true);
-        assert!(on.validate().is_ok());
+        assert!(fits(&on));
         let said = on.parameters.unwrap()["properties"]["where"].clone();
         // No computer paired here (no staff): the lamp alone (#6547).
         assert_eq!(said["enum"], json!(["lamp"]));
@@ -15580,7 +15592,7 @@ pub(crate) mod tests {
             lamp_engines_here(Some(engines));
             let on = start(true);
             lamp_engines_here(None);
-            assert!(on.validate().is_ok());
+            assert!(fits(&on));
             on.parameters.unwrap()["properties"]["engine"].clone()
         };
         let engine = engine_with(&["hermes", "openclaw"]);

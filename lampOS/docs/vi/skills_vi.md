@@ -912,8 +912,8 @@ sau:
    - **Tạo kỹ năng không bao giờ là một task** (#8022 case 2, first builder
      đồng ý lúc 11:05): khi `make_skill` được khai báo, mô tả của
      `start_agent_task` kết thúc bằng "Making a skill is make_skill's, never this."
-     (`agent_tasks::MAKE_TOLD`), chỉ khi cả hai vẫn vừa 1.024 byte của
-     link; mô tả nào không vừa thì giữ nguyên. Không có `make_skill` thì câu
+     (`agent_tasks::MAKE_TOLD`), chỉ khi cả hai vẫn vừa giới hạn mô tả riêng của từng tuyến: 1.024 byte của Live (`lamp_gemini::MOST_DESCRIPTION_BYTES`) trong một phiên Live, của tuyến thứ hai (`second_provider::MOST_DESCRIPTION_BYTES`, #8756) trong các yêu cầu chat của nó;
+     mô tả nào không vừa thì giữ nguyên. Không có `make_skill` thì câu
      này không bao giờ được nói. Mô hình vẫn tự đánh giá; không khớp từ
      nào. Test: `a_make_is_told_make_skills_only_while_make_skill_is_declared`.
    - **Được parse trước khi đọc lại** (#6749 E,
