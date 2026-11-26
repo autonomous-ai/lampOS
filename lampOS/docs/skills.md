@@ -7855,7 +7855,10 @@ forces one), a skill it makes is made whole, with everything a run needs:
   changes, so compute it when the skill runs: a task step whose script
   prints it." A constant line ("Time to stretch!") stays a fixed `say`, and
   so do the same words in a skill only the person's words or a hand start,
-  and `remind` steps. The journal names it "(a say with a number or a
+  and `remind` steps. Known limits: a constant line that holds a number
+  ("Drink 2 glasses of water.") on a trigger is refused too and becomes a
+  task step that prints it, and only English words are read, so a
+  Vietnamese number word ("chín mươi chín") gets through. The journal names it "(a say with a number or a
   date)" beside "(a run step)" and "(a speaking grant)". The lamp's own
   model's brief says it too (`make_skill_local::CHANGING_LINE`). Tests
   `a_timed_fixed_say_with_a_number_or_a_date_is_refused_and_a_constant_one_kept`,
