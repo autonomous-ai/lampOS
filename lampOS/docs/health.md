@@ -160,8 +160,12 @@ time go in, a `Health` comes out):
   nothing: it counts in `quiet_ms` again only once it has said `ok`. A
   part that goes quiet without saying it (a crash) is stale and counts as
   before. It is a fact, not a field or a level: a `lamp-health` from
-  before reads it as one more `ok` report. A forgotten part named with
-  `--expect` is missing again until it next reports. Who says it: the
+  before reads it as one more `ok` report. A part named with `--expect`
+  that stopped on purpose is never missing (#8640: a body stopped by
+  systemd was "has never reported", and the app showed no body): it is an
+  item, `stale` "stopped" within the stale time (a restart's few seconds),
+  then `error` "stopped; down for N s", until it next reports
+  (`parts::mark_stopped`). A part not expected is forgotten as above. Who says it: the
   voice, for `voice-keys`, when own keys are turned off (the second
   worker's start with `LAMP_OWN_KEYS` off) and when it drops the second
   worker (#960) with the switch on ([own-keys.md](own-keys.md)); and the

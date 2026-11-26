@@ -63,6 +63,9 @@ pub enum Taken {
 #[derive(Debug, Default)]
 pub struct Parts {
     kept: BTreeMap<String, Kept>,
+    /// Each part that said it is stopping, since when, until it reports
+    /// again ([`mark_stopped`], #8640). At most [`MOST_PARTS`].
+    stopped: BTreeMap<String, Instant>,
 }
 
 impl Parts {
@@ -80,8 +83,12 @@ impl Parts {
         // it takes no room.
         if report.is_stopping() {
             self.kept.remove(&report.name);
+            if self.stopped.len() < MOST_PARTS || self.stopped.contains_key(&report.name) {
+                self.stopped.insert(report.name.clone(), at);
+            }
             return Taken::Forgotten;
         }
+        self.stopped.remove(&report.name);
         if self.kept.len() >= MOST_PARTS && !self.kept.contains_key(&report.name) {
             return Taken::Full;
         }
@@ -106,6 +113,11 @@ impl Parts {
 
     pub fn reports(&self) -> &BTreeMap<String, Kept> {
         &self.kept
+    }
+
+    /// The parts that said they are stopping and have not reported since.
+    pub fn stopped(&self) -> &BTreeMap<String, Instant> {
+        &self.stopped
     }
 }
 
@@ -491,6 +503,51 @@ pub fn mark_selftest(health: &mut Health, item: HealthItem) {
         return;
     }
     health.items.push(item);
+    relevel(health);
+}
+
+/// An expected part that said it is stopping ([`Parts::stopped`]) and has
+/// not reported since, as an item instead of `missing` (#8640: a body
+/// stopped by systemd was "has never reported", and the app showed no body):
+/// `stale` "stopped" within `stale_after` (a restart's few seconds), then
+/// `error` "stopped; down for N s". A part not expected stays forgotten
+/// (#2415's P3). The lamp's level and message are worked out again; what
+/// comes out still passes `Health::check`.
+pub fn mark_stopped(
+    health: &mut Health,
+    stopped: &BTreeMap<String, Instant>,
+    now: Instant,
+    expected: &[String],
+    stale_after: Duration,
+) {
+    let limit = millis(stale_after);
+    for (name, at) in stopped {
+        if !expected.contains(name) || health.items.iter().any(|item| &item.name == name) {
+            continue;
+        }
+        health.missing.retain(|missing| missing != name);
+        let age_ms = millis(now.saturating_duration_since(*at));
+        let (level, message) = if age_ms > limit {
+            (
+                Level::Error,
+                format!("stopped; down for {} s", age_ms / 1_000),
+            )
+        } else {
+            (Level::Stale, "stopped".to_owned())
+        };
+        health.items.push(HealthItem {
+            name: name.clone(),
+            level,
+            message,
+            age_ms,
+        });
+    }
+    relevel(health);
+}
+
+/// The items sorted worst first, and the lamp's level and message from
+/// them and `missing`, as [`health`] works them out.
+fn relevel(health: &mut Health) {
     health.items.sort_by(|a, b| {
         b.level
             .rank()
@@ -1557,6 +1614,57 @@ mod tests {
             Taken::Forgotten
         );
         assert_eq!(parts.reports().len(), MOST_PARTS);
+    }
+
+    /// #8640 (lamp-52e6, 26 Nov 07:46): lamp-body stopped by systemd says it
+    /// is stopping, is forgotten, and an expected body then went into
+    /// `missing` as "has never reported": the app showed no body at all. An
+    /// expected part that said it is stopping is kept as stopped: `stale`
+    /// within the stale time (a restart's few seconds), `error` past it,
+    /// with how long it has been down, and never missing. One not expected
+    /// is still forgotten, and a report from it again clears the stop.
+    #[test]
+    fn an_expected_part_that_stops_is_down_with_its_age_never_missing() {
+        let now = Instant::now() + Duration::from_secs(3_600);
+        let expected = ["body".to_owned()];
+        let lamp_at = |parts: &Parts, at: Instant| {
+            let mut lamp = health(parts.reports(), at, &expected, STALE);
+            mark_stopped(&mut lamp, parts.stopped(), at, &expected, STALE);
+            assert_eq!(lamp.check(), Ok(()), "{lamp:?}");
+            lamp
+        };
+        let mut parts = Parts::new();
+        parts.take(&report(Level::Ok, "body", ""), now - ms(20_000));
+        assert_eq!(
+            parts.take(&Diagnostic::stopping("body"), now - ms(12_000)),
+            Taken::Forgotten
+        );
+        let soon = lamp_at(&parts, now - ms(10_000));
+        assert!(soon.missing.is_empty(), "{soon:?}");
+        assert_eq!(shape(&soon), [("body", Level::Stale, "stopped")]);
+        let later = lamp_at(&parts, now);
+        assert!(later.missing.is_empty());
+        assert_eq!(
+            shape(&later),
+            [("body", Level::Error, "stopped; down for 12 s")]
+        );
+        assert_eq!(later.level, Level::Error);
+        assert_eq!(later.items[0].age_ms, 12_000);
+        // Back: its next report clears the stop.
+        parts.take(&report(Level::Ok, "body", ""), now + ms(1_000));
+        let back = lamp_at(&parts, now + ms(1_000));
+        assert_eq!(shape(&back), [("body", Level::Ok, "")]);
+        assert_eq!(back.level, Level::Ok);
+        // Not expected: forgotten as before, never an item.
+        let mut parts = Parts::new();
+        parts.take(&Diagnostic::stopping("voice-keys"), now - ms(60_000));
+        let lamp = lamp_at(&parts, now);
+        assert!(lamp.items.is_empty(), "{lamp:?}");
+        assert_eq!(
+            lamp.missing,
+            ["body"],
+            "only the expected body, never voice-keys"
+        );
     }
 
     /// The body's last report when it stops on a fault says `state` =
