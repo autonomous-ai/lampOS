@@ -3754,8 +3754,8 @@ không thêm gì vào prompt của lượt ngoài một dòng việc-còn-mở b
   work; say what is being done or what was found." (`NO_AGENT_NAME`, nghiêm
   ngặt, không ngoại lệ); mô tả của lệnh giao việc, được báo mỗi lượt, nói
   điều đó với một ngoại lệ: "Never tell the person which agent runs their
-  work, unless they ask which agent the lamp uses: then lamp_help's agent
-  topic says it; say what is being done or what was found."
+  work unless they ask which agent the lamp uses (lamp_help's agent
+  topic); say what is being done or what was found."
   (`NO_AGENT_NAME_UNLESS_ASKED`, #8729, chủ đề agent của FAQ); một
   engine do người dùng tự nêu thì được nói lại đúng tên, còn lời của việc
   và câu trả lời của agent không bao giờ bị đổi
