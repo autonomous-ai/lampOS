@@ -662,6 +662,14 @@ pub(crate) const CANNOT_MOVE_SAID: &str = "I can't move right now";
 /// `calls=none` and no dance).
 pub(crate) const MOVE_THEN_NOTE: &str = "(For you to know: in that turn your body couldn't move, at that moment only. It may move again now: when they ask you to dance, move or make a gesture, call it again; you are told if it still can't. Never say you can't move unless a call in your own turn just said so.)";
 
+/// Told once after the history of a request whose kept exchanges hold a
+/// move refused because the body was down, while the body can move now
+/// (`worker::history_told`, `worker::BODY_MOVES`). #8640's row on lamp
+/// 16345: once lamp-body was back up the model kept saying its arm and
+/// head were stuck and called no dance (0 of 10), with nothing telling it
+/// the body moves again.
+pub(crate) const MOVES_AGAIN_NOTE: &str = "(For you to know: your body can move again now. What was said earlier about not moving was true then, not now: when they ask you to dance, move or make a gesture, call it.)";
+
 /// Told after the lamp's words of an earlier turn in which `names` were
 /// answered with an error: that failure was that one try, never how things
 /// stand now. On lamp-9adf at 13929 (17 Nov 23:20) "what time is sunrise
