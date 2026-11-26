@@ -1669,6 +1669,17 @@ fn lone_words(heard: &str) -> bool {
     (1..=2).contains(&words) && !heard.contains('?') && !crate::not_speech::short_word(heard)
 }
 
+/// Whether a line let out only as the conversation going on is held as
+/// [`LONE_WORDS`]: one or two words ([`lone_words`]), not a stop over the
+/// lamp's answer, and not with `LAMP_SHORT_REPLIES_CARRY` (#8772, the
+/// product owner's rule of 26 Nov 2026: in the conversation's 20 s every
+/// line carries). On lamp-74ff that day, in a doubling game, the lamp's
+/// "Twenty-four. Your turn." asked nothing by its `?`, so the owner's "Sixty
+/// four." was held as stray words.
+fn lone_words_held(short_replies_carry: bool, alone: bool, heard: &str, stop: bool) -> bool {
+    !short_replies_carry && alone && lone_words(heard) && !stop
+}
+
 /// Told after [`SPOKEN_NOTE`] when the model looks by a call (#1712). The
 /// look is a still picture where the head already points: no head motion
 /// goes with it, so the model must not say it turned (#5694).
@@ -5642,6 +5653,18 @@ pub fn serve(
                 heeding.attention.only_hey_lamp(true);
             }
         }
+        // Short replies carry (`LAMP_SHORT_REPLIES_CARRY=on`, #8772, the
+        // product owner's rule of 26 Nov 2026).
+        if std::env::var(crate::second_provider::SHORT_REPLIES_CARRY_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: in a conversation a reply of a word or two carries as any line does (LAMP_SHORT_REPLIES_CARRY)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.carrying_short_replies();
+            }
+        }
         // One reply window (`LAMP_ONE_REPLY_WINDOW=on`, the product owner on
         // 26 Nov 2026): the lamp's own news gets the conversation's 20 s.
         if std::env::var(crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT)
@@ -8903,6 +8926,8 @@ pub(crate) struct Heeding {
     /// With it, `LAMP_NO_FACE_FOLLOW_UP_BY_VOICE=on`
     /// ([`Self::renewing_no_face_follow_ups_by_voice`]).
     no_face_by_voice: bool,
+    /// `LAMP_SHORT_REPLIES_CARRY=on` ([`Self::carrying_short_replies`], #8772).
+    short_replies_carry: bool,
     /// `LAMP_NAME_SIGN_TIED` (#8092): the request `LAMP_SAID_TO_ME` let out
     /// as the one answer with no look to the lamp's waiting question
     /// ([`crate::said_to_me::Said::AnswerNoLook`]), or as the one cut-in
@@ -10172,6 +10197,7 @@ impl Heeding {
             follow_up_renews: false,
             no_face_renews: false,
             no_face_by_voice: false,
+            short_replies_carry: false,
             no_look_answer: None,
             look_free_used: false,
             follow_up_line: None,
@@ -10824,6 +10850,12 @@ impl Heeding {
     /// answered every one.
     pub(crate) fn renewing_no_face_follow_ups_by_voice(&mut self) {
         self.no_face_by_voice = true;
+    }
+
+    /// `LAMP_SHORT_REPLIES_CARRY=on` (#8772): in a conversation a reply of a
+    /// word or two carries as any line does ([`lone_words_held`]).
+    pub(crate) fn carrying_short_replies(&mut self) {
+        self.short_replies_carry = true;
     }
 
     /// The call a line said in `window` goes on from: the person's last
@@ -13871,7 +13903,7 @@ impl Heeding {
         let stop_over_the_lamp = self.spoken_stops
             && (self.began_over == Some(request) || self.began_just_after == Some(request))
             && crate::spoken_stop::is_stop_request(heard);
-        if alone && lone_words(heard) && !stop_over_the_lamp {
+        if lone_words_held(self.short_replies_carry, alone, heard, stop_over_the_lamp) {
             verdict = Some(crate::attention::Verdict::Hold(LONE_WORDS));
         }
         // `LAMP_UNTIED_GOING_ON=held` (#5008): desk talk with no tie to the
@@ -16708,6 +16740,28 @@ mod route_checks;
 
 #[cfg(test)]
 mod tests {
+    /// #8772 (lamp-74ff, 26 Nov, a doubling game): after "Twenty-four. Your
+    /// turn." the owner's "Sixty four." was held as stray words. With
+    /// `LAMP_SHORT_REPLIES_CARRY` it carries; off, as before; a stop over the
+    /// lamp's answer is never held; a line with a sign of its own is not
+    /// `alone` and was never held.
+    #[test]
+    fn with_short_replies_carry_a_word_or_two_in_the_conversation_is_not_held() {
+        assert!(!super::lone_words_held(true, true, "Sixty four.", false));
+        assert!(
+            super::lone_words_held(false, true, "Sixty four.", false),
+            "off: as before"
+        );
+        assert!(!super::lone_words_held(false, true, "Stop.", true));
+        assert!(!super::lone_words_held(false, false, "Sixty four.", false));
+        assert!(!super::lone_words_held(
+            false,
+            true,
+            "What about Spain?",
+            false
+        ));
+    }
+
     /// Exercise optional confirmation and summaries independently through the
     /// production async batch; pending TLS stays on this current-thread reactor.
     #[tokio::test(flavor = "current_thread")]

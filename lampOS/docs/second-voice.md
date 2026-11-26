@@ -6183,6 +6183,17 @@ after a take-over, but now for every turn:
     `with_one_reply_window_the_lamps_news_is_replied_to_within_twenty_seconds`,
     `with_one_reply_window_a_line_about_its_work_opens_no_window_of_its_own`.
     Not yet played on a lamp.
+  - **Short replies carry, with `LAMP_SHORT_REPLIES_CARRY=on`** (on in the
+    product's lamp-voice.service, #8772). A line let out only as the
+    conversation going on is never held for being one or two words with no
+    `?` (`LONE_WORDS`, `lone_words_held`): in the conversation's 20 s every
+    line carries. On lamp-74ff on 26 Nov, in a doubling game, the lamp's
+    "Twenty-four. Your turn." asked nothing by its `?`, so the owner's
+    "Sixty four." was held as stray words. The cost: a mishearing of one or
+    two words in the window is answered (#1712's "Surprise"). Journal at
+    start: `in a conversation a reply of a word or two carries`. Test:
+    `with_short_replies_carry_a_word_or_two_in_the_conversation_is_not_held`.
+    Not yet played on a lamp.
 - **A hearing of the name stays with its own line**
   (`LAMP_NAME_STAYS_IN_ITS_LINE=on`, on in the product unit). On lamp-4ace on
   2026-10-26 at 06:21 (build 6919, the busy scene played) `lamp-name` heard

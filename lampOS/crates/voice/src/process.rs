@@ -3324,6 +3324,8 @@ fn second_route_worker_environment(
         crate::second_provider::NAME_HEY_ONLY_ENVIRONMENT,
         // The lamp's own news gets the conversation's 20 s (the same day).
         crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT,
+        // Short replies carry in a conversation (#8772).
+        crate::second_provider::SHORT_REPLIES_CARRY_ENVIRONMENT,
         crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT,
         // "Hey, Lynn. …" keeps a sure hearing in a busy room (the owner's
         // first rule, 25 Nov 2026).
@@ -3841,6 +3843,7 @@ mod tests {
             crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT,
             crate::second_provider::NAME_HEY_ONLY_ENVIRONMENT,
             crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT,
+            crate::second_provider::SHORT_REPLIES_CARRY_ENVIRONMENT,
             crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT,
             crate::second_provider::NAME_GREETED_STAND_IN_ENVIRONMENT,
             crate::attention::MOM_NOT_THE_NAME_ENVIRONMENT,
@@ -5147,6 +5150,7 @@ mod tests {
                     || name == crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT
                     || name == crate::second_provider::NAME_HEY_ONLY_ENVIRONMENT
                     || name == crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT
+                    || name == crate::second_provider::SHORT_REPLIES_CARRY_ENVIRONMENT
                     || name == crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT
                     || name == crate::second_provider::NAME_GREETED_STAND_IN_ENVIRONMENT
                     || name == crate::attention::MOM_NOT_THE_NAME_ENVIRONMENT
@@ -5623,6 +5627,7 @@ mod tests {
                     "LAMP_SERVICE_REDO=on",
                     "LAMP_SESSION_PERSON=on",
                     "LAMP_SHORT_DONE=on",
+                    "LAMP_SHORT_REPLIES_CARRY=on",
                     "LAMP_SKILL_ASKED=on",
                     "LAMP_SKILL_CLAIM_CHECKED=on",
                     "LAMP_SKILL_KEYTERM=on",
