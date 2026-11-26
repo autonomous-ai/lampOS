@@ -1076,6 +1076,12 @@ pub const NAME_FACE_OR_WORDS_ENVIRONMENT: &str = "LAMP_NAME_FACE_OR_WORDS";
 /// owner's own calls.
 pub const NAME_HEY_ONLY_ENVIRONMENT: &str = "LAMP_NAME_HEY_ONLY";
 
+/// `on` exactly, off unless set (the product owner, 26 Nov 2026): the lamp's
+/// own news is replied to within the conversation's 20 s, as any answer is,
+/// and a line about its work opens no window of its own
+/// ([`crate::attention::Attention::one_reply_window`]).
+pub const ONE_REPLY_WINDOW_ENVIRONMENT: &str = "LAMP_ONE_REPLY_WINDOW";
+
 /// `on` exactly, off unless set (#8114, the first builder's 08:54 and 08:57):
 /// a line whose call word is another person's name ("Hey, Lance.", "Dan,
 /// are you done?") is never the lamp's call, however sure lamp-name is,

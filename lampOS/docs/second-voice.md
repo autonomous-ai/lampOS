@@ -6168,6 +6168,21 @@ after a take-over, but now for every turn:
     `with_hey_only_a_call_is_hey_lamp_at_the_lines_start`,
     `with_hey_only_words_call_the_lamp_only_after_a_greeting`. Not yet played
     on a lamp.
+  - **One reply window, with `LAMP_ONE_REPLY_WINDOW=on`** (on in the
+    product's lamp-voice.service; the product owner's ruling of 26 Nov 2026:
+    "ok 20s make sense"). A reply to the lamp's own news (a turn it began
+    itself) counts within `attention::ONE_REPLY_WINDOW_US`, 20 s, the window
+    any answer keeps a conversation going with `LAMP_FOLLOW_UPS`, not
+    `NEWS_REPLY_US`'s 3 min; and a line about the lamp's work
+    (`about_its_work`) is let out by no window of its own (`WORK_ASKED_US`'s
+    10 min, opened by every unprompted turn): past the 20 s it is "Hey
+    Lamp", as any line is. On lamp-74ff that day a goodbye to colleagues
+    2 min 53 s after the stuffy-air skill's remark was answered as its
+    reply. Journal at start: `a reply to the lamp's own news counts within
+    20 s`. Latency: none. Tests (both fail with the rule taken out):
+    `with_one_reply_window_the_lamps_news_is_replied_to_within_twenty_seconds`,
+    `with_one_reply_window_a_line_about_its_work_opens_no_window_of_its_own`.
+    Not yet played on a lamp.
 - **A hearing of the name stays with its own line**
   (`LAMP_NAME_STAYS_IN_ITS_LINE=on`, on in the product unit). On lamp-4ace on
   2026-10-26 at 06:21 (build 6919, the busy scene played) `lamp-name` heard
