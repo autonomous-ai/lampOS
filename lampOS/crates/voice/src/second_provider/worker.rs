@@ -8789,6 +8789,13 @@ pub(crate) struct Heeding {
     chain: Vec<u64>,
     /// [`Self::said_until_us`] but for the words of answers to `chain`.
     said_until_free_us: Option<u64>,
+    /// The request whose words were told last ([`crate::second_provider::Did::Said`]).
+    saying: Option<u64>,
+    /// The newest request whose answer was cut
+    /// ([`crate::second_provider::Did::Cut`]): a packet of it told after the
+    /// cut never moves the lamp's words on again (the Reviewer-lead's P3 2
+    /// on #8796).
+    cut_through: Option<u64>,
     /// `LAMP_UNTIED_GOING_ON=on` ([`Self::not_renewing_untied`]).
     untied: bool,
     /// `LAMP_UNTIED_GOING_ON=held` ([`Self::holding_untied`]).
@@ -10108,6 +10115,8 @@ impl Heeding {
             not_own: false,
             chain: Vec::new(),
             said_until_free_us: None,
+            saying: None,
+            cut_through: None,
             untied: false,
             untied_held: false,
             answer_grace: false,
@@ -12122,7 +12131,12 @@ impl Heeding {
         match did {
             crate::second_provider::Did::Worked(at_us) => self.attention.worked(at_us),
             crate::second_provider::Did::Spoke(at_us) => self.attention.news_told(at_us),
+            // A packet of an answer already cut, told after its cut: its
+            // words were never played past the cut.
+            crate::second_provider::Did::Said(request, _)
+                if self.cut_through.is_some_and(|cut| request <= cut) => {}
             crate::second_provider::Did::Said(request, until_us) => {
+                self.saying = Some(request);
                 if self.carries && self.carrying && !self.chain.contains(&request) {
                     self.carry_window.answered(request, until_us);
                 }
@@ -12186,6 +12200,7 @@ impl Heeding {
             // A cut answer's words end at the cut: the conversation's 20 s
             // run from there, not from the end of the audio it had sent.
             crate::second_provider::Did::Cut(at_us) => {
+                self.cut_through = self.cut_through.max(self.saying);
                 let cut = |until: &mut Option<u64>| *until = until.map(|until| until.min(at_us));
                 cut(&mut self.said_until_us);
                 cut(&mut self.said_until_free_us);
@@ -18322,7 +18337,9 @@ mod tests {
     /// people's talk about 30 s after the cut was taken as the conversation
     /// going on. Here the answer's sent audio plays until 5 s from now: uncut,
     /// a nameless line now is in the conversation; cut 30 s ago, it is held,
-    /// past the 20 s after the lamp's words; cut 10 s ago, still in it.
+    /// past the 20 s after the lamp's words; cut 10 s ago, still in it. Each
+    /// cut is followed by a late packet of the cut answer, which moves
+    /// nothing on.
     #[test]
     fn a_cut_answers_words_end_where_it_was_cut() {
         let _one = crate::provider_worker::tests::one_thread();
@@ -18342,6 +18359,9 @@ mod tests {
                 heeding.lamp_did(crate::second_provider::Did::Cut(
                     now_us.saturating_sub(ago * 1_000_000),
                 ));
+                // A packet of the cut answer told after its cut (the
+                // Reviewer-lead's P3 2 on #8796) moves nothing on.
+                heeding.lamp_did(crate::second_provider::Did::Said(1, now_us + 6_000_000));
             }
             heeding.heed(
                 2,
