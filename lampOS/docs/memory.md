@@ -1299,11 +1299,15 @@ conversation beyond its exchanges, and for how long:
   the room's, told as the room's. **The room's talk note can be found by
   anyone in the room, an unplaced voice included**; that is intended
   ([switches.md](switches.md)). Another person's is never told. A
-  recall's talk notes are told only while the whole answer fits the 4,096
+  recall's talk notes are told only while the whole answer, its partial
+  span's note included, fits the 4,096
   bytes of one tool answer (`lamp_gemini::MAX_TOOL_JSON_BYTES`, less the
-  64 bytes `records_recalled` leaves): a note past that room is left out
-  whole and the journal counts it (`remember::talk_fitting`); the recall's
-  own entries are never left out. When everything fits, the ask and the
+  64 bytes `records_recalled` leaves), counted with the note a partial
+  span is marked with after them (`remember::told_bytes`): the first note
+  past that room, and every note after it (the room's after theirs), is
+  left out whole, so what is told keeps the order asked, and the journal
+  counts them (`remember::talk_fitting`); the recall's own entries are
+  never left out. Records are sized against the same count. When everything fits, the ask and the
   answer are as before. On lamp-06c1 (25 Nov req 437, 26 Nov S8 req 146)
   6 entries and 2 notes passed 4,096 bytes, and the whole recall was told
   as the memory not answering.
@@ -2440,7 +2444,9 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     own line in its place, that request's answer cut (a held line's
     "request N's words, cut short by it, are answered in its place"), does
     not end it: its own line, or its person's words, are the done request's
-    own line in the same words (`Thread::answered_between_but_in_place`).
+    own line in the same words (`Thread::answered_between_but_in_place`),
+    unless the lamp's answer before the yes ended in a question
+    (`Thread::lamp_asked_by_its_end`): then the yes answers that.
     On lamp-06c1 on 26 Nov (reqs 141-144) "Lily visits on Saturday after
     all." was changed in 141, 142 answered it, and "Yes. Please keep that."
     was told nothing was waiting and asked again. And before round 1 of a line that is only a yes, with no offer

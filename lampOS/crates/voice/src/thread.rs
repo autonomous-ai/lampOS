@@ -387,8 +387,6 @@ pub fn count_only(request: Option<u64>) {
     }
 }
 
-/// Text of at most `most` bytes, with every run of whitespace or control
-/// characters one space.
 /// Whether lines `a` and `b` say the same words, in order: lower case, any
 /// run of what is not a letter or a digit between words
 /// ([`Thread::answered_between_but_in_place`]).
@@ -403,6 +401,8 @@ fn same_words(a: &str, b: &str) -> bool {
     !a.is_empty() && a == words(b)
 }
 
+/// Text of at most `most` bytes, with every run of whitespace or control
+/// characters one space.
 fn add(to: &mut String, text: &str, most: usize) {
     for c in text.chars() {
         let c = if c.is_control() || c.is_whitespace() {

@@ -694,9 +694,11 @@ fn done_last_turn(
     // done write's own line in its place, its answer cut, is that write's
     // turn too (#8570, S8 reqs 141-144: "Lily visits on Saturday after
     // all." changed in 141, answered by 142, then "Yes. Please keep that."
-    // was told nothing was waiting and asked again).
+    // was told nothing was waiting and asked again). Not when the lamp's
+    // answer before the yes ended in a question: the yes answers that
+    // (the Reviewer-lead's P3 on #8745).
     let again = done_yes_again_on();
-    let between = if done_in_place_on() {
+    let between = if done_in_place_on() && !thread.lamp_asked_by_its_end(request) {
         thread.answered_between_but_in_place(done_for, request, |person| {
             again && yes_to_done(person, done)
         })
@@ -2138,21 +2140,23 @@ mod tests {
         use crate::thread::Thread;
         let now = Instant::now();
         let lily = "Lily visits on Saturday after all.";
-        let in_place = |between: &str| {
+        let in_place_said = |between: &str, said: &str| {
             let mut thread = Thread::new();
             // Request 1's own line, held at its first call; it ended before
             // its answer, and request 2 answers its words in its place.
             thread.line_of(1, lily);
             thread.person(between, true, now);
             thread.line_of(2, between);
-            thread.lamp(
-                2,
-                "Kept: Lily visits on Saturday after all, that replaces the Sunday one.",
-                now,
-            );
+            thread.lamp(2, said, now);
             // Request 3 heard nothing and left no exchange.
             thread.person("Yes. Please keep that.", true, now);
             thread
+        };
+        let in_place = |between: &str| {
+            in_place_said(
+                between,
+                "Kept: Lily visits on Saturday after all, that replaces the Sunday one.",
+            )
         };
         let changed = Some((MemoryDone::Changed, Some(1)));
         set_done_in_place_for_test(true);
@@ -2166,6 +2170,15 @@ mod tests {
         let thread = in_place("My goldfish is called Pip.");
         let told = yes_alone_in(&thread, (4, None, now), false, changed).unwrap();
         assert_eq!(told["note"], YES_ALONE, "{told}");
+        assert!(done_already_in(&thread, (4, None, now), changed).is_none());
+        // An answer in its place that ended in a question: the yes answers
+        // the question, not the done write (the Reviewer-lead's P3 on #8745).
+        let thread = in_place_said(lily, "Kept: Saturday now. Want me to tell Lily's mum too?");
+        let told = yes_alone_in(&thread, (4, None, now), false, changed);
+        assert!(
+            told.as_ref().is_none_or(|told| told["note"] == YES_ALONE),
+            "{told:?}"
+        );
         assert!(done_already_in(&thread, (4, None, now), changed).is_none());
         // Off: as on the lamp, told nothing was waiting.
         set_done_in_place_for_test(false);
