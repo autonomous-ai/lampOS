@@ -6153,8 +6153,9 @@ after a take-over, but now for every turn:
     whose first word, past one filler, is "hey", "hi" or "hello"
     (`opens_with_hey`), is the call whatever the rules above ruled of its
     word, when its words name the lamp ("Hey Lamp, …", "Hello, Lamp. …",
-    `greets_the_lamp_by_name`) or the hearing is at `NEAR_SCORE` (0.95) or
-    more: speech to text writes "Hey Lamp" as "Hey man", "Hey, Lynn." or
+    `greets_the_lamp_by_name`) or a hearing within those 2.5 s is at
+    `NEAR_SCORE` (0.95) or more (`start_score`, never a later hearing's:
+    Reviewer-three's P2 on #8781, a 0.905 start and a 0.99 hearing 5 s in): speech to text writes "Hey Lamp" as "Hey man", "Hey, Lynn." or
     "Hello? …", but two people's "Hey man, what's up?" was heard at 0.905 on
     lamp-74ff (26 Nov, the Reviewer-lead's P3 1 on #8781), and plain calls
     written without the name at 0.980 to 0.997 (25 Nov). Unless the words
@@ -6170,8 +6171,8 @@ after a take-over, but now for every turn:
     the 2.5 s, a greeting whose words don't name the lamp heard under 0.95,
     a line opening with the name itself heard under 0.95 (a bare "Lamp, …":
     `lamp-name`, trained on "Hey Lamp", heard nothing of one on lamp-74ff on
-    26 Nov), and "OK Lamp". At 0.95 or more, a line opening with the name
-    itself is "Hey Lamp" with its greeting lost (`opens_with_the_name`),
+    26 Nov), and "OK Lamp". At 0.95 or more by its start, a line opening with
+    the name itself is "Hey Lamp" with its greeting lost (`opens_with_the_name`),
     kept as one: at 803ab07fbb lamp-74ff dropped "Lamp, how far is it from
     London to Paris?" (0.99999), and a bare "Hey Lamp." answered as a call
     after its wait, which is judged as `CALLED_WORDS`, "Lamp." (0.996), so
