@@ -70,8 +70,18 @@ turned away blocks the detector scored as speech from 0.3 s before the name
 began until it was heard, the voice logs one line for that hearing, and
 none for another hearing begun within it:
 `lamp-voice: the lamp's name was heard (score 0.94) but the faint floor
-turned the line away: 40 of 40 speech blocks were under it, the loudest at
--29.2 dBFS (level 141) against a floor of -28.0 dBFS (level 150)`. It is
+turned the line away: 0 of 40 speech blocks were over it and 40 under, the
+call's loudest at -29.2 dBFS (level 141) and the loudest under it at -29.2
+dBFS (level 141) against a floor of -28.0 dBFS (level 150); the longest run
+over it was 0 blocks (a line needs 6), 40 without it`. The call's loudest is
+over all its speech blocks, not only those under the floor. Whether a line
+opened is not known there, so the line says whether the floor could have
+kept one from opening, by the rule a line opens on (6 blocks in a row scored
+0.80 or more after the floor, `activity::START_BLOCKS`): `turned the line
+away` only when such a run is there without the floor and not with it; `the
+faint floor left a line free to open` when a run over the floor is there
+(lamp-74ff, 26 Nov 12:24:13: 20 of 22 blocks over the floor, said as turned
+away before #8728); `no line could open, floor or not` when neither is. It is
 only said: nothing is heard that was not before. Host tests
 (`faint_named::tests`).
 
