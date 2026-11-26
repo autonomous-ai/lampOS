@@ -363,6 +363,54 @@ fn the_schema_refuses_what_lamp_skills_refuses_in_shape() {
     }
 }
 
+/// `toml_text` as the task skill `format-task` with a script of its own at
+/// `scripts/main.py`, and what `lamp_skills::load` says of it.
+fn loads_task(toml_text: &str) -> Result<(), String> {
+    let root = tempfile::tempdir().unwrap();
+    let folder = root.path().join("format-task");
+    std::fs::create_dir_all(folder.join("scripts")).unwrap();
+    std::fs::write(
+        folder.join("SKILL.md"),
+        "---\nname: format-task\ndescription: A task case of the format's test.\n---\n",
+    )
+    .unwrap();
+    std::fs::write(folder.join("skill.toml"), toml_text).unwrap();
+    std::fs::write(folder.join("scripts/main.py"), "print('done')\n").unwrap();
+    lamp_skills::load(&folder).map(|_| ())
+}
+
+/// #8079: a `do.task`'s `tell = "once_while_holding"` (written by a voice
+/// make for a watch told once while its condition holds; any skill may
+/// write it, docs/skill-format.md) is the format's: the schema and the
+/// loader take it, with or without it, and refuse any other value alike,
+/// so a made watch's `skill.toml` passes `lamp skill check` as the lamp
+/// loads it.
+#[test]
+fn a_tasks_tell_once_is_the_formats_and_any_other_value_is_refused() {
+    const TASK: &str = "version = \"1.0.0\"\ngrants = [\"camera\"]\ntool = \"photo_booth\"\n\
+        [permissions]\ntopics = [\"clock/local\"]\n[[do]]\ntask = { task = \"Take a photo and \
+        tell me what is on my desk\", run = \"scripts/main.py\"TELL }\n";
+    let with = |tell: &str| TASK.replace("TELL", tell);
+    assert_eq!(loads_task(&with("")), Ok(()));
+    assert_eq!(check(&as_json(&with(""))), Vec::<String>::new());
+    let once = with(", tell = \"once_while_holding\"");
+    assert_eq!(loads_task(&once), Ok(()));
+    assert_eq!(check(&as_json(&once)), Vec::<String>::new(), "{once}");
+    for (bad, why) in [
+        (
+            with(", tell = \"always\""),
+            "a tell the format doesn't have",
+        ),
+        (with(", tell = 1"), "a tell that isn't a string"),
+    ] {
+        assert!(
+            !check(&as_json(&bad)).is_empty(),
+            "the schema accepted {why}: {bad}"
+        );
+        assert!(loads_task(&bad).is_err(), "lamp-skills loaded {why}: {bad}");
+    }
+}
+
 /// A read step (#5288): the schema and the loader take a read of any
 /// linked service with reads, and refuse the same changes to it. A read of
 /// a whole text, and a calendar's events with no day, the loader alone
