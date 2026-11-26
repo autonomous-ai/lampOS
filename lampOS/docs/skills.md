@@ -7395,7 +7395,8 @@ the same code for both writers.
   never said "Every 90 minutes"). The brief every agent task runs
   (`make_no_cannot::SCRIPT`, `scripts/agent.py`) now ends "…, or, when the
   task is only for when something holds and it doesn't now, answer only a
-  dash (-)", which says nothing. **Told once until it stops holding
+  dash (-), never words", which says nothing (words such as "No rain now."
+  would be read as holding). **Told once until it stops holding
   (#8089, a reader's P2 on its HOLD):** lamp-skills reads a run's answer
   as words, silent (a lone dash or none) or failed (`task::ran`). Only a
   watch made to speak when something holds is told once (the second
@@ -7413,7 +7414,13 @@ the same code for both writers.
   …". For a marked watch's run nobody asked by voice now, lamp-skills
   keeps a told mark per skill and folder sha256 in `--state-dir`'s
   `task-watch-told.json` (`task::watch_tells`): the first holding run is
-  told and marked; while marked, a holding run says nothing (journal `its
+  told, and marked only once its telling ended told (`watch_told`, after
+  `tell_its_run`'s outcome reads Told, `answer_news`; the second read's
+  P2 on #8079): a telling nobody was there for within its hour is dropped
+  unsaid, and one a restart lost never began, so neither marks it and the
+  next holding run says it again (journal `its watch holds, but its
+  telling ended …: not marked, said again next time`); while marked, a
+  holding run says nothing (journal `its
   watch still holds, told already: not said again`); a silent run clears
   it, so it is told again only once it stopped holding and holds again; a
   failed run changes nothing; a watch made again starts unmarked. The

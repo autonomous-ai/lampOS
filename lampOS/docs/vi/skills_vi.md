@@ -3809,7 +3809,8 @@ cả hai người viết.
   được nói "Every 90 minutes"). Brief mà mọi task của agent chạy
   (`make_no_cannot::SCRIPT`, `scripts/agent.py`) giờ kết thúc "…, or, when
   the task is only for when something holds and it doesn't now, answer
-  only a dash (-)", và câu đó không nói gì. **Nói một lần cho tới khi điều
+  only a dash (-), never words", và câu đó không nói gì (lời như "No rain
+  now." sẽ bị đọc là điều kiện đúng). **Nói một lần cho tới khi điều
   kiện thôi đúng (#8089, P2 của một người đọc trong HOLD):** lamp-skills
   đọc câu trả lời của lần chạy là có lời, im lặng (chỉ một gạch hoặc
   không có gì) hay lỗi (`task::ran`). Chỉ việc theo dõi được làm để nói
@@ -3829,7 +3830,14 @@ cả hai người viết.
   nói lúc đó, lamp-skills giữ một dấu đã nói theo skill và sha256 của thư
   mục trong `task-watch-told.json` của
   `--state-dir` (`task::watch_tells`): lần chạy đầu tiên điều kiện đúng
-  được nói và đánh dấu; khi còn dấu, lần chạy điều kiện đúng không nói gì
+  được nói, và chỉ được đánh dấu khi việc nói đã kết thúc là Told
+  (`watch_told`, sau khi kết quả của `tell_its_run` đọc ra Told,
+  `answer_news`; P2 của lần đọc thứ hai trên #8079): lần nói không có ai
+  trong một giờ bị bỏ không nói, và lần nói bị mất khi khởi động lại chưa
+  từng bắt đầu, nên cả hai đều không đánh dấu và lần chạy điều kiện đúng
+  tiếp theo nói lại (nhật ký `its watch holds, but its telling ended …:
+  not marked, said again next time`); khi còn dấu, lần chạy điều kiện
+  đúng không nói gì
   (nhật ký `its watch still holds, told already: not said again`); lần
   chạy im lặng xoá dấu, nên chỉ nói lại khi điều kiện đã thôi đúng rồi
   đúng lại; lần chạy lỗi không đổi gì; việc theo dõi làm lại bắt đầu không

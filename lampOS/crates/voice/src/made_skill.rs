@@ -8345,9 +8345,11 @@ fn clock_watch(trigger: &toml::Table) -> Option<String> {
 }
 
 /// Whether the skill whose `skill.toml` is `text` is a clock watch
-/// ([`clock_watch`]), whatever this process's switches: lamp-skills reads
-/// it to tell a watch's condition once until it stops holding
-/// (`lamp_skills::task::watch_tells`, #8089).
+/// ([`clock_watch`]), whatever this process's switches: the middle form's
+/// own read of a model's block (`crate::make_no_cannot::told_once`, which
+/// keeps the `tell` for a clock watch alone). lamp-skills never reads this:
+/// it tells a watch once by the task's own `tell`
+/// (`lamp_skills::task::TaskStep::tell_once`, `watch_tells`, #8089).
 pub fn is_clock_watch(text: &str) -> bool {
     toml::from_str::<toml::Table>(text).is_ok_and(|table| {
         table
@@ -15790,8 +15792,9 @@ light = { colour = "green", level = 3, for = "20s" }
     /// #8089 (Twelve's P3 on the HOLD): a clock trigger with any key that
     /// limits or holds it (`during`, `days`, `rearm`, `for`, `when`,
     /// `absent_for`, `wait`) is no watch, so it is never said "Every 90
-    /// minutes" while it runs only some hours or days; lamp-skills reads
-    /// the same ([`is_clock_watch`]).
+    /// minutes" while it runs only some hours or days, and the middle form
+    /// keeps no `tell` for it ([`is_clock_watch`]; lamp-skills tells once by
+    /// the task's `tell` alone).
     #[test]
     fn a_clock_trigger_limited_or_held_is_no_watch() {
         let base = "topic = \"clock/local\"\nfield = \"known\"\nequals = true\n\

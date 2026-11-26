@@ -142,14 +142,16 @@ pub const RUN: &str = "scripts/agent.py";
 /// [`RUN`]'s text: a task only for when something holds (a watch on
 /// outside data on the lamp's clock, [`WATCH`], #8079: "if Bitcoin goes
 /// under ninety thousand dollars, tell me") is answered with a lone dash
-/// while it doesn't hold, which lamp-skills says nothing of and reads as
-/// "not holding" (`lamp_skills::task::Ran::Silent`); it then tells a
-/// holding watch once until a run finds it not holding again
-/// (`lamp_skills::task::watch_tells`, #8089).
+/// while it doesn't hold, never words ("No rain now." would be read as
+/// holding and mark the watch told; the second read's P3 on #8079), which
+/// lamp-skills says nothing of and reads as "not holding"
+/// (`lamp_skills::task::Ran::Silent`); it then tells a holding watch once
+/// until a run finds it not holding again (`lamp_skills::task::watch_tells`,
+/// #8089).
 pub const SCRIPT: &str = "print(\"This skill's task is for the lamp's agent to do itself, with its \
 own tools and only the skill's grants; then tell the owner in a sentence or two what it found or \
 did, or, when the task is only for when something holds and it doesn't now, answer only a dash \
-(-).\")\n";
+(-), never words.\")\n";
 
 /// What the make is refused as when the lamp's agent answered `cannot:`
 /// with the switch on: never its words, and always made a task

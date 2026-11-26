@@ -1449,10 +1449,13 @@ pub fn ran(answer: &str) -> Ran {
     }
 }
 
-/// Whether what a clock watch's run found (`ran`) is said (#8089, Twelve's
-/// P2 on the HOLD: "tell me if Bitcoin goes under 90k" said so every 90
-/// minutes while it stayed under; a person means once): told once when its
-/// condition holds, then not again while it still holds; told again only
+/// Whether what a clock watch's run found (`ran`) is said (#8089, a
+/// reader's P2 on the HOLD: "tell me if Bitcoin goes under 90k" said so
+/// every 90 minutes while it stayed under; a person means once): told once
+/// when its condition holds, then not again while it still holds and its
+/// telling was told ([`watch_told`] sets the mark, never this: a telling
+/// dropped unsaid or lost to a restart leaves none, so the next holding
+/// run says it again; the second read's P2 on #8079); told again only
 /// after a run in which it didn't hold ([`Ran::Silent`]) clears the mark.
 /// A failed run changes nothing. The mark is kept in `state`'s
 /// [`WATCH_TOLD_FILE`] under the skill and its folder's `sha256`, so a
@@ -1466,12 +1469,7 @@ pub fn watch_tells(state: &Path, skill: &str, sha256: &str, ran: Ran) -> bool {
             let at = told.iter().position(|(name, _)| name == skill);
             let marked = at.is_some_and(|at| told[at].1 == sha256);
             match ran {
-                Ran::Words if marked => false,
-                Ran::Words => {
-                    told.retain(|(name, _)| name != skill);
-                    told.push((skill.to_owned(), sha256.to_owned()));
-                    true
-                }
+                Ran::Words => !marked,
                 Ran::Silent => {
                     told.retain(|(name, _)| name != skill);
                     false
