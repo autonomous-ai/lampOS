@@ -373,6 +373,7 @@ fn main() -> ExitCode {
         // The owner's desk noticing switch (#6543): only with
         // LAMP_SEEN_ACTIVITY=on, the yes kept as the spoken one.
         desk_noticing: lamp_cloud::consent::desk_from_environment(),
+        privacy_light: lamp_cloud::privacy_light::Place::from_environment(),
         // The owner's dev monitor (#5883): only with LAMP_APP_MONITOR=on and
         // LAMP_SETTINGS_CHANGE=on, each link sealed to this lamp's device id.
         monitor: lamp_cloud::monitor::Place::from_environment(&account.device_id),
@@ -442,6 +443,7 @@ fn main() -> ExitCode {
         control: None,
         consent: None,
         desk_noticing: None,
+        privacy_light: None,
         monitor: None,
         devices: None,
         apps: None,
