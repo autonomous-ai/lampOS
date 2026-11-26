@@ -723,7 +723,11 @@ start; the folder stays root's alone, 0700, each file 0600.
   before the tool check: set it again). Each `offers[]` entry adds `agent`:
   `false` for Deepgram and ElevenLabs and for a kept model key whose tool
   check failed, `true` otherwise. Never a key.
-- **lamp-cloud restarted:** after a `keys.set` that kept a model key, or a
+- **lamp-cloud restarted:** after a person sets or removes a model key, the
+  helper restarts lamp-voice and lamp-cloud, so the cloud link drops for a
+  few seconds on purpose; an ElevenLabs or Deepgram change restarts only the
+  voice. #8742's forwarder finishes an agent turn in flight before it stops.
+  In detail: after a `keys.set` that kept a model key, or a
   `keys.remove` of one, the helper restarts lamp-cloud
   (`systemctl try-restart lamp-cloud.service`) right after the voice, at the
   same quiet moment and under the same update lock (`keys::restart_after`),
