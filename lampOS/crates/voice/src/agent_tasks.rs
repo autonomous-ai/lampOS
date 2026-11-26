@@ -611,9 +611,14 @@ fn lamp_engines() -> Vec<String> {
 /// Who does the lamp's own work, as the person hears it (#7930): never the
 /// engine's name, which the person has no need of.
 pub(crate) const OWN_ENGINE: &str = "the lamp";
-/// The one line the model is told about naming agents (the owner, #7930).
+/// The line work's news is told about naming agents (the owner, #7930):
+/// strict, with no exception.
 pub(crate) const NO_AGENT_NAME: &str =
     "Never tell the person which agent runs their work; say what is being done or what was found.";
+/// [`NO_AGENT_NAME`] as the hand-over's description tells it every turn
+/// (#8729): asked which agent the lamp uses, the FAQ's agent topic says it
+/// (`crate::faq_now`).
+pub(crate) const NO_AGENT_NAME_UNLESS_ASKED: &str = "Never tell the person which agent runs their work, unless they ask which agent the lamp uses: then lamp_help's agent topic says it; say what is being done or what was found.";
 
 /// Who does the work on the lamp itself, as the person calls them: the
 /// lamp's default engine as last read, Hermes until read (lamp-tasks'
@@ -629,9 +634,7 @@ fn lamp_name() -> &'static str {
 /// tasks part's targets (#8729, `crate::faq_now`): none before a read or
 /// without the lamp's own target, never [`lamp_name`]'s Hermes in its place.
 pub(crate) fn lamp_agent_name() -> Option<&'static str> {
-    lamp_engines()
-        .first()
-        .map(|engine| display_name(engine))
+    lamp_engines().first().map(|engine| display_name(engine))
 }
 
 /// How the person calls the Harness engines whose names are not just their
@@ -2157,7 +2160,7 @@ fn on_the_lamp_description(place: &Place, staff: &[Member]) -> String {
          you over 10 s (research, code, files, several steps), what is asked of an agent, and \
          what you have no function for: hand it over, never say you can't. Never for a quick \
          answer, a story or joke told aloud, or your functions (light, volume, timers, \
-         reminders, time, weather, memory, skills). {NO_AGENT_NAME} For new work leave out \
+         reminders, time, weather, memory, skills). {NO_AGENT_NAME_UNLESS_ASKED} For new work leave out \
          `where` and `who`, even for code or a site; `where` only if they name a machine. \
          More on earlier work (\"in the sea poem, add a line\") \
          is a new call with `session`, made now, before you say it back: never a recall or \
