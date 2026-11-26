@@ -26,6 +26,13 @@ in a section of its own while the app runs, and called through lamp-control's
 phrases stay for a session's fast words. `LAMP_APP_TOOLS` is in no product
 unit, so it is off on every lamp; the switch-on, #8602 (it replaces the closed #8504), is open.
 
+## Lamp Doctor's types (#8726)
+
+What the Lamp Doctor app is told of a turn and may send out, as types with no field for a word: `lamp_msgs::doctor`. Nothing publishes or reads them yet; the grants an app holds for them (`turns`, `report`) and what they do come in the next piece.
+
+- **`TurnRecord`:** one finished turn without its words: the times (heard to first sound), the outcome (answered, stuck, refused, held, asked again, error, no answer, lost answer, cancelled), the counts (cut-ins, tool calls, timeouts, errors, words heard and said), yes/no signals the voice works out of the words (heard wrongly, name missed, held then repeated), each failed call as a case (what it was to, how it failed, the HTTP status or the voice's fault category, the milliseconds waited, its request number), a yes/no proof for a call that has one (the skill ran, the memory saved), the route and the build. Every string in it is a name from a fixed list, so it has no field for a word anyone said, a name or a speaker.
+- **`Report`:** the one body an app may send out, a flat body in a fixed schema, read whole or refused whole (`Report::from_value`): the lamp's own `day` (`YYYY-MM-DD`) and `build`; the day's numbers (turns, answered within 5 s in percent, heard to first sound median and p90 in milliseconds, asked again, held, cut-ins, tool timeouts, stuck); the tier 1 to 4 (the v6 score's T1 to T4); the score 0.0 to 10.0 in steps of 0.1 and its band (`green` from 8, `amber` from 6, else `red`); failure categories, the 12 kinds of the v6 score, each once with a count of 1 or more; up to 50 `cases` (each failed or timed-out call: its time `HH:MM`, what it was to, how it failed, the HTTP status and the fault category if any, the milliseconds waited, the request's number) and `cases_dropped` for the rest; the route (`first`, `second` or `unknown`); and the diagnosis's version. No field takes free text: every string is on a list or is a time or a date, and every number is held to what it can be (a count at most 100,000 and the cases left out at most the turns, a request's number at most 100,000, a wait at most two minutes, a version at most 100). A refusal never repeats what was in the report.
+
 ## The package (format 2)
 
 A package is a tar, as a skill's (format 1, [skills.md](skills.md)): the

@@ -68,6 +68,8 @@ pub use play_allow::*;
 pub mod app_help;
 pub use app_help::{AppHelps, AppsHelp, app_help_topics};
 mod body_sound;
+/// What Lamp Doctor's app is told of a turn and may send out (#8726).
+pub mod doctor;
 pub use body_sound::*;
 mod lamp_did;
 pub use lamp_did::*;
