@@ -665,11 +665,19 @@ const START_PROMISED: [&str; 4] = ["i'll", "will", "going", "gonna"];
 /// - "noticing", "notice", "watching" or "watch", or "looking" or "look"
 ///   with "desk" in the clause, then "again" after it, the lamp as subject
 ///   ([`LAMP_SUBJECT`] before it, or an "-ing" word first: "Watching
-///   again."): "I'm noticing your desk again", "I'm looking at your desk
-///   again";
+///   again."), and the desk's looking: "desk" in the clause or a line
+///   naming the noticing ([`names_the_noticing`]): "I'm noticing your desk
+///   again", "I'm looking at your desk again"; never "I'm watching the
+///   timer again" to "Lamp, remind me about the oven." (Twelve's P2 on
+///   #8804, c7203889421);
 /// - "on" after "is", "are", "back", "now" or a "'s", with one of
-///   [`OFF_LOOKING`] before it and none of [`PERSON_WORDS`] in the clause:
-///   "noticing is on", "my camera's on", "desk noticing is back on";
+///   [`OFF_LOOKING`] before it, none of [`PERSON_WORDS`] in the clause,
+///   only a time word ("now", "again", "already", "still", "too") after
+///   it, and the desk's looking: "desk" in the clause, a line naming the
+///   noticing, or the looking word itself the subject right before
+///   "is"/"are"/"'s": "noticing is on", "my camera's on", "desk noticing is
+///   back on", "Desk noticing is on now"; never "The camera is on the
+///   shelf.";
 /// - "back on" with the lamp before it and no person before it, and a word
 ///   of the looking or the desk in the clause, or "it" ("I've turned it
 ///   back on") to a line naming the noticing ([`names_the_noticing`]):
@@ -710,16 +718,31 @@ fn clause_claims_start(words: &[String], named: bool, offered: bool) -> bool {
         let word = words[at].as_str();
         let verb = matches!(word, "noticing" | "notice" | "watching" | "watch")
             || (matches!(word, "looking" | "look") && desk);
-        verb && words[at + 1..].iter().any(|word| word == "again")
+        // The desk's looking, not a timer's or the oven's (Twelve's P2 on
+        // #8804): the desk named, or a line naming the noticing.
+        verb && (desk || named)
+            && words[at + 1..].iter().any(|word| word == "again")
             && (lamp_before(at) || (at == 0 && word.ends_with("ing")))
             && stands(at)
     });
     let is_on = !words.iter().any(|word| has(&PERSON_WORDS, word))
         && (1..words.len()).any(|at| {
             let before = words[at - 1].as_str();
+            // The looking word itself the subject of the "is/'s on"
+            // ("noticing is on", "my camera's on").
+            let subject = (before.ends_with("'s") && looking_word(before))
+                || (matches!(before, "is" | "are")
+                    && at >= 2
+                    && has(&OFF_LOOKING, words[at - 2].as_str()));
             words[at] == "on"
                 && (matches!(before, "is" | "are" | "back" | "now") || before.ends_with("'s"))
                 && words[..at].iter().any(|word| looking_word(word))
+                && (desk || named || subject)
+                // "On" as the state, not a place ("the camera is on the
+                // shelf"): only a time word after it in the clause.
+                && words[at + 1..]
+                    .iter()
+                    .all(|word| matches!(word.as_str(), "now" | "again" | "already" | "still" | "too"))
                 && stands(at)
         });
     let back_on = (2..words.len()).any(|at| {
@@ -913,18 +936,33 @@ impl ClaimWatch {
     /// [`Self::piece`]'s), when the reply claimed a start
     /// ([`claims_started`]) and desk noticing is still off at `path`, so no
     /// `look_at_my_desk` turned it on, the line that corrects it, said after
-    /// the reply: [`crate::action_claim::NOT_DONE_LINE`], the existing line
-    /// for a claimed action no call made ("Sorry, I didn't do that. Could
-    /// you ask me again?"). The same for the owner and anyone else: the
-    /// owner's ask again runs `look_at_my_desk`, and anyone else's is
-    /// refused by it ([`OWNER_ONLY`]). It never runs `look_at_my_desk` and
+    /// the reply: for the owner (`owners`, asked only then: the look tool's
+    /// own check, [`owners_spoken_yes`]), [`crate::action_claim::NOT_DONE_LINE`],
+    /// the existing line for a claimed action no call made ("Sorry, I
+    /// didn't do that. Could you ask me again?"), as their ask again runs
+    /// `look_at_my_desk`; for anyone else, or a line not known as the
+    /// owner's, its first sentence alone,
+    /// [`crate::action_claim::NOT_DONE_FIRST`] ("Sorry, I didn't do
+    /// that."), as their ask again is refused ([`OWNER_ONLY`]; the first
+    /// builder's c7203862036 on #8804). It never runs `look_at_my_desk` and
     /// never turns noticing on (the Reviewer-lead's c7202262971 and the
     /// first builder's c7202392079 on #7767). Once a turn; `None` for a
     /// turn nobody spoke, whose claim [`Self::piece`] never judged.
-    pub fn start_correction(&mut self, path: Option<&Path>, request: u64) -> Option<&'static str> {
+    pub fn start_correction(
+        &mut self,
+        path: Option<&Path>,
+        request: u64,
+        owners: impl FnOnce() -> bool,
+    ) -> Option<&'static str> {
         let path =
             path.filter(|_| self.started && !std::mem::replace(&mut self.corrected, true))?;
-        start_claimed(path, request).then_some(crate::action_claim::NOT_DONE_LINE)
+        start_claimed(path, request).then(|| {
+            if owners() {
+                crate::action_claim::NOT_DONE_LINE
+            } else {
+                crate::action_claim::NOT_DONE_FIRST
+            }
+        })
     }
 }
 
@@ -1029,7 +1067,10 @@ pub fn live_end(request: u64, heard: bool) -> bool {
     // A claimed start with desk noticing off (#7767): Live says no fixed
     // line of the lamp's own, so it is journalled only, and nothing is
     // turned on.
-    if claim.start_correction(Some(&path), request).is_some() {
+    if claim
+        .start_correction(Some(&path), request, || false)
+        .is_some()
+    {
         eprintln!(
             "lamp-voice provider: request {request}: the claimed start is not corrected on Live: it says no fixed line"
         );
@@ -1195,7 +1236,7 @@ pub fn turn_began(request: u64) {
 /// owner's own spoken yes: outside the private room, the owner seen saying
 /// it or in their voice; in it, where any heard line is the owner's, their
 /// voice by the judge only. A line not heard is none.
-fn owners_spoken_yes(
+pub(crate) fn owners_spoken_yes(
     request: u64,
     heard: bool,
     lease: Option<&crate::memory_scope::ScopeLease>,
@@ -2623,6 +2664,7 @@ mod tests {
             ("Look again at the second line.", heard),
             ("Only the lamp's owner can turn that back on.", heard),
             (crate::action_claim::NOT_DONE_LINE, heard),
+            (crate::action_claim::NOT_DONE_FIRST, heard),
         ] {
             assert!(!claims_started(reply, heard), "{reply} to {heard:?}");
         }
@@ -2665,7 +2707,7 @@ mod tests {
         let mut watch = ClaimWatch::default();
         assert!(!watch.piece(Some(&path), 1, reply, heard));
         watch.end(Some(&path), 1, heard);
-        assert_eq!(watch.start_correction(Some(&path), 1), None);
+        assert_eq!(watch.start_correction(Some(&path), 1, || true), None);
         assert!(!path.exists() && !face.exists());
         // Off (a stop's kept no): the line, once; still off after it.
         assert!(stop_claimed(&path, 2));
@@ -2673,30 +2715,37 @@ mod tests {
         let mut watch = ClaimWatch::default();
         assert!(!watch.piece(Some(&path), 3, reply, heard));
         watch.end(Some(&path), 3, heard);
+        // The owner's line: the whole not-done line (c7203862036 on #8804).
         assert_eq!(
-            watch.start_correction(Some(&path), 3),
+            watch.start_correction(Some(&path), 3, || true),
             Some(crate::action_claim::NOT_DONE_LINE)
         );
-        assert_eq!(watch.start_correction(Some(&path), 3), None);
+        assert_eq!(
+            crate::action_claim::NOT_DONE_LINE,
+            "Sorry, I didn't do that. Could you ask me again?"
+        );
+        assert_eq!(watch.start_correction(Some(&path), 3, || true), None);
         assert!(!allowed(&path, SEEN_ACTIVITY, true));
         assert!(!allowed(&face, FACE_EXPRESSIONS, true));
         assert_eq!(std::fs::read(&path).unwrap(), off);
         // Its last sentence with no stop of its own is judged at the end.
         let mut watch = ClaimWatch::default();
         assert!(!watch.piece(Some(&path), 4, "Okay, watching again", heard));
-        assert_eq!(watch.start_correction(Some(&path), 4), None);
+        assert_eq!(watch.start_correction(Some(&path), 4, || true), None);
         let mut watch = ClaimWatch::default();
         watch.piece(Some(&path), 5, "Okay, watching again", heard);
         watch.end(Some(&path), 5, heard);
+        // Anyone else's, or a line not known as the owner's: its first
+        // sentence alone.
         assert_eq!(
-            watch.start_correction(Some(&path), 5),
-            Some(crate::action_claim::NOT_DONE_LINE)
+            watch.start_correction(Some(&path), 5, || false),
+            Some("Sorry, I didn't do that.")
         );
         // The switch off (no path): nothing judged.
         let mut watch = ClaimWatch::default();
         watch.piece(None, 6, reply, heard);
         watch.end(None, 6, heard);
-        assert_eq!(watch.start_correction(None, 6), None);
+        assert_eq!(watch.start_correction(None, 6, || true), None);
         // An offer is no claim: no line.
         let mut watch = ClaimWatch::default();
         watch.piece(
@@ -2706,7 +2755,7 @@ mod tests {
             heard,
         );
         watch.end(Some(&path), 7, heard);
-        assert_eq!(watch.start_correction(Some(&path), 7), None);
+        assert_eq!(watch.start_correction(Some(&path), 7, || true), None);
         let _ = std::fs::remove_dir_all(folder);
     }
 
@@ -2720,7 +2769,7 @@ mod tests {
         let mut watch = ClaimWatch::default();
         watch.piece(Some(&path), 2, "I'm noticing your desk again.", None);
         watch.end(Some(&path), 2, None);
-        assert_eq!(watch.start_correction(Some(&path), 2), None);
+        assert_eq!(watch.start_correction(Some(&path), 2, || true), None);
         let _ = std::fs::remove_dir_all(folder);
     }
 

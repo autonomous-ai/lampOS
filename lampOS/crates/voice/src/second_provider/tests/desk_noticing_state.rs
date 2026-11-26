@@ -313,7 +313,7 @@ fn a_claimed_start_with_noticing_off_is_corrected_after_the_reply() {
         [
             format!("said:{REPLY}"),
             // Each piece after the first is said after a space.
-            format!("said: Sorry, I didn't do that."),
+            "said: Sorry, I didn't do that.".to_owned(),
         ]
     );
     assert!(!allowed(&path, SEEN_ACTIVITY, true));

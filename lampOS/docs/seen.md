@@ -123,16 +123,26 @@ lamp also says once when the opt-in is turned off.
    spoken turn's reply that says the lamp is looking again by the same
    rules (`seen_yes::claims_started`: one clause, the lamp as subject, a
    negation cancels it, an offer or a time it waits for governs only what
-   follows; "I'm noticing your desk again", "Watching again.", "noticing
-   is on", "I've turned it back on" to a line naming the noticing; never
-   "I'll start looking again whenever you want", "Once you say so, I'm
-   noticing your desk again", "I've turned the light back on" or a
-   question), with seen activity still off at the turn's end, so no
-   `look_at_my_desk` turned it on, is followed on the second route by the
-   existing not-done line, `action_claim::NOT_DONE_LINE` ("Sorry, I didn't
-   do that. Could you ask me again?"), once, for the owner and anyone else
-   alike: the owner's ask again runs `look_at_my_desk`, and anyone else's
-   is refused by it. The camera goes on only from that call; the
+   follows, and the looking the desk's: "desk" in the clause, a line
+   naming the noticing, or the looking word itself the subject of "is
+   on"; "I'm noticing your desk again", "Watching again." or "I've turned
+   it back on" to a line naming the noticing, "noticing is on", "my
+   camera's on", "Desk noticing is on now"; never "I'll start looking
+   again whenever you want", "Once you say so, I'm noticing your desk
+   again", "I've turned the light back on", a question, nor, to "Lamp,
+   remind me about the oven.", "Okay, I'm watching the timer again.",
+   "Sure, I'll watch the oven again.", "I'm noticing the noise again." or
+   "The camera is on the shelf.", Twelve's P2 on #8804, c7203889421), with
+   seen activity still off at the turn's end, so no `look_at_my_desk`
+   turned it on, is followed on the second route by the existing not-done
+   line, once: for the owner (the look tool's own check,
+   `seen_yes::owners_spoken_yes`) the whole `action_claim::NOT_DONE_LINE`
+   ("Sorry, I didn't do that. Could you ask me again?"), as their ask
+   again runs `look_at_my_desk`; for anyone else, or a line not known as
+   the owner's, only its first sentence, `action_claim::NOT_DONE_FIRST`
+   ("Sorry, I didn't do that."), as their ask again would be refused (the
+   first builder's c7203862036 on #8804; in the private room every speaker
+   is the owner, so the short form shows only outside it). The camera goes on only from that call; the
    correction reads the files and writes nothing, with one journal line
    (`the reply says it is looking again with desk noticing off and no
    start called`). Live says no fixed line of its own, so there the claim

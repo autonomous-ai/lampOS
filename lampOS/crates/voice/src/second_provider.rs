@@ -19664,6 +19664,7 @@ async fn answer(
         choice_held: None,
         heard_line: heard.then(|| said.clone()),
         claimed_stop: crate::seen_yes::ClaimWatch::default(),
+        scope: scope.clone(),
     };
     let began = Instant::now();
     // The bounds below are on the runtime's clock, which a test can step.
@@ -25375,6 +25376,9 @@ struct Queue<'a> {
     /// runs: nothing is watched (the Reviewer-lead's must-fix 2 on #8674).
     heard_line: Option<String>,
     claimed_stop: crate::seen_yes::ClaimWatch,
+    /// The turn's memory scope, for the owner check of a claimed start's
+    /// correction ([`crate::seen_yes::owners_spoken_yes`], #8804).
+    scope: Option<crate::memory_scope::ScopeLease>,
 }
 impl Drop for Queue<'_> {
     /// The reply's end: its last piece judged for a claimed stop, and its
@@ -25390,12 +25394,21 @@ impl Drop for Queue<'_> {
         // A claim to be looking again with desk noticing still off and no
         // start called (#8683's ROW, c7200527698: "I'm noticing your desk
         // again." with `calls=none`): corrected after the reply with the
-        // existing not-done line, never by running `look_at_my_desk`
+        // existing not-done line (the owner's whole, anyone else's first
+        // sentence alone), never by running `look_at_my_desk`
         // (`seen_yes::ClaimWatch::start_correction`, #7767).
-        if let Some(line) = self
-            .claimed_stop
-            .start_correction(self.shared.desk_noticing.as_deref(), self.request)
-        {
+        if let Some(line) = self.claimed_stop.start_correction(
+            self.shared.desk_noticing.as_deref(),
+            self.request,
+            || {
+                // The look tool's own owner check (c7203862036 on #8804).
+                crate::seen_yes::owners_spoken_yes(
+                    self.request,
+                    self.heard_line.is_some(),
+                    self.scope.as_ref(),
+                )
+            },
+        ) {
             self.say_after(self.shared.fixed(line));
         }
         if let Some(tags) = &mut self.tags
