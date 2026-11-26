@@ -19,7 +19,7 @@ pub mod asleep;
 mod privacy;
 pub mod setup;
 pub mod waking;
-pub use privacy::PrivacyObservation;
+pub use privacy::{DIM_CEILING, PrivacyLook, PrivacyObservation};
 
 #[cfg(target_os = "linux")]
 pub mod linux;
@@ -328,6 +328,8 @@ pub struct GuardedRing<S: FrameSink> {
     /// The separate physical-mute indication, never a conversational permit.
     privacy: Option<PrivacyObservation>,
     privacy_painted_at: Option<MonoTime>,
+    /// The look of the last privacy frame written (#8696).
+    privacy_look: PrivacyLook,
     faulted: bool,
     stopped: bool,
     /// When the current run of late writes began.
@@ -408,6 +410,7 @@ impl<S: FrameSink> GuardedRing<S> {
             resting: false,
             privacy: None,
             privacy_painted_at: None,
+            privacy_look: PrivacyLook::Red,
             faulted: false,
             stopped: false,
             late_since: None,

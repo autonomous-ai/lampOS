@@ -1056,3 +1056,213 @@ fn a_tighter_cap_dims_the_shown_cue_under_its_permit_and_never_blanks_or_brighte
             .all(|frame| !is_black(frame))
     );
 }
+
+// The person's look for the physical-mute indication (#8696): red, a
+// dimmer red, or dark. Each is a fixed frame chosen here, after the same
+// guards as today's red.
+
+/// Each frame's red channel, checking every pixel is red alone.
+fn reds(frame: &EncodedFrame) -> Vec<u8> {
+    frame.bytes()[PRIMER_BYTES..FRAME_BYTES - RESET_BYTES]
+        .chunks_exact(24)
+        .map(|pixel| {
+            assert_eq!(decode_channel(&pixel[..8]), 0, "green");
+            assert_eq!(decode_channel(&pixel[16..]), 0, "blue");
+            decode_channel(&pixel[8..16])
+        })
+        .collect()
+}
+
+/// A 4 s sweep of fresh evidence every 10 ms, painted in `look`.
+fn sweep(look: PrivacyLook) -> GuardedRing<Sink> {
+    let (mut ring, mut controller, mut evidence) = muted();
+    for us in (10..=4_000_010).step_by(10_000) {
+        advance_to(us);
+        ring.install_authority(controller.snapshot(clock()).unwrap())
+            .unwrap();
+        evidence.observed_at = clock();
+        evidence.expires_at = at(us + 50_000);
+        ring.show_privacy_look(Some(evidence), look).unwrap();
+    }
+    ring
+}
+
+#[test]
+fn the_dim_privacy_look_breathes_red_1_to_4_and_nothing_else() {
+    let ring = sweep(PrivacyLook::Dim);
+    assert!(ring.sink.frames.len() <= 162);
+    let mut minimum = u8::MAX;
+    let mut maximum = 0;
+    for frame in ring.sink.frames.iter().skip(1) {
+        for red in reds(frame) {
+            assert!((1..=4).contains(&red), "{red}");
+            minimum = minimum.min(red);
+            maximum = maximum.max(red);
+        }
+        assert!(peak(frame) <= 4);
+    }
+    assert_eq!((minimum, maximum), (1, 4));
+}
+
+#[test]
+fn the_red_privacy_look_is_todays_breath() {
+    let looked = sweep(PrivacyLook::Red);
+    let (mut today, mut controller, mut evidence) = muted();
+    for us in (10..=4_000_010).step_by(10_000) {
+        advance_to(us);
+        today
+            .install_authority(controller.snapshot(clock()).unwrap())
+            .unwrap();
+        evidence.observed_at = clock();
+        evidence.expires_at = at(us + 50_000);
+        today.show_privacy_muted(Some(evidence)).unwrap();
+    }
+    assert_eq!(looked.sink.frames, today.sink.frames);
+    let mut maximum = 0;
+    for frame in looked.sink.frames.iter().skip(1) {
+        maximum = maximum.max(peak(frame));
+    }
+    assert_eq!(maximum, 10);
+}
+
+#[test]
+fn the_off_privacy_look_writes_black_once_and_keeps_its_evidence() {
+    let (mut ring, mut controller, mut evidence) = muted();
+    ring.show_privacy_look(Some(evidence), PrivacyLook::Red)
+        .unwrap();
+    assert!(!is_black(ring.sink.frames.last().unwrap()));
+    // Off 5 ms later: one black frame at once, then nothing more.
+    advance_to(5_010);
+    assert!(
+        ring.show_privacy_look(Some(evidence), PrivacyLook::Off)
+            .unwrap()
+            .is_some()
+    );
+    assert!(is_black(ring.sink.frames.last().unwrap()));
+    let count = ring.sink.frames.len();
+    for us in (6_010..=2_000_010).step_by(10_000) {
+        advance_to(us);
+        ring.install_authority(controller.snapshot(clock()).unwrap())
+            .unwrap();
+        evidence.observed_at = clock();
+        evidence.expires_at = at(us + 50_000);
+        assert!(
+            ring.show_privacy_look(Some(evidence), PrivacyLook::Off)
+                .unwrap()
+                .is_none()
+        );
+        assert!(ring.tick().unwrap().is_none());
+        assert!(ring.privacy_shown(), "the evidence is kept while dark");
+    }
+    assert_eq!(ring.sink.frames.len(), count, "dark writes nothing more");
+    // Back to red: painted on the next call, not after an interval.
+    advance_to(2_001_010);
+    evidence.observed_at = clock();
+    evidence.expires_at = at(2_051_010);
+    assert!(
+        ring.show_privacy_look(Some(evidence), PrivacyLook::Red)
+            .unwrap()
+            .is_some()
+    );
+    assert!(!is_black(ring.sink.frames.last().unwrap()));
+    // A first showing that is dark writes one black frame and no red.
+    let (mut ring, _, evidence) = muted();
+    ring.show_privacy_look(Some(evidence), PrivacyLook::Off)
+        .unwrap();
+    assert!(ring.sink.frames.iter().all(is_black));
+    assert!(ring.privacy_shown());
+}
+
+#[test]
+fn no_privacy_look_paints_without_the_physical_evidence() {
+    for look in [PrivacyLook::Red, PrivacyLook::Dim, PrivacyLook::Off] {
+        let (_, _, evidence) = muted();
+        // No authority, and Allowed authority (a software-only state).
+        let mut no_authority = GuardedRing::with_clock(Sink::default(), boot(1), clock).unwrap();
+        assert!(
+            no_authority
+                .show_privacy_look(Some(evidence), look)
+                .unwrap()
+                .is_none()
+        );
+        assert!(!no_authority.privacy_shown());
+        assert_eq!(no_authority.sink.frames.len(), 1);
+        let (mut allowed, _) = idle();
+        assert!(
+            allowed
+                .show_privacy_look(Some(evidence), look)
+                .unwrap()
+                .is_none()
+        );
+        assert!(!allowed.privacy_shown());
+        assert_eq!(allowed.sink.frames.len(), 1);
+
+        let mut invalid = [evidence; 10];
+        // A software mute: no switch read, or the switch open.
+        invalid[0].physical_muted = None;
+        invalid[1].physical_muted = Some(false);
+        invalid[2].permitted = true;
+        invalid[3].controller_boot = boot(2);
+        invalid[4].microphone_generation += 1;
+        invalid[5].observed_at = at(11);
+        invalid[6].expires_at = at(10);
+        invalid[7].expires_at = at(50_011);
+        invalid[8].observed_at = at(0);
+        invalid[9].expires_at = at(9);
+        for observation in invalid.into_iter().map(Some).chain([None]) {
+            let (mut ring, _, valid) = muted();
+            assert!(
+                ring.show_privacy_look(observation, look).unwrap().is_none(),
+                "{look:?} {observation:?}"
+            );
+            assert!(ring.sink.frames.iter().all(is_black));
+            assert!(!ring.privacy_shown());
+            ring.show_privacy_look(Some(valid), look).unwrap();
+            assert!(ring.privacy_shown());
+            assert_eq!(
+                is_black(ring.sink.frames.last().unwrap()),
+                look == PrivacyLook::Off
+            );
+            assert!(ring.show_privacy_look(observation, look).unwrap().is_none());
+            assert!(is_black(ring.sink.frames.last().unwrap()));
+            assert!(!ring.privacy_shown(), "{look:?} {observation:?}");
+        }
+        // A turn's owner present: closed, whatever the look.
+        let (mut ring, mut controller, evidence) = muted();
+        let owner = controller.admit(clock(), AdmittedInput::NewTurn);
+        if owner.is_ok() {
+            ring.install_authority(controller.snapshot(clock()).unwrap())
+                .unwrap();
+            assert!(
+                ring.show_privacy_look(Some(evidence), look)
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(ring.sink.frames.iter().all(is_black));
+        }
+    }
+}
+
+#[test]
+fn a_changed_privacy_look_paints_without_waiting_the_frame_interval() {
+    let (mut ring, _, evidence) = muted();
+    ring.show_privacy_look(Some(evidence), PrivacyLook::Red)
+        .unwrap();
+    let count = ring.sink.frames.len();
+    // The same look 5 ms later waits for the 25 ms interval.
+    advance_to(5_010);
+    assert!(
+        ring.show_privacy_look(Some(evidence), PrivacyLook::Red)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(ring.sink.frames.len(), count);
+    // A new look 5 ms after a frame is painted at once.
+    assert!(
+        ring.show_privacy_look(Some(evidence), PrivacyLook::Dim)
+            .unwrap()
+            .is_some()
+    );
+    assert_eq!(ring.sink.frames.len(), count + 1);
+    assert!(peak(ring.sink.frames.last().unwrap()) <= 4);
+}
