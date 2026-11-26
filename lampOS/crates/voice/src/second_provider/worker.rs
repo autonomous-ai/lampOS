@@ -12459,6 +12459,16 @@ impl Heeding {
                     .is_some_and(|likeness| likeness < crate::same_voice::DIFFERENT_BELOW));
         // `LAMP_NAME_SIGN_TIED` (#8092): only with eyes to give a look.
         let looks_needed = self.attention.second_sign_tied() && self.eyes.is_some();
+        // `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER`: over the answer, whether the
+        // line's words tie it to the conversation, so that with no look it
+        // may still be let out (Sixth's row on #8689: a blanket hold held
+        // the asker's own follow-ups and corrections).
+        let over_held = self.over_the_answer_no_follow_up(request);
+        let asked = signs.lamp_asked || crate::services::answer_awaited(heard);
+        let cut_in_tied = over_held
+            && (self.tied_to_the_lamp(request, heard, false)
+                || crate::untied_going_on::corrects(heard)
+                || (asked && crate::untied_going_on::a_short_reply(heard)));
         let line = crate::said_to_me::Line {
             heard,
             // With looks needed, in the window a hearing under
@@ -12479,7 +12489,7 @@ impl Heeding {
             going_on: signs.going_on,
             // A read-back asks for an answer, however its last sentence
             // reads (`services::answer_awaited`).
-            lamp_asked: signs.lamp_asked || crate::services::answer_awaited(heard),
+            lamp_asked: asked,
             question_waits: self.question_waits(request, heard, signs),
             turned,
             // An earlier line's second voice, since the lamp last spoke and
@@ -12491,10 +12501,12 @@ impl Heeding {
             looks_needed,
             look_free_answered: self.look_free_used,
             // Begun over the lamp's own answer, which it cut (#8205). With
-            // `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER`, no look-free cut-in either:
-            // two people's talk over the answer came through as it.
+            // `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER`, no look-free cut-in or
+            // answer unless its words tie it to the conversation: two
+            // people's talk over the answer came through as the cut-in.
             cut_in: self.began_over == Some(request),
-            cut_in_held: self.over_the_answer_no_follow_up(request),
+            cut_in_held: over_held,
+            cut_in_tied,
             asked_looks: self.asked_looks,
             first_after_asked: self.first_after_asked(said.0, signs.continues_from),
             // `LAMP_FOLLOW_UPS`: in the window only another voice than the
@@ -12522,9 +12534,14 @@ impl Heeding {
         }
         let going_on = signs.going_on;
         let decision = crate::said_to_me::judge(line);
-        if going_on && self.over_the_answer_no_follow_up(request) {
+        if going_on && over_held {
+            let tie = if cut_in_tied {
+                "its words tie it to the conversation, so with no look it may still be let out"
+            } else {
+                "its words don't tie it to the conversation, so with no look it is held"
+            };
             eprintln!(
-                "lamp-voice second: request {request}: it began over the lamp's answer: no follow-up pass, it has no voice print; judged as before LAMP_FOLLOW_UPS (LAMP_FOLLOW_UPS_AFTER_THE_ANSWER)"
+                "lamp-voice second: request {request}: it began over the lamp's answer: no follow-up pass, it has no voice print; judged as before LAMP_FOLLOW_UPS; {tie} (LAMP_FOLLOW_UPS_AFTER_THE_ANSWER)"
             );
         }
         // The next line after the same words of the lamp's is not the first;
@@ -31114,18 +31131,38 @@ mod tests {
     /// that night, October's two-person battery let 41 lines said over the
     /// lamp's answers out as follow-ups: a line begun over the lamp's voice
     /// gets no print, so the window could never tell another voice there.
-    /// With the switch such a line takes no follow-up pass, and with no look
-    /// it is held, the first too: no look-free cut-in (#8205), which let 19
-    /// such lines through on that lamp, each named call giving it back. A
-    /// line begun after the answer is still a follow-up, looking or not.
-    /// Without the switch every such line is a follow-up.
+    /// With the switch such a line takes no follow-up pass. With no look, its
+    /// words decide both look-free doors, the one cut-in (#8205) and the one
+    /// answer to the lamp's waiting question (#8092): a line they tie to the
+    /// conversation, or that corrects what was asked, is let out ("No, I
+    /// meant Spain.", "And how many people live there?"), and any other is
+    /// held ("Don't stop now, you're almost done."). Sixth's row on
+    /// lamp-52e6 that morning: with a blanket hold, the asker's follow-ups
+    /// and corrections over the answer were held (0 of 3, 0 of 2), and that
+    /// room line came in by the waiting question. A line begun after the
+    /// answer is still a follow-up, looking or not. Without the switch every
+    /// such line is a follow-up.
     #[test]
     fn with_follow_ups_after_the_answer_a_line_over_the_answer_is_judged_as_before() {
         let _one = crate::provider_worker::tests::one_thread();
         use crate::second_provider::Heard;
-        // Whether line 9 is answered: `heed_signs` gives why it is held.
-        let answered = |after_only: bool, over: bool, one_used: bool| {
-            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        const CORRECTION: &str = "No, I meant Spain.";
+        const FOLLOW_UP: &str = "And how many people live there?";
+        const ROOM: &str = "Don't stop now, you're almost done.";
+        // Whether line 9 is answered after the asker's question 8; with
+        // `asked` the lamp's answer asked a question it still waits on.
+        // `heed_signs` gives why a line is held.
+        let answered = |after_only: bool, over: bool, one_used: bool, asked: bool, line: &str| {
+            let mut thread = crate::thread::Thread::new();
+            let now = Instant::now();
+            thread.person("Hey Lamp, what's the capital of Portugal?", true, now);
+            let answer = if asked {
+                "The capital of Portugal is Lisbon. Do you want to hear more about it?"
+            } else {
+                "The capital of Portugal is Lisbon, a city on seven hills by the sea."
+            };
+            thread.lamp(8, answer, now);
+            *crate::thread::THREAD.lock().unwrap() = thread;
             let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
             let now_us = monotonic_us();
             let mut heeding = product_heeding(eyes);
@@ -31146,27 +31183,46 @@ mod tests {
             let signs = super::Signs {
                 going_on: true,
                 turned: None,
+                lamp_asked: asked,
                 ..turned_signs(crate::room_told::Room::Unknown)
             };
-            let line = "Did you finish the report?";
             let held = heeding.heed_signs(9, (now_us, now_us + 2_200_000), line, signs);
             *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
             held.is_none()
         };
         assert!(
-            answered(false, true, true),
+            answered(false, true, true, false, ROOM),
             "LAMP_FOLLOW_UPS alone: over the answer, a follow-up"
         );
+        // The cut-in door: no question waits.
         assert!(
-            !answered(true, true, false),
-            "over the answer, the first with no look: held, no look-free cut-in"
+            answered(true, true, false, false, CORRECTION),
+            "over the answer, the asker's correction with no look: the one cut-in"
         );
         assert!(
-            !answered(true, true, true),
+            answered(true, true, false, false, FOLLOW_UP),
+            "over the answer, a follow-up its words tie: the one cut-in"
+        );
+        assert!(
+            !answered(true, true, false, false, ROOM),
+            "over the answer, the room's untied line with no look: held"
+        );
+        // The waiting-question door.
+        assert!(
+            answered(true, true, false, true, CORRECTION),
+            "over the answer, the correction: the one answer to the waiting question"
+        );
+        assert!(
+            !answered(true, true, false, true, ROOM),
+            "over the answer, the room's untied line: held, though a question waits"
+        );
+        assert!(
+            !answered(true, true, true, false, CORRECTION),
             "over the answer, the next with no look: held, as before"
         );
         assert!(
-            answered(true, false, true),
+            answered(true, false, true, false, ROOM),
             "after the answer: a follow-up, looking or not"
         );
     }
