@@ -36464,6 +36464,9 @@ mod tests {
                 lamp_msgs::Diagnostic::TYPE,
             )
             .unwrap();
+        // Another test's refused voice in this binary (#8711's flake): this
+        // reporter reads its own counters, never the process-wide ones.
+        super::super::net::OWN_VOICE_REFUSED.store(401, std::sync::atomic::Ordering::Relaxed);
         super::report_own_key(Some(&root), false);
         let mut heard = Vec::new();
         while heard.len() < 2 {
