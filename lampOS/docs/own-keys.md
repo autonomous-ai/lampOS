@@ -73,7 +73,8 @@ person's words in `error` and `data.code`: `refused`, `voice_refused`
 doesn't have), `unreached`,
 `not_kept` (the key worked but couldn't be written: the lamp uses its own),
 `bad_field` (the field named), `busy` (one key request at a time),
-`not_allowed` (a peer other than `lamp-cloud`) or `unavailable` (the helper
+`not_allowed` (a peer other than `lamp-cloud`), `not_on_this_lamp` (Phonon
+asked for on a lamp without its service, #8754) or `unavailable` (the helper
 not there or not answering). Without the switch: V1's "not on this lamp" at
 once, with no `starting`. Setup's status says `own_keys` by service as
 `{"code", "answer"}`.
@@ -930,8 +931,12 @@ start; the folder stays root's alone, 0700, each file 0600.
 ## Phonon on the lamp (#8754, built, off until a person chooses it)
 
 A voice with no key: `{"service":"phonon","voice_id":"<name>"}` keeps only
-the voice's name, as `phonon.voice` in this folder, and is offered only
-while the lamp speaks English. Choosing it removes a person's own
+the voice's name, as `phonon.voice` in this folder. It is offered and
+taken only while the lamp speaks English and only where
+`lamp-phonon.service` is installed (`/etc/systemd/system`,
+`/usr/lib/systemd/system` or `/lib/systemd/system`); without the unit,
+`keys.get` has no Phonon offer and `keys.set` is refused with code
+`not_on_this_lamp`, nothing removed. Choosing it removes a person's own
 ElevenLabs voice, and keeping an ElevenLabs voice removes it: one own voice
 at a time. Its `offers[]` entry has `"runs": "lamp"`, its `voices`, and
 `"agent": false`. Choosing or removing it restarts `lamp-phonon.service`

@@ -1479,6 +1479,10 @@ pub fn check_and_keep(given: &Given, store: &Store, check: &mut impl Check) -> (
     (verdict, changed)
 }
 
+/// The refusal's code for Phonon chosen on a lamp without
+/// `lamp-phonon.service` (#8754).
+pub const NOT_ON_THIS_LAMP: &str = "not_on_this_lamp";
+
 /// A refusal in the contract's shape: the person's words and its code.
 pub fn refused(why: &str, code: &str) -> Value {
     json!({"refused": why, "code": code})
@@ -1575,7 +1579,48 @@ pub fn answer(
     check: &mut impl Check,
     enabled: bool,
 ) -> (Value, Option<Done>) {
-    answer_speaking(line, store, check, enabled, speaks_english())
+    let here = PhononHere::on_this_lamp(&UNIT_FOLDERS.map(Path::new), speaks_english());
+    answer_speaking(line, store, check, enabled, here)
+}
+
+/// Where systemd keeps units a lamp has installed: a test lamp's
+/// `lamp-phonon.service` is copied into the first (`docs/phonon.md`), and
+/// the product's install would put it in one of them.
+pub const UNIT_FOLDERS: [&str; 3] = [
+    "/etc/systemd/system",
+    "/usr/lib/systemd/system",
+    "/lib/systemd/system",
+];
+
+/// Whether Phonon can be offered on this lamp (#8754, the Reviewer-lead's
+/// HOLD on #8768): only where `lamp-phonon.service` is installed, since a
+/// choice with no service would remove the person's ElevenLabs voice and
+/// leave every sentence to the lamp's own; and only in English.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhononHere {
+    /// Installed, and the lamp speaks English: offered and taken.
+    Offered,
+    /// Installed, but the lamp speaks another language.
+    NotEnglish,
+    /// `lamp-phonon.service` is in none of the unit folders.
+    NotInstalled,
+}
+
+impl PhononHere {
+    /// From the unit `folders` to look in ([`UNIT_FOLDERS`] on a lamp) and
+    /// the lamp's language.
+    pub fn on_this_lamp(folders: &[&Path], english: bool) -> Self {
+        if !folders
+            .iter()
+            .any(|folder| folder.join(PHONON_UNIT).is_file())
+        {
+            Self::NotInstalled
+        } else if english {
+            Self::Offered
+        } else {
+            Self::NotEnglish
+        }
+    }
 }
 
 /// The owner's language, one code (`/etc/lampOS/setup/language`, #4473).
@@ -1604,14 +1649,14 @@ pub fn phonon_offer() -> Value {
     })
 }
 
-/// [`answer`] with the lamp's language given: `english` offers Phonon and
-/// takes its choice; otherwise neither (#8754).
+/// [`answer`] with Phonon's place on this lamp given: only
+/// [`PhononHere::Offered`] offers Phonon and takes its choice (#8754).
 pub fn answer_speaking(
     line: &str,
     store: &Store,
     check: &mut impl Check,
     enabled: bool,
-    english: bool,
+    phonon: PhononHere,
 ) -> (Value, Option<Done>) {
     if !enabled {
         return (
@@ -1627,12 +1672,19 @@ pub fn answer_speaking(
         Asked::Which => {
             let mut which = store.which();
             which["phonon"] = json!(store.phonon().map(|voice| voice.name));
-            if english && let Some(offers) = which["offers"].as_array_mut() {
+            if phonon == PhononHere::Offered
+                && let Some(offers) = which["offers"].as_array_mut()
+            {
                 offers.push(phonon_offer());
             }
             (json!({"done": which}), None)
         }
-        Asked::Phonon(Some(_)) if !english => (
+        // Nothing is kept or removed: the person's ElevenLabs voice stays.
+        Asked::Phonon(Some(_)) if phonon == PhononHere::NotInstalled => (
+            refused("Phonon is not installed on this lamp", NOT_ON_THIS_LAMP),
+            None,
+        ),
+        Asked::Phonon(Some(_)) if phonon == PhononHere::NotEnglish => (
             refused(
                 "Phonon speaks English only, and the lamp speaks another language",
                 "unavailable",

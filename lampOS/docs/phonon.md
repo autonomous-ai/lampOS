@@ -24,14 +24,23 @@ key, and once the model is on the lamp the speech never leaves it.
 Through the keys helper, as a person's own voice is (`docs/own-keys.md`),
 but with no key and no check against a service:
 
-- **`keys.get`** lists one more offer while the lamp speaks English (the
-  language file is missing, empty or `en`):
+- **Only where it is installed:** the helper offers and takes Phonon only
+  when `lamp-phonon.service` is in `/etc/systemd/system`,
+  `/usr/lib/systemd/system` or `/lib/systemd/system`. The product's install
+  doesn't carry it yet, so on a product lamp nothing below appears:
+  `keys.get` has no Phonon offer, and `keys.set` for `phonon` is refused
+  with code `not_on_this_lamp`, the person's ElevenLabs key and voice
+  untouched. Otherwise a choice would remove their voice for a service
+  that isn't there.
+- **`keys.get`** lists one more offer where it is installed and the lamp
+  speaks English (the language file is missing, empty or `en`):
   `{"service":"phonon","name":"On this lamp","kind":"voice","runs":"lamp","models":[],"base_url":false,"fields":["voice_id"],"voices":["Freya", …]}`.
   It also reports `"phonon"` as the chosen voice's name, or `null`.
 - **`keys.set`** `{"service":"phonon","voice_id":"Toby"}` keeps the name
   (any case) in `/etc/lampOS/voice/own/phonon.voice` (0600). A key, any
-  other field, a voice not offered, or a lamp in another language is
-  refused, and nothing is kept.
+  other field, a voice not offered, a lamp in another language
+  (`unavailable`) or a lamp without the unit (`not_on_this_lamp`) is
+  refused, and nothing is kept or removed.
 - **`keys.remove`** `{"service":"phonon"}` removes it. The lamp's own
   voice comes back.
 - **One own voice at a time:** choosing Phonon removes a person's own
@@ -142,7 +151,9 @@ running a build of this branch, with `LAMP_OWN_KEYS=on` in
    `/etc/systemd/system/`, replace `@LAMP_USER@` with `lampos` and
    `@PHONON_SHA256@` with the folder of the installed `lamp-phonon` (or
    point `ExecStart=` at the binary), then `systemctl daemon-reload` and
-   `systemctl enable lamp-phonon.service`.
+   `systemctl enable lamp-phonon.service`. From then on the app's Voice
+   page offers "On this lamp" too, and choosing it there does steps 2
+   and 3's restarts itself.
 2. Choose a voice, as root's keys helper would keep it (the helper itself
    answers only `lamp-cloud`):
 
@@ -176,6 +187,8 @@ it tests the voice's path as the app would use it.
   connection; `Voice::Phonon` speaking each sentence with the lamp's voice
   never asked, and falling back without a service; never near; the choice
   only when switched on, chosen and English.
-- `-p lamp-setup --test it keys`: offered only in English, chosen without a
-  key, one own voice at a time, refusals keeping nothing, and removal.
+- `-p lamp-setup --test it keys`: offered only in English and only where
+  the unit is installed (refused `not_on_this_lamp` without it, the
+  ElevenLabs files untouched), chosen without a key, one own voice at a
+  time, refusals keeping nothing, and removal.
 - `-p lamp-cloud keys`: `keys.set` passes a voice name and refuses a key.

@@ -47,7 +47,13 @@ fn never_said(reply: &Value, done: &Option<keys::Done>) {
 fn a_key_absent_present_and_removed() {
     let store = Store(folder("cycle"));
     let mut works = Told(Verdict::Works, vec![]);
-    let (reply, _) = keys::answer_speaking(r#"{"which":true}"#, &store, &mut works, true, true);
+    let (reply, _) = keys::answer_speaking(
+        r#"{"which":true}"#,
+        &store,
+        &mut works,
+        true,
+        keys::PhononHere::Offered,
+    );
     // With #8367's, #8362's and #8754's fields beside today's (`offers` is
     // pinned below).
     let none = json!({"deepseek": null, "deepgram": null, "elevenlabs": null, "openai_compatible": null, "openrouter": null, "gemini": null, "anthropic": null, "gemini_voice": null});
@@ -459,7 +465,13 @@ const VOICE: &str = "PersonVoice8367abcdef";
 fn elevenlabs_is_offered_beside_the_model_services() {
     let store = Store(folder("offers"));
     let mut works = Told(Verdict::Works, vec![]);
-    let (reply, _) = keys::answer_speaking(r#"{"which":true}"#, &store, &mut works, true, true);
+    let (reply, _) = keys::answer_speaking(
+        r#"{"which":true}"#,
+        &store,
+        &mut works,
+        true,
+        keys::PhononHere::Offered,
+    );
     let which = &reply["done"];
     assert_eq!(
         which["offers"],
@@ -1598,29 +1610,29 @@ fn the_agent_uses_an_own_model_key_only_once_it_made_a_tool_call() {
 fn phonon_is_chosen_without_a_key_while_the_lamp_speaks_english() {
     let store = Store(folder("phonon"));
     let mut works = Told(Verdict::Works, vec![]);
-    let offered = |english: bool| {
+    let offered = |here: keys::PhononHere| {
         let mut works = Told(Verdict::Works, vec![]);
-        let (reply, _) =
-            keys::answer_speaking(r#"{"which":true}"#, &store, &mut works, true, english);
+        let (reply, _) = keys::answer_speaking(r#"{"which":true}"#, &store, &mut works, true, here);
         reply["done"]["offers"]
             .as_array()
             .unwrap()
             .iter()
             .any(|offer| offer["service"] == "phonon")
     };
-    assert!(offered(true));
-    assert!(!offered(false));
+    assert!(offered(keys::PhononHere::Offered));
+    assert!(!offered(keys::PhononHere::NotEnglish));
+    assert!(!offered(keys::PhononHere::NotInstalled));
 
     // An own ElevenLabs voice, then Phonon in its place.
     let line = set("elevenlabs", &format!(r#","voice_id":"{VOICE}""#));
-    keys::answer_speaking(&line, &store, &mut works, true, true);
+    keys::answer_speaking(&line, &store, &mut works, true, keys::PhononHere::Offered);
     assert!(store.has(Service::ElevenLabs));
     let (reply, done) = keys::answer_speaking(
         r#"{"set":"phonon","voice_id":"toby"}"#,
         &store,
         &mut works,
         true,
-        true,
+        keys::PhononHere::Offered,
     );
     assert_eq!(
         reply,
@@ -1636,29 +1648,40 @@ fn phonon_is_chosen_without_a_key_while_the_lamp_speaks_english() {
     );
     assert!(!store.has(Service::ElevenLabs));
     assert_eq!(store.phonon().map(|voice| voice.name), Some("Toby"));
-    let (reply, _) = keys::answer_speaking(r#"{"which":true}"#, &store, &mut works, true, true);
+    let (reply, _) = keys::answer_speaking(
+        r#"{"which":true}"#,
+        &store,
+        &mut works,
+        true,
+        keys::PhononHere::Offered,
+    );
     assert_eq!(reply["done"]["phonon"], "Toby");
 
     // An own ElevenLabs voice again takes Phonon's place.
-    keys::answer_speaking(&line, &store, &mut works, true, true);
+    keys::answer_speaking(&line, &store, &mut works, true, keys::PhononHere::Offered);
     assert!(store.has(Service::ElevenLabs) && store.phonon().is_none());
 
     // Refused, and nothing kept.
-    for (line, english, code) in [
+    let (offered, not_english) = (keys::PhononHere::Offered, keys::PhononHere::NotEnglish);
+    for (line, here, code) in [
         (
             r#"{"set":"phonon","voice_id":"Freya"}"#,
-            false,
+            not_english,
             "unavailable",
         ),
-        (r#"{"set":"phonon","voice_id":"Kore"}"#, true, "bad_field"),
-        (r#"{"set":"phonon"}"#, true, "bad_field"),
+        (
+            r#"{"set":"phonon","voice_id":"Kore"}"#,
+            offered,
+            "bad_field",
+        ),
+        (r#"{"set":"phonon"}"#, offered, "bad_field"),
         (
             r#"{"set":"phonon","voice_id":"Freya","key":"sk-x"}"#,
-            true,
+            offered,
             "bad_field",
         ),
     ] {
-        let (reply, done) = keys::answer_speaking(line, &store, &mut works, true, english);
+        let (reply, done) = keys::answer_speaking(line, &store, &mut works, true, here);
         assert_eq!(reply["code"], code, "{line}");
         assert!(done.is_none(), "{line}");
         assert!(store.phonon().is_none(), "{line}");
@@ -1670,10 +1693,15 @@ fn phonon_is_chosen_without_a_key_while_the_lamp_speaks_english() {
         &store,
         &mut works,
         true,
-        true,
+        keys::PhononHere::Offered,
     );
-    let (reply, done) =
-        keys::answer_speaking(r#"{"remove":"phonon"}"#, &store, &mut works, true, true);
+    let (reply, done) = keys::answer_speaking(
+        r#"{"remove":"phonon"}"#,
+        &store,
+        &mut works,
+        true,
+        keys::PhononHere::Offered,
+    );
     assert_eq!(
         reply,
         json!({"done": {"service": "phonon", "uses": "lamp"}})
@@ -1688,4 +1716,119 @@ fn phonon_is_chosen_without_a_key_while_the_lamp_speaks_english() {
             .iter()
             .all(|given| given.service == Service::ElevenLabs)
     );
+}
+
+/// Phonon is offered and taken only where `lamp-phonon.service` is
+/// installed (the Reviewer-lead's HOLD on #8768): on a lamp without it,
+/// `keys.get` has no Phonon offer and `which` is as before, and
+/// `keys.set` is refused `not_on_this_lamp` with the person's ElevenLabs
+/// key and voice untouched and nothing restarted.
+#[test]
+fn phonon_is_offered_and_kept_only_where_its_unit_is_installed() {
+    use keys::PhononHere;
+    let units = folder("phonon-units");
+    let (etc, lib) = (units.join("etc"), units.join("lib"));
+    fs::create_dir_all(&etc).unwrap();
+    fs::create_dir_all(&lib).unwrap();
+    let folders = [etc.as_path(), lib.as_path()];
+    assert_eq!(
+        PhononHere::on_this_lamp(&folders, true),
+        PhononHere::NotInstalled
+    );
+    assert_eq!(
+        PhononHere::on_this_lamp(&folders, false),
+        PhononHere::NotInstalled
+    );
+    // A folder named as the unit is not the unit.
+    fs::create_dir_all(lib.join(keys::PHONON_UNIT)).unwrap();
+    assert_eq!(
+        PhononHere::on_this_lamp(&folders, true),
+        PhononHere::NotInstalled
+    );
+    // Installed in any of the folders, as docs/phonon.md has a tester do.
+    fs::write(etc.join(keys::PHONON_UNIT), "[Unit]\n").unwrap();
+    assert_eq!(
+        PhononHere::on_this_lamp(&folders, true),
+        PhononHere::Offered
+    );
+    assert_eq!(
+        PhononHere::on_this_lamp(&folders, false),
+        PhononHere::NotEnglish
+    );
+    assert_eq!(
+        PhononHere::on_this_lamp(&[lib.as_path()], true),
+        PhononHere::NotInstalled
+    );
+
+    // Not installed: an own ElevenLabs voice stays, Phonon is neither
+    // offered nor kept.
+    let store = Store(folder("phonon-not-installed"));
+    let mut works = Told(Verdict::Works, vec![]);
+    let line = set("elevenlabs", &format!(r#","voice_id":"{VOICE}""#));
+    keys::answer_speaking(&line, &store, &mut works, true, PhononHere::Offered);
+    assert!(store.has(Service::ElevenLabs));
+    let before: Vec<_> = {
+        let mut files: Vec<_> = fs::read_dir(&store.0)
+            .unwrap()
+            .flatten()
+            .map(|entry| (entry.file_name(), fs::read(entry.path()).unwrap()))
+            .collect();
+        files.sort();
+        files
+    };
+    let which = |here| {
+        let mut works = Told(Verdict::Works, vec![]);
+        keys::answer_speaking(r#"{"which":true}"#, &store, &mut works, true, here).0
+    };
+    let (installed, not) = (which(PhononHere::Offered), which(PhononHere::NotInstalled));
+    assert!(
+        !not["done"]["offers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|offer| offer["service"] == "phonon")
+    );
+    // `which` is otherwise as it was: only the offer differs.
+    let mut without = installed.clone();
+    without["done"]["offers"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|offer| offer["service"] != "phonon");
+    assert_eq!(without, not);
+    assert_eq!(not["done"]["phonon"], Value::Null);
+
+    let (reply, done) = keys::answer_speaking(
+        r#"{"set":"phonon","voice_id":"Freya"}"#,
+        &store,
+        &mut works,
+        true,
+        PhononHere::NotInstalled,
+    );
+    assert_eq!(reply["code"], keys::NOT_ON_THIS_LAMP);
+    assert!(reply["refused"].is_string());
+    assert!(done.is_none());
+    assert!(store.has(Service::ElevenLabs) && store.phonon().is_none());
+    let after: Vec<_> = {
+        let mut files: Vec<_> = fs::read_dir(&store.0)
+            .unwrap()
+            .flatten()
+            .map(|entry| (entry.file_name(), fs::read(entry.path()).unwrap()))
+            .collect();
+        files.sort();
+        files
+    };
+    assert_eq!(before, after);
+
+    // Installed: offered and kept, in the ElevenLabs voice's place.
+    let (reply, done) = keys::answer_speaking(
+        r#"{"set":"phonon","voice_id":"Freya"}"#,
+        &store,
+        &mut works,
+        true,
+        PhononHere::Offered,
+    );
+    assert_eq!(reply["done"]["code"], "works");
+    assert!(done.unwrap().restart_voice);
+    assert_eq!(store.phonon().map(|voice| voice.name), Some("Freya"));
+    assert!(!store.has(Service::ElevenLabs));
 }
