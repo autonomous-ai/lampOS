@@ -1,0 +1,30 @@
+# quiet-desk (kit-q-quiet-desk): one WAV per line lines.tsv says (say and mem), 26 lines. All in one ElevenLabs stock voice,
+# the made-up test face's (Sarah, EXAVITQu4vr4xnSDxMaL, eleven_flash_v2_5, speed 1.0), rendered through the lamp's own
+# speech relay, as memory5's. file = the first 16 hex of SHA-256(text). The WAVs are not in the repo. Played tests only.
+#file	voice	text
+fc5bfc27958c47ce.wav	olivia	Hey Lamp, my sister's name is Anna.
+ddec53f9ec3560b3.wav	olivia	Yes, please remember that.
+f98a2ed16023bdf9.wav	olivia	What's my sister's name?
+e8574e02e77a41a7.wav	olivia	Hey Lamp, my favourite colour is lilac.
+0fc70e804637c5f1.wav	olivia	What's my favourite colour?
+96a99546910964df.wav	olivia	Hey Lamp, I've got the dentist on Friday at half past nine.
+c9370b434a7f7831.wav	olivia	What day is my dentist?
+4f5f3a2c719a06b7.wav	olivia	Hey Lamp, my desk at work is on the fourth floor.
+e03dbd11e9a97f29.wav	olivia	Which floor is my desk on?
+d15004821b34d678.wav	olivia	Hey Lamp, I take my tea with oat milk and no sugar.
+49f4e76525f8dad7.wav	olivia	How do I take my tea?
+a67014ebc4378265.wav	olivia	Hey Lamp, my neighbour's dog is called Biscuit.
+09e2d95e6a734ecd.wav	olivia	What's the neighbour's dog called?
+371c6e832157974b.wav	olivia	Hey Lamp, my mum's birthday is on the ninth of March.
+4842a98b45870356.wav	olivia	When's my mum's birthday?
+98e64171113dd12d.wav	olivia	Hey Lamp, no, it's Hannah, not Anna. My sister's name is Hannah.
+ad1c2122fb22abf0.wav	olivia	Yes, please change it.
+861d2752bc254351.wav	olivia	So what's my sister called?
+c400d123c4a527da.wav	olivia	Hey Lamp, forget my favourite colour.
+27a9ef3dad6dc964.wav	olivia	Yes, please forget it.
+cbd28eec641a09d6.wav	olivia	Priya, my flight to Lisbon leaves at six on Sunday, so I'm off on Monday.
+373bdcf928bb6378.wav	olivia	Lamp, when does my flight leave?
+f1584c98c337a776.wav	olivia	Lamp, what's my brother's name?
+1020617a7ccc5f73.wav	olivia	Hey Lamp, what's my sister's name?
+4721b1a5a632d308.wav	olivia	And when's my dentist?
+3b6b8576f10397bc.wav	olivia	Do you know my favourite colour?
