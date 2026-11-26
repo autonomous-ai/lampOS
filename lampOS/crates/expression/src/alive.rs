@@ -1618,7 +1618,7 @@ impl Life {
         let looking = may_look && !matches!(context.voice, Some(Voice::Thinking | Voice::Speaking));
         // A touch that stops the lamp's speech keeps its look (#8635): it is
         // shown once the voice has stopped, within the look's time.
-        if !looking && !(may_look && context.voice == Some(Voice::Speaking)) {
+        if !(looking || may_look && context.voice == Some(Voice::Speaking)) {
             self.looking_until_us = None;
         }
         self.look_up = if looking {
