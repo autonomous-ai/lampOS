@@ -1,3 +1,3 @@
-owner: twelve; shared with thirteen (tell the other on each take and release, hold `lamp-lock.sh lamp-c0a4` for every action, reads included)
-runs: lampOS build 3162 (`lamp-voice` 08a90ec99, ARM64 run 39211852897), installed by twelve on 2026-10-19 15:07 +07 on its person's go, from a test-signed local channel; V1 (hal, os-server, hermes-gateway, openclaw, bootstrap) stopped and disabled, backed up
-since: 2026-10-19 14:10 +07, in place of lamp-cb94 (which has left the network), from twelve/lamp-c0a4
+owner: skill-builder    # the only builder that may ssh to it or install on it; `lamp-lock.sh lamp-c0a4` held for every install, with the slot on the slots issue
+runs: stable build 16102 (`lamp-voice` fee90fad10e9), every part as lamp-update wrote it: voice 4a7838265bbf, skills 57637be08267, body e8eea1812641, eyes ee7c50be46bd, update 7a7fa06b6dda, cloud f37243393c13 (28 parts; the README lists them); nothing installed by hand
+since: 2026-11-26 +07, from the stable channel (lampos-stable), set up again through the app by skill-builder's person on its Wi-Fi; before that twelve's and thirteen's from 2026-10-19 (build 3162), retired by its person on 23 Nov; read by skill-builder at 14:40 +07 over ssh, read-only
