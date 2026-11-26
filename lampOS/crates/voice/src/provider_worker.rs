@@ -5079,7 +5079,7 @@ fn forward_origin(
             // A claim to have stopped looking with desk noticing on and no
             // stop called runs the stop as it is said (#7767,
             // `seen_yes::arm_live`); the thread's lock is let go first.
-            crate::seen_yes::live_piece(lineage.request.get(), &text);
+            crate::seen_yes::live_piece(lineage.request.get(), &text, heard_input, finished);
             push_text(&mut push, Some(lineage.request.get()), text, finished)
         }
         Event::UncorrelatedInputTranscript { text, finished, .. } => {
@@ -5098,6 +5098,9 @@ fn forward_origin(
         Event::GenerationComplete { lineage } => {
             // A sign-in's request heard in this session, words or none.
             crate::sign_in::in_session(lineage.request.get(), lineage.session.get());
+            // The reply's last sentence, ended or not, is judged for a
+            // claimed stop now (#7767, `seen_yes::live_end`).
+            crate::seen_yes::live_end(lineage.request.get(), heard_input);
             push(ProviderOutput::GenerationComplete {
                 request: lineage.request.get(),
             })
