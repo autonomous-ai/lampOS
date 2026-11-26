@@ -3322,6 +3322,8 @@ fn second_route_worker_environment(
         crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT,
         // A call is "Hey Lamp" at a line's start (the product owner, 26 Nov).
         crate::second_provider::NAME_HEY_ONLY_ENVIRONMENT,
+        // The lamp's own news gets the conversation's 20 s (the same day).
+        crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT,
         crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT,
         // "Hey, Lynn. …" keeps a sure hearing in a busy room (the owner's
         // first rule, 25 Nov 2026).
@@ -3838,6 +3840,7 @@ mod tests {
             crate::second_provider::NEWS_REPLY_HEEDS_HELD_ENVIRONMENT,
             crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT,
             crate::second_provider::NAME_HEY_ONLY_ENVIRONMENT,
+            crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT,
             crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT,
             crate::second_provider::NAME_GREETED_STAND_IN_ENVIRONMENT,
             crate::attention::MOM_NOT_THE_NAME_ENVIRONMENT,
@@ -5143,6 +5146,7 @@ mod tests {
                     || name == crate::second_provider::NEWS_REPLY_HEEDS_HELD_ENVIRONMENT
                     || name == crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT
                     || name == crate::second_provider::NAME_HEY_ONLY_ENVIRONMENT
+                    || name == crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT
                     || name == crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT
                     || name == crate::second_provider::NAME_GREETED_STAND_IN_ENVIRONMENT
                     || name == crate::attention::MOM_NOT_THE_NAME_ENVIRONMENT
@@ -5534,6 +5538,7 @@ mod tests {
                     "LAMP_NUDGE_CLAIM_CHECKED=on",
                     "LAMP_ONE_AS_LAMP=on",
                     "LAMP_ONE_FACE_REMINDERS=on",
+                    "LAMP_ONE_REPLY_WINDOW=on",
                     "LAMP_OPENS_FURTHER=on",
                     "LAMP_OWNER_LINK=on",
                     "LAMP_OWNER_PLACE=on",
