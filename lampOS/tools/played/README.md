@@ -5,6 +5,16 @@ A Mac beside the lamp speaks scripted lines from its own speakers, in macOS
 session over ssh to print what the lamp heard and said, and when. A played
 voice is a smoke test: the lamp hears replayed speech worse than a person.
 
+**Other voices (`PLAYED_WAV_DIR`, off unless set):** a line already rendered
+in that folder as `<sha12 of "VOICE|TEXT">.wav` (16 kHz, 16-bit mono, e.g.
+the ElevenLabs set in the draft release `kit-played-el-1126`, with its
+`voices.tsv` from each macOS speaker to its ElevenLabs voice) is played as
+it is, in `scenario.py`'s `wav_for`; any other line falls back to `say`.
+`stop-lines.sh` takes `STOP_LINES_SAY=el-say.sh`, a `say` stand-in that does
+the same. A figure in other voices is no figure in macOS voices: October's
+74.7% two-person floor was scored in macOS voices, so the first run in
+another set scores stable in it too, as that set's own baseline.
+
 `battery.sh LABEL` runs the whole played test, about 17 minutes:
 
 1. **Two people** (`twopeople829.sh`, one round, #829): four scenes of two

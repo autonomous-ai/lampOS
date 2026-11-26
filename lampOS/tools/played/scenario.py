@@ -22,6 +22,10 @@ SSH_ENV = dict(os.environ, LAMP_SSH_TIMEOUT='5')
 RATE = os.environ.get('LAMP_SAY_RATE', '185')
 
 def wav_for(voice, text):
+    # PLAYED_WAV_DIR (off by default): a line already rendered there as <sha12 of "voice|text">.wav (16 kHz 16-bit
+    # mono, e.g. ElevenLabs) is played as it is; any other line falls back to `say`.
+    pre = os.environ.get('PLAYED_WAV_DIR') and f"{os.environ['PLAYED_WAV_DIR']}/{hashlib.sha256(f'{voice}|{text}'.encode()).hexdigest()[:12]}.wav"
+    if pre and os.path.exists(pre): return pre
     key = hashlib.sha256(f'{voice}|{RATE}|{text}'.encode()).hexdigest()[:16]
     path = f'{V}/prompts/generated/{key}.wav'
     if not os.path.exists(path):
