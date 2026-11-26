@@ -586,13 +586,31 @@ const ASKING_WORDS: [&str; 14] = [
 /// sentence and its first piece is cut before any number
 /// ([`is_number`]).
 pub fn asks_live(line: &str) -> bool {
+    asks_live_by(line, true)
+}
+
+/// Whether the person's line asked a live fact, for [`Hold::lets_through`]
+/// (#8615's (d')): as [`asks_live`], but a weather condition alone counts
+/// only in a question ("Will it be sunny in Hanoi?"). kit-8646's "tell me
+/// a short story about a cat who goes to the beach in Da Nang when it's
+/// sunny." names the story's setting and asks nothing live (lamp-52e6, 26
+/// Nov, build 16293: its "sunny" figure was held after the first piece's
+/// audio began, and the story asked again).
+pub fn asks_live_fact(line: &str) -> bool {
+    asks_live_by(line, line.contains('?'))
+}
+
+/// [`asks_live`]'s words, a weather condition ([`CONDITIONS`], some of them
+/// [`WEATHER_WORDS`] too) counted only with `conditions`.
+fn asks_live_by(line: &str, conditions: bool) -> bool {
     let lower = words(line);
     let joined = format!(" {} ", lower.join(" "));
     lower.iter().any(|word| {
         let word = word.trim_end_matches("'s");
+        let condition = CONDITIONS.contains(&word);
         LIVE_WORDS.contains(&word)
-            || WEATHER_WORDS.contains(&word)
-            || CONDITIONS.contains(&word)
+            || WEATHER_WORDS.contains(&word) && !condition
+            || conditions && condition
             || ASKING_WORDS.contains(&word)
     }) || LIVE_PHRASES
         .iter()
@@ -728,6 +746,9 @@ pub(crate) struct Hold {
     /// Whether the person's line [`asks_live`]: only then do the first
     /// words wait ([`Self::holds_back`]).
     asked_live: bool,
+    /// Whether the person's line [`asks_live_fact`]: only then is a
+    /// numberless figure after words out still held ([`Self::lets_through`]).
+    asked_fact: bool,
     /// What this round said, with the switch on: a round held keeps it as
     /// [`Self::echo`] for the round asked again.
     round_said: Vec<String>,
@@ -800,7 +821,7 @@ impl Hold {
     }
 
     /// Whether `sentence`'s figure, which no lookup backs, is said as it
-    /// is: on a line that asked no live fact ([`asks_live`]), once some of
+    /// is: on a line that asked no live fact ([`asks_live_fact`]), once some of
     /// the turn's words were said, and only when the figure has no number
     /// in it ([`is_number`]: a weather condition with a place). The lead's
     /// choice (d') on #8615, 25 Nov 17:50: kit-10824's story about a cat
@@ -811,7 +832,7 @@ impl Hold {
     /// Twelve's HOLD on #8224); so does any figure on a line that asked
     /// one, or before anything was said.
     fn lets_through(&mut self, sentence: &str) -> bool {
-        if self.asked_live || !self.words_out || sentence.split_whitespace().any(is_number) {
+        if self.asked_fact || !self.words_out || sentence.split_whitespace().any(is_number) {
             return false;
         }
         if !std::mem::replace(&mut self.let_through, true) {
@@ -834,12 +855,14 @@ impl Hold {
     /// The person's line, `line`: whether it [`asks_live`].
     #[cfg(test)]
     pub(crate) fn asked(self, line: &str) -> Self {
-        self.asking_live(asks_live(line))
+        self.asking_live(asks_live(line), asks_live_fact(line))
     }
 
-    /// Whether the person's line [`asks_live`], read before it was moved.
-    pub(crate) fn asking_live(mut self, live: bool) -> Self {
+    /// Whether the person's line [`asks_live`] and [`asks_live_fact`],
+    /// read before it was moved.
+    pub(crate) fn asking_live(mut self, live: bool, fact: bool) -> Self {
         self.asked_live = live;
+        self.asked_fact = fact;
         self
     }
 
