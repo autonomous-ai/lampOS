@@ -901,12 +901,52 @@ fn the_route_is_the_voices_model_and_only_with_its_tool_check() {
             .unwrap()
             .contains("openai_compatible URL")
     );
-    // The unit's copy, `own_<name>`, marked out of date by a relayed change.
-    let copy = tempfile::tempdir().unwrap();
-    std::fs::write(copy.path().join("own_deepseek.key"), "ds").unwrap();
-    std::fs::write(copy.path().join("own_deepseek.checked"), "works\ntools").unwrap();
-    let unit = OwnKeys::credentials(copy.path());
-    assert!(unit.route().is_ok());
-    unit.changed().store(true, Ordering::Release);
-    assert!(unit.route().err().unwrap().contains("next start"));
+}
+
+/// No own folder (a new or reset lamp), or one lamp-cloud can't list (a
+/// helper from before #8735 keeps it 0700): the relay, said by its kind.
+#[test]
+fn a_missing_or_unreadable_folder_is_the_relay() {
+    let own = tempfile::tempdir().unwrap();
+    let gone = OwnKeys::folder(&own.path().join("none"));
+    assert!(
+        gone.route()
+            .err()
+            .unwrap()
+            .contains("keys folder can't be read")
+    );
+    let shut = own.path().join("shut");
+    std::fs::create_dir(&shut).unwrap();
+    std::fs::write(shut.join("deepseek.key"), "ds").unwrap();
+    std::fs::write(shut.join("deepseek.checked"), "works\ntools").unwrap();
+    let keys = OwnKeys::folder(&shut);
+    assert!(keys.route().is_ok());
+    std::fs::set_permissions(&shut, std::fs::Permissions::from_mode(0o000)).unwrap();
+    // Root reads past a mode: there is nothing to show then.
+    if std::fs::read_dir(&shut).is_err() {
+        assert!(
+            keys.route()
+                .err()
+                .unwrap()
+                .contains("keys folder can't be read")
+        );
+    }
+    std::fs::set_permissions(&shut, std::fs::Permissions::from_mode(0o700)).unwrap();
+}
+
+/// The folder read is the one root's keys helper keeps (#8735), and the
+/// product unit names it read-only, never a credential copy.
+#[test]
+fn the_own_folder_is_the_helpers_and_the_unit_reads_it_in_place() {
+    assert_eq!(OWN_FOLDER, lamp_setup::keys::FOLDER);
+    let unit = include_str!("../../../../deploy/product/lamp-cloud.service");
+    assert!(
+        unit.lines()
+            .any(|line| line == format!("ReadOnlyPaths=-{OWN_FOLDER}"))
+    );
+    assert!(
+        !unit
+            .lines()
+            .any(|line| line.starts_with("LoadCredential=own:"))
+    );
 }

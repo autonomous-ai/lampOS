@@ -43,7 +43,6 @@ use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -222,50 +221,31 @@ impl Started {
     }
 }
 
+/// Root's keys helper's folder, which the voice loads too
+/// (`lamp_setup::keys::FOLDER`).
+pub const OWN_FOLDER: &str = "/etc/lampOS/voice/own";
+
 /// Where the person's own keys are read (#8735): root's own folder
-/// (`/etc/lampOS/voice/own`) as lamp-cloud's unit hands it in
-/// (`LoadCredential=own:<folder>`, each file `own_<name>`), read again at
-/// each request.
-///
-/// systemd copies a credential once, as the unit starts, so that copy never
-/// changes while lamp-cloud runs. A `keys.set` or `keys.remove` of a model
-/// key that lamp-cloud relays to root's helper therefore marks it out of
-/// date ([`OwnKeys::changed`]): from then until lamp-cloud's next start the
-/// agent is on the relay, so a key the person removed is never used.
+/// ([`OWN_FOLDER`]) itself, `root:lampos` 0750 with its files 0640, so
+/// lamp-cloud (group `lampos`) reads it directly and a key set or removed
+/// takes effect at the next request, with no restart. Read again at each
+/// request: a listing and a few small files.
 #[derive(Debug, Clone)]
 pub struct OwnKeys {
     dir: PathBuf,
-    prefix: &'static str,
-    changed: Arc<AtomicBool>,
 }
 
 impl OwnKeys {
-    /// The unit's credentials folder, `own_<name>` each.
-    pub fn credentials(dir: &Path) -> Self {
-        Self {
-            dir: dir.to_path_buf(),
-            prefix: "own_",
-            changed: Arc::default(),
-        }
-    }
-
-    /// The own folder itself, `<name>` each.
+    /// The own folder at `dir`, `<service>.key` and the rest.
     pub fn folder(dir: &Path) -> Self {
         Self {
-            prefix: "",
-            ..Self::credentials(dir)
+            dir: dir.to_path_buf(),
         }
-    }
-
-    /// Set when lamp-cloud has relayed a change of a model key: its copy is
-    /// out of date until its next start.
-    pub fn changed(&self) -> Arc<AtomicBool> {
-        self.changed.clone()
     }
 
     /// One file's text, trimmed; `None` when there is none.
     fn read(&self, name: &str) -> Result<Option<String>, ()> {
-        match std::fs::read_to_string(self.dir.join(format!("{}{name}", self.prefix))) {
+        match std::fs::read_to_string(self.dir.join(name)) {
             Ok(text) => Ok(Some(text.trim().to_owned())),
             Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
             Err(_) => Err(()),
@@ -274,10 +254,13 @@ impl OwnKeys {
 
     /// The person's own model the agent chats with, or why the relay.
     fn route(&self) -> Result<OwnRoute, String> {
-        if self.changed.load(Ordering::Acquire) {
-            return Err("the person's model key changed after lamp-cloud started; \
-                        it is read again at lamp-cloud's next start"
-                .into());
+        // No folder (a new or reset lamp) or no access (a helper from
+        // before #8735 keeps it 0700): the relay, said once.
+        if let Err(error) = std::fs::read_dir(&self.dir) {
+            return Err(format!(
+                "the person's keys folder can't be read ({})",
+                error.kind()
+            ));
         }
         let Some(model) = own_model::PRECEDENCE
             .into_iter()

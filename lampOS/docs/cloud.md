@@ -3572,26 +3572,23 @@ adds the key itself (`lamp_cloud::hermes_llm`).
     own openrouter google/gemini-3.6-flash at openrouter.ai`, or `the
     agent's model: relay (no model key of the person's)` with its reason.
     Never a key.
-  - **Where it reads them:** `LoadCredential=own:/etc/lampOS/voice/own` on
-    `lamp-cloud.service` (a blank `SetCredential=own:\n` when the folder is
-    missing), read again at each request. systemd copies a credential once,
-    when the unit starts, so a key set or removed later is not in that copy.
-    A model key's `keys.set` or `keys.remove` that lamp-cloud relays to the
-    helper therefore puts the agent back on the relay until lamp-cloud's
-    next start (a reboot or an update), said as the route's reason. A key
-    the person removed is never used, and a new one takes effect at
-    lamp-cloud's next start. A live switch needs lamp-cloud to read root's
-    folder itself, which the folder's 0700 does not allow yet (a follow-up
-    on #8735).
-  - **Who can read the key:** lamp-cloud runs as `lampos`, which can read
-    that copy, and the agent runtimes run as `lampos` too. They could read
-    the person's key, as they can read the relay's key (`LoadCredential=key`)
-    today. Moving both keys out of the agent's reach is a follow-up (#8735).
+  - **Where it reads them:** root's keys helper's folder itself,
+    `/etc/lampOS/voice/own` (`hermes_llm::OWN_FOLDER`), read again at each
+    request, so a key set or removed from the app reaches the agent at its
+    next chat, with no restart of lamp-cloud, which would drop the app's
+    link. The helper keeps the folder `root:lampos` 0750 and its files 0640
+    (#8735's setup part), and lamp-cloud runs as group `lampos`;
+    `lamp-cloud.service` names it `ReadOnlyPaths=-/etc/lampOS/voice/own`.
+    No folder, or one it can't list: the relay, said once with the reason
+    (`the person's keys folder can't be read (<kind>)`).
+  - **Who can read the key:** the agent runtimes run as `lampos` too, so
+    they can read the person's key, as they can read the relay's key
+    (`LoadCredential=key`) today.
   - Tests: `hermes_llm::tests::an_own_model_takes_the_agents_chat_and_a_removed_one_gives_it_back`,
     `an_own_401_falls_back_to_the_relay`,
     `a_forged_model_is_still_a_400_on_the_own_route`,
-    `the_route_is_the_voices_model_and_only_with_its_tool_check`, and
-    `settings::tests::a_model_keys_change_marks_the_forwarders_copy`.
+    `the_route_is_the_voices_model_and_only_with_its_tool_check` and
+    `a_missing_or_unreadable_folder_is_the_relay`.
 
 ## Not yet known, for the backend (#1396)
 
