@@ -5099,6 +5099,30 @@ after a take-over, but now for every turn:
   `with_the_switch_a_held_line_carried_or_answered_is_no_talk`,
   `with_the_switch_held_lines_judged_before_either_closes_end_no_conversation`. Not yet
   shown on a lamp: the first builder's row on lamp-52e6.
+- **A run in one voice never makes a busy room, with `LAMP_ONE_VOICE_NOT_BUSY=on`**
+  (on in the product, off unless set elsewhere, #8771). The room turns
+  busy on a run of lines the lamp said nothing to: three inside a minute,
+  two from a quiet room (`room_told.rs`, `BUSY_RUN`, `QUIET_ENDS_RUN`).
+  With `LAMP_ROOM_HELD_TALK` a line held as said to nobody joins that run,
+  a lone voice's too; so on lamp-74ff on 26 Nov the owner's own tries at
+  the lamp, a camera that read their face as turned away and a name heard
+  under the sure score, turned the room busy, and their calls after it
+  were dropped. With the switch, each line the rule judges is told to the
+  room with its voice against the line that joined the run before it
+  (`Heeding::same_voice_as`, the window's prints, `same_voice::alike`): the
+  same at `SAME_FROM` (0.70) or more, another under `DIFFERENT_BELOW`
+  (0.30), not known between the bars or with a print missing
+  (`one_voice_mark`). A run whose lines after its first are all the same
+  voice leaves the room as it was (`RoomTold::run_in_one_voice`); a line
+  not known, or another voice, counts as before, so a room with no prints
+  turns busy as before, and two people talking still make it busy. Journal
+  at start: `turns the room busy only when they are not all one voice`;
+  per line, `its voice against request N's, the busy room's last line`.
+  Latency: none, a cosine of two prints already made, at the verdict.
+  Tests (the first fails with the switch off):
+  `with_the_switch_a_run_in_one_voice_never_makes_the_room_busy`,
+  `with_the_switch_another_voice_after_one_voices_run_makes_the_room_busy`,
+  `one_voice_marks_read_the_prints_bars`. Not yet played on a lamp.
 - **A decline says nothing and starts no conversation, with
   `LAMP_DECLINE_SILENT=on`** (off unless set, #3945). Two gaps it closes.
   Words the model streams before its `not_for_me` call ("Sure, I'll stay

@@ -5707,6 +5707,19 @@ pub fn serve(
                 }
             }
         }
+        // A run in one voice never makes a busy room (`LAMP_ONE_VOICE_NOT_BUSY=on`,
+        // #8771): one person trying to reach the lamp is no one talking past it.
+        if crate::second_provider::one_voice_not_busy_on() {
+            eprintln!(
+                "lamp-voice second: a run of lines the lamp said nothing to turns the room busy only when they are not all one voice, by their prints; a line with no print counts as before (LAMP_ONE_VOICE_NOT_BUSY)"
+            );
+            if let Ok(mut room) = crate::room_told::room().lock() {
+                room.count_one_voice(true);
+            }
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.telling_the_room_each_voice();
+            }
+        }
         // Held desk talk makes a busy room (`LAMP_ROOM_HELD_TALK=on`, #7332).
         if std::env::var(crate::second_provider::ROOM_HELD_TALK_ENVIRONMENT)
             .is_ok_and(|value| value == "on")
@@ -8806,6 +8819,9 @@ pub(crate) struct Heeding {
     /// With it, `LAMP_NO_FACE_FOLLOW_UP_BY_VOICE=on`
     /// ([`Self::renewing_no_face_follow_ups_by_voice`]).
     no_face_by_voice: bool,
+    /// `LAMP_ONE_VOICE_NOT_BUSY=on` ([`Self::telling_the_room_each_voice`],
+    /// #8771): each judged line's voice against the run's last, for the room.
+    one_voice_not_busy: bool,
     /// `LAMP_NAME_SIGN_TIED` (#8092): the request `LAMP_SAID_TO_ME` let out
     /// as the one answer with no look to the lamp's waiting question
     /// ([`crate::said_to_me::Said::AnswerNoLook`]), or as the one cut-in
@@ -9365,6 +9381,19 @@ fn speakers_between(
 }
 
 /// `began_us..ended_us`, by this process's monotonic clock, as instants.
+/// `LAMP_ONE_VOICE_NOT_BUSY` (#8771): two lines' likeness as the room reads
+/// it: the same voice at [`crate::same_voice::SAME_FROM`] or more, another
+/// under [`crate::same_voice::DIFFERENT_BELOW`], not known between.
+pub(crate) fn one_voice_mark(likeness: f32) -> Option<bool> {
+    if likeness >= crate::same_voice::SAME_FROM {
+        Some(true)
+    } else if likeness < crate::same_voice::DIFFERENT_BELOW {
+        Some(false)
+    } else {
+        None
+    }
+}
+
 fn line_between(began_us: u64, ended_us: u64) -> Option<(Instant, Instant)> {
     let (now, now_us) = (Instant::now(), monotonic_us());
     let at = |us: u64| {
@@ -10075,6 +10104,7 @@ impl Heeding {
             follow_up_renews: false,
             no_face_renews: false,
             no_face_by_voice: false,
+            one_voice_not_busy: false,
             no_look_answer: None,
             look_free_used: false,
             follow_up_line: None,
@@ -10727,6 +10757,24 @@ impl Heeding {
     /// answered every one.
     pub(crate) fn renewing_no_face_follow_ups_by_voice(&mut self) {
         self.no_face_by_voice = true;
+    }
+
+    /// `LAMP_ONE_VOICE_NOT_BUSY=on` (#8771): each judged line's voice is told
+    /// to the room against the line that last joined its run, so a run in one
+    /// voice never turns the room busy (`room_told::RoomTold::count_one_voice`).
+    pub(crate) fn telling_the_room_each_voice(&mut self) {
+        self.one_voice_not_busy = true;
+    }
+
+    /// `request`'s voice against `last`'s, by the window's prints: the same
+    /// at [`crate::same_voice::SAME_FROM`] or more, another under
+    /// [`crate::same_voice::DIFFERENT_BELOW`], and not known between the bars
+    /// or with a print missing (#8771).
+    fn same_voice_as(&mut self, last: u64, request: u64) -> (Option<bool>, Option<f32>) {
+        let likeness = self
+            .window_voices()
+            .and_then(|voices| voices.alike(last, request));
+        (likeness.and_then(one_voice_mark), likeness)
     }
 
     /// The call a line said in `window` goes on from: the person's last
@@ -13752,6 +13800,19 @@ impl Heeding {
                 .as_ref()
                 .and_then(|(bus, _)| crate::bus_out::faces_in_view(bus))
                 .is_some_and(|faces| faces <= 1);
+        // `LAMP_ONE_VOICE_NOT_BUSY` (#8771): this line's voice against the
+        // line that last joined the busy room's run, read before the verdict
+        // borrows the rule, told to the room with the verdict below.
+        let one_voice = if self.one_voice_not_busy {
+            let last = crate::room_told::room()
+                .lock()
+                .ok()
+                .and_then(|room| room.last_joined())
+                .filter(|last| *last != request);
+            last.map(|last| (last, self.same_voice_as(last, request)))
+        } else {
+            None
+        };
         let attention = &mut self.attention;
         attention.one_person_present(one_person);
         let (heard, busy, lamp_asked, turned) =
@@ -14040,6 +14101,21 @@ impl Heeding {
             }
             if self.face_not_speaking == Some(request) {
                 room.face_not_speaking(request);
+            }
+            // `LAMP_ONE_VOICE_NOT_BUSY`: this line's voice against the run's
+            // last, read above, kept until it joins (#8771).
+            if let Some((last, (same, likeness))) = one_voice {
+                if let Some(likeness) = likeness {
+                    eprintln!(
+                        "lamp-voice second: request {request}: its voice against request {last}'s, the busy room's last line: {} ({likeness:.2}) (LAMP_ONE_VOICE_NOT_BUSY)",
+                        match same {
+                            Some(true) => "the same",
+                            Some(false) => "another",
+                            None => "not known",
+                        }
+                    );
+                }
+                room.voice_of(request, same);
             }
             room.judged(request, verdict, seen.other_voice);
             if called {
@@ -16599,6 +16675,17 @@ mod route_checks;
 
 #[cfg(test)]
 mod tests {
+    /// #8771: the room reads a likeness by the same bars as the prints'.
+    #[test]
+    fn one_voice_marks_read_the_prints_bars() {
+        use crate::same_voice::{DIFFERENT_BELOW, SAME_FROM};
+        assert_eq!(super::one_voice_mark(SAME_FROM), Some(true));
+        assert_eq!(super::one_voice_mark(0.95), Some(true));
+        assert_eq!(super::one_voice_mark(DIFFERENT_BELOW - 0.01), Some(false));
+        assert_eq!(super::one_voice_mark(DIFFERENT_BELOW), None, "between the bars");
+        assert_eq!(super::one_voice_mark(SAME_FROM - 0.01), None, "between the bars");
+    }
+
     /// Exercise optional confirmation and summaries independently through the
     /// production async batch; pending TLS stays on this current-thread reactor.
     #[tokio::test(flavor = "current_thread")]
