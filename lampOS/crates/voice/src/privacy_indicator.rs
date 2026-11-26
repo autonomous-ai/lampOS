@@ -467,9 +467,12 @@ impl State {
         let written = ring
             .show_privacy_look(observed, look)
             .map_err(io::Error::other)?;
+        // The look is told only with the switch on: off, the journal is as
+        // before (the Reviewer-lead's P3 on #8733).
         if !ring.privacy_shown() {
             self.said = None;
         } else if let Some(receipt) = written
+            && self.looks.is_some()
             && self.said != Some(look)
         {
             eprintln!(
