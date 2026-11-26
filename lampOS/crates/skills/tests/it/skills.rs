@@ -9153,12 +9153,20 @@ body = { mood = "reading", for = "10s", toward = -0.5 }
 /// lamp's health says the body is down, or the body says it does not
 /// stand this run, is refused: the model is told it can't move and why,
 /// and no gesture is asked of the body. A body that is up still moves.
+/// A call so refused is no run: its `[again]` while has not begun, so the
+/// dance asked once the body is up is not "You just danced." (#8640's row
+/// on lamp 16345); the dance that did run starts it.
 #[test]
 fn a_gesture_is_refused_aloud_while_the_body_is_down() {
     let jive = r#"
 tool = "jive"
 [permissions]
 body = true
+topics = ["voice/heard"]
+[again]
+within = "45s"
+if_heard = ["again"]
+told = "You just danced."
 [[do]]
 body = { gesture = "nod" }
 "#;
@@ -9219,10 +9227,24 @@ body = { gesture = "nod" }
         .unwrap();
     limits.publish_json(2, &stands(false)).unwrap();
     refused(&program);
-    // Up and standing: it moves.
+    // Up and standing: it moves, within 45 s of the refusals.
     limits.publish_json(3, &stands(true)).unwrap();
-    assert_eq!(program.call("jive", "{}")["ok"], true);
+    let answer = program.call("jive", "{}");
+    assert_eq!(answer["ok"], true, "{answer}");
     assert!(program.said().iter().any(|said| said.contains("nod")));
+    // The dance that ran is the one the while counts from: once its run
+    // is over (no `over` comes, so it gives up on the clip), 20 s on, a
+    // call is refused as just danced.
+    program.clock.skip(Duration::from_secs(20));
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let again = loop {
+        let answer = program.call("jive", "{}");
+        if answer["error"] != "I'm still doing that." || Instant::now() > deadline {
+            break answer;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    };
+    assert_eq!(again["error"], "You just danced.", "{again}");
 }
 
 /// #4135: a `stand` step is a percent of the lamp's own stand, 1 to 100,
