@@ -1294,6 +1294,32 @@ mod tests {
         assert_eq!(hold.take(), None);
     }
 
+    /// #8615's (d'), V2's ruling 26 Nov 18:35: a weather condition in the
+    /// person's line asks a live fact only in a question, by its '?' or by
+    /// a question's words (speech to text drops the '?' too often); a
+    /// story's setting asks none (kit-8646's s1).
+    #[test]
+    fn a_condition_asks_a_live_fact_only_in_a_question() {
+        for line in [
+            "will it be sunny in Hanoi",
+            "is it raining in Hue",
+            "Hey Lamp, is it raining in Hue",
+            "Lamp, tell me, will it be sunny in Hanoi",
+            "Will it be sunny in Hanoi?",
+        ] {
+            assert!(asks_live_fact(line), "{line}");
+        }
+        for line in [
+            "the beach in Da Nang when it's sunny",
+            "Hey Lamp, tell me a short story about a cat who goes to the beach in Da Nang when it's sunny.",
+            "a cat who loved rainy days",
+            // Known limit: a question put another way, with no '?'.
+            "I wonder if it's sunny in Hanoi",
+        ] {
+            assert!(!asks_live_fact(line), "{line}");
+        }
+    }
+
     /// The first words wait only on a line that asks for a live fact
     /// (the first builder on #8224, rule 7), never for a number in the
     /// reply: a timer or a count asked plainly never waits.
