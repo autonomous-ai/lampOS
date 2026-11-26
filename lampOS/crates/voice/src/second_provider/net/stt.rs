@@ -21,6 +21,9 @@ use tokio_tungstenite::{
 mod flux;
 mod sent_level;
 
+use sent_level::SentLevel;
+pub use sent_level::{arguments as sent_floor_arguments, take as take_sent_floor};
+
 const MODEL: &str = "nova-3-general";
 const DEEPGRAM: &str = "wss://api.deepgram.com/v1/listen";
 /// Deepgram closes a socket that hears nothing for 10 s.
@@ -415,11 +418,28 @@ pub struct Replies {
     /// reason, the socket ending, or a failure (#1047, the first builder at
     /// 20:58).
     ended: std::sync::Mutex<Option<String>>,
+    /// The level of the audio sent, counted where each block goes out, for
+    /// the line's end (#8776).
+    sent: std::sync::Mutex<SentLevel>,
 }
 
 impl Replies {
     fn count(&self, kind: &AtomicUsize) {
         kind.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Audio going out on the stream: its level, for the line's end.
+    fn sent(&self, bytes: &[u8]) {
+        if let Ok(mut sent) = self.sent.lock() {
+            sent.sent(bytes);
+        }
+    }
+
+    /// The level sent so far, as the line's end says it (#8776).
+    fn sent_told(&self) -> String {
+        self.sent
+            .lock()
+            .map_or_else(|_| String::new(), |sent| sent.told())
     }
 
     fn end(&self, how: String) {
@@ -704,7 +724,10 @@ impl SttStream {
         let (said, words) = mpsc::unbounded_channel();
         let (final_of, finals) = mpsc::unbounded_channel();
         let (early_words, early) = mpsc::unbounded_channel();
-        let replies = Arc::new(Replies::default());
+        let replies = Arc::new(Replies {
+            sent: std::sync::Mutex::new(SentLevel::new(sent_level::floor())),
+            ..Replies::default()
+        });
         let quiet_end = Arc::new(AtomicBool::new(false));
         let task = if on_flux {
             tokio::spawn(flux::run(
@@ -828,13 +851,28 @@ impl SttStream {
     /// `request`, what the words' state was when the line ended.
     pub async fn finish(self, request: u64) -> Result<String> {
         let queued = self.queued_samples.load(Ordering::Relaxed);
-        let (words, at_end) = self.finish_told(true).await?;
+        let (words, line) = self.finish_line(request).await?;
         // What this line's sound came to, for the day (#7347).
         crate::day_tally::line_ended(Some(request), queued, words.trim().is_empty());
-        if let Some(at_end) = at_end {
-            eprintln!("lamp-voice second: request {request} at the line's end: {at_end}");
+        if let Some(line) = line {
+            eprintln!("{line}");
         }
         Ok(words)
+    }
+
+    /// The words, and the journal's line for `request`'s end: the account
+    /// of the end of the line, then the level of what was sent (#8776),
+    /// last so that what reads the line by its older words still finds them.
+    async fn finish_line(self, request: u64) -> Result<(String, Option<String>)> {
+        let replies = Arc::clone(&self.replies);
+        let (words, at_end) = self.finish_told(true).await?;
+        let level = replies.sent_told();
+        Ok((
+            words,
+            at_end.map(|at_end| {
+                format!("lamp-voice second: request {request} at the line's end: {at_end}{level}")
+            }),
+        ))
     }
 
     /// The same, without the journal's line: for a stop word's words
@@ -1125,6 +1163,8 @@ where
                             samples_sent += bytes.len() / 2;
                             // Counted for the day, with LAMP_VOICE_DAY_TALLY=on (#7347).
                             crate::day_tally::heard(bytes.len() / 2);
+                            // And its level, for the line's end (#8776).
+                            replies.sent(&bytes);
                             write
                                 .send(Message::binary(bytes))
                                 .await
@@ -3203,7 +3243,7 @@ mod tests {
         let stream =
             SttStream::start(WebSocketStream::from_raw_socket(near, Role::Client, None).await);
         // -28 dBFS on the face's scale, as `--faint-floor-db -28` gives it.
-        *stream.sent.lock().unwrap() = SentLevel::new(Some(150));
+        *stream.replies.sent.lock().unwrap() = SentLevel::new(Some(150));
         for _ in 0..25 {
             stream.send(&[SOUND; 320]).unwrap();
         }
@@ -3215,7 +3255,7 @@ mod tests {
             line.starts_with("lamp-voice second: request 7 at the line's end: settled="),
             "{line}"
         );
-        assert!(line.contains("finals cover 500 of 500 ms sent"), "{line}");
+        assert!(line.contains("finals cover none of 500 ms sent"), "{line}");
         assert!(line.contains("results 0 with words, 1 without"), "{line}");
         assert!(
             line.ends_with(
