@@ -10098,6 +10098,18 @@ impl Engine {
             }
         }
         self.invalidate_changes(now_us);
+        // A Stop or mute press starts no skill run (#8651): a person who
+        // presses to quiet the lamp gets quiet, every time. A pet still does.
+        let quiet_press = topic == lamp_msgs::ControlGesture::TOPIC
+            && matches!(value["intent"].as_str(), Some("stop" | "software_mute"));
+        if quiet_press
+            && self
+                .skills
+                .iter()
+                .any(|skill| skill.triggers.iter().any(|trigger| trigger.topic == topic))
+        {
+            eprintln!("lamp-skills: a Stop press starts no skill run (#8651)");
+        }
         let mut runs = kept_dropped;
         let mut stood_in_for: Vec<String> = Vec::new();
         let minute = self.local_minute(now_us);
@@ -10151,6 +10163,7 @@ impl Engine {
                         .ran_us = Some(now_us);
                 }
                 if trigger.topic != topic
+                    || quiet_press
                     || (more && !hears_more_with(&self.seen_more, self.desk_noticing, skill))
                 {
                     continue;
@@ -14373,6 +14386,47 @@ mod tests {
         assert_eq!(ran, 1);
         engine.kept("sip");
         assert!(!engine.unwritten("sip"));
+    }
+
+    /// #8651, the first builder's ruling: a Stop or mute press starts no
+    /// skill run, even of a `controls/gesture` skill that speaks; a person
+    /// who presses to quiet the lamp gets quiet. A pet still runs it.
+    #[test]
+    fn a_stop_press_starts_no_skill_run_and_a_pet_does() {
+        use lamp_msgs::{ControlGesture, ControlIntent};
+        let dir = tempfile::tempdir().unwrap();
+        let folder = write_skill(
+            dir.path(),
+            "press",
+            "version = \"1.0.0\"\n\
+             [permissions]\ntopics = [\"controls/gesture\"]\nspeak = true\n\
+             [trigger]\ntopic = \"controls/gesture\"\nfield = \"enabled\"\nequals = true\n\
+             [ask]\npolicy = \"nudge\"\n\
+             [[do]]\nsay = { text = \"Hello there.\" }\n",
+        );
+        let ran = |intent: ControlIntent, gesture: &str, source: &str| {
+            let mut engine = Engine::new(vec![load(&folder).unwrap()], true);
+            let message = serde_json::json!({
+                "source": source,
+                "gesture": gesture,
+                "intent": intent,
+                "enabled": true,
+            });
+            engine
+                .observe(
+                    ControlGesture::TOPIC,
+                    1_000_000,
+                    message.to_string().as_bytes(),
+                    None,
+                )
+                .into_iter()
+                .filter(|run| !run.calls.is_empty() || run.ask.is_some())
+                .count()
+        };
+        assert_eq!(ran(ControlIntent::Stop, "tap", "button"), 0);
+        assert_eq!(ran(ControlIntent::Stop, "tap", "base"), 0);
+        assert_eq!(ran(ControlIntent::SoftwareMute, "long_press", "button"), 0);
+        assert_eq!(ran(ControlIntent::Pet, "pet", "headpad"), 1);
     }
 
     const PHOTO_BOOTH: &str = "version = \"1.0.0\"\ngrants = [\"camera\", \"light\"]\n\

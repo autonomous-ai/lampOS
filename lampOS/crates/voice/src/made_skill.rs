@@ -11756,7 +11756,10 @@ fn says_what_changes(say: &toml::Value) -> bool {
 /// strip (`controls/touch`), a pat on the head (`controls/pet`), and a tap,
 /// a pet or a long press of the button, the base or a head pad
 /// (`controls/gesture`). Not `controls/state` or `controls/touch_state`,
-/// the controls' standing state, said with no hand at all.
+/// the controls' standing state, said with no hand at all. A Stop or mute
+/// press starts no skill run (lamp-skills, #8651): a person who presses to
+/// quiet the lamp gets quiet, so a `controls/gesture` skill runs only from
+/// a pet.
 const HAND_TOPICS: [&str; 3] = [
     lamp_msgs::TouchEvent::TOPIC,
     lamp_msgs::HeadPet::TOPIC,
@@ -11796,7 +11799,8 @@ const SPEAKING_GRANTS: [&str; 2] = ["speak", "speaker"];
 /// before. So is a skill only a hand on the lamp starts ([`HAND_TOPICS`], the first
 /// builder's ruling on #8651): every one of its triggers is a touch, a pat
 /// or a press, the person at the lamp asking, whom the told answer's quiet
-/// minute would answer a minute late.
+/// minute would answer a minute late. A Stop or mute press starts no skill
+/// run at all (lamp-skills), so of a press only a pet ever runs one.
 fn told_only(toml: &str) -> Result<(), Refused> {
     let Some(how) = speaks_on_its_own(toml) else {
         return Ok(());
