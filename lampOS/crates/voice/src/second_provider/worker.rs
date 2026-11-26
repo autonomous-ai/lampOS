@@ -9380,7 +9380,6 @@ fn speakers_between(
     }
 }
 
-/// `began_us..ended_us`, by this process's monotonic clock, as instants.
 /// `LAMP_ONE_VOICE_NOT_BUSY` (#8771): two lines' likeness as the room reads
 /// it: the same voice at [`crate::same_voice::SAME_FROM`] or more, another
 /// under [`crate::same_voice::DIFFERENT_BELOW`], not known between.
@@ -9394,6 +9393,7 @@ pub(crate) fn one_voice_mark(likeness: f32) -> Option<bool> {
     }
 }
 
+/// `began_us..ended_us`, by this process's monotonic clock, as instants.
 fn line_between(began_us: u64, ended_us: u64) -> Option<(Instant, Instant)> {
     let (now, now_us) = (Instant::now(), monotonic_us());
     let at = |us: u64| {
@@ -13813,6 +13813,7 @@ impl Heeding {
         } else {
             None
         };
+        let one_voice_on = self.one_voice_not_busy;
         let attention = &mut self.attention;
         attention.one_person_present(one_person);
         let (heard, busy, lamp_asked, turned) =
@@ -14103,19 +14104,23 @@ impl Heeding {
                 room.face_not_speaking(request);
             }
             // `LAMP_ONE_VOICE_NOT_BUSY`: this line's voice against the run's
-            // last, read above, kept until it joins (#8771).
-            if let Some((last, (same, likeness))) = one_voice {
-                if let Some(likeness) = likeness {
-                    eprintln!(
-                        "lamp-voice second: request {request}: its voice against request {last}'s, the busy room's last line: {} ({likeness:.2}) (LAMP_ONE_VOICE_NOT_BUSY)",
-                        match same {
-                            Some(true) => "the same",
-                            Some(false) => "another",
-                            None => "not known",
-                        }
-                    );
-                }
-                room.voice_of(request, same);
+            // last, read above, and whether the lamp's name was heard in it,
+            // kept until it joins (#8771).
+            if one_voice_on {
+                let same = one_voice.and_then(|(last, (same, likeness))| {
+                    if let Some(likeness) = likeness {
+                        eprintln!(
+                            "lamp-voice second: request {request}: its voice against request {last}'s, the busy room's last line: {} ({likeness:.2}) (LAMP_ONE_VOICE_NOT_BUSY)",
+                            match same {
+                                Some(true) => "the same",
+                                Some(false) => "another",
+                                None => "not known",
+                            }
+                        );
+                    }
+                    same
+                });
+                room.voice_of(request, same, attention.name_heard_for_the_line());
             }
             room.judged(request, verdict, seen.other_voice);
             if called {
@@ -16682,8 +16687,16 @@ mod tests {
         assert_eq!(super::one_voice_mark(SAME_FROM), Some(true));
         assert_eq!(super::one_voice_mark(0.95), Some(true));
         assert_eq!(super::one_voice_mark(DIFFERENT_BELOW - 0.01), Some(false));
-        assert_eq!(super::one_voice_mark(DIFFERENT_BELOW), None, "between the bars");
-        assert_eq!(super::one_voice_mark(SAME_FROM - 0.01), None, "between the bars");
+        assert_eq!(
+            super::one_voice_mark(DIFFERENT_BELOW),
+            None,
+            "between the bars"
+        );
+        assert_eq!(
+            super::one_voice_mark(SAME_FROM - 0.01),
+            None,
+            "between the bars"
+        );
     }
 
     /// Exercise optional confirmation and summaries independently through the

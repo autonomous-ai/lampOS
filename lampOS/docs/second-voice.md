@@ -5113,7 +5113,11 @@ after a take-over, but now for every turn:
   same at `SAME_FROM` (0.70) or more, another under `DIFFERENT_BELOW`
   (0.30), not known between the bars or with a print missing
   (`one_voice_mark`). A run whose lines after its first are all the same
-  voice leaves the room as it was (`RoomTold::run_in_one_voice`); a line
+  voice, with the lamp's name heard in one of them, kept or dropped
+  (`Attention::name_heard_for_the_line`), leaves the room as it was
+  (`RoomTold::run_in_one_voice`): one person trying to reach the lamp. One
+  voice that never names it, the near side of a phone call, is talk as
+  before (the Reviewer-lead's P2 on #8777). A line
   not known, or another voice, counts as before, so a room with no prints
   turns busy as before, and two people talking still make it busy. Journal
   at start: `turns the room busy only when they are not all one voice`;
@@ -5122,6 +5126,7 @@ after a take-over, but now for every turn:
   Tests (the first fails with the switch off):
   `with_the_switch_a_run_in_one_voice_never_makes_the_room_busy`,
   `with_the_switch_another_voice_after_one_voices_run_makes_the_room_busy`,
+  `with_the_switch_one_voice_that_never_names_the_lamp_still_makes_the_room_busy`,
   `one_voice_marks_read_the_prints_bars`. Not yet played on a lamp.
 - **A decline says nothing and starts no conversation, with
   `LAMP_DECLINE_SILENT=on`** (off unless set, #3945). Two gaps it closes.

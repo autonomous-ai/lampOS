@@ -207,14 +207,16 @@ pub struct RoomTold {
     held_not_spoken_to: bool,
     held_room_talk: VecDeque<u64>,
     /// `LAMP_ONE_VOICE_NOT_BUSY` ([`Self::count_one_voice`], #8771): a run in
-    /// one voice never turns the room busy. Each line's voice against the
-    /// line that last joined the run, as the worker's prints tell it
+    /// one voice that heard the lamp's name never turns the room busy. Each
+    /// line's voice against the line that last joined the run, as the
+    /// worker's prints tell it, and whether the name was heard in it
     /// ([`Self::voice_of`]), kept until the line joins, the newest
     /// [`HELD_KEPT`]; the run's own marks, beside [`Self::unanswered`]; and
     /// the request that joined last.
     one_voice: bool,
-    voice_marks: VecDeque<(u64, Option<bool>)>,
+    voice_marks: VecDeque<(u64, Option<bool>, bool)>,
     run_voices: VecDeque<Option<bool>>,
+    run_names: VecDeque<bool>,
     last_joined: Option<u64>,
     /// The request whose face turned to the lamp was seen not speaking it
     /// (`LAMP_TURNED_FACE_SPEAKS`, [`Self::face_not_speaking`]).
@@ -263,6 +265,7 @@ impl RoomTold {
             one_voice: false,
             voice_marks: VecDeque::new(),
             run_voices: VecDeque::new(),
+            run_names: VecDeque::new(),
             last_joined: None,
             not_speaking: None,
             carried: None,
@@ -306,14 +309,16 @@ impl RoomTold {
     }
 
     /// With `LAMP_ONE_VOICE_NOT_BUSY` (#8771), from now on: a run of things
-    /// the lamp said nothing to turns the room busy only when its lines are
-    /// not all one voice. A busy room is people talking to each other; a run
-    /// in one voice is one person trying to reach the lamp. On lamp-52e6 on
-    /// 26 Nov at 14:55 the lead's own nameless tries, held as said to
-    /// nobody, made the room busy, and every call of theirs after it under
-    /// the sure score was dropped. A line whose voice is not known (no print,
-    /// or between the bars) breaks the one voice, so a run with no prints
-    /// turns the room busy as before.
+    /// the lamp said nothing to turns the room busy unless its lines are all
+    /// one voice and the lamp's name was heard in one of them. A busy room is
+    /// people talking to each other; a run in one voice that calls the lamp
+    /// is one person trying to reach it. On lamp-74ff on 26 Nov the owner's
+    /// own tries, held as said to nobody, made the room busy, and their calls
+    /// under the sure score after it were dropped. One voice that never says
+    /// the name, someone on a call whose far side isn't heard, is talk as
+    /// before (the Reviewer-lead's P2 on #8777). A line whose voice is not
+    /// known (no print, or between the bars) breaks the one voice, so a run
+    /// with no prints turns the room busy as before.
     pub fn count_one_voice(&mut self, on: bool) {
         self.one_voice = on;
     }
@@ -326,17 +331,20 @@ impl RoomTold {
 
     /// `request`'s voice against [`Self::last_joined`]'s, as the worker's
     /// prints tell it: the same (`Some(true)`), another (`Some(false)`), or
-    /// not known (`None`). Read when the line joins the run.
-    pub fn voice_of(&mut self, request: u64, same: Option<bool>) {
-        self.voice_marks.retain(|(of, _)| *of != request);
+    /// not known (`None`, and for a line with no run before it); and whether
+    /// the lamp's name was heard in it, kept or dropped. Read when the line
+    /// joins the run.
+    pub fn voice_of(&mut self, request: u64, same: Option<bool>, named: bool) {
+        self.voice_marks.retain(|(of, ..)| *of != request);
         if self.voice_marks.len() == HELD_KEPT {
             self.voice_marks.pop_front();
         }
-        self.voice_marks.push_back((request, same));
+        self.voice_marks.push_back((request, same, named));
     }
 
-    /// Whether the newest `run` lines of the run are all one voice: each
-    /// after the first the same as the one before it.
+    /// Whether the newest `run` lines of the run are one person calling the
+    /// lamp: each after the first the same voice as the one before it, and
+    /// the lamp's name heard in at least one of them.
     fn run_in_one_voice(&self, run: usize) -> bool {
         run >= 2
             && self.run_voices.len() >= run
@@ -346,6 +354,7 @@ impl RoomTold {
                 .rev()
                 .take(run - 1)
                 .all(|same| *same == Some(true))
+            && self.run_names.iter().rev().take(run).any(|named| *named)
     }
 
     /// `request` was said while the only faces turned to the lamp were seen
@@ -679,6 +688,7 @@ impl RoomTold {
         }
         self.unanswered.clear();
         self.run_voices.clear();
+        self.run_names.clear();
         self.talk_since_spoke = 0;
         self.other_voice_only = false;
         self.talk_counted = self.talk_counted.max(request);
@@ -825,15 +835,17 @@ impl RoomTold {
         if self.unanswered.len() == BUSY_RUN {
             self.unanswered.pop_front();
             self.run_voices.pop_front();
+            self.run_names.pop_front();
         }
         self.unanswered.push_back(now_us);
-        let same = self
+        let (same, named) = self
             .voice_marks
             .iter()
-            .position(|(of, _)| *of == request)
+            .position(|(of, ..)| *of == request)
             .and_then(|at| self.voice_marks.remove(at))
-            .and_then(|(_, same)| same);
+            .map_or((None, false), |(_, same, named)| (same, named));
         self.run_voices.push_back(same);
+        self.run_names.push_back(named);
         self.last_joined = Some(request);
         self.last_talk_us = Some(now_us);
     }
@@ -899,10 +911,12 @@ impl RoomTold {
             // The run has been counted; the next three decide afresh.
             self.unanswered.clear();
             self.run_voices.clear();
+            self.run_names.clear();
         } else if talk_over || no_talk || now_us.saturating_sub(since) >= QUIET_AFTER_US {
             self.room = Room::Quiet;
             self.unanswered.clear();
             self.run_voices.clear();
+            self.run_names.clear();
         }
         self.room
     }
@@ -2336,7 +2350,7 @@ mod tests {
             {
                 if index > 0 {
                     assert_eq!(room.last_joined(), Some(request - 1), "the run's last line");
-                    room.voice_of(request, marks[index - 1]);
+                    room.voice_of(request, marks[index - 1], true);
                 }
                 room.heard(request, at * S);
                 room.ended(request, at * S + S / 2);
@@ -2345,10 +2359,26 @@ mod tests {
             }
             room.at(52 * S)
         };
-        assert_eq!(run([Some(true), Some(true)], true), Room::Unknown, "one voice");
-        assert_eq!(run([Some(true), Some(true)], false), Room::Busy, "without the switch");
-        assert_eq!(run([Some(true), Some(false)], true), Room::Busy, "another voice");
-        assert_eq!(run([None, Some(true)], true), Room::Busy, "a voice not known");
+        assert_eq!(
+            run([Some(true), Some(true)], true),
+            Room::Unknown,
+            "one voice"
+        );
+        assert_eq!(
+            run([Some(true), Some(true)], false),
+            Room::Busy,
+            "without the switch"
+        );
+        assert_eq!(
+            run([Some(true), Some(false)], true),
+            Room::Busy,
+            "another voice"
+        );
+        assert_eq!(
+            run([None, Some(true)], true),
+            Room::Busy,
+            "a voice not known"
+        );
     }
 
     /// #8771: three lines in one voice leave the room as it was; a fourth in
@@ -2363,7 +2393,7 @@ mod tests {
         room.at(0);
         let say = |room: &mut RoomTold, request: u64, at: u64, same: Option<bool>| {
             if let Some(same) = same {
-                room.voice_of(request, Some(same));
+                room.voice_of(request, Some(same), true);
             }
             room.heard(request, at * S);
             room.ended(request, at * S + S / 2);
@@ -2373,8 +2403,49 @@ mod tests {
         };
         assert_eq!(say(&mut room, 1, 10, None), Room::Unknown);
         assert_eq!(say(&mut room, 2, 20, Some(true)), Room::Unknown);
-        assert_eq!(say(&mut room, 3, 30, Some(true)), Room::Unknown, "three in one voice");
-        assert_eq!(say(&mut room, 4, 40, Some(false)), Room::Busy, "a second voice");
+        assert_eq!(
+            say(&mut room, 3, 30, Some(true)),
+            Room::Unknown,
+            "three in one voice"
+        );
+        assert_eq!(
+            say(&mut room, 4, 40, Some(false)),
+            Room::Busy,
+            "a second voice"
+        );
+    }
+
+    /// The Reviewer-lead's P2 on #8777: one voice that never says the lamp's
+    /// name, the near side of a phone call, is talk: its run makes the room
+    /// busy as before. One that called the lamp in the run does not.
+    #[test]
+    fn with_the_switch_one_voice_that_never_names_the_lamp_still_makes_the_room_busy() {
+        use crate::attention::{NOT_SPOKEN_TO, Verdict};
+        let run = |named: bool| {
+            let mut room = RoomTold::new();
+            room.count_only_talk(true);
+            room.count_held_not_spoken_to(true);
+            room.count_one_voice(true);
+            room.at(0);
+            for (request, at) in [(1u64, 10u64), (2, 30), (3, 50)] {
+                room.voice_of(
+                    request,
+                    (request > 1).then_some(true),
+                    named && request == 2,
+                );
+                room.heard(request, at * S);
+                room.ended(request, at * S + S / 2);
+                room.judged(request, Some(Verdict::Hold(NOT_SPOKEN_TO)), false);
+                room.left_unanswered(request, at * S + S);
+            }
+            room.at(52 * S)
+        };
+        assert_eq!(
+            run(false),
+            Room::Busy,
+            "one voice, no name: a call's near side"
+        );
+        assert_eq!(run(true), Room::Unknown, "one voice that called the lamp");
     }
 
     #[test]
