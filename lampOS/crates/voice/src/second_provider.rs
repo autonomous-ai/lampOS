@@ -1087,6 +1087,11 @@ pub const ONE_REPLY_WINDOW_ENVIRONMENT: &str = "LAMP_ONE_REPLY_WINDOW";
 /// does, never held as stray words (`second_provider::worker::LONE_WORDS`).
 pub const SHORT_REPLIES_CARRY_ENVIRONMENT: &str = "LAMP_SHORT_REPLIES_CARRY";
 
+/// [`SHORT_REPLIES_CARRY_ENVIRONMENT`] from this worker's environment.
+pub(crate) fn short_replies_carry_on() -> bool {
+    std::env::var(SHORT_REPLIES_CARRY_ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
 /// `on` exactly, off unless set (#8114, the first builder's 08:54 and 08:57):
 /// a line whose call word is another person's name ("Hey, Lance.", "Dan,
 /// are you done?") is never the lamp's call, however sure lamp-name is,
@@ -2216,6 +2221,9 @@ struct Shared {
     /// Told each line's words once written ([`Engine::telling_words_back`]).
     words_back: Option<WordsBack>,
     asked: Option<Asked>,
+    /// `LAMP_SHORT_REPLIES_CARRY` (#8772): whether a conversation is going on
+    /// for a checked sound ([`Engine::carrying_short_sounds_in_conversation`]).
+    sound_carries: Option<Asked>,
     /// The sounds made while a first round is awaited, when switched on.
     cues: Option<Arc<Cues>>,
     /// When the wait sound comes ([`CUE_AFTER`], or [`CUE_AFTER_ENVIRONMENT`]'s).
@@ -5625,6 +5633,7 @@ impl Engine {
                 line_heard: None,
                 words_back: None,
                 asked: None,
+                sound_carries: None,
                 cues: None,
                 cue_after: CUE_AFTER,
                 every_tool_cued: false,
@@ -6759,6 +6768,18 @@ impl Engine {
     ) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.requested_audio = Some((crate::process::boot_text(boot), runner));
+        }
+        self
+    }
+
+    /// With `LAMP_SHORT_REPLIES_CARRY` (#8772): a checked sound with a word
+    /// in it is judged as a line when `going_on` says a conversation with the
+    /// lamp is going on, whatever the lamp last said: "Two." after "Ready
+    /// when you are!" in a doubling game (lamp-74ff, 26 Nov 21:00). Before
+    /// any turn only.
+    pub fn carrying_short_sounds_in_conversation(mut self, going_on: Asked) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.sound_carries = Some(going_on);
         }
         self
     }
@@ -11930,6 +11951,16 @@ async fn spoken(
     let asked_by_the_lamp = marked
         && text.chars().any(char::is_alphanumeric)
         && shared.asked.as_ref().is_some_and(|asked| asked(request));
+    // `LAMP_SHORT_REPLIES_CARRY` (#8772): in a conversation going on, a sound
+    // with a word in it is judged as a line, the lamp's last words a question
+    // or not.
+    let carried_sound = marked
+        && !asked_by_the_lamp
+        && text.chars().any(char::is_alphanumeric)
+        && shared
+            .sound_carries
+            .as_ref()
+            .is_some_and(|going_on| going_on(request));
     // So too the answer a prepared write's read-back asked for, whatever it
     // says: the model judges it (`services::answer_awaited`).
     let answer_awaited = marked && crate::services::answer_awaited(&text);
@@ -11949,8 +11980,12 @@ async fn spoken(
         && !(asked_by_the_lamp || answer_awaited || task_answer)
         && text.chars().any(char::is_alphanumeric)
         && a_yes_held(&shared);
-    let answers = asked_by_the_lamp || answer_awaited || task_answer || yes_held;
-    if asked_by_the_lamp {
+    let answers = asked_by_the_lamp || carried_sound || answer_awaited || task_answer || yes_held;
+    if carried_sound {
+        eprintln!(
+            "lamp-voice second: request {request}: a short sound with a word in it, in a conversation going on: judged as a line (LAMP_SHORT_REPLIES_CARRY)"
+        );
+    } else if asked_by_the_lamp {
         eprintln!(
             "lamp-voice second: request {request}: a short sound with a word in it, right after the lamp's own question, in a conversation going on: judged as a line"
         );

@@ -6667,6 +6667,17 @@ pub fn serve(
             .unwrap_or_default()
         }));
     }
+    // `LAMP_SHORT_REPLIES_CARRY` (#8772): in a conversation going on, a
+    // checked sound with a word in it is judged as a line, the lamp's last
+    // words a question or not. Its own hook: an empty answer is asked again
+    // only after the lamp's own question, as before.
+    if checked && crate::second_provider::short_replies_carry_on() {
+        let file = thread.clone();
+        engine = engine.carrying_short_sounds_in_conversation(Arc::new(move |_request| {
+            crate::thread::current(file.as_deref(), |thread| thread.going_on(Instant::now()))
+                .unwrap_or_default()
+        }));
+    }
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
