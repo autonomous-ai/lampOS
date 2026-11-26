@@ -70,20 +70,35 @@ lamp also says once when the opt-in is turned off.
    are read on that line only, never cached, so a change to them between
    turns reaches the next one; the Live route has no such note yet. And
    the reply is checked as it is said, on both routes
-   (`seen_yes::claims_stopped`, `seen_yes::ClaimWatch`): a reply that says
-   the lamp stopped looking, or isn't looking ("I've stopped watching your
-   desk", "I've stopped." to a line naming the looking, "I won't look",
-   "no longer watching", "desk noticing is off"), while seen activity or
-   face reads are still on, runs the stop itself, the same kept no as
-   `stop_looking_at_my_desk` (anyone's, `"by":"voice"`, the mark raised),
-   before the second route's piece is given to the voice and as Live's
-   output transcript arrives, with one journal line (`the reply says it
-   stopped looking ... so the stop is run`). The lamp never says it stopped
-   looking while it looks (lamp-06c1's third re-row of #8674, 26 Nov, Q3:
-   "I've stopped watching your desk" with `calls=none`, and the bursts went
-   on). A question, or an offer of a way off ("you can turn it off any
-   time"), is no claim; a reply taken for one wrongly costs one stop the
-   person can undo, so the check matches too often rather than too rarely.
+   (`seen_yes::claims_stopped`, `seen_yes::ClaimWatch`), for a person's
+   spoken turn only (the second route's `Asker::Spoken`, Live's heard
+   turns with a heard line), where `stop_looking_at_my_desk` could run;
+   never a written turn (a skill's say, a look's prompt) or a reminder. A
+   reply that says the lamp itself stopped looking, or isn't looking, in
+   one clause, the lamp as subject ("I've stopped watching your desk", "I
+   won't look", "I'm not looking at your desk", "no longer watching",
+   "desk noticing is off", "my camera is off"), or a bare "I've stopped."
+   to a line asking it to stop looking (`seen_yes::names_the_looking`),
+   while seen activity or face reads are still on, runs the stop itself,
+   the same kept no as `stop_looking_at_my_desk` (anyone's, `"by":"voice"`,
+   the mark raised), before the second route's sentence is given to the
+   voice and as Live's output transcript ends each sentence, with one
+   journal line (`the reply says it stopped looking ... so the stop is
+   run`). The lamp never says it stopped looking while it looks (lamp-06c1's
+   third re-row of #8674, 26 Nov, Q3: "I've stopped watching your desk"
+   with `calls=none`, and the bursts went on). A word of the looking in the
+   person's line alone makes no claim ("Music stopped." to "Let me see,
+   stop the music"), nor a "not" or "off" with no lamp in it ("Try not to
+   look at the screen.", "Take your eyes off the screen and stretch."), nor
+   a question, with its "?" or opening as one ("Should I stop watching?"),
+   nor an offer of a way off ("you can turn it off any time"): where the
+   claim is unclear, it is none. Live's transcript pieces are joined as
+   given (a word split across two is still the word), and a sentence is
+   judged only once it has ended, or at the turn's end
+   (`GenerationComplete`, or the transcript's `finished`); the second
+   route's pieces are whole sentences or clauses with the space between
+   them given back (the Reviewer-lead's three must-fixes on #8674,
+   c7185816145).
    Once both are off (a stop called first), nothing more is written. It
    adds a word check on a sentence already in hand, and on a claim the
    stop's own two small writes. The
