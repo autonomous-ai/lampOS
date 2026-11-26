@@ -139,10 +139,12 @@ one plain path (`reset-plan-product.json`, the rule on #2060), and
   error's kind.
 
 After a change the helper restarts the voice (`systemctl try-restart`) once
-the lamp is quiet, an update's rule (45 s with nobody heard and nothing
-said), and no update is at work: it takes lamp-update's lock and holds it
+the voice has rested 1 s with nobody heard and nothing said
+(`change::KEY_CHANGE_QUIET`, the lead's call on #8710: not an update's
+45 s, so the person's next words already go the new way; a turn in flight
+is waited out, never cut), and no update is at work: it takes lamp-update's lock and holds it
 through the restart (`change::quiet_and_unlocked`, as the zone's
-`lamp-schedule` restart does), since a round puts its build back when the
+`lamp-schedule` restart does, which still waits the 45 s), since a round puts its build back when the
 voice it restarted changes process in its watch (`updates.md` step 9).
 While an update holds the lock it looks again 10 s later, after the quiet
 again. It waits at most 30 minutes in all; otherwise the voice takes it at
