@@ -1113,7 +1113,7 @@ fn the_agent_uses_an_own_model_key_only_once_it_made_a_tool_call() {
     let which = |store: &Store| {
         let (reply, _) = keys::answer(
             r#"{"which":true}"#,
-            &store,
+            store,
             &mut Told(Verdict::Works, vec![]),
             true,
         );
