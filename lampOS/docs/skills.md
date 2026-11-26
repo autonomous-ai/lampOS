@@ -7512,7 +7512,8 @@ the same code for both writers.
   trace as `make_held_ended` with its `why`, the bound's as `"bound"`.
   Past its deep pose the head wanders slowly around it in pitch, roll and
   the base's yaw, never still more than about 6 s ([body.md](body.md), "A
-  long thinking wanders"), so a long one never reads as a machine stuck.
+  long thinking wanders"), so a long one never reads as a machine stuck;
+  a lamp kept down (resting from a load or heat, seated) doesn't wander.
   Tests: `a_make_cut_by_a_gap_keeps_thinking_with_no_turn_until_its_line`,
   `a_capture_gap_keeps_a_makes_thinking_with_no_turn`,
   `a_count_queued_behind_a_stop_never_re_arms_a_makes_thinking`,
@@ -7523,8 +7524,9 @@ the same code for both writers.
   `a_make_let_run_on_is_no_longer_under_way` and
   `the_second_worker_tells_the_makes_under_way_only_on_the_one_path`, with
   `a_long_thinking_wanders_around_its_deep_pose_and_a_short_one_never`,
-  `a_long_thinking_moves_the_heads_pitch_and_roll_and_is_never_still_for_long`
-  and `a_long_thinkings_joints_are_kept_awake_through_its_wander`. Off: today's line,
+  `a_long_thinking_moves_the_heads_pitch_and_roll_and_is_never_still_for_long`,
+  `a_long_thinkings_joints_are_kept_awake_through_its_wander` and
+  `a_kept_down_lamps_long_thinking_moves_nothing`. Off: today's line,
   and no second. Tests: `the_one_path_waiting_line_says_how_long`,
   `a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more`,
   `a_one_path_makes_waiting_line_completes_its_generation_after_its_audio`

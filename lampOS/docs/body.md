@@ -696,7 +696,11 @@ steps:
 The wander is an offset in degrees laid on the thinking pose's counts. A
 person's voice ends it at the next step (listening wins, as before), and
 while the lamp keeps still for someone (`{"quiet":true}`, the voice's care
-hold, #7689) there is none. Every bound the pose has holds it too: the
+hold, #7689) there is none. Nor is there while the lamp is kept down
+(`kept_down`: tired after a load, a heat or tracking rest, unable to lift,
+seated, or a rest that ends folded; the Reviewer-lead's HOLD on #8678): a
+lamp resting from load or heat drives no joint for it and keeps none
+awake. Every bound the pose has holds it too: the
 reach, the speed and acceleration, a hand's hold, a glance. A joint at its
 bound isn't kept awake. At the product unit's `--reach 150,15,1,250` the
 head's roll reach is 1 count at levels 1 and 2 (`stand_roll` 0), so the
@@ -705,7 +709,8 @@ wander a roll of its own at levels 1 and 2 is the owner's call, and it
 isn't made here. Tests: `gesture.rs`'s
 `a_long_thinking_wanders_around_its_deep_pose_and_a_short_one_never` and
 `a_long_thinking_moves_the_heads_pitch_and_roll_and_is_never_still_for_long`,
-and `body/tests.rs`'s `a_long_thinkings_joints_are_kept_awake_through_its_wander`.
+and `body/tests.rs`'s `a_long_thinkings_joints_are_kept_awake_through_its_wander`
+and `a_kept_down_lamps_long_thinking_moves_nothing`.
 The numbers wait on a camera rerun of the long thinking, judged by a
 person: if it reads as fidgeting, the amplitudes are halved first.
 

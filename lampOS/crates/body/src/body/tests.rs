@@ -22543,6 +22543,90 @@ fn a_lamp_folded_hot_stays_down_until_cool_and_then_a_new_line() {
     );
 }
 
+/// The Reviewer-lead's HOLD on #8678: a lamp kept down, here folded hot
+/// under `rest_cools` (down by 15 s, waiting to cool and for a person),
+/// that then thinks a long make from 40 s to 110 s moves nothing for the
+/// wander and keeps no joint awake for it: the pose wants each head joint
+/// where it is, and the head and the base stay put.
+#[test]
+fn a_kept_down_lamps_long_thinking_moves_nothing() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(120));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 3;
+    lamp.heats = (46..=63u8)
+        .zip(0u64..)
+        .map(|(to, n)| (Duration::from_millis(6_000 + 100 * n), 2, to))
+        .chain(
+            (45..=62u8)
+                .rev()
+                .zip(0u64..)
+                .map(|(to, n)| (Duration::from_secs(12 + n), 2, to)),
+        )
+        .collect();
+    let heard = clock.time.clone();
+    let seen_at = clock.time.clone();
+    let mut seen = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits {
+            strain_guard: Some(StrainGuard {
+                load: StrainGuard::LOAD,
+                seconds: StrainGuard::SECONDS,
+                cools: false,
+                rest_cools: true,
+            }),
+            ..Limits::FOLDED
+        },
+        Some(HOME),
+        Some(standing(100, 600)),
+        None,
+        move || {
+            Some(match heard.get().as_secs() {
+                0..2 => (Mood::Listening, 100),
+                40..110 => (Mood::Thinking, 0),
+                _ => (Mood::Resting, 0),
+            })
+        },
+        Asked::default,
+        |glimpse| seen.push((seen_at.get(), *glimpse)),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.retreats.len(), 1, "{:?}", report.retreats);
+    // Past the deep pose (40 s + 4.8 s) to the end of the thinking, kept
+    // down at every step.
+    let thinking: Vec<&Glimpse> = seen
+        .iter()
+        .filter(|(at, glimpse)| {
+            glimpse.mood == Mood::Thinking
+                && (Duration::from_secs(46)..Duration::from_secs(110)).contains(at)
+        })
+        .map(|(_, glimpse)| glimpse)
+        .collect();
+    assert!(thinking.len() > 2_500, "{}", thinking.len());
+    assert!(
+        thinking
+            .iter()
+            .all(|glimpse| glimpse.stand == 0.0 && glimpse.rest_waits.is_some()),
+        "kept down throughout"
+    );
+    for what in ["wanted", "goal", "position"] {
+        let of = |glimpse: &Glimpse| match what {
+            "wanted" => glimpse.wanted,
+            "goal" => glimpse.goals,
+            _ => glimpse.positions,
+        };
+        for index in 0..3 {
+            let low = thinking.iter().map(|g| of(g)[index]).min().unwrap();
+            let high = thinking.iter().map(|g| of(g)[index]).max().unwrap();
+            assert!(
+                high - low <= 2,
+                "joint {index}'s {what} moved: {low} to {high}"
+            );
+        }
+    }
+}
+
 /// #7749: the level asked at `at`, alternating 5 and 2 every 7 s.
 fn level_every_seven(at: Duration) -> u8 {
     if (at.as_secs() / 7).is_multiple_of(2) {

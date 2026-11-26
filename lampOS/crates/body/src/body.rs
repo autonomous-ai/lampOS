@@ -8896,9 +8896,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             _ => (0.0, None),
         };
         // A long thinking's wander around its deep pose (#7418, rule 8), in
-        // degrees: none while kept still for someone (#7689). The reach and
-        // the speed bounds below hold it as they hold the rest.
-        let wandering = gestures.wander(now_us, asked_now.quiet);
+        // degrees: none while kept still for someone (#7689), nor while
+        // kept down (tired, a heat or tracking rest, unable to lift, seated,
+        // a rest that ends folded): a lamp resting from load or heat drives
+        // no joint for it and keeps none awake. The reach and the speed
+        // bounds below hold it as they hold the rest.
+        let wandering = gestures.wander(now_us, asked_now.quiet || kept_down);
         let wander = wandering
             .degrees
             .map(|degrees| degrees * lease::COUNTS_PER_DEGREE);
