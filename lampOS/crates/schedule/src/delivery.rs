@@ -28,11 +28,18 @@ const KIND: &str = "lamp_schedule_delivery_ledger";
 // 2: an attempt retired as abandoned (`RetirementBasis::Abandoned`, #5219). A
 // ledger is written as 2 only while it holds one ([`written_schema`]);
 // otherwise as 1, which a build from before reads as it always did.
-const SCHEMA: u32 = 2;
+// 3: an item rung offline from the generic line, its words not told
+// (`Entry::rung_untold`, #8708). Written as 3 only while one is marked, so a
+// build from before sets it aside as a newer build's, as for every bump.
+const SCHEMA: u32 = 3;
 
-/// The oldest schema whose builds read every record in `state`: 2 with an
-/// abandoned attempt's retirement kept, else 1.
+/// The oldest schema whose builds read every record in `state`: 3 with an
+/// item marked "rung, not told", 2 with an abandoned attempt's retirement
+/// kept, else 1.
 fn written_schema(state: &State) -> u32 {
+    if state.entries.iter().any(|entry| entry.rung_untold) {
+        return 3;
+    }
     if state.entries.iter().any(|entry| {
         entry
             .previous
@@ -430,6 +437,12 @@ struct Entry {
     /// build from before wrote, and then left out, so it reads as before.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     request_id: Option<String>,
+    /// Rung with no link from the generic line, its own words never told
+    /// (`LAMP_OFFLINE_RINGS`, #8708): said in its words once the link is
+    /// back, then cleared. Absent while false, so a ledger with none is
+    /// written as before.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    rung_untold: bool,
 }
 /// An item said and acknowledged, kept past compaction (#5560).
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -534,6 +547,7 @@ impl State {
                     .request_id
                     .as_deref()
                     .is_some_and(|id| !request_id(id))
+                || (entry.rung_untold && view.completion.is_some())
             {
                 return Err(invalid());
             }
@@ -869,6 +883,7 @@ impl<P: Persistence> DeliveryLedger<P> {
             pending_revision: pending.revision(),
             previous: None,
             request_id: Some(pending.request_id().to_owned()),
+            rung_untold: false,
         });
         next.entries
             .sort_by(|a, b| a.view.prepared.key.cmp(&b.view.prepared.key));
@@ -934,18 +949,38 @@ impl<P: Persistence> DeliveryLedger<P> {
         }
         let mut next = self.state.clone();
         next.entries[index].view.completion = Some(proof.clone());
+        // Its words said: no longer "rung, not told" (#8708).
+        next.entries[index].rung_untold = false;
         self.save(next)?;
         Ok(completed)
     }
-    /// Stub (#8708 red): not marked yet.
+    /// The attempt `prepared` was rung with no link from the generic line,
+    /// "You have a reminder.", and its own words were never told
+    /// (`LAMP_OFFLINE_RINGS`, #8708): the item is marked "rung, not told",
+    /// kept across a restart, until its words are said and it is completed
+    /// ([`Self::complete`] clears it).
     pub fn mark_rung_untold(&mut self, prepared: &PreparedToken) -> Result<(), Error> {
-        let _ = prepared;
-        Ok(())
+        self.healthy()?;
+        let index = self.prepared_index(prepared)?;
+        let entry = &self.state.entries[index];
+        if entry.view.completion.is_some() || entry.view.resolution.is_some() {
+            return Err(error("not_prepared"));
+        }
+        if entry.rung_untold {
+            return Ok(());
+        }
+        let mut next = self.state.clone();
+        next.entries[index].rung_untold = true;
+        self.save(next)
     }
-    /// Stub (#8708 red): nothing is marked yet.
+    /// Whether `key`'s item is marked "rung, not told"
+    /// ([`Self::mark_rung_untold`]).
     pub fn rung_untold(&self, key: &DeliveryKey) -> bool {
-        let _ = key;
-        false
+        !self.failed
+            && self
+                .state
+                .index(key)
+                .is_ok_and(|index| self.state.entries[index].rung_untold)
     }
     pub fn plan_ack(
         &mut self,

@@ -113,11 +113,13 @@ pub(crate) fn ring_for(
     cache: Option<&crate::say::tts_cache::TtsCache>,
     clips: &crate::ring_clips::Clips,
 ) -> Ring {
-    // Red stub (#8708): the generic line only.
+    if offer.rung_offline {
+        return Ring::Wait(RUNG_WAITS);
+    }
     let Some(cache) = cache else {
         return Ring::Wait(NO_CLIP);
     };
-    if false && !offer.timer {
+    if !offer.timer {
         let (voice, owners) = (cache.identity(), cache.owners());
         let store = &offer.token.key.store_id;
         let own = std::iter::once((offer.token.key.id, offer.text.as_str()))
@@ -161,16 +163,17 @@ impl OfflineRinger {
         session: Option<u64>,
         read: impl FnOnce() -> Ring,
     ) -> Result<(u64, Ring), Option<&'static str>> {
-        // Red stub (#8708): read every pass.
-        let _ = &self.waiting;
-        let ring = match session.or(Some(0)) {
+        if self.waiting.as_deref() == Some(key) {
+            return Err(None);
+        }
+        let ring = match session {
             None => Ring::Wait(NO_SESSION),
             Some(session) => match read() {
                 Ring::Wait(why) => Ring::Wait(why),
                 ring => return Ok((session, ring)),
             },
         };
-        let _ = key;
+        self.waiting = Some(key.to_owned());
         match ring {
             Ring::Wait(why) => Err(Some(why)),
             _ => Err(None),
