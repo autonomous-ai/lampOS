@@ -1886,7 +1886,12 @@ fn named_beside(settings: &Settings, key: &str) -> BTreeSet<String> {
 ///
 /// A skill told by its `when` line ([`skill_whens`]) is given its whole
 /// words with it ([`crate::use_skill::now`], #6218).
-fn told_ran(settings: &Settings, skills: &[Tool], skill: &str, told: &mut Value) {
+///
+/// The FAQ's agent answer is told which agent and text model this lamp
+/// uses now ([`crate::faq_now::add`], #8729).
+fn told_ran(settings: &Settings, skills: &[Tool], call: &ToolCall, told: &mut Value) {
+    let skill = call.name.as_str();
+    crate::faq_now::add(skill, &call.args, told);
     if search_walk(settings, skill).is_none() {
         crate::use_skill::ran(skill, told);
     }
@@ -2066,7 +2071,7 @@ fn run_spoken_call_inner(
                         settings, &found, &skill, request, heard, context, lease,
                     );
                     if answered {
-                        told_ran(settings, &skills, &skill.name, &mut answer.told);
+                        told_ran(settings, &skills, &skill, &mut answer.told);
                     }
                     (whom, answer, answered)
                 }
@@ -3070,7 +3075,7 @@ fn run_call_with_scope(
                         let (whom, (mut told, answered)) =
                             run_call_with_scope(&found, &skill, request, heard, lease);
                         if answered {
-                            told_ran(settings, &skills, &skill.name, &mut told);
+                            told_ran(settings, &skills, &skill, &mut told);
                         }
                         (whom, (told, answered))
                     }

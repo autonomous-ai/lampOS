@@ -146,7 +146,7 @@ fn each_topic_is_told_its_section_within_the_link() {
         }
         topics += 1;
     }
-    assert_eq!(topics, 13);
+    assert_eq!(topics, 14);
     let none = told_of(Value::Null, &[], &[]);
     assert!(
         none["next"]
@@ -668,4 +668,35 @@ fn the_about_section_names_the_product_page_and_no_price() {
     assert!(about.contains("made by Autonomous"), "{about}");
     assert!(about.contains("autonomous.ai/lamp"), "{about}");
     assert!(!about.contains('$'), "{about}");
+}
+
+/// #8729: the agent section never names Linked accounts, says an agent is
+/// no account to link, and its call is told, beside it, which agent and
+/// text model this lamp uses now (`lamp_voice::faq_now`), still within what the link carries.
+#[test]
+fn the_agent_answer_names_no_linked_accounts_and_is_told_this_lamp_now() {
+    let skill = faq();
+    let agent = &skill
+        .knowledge
+        .as_ref()
+        .unwrap()
+        .section("agent")
+        .unwrap()
+        .text;
+    assert!(!agent.contains("Linked accounts"), "{agent}");
+    assert!(agent.contains("isn't an account you link"), "{agent}");
+    assert!(agent.contains(lamp_voice::faq_now::KEY), "{agent}");
+    let args = json!({ "topic": "agent" });
+    let mut answer = told_of(args.clone(), &[], &[]);
+    lamp_voice::faq_now::add("lamp_help", &args, &mut answer);
+    let now = answer[lamp_voice::faq_now::KEY].as_str().unwrap();
+    assert!(
+        now.starts_with("Read from this lamp's own settings now: "),
+        "{now}"
+    );
+    assert!(
+        lamp_voice::tools::sendable(&answer),
+        "{}",
+        answer.to_string().len()
+    );
 }

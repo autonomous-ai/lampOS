@@ -2576,7 +2576,7 @@ and version and held to the add-on limits, for a judge. Without
 | Smoky air, Dusty air (#1684) | core | **Held until measured.** The air at the desk suddenly smoky (PM2.5 up 100 µg/m³ within 3 minutes, to 150 or more, held 30 s): one exact line, a small lift and an amber breath, once a spell, at any hour; and very dusty for an hour (125 or more): one exact line, at most once a day, in the daytime, with someone at the desk. Neither is a smoke alarm, which only the docs say (here and [air.md](air.md)): their lines, their `SKILL.md` descriptions and what the model is told to answer never say fire, alarm or smoke alarm; Smoky air's line begins "The air reads like smoke". Neither declares a `[stop]`, so a passing "stop" cannot snooze the smoke line (#1837's P3). Installed disabled (`install::PRODUCT_SKILLS_OFF`) until the four real traces (kettle steam, toast, a candle blown out, a match) are recorded on a lamp with an air sensor and their numbers are decided from the replays; their cases are written by a script, and those four are placeholders, to be replaced by the real recording (#1684). Their thresholds are provisional until then. For a trial, see [air.md](air.md), "Smoky air and Dusty air on a trial lamp" |
 | Feelings (#3691) | core | What the lamp felt, shown as a creature would: Mood's `felt` on `mood/state` (glad, lively, low; [mood.md](mood.md)) as a small head move of its own and a step of light from the person's, never brighter. Installed disabled (`install::PRODUCT_SKILLS_OFF`) until its lamp check, and it does nothing without Mood (`LAMP_MOOD=on`), which stays trial-only with Tone |
 | Light scenes, Point the light (`point-light`), Light show | core | Asked for by a person, never on their own (#1679): a scene's light, kept, with the head over the desk for reading and focus; the head over the desk and turned toward what the model's look saw there ("light my book"; its line says it puts the light on a thing the person names on the desk, and the second route's `take_a_look` says that is point_light's, #8175); a show of slow-changing colours under a minute. Light show comes with the product since #5745, Light scenes and Point the light since #5744 (`light_show`, `light_scene`, `point_light`, reached through `use_skill`, `LAMP_USE_SKILL=on`) |
-| How to use the lamp (`faq`, #5790) | core | Asked by a person, never on its own: "how do I...", "what can you do?", "where do I link my calendar?", "help", "how do reminders work?"; not for their own reminders or timers, which are `list_reminders`' (#8181). Its tool `lamp_help`, reached through `use_skill`, with `topic` (`abilities`, the default, `connectors`, `controls`, `light`, `reminders`, `nudges`, `guard_mode`, `skills`, `updates`, `unplug`, `memory`, `setup`, `about`: who made the lamp and that it's sold at autonomous.ai/lamp, no price), is told one section of its product knowledge (`knowledge.md`, the `knowledge` key above) and answers from it in one to three sentences. It only tells: it reads no topic and asks nothing of the light or the body. In the product's install since #5790 (below, "Core skill: how to use the lamp") |
+| How to use the lamp (`faq`, #5790) | core | Asked by a person, never on its own: "how do I...", "what can you do?", "where do I link my calendar?", "help", "how do reminders work?"; not for their own reminders or timers, which are `list_reminders`' (#8181). Its tool `lamp_help`, reached through `use_skill`, with `topic` (`abilities`, the default, `connectors`, `controls`, `light`, `reminders`, `nudges`, `guard_mode`, `skills`, `updates`, `unplug`, `memory`, `setup`, `agent`: what an agent is here, never a linked account, where the app changes it, and, read from the lamp's own settings at answer time, which agent and text model it uses now (#8729), `about`: who made the lamp and that it's sold at autonomous.ai/lamp, no price), is told one section of its product knowledge (`knowledge.md`, the `knowledge` key above) and answers from it in one to three sentences. It only tells: it reads no topic and asks nothing of the light or the body. In the product's install since #5790 (below, "Core skill: how to use the lamp") |
 | Pose (#4135) | core | Asked for by a person, never on its own: "get lower", "sit down", "back to normal". Its tool `set_pose` (`normal`, `lower`, `sit`) asks the body's stand at 100, 60 or 30 percent of its own through a `stand` step, kept until the next ask or power-up; asked taller than its usual height, the model says so ("This is as tall as I stand.") and calls nothing. Comes with the product since #4135, its stand moving the body only with `LAMP_BODY_POSE_ASK=on` in lamp-skills and lamp-body, which the product's units set since lamp-52e6's run of 29 Oct |
 | Onboarding | core | Every lamp's first meeting: the walk's steps and their order are this skill's own file (`skills/onboarding/skill.toml`), which the voice reads once when it starts, checked by the same validator Skills loads and packages a core skill with ([onboarding.md](onboarding.md)) |
 | Startle (#2822) | core | A creature glances at a sudden sound, a bang or something dropped, then lets it go. Its move is this skill's own file (`[startle]`), which `lamp-expression serve` reads once when it starts ([expression.md](expression.md), "The startle: a glance at a sudden sound") |
@@ -9704,7 +9704,8 @@ its web pages. `skills/faq/` is a core skill in the product's install
 (`install::PRODUCT_SKILLS`), reached through `use_skill` (`lamp_help`,
 with a `topic`); its description names the asks it is for ("how do I...?",
 "how do reminders work?", "what can you do?", "where do I link Gmail or my calendar?", "what does
-the button do?", "who made you?", "where can I buy you?", "what's your
+the button do?", "which agent or model do you use?",
+"can I switch you to another agent?", "who made you?", "where can I buy you?", "what's your
 website?", "help"), so a request for help is a call and not the
 model's own guess. Its description and its `when` also say it is "not for
 their own reminders or timers", which are `list_reminders`' (#8181: on
@@ -9744,15 +9745,46 @@ line no longer cuts `wellbeing_nudges` or `set_pose` to its name alone.
   `lamp-cloud`, say) is not visible to `lamp-skills`; there the file says
   "if it's on for your lamp", and each switch it relies on is named in a
   comment with its product default.
+- **This lamp's agent and model, read at answer time** (#8729). Without
+  them an agent could be taken for a linked account and no model named.
+  Both differ per lamp (the owner's choice of agent in the
+  app; the relay's model or a person's own key's, [own-keys.md](own-keys.md)),
+  so the `agent` section says only what holds for every lamp: what an agent
+  is (Hermes or OpenClaw on the lamp, Claude Code or Codex on a computer),
+  that it is never an account to link, and that the app's page for the lamp
+  shows its agents and lets the owner choose the one it uses
+  ([cloud.md](cloud.md), "The lamp's agents" and "The lamp's default
+  agent"). The voice adds what this lamp has now beside a `lamp_help` call
+  with `topic` `agent` or `about`, under `this_lamp_now`
+  (`crates/voice/src/faq_now.rs`, from `tools::told_ran`): "Read from this
+  lamp's own settings now: the lamp's agent is OpenClaw; its text model is
+  DeepSeek's deepseek-flash, through Autonomous's relay." The agent is the
+  `lamp` target's engine in lamp-tasks' `targets` answer, its default, as
+  the voice reads it every 30 s with `LAMP_TASKS_WHO`
+  (`agent_tasks::lamp_agent_name`); the model is the second route's chat as
+  it started, its name and whose key or relay, never a key or URL
+  (`second_provider::worker::text_model_said`, kept by `services`; a
+  person's own key is "with the owner's own key"). What can't be read (no
+  targets read yet, no `lamp` target, or the Gemini Live route, which keeps
+  no text model) is said "couldn't be read just now", and the section tells
+  the model to say it can't tell then, never guess a name. Linked accounts
+  never takes an agent either: `lamp-services` answers a call naming one
+  (`OpenClaw`, `Hermes`, `Claude Code`, `Codex`, …) with
+  `serve::AGENT_NOT_LINKED`, not `CANT_LINK`
+  ([services.md](services.md)). Tests: `faq_now::tests`, `lamp-services`'
+  `an_agent_named_as_a_service_is_never_sent_to_linked_accounts`, and the
+  evals below. Not yet shown on a lamp: the agent and model asks by voice.
 - **Kept true.** `crates/skills/tests/it/faq.rs`: each `LAMP_*` the file
   names is in [switches.md](switches.md), each skill it names is a folder
   of `skills/`, each skill `abilities` speaks of by its name or title is
   named there in backticks, a product lamp tells each named skill as the
   install leaves it, `about` names the product page
   (`robots/lamp/README.md`) and no price, each topic's answer fits the link through
-  `use_skill`, and the eval set `skills/faq/tests/evals.toml` (43
-  owner-style questions, six of them an honest "I can't do that yet", and
-  three about a skill not on this lamp or turned off, told so) maps each
+  `use_skill`, and the eval set `skills/faq/tests/evals.toml` (47
+  owner-style questions, six of them an honest "I can't do that yet",
+  three about a skill not on this lamp or turned off, told so, and two
+  asking to connect or link an agent, whose section names no Linked
+  accounts) maps each
   question to `lamp_help`'s topic whose section holds the answer's words.
   `crates/update/tests/functions.rs`
   (`every_product_skill_s_line_is_whole_in_use_skill_s_section`) holds

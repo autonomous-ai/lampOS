@@ -129,6 +129,14 @@ To do it again, say "Lamp, let's redo the setup", or redo one step: "Lamp, can w
 Changing my Wi-Fi from the app isn't there yet.
 <!-- LAMP_SETTINGS_WIFI: off -->
 
+## agent
+An agent is the helper I hand bigger work to: Hermes or OpenClaw here on me, or Claude Code or Codex on your computer. An agent isn't an account you link, and you never give me a password or key for it.
+<!-- LAMP_HERMES_ON_LAMP, LAMP_OPENCLAW_ON_LAMP: on in the product (lamp-tasks.service, lamp-cloud.service) -->
+To change which agent I use, open this lamp in the Autonomous app: it shows my agents, installs a missing one with a tap, and lets you choose the one I use.
+<!-- LAMP_APP_ENGINES: on in the product; docs/cloud.md, "The lamp's agents" (engines.install) and "The lamp's default agent" (engines.default) -->
+Which agent and which text model I use right now are read from my own settings and told with this answer as this_lamp_now: say those names as told. If it says one couldn't be read, say you can't tell just now, and never guess a name.
+<!-- this_lamp_now: lamp-voice's faq_now, the lamp's default agent from lamp-tasks' targets and the text model the second route started with -->
+
 ## about
 I'm made by Autonomous, and I run Autonomous's open-source OS for physical AI.
 You can buy me on Autonomous's website, at autonomous.ai/lamp. The price and shipping are on that page.
