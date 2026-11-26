@@ -803,10 +803,12 @@ this room" until someone asks to be recognised.
   per print; `none` with the best), the near gate and the threshold. No
   name, no id: only numbers, always on (#3126; width, turn, across and age #7424).
   Beside it, the sticky plan's T0 line (`who::recognition_told`):
-  `recognition best 0.341 height 0.152 (near at 0.1, same at 0.363) second 0.120 eyes 14.2 px turned -12 deg score 0.91 print 152 ms`,
+  `recognition best 0.341 height 0.152 (near at 0.1, same at 0.363) second 0.120 eyes 14.2 px turned -12 deg from marks score 0.91 print 152 ms`,
   the best likeness and the largest face's height again, then `second` (the
   best cosine against anyone else's prints), `eyes` (the near face's eye
-  distance in pixels), `turned` (its turn in degrees), `score` (the
+  distance in pixels), `turned` (its turn in degrees) and which way it was
+  read (`from marks`, or `from mesh` with `LAMP_EYES_FACING_FROM_MESH=on`,
+  [below](#facing-from-the-mesh-lamp_eyes_facing_from_meshon)), `score` (the
   detector's) and `print` (the print's time in ms), each `none` when not
   measured. Numbers only as well.
 - **Kept.** `--people FILE` (on lamp-4ace `/var/lib/lampos-eyes/people.json`,
@@ -2551,9 +2553,12 @@ process, shows there before any trial waits for it. For each face:
 - **how far it is turned**, in radians, and **whether that counts as
   turned to the lamp** ([`facing`](../crates/eyes/src/facing.rs): within
   60 degrees in the middle of the picture, more toward its edges, where
-  the lens shows a straight face turned). A face narrower than 7.5% of
-  the picture, or with an eye or the nose outside it, has neither: it
-  counts for nothing either way;
+  the lens shows a straight face turned). The turn is read from the five
+  marks, or with `LAMP_EYES_FACING_FROM_MESH=on` (on in the product's
+  unit) the meshed face's from its mesh
+  ([below](#facing-from-the-mesh-lamp_eyes_facing_from_meshon)). A face
+  narrower than 7.5% of the picture, or with an eye or the nose outside
+  it, has neither: it counts for nothing either way;
 - with `LAMP_EYES_PITCH_GAZE=on` (#7442, off unless set), **how far the
   head is tipped** (`pitch`, radians, positive down as ROS has it) and,
   for one face, **whether its eyes look toward the lamp** (`looking`).
@@ -2562,7 +2567,9 @@ process, shows there before any trial waits for it. For each face:
 #### Pitch and gaze (`LAMP_EYES_PITCH_GAZE=on`, #7442)
 
 **Pitch** ([`facing::pitch_deg`](../crates/eyes/src/facing.rs)) comes from
-the same five marks as the turn: the nose's drop `r` and the mouth
+the same five marks as the turn (for the face meshed in a look, with
+`LAMP_EYES_FACING_FROM_MESH=on`, from its mesh instead:
+[below](#facing-from-the-mesh-lamp_eyes_facing_from_meshon)): the nose's drop `r` and the mouth
 corners' midpoint's drop `m` below the point between the eyes, square to
 the eye line (a head tilted over reads the same). A head tipped by `t`
 gives `r = 0.64 cos t + 0.5 sin t` and `m = 1.15 cos t + 0.2 sin t`; the
@@ -2610,6 +2617,72 @@ sends it. With the yes, the read is
 the full seems read as before. With the switch off and no yes, no read
 runs, as before. Every other face, or no read, leaves it out: unknown,
 not away.
+
+#### Facing from the mesh (`LAMP_EYES_FACING_FROM_MESH=on`)
+
+At the desk the five marks are a few pixels apart, and one pixel of the
+nose mark moves the turn 10 to 20 degrees. On lamp-74ff (26 Nov), with
+the owner seated facing the lamp, the eye marks were 9.5 px apart on
+average and 1,088 of 1,807 recognition reads said `turned 60+ deg`, most
+of them 90: a person looking at the lamp read as turned away, so looking
+at it and talking did not count as talking to it.
+
+With `LAMP_EYES_FACING_FROM_MESH=on` (off unless set; on in the product's
+unit) and `--mouth-model`, the face meshed in a look is turned and tipped
+as its Face Mesh V2 points say
+([`facing::mesh_head`](../crates/eyes/src/facing.rs)), read from the mesh
+the mouth's read already ran on that look: no second model run. That
+face's `yaw`, `facing` and `pitch` on `humans/faces/tracked`, the turn
+its speaking is judged with (`MOST_TURN_DEG`, `STEADY_MOST_TURN_DEG`) and
+the recognition line's turn come from it. Every other face, a mesh that
+can't be read (points missing or not numbers, or a face pointing away
+from the camera), and every look with the switch off are as the marks
+say, unchanged. A face under 7.5% of the picture's width has no turn
+either way, and the windows are the same: facing within 60 degrees in the
+middle of the picture, up to 90 at its edges; pitch from 20 up to 25 down,
+and none past a 60-degree turn.
+
+The head is a closed form from mesh points nothing on the face moves (not
+the lids, the irises, the brows, the lips or the jaw: where the eyes look
+is not read):
+
+- **across**: the outer eye corners (points 33 and 263), the inner ones
+  (133, 362) and the nose's sides (129, 358), each pair from the
+  picture's left to its right, summed. On a face the same on both sides
+  each pair runs straight across it, so no face model sets the turn's
+  zero;
+- **up**: the nose's base to between the brows (2 to 9) and to the
+  forehead's middle (94 to 151), summed, less its part across;
+- **out of the face**: across times up, leaned back by the 8.4 degrees up
+  leans on MediaPipe's canonical face (`canonical_face_model.obj`), so
+  that face square to the camera reads 0 and 0.
+
+The face's tilt in the picture is taken out along its own eye line; the
+turn is how far out of the face points to the side (positive toward the
+picture's right, the bus's sign) and the tip how far down (positive
+down). It is exact for any turn and tip of a rigid face at any size and
+place in the crop (the tests), and reads each angle from the whole length
+of each pair: with the eyes 10 picture pixels apart, meshed at 256 from
+about 50, an error of one picture pixel on every point, each its own way,
+moves the turn about 5 degrees (a Monte Carlo of the canonical face),
+where one pixel on the nose mark alone moves the marks' 11.5. The model's
+depth is taken at the scale of its x, as MediaPipe's own face geometry
+takes it; read at half that scale, 70 degrees would read 54. Not yet
+checked against a person on a lamp: the row is a person at the desk
+facing the lamp, reading `from mesh` under 30 degrees in most reads, and
+turned to a screen beside it, past 60.
+
+Where the mesh runs is unchanged. In the product (no `--mouth-on-heard`,
+no `LAMP_EYES_SPEAKING_ALL_FACES`, no `LAMP_EYES_MOUTH_FULL_LOOK`) that is
+the largest face on every look with a face, cut from the 320-wide
+picture, so the largest face's turn is its mesh's whenever that mesh can
+be read, and every other face's is its marks'. With `--mouth-on-heard on` the mesh runs only while a
+line is heard, and every other look's turn is the marks'. At start the
+journal says `facing from the mesh (LAMP_EYES_FACING_FROM_MESH=on): the
+face meshed each look is turned and tipped as its mesh says; every other
+face as its marks` (or, without `--mouth-model`, that no face is meshed),
+and the recognition line says which way its turn was read (`turned 4 deg
+from mesh`, or `from marks`).
 
 ### Who counts as someone at the lamp (`LAMP_FACES_AT_DESK_ONLY=on`)
 
@@ -3653,6 +3726,9 @@ the product: it is a line a look, up to four a second) the journal says
 is the inner lips' gap (points 13 and 14) over the face's height (10 to
 152), the eye distance in detector pixels and in the pixels the mesh's crop
 was cut from (the same without the switch), and the time. No picture is kept.
+With `LAMP_EYES_FACING_FROM_MESH=on` the same points also give that face's
+turn and tip, with no second run
+([above](#facing-from-the-mesh-lamp_eyes_facing_from_meshon)).
 
 With `LAMP_EYES_SPEAKING=on` as well, that face's `speaking` reads the
 mesh instead of the corners whenever every look in its 2 s window had the
