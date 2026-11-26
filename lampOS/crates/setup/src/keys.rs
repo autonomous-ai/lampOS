@@ -60,6 +60,15 @@ pub const ANTHROPIC_API: &str = lamp_msgs::own_model::ANTHROPIC_API;
 pub const ANTHROPIC_VERSION: &str = "2023-06-01";
 /// The most an OpenAI-compatible endpoint's model list is read (#8362).
 pub const MODELS_MOST: usize = 1 << 20;
+/// How long the agent's tool check may take (#8735), after the key's own
+/// check: with [`CHECK_WITHIN`] still under `lamp-cloud`'s 15 s wait.
+pub const TOOLS_WITHIN: Duration = Duration::from_secs(6);
+/// The tool check's `max_tokens`: a call to a tool with no arguments, and
+/// Gemini's minimal thinking before it.
+pub const TOOLS_MAX_TOKENS: u32 = 256;
+/// The model DeepSeek's own key is asked for, as the voice asks it
+/// (`lamp_voice::second_config::DEEPSEEK_MODEL`).
+pub const DEEPSEEK_MODEL: &str = "deepseek-flash";
 /// The longest voice ID taken: ElevenLabs' are 20 letters and digits.
 pub const VOICE_ID_MOST: usize = 64;
 /// The person's ElevenLabs voice ID, kept beside its key.
@@ -619,6 +628,9 @@ pub enum Verdict {
     /// The OpenAI-compatible endpoint took the key but lists no model by the
     /// name given (#8362): not kept, and its list is never said back.
     NoModel,
+    /// A model service took the key, but its chat made no tool call (#8735):
+    /// kept for the voice, while the agent stays on the relay.
+    WorksNoTools,
 }
 
 impl Verdict {
@@ -631,6 +643,10 @@ impl Verdict {
                 format!("that key and voice work: {}", goes_where(given))
             }
             Self::Works => format!("that key works: {}", goes_where(given)),
+            Self::WorksNoTools => format!(
+                "that key works for the lamp's voice: {}. It made no tool call, so the lamp's agent stays on the lamp's own model",
+                goes_where(given)
+            ),
             Self::Refused => "that key was refused".into(),
             Self::VoiceRefused => {
                 "that key works, but that voice ID isn't on its ElevenLabs account; nothing changed"
@@ -652,10 +668,11 @@ impl Verdict {
     }
 
     /// The answer's code in the contract (#2094, El 11:1x): `works`,
-    /// `refused`, `unreached` or `not_kept`.
+    /// `refused`, `unreached` or `not_kept`; `works_no_tools` (#8735).
     pub fn code(self) -> &'static str {
         match self {
             Self::Works => "works",
+            Self::WorksNoTools => "works_no_tools",
             Self::Refused => "refused",
             Self::VoiceRefused => "voice_refused",
             Self::Unreached => "unreached",
@@ -738,6 +755,8 @@ pub struct HttpCheck {
     /// voice's speech will.
     pub switched: Option<String>,
     https_only: bool,
+    /// Whether a model key's check also asks for a tool call (#8735).
+    tools: bool,
 }
 
 impl Default for HttpCheck {
@@ -747,6 +766,7 @@ impl Default for HttpCheck {
             elevenlabs: ELEVENLABS_API.to_owned(),
             switched: lamp_msgs::own_voice::switched_from_environment(),
             https_only: true,
+            tools: true,
         }
     }
 }
@@ -760,17 +780,46 @@ impl HttpCheck {
             deepgram,
             switched: None,
             https_only: false,
+            tools: false,
         }
     }
 
-    async fn ask(&self, given: &Given) -> Option<Verdict> {
-        let client = reqwest::Client::builder()
+    fn client(&self) -> Option<reqwest::Client> {
+        reqwest::Client::builder()
             .tls_backend_preconfigured(tls()?)
             .https_only(self.https_only)
             .redirect(reqwest::redirect::Policy::none())
             .timeout(CHECK_WITHIN)
             .build()
+            .ok()
+    }
+
+    /// The agent's tool check (#8735): [`tools_asked`] once, with the key as
+    /// the bearer, as the voice chats. Whether a tool call came back.
+    async fn calls_tools(&self, given: &Given) -> Option<bool> {
+        let (url, body) = tools_asked(given);
+        let response = self
+            .client()?
+            .post(url)
+            .bearer_auth(&given.key)
+            .header("content-type", "application/json")
+            .body(body.to_string())
+            .send()
+            .await
             .ok()?;
+        if !response.status().is_success() {
+            return Some(false);
+        }
+        let reply: Value = serde_json::from_slice(&read_most(response).await?).ok()?;
+        Some(
+            reply["choices"][0]["message"]["tool_calls"]
+                .as_array()
+                .is_some_and(|calls| !calls.is_empty()),
+        )
+    }
+
+    async fn ask(&self, given: &Given) -> Option<Verdict> {
+        let client = self.client()?;
         let request = match given.service {
             // OpenRouter's model list is public: `/key` alone refuses a key.
             Service::OpenRouter => client
@@ -865,15 +914,7 @@ impl HttpCheck {
         };
         // The endpoint's own list decides the model (#8362): read within
         // the same bound and at most [`MODELS_MOST`], never said back.
-        let mut response = response;
-        let mut body = Vec::new();
-        while let Ok(Ok(Some(chunk))) = tokio::time::timeout(CHECK_WITHIN, response.chunk()).await {
-            body.extend_from_slice(&chunk);
-            if body.len() > MODELS_MOST {
-                return None;
-            }
-        }
-        let listed: Value = serde_json::from_slice(&body).ok()?;
+        let listed: Value = serde_json::from_slice(&read_most(response).await?).ok()?;
         if given.service == Service::Gemini {
             // The model's own id, `models/<id>` or `<id>`.
             let id = listed["id"].as_str().unwrap_or_default();
@@ -894,6 +935,58 @@ impl HttpCheck {
             Verdict::NoModel
         })
     }
+}
+
+/// A reply's body, within [`CHECK_WITHIN`] a chunk and at most
+/// [`MODELS_MOST`]; `None` past it.
+async fn read_most(mut response: reqwest::Response) -> Option<Vec<u8>> {
+    let mut body = Vec::new();
+    while let Ok(Ok(Some(chunk))) = tokio::time::timeout(CHECK_WITHIN, response.chunk()).await {
+        body.extend_from_slice(&chunk);
+        if body.len() > MODELS_MOST {
+            return None;
+        }
+    }
+    Some(body)
+}
+
+/// The one chat the agent's tool check asks (#8735): `<base>/chat/completions`
+/// at the endpoint and model the key was checked with, one tool with no
+/// arguments, `tool_choice: "required"` and [`TOOLS_MAX_TOKENS`]. DeepSeek
+/// thinking off, as it refuses a forced `tool_choice` while thinking, and
+/// Gemini at its minimal thinking, as the voice asks them.
+pub fn tools_asked(given: &Given) -> (String, Value) {
+    let service = given.service;
+    let base = given
+        .base_url
+        .as_deref()
+        .or(service.endpoint())
+        .unwrap_or(DEEPSEEK_BASE_URL)
+        .trim_end_matches('/');
+    let model = given.model.as_deref().unwrap_or(DEEPSEEK_MODEL);
+    let mut body = json!({
+        "model": model,
+        "messages": [{"role": "user", "content": "Call the ping tool."}],
+        "tools": [{"type": "function", "function": {
+            "name": "ping",
+            "description": "Says the lamp is here.",
+            "parameters": {"type": "object", "properties": {}},
+        }}],
+        "tool_choice": "required",
+        "max_tokens": TOOLS_MAX_TOKENS,
+        "stream": false,
+    });
+    let deepseek = service == Service::DeepSeek
+        || (service == Service::OpenAiCompatible
+            && (model.to_ascii_lowercase().starts_with("deepseek")
+                || host(base) == "api.deepseek.com"));
+    if deepseek {
+        body["thinking"] = json!({"type": "disabled"});
+    }
+    if service == Service::Gemini {
+        body["reasoning_effort"] = json!("minimal");
+    }
+    (format!("{base}/chat/completions"), body)
 }
 
 /// Whether Gemini's error body refuses the key (#8420): it answers a bad key
@@ -924,11 +1017,24 @@ impl Check for HttpCheck {
             return Verdict::Unreached;
         };
         // The whole check within the bound, however many requests it asks.
-        runtime
+        let verdict = runtime
             .block_on(async { tokio::time::timeout(CHECK_WITHIN, self.ask(given)).await })
             .ok()
             .flatten()
-            .unwrap_or(Verdict::Unreached)
+            .unwrap_or(Verdict::Unreached);
+        if verdict != Verdict::Works || !self.tools || !Service::MODELS.contains(&given.service) {
+            return verdict;
+        }
+        // The agent's tool check (#8735), within its own bound: a chat with
+        // no tool call, an error or no answer in time keeps the key for the
+        // voice and leaves the agent on the relay.
+        let tools = runtime
+            .block_on(async { tokio::time::timeout(TOOLS_WITHIN, self.calls_tools(given)).await });
+        if tools == Ok(Some(true)) {
+            Verdict::Works
+        } else {
+            Verdict::WorksNoTools
+        }
     }
 }
 
@@ -981,9 +1087,14 @@ impl Store {
 
     /// The last check's code for `service`, kept beside its key; best
     /// effort, as it holds nothing a voice reads (#8362). Only in a folder
-    /// already there: a refused first key leaves nothing on the lamp.
+    /// already there: a refused first key leaves nothing on the lamp. A
+    /// model key that works adds the agent's tool check on a second line
+    /// (#8735): `tools` or `no_tools`.
     pub fn checked(&self, service: Service, verdict: Verdict) {
+        let model = Service::MODELS.contains(&service);
         let code = match verdict {
+            Verdict::Works if model => "works\ntools",
+            Verdict::WorksNoTools => "works\nno_tools",
             Verdict::Works => "works",
             Verdict::Refused | Verdict::NoModel | Verdict::VoiceRefused => "refused",
             Verdict::Unreached => "unreached",
@@ -1032,6 +1143,17 @@ impl Store {
         Ok(())
     }
 
+    /// The `.checked` record's two lines: the key's check, then a model
+    /// key's tool check (#8735). Never a key.
+    fn checked_lines(&self, service: Service) -> (Option<String>, Option<String>) {
+        let text = fs::read_to_string(self.0.join(service.checked_file())).unwrap_or_default();
+        let mut lines = text
+            .lines()
+            .map(|line| line.trim().to_owned())
+            .filter(|line| !line.is_empty());
+        (lines.next(), lines.next())
+    }
+
     /// Whether the person's key is there for `service`.
     pub fn has(&self, service: Service) -> bool {
         self.0.join(service.key_file()).is_file()
@@ -1040,7 +1162,9 @@ impl Store {
     /// `{"deepseek": "own" | "lamp", "deepgram": "own" | "lamp", "since":
     /// {"deepseek", "deepgram"}, "deepseek_host"}`: whose key, since when it
     /// was kept (RFC 3339 UTC, `null` for the lamp's own) and the host
-    /// DeepSeek's goes to (`null` for the lamp's own). Never a key.
+    /// DeepSeek's goes to (`null` for the lamp's own). Never a key. #8735:
+    /// `in_use.agent` (`own` | `relay`) and `in_use.agent_why`, and each
+    /// offer's `agent`, from the tool check kept in `.checked`.
     pub fn which(&self) -> Value {
         let mut which = serde_json::Map::new();
         let mut since = serde_json::Map::new();
@@ -1100,9 +1224,9 @@ impl Store {
                 service.id().into(),
                 json!(read(service, service.model_file())),
             );
-            let code = fs::read_to_string(self.0.join(service.checked_file()))
-                .ok()
-                .map(|code| code.trim().to_owned())
+            let code = self
+                .checked_lines(service)
+                .0
                 .filter(|code| ["works", "refused", "unreached"].contains(&code.as_str()));
             checked.insert(service.id().into(), json!(code));
         }
@@ -1110,12 +1234,45 @@ impl Store {
         which.insert("checked".into(), Value::Object(checked));
         let in_use = Service::MODELS
             .into_iter()
-            .find(|service| self.has(*service))
-            .map(Service::id);
-        which.insert("in_use".into(), json!({ "model": in_use }));
+            .find(|service| self.has(*service));
+        // #8735: what the agent uses, `own` only for an in-use model key whose
+        // chat made a tool call, and why not, by a short code.
+        let why = match in_use.map(|service| self.checked_lines(service)) {
+            Some((Some(code), Some(tools))) if code == "works" && tools == "tools" => None,
+            Some((_, Some(tools))) if tools == "no_tools" => Some("no_tool_calls"),
+            Some((Some(code), _)) if code == "refused" => Some("refused"),
+            // Kept before the tool check was asked: set again to check it.
+            Some(_) => Some("unchecked"),
+            None if self.has(Service::ElevenLabs) => Some("tts_only"),
+            None => Some("no_model_key"),
+        };
+        which.insert(
+            "in_use".into(),
+            json!({
+                "model": in_use.map(Service::id),
+                "agent": if why.is_none() { "own" } else { "relay" },
+                "agent_why": why,
+            }),
+        );
         which.insert(
             "offers".into(),
-            Value::Array(Service::ALL.into_iter().map(Service::offer).collect()),
+            Value::Array(
+                Service::ALL
+                    .into_iter()
+                    .map(|service| {
+                        let mut offer = service.offer();
+                        // A model service serves the agent unless its kept
+                        // key's tool check failed (#8735).
+                        offer["agent"] = json!(
+                            Service::MODELS.contains(&service)
+                                && !(self.has(service)
+                                    && self.checked_lines(service).1.as_deref()
+                                        == Some("no_tools"))
+                        );
+                        offer
+                    })
+                    .collect(),
+            ),
         );
         Value::Object(which)
     }
@@ -1138,17 +1295,22 @@ fn remove(path: &Path) -> io::Result<()> {
 /// have removed the one kept before (`keep` takes the old key away first):
 /// so the service's key is removed as far as it can be, said as
 /// [`Verdict::NotKept`], and counted as a change, for the voice to restart.
+///
+/// The check's code is kept in `.checked` here, for setup's keys and
+/// `keys.set`'s alike, so `keys.get` says the agent's tool check (#8735).
 pub fn check_and_keep(given: &Given, store: &Store, check: &mut impl Check) -> (Verdict, bool) {
-    match check.check(given) {
-        Verdict::Works => match store.keep(given) {
-            Ok(()) => (Verdict::Works, true),
+    let (verdict, changed) = match check.check(given) {
+        verdict @ (Verdict::Works | Verdict::WorksNoTools) => match store.keep(given) {
+            Ok(()) => (verdict, true),
             Err(_) => {
                 let _ = store.remove(given.service);
                 (Verdict::NotKept, true)
             }
         },
         verdict => (verdict, false),
-    }
+    };
+    store.checked(given.service, verdict);
+    (verdict, changed)
 }
 
 /// A refusal in the contract's shape: the person's words and its code.
@@ -1229,13 +1391,14 @@ pub fn answer(
 /// Check `given`, keep it if it works, and the reply and the journal's line.
 fn set(given: Given, store: &Store, check: &mut impl Check) -> (Value, Option<Done>) {
     let (verdict, changed) = check_and_keep(&given, store, check);
-    store.checked(given.service, verdict);
     let service = given.service;
     let said = format!(
         "the person's {} key: {}",
         service.name(),
         match verdict {
             Verdict::Works => "it works, kept",
+            Verdict::WorksNoTools =>
+                "it works but made no tool call, kept; the agent stays on the relay",
             Verdict::Refused => "refused by the service, not kept",
             Verdict::VoiceRefused => "the voice ID was not on its account, not kept",
             Verdict::Unreached => "the check reached nothing, not kept",
@@ -1247,7 +1410,7 @@ fn set(given: Given, store: &Store, check: &mut impl Check) -> (Value, Option<Do
         restart_voice: changed,
         said,
     });
-    if verdict == Verdict::Works {
+    if matches!(verdict, Verdict::Works | Verdict::WorksNoTools) {
         (
             json!({"done": {"service": service.id(), "uses": "own", "code": verdict.code(), "answer": verdict.words(&given)}}),
             done,
@@ -1567,6 +1730,75 @@ mod tests {
             }
             let _ = fs::remove_dir_all(&folder);
         }
+    }
+
+    /// #8735: a model key that works is asked once more, a chat forcing one
+    /// tool with the key as the bearer: a tool call back is `Works`, a chat
+    /// without one `WorksNoTools`, which is kept.
+    #[test]
+    fn a_model_check_asks_once_for_a_tool_call() {
+        const LISTED: &str = r#"{"object":"list","data":[{"id":"grok-4","object":"model"}]}"#;
+        const CALLED: &str = r#"{"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[{"id":"c1","type":"function","function":{"name":"ping","arguments":"{}"}}]}}]}"#;
+        const SAID: &str = r#"{"choices":[{"message":{"role":"assistant","content":"pong"}}]}"#;
+        let ok = |body: &str| {
+            format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            )
+        };
+        for (chat, verdict) in [
+            (ok(CALLED), Verdict::Works),
+            (ok(SAID), Verdict::WorksNoTools),
+            (
+                "HTTP/1.1 400 X\r\ncontent-length: 0\r\nconnection: close\r\n\r\n".into(),
+                Verdict::WorksNoTools,
+            ),
+        ] {
+            let (base, served) = answering_each(&[&ok(LISTED), &chat]);
+            let given = Given {
+                service: Service::OpenAiCompatible,
+                key: "sk-made-up-8735".into(),
+                base_url: Some(format!("{base}/v1")),
+                voice_id: None,
+                model: Some("grok-4".into()),
+            };
+            let mut check = HttpCheck::local(String::new());
+            check.tools = true;
+            assert_eq!(check.check(&given), verdict);
+            let asked = served.join_each().unwrap();
+            assert!(asked[0].starts_with("get /v1/models http/1.1"), "{asked:?}");
+            let tools = &asked[1];
+            assert!(
+                tools.starts_with("post /v1/chat/completions http/1.1"),
+                "{tools}"
+            );
+            assert!(tools.contains("authorization: bearer sk-made-up-8735"));
+            // The body is `tools_asked`'s, pinned here; the server reads one
+            // segment of the request, which may end before the body.
+            let (url, body) = tools_asked(&given);
+            assert_eq!(url, format!("{base}/v1/chat/completions"));
+            assert_eq!(body["model"], "grok-4");
+            assert_eq!(body["tool_choice"], "required");
+            assert_eq!(body["tools"][0]["function"]["name"], "ping");
+            assert_eq!(body["max_tokens"], TOOLS_MAX_TOKENS);
+            assert!(body.get("thinking").is_none());
+        }
+        // DeepSeek thinking off, Gemini at its floor, each at its own chat.
+        let deepseek = given(Service::DeepSeek, "k", None).unwrap();
+        let (url, body) = tools_asked(&deepseek);
+        assert_eq!(url, "https://api.deepseek.com/chat/completions");
+        assert_eq!(body["model"], DEEPSEEK_MODEL);
+        assert_eq!(body["thinking"], json!({"type": "disabled"}));
+        let gemini = Given {
+            service: Service::Gemini,
+            model: Some("gemini-3.6-flash".into()),
+            base_url: None,
+            ..deepseek
+        };
+        let (url, body) = tools_asked(&gemini);
+        assert_eq!(url, format!("{GEMINI_API}/chat/completions"));
+        assert_eq!(body["reasoning_effort"], "minimal");
+        assert!(body.get("thinking").is_none());
     }
 
     /// #8420: OpenRouter's check is two requests to its fixed endpoint:

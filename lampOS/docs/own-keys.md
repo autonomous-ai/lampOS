@@ -62,9 +62,9 @@ The contract posted on #2094 (11:13, with its additions after), which
 
 | Kind | Asked | Success `data` |
 |---|---|---|
-| `keys.set` | `{"service": "deepseek" \| "deepgram" \| "elevenlabs", "key"?, "base_url"?, "voice_id"?, "request_id"?}` (`key` only absent for ElevenLabs' voice alone) | `{"service", "uses": "own", "code": "works", "answer"}` |
+| `keys.set` | `{"service": "deepseek" \| "deepgram" \| "elevenlabs", "key"?, "base_url"?, "voice_id"?, "request_id"?}` (`key` only absent for ElevenLabs' voice alone) | `{"service", "uses": "own", "code": "works" \| "works_no_tools", "answer"}` (#8735, below) |
 | `keys.remove` | `{"service", "request_id"?}` | `{"service", "uses": "lamp"}` |
-| `keys.get` | `{"request_id"?}` | `{"deepseek": "own" \| "lamp", "deepgram": "own" \| "lamp", "elevenlabs": "own" \| "lamp", "since": {"deepseek": RFC 3339 \| null, "deepgram": …, "elevenlabs": …}, "deepseek_host": host \| null, "voice_id": {"elevenlabs": id \| null}, "offers": [...]}` (#8367, below) |
+| `keys.get` | `{"request_id"?}` | `{"deepseek": "own" \| "lamp", "deepgram": "own" \| "lamp", "elevenlabs": "own" \| "lamp", "since": {"deepseek": RFC 3339 \| null, "deepgram": …, "elevenlabs": …}, "deepseek_host": host \| null, "voice_id": {"elevenlabs": id \| null}, "offers": [...]}` (#8367, below; `in_use` and each offer's `agent`, #8735 below) |
 
 Each is `starting` at once, then one `success` or `failure` of the same kind
 within 15 s; `request_id` comes back in `data` on each. A `failure` has the
@@ -686,6 +686,49 @@ the person's own model too, through lamp-cloud's forwarder
   user, `lampos`, as the relay's key is. The agent runtimes run as
   `lampos` too, so they can read the person's model key, as they can read
   the relay's key today.
+
+## The agent's tool check (#8735, PR2: setup side)
+
+The lamp's agent (OpenClaw, Hermes) breaks on a model that makes no tool
+calls, so a model key is checked for them once, at `keys.set` and at setup
+(the lead's answer to Q3 on #8735). The forwarder that would send the agent
+to the person's model is not built yet (PR1, waiting on Q1): today the agent
+stays on the relay whatever `keys.get` says.
+
+- **When:** after a model service's key check works (DeepSeek,
+  OpenAI-compatible, OpenRouter, Gemini, Anthropic; never Deepgram or
+  ElevenLabs), one more request within 6 s of its own (`TOOLS_WITHIN`, so
+  both stay under `lamp-cloud`'s 15 s): `POST <base>/chat/completions` at
+  the endpoint and model just checked, the key as the bearer, as the voice
+  chats. Body: one user line, one tool `ping` with no arguments,
+  `tool_choice: "required"`, `max_tokens: 256`, `stream: false`; DeepSeek's
+  with `thinking: {"type": "disabled"}` (a forced `tool_choice` is refused
+  while it thinks), Gemini's with `reasoning_effort: "minimal"`.
+- **Works:** a 2xx whose `choices[0].message.tool_calls` is a non-empty
+  list. Anything else (no tool call, an error status, a body that isn't
+  JSON, no answer in 6 s) is `works_no_tools`.
+- **`works_no_tools`:** the key is kept and the voice uses it as with
+  `works`; the reply is `success` `{"service", "uses": "own", "code":
+  "works_no_tools", "answer"}`, the answer "that key works for the lamp's
+  voice: <where the data goes>. It made no tool call, so the lamp's agent
+  stays on the lamp's own model".
+- **Kept:** in the key's `<service>.checked`, a second line beside its
+  code: `works` then `tools` or `no_tools`. `checked.<service>` still says
+  the first line alone. A key kept before #8735 has no second line.
+- **`keys.get`:** `in_use` is `{"model": service | null, "agent": "own" |
+  "relay", "agent_why": code | null}`. `own` only when the in-use model key's
+  tool check passed; otherwise `relay`, `agent_why` one of `no_model_key`,
+  `tts_only` (an ElevenLabs key and no model key), `no_tool_calls`, `refused`
+  (the last `keys.set` for that service was refused) or `unchecked` (kept
+  before the tool check: set it again). Each `offers[]` entry adds `agent`:
+  `false` for Deepgram and ElevenLabs and for a kept model key whose tool
+  check failed, `true` otherwise. Never a key.
+- **`lamp-cloud`** passes the helper's `done` through as it is
+  (`settings::ask_keys`), under its 4096-byte read of a reply.
+- **Tests:** `src/keys.rs` (`a_model_check_asks_once_for_a_tool_call`) and
+  `tests/it/keys.rs`
+  (`the_agent_uses_an_own_model_key_only_once_it_made_a_tool_call`). Not yet
+  run against a real service.
 
 ## Updates
 
