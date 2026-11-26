@@ -6,11 +6,15 @@
 //! line, and until now that was said nowhere: on lamp-06c1 on 12 Nov a
 //! "Hey Lamp" that `lamp-name` heard at 0.937 left lamp-voice's journal
 //! empty for a minute. When `lamp-name` hears the name and the floor turned
-//! away speech blocks in the hearing, lamp-voice says so in one line, with
-//! the level against the floor. It only says it: nothing is heard that was
-//! not heard before.
+//! away speech blocks in the hearing, lamp-voice says so in one line: the
+//! blocks over and under the floor, the call's own loudest block and the
+//! loudest under the floor, and whether the floor could have kept a line
+//! from opening (#8728). It only says it: nothing is heard that was not
+//! heard before.
 
 use std::collections::VecDeque;
+
+use crate::activity::{START_BLOCKS, START_PROBABILITY};
 
 /// Its own name on `name/heard`: `voice` is the second look's.
 pub const SUBSCRIBER: &str = "voice_faint";
@@ -28,15 +32,33 @@ const SLACK_US: u64 = 300_000;
 /// What the detector took for speech lately, and the hearing last said.
 #[derive(Debug, Default)]
 pub struct FaintNamed {
-    /// `(read at, level, floor, turned away)` for each block the detector
-    /// scored 0.5 or more while the floor was in force.
-    blocks: VecDeque<(u64, u8, u8, bool)>,
+    /// Each block the detector scored 0.5 or more while the floor was in
+    /// force.
+    blocks: VecDeque<Block>,
     /// The end of the last hearing said, so that one hearing is said once.
     said_until_us: Option<u64>,
+    /// Blocks in a row, up to the last one, scored
+    /// [`START_PROBABILITY`] or more: over the floor, and whatever the floor.
+    run_over: u16,
+    run_any: u16,
+}
+
+/// One block as the detector and the floor judged it.
+#[derive(Debug, Clone, Copy)]
+struct Block {
+    at_us: u64,
+    level: u8,
+    floor: u8,
+    under: bool,
+    /// The runs ([`FaintNamed::run_over`], [`FaintNamed::run_any`]) this
+    /// block ends.
+    run_over: u16,
+    run_any: u16,
 }
 
 impl FaintNamed {
-    /// One block as the detector and the floor judged it.
+    /// One block as the detector and the floor judged it. Told of every
+    /// block, so that its runs are runs.
     pub fn block(
         &mut self,
         at_us: u64,
@@ -48,46 +70,87 @@ impl FaintNamed {
         while self
             .blocks
             .front()
-            .is_some_and(|(at, ..)| at_us.saturating_sub(*at) > KEPT_US)
+            .is_some_and(|block| at_us.saturating_sub(block.at_us) > KEPT_US)
         {
             self.blocks.pop_front();
         }
+        let sure = floor.is_some() && probability.is_finite() && probability >= START_PROBABILITY;
+        self.run_any = if sure { self.run_any.saturating_add(1) } else { 0 };
+        self.run_over = if sure && !under_floor {
+            self.run_over.saturating_add(1)
+        } else {
+            0
+        };
         if let Some(floor) = floor
             && probability.is_finite()
             && probability >= 0.5
         {
-            self.blocks.push_back((at_us, level, floor, under_floor));
+            self.blocks.push_back(Block {
+                at_us,
+                level,
+                floor,
+                under: under_floor,
+                run_over: self.run_over,
+                run_any: self.run_any,
+            });
         }
     }
 
     /// `lamp-name` heard the name, begun at `began_us`, said at `now_us`:
     /// the line to log, if the floor turned away speech in it. A hearing
     /// that begins within one already said is not said again.
+    ///
+    /// Whether a line opened is the coordinator's, not known here. What is
+    /// known is whether the floor could have kept one from opening: a line
+    /// opens on [`START_BLOCKS`] blocks in a row scored
+    /// [`START_PROBABILITY`] or more after the floor (`activity.rs`). With
+    /// such a run over the floor, the floor did not keep the line shut;
+    /// with one only when the floor is set aside, it did; with neither, the
+    /// detector alone opened nothing.
     pub fn named(&mut self, began_us: u64, now_us: u64, score: f32) -> Option<String> {
         if self.said_until_us.is_some_and(|until| began_us <= until) {
             return None;
         }
         let from_us = began_us.saturating_sub(SLACK_US);
-        let in_it = self
+        let in_it: Vec<Block> = self
             .blocks
             .iter()
-            .filter(|(at, ..)| (from_us..=now_us).contains(at));
-        let speech = in_it.clone().count();
-        let (loudest, floor) = in_it
-            .filter(|(.., under)| *under)
-            .map(|(_, level, floor, _)| (*level, *floor))
-            .max_by_key(|(level, _)| *level)?;
-        let under = self
-            .blocks
+            .filter(|block| (from_us..=now_us).contains(&block.at_us))
+            .copied()
+            .collect();
+        let loudest_under = in_it
             .iter()
-            .filter(|(at, .., under)| *under && (from_us..=now_us).contains(at))
-            .count();
-        self.said_until_us = Some(now_us);
-        Some(format!(
-            "lamp-voice: the lamp's name was heard (score {score:.2}) but the faint floor turned the line away: {under} of {speech} speech blocks were under it, the loudest at {:.1} dBFS (level {loudest}) against a floor of {:.1} dBFS (level {floor})",
+            .filter(|block| block.under)
+            .max_by_key(|block| block.level)?;
+        let speech = in_it.len();
+        let under = in_it.iter().filter(|block| block.under).count();
+        let over = speech - under;
+        let loudest = in_it.iter().map(|block| block.level).max().unwrap_or(0);
+        let run_over = in_it.iter().map(|block| block.run_over).max().unwrap_or(0);
+        let run_any = in_it.iter().map(|block| block.run_any).max().unwrap_or(0);
+        let floor = loudest_under.floor;
+        let levels = format!(
+            "{over} of {speech} speech blocks were over it and {under} under, the call's loudest at {:.1} dBFS (level {loudest}) and the loudest under it at {:.1} dBFS (level {}) against a floor of {:.1} dBFS (level {floor})",
             dbfs(loudest),
+            dbfs(loudest_under.level),
+            loudest_under.level,
             dbfs(floor),
-        ))
+        );
+        self.said_until_us = Some(now_us);
+        let needs = START_BLOCKS;
+        Some(if run_over >= needs {
+            format!(
+                "lamp-voice: the lamp's name was heard (score {score:.2}) and the faint floor left a line free to open: {levels}; the longest run over it was {run_over} blocks (a line needs {needs})"
+            )
+        } else if run_any >= needs {
+            format!(
+                "lamp-voice: the lamp's name was heard (score {score:.2}) but the faint floor turned the line away: {levels}; the longest run over it was {run_over} blocks (a line needs {needs}), {run_any} without it"
+            )
+        } else {
+            format!(
+                "lamp-voice: the lamp's name was heard (score {score:.2}) but no line could open, floor or not: {levels}; the longest run the detector was sure of was {run_any} blocks (a line needs {needs})"
+            )
+        })
     }
 }
 
@@ -99,7 +162,7 @@ impl FaintNamed {
         let from_us = began_us.saturating_sub(SLACK_US);
         self.blocks
             .iter()
-            .any(|(at, .., under)| *under && (from_us..=now_us).contains(at))
+            .any(|block| block.under && (from_us..=now_us).contains(&block.at_us))
     }
 }
 
@@ -131,7 +194,7 @@ mod tests {
         assert_eq!(
             line.as_deref(),
             Some(
-                "lamp-voice: the lamp's name was heard (score 0.94) but the faint floor turned the line away: 40 of 40 speech blocks were under it, the loudest at -29.2 dBFS (level 141) against a floor of -28.0 dBFS (level 150)"
+                "lamp-voice: the lamp's name was heard (score 0.94) but the faint floor turned the line away: 0 of 40 speech blocks were over it and 40 under, the call's loudest at -29.2 dBFS (level 141) and the loudest under it at -29.2 dBFS (level 141) against a floor of -28.0 dBFS (level 150); the longest run over it was 0 blocks (a line needs 6), 40 without it"
             )
         );
     }
@@ -206,9 +269,65 @@ mod tests {
         let line = heard.named(began, now, 0.95);
         assert!(
             line.as_deref()
-                .is_some_and(|line| line.contains("40 of 40 speech blocks")),
+                .is_some_and(|line| line.contains("0 of 40 speech blocks were over it and 40 under")),
             "{line:?}"
         );
+    }
+
+    /// Blocks from 1 s, 10 ms apart, scored 0.9 against a floor of 150:
+    /// `o` over it at level 170, `u` under it at level 140.
+    fn blocks(heard: &mut FaintNamed, pattern: &str) {
+        for (index, kind) in pattern.chars().enumerate() {
+            let under = kind == 'u';
+            let level = if under { 140 } else { 170 };
+            heard.block(1_000_000 + index as u64 * BLOCK_US, 0.9, level, Some(150), under);
+        }
+    }
+
+    /// #8728: lamp-74ff, 26 Nov 12:24:13, "2 of 22 speech blocks were under
+    /// it, the loudest at -30.4 dBFS" was said as turned away, the loudest
+    /// of the two under the floor given as the call's.
+    #[test]
+    fn a_call_mostly_over_the_floor_is_not_said_turned_away() {
+        let mut heard = FaintNamed::default();
+        blocks(&mut heard, "uuoooooooooooooooooooo");
+        let line = heard.named(1_050_000, 1_500_000, 0.95).expect("said");
+        assert!(!line.contains("turned the line away"), "{line}");
+        assert!(
+            line.contains(
+                "the faint floor left a line free to open: 20 of 22 speech blocks were over it and 2 under, the call's loudest at -25.3 dBFS (level 170) and the loudest under it at -29.3 dBFS (level 140)"
+            ),
+            "{line}"
+        );
+        assert!(line.contains("the longest run over it was 20 blocks (a line needs 6)"), "{line}");
+    }
+
+    #[test]
+    fn a_run_of_six_over_the_floor_frees_a_line_and_five_does_not() {
+        let mut five = FaintNamed::default();
+        blocks(&mut five, "ooooouooooouooooou");
+        let line = five.named(1_050_000, 1_500_000, 0.95).expect("said");
+        assert!(line.contains("but the faint floor turned the line away"), "{line}");
+        assert!(line.contains("the longest run over it was 5 blocks (a line needs 6), 18 without it"), "{line}");
+        let mut six = FaintNamed::default();
+        blocks(&mut six, "oooooouoooooou");
+        let line = six.named(1_050_000, 1_500_000, 0.95).expect("said");
+        assert!(line.contains("the faint floor left a line free to open"), "{line}");
+        assert!(line.contains("the longest run over it was 6 blocks"), "{line}");
+    }
+
+    /// Blocks the detector was not sure of: no line would open with the
+    /// floor set aside, so the floor turned nothing away that opens lines.
+    #[test]
+    fn a_call_the_detector_was_unsure_of_is_not_blamed_on_the_floor() {
+        let mut heard = FaintNamed::default();
+        for index in 0..40u64 {
+            heard.block(1_000_000 + index * BLOCK_US, 0.6, 140, Some(150), true);
+        }
+        let line = heard.named(1_050_000, 1_500_000, 0.95).expect("said");
+        assert!(!line.contains("turned the line away"), "{line}");
+        assert!(line.contains("but no line could open, floor or not"), "{line}");
+        assert!(line.contains("the detector was sure of was 0 blocks"), "{line}");
     }
 
     #[test]
