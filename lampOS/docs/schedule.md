@@ -1878,8 +1878,40 @@ for the link. Off, nothing changes. Tests:
 `the_offline_rings_lines_are_warmed_only_with_the_switch_and_read_not_rendered`
 (`say/tts_cache.rs`) and
 `the_offline_rings_lines_have_their_words_in_each_language` (`language.rs`).
-Not built: a reminder's own words as its clip, rendered when it is set; a
-reminder rings with the generic line.
+A reminder rings with the generic line, never its own words (clip C, the
+first builder's call on #8687, 26 Nov). Its own words as its clip, rendered
+while online and removed when its id leaves Schedule, is a later follow-up
+with its own privacy read.
+
+The link is checked once before a ring (the first builder's call 2). On the
+second route as the only voice, the link read down only once a turn failed
+on the network, so a ring due in an outage nobody had spoken in was first
+tried as a model turn and rang late. With the switch the consumer child
+walks the store one page (8 items) a tick for the soonest item set and not
+yet due, and tells the voice its id, delivery and due time on the
+monotonic clock (`FromWorker::Upcoming`), never its words, only when it
+changes and in the tick's `Idle` slot. From
+`offline_rings::PROBE_BEFORE_DUE_US` (10 s) before that due time, the
+coordinator sends the provider worker one `Control::CheckLink` for that
+item (`offline_rings::asks_link_check`). The second route runs the check it
+already runs after a network fault (`second_provider::link::Watch::ask`,
+`Link::ask`: a bare connection to each service host, bounded at
+`PROBE_WITHIN`, 4 s), skipped while a check runs, while down, without
+targets, and within `LINK_CONFIRMED_WITHIN_US` (60 s) of a completed turn
+or a check that found a host. No host answering takes the link down
+(`ConnectTimeout`) by 6 s before due, so at the due time it is past its 5 s
+grace and the ring plays from its clip; once down, the existing 5 s
+re-checks run as before. Nothing is checked with no ring due, and nothing
+outside this once. The Live worker takes nothing from `CheckLink`; the
+session records `offline_ring_link_check`. Tests:
+`the_link_is_checked_once_ten_seconds_before_a_due_ring_and_never_with_none_due`
+and `a_ring_whose_check_reads_down_plays_from_its_clip_at_due`
+(`offline_rings.rs`),
+`a_check_before_a_ring_runs_once_and_not_within_a_minute_of_the_link_found`
+and `the_watch_skips_the_check_within_a_minute_of_a_turn_completed`
+(`second_provider/link.rs`), and
+`with_offline_rings_the_soonest_ring_not_yet_due_is_told_once_and_never_its_words`
+(`reminders/consumer/tests.rs`).
 
 Crash-uncertain attempts (no settlement ever sent) stay pending without
 re-speech while the voice that made them runs. Such an oldest entry does

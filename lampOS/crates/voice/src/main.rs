@@ -1038,7 +1038,8 @@ fn probe(mut channels: WorkerChannels) -> Result<()> {
                 Control::StartCapture
                 | Control::ConnectReference { .. }
                 | Control::ProviderOutputCapacity { .. }
-                | Control::NameGrant { .. },
+                | Control::NameGrant { .. }
+                | Control::CheckLink,
             ) => {
                 return Err(io::Error::other("invalid probe command").into());
             }

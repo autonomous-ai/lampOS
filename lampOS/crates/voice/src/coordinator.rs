@@ -6733,6 +6733,9 @@ fn conversation_with_gate_inner(
     };
     // The item last said to have no clip, so the journal says it once.
     let mut ring_missing_told: Option<String> = None;
+    // The ring the link's check was last asked for, by its Schedule id and
+    // delivery, so it is asked once (`offline_rings::asks_link_check`).
+    let mut link_check_asked: Option<(u64, u64)> = None;
     // With `LAMP_REACH_PROBE=on`: a link down while the internet answers is
     // not the home's outage, and the voice waits for the probe's verdict
     // before it says one (#830).
@@ -13801,6 +13804,32 @@ fn conversation_with_gate_inner(
                     ring_missing_told = Some(key);
                 }
                 _ => {}
+            }
+        }
+        // About 10 s before the soonest ring is due, the provider worker is
+        // asked once for its link's check, so a ring due in an outage
+        // nobody spoke in finds the link down and plays from its clip at
+        // the due time (`LAMP_OFFLINE_RINGS`, the first builder's call on
+        // #8687). The second route skips it within a minute of the link
+        // found; every other provider takes nothing from it.
+        if offline_rings && let Some(soonest) = reminders.as_ref().and_then(|r| r.upcoming()) {
+            let key = (soonest.id, soonest.delivery);
+            if crate::offline_rings::asks_link_check(
+                offline_rings,
+                Some((&key, soonest.due_at_us)),
+                link_check_asked.as_ref(),
+                reminder_now_us,
+            ) {
+                rig.provider.channels.control.send(Control::CheckLink)?;
+                link_check_asked = Some(key);
+                eprintln!(
+                    "lamp-voice: a ring is due within 10 s: the link is checked once (LAMP_OFFLINE_RINGS)"
+                );
+                record(
+                    trace,
+                    json!({"kind":"offline_ring_link_check","due_in_us":soonest.due_at_us.saturating_sub(reminder_now_us),
+                        "at_us":reminder_now_us}),
+                )?;
             }
         }
         // A reminder held for its skill, and still offered, is said before
