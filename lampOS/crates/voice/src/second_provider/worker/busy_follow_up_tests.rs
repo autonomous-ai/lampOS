@@ -83,6 +83,18 @@ fn play_with(renews: bool, decline_silent: bool, steps: &[Step]) -> Vec<Judged> 
 /// [`play_with`], with `LAMP_BUSY_NO_FACE_RENEWS` when `no_face`. A line
 /// whose face is `""` has no face seen speaking it.
 fn play_all(renews: bool, decline_silent: bool, no_face: bool, steps: &[Step]) -> Vec<Judged> {
+    play_full(renews, decline_silent, no_face, false, steps)
+}
+
+/// [`play_all`], with `LAMP_NO_FACE_FOLLOW_UP_BY_VOICE` when `by_voice`. No
+/// line here has a print, so none is found in the conversation's own voice.
+fn play_full(
+    renews: bool,
+    decline_silent: bool,
+    no_face: bool,
+    by_voice: bool,
+    steps: &[Step],
+) -> Vec<Judged> {
     let _one = crate::provider_worker::tests::one_thread();
     let _clock =
         crate::scenario_clock::Scope::enter_at(Duration::from_secs(10), 600_000_000).unwrap();
@@ -100,6 +112,9 @@ fn play_all(renews: bool, decline_silent: bool, no_face: bool, steps: &[Step]) -
     }
     if no_face {
         heeding.renewing_no_face_follow_ups();
+    }
+    if by_voice {
+        heeding.renewing_no_face_follow_ups_by_voice();
     }
     let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
     heeding.seeing_speaking_faces(eyes.clone(), None);
@@ -401,5 +416,55 @@ fn a_no_face_follow_up_renews_the_call() {
     assert_eq!(
         let_out(&play_all(false, false, true, &steps(""))),
         let_out(&play_all(false, false, false, &steps("")))
+    );
+}
+
+/// `LAMP_NO_FACE_FOLLOW_UP_BY_VOICE` (lamp-74ff, 26 Nov 2026: in October's
+/// two-person battery, 21 lines of two people's talk with no face seen and
+/// no print were each told they were the caller's follow-up, and all were
+/// answered). r47 to r53's scene again, its no-face lines with no print:
+/// with the switch none is the caller's own, so each let out in the call's
+/// window is told it may be people's talk ([`CONVERSATION_ALONE`]) and
+/// renews nothing, and the late lines are held, as with
+/// `LAMP_BUSY_FOLLOW_UP_RENEWS` alone. Without it each is the caller's.
+#[test]
+fn by_voice_a_no_face_follow_up_without_the_conversations_voice_renews_nothing() {
+    let steps = [
+        line(0, 2_000, "Lamp, can you remember my face?", OWNER),
+        line(
+            6_000,
+            4_000,
+            "And the one I told you about yesterday too.",
+            "",
+        ),
+        line(12_000, 2_000, "You know, the one from the office.", ""),
+        line(22_000, 1_000, "Are you still there?", ""),
+        line(35_000, 1_000, "Hello, can you hear me?", ""),
+    ];
+    let by_voice = play_full(true, false, true, true, &steps);
+    assert_eq!(let_out(&by_voice), [true, true, true, false, false]);
+    assert_eq!(by_voice[1].1, Some(CONVERSATION_ALONE));
+    assert_eq!(by_voice[2].1, Some(CONVERSATION_ALONE));
+    let before = play_full(true, false, true, false, &steps);
+    assert_eq!(let_out(&before), [true; 5]);
+    assert_eq!(before[1].1, Some(FOLLOW_UP_NOTE));
+}
+
+/// The rule: with no face seen, only the conversation's own voice keeps a
+/// line the caller's; a face seen speaking it is the caller's-face rule's,
+/// and off nothing changes.
+#[test]
+fn by_voice_only_the_conversations_own_voice_keeps_a_no_face_line_the_callers() {
+    let none = crate::speaking_faces::Speakers::new();
+    let one = vec![OWNER.to_owned()];
+    assert!(unvoiced_follow_up(true, &none, false), "no print");
+    assert!(
+        !unvoiced_follow_up(true, &none, true),
+        "the conversation's own voice"
+    );
+    assert!(!unvoiced_follow_up(false, &none, false), "off");
+    assert!(
+        !unvoiced_follow_up(true, &one, false),
+        "a face seen speaking"
     );
 }
