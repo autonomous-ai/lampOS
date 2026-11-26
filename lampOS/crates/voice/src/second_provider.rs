@@ -1066,6 +1066,16 @@ pub const NEWS_REPLY_HEEDS_HELD_ENVIRONMENT: &str = "LAMP_NEWS_REPLY_HEEDS_HELD"
 /// and open a window (#8114's shapes 5-7, #8136).
 pub const NAME_FACE_OR_WORDS_ENVIRONMENT: &str = "LAMP_NAME_FACE_OR_WORDS";
 
+/// `on` exactly, off unless set (the product owner, 26 Nov 2026: "remove
+/// 'Lamp'. must say 'Hey Lamp'. 'Lamp' alone creates so many issues."): out
+/// of a conversation, a hearing of the name is a call only as "Hey Lamp" at
+/// the line's start, and words call the lamp only when they open with a
+/// greeting ([`crate::attention::Attention::only_hey_lamp`]). On lamp-74ff
+/// that day a bare "Lamp" heard in "Okay. Fine. Exactly." woke the lamp into
+/// an office's talk, and the camera rules meant to stop such wakes held the
+/// owner's own calls.
+pub const NAME_HEY_ONLY_ENVIRONMENT: &str = "LAMP_NAME_HEY_ONLY";
+
 /// `on` exactly, off unless set (#8114, the first builder's 08:54 and 08:57):
 /// a line whose call word is another person's name ("Hey, Lance.", "Dan,
 /// are you done?") is never the lamp's call, however sure lamp-name is,

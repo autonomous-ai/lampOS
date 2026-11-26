@@ -5630,6 +5630,18 @@ pub fn serve(
                 heeding.attention.need_a_face_or_words(true);
             }
         }
+        // A call is "Hey Lamp" at a line's start (`LAMP_NAME_HEY_ONLY=on`, the
+        // product owner on 26 Nov 2026).
+        if std::env::var(crate::second_provider::NAME_HEY_ONLY_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: out of a conversation a call is \"Hey Lamp\" at a line's start: a hearing there with a greeting before it is the call, whatever else rules its word; a bare \"Lamp\" or the name inside a sentence is none (LAMP_NAME_HEY_ONLY)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.attention.only_hey_lamp(true);
+            }
+        }
         // Another person's name in the call's place is theirs
         // (`LAMP_NAME_NOT_ANOTHERS=on`, #8114).
         if crate::second_provider::not_anothers_on() {
@@ -13296,7 +13308,12 @@ impl Heeding {
             );
         }
         if self.attention.weigh_the_name(signs.turned, signs.going_on) {
-            if self.attention.name_dropped_by_near() {
+            if self.attention.name_dropped_without_hey() {
+                eprintln!(
+                    "lamp-voice second: request {request}: its name, heard only in the room's sound (began {} ms into the line{soft_lead}), counts for nothing: a call is \"Hey Lamp\" at the line's start (LAMP_NAME_HEY_ONLY)",
+                    name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
+                );
+            } else if self.attention.name_dropped_by_near() {
                 eprintln!(
                     "lamp-voice second: request {request}: its name, heard only in the room's sound (began {} ms into the line{soft_lead}), counts for nothing: LAMP_NAME_NEAR ruled the line not the name, or its one word, with no face turned, doesn't sound like the name, and that verdict wins over every second sign; the model is not told it was heard (LAMP_NAME_SIGN_TIED, #8092)",
                     name_into_ms.map_or_else(|| "?".to_owned(), |ms| ms.to_string())
