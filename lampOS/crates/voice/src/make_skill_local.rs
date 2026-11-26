@@ -8275,7 +8275,15 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         crate::make_skill_agent::tests::stub(
             Some("hermes"),
             std::sync::Arc::new(move |rules: &str| {
-                // The same system prompt and brief DeepSeek is sent.
+                // The same system prompt and brief DeepSeek is sent; a
+                // repair's with the check's refusal first (#8651).
+                let rules = match rules.strip_prefix("FIX THIS FIRST. ") {
+                    Some(led) => {
+                        assert!(led.starts_with(made_skill::REPAIR_MARK), "{rules}");
+                        led.split_once("\n\n").unwrap().1
+                    }
+                    None => rules,
+                };
                 assert!(rules.starts_with(&system()), "{rules}");
                 assert!(rules.contains(made_skill::BRIEF_HEAD), "{rules}");
                 answers.lock().unwrap().next().flatten()
@@ -10371,7 +10379,10 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                 (true, true, true),
                 (true, false, true),
             ] {
-                let rules = format!("{}\n\n{repair}\n", system_net(reads, agent, net));
+                // As the agent's make run is handed them, the refusal first
+                // too (#8651).
+                let rules =
+                    crate::make_skill_agent::rules_of(&system_net(reads, agent, net), &repair);
                 assert!(
                     rules.len() <= lamp_tasks::skill_make::MOST_RULES_BYTES,
                     "{} > {}",
