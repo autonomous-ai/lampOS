@@ -104,6 +104,30 @@ jobs:
       - run: python -m pip install -e ../python -e '.[test]'
       - run: python -m pytest -q tests
 
+  # The apps under lampOS/sdk/apps (Lamp Doctor, #8726): each folder's own
+  # tests, on the SDK beside them (their conftest puts lampos on the path) and its fake lamp.
+  apps:
+    name: lampOS SDK — apps, Python ${{ matrix.python }} (pytest)
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install --upgrade pip pytest 'websockets>=13' 'cryptography>=42' 'tomli>=2; python_version < "3.11"'
+      - name: Each app's tests
+        run: |
+          status=0
+          for dir in lampOS/sdk/apps/*/; do
+            [ -d "$dir/tests" ] || continue
+            (cd "$dir" && python -m pytest -q tests) || status=1
+          done
+          exit $status
+
   js:
     name: lampOS SDK — JavaScript, Node ${{ matrix.node }} (node --test)
     runs-on: ubuntu-24.04
