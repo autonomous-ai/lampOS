@@ -55,7 +55,10 @@ impl Lamp {
                     width = width.max(1) - 1,
                 ),
             ),
-            ("timeout".to_owned(), "#!/bin/sh\nshift\nexec \"$@\"\n".to_owned()),
+            (
+                "timeout".to_owned(),
+                "#!/bin/sh\nshift\nexec \"$@\"\n".to_owned(),
+            ),
         ];
         for tool in ["systemctl", "pkill", "killall"] {
             tools.push((
@@ -144,9 +147,10 @@ fn names(folder: &Path) -> Vec<String> {
 /// exit-note.conf of the image's names it.
 #[test]
 fn the_voice_runs_the_fault_keep_at_its_stop_from_a_drop_in_of_its_own() {
-    let text =
-        fs::read_to_string(rootfs().join("etc/systemd/system/lamp-voice.service.d/lamp-fault-keep.conf"))
-            .unwrap();
+    let text = fs::read_to_string(
+        rootfs().join("etc/systemd/system/lamp-voice.service.d/lamp-fault-keep.conf"),
+    )
+    .unwrap();
     let lines: Vec<&str> = text
         .lines()
         .map(str::trim)
@@ -159,8 +163,13 @@ fn the_voice_runs_the_fault_keep_at_its_stop_from_a_drop_in_of_its_own() {
             "ExecStopPost=-+/bin/bash /usr/local/libexec/lamp-journal-keep fault %n",
         ]
     );
-    let product = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product/exit-note.conf");
-    assert!(!fs::read_to_string(product).unwrap().contains("lamp-journal-keep"));
+    let product =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product/exit-note.conf");
+    assert!(
+        !fs::read_to_string(product)
+            .unwrap()
+            .contains("lamp-journal-keep")
+    );
 }
 
 /// A success, or a stop with no result, keeps nothing and asks the journal
@@ -206,7 +215,9 @@ fn a_crash_loop_stops_at_5_files_a_boot_of_64_kb_each() {
     assert_eq!(kept.len(), 5);
     for name in &kept {
         assert_eq!(
-            fs::metadata(lamp.keep.join("fault").join(name)).unwrap().len(),
+            fs::metadata(lamp.keep.join("fault").join(name))
+                .unwrap()
+                .len(),
             65536
         );
     }
