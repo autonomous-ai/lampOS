@@ -3070,8 +3070,11 @@ pub struct RecognitionMeasures {
     pub tallest: f32,
     /// The near face's eye distance in the picture, in pixels.
     pub eyes_px: Option<f32>,
-    /// How far the near face's head is turned, in degrees (`facing::yaw_deg`).
+    /// How far the near face's head is turned, in degrees (`facing::turn`).
     pub turned_deg: Option<f32>,
+    /// Which way that turn was read: its marks, or with
+    /// `LAMP_EYES_FACING_FROM_MESH=on` its mesh this look.
+    pub turned_from: crate::facing::TurnFrom,
     /// The detector's score for the near face.
     pub score: Option<f32>,
     /// How long the print took, in ms; `None` with none read.
@@ -3084,12 +3087,13 @@ pub fn recognition_told(measures: &RecognitionMeasures) -> String {
         value.map_or_else(|| "none".to_owned(), |value| format!("{value:.places$}"))
     };
     format!(
-        "lamp-eyes: recognition best {} height {:.3} (near at {NEAR_ENOUGH}, same at {SAME_PERSON}) second {} eyes {} px turned {} deg score {} print {} ms",
+        "lamp-eyes: recognition best {} height {:.3} (near at {NEAR_ENOUGH}, same at {SAME_PERSON}) second {} eyes {} px turned {} deg from {} score {} print {} ms",
         number(measures.best, 3),
         measures.tallest,
         number(measures.second, 3),
         number(measures.eyes_px, 1),
         number(measures.turned_deg, 0),
+        measures.turned_from.word(),
         number(measures.score, 2),
         measures
             .print_ms
@@ -7973,25 +7977,39 @@ mod tests {
         const { assert!(REMATCH_LIKENESS <= 0.32 && REMATCH_LIKENESS < SAME_PERSON) };
     }
 
-    /// T0: the recognition line has its measures and never a name.
+    /// T0: the recognition line has its measures and never a name, and
+    /// says which way the turn was read (`LAMP_EYES_FACING_FROM_MESH`).
     #[test]
     fn the_recognition_line_has_numbers_only() {
-        let line = recognition_told(&RecognitionMeasures {
+        let measures = RecognitionMeasures {
             best: Some(0.341),
             second: Some(0.12),
             tallest: 0.2,
             eyes_px: Some(14.25),
             turned_deg: Some(-12.4),
+            turned_from: crate::facing::TurnFrom::Marks,
             score: Some(0.91),
             print_ms: Some(152),
-        });
+        };
+        let line = recognition_told(&measures);
         assert_eq!(
             line,
-            "lamp-eyes: recognition best 0.341 height 0.200 (near at 0.1, same at 0.363) second 0.120 eyes 14.2 px turned -12 deg score 0.91 print 152 ms"
+            "lamp-eyes: recognition best 0.341 height 0.200 (near at 0.1, same at 0.363) second 0.120 eyes 14.2 px turned -12 deg from marks score 0.91 print 152 ms"
+        );
+        let meshed = recognition_told(&RecognitionMeasures {
+            turned_deg: Some(4.0),
+            turned_from: crate::facing::TurnFrom::Mesh,
+            ..measures
+        });
+        assert!(
+            meshed.contains(" turned 4 deg from mesh score "),
+            "{meshed}"
         );
         let none = recognition_told(&RecognitionMeasures::default());
         assert!(
-            none.contains("best none") && none.contains("print none ms"),
+            none.contains("best none")
+                && none.contains("turned none deg from marks")
+                && none.contains("print none ms"),
             "{none}"
         );
         // Nothing in it but words of its own and numbers.
@@ -8013,6 +8031,8 @@ mod tests {
                         "px",
                         "turned",
                         "deg",
+                        "from",
+                        "marks",
                         "score",
                         "print",
                         "ms"

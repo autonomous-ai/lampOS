@@ -14,6 +14,14 @@
 //! into "facing or not" for one look, and a run of looks into a vote. The
 //! numbers are V1's and were tuned on V1's lamps at twice this picture's
 //! width; none has been checked on this lamp.
+//!
+//! At desk distance the marks are a few pixels apart, and a pixel's wobble
+//! in the nose moves the turn 10 to 20 degrees (lamp-74ff, 26 Nov: 60% of
+//! 1,807 reads `turned 60+ deg` with the owner facing the lamp). With
+//! `LAMP_EYES_FACING_FROM_MESH=on` ([`FROM_MESH_ENVIRONMENT`]) the face the
+//! mouth's Face Mesh V2 already meshed in a look is turned and tipped as
+//! its mesh says instead ([`mesh_head`]): no second model run, and every
+//! other face as the marks say.
 
 /// A face turned further than this is not facing the lamp. V1's default
 /// was 25 and its lamps were set to 60 after trying them with people: a
@@ -180,6 +188,269 @@ pub fn allowed_deg(from_middle: f32) -> f32 {
 /// leave out of the vote: here it is simply not facing.
 pub fn facing(yaw: Option<f32>, width_share: f32, from_middle: f32) -> bool {
     yaw.is_some_and(|yaw| width_share >= LEAST_WIDTH && yaw <= allowed_deg(from_middle))
+}
+
+/// Where the eyes read whether a face meshed in a look is turned and tipped
+/// as its Face Mesh V2 points say ([`mesh_head`]), not as its five marks
+/// say: `on` exactly, off unless set. A face with no mesh that look (not
+/// the largest, or `--mouth-on-heard` with no line heard), a mesh that
+/// can't be read, or the switch off: the marks, unchanged. A face too small
+/// for the marks to measure ([`LEAST_WIDTH`]) has no turn either way.
+pub const FROM_MESH_ENVIRONMENT: &str = "LAMP_EYES_FACING_FROM_MESH";
+
+/// Whether [`FROM_MESH_ENVIRONMENT`] is on in this process's environment.
+pub fn from_mesh_on() -> bool {
+    std::env::var(FROM_MESH_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// Which way a face's turn was read in a look.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TurnFrom {
+    /// Its five marks ([`yaw_deg`]).
+    #[default]
+    Marks,
+    /// Its mesh ([`mesh_head`]).
+    Mesh,
+}
+
+impl TurnFrom {
+    /// The word the journal says it with.
+    pub fn word(self) -> &'static str {
+        match self {
+            Self::Marks => "marks",
+            Self::Mesh => "mesh",
+        }
+    }
+}
+
+/// How a head is turned and tipped, from its mesh ([`mesh_head`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Head {
+    /// Turned, in degrees: 0 facing the camera, positive toward the
+    /// picture's right (the face's own left), as the bus's `yaw`.
+    pub yaw_deg: f32,
+    /// Tipped, in degrees: positive down, as [`pitch_deg`].
+    pub pitch_deg: f32,
+}
+
+/// How far a face is turned in a look, either way, and which way that was
+/// read: its mesh's turn when it has a [`Head`], else its marks'
+/// ([`yaw_deg`]).
+pub fn turn(marks: &[(f32, f32); 5], head: Option<Head>) -> (Option<f32>, TurnFrom) {
+    match head {
+        Some(head) => (Some(head.yaw_deg.abs()), TurnFrom::Mesh),
+        None => (yaw_deg(marks), TurnFrom::Marks),
+    }
+}
+
+/// How far a face is tipped in a look: its mesh's pitch when it has a
+/// [`Head`], else its marks' ([`pitch_deg`]). Not measured, either way, for
+/// a head turned past [`PITCH_MOST_YAW_DEG`].
+pub fn tip(marks: &[(f32, f32); 5], head: Option<Head>) -> Option<f32> {
+    match head {
+        Some(head) => (head.yaw_deg.abs() <= PITCH_MOST_YAW_DEG).then_some(head.pitch_deg),
+        None => pitch_deg(marks),
+    }
+}
+
+/// The mesh's points across the face, each pair from the point on the
+/// picture's left to its mirror image on the right: the outer eye corners,
+/// the inner ones and the sides of the nose. Neither the lids nor the
+/// irises (where the eyes look is not read), the brows, the lips or the
+/// jaw: blinking, speaking and smiling move none of these.
+const ACROSS: [(usize, usize); 3] = [(33, 263), (133, 362), (129, 358)];
+/// The mesh's points up the face's middle, each pair from a point at the
+/// nose's base to one above it: between the brows, and the forehead's
+/// middle. Bone and cartilage the jaw doesn't move.
+const UP: [(usize, usize); 2] = [(2, 9), (94, 151)];
+/// Where [`ACROSS`]'s and [`UP`]'s points sit on MediaPipe's canonical face
+/// (`mediapipe/modules/face_geometry/data/canonical_face_model.obj`,
+/// Apache-2.0 as the model is), by their index in the mesh: centimetres, x
+/// to the face's own left, y up, z out of the face. Only [`UP`]'s lean is
+/// read from it ([`up_lean`]); each of [`ACROSS`]'s pairs is a mirror pair
+/// there, as on any face the same on both sides.
+const CANONICAL: [(usize, [f32; 3]); 10] = [
+    (33, [-4.445_859, 2.663_991, 3.173_422]),
+    (263, [4.445_859, 2.663_991, 3.173_422]),
+    (133, [-1.856_432, 2.585_245, 3.757_904]),
+    (362, [1.856_432, 2.585_245, 3.757_904]),
+    (129, [-1.785_794, -0.978_284, 4.850_47]),
+    (358, [1.785_794, -0.978_284, 4.850_47]),
+    (2, [0.0, -2.089_024, 6.058_267]),
+    (9, [0.0, 4.885_979, 5.385_258]),
+    (94, [0.0, -1.724_003, 6.601_39]),
+    (151, [0.0, 6.545_39, 5.027_311]),
+];
+
+/// How far [`UP`]'s pairs, summed, lean out of the canonical face, in
+/// radians: about -8.4 degrees, their tops set back.
+fn up_lean() -> f32 {
+    let at = |index: usize| {
+        CANONICAL
+            .iter()
+            .find(|(at, _)| *at == index)
+            .map_or([0.0; 3], |(_, point)| *point)
+    };
+    let (mut up, mut out) = (0.0f32, 0.0f32);
+    for (from, to) in UP {
+        let (from, to) = (at(from), at(to));
+        up += to[1] - from[1];
+        out += to[2] - from[2];
+    }
+    out.atan2(up)
+}
+
+/// How a head is turned and tipped, from its Face Mesh V2 points: the 478
+/// of [`crate::mesh::Mesh::landmarks_of`], each x and y in the crop's
+/// pixels (the crop turned so the detector's eyes are level) and z, depth
+/// away from the camera, which the model gives at x's scale (MediaPipe's
+/// own face geometry reads it so). `None` for points not all there or not
+/// numbers, or that no head seen from the front could give.
+///
+/// A closed form from points nothing on the face moves (the product
+/// owner's ask, 26 Nov):
+/// - **across**, from the head's right to its left: the sum of three
+///   pairs ([`ACROSS`]). On a face the same on both sides each pair runs
+///   straight across it, whatever the face's shape, so no face model sets
+///   the turn's zero;
+/// - **up**: the sum of two pairs up the face's middle ([`UP`]), less its
+///   part across;
+/// - **out of the face**, toward the camera: across times up, leaned as
+///   far as up leans on MediaPipe's canonical face ([`up_lean`]), so that
+///   face, square to the camera, reads 0 and 0.
+///
+/// The face's tilt in the picture is taken out along its own eye line
+/// (across), then the turn is how far out of the face points to the side
+/// and the tip how far down. Exact for any turn and tip of a rigid face
+/// at any size and place in the crop (the tests). A turn or a tip is read
+/// from the whole of each pair, many crop pixels long: on a face with its
+/// eyes 10 of the picture's pixels apart, meshed at 256 from about 50, one
+/// picture pixel of error on every point, each its own way, moves the turn
+/// about 5 degrees (a Monte Carlo of the canonical face), where one pixel
+/// on the nose mark alone moves [`yaw_deg`]'s 11.5. The depth's scale is
+/// the model's: read at half of x's, 70 degrees would read 54. Not yet
+/// checked against a person on a lamp.
+pub fn mesh_head(landmarks: &[f32]) -> Option<Head> {
+    if landmarks.len() != crate::mesh::LANDMARKS * 3 {
+        return None;
+    }
+    let point = |at: usize| {
+        [
+            landmarks[at * 3],
+            landmarks[at * 3 + 1],
+            landmarks[at * 3 + 2],
+        ]
+    };
+    let sum = |pairs: &[(usize, usize)]| {
+        pairs.iter().fold([0.0; 3], |sum, &(from, to)| {
+            plus(sum, minus(point(to), point(from)))
+        })
+    };
+    let (across, up) = (sum(&ACROSS), sum(&UP));
+    if !across.iter().chain(&up).all(|value| value.is_finite()) {
+        return None;
+    }
+    let across = unit(across)?;
+    // Square to across.
+    let up = unit(minus(up, times(across, dot(up, across))))?;
+    // Out of the face, toward the camera (the crop's z is away from it).
+    let (lean_sin, lean_cos) = up_lean().sin_cos();
+    let out = plus(times(cross(across, up), lean_cos), times(up, lean_sin));
+    // The face's tilt in the picture taken out, along its own eye line.
+    let flat = across[0].hypot(across[1]);
+    let (tilt_sin, tilt_cos) = if flat > 1e-6 {
+        (across[1] / flat, across[0] / flat)
+    } else {
+        (0.0, 1.0)
+    };
+    let out = [
+        out[0] * tilt_cos + out[1] * tilt_sin,
+        -out[0] * tilt_sin + out[1] * tilt_cos,
+        out[2],
+    ];
+    // A face seen from the front looks into the camera's half.
+    if out[2] >= 0.0 {
+        return None;
+    }
+    Some(Head {
+        yaw_deg: out[0].atan2(-out[2]).to_degrees(),
+        pitch_deg: out[1].atan2(out[0].hypot(out[2])).to_degrees(),
+    })
+}
+
+type Vector = [f32; 3];
+
+fn plus(a: Vector, b: Vector) -> Vector {
+    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+}
+
+fn minus(a: Vector, b: Vector) -> Vector {
+    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+}
+
+fn times(a: Vector, by: f32) -> Vector {
+    [a[0] * by, a[1] * by, a[2] * by]
+}
+
+fn dot(a: Vector, b: Vector) -> f32 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+fn cross(a: Vector, b: Vector) -> Vector {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+
+/// `a` made a unit long; none for one too short to have a direction.
+fn unit(a: Vector) -> Option<Vector> {
+    let length = dot(a, a).sqrt();
+    (length > 1e-3).then(|| times(a, 1.0 / length))
+}
+
+/// Each face's [`Head`] from this look's meshes, by its index among the
+/// faces found (`meshed`: each meshed face's index and points): none for a
+/// face not meshed or whose mesh can't be read, and none at all with `on`
+/// false ([`FROM_MESH_ENVIRONMENT`]).
+pub fn mesh_heads(on: bool, faces: usize, meshed: &[(usize, Vec<f32>)]) -> Vec<Option<Head>> {
+    let mut heads = vec![None; faces];
+    if on {
+        for (index, landmarks) in meshed {
+            if let Some(head) = heads.get_mut(*index) {
+                *head = mesh_head(landmarks);
+            }
+        }
+    }
+    heads
+}
+
+/// A mesh of the canonical face ([`CANONICAL`]'s points, every other point
+/// 0) as the mouth's crop would hold it: tipped `pitch` degrees (down
+/// positive), then turned `yaw` (toward the picture's right positive), then
+/// tilted `roll` in the picture's plane, `scale` crop pixels a centimetre,
+/// its middle at the crop's.
+#[cfg(test)]
+pub(crate) fn canonical_mesh(yaw: f32, pitch: f32, roll: f32, scale: f32) -> Vec<f32> {
+    let mut landmarks = vec![0.0; crate::mesh::LANDMARKS * 3];
+    let (yaw_sin, yaw_cos) = yaw.to_radians().sin_cos();
+    let (pitch_sin, pitch_cos) = pitch.to_radians().sin_cos();
+    let (roll_sin, roll_cos) = roll.to_radians().sin_cos();
+    for (index, [x, y, z]) in CANONICAL {
+        // Square to the camera, the crop's x is the face's own left, its y
+        // down and its z away from the camera.
+        let (x, y, z) = (x, -y, -z);
+        let (y, z) = (y * pitch_cos - z * pitch_sin, y * pitch_sin + z * pitch_cos);
+        let (x, z) = (x * yaw_cos - z * yaw_sin, x * yaw_sin + z * yaw_cos);
+        let (x, y) = (x * roll_cos - y * roll_sin, x * roll_sin + y * roll_cos);
+        landmarks[index * 3..index * 3 + 3].copy_from_slice(&[
+            128.0 + scale * x,
+            128.0 + scale * y,
+            scale * z,
+        ]);
+    }
+    landmarks
 }
 
 /// The looks of the last moment, for the vote taken when someone begins to
@@ -456,5 +727,122 @@ mod tests {
         // Looks older than a second and a half are forgotten: a person who
         // faced the lamp and left is not still facing it.
         assert_eq!(recent.vote(1_100 * MS + WINDOW_US + 1), None);
+    }
+
+    fn at(index: usize) -> [f32; 3] {
+        CANONICAL
+            .iter()
+            .find(|(at, _)| *at == index)
+            .map(|(_, point)| *point)
+            .unwrap()
+    }
+
+    #[test]
+    fn the_canonical_face_reads_square_and_its_pairs_are_mirrors() {
+        // A typo in the table would break a mirror or the middle.
+        for (from, to) in ACROSS {
+            let (from, to) = (at(from), at(to));
+            assert!(from[0] < 0.0, "{from:?} is on the picture's left");
+            assert_eq!([-from[0], from[1], from[2]], to);
+        }
+        for (from, to) in UP {
+            assert_eq!((at(from)[0], at(to)[0]), (0.0, 0.0));
+            assert!(at(to)[1] > at(from)[1], "{to} is above {from}");
+        }
+        let lean = up_lean().to_degrees();
+        assert!((lean + 8.385).abs() < 0.01, "{lean}");
+        let head = mesh_head(&canonical_mesh(0.0, 0.0, 0.0, 8.0)).unwrap();
+        assert!(
+            head.yaw_deg.abs() < 1e-3 && head.pitch_deg.abs() < 1e-3,
+            "{head:?}"
+        );
+    }
+
+    /// Any turn and tip of a rigid face reads back as made, tilted in the
+    /// picture or not, small or large in the crop.
+    #[test]
+    fn a_mesh_reads_the_turn_and_tip_it_was_made_with() {
+        for yaw in [-80.0, -60.0, -30.0, -10.0, 0.0, 10.0, 30.0, 60.0, 80.0] {
+            for pitch in [-40.0, -20.0, 0.0, 20.0, 40.0] {
+                for roll in [-15.0, 0.0, 10.0] {
+                    for scale in [2.0, 8.0] {
+                        let mut mesh = canonical_mesh(yaw, pitch, roll, scale);
+                        // Anywhere in the crop, at any depth.
+                        if scale > 4.0 {
+                            for point in mesh.chunks_mut(3) {
+                                point[0] -= 40.0;
+                                point[1] += 25.0;
+                                point[2] += 300.0;
+                            }
+                        }
+                        let head = mesh_head(&mesh)
+                            .unwrap_or_else(|| panic!("{yaw} {pitch} {roll} {scale}"));
+                        assert!(
+                            (head.yaw_deg - yaw).abs() < 0.01
+                                && (head.pitch_deg - pitch).abs() < 0.01,
+                            "made {yaw} {pitch} {roll} {scale}, read {head:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_mesh_no_head_seen_from_the_front_could_give_is_not_read() {
+        let square = canonical_mesh(0.0, 0.0, 0.0, 8.0);
+        assert!(mesh_head(&square[..square.len() - 3]).is_none());
+        assert!(mesh_head(&[]).is_none());
+        assert!(mesh_head(&vec![0.0; crate::mesh::LANDMARKS * 3]).is_none());
+        let mut lost = square.clone();
+        lost[263 * 3 + 2] = f32::NAN;
+        assert!(mesh_head(&lost).is_none());
+        // A point it doesn't read may be anything: the inner lips here.
+        let mut lips = square.clone();
+        lips[crate::mesh::UPPER_LIP * 3] = f32::NAN;
+        assert!(mesh_head(&lips).is_some());
+        // Mirrored, or upside down: no head seen from the front gives it.
+        for flip in [0, 1] {
+            let mut flipped = square.clone();
+            for point in flipped.chunks_mut(3) {
+                point[flip] = 256.0 - point[flip];
+            }
+            assert!(mesh_head(&flipped).is_none(), "{flip}");
+        }
+    }
+
+    #[test]
+    fn with_a_head_the_turn_and_tip_are_the_meshs_and_without_one_the_marks() {
+        let marks = marks(0.5);
+        let head = Head {
+            yaw_deg: -40.0,
+            pitch_deg: 10.0,
+        };
+        assert_eq!(turn(&marks, Some(head)), (Some(40.0), TurnFrom::Mesh));
+        assert_eq!(turn(&marks, None), (yaw_deg(&marks), TurnFrom::Marks));
+        assert_eq!(tip(&marks, Some(head)), Some(10.0));
+        assert_eq!(tip(&marks, None), pitch_deg(&marks));
+        // Turned past sixty: no pitch, as from the marks.
+        let side_on = Head {
+            yaw_deg: 70.0,
+            ..head
+        };
+        assert_eq!(tip(&marks, Some(side_on)), None);
+        assert_eq!(
+            (TurnFrom::Marks.word(), TurnFrom::Mesh.word()),
+            ("marks", "mesh")
+        );
+    }
+
+    #[test]
+    fn heads_come_only_with_the_switch_and_only_for_the_faces_meshed() {
+        let mesh = canonical_mesh(20.0, 0.0, 0.0, 8.0);
+        assert_eq!(mesh_heads(false, 2, &[(1, mesh.clone())]), vec![None, None]);
+        let heads = mesh_heads(true, 2, &[(1, mesh.clone())]);
+        assert!(heads[0].is_none());
+        assert!((heads[1].unwrap().yaw_deg - 20.0).abs() < 0.01);
+        // An index past the faces found, or a mesh that can't be read.
+        assert_eq!(mesh_heads(true, 1, &[(3, mesh)]), vec![None]);
+        assert_eq!(mesh_heads(true, 1, &[(0, vec![1.0; 9])]), vec![None]);
     }
 }

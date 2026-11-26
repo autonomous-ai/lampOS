@@ -273,7 +273,23 @@ pub fn message(
     ids: &mut Ids,
     now_us: u64,
 ) -> Faces {
-    message_observed(found, opens, filled, ids, now_us, None)
+    message_with_heads(found, opens, &[], filled, ids, now_us)
+}
+
+/// As [`message`], with `heads` each face's head from its mesh, by its
+/// index, where it was meshed and read (`LAMP_EYES_FACING_FROM_MESH=on`,
+/// `facing::mesh_heads`): that face's turn, whether it faces the lamp, its
+/// pitch and the turn its speaking is judged with come from it, not from
+/// its marks. Every other face is as [`message`] has it.
+pub fn message_with_heads(
+    found: &[faces::Face],
+    opens: &[Option<f32>],
+    heads: &[Option<facing::Head>],
+    filled: (usize, usize),
+    ids: &mut Ids,
+    now_us: u64,
+) -> Faces {
+    message_observed(found, opens, heads, filled, ids, now_us, None)
 }
 
 /// At most one numeric record, for the same largest detection the mesh uses.
@@ -291,6 +307,7 @@ pub struct MouthObservation {
 fn message_observed(
     found: &[faces::Face],
     opens: &[Option<f32>],
+    heads: &[Option<facing::Head>],
     filled: (usize, usize),
     ids: &mut Ids,
     now_us: u64,
@@ -319,8 +336,16 @@ fn message_observed(
             let from_middle = ((face.x + face.width / 2.0) / width * 2.0 - 1.0).abs();
             let measured = width_share >= facing::LEAST_WIDTH
                 && facing::marks_seen(&face.marks, width, height);
-            let turn = measured.then(|| facing::yaw_deg(&face.marks)).flatten();
-            let to_the_right = face.marks[2].0 >= (face.marks[0].0 + face.marks[1].0) / 2.0;
+            // A face meshed this look with LAMP_EYES_FACING_FROM_MESH on is
+            // turned and tipped as its mesh says; any other, as its marks.
+            let head = heads.get(index).copied().flatten();
+            let turn = measured
+                .then(|| facing::turn(&face.marks, head).0)
+                .flatten();
+            let to_the_right = match head {
+                Some(head) => head.yaw_deg >= 0.0,
+                None => face.marks[2].0 >= (face.marks[0].0 + face.marks[1].0) / 2.0,
+            };
             let speaking = ids.mouths.as_mut().map(|mouths| {
                 let open = opens.get(index).copied().flatten();
                 if largest == Some(index)
@@ -344,7 +369,7 @@ fn message_observed(
                 ids.talking.push(id);
             }
             let pitch = (ids.pitch_gaze && measured)
-                .then(|| facing::pitch_deg(&face.marks))
+                .then(|| facing::tip(&face.marks, head))
                 .flatten()
                 .map(f32::to_radians);
             let looking = ids
@@ -750,10 +775,24 @@ impl BusOut {
         filled: (usize, usize),
         now_us: u64,
     ) {
+        self.saw_with_heads(found, opens, &[], filled, now_us);
+    }
+
+    /// As [`Self::saw`], with each meshed face's head from its mesh
+    /// ([`message_with_heads`]).
+    pub fn saw_with_heads(
+        &mut self,
+        found: &[faces::Face],
+        opens: &[Option<f32>],
+        heads: &[Option<facing::Head>],
+        filled: (usize, usize),
+        now_us: u64,
+    ) {
         let mut diagnostic = None;
         let seen = message_observed(
             found,
             opens,
+            heads,
             filled,
             &mut self.ids,
             now_us,
@@ -1093,6 +1132,161 @@ mod tests {
             (later.faces[0].id.as_str(), later.faces[0].looking),
             ("f1", None)
         );
+    }
+
+    /// The product's picture, as lamp-eyes looks.
+    const SEATED_PICTURE: (usize, usize) = (320, 240);
+
+    /// A face seated at the desk as lamp-74ff's journal had it (26 Nov), in
+    /// the middle of the product's picture: its eye marks 10 px apart, the
+    /// nose mark `nose` px right of the point between them.
+    fn seated(nose: f32) -> faces::Face {
+        faces::Face {
+            score: 0.9,
+            x: 147.0,
+            y: 100.0,
+            width: 26.0,
+            height: 32.0,
+            marks: [
+                (155.0, 112.0),
+                (165.0, 112.0),
+                (160.0 + nose, 119.0),
+                (156.0, 125.0),
+                (164.0, 125.0),
+            ],
+        }
+    }
+
+    /// `face` alone, meshed as the canonical face turned `yaw` degrees,
+    /// `LAMP_EYES_FACING_FROM_MESH` on and `LAMP_EYES_PITCH_GAZE` on.
+    fn meshed(face: faces::Face, yaw: f32) -> Face {
+        let mesh = facing::canonical_mesh(yaw, 0.0, 0.0, 8.0);
+        let heads = facing::mesh_heads(true, 1, &[(0, mesh)]);
+        let mut ids = Ids {
+            pitch_gaze: true,
+            ..Ids::default()
+        };
+        message_with_heads(&[face], &[], &heads, SEATED_PICTURE, &mut ids, 0)
+            .faces
+            .remove(0)
+    }
+
+    /// (a) The product owner's ask (lamp-74ff, 26 Nov): seated, looking
+    /// straight at the lamp, the nose mark a few pixels off at that size.
+    /// Its marks read it turned 37 degrees (3 px) or side on (5 px, the
+    /// journal's `turned 90 deg`); its mesh says straight, so it faces the
+    /// lamp, turned under 10 degrees and level.
+    #[test]
+    fn with_the_mesh_a_seated_face_looking_at_the_lamp_faces_it_whatever_its_nose_mark() {
+        for nose in [3.0, 5.0] {
+            let face = seated(nose);
+            let by_marks = facing::yaw_deg(&face.marks).unwrap();
+            assert!(by_marks > 30.0, "{nose}: {by_marks}");
+            let seen = meshed(face, 0.0);
+            assert_eq!(seen.facing, Some(true), "{nose}: {seen:?}");
+            assert!(
+                seen.yaw.unwrap().to_degrees().abs() < 10.0,
+                "{nose}: {seen:?}"
+            );
+            assert!(
+                seen.pitch.unwrap().to_degrees().abs() < 5.0,
+                "{nose}: {seen:?}"
+            );
+        }
+    }
+
+    /// (b) Turned 70 degrees, its mesh says, a face in the middle of the
+    /// picture (60 allowed there) does not face the lamp, though its marks
+    /// say it is straight; the sign is the side, and at 45 it still does.
+    #[test]
+    fn with_the_mesh_a_face_turned_seventy_degrees_does_not_face_the_lamp() {
+        let face = seated(0.0);
+        assert!(facing::yaw_deg(&face.marks).unwrap() < 1.0);
+        let by_marks = message(&[face], &[], SEATED_PICTURE, &mut Ids::default(), 0);
+        assert_eq!(by_marks.faces[0].facing, Some(true));
+        for yaw in [70.0f32, -70.0] {
+            let seen = meshed(face, yaw);
+            assert_eq!(seen.facing, Some(false), "{yaw}: {seen:?}");
+            assert!(
+                (seen.yaw.unwrap().to_degrees() - yaw).abs() < 0.1,
+                "{yaw}: {seen:?}"
+            );
+            // Past sixty, no pitch, as from the marks.
+            assert_eq!(seen.pitch, None, "{yaw}");
+        }
+        assert_eq!(meshed(face, 45.0).facing, Some(true));
+    }
+
+    /// (c) A face without a mesh this look is as before: the switch off, no
+    /// mesh, a mesh that can't be read, or the face not the one meshed.
+    #[test]
+    fn without_a_mesh_for_a_face_it_is_as_before() {
+        let faces = [
+            face(240.0, 120.0, 160.0, 200.0, 0.3),
+            face(40.0, 100.0, 120.0, 150.0, 0.95),
+        ];
+        let mesh = facing::canonical_mesh(0.0, 0.0, 0.0, 8.0);
+        let ids = |pitch_gaze: bool, speaking: bool| Ids {
+            pitch_gaze,
+            mouths: speaking.then(speaking::Mouths::default),
+            ..Ids::default()
+        };
+        for heads in [
+            facing::mesh_heads(false, 2, &[(0, mesh.clone())]),
+            facing::mesh_heads(true, 2, &[]),
+            facing::mesh_heads(true, 2, &[(0, vec![0.0; 12])]),
+            Vec::new(),
+        ] {
+            for (pitch_gaze, speaking) in [(false, false), (true, false), (true, true)] {
+                let (mut was, mut now) = (ids(pitch_gaze, speaking), ids(pitch_gaze, speaking));
+                for look in 0..6 {
+                    let at = look * 250_000;
+                    assert_eq!(
+                        message_with_heads(&faces, &[], &heads, PICTURE, &mut now, at),
+                        message(&faces, &[], PICTURE, &mut was, at),
+                        "{heads:?} {pitch_gaze} {speaking} {look}"
+                    );
+                }
+            }
+        }
+        // The first face meshed: the second keeps its marks' turn.
+        let heads = facing::mesh_heads(true, 2, &[(0, mesh)]);
+        let seen = message_with_heads(&faces, &[], &heads, PICTURE, &mut ids(true, true), 0);
+        let was = message(&faces, &[], PICTURE, &mut ids(true, true), 0);
+        assert_eq!(seen.faces[1], was.faces[1]);
+        assert_ne!(seen.faces[0].yaw, was.faces[0].yaw);
+    }
+
+    /// With speaking judged, the meshed face's turn is its mesh's there too:
+    /// a face looking at the lamp whose nose mark reads it turned 64 degrees
+    /// is not left `unknown` as turned.
+    #[test]
+    fn the_speaking_judge_takes_the_meshed_faces_turn_from_its_mesh() {
+        let face = face(240.0, 120.0, 100.0, 120.0, 0.45);
+        assert!(facing::yaw_deg(&face.marks).unwrap() > 60.0);
+        let judged = |heads: &[Option<facing::Head>]| {
+            let mut ids = Ids {
+                mouths: Some(speaking::Mouths::default()),
+                ..Ids::default()
+            };
+            let mut detail = None;
+            message_observed(
+                &[face],
+                &[None],
+                heads,
+                PICTURE,
+                &mut ids,
+                0,
+                Some(&mut detail),
+            );
+            detail.unwrap().decision
+        };
+        let by_marks = judged(&[]);
+        assert_eq!(by_marks.reason, speaking::Reason::Turned);
+        let heads = facing::mesh_heads(true, 1, &[(0, facing::canonical_mesh(0.0, 0.0, 0.0, 8.0))]);
+        let by_mesh = judged(&heads);
+        assert!(by_mesh.turn_deg.unwrap() < 1.0, "{by_mesh:?}");
+        assert_ne!(by_mesh.reason, speaking::Reason::Turned);
     }
 
     #[test]
@@ -1769,6 +1963,7 @@ mod tests {
             let actual = message_observed(
                 &looks,
                 &opens,
+                &[],
                 PICTURE,
                 &mut on,
                 look * 250_000,
@@ -1818,10 +2013,19 @@ mod tests {
             assert!(serde_json::to_vec(&detail).unwrap().len() < 2_048);
         }
         let mut detail = None;
-        message_observed(&[], &[], PICTURE, &mut on, 9_000_000, Some(&mut detail));
+        message_observed(
+            &[],
+            &[],
+            &[],
+            PICTURE,
+            &mut on,
+            9_000_000,
+            Some(&mut detail),
+        );
         assert!(detail.is_none(), "no face is not a judgement");
         message_observed(
             &[face(240.0, 120.0, 160.0, 200.0, 0.0)],
+            &[],
             &[],
             PICTURE,
             &mut Ids::default(),
@@ -1866,6 +2070,7 @@ mod tests {
                 let seen = message_observed(
                     &looks,
                     &[Some(if look % 3 == 0 { 0.04 } else { 0.0 })],
+                    &[],
                     PICTURE,
                     &mut ids,
                     look * 250_000,
