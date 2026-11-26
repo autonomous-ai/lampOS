@@ -266,7 +266,8 @@ With the Controls privacy route on (`LAMP_PRIVACY_CONTROLS=on`), the muted
 look is the physical-mute indication below instead, and the asleep face stays
 off whatever `LAMP_RING_ASLEEP` says: the ring has one writer at a time (the
 first builder on #795, 2026-10-16 13:50). So with the route on, the red breath
-is the hardware switch and a software mute leaves the ring dark; the warm
+(or the person's dimmer or dark look, "The person's look" below) is the
+hardware switch and a software mute leaves the ring dark; the warm
 asleep face is the route-off look, and, with head touch, a hand's sleep's
 while the slide is open (#1362, "A hand's sleep" below). A lamp with no slide
 (`LAMP_PRIVACY_CONTROLS=no-slide`) has no red breath to show, so its ring is
@@ -321,6 +322,53 @@ light ended with the stop, and the voice ends with 0. Fake-sink tests establish 
 behavior only. Lamp checks must measure switch acquisition, permission/handle
 closure, speaker silence and visible indication separately, including rapid
 flips, stale input, worker failure and repeated writer handoffs.
+
+#### The person's look (#8696)
+
+A person may choose how the indication looks, in the owner's app (Privacy
+page, `led.privacy.set`, [cloud.md](cloud.md)): it changes only the light.
+The microphones and the camera close the same in all three, and the guards
+above run first and unchanged, so no look paints on a software mute, an
+unknown state or stale evidence.
+
+| Look | Frame | Levels |
+|---|---|---|
+| Red (the default) | today's 4 s cosine breath, all 32 pixels, green and blue zero | red **2–10**, ceiling 10 |
+| Dimmer (`dim`) | the same 4 s breath, `round(1 + 1.5 × (1 − cos))` | red **1–4**, ceiling 4 (`lamp_ring::DIM_CEILING`); 1 keeps it lit at the trough |
+| Off | one black frame as it begins, then no write | dark |
+
+- **Where it is kept:** `/var/lib/lampOS/light/privacy.json`, `{"look":"dim"}`,
+  root's 0600 in the light folder, which stays 0700. Root's change helper
+  writes it whole, and only for lamp-cloud's own process
+  ([setup.md](setup.md), "Changed after setup"). The reset's plan already
+  wipes the folder, so a factory reset gives red again.
+- **Fail safe:** a missing file, a link, one that is not a plain file, one
+  longer than 64 bytes, or a look it does not know reads as red
+  (`lamp_msgs::privacy_light::read`).
+- **How it reaches the ring:** with `LAMP_PRIVACY_LIGHT=on` in the voice, the
+  wait passes `--privacy-light PATH` to this worker (its environment is
+  cleared). A thread of the worker's own looks at the file every **100 ms**
+  and reads it again when it changed, so the 2 ms step does no file I/O. The
+  worker reads it once before its first frame, so a restart or a new close
+  begins in the kept look, never with a red flash. A changed look is painted
+  on the next step, not after the 25 ms frame interval. With the slide
+  closed, a set shows within the 100 ms look and one step of the helper's
+  answer, inside the first builder's about 1 s.
+- **Off is dark, not stopped:** the worker keeps running, keeps checking the
+  evidence (a denial still blanks) and keeps the one-writer handoff: its
+  shutdown receipt and exit come in all three looks.
+- **`lamp/did`:** the "microphone is off at the switch" notice is told as the
+  showing begins in all three looks, dark too, so the person's app shows the
+  mute whatever the ring shows.
+- **The journal:** one line per look shown, `lamp-voice: privacy light: dim
+  (painted at_us N)`. No bus topic carries the look.
+- **Without the switch** (off unless `on` exactly, as in the product today),
+  the worker gets no flag and paints red, and the app is not offered the
+  choice. A lamp with no slide never shows the indication, so it never lists
+  the two kinds.
+
+The dark-room camera leg of the row decides the dimmer's range: if red 1
+can't be seen, or the breath looks stepped, it becomes red 2–5, named here.
 
 ### The resting face and its authority
 

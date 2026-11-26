@@ -676,6 +676,19 @@ must have stopped first; a shutdown black-write receipt **and** process exit
 are required before its replacement starts. SPI stays outside the privacy and
 audio owner loops. See [service privacy](service-privacy.md).
 
+**The person's look (#8696).** With `LAMP_PRIVACY_LIGHT=on` the indication
+is red (this breath, the default), a dimmer red (the same breath at red 1–4)
+or off (dark), as the person chose in the app; see
+[ring choreography](ring-choreography.md#the-persons-look-8696) for the frames,
+the store and the fail safe to red. **Off changes only the light: the
+microphones and the camera close the same.** The look is read only by the
+indicator worker, after the ring's own guards; nothing on the mute's path
+(Controls, the privacy worker and its lease, the capture gates, the
+controller) reads it, which a source scan tests
+(`nothing_on_the_mute_path_reads_the_privacy_look`). With Off the worker keeps
+running dark, so its handoff to the next ring owner is the same in all three
+looks, and the "microphone off at the switch" notice is still told.
+
 The indicator never reads the bus itself (#795 review). One receive from the
 bus passes over any number of messages it refuses, so a flood of them on
 `voice/privacy` must not stand between the writer's Stop and expiry checks.
@@ -712,7 +725,9 @@ publication within 50 ms; accepted mute to both capture gates closed within
 20 ms or immediately on a level/fault change, and its selected owner loop at
 1 ms. Ears and Voice privacy workers poll at 2 ms. Ordinary mute indication
 also targets 100 ms, but follows verified active-runtime cleanup and process
-startup. A stalled writer can exhaust the shared 300 ms wait-cleanup grace;
+startup. A look set with the slide closed (#8696) is followed within the
+worker's 100 ms look at the file and one 2 ms step after the change helper
+answers; the target from the app is about 1 s, the rest being the cloud's. A stalled writer can exhaust the shared 300 ms wait-cleanup grace;
 incomplete indicator startup retains the existing three-second startup bound.
 Forced exit or an unverified black write is a failure, never permission to
 resume. In the muted wait an indicator failure with its black write verified
