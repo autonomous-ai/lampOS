@@ -6160,6 +6160,50 @@ async fn a_short_sound_not_heard_as_a_short_word_is_held_when_sounds_are_checked
     }
 }
 
+/// #8772, `LAMP_SHORT_REPLIES_CARRY` (lamp-74ff, 26 Nov 21:00, a doubling
+/// game): "Two." after the lamp's "Ready when you are!" ended as a short
+/// sound and was held, the lamp's last words no question. With a
+/// conversation going on (`carrying_short_sounds_in_conversation`) it is
+/// judged as a line and answered; with none going on, it is held as before.
+#[tokio::test]
+async fn with_short_replies_carry_a_short_sound_in_a_conversation_is_judged_as_a_line() {
+    let run = |going_on: bool| async move {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Two.".to_owned())].into()),
+            chats: Mutex::new([vec![text("Four."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine
+            .checking_sounds(true)
+            .answering_the_lamp(Arc::new(|_| false))
+            .carrying_short_sounds_in_conversation(Arc::new(move |request| {
+                assert_eq!(request, 1);
+                going_on
+            }));
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(ProviderInput::End {
+            request: 1,
+            privacy_generation: 1,
+            sound: true,
+            cut_in: false,
+        });
+        let labels = turn(&mut engine).await;
+        let asked = script.asked.lock().unwrap().len();
+        (labels, asked)
+    };
+    let (labels, asked) = run(true).await;
+    assert!(
+        labels.iter().any(|label| label.starts_with("audio:")),
+        "{labels:?}"
+    );
+    assert_eq!(asked, 1);
+    let (held, asked) = run(false).await;
+    assert_eq!(held, ["started:1", "heard:Two.", "complete"]);
+    assert_eq!(asked, 0);
+}
+
 /// #7834: on lamp-9adf on 19 Nov "Lamp, put it back." ended as a short
 /// sound and was held 2 times in 5, `LAMP_ENDPOINT_PAUSE_JOIN` being off
 /// there. A line begun with the lamp's name set off is never held as a

@@ -1088,14 +1088,33 @@ fn greeting_set_off(heard: &str) -> bool {
         .starts_with(['?', '.', '!'])
 }
 
-/// Whether the word after `heard`'s opening greeting is the lamp's name, or
-/// a word written or sounding like it: "Hey, Lamp.", "Hey man", "Hi, Lynn".
-/// Not "Hi Mark, the lamp is …": there the name comes later, in a sentence.
-fn greeted_word_like_the_name(heard: &str) -> bool {
+/// Whether `heard`'s words show that a hearing at its start was not "Hey
+/// Lamp": an "ok" or "okay" opening it ("OK Lamp" is not the call the
+/// product owner named), or a greeting followed, in the same sentence, by a
+/// word written as a name and not like the lamp's ("Hi, Mark. Did you move
+/// the lamp?", "Hey John, …"). Anything else leaves the hearing to stand:
+/// `lamp-name` is trained on "Hey Lamp" and not on a bare "Lamp", and speech
+/// to text often drops or mangles the call ("Galam. What is …", "Hang Tell
+/// me …", "What is one plus one?").
+fn words_rule_out_hey(heard: &str) -> bool {
     let mut words = past_a_filler(heard);
-    words.next();
-    words.next().is_some_and(|word| {
-        written_for_the_name(word) || crate::second_provider::sounds_like_the_name(word)
+    let Some(first) = words.next() else {
+        return false;
+    };
+    if first.eq_ignore_ascii_case("ok") || first.eq_ignore_ascii_case("okay") {
+        return true;
+    }
+    if !HEY_GREETINGS
+        .iter()
+        .any(|greeting| first.eq_ignore_ascii_case(greeting))
+        || greeting_set_off(heard)
+    {
+        return false;
+    }
+    words.next().is_some_and(|second| {
+        second.chars().next().is_some_and(char::is_uppercase)
+            && !written_for_the_name(second)
+            && !crate::second_provider::sounds_like_the_name(second)
     })
 }
 
@@ -2653,12 +2672,12 @@ impl Attention {
         self.hey_kept = weighed
             && self.hey_only
             && !in_conversation
-            && opens_with_hey(&self.heard)
             && self.named_near_the_start
-            // The word after the greeting is the name or like it, or the
-            // greeting stands alone: "Hi Mark, did you move the lamp?" heard
-            // at its start on lamp-74ff (26 Nov, 20:51) is no call.
-            && (greeted_word_like_the_name(&self.heard) || greeting_set_off(&self.heard))
+            // `lamp-name` heard "Hey Lamp" at the line's start, and its words
+            // don't say otherwise: "OK Lamp", or "Hi, Mark. Did you move the
+            // lamp?", heard at its start on lamp-74ff (26 Nov, 20:51), are
+            // no call.
+            && !words_rule_out_hey(&self.heard)
             && !self.name_anothers_dropped;
         self.name_unhey_dropped = weighed && self.hey_only && !in_conversation && !self.hey_kept;
         if self.hey_kept {
@@ -8348,11 +8367,13 @@ mod tests {
     /// once per process (`language::at_start`), so English stands in for it
     /// here; the same `text_calls` passes its forms. "Okay." is still dropped.
     /// `LAMP_NAME_HEY_ONLY` (the product owner, 26 Nov 2026): out of a
-    /// conversation a call is "Hey Lamp" at the line's start. A hearing there
-    /// with a greeting before it is kept, as speech to text writes it ("Hey
-    /// man", "Hello?"); a bare "Lamp", a line with no greeting, or the name
-    /// heard late in a sentence is no call. In a conversation the rule holds
-    /// nothing. Off, a bare "Lamp" at the start counts as before.
+    /// conversation a call is "Hey Lamp" at the line's start. `lamp-name` is
+    /// trained on "Hey Lamp", not on a bare "Lamp", so its hearing within
+    /// `HEY_AT_THE_START_US` of the start is the call, however speech to text
+    /// wrote the words ("Galam. …", "Hang …", "What is one plus one?", lamp-74ff
+    /// 26 Nov), unless the words say otherwise: "OK Lamp", or a greeting and
+    /// another's name ("Hi, Mark. …"). A hearing late in the line is none. In
+    /// a conversation the rule holds nothing. Off, as before.
     #[test]
     fn with_hey_only_a_call_is_hey_lamp_at_the_lines_start() {
         let weigh = |heard: &str, hearing_at_us: u64, hey_only: bool, going_on: bool| {
@@ -8375,6 +8396,10 @@ mod tests {
             "Hey man, what time is it?",
             "Hello? Do you know my face?",
             "Um, hey lamp, are you there?",
+            "Galam. What is the capital of France?",
+            "Hang Tell me a long story about a dragon.",
+            "What is one plus one?",
+            "Hey what time is it?",
         ] {
             assert_eq!(
                 weigh(heard, start, true, false),
@@ -8383,9 +8408,10 @@ mod tests {
             );
         }
         for heard in [
-            "Lamp, what time is it?",
+            "OK Lamp, what is two plus two?",
             "Okay. Fine. Exactly.",
-            "What is one plus one?",
+            "Hi, Mark. Did you move the lamp this morning?",
+            "Hey John, come here.",
         ] {
             assert_eq!(
                 weigh(heard, start, true, false),
@@ -8393,39 +8419,8 @@ mod tests {
                 "{heard}"
             );
         }
-        assert_eq!(
-            weigh(
-                "Hi Mark, the lamp is too bright today.",
-                12_000_000,
-                true,
-                false
-            ),
-            (true, false, true),
-            "the name heard late in a sentence"
-        );
-        // lamp-74ff, 26 Nov 20:51: "Hi Mark, …" heard at its start woke the
-        // lamp; a greeting with another word after it is no call, nor one
-        // that runs on into the sentence.
-        assert_eq!(
-            weigh(
-                "Hi Mark, did you move the lamp this morning?",
-                start,
-                true,
-                false
-            ),
-            (true, false, true)
-        );
-        assert_eq!(
-            weigh("Hey what time is it?", start, true, false),
-            (true, false, true)
-        );
-        assert!(super::greeting_set_off("Hello? Do you know my face?"));
-        assert!(super::greeting_set_off("Um, hey! What time is it?"));
-        assert!(!super::greeting_set_off("Hey, Mark, come here."));
-        assert!(!super::greeting_set_off("Hey what time is it?"));
-        // "Hey, ... Lamp." with a pause: heard 1.93 s in on lamp-74ff, kept
-        // when the word after the greeting is like the name; past
-        // HEY_AT_THE_START_US, or with another word there, not.
+        // "Hey, ... Lamp." with a pause: heard 1.93 s in on lamp-74ff, kept;
+        // past HEY_AT_THE_START_US, not; a late hearing in a sentence, not.
         assert_eq!(
             weigh("Hey man. What day is it today?", 11_930_000, true, false),
             (false, true, false)
@@ -8434,6 +8429,19 @@ mod tests {
             weigh("Hey man. What day is it today?", 12_600_000, true, false),
             (true, false, true)
         );
+        assert_eq!(
+            weigh(
+                "The lamp on my desk is too bright today.",
+                12_600_000,
+                true,
+                false
+            ),
+            (true, false, true)
+        );
+        assert!(super::greeting_set_off("Hello? Do you know my face?"));
+        assert!(super::greeting_set_off("Um, hey! What time is it?"));
+        assert!(!super::greeting_set_off("Hey, Mark, come here."));
+        assert!(!super::greeting_set_off("Hey what time is it?"));
         assert!(
             !weigh("Lamp, and Spain?", start, true, true).2,
             "in a conversation"
