@@ -380,6 +380,9 @@ Environment=LAMP_ROOM_HELD_TALK=on
 Environment=LAMP_BUSY_FOLLOW_UP_RENEWS=on
 # LAMP_BUSY_NO_FACE_RENEWS: #7332; lamp-74ff 17 Nov r47 to r53 held when no face was seen speaking. Its rules are its row in docs/switches.md.
 Environment=LAMP_BUSY_NO_FACE_RENEWS=on
+# LAMP_NO_FACE_FOLLOW_UP_BY_VOICE: with no face seen, the caller's own follow-up only in the conversation's own voice;
+# else told it may be people's talk (26 Nov 2026, two people's talk answered). Its row in docs/switches.md.
+Environment=LAMP_NO_FACE_FOLLOW_UP_BY_VOICE=on
 # LAMP_TURNED_FACE_SPEAKS: its why and rules are its row in docs/switches.md (#7297).
 Environment=LAMP_TURNED_FACE_SPEAKS=on
 # LAMP_SAID_TO_ME: its why and rules are its row in docs/switches.md (#7442).

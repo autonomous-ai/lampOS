@@ -5061,7 +5061,20 @@ after a take-over, but now for every turn:
   carried by the owner's call. Journal at start: `in a busy room a
   follow-up no face was seen speaking renews the caller's call too`.
   Latency: none, bookkeeping at the verdict. Test (fails with the switch
-  off): `a_no_face_follow_up_renews_the_call`.
+  off): `a_no_face_follow_up_renews_the_call`. With
+  `LAMP_NO_FACE_FOLLOW_UP_BY_VOICE=on` (on in the product, 26 Nov 2026), a
+  line no face was seen speaking is the caller's own follow-up only in the
+  conversation's own voice, as the same-voice check found it
+  (`Seen::same_voice`, `unvoiced_follow_up`): a line with no print (too
+  short, or begun over the lamp's voice) or with a likeness in between
+  renews nothing and is told `CONVERSATION_ALONE`, so the model may call
+  `not_for_me` on talk plainly said to someone else. On lamp-74ff that
+  morning, October's two-person battery had 21 lines of two people's talk
+  with no face and no print each told they were the caller's, and all
+  were answered. Journal: `no face seen speaking it and its voice not
+  found as the conversation's: not the caller's own follow-up`. Tests:
+  `by_voice_a_no_face_follow_up_without_the_conversations_voice_renews_nothing`,
+  `by_voice_only_the_conversations_own_voice_keeps_a_no_face_line_the_callers`.
 - **Held desk talk makes a busy room, with `LAMP_ROOM_HELD_TALK=on`**
   (on in the product, off unless set elsewhere, #7332; the first builder on #7570 at 07:14 on 18 Nov).
   The room turns busy after three lines left alone as talk inside a
