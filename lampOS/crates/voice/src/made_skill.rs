@@ -10378,12 +10378,8 @@ pub fn keep_asked(
     // through the lamp's told answer (#8610): refused here, before its
     // check and its try, so its code never speaks during the make; the
     // repair is told to print instead.
-    told_only(&files.toml).inspect_err(|_| {
-        eprintln!(
-            "lamp-voice: a made skill was not kept: a trigger starts it and its code would speak \
-             on its own (a run step, or a speak or speaker grant)"
-        );
-    })?;
+    // `told_only` journals why (the Reviewer-lead's P3 on #8688).
+    told_only(&files.toml)?;
     // The lamp's agent never keeps a timed fixed say with what it says
     // left out (El's P2 on #8732): refused with a repair that tells it the
     // task step, as DeepSeek's first answer is held for the agent
@@ -11887,8 +11883,8 @@ pub fn told_only(toml: &str) -> Result<(), Refused> {
     // The journal names which it was (El's P3 on #8688); the refusal's
     // words, and so the repair's and the person's, are the same for both.
     eprintln!(
-        "lamp-voice: a made skill was not kept: a trigger starts it and its code would speak \
-         on its own ({how})"
+        "lamp-voice: a skill is refused: a trigger starts it and its code would speak on its \
+         own ({how})"
     );
     let repair = if how == A_CHANGING_SAY {
         CHANGING_SAY_REPAIR
