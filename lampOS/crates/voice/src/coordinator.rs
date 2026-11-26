@@ -13752,6 +13752,14 @@ fn conversation_with_gate_inner(
             last_publish = monotonic_us();
             begun_for(ticket, reply);
         }
+        // The link ready again: rings rung offline and not told are offered
+        // again, in their words (the Reviewer-lead's P2 on #8800).
+        if offline_rings
+            && cloud.ready_session().is_some()
+            && let Some(reminders) = reminders.as_mut()
+        {
+            reminders.link_ready();
+        }
         // With no link, a due timer or reminder rings on time from its clip
         // (`LAMP_OFFLINE_RINGS`, #8632): the same gates as above but the
         // session, and no wait for a skill's ask, whose words need the model.
@@ -13786,11 +13794,24 @@ fn conversation_with_gate_inner(
             && overdue_may_begin
         {
             let key = reminder_key(&offer);
+            // Rung offline before and not told (after a restart): sent back
+            // to wait for the link, so later rings go on (the
+            // Reviewer-lead's P2 on #8800).
+            if offer.rung_offline {
+                reminders.wait_for_link(&offer);
+                eprintln!(
+                    "lamp-voice: a reminder rung offline already came due again with no link: it waits for the link, later rings go on (LAMP_OFFLINE_RINGS)"
+                );
+            }
             // No session seen yet: nothing read from the disk (Twelve's P3
             // 1 on #8687). A reminder's own clip, else the generic line.
-            let chosen = offline_ringer.choose(&key, cloud.last_session(), || {
-                crate::offline_rings::ring_for(&offer, ring_clips.as_deref(), &own_clips)
-            });
+            let chosen = if offer.rung_offline {
+                Err(None)
+            } else {
+                offline_ringer.choose(&key, cloud.last_session(), || {
+                    crate::offline_rings::ring_for(&offer, ring_clips.as_deref(), &own_clips)
+                })
+            };
             match chosen {
                 Ok((session, ring)) => {
                     let (own, clip) = match ring {

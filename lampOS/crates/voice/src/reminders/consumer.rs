@@ -304,6 +304,12 @@ struct Consumer<P: Persistence> {
     /// With `LAMP_OFFLINE_RINGS=on` (#8632): the store walked for the
     /// soonest ring not yet due ([`Self::upcoming`]).
     upcoming: Option<UpcomingWalk>,
+    /// Rung with no link from the generic line, their words not told
+    /// (#8708): each waits for the link, passed over meanwhile so it never
+    /// holds up a later ring in the same outage, until the voice says the
+    /// link is back ([`ToWorker::LinkBack`]; the Reviewer-lead's P2 on
+    /// #8800).
+    link_waits: BTreeSet<DeliveryKey>,
 }
 
 /// The walk for the soonest ring not yet due: a page of the store a tick,
@@ -348,6 +354,7 @@ impl<P: Persistence> Consumer<P> {
             cannot_ring: None,
             refusing_since: None,
             upcoming: None,
+            link_waits: BTreeSet::new(),
         }
     }
     /// With `LAMP_OFFLINE_RINGS=on` (#8632): one page of the store, at most
@@ -549,6 +556,10 @@ impl<P: Persistence> Consumer<P> {
                 self.notice_owed = true;
                 return Ok(());
             }
+            ToWorker::LinkBack {} => {
+                self.link_waits.clear();
+                return Ok(());
+            }
             ToWorker::RingStopped { token } => {
                 self.ring_stopped(token.clone());
                 return Ok(());
@@ -635,7 +646,7 @@ impl<P: Persistence> Consumer<P> {
                 }
                 self.rung_offline(token.clone());
             }
-            ToWorker::Noticed {} | ToWorker::RingStopped { .. } => {
+            ToWorker::Noticed {} | ToWorker::RingStopped { .. } | ToWorker::LinkBack {} => {
                 unreachable!("answered above")
             }
         }
@@ -682,8 +693,11 @@ impl<P: Persistence> Consumer<P> {
     /// `token`'s attempt rang with no link from the generic line and its
     /// words were never told (#8708): the ledger marks it "rung, not told",
     /// kept across a restart, and it is offered again as a retired one is,
-    /// counting toward no hold. Offered with the mark ([`Offer::rung_offline`]),
-    /// the voice rings it again only once the link is back, in its words.
+    /// counting toward no hold, once the voice says the link is back
+    /// ([`Self::link_waits`]). Offered with the mark ([`Offer::rung_offline`]),
+    /// the voice rings it again only once the link is back, in its words; a
+    /// marked one offered with no link (after a restart) the voice sends
+    /// back as rung offline again, so it waits too.
     fn rung_offline(&mut self, token: PreparedToken) {
         let line = match self.ledger.mark_rung_untold(&token) {
             Ok(()) => RUNG_UNTOLD.to_owned(),
@@ -695,6 +709,7 @@ impl<P: Persistence> Consumer<P> {
             basis: RetirementBasis::Abandoned {},
         };
         self.journal.item(&token.key, line);
+        self.link_waits.insert(token.key.clone());
         self.retry.insert(token.key.clone(), (token, proof));
     }
     /// Only items still waiting to be said are counted, so the counts stay
@@ -869,9 +884,13 @@ impl<P: Persistence> Consumer<P> {
         } else {
             let token = self.prepare(&pending)?;
             // Said late: the others as late are said with it, in one line
-            // (29e7, 2 Nov).
+            // (29e7, 2 Nov). Never into one rung offline and not told: it
+            // may wait for the link (#8708).
             let room = JOINED_TEXT_BYTES.saturating_sub(json_bytes(&text));
-            let also = if late_line(late, late_by_ms) && room > 0 {
+            let also = if late_line(late, late_by_ms)
+                && room > 0
+                && !self.ledger.rung_untold(&token.key)
+            {
                 self.join_late(socket, &token.key, room, deadline)
             } else {
                 Vec::new()
@@ -1006,7 +1025,8 @@ impl<P: Persistence> Consumer<P> {
             };
             let unheld = self.retry.contains_key(&key)
                 || self.ledger.view(&key).is_ok_and(|view| view.is_none());
-            if !unheld {
+            // One rung offline and not told is said on its own (#8708).
+            if !unheld || self.link_waits.contains(&key) || self.ledger.rung_untold(&key) {
                 continue;
             }
             let request = Request::Get { id };
@@ -1099,7 +1119,10 @@ impl<P: Persistence> Consumer<P> {
         // by the ledger, e.g. `stale_revision`, or by its own evidence) is
         // journaled and passed over like a held one, never allowed to
         // silence every later item (#5498).
-        let tried = if self.known(&key)? {
+        // One waiting for the link is passed over, unjournaled (#8708).
+        let tried = if self.link_waits.contains(&key) {
+            Some(key)
+        } else if self.known(&key)? {
             self.held(&key)?;
             None
         } else if self.offered(socket, due, &key, now, deadline)? {
@@ -1139,7 +1162,7 @@ impl<P: Persistence> Consumer<P> {
                 id,
                 delivery,
             };
-            if tried.as_ref() == Some(&key) {
+            if tried.as_ref() == Some(&key) || self.link_waits.contains(&key) {
                 continue;
             }
             if !self.known(&key)? {

@@ -285,6 +285,8 @@ impl RoundtripFixture {
             cut_last: None,
             stop_owed: None,
             upcoming: None,
+            link_waits: false,
+            link_back_owed: false,
         });
         self.worker = Some(worker);
         self.parent().poll(monotonic_us());
@@ -526,4 +528,66 @@ impl Drop for RoundtripFixture {
         self.schedule.take();
         self.publisher.take();
     }
+}
+
+/// The Reviewer-lead's P2 on #8800, through the real parent and IPC: a
+/// reminder rung offline and not told, offered again with no link after a
+/// restart, is sent back to wait (`Reminders::wait_for_link`), so the next
+/// due one is offered; once the link is ready the consumer is told, once.
+#[test]
+fn a_marked_reminder_sent_back_offline_lets_the_next_ring_go_and_waits_for_the_link() {
+    let mut fixture = RoundtripFixture::of_reminders();
+    fixture.set_more(&["Call the plumber."]);
+    let first = fixture.offer();
+    // Rung from the generic line, played whole: marked "rung, not told".
+    fixture
+        .consumer
+        .as_mut()
+        .unwrap()
+        .command(
+            ToWorker::RungOffline {
+                token: first.token.clone(),
+            },
+            monotonic_us(),
+        )
+        .unwrap();
+    fixture.consumer.as_mut().unwrap().next_offer_us = 0;
+    fixture.send_outgoing();
+    let next = fixture.offer();
+    assert_ne!(next.token.key, first.token.key, "the next one goes on");
+    // A restart: the marked one is offered again with no link, and the
+    // voice sends it back to wait.
+    fixture.restart_consumer();
+    // As the consumer's start does (`run`).
+    fixture
+        .consumer
+        .as_mut()
+        .unwrap()
+        .retire_earlier_voices()
+        .unwrap();
+    let marked = fixture.offer();
+    assert_eq!(marked.token.key, first.token.key);
+    assert!(marked.rung_offline);
+    fixture.parent().wait_for_link(&marked);
+    assert!(fixture.parent().offer(monotonic_us()).is_none());
+    assert_eq!(fixture.settle_parent(), 1);
+    assert!(matches!(
+        fixture.received().last(),
+        Some(ToWorker::RungOffline { .. })
+    ));
+    fixture.consumer.as_mut().unwrap().next_offer_us = 0;
+    let again = fixture.offer();
+    assert_eq!(again.token.key, next.token.key, "not held up");
+    // The link ready: told once.
+    fixture.parent().link_ready();
+    fixture.settle_parent();
+    assert!(matches!(
+        fixture.received().last(),
+        Some(ToWorker::LinkBack {})
+    ));
+    assert!(fixture.consumer.as_ref().unwrap().link_waits.is_empty());
+    let told = fixture.received().len();
+    fixture.parent().link_ready();
+    fixture.settle_parent();
+    assert_eq!(fixture.received().len(), told, "once");
 }

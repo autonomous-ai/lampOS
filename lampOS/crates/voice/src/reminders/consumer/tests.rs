@@ -2675,11 +2675,19 @@ fn a_generic_ring_stays_rung_not_told_and_is_told_once_when_the_link_is_back() {
             .completion
             .is_none()
     );
-    // Offered again after the pacing, with the mark: offline, it waits.
+    // Not offered again while the link is down (the Reviewer-lead's P2 on
+    // #8800); once the voice says it is back, offered with the mark. Sent
+    // offline after all, it waits.
     assert!(first.next_offer_us >= PACE_US);
     first.next_offer_us = 0;
     let paced = lamp_ipc::monotonic_us();
     let report = due(&engine.lock().unwrap(), paced);
+    first.tick(&socket.path(), Some(&report), paced).unwrap();
+    no_offer(&first);
+    first.outgoing.clear();
+    first
+        .command(ToWorker::LinkBack {}, lamp_ipc::monotonic_us())
+        .unwrap();
     first.tick(&socket.path(), Some(&report), paced).unwrap();
     let again = take_offer(&mut first);
     assert!(again.rung_offline);
