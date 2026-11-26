@@ -728,8 +728,9 @@ async fn endpoint(
     (format!("http://{address}/v1"), taken)
 }
 
-/// The person's OpenAI-compatible key kept in `dir` as root's helper keeps
-/// it, at `url` with `model`, its check's second line `tools`.
+/// The person's OpenAI-compatible key handed in as lamp-cloud's unit hands
+/// it (`own_<file>` in its credentials), at `url` with `model`, its check's
+/// second line `tools`.
 fn keep_compatible(dir: &Path, url: &str, model: &str, tools: &str) {
     for (name, text) in [
         ("openai_compatible.key", OWN_KEY),
@@ -737,16 +738,26 @@ fn keep_compatible(dir: &Path, url: &str, model: &str, tools: &str) {
         ("openai_compatible.model", model),
         ("openai_compatible.checked", &format!("works\n{tools}")),
     ] {
-        std::fs::write(dir.join(name), text).unwrap();
+        std::fs::write(dir.join(format!("own_{name}")), text).unwrap();
+    }
+}
+
+/// Every credential the unit hands in, as its blank fallback (`\n`): a
+/// lamp with no key of the person's.
+fn blank(dir: &Path) {
+    for name in handed_in() {
+        std::fs::write(dir.join(format!("own_{name}")), "\n").unwrap();
     }
 }
 
 /// The forwarder to the relay at `base`, with the person's keys in `own`
 /// and the relay's day in `meter` when given.
-async fn own_forwarder(base: &str, own: OwnKeys, meter: Option<&Path>) -> SocketAddr {
+async fn own_forwarder(base: &str, own: &Path, meter: Option<&Path>) -> SocketAddr {
     let listener = Forwarder::bind(0).await.unwrap();
     let address = listener.local_addr().unwrap();
-    let mut forwarder = Forwarder::new(base, KEY, TOKEN).unwrap().with_own(own);
+    let mut forwarder = Forwarder::new(base, KEY, TOKEN)
+        .unwrap()
+        .with_own(&OwnKeys::credentials(own));
     if let Some(meter) = meter {
         forwarder = forwarder.with_meter(meter);
     }
@@ -759,17 +770,18 @@ fn models() -> Vec<u8> {
 }
 
 /// The agent's chat goes to the person's model with their key, `model`
-/// made theirs and the rest as sent, and `/models` is answered here; once
-/// the key is removed, the relay, with no restart. The relay's day is not
-/// counted for the own route.
+/// made theirs and the rest as sent, and `/models` is answered here; the
+/// relay's day is not counted. Removed, the helper restarts lamp-cloud with
+/// the blank credentials: the relay.
 #[tokio::test]
 async fn an_own_model_takes_the_agents_chat_and_a_removed_one_gives_it_back() {
     let own = tempfile::tempdir().unwrap();
     let meter = tempfile::tempdir().unwrap();
     let (url, mut asked) = endpoint(vec![(200, WHOLE)]).await;
     let (relay_base, mut relayed) = endpoint(vec![(200, WHOLE)]).await;
+    blank(own.path());
     keep_compatible(own.path(), &url, "their-model-1", "tools");
-    let address = own_forwarder(&relay_base, OwnKeys::folder(own.path()), Some(meter.path())).await;
+    let address = own_forwarder(&relay_base, own.path(), Some(meter.path())).await;
     let body = r#"{"model":"deepseek-flash","stream":false,"messages":[],"tools":[]}"#;
     let (status, _, answer) = ask(address, &chat(Some(TOKEN), body)).await;
     assert_eq!((status, answer.as_slice()), (200, WHOLE.as_bytes()));
@@ -793,8 +805,9 @@ async fn an_own_model_takes_the_agents_chat_and_a_removed_one_gives_it_back() {
         "the person's own spend is not the relay's day"
     );
     assert!(relayed.try_recv().is_err(), "the relay was never asked");
-    // Removed: the relay, read again at this request.
-    std::fs::remove_file(own.path().join("openai_compatible.key")).unwrap();
+    // Removed: lamp-cloud started again with the blank fallbacks.
+    blank(own.path());
+    let address = own_forwarder(&relay_base, own.path(), None).await;
     let (status, _, _) = ask(address, &chat(Some(TOKEN), ASKED)).await;
     assert_eq!(status, 200);
     let upstream = relayed.recv().await.unwrap();
@@ -817,7 +830,7 @@ async fn an_own_401_falls_back_to_the_relay() {
     let (url, mut asked) = endpoint(vec![(401, r#"{"error":"bad key"}"#)]).await;
     let (relay_base, mut relayed) = endpoint(vec![(200, WHOLE)]).await;
     keep_compatible(own.path(), &url, "their-model-1", "tools");
-    let address = own_forwarder(&relay_base, OwnKeys::folder(own.path()), None).await;
+    let address = own_forwarder(&relay_base, own.path(), None).await;
     let (status, _, answer) = ask(address, &chat(Some(TOKEN), ASKED)).await;
     assert_eq!((status, answer.as_slice()), (200, WHOLE.as_bytes()));
     assert!(
@@ -840,24 +853,28 @@ async fn a_forged_model_is_still_a_400_on_the_own_route() {
     let own = tempfile::tempdir().unwrap();
     let (url, mut asked) = endpoint(vec![(200, WHOLE)]).await;
     keep_compatible(own.path(), &url, "their-model-1", "tools");
-    let address = own_forwarder("http://127.0.0.1:9/none", OwnKeys::folder(own.path()), None).await;
+    let address = own_forwarder("http://127.0.0.1:9/none", own.path(), None).await;
     let forged = r#"{"model":"their-model-1","messages":[]}"#;
     assert_eq!(ask(address, &chat(Some(TOKEN), forged)).await.0, 400);
     tokio::time::sleep(Duration::from_millis(50)).await;
     assert!(asked.try_recv().is_err());
 }
 
-/// The route chosen from the folder: the voice's precedence; hearing and
-/// voice keys alone, a failed or missing tool check, or a changed copy: the
-/// relay.
+/// The route from the credentials: the voice's precedence; blank
+/// fallbacks, hearing and voice keys alone, or a failed or missing tool
+/// check: the relay.
 #[test]
 fn the_route_is_the_voices_model_and_only_with_its_tool_check() {
     let own = tempfile::tempdir().unwrap();
-    let keys = OwnKeys::folder(own.path());
-    let write = |name: &str, text: &str| std::fs::write(own.path().join(name), text).unwrap();
+    let keys = OwnKeys::credentials(own.path());
+    blank(own.path());
+    assert_eq!(keys.route().err().unwrap(), "no model key of the person's");
+    let write = |name: &str, text: &str| {
+        std::fs::write(own.path().join(format!("own_{name}")), text).unwrap()
+    };
+    // Never handed in, but the relay even if they were.
     write("deepgram.key", "dg");
     write("elevenlabs.key", "el");
-    write("elevenlabs.voice", "abc");
     assert_eq!(keys.route().err().unwrap(), "no model key of the person's");
     write("deepseek.key", "ds");
     write("deepseek.checked", "works");
@@ -885,7 +902,7 @@ fn the_route_is_the_voices_model_and_only_with_its_tool_check() {
         keys.route().unwrap().told(),
         "own openrouter google/gemini-3.6-flash at openrouter.ai"
     );
-    std::fs::remove_file(own.path().join("openrouter.key")).unwrap();
+    write("openrouter.key", "\n");
     write("gemini.key", "gm");
     write("gemini.model", "gemini-3.6-flash");
     write("gemini.checked", "works\ntools");
@@ -904,50 +921,38 @@ fn the_route_is_the_voices_model_and_only_with_its_tool_check() {
     );
 }
 
-/// No own folder (a new or reset lamp), or one lamp-cloud can't list (a
-/// helper from before #8735 keeps it 0700): the relay, said by its kind.
+/// The product unit hands in each model service's files and nothing else
+/// of the person's folder, each with a blank fallback first, so a lamp with
+/// no key of the person's still starts lamp-cloud: systemd 252 fails a
+/// unit whose `LoadCredential=` file is missing unless a `SetCredential=`
+/// of the same name gives the fallback (lamp-skills' `owner`, lamp-75c9, 5
+/// Nov), and an empty one fails too, so it is one newline.
 #[test]
-fn a_missing_or_unreadable_folder_is_the_relay() {
-    let own = tempfile::tempdir().unwrap();
-    let gone = OwnKeys::folder(&own.path().join("none"));
-    assert!(
-        gone.route()
-            .err()
-            .unwrap()
-            .contains("keys folder can't be read")
-    );
-    let shut = own.path().join("shut");
-    std::fs::create_dir(&shut).unwrap();
-    std::fs::write(shut.join("deepseek.key"), "ds").unwrap();
-    std::fs::write(shut.join("deepseek.checked"), "works\ntools").unwrap();
-    let keys = OwnKeys::folder(&shut);
-    assert!(keys.route().is_ok());
-    std::fs::set_permissions(&shut, std::fs::Permissions::from_mode(0o000)).unwrap();
-    // Root reads past a mode: there is nothing to show then.
-    if std::fs::read_dir(&shut).is_err() {
-        assert!(
-            keys.route()
-                .err()
-                .unwrap()
-                .contains("keys folder can't be read")
-        );
-    }
-    std::fs::set_permissions(&shut, std::fs::Permissions::from_mode(0o700)).unwrap();
-}
-
-/// The folder read is the one root's keys helper keeps (#8735), and the
-/// product unit names it read-only, never a credential copy.
-#[test]
-fn the_own_folder_is_the_helpers_and_the_unit_reads_it_in_place() {
+fn the_unit_hands_in_only_the_model_keys_each_with_a_blank_fallback() {
     assert_eq!(OWN_FOLDER, lamp_setup::keys::FOLDER);
     let unit = include_str!("../../../../deploy/product/lamp-cloud.service");
+    let lines: Vec<&str> = unit.lines().collect();
+    let mut loaded = Vec::new();
+    for (at, line) in lines.iter().enumerate() {
+        let Some(load) = line.strip_prefix("LoadCredential=own") else {
+            continue;
+        };
+        let (name, from) = load.split_once(':').unwrap();
+        let file = name
+            .strip_prefix('_')
+            .expect("own_<file>, never the folder");
+        assert_eq!(from, format!("{OWN_FOLDER}/{file}"));
+        assert!(
+            lines[..at].contains(&format!("SetCredential=own_{file}:\\n").as_str()),
+            "{file}'s blank fallback first"
+        );
+        loaded.push(file.to_owned());
+    }
+    assert_eq!(loaded, handed_in());
     assert!(
-        unit.lines()
-            .any(|line| line == format!("ReadOnlyPaths=-{OWN_FOLDER}"))
+        !loaded
+            .iter()
+            .any(|file| file.starts_with("deepgram") || file.starts_with("elevenlabs"))
     );
-    assert!(
-        !unit
-            .lines()
-            .any(|line| line.starts_with("LoadCredential=own:"))
-    );
+    assert!(!unit.contains(&format!("ReadOnlyPaths=-{OWN_FOLDER}")));
 }

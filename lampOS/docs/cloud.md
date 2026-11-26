@@ -3704,27 +3704,34 @@ adds the key itself (`lamp_cloud::hermes_llm`).
     journal. If it can't be reached, the answer is 502.
   - **Not counted:** the relay's day used (`day-used.json`) is not counted
     for these chats: the person pays for them.
-  - **Journal:** one line each time the route changes: `the agent's model:
+  - **Journal:** one line at lamp-cloud's start: `the agent's model:
     own openrouter google/gemini-3.6-flash at openrouter.ai`, or `the
     agent's model: relay (no model key of the person's)` with its reason.
     Never a key.
-  - **Where it reads them:** root's keys helper's folder itself,
-    `/etc/lampOS/voice/own` (`hermes_llm::OWN_FOLDER`), read again at each
-    request, so a key set or removed from the app reaches the agent at its
-    next chat, with no restart of lamp-cloud, which would drop the app's
-    link. The helper keeps the folder `root:lampos` 0750 and its files 0640
-    (#8735's setup part), and lamp-cloud runs as group `lampos`;
-    `lamp-cloud.service` names it `ReadOnlyPaths=-/etc/lampOS/voice/own`.
-    No folder, or one it can't list: the relay, said once with the reason
-    (`the person's keys folder can't be read (<kind>)`).
-  - **Who can read the key:** the agent runtimes run as `lampos` too, so
-    they can read the person's key, as they can read the relay's key
-    (`LoadCredential=key`) today.
+  - **Where it reads them:** lamp-cloud holds only the model key and what
+    goes with it, by credential, as it holds the relay's key. Its unit hands
+    in each model service's `.key`, `.url`, `.model` and `.checked` from
+    root's keys folder (`/etc/lampOS/voice/own`, root's, 0700) as the
+    credential `own_<file>`. It never hands in the folder, a Deepgram key or
+    an ElevenLabs key. Each has a blank `SetCredential=own_<file>:\n` first,
+    so a lamp with no key of the person's still starts lamp-cloud: systemd
+    252 fails a unit whose `LoadCredential=` file is missing otherwise, as
+    lamp-skills' `owner` showed (lamp-75c9, 5 Nov). A blank credential is no
+    key.
+  - **When a change takes effect:** the forwarder reads the credentials
+    once, at lamp-cloud's start, and says the route then. After a model
+    key's `keys.set` or `keys.remove`, the keys helper restarts lamp-cloud
+    (#8741), so the change takes effect then, at the cost of a few seconds
+    of the cloud link.
+  - **Who can read the key:** lamp-cloud's credentials are readable by its
+    user, `lampos`, as the relay's key is. The agent runtimes run as
+    `lampos` too, so they can read the person's model key, as they can read
+    the relay's.
   - Tests: `hermes_llm::tests::an_own_model_takes_the_agents_chat_and_a_removed_one_gives_it_back`,
     `an_own_401_falls_back_to_the_relay`,
     `a_forged_model_is_still_a_400_on_the_own_route`,
     `the_route_is_the_voices_model_and_only_with_its_tool_check` and
-    `a_missing_or_unreadable_folder_is_the_relay`.
+    `the_unit_hands_in_only_the_model_keys_each_with_a_blank_fallback`.
 
 ## Not yet known, for the backend (#1396)
 

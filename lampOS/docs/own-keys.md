@@ -659,13 +659,18 @@ the person's own model too, through lamp-cloud's forwarder
   used, which bounds skills' runs (the lead on #8735).
 - **A refused key:** 401 or 403 from the person's endpoint before anything
   is passed back sends that chat to the relay, said once in the journal.
-- **When a change takes effect:** at the agent's next chat. lamp-cloud
-  reads the folder itself at each request, with no restart: the helper
-  keeps it `root:lampos` 0750 and its files 0640 for that (#8735's setup
-  part). No folder, or one lamp-cloud can't list: the relay, said once.
-- **Who can read the key:** lamp-cloud reads the folder as group `lampos`.
-  The agent runtimes run as `lampos` too, so they can read the person's
-  key, as they can read the relay's key today.
+- **How lamp-cloud gets the key:** by credential, as it gets the relay's
+  key. Its unit hands in only each model service's `.key`, `.url`,
+  `.model` and `.checked` from this folder, each as `own_<file>` with a
+  blank fallback, so lamp-cloud starts on a lamp with none. The folder
+  stays root's, 0700.
+- **When a change takes effect:** lamp-cloud reads them at its start. The
+  helper restarts lamp-cloud after a model key's change (#8741), a few
+  seconds of the cloud link, and the agent uses the new route from then.
+- **Who can read the key:** lamp-cloud's credentials are readable by its
+  user, `lampos`, as the relay's key is. The agent runtimes run as
+  `lampos` too, so they can read the person's model key, as they can read
+  the relay's key today.
 
 ## Updates
 

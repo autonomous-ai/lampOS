@@ -36,7 +36,8 @@
 //! the relay's day is not counted. A hearing or voice key alone, no model
 //! key, or no tool call: the relay, as before. Their endpoint refusing the
 //! key (401, 403) before anything is passed: that request goes to the
-//! relay, said once. Each route chosen is one journal line, never a key.
+//! relay, said once. The route is read and said once, at lamp-cloud's
+//! start; never a key.
 use lamp_msgs::own_model::{self, Model};
 use serde_json::Value;
 use std::io;
@@ -221,31 +222,56 @@ impl Started {
     }
 }
 
-/// Root's keys helper's folder, which the voice loads too
-/// (`lamp_setup::keys::FOLDER`).
+/// Root's keys helper's folder (`lamp_setup::keys::FOLDER`): root's alone,
+/// 0700. lamp-cloud never reads it; its unit hands in only the model
+/// services' files, one credential each.
 pub const OWN_FOLDER: &str = "/etc/lampOS/voice/own";
 
-/// Where the person's own keys are read (#8735): root's own folder
-/// ([`OWN_FOLDER`]) itself, `root:lampos` 0750 with its files 0640, so
-/// lamp-cloud (group `lampos`) reads it directly and a key set or removed
-/// takes effect at the next request, with no restart. Read again at each
-/// request: a listing and a few small files.
+/// The person's own model key and what goes with it (#8735), as lamp-cloud's
+/// unit hands them in: each model service's `.key`, `.url`, `.model` and
+/// `.checked` from [`OWN_FOLDER`] as the credential `own_<file>`
+/// (`LoadCredential=own_<file>:<folder>/<file>`), blank (`SetCredential=`)
+/// when there is none, so lamp-cloud always starts. No hearing or voice key
+/// is handed in. Read once, at lamp-cloud's start: systemd copies a
+/// credential then, so the keys helper restarts lamp-cloud after a model
+/// key's change.
 #[derive(Debug, Clone)]
 pub struct OwnKeys {
     dir: PathBuf,
 }
 
+/// The files of each model service lamp-cloud's unit hands in, each the
+/// credential `own_<file>` ([`OwnKeys`]).
+pub fn handed_in() -> Vec<String> {
+    own_model::PRECEDENCE
+        .into_iter()
+        .flat_map(|model| {
+            let id = model.id();
+            let url = matches!(model, Model::OpenAiCompatible | Model::DeepSeek);
+            [
+                Some(format!("{id}.key")),
+                url.then(|| format!("{id}.url")),
+                model.has_model_file().then(|| format!("{id}.model")),
+                Some(format!("{id}.checked")),
+            ]
+        })
+        .flatten()
+        .collect()
+}
+
 impl OwnKeys {
-    /// The own folder at `dir`, `<service>.key` and the rest.
-    pub fn folder(dir: &Path) -> Self {
+    /// The unit's credentials folder (`$CREDENTIALS_DIRECTORY`).
+    pub fn credentials(dir: &Path) -> Self {
         Self {
             dir: dir.to_path_buf(),
         }
     }
 
-    /// One file's text, trimmed; `None` when there is none.
+    /// One file's text, trimmed; `None` when there is none, or it is the
+    /// unit's blank fallback.
     fn read(&self, name: &str) -> Result<Option<String>, ()> {
-        match std::fs::read_to_string(self.dir.join(name)) {
+        match std::fs::read_to_string(self.dir.join(format!("own_{name}"))) {
+            Ok(text) if text.trim().is_empty() => Ok(None),
             Ok(text) => Ok(Some(text.trim().to_owned())),
             Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
             Err(_) => Err(()),
@@ -254,14 +280,6 @@ impl OwnKeys {
 
     /// The person's own model the agent chats with, or why the relay.
     fn route(&self) -> Result<OwnRoute, String> {
-        // No folder (a new or reset lamp) or no access (a helper from
-        // before #8735 keeps it 0700): the relay, said once.
-        if let Err(error) = std::fs::read_dir(&self.dir) {
-            return Err(format!(
-                "the person's keys folder can't be read ({})",
-                error.kind()
-            ));
-        }
         let Some(model) = own_model::PRECEDENCE
             .into_iter()
             .find(|model| !matches!(self.read(&format!("{}.key", model.id())), Ok(None)))
@@ -274,7 +292,6 @@ impl OwnKeys {
             .read(&format!("{id}.key"))
             .ok()
             .flatten()
-            .filter(|key| !key.is_empty())
             .ok_or_else(|| unread("key"))?;
         let kept_url = self
             .read(&format!("{id}.url"))
@@ -348,10 +365,10 @@ pub struct Forwarder {
     unread: Arc<Semaphore>,
     started: Mutex<Started>,
     meter: Option<Meter>,
-    /// The person's own keys, with `LAMP_OWN_KEYS=on` (#8735).
-    own: Option<OwnKeys>,
-    /// The route last said, and the own route whose refusal was said.
-    said_route: Mutex<String>,
+    /// The person's own model, read at the start with `LAMP_OWN_KEYS=on`
+    /// (#8735); `None`: the relay.
+    own: Option<OwnRoute>,
+    /// The own route's refusal was said.
     said_refused: Mutex<String>,
 }
 
@@ -595,35 +612,21 @@ impl Forwarder {
             started: Mutex::new(Started::default()),
             meter: None,
             own: None,
-            said_route: Mutex::default(),
             said_refused: Mutex::default(),
         })
     }
 
-    /// The person's own model keys read from `own` at each request (#8735).
-    pub fn with_own(mut self, own: OwnKeys) -> Self {
-        self.own = Some(own);
-        self
-    }
-
-    /// The route for this request: the person's own model, or the relay
-    /// (`None`). Said in the journal when it differs from the last said.
-    fn own_route(&self) -> Option<OwnRoute> {
-        let own = self.own.as_ref()?;
+    /// The person's own model from `own` (#8735), read once, the route said
+    /// in the journal once.
+    pub fn with_own(mut self, own: &OwnKeys) -> Self {
         let route = own.route();
         let line = match &route {
             Ok(route) => route.told(),
             Err(why) => format!("relay ({why})"),
         };
-        let mut said = self
-            .said_route
-            .lock()
-            .unwrap_or_else(|poison| poison.into_inner());
-        if *said != line {
-            eprintln!("lamp-cloud: the Hermes forwarder: the agent's model: {line}");
-            *said = line;
-        }
-        route.ok()
+        eprintln!("lamp-cloud: the Hermes forwarder: the agent's model: {line}");
+        self.own = route.ok();
+        self
     }
 
     /// A chat sent to the person's own model, `model` made theirs. `None`
@@ -885,11 +888,11 @@ impl Forwarder {
         };
         let chat = request.path == CHAT_PATH;
         // The person's own model (#8735): no relay, so no meter.
-        if let Some(route) = self.own_route() {
+        if let Some(route) = &self.own {
             if !chat {
                 return Self::models_here(&mut stream).await;
             }
-            match self.ask_own(&route, &request.body).await {
+            match self.ask_own(route, &request.body).await {
                 Ok(Some(mut answer)) => {
                     let head = Self::head(&answer).1;
                     return match Self::pass(&mut stream, &mut answer, head, None).await {
@@ -1036,7 +1039,7 @@ pub async fn serve_when(
         if lamp_skills::relay_share::on() {
             forwarder = forwarder.with_meter(state);
         }
-        if let Some(own) = own {
+        if let Some(own) = &own {
             forwarder = forwarder.with_own(own);
         }
         let listener = Forwarder::bind(port)
