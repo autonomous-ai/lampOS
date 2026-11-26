@@ -5268,6 +5268,7 @@ fn the_round_rejects_a_done_matching_a_rewritten_request_instead_of_its_own_requ
                 op,
                 sequence,
                 image: false,
+                image_journal: false,
             };
             let done = apply::Done {
                 version: apply::VERSION,
@@ -5808,7 +5809,14 @@ fn asound_waits_for_a_quiet_moment_within_the_bound_and_then_for_the_next_round(
 fn with_image_off_the_images_files_are_not_written_and_that_is_said() {
     let (mut lamp, ran) = lamp_with_image();
     lamp.config.image = false;
-    asound_build(&mut lamp, 2);
+    publish_image(
+        &mut lamp,
+        2,
+        vec![
+            image_file(ASOUND, "asound 2", &["asound 1", "asound 2"]),
+            image_file(SPEAKER, "speaker 2", &["speaker 1", "speaker 2"]),
+        ],
+    );
     assert_eq!(lamp.round(), Outcome::UpToDate(2));
     assert_eq!(lamp.read(ASOUND), "asound 1");
     assert!(ran.borrow().is_empty());
@@ -5819,6 +5827,126 @@ fn with_image_off_the_images_files_are_not_written_and_that_is_said() {
                 && line.contains("LAMP_UPDATE_IMAGE=on")),
         "{:?}",
         lamp.said
+    );
+}
+
+const KEEP: &str = "/usr/local/libexec/lamp-journal-keep";
+
+/// #7254: with `LAMP_UPDATE_IMAGE` off a build that carries the journal's
+/// files has a plain round write those, and no other image file.
+#[test]
+fn with_image_off_a_round_writes_the_journal_files_and_no_other_image_file() {
+    let (mut lamp, ran) = lamp_with_image();
+    lamp.config.image = false;
+    let keep = lamp.root.join(KEEP.trim_start_matches('/'));
+    fs::create_dir_all(keep.parent().unwrap()).unwrap();
+    fs::write(&keep, "keep 1").unwrap();
+    publish_image(
+        &mut lamp,
+        2,
+        vec![
+            image_file(ASOUND, "asound 2", &["asound 1", "asound 2"]),
+            image_file(SPEAKER, "speaker 2", &["speaker 1", "speaker 2"]),
+            image_file(JOURNAL, "journal 2", &["journal 1", "journal 2"]),
+            image_file(KEEP, "keep 2", &["keep 1", "keep 2"]),
+        ],
+    );
+    let outcome = lamp.round();
+    assert!(
+        matches!(outcome, Outcome::Switched(2) | Outcome::UpToDate(2)),
+        "{outcome:?} {:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.read(JOURNAL), "journal 2");
+    assert_eq!(lamp.read(KEEP), "keep 2");
+    assert_eq!(lamp.read(ASOUND), "asound 1");
+    assert_eq!(lamp.read(SPEAKER), "speaker 1");
+    let calls = lamp.calls();
+    assert!(
+        !calls.iter().any(|call| call.contains("journald")),
+        "{calls:?}"
+    );
+    assert!(
+        !calls
+            .iter()
+            .any(|call| call == "restart lamp-voice.service"),
+        "{calls:?}"
+    );
+    assert!(
+        !ran.borrow()
+            .iter()
+            .any(|command| command.contains("journald"))
+    );
+    // A second round changes nothing.
+    let again = lamp.round();
+    assert!(matches!(again, Outcome::UpToDate(2)), "{again:?}");
+    assert_eq!(lamp.read(JOURNAL), "journal 2");
+}
+
+/// #7254, the first builder 10:42: a round that fails after the journal's
+/// files were written puts them back, so a half-written drop-in never waits
+/// for the next boot.
+#[test]
+fn with_image_off_a_failed_round_puts_the_journal_files_back() {
+    let (mut lamp, ran) = lamp_with_image();
+    lamp.config.image = false;
+    let keep = lamp.root.join(KEEP.trim_start_matches('/'));
+    fs::create_dir_all(keep.parent().unwrap()).unwrap();
+    fs::write(&keep, "keep 1").unwrap();
+    let mut manifest = lamp.manifest(
+        2,
+        &[
+            ("lamp-voice", "voice 2, which crashes"),
+            ("lamp-turn-end", "turn-end 1"),
+            ("lamp-body", "body 1"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[],
+    );
+    manifest.min_updater = Some(manifest::IMAGE_UPDATER);
+    manifest.image = vec![
+        image_file(ASOUND, "asound 2", &["asound 1", "asound 2"]),
+        image_file(JOURNAL, "journal 2", &["journal 1", "journal 2"]),
+        image_file(KEEP, "keep 2", &["keep 1", "keep 2"]),
+    ];
+    let envelope = manifest::seal(&serde_json::to_vec(&manifest).unwrap(), &lamp.key).unwrap();
+    lamp.channel
+        .files
+        .insert(format!("{CHANNEL}{}", manifest::ENVELOPE), envelope);
+    let outcome = lamp.round();
+    assert!(
+        matches!(
+            &outcome,
+            Outcome::RolledBack {
+                sequence: 2,
+                after: Ok(()),
+                ..
+            }
+        ),
+        "{outcome:?} {:?}",
+        lamp.said
+    );
+    // The writer was asked twice, to write and to put back (the same build
+    // with a good voice writes the files, in the test above); the files are
+    // as the lamp had them and asound was never touched.
+    let asked = lamp
+        .calls()
+        .iter()
+        .filter(|call| *call == &format!("restart {}", apply::UNIT))
+        .count();
+    assert_eq!(asked, 2, "{:?}", lamp.calls());
+    assert_eq!(lamp.read(JOURNAL), "journal 1");
+    assert_eq!(lamp.read(KEEP), "keep 1");
+    assert_eq!(lamp.read(ASOUND), "asound 1");
+    assert!(
+        !ran.borrow()
+            .iter()
+            .any(|command| command.contains("journald"))
+    );
+    assert!(
+        !lamp.calls().iter().any(|call| call.contains("journald")),
+        "{:?}",
+        lamp.calls()
     );
 }
 
