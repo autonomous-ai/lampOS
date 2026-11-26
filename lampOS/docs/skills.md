@@ -7909,7 +7909,8 @@ forces one), a skill it makes is made whole, with everything a run needs:
   ("how many", "how much", "how long", "how far", "how old", "what time",
   "what day", "what date", "which day", "days left", "days until", and in
   Vietnamese "bao nhiêu", "bao lâu", "mấy giờ", "mấy ngày", "còn mấy",
-  "ngày nào", as a whole word), and every fixed say of the timed skill
+  as a whole word, not followed by "cũng" or after "dù": "ngày nào cũng
+  …", "every day …", is no ask), and every fixed say of the timed skill
   has no digit and doesn't repeat that phrase. The agent is told the
   ask's words from that phrase to the end of its sentence as the note. A
   say with a digit is told-only's (`CHANGING_SAY_REPAIR`); one that

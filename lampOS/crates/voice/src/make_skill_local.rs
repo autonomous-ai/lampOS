@@ -8607,6 +8607,17 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             made_skill::value_left_out(&dropped, "say somehow many thanks at 6"),
             None
         );
+        // El's and the Reviewer-lead's P2: "ngày nào cũng …" is "every day
+        // …", and a phrase with "cũng" after it or "dù" before it asks for
+        // no value: a plain Vietnamese daily reminder keeps its fixed say.
+        let water = year_count("Đến giờ uống nước rồi!", true, false);
+        for asked in [
+            "ngày nào cũng nhắc tôi uống nước lúc 9 giờ",
+            "nhắc tôi uống nước, bao lâu cũng được",
+            "dù mấy giờ cũng nhắc tôi uống nước",
+        ] {
+            assert_eq!(made_skill::value_left_out(&water, asked), None, "{asked}");
+        }
         assert_eq!(
             made_skill::value_left_out(&year_count(days, false, false), asked),
             None
