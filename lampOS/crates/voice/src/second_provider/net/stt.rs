@@ -19,6 +19,7 @@ use tokio_tungstenite::{
 };
 
 mod flux;
+mod sent_level;
 
 const MODEL: &str = "nova-3-general";
 const DEEPGRAM: &str = "wss://api.deepgram.com/v1/listen";
@@ -3176,6 +3177,52 @@ mod tests {
         stream.send(&[7]).unwrap();
         assert_eq!(stream.finish(1).await.unwrap(), "hello lamp");
         assert_eq!(server.await.unwrap(), 8);
+    }
+
+    /// Every request's line's end says how loud what was sent was, one
+    /// with no words too, after everything it said before (#8776): what
+    /// reads the line by its older words still finds them.
+    #[tokio::test]
+    async fn a_lines_end_with_no_words_says_the_level_sent() {
+        use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Role};
+        let (near, far) = tokio::io::duplex(1 << 16);
+        let server = tokio::spawn(async move {
+            let mut socket = WebSocketStream::from_raw_socket(far, Role::Server, None).await;
+            while let Some(Ok(message)) = socket.next().await {
+                match message {
+                    Message::Text(text) if text.contains("Finalize") => {
+                        let empty = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":0.5,"channel":{"alternatives":[{"transcript":""}]}}"#;
+                        socket.send(Message::text(empty)).await.unwrap();
+                    }
+                    Message::Text(text) if text.contains("CloseStream") => break,
+                    _ => {}
+                }
+            }
+            let _ = socket.close(None).await;
+        });
+        let stream =
+            SttStream::start(WebSocketStream::from_raw_socket(near, Role::Client, None).await);
+        // -28 dBFS on the face's scale, as `--faint-floor-db -28` gives it.
+        *stream.sent.lock().unwrap() = SentLevel::new(Some(150));
+        for _ in 0..25 {
+            stream.send(&[SOUND; 320]).unwrap();
+        }
+        let (words, line) = stream.finish_line(7).await.unwrap();
+        server.abort();
+        assert_eq!(words, "");
+        let line = line.unwrap();
+        assert!(
+            line.starts_with("lamp-voice second: request 7 at the line's end: settled="),
+            "{line}"
+        );
+        assert!(line.contains("finals cover 500 of 500 ms sent"), "{line}");
+        assert!(line.contains("results 0 with words, 1 without"), "{line}");
+        assert!(
+            line.ends_with(
+                ", words from=finalize, peak -20.8 dBFS, rms -20.8 dBFS, clipped 0, over the floor 100%"
+            ),
+            "{line}"
+        );
     }
 
     /// The owner's language (#4473) asks Nova-3 for it; English asks what
