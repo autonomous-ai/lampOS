@@ -71,7 +71,8 @@ usage: lamp-setup COMMAND [OPTIONS]
       wpa_supplicant re-reads it and the radio restarts; with --boot, before
       wpa_supplicant starts, only the file.
   keys [--folder DIR] [--bus-root PATH] [--enable]
-      Root's helper for a person's own DeepSeek and Deepgram keys (#2094):
+      Root's helper for a person's own keys (#2094): models, Deepgram, and
+      an own voice, ElevenLabs' or Gemini's (#8367, #8754):
       one request line on standard input from lamp-cloud, a key to check and
       keep, one to remove, or whose each service uses. A key is kept only
       once its service took it, in DIR (/etc/lampOS/voice/own), and the

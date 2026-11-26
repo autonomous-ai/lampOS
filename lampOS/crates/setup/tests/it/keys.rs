@@ -48,12 +48,12 @@ fn a_key_absent_present_and_removed() {
     let store = Store(folder("cycle"));
     let mut works = Told(Verdict::Works, vec![]);
     let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
-    // With #8367's and #8362's fields beside today's (`offers` is pinned
-    // below).
-    let none = json!({"deepseek": null, "deepgram": null, "elevenlabs": null, "openai_compatible": null, "openrouter": null, "gemini": null, "anthropic": null});
+    // With #8367's, #8362's and #8754's fields beside today's (`offers` is
+    // pinned below).
+    let none = json!({"deepseek": null, "deepgram": null, "elevenlabs": null, "openai_compatible": null, "openrouter": null, "gemini": null, "anthropic": null, "gemini_voice": null});
     assert_eq!(
         reply,
-        json!({"done": {"deepseek": "lamp", "deepgram": "lamp", "elevenlabs": "lamp", "openai_compatible": "lamp", "openrouter": "lamp", "gemini": "lamp", "anthropic": "lamp", "since": none, "deepseek_host": null, "voice_id": {"elevenlabs": null}, "openai_compatible_host": null, "model": none, "checked": none, "in_use": {"model": null, "agent": "relay", "agent_why": "no_model_key"}, "offers": reply["done"]["offers"]}})
+        json!({"done": {"deepseek": "lamp", "deepgram": "lamp", "elevenlabs": "lamp", "openai_compatible": "lamp", "openrouter": "lamp", "gemini": "lamp", "anthropic": "lamp", "gemini_voice": "lamp", "since": none, "deepseek_host": null, "voice_id": {"elevenlabs": null, "gemini_voice": null}, "openai_compatible_host": null, "model": none, "checked": none, "in_use": {"model": null, "agent": "relay", "agent_why": "no_model_key", "voice": null}, "offers": reply["done"]["offers"]}})
     );
     for service in ["deepseek", "deepgram"] {
         let (reply, done) = keys::answer(&set(service, ""), &store, &mut works, true);
@@ -471,10 +471,15 @@ fn elevenlabs_is_offered_beside_the_model_services() {
             {"service": "openrouter", "name": "OpenRouter", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://openrouter.ai/api/v1", "agent": true},
             {"service": "gemini", "name": "Gemini", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai", "agent": true},
             {"service": "anthropic", "name": "Anthropic", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://api.anthropic.com/v1", "agent": true},
+            {"service": "gemini_voice", "name": "Gemini", "kind": "voice", "models": [], "base_url": false, "fields": ["voice_id"], "voices": keys_voices(), "agent": false},
         ])
     );
     assert_eq!(which["elevenlabs"], "lamp");
-    assert_eq!(which["voice_id"], json!({"elevenlabs": null}));
+    assert_eq!(which["gemini_voice"], "lamp");
+    assert_eq!(
+        which["voice_id"],
+        json!({"elevenlabs": null, "gemini_voice": null})
+    );
     // Today's fields stay as they are, for an older app.
     assert_eq!(which["deepseek"], "lamp");
     assert_eq!(which["deepgram"], "lamp");
@@ -518,7 +523,14 @@ fn an_elevenlabs_key_and_voice_are_checked_kept_and_never_said() {
     let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
     never_said(&reply, &None);
     assert_eq!(reply["done"]["elevenlabs"], "own");
-    assert_eq!(reply["done"]["voice_id"], json!({"elevenlabs": VOICE}));
+    assert_eq!(
+        reply["done"]["voice_id"],
+        json!({"elevenlabs": VOICE, "gemini_voice": null})
+    );
+    assert_eq!(
+        reply["done"]["in_use"],
+        json!({"model": null, "agent": "relay", "agent_why": "tts_only", "voice": "elevenlabs"})
+    );
     // "Use the lamp's own again": both files gone, the lamp's voice back.
     let (reply, done) = keys::answer(r#"{"remove":"elevenlabs"}"#, &store, &mut works, true);
     assert_eq!(
@@ -585,6 +597,360 @@ fn with_the_switch_off_an_elevenlabs_key_changes_nothing() {
     assert!(!store.0.exists());
 }
 
+/// The Gemini voices `keys.get` offers (#8754), as Google's guide lists
+/// them: pinned here by name, so a change to the list is seen.
+fn keys_voices() -> Value {
+    json!([
+        "Zephyr",
+        "Puck",
+        "Charon",
+        "Kore",
+        "Fenrir",
+        "Leda",
+        "Orus",
+        "Aoede",
+        "Callirrhoe",
+        "Autonoe",
+        "Enceladus",
+        "Iapetus",
+        "Umbriel",
+        "Algieba",
+        "Despina",
+        "Erinome",
+        "Algenib",
+        "Rasalgethi",
+        "Laomedeia",
+        "Achernar",
+        "Alnilam",
+        "Schedar",
+        "Gacrux",
+        "Pulcherrima",
+        "Achird",
+        "Zubenelgenubi",
+        "Vindemiatrix",
+        "Sadachbia",
+        "Sadaltager",
+        "Sulafat"
+    ])
+}
+
+/// #8754: a Gemini key and voice name that Google takes are kept beside the
+/// others as `gemini_voice.*`, 0600, said in the lamp's own words, and the
+/// voice restarts to speak in it; neither the reply nor the journal's line
+/// holds the key, and "use the lamp's own again" removes every file of it.
+#[test]
+fn a_gemini_voice_key_and_voice_are_checked_kept_and_never_said() {
+    let store = Store(folder("gemini-voice"));
+    let mut works = Told(Verdict::Works, vec![]);
+    let line = set("gemini_voice", r#","voice_id":"Kore""#);
+    let (reply, done) = keys::answer(&line, &store, &mut works, true);
+    never_said(&reply, &done);
+    assert_eq!(
+        reply,
+        json!({"done": {"service": "gemini_voice", "uses": "own", "code": "works", "answer":
+            "that key and voice work: the lamp now speaks in your Gemini voice, and what it says goes to Google's Gemini API under your account and its terms"}})
+    );
+    let done = done.unwrap();
+    assert!(done.restart_voice);
+    assert_eq!(done.said, "the person's Gemini voice key: it works, kept");
+    assert_eq!(works.1.len(), 1, "one check");
+    assert_eq!(works.1[0].service, Service::GeminiVoice);
+    assert_eq!(works.1[0].voice_id.as_deref(), Some("Kore"));
+    assert_eq!(works.1[0].base_url, None);
+    assert_eq!(
+        fs::read_to_string(store.0.join("gemini_voice.key")).unwrap(),
+        PLANTED
+    );
+    assert_eq!(
+        fs::read_to_string(store.0.join("gemini_voice.voice")).unwrap(),
+        "Kore\n"
+    );
+    for file in [
+        "gemini_voice.key",
+        "gemini_voice.voice",
+        "gemini_voice.checked",
+    ] {
+        let mode = fs::metadata(store.0.join(file))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600, "{file}");
+    }
+    assert_eq!(
+        fs::metadata(&store.0).unwrap().permissions().mode() & 0o777,
+        0o700
+    );
+    let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
+    never_said(&reply, &None);
+    assert_eq!(reply["done"]["gemini_voice"], "own");
+    assert_eq!(reply["done"]["gemini"], "lamp");
+    assert_eq!(
+        reply["done"]["voice_id"],
+        json!({"elevenlabs": null, "gemini_voice": "Kore"})
+    );
+    assert_eq!(reply["done"]["checked"]["gemini_voice"], "works");
+    assert_eq!(
+        reply["done"]["in_use"],
+        json!({"model": null, "agent": "relay", "agent_why": "tts_only", "voice": "gemini_voice"})
+    );
+    let (reply, done) = keys::answer(r#"{"remove":"gemini_voice"}"#, &store, &mut works, true);
+    assert_eq!(
+        reply,
+        json!({"done": {"service": "gemini_voice", "uses": "lamp"}})
+    );
+    let done = done.unwrap();
+    assert!(done.restart_voice);
+    assert_eq!(done.said, "the person's Gemini voice key was removed");
+    for file in [
+        "gemini_voice.key",
+        "gemini_voice.voice",
+        "gemini_voice.checked",
+    ] {
+        assert!(!store.0.join(file).exists(), "{file}");
+    }
+}
+
+/// #8754: with no `key`, `keys.set` for Gemini's voice changes only the
+/// voice, checked with the kept key, and only when one is kept; ElevenLabs'
+/// kept key is never used for it.
+#[test]
+fn a_gemini_voice_alone_changes_only_the_voice_beside_a_kept_key() {
+    let store = Store(folder("gemini-voice-alone"));
+    let mut works = Told(Verdict::Works, vec![]);
+    let alone = r#"{"set":"gemini_voice","voice_id":"Puck"}"#;
+    let (reply, done) = keys::answer(alone, &store, &mut works, true);
+    assert_eq!(
+        reply,
+        json!({"refused": "a voice is changed beside a kept Gemini voice key: give the key too", "code": "bad_field"})
+    );
+    assert!(done.is_none());
+    assert!(works.1.is_empty(), "nothing checked");
+    // A key with no voice, none kept: refused before any check.
+    let (reply, _) = keys::answer(&set("gemini_voice", ""), &store, &mut works, true);
+    assert_eq!(
+        reply,
+        json!({"refused": "Gemini's voice needs a voice name with its key", "code": "bad_field"})
+    );
+    assert!(works.1.is_empty(), "nothing checked");
+    let (reply, _) = keys::answer(
+        &set("gemini_voice", r#","voice_id":"Kore""#),
+        &store,
+        &mut works,
+        true,
+    );
+    assert_eq!(reply["done"]["code"], "works", "{reply}");
+    let (reply, done) = keys::answer(alone, &store, &mut works, true);
+    never_said(&reply, &done);
+    assert_eq!(reply["done"]["code"], "works", "{reply}");
+    assert!(done.unwrap().restart_voice);
+    assert_eq!(works.1.len(), 2, "the new voice checked with the kept key");
+    assert_eq!(works.1[1].service, Service::GeminiVoice);
+    assert_eq!(works.1[1].key, PLANTED);
+    assert_eq!(
+        fs::read_to_string(store.0.join("gemini_voice.voice")).unwrap(),
+        "Puck\n"
+    );
+    // A key alone keeps the kept voice.
+    let (reply, _) = keys::answer(&set("gemini_voice", ""), &store, &mut works, true);
+    assert_eq!(reply["done"]["code"], "works", "{reply}");
+    assert_eq!(works.1[2].voice_id.as_deref(), Some("Puck"));
+    // A voice name is letters and digits only, never quoted back; no
+    // endpoint and no model are taken.
+    for bad in [
+        r#","voice_id":"../x""#,
+        r#","base_url":"https://x.invalid""#,
+        r#","voice_id":"Kore","model":"m""#,
+    ] {
+        let (reply, _) = keys::answer(&set("gemini_voice", bad), &store, &mut works, true);
+        assert_eq!(reply["code"], "bad_field", "{bad}: {reply}");
+        assert!(!reply.to_string().contains("../x"), "{reply}");
+        never_said(&reply, &None);
+    }
+    assert_eq!(works.1.len(), 3, "none of those checked");
+}
+
+/// #8754: a voice Google refuses by name leaves the kept voice as it was,
+/// said plainly; a key it refuses is not kept.
+#[test]
+fn a_refused_gemini_voice_or_key_is_not_kept() {
+    let store = Store(folder("gemini-voice-refused"));
+    let line = set("gemini_voice", r#","voice_id":"Nobody""#);
+    let (reply, done) = keys::answer(
+        &line,
+        &store,
+        &mut Told(Verdict::VoiceRefused, vec![]),
+        true,
+    );
+    never_said(&reply, &done);
+    assert_eq!(
+        reply,
+        json!({"refused": "that key works, but Gemini has no voice by that name; nothing changed", "code": "voice_refused"})
+    );
+    assert!(!done.unwrap().restart_voice);
+    assert!(!store.0.join("gemini_voice.key").exists());
+    let (reply, _) = keys::answer(&line, &store, &mut Told(Verdict::Refused, vec![]), true);
+    assert_eq!(
+        reply,
+        json!({"refused": "that key was refused", "code": "refused"})
+    );
+    assert!(!store.0.join("gemini_voice.key").exists());
+}
+
+/// #8754: one own voice at a time, as one own model: keeping Gemini's
+/// voice takes ElevenLabs' away, key and voice ID, and keeping ElevenLabs'
+/// takes Gemini's away, so the voice in use is never a guess.
+#[test]
+fn keeping_one_own_voice_removes_the_other() {
+    let store = Store(folder("one-voice"));
+    let mut works = Told(Verdict::Works, vec![]);
+    keys::answer(
+        &set("elevenlabs", &format!(r#","voice_id":"{VOICE}""#)),
+        &store,
+        &mut works,
+        true,
+    );
+    assert!(store.0.join("elevenlabs.key").is_file());
+    let (reply, _) = keys::answer(
+        &set("gemini_voice", r#","voice_id":"Kore""#),
+        &store,
+        &mut works,
+        true,
+    );
+    assert_eq!(reply["done"]["code"], "works", "{reply}");
+    for file in ["elevenlabs.key", "elevenlabs.voice", "elevenlabs.checked"] {
+        assert!(!store.0.join(file).exists(), "{file}");
+    }
+    assert!(store.0.join("gemini_voice.key").is_file());
+    let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
+    assert_eq!(
+        (&reply["done"]["elevenlabs"], &reply["done"]["gemini_voice"]),
+        (&json!("lamp"), &json!("own"))
+    );
+    keys::answer(
+        &set("elevenlabs", &format!(r#","voice_id":"{VOICE}""#)),
+        &store,
+        &mut works,
+        true,
+    );
+    for file in [
+        "gemini_voice.key",
+        "gemini_voice.voice",
+        "gemini_voice.checked",
+    ] {
+        assert!(!store.0.join(file).exists(), "{file}");
+    }
+    let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
+    assert_eq!(
+        reply["done"]["in_use"],
+        json!({"model": null, "agent": "relay", "agent_why": "tts_only", "voice": "elevenlabs"})
+    );
+}
+
+/// #8754: Gemini's model and Gemini's voice are two services: a key for
+/// each lives side by side, and removing one leaves the other.
+#[test]
+fn a_gemini_chat_key_and_a_gemini_voice_key_live_side_by_side() {
+    let store = Store(folder("gemini-both"));
+    let mut works = Told(Verdict::Works, vec![]);
+    let chat = json!({"set": "gemini", "key": PLANTED, "model": "gemini-2.5-flash"}).to_string();
+    keys::answer(&chat, &store, &mut works, true);
+    keys::answer(
+        &set("gemini_voice", r#","voice_id":"Kore""#),
+        &store,
+        &mut works,
+        true,
+    );
+    for file in [
+        "gemini.key",
+        "gemini.model",
+        "gemini_voice.key",
+        "gemini_voice.voice",
+    ] {
+        assert!(store.0.join(file).is_file(), "{file}");
+    }
+    let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
+    assert_eq!(
+        reply["done"]["in_use"],
+        json!({"model": "gemini", "agent": "own", "agent_why": null, "voice": "gemini_voice"})
+    );
+    keys::answer(r#"{"remove":"gemini"}"#, &store, &mut works, true);
+    assert!(!store.0.join("gemini.key").exists());
+    assert!(store.0.join("gemini_voice.key").is_file());
+    keys::answer(&chat, &store, &mut works, true);
+    keys::answer(r#"{"remove":"gemini_voice"}"#, &store, &mut works, true);
+    assert!(store.0.join("gemini.key").is_file());
+    assert!(!store.0.join("gemini_voice.key").exists());
+}
+
+/// #8754: off, a Gemini voice line changes nothing, as every other.
+#[test]
+fn with_the_switch_off_a_gemini_voice_key_changes_nothing() {
+    let store = Store(folder("gemini-voice-off"));
+    let mut check = Told(Verdict::Works, vec![]);
+    let line = set("gemini_voice", r#","voice_id":"Kore""#);
+    let (reply, done) = keys::answer(&line, &store, &mut check, false);
+    assert_eq!(
+        reply,
+        json!({"refused": "own keys are off on this lamp", "code": "unavailable"})
+    );
+    assert!(done.is_none());
+    assert!(check.1.is_empty());
+    assert!(!store.0.exists());
+}
+
+/// #8754 (the first builder's rule on #7814): a person's own voice keys,
+/// ElevenLabs' and Gemini's, live only in root's 0700 folder, which only
+/// the voice loads (`LoadCredential=own:`) and only root's keys helper
+/// writes: no other product unit names the folder, so no agent runtime and
+/// no other part running as `lampos` (`lamp-cloud`, `lamp-tasks`, the
+/// skills) can read them.
+#[test]
+fn the_own_voice_keys_are_read_by_the_voice_alone() {
+    for service in Service::VOICES {
+        assert!(!service.key_file().contains('/'), "{service:?}");
+        assert!(!service.voice_file().unwrap().contains('/'), "{service:?}");
+    }
+    assert_eq!(keys::FOLDER, "/etc/lampOS/voice/own");
+    let product = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    let mut naming = Vec::new();
+    for entry in fs::read_dir(&product).unwrap() {
+        let path = entry.unwrap().path();
+        if !matches!(
+            path.extension().and_then(|e| e.to_str()),
+            Some("service" | "socket" | "conf")
+        ) {
+            continue;
+        }
+        let text = fs::read_to_string(&path).unwrap();
+        let name = path.file_name().unwrap().to_str().unwrap().to_owned();
+        if text.contains(keys::FOLDER)
+            || text.contains("voice/own")
+            || text.contains("gemini_voice")
+            || text.contains("elevenlabs.key")
+        {
+            naming.push(name.clone());
+        }
+        if text.contains("LoadCredential=own:") {
+            assert!(
+                ["lamp-voice.service", "own-keys-voice.conf"].contains(&name.as_str()),
+                "{name} loads the own keys"
+            );
+        }
+    }
+    naming.sort();
+    assert_eq!(
+        naming,
+        [
+            "lamp-setup-keys@.service",
+            "lamp-voice.service",
+            "own-keys-voice.conf"
+        ]
+    );
+    let keys_unit = include_str!("../../../../deploy/product/lamp-setup-keys@.service");
+    assert!(keys_unit.contains("User=root\n"));
+    assert!(keys_unit.contains("ConfigurationDirectoryMode=0700\n"));
+}
+
 /// #8362 step 1b: a person's own model at an OpenAI-compatible endpoint (Grok
 /// and the like), on the same `keys.*` path. `offers` names it with
 /// `base_url: true` and `fields: ["model"]` (#8367's shape); its key, endpoint and model are kept as three private
@@ -610,7 +976,7 @@ fn an_openai_compatible_model_is_kept_with_its_endpoint_and_model() {
     assert_eq!(which["model"]["openai_compatible"], Value::Null);
     assert_eq!(
         which["in_use"],
-        json!({"model": null, "agent": "relay", "agent_why": "no_model_key"})
+        json!({"model": null, "agent": "relay", "agent_why": "no_model_key", "voice": null})
     );
 
     // DeepSeek's own first, then the OpenAI-compatible one over it.
@@ -663,7 +1029,7 @@ fn an_openai_compatible_model_is_kept_with_its_endpoint_and_model() {
     assert_eq!(which["checked"]["openai_compatible"], "works");
     assert_eq!(
         which["in_use"],
-        json!({"model": "openai_compatible", "agent": "own", "agent_why": null})
+        json!({"model": "openai_compatible", "agent": "own", "agent_why": null, "voice": null})
     );
     // Removed: the lamp's own model again, and nothing of it left.
     let (reply, done) = keys::answer(
@@ -687,7 +1053,7 @@ fn an_openai_compatible_model_is_kept_with_its_endpoint_and_model() {
     let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
     assert_eq!(
         reply["done"]["in_use"],
-        json!({"model": null, "agent": "relay", "agent_why": "no_model_key"})
+        json!({"model": null, "agent": "relay", "agent_why": "no_model_key", "voice": null})
     );
 }
 
@@ -849,7 +1215,7 @@ fn an_openrouter_model_is_kept_with_its_model_at_openrouters_own_endpoint() {
     assert_eq!(which["checked"]["openrouter"], "works");
     assert_eq!(
         which["in_use"],
-        json!({"model": "openrouter", "agent": "own", "agent_why": null})
+        json!({"model": "openrouter", "agent": "own", "agent_why": null, "voice": null})
     );
     // An OpenAI-compatible one over it takes OpenRouter's away in turn.
     keys::answer(&compatible, &store, &mut works, true);
@@ -859,7 +1225,7 @@ fn an_openrouter_model_is_kept_with_its_model_at_openrouters_own_endpoint() {
     let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
     assert_eq!(
         reply["done"]["in_use"],
-        json!({"model": "openai_compatible", "agent": "own", "agent_why": null})
+        json!({"model": "openai_compatible", "agent": "own", "agent_why": null, "voice": null})
     );
     // Removed: nothing of it left.
     keys::answer(&line, &store, &mut works, true);
@@ -969,7 +1335,7 @@ fn a_gemini_model_is_kept_with_its_model_at_geminis_own_endpoint() {
     assert_eq!(which["checked"]["gemini"], "works");
     assert_eq!(
         which["in_use"],
-        json!({"model": "gemini", "agent": "own", "agent_why": null})
+        json!({"model": "gemini", "agent": "own", "agent_why": null, "voice": null})
     );
     // OpenRouter's over it takes Gemini's away in turn.
     keys::answer(&openrouter, &store, &mut works, true);
@@ -1083,7 +1449,7 @@ fn an_anthropic_model_is_kept_with_its_model_at_anthropics_own_endpoint() {
     assert_eq!(which["checked"]["anthropic"], "works");
     assert_eq!(
         which["in_use"],
-        json!({"model": "anthropic", "agent": "own", "agent_why": null})
+        json!({"model": "anthropic", "agent": "own", "agent_why": null, "voice": null})
     );
     // Gemini's over it takes Anthropic's away in turn.
     keys::answer(&gemini, &store, &mut works, true);
@@ -1144,7 +1510,7 @@ fn the_agent_uses_an_own_model_key_only_once_it_made_a_tool_call() {
     let now = which(&store);
     assert_eq!(
         now["in_use"],
-        json!({"model": "gemini", "agent": "own", "agent_why": null})
+        json!({"model": "gemini", "agent": "own", "agent_why": null, "voice": null})
     );
     assert_eq!(offer(&now, "gemini"), true);
 
@@ -1180,7 +1546,7 @@ fn the_agent_uses_an_own_model_key_only_once_it_made_a_tool_call() {
     assert_eq!(now["checked"]["gemini"], "works");
     assert_eq!(
         now["in_use"],
-        json!({"model": "gemini", "agent": "relay", "agent_why": "no_tool_calls"})
+        json!({"model": "gemini", "agent": "relay", "agent_why": "no_tool_calls", "voice": null})
     );
     assert_eq!(offer(&now, "gemini"), false);
     assert_eq!(offer(&now, "openrouter"), true);
@@ -1195,7 +1561,7 @@ fn the_agent_uses_an_own_model_key_only_once_it_made_a_tool_call() {
     let now = which(&store);
     assert_eq!(
         now["in_use"],
-        json!({"model": null, "agent": "relay", "agent_why": "no_model_key"})
+        json!({"model": null, "agent": "relay", "agent_why": "no_model_key", "voice": null})
     );
     assert_eq!(offer(&now, "gemini"), true);
 
@@ -1206,7 +1572,7 @@ fn the_agent_uses_an_own_model_key_only_once_it_made_a_tool_call() {
     let now = which(&store);
     assert_eq!(
         now["in_use"],
-        json!({"model": null, "agent": "relay", "agent_why": "tts_only"})
+        json!({"model": null, "agent": "relay", "agent_why": "tts_only", "voice": "elevenlabs"})
     );
     assert_eq!(offer(&now, "elevenlabs"), false);
     assert_eq!(offer(&now, "deepgram"), false);
@@ -1216,7 +1582,7 @@ fn the_agent_uses_an_own_model_key_only_once_it_made_a_tool_call() {
     fs::write(store.0.join("deepseek.checked"), "works").unwrap();
     assert_eq!(
         which(&store)["in_use"],
-        json!({"model": "deepseek", "agent": "relay", "agent_why": "unchecked"})
+        json!({"model": "deepseek", "agent": "relay", "agent_why": "unchecked", "voice": "elevenlabs"})
     );
     let _ = fs::remove_dir_all(store.0.parent().unwrap());
 }
