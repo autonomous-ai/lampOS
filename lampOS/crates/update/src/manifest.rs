@@ -132,6 +132,15 @@ pub const IMAGE_FILES: &[&str] = &[
     "/usr/local/libexec/lamp-journal-keep",
     "/usr/local/libexec/lamp-ramlog-postrotate",
 ];
+/// The image's files a round asks for with `LAMP_UPDATE_IMAGE` off (#7254):
+/// the journal's size and the clean-shutdown keep. The fault keep's own
+/// drop-in (#8713) joins this list, with a test, once it is one of
+/// [`IMAGE_FILES`]. Each is one of [`IMAGE_FILES`].
+pub const JOURNAL_FILES: &[&str] = &[
+    "/etc/systemd/journald.conf.d/zz-lamp-journal.conf",
+    "/etc/systemd/system/orangepi-ramlog.service.d/zz-lamp-journal-keep.conf",
+    "/usr/local/libexec/lamp-journal-keep",
+];
 /// At most this many of the image's files in one build, all variants.
 pub const MOST_IMAGE: usize = 64;
 /// At most this many SHA-256s the image has shipped, for one file.

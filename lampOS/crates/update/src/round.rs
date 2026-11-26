@@ -1673,7 +1673,14 @@ impl Run<'_, '_> {
         // The image's files only with the switch on: off, neither the
         // hardware profile nor any of them is read. On, one that can't be
         // read is said, and the rest of the build goes on without them.
-        if !manifest.image.is_empty() && !self.config.image {
+        // With the switch off only the journal's files are asked for
+        // (#7254, `manifest::JOURNAL_FILES`).
+        let journal_only = !self.config.image
+            && manifest
+                .image
+                .iter()
+                .any(|file| manifest::JOURNAL_FILES.contains(&file.path.as_str()));
+        if !manifest.image.is_empty() && !self.config.image && !journal_only {
             self.say(&format!(
                 "build {}'s image files are not written: {}=on is not set",
                 manifest.sequence,
@@ -1682,7 +1689,10 @@ impl Run<'_, '_> {
         } else if !manifest.image.is_empty() {
             let steps = match image::variant(&self.config.root) {
                 Ok(Some(variant)) => {
-                    let (files, shipped) = image::for_variant(&manifest.image, &variant);
+                    let (mut files, shipped) = image::for_variant(&manifest.image, &variant);
+                    if journal_only {
+                        files.retain(|file| manifest::JOURNAL_FILES.contains(&file.path.as_str()));
+                    }
                     apply::plan(
                         &self.config.root,
                         &files,
@@ -1829,8 +1839,10 @@ impl Run<'_, '_> {
     fn ask_apply(&mut self, op: apply::Op, sequence: u64) -> Result<(), String> {
         let records = self.records.folder().to_owned();
         let envelope = (op == apply::Op::Apply).then_some(self.envelope.as_slice());
-        let image = op == apply::Op::Apply && !self.image_writes.is_empty();
-        apply::stage(&records, op, sequence, envelope, image)
+        let wrote = op == apply::Op::Apply && !self.image_writes.is_empty();
+        let image = wrote && self.config.image;
+        let journal = wrote && !self.config.image;
+        apply::stage_journal(&records, op, sequence, envelope, image, journal)
             .map_err(|error| format!("the settings cannot be staged: {error}"))?;
         self.world
             .systemd

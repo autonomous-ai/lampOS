@@ -3031,11 +3031,30 @@ path it doesn't know, and ignores a field it doesn't know.
   product". With `--image robots/lamp [--variant NAME]` each is compared
   with that variant's, and a difference fails the check.
 
-Off, or absent: none of the image's files is written, neither they nor
-`/etc/autonomous/hardware-profile` is read, and the round says so
-(`build N's image files are not written: LAMP_UPDATE_IMAGE=on is not
-set`). On, a profile or image file that can't be read is said, and the
-rest of the build goes on without the image's files.
+Off, or absent: none of the image's files is written, except the journal's
+(below); neither they nor `/etc/autonomous/hardware-profile` is read, and
+the round says so (`build N's image files are not written:
+LAMP_UPDATE_IMAGE=on is not set`). On, a profile or image file that can't be
+read is said, and the rest of the build goes on without the image's files.
+
+**The journal's files, with the switch off (#7254).** A lamp in a home gets
+the journal's size and the clean-shutdown keep from a round, without the
+whole image: `manifest::JOURNAL_FILES`, today journald's
+`zz-lamp-journal.conf`, ramlog's `zz-lamp-journal-keep.conf` and
+`/usr/local/libexec/lamp-journal-keep`, each one of `IMAGE_FILES`. When a
+build carries any of them and the switch is off, the round asks
+`lamp-update-apply` for them alone (`image_journal` in `request.json`,
+`image` off), and the writer takes the build's image files that are in that
+list and no other, by the same rule as above: a file is written only where
+the lamp has a version the image shipped, so a hand edit is kept and said.
+No new manifest field, so no `min_updater`: a writer older than
+`image_journal` ignores it and writes no image file at all, and the round
+finds them not written as it does for any file the writer left. journald is
+never restarted or signalled: its drop-in is read at the next boot, and the
+round says so. A second round finds them as written and changes nothing.
+The fault keep's drop-in (`lamp-fault-keep.conf`, #8713) is not in the list
+yet: it joins it, with its test, after #8717 adds it to `IMAGE_FILES`, so until
+then the keep script reaches a lamp but nothing calls it on a fault.
 
 ## What was measured, and where
 
