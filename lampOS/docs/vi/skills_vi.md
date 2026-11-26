@@ -4301,7 +4301,8 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   `VALUE_ASKS` ("how many", "how much", "how long", "how far", "how old",
   "what time", "what day", "what date", "which day", "days left", "days
   until", và tiếng Việt "bao nhiêu", "bao lâu", "mấy giờ", "mấy ngày",
-  "còn mấy", "ngày nào", tính như một từ trọn vẹn), và mọi câu `say` cố
+  "còn mấy", tính như một từ trọn vẹn, không có "cũng" đứng sau hay "dù"
+  đứng trước: "ngày nào cũng …" không phải là hỏi giá trị), và mọi câu `say` cố
   định của kỹ năng hẹn giờ đều không có chữ số và không lặp lại cụm đó.
   Agent được báo phần lời yêu cầu từ cụm đó tới hết câu, làm ghi chú. Một
   câu `say` có chữ số thuộc về told-only (`CHANGING_SAY_REPAIR`); một câu
