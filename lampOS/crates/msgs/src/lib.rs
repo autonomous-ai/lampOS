@@ -154,6 +154,11 @@ pub mod chosen_voice;
 /// a test lamp's `LAMP_OWN_ELEVENLABS_URL` (#8367, `docs/own-keys.md`).
 pub mod own_voice;
 
+/// Which of a person's own model keys is the lamp's model, and where each
+/// named service is asked (#8362, #8420, #8735, `docs/own-keys.md`): for the
+/// keys helper, the voice and lamp-cloud's forwarder alike.
+pub mod own_model;
+
 /// The local agent's user, group, socket folder and drop-in text (the owner's
 /// switch, `docs/control.md`).
 pub mod local_agent;
