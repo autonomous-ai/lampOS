@@ -5642,6 +5642,19 @@ pub fn serve(
                 heeding.attention.only_hey_lamp(true);
             }
         }
+        // One reply window (`LAMP_ONE_REPLY_WINDOW=on`, the product owner on
+        // 26 Nov 2026): the lamp's own news gets the conversation's 20 s.
+        if std::env::var(crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a reply to the lamp's own news counts within {} s, as any answer's does; a line about its work opens no window of its own (LAMP_ONE_REPLY_WINDOW)",
+                crate::attention::ONE_REPLY_WINDOW_US / 1_000_000
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.attention.one_reply_window(true);
+            }
+        }
         // Another person's name in the call's place is theirs
         // (`LAMP_NAME_NOT_ANOTHERS=on`, #8114).
         if crate::second_provider::not_anothers_on() {

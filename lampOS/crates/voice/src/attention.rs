@@ -351,6 +351,12 @@ pub(crate) const AFTER_NEWS: &str = "the first thing said after the lamp's own n
 /// ([`about_its_work`]) is for it this long after the lamp's news, or after
 /// it started a task, a timer or a reminder.
 pub const WORK_ASKED_US: u64 = 600_000_000;
+
+/// With `LAMP_ONE_REPLY_WINDOW` ([`Attention::one_reply_window`]): the lamp's
+/// own news is replied to as any answer is, within the conversation's 20 s
+/// (`LAMP_FOLLOW_UPS`' window after the lamp's words), not [`NEWS_REPLY_US`];
+/// and a line about its work opens nothing of its own ([`WORK_ASKED_US`]).
+pub const ONE_REPLY_WINDOW_US: u64 = 20_000_000;
 pub(crate) const ABOUT_ITS_WORK: &str = "a question about the lamp's own task, reminder or timer";
 
 /// With the switch, a line that follows, by at most this long, one that
@@ -2151,6 +2157,8 @@ pub struct Attention {
     hey_only: bool,
     hey_kept: bool,
     name_unhey_dropped: bool,
+    /// `LAMP_ONE_REPLY_WINDOW` ([`Attention::one_reply_window`]).
+    one_reply_window: bool,
     /// `LAMP_NAME_NOT_ANOTHERS=on` (#8114, [`Self::hold_anothers_name`]).
     not_anothers: bool,
     /// `LAMP_NAME_GREETED_STAND_IN=on` ([`Self::keep_greeted_stand_ins`]).
@@ -2794,6 +2802,18 @@ impl Attention {
     /// Lamp" at the line's start, with `LAMP_NAME_HEY_ONLY`.
     pub fn name_kept_as_hey(&self) -> bool {
         self.hey_kept
+    }
+
+    /// With `LAMP_ONE_REPLY_WINDOW` (`second_provider::ONE_REPLY_WINDOW_ENVIRONMENT`,
+    /// the product owner on 26 Nov 2026: "ok 20s make sense"), from now on: a
+    /// reply to the lamp's own news counts within [`ONE_REPLY_WINDOW_US`],
+    /// the 20 s any answer keeps a conversation going, not [`NEWS_REPLY_US`];
+    /// and a line about the lamp's work ([`about_its_work`]) is let out by no
+    /// window of its own ([`WORK_ASKED_US`]): after 20 s it is "Hey Lamp", as
+    /// any line is. On lamp-74ff that day a goodbye to colleagues 2 min 53 s
+    /// after the stuffy-air skill's remark was answered as its reply.
+    pub fn one_reply_window(&mut self, on: bool) {
+        self.one_reply_window = on;
     }
 
     /// Whether the name heard for the line last weighed, though dropped, is
@@ -3650,14 +3670,20 @@ impl Attention {
             && let Some(began) = self.began_us
         {
             let since = |at: Option<u64>| at.filter(|at| *at <= began).map(|at| began - at);
-            let news_reply = news_ago.is_some_and(|ago| ago <= NEWS_REPLY_US) && room != Room::Busy;
+            let news_window = if self.one_reply_window {
+                ONE_REPLY_WINDOW_US
+            } else {
+                NEWS_REPLY_US
+            };
+            let news_reply = news_ago.is_some_and(|ago| ago <= news_window) && room != Room::Busy;
             // `LAMP_NEWS_REPLY_HEEDS_HELD` (#8383): a line `said_to_me`
             // held is no reply; its words may still ask about the work.
             self.news_reply_held =
                 news_reply && self.news_reply_heeds_held && self.said_held_of == Some(self.request);
             let why = if news_reply && !self.news_reply_held {
                 Some(AFTER_NEWS)
-            } else if since(self.worked_us).is_some_and(|ago| ago <= WORK_ASKED_US)
+            } else if !self.one_reply_window
+                && since(self.worked_us).is_some_and(|ago| ago <= WORK_ASKED_US)
                 && about_its_work(&self.heard)
             {
                 Some(ABOUT_ITS_WORK)
@@ -4021,6 +4047,7 @@ impl Attention {
     /// out.
     fn asks_about_its_work(&self) -> bool {
         self.spoken_to
+            && !self.one_reply_window
             && self.began_us.is_some_and(|began| {
                 self.worked_us
                     .filter(|at| *at <= began)
@@ -5912,6 +5939,66 @@ mod tests {
     /// `LAMP_NEWS_REPLY_HEEDS_HELD` the hold keeps it from `AFTER_NEWS`;
     /// off, or not held (or held for another request), as before. A held
     /// line asking about the lamp's work is still taken so.
+    /// `LAMP_ONE_REPLY_WINDOW` (the product owner, 26 Nov 2026): the lamp's
+    /// own news is replied to within the conversation's 20 s, as any answer
+    /// is. lamp-74ff that day: a goodbye to colleagues 2 min 53 s after the
+    /// stuffy-air skill's remark was answered as its reply. Off, 3 min as
+    /// before.
+    #[test]
+    fn with_one_reply_window_the_lamps_news_is_replied_to_within_twenty_seconds() {
+        const S: u64 = 1_000_000;
+        let reply = |on: bool, after_s: u64| {
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.one_reply_window(on);
+            attention.news_told(100 * S);
+            attention.began_at(22, 4, (100 + after_s) * S);
+            attention.heard("Okay, bye then.");
+            attention.first_output(22, Room::Quiet, false).unwrap()
+        };
+        assert_eq!(
+            reply(true, 15),
+            Verdict::Play(AFTER_NEWS),
+            "a reply in 20 s"
+        );
+        assert_ne!(reply(true, 25), Verdict::Play(AFTER_NEWS), "past 20 s");
+        assert_ne!(
+            reply(true, 173),
+            Verdict::Play(AFTER_NEWS),
+            "the 19:03:36 goodbye"
+        );
+        assert_eq!(
+            reply(false, 173),
+            Verdict::Play(AFTER_NEWS),
+            "off: 3 min as before"
+        );
+        assert_eq!(super::ONE_REPLY_WINDOW_US, 20 * S);
+    }
+
+    /// `LAMP_ONE_REPLY_WINDOW`: a line about the lamp's work opens no window
+    /// of its own; past the reply's 20 s it is "Hey Lamp", as any line is.
+    /// Off, "How is that task going?" 46.8 s after a task began is let out as
+    /// before (#1378).
+    #[test]
+    fn with_one_reply_window_a_line_about_its_work_opens_no_window_of_its_own() {
+        const S: u64 = 1_000_000;
+        let asked = |on: bool| {
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.one_reply_window(on);
+            attention.worked(100 * S);
+            attention.began_at(22, 4, 100 * S + 46_800_000);
+            attention.heard("How is that task going?");
+            attention.first_output(22, Room::Quiet, false).unwrap()
+        };
+        assert_ne!(asked(true), Verdict::Play(ABOUT_ITS_WORK));
+        assert_eq!(
+            asked(false),
+            Verdict::Play(ABOUT_ITS_WORK),
+            "off: as before"
+        );
+    }
+
     #[test]
     fn a_line_said_to_me_held_is_no_reply_to_the_news_with_the_switch() {
         const S: u64 = 1_000_000;
