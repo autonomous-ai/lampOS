@@ -379,6 +379,18 @@ with the device closed before the wait returns, so the next cycle's ring
 worker is again the only writer. If the device cannot be opened it says so
 once in the journal and the ring stays dark, as before.
 
+**The person's light off (#8634).** The app's "Keep a light on while
+resting" switch is the person's own light being on. With it off, no asleep
+face is started, for a mute, a closed privacy switch or a hand's sleep, so
+every light stays off while the lamp sleeps (the Controls route's privacy
+slide still paints its own indication); the reminder pulse and the
+restart guard's sign, which are drawn on that face, don't show either. Off
+is read when the wait begins: the ring's last `light/state`, else the light
+last asked for on the bus, else the one kept on disk (`LAMP_LIGHT_KEEP=on`,
+on in the product), so a restart keeps the choice. Never set: the face as
+before. A tap on the head of a muted lamp still answers with the face for a
+second.
+
 **A reminder owed while it waits (#1545, `LAMP_REMINDER_PULSE=on`).** While
 a reminder is owed and the wait is the privacy switch's or the person's mute
 (`Waiting::pulses`: not the restart guard or a switch that can't be read;
