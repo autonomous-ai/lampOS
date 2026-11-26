@@ -2556,6 +2556,20 @@ pub fn repair_brief(request: &str, lines: &str) -> Result<String, &'static str> 
     ))
 }
 
+/// The check's refusal in a repair `brief` ([`repair_brief`]), whole and
+/// first, for the top of the agent's rules (M5 on lamp-ee17, #8651: a draft
+/// refused three times as speaking on its own was never changed, as the
+/// agent read rules.md's last line and the request, and the refusal sat in
+/// the middle). `None` for a first brief.
+pub fn repair_lead(brief: &str) -> Option<String> {
+    let (_, after) = brief.split_once(REPAIR_MARK)?;
+    let (lines, _) = after.split_once(REPAIR_ASK)?;
+    Some(format!(
+        "FIX THIS FIRST. {REPAIR_MARK}{lines}{}",
+        REPAIR_ASK.trim_end()
+    ))
+}
+
 /// Why a made skill is not kept, in the lamp's words for the journal (the
 /// person hears [`plain_reason`]'s, or the model's own `cannot:`
 /// sentence); and when the lamp's check refused it, the check's lines for
@@ -11605,13 +11619,13 @@ pub const TOLD_ONLY_TRY: &str = "That one would speak on its own; I can only kee
 
 /// What a repair is told of a skill refused as [`SPEAKS_ON_ITS_OWN`], as
 /// the try's failure: the told answer's form.
-pub const TOLD_ONLY_REPAIR: &str = "When the lamp tried the skill once, it would speak on its \
-     own: a skill a time, an event or a repeat starts (any [trigger] but a touch or a press) \
-     tells the person only through the lamp's told answer, said when they are there. Make its \
-     [[do]] a task step (task = { task, run }), never a run step; take speak and speaker out of \
-     its grants; have its scripts print what they found and never call lamp.say, lamp.sound, \
-     the speaker or control.sock; and end the agent's answer with the short spoken summary, \
-     never a dash.";
+pub const TOLD_ONLY_REPAIR: &str = "Not kept: a skill a time, an event or a repeat starts (any \
+     [trigger] but a touch or a press) may not have a run step or speak itself; the lamp refused \
+     its shape and never ran it. Change the run step to a task step (task = { task, run }) whose \
+     script prints the answer; the lamp tells it when the person is there. Also take speak and \
+     speaker out of its grants; have its scripts print what they found and never call lamp.say, \
+     lamp.sound, the speaker or control.sock; and end the agent's answer with the short spoken \
+     summary, never a dash.";
 
 /// What a repair is told of a skill refused as [`SPEAKS_ON_ITS_OWN`] for
 /// a fixed say whose words hold a number or a date ([`says_what_changes`];

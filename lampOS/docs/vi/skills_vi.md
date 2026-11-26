@@ -4164,7 +4164,16 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   Lời từ chối đến người viết trước, như thất bại của lần
   chạy thử (`made_skill::TOLD_ONLY_REPAIR`: một bước `task`, không `speak`,
   script in ra, câu trả lời của agent là phần tóm tắt nói ra), nên một lần
-  sửa định hình lại nó và không có gì được nói. Chỉ khi việc tạo kết thúc
+  sửa định hình lại nó và không có gì được nói. Nó bắt đầu bằng "Not kept:"
+  và gọi tên hình dạng bị từ chối (một bước run, hay tự nói) và cách đổi
+  (một bước task có script in ra câu trả lời), không bao giờ nói "when the
+  lamp tried" nó, vì nó chưa từng được chạy. Rules của một lần sửa cho
+  agent của đèn bắt đầu bằng nguyên lời từ chối của phép kiểm, "FIX THIS
+  FIRST." rồi đến brief như trước (`make_skill_agent::rules_of`,
+  `made_skill::repair_lead`; M5 trên lamp-ee17, #8651: agent chỉ đọc dòng
+  cuối của rules.md và yêu cầu, nên lời từ chối ở giữa không bao giờ được
+  đọc, và cùng một bước run bị từ chối ba lần). Test
+  `a_repairs_rules_begin_with_the_checks_refusal`. Chỉ khi việc tạo kết thúc
   mà không giữ được kỹ năng nào, người dùng mới nghe
   `made_skill::TOLD_ONLY_TRY`, một lần (`plain_reason`, một dòng của #8454,
   lời từ chối trước được giữ của #8612): "That one would speak on its own;
