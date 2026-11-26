@@ -105,3 +105,49 @@ fn a_control_socket_full_past_the_bound_ends_the_voice_as_before() {
         .expect_err("a socket full past the bound ends the voice");
     assert_eq!(error.kind(), io::ErrorKind::WouldBlock);
 }
+
+/// The Reviewer-lead's P2 on #8687: the link's check asked before a ring
+/// on a full control socket (the worker stuck in a slow call, as in an
+/// outage) never ends the voice. It is left unasked, and asked once room
+/// frees.
+#[test]
+fn a_link_check_on_a_full_control_socket_waits_for_room_and_is_asked_once() {
+    let directory = SessionDirectory::create().unwrap();
+    let (mut rig, mut peers, mut second) = second_only(&directory);
+    let (mut controller, _, _) = super::tests::active_reply();
+    fill(&mut rig, &mut controller);
+    let key = (4, 1);
+    let mut asked = None;
+    let full = ask_link_check(&mut rig.provider, key, &mut asked)
+        .expect("a full control socket is no exit");
+    assert!(!full && asked.is_none(), "not asked yet");
+    for peer in [
+        &mut second,
+        &mut peers.speaker,
+        &mut peers.capture,
+        &mut peers.privacy,
+    ] {
+        read_backlog(peer);
+    }
+    assert!(ask_link_check(&mut rig.provider, key, &mut asked).unwrap());
+    assert_eq!(asked, Some(key));
+    assert!(matches!(
+        second.control.receive().unwrap(),
+        Some(Control::CheckLink)
+    ));
+    assert!(second.control.receive().unwrap().is_none(), "asked once");
+    rig.running().unwrap();
+}
+
+/// A peer gone still ends the voice, as for every other send.
+#[test]
+fn a_link_check_on_a_closed_control_socket_still_ends_the_voice() {
+    let directory = SessionDirectory::create().unwrap();
+    let (mut rig, _peers, second) = second_only(&directory);
+    drop(second);
+    let mut asked = None;
+    let error = ask_link_check(&mut rig.provider, (4, 1), &mut asked)
+        .expect_err("a peer gone is no full socket");
+    assert_ne!(error.kind(), io::ErrorKind::WouldBlock);
+    assert!(asked.is_none());
+}

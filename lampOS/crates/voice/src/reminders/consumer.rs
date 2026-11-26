@@ -37,6 +37,12 @@ const REARM_US: u64 = 60_000_000;
 const REQUEST_BUDGET: Duration = Duration::from_millis(250);
 const PACE_US: u64 = 5_000_000;
 const QUEUE: usize = 4;
+/// With `LAMP_OFFLINE_RINGS=on` (#8632), how often a walk of the store for
+/// the soonest ring not yet due begins, at most: once a second, so it costs
+/// the tick's budget one Schedule call a second, not one every tick (the
+/// Reviewer-lead's P3 on #8687). A walk of more than one page goes on a
+/// page a tick. For the owner's table.
+const UPCOMING_WALK_EVERY_US: u64 = 1_000_000;
 /// What of a tick's budget joining late ones leaves the offer (29e7).
 const JOIN_SPARE: Duration = Duration::from_millis(100);
 
@@ -307,6 +313,9 @@ struct UpcomingWalk {
     soonest: Option<(super::Upcoming, i64)>,
     told: Option<Option<(u64, u64, i64)>>,
     owed: Option<Option<super::Upcoming>>,
+    /// When the last walk ended: the next begins
+    /// [`UPCOMING_WALK_EVERY_US`] after it.
+    ended_at: Option<u64>,
 }
 impl<P: Persistence> Consumer<P> {
     fn new(ledger: DeliveryLedger<P>, session: String) -> Self {
@@ -340,6 +349,14 @@ impl<P: Persistence> Consumer<P> {
         let Some(walk) = &mut self.upcoming else {
             return;
         };
+        // A new walk at most once a second (the Reviewer-lead's P3).
+        if walk.cursor == 0
+            && walk
+                .ended_at
+                .is_some_and(|at| now.saturating_sub(at) < UPCOMING_WALK_EVERY_US)
+        {
+            return;
+        }
         let request = Request::List {
             after_id: walk.cursor,
             limit: 8,
@@ -385,6 +402,7 @@ impl<P: Persistence> Consumer<P> {
             Some(next) if next > walk.cursor => walk.cursor = next,
             _ => {
                 walk.cursor = 0;
+                walk.ended_at = Some(now);
                 let found = walk.soonest.take();
                 let key = found.map(|(soonest, at)| (soonest.id, soonest.delivery, at));
                 if walk.told != Some(key) {

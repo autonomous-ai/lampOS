@@ -2542,6 +2542,27 @@ fn send_authority(worker: &mut Worker, snapshot: Snapshot) -> io::Result<()> {
     }
 }
 
+/// Asks `worker` once for its link's check before the ring `key`
+/// (`LAMP_OFFLINE_RINGS`, #8632): true when sent, and `asked` is then
+/// `key`. A full control socket (`WouldBlock`, the worker's one thread
+/// waiting on a slow call, #8204, as in an outage) is no error: false,
+/// `asked` left as it was, so the next pass asks again (the Reviewer-lead's
+/// P2 on #8687). Any other error is returned, as for every other send.
+fn ask_link_check(
+    worker: &mut Worker,
+    key: (u64, u64),
+    asked: &mut Option<(u64, u64)>,
+) -> io::Result<bool> {
+    match worker.channels.control.send(Control::CheckLink) {
+        Ok(()) => {
+            *asked = Some(key);
+            Ok(true)
+        }
+        Err(error) if error.kind() == io::ErrorKind::WouldBlock => Ok(false),
+        Err(error) => Err(error),
+    }
+}
+
 /// A worker's refused authority send, as the session ends on it. On the
 /// Controls route a privacy worker that ended cleanly is its switch
 /// unreadable, as at its start (`privacy_started`): the microphones stay
@@ -13819,9 +13840,8 @@ fn conversation_with_gate_inner(
                 Some((&key, soonest.due_at_us)),
                 link_check_asked.as_ref(),
                 reminder_now_us,
-            ) {
-                rig.provider.channels.control.send(Control::CheckLink)?;
-                link_check_asked = Some(key);
+            ) && ask_link_check(&mut rig.provider, key, &mut link_check_asked)?
+            {
                 eprintln!(
                     "lamp-voice: a ring is due within 10 s: the link is checked once (LAMP_OFFLINE_RINGS)"
                 );
