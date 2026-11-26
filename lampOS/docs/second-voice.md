@@ -6194,7 +6194,12 @@ after a take-over, but now for every turn:
     `?` (`LONE_WORDS`, `lone_words_held`): in the conversation's 20 s every
     line carries. On lamp-74ff on 26 Nov, in a doubling game, the lamp's
     "Twenty-four. Your turn." asked nothing by its `?`, so the owner's
-    "Sixty four." was held as stray words. The cost: a mishearing of one or
+    "Sixty four." was held as stray words. A checked short sound with a word in
+    it, in a conversation going on, is judged as a line too, the lamp's last
+    words a question or not (`Engine::carrying_short_sounds_in_conversation`,
+    its own hook, so an empty answer is asked again only after the lamp's
+    question, as before): a played "Two." after "Ready when you are!" was
+    held as a short sound, and each held number let the 20 s lapse. The cost: a mishearing of one or
     two words in the window is answered (#1712's "Surprise"). Journal at
     start: `in a conversation a reply of a word or two carries`. Test:
     `with_short_replies_carry_a_word_or_two_in_the_conversation_is_not_held`.
