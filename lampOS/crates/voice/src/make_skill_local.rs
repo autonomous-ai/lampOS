@@ -544,7 +544,7 @@ fn system_net(reads: bool, agent: bool, net: bool) -> String {
          {own}or {may_also}, on one of the triggers below. {more} {blink} To speak, a skill has speak = \
          true in [permissions], {cooldown}, and one [[do]] step say = {{ text = \
          \"Welcome back!\" }}: the exact words, at most 300 characters, no quotes, in the \
-         language the person asked in, said as written. Its one sound is a soft hum: a [[do]] \
+         language the person asked in, said as written. {CHANGING_LINE} Its one sound is a soft hum: a [[do]] \
          step cue = \"hum\", paced as a say, in place of a say; it has no other sound and no \
          sound file. When it runs is one \
          [trigger] table (never [[trigger]]; coming to the desk is room/presence, never the \
@@ -605,7 +605,15 @@ fn code_rules() -> String {
 /// "knowing facts about apples on my own" answered `cannot:`), with
 /// [`made_skill::NOTES_ENVIRONMENT`] on.
 const KNOWN_NOW: &str = "What you know now (facts, a poem, a joke, a list) is no lookup: write it \
-                         into the say or the code yourself, as fixed text, never cannot for that.";
+                         into the say or the code yourself, as fixed text, never cannot for that. \
+                         A count, a date or a price that changes is no fixed text.";
+
+/// #8651 (the first builder's call after leg M: "ninety nine days left in
+/// the year" written into a 6 AM say, wrong from the next day): what the
+/// brief says of a line that changes, as `made_skill::told_only` refuses it.
+const CHANGING_LINE: &str = "A say's words are fixed forever: a line that changes (a count, a \
+     date, a price) is never a say in a skill a time, an event or a repeat starts, but a task \
+     step whose script prints it, its answer told.";
 
 /// The end of the cannot rule with notes on (#7245): a note or code is a
 /// step too.
@@ -8199,6 +8207,18 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         );
         assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #8651 (leg M: "ninety nine days left in the year" written into a
+    /// 6 AM say): every brief, the lamp's own model's and the agent's, says
+    /// a line that changes is a task step that prints it, never a fixed say.
+    #[test]
+    fn the_brief_says_a_line_that_changes_is_never_a_fixed_say() {
+        for (reads, agent) in [(false, false), (true, false), (false, true), (true, true)] {
+            let system = system_for(reads, agent);
+            assert!(system.contains(CHANGING_LINE), "{reads} {agent}");
+        }
+        assert!(CHANGING_LINE.contains("task step whose script prints it"));
     }
 
     /// The owner, 10 Nov: "re-run it yourself until it works". A skill the

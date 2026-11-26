@@ -86,7 +86,12 @@ and code that says its own line, are only for a skill the person's own
 words start, or one only a hand on the lamp starts: every trigger on
 `controls/touch`, `controls/pet` or `controls/gesture` (a touch, a pat, a
 button press), the person at the lamp asking, whom the told answer would
-answer a minute late (#8651). A pet or a bump starts such a skill too. Fixed `say` and `remind` steps are as before.
+answer a minute late (#8651). A pet or a bump starts such a skill too.
+In a told-only skill, a fixed `say` whose words hold a number or a date (a
+digit, an English number word, a weekday or a month) is refused too: this
+answer changes, so compute it when the skill runs, a task step whose
+script prints it (#8651; a constant line like "Time to stretch!" stays a
+`say`, as do `remind` steps; [skills.md](skills.md) has the word list). Fixed `say` and `remind` steps are as before.
 
 Other front-matter lines and the body are for people.
 

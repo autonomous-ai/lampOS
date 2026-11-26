@@ -11613,6 +11613,131 @@ pub const TOLD_ONLY_REPAIR: &str = "When the lamp tried the skill once, it would
      the speaker or control.sock; and end the agent's answer with the short spoken summary, \
      never a dash.";
 
+/// What a repair is told of a skill refused as [`SPEAKS_ON_ITS_OWN`] for
+/// a fixed say whose words hold a number or a date ([`says_what_changes`];
+/// the first builder's call on #8651 after leg M: "ninety nine days left in
+/// the year", worked out at the make, wrong from the next day).
+pub const CHANGING_SAY_REPAIR: &str = "Not kept: its say step's words hold a number or a date, and \
+     a time, an event or a repeat starts it, so it would say the same number on another day. This \
+     answer changes, so compute it when the skill runs: a task step whose script prints it. Make \
+     its [[do]] a task step (task = { task, run }) in place of the say; have its script work out \
+     the line and print it; take speak and speaker out of its grants; and end the agent's answer \
+     with that line, which the lamp tells. A line that never changes (\"Time to stretch!\") stays \
+     a fixed say.";
+
+/// The words that make a fixed say's line one that changes
+/// ([`says_what_changes`]): English number words, zero to ninety-nine, a
+/// hundred and a thousand, the ordinals of a month's days (twenty-first is
+/// twenty and first), and the weekdays and months.
+const CHANGING_WORDS: [&str; 68] = [
+    "zero",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+    "twenty",
+    "thirty",
+    "forty",
+    "fifty",
+    "sixty",
+    "seventy",
+    "eighty",
+    "ninety",
+    "hundred",
+    "thousand",
+    "first",
+    "second",
+    "third",
+    "fourth",
+    "fifth",
+    "sixth",
+    "seventh",
+    "eighth",
+    "ninth",
+    "tenth",
+    "eleventh",
+    "twelfth",
+    "thirteenth",
+    "fourteenth",
+    "fifteenth",
+    "sixteenth",
+    "seventeenth",
+    "eighteenth",
+    "nineteenth",
+    "twentieth",
+    "thirtieth",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+    "january",
+    "february",
+    "april",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
+];
+
+/// The months that are also plain words ("you may", "a march"): a month
+/// only when capitalised.
+const CAPITAL_MONTHS: [&str; 2] = ["May", "March"];
+
+/// Whether a `say` step's own words (`say = "a note"`, or `{ text }` or
+/// `{ note }`, one line or a list) hold a number or a date: a digit, or a
+/// whole word of [`CHANGING_WORDS`] (any case) or [`CAPITAL_MONTHS`].
+/// Words are split at anything but a letter or a digit, so `ninety-nine`
+/// and `ninety_nine` (an underscore stands for a space) count too. A
+/// `{ from }` say's words are the voice's own, never fixed here.
+fn says_what_changes(say: &toml::Value) -> bool {
+    fn lines_of(value: &toml::Value) -> Vec<&str> {
+        match value {
+            toml::Value::String(line) => vec![line.as_str()],
+            toml::Value::Array(each) => each.iter().filter_map(toml::Value::as_str).collect(),
+            _ => Vec::new(),
+        }
+    }
+    let lines: Vec<&str> = match say {
+        toml::Value::Table(say) => ["text", "note"]
+            .iter()
+            .filter_map(|key| say.get(*key))
+            .flat_map(lines_of)
+            .collect(),
+        say => lines_of(say),
+    };
+    lines.iter().any(|line| {
+        line.chars().any(|c| c.is_ascii_digit())
+            || line
+                .split(|c: char| !c.is_alphanumeric())
+                .filter(|word| !word.is_empty())
+                .any(|word| {
+                    CHANGING_WORDS.contains(&word.to_lowercase().as_str())
+                        || CAPITAL_MONTHS.contains(&word)
+                })
+    })
+}
+
 /// The topics a hand on the lamp says (#8651): a touch on the pads or the
 /// strip (`controls/touch`), a pat on the head (`controls/pet`), and a tap,
 /// a pet or a long press of the button, the base or a head pad
@@ -11650,9 +11775,11 @@ const SPEAKING_GRANTS: [&str; 2] = ["speak", "speaker"];
 /// ([`SPEAKS_ON_ITS_OWN`], [`TOLD_ONLY_REPAIR`]) when such a skill has a
 /// `run` step (which succeeds only by speaking) or a code step whose
 /// `grants` name `speak` or `speaker` (lamp-control's grants for every op
-/// that sounds, so the rule holds at each run too). A skill only the
-/// person's words start, and fixed `say` and `remind` steps, are as before.
-/// So is a skill only a hand on the lamp starts ([`HAND_TOPICS`], the first
+/// that sounds, so the rule holds at each run too), or a fixed `say` step
+/// whose words hold a number or a date (#8651, [`CHANGING_SAY_REPAIR`]):
+/// worked out at the make, it would be wrong the next day. A skill only
+/// the person's words start, a constant `say` and `remind` steps are as
+/// before. So is a skill only a hand on the lamp starts ([`HAND_TOPICS`], the first
 /// builder's ruling on #8651): every one of its triggers is a touch, a pat
 /// or a press, the person at the lamp asking, whom the told answer's quiet
 /// minute would answer a minute late.
@@ -11666,14 +11793,22 @@ fn told_only(toml: &str) -> Result<(), Refused> {
         "lamp-voice: a made skill was not kept: a trigger starts it and its code would speak \
          on its own ({how})"
     );
-    Err(Refused(
-        SPEAKS_ON_ITS_OWN.into(),
-        Some(TOLD_ONLY_REPAIR.into()),
-    ))
+    let repair = if how == A_CHANGING_SAY {
+        CHANGING_SAY_REPAIR
+    } else {
+        TOLD_ONLY_REPAIR
+    };
+    Err(Refused(SPEAKS_ON_ITS_OWN.into(), Some(repair.into())))
 }
 
-/// Why [`told_only`] refuses `toml`, for its journal line: `"a run step"`
-/// or `"a speaking grant"`; `None` when it is kept.
+/// [`speaks_on_its_own`]'s name for a fixed say whose words change.
+const A_CHANGING_SAY: &str = "a say with a number or a date";
+
+/// Why [`told_only`] refuses `toml`, for its journal line: `"a run step"`,
+/// `"a speaking grant"` or [`A_CHANGING_SAY`] (a fixed `say` step whose
+/// words hold a number or a date, [`says_what_changes`], #8651); `None`
+/// when it is kept. A `remind` step's words are the person's reminder and
+/// stay as they are.
 fn speaks_on_its_own(toml: &str) -> Option<&'static str> {
     // A skill.toml that doesn't parse is let through here only because the
     // pack refuses it later (`lamp-skills pack`), before any try or keep.
@@ -11705,6 +11840,11 @@ fn speaks_on_its_own(toml: &str) -> Option<&'static str> {
         Some("a run step")
     } else if tasks && speaking {
         Some("a speaking grant")
+    } else if steps
+        .iter()
+        .any(|step| step.get("say").is_some_and(says_what_changes))
+    {
+        Some(A_CHANGING_SAY)
     } else {
         None
     }
@@ -20202,6 +20342,59 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             );
             assert_eq!(speaks_on_its_own(&task), Some("a speaking grant"), "{task}");
         }
+    }
+
+    /// The first builder's call on #8651 after leg M: a fixed say whose
+    /// words hold a number or a date, in a skill a time starts, is refused
+    /// for a task step that works it out at each run; a constant line, the
+    /// same line asked aloud, a touch's and a reminder's words are kept.
+    #[test]
+    fn a_timed_fixed_say_with_a_number_or_a_date_is_refused_and_a_constant_one_kept() {
+        let timed = "\n[permissions]\nspeak = true\ntopics = [\"clock/local\"]\n\n[trigger]\n\
+            topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
+            during = { from = \"06:00\", to = \"06:01\" }\n";
+        let say = |words: &str| format!("[[do]]\nsay = {{ text = \"{words}\" }}\n");
+        let count = say("There are ninety nine days left in the year");
+        for refused in [
+            count.clone(),
+            say("there_are_ninety_nine_days_left_in_the_year"),
+            say("99 days to go."),
+            say("Happy Monday!"),
+            say("It's the first of May."),
+            "[[do]]\nsay = \"Tell them it's the twenty-first.\"\n".into(),
+            "[[do]]\nsay = { text = [\"Hi.\", \"Only three left.\"] }\n".into(),
+        ] {
+            let toml = format!("{refused}{timed}");
+            let refusal = told_only(&toml).unwrap_err();
+            assert_eq!(refusal.0, SPEAKS_ON_ITS_OWN, "{toml}");
+            assert_eq!(refusal.1.as_deref(), Some(CHANGING_SAY_REPAIR));
+            assert_eq!(speaks_on_its_own(&toml), Some(A_CHANGING_SAY));
+        }
+        assert!(CHANGING_SAY_REPAIR.contains(
+            "This answer changes, so compute it when the skill runs: a task step whose \
+                 script prints it."
+        ));
+        assert!(CHANGING_SAY_REPAIR.len() <= MOST_REPAIR_BYTES);
+        for kept in [
+            say("Time to stretch!"),
+            say("Drink some water."),
+            say("You may want a break."),
+        ] {
+            let toml = format!("{kept}{timed}");
+            assert_eq!(told_only(&toml), Ok(()), "{toml}");
+        }
+        // Asked aloud, with no trigger: worked out when asked, it's kept.
+        assert_eq!(
+            told_only(&format!("asks = [\"year count\"]\n{count}")),
+            Ok(())
+        );
+        // A touch starts it: the person at the lamp, kept.
+        let touch = "\n[trigger]\ntopic = \"controls/touch\"\nfield = \"enabled\"\n\
+            equals = true\n";
+        assert_eq!(told_only(&format!("{count}{touch}")), Ok(()));
+        // A reminder's words are the person's, as before.
+        let remind = "[[do]]\nremind = { in = \"10m\", words = \"Take the 5 pm call\" }\n";
+        assert_eq!(told_only(&format!("{remind}{timed}")), Ok(()));
     }
 
     /// The script lamp-9adf's model wrote (#6749 E, 13 Nov): `for` is a
