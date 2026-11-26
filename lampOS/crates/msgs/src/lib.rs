@@ -161,6 +161,10 @@ pub mod own_voice;
 /// keys helper, the voice and lamp-cloud's forwarder alike.
 pub mod own_model;
 
+/// Phonon, the voice that runs on the lamp (#8754, `docs/phonon.md`): its
+/// socket, the person's choice, the pinned model and voices, and the framing.
+pub mod phonon;
+
 /// The local agent's user, group, socket folder and drop-in text (the owner's
 /// switch, `docs/control.md`).
 pub mod local_agent;
