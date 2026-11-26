@@ -685,8 +685,9 @@ fn drain_authority(
 /// the voice's event publishes on top,
 /// 4 × (`DENIED_LAPSE_MOST_US` + `MAX_AUTHORITY_LEASE_US`) /
 /// [`crate::coordinator::AUTHORITY_RENEW_US`] = 4 × 1.75 s / 20 ms = 352.
-/// Awaiting the owner's call: with no bound (option A′) the drain reads to
-/// empty however long, and this and its check go.
+/// A named backstop: unreachable while the control socket holds about 118
+/// authorities (117-119 on the Mac, 64 KiB), since past that the voice skips
+/// renewals (#8204).
 pub(crate) const AUTHORITY_DRAIN_MOST: usize = 352;
 
 /// The longest a lapsed Denied-only authority is ridden (#4332): capture's
