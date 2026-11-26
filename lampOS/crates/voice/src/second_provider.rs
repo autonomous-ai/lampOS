@@ -1963,6 +1963,15 @@ pub enum Did {
     /// lamp was saying was stopped, and a conversation carried for the one
     /// it answered is over (`LAMP_SAME_SPEAKER_CARRIES`).
     Stopped,
+    /// The lamp's answer was cut at this time, by a line that cut it or by
+    /// a stop (its Start's `heard_of_cut` or `after_stop`): its words end
+    /// here. Each [`Did::Said`] is the end of all the audio sent so far,
+    /// and an answer is sent ahead of its playing, so without this a cut
+    /// answer's words count until its whole sent audio would have played.
+    /// On lamp-74ff on 27 Nov at 00:25, a 125-word answer was cut after
+    /// 10.8 s of it, and a line in two people's talk about 30 s after the
+    /// cut was taken as the conversation going on.
+    Cut(u64),
 }
 /// Where the engine says what the lamp did.
 pub type LampDid = Arc<dyn Fn(Did) + Send + Sync>;
@@ -8626,6 +8635,15 @@ impl Engine {
                     if let Some(did) = &self.shared.did {
                         did(Did::Stopped);
                     }
+                }
+                // A line that cut the lamp's answer, or the first after a stop
+                // that cut it: the lamp's words end now, not where the audio
+                // it had sent would have ended. Told before this line is
+                // judged.
+                if (heard_of_cut.is_some() || after_stop)
+                    && let Some(did) = &self.shared.did
+                {
+                    did(Did::Cut(monotonic_us()));
                 }
                 // The lamp's name said alone just before, its answer waiting
                 // for this line (`LAMP_SECOND_NAME_CARRIES`): begin dropped

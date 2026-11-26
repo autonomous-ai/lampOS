@@ -8509,7 +8509,7 @@ async fn the_lamps_work_and_its_own_turns_are_told_to_the_rule() {
             Did::Worked(_) => "worked",
             Did::Spoke(_) => "spoke",
             // The words' end, told with each packet: tested on its own.
-            Did::Said(..) | Did::Declined(_) | Did::Stopped => return,
+            Did::Said(..) | Did::Declined(_) | Did::Stopped | Did::Cut(_) => return,
         })
     }));
     for request in 1..=2 {
@@ -8577,6 +8577,72 @@ async fn the_first_line_after_a_stop_tells_the_rule_of_it() {
         turn(&mut engine).await;
     }
     assert_eq!(*stops.lock().unwrap(), [1]);
+}
+
+/// [`Did::Cut`]: the first line after a stop, and a line that cut the lamp's
+/// answer, tell the rule the lamp's words end now, before the line is
+/// judged; a line that cut nothing tells none.
+#[tokio::test]
+async fn a_line_that_cut_the_lamp_or_followed_a_stop_tells_the_rule_its_words_ended() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Sure.".to_owned()),
+                Ok("And then?".to_owned()),
+                Ok("Wait, what?".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![text("Okay."), Ok(ChatEvent::Done)],
+                vec![text("Then this."), Ok(ChatEvent::Done)],
+                vec![text("This, then."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let cuts: Arc<Mutex<Vec<usize>>> = Arc::default();
+    let seen = cuts.clone();
+    let lines = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let begun = lines.clone();
+    let mut engine = engine.telling_what_it_did(Arc::new(move |did| {
+        if let Did::Cut(at_us) = did {
+            assert!(at_us > 0);
+            seen.lock()
+                .unwrap()
+                .push(begun.load(std::sync::atomic::Ordering::Relaxed));
+        }
+    }));
+    let cut = crate::said_as_heard::HeardOfCut {
+        request: 1,
+        samples: 24_000,
+    };
+    for (request, after_stop, heard_of_cut) in
+        [(1, true, None), (2, false, None), (3, false, Some(cut))]
+    {
+        lines.store(request as usize, std::sync::atomic::Ordering::Relaxed);
+        engine.submit(ProviderInput::Start {
+            request,
+            session: 1,
+            privacy_generation: 1,
+            continues: false,
+            continues_cut_off: false,
+            over_the_lamp: false,
+            after_stop,
+            follows_on: false,
+            over_the_lamps_voice: heard_of_cut.is_some(),
+            heard_of_cut,
+            soft_lead_us: 0,
+            language: None,
+        });
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        turn(&mut engine).await;
+    }
+    assert_eq!(*cuts.lock().unwrap(), [1, 3]);
 }
 
 /// #1712, the first builder at 19:21: the engine tells when the lamp's
