@@ -3651,10 +3651,11 @@ fn tool_call(
         .iter()
         .find(|skill| skill.tool.as_deref() == Some(name.as_str()))
         .map(|skill| (skill.name.clone(), engine.tool_ran_at(&skill.name)));
+    let called_us = clock::now_us();
     let mut run = match engine.tool_with_requested_audio(
         &name,
         &args,
-        clock::now_us(),
+        called_us,
         spoken && requested_audio::from_environment(),
     ) {
         Ok(run) => run,
@@ -3682,6 +3683,7 @@ fn tool_call(
         if !admission.commit() {
             return;
         }
+        engine.tool_ran(&run.skill, called_us);
         let offered = audio
             .lock()
             .unwrap()
@@ -3825,6 +3827,9 @@ fn tool_call(
     if !admission.commit() {
         return;
     }
+    // Only now is it a run: refused above (the body down, no gaze, a task
+    // not handed over), its `[again]` while never began (#8640).
+    engine.tool_ran(&run.skill, called_us);
     if let Some((skill, looked)) = counted {
         runner.looks.borrow_mut().insert(skill, looked + 1);
     }
