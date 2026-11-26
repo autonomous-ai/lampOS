@@ -2178,7 +2178,12 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     named to the person (#7930, the owner): its read-back, `where` and
     hand-over say "the lamp", its news says "the lamp" and adds "Never tell
     the person which agent runs their work; say what is being done or what
-    was found." (`NO_AGENT_NAME`); an engine the person named is said back
+    was found." (`NO_AGENT_NAME`, strict, with no exception); the
+    hand-over's description, told every turn, says it with one exception:
+    "Never tell the person which agent runs their work, unless they ask
+    which agent the lamp uses: then lamp_help's agent topic says it; say
+    what is being done or what was found." (`NO_AGENT_NAME_UNLESS_ASKED`,
+    #8729, [skills.md](skills.md), the FAQ's agent topic); an engine the person named is said back
     as named, and the task's words and the agent's answer are never changed
     (`the_lamps_own_engine_is_never_named_in_its_news`). Its hand-over is
     said in the first person ("Sure, I'll work on that.", a question "Sure,

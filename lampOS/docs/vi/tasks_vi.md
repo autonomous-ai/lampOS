@@ -3751,7 +3751,12 @@ không thêm gì vào prompt của lượt ngoài một dòng việc-còn-mở b
   Engine riêng của đèn không bao giờ được nói tên với người dùng (#7930,
   chủ đèn): lời đọc lại, `where` và lời giao việc nói "the lamp", tin báo
   nói "the lamp" và thêm "Never tell the person which agent runs their
-  work; say what is being done or what was found." (`NO_AGENT_NAME`); một
+  work; say what is being done or what was found." (`NO_AGENT_NAME`, nghiêm
+  ngặt, không ngoại lệ); mô tả của lệnh giao việc, được báo mỗi lượt, nói
+  điều đó với một ngoại lệ: "Never tell the person which agent runs their
+  work, unless they ask which agent the lamp uses: then lamp_help's agent
+  topic says it; say what is being done or what was found."
+  (`NO_AGENT_NAME_UNLESS_ASKED`, #8729, chủ đề agent của FAQ); một
   engine do người dùng tự nêu thì được nói lại đúng tên, còn lời của việc
   và câu trả lời của agent không bao giờ bị đổi
   (`the_lamps_own_engine_is_never_named_in_its_news`). Lời giao việc của nó
