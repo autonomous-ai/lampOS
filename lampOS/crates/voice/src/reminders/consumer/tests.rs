@@ -2717,3 +2717,132 @@ fn a_generic_ring_stays_rung_not_told_and_is_told_once_when_the_link_is_back() {
     let view = restarted.ledger.view(&told.token.key).unwrap().unwrap();
     assert!(view.completion.is_some(), "said once, to be acknowledged");
 }
+
+/// The Reviewer-lead's P2 on #8800: reminder A rung offline from the
+/// generic line is marked "rung, not told" and waits for the link, but it
+/// no longer holds up the rest: timer B, due in the same outage, rings on
+/// time, nothing is joined into A, and once the voice says the link is
+/// back, A is said in its words once.
+#[test]
+fn a_reminder_rung_not_told_never_holds_up_a_timer_due_in_the_same_outage() {
+    // A a reminder due 3 h after the store began, served half an hour late
+    // (said late);
+    // B a one-minute timer set in the outage, due a second ago.
+    const SERVED: u64 = 3 * 3_600_000 + 1_800_000;
+    let mut engine = Engine::open(Disk::default(), "Etc/UTC", &sample(0), STORE_ID).unwrap();
+    engine
+        .answer(
+            Request::Set {
+                person: None,
+                guard: guard(&engine, "set-pills"),
+                text: "Take your pills.".into(),
+                // 11:00, the store's clock being 08:00 at its start.
+                when: When::At {
+                    time: "11:00".into(),
+                    day: None,
+                    zone: None,
+                    fold: None,
+                },
+            },
+            &sample(0),
+        )
+        .unwrap();
+    engine.tick(&sample(SERVED - 61_000)).unwrap();
+    engine
+        .answer(
+            Request::Set {
+                person: None,
+                guard: guard(&engine, "set-tea"),
+                text: "Tea".into(),
+                when: When::After { seconds: 60 },
+            },
+            &sample(SERVED - 61_000),
+        )
+        .unwrap();
+    engine.tick(&sample(SERVED)).unwrap();
+    let engine = Arc::new(Mutex::new(engine));
+    let shared = engine.clone();
+    let socket = Socket::new(move |request| {
+        Some(
+            shared
+                .lock()
+                .unwrap()
+                .answer(request.clone(), &sample(SERVED))
+                .unwrap_or_else(|e| refusal(e.code, e.message)),
+        )
+    });
+    let mut consumer = consumer(Disk::default());
+    let tick = |consumer: &mut Consumer<Disk>| {
+        consumer.next_offer_us = 0;
+        let now = monotonic_us();
+        let report = engine
+            .lock()
+            .unwrap()
+            .due(&sample(SERVED), stamp(now, 1), true);
+        consumer.tick(&socket.path(), Some(&report), now).unwrap();
+    };
+    tick(&mut consumer);
+    let pills = take_offer(&mut consumer);
+    assert_eq!(pills.text, "Take your pills.");
+    assert!(!pills.timer, "a reminder");
+    assert!(pills.late_line());
+    assert!(pills.also.is_empty());
+    // Rung offline from the generic line, played whole: marked.
+    consumer
+        .command(
+            ToWorker::RungOffline {
+                token: pills.token.clone(),
+            },
+            monotonic_us(),
+        )
+        .unwrap();
+    assert!(matches!(
+        consumer.outgoing.pop_back(),
+        Some(FromWorker::Settled { .. })
+    ));
+    assert!(consumer.ledger.rung_untold(&pills.token.key));
+    // Still offline: the timer is offered next, alone, and rings.
+    tick(&mut consumer);
+    let tea = take_offer(&mut consumer);
+    assert_eq!(tea.text, "Tea", "the marked reminder held up the timer");
+    assert!(tea.timer && tea.also.is_empty() && !tea.rung_offline);
+    consumer
+        .command(
+            ToWorker::Complete {
+                token: tea.token.clone(),
+                proof: completion(&tea.token),
+            },
+            monotonic_us(),
+        )
+        .unwrap();
+    consumer.outgoing.clear();
+    // Offline still: the marked reminder is not offered again.
+    for _ in 0..8 {
+        tick(&mut consumer);
+        no_offer(&consumer);
+        consumer.outgoing.clear();
+    }
+    // The link back, as the voice sends it: said in its words, alone, once.
+    let link_back: ToWorker = serde_json::from_value(json!({"kind": "link_back"})).unwrap();
+    consumer.command(link_back, monotonic_us()).unwrap();
+    tick(&mut consumer);
+    let told = take_offer(&mut consumer);
+    assert_eq!(told.token.key, pills.token.key);
+    assert!(told.rung_offline && told.also.is_empty());
+    consumer
+        .command(
+            ToWorker::Complete {
+                token: told.token.clone(),
+                proof: completion(&told.token),
+            },
+            monotonic_us(),
+        )
+        .unwrap();
+    assert!(!consumer.ledger.rung_untold(&told.token.key));
+    consumer.outgoing.clear();
+    for _ in 0..8 {
+        tick(&mut consumer);
+        no_offer(&consumer);
+        consumer.outgoing.clear();
+    }
+}
