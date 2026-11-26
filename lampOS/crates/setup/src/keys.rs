@@ -10,7 +10,6 @@
 //! A key is in the request line, the check's header and its file, nowhere
 //! else: never a reply, an error or a journal line. [`Asked`]'s `Debug`
 //! hides it, and the check's error is said by its kind alone.
-use crate::serve::write_private;
 use serde_json::{Value, json};
 use std::{
     fmt, fs, io,
@@ -1038,17 +1037,73 @@ impl Check for HttpCheck {
     }
 }
 
-/// The folder of the person's keys, root's, 0700, each file 0600.
+/// The group that may read the folder (#8735): lamp-cloud's forwarder reads
+/// the person's model key there. lamp-cloud and the agent runtimes run as
+/// it, so they can read the person's key, as they can the relay key.
+pub const READER_GROUP: &str = "lampos";
+/// The folder's mode: root writes, [`READER_GROUP`] reads (#8735).
+pub const FOLDER_MODE: u32 = 0o750;
+/// Each kept file's mode (#8735).
+pub const FILE_MODE: u32 = 0o640;
+
+/// [`READER_GROUP`]'s gid from `/etc/group`, read at each write: `None` where
+/// there is no such group (a build machine), when the group stays root's.
+fn reader_gid() -> Option<u32> {
+    fs::read_to_string("/etc/group")
+        .ok()?
+        .lines()
+        .find_map(|line| {
+            let mut fields = line.split(':');
+            if fields.next() != Some(READER_GROUP) {
+                return None;
+            }
+            fields.nth(1)?.parse().ok()
+        })
+}
+
+/// `path` to root and [`READER_GROUP`], where the group is there.
+fn to_reader_group(path: &Path) -> io::Result<()> {
+    match reader_gid() {
+        Some(gid) => rustix::fs::chown(path, None, Some(rustix::fs::Gid::from_raw(gid)))
+            .map_err(io::Error::from),
+        None => Ok(()),
+    }
+}
+
+/// `bytes` written whole to `path` at [`FILE_MODE`], in [`READER_GROUP`]
+/// before it is renamed into place.
+fn write_kept(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let temporary = crate::serve::stage(path, bytes, FILE_MODE)?;
+    if let Err(why) = to_reader_group(&temporary) {
+        let _ = fs::remove_file(&temporary);
+        return Err(why);
+    }
+    crate::serve::put_in_place(&temporary, path)
+}
+
+/// The folder of the person's keys, root's and [`READER_GROUP`]'s, 0750,
+/// each file 0640 (#8735).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Store(pub PathBuf);
 
 impl Store {
+    /// The folder made, or brought to [`FOLDER_MODE`] with every file in it
+    /// at [`FILE_MODE`], a folder kept 0700 and 0600 before #8735 included.
     fn folder(&self) -> io::Result<()> {
         fs::DirBuilder::new()
             .recursive(true)
-            .mode(0o700)
+            .mode(FOLDER_MODE)
             .create(&self.0)?;
-        fs::set_permissions(&self.0, fs::Permissions::from_mode(0o700))
+        fs::set_permissions(&self.0, fs::Permissions::from_mode(FOLDER_MODE))?;
+        to_reader_group(&self.0)?;
+        for entry in fs::read_dir(&self.0)? {
+            let path = entry?.path();
+            if fs::symlink_metadata(&path)?.is_file() {
+                fs::set_permissions(&path, fs::Permissions::from_mode(FILE_MODE))?;
+                to_reader_group(&path)?;
+            }
+        }
+        Ok(())
     }
 
     /// Keep a key that worked, and DeepSeek's endpoint beside it: the old
@@ -1059,19 +1114,19 @@ impl Store {
         let service = given.service;
         if let (Some(url), Some(file)) = (&given.base_url, service.url_file()) {
             remove(&self.0.join(service.key_file()))?;
-            write_private(&self.0.join(file), format!("{url}\n").as_bytes())?;
+            write_kept(&self.0.join(file), format!("{url}\n").as_bytes())?;
         }
         if let Some(id) = &given.voice_id {
-            write_private(
+            write_kept(
                 &self.0.join(ELEVENLABS_VOICE_FILE),
                 format!("{id}\n").as_bytes(),
             )?;
         }
         // An OpenAI-compatible model's name, before its key (#8362).
         if let (Some(model), Some(file)) = (&given.model, service.model_file()) {
-            write_private(&self.0.join(file), format!("{model}\n").as_bytes())?;
+            write_kept(&self.0.join(file), format!("{model}\n").as_bytes())?;
         }
-        write_private(&self.0.join(service.key_file()), given.key.as_bytes())?;
+        write_kept(&self.0.join(service.key_file()), given.key.as_bytes())?;
         // One own model at a time (#8362): keeping one model service's key
         // takes the other's away, so the model in use is never a guess.
         if Service::MODELS.contains(&service) {
@@ -1101,7 +1156,7 @@ impl Store {
             Verdict::NotKept => return,
         };
         if self.0.is_dir() {
-            let _ = write_private(&self.0.join(service.checked_file()), code.as_bytes());
+            let _ = write_kept(&self.0.join(service.checked_file()), code.as_bytes());
         }
     }
 
