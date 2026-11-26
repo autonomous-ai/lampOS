@@ -1567,6 +1567,11 @@ pub(crate) struct Options {
     /// A request whose heard words name one of the staff is told so
     /// beside its sound ([`crate::staff_note`]). Only with the tasks part.
     pub(crate) staff_note: bool,
+    /// With `LAMP_NOTICING_BY_DEFAULT` on and seen activity declared
+    /// (#7767), seen activity's file: a heard line naming the looking is
+    /// told the desk noticing's state beside its sound, as on the second
+    /// route ([`crate::seen_yes::LiveState`]). `None`: nothing told.
+    pub(crate) desk_noticing: Option<std::path::PathBuf>,
     /// What the worker's sessions were given, against which a changed
     /// executive catalog is told apart (#1472). `None`: never renewed for it.
     pub(crate) catalog: Option<std::sync::Arc<crate::session_tools::Given>>,
@@ -1610,6 +1615,7 @@ impl Options {
             follows_run: false,
             wait_for_room: false,
             staff_note: false,
+            desk_noticing: None,
             spoken_to: false,
             voices: None,
             catalog: None,
@@ -1930,6 +1936,16 @@ pub async fn run_with_continuation(
     )?;
     // A line lost before any output may be sent once more (#705, Step B).
     provider.resend_lost_lines(files.resend_lost_line);
+    // The desk noticing's state told beside a heard line naming the
+    // looking, as the second route tells it (#7767).
+    let desk_noticing = (files.tools.seen_activity
+        && lamp_msgs::consent::noticing_by_default())
+    .then(|| {
+        eprintln!(
+            "lamp-voice provider: a heard line naming the looking is told the desk noticing's state, read then (LAMP_NOTICING_BY_DEFAULT)"
+        );
+        crate::seen_yes::path()
+    });
     let options = Options {
         reporting,
         holding_answer: files.holding_answer,
@@ -1968,6 +1984,7 @@ pub async fn run_with_continuation(
         // What each session was given, against a changed catalog (#1472).
         catalog: Some(given),
         staff_note: files.staff_note,
+        desk_noticing,
         spoken_to: files.attention && files.spoken_to,
         // The child starts now: its model loads while the link opens.
         voices: match (files.attention && files.spoken_to, files.same_voice) {
@@ -2298,6 +2315,8 @@ async fn serve_with_visual<C: Connect>(
     let mut called = crate::called::Called::default();
     // What was heard of the newest request, for the staff's note.
     let mut staff_heard = crate::staff_note::Heard::default();
+    // What was heard of the newest request, for the desk noticing's state.
+    let mut desk_heard = crate::seen_yes::LiveState::default();
     let mut desk = ToolDesk::new(options.tools.clone());
     desk.worker_boot = options
         .tools
@@ -3298,7 +3317,7 @@ async fn serve_with_visual<C: Connect>(
                                     );
                                 }
                                 Some(open) => {
-                                    let text = staff_note_text(intake.handoff.noted.as_ref(), request, staff_heard.told(), &part);
+                                    let text = with_room(request, staff_note_text(intake.handoff.noted.as_ref(), request, staff_heard.told(), &part), &part);
                                     match provider.try_note(open, &text) {
                                         Ok(()) => {
                                             intake.handoff.noted = Some((request, text));
@@ -3314,6 +3333,51 @@ async fn serve_with_visual<C: Connect>(
                                 }
                             }
                         }
+                    }
+                }
+                // A heard line naming the looking: the model is told the
+                // desk noticing's state beside its sound while its input is
+                // open, as the second route tells it (#7767, the
+                // Reviewer-lead's c7203343369, item 3); found only after the
+                // input closed, nothing is told.
+                if let (Some(path), Ok(Notice::Event(event))) = (options.desk_noticing.as_deref(), &notice) {
+                    let open = intake.handoff.visual_turn().map(|turn| turn.request);
+                    let told = match event {
+                        Event::InputStarted { lineage, .. } => {
+                            let request = lineage.request.get();
+                            match intake.handoff.went_on.filter(|(went, _)| *went == request) {
+                                Some((_, cut_off)) => desk_heard.went_on(request, cut_off),
+                                // A reminder's turn and a written one hear
+                                // no person: their input is never open.
+                                None => desk_heard.began(
+                                    request,
+                                    !reminder_origin && open.is_some_and(|open| open.get() == request),
+                                ),
+                            }
+                            None
+                        }
+                        Event::UncorrelatedInputTranscript { text, .. } => {
+                            desk_heard.piece(Some(path), text, open.map(RequestId::get))
+                        }
+                        _ => None,
+                    };
+                    match (told, open) {
+                        (Some(crate::seen_yes::LiveTold::Tell(request, note)), Some(open)) => {
+                            match add_note(&provider, &mut intake.handoff.noted, open, &note) {
+                                Ok(()) => eprintln!(
+                                    "lamp-voice provider: request {request}: told the desk noticing's state, read now"
+                                ),
+                                Err(error) => eprintln!(
+                                    "lamp-voice provider: request {request}: the desk noticing's state not told: {error}"
+                                ),
+                            }
+                        }
+                        (Some(crate::seen_yes::LiveTold::Late(request) | crate::seen_yes::LiveTold::Tell(request, _)), _) => {
+                            eprintln!(
+                                "lamp-voice provider: request {request}: named the looking after its input was closed; the desk noticing's state not told: late"
+                            );
+                        }
+                        (None, _) => {}
                     }
                 }
                 // What the person says in the request in hand, for a name
@@ -7071,10 +7135,37 @@ fn add_note<C: Connect>(
     request: RequestId,
     part: &str,
 ) -> std::result::Result<(), Error> {
-    let text = note_text(noted.as_ref(), request.get(), part);
+    let text = with_room(
+        request.get(),
+        note_text(noted.as_ref(), request.get(), part),
+        part,
+    );
     provider.try_note(request, &text)?;
     *noted = Some((request.get(), text));
     Ok(())
+}
+
+/// `text`, the note for `request` with `part` in it, fitted under the
+/// service's cap (`lamp_gemini::wire::MAX_NOTE_BYTES`): the desk noticing's
+/// state (#7767, [`crate::seen_yes::without_state_note`]) yields its room to
+/// any other note due in the same request, being a few words more, never
+/// the only sign of what was asked. Over the cap with no state in it, as
+/// it is: the service refuses it, as before.
+fn with_room(request: u64, text: String, part: &str) -> String {
+    if text.len() <= lamp_gemini::wire::MAX_NOTE_BYTES {
+        return text;
+    }
+    match crate::seen_yes::without_state_note(&text)
+        .filter(|fewer| fewer.len() <= lamp_gemini::wire::MAX_NOTE_BYTES && fewer.contains(part))
+    {
+        Some(fewer) => {
+            eprintln!(
+                "lamp-voice provider: request {request}: the desk noticing's state is taken out of its note for room: not told"
+            );
+            fewer
+        }
+        None => text,
+    }
 }
 
 /// The room microphone's greatest rise over its quiet, in decibels, in a
@@ -11272,6 +11363,7 @@ pub(crate) mod tests {
             follows_run: false,
             wait_for_room: false,
             staff_note: false,
+            desk_noticing: None,
             spoken_to: false,
             voices: None,
             catalog: None,
@@ -11304,6 +11396,7 @@ pub(crate) mod tests {
                 follows_run: false,
                 wait_for_room: false,
                 staff_note: false,
+                desk_noticing: None,
                 spoken_to: false,
                 voices: None,
                 catalog: None,
@@ -11361,6 +11454,7 @@ pub(crate) mod tests {
                 follows_run: false,
                 wait_for_room: false,
                 staff_note: false,
+                desk_noticing: None,
                 spoken_to: false,
                 voices: None,
                 catalog: None,
@@ -12376,6 +12470,7 @@ pub(crate) mod tests {
                 follows_run: false,
                 wait_for_room: false,
                 staff_note: false,
+                desk_noticing: None,
                 spoken_to: false,
                 voices: None,
                 catalog: None,
@@ -16183,6 +16278,7 @@ pub(crate) mod tests {
                     follows_run: false,
                     wait_for_room: false,
                     staff_note: false,
+                    desk_noticing: None,
                     spoken_to: false,
                     voices: None,
                     catalog: None,
@@ -16260,6 +16356,7 @@ pub(crate) mod tests {
                     follows_run: false,
                     wait_for_room: false,
                     staff_note: false,
+                    desk_noticing: None,
                     spoken_to: false,
                     voices: None,
                     catalog: None,
@@ -16637,6 +16734,9 @@ pub(crate) mod tests {
     /// A session renewed when the executive's catalog changed (#1472):
     /// tests only.
     mod catalog;
+    /// Live's state note for a line naming the looking (#7767): tests
+    /// only.
+    mod desk_noticing;
     /// A line going on in a busy room waits for the Policy (#1522): tests
     /// only.
     mod going_on_asks;
