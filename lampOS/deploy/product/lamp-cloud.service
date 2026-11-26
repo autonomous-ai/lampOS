@@ -172,12 +172,46 @@ Nice=5
 LoadCredential=account:/etc/lampOS/setup/backend.json
 LoadCredential=key:/etc/lampOS/voice/credential
 LoadCredential=build:/var/lib/lampos-update/state.json
-# The person's own keys (#8735, docs/own-keys.md "The lamp's agent"), with LAMP_OWN_KEYS=on: the Hermes forwarder
-# reads root's keys helper's folder itself, at each request, so a key set or removed from the app reaches the agent
-# at its next chat, with no restart. The helper keeps it root:lampos 0750, its files 0640, so this unit's group reads
-# it. Read only: ProtectSystem=strict leaves /etc readable, and this line says so. Missing, or not yet readable: the
-# relay. The agent runtimes run as lampos too, so they can read the person's key, as they can the relay's `key` above.
-ReadOnlyPaths=-/etc/lampOS/voice/own
+# The person's own model key (#8735, docs/own-keys.md "The lamp's agent"), with LAMP_OWN_KEYS=on, handed in as the
+# relay's `key` is: only each model service's key, endpoint, model and check record from root's keys helper's folder
+# (root's, 0700), one credential each, never the folder, a Deepgram or an ElevenLabs key. Each has a blank fallback
+# first, so a lamp with no key of the person's still starts this unit: systemd 252 fails a unit whose
+# LoadCredential= file is missing unless a SetCredential= of the same name gives one, and an empty one fails too, so
+# it is one newline (lamp-skills.service's `owner`, lamp-75c9, 5 Nov). Copied at this unit's start: the keys helper
+# restarts it after a model key's change. Readable by this unit's user, lampos, as the relay's `key` is; the agent
+# runtimes run as lampos too, so they can read the person's model key, as they can the relay's.
+SetCredential=own_openai_compatible.key:\n
+LoadCredential=own_openai_compatible.key:/etc/lampOS/voice/own/openai_compatible.key
+SetCredential=own_openai_compatible.url:\n
+LoadCredential=own_openai_compatible.url:/etc/lampOS/voice/own/openai_compatible.url
+SetCredential=own_openai_compatible.model:\n
+LoadCredential=own_openai_compatible.model:/etc/lampOS/voice/own/openai_compatible.model
+SetCredential=own_openai_compatible.checked:\n
+LoadCredential=own_openai_compatible.checked:/etc/lampOS/voice/own/openai_compatible.checked
+SetCredential=own_openrouter.key:\n
+LoadCredential=own_openrouter.key:/etc/lampOS/voice/own/openrouter.key
+SetCredential=own_openrouter.model:\n
+LoadCredential=own_openrouter.model:/etc/lampOS/voice/own/openrouter.model
+SetCredential=own_openrouter.checked:\n
+LoadCredential=own_openrouter.checked:/etc/lampOS/voice/own/openrouter.checked
+SetCredential=own_gemini.key:\n
+LoadCredential=own_gemini.key:/etc/lampOS/voice/own/gemini.key
+SetCredential=own_gemini.model:\n
+LoadCredential=own_gemini.model:/etc/lampOS/voice/own/gemini.model
+SetCredential=own_gemini.checked:\n
+LoadCredential=own_gemini.checked:/etc/lampOS/voice/own/gemini.checked
+SetCredential=own_anthropic.key:\n
+LoadCredential=own_anthropic.key:/etc/lampOS/voice/own/anthropic.key
+SetCredential=own_anthropic.model:\n
+LoadCredential=own_anthropic.model:/etc/lampOS/voice/own/anthropic.model
+SetCredential=own_anthropic.checked:\n
+LoadCredential=own_anthropic.checked:/etc/lampOS/voice/own/anthropic.checked
+SetCredential=own_deepseek.key:\n
+LoadCredential=own_deepseek.key:/etc/lampOS/voice/own/deepseek.key
+SetCredential=own_deepseek.url:\n
+LoadCredential=own_deepseek.url:/etc/lampOS/voice/own/deepseek.url
+SetCredential=own_deepseek.checked:\n
+LoadCredential=own_deepseek.checked:/etc/lampOS/voice/own/deepseek.checked
 # lamp-control's admin socket, for the app's Add a developer computer (`control.code`, sealed;
 # `control.clients`, `control.revoke`, docs/cloud.md "The developer door"). This is the first time
 # the cloud-facing part can mint pairing codes and revoke pairings. It is gated by the owner's
