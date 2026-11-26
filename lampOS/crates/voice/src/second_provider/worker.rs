@@ -5695,6 +5695,16 @@ pub fn serve(
                 if let Ok(mut heeding) = heeding.lock() {
                     heeding.renewing_no_face_follow_ups();
                 }
+                // With no face seen, only the conversation's own voice
+                // (`LAMP_NO_FACE_FOLLOW_UP_BY_VOICE=on`, 26 Nov 2026).
+                if crate::second_provider::no_face_follow_up_by_voice_on() {
+                    eprintln!(
+                        "lamp-voice second: with no face seen speaking it, a line is the caller's own follow-up only in the conversation's own voice; else it is told it may be people's talk (LAMP_NO_FACE_FOLLOW_UP_BY_VOICE)"
+                    );
+                    if let Ok(mut heeding) = heeding.lock() {
+                        heeding.renewing_no_face_follow_ups_by_voice();
+                    }
+                }
             }
         }
         // Held desk talk makes a busy room (`LAMP_ROOM_HELD_TALK=on`, #7332).
@@ -8793,6 +8803,9 @@ pub(crate) struct Heeding {
     /// With it, `LAMP_BUSY_NO_FACE_RENEWS=on`
     /// ([`Self::renewing_no_face_follow_ups`]).
     no_face_renews: bool,
+    /// With it, `LAMP_NO_FACE_FOLLOW_UP_BY_VOICE=on`
+    /// ([`Self::renewing_no_face_follow_ups_by_voice`]).
+    no_face_by_voice: bool,
     /// `LAMP_NAME_SIGN_TIED` (#8092): the request `LAMP_SAID_TO_ME` let out
     /// as the one answer with no look to the lamp's waiting question
     /// ([`crate::said_to_me::Said::AnswerNoLook`]), or as the one cut-in
@@ -10061,6 +10074,7 @@ impl Heeding {
             from_start: false,
             follow_up_renews: false,
             no_face_renews: false,
+            no_face_by_voice: false,
             no_look_answer: None,
             look_free_used: false,
             follow_up_line: None,
@@ -10698,6 +10712,21 @@ impl Heeding {
     /// speaking renews the call too, and is carried by it.
     pub(crate) fn renewing_no_face_follow_ups(&mut self) {
         self.no_face_renews = true;
+    }
+
+    /// `LAMP_NO_FACE_FOLLOW_UP_BY_VOICE=on` (the product owner's "test all
+    /// scenarios", 26 Nov 2026): with [`Self::renewing_no_face_follow_ups`],
+    /// a line no face was seen speaking is the caller's own follow-up only
+    /// when the same-voice check found it in the conversation's own voice.
+    /// A line with no print (too short, or begun over the lamp's voice) or
+    /// with a likeness in between is told it may be people's talk
+    /// ([`CONVERSATION_ALONE`]) and renews nothing. On lamp-74ff that
+    /// morning, October's two-person battery had 21 lines of two people's
+    /// talk judged "the caller's own follow-up" with no face and no print.
+    /// The model was told each was the caller's (`FOLLOW_UP_NOTE`), and
+    /// answered every one.
+    pub(crate) fn renewing_no_face_follow_ups_by_voice(&mut self) {
+        self.no_face_by_voice = true;
     }
 
     /// The call a line said in `window` goes on from: the person's last
@@ -14081,6 +14110,16 @@ impl Heeding {
             && !someone_else
             && !(self.no_face_renews && seen.other_voice)
             && renews_for_the_caller(&seen.speakers, &self.caller_faces, self.no_face_renews);
+        // `LAMP_NO_FACE_FOLLOW_UP_BY_VOICE`: with no face seen, the
+        // conversation's own voice, not only no other voice found.
+        let unvoiced = callers_follow_up
+            && unvoiced_follow_up(self.no_face_by_voice, &seen.speakers, seen.same_voice);
+        let callers_follow_up = callers_follow_up && !unvoiced;
+        if unvoiced {
+            eprintln!(
+                "lamp-voice second: request {request}: no face seen speaking it and its voice not found as the conversation's: not the caller's own follow-up; told it may be people's talk (LAMP_NO_FACE_FOLLOW_UP_BY_VOICE)"
+            );
+        }
         if callers_follow_up {
             eprintln!(
                 "lamp-voice second: request {request}: the caller's own follow-up: it renews the call for the caller's lines, and the model is told it is theirs (LAMP_BUSY_FOLLOW_UP_RENEWS)"
@@ -14489,6 +14528,23 @@ fn renews_for_the_caller(
     no_face: bool,
 ) -> bool {
     (no_face && speakers.is_empty()) || spoken_by_the_caller_alone(speakers, caller_faces)
+}
+
+/// `LAMP_NO_FACE_FOLLOW_UP_BY_VOICE` (`by_voice`): whether a line
+/// [`renews_for_the_caller`] takes as the caller's own for no face seen
+/// speaking it is not theirs: no face was seen speaking it and the
+/// same-voice check did not find it in the conversation's own voice
+/// (`same_voice`), for want of a print (too short, or begun over the lamp's
+/// voice) or with a likeness in between. A line a face was seen speaking
+/// keeps the caller's-face rule. On lamp-74ff on 26 Nov 2026, October's
+/// two-person battery had 21 lines of two people's talk with no face seen
+/// and no print each taken as the caller's, and all were answered.
+fn unvoiced_follow_up(
+    by_voice: bool,
+    speakers: &crate::speaking_faces::Speakers,
+    same_voice: bool,
+) -> bool {
+    by_voice && speakers.is_empty() && !same_voice
 }
 
 /// Whether the faces seen speaking a line are the caller's one face and no

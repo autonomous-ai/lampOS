@@ -3522,6 +3522,8 @@ fn second_route_worker_environment(
         // Inside a live back-and-forth the doubt goes to the person (#7332).
         crate::second_provider::BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT,
         crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT,
+        // With no face seen, the caller's follow-up only in their own voice.
+        crate::second_provider::NO_FACE_FOLLOW_UP_BY_VOICE_ENVIRONMENT,
         // Held desk talk makes a busy room (#7332).
         crate::second_provider::ROOM_HELD_TALK_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
@@ -3933,6 +3935,7 @@ mod tests {
             crate::second_provider::DECLINE_SILENT_ENVIRONMENT,
             crate::second_provider::BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT,
             crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT,
+            crate::second_provider::NO_FACE_FOLLOW_UP_BY_VOICE_ENVIRONMENT,
             crate::second_provider::ROOM_HELD_TALK_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
             crate::speaking_faces::EYES_ENVIRONMENT,
@@ -5210,6 +5213,7 @@ mod tests {
                     || name == crate::second_provider::DECLINE_SILENT_ENVIRONMENT
                     || name == crate::second_provider::BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT
                     || name == crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT
+                    || name == crate::second_provider::NO_FACE_FOLLOW_UP_BY_VOICE_ENVIRONMENT
                     || name == crate::second_provider::ROOM_HELD_TALK_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
                     || name == crate::speaking_faces::EYES_ENVIRONMENT
@@ -5466,6 +5470,7 @@ mod tests {
                     "LAMP_NAME_WORDLESS_BAR=on",
                     "LAMP_NEWS_REPLY_HEEDS_HELD=on",
                     "LAMP_NOT_FOR_ME_WORDS=on",
+                    "LAMP_NO_FACE_FOLLOW_UP_BY_VOICE=on",
                     "LAMP_NO_WORDS_AGAIN=on",
                     "LAMP_NUDGE_CLAIM_CHECKED=on",
                     "LAMP_ONE_AS_LAMP=on",

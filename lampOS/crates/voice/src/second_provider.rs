@@ -1127,6 +1127,18 @@ pub const BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT: &str = "LAMP_BUSY_FOLLOW_UP_RENEWS"
 /// [`worker::Heeding::renewing_no_face_follow_ups`], #7332).
 pub const BUSY_NO_FACE_RENEWS_ENVIRONMENT: &str = "LAMP_BUSY_NO_FACE_RENEWS";
 
+/// `on` exactly, off unless set: with [`BUSY_NO_FACE_RENEWS_ENVIRONMENT`], a
+/// line no face was seen speaking is the caller's own follow-up only when
+/// the same-voice check found it in the conversation's own voice
+/// ([`worker::Heeding::renewing_no_face_follow_ups_by_voice`]). Else it is
+/// told it may be people's talk, not that it is the caller's.
+pub const NO_FACE_FOLLOW_UP_BY_VOICE_ENVIRONMENT: &str = "LAMP_NO_FACE_FOLLOW_UP_BY_VOICE";
+
+/// [`NO_FACE_FOLLOW_UP_BY_VOICE_ENVIRONMENT`] from this worker's environment.
+pub(crate) fn no_face_follow_up_by_voice_on() -> bool {
+    std::env::var(NO_FACE_FOLLOW_UP_BY_VOICE_ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
 /// A line held as said to nobody is talk for the busy room
 /// (`LAMP_ROOM_HELD_TALK=on`,
 /// [`crate::room_told::RoomTold::count_held_not_spoken_to`], #7332).
