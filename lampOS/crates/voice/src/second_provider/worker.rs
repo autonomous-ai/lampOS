@@ -1214,6 +1214,41 @@ pub(crate) fn deepseek_where(hosted: &crate::second_config::Hosted) -> String {
     }
 }
 
+/// The text model `chat` answers with, as a person hears it (#8729): its
+/// name, and whose key or relay it goes through, never a key or a URL.
+pub(crate) fn text_model_said(
+    chat: Option<ChatRoute>,
+    config: &crate::second_config::SecondConfig,
+) -> String {
+    use crate::second_config::OwnChat;
+    let hosted = &config.hosted;
+    match chat {
+        None => config.llm_model.clone(),
+        Some(ChatRoute::Gemini) => format!("Google's Gemini {}", config.gemini.chat_model),
+        Some(ChatRoute::OpenRouter) => format!("{}, through OpenRouter", hosted.openrouter_model),
+        Some(ChatRoute::DeepSeek) => match hosted.own_chat {
+            Some(chat) => format!(
+                "{}, with the owner's own key{}",
+                hosted.deepseek_model,
+                match chat {
+                    OwnChat::OpenAiCompatible => "",
+                    OwnChat::OpenRouter => ", through OpenRouter",
+                    OwnChat::Gemini => ", through Google's Gemini",
+                    OwnChat::Anthropic => ", through Anthropic",
+                }
+            ),
+            None if hosted.own_deepseek.is_some() => {
+                format!("DeepSeek's {}, with the owner's own key", hosted.deepseek_model)
+            }
+            None if hosted.deepseek_base_url.is_some() => format!(
+                "DeepSeek's {}, through Autonomous's relay",
+                hosted.deepseek_model
+            ),
+            None => format!("DeepSeek's {}", hosted.deepseek_model),
+        },
+    }
+}
+
 /// The real services as `route` sets them: the configured chat and voice,
 /// or Gemini's, OpenRouter's or DeepSeek's in their place, each saying so in
 /// the journal once. OpenRouter's and DeepSeek's keys are the voice unit's
@@ -1251,6 +1286,8 @@ pub fn services(
         .then(|| gemini_key(provider, credentials))
         .transpose()?;
     let routable = relay_routable(&config, route, key.as_ref());
+    // The text model as the FAQ tells it (#8729, `crate::faq_now`).
+    crate::faq_now::keep_text_model(text_model_said(route.chat, &config));
     let mut net = Net::new(config, declare).map_err(io::Error::other)?;
     let call = |model| {
         key.as_ref().map(|key| super::services::GeminiCall {

@@ -419,6 +419,36 @@ pub const NO_PERMISSION: &str =
 pub const CANT_LINK: &str =
     "The services it can link are in the app: open this lamp, then Settings, then Linked accounts.";
 
+/// What a call naming an agent instead of a service is told, after its
+/// name (#8729). An agent is never an account to link; the FAQ's agent
+/// answer says which one the lamp runs and where the app changes it.
+pub const AGENT_NOT_LINKED: &str = "is an agent the lamp can run, not a service to link: never send the person to the app's accounts for it. Which agent the lamp runs now, and where it is chosen in the app, is the lamp_help skill's agent topic.";
+
+/// The agents a person may name as if they were a service, as words with
+/// no spaces, hyphens or case (`lamp_tasks`' engines, as people call them).
+// ponytail: a fixed list of the agents people name; a new Harness engine
+// people say as a service joins it.
+const AGENTS: [&str; 8] = [
+    "openclaw",
+    "hermes",
+    "claudecode",
+    "claude",
+    "codex",
+    "opencode",
+    "devin",
+    "agent",
+];
+
+/// Whether `asked` names an agent ([`AGENTS`]), not a service.
+fn is_agent(asked: &str) -> bool {
+    let word: String = asked
+        .chars()
+        .filter(|c| c.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect();
+    AGENTS.contains(&word.as_str())
+}
+
 /// The words for a write `service` is linked without permission for.
 fn no_permission(service: &catalog::Service, what: &str) -> String {
     format!(
@@ -437,6 +467,9 @@ fn cant_link(asked: Option<&str>) -> String {
                 .chars()
                 .all(|c| c.is_alphanumeric() || " -_".contains(c))
     });
+    if let Some(name) = name.filter(|name| is_agent(name)) {
+        return format!("{name} {AGENT_NOT_LINKED}");
+    }
     format!(
         "The lamp can't link {} yet. {CANT_LINK}",
         name.unwrap_or("that service")
@@ -7250,6 +7283,23 @@ mod tests {
         let read = run(services.tool(&read_line(json!({"service":"dropbox","what":"files"}))));
         assert_eq!(read["error"], cant("dropbox"));
         assert!(services.http.calls.lock().unwrap().is_empty());
+    }
+
+    /// #8729: an agent named as a service is told it is an
+    /// agent, never sent to Linked accounts, and the FAQ's agent topic is
+    /// named; a service the lamp can't link is told as before.
+    #[test]
+    fn an_agent_named_as_a_service_is_never_sent_to_linked_accounts() {
+        let dir = tempfile::tempdir().unwrap();
+        let services = services(dir.path(), "{}", true);
+        for agent in ["OpenClaw", "Open Claw", "hermes", "Claude Code", "Codex"] {
+            let read = run(services.tool(&read_line(json!({"service":agent,"what":"recent"}))));
+            let told = read["error"].as_str().unwrap();
+            assert_eq!(told, format!("{agent} {AGENT_NOT_LINKED}"));
+            assert!(!told.contains("Linked accounts"), "{told}");
+            assert!(told.contains("lamp_help skill's agent topic"), "{told}");
+        }
+        assert!(cant_link(Some("Outlook")).ends_with(CANT_LINK));
     }
 
     /// A service named as the model may say it, by its name or its code in

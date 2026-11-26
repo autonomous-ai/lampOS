@@ -625,6 +625,15 @@ fn lamp_name() -> &'static str {
         .map_or(HERMES, |engine| display_name(engine))
 }
 
+/// The lamp's default agent as the person calls it, as last read from the
+/// tasks part's targets (#8729, `crate::faq_now`): none before a read or
+/// without the lamp's own target, never [`lamp_name`]'s Hermes in its place.
+pub(crate) fn lamp_agent_name() -> Option<&'static str> {
+    lamp_engines()
+        .first()
+        .map(|engine| display_name(engine))
+}
+
 /// How the person calls the Harness engines whose names are not just their
 /// id with a capital (#6492). Only for saying a name: never which engines
 /// may run, which is whatever Harness reports on the lamp.

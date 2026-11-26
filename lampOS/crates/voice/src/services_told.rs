@@ -52,8 +52,9 @@ pub fn on_from_environment() -> bool {
 /// (#5867).
 pub fn note(names: &[String]) -> String {
     format!(
-        "(For you to know, not to answer: the lamp's owner linked these services to you in the app's Linked accounts: {}. They are yours to use for the owner: read from one with service_read, and send, post or create with service_write, when they ask. Asked about one, use it, or say plainly what you can do with it; never say it is the app's job or that you don't know it. A service the lamp can link ({}) but not in this list {} Any other service the lamp can't link yet: say so. {})",
+        "(For you to know, not to answer: the lamp's owner linked these services to you in the app's Linked accounts: {}. They are yours to use for the owner: read from one with service_read, and send, post or create with service_write, when they ask. Asked about one, use it, or say plainly what you can do with it; never say it is the app's job or that you don't know it. OpenClaw, Hermes, Claude Code, Codex or another agent {} A service the lamp can link ({}) but not in this list {} Any other service the lamp can't link yet: say so. {})",
         names.join(", "),
+        lamp_services::serve::AGENT_NOT_LINKED,
         linkable(),
         lamp_services::serve::NOT_LINKED,
         lamp_services::serve::CANT_LINK
@@ -235,6 +236,14 @@ mod tests {
             told.ends_with(&format!(
                 "A service the lamp can link ({}) but not in this list {not_linked} Any other service the lamp can't link yet: say so. {cant_link})",
                 linkable()
+            )),
+            "{told}"
+        );
+        // #8729: an agent is never a service to link.
+        assert!(
+            told.contains(&format!(
+                "OpenClaw, Hermes, Claude Code, Codex or another agent {}",
+                lamp_services::serve::AGENT_NOT_LINKED
             )),
             "{told}"
         );

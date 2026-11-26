@@ -1857,7 +1857,9 @@ call then gets that service's answer, or its `NOT_LINKED` words.
 
 A call naming a service the lamp has no connector for (no code or name in
 the catalogue matches) fails with "The lamp can't link <name> yet. The services it can
-link are in the app: open this lamp, then Settings, then Linked accounts." (`serve::CANT_LINK`, after the
+link are in the app: open this lamp, then Settings, then Linked accounts." (`serve::CANT_LINK`; a name that
+is an agent, such as OpenClaw, Hermes, Claude Code or Codex, is answered "<name> is an agent the lamp can
+run, not a service to link: …" instead, `serve::AGENT_NOT_LINKED`, #8729, never sent to Linked accounts; after the
 first sentence). `<name>` is the name the call gave, said only when it is at
 most 40 characters, all letters, digits, spaces, `-` or `_`; any other name,
 or none, is said as "that service". `services_connected`'s description names
@@ -3407,7 +3409,11 @@ to answer: the lamp's owner linked these services to you in the app's
 Linked accounts: Notion, Gmail. They are yours to use for the owner: read from
 one with service_read, and send, post or create with service_write, when
 they ask. Asked about one, use it, or say plainly what you can do with it;
-never say it is the app's job or that you don't know it. A service the
+never say it is the app's job or that you don't know it. OpenClaw, Hermes,
+Claude Code, Codex or another agent is an agent the lamp can run, not a
+service to link: never send the person to the app's accounts for it. Which
+agent the lamp runs now, and where it is chosen in the app, is the lamp_help
+skill's agent topic. A service the
 lamp can link (Gmail, Google Calendar, Google Drive, Figma, GitHub, Linear, Asana, Ahrefs, Facebook Page, Slack, monday.com, HubSpot, Amplitude, Notion) but not in this list isn't linked to this lamp yet. It
 can be linked in the app: open this lamp, then Settings, then Linked
 accounts. Any other service the lamp can't link yet: say so. The services

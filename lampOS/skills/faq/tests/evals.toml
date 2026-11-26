@@ -234,6 +234,33 @@ said = "How do I connect you to a new Wi-Fi?"
 topic = "setup"
 holds = ["Add Lamp", "Changing my Wi-Fi from the app isn't there yet"]
 
+# #8729: an agent (OpenClaw, Hermes, Claude Code, Codex) is never a linked
+# account: asked to connect or link one, the answer is the agent section,
+# which names no Linked accounts. Which agent and text model the lamp uses
+# now are read from its own settings at answer time and told beside the
+# section (`this_lamp_now`, lamp-voice's `faq_now`), never fixed here.
+[[ask]]
+said = "Can I switch you to Hermes?"
+topic = "agent"
+holds = ["isn't an account you link", "open this lamp in the Autonomous app", "choose the one I use"]
+never = ["Linked accounts", "Settings, then"]
+
+[[ask]]
+said = "Can I add OpenClaw to my linked accounts?"
+topic = "agent"
+holds = ["Hermes or OpenClaw", "isn't an account you link"]
+never = ["Linked accounts", "Settings, then"]
+
+[[ask]]
+said = "Which language model answers me?"
+topic = "agent"
+holds = ["text model", "read from my own settings", "this_lamp_now", "never guess"]
+
+[[ask]]
+said = "Which assistant software is running on you?"
+topic = "agent"
+holds = ["Which agent", "this_lamp_now"]
+
 [[ask]]
 said = "Which website sells you?"
 topic = "about"
