@@ -527,9 +527,7 @@ impl<P: Persistence> Consumer<P> {
     }
     /// What the last walk found for the clips' thread (#8708), once.
     fn clips_owed(&mut self) -> Option<crate::ring_clips::Wanted> {
-        // Red stub (#8708).
-        let _ = self.upcoming.as_mut()?.wanted.take();
-        None
+        self.upcoming.as_mut()?.wanted.take()
     }
     fn withdraw(&mut self) -> io::Result<()> {
         if let Some(current) = &self.current {

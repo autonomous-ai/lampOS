@@ -2557,6 +2557,9 @@ fn ask_link_check(
     key: (u64, u64),
     asked: &mut Option<(u64, u64)>,
 ) -> io::Result<bool> {
+    if worker.renewal_stall.skipped() > 0 {
+        return Ok(false);
+    }
     match worker.channels.control.send(Control::CheckLink) {
         Ok(()) => {
             *asked = Some(key);

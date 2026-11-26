@@ -706,8 +706,7 @@ impl Receipt {
     /// or mostly heard, it is settled as [`ToWorker::RungOffline`], so its
     /// words are told once the link is back.
     pub fn untold(&mut self) {
-        // Red stub (#8708).
-        let _ = &self.0;
+        self.0.borrow_mut().untold = true;
     }
     pub fn completion_recorded(&self) -> bool {
         matches!(self.0.borrow().settlement, Some(ToWorker::Complete { .. }))
