@@ -1489,6 +1489,24 @@ pub fn watch_tells(state: &Path, skill: &str, sha256: &str, ran: Ran) -> bool {
     }
 }
 
+/// Marks `skill`'s watch (its folder's `sha256`) as told, once its telling
+/// was told to the person ([`watch_tells`], the second read's P2 on #8079):
+/// a telling nobody was there for within its hour is dropped unsaid and
+/// leaves no mark, so the next holding run says it again.
+pub fn watch_told(state: &Path, skill: &str, sha256: &str) {
+    let marked = ledger_change(
+        state,
+        WATCH_TOLD_FILE,
+        |told: &mut Vec<(String, String)>| {
+            told.retain(|(name, _)| name != skill);
+            told.push((skill.to_owned(), sha256.to_owned()));
+        },
+    );
+    if let Err(error) = marked {
+        eprintln!("lamp-skills: skill:{skill}: do.task: its watch's told mark: {error}");
+    }
+}
+
 /// A small list in `state`'s `file`, read, changed by `change` and written
 /// back whole when it changed, under one lock so no other change is lost
 /// between the read and the write; `change`'s answer back. A list that
@@ -2327,12 +2345,16 @@ mod tests {
         set_on_here(None);
     }
 
-    /// #8089 (Twelve's P2 on the HOLD): a clock watch whose condition holds
-    /// is told once; a second holding run says nothing; a run in which it
-    /// doesn't hold (its agent's lone dash, or no words) says nothing and
-    /// clears the mark, so the next holding run tells again; a failed run
-    /// changes nothing; a watch made again (its folder's sha256) starts
-    /// unmarked; another watch's mark is its own.
+    /// #8089 (a reader's P2 on the HOLD) and the second read's P2 on #8079
+    /// (round 5): a clock watch whose condition holds is told once; the
+    /// mark is set only once its telling was told ([`watch_told`]), so a
+    /// holding run whose telling was dropped unsaid (nobody there within
+    /// the hour) is said again on the next holding run; told, a second
+    /// holding run says nothing; a run in which it doesn't hold (its
+    /// agent's lone dash, or no words) says nothing and clears the mark, so
+    /// the next holding run tells again; a failed run changes nothing; a
+    /// watch made again (its folder's sha256) starts unmarked; another
+    /// watch's mark is its own.
     #[test]
     fn a_watch_tells_once_until_it_stops_holding() {
         let holds =
@@ -2348,8 +2370,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let state = dir.path();
         let watch = |answer: &str| watch_tells(state, "bitcoin-watch", "ab", ran(answer));
-        // Two holding runs: only the first speaks.
+        let told = || watch_told(state, "bitcoin-watch", "ab");
+        // A holding run tells; its telling dropped unsaid, the next holding
+        // run tells again; told, a holding run says nothing more.
         assert!(watch(&holds));
+        assert!(watch(&holds), "dropped unsaid: said again");
+        told();
         assert!(!watch(&holds));
         // A failed run knows nothing of the condition: its mark stands.
         assert!(!watch(&failed));
@@ -2357,14 +2383,17 @@ mod tests {
         // It stops holding, then holds again: told again, once.
         assert!(!watch(&not_now));
         assert!(watch(&holds));
+        told();
         assert!(!watch(&holds));
         // Another watch, and this one made again, are unmarked.
         assert!(watch_tells(state, "rain-watch", "cd", Ran::Words));
         assert!(watch_tells(state, "bitcoin-watch", "ef", Ran::Words));
+        watch_told(state, "bitcoin-watch", "ef");
         assert!(!watch_tells(state, "bitcoin-watch", "ef", Ran::Words));
         // A mark list that can't be read heals, and tells.
         std::fs::write(state.join(WATCH_TOLD_FILE), b"{not json").unwrap();
         assert!(watch(&holds));
+        told();
         assert!(!watch(&holds));
     }
 

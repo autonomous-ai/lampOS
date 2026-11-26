@@ -6396,7 +6396,7 @@ fn hand_task(
             _ => tried.failed(),
         };
         let state = state.as_deref();
-        let found = watch_found(
+        let (found, mark) = watch_found(
             &skill,
             (&folder, step.tell_once),
             state,
@@ -6404,7 +6404,7 @@ fn hand_task(
             ran.take(),
             asked_at,
         );
-        tell_its_run(
+        let told = tell_its_run(
             &skill,
             found,
             failed,
@@ -6416,6 +6416,9 @@ fn hand_task(
             state,
             &mut room,
         );
+        if let (Some(state), Some(sha256)) = (state, mark.as_deref()) {
+            watch_told_once(&skill, state, sha256, told.as_deref());
+        }
     });
 }
 
@@ -6554,7 +6557,9 @@ fn hand_over_run_once(
 /// sha256 of its `folder`): only a skill made to speak when something
 /// holds, its `do.task`'s `tell_once`
 /// ([`lamp_skills::task::TELL_ONCE_WHILE_HOLDING`]), tells once until it
-/// stops holding; any other says every run's words.
+/// stops holding; any other says every run's words. Beside what is said,
+/// the folder's sha256 to mark once the telling was told
+/// ([`watch_told_once`]): a holding watch's run that is being told.
 fn watch_found(
     skill: &str,
     (folder, tell_once): (&Path, bool),
@@ -6562,27 +6567,49 @@ fn watch_found(
     found: Option<Vec<String>>,
     ran: Option<lamp_skills::task::Ran>,
     asked_at: Option<u64>,
-) -> Option<Vec<String>> {
+) -> (Option<Vec<String>>, Option<String>) {
     let (Some(state), Some(ran)) = (state, ran) else {
-        return found;
+        return (found, None);
     };
     // Only a watch made to speak when something holds carries its `tell`
     // (the Reviewer-lead's must-check on #8089): a plain report every
     // while ("every 2 hours, tell me the headlines") says every run.
     if !tell_once || asked_now(asked_at, unix_ms()) {
-        return found;
+        return (found, None);
     }
     let sha256 = lamp_skills::task::folder_sha256(folder).unwrap_or_default();
     if lamp_skills::task::watch_tells(state, skill, &sha256, ran) {
         eprintln!("lamp-skills: skill:{skill}: do.task: its watch holds: told once");
-        return found;
+        return (found, Some(sha256));
     }
     if found.is_some() {
         eprintln!(
             "lamp-skills: skill:{skill}: do.task: its watch still holds, told already: not said again"
         );
     }
-    None
+    (None, None)
+}
+
+/// Marks a holding watch's run told ([`lamp_skills::task::watch_told`],
+/// `sha256` its folder's) only once its telling ended told (`told`,
+/// [`tell_its_run`]'s outcome as `skills/tasks` reads it,
+/// [`lamp_skills::service_read::answer_news`]): a telling nobody was there
+/// for within its hour is dropped unsaid, and one a restart lost never
+/// began, so neither marks it and the next holding run says it again (the
+/// second read's P2 on #8079).
+fn watch_told_once(skill: &str, state: &Path, sha256: &str, told: Option<&str>) {
+    let told_stage = told.is_some_and(|told| {
+        lamp_skills::service_read::answer_news(skill, told).stage == lamp_msgs::SkillTaskStage::Told
+    });
+    if told_stage {
+        lamp_skills::task::watch_told(state, skill, sha256);
+        eprintln!("lamp-skills: skill:{skill}: do.task: its watch holds: told, marked");
+    } else {
+        eprintln!(
+            "lamp-skills: skill:{skill}: do.task: its watch holds, but its telling ended {}: not marked, said again next time",
+            told.unwrap_or("before it began")
+        );
+    }
 }
 
 /// Whether a run's told line (what its agent found, or its #7200
@@ -10609,13 +10636,16 @@ mod tests {
         );
     }
 
-    /// The Reviewer-lead's must-check on #8089: only a skill made to speak
-    /// when something holds (its `do.task`'s `tell_once`) is told once
-    /// while it holds. A plain report every while ("every 2 hours, tell me
-    /// the headlines") says both of two runs with words. A marked watch
-    /// says the first of two holding runs, nothing for a run not holding,
-    /// and the next holding run again. A run asked by voice now is always
-    /// said.
+    /// The Reviewer-lead's must-check on #8089 and the second read's P2 on
+    /// #8079 (round 5): only a skill made to speak when something holds
+    /// (its `do.task`'s `tell_once`) is told once while it holds, and it is
+    /// marked told only once its telling was told. A plain report every
+    /// while ("every 2 hours, tell me the headlines") says both of two runs
+    /// with words. A watch's holding run whose telling was dropped (nobody
+    /// there within the hour) or never began is said again on the next
+    /// holding run; one whose telling was told is not; a run not holding
+    /// clears the mark, and the next holding run is said again. A run
+    /// asked by voice now is always said, with nothing to mark.
     #[test]
     fn only_a_watch_made_to_speak_when_it_holds_is_told_once() {
         use lamp_skills::task::Ran;
@@ -10628,18 +10658,51 @@ mod tests {
         let found = |skill: &str, once: bool, found: Option<Vec<String>>, ran: Ran| {
             watch_found(skill, (&folder, once), Some(&state), found, Some(ran), None)
         };
-        // A plain report: every run's words said.
+        // A plain report: every run's words said, nothing to mark.
         for _ in 0..2 {
-            assert_eq!(found("headlines", false, words(), Ran::Words), words());
+            assert_eq!(
+                found("headlines", false, words(), Ran::Words),
+                (words(), None)
+            );
         }
-        // A marked watch: once while it holds, again after it didn't.
+        // A watch: its first holding run is said; its telling dropped
+        // unsaid, the next holding run is said again; told, the next says
+        // nothing.
         let holds = || Some(vec!["Bitcoin is under 90,000 dollars.".to_owned()]);
-        assert_eq!(found("bitcoin-watch", true, holds(), Ran::Words), holds());
-        assert_eq!(found("bitcoin-watch", true, holds(), Ran::Words), None);
-        assert_eq!(found("bitcoin-watch", true, None, Ran::Silent), None);
-        assert_eq!(found("bitcoin-watch", true, holds(), Ran::Words), holds());
-        assert_eq!(found("bitcoin-watch", true, holds(), Ran::Words), None);
-        // Asked by voice now: said, the mark aside.
+        let (said, mark) = found("bitcoin-watch", true, holds(), Ran::Words);
+        assert_eq!(said, holds());
+        let sha256 = mark.expect("a holding watch's run has a mark to set");
+        watch_told_once("bitcoin-watch", &state, &sha256, Some("skipped: not alone"));
+        let (said, mark) = found("bitcoin-watch", true, holds(), Ran::Words);
+        assert_eq!(said, holds(), "dropped unsaid: said again");
+        assert_eq!(mark.as_deref(), Some(sha256.as_str()));
+        watch_told_once("bitcoin-watch", &state, &sha256, Some("told"));
+        assert_eq!(
+            found("bitcoin-watch", true, holds(), Ran::Words),
+            (None, None)
+        );
+        // Not holding: the mark cleared; holding again: said, and a
+        // telling that never began (a restart) leaves it unmarked.
+        assert_eq!(
+            found("bitcoin-watch", true, None, Ran::Silent),
+            (None, None)
+        );
+        let (said, mark) = found("bitcoin-watch", true, holds(), Ran::Words);
+        assert_eq!(said, holds());
+        watch_told_once("bitcoin-watch", &state, &mark.unwrap(), None);
+        let (said, mark) = found("bitcoin-watch", true, holds(), Ran::Words);
+        assert_eq!(said, holds(), "never begun: said again");
+        watch_told_once(
+            "bitcoin-watch",
+            &state,
+            &mark.unwrap(),
+            Some("said as news: told"),
+        );
+        assert_eq!(
+            found("bitcoin-watch", true, holds(), Ran::Words),
+            (None, None)
+        );
+        // Asked by voice now: said, the mark aside, nothing to mark.
         let asked = watch_found(
             "bitcoin-watch",
             (&folder, true),
@@ -10648,6 +10711,6 @@ mod tests {
             Some(Ran::Words),
             Some(unix_ms()),
         );
-        assert_eq!(asked, holds());
+        assert_eq!(asked, (holds(), None));
     }
 }
