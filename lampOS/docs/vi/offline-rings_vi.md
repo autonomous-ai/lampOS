@@ -17,6 +17,11 @@ vốn là một lượt của mô hình, và cổng của nó cần một phiên
   đèn, được tạo sẵn lúc khởi động khi còn mạng. Phát trọn vẹn thì mục đó được
   ghi là đã nói: khi mạng trở lại không nói lại gì về nó. Không có đoạn âm
   thanh nào được giữ thì nó chờ mạng như trước.
+- **Một lỗ hổng đã biết, không phải ý định:** sau câu reo chung, lời của
+  chính lời nhắc không bao giờ được nói. Vì vậy công tắc vẫn tắt cho đến khi
+  điểm 5 của first builder (c7183858037) được làm cùng #8708: một lần reo
+  khi mất mạng không tính là đã nói lời nhắc, và lời của nó được nói một lần
+  khi mạng trở lại.
 - **Quyết định của first builder (26/11, điểm 1): phương án C.** Lời nhắc khi
   mất mạng luôn reo bằng câu chung "You have a reminder.", không bao giờ bằng
   lời của chính nó. Phương án B (đọc lời nhắc bằng lời của nó, tạo sẵn khi
