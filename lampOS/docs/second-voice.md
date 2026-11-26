@@ -4698,9 +4698,16 @@ after a take-over, but now for every turn:
   the rest of its round, and the round's words are not kept. A quoted line
   and a reminder's ring are not judged. On a line that asked no live fact
   (`live_fact::asks_live_fact` false: `asks_live`'s words, but a weather
-  condition alone counts only in a question, so "tell me a short story
-  about a cat who goes to the beach in Da Nang when it's sunny." asks none
-  and "Will it be sunny in Hanoi?" asks one; kit-8646, 26 Nov, build
+  condition alone counts only in a question: the line has a '?', opens
+  (past the lamp's call) with `will it`, `is it`, `does it`, `how's`/`how
+  is`, `what's`/`what is` or `should I`, or has the condition right after
+  one of those, `be` between allowed (V2, 26 Nov 18:35: speech to text drops
+  the '?' too often). So "will it be sunny in Hanoi" and "is it raining in
+  Hue" ask one, and "tell me a short story about a cat who goes to the
+  beach in Da Nang when it's sunny." and "a cat who loved rainy days" ask
+  none. Known limit: a question put another way with no '?' ("I wonder if
+  it's sunny in Hanoi") asks none, so its numberless condition is said once
+  words are out; kit-8646, 26 Nov, build
   16293: that story's "sunny" was held after its first piece's audio
   began, then asked again; the first-words wait still reads `asks_live`), once some of the turn's words were said,
   a figure with no number in it (a weather condition with a place) is
@@ -4715,7 +4722,8 @@ after a take-over, but now for every turn:
   silver?"); so does any figure on a line that asked one, or before
   anything was said. Test:
   `live_fact::a_numberless_figure_in_a_line_that_asked_none_is_said_once_words_are_out`,
-  `live_fact::a_story_line_naming_a_condition_says_its_numberless_figure_after_the_first_piece`.
+  `live_fact::a_story_line_naming_a_condition_says_its_numberless_figure_after_the_first_piece`,
+  `live_fact::tests::a_condition_asks_a_live_fact_only_in_a_question`.
   The round-end check (`chat round N: K sentence(s) gave a live figure no
   lookup backs`) judges only what `Hold::pass` held, so the same rule
   applies there. "Words out" means a sentence went to the voice

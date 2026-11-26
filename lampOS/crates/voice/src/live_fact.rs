@@ -589,15 +589,50 @@ pub fn asks_live(line: &str) -> bool {
     asks_live_by(line, true)
 }
 
+/// A question's opening words, folded as [`words`] folds them: a weather
+/// condition after one, or in a line that opens with one, is asked
+/// (V2's ruling on #8615, 26 Nov 18:35).
+const QUESTION_OPENERS: [&str; 8] = [
+    "will it", "is it", "does it", "how's", "how is", "what's", "what is", "should i",
+];
+
+/// What a line may open with before its question: the call.
+const CALLS: [&str; 4] = ["hey", "hi", "ok", "lamp"];
+
 /// Whether the person's line asked a live fact, for [`Hold::lets_through`]
 /// (#8615's (d')): as [`asks_live`], but a weather condition alone counts
-/// only in a question ("Will it be sunny in Hanoi?"). kit-8646's "tell me
-/// a short story about a cat who goes to the beach in Da Nang when it's
-/// sunny." names the story's setting and asks nothing live (lamp-52e6, 26
-/// Nov, build 16293: its "sunny" figure was held after the first piece's
-/// audio began, and the story asked again).
+/// only in a question: the line has a '?', opens with one of
+/// [`QUESTION_OPENERS`] (past the lamp's call), or has the condition right
+/// after one ("tell me, will it be sunny"), "be" between them allowed.
+/// Speech to text drops the '?' too often to read it alone. kit-8646's
+/// "tell me a short story about a cat who goes to the beach in Da Nang
+/// when it's sunny." names the story's setting and asks nothing live
+/// (lamp-52e6, 26 Nov, build 16293: its "sunny" figure was held after the
+/// first piece's audio began, and the story asked again). Known limit: a
+/// question put another way with no '?' ("I wonder if it's sunny in
+/// Hanoi") asks none, so its numberless condition is said once words are
+/// out.
 pub fn asks_live_fact(line: &str) -> bool {
-    asks_live_by(line, line.contains('?'))
+    asks_live_by(line, line.contains('?') || asks_a_question(line))
+}
+
+/// Whether `line` opens with a question's words, or a weather condition
+/// sits right after them ([`QUESTION_OPENERS`]).
+fn asks_a_question(line: &str) -> bool {
+    let lower = words(line);
+    let start = lower
+        .iter()
+        .take_while(|word| CALLS.contains(&word.as_str()))
+        .count();
+    let opening = format!("{} ", lower[start..].join(" "));
+    let joined = format!(" {} ", lower.join(" "));
+    QUESTION_OPENERS.iter().any(|opener| {
+        opening.starts_with(&format!("{opener} "))
+            || CONDITIONS.iter().any(|condition| {
+                joined.contains(&format!(" {opener} {condition} "))
+                    || joined.contains(&format!(" {opener} be {condition} "))
+            })
+    })
 }
 
 /// [`asks_live`]'s words, a weather condition ([`CONDITIONS`], some of them
