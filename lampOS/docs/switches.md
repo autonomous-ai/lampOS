@@ -958,7 +958,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_ROOM_FILE` | After a quick restart, the lamp remembers whether the room was quiet or busy instead of starting unsure. |
 | `LAMP_SERVICE_DOWN_LINE` | When the lamp's service is down but the internet works, the lamp says so once instead of going silent. |
 | `LAMP_OUTAGE_LINE_AGAIN` | On in the product: offline, the lamp tells you why on every try, not just the first; a lost answer says it was lost. |
-| `LAMP_OFFLINE_RINGS` | With no internet, your timers and reminders still ring on time, once, a reminder in its own words, and a cough gets no second apology. |
+| `LAMP_OFFLINE_RINGS` | Offline, timers and reminders ring on time, once, reminders in their own words; a cough gets no repeat. |
 | `LAMP_PRIVACY_GAP_RIDE` | On in the product: a split-second glitch reading the privacy switch no longer ends your conversation. |
 | `LAMP_VOICE_LOCK_CODE` | The lamp keeps its voice's code in memory, so a busy memory card can't freeze it mid-answer. |
 | `LAMP_VOICE_YOUNG_BOOT_GRACE` | Right after a slow power-on, the lamp's voice waits for its parts instead of failing and restarting. |
