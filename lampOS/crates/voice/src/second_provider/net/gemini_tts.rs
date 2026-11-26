@@ -9,7 +9,7 @@
 use super::{
     Error, Result,
     chat::Lines,
-    chunk, http_client, post,
+    chunk, http_client, post_reading_the_key,
     tts::{Packets, without_tags},
 };
 use serde_json::{Value, json};
@@ -46,6 +46,9 @@ pub struct GeminiTts {
     used: Mutex<Option<Instant>>,
     /// Sentences asked and not yet begun.
     asking: Arc<AtomicUsize>,
+    /// The person's own Gemini voice (#8754): Gemini's 400 for a bad key is
+    /// read as [`Error::KeyInvalid`], which gives way to the lamp's voice.
+    key_400: bool,
 }
 
 /// A sentence asked of Gemini until its first audio or its failure: how
@@ -76,6 +79,16 @@ impl GeminiTts {
             voice: voice.to_owned(),
             used: Mutex::new(None),
             asking: Arc::default(),
+            key_400: false,
+        })
+    }
+
+    /// The person's own Gemini voice (#8754): [`Self::new`], with Gemini's
+    /// 400 for a bad key read as [`Error::KeyInvalid`].
+    pub fn persons(base_url: &str, model: &str, key: &str, voice: &str) -> Result<Self> {
+        Ok(Self {
+            key_400: true,
+            ..Self::new(base_url, model, key, voice)?
         })
     }
 
@@ -122,11 +135,12 @@ impl GeminiTts {
         if let Ok(mut used) = self.used.lock() {
             *used = Some(Instant::now());
         }
-        let response = post(
+        let response = post_reading_the_key(
             &self.client,
             &self.url,
             ("x-goog-api-key", &self.key),
             &body,
+            self.key_400,
         )
         .await?;
         Ok(GeminiSpeech {
@@ -442,5 +456,50 @@ mod tests {
             "{request}"
         );
         assert!(request.contains("x-goog-api-key: g-key"));
+    }
+
+    /// #8754: the person's own Gemini voice reads Gemini's 400 for a bad key
+    /// as the key refused ([`Error::KeyInvalid`]); the lamp's Gemini voice,
+    /// and any other 400, stay a plain status.
+    #[tokio::test]
+    async fn the_persons_gemini_voice_reads_a_bad_keys_400_as_the_key_refused() {
+        const BAD_KEY: &str = r#"{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"reason":"API_KEY_INVALID"}]}}"#;
+        const OTHER: &str =
+            r#"{"error":{"code":400,"message":"Invalid voice.","status":"INVALID_ARGUMENT"}}"#;
+        for (persons, body, error) in [
+            (true, BAD_KEY, Error::KeyInvalid),
+            (true, OTHER, Error::Status(400)),
+            (false, BAD_KEY, Error::Status(400)),
+        ] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let server = tokio::spawn(async move {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut request = Vec::new();
+                let mut buffer = [0; 4096];
+                while !String::from_utf8_lossy(&request).contains("voiceName") {
+                    let n = socket.read(&mut buffer).await.unwrap();
+                    request.extend_from_slice(&buffer[..n]);
+                }
+                let reply = format!(
+                    "HTTP/1.1 400 Bad Request\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                socket.write_all(reply.as_bytes()).await.unwrap();
+            });
+            let base = format!("http://{address}/v1beta");
+            let tts = if persons {
+                GeminiTts::persons(&base, "m-tts", "AIza-planted", "Kore")
+            } else {
+                GeminiTts::new(&base, "m-tts", "g-key", "Kore")
+            }
+            .unwrap();
+            assert_eq!(
+                tts.speak("Hi.").await.err(),
+                Some(error.clone()),
+                "{persons} {body}"
+            );
+            server.await.unwrap();
+        }
     }
 }

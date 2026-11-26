@@ -211,6 +211,11 @@ pub struct Net {
     /// `LAMP_SECOND_SPEECH=gemini`: Gemini's voice first, the configured
     /// one when it fails.
     gemini_tts: Option<Arc<GeminiTts>>,
+    /// The person's own Gemini voice (`LAMP_OWN_KEYS`, #8754): first for
+    /// every piece, at Google's own API with their key, never the relay's;
+    /// the lamp's one voice ([`Self::gemini_tts`] or the configured one)
+    /// says what it can't, from its refusal or second failure on.
+    own_gemini: Option<(Arc<GeminiTts>, Arc<net::OwnVoiceLost>)>,
     declare: net::Declare,
     /// `LAMP_SECOND_CHAT_WARM=on`: the chat's connection is opened as a line
     /// begins ([`Chat::warm`]).
@@ -547,6 +552,7 @@ impl Net {
             chat: Arc::new(Chat::new(&config, declare.clone())?),
             tts: Arc::new(Tts::new(&config)?),
             gemini_tts: None,
+            own_gemini: None,
             declare,
             warm_chat: false,
             warm_speech: false,
@@ -934,6 +940,66 @@ impl Net {
         .boxed()
     }
 
+    /// The person's own Gemini voice, as the configuration has it
+    /// (`hosted.own_gemini_voice`, #8754), over the lamp's one voice, which
+    /// stays for the fallback: their key at Google's own API
+    /// ([`crate::second_config::GEMINI_BASE_URL`]) in the speech model the
+    /// keys helper checked ([`crate::second_config::GEMINI_SPEECH_MODEL`]),
+    /// never the relay's address, a near one or the unit's model switch.
+    /// Whether it was there.
+    pub fn speaking_in_the_persons_gemini_voice(mut self) -> net::Result<(Self, bool)> {
+        let Some(own) = self.config.hosted.own_gemini_voice.clone() else {
+            return Ok((self, false));
+        };
+        self.own_gemini = Some((
+            Arc::new(GeminiTts::persons(
+                crate::second_config::GEMINI_BASE_URL,
+                crate::second_config::GEMINI_SPEECH_MODEL,
+                own.key.expose().trim(),
+                &own.voice,
+            )?),
+            net::own_voice_lost(),
+        ));
+        Ok((self, true))
+    }
+
+    /// [`Self::speaking_in_the_persons_gemini_voice`] at `base_url`, with
+    /// `lost` in place of the process's one: tests only.
+    #[cfg(test)]
+    fn speaking_in_the_persons_gemini_voice_at(
+        mut self,
+        base_url: &str,
+        lost: Arc<net::OwnVoiceLost>,
+    ) -> Self {
+        let own = self.config.hosted.own_gemini_voice.clone().unwrap();
+        self.own_gemini = Some((
+            Arc::new(
+                GeminiTts::persons(
+                    base_url,
+                    crate::second_config::GEMINI_SPEECH_MODEL,
+                    own.key.expose(),
+                    &own.voice,
+                )
+                .unwrap(),
+            ),
+            lost,
+        ));
+        self
+    }
+
+    /// Whether the person's own Gemini voice was taken: tests only.
+    #[cfg(test)]
+    pub(crate) fn has_the_persons_gemini_voice(&self) -> bool {
+        self.own_gemini.is_some()
+    }
+
+    /// Whether a piece asked now goes to the person's own Gemini voice.
+    fn speaks_the_persons_gemini(&self) -> bool {
+        self.own_gemini
+            .as_ref()
+            .is_some_and(|(_, lost)| !lost.is_lost())
+    }
+
     /// Speech is Gemini's, in `voice` (`LAMP_SECOND_SPEECH=gemini`); a
     /// sentence it cannot say goes to the configured voice.
     pub fn speaking_with_gemini(
@@ -970,18 +1036,27 @@ async fn gemini_first(
     Ok(stream::iter([Ok(first)]).chain(rest).boxed())
 }
 
-/// The lamp's one voice ([`Net`]): Gemini's or the configured one.
+/// The lamp's one voice ([`Net`]): Gemini's or the configured one; or the
+/// person's own Gemini voice over it (#8754).
 #[derive(Clone)]
 enum Voice {
     Gemini(Arc<GeminiTts>),
     Configured(Arc<Tts>, &'static str),
+    /// The person's own Gemini voice, the lamp's own voice for what it
+    /// can't say, and the process's one refusal ([`net::OwnVoiceLost`]).
+    OwnGemini(Arc<GeminiTts>, Box<Voice>, Arc<net::OwnVoiceLost>),
 }
+
+/// The person's own Gemini voice's name in its journal lines (#8754).
+const OWN_GEMINI: &str = "Gemini";
 
 impl Voice {
     fn name(&self) -> &'static str {
         match self {
             Self::Gemini(_) => "Gemini",
             Self::Configured(_, name) => name,
+            Self::OwnGemini(_, lamps, lost) if lost.is_lost() => lamps.name(),
+            Self::OwnGemini(..) => "the person's Gemini voice",
         }
     }
 
@@ -993,6 +1068,29 @@ impl Voice {
     ) -> net::Result<BoxStream<'static, net::Result<Vec<i16>>>> {
         match self {
             Self::Gemini(gemini) => gemini_first(gemini, text).await,
+            // #8754: a piece Google refuses for the person's key (401, 403,
+            // or a 400 its body says is the key) is said in the lamp's own
+            // voice after the one notice, and every piece after; a piece it
+            // fails to start for another reason goes back to the services,
+            // which ask once more and then give way, as for ElevenLabs.
+            Self::OwnGemini(own, lamps, lost) => {
+                if !lost.is_lost() {
+                    match gemini_first(own, text).await {
+                        Err(net::Error::Status(status @ (401 | 403))) => {
+                            lost.refused_by(status, OWN_GEMINI);
+                        }
+                        Err(net::Error::KeyInvalid) => lost.refused_by(400, OWN_GEMINI),
+                        spoken => return spoken,
+                    }
+                }
+                // The notice goes with an answer's piece only, as for
+                // ElevenLabs: never a line rendered ahead with no turn.
+                let text = match turn {
+                    Some(_) => lost.told_by(text, OWN_GEMINI),
+                    None => text.to_owned(),
+                };
+                Box::pin(lamps.first(&text, turn)).await
+            }
             Self::Configured(tts, _) => {
                 let mut speech = match turn {
                     Some(turn) => tts.speak_for(text, turn).await?,
@@ -1024,6 +1122,15 @@ impl Voice {
                 });
                 Ok(stream::iter(first.map(Ok)).chain(rest).boxed())
             }
+            // The lamp's own voice, once the person's Gemini voice was
+            // refused or gave way (#8754), as that voice is asked again.
+            (Self::OwnGemini(_, lamps, lost), _) if lost.is_lost() => {
+                let text = match turn {
+                    Some(_) => lost.told_by(text, OWN_GEMINI),
+                    None => text.to_owned(),
+                };
+                Box::pin(lamps.first_fresh(&text, turn)).await
+            }
             _ => self.first(text, turn).await,
         }
     }
@@ -1032,21 +1139,30 @@ impl Voice {
     /// configured voice for a turn's piece. Gemini, and speech with no turn,
     /// are asked as the first time (El's P3 on #4345).
     fn asks_fresh(&self, turn: Option<net::Turn>) -> bool {
-        matches!((self, turn), (Self::Configured(..), Some(_)))
+        match self {
+            Self::OwnGemini(_, lamps, lost) => lost.is_lost() && lamps.asks_fresh(turn),
+            _ => matches!((self, turn), (Self::Configured(..), Some(_))),
+        }
     }
 
     /// Whether a piece asked now goes to the person's own ElevenLabs voice
     /// (#8367), which gives way to the lamp's own once it fails a piece
     /// twice ([`in_one_voice_near`], #8394's P2).
     fn speaks_the_persons(&self) -> bool {
-        matches!(self, Self::Configured(tts, _) if tts.speaks_the_persons())
+        match self {
+            Self::Configured(tts, _) => tts.speaks_the_persons(),
+            Self::OwnGemini(_, _, lost) => !lost.is_lost(),
+            Self::Gemini(_) => false,
+        }
     }
 
     /// The person's own voice gives way to the lamp's own, `why` its second
     /// failure ([`net::Tts::give_way`]); nothing for any other voice.
     fn give_way(&self, why: &net::Error) {
-        if let Self::Configured(tts, _) = self {
-            tts.give_way(why);
+        match self {
+            Self::Configured(tts, _) => tts.give_way(why),
+            Self::OwnGemini(_, _, lost) => lost.failed_by(why, OWN_GEMINI),
+            Self::Gemini(_) => {}
         }
     }
 }
@@ -1223,17 +1339,26 @@ impl Net {
         .boxed()
     }
 
-    /// The lamp's one voice: Gemini's, or the configured one.
+    /// The lamp's one voice: Gemini's, or the configured one; with the
+    /// person's own Gemini voice (#8754), theirs over it.
     fn voice(&self) -> Voice {
-        match &self.gemini_tts {
+        let lamps = match &self.gemini_tts {
             Some(gemini) => Voice::Gemini(gemini.clone()),
             None => Voice::Configured(self.tts.clone(), self.config.tts_provider.name()),
+        };
+        match &self.own_gemini {
+            Some((own, lost)) => Voice::OwnGemini(own.clone(), Box::new(lamps), lost.clone()),
+            None => lamps,
         }
     }
 
     /// The turn's voice, and the same at its own address when that one is
-    /// near (#2882).
+    /// near (#2882). The person's own Gemini voice is never near: their key
+    /// goes to Google alone (#8754).
     fn turn_voice(&self) -> (Voice, Option<(Voice, Taken, Service)>) {
+        if self.own_gemini.is_some() {
+            return (self.voice(), None);
+        }
         if let Some((gemini, taken)) = self.near_gemini_tts() {
             return (
                 Voice::Gemini(gemini),
@@ -1431,8 +1556,9 @@ impl Services for Net {
     }
 
     fn open_speech_ahead(&self, request: u64) {
-        // The configured voice only when it is the lamp's one voice.
-        if !self.speech_socket || self.gemini_tts.is_some() {
+        // The configured voice only when it is the lamp's one voice, and
+        // not while the person's Gemini voice speaks (#8754).
+        if !self.speech_socket || self.gemini_tts.is_some() || self.speaks_the_persons_gemini() {
             return;
         }
         let tts = self.turn_tts();
@@ -1471,11 +1597,15 @@ impl Services for Net {
     }
 
     fn warm(&self) -> BoxFuture<'static, ()> {
-        // The turn's chat and voice, near or their own (#2882).
-        let gemini = self
-            .near_gemini_tts()
-            .map(|(tts, _)| tts)
-            .or_else(|| self.gemini_tts.clone());
+        // The turn's chat and voice, near or their own (#2882); the
+        // person's own Gemini voice while it speaks (#8754), at Google.
+        let gemini = match &self.own_gemini {
+            Some((own, _)) if self.speaks_the_persons_gemini() => Some(own.clone()),
+            _ => self
+                .near_gemini_tts()
+                .map(|(tts, _)| tts)
+                .or_else(|| self.gemini_tts.clone()),
+        };
         let chat = self.warm_chat.then(|| {
             self.near_chat()
                 .map_or_else(|| self.chat.clone(), |(chat, _, _)| chat)
@@ -2137,6 +2267,179 @@ pub(crate) mod tests {
                 "HTTP {status}"
             );
         }
+    }
+
+    /// The person's own Gemini voice at `own` (#8754), with the lamp's own
+    /// ElevenLabs voice at `lamps` to fall back to, on a refusal state of
+    /// its own.
+    fn persons_gemini_voice(own: &str, lamps: &str, lost: &Arc<net::OwnVoiceLost>) -> Voice {
+        let lamps = Tts::with(TtsProvider::ElevenLabs, lamps, LAMPS_KEY, None).unwrap();
+        let own = GeminiTts::persons(own, "m-tts", PERSONS_GEMINI_KEY, "Puck").unwrap();
+        Voice::OwnGemini(
+            Arc::new(own),
+            Box::new(Voice::Configured(Arc::new(lamps), "ElevenLabs")),
+            lost.clone(),
+        )
+    }
+
+    const PERSONS_GEMINI_KEY: &str = "aiza-planted-8754-own";
+
+    /// #8754: the person's own Gemini voice says each sentence while Google
+    /// takes it, the lamp's voice never asked. A refusal of their key (401,
+    /// 403, or a 400 whose body says the key) gives way at once, with no
+    /// second asking; any other failure (a plain 400, a 429, a 5xx) is asked
+    /// once more and then gives way, as ElevenLabs' does. Either way the
+    /// sentence and every one after are said in the lamp's own voice, after
+    /// the one notice that names Gemini; the journal names neither the key
+    /// nor the voice.
+    #[tokio::test]
+    async fn the_persons_gemini_voice_failing_twice_or_refused_gives_way_to_the_lamps_own() {
+        use base64::{Engine, engine::general_purpose::STANDARD};
+        let event = serde_json::json!({"candidates": [{"content": {"parts": [
+            {"inlineData": {"mimeType": "audio/L16;codec=pcm;rate=24000", "data": STANDARD.encode(bytes(&[3, 4]))}}
+        ]}}]});
+        let sse = format!("data: {event}\r\n\r\n").into_bytes();
+        let (own_url, own_asked) = recording(
+            answer_head(200, sse.len()),
+            sse,
+            PERSONS_GEMINI_KEY,
+            std::time::Duration::ZERO,
+        )
+        .await;
+        let (lamps_url, lamps_asked) = recording(
+            answer_head(200, 4),
+            bytes(&[5, 6]),
+            LAMPS_KEY,
+            std::time::Duration::ZERO,
+        )
+        .await;
+        let lost = Arc::new(net::OwnVoiceLost::default());
+        let voice = persons_gemini_voice(&own_url, &lamps_url, &lost);
+        assert!(voice.speaks_the_persons());
+        assert_eq!(
+            spoken(in_one_voice(voice, "Hello there.".into(), turn_of(8754))).await,
+            Ok(vec![3, 4]),
+            "the person's Gemini voice, as it is"
+        );
+        assert_eq!(own_asked.lock().unwrap().len(), 1);
+        assert!(lamps_asked.lock().unwrap().is_empty());
+        assert!(lost.said().is_empty());
+
+        let bad_key = br#"{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"reason":"API_KEY_INVALID"}]}}"#.to_vec();
+        let plain =
+            br#"{"error":{"code":400,"message":"no","status":"INVALID_ARGUMENT"}}"#.to_vec();
+        for (status, body, own_tries, refused) in [
+            (401, Vec::new(), 1, true),
+            (403, Vec::new(), 1, true),
+            (400, bad_key, 1, true),
+            (400, plain, 2, false),
+            (429, Vec::new(), 2, false),
+            (503, Vec::new(), 2, false),
+        ] {
+            let (own_url, own_asked) = recording(
+                answer_head(status, body.len()),
+                body,
+                PERSONS_GEMINI_KEY,
+                std::time::Duration::ZERO,
+            )
+            .await;
+            let (lamps_url, lamps_asked) = recording(
+                answer_head(200, 4),
+                bytes(&[5, 6]),
+                LAMPS_KEY,
+                std::time::Duration::ZERO,
+            )
+            .await;
+            let lost = Arc::new(net::OwnVoiceLost::default());
+            let voice = persons_gemini_voice(&own_url, &lamps_url, &lost);
+            assert_eq!(
+                spoken(in_one_voice(
+                    voice.clone(),
+                    "Hello there.".into(),
+                    turn_of(8754)
+                ))
+                .await,
+                Ok(vec![10, 12]),
+                "HTTP {status}: said, in the lamp's own voice"
+            );
+            assert!(!voice.speaks_the_persons(), "HTTP {status}");
+            assert_eq!(
+                spoken(in_one_voice(voice, "And again.".into(), turn_of(8754))).await,
+                Ok(vec![10, 12]),
+                "HTTP {status}: the next sentence too"
+            );
+            assert_eq!(own_asked.lock().unwrap().len(), own_tries, "HTTP {status}");
+            assert_eq!(
+                texts(&lamps_asked),
+                [
+                    format!("{} Hello there.", net::own_voice_lost_line("Gemini")),
+                    "And again.".to_owned()
+                ],
+                "HTTP {status}: the notice said once, with the first sentence"
+            );
+            let journal = lost.said();
+            assert_eq!(journal.len(), 2, "HTTP {status}: {journal:?}");
+            if refused {
+                assert!(
+                    journal[0].starts_with(
+                        "lamp-voice second: Gemini refused the person's own key or voice"
+                    ),
+                    "{journal:?}"
+                );
+            } else {
+                assert!(
+                    journal[0].starts_with(
+                        "lamp-voice second: the person's own Gemini voice failed a sentence twice"
+                    ),
+                    "{journal:?}"
+                );
+            }
+            for line in &journal {
+                assert!(!line.contains("ElevenLabs"), "{line}");
+                assert!(
+                    !line.contains(PERSONS_GEMINI_KEY) && !line.contains("Puck"),
+                    "{line}"
+                );
+            }
+        }
+        assert_eq!(
+            net::own_voice_lost_line("Gemini"),
+            "Your Gemini voice isn't working right now, so I'm back to my own voice."
+        );
+        assert_eq!(
+            net::own_voice_lost_line("ElevenLabs"),
+            net::OWN_VOICE_LOST_LINE
+        );
+    }
+
+    /// #8754: with the person's own Gemini voice, the turn's voice is theirs
+    /// at its own address, never a near one: their key goes to Google alone,
+    /// and the lamp's one voice is kept behind it for the fallback.
+    #[test]
+    fn the_persons_gemini_voice_is_never_near_and_keeps_the_lamps_voice_behind_it() {
+        let mut config = config_at(
+            "own-gemini-voice",
+            "k-relay",
+            "http://127.0.0.1:9",
+            "http://127.0.0.1:9",
+        );
+        config.hosted.own_gemini_voice = Some(crate::second_config::OwnGeminiVoice {
+            key: crate::second_config::Key::for_test("AIza-planted-8754"),
+            voice: "Puck".into(),
+        });
+        let lost = Arc::new(net::OwnVoiceLost::default());
+        let net = Net::new(config, Arc::new(Vec::new))
+            .unwrap()
+            .speaking_in_the_persons_gemini_voice_at("http://127.0.0.1:9", lost.clone());
+        let (voice, near) = net.turn_voice();
+        assert!(near.is_none());
+        assert!(
+            matches!(&voice, Voice::OwnGemini(_, lamps, _) if matches!(**lamps, Voice::Configured(..)))
+        );
+        assert!(voice.speaks_the_persons());
+        lost.refused_by(401, "Gemini");
+        assert!(!net.voice().speaks_the_persons());
+        assert_eq!(net.voice().name(), net.config.tts_provider.name());
     }
 
     /// Nothing to say asks no voice at all.

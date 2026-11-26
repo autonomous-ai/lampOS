@@ -950,6 +950,34 @@ mod tests {
         assert!(!relay.told().contains("near"), "{}", relay.told());
     }
 
+    /// #8754: with the person's own Gemini voice the probe's speech is not
+    /// routed to a near address either, as the voice's own isn't; the
+    /// person's Gemini key is never the key of any arm, which the probe
+    /// takes from the route's configured voice and Gemini alone.
+    #[test]
+    fn an_own_gemini_voice_key_is_never_sent_to_the_relay() {
+        let mut config = config_at(
+            "probe-own-gemini-voice",
+            "k-relay",
+            "https://relay.invalid",
+            "https://relay.invalid",
+        );
+        let routes = Routes {
+            speech: Some("https://near.invalid/api/v1/ai".into()),
+            ..Routes::default()
+        };
+        assert!(matches!(speech_relay(&config, &routes), Relay::Near(_)));
+        config.hosted.own_gemini_voice = Some(crate::second_config::OwnGeminiVoice {
+            key: crate::second_config::Key::for_test("AIza-planted-8754"),
+            voice: "Puck".into(),
+        });
+        let relay = speech_relay(&config, &routes);
+        assert_eq!(relay, Relay::Normal(config.tts_base_url.clone()));
+        assert!(!relay.told().contains("near"), "{}", relay.told());
+        assert_eq!(config.tts_key.expose(), "k-relay");
+        assert!(!format!("{config:?}").contains("AIza-planted"));
+    }
+
     /// With the routes off the probe never asks for them, and its arms
     /// reach the normal address; an address the unit's environment gave is
     /// never routed, whatever the routes say.
