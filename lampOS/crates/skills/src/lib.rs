@@ -14787,6 +14787,26 @@ mod tests {
             let folder = timed("told", grants);
             package::pack(&folder, &out).unwrap_or_else(|why| panic!("{grants}: {why}"));
         }
+        // A fixed say with a number (#8651) is told its own repair, not the
+        // told answer's form.
+        let counted = task_skill(
+            &dir.path().join("counted"),
+            "year-count",
+            "version = \"1.0.0\"\n[trigger]\n\
+             topic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n\
+             [ask]\npolicy = \"nudge\"\n[permissions]\ntopics = [\"voice/state\"]\nspeak = true\n\
+             [[do]]\nsay = \"Ninety nine days left in the year.\"\n",
+        );
+        let refused = package::pack(&counted, &out).unwrap_err();
+        assert_eq!(
+            refused,
+            format!(
+                "{}{}: {}",
+                package::TOLD_ONLY_REFUSED,
+                lamp_voice::made_skill::SPEAKS_ON_ITS_OWN,
+                lamp_voice::made_skill::CHANGING_SAY_REPAIR
+            )
+        );
         // The same skill started by a tool alone may still speak.
         let speaks =
             PHOTO_BOOTH.replace(r#"["camera", "light"]"#, r#"["camera", "light", "speak"]"#);

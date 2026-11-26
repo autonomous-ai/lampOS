@@ -4349,7 +4349,9 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   (`made_skill::told_only`, gọi từ `package::pack_signed_by`), nói
   `not packed: told_only: ` (`package::TOLD_ONLY_REFUSED`),
   `SPEAKS_ON_ITS_OWN` và dạng câu trả lời được kể
-  (`made_skill::TOLD_ONLY_SHAPE`), để việc tạo biết dạng đó trước khi giữ;
+  (`made_skill::TOLD_ONLY_SHAPE`; với một câu say cố định có số hay ngày,
+  lời hướng dẫn sửa riêng của nó, `made_skill::CHANGING_SAY_REPAIR`), để
+  việc tạo biết dạng đó trước khi giữ;
   nó áp cho mọi gói, như `Skill::made_refuses`. Vì vậy một kỹ năng được
   giữ trước #8651 mà trigger khởi động và code của nó sẽ tự nói vẫn chạy,
   nhưng việc chia sẻ lên Store và bản xem trước của nó
@@ -4358,7 +4360,10 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   không bao giờ là lời hướng dẫn sửa của agent: lời từ chối được nhận ra
   qua dấu của nó (`package::refused_told_only`), và app hiện
   `cloud::share::SPEAKS_ON_ITS_OWN`, "This skill speaks when it starts on
-  its own, so it can't be shared yet." `lamp-skills pack` giữ lời hướng
+  its own, so it can't be shared yet.", bằng tiếng Việt khi chia sẻ bằng
+  tiếng Việt (`SPEAKS_ON_ITS_OWN_VI`, "Kỹ năng này tự nói khi nó tự bắt
+  đầu, nên chưa chia sẻ được."); các ngôn ngữ khác nhận dòng tiếng Anh.
+  `lamp-skills pack` giữ lời hướng
   dẫn sửa. Test:
   `pack_refuses_a_trigger_skill_that_would_speak_and_packs_a_told_only_one`,
   `a_kept_trigger_skill_that_would_speak_is_refused_in_a_plain_line`,

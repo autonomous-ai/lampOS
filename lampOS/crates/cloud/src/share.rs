@@ -328,6 +328,22 @@ fn copy_skill(from: &Path, to: &Path) -> Result<(), String> {
 pub const SPEAKS_ON_ITS_OWN: &str =
     "This skill speaks when it starts on its own, so it can't be shared yet.";
 
+/// [`SPEAKS_ON_ITS_OWN`] in Vietnamese, as share's other lines are
+/// ([`visibility_note`]; El's P3 on #8688). Other languages get the English
+/// line.
+pub const SPEAKS_ON_ITS_OWN_VI: &str =
+    "Kỹ năng này tự nói khi nó tự bắt đầu, nên chưa chia sẻ được.";
+
+/// A share's refusal in the owner's `language`: the told-only line in
+/// Vietnamese for `vi`, any other as it is.
+fn in_language(why: String, language: &str) -> String {
+    if why == SPEAKS_ON_ITS_OWN && language == "vi" {
+        SPEAKS_ON_ITS_OWN_VI.to_owned()
+    } else {
+        why
+    }
+}
+
 /// A pack refusal as the owner is told it: the told-only one
 /// (`lamp_skills::package::refused_told_only`) as [`SPEAKS_ON_ITS_OWN`],
 /// any other as it is.
@@ -700,7 +716,8 @@ pub fn share(
     let visibility = visibility(data)?;
     let folder = shareable(places, &name)?;
     if data.get("preview").and_then(Value::as_bool) == Some(true) {
-        let (sha256, files) = seen(&folder, scratch, || {})?;
+        let (sha256, files) =
+            seen(&folder, scratch, || {}).map_err(|why| in_language(why, language))?;
         let mut preview = json!({"name": name, "sha256": sha256, "files": files});
         // The mode the owner named, and the lamp's line for it in the
         // owner's language, to be read before the yes; none named, none
@@ -718,7 +735,7 @@ pub fn share(
         .get("sha256")
         .and_then(Value::as_str)
         .ok_or_else(|| NOT_SEEN.to_owned())?;
-    let (file_name, tar) = pack(&folder, scratch)?;
+    let (file_name, tar) = pack(&folder, scratch).map_err(|why| in_language(why, language))?;
     if lamp_skills::package::sha256_hex(&tar) != seen {
         return Err(CHANGED.to_owned());
     }
