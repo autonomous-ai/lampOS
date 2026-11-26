@@ -1,4 +1,4 @@
-# Hẹn giờ và lời nhắc khi mất mạng (`LAMP_OFFLINE_RINGS`, #8632)
+# Hẹn giờ và lời nhắc khi mất mạng (`LAMP_OFFLINE_RINGS`, #8632, #8708)
 
 Bản tiếng Việt của mục "Timers and reminders with no link" trong
 [offline.md](../offline.md) và "With no link" trong
@@ -11,22 +11,47 @@ tra của #8632): một hẹn giờ đặt trước khi mất mạng 10 phút đ
 vốn là một lượt của mô hình, và cổng của nó cần một phiên đám mây sẵn sàng.
 
 - **Hẹn giờ hoặc lời nhắc đến hạn vẫn reo đúng giờ:** khi mạng mất quá thời
-  gian chờ 5 s (`bus_out::LINK_GRACE_US`) và không có phiên nào sẵn sàng, nó
-  reo từ một đoạn âm thanh trong bộ nhớ đệm giọng nói: "Your timer is done."
-  cho hẹn giờ, "You have a reminder." cho lời nhắc, bằng ngôn ngữ của chủ
-  đèn, được tạo sẵn lúc khởi động khi còn mạng. Phát trọn vẹn thì mục đó được
-  ghi là đã nói: khi mạng trở lại không nói lại gì về nó. Không có đoạn âm
-  thanh nào được giữ thì nó chờ mạng như trước.
-- **Một lỗ hổng đã biết, không phải ý định:** sau câu reo chung, lời của
-  chính lời nhắc không bao giờ được nói. Vì vậy công tắc vẫn tắt cho đến khi
-  điểm 5 của first builder (c7183858037) được làm cùng #8708: một lần reo
-  khi mất mạng không tính là đã nói lời nhắc, và lời của nó được nói một lần
-  khi mạng trở lại.
-- **Quyết định của first builder (26/11, điểm 1): phương án C.** Lời nhắc khi
-  mất mạng luôn reo bằng câu chung "You have a reminder.", không bao giờ bằng
-  lời của chính nó. Phương án B (đọc lời nhắc bằng lời của nó, tạo sẵn khi
-  còn mạng và xoá khi mục rời khỏi Schedule) là việc tiếp theo, với bước
-  kiểm tra quyền riêng tư riêng, không nằm trong PR này.
+  gian chờ 5 s (`bus_out::LINK_GRACE_US`) và không có phiên nào sẵn sàng. Hẹn
+  giờ reo "Your timer is done." từ bộ nhớ đệm giọng nói, bằng ngôn ngữ của
+  chủ đèn, được tạo sẵn lúc khởi động khi còn mạng; phát trọn vẹn thì được
+  ghi là đã nói.
+- **Lời nhắc reo bằng chính lời của nó (#8708):** khi còn mạng, tiến trình
+  con Schedule (tiến trình duy nhất vốn đã đọc lời của lời nhắc) tạo cho mỗi
+  lời nhắc (không bao giờ cho hẹn giờ) một đoạn âm thanh riêng: "You have a
+  reminder." và lời của nó, qua dịch vụ giọng nói của tuyến thứ hai
+  (`TtsCache::render_once`), trên một luồng riêng, không bao giờ trong nhịp
+  200 ms. Gói tin gửi cho giọng nói vẫn chỉ có id và thời gian, không bao giờ
+  có lời. Đoạn âm thanh lưu ở
+  `/var/lib/lampOS/voice/ring-clips/<store_id>-<id>.wav` (0700), kèm một tệp
+  `.json` giữ mã băm SHA-256 của lời và `voice|model|language`; một trong hai
+  đổi thì được tạo lại. Khi mất mạng, giọng nói đọc đoạn âm thanh theo id và
+  kiểm tra nó với lời của mục đến hạn: đúng thì phát; nhiều lời nhắc trễ gộp
+  vào một lần reo (`Offer::also`) phát lần lượt từng đoạn.
+- **Dọn dẹp:** cuối mỗi lượt đọc kho (khoảng mỗi giây), đoạn âm thanh có id
+  không còn trong Schedule bị xoá (đã nói, bị huỷ, id cũ của một lần sửa,
+  người đó bị `Forget`), và mọi đoạn của một `store_id` khác. Tạo thất bại
+  (mất mạng) thì thử lại sau 60 s, rồi gấp đôi mỗi lần, tối đa mỗi giờ một
+  lần.
+- **Không có đoạn âm thanh riêng** (đặt khi mất mạng, hoặc tạo thất bại):
+  phát câu chung "You have a reminder.", và mục đó được đánh dấu "đã reo,
+  chưa nói" trong sổ giao của tiến trình con (`delivery::SCHEMA` 3, còn giữ
+  sau khi khởi động lại). Nó không reo lại khi mất mạng, và khi mạng trở lại
+  nó được nói bằng lời của nó một lần, như một lượt của mô hình; rồi dấu đó
+  bị xoá. Đây là điểm 5 của first builder (c7183858037), sửa lỗ hổng đã biết
+  của #8632. Không có đoạn âm thanh nào cả thì nó chờ mạng như trước.
+- **Giới hạn dung lượng (điểm thêm 2 của first builder):** thư mục giữ tối
+  đa 122.918.400 byte (`ring_clips::MOST_BYTES`, khoảng 123 MB): một đoạn âm
+  thanh và tệp kèm cho mỗi mục trong tối đa 128 mục của Schedule, mỗi đoạn
+  dài nhất 20 s ở 24 kHz 16-bit (960.044 byte). 300 byte lời cộng câu mở đầu
+  chạm mức 20 s ở tốc độ nói (khoảng 15 ký tự mỗi giây), nên đó là trường hợp
+  xấu nhất thật (ở 16 kHz sẽ khoảng 82 MB). Quá mức này thì không tạo thêm,
+  và nhật ký ghi một dòng.
+- **Khôi phục cài đặt gốc xoá chúng (điểm thêm 1):** các đoạn âm thanh là lời
+  nhắc của người dùng dưới dạng âm thanh, nên
+  `/var/lib/lampOS/voice/ring-clips` nằm trong kế hoạch reset của sản phẩm.
+- **Mỗi vòng không đọc đĩa vô ích (P3 1 của Twelve trên #8687):** chưa thấy
+  phiên nào thì không đọc đoạn âm thanh nào; một mục đã thấy đang chờ thì
+  không đọc lại ở các vòng sau, và việc chờ chỉ được ghi nhật ký một lần.
 - **Kiểm tra mạng trước khi reo (điểm 2):** ở tuyến thứ hai khi là giọng duy
   nhất của đèn, mạng chỉ được coi là mất sau khi một lượt thất bại vì mạng.
   Nên nếu không ai nói gì trong lúc mất mạng, lần reo trước đây được thử như
@@ -46,12 +71,17 @@ vốn là một lượt của mô hình, và cổng của nó cần một phiên
     đã mất quá thời gian chờ 5 s, nên lần reo phát từ đoạn âm thanh đúng giờ.
   - Nếu socket điều khiển của worker đang đầy (worker kẹt trong một lời gọi
     chậm, #8204), yêu cầu kiểm tra chưa được gửi và được gửi lại ở vòng sau;
-    giọng nói không bao giờ dừng vì việc này.
+    giọng nói không bao giờ dừng vì việc này. Khi các lần gia hạn quyền của
+    worker đang bị bỏ qua (đang kẹt), cũng không gửi; chỉ gửi khi một lần gia
+    hạn được nhận lại (P3 2 của Twelve trên #8687).
   - Để biết lần reo sớm nhất, tiến trình con Schedule của giọng nói bắt đầu
     một lượt đọc kho nhiều nhất mỗi giây một lần (`UPCOMING_WALK_EVERY_US`),
     mỗi nhịp (200 ms) một trang tối đa 8 mục, chỉ lấy id và thời gian, không
     bao giờ lấy lời, và báo cho giọng nói khi kết quả thay đổi
     (`FromWorker::Upcoming`). Đây là đọc cục bộ qua socket, không ra mạng.
+- **Giới hạn:** một lượt hoàn tất chưa tới một phút trước hạn thì bỏ qua
+  kiểm tra. Nếu mạng mất sau lượt đó, lần reo được thử như một lượt của mô
+  hình trước, như trước đây, và có thể reo trễ vài giây.
 - **Không có câu thứ hai cho một tiếng động ngắn:** một câu tiếp theo có dưới
   400 ms tiếng nói, kết thúc trong vòng 8 s sau câu báo mất mạng, không nhận
   thêm câu báo nào.
@@ -67,6 +97,9 @@ vốn là một lượt của mô hình, và cổng của nó cần một phiên
 | Mạng đã được xác nhận trong khoảng này thì bỏ qua kiểm tra | 60 s (`LINK_CONFIRMED_WITHIN_US`) | `offline_rings.rs` |
 | Bước kiểm tra chờ máy chủ trả lời tối đa | 4 s (`PROBE_WITHIN`, có sẵn) | `second_provider/link.rs` |
 | Lượt đọc kho tìm lần reo sớm nhất bắt đầu nhiều nhất | mỗi 1 s (`UPCOMING_WALK_EVERY_US`) | `reminders/consumer.rs` |
+| Dung lượng tối đa của thư mục đoạn âm thanh | 122.918.400 byte (`MOST_BYTES`) | `ring_clips.rs` |
+| Đoạn âm thanh dài nhất được giữ | 20 s (`MOST_FRAMES`, có sẵn) | `say/tts_cache.rs` |
+| Tạo lại sau khi thất bại | 60 s, gấp đôi, tối đa 1 giờ (`WARM_EVERY`, `WARM_EVERY_MOST`, có sẵn) | `say/tts_cache.rs` |
 
 ## Chạy lại hàng kiểm tra (lamp-06c1)
 
@@ -78,3 +111,10 @@ ngắn nào nhận câu báo thứ hai. Thêm trường hợp "không ai nói g�
 mạng": một hẹn giờ đến hạn sau hơn 60 s không có lượt nào, ghi lại thời gian
 reo tính từ hạn (`late_by_ms` của `offline_ring`) và dòng nhật ký kiểm tra
 mạng trước khi reo.
+
+Hàng của #8708 (không cần người): đặt một lời nhắc khi còn mạng, đoạn âm
+thanh của nó xuất hiện; cắt mạng, nó reo bằng lời của nó trong vòng 5 s sau
+hạn, một lần; huỷ một cái và sửa một cái, đoạn âm thanh cũ mất trong khoảng
+1 s; khởi động lại khi còn mạng rồi cắt mạng, nó vẫn reo; đặt một cái trong
+lúc mất mạng, câu chung phát, rồi lời của nó được nói một lần sau khi có
+mạng lại; `Forget` người thử nghiệm của bộ kit, các đoạn âm thanh của họ mất.

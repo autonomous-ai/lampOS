@@ -120,7 +120,9 @@ skills' state `/var/lib/lampos-skills-state` (daily routine claims included),
 the pushed skills and the owner's yes to them `/var/lib/lampOS/skills-dev`, the
 lasting light and volume limits `/var/lib/lampos-output-caps`, schedule `/var/lib/lampos-schedule/store`, voice sessions
 `/var/lib/lampOS/voice/sessions`, reminder delivery
-`/var/lib/lampOS/voice/schedule-delivery`, the conversation thread
+`/var/lib/lampOS/voice/schedule-delivery`, each reminder's offline clip, its
+words as sound `/var/lib/lampOS/voice/ring-clips` (`LAMP_OFFLINE_RINGS`,
+#8708), the conversation thread
 `/run/lampos-voice/thread.json`, the voice's first-output log
 `/var/lib/lampOS/voice/first-output`, what the voice has told of tasks
 `/var/lib/lampOS/voice/tasks-told` (its default, `LAMP_TASKS_TOLD`), the
