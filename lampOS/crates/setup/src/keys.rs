@@ -1330,11 +1330,14 @@ pub struct Done {
     pub said: String,
 }
 
-/// After a key change is answered: the voice, and `lamp-cloud` when
-/// `done.restart_cloud`, restarted once the voice has rested 1 s, a turn in
-/// flight waited out ([`crate::change::KEY_CHANGE_QUIET`], #8710; the reply is
-/// out before), and no update is at work, lamp-update's lock held through
-/// both. The journal's lines.
+/// After a key change is answered: the voice restarted once it has rested
+/// 1 s, a turn in flight waited out ([`crate::change::KEY_CHANGE_QUIET`],
+/// #8710), and no update is at work, lamp-update's lock held through both
+/// restarts. `lamp-cloud`, when `done.restart_cloud`, waits an update's
+/// [`lamp_update::quiet::QUIET`] (45 s) of rest after the voice's restart:
+/// it holds the reply only in memory until its online loop relays it, and a
+/// link down or a slow publish must not lose it (Sixth's P2 on #8741). All
+/// within [`crate::change::QUIET_MOST`]. The journal's lines.
 pub fn restart_after(
     done: &Done,
     ears: &mut impl crate::change::Ears,
@@ -1342,6 +1345,7 @@ pub fn restart_after(
     systemd: &mut impl crate::change::Systemd,
 ) -> Vec<String> {
     use crate::change;
+    let started = ears.now_ms();
     let _held = match change::quiet_and_unlocked(
         ears,
         records,
@@ -1366,6 +1370,19 @@ pub fn restart_after(
         Err(why) => format!("the voice could not be restarted: {why}"),
     }];
     if done.restart_cloud {
+        let spent = std::time::Duration::from_millis(ears.now_ms().saturating_sub(started));
+        if let Err(why) = change::wait_for_rest(
+            ears,
+            lamp_update::quiet::QUIET,
+            change::QUIET_MOST.saturating_sub(spent),
+        ) {
+            said.push(format!(
+                "lamp-cloud was not restarted: the lamp was not quiet for {} s within {} min ({why}); it loads the person's model key at its next start",
+                lamp_update::quiet::QUIET.as_secs(),
+                change::QUIET_MOST.as_secs() / 60
+            ));
+            return said;
+        }
         said.push(match systemd.systemctl(&["try-restart", ASKER_UNIT]) {
             Ok(()) => "lamp-cloud restarted to load the person's model key for the agent (its LoadCredential= is copied only at its start, #8742)".to_owned(),
             Err(why) => format!("lamp-cloud could not be restarted to load the person's model key: {why}"),
