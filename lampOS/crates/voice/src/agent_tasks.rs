@@ -618,7 +618,7 @@ pub(crate) const NO_AGENT_NAME: &str =
 /// [`NO_AGENT_NAME`] as the hand-over's description tells it every turn
 /// (#8729): asked which agent the lamp uses, the FAQ's agent topic says it
 /// (`crate::faq_now`).
-pub(crate) const NO_AGENT_NAME_UNLESS_ASKED: &str = "Never tell the person which agent runs their work unless they ask which agent the lamp uses (lamp_help's agent topic); say what is being done or what was found.";
+pub(crate) const NO_AGENT_NAME_UNLESS_ASKED: &str = "Never name the agent doing their work unless asked which agent the lamp uses (lamp_help); say what is done or found.";
 
 /// Who does the work on the lamp itself, as the person calls them: the
 /// lamp's default engine as last read, Hermes until read (lamp-tasks'
