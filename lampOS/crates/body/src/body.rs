@@ -8307,6 +8307,14 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 } else {
                     Some((crate::moves::busy(by.0), by.1))
                 }
+            } else if !limits.arbitration
+                && is_fill(clip)
+                && pending.is_some_and(|(old, _)| !is_fill(old))
+            {
+                // A gesture waits for a fill to ease out: a fill asked
+                // now (the voice's nod on "Sure!") is dropped, never the
+                // gesture waiting (#8640).
+                Some(("dropped: another gesture plays", None))
             } else if let Some((old, _)) = pending.filter(|_| limits.arbitration) {
                 let by = if from_outside(old) {
                     pending_by

@@ -1695,7 +1695,8 @@ the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body
   ("dropped: another gesture plays", as for any gesture: `--arbitration` is off in the product).
   A fill (nod, acknowledge, curious, the called look) gives way to any other gesture asked while
   it plays: it ends and the asked one plays, so a dance a person asked for is never dropped for a
-  fill (#8640); a fill never takes the body from another gesture.
+  fill (#8640); a fill never takes the body from another gesture, nor from one waiting for a fill
+  to ease out (a nod asked then is dropped and the waiting dance plays).
 - **Pause nod.** Expression's pause clip waits `pause_cooldown_us`: the catalogue's cooldown at level 1,
   else the level's gap, never longer than the catalogue's and never under 3 s.
 - **Music.** A skill trigger with `lively = true` (Music sway, [skills.md](skills.md)): its cooldown at
