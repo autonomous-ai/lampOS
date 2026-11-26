@@ -926,9 +926,9 @@ fn own_keys(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::er
         }
         _ => {}
     }
-    if !done.is_some_and(|done| done.restart_voice) {
+    let Some(done) = done.filter(|done| done.restart_voice) else {
         return Ok(true);
-    }
+    };
     let bus = match bus_root {
         Some(root) => Bus::new(root)?,
         None => Bus::from_environment()?,
@@ -938,26 +938,8 @@ fn own_keys(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::er
     // to the end: a round puts its build back when the voice it restarted
     // changes process in its watch.
     let records = lamp_update::records::Records::new(PathBuf::from(lamp_update::install::RECORDS));
-    match change::quiet_and_unlocked(
-        &mut ears,
-        &records,
-        change::KEY_CHANGE_QUIET,
-        change::QUIET_MOST,
-    ) {
-        Ok(_held) => match std::process::Command::new("/usr/bin/systemctl")
-            .args(["try-restart", keys::VOICE_UNIT])
-            .status()
-        {
-            Ok(status) if status.success() => {
-                eprintln!("lamp-setup: keys: the voice restarted to take them, at a quiet moment")
-            }
-            Ok(status) => eprintln!("lamp-setup: keys: the voice's restart ended with {status}"),
-            Err(error) => eprintln!("lamp-setup: keys: the voice could not be restarted: {error}"),
-        },
-        Err(why) => eprintln!(
-            "lamp-setup: keys: the lamp was not quiet with no update at work within {} min ({why}); the voice takes them at its next start",
-            change::QUIET_MOST.as_secs() / 60
-        ),
+    for line in keys::restart_after(&done, &mut ears, &records, &mut change::Systemctl) {
+        eprintln!("lamp-setup: keys: {line}");
     }
     Ok(true)
 }

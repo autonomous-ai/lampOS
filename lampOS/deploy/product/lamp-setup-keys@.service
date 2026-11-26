@@ -3,7 +3,8 @@
 # refused before its line is read. A key is checked with one request to its service (5 s, no
 # redirect) and kept only if it works, root's, 0600, in the folder the voice loads whole; then the
 # voice is restarted once the lamp is quiet (45 s, an update's rule) and no update is at work
-# (holding lamp-update's lock through the restart), waiting at most 30 minutes.
+# (holding lamp-update's lock through the restart), waiting at most 30 minutes; for a model key,
+# lamp-cloud after it, whose forwarder loads the key by LoadCredential= only at its start (#8735).
 # A key is never journalled.
 [Unit]
 Description=lampOS own keys: one request
