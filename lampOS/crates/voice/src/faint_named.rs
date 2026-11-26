@@ -75,7 +75,11 @@ impl FaintNamed {
             self.blocks.pop_front();
         }
         let sure = floor.is_some() && probability.is_finite() && probability >= START_PROBABILITY;
-        self.run_any = if sure { self.run_any.saturating_add(1) } else { 0 };
+        self.run_any = if sure {
+            self.run_any.saturating_add(1)
+        } else {
+            0
+        };
         self.run_over = if sure && !under_floor {
             self.run_over.saturating_add(1)
         } else {
@@ -268,8 +272,9 @@ mod tests {
         }
         let line = heard.named(began, now, 0.95);
         assert!(
-            line.as_deref()
-                .is_some_and(|line| line.contains("0 of 40 speech blocks were over it and 40 under")),
+            line.as_deref().is_some_and(
+                |line| line.contains("0 of 40 speech blocks were over it and 40 under")
+            ),
             "{line:?}"
         );
     }
@@ -280,7 +285,13 @@ mod tests {
         for (index, kind) in pattern.chars().enumerate() {
             let under = kind == 'u';
             let level = if under { 140 } else { 170 };
-            heard.block(1_000_000 + index as u64 * BLOCK_US, 0.9, level, Some(150), under);
+            heard.block(
+                1_000_000 + index as u64 * BLOCK_US,
+                0.9,
+                level,
+                Some(150),
+                under,
+            );
         }
     }
 
@@ -299,7 +310,10 @@ mod tests {
             ),
             "{line}"
         );
-        assert!(line.contains("the longest run over it was 20 blocks (a line needs 6)"), "{line}");
+        assert!(
+            line.contains("the longest run over it was 20 blocks (a line needs 6)"),
+            "{line}"
+        );
     }
 
     #[test]
@@ -307,13 +321,25 @@ mod tests {
         let mut five = FaintNamed::default();
         blocks(&mut five, "ooooouooooouooooou");
         let line = five.named(1_050_000, 1_500_000, 0.95).expect("said");
-        assert!(line.contains("but the faint floor turned the line away"), "{line}");
-        assert!(line.contains("the longest run over it was 5 blocks (a line needs 6), 18 without it"), "{line}");
+        assert!(
+            line.contains("but the faint floor turned the line away"),
+            "{line}"
+        );
+        assert!(
+            line.contains("the longest run over it was 5 blocks (a line needs 6), 18 without it"),
+            "{line}"
+        );
         let mut six = FaintNamed::default();
         blocks(&mut six, "oooooouoooooou");
         let line = six.named(1_050_000, 1_500_000, 0.95).expect("said");
-        assert!(line.contains("the faint floor left a line free to open"), "{line}");
-        assert!(line.contains("the longest run over it was 6 blocks"), "{line}");
+        assert!(
+            line.contains("the faint floor left a line free to open"),
+            "{line}"
+        );
+        assert!(
+            line.contains("the longest run over it was 6 blocks"),
+            "{line}"
+        );
     }
 
     /// Blocks the detector was not sure of: no line would open with the
@@ -326,8 +352,14 @@ mod tests {
         }
         let line = heard.named(1_050_000, 1_500_000, 0.95).expect("said");
         assert!(!line.contains("turned the line away"), "{line}");
-        assert!(line.contains("but no line could open, floor or not"), "{line}");
-        assert!(line.contains("the detector was sure of was 0 blocks"), "{line}");
+        assert!(
+            line.contains("but no line could open, floor or not"),
+            "{line}"
+        );
+        assert!(
+            line.contains("the detector was sure of was 0 blocks"),
+            "{line}"
+        );
     }
 
     #[test]
