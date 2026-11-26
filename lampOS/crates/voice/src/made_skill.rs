@@ -10384,7 +10384,7 @@ pub fn keep_asked(
     // ([`says_fixed_with_left_out`]). DeepSeek's own, with no agent to
     // write it, is kept as before.
     if request.made_with != MadeWith::DeepSeek
-        && let Some(note) = fixed_say_left_out(&files)
+        && let Some(note) = value_left_out_of(&files, &words)
     {
         eprintln!(
             "lamp-voice: a made skill was not kept: the agent's fixed say has what it says left \
@@ -10392,7 +10392,7 @@ pub fn keep_asked(
         );
         return Err(Refused(
             VALUE_LEFT_OUT_HELD.into(),
-            Some(value_left_out_told(note)),
+            Some(value_left_out_told(&note)),
         ));
     }
     // A skill the lamp's agent made with code says what it uses, where its
@@ -11892,10 +11892,10 @@ pub const VALUE_LEFT_OUT_HELD: &str =
 /// taken to be the say's value dropped, the likeliest case; a note about
 /// something else (a light it couldn't dim slowly) costs only one agent
 /// make, never a skill kept wrong. A skill asked aloud or only a hand
-/// starts, or with no note, is as before. Limits: a `remind` step's words
-/// are the person's reminder, as [`told_only`] keeps them, so a reminder
-/// beside a note is never held; and an answer that drops the note but
-/// keeps the fixed say is not caught here.
+/// starts, or with no note, is as before ([`value_left_out`] also takes an
+/// ask for a value with no note). Limits: a `remind` step's words are the
+/// person's reminder, as [`told_only`] keeps them, so a reminder beside a
+/// note is never held.
 pub fn says_fixed_with_left_out(answer: &str) -> bool {
     files(answer).is_ok_and(|files| fixed_say_left_out(&files).is_some())
 }
@@ -11904,7 +11904,14 @@ pub fn says_fixed_with_left_out(answer: &str) -> bool {
 /// note when it holds, else `None`.
 fn fixed_say_left_out(files: &Files) -> Option<&str> {
     let note = files.left_out.as_deref()?;
-    let table = toml::from_str::<toml::Table>(&files.toml).ok()?;
+    timed_fixed_says(&files.toml).map(|_| note)
+}
+
+/// The fixed words of a skill a time, an event or a repeat starts whose
+/// only speaking is a fixed `say` ([`says_fixed_with_left_out`]'s shape),
+/// each say's lines joined; `None` for any other skill.
+fn timed_fixed_says(toml_text: &str) -> Option<Vec<String>> {
+    let table = toml::from_str::<toml::Table>(toml_text).ok()?;
     if started_by_a_hand_alone(table.get("trigger")?) {
         return None;
     }
@@ -11918,17 +11925,114 @@ fn fixed_say_left_out(files: &Files) -> Option<&str> {
     // `say = { note }` is the model's answer at run time (the
     // Reviewer-lead's P3 on #8732), so a skill with one is no fixed say.
     let says = || steps.iter().filter_map(|step| step.get("say"));
-    let fixed = says().any(|say| match say {
-        toml::Value::Table(say) => say.contains_key("text") && !say.contains_key("note"),
-        say => say.is_str() || say.is_array(),
-    });
+    let lines = |words: &toml::Value| match words {
+        toml::Value::String(line) => line.clone(),
+        toml::Value::Array(lines) => lines
+            .iter()
+            .filter_map(toml::Value::as_str)
+            .collect::<Vec<_>>()
+            .join(" "),
+        _ => String::new(),
+    };
+    let fixed: Vec<String> = says()
+        .filter_map(|say| match say {
+            toml::Value::Table(say) if !say.contains_key("note") => say.get("text").map(lines),
+            toml::Value::Table(_) => None,
+            say => Some(lines(say)),
+        })
+        .collect();
     let at_run_time = says().any(|say| say.get("note").is_some());
-    (fixed
+    (!fixed.is_empty()
         && !at_run_time
         && !steps
             .iter()
             .any(|step| step.get("run").is_some() || step.get("task").is_some()))
-    .then_some(note)
+    .then_some(fixed)
+}
+
+/// The words of a person's ask that want a value worked out when the skill
+/// runs ("how many days are left in the year", "bao nhiêu ngày"): from the
+/// first such phrase to the end of its sentence, cut at
+/// [`MOST_CANNOT_CHARS`]. `None` when the ask names none.
+fn value_asked(words: &str) -> Option<String> {
+    let lower = words.to_lowercase();
+    let at = VALUE_ASKS
+        .iter()
+        .filter_map(|ask| {
+            lower
+                .match_indices(ask)
+                .find(|(at, _)| {
+                    !lower[..*at]
+                        .chars()
+                        .next_back()
+                        .is_some_and(char::is_alphanumeric)
+                })
+                .map(|(at, _)| at)
+        })
+        .min()?;
+    let rest = &lower[at..];
+    let end = rest.find(['.', '?', '!', '\n']).unwrap_or(rest.len());
+    Some(cut_chars(rest[..end].trim(), MOST_CANNOT_CHARS))
+}
+
+/// The phrases of an ask for a value only a run can know: a count, an
+/// amount, a time or a day, in English and Vietnamese ([`value_asked`]).
+const VALUE_ASKS: [&str; 17] = [
+    "how many",
+    "how much",
+    "how long",
+    "how far",
+    "how old",
+    "what time",
+    "what day",
+    "what date",
+    "which day",
+    "days left",
+    "days until",
+    "bao nhiêu",
+    "bao lâu",
+    "mấy giờ",
+    "mấy ngày",
+    "còn mấy",
+    "ngày nào",
+];
+
+/// A timed fixed say made for an ask of a value ([`value_asked`]) whose
+/// words carry no digit and don't repeat the ask (lamp-ee17, 26 Nov,
+/// #8732's row: DeepSeek kept "There are days left in the year." for "how
+/// many days are left in the year", the count dropped with no `left out:`
+/// note): the ask's value, as the maker's note would have said it. A say
+/// that repeats the ask ("time to check how much you spent") is a
+/// reminder, and one with a digit is [`told_only`]'s.
+fn value_left_unsaid(files: &Files, asked: &str) -> Option<String> {
+    let value = value_asked(asked)?;
+    let says = timed_fixed_says(&files.toml)?;
+    let ask = VALUE_ASKS
+        .iter()
+        .find(|ask| value.starts_with(**ask))
+        .copied()
+        .unwrap_or_default();
+    says.iter()
+        .all(|say| {
+            !say.chars().any(|letter| letter.is_ascii_digit()) && !say.to_lowercase().contains(ask)
+        })
+        .then_some(value)
+}
+
+/// What the lamp's agent is told is left out of a timed fixed say: the
+/// maker's `left out:` note ([`fixed_say_left_out`]), or with none the
+/// value the person's words ask for that its words dropped
+/// ([`value_left_unsaid`]); `None` for any other skill.
+fn value_left_out_of(files: &Files, asked: &str) -> Option<String> {
+    fixed_say_left_out(files)
+        .map(str::to_owned)
+        .or_else(|| value_left_unsaid(files, asked))
+}
+
+/// [`value_left_out_of`] DeepSeek's `answer`, for the ask's `asked`
+/// words (the request and the heard line): its note, quoted to the agent.
+pub fn value_left_out(answer: &str, asked: &str) -> Option<String> {
+    value_left_out_of(&files(answer).ok()?, asked)
 }
 
 /// The maker's `left out:` note of DeepSeek's `answer`, when it has one.
