@@ -12,7 +12,8 @@
 #
 # `keep`, from ramlog's stop at a clean shutdown or reboot only (systemd
 #   says "stopping"; never at a `systemctl stop`, and a crash runs nothing,
-#   so a crashed boot is lost, as accepted on #2602): journald rotates, so
+#   so a crashed boot is lost, as accepted on #2602; a part's fault keeps
+#   its own last lines, `fault` below): journald rotates, so
 #   every file is closed, then this boot's closed files are copied, newest
 #   first, to $keep/last, up to 5 MB, stopping at the first that doesn't fit
 #   so what is kept is the boot's end without a gap. The boot before moves
@@ -55,6 +56,20 @@
 # `link` at boot and every `setup` run (every 3 minutes) delete any older,
 # with their links. Nothing is deleted on a clock not set yet.
 #
+# `fault UNIT`, from a part's own drop-in lamp-fault-keep.conf (#8713) as
+#   `ExecStopPost=`, at each stop of the part: only a stop systemd doesn't
+#   call a success ($SERVICE_RESULT), so a crash, a kill or a watchdog, never
+#   a clean stop. A lamp is unplugged and never shut down, so `keep` misses
+#   a fault's boot; this keeps that unit's last lines of this boot as text,
+#   read with `journalctl -u UNIT -b -n 300`, at most 64 KB, in
+#   $keep/fault/<boot id>.<n>.<UNIT>.log, written whole then synced, so a
+#   power cut right after leaves it. At most 5 a boot: a crash loop stops
+#   there and says so, so the eMMC sees at most 5 small writes a boot. Only
+#   lines the journal already holds, so they follow the kept boots' rules:
+#   none past 72 hours (expire_boots), a reset wipes them, and the owner's
+#   "forget everything" removes them and leaves .forgotten-boot, after which
+#   none of that boot is kept. Not from exit-note.conf: a drop-in of its own.
+#
 # The paths, the state and the boot's id may be given for tests only; with
 # them given, journald isn't asked to rotate.
 keep=${LAMP_JOURNAL_KEEP:-/var/lib/lamp-journal}
@@ -67,6 +82,10 @@ setup_after=20
 # 72 hours, and a time before which the clock isn't set yet (2026-01-01).
 setup_life=259200
 clock_set=1767225600
+# `fault`'s bounds: lines and bytes a file, files a boot.
+fault_lines=300
+fault_bytes=65536
+fault_most=5
 steps="where_you_sit who_you_are how_you_sound touch privacy giving_way room_sounds face_expressions preferences"
 
 # Whether the setup walk is under way, as lamp-update's walk.rs reads it:
@@ -105,6 +124,12 @@ expire_boots() {
             echo "lamp-journal-keep: a kept boot's file is deleted after 72 hours" >&2
         done
         rmdir "$keep/$slot" 2>/dev/null
+    done
+    for file in "$keep/fault"/*.log; do
+        [ -f "$file" ] || continue
+        [ $((now - $(stat -c %Y "$file"))) -ge "$setup_life" ] || continue
+        rm -f "$file"
+        echo "lamp-journal-keep: a fault's kept lines are deleted after 72 hours" >&2
     done
     return 0
 }
@@ -184,6 +209,38 @@ keep)
             echo "lamp-journal-keep: the boot before could not be moved to $keep/previous" >&2
     fi
     sync
+    ;;
+fault)
+    unit=$2
+    [ -n "$unit" ] && [ -n "${SERVICE_RESULT:-}" ] || exit 0
+    [ "$SERVICE_RESULT" = success ] && exit 0
+    boot=$(boot_id)
+    [ -n "$boot" ] || exit 0
+    # Forgotten during this boot (or reset): nothing more of it is kept.
+    if [ -f "$keep/.forgotten-boot" ] &&
+        [ "$(cat "$keep/.forgotten-boot")" = "$boot" ]; then
+        exit 0
+    fi
+    slot=$keep/fault
+    count=0
+    for file in "$slot/$boot".*.log; do
+        [ -f "$file" ] && count=$((count + 1))
+    done
+    if [ "$count" -ge "$fault_most" ]; then
+        echo "lamp-journal-keep: $unit's fault is not kept: this boot has kept $fault_most" >&2
+        exit 0
+    fi
+    mkdir -p "$slot" || exit 0
+    name=$boot.$((count + 1)).$unit.log
+    # Bounded in time too: ExecStopPost= counts in the unit's stop timeout.
+    timeout 3 journalctl -u "$unit" -b -n "$fault_lines" -o short-iso --no-pager 2>/dev/null |
+        head -c "$fault_bytes" >"$slot/.$name"
+    if [ -s "$slot/.$name" ] && mv "$slot/.$name" "$slot/$name"; then
+        sync
+        echo "lamp-journal-keep: $unit's last lines are kept in $slot/$name" >&2
+    else
+        rm -f "$slot/.$name"
+    fi
     ;;
 link)
     mkdir -p "$run" || exit 0

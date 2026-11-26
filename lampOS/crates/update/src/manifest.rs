@@ -122,6 +122,10 @@ pub const IMAGE_FILES: &[&str] = &[
     "/etc/systemd/system/lamp-cmedia-speaker.service",
     "/etc/systemd/system/lamp-journal-setup.service",
     "/etc/systemd/system/lamp-journal-setup.timer",
+    // A fault's last lines kept past a power cut (#8713): the voice only,
+    // as its exits were the faults #7219 and #7224 were found from. Each
+    // part more takes one of [`MOST_IMAGE`] a variant.
+    "/etc/systemd/system/lamp-voice.service.d/lamp-fault-keep.conf",
     "/etc/systemd/system/respeaker-lite-softvol.service",
     "/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf",
     "/etc/systemd/system/orangepi-ramlog.service.d/zz-lamp-journal-keep.conf",

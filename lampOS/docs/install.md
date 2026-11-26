@@ -3664,6 +3664,50 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
     (`LAMP_UPDATE_IMAGE=on`), then `systemctl daemon-reload`: the next
     shutdown keeps, and the boot after it links. By hand: copy both, then
     `sudo systemctl daemon-reload`.
+- A fault's last lines, kept on the eMMC past a power cut (#8713, part 2
+  of #7254): `robots/lamp/rootfs/etc/systemd/system/lamp-voice.service.d/lamp-fault-keep.conf`
+  runs `lamp-journal-keep fault %n` as the voice's `ExecStopPost=` (`-+`:
+  as root past its sandbox, never failing the stop). A lamp is unplugged
+  and never shut down, so the kept boots above miss a crashed boot, and
+  #7219 and #7224 were found from the voice's last lines.
+  - **What it keeps:** at a stop systemd doesn't call a success
+    (`$SERVICE_RESULT` other than `success`: a crash, a kill, a watchdog),
+    the unit's last lines of this boot as text (`journalctl -u UNIT -b -n
+    300 -o short-iso`, at most 64 KB, 3 s at most), to
+    `/var/lib/lamp-journal/fault/<boot id>.<n>.<UNIT>.log`, written whole
+    then synced. A clean stop keeps nothing. Read it with `sudo cat` after
+    the next boot. Each keep says `lamp-journal-keep: UNIT's last lines
+    are kept in …`.
+  - **Why `ExecStopPost=`, not `OnFailure=`:** it runs inside the stop,
+    with that stop's result and before `Restart=` starts the part again,
+    so the lines are the dead run's last. A drop-in of its own, never
+    `exit-note.conf`, which install owns and rounds never rewrite: a lamp's
+    copy can be removed by name.
+  - **Only the voice:** each part more is one more of the image's files in
+    every variant, of `MOST_IMAGE`'s 64 (50 used before this one).
+  - **Privacy:** only lines the journal already holds, so it follows the
+    kept boots' rules: none past 72 hours (`link` at boot and every
+    `lamp-journal-setup` run delete older, `… a fault's kept lines are
+    deleted after 72 hours`), a reset wipes it (both plans wipe
+    `/var/lib/lamp-journal`), and the owner's "forget everything" removes
+    the folder (`setup_journal.rs`) and leaves `.forgotten-boot`, after
+    which no fault of that boot is kept.
+  - **Tests:** `tests/it/image_journal_fault.rs` pins the drop-in and runs
+    the script; `lamp-voice`'s `setup_journal` tests and `lamp-setup`'s
+    reset store list cover the folder.
+  - **Existing lamps:** a build carries the drop-in and the script with
+    the image's files (`LAMP_UPDATE_IMAGE=on`), then a daemon-reload: the
+    voice's next stop runs it, no restart. A plain round doesn't write
+    them yet: that is #7254 part 3's narrow step. By hand: copy both, then
+    `sudo systemctl daemon-reload`.
+
+  The kept journal's bounds on the eMMC:
+
+  | Kept | When | Bound | Gone |
+  |------|------|-------|------|
+  | Last two boots (`last`, `previous`) | a clean shutdown or reboot | 5 MB a boot, 2 boots, 10 MB | 72 h after a file closed, a reset, the owner's forget |
+  | A first-time setup (`setup`) | the walk and the hour after | 24 MB | 72 h after the walk began, a reset, a redo, the owner's forget |
+  | A fault's last lines (`fault`) | a part's stop that isn't a success (the voice) | 300 lines and 64 KB a file, 5 files a boot | 72 h after it was kept, a reset, the owner's forget |
 - A first-time setup's journal, kept on the eMMC past the 20M cap:
   `robots/lamp/rootfs/etc/systemd/system/lamp-journal-setup.timer` and
   `lamp-journal-setup.service`, running `lamp-journal-keep setup` (#5144).

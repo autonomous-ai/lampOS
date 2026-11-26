@@ -2977,7 +2977,10 @@ path it doesn't know, and ignores a field it doesn't know.
   shutdown keeps, and the boot after links; since #5144 it also wants
   `lamp-journal-setup.timer`), `lamp-journal-setup.service` and
   `lamp-journal-setup.timer` (#5144: a first-time setup's journal on the
-  eMMC; started at the next boot, install.md), journald's `zz-lamp-journal.conf`, and the udev rules `90-respeaker-lite`,
+  eMMC; started at the next boot, install.md), the voice's
+  `lamp-voice.service.d/lamp-fault-keep.conf` (#8713: a fault's last lines
+  on the eMMC; a daemon-reload, so the voice's next stop runs it, no
+  restart), journald's `zz-lamp-journal.conf`, and the udev rules `90-respeaker-lite`,
   `91-pulseaudio-hal-ignore` and `99-lamp-device`. Never V1's HAL
   (`/opt/hal/.env`, `led-boot`/`led-shutdown`, `hal.service`'s drop-in),
   never the radio scripts (`device-ap-mode`/`device-sta-mode` are written

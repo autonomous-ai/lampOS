@@ -1003,11 +1003,12 @@ const PERSON_STORES: [&str; 48] = [
     // the folder, so a `person.json.new` a power cut left goes too.
     "/var/lib/lampOS/light",
     // The journal the image keeps on the eMMC (`lamp-journal-keep`): a
-    // first-time setup's (#5144) and the last two boots' (#2602, #5358).
-    // Their lines can hold what the person said.
+    // first-time setup's (#5144), the last two boots' (#2602, #5358) and a
+    // fault's last lines (#8713). Their lines can hold what the person said.
     "/var/lib/lamp-journal/setup",
     "/var/lib/lamp-journal/last",
     "/var/lib/lamp-journal/previous",
+    "/var/lib/lamp-journal/fault",
     // What setup saves, and its marker: the user's key, to the voice and to
     // the Policy (the owner, #806, 16:13), and the name.
     "/etc/lampOS/voice/credential",
