@@ -306,6 +306,44 @@ và trên tuyến thứ hai (`second_provider/tests/live_fact.rs`)
 Chưa chạy trên đèn: dòng kiểm tra là lời nhờ về mưa trên lamp-06c1 chỉ tạo
 đúng một lần chuẩn bị.
 
+### Chỉ đăng nhập khi người dùng nhờ hoặc đồng ý (#8700, luôn bật)
+
+Một lần, 1 trên 10, câu "ask Codex to tell me the capital of Japan" trên một
+đèn chưa đăng nhập Harness đã khiến mô hình tự gọi `sign_in_computer`. Mô tả
+của hàm giờ nói chỉ gọi khi người dùng tự nhờ đăng nhập, ghép đôi hoặc kết
+nối một máy tính (hoặc Harness), hoặc nói "có" với lời đề nghị đăng nhập của
+chính đèn; không bao giờ tự gọi vì một agent hay máy tính không có sẵn: hãy
+nói vậy và đề nghị. Giọng nói cũng kiểm tra trong code trước khi hỏi phần
+tasks bất cứ điều gì (`sign_in::may_start`). Một START chạy khi lời người dùng
+nghe được:
+
+- nhờ đăng nhập (`sign_in::asks_to_sign_in`): "sign … in" (trong vòng ba
+  từ), "signin", "login" hoặc "log … in/on", nói riêng ("please sign me in")
+  hoặc kèm một từ chỉ máy tính (computer, laptop, Mac, MacBook, PC, Harness,
+  hand-over, hoặc "the lamp", không phải khi gọi tên đèn); "pair",
+  "connect", "link", "set up" hoặc "hook up" kèm một từ chỉ máy tính; hoặc
+  "code" khi mã của một lần đăng nhập còn được giữ ("say the code again");
+- hoặc là một tiếng "có" đơn thuần (`agent_tasks::yes_to_a_question`, cùng
+  phép thử "có" của bước xác nhận) cho câu cuối của đèn, câu đó là câu hỏi,
+  không bị cắt, nói trước đó tối đa `CONFIRM_WITHIN` (120 s), và câu hỏi đó
+  đề nghị đăng nhập (các từ sau dấu chấm cuối: "sign … in", "signing",
+  "login", "pair", "connect").
+
+Nếu không, lần gọi bị từ chối bằng một lỗi cuối, không gọi lại: "Not
+started: the person did not ask to sign in or pair a computer, nor say yes
+to your offer to. Answer what they asked; if a computer is needed, say it
+isn't available, offer to sign it in, and call this only on their yes."
+Nhật ký ghi `lamp-voice: sign-in: request N: sign_in_computer refused: the
+person did not ask to sign in, nor say yes to the lamp's offer (#8700)`.
+"Ask Codex to sign in to GitHub" là việc của agent, không phải đăng nhập
+đèn. Lời chỉ được đọc bằng tiếng Anh, như các cổng chỉ-tiếng-Anh khác: khi
+ngôn ngữ của chủ là ngôn ngữ khác (`crates/voice/src/language.rs`) thì không
+kiểm tra, và khi không biết lời của request thì cũng không từ chối (từ chối
+nhầm lời nhờ của chính người dùng tệ hơn là không kiểm tra, như #6537).
+
+Test: `a_sign_in_starts_only_on_the_persons_ask_or_yes_to_the_offer`,
+`a_start_the_person_did_not_ask_for_is_refused_before_any_sign_in`.
+
 ### Giữ trong bộ nhớ của người dùng (bản ghi liên kết, lát 3, `LAMP_SERVICE_RECORDS_TASKS`, bật trong sản phẩm)
 
 Bật trong sản phẩm từ 20/11 (`lamp-voice.service`), theo quy tắc của chủ
