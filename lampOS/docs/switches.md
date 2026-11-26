@@ -1342,6 +1342,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_WATCH` | Ask the lamp to tell you when the air gets stuffy or someone comes in, and it tells you once. |
 | `LAMP_UPDATE_NOW` | The owner can tap Update now in the app, and the lamp takes a waiting update at once. |
 | `LAMP_UPDATE_CDN_FEED` | An older lamp gets its updates from our own servers, so it keeps updating where GitHub can't be reached. |
+| `LAMP_PRIVACY_LIGHT` | In the app you can make the red privacy light dimmer or turn it off; the microphone and camera stay off either way. |
 
 ## What the census found
 
