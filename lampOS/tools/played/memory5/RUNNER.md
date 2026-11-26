@@ -32,7 +32,7 @@ A line's WAV file is `<first 16 hex of SHA-256(text)>.wav`, with `text` exactly 
 | P9 | Eyes' people | `/var/lib/lampos-eyes/people.json`: the ids (`p-[0-9a-f]{16}(-[0-9]{1,3})?`) and whether any name is `Olivia`. Save ids and a name hash only, never names | file missing, or an `Olivia` already known |
 | P10 | Owner id | the 52e6 owner's `p-…` (the walk file's owner, or the app). Do not use 06c1's `p-fc66f021c67d064c` | not found |
 | P11 | Scopes' keys | every scope in the list below, read as in the next table | any read not `ok` |
-| P12 | Word clash | the content words of every keep line (`remember` or `actually`), against every as-found entry of the test face, room and owner scopes (below) | any shared word: reword the line before the run |
+| P12 | Word clash | the fact words of the keep lines (`ferdinand`, `apricot`, `bottle`, `scooter`, `plant`), against every as-found entry of the room and owner scopes (below) | any shared word: reword the line before the run |
 | P13 | WAVs | every `say`/`mem` line's WAV present and `shasum -c` OK | any missing (exit 3) |
 | P14 | Quiet and face | the gap gate (below), run before `q0` and before each `quiet` step | see the gap gate |
 
@@ -48,6 +48,7 @@ A line's WAV file is `<first 16 hex of SHA-256(text)>.wav`, with `text` exactly 
 | O records | `{"op":"service_records","person":O,"limit":50}`, then **for every key** `{"op":"service_records","person":O,"key":K}` | The list is capped at `LIST_MOST` = 50 (server side, newest change first). The set of keys is the union of the page's keys and the as-found key list from earlier runs or the app. If the page holds exactly 50 rows and no as-found key list is given, stop: the tail cannot be counted. Save `key|status|changed_unix_ms` for each key. |
 | O contacts | `{"op":"service_contacts","person":O}` | Save `sha256(lower(name))[:12]:changed_unix_ms`, never the name |
 | Schedule | `{"op":"list_set","after_id":A,"limit":8}`, paged until a page holds fewer than 8 | Reminder ids, for the cleanup |
+| F, everyone, O, r-F, r-O, r-everyone exchanges | `{"op":"exchanges_after","person":S,"after":A,"limit":20}`, paged until `more` is false | Save each scope's **newest exchange id as found**. An exchange past it is NEW; the put-back (§4) forgets one only when it is tied to a kit turn |
 
 The test face's scope `F` and `r-F` must be **empty before the enrol** on 52e6. If they are not, stop: 52e6 is meant to hold no person's records.
 
@@ -124,7 +125,10 @@ The line is misheard when nothing was heard or nothing played (once bad requests
 DONT  = (?i)\b(don't|do not|haven't|have not|no record|not sure|nothing (on|about)|can't recall|no idea)\b
 FACT  = lamp-memory: remember person=\S+ ok        # an entry is a kept fact if its at_unix_ms is within 1.0 s of one
 NEW   = an entry of the snapshot's scope whose id is not in the preflight baseline (kept + talk ids)
+MEM   = request <q>: memory told .*hits_told=[1-9]   # or j has `request <q>: tools: .*calls=\S*recall`
 ```
+
+**Answers can come from the conversation, not memory.** The voice tells a session the person's last exchanges, and in a person's turn the room's lines of their conversation too (`thread.rs`: `EXCHANGES` = 12, `REMEMBERED_FOR` = 600 s; `recent_with_room_lines`). Every ask below lands within 600 s of its tell, so a right answer alone does not show memory kept it (the Reviewer-lead's P2 on #8721). R2, R3, C1 and C19 PASS only with `MEM` in the ask's `j` (C1 and R2/R3 on `hits_path=(speaking|face)` or a recall call; C19 on any path or a recall call). The fact said without `MEM` reads INCONCLUSIVE `not carried by memory`, never a PASS. R1 (the name comes from the eyes, never said in the set) and the checks that fail on a word said (C2, C30, B4848, N1) are not changed: history can make them fail, never pass.
 
 ### The steps
 
@@ -186,10 +190,10 @@ A PASS or FAIL whose deciding lines (`checks.tsv` column `lines`) include one wi
 |---|---|---|---|---|---|---|
 | N1 (S9) | **hard** | yes | turn `s9_name`. Evidence: `memory scope the room's` and `faces in view 0` | neither the test-face name nor the owner's typed name (`OWNER_NAME_CHECK`) in `said` (case-folded) | a name said | no name set: INCONCLUSIVE |
 | R1 (S0g) | - | yes | turn `s0g_name` | `Olivia` in `said` | not in it | |
-| R2 (S0g) | - | yes | FACT entries in F at `snap_s0g` matching `ferdinand`; turn `s0g_r1` | `ferdinand` in `said` | not kept, or kept and not told | |
-| R3 (S0g) | - | yes | same with `apricot`, `s0g_r2` | `apricot` in `said` | as R2 | |
+| R2 (S0g) | - | yes | FACT entries in F at `snap_s0g` matching `ferdinand`; turn `s0g_r1` | `ferdinand` in `said`, and `MEM` | not kept, or kept and not told | told without `MEM`: INCONCLUSIVE `not carried by memory` |
+| R3 (S0g) | - | yes | same with `apricot`, `s0g_r2` | `apricot` in `said`, and `MEM` | as R2 | as R2 |
 | T1 (S0g) | - | report | turn `s0g_t1` `j`: `calls=\S*keep_rule`; NEW ids in `r-F` at `snap_s0g` | both | either missing | `LAMP_MEMORY_RULES` off: INCONCLUSIVE |
-| C1 (S13g) | - | yes | turn `s13g_ask_face`. Evidence: `memory told .*hits_path=(speaking\|face)` | `(?i)\bgreen\b` in `said` | DONT, or `(?i)\b(blue\|red\|black\|white)\b` | INCONCLUSIVE |
+| C1 (S13g) | - | yes | turn `s13g_ask_face`. Evidence: `memory told .*hits_path=(speaking\|face)` | `(?i)\bgreen\b` in `said`, and `MEM` | DONT, or `(?i)\b(blue\|red\|black\|white)\b` | green without `MEM`: INCONCLUSIVE `not carried by memory`; else INCONCLUSIVE |
 | C2 (S13g) | **hard** | yes | NEW `scooter` entries in F, everyone and O at `snap_s13g_hidden`; turn `s13g_ask_hidden`. Evidence: `told and kept as the room's`; `a remember about a person was not kept: speaker unknown` in [keep start, keep end + 25 s]; `memory had nothing told\|hits_path=room` | no scooter id in any of the three scopes, and no green told | a scooter id anywhere; or `\bgreen\b` in `said`; or `memory told .*hits_path=(speaking\|face)` on the ask | no snapshot, or misheard: INCONCLUSIVE |
 | C5 (S13g) | - | yes | `lamp-voice provider: remember: replaces=` in [`s13g_fix` start, `s13g_fix_yes` end + 25 s]; NEW `bottle` entries in F at `snap_s13g_fix`. Evidence: `replaces=y .*answer=replaced` | the bottle entries hold `blue` and none hold `green` | both `green` and `blue` held | INCONCLUSIVE |
 | C12 (S13g) | **hard** | yes | `forget called: source_id \S+, about [1-9][0-9]* words` in [`s13g_forget_about` start, `s13g_forget_yes` end + 25 s]; NEW `bottle` in F and everyone at `snap_s13g_forget` | the forget line found, and no bottle entry left | a bottle entry left | no forget line and nothing left: INCONCLUSIVE |
@@ -198,7 +202,7 @@ A PASS or FAIL whose deciding lines (`checks.tsv` column `lines`) include one wi
 | C44 (S3g) | **hard** | yes | the same new entries; the words `[a-z]{4,}` of the six turns' `heard` text, minus `{lamp, that, this, with, have, next, week}` | every new entry shares one of those words | an entry shares none | no entries, or entries with no `kept [1-9]` pass: INCONCLUSIVE |
 | T2 (S2g) | - | report | turn `s2g_t2`. Sentences: split on `(?<=[.!?])\s+`. Words: `[\w']+` | T1 PASS, ≤ 1 sentence and ≤ 25 words | more | T1 not PASS: INCONCLUSIVE |
 | C30 (S2g) | **hard** | yes | turn `s2g_blood` | DONT in `said` | `(?i)\b(A\|B\|AB\|O)\s*(positive\|negative\|\+\|-)` | INCONCLUSIVE |
-| C19 (S2g) | **hard** | yes | NEW `plant` entries in everyone at `snap_s2g_room`; turn `s2g_room_ask` | `(?i)plant\|water\|friday` in `said` and no FAIL phrase | `(?i)\byou (told\|said\|mentioned\|asked)\b` | `LAMP_MEMORY_ROOM_NOT_ASKER` off, or the plant not kept as the room's: INCONCLUSIVE |
+| C19 (S2g) | **hard** | yes | NEW `plant` entries in everyone at `snap_s2g_room`; turn `s2g_room_ask` | `(?i)plant\|water\|friday` in `said`, no FAIL phrase, and `MEM` | `(?i)\byou (told\|said\|mentioned\|asked)\b` | `LAMP_MEMORY_ROOM_NOT_ASKER` off, or the plant not kept as the room's: INCONCLUSIVE; the plant told without `MEM`: INCONCLUSIVE `not carried by memory` |
 
 **The set's verdict** (in this order):
 
@@ -208,20 +212,28 @@ A PASS or FAIL whose deciding lines (`checks.tsv` column `lines`) include one wi
 4. A hard check not judged: **VOID**.
 5. Otherwise **PASS**, and a PASS with an unclean put-back read-back (§4) becomes **VOID**: a kit fault, with the lamp held.
 
-Output one line: `memory5: PASS|FAIL|VOID, <passed>/15`. Write `memory5.tsv` (check, scene, item, hard, counts, verdict, evidence) and `verdict.json` (`verdict, passed, total, judged, pool, hard "k/7", why, checks`).
+Output one line: `memory5: PASS|FAIL|VOID, <passed>/15`. Write `memory5.tsv` (check, scene, item, hard, counts, verdict, evidence) and `verdict.json` (`verdict, passed, total, judged, pool, hard "k/7", why, checks`), locally.
+
+**What is posted is machine-only** (on the gate's issue or #7814): the verdict line, each check with its verdict, and for a miss the check, the request numbers, the entry ids and counts, and only journal lines of these forms, with anything after a `:` that is quoted text cut: `request N: memory told|had nothing told …` (counts and paths), `request N: tools: … calls=…`, `request N: held back: <reason>`, `request N heard N words`, `forget called: source_id …, about N words`, `remember: replaces=… answer=…`, `lamp-memory: remember person=<F|room|owner> ok`. Never `voice/said` or `voice/heard` text, entry text, or a person id other than F's. A face misread can put an owner's turn in a kit window; this keeps their words off the issue.
 
 ---
 
 ## 4. Cleanup and put-back (always runs: on success, on a fail, on the run cap, on TERM)
 
+The put-back forgets only what the kit itself made: the test face's ids above the before snapshot, and in the other scopes each id tied to one of the kit's own turns. It never forgets by word, never searches by word, never uses `selective`, and never uses `exchanges_forget` or a forget by `about` words. (El's P1 on #8721: a forget by word in the owner's or room's scope takes the owner's own talk in the run's window, and a check of kept ids cannot see an exchange go.)
+
+**Kit turns.** The request numbers of the kit's played lines: for each mark, the `voice/heard` request in [start − 2 s, end + 12 s] whose text matches the line (§3's turn of a line). Only these requests, and the journal's lines for them, tie an id to the kit.
+
 | # | Do | Check |
 |---|---|---|
 | U1 | `face hide`. Stop the bus recorder by its PID. Fetch the journal since T0 − 5 s and the recording. Judge (§3) **before** any forget | |
-| U2 | **Forget new entries by id.** For F and r-F: every id in `kept` (with observations) and `talk_notes` not in the baseline. For everyone, O, r-O and r-everyone: only ids not in the baseline **and** with `at_unix_ms ≥ T0` and text matching the words `ferdinand, apricot, jam, scooter, bottle, sweden, ghana, nepal, sentence, moon, teal, dentist, repaint, kitchen, plant`. Also use `{"op":"search","person":S,"query":W,"limit":50}` for each word, to find exchanges the `kept` list does not show. Send `{"op":"forget","person":S,"id":N}`, one per id | each answer `ok`; every as-found id of everyone and O still listed after each forget (stop forgetting at the first one gone) |
-| U3 | `"selective":true` walks linked rows: it also takes any row that shares a distinctive word with the forgotten one, and any copy of it. Use it only through the guard: before a selective forget of a kept or observation id, read the scope live. Leave the id (record it as held, never forget it) if it has no content word, or if it shares a content word with a row the kit did not write. Content words are lowercased words of 3+ characters, not common words, with a final `s` dropped. Then remove the held ids by a plain forget by id, after a read shows no other row with their words | |
+| U2 | **Kit ids, by id only.** Read every scope again (§1's reads). F and r-F were empty before the enrol (E5), so every id in them above that snapshot is the kit's: each `kept` (with observations), `talk_notes`, rule and exchange id. In everyone, O, r-O and r-everyone an id is the kit's only when it is NEW (not in the as-found ids, or an exchange id past the scope's as-found newest) **and tied to a kit turn**: **kept or observation entry**: its `at_unix_ms` is within 1 s of a `lamp-memory: remember person=<S> ok` line, or of an `observation pass` line, that follows a kit turn within 25 s; **rule entry**: within 1 s of a kit turn's `calls=…keep_rule`; **exchange**: its `at_unix_ms` is inside a kit turn's window and its `heard` matches that kit line's text (difflib ratio ≥ 0.8, compared locally). Nothing else selects an id there: never a word, never a `search` | |
+| U3 | **Dry run.** Write the list (scope, id, kind, the tying request, the first 40 bytes of its text) to the run's local log, never posted. Any NEW id in everyone, O, r-O or r-everyone that is not tied to a kit turn is **left**, listed as `untied` (ids only), and the read-back reads not clean: a person reads it before anything more is forgotten | |
+| U3a | **Forget each listed id** with `{"op":"forget","person":S,"id":N}`, one per id, F's first | each answer `ok`; after each forget, every as-found id of everyone and O still listed, and each scope's as-found newest exchange still there. Stop at the first one gone, and hold the lamp |
+| U3b | **Service records.** A NEW O record key (`changed_unix_ms ≥ T0`) is the kit's only when its change follows a kit turn's tool call within 25 s (none expected: no line asks for one). Before removing it, read **every** O key (§1's reads) and check that `{"op":"service_records_forget","person":O,"about":W}`'s words W match that key's record and no other key's, by key, never by the count. If W would reach any as-found key, leave it, list it, and hold the lamp | each removed key gone; every as-found key's `key\|status\|changed_unix_ms` unchanged |
 | U4 | **Remove the test face from the eyes:** `{"forget":"Olivia"}` on `/run/lampos-eyes/who.sock` | `{"forgot":true,"name_id_free":…,"id":"<F>"}` (`id` is given with `LAMP_MEMORY_STABLE_ID=on`, product on); `people.json` ids equal P9's again; `{"who":true}` is not Olivia |
-| U5 | **Remove her from memory:** `{"op":"forget_person","person":F}` on the memory socket, after every r-F id has been forgotten by id (U2) | `kept` of F and r-F both return 0 entries; `talk_notes` of F returns 0 |
-| U6 | Schedule: cancel by id any reminder not in the baseline with a kit word or `kind == "timer"`: `{"op":"cancel","id":N,"guard":{"store_id":…,"revision":…,"request_id":<32 hex>}}`, with the guard from `{"op":"status"}` | none expected: no step sets one |
+| U5 | **Remove her from memory:** `{"op":"forget_person","person":F}` on the memory socket, after every r-F id has been forgotten by id (U3a) | `kept` of F and r-F both return 0 entries; `talk_notes` of F returns 0 |
+| U6 | Schedule: cancel by id a reminder not in the baseline whose `request_id` or creation follows a kit turn's tool call within 25 s: `{"op":"cancel","id":N,"guard":{"store_id":…,"revision":…,"request_id":<32 hex>}}`, with the guard from `{"op":"status"}` | none expected: no step sets one |
 | U7 | Mac volume back to min(as found, 45). Remove the lamp-side scratch directory | |
 | U8 | **Recount every scope** (§1's reads again) | the table below |
 
@@ -236,12 +248,16 @@ Output one line: `memory5: PASS|FAIL|VOID, <passed>/15`. Write `memory5.tsv` (ch
 | Owner records, by key | every `key\|status\|changed_unix_ms` == as found. No key added, and none on the newest-first page with `changed_unix_ms ≥ T0` |
 | Owner contacts | == as found |
 | Rule scopes r-O, r-everyone | ids == as found |
+| Exchanges, everyone, O, r-O, r-everyone | each scope's as-found newest id still present; no NEW exchange tied to a kit turn left |
+| Untied ids | none listed in U3 |
 | No kit ids left | the after ids minus the before ids are empty in every scope |
 | Voice | same MainPID and NRestarts as P4; no `muted by the restart guard` since T0 |
 | Walk file | sha == P8's; `owner` still set |
 | Build, links, exes | == P2 and P6; `lamp-update` active |
 | Drop-ins | == P5; no `zz-friday`; no `/run/friday-*` |
-| Leak check | the run folder holds no e-mail-shaped token and no `\bOlivia\b` (mask the name in the logs) |
+| Leak check | the run folder holds no e-mail-shaped token and no `\bOlivia\b` (mask the name in the logs); the posted text holds no `voice/said` or entry text and no person id but F's |
+
+A NEW owner or room entry made by the owner's own talk during the run is untied, so it is never forgotten: it is listed (ids only) and left for the owner.
 
 **Exit codes.** Friday's `run-memory5.sh` exits 2 (usage or env), 3 (preflight stopped, no WAV, word clash, base read-back not as found), 4 (a WAV missing mid-run, an unknown kind) or 0 (played; the verdict is in the line). Fifth's gate wrapper maps them to `gate-G5.sh`'s 0/10–13. This mapping is proposed; Fifth sets the meanings to `gate-G5.sh`'s own:
 
@@ -262,7 +278,7 @@ Output one line: `memory5: PASS|FAIL|VOID, <passed>/15`. Write `memory5.tsv` (ch
 | 1 | **Held lines break the 60 s gap** | The product's conversation gap (`CONVERSATION_GAP_US` = 60 s) restarts on any finished worded line, including one the lamp held as "not said to the lamp" (a bystander, office noise). The second route emits the transcript before the said-to-me hold. Friday's old `quiet62` waited for 62 s with no journal line, which is not what the product measures. Scored tries then had no new session | Use §1's gap gate: count from the last `heard [1-9][0-9]* words`, `first answer audio`, `first audio byte` or `lamp-voice: saying `. Check `faces in view 1` at the line's Start. A try whose request shows a reset inside the gap is VOID, and is never counted as a FAIL |
 | 2 | **daemon-reload restarts the voice** | `systemctl daemon-reload` re-arms `lampos-setup-done.path` (`PathExists=/var/lib/lampos-setup/done`, `Unit=lampos.target`). The path still exists, so `lampos.target` starts again and pulls `lamp-voice` back up 0.46 s after a stop. `Restart=on-failure` is not the cause | memory5 needs no drop-in, so never run `daemon-reload` or restart the voice. If a future leg must, stop the voice, reload, wait 2 s, then stop it again if it came back. Confirm with `systemctl list-dependencies --reverse lamp-voice` and `journalctl -u lampos-setup-done.path` |
 | 3 | **The walk file loses its owner** | When the voice starts while the eyes know nobody, the stock voice's owner refresh (at start, then every 10 s) sees an empty names list, posts `owner_gone`, and the walk drops `owner` from `/var/lib/lampOS/voice/onboarding/progress.json`. On 52e6 the eyes may know nobody but Olivia during the leg | Never restart the voice during the leg (pitfall 2). Remove Olivia from the eyes with the voice running, never across a voice start. Check the walk file's sha and `owner` in preflight and the read-back. If the eyes must restart, the eyes go first; wait until they know their people (≥ 1, or as found), then start the voice |
-| 4 | **Forget-by-words skips shared words: forget by id** | A forget by the person's words (`forget what I said about …`, or the `about` route) leaves any row whose words are also in another row. `selective` forgets walk linked rows: a kept "Stop." took 4 of the test face's other items. In #8570's big forgets, 10 kit keeps were left behind because each shared a word with an older row | The put-back forgets every new entry by its id (§4 U2–U3), with the guard for `selective`. Then it recounts by key. It never forgets by words |
+| 4 | **Forget-by-words skips shared words: forget by id** | A forget by the person's words (`forget what I said about …`, or the `about` route) leaves any row whose words are also in another row. `selective` forgets walk linked rows: a kept "Stop." took 4 of the test face's other items. In #8570's big forgets, 10 kit keeps were left behind because each shared a word with an older row | The put-back forgets only the kit's own ids, each by its id (§4 U2–U3a), never `selective`. Then it recounts by key. It never forgets or searches by words |
 | 5 | **The paged list at 50** | `service_records` lists at most 50 (`LIST_MOST`, server side, newest change first), and `talk_notes`/`search` take `limit` 50. A "50 records" count is the page cap, not the total. `kept` is filled newest first up to 16 KB (`max_bytes` is clamped to 16384; with no `max_bytes` it is 4 KB) | Compare record **keys**, each read by `key`, never the count. Pass `max_bytes: 16384` to every `kept`. Compare ids, not lengths |
 
 The test face's made-up name is never written to a posted file. Ids, counts and hashes only.
