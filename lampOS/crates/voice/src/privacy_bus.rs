@@ -3083,6 +3083,10 @@ pub(crate) mod tests {
         // When the last state was sent, for the hold-up at Controls' pace,
         // and the time it was stamped, which an aging lapse keeps old.
         let (mut paced, mut stamped) = (started, started);
+        // When the last authority was sent: at the product's renewal pace,
+        // [`crate::coordinator::AUTHORITY_RENEW_US`], not every 5 ms pass,
+        // so the ride drives the worker as the coordinator does (#8466).
+        let mut authorised: Option<u64> = None;
         loop {
             take(&mut voice, &mut lease, &mut ridden);
             let now = lamp_ipc::monotonic_us();
@@ -3115,11 +3119,14 @@ pub(crate) mod tests {
             // (`process.rs`'s startup wait). Queued from the spawn instead, a
             // start of over 100 ms found the third past its control channel's
             // 100 ms and ended, which the voice never asks of a worker.
-            if ridden
-                .events
-                .iter()
-                .any(|(_, event)| matches!(event, WorkerEvent::Ready))
+            if authorised
+                .is_none_or(|at| now.saturating_sub(at) >= crate::coordinator::AUTHORITY_RENEW_US)
+                && ridden
+                    .events
+                    .iter()
+                    .any(|(_, event)| matches!(event, WorkerEvent::Ready))
             {
+                authorised = Some(now);
                 let snapshot = controller.snapshot(MonoTime::from_micros(now)).unwrap();
                 match voice.control.send(Control::Authority { snapshot }) {
                     Ok(()) => {}
