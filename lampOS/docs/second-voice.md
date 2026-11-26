@@ -606,6 +606,13 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   `request N piece K handed to the speaker: M ms of audio`; each playback
   gap too, from the coordinator (`docs/duplex-listening.md`). Test:
   `a_lead_in_whose_next_round_is_out_makes_one_sound`.
+  Known limit: it covers a gap after the answer's own words only, not one
+  before the first piece. A turn whose chat did not begin in 1.5 s makes
+  the first wait sound, which also spends `LAMP_BUSY_FOLLOW_UP_RENEWS`'s
+  one sound a round, so a slow call and a slow next round after it make
+  none, and a second sound there would come right after the first with no
+  words between. kit-8646 (26 Nov) w1: the sound at 1.5 s, weather 2.1 s,
+  round 2's first audio at 5.8 s, a 3.7 s gap.
   With `LAMP_SECOND_CUE_AFTER_MS` (500 to 4,000 ms, off unless set), the
   sound comes that long after the words in place of 1.5 s; a value it
   can't take is said and left at 1.5 s. A ready sound also moves the
@@ -4690,7 +4697,12 @@ after a take-over, but now for every turn:
   only when its answer found something; another turn's never) is held with
   the rest of its round, and the round's words are not kept. A quoted line
   and a reminder's ring are not judged. On a line that asked no live fact
-  (`live_fact::asks_live` false), once some of the turn's words were said,
+  (`live_fact::asks_live_fact` false: `asks_live`'s words, but a weather
+  condition alone counts only in a question, so "tell me a short story
+  about a cat who goes to the beach in Da Nang when it's sunny." asks none
+  and "Will it be sunny in Hanoi?" asks one; kit-8646, 26 Nov, build
+  16293: that story's "sunny" was held after its first piece's audio
+  began, then asked again; the first-words wait still reads `asks_live`), once some of the turn's words were said,
   a figure with no number in it (a weather condition with a place) is
   said as it is, with no ask again and no extra round (#8615, the lead's
   choice (d'), 25 Nov: on lamp-52e6, kit-10824, a story about a
@@ -4702,7 +4714,12 @@ after a take-over, but now for every turn:
   again, as on a live line `asks_live` misses ("How much is an ounce of
   silver?"); so does any figure on a line that asked one, or before
   anything was said. Test:
-  `live_fact::a_numberless_figure_in_a_line_that_asked_none_is_said_once_words_are_out`. With no call, the model is asked
+  `live_fact::a_numberless_figure_in_a_line_that_asked_none_is_said_once_words_are_out`,
+  `live_fact::a_story_line_naming_a_condition_says_its_numberless_figure_after_the_first_piece`.
+  The round-end check (`chat round N: K sentence(s) gave a live figure no
+  lookup backs`) judges only what `Hold::pass` held, so the same rule
+  applies there. "Words out" means a sentence went to the voice
+  (`Hold::said`), before its audio. With no call, the model is asked
   once with `live_fact::note`, whose round must call the lookup it names
   (`live_fact::force`, `tool_choice`; `weather` when the held words speak
   of weather and it is declared, else `web_search`); a second such reply,
