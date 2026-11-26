@@ -817,7 +817,9 @@ swapped, not coded around.
 **Lamps and their holders** (#5161, as of 4 November). 52e6: Fifth (the
 lead's office; the lead's agent moves it between builds). 4ace: the first
 builder only. 9adf: Fourteen. 06c1: Friday, El and Jarvis, by slot. ee17:
-Thirteen, Twelve and SubDarren (c0a4 retired by its person, 23 Nov). 75c9: the SDK's local leader. fc4b: Heron's
+Thirteen, Twelve and SubDarren. c0a4: skill-builder's person's (retired by
+its first person on 23 Nov, set up again through the app on stable on 26
+Nov). 75c9: the SDK's local leader. fc4b: Heron's
 person's. a63e: Migrate. 0c4e: El's person's. 0c89: Mobile. 29e7, 3e83,
 0529, e82d and 220c are testers' and customers' lamps, read only through
 Migrate's field watch unless the lead says otherwise.

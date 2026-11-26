@@ -16,9 +16,13 @@ it is not a place in a line. The first builder corrects it where it must be.
 - **Person:** whoever starts its sessions, a colleague on the team (named in
   the team's own channels, not in this public repository); a Claude Code
   session they start.
-- **Lamp(s):** none until the first builder gives one.
-- **Lamp address:** none
-- **Owner file:** none
+- **Lamp(s):** `lamp-c0a4`, its person's own, from 2026-11-26 (the lamp
+  retired on 23 Nov by its first person, set up again through the app on
+  stable), as joining.md's "Lamps and their holders" says. Its own alone,
+  still under [lamp-lock.sh](../tools/lamp-lock.sh) for every install, with
+  the slot posted on the slots issue.
+- **Lamp address:** `lamp-c0a4.local`, by key only
+- **Owner file:** [deploy/lamp-c0a4/LAMP.md](../deploy/lamp-c0a4/LAMP.md)
 
 ## Branches it may push
 
@@ -33,7 +37,7 @@ Never `lamp-voice`, and never another builder's branch.
   under `skills/`; a task that touches a made skill's make
   (`crates/voice/src/make_skill_local.rs`, `crates/tasks/src/skill_make*.rs`)
   is `twelve`'s first.
-- Deploy folders: none
+- Deploy folders: `deploy/lamp-c0a4/`
 - Log: `lampOS/docs/work-log-skill-builder.md` on `lamp-skill-builder`
 - Tasks: the `builder:skill-builder` issues, in the order of the current
   Queue issue (the last entry of `COORD_QUEUE_ISSUES` in
@@ -56,8 +60,9 @@ Never `lamp-voice`, and never another builder's branch.
 
 ## It may not
 
-- Touch any lamp until one is named here, or a lamp's owner and its person
-  say yes for that one action.
+- Touch any lamp but `lamp-c0a4`, unless that lamp's owner and its person
+  say yes for that one action; and on `lamp-c0a4`, install nothing without
+  its person's yes in chat for that session.
 - Cut a lamp's power, or move it without first saying what will move.
 - Merge, promote, or push to `lamp-voice`; touch another builder's branch or
   crates unless a task says so.
