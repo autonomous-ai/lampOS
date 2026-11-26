@@ -7758,7 +7758,13 @@ forces one), a skill it makes is made whole, with everything a run needs:
   pet or a long press of the button, the base or a head pad), keeps its
   `run` step and its `speak`, since that is the person at the lamp asking,
   and the told answer's quiet minute would answer a pat a minute late
-  (`made_skill::HAND_TOPICS`). One trigger on anything else (a time, an
+  (`made_skill::HAND_TOPICS`). A Stop or mute press (a tap or a long
+  press, `controls/gesture` with `intent` `stop` or `software_mute`) starts
+  no skill run, made or hand-written (the first builder's ruling on #8651):
+  a person who presses to quiet the lamp gets quiet, every time, so a
+  `controls/gesture` skill runs only from a pet. lamp-skills journals
+  "lamp-skills: a Stop press starts no skill run (#8651)". Test
+  `a_stop_press_starts_no_skill_run_and_a_pet_does`. One trigger on anything else (a time, an
   event, another sensor, `controls/state` or `controls/touch_state`) makes
   the whole skill told-only, or that trigger could still run its `run`
   step. Test
