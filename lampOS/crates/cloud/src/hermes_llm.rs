@@ -1096,8 +1096,7 @@ pub async fn run(
     say: &mut dyn FnMut(&str),
 ) {
     serve_when(
-        on_from_environment(),
-        PORT,
+        on_from_environment().then_some(PORT),
         state,
         second_json,
         key,
@@ -1108,12 +1107,11 @@ pub async fn run(
     .await
 }
 
-/// [`run`] with the switches already read (`on`, [`on_from`]) and the port
-/// given, so a test can show either switch alone starts the listener
-/// (#6226). Off, nothing is listened on.
+/// [`run`] with the switches already read and the port given, `None`
+/// when off ([`on_from`]), so a test can show either switch alone starts the
+/// listener (#6226). Off, nothing is listened on.
 pub async fn serve_when(
-    on: bool,
-    port: u16,
+    port: Option<u16>,
     state: Option<&Path>,
     second_json: Option<&str>,
     key: &str,
@@ -1121,9 +1119,9 @@ pub async fn serve_when(
     stop: impl std::future::Future<Output = ()>,
     say: &mut dyn FnMut(&str),
 ) {
-    if !on {
+    let Some(port) = port else {
         return stop.await;
-    }
+    };
     let started = async {
         let state = state.ok_or("no state folder for the local token")?;
         let token = token(state).map_err(|_| "the local token can't be kept")?;
