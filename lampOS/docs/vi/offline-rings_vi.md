@@ -39,7 +39,11 @@ vốn là một lượt của mô hình, và cổng của nó cần một phiên
     kiểm tra mỗi 5 s có sẵn chạy như trước để biết khi nào mạng trở lại.
   - Nếu kiểm tra thấy mạng mất (xong muộn nhất 6 s trước hạn), đến hạn mạng
     đã mất quá thời gian chờ 5 s, nên lần reo phát từ đoạn âm thanh đúng giờ.
-  - Để biết lần reo sớm nhất, tiến trình con Schedule của giọng nói đọc kho
+  - Nếu socket điều khiển của worker đang đầy (worker kẹt trong một lời gọi
+    chậm, #8204), yêu cầu kiểm tra chưa được gửi và được gửi lại ở vòng sau;
+    giọng nói không bao giờ dừng vì việc này.
+  - Để biết lần reo sớm nhất, tiến trình con Schedule của giọng nói bắt đầu
+    một lượt đọc kho nhiều nhất mỗi giây một lần (`UPCOMING_WALK_EVERY_US`),
     mỗi nhịp (200 ms) một trang tối đa 8 mục, chỉ lấy id và thời gian, không
     bao giờ lấy lời, và báo cho giọng nói khi kết quả thay đổi
     (`FromWorker::Upcoming`). Đây là đọc cục bộ qua socket, không ra mạng.
@@ -57,6 +61,7 @@ vốn là một lượt của mô hình, và cổng của nó cần một phiên
 | Kiểm tra mạng bao lâu trước hạn reo sớm nhất, một lần | 10 s (`PROBE_BEFORE_DUE_US`) | `offline_rings.rs` |
 | Mạng đã được xác nhận trong khoảng này thì bỏ qua kiểm tra | 60 s (`LINK_CONFIRMED_WITHIN_US`) | `offline_rings.rs` |
 | Bước kiểm tra chờ máy chủ trả lời tối đa | 4 s (`PROBE_WITHIN`, có sẵn) | `second_provider/link.rs` |
+| Lượt đọc kho tìm lần reo sớm nhất bắt đầu nhiều nhất | mỗi 1 s (`UPCOMING_WALK_EVERY_US`) | `reminders/consumer.rs` |
 
 ## Chạy lại hàng kiểm tra (lamp-06c1)
 
