@@ -1941,7 +1941,10 @@ trắng và `-` được đọc là `_` ("Google Drive", "GMAIL", "google calend
 
 Một lệnh gọi nêu một dịch vụ mà đèn không có connector (không mã hay tên nào
 trong catalogue khớp) thất bại với "The lamp can't link <name> yet. The services it can
-link are in the app: open this lamp, then Settings, then Linked accounts." (`serve::CANT_LINK`, sau câu
+link are in the app: open this lamp, then Settings, then Linked accounts." (`serve::CANT_LINK`; một tên
+là tác tử, như OpenClaw, Hermes, Claude Code hay Codex, được trả lời "<name> is an agent the lamp can run,
+not a service to link: …" thay vào đó, `serve::AGENT_NOT_LINKED`, #8729, không bao giờ bị chỉ tới Linked
+accounts; sau câu
 đầu). `<name>` là tên lệnh gọi đưa ra, chỉ được nói khi nó tối đa 40 ký tự,
 toàn chữ cái, chữ số, khoảng trắng, `-` hoặc `_`; mọi tên khác, hoặc không có
 tên, được nói là "that service". Mô tả của `services_connected` nêu các dịch
@@ -3442,7 +3445,11 @@ the lamp's owner linked these services to you in the app's Linked accounts:
 Notion, Gmail. They are yours to use for the owner: read from one with
 service_read, and send, post or create with service_write, when they ask.
 Asked about one, use it, or say plainly what you can do with it; never say
-it is the app's job or that you don't know it. A service the lamp can link
+it is the app's job or that you don't know it. OpenClaw, Hermes, Claude
+Code, Codex or another agent is an agent the lamp can run, not a service to
+link: never send the person to the app's accounts for it. Which agent the
+lamp runs now, and where it is chosen in the app, is the lamp_help skill's
+agent topic. A service the lamp can link
 (Gmail, Google Calendar, Google Drive, Figma, GitHub, Linear, Asana, Ahrefs, Facebook Page, Slack, monday.com, HubSpot, Amplitude, Notion) but not in this list isn't linked to this lamp yet. It can be linked
 in the app: open this lamp, then Settings, then Linked accounts. Any other
 service the lamp can't link yet: say so. The services it can link are in
