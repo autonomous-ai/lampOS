@@ -6340,11 +6340,13 @@ pub fn serve(
                     let facing = heeding.clone();
                     engine = engine
                         .taking_a_stand_in_said_facing(true)
-                        .seeing_the_line_said_facing(Arc::new(move |window: (u64, u64)| {
-                            facing
-                                .lock()
-                                .is_ok_and(|heeding| heeding.said_facing(window))
-                        }));
+                        .seeing_the_line_said_facing(Arc::new(
+                            move |window: (u64, u64), turned| {
+                                facing
+                                    .lock()
+                                    .is_ok_and(|heeding| heeding.said_facing(window, turned))
+                            },
+                        ));
                 }
             } else {
                 eprintln!(
@@ -9384,14 +9386,16 @@ fn speakers_between(
     }
 }
 
-/// `began_us..ended_us`, by this process's monotonic clock, as instants.
-/// `LAMP_NAME_FACING_STAND_IN`'s face, from the line's looks: read speaking
-/// while facing the lamp in [`crate::said_to_me::FACING_LOOKS`] looks or more,
-/// and no second voice in the room lately (`Heeding::said_facing`).
-pub(crate) fn said_facing_alone(facing_looks: usize, second_voice: bool) -> bool {
-    !second_voice && facing_looks >= crate::said_to_me::FACING_LOOKS
+/// `LAMP_NAME_FACING_STAND_IN`'s face: a close face turned to the lamp
+/// (`turned`, the near hearing's own sign) or one read speaking while facing
+/// the lamp in [`crate::said_to_me::FACING_LOOKS`] looks or more, and either
+/// only with no second voice in the room lately (`Heeding::said_facing`;
+/// Twelve's P2 on #8763: someone on a video call facing the lamp).
+pub(crate) fn stand_in_face(turned: bool, facing_looks: usize, second_voice: bool) -> bool {
+    !second_voice && (turned || facing_looks >= crate::said_to_me::FACING_LOOKS)
 }
 
+/// `began_us..ended_us`, by this process's monotonic clock, as instants.
 fn line_between(began_us: u64, ended_us: u64) -> Option<(Instant, Instant)> {
     let (now, now_us) = (Instant::now(), monotonic_us());
     let at = |us: u64| {
@@ -11199,13 +11203,13 @@ impl Heeding {
     /// spoke, as `LAMP_SAID_TO_ME` refuses it too (`said_to_me::Held::SecondVoice`,
     /// #7891: someone facing the lamp while on a call or talking to another
     /// person; the Reviewer-lead's second P2 on #8763). No eyes: no.
-    pub(crate) fn said_facing(&self, (began_us, ended_us): (u64, u64)) -> bool {
+    pub(crate) fn said_facing(&self, (began_us, ended_us): (u64, u64), turned: bool) -> bool {
         let Some((eyes, _)) = self.eyes.as_ref() else {
             return false;
         };
         let facing_looks = line_between(began_us, ended_us)
             .map_or(0, |(from, to)| eyes.turned_speaking_facing_looks(from, to));
-        said_facing_alone(facing_looks, self.second_voice_lately())
+        stand_in_face(turned, facing_looks, self.second_voice_lately())
     }
 
     /// An earlier line's second voice, since the lamp last spoke and within

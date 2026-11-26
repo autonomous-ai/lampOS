@@ -5948,11 +5948,11 @@ after a take-over, but now for every turn:
     (0.9) or more by the line's start and a face turned to the lamp said
     the line: a close one (`Heeding::turned_to_the_lamp`, the near
     hearing's own sign) or one read speaking it while facing the lamp in
-    `said_to_me::FACING_LOOKS` (2) looks, close or not, never after a
-    second voice in the room since the lamp last spoke, which
-    `LAMP_SAID_TO_ME` refuses too (`Heeding::said_facing`,
+    `said_to_me::FACING_LOOKS` (2) looks, close or not; either face never
+    after a second voice in the room since the lamp last spoke, which
+    `LAMP_SAID_TO_ME` refuses too (`worker::stand_in_face`,
     `said_to_me::Held::SecondVoice`, #7891: someone facing the lamp on a
-    call or talking to another person). The greeting is "hey", "hi", "ok"
+    video call or talking to another person). The greeting is "hey", "hi", "ok"
     or "okay", as `first_word_set_off` passes them. The journal says `its first word past a
     greeting, set off, is one speech to text writes for the lamp's name
     though people say it to each other too ("man"), … (LAMP_NAME_FACING_STAND_IN)`,

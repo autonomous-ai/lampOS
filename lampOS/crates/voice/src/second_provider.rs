@@ -3255,7 +3255,7 @@ pub type NameNear = Arc<dyn Fn((u64, u64)) -> (Option<f32>, bool) + Send + Sync>
 /// Whether a face turned to the lamp was read speaking a line's window while
 /// it faced the lamp, close or not (`LAMP_NAME_FACING_STAND_IN`;
 /// `worker::Heeding::said_facing`).
-pub type SaidFacing = Arc<dyn Fn((u64, u64)) -> bool + Send + Sync>;
+pub type SaidFacing = Arc<dyn Fn((u64, u64), bool) -> bool + Send + Sync>;
 
 /// The switches that widen how [`named_near`] reads a line's first word
 /// beside lamp-name's near hearing.
@@ -3525,7 +3525,7 @@ fn named_near(
         && like == LikeTheName::Not
         && facing_stand_in(&text, (start, end), heard);
     let facing_said =
-        facing_word && (turned || said_facing.is_some_and(|said_facing| said_facing(window)));
+        facing_word && said_facing.map_or(turned, |said_facing| said_facing(window, turned));
     if facing_word && !facing_said {
         eprintln!(
             "lamp-voice second: request {request}: its first word past a greeting, set off, is one speech to text writes for the lamp's name though people say it to each other too (\"{word}\"), heard near, but no face turned to the lamp said it, or a second voice was heard in the room: not taken as the name by this rule (LAMP_NAME_FACING_STAND_IN)"

@@ -204,21 +204,34 @@ fn a_word_sounds_like_the_name_by_its_shape_or_as_heard_for_it() {
 struct Face {
     turned: bool,
     said_facing: bool,
+    /// A second voice in the room lately, which holds either face for the
+    /// stand-in rule (`worker::stand_in_face`).
+    second_voice: bool,
 }
 
 const NO_FACE: Face = Face {
     turned: false,
     said_facing: false,
+    second_voice: false,
 };
 const CLOSE_FACE: Face = Face {
     turned: true,
     said_facing: false,
+    second_voice: false,
+};
+/// Twelve's P2 on #8763: a close face turned to the lamp and speaking, on a
+/// video call with the screen behind the lamp: a second voice lately.
+const CLOSE_FACE_ON_A_CALL: Face = Face {
+    turned: true,
+    said_facing: false,
+    second_voice: true,
 };
 /// The owner's at 15:01 on 26 Nov: read speaking the line facing the lamp in
 /// 2 looks, no close face.
 const FACING_FACE: Face = Face {
     turned: false,
     said_facing: true,
+    second_voice: false,
 };
 
 /// One line heard as `heard`, lamp-name's near hearing at its start `near`,
@@ -240,6 +253,7 @@ async fn asked_facing_in(
     let Face {
         turned,
         said_facing,
+        second_voice,
     } = face;
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
@@ -255,7 +269,14 @@ async fn asked_facing_in(
         .hearing_the_name_near(Arc::new(move |_: (u64, u64)| (near, turned)))
         .taking_a_stand_in_said_facing(on)
         .taking_the_name_as_a_sentence(as_a_sentence)
-        .seeing_the_line_said_facing(Arc::new(move |_: (u64, u64)| said_facing));
+        .seeing_the_line_said_facing(Arc::new(move |_: (u64, u64), turned| {
+            let looks = if said_facing {
+                crate::said_to_me::FACING_LOOKS
+            } else {
+                0
+            };
+            super::super::worker::stand_in_face(turned, looks, second_voice)
+        }));
     engine.submit(start(1));
     engine.submit(ProviderInput::Audio {
         request: 1,
@@ -310,6 +331,13 @@ async fn a_greeted_word_said_to_a_person_is_the_name_said_by_a_face_turned_to_th
     );
     for (heard, near, face, on, why) in [
         (line, Some(0.996), NO_FACE, true, "no face"),
+        (
+            line,
+            Some(0.996),
+            CLOSE_FACE_ON_A_CALL,
+            true,
+            "a close face after a second voice",
+        ),
         (
             line,
             Some(0.89),
@@ -396,11 +424,18 @@ async fn with_no_face_a_greeted_stand_in_falls_through_to_the_sentence_rule() {
 /// someone on a call, or talking to another person, while facing the lamp).
 #[test]
 fn a_face_read_speaking_facing_is_not_the_rules_after_a_second_voice() {
-    use super::super::worker::said_facing_alone;
+    use super::super::worker::stand_in_face;
     let looks = crate::said_to_me::FACING_LOOKS;
-    assert!(said_facing_alone(looks, false));
-    assert!(!said_facing_alone(looks, true), "a second voice lately");
-    assert!(!said_facing_alone(looks - 1, false), "too few looks");
+    assert!(stand_in_face(false, looks, false));
+    assert!(!stand_in_face(false, looks, true), "a second voice lately");
+    assert!(!stand_in_face(false, looks - 1, false), "too few looks");
+    // Twelve's P2 on #8763: a close face turned to the lamp is the rule's
+    // face too, and the second voice holds it as it holds the read one.
+    assert!(stand_in_face(true, 0, false));
+    assert!(
+        !stand_in_face(true, 0, true),
+        "a close face on a video call"
+    );
 }
 
 /// The greeted word, the list and the bar, by themselves.
