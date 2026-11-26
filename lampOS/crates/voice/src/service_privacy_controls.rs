@@ -187,13 +187,9 @@ fn wait(
         let root_text = root
             .to_str()
             .ok_or_else(|| io::Error::other("privacy root must be UTF-8"))?;
-        Worker::spawn_optional_ring_with_tick(
-            executable,
-            &path,
-            boot,
-            &["--privacy", "--bus-root", root_text],
-            tick,
-        )
+        let args = crate::privacy_indicator::ring_arguments(root_text);
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        Worker::spawn_optional_ring_with_tick(executable, &path, boot, &args, tick)
     };
     run(
         worker,

@@ -989,7 +989,20 @@ fn run() -> Result<()> {
             if !root.is_absolute() { return Err(io::Error::other("privacy indicator root must be absolute").into()); }
             let mut channels=WorkerChannels::bind(Path::new(dir),role,parent,worker,true)?;
             channels.connect(Path::new(dir),role,true)?;
-            lamp_voice::privacy_indicator::run(channels,parent,root)?;
+            lamp_voice::privacy_indicator::run(channels,parent,root,None)?;
+        },
+        // The same, painting by the person's kept look (#8696), with
+        // LAMP_PRIVACY_LIGHT=on in the voice.
+        #[cfg(target_os="linux")]
+        [command,role,dir,parent,worker,mode,flag,root,look_flag,look] if command=="worker" && role=="ring" && mode=="--privacy" && flag=="--bus-root" && look_flag==lamp_voice::privacy_indicator::LOOK_FLAG => {
+            let parent=parse_boot(parent)?;
+            let worker=parse_boot(worker)?;
+            let root=Path::new(root);
+            let look=Path::new(look);
+            if !root.is_absolute() || !look.is_absolute() { return Err(io::Error::other("privacy indicator paths must be absolute").into()); }
+            let mut channels=WorkerChannels::bind(Path::new(dir),role,parent,worker,true)?;
+            channels.connect(Path::new(dir),role,true)?;
+            lamp_voice::privacy_indicator::run(channels,parent,root,Some(look))?;
         },
         [command,role,dir,parent,worker] if command=="worker" => {
             let parent=parse_boot(parent)?;

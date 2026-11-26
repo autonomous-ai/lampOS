@@ -1,22 +1,174 @@
 //! Optional quiescent physical-mute ring worker. SPI never runs in the sampler
 //! or the service wait loop. The supervisor must verify this writer's shutdown
 //! receipt and process exit before starting another ring owner.
+//!
+//! The person's look (#8696, `docs/ring-choreography.md`, "The person's
+//! look"): with `LAMP_PRIVACY_LIGHT=on` in the voice, the wait passes
+//! [`LOOK_FLAG`] and the kept file's path ([`ring_arguments`]), and this
+//! worker paints red, a dimmer red or nothing by it. A thread of its own
+//! ([`LookWatch`]) looks at the file every [`LOOK_EVERY`] and reads it again
+//! when it changed, so the 2 ms step does no file I/O. The look is read once
+//! before the first paint, so a new showing begins in the kept look. It is
+//! picked only after the ring's own guards, which it never reaches: nothing
+//! on the mute's path reads it.
+// Off Linux only the worker's flags are used (the muted wait builds them on
+// every target); the writer and its state run on Linux and in tests.
+#![cfg_attr(not(any(target_os = "linux", test)), allow(dead_code, unused_imports))]
 use crate::{
     ring_wire::{RingBlankReason, RingFeedback},
     ring_worker::RingLink,
     wire::{Control, WorkerEvent},
 };
 use lamp_ipc::monotonic_us;
-use lamp_ring::{BlankReason, BlankReceipt, FrameSink, GuardedRing, PrivacyObservation};
+use lamp_ring::{
+    BlankReason, BlankReceipt, FrameSink, GuardedRing, PrivacyLook, PrivacyObservation,
+};
 use lamp_turn_owner::{BootId, BoundaryGuard, Error as AuthorityError, MonoTime};
 use std::io;
-#[cfg(target_os = "linux")]
+use std::path::{Path, PathBuf};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, AtomicU8, Ordering},
+};
 use std::time::Duration;
 
 const CONTROL_BUDGET: usize = 16;
 const INITIAL_AUTHORITY_US: u64 = 250_000;
 #[cfg(target_os = "linux")]
 const TICK: Duration = Duration::from_millis(2);
+
+/// The worker's flag before the kept look's path (#8696).
+pub const LOOK_FLAG: &str = "--privacy-light";
+
+/// How often [`LookWatch`] looks at the kept file: a set with the slide
+/// closed shows within this and one step, well inside the first builder's
+/// about 1 s.
+pub const LOOK_EVERY: Duration = Duration::from_millis(100);
+
+/// The flags after `worker ring` for the muted indicator: `--privacy
+/// --bus-root ROOT`, and the kept look's flag and path with
+/// `LAMP_PRIVACY_LIGHT=on` in the voice. The worker's environment is
+/// cleared, so the switch reaches it only as this flag.
+pub fn ring_arguments(root: &str) -> Vec<String> {
+    ring_arguments_with(root, lamp_msgs::privacy_light::on_in_environment())
+}
+
+fn ring_arguments_with(root: &str, look: bool) -> Vec<String> {
+    let mut args = vec![
+        "--privacy".to_owned(),
+        "--bus-root".to_owned(),
+        root.to_owned(),
+    ];
+    if look {
+        args.push(LOOK_FLAG.to_owned());
+        args.push(lamp_msgs::privacy_light::PATH.to_owned());
+    }
+    args
+}
+
+/// The ring's look for a kept one.
+fn painted(look: lamp_msgs::privacy_light::Look) -> PrivacyLook {
+    match look {
+        lamp_msgs::privacy_light::Look::Red => PrivacyLook::Red,
+        lamp_msgs::privacy_light::Look::Dim => PrivacyLook::Dim,
+        lamp_msgs::privacy_light::Look::Off => PrivacyLook::Off,
+    }
+}
+
+fn code(look: PrivacyLook) -> u8 {
+    match look {
+        PrivacyLook::Red => 0,
+        PrivacyLook::Dim => 1,
+        PrivacyLook::Off => 2,
+    }
+}
+
+fn decoded(code: u8) -> PrivacyLook {
+    match code {
+        1 => PrivacyLook::Dim,
+        2 => PrivacyLook::Off,
+        _ => PrivacyLook::Red,
+    }
+}
+
+/// What tells a changed file from the one last read: its inode (a whole
+/// write is a rename), size and modification time. None while missing.
+type Stamp = Option<(u64, u64, Option<std::time::SystemTime>)>;
+
+fn stamp(path: &Path) -> Stamp {
+    use std::os::unix::fs::MetadataExt;
+    std::fs::symlink_metadata(path)
+        .ok()
+        .map(|meta| (meta.ino(), meta.len(), meta.modified().ok()))
+}
+
+/// The kept look, followed on a thread of its own: read once at
+/// [`LookWatch::start`], then looked at every `every` and read again when it
+/// changed. Red whenever it can't be read ([`lamp_msgs::privacy_light::read`]).
+pub(crate) struct LookWatch {
+    current: Arc<AtomicU8>,
+    going: Arc<AtomicBool>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+
+impl LookWatch {
+    pub(crate) fn start(path: PathBuf, every: Duration) -> io::Result<Self> {
+        let mut seen = stamp(&path);
+        let current = Arc::new(AtomicU8::new(code(painted(
+            lamp_msgs::privacy_light::read(&path),
+        ))));
+        let going = Arc::new(AtomicBool::new(true));
+        let thread = {
+            let (current, going) = (current.clone(), going.clone());
+            std::thread::Builder::new()
+                .name("privacy-look".into())
+                .spawn(move || {
+                    while going.load(Ordering::Acquire) {
+                        // Woken at once by the drop, so a stop never waits
+                        // out a look.
+                        std::thread::park_timeout(every);
+                        if !going.load(Ordering::Acquire) {
+                            return;
+                        }
+                        let now = stamp(&path);
+                        if now != seen {
+                            seen = now;
+                            let look = painted(lamp_msgs::privacy_light::read(&path));
+                            current.store(code(look), Ordering::Release);
+                        }
+                    }
+                })?
+        };
+        Ok(Self {
+            current,
+            going,
+            thread: Some(thread),
+        })
+    }
+
+    /// The look last read.
+    pub(crate) fn look(&self) -> PrivacyLook {
+        decoded(self.current.load(Ordering::Acquire))
+    }
+}
+
+impl Drop for LookWatch {
+    fn drop(&mut self) {
+        self.going.store(false, Ordering::Release);
+        if let Some(thread) = self.thread.take() {
+            thread.thread().unpark();
+            let _ = thread.join();
+        }
+    }
+}
+
+fn look_name(look: PrivacyLook) -> &'static str {
+    match look {
+        PrivacyLook::Red => "red",
+        PrivacyLook::Dim => "dim",
+        PrivacyLook::Off => "off",
+    }
+}
 
 /// Only the supervisor's explicit `ring --privacy --bus-root PATH` dispatch
 /// calls this. Workers do not read the feature environment themselves.
@@ -25,6 +177,7 @@ pub fn run(
     mut channels: crate::transport::WorkerChannels,
     controller_boot: BootId,
     root: &std::path::Path,
+    look: Option<&Path>,
 ) -> io::Result<()> {
     // The bus is read by the watch's own thread, never between this
     // writer's Stop and expiry checks (#795 review).
@@ -35,12 +188,18 @@ pub fn run(
         Ok(watch) => watch,
         Err(error) => return startup_failure(&mut channels, error),
     };
+    // Read before the ring opens, so the first frame is in the kept look.
+    let looks = match look.map(|path| LookWatch::start(path.to_path_buf(), LOOK_EVERY)) {
+        None => None,
+        Some(Ok(watch)) => Some(watch),
+        Some(Err(error)) => return startup_failure(&mut channels, error),
+    };
     // The waking face lets go at once for it, with no fade (#1681).
     let (ring, _) = match lamp_ring::linux::open_privacy(controller_boot) {
         Ok(opened) => opened,
         Err(error) => return startup_failure(&mut channels, error),
     };
-    run_guarded(channels, controller_boot, ring, move || {
+    run_guarded(channels, controller_boot, ring, looks, move || {
         watch
             .latest()?
             .map(|lease| {
@@ -70,12 +229,14 @@ fn run_guarded(
     mut link: impl RingLink,
     controller_boot: BootId,
     mut ring: GuardedRing<impl FrameSink>,
+    looks: Option<LookWatch>,
     mut observation: impl FnMut() -> io::Result<Option<PrivacyObservation>>,
 ) -> io::Result<()> {
     let result = (|| {
         // The constructor has already completed the startup black write.
         link.publish(WorkerEvent::Ready)?;
         let mut state = State::new(controller_boot, monotonic_us());
+        state.looks = looks;
         loop {
             if state.step(&mut link, &mut ring, &mut observation)? {
                 return Ok(());
@@ -142,8 +303,14 @@ struct State {
     authority: BoundaryGuard,
     started_at: u64,
     previous_at: u64,
-    /// Whether the red breath just written begins a showing, for `lamp/did`.
+    /// Whether the indication just held begins a showing, for `lamp/did`.
     shown: crate::did_ring::Episode,
+    /// The showings told as `lamp/did`, in any look.
+    notices: u64,
+    /// The person's kept look, with [`LOOK_FLAG`]; red without it.
+    looks: Option<LookWatch>,
+    /// The look last said in the journal while shown.
+    said: Option<PrivacyLook>,
 }
 
 enum Drained {
@@ -159,7 +326,17 @@ impl State {
             started_at: at_us,
             previous_at: at_us,
             shown: crate::did_ring::Episode::default(),
+            notices: 0,
+            looks: None,
+            said: None,
         }
+    }
+
+    /// The look to paint now: the watch's last read, red without one.
+    fn look(&self) -> PrivacyLook {
+        self.looks
+            .as_ref()
+            .map_or(PrivacyLook::Red, LookWatch::look)
     }
 
     fn heartbeat(&mut self, at_us: u64) -> io::Result<()> {
@@ -284,12 +461,29 @@ impl State {
         }
         let observed = observed?;
         self.heartbeat(monotonic_us())?;
+        // Picked only now, after the guards' evidence was taken: the look
+        // changes the frame, never whether one may be painted.
+        let look = self.look();
         let written = ring
-            .show_privacy_muted(observed)
+            .show_privacy_look(observed, look)
             .map_err(io::Error::other)?;
-        // A frame written: told once as the showing begins, that the lamp was
-        // private and nothing from while it was (#7757).
-        if written.is_some() && self.shown.seen(monotonic_us()) {
+        if !ring.privacy_shown() {
+            self.said = None;
+        } else if let Some(receipt) = written
+            && self.said != Some(look)
+        {
+            eprintln!(
+                "lamp-voice: privacy light: {} (painted at_us {})",
+                look_name(look),
+                receipt.started_at().as_micros()
+            );
+            self.said = Some(look);
+        }
+        // Held, in any look, dark too (#8696): told once as the showing
+        // begins, that the lamp was private and nothing from while it was
+        // (#7757). The person's app shows the mute whatever the ring shows.
+        if ring.privacy_shown() && self.shown.seen(monotonic_us()) {
+            self.notices += 1;
             crate::did_ring::told(crate::did_ring::Face::PrivacyMuted);
         }
         Ok(false)
@@ -578,5 +772,269 @@ mod tests {
         assert!(failed(&mut link, &mut ring, error).is_err());
         assert_eq!(sink.0.borrow().last(), Some(&EncodedFrame::black()));
         assert!(ring.is_faulted());
+    }
+
+    // The person's look (#8696).
+
+    /// A muted wait's controller, kept so each step can renew it.
+    fn live() -> (State, GuardedRing<Sink>, Sink, Link, Controller) {
+        let boot = BootId::new([7; 16]).unwrap();
+        let at = MonoTime::from_micros(monotonic_us());
+        let mut controller = Controller::new(boot, at);
+        controller
+            .set_microphone_permission(at, Permission::Denied)
+            .unwrap();
+        controller
+            .set_camera_permission(at, Permission::Denied)
+            .unwrap();
+        let sink = Sink::default();
+        let ring = GuardedRing::new(sink.clone(), boot).unwrap();
+        (
+            State::new(boot, at.as_micros()),
+            ring,
+            sink,
+            Link::default(),
+            controller,
+        )
+    }
+
+    /// One step with a fresh authority and a fresh physical LOW (or none).
+    fn fresh_step(
+        state: &mut State,
+        ring: &mut GuardedRing<Sink>,
+        link: &mut Link,
+        controller: &mut Controller,
+        low: bool,
+    ) -> bool {
+        let at = MonoTime::from_micros(monotonic_us());
+        let snapshot = controller.snapshot(at).unwrap();
+        link.controls.push_back(Control::Authority { snapshot });
+        let observation = PrivacyObservation {
+            controller_boot: snapshot.boot(),
+            microphone_generation: snapshot.microphone_generation(),
+            observed_at: at,
+            expires_at: MonoTime::from_micros(at.as_micros() + 50_000),
+            permitted: false,
+            physical_muted: Some(true),
+        };
+        state
+            .step(link, ring, &mut || Ok(low.then_some(observation)))
+            .unwrap()
+    }
+
+    fn kept(name: &str, look: lamp_msgs::privacy_light::Look) -> PathBuf {
+        let folder = std::env::temp_dir().join(format!("vpl-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let path = folder.join("privacy.json");
+        keep(&path, look);
+        path
+    }
+
+    /// Written whole, as the change helper writes it: beside, then renamed.
+    fn keep(path: &Path, look: lamp_msgs::privacy_light::Look) {
+        let next = path.with_extension("next");
+        std::fs::write(&next, lamp_msgs::privacy_light::bytes(look)).unwrap();
+        std::fs::rename(&next, path).unwrap();
+    }
+
+    #[test]
+    fn the_indicator_follows_a_look_written_while_it_shows() {
+        use lamp_msgs::privacy_light::Look;
+        let path = kept("follows", Look::Red);
+        let (mut state, mut ring, sink, mut link, mut controller) = live();
+        state.looks = Some(LookWatch::start(path.clone(), LOOK_EVERY).unwrap());
+        for _ in 0..10 {
+            fresh_step(&mut state, &mut ring, &mut link, &mut controller, true);
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        assert!(sink.0.borrow().last().unwrap().peak() >= 2, "red shows");
+        for (look, painted) in [
+            (Look::Dim, PrivacyLook::Dim),
+            (Look::Off, PrivacyLook::Off),
+            (Look::Red, PrivacyLook::Red),
+        ] {
+            keep(&path, look);
+            let asked = std::time::Instant::now();
+            while state.look() != painted {
+                assert!(
+                    asked.elapsed() < LOOK_EVERY * 2,
+                    "{look:?} not followed within {:?}",
+                    LOOK_EVERY * 2
+                );
+                fresh_step(&mut state, &mut ring, &mut link, &mut controller, true);
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            let before = sink.0.borrow().len();
+            fresh_step(&mut state, &mut ring, &mut link, &mut controller, true);
+            let frames = sink.0.borrow();
+            // A changed look is painted on the very next step.
+            assert_eq!(frames.len(), before + 1, "{look:?}");
+            let last = frames.last().unwrap();
+            match painted {
+                PrivacyLook::Dim => assert!((1..=4).contains(&last.peak())),
+                PrivacyLook::Off => assert_eq!(*last, EncodedFrame::black()),
+                PrivacyLook::Red => assert!((2..=10).contains(&last.peak())),
+            }
+            drop(frames);
+            assert!(ring.privacy_shown());
+        }
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn the_indicator_starts_in_the_kept_look_with_no_red_frame_first() {
+        use lamp_msgs::privacy_light::Look;
+        for (look, most) in [(Look::Off, 0), (Look::Dim, 4)] {
+            let path = kept("starts", look);
+            let (mut state, mut ring, sink, mut link, mut controller) = live();
+            // Watched slowly, so only the read at start can give the look.
+            state.looks = Some(LookWatch::start(path.clone(), Duration::from_secs(60)).unwrap());
+            for _ in 0..20 {
+                fresh_step(&mut state, &mut ring, &mut link, &mut controller, true);
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            let frames = sink.0.borrow();
+            assert!(frames.len() >= 2, "{look:?}");
+            assert!(
+                frames.iter().all(|frame| frame.peak() <= most),
+                "{look:?}: a frame above {most}"
+            );
+            drop(frames);
+            assert!(ring.privacy_shown());
+            // The mute notice is told in every look, dark too.
+            assert_eq!(state.notices, 1, "{look:?}");
+            let _ = std::fs::remove_dir_all(path.parent().unwrap());
+        }
+    }
+
+    #[test]
+    fn the_indicator_without_the_flag_paints_red() {
+        assert_eq!(
+            ring_arguments_with("/run/lampos-bus", false),
+            ["--privacy", "--bus-root", "/run/lampos-bus"]
+        );
+        assert_eq!(
+            ring_arguments_with("/run/lampos-bus", true),
+            [
+                "--privacy",
+                "--bus-root",
+                "/run/lampos-bus",
+                LOOK_FLAG,
+                lamp_msgs::privacy_light::PATH
+            ]
+        );
+        // A kept off is never read without the flag.
+        let path = kept("noflag", lamp_msgs::privacy_light::Look::Off);
+        let (mut state, mut ring, sink, mut link, mut controller) = live();
+        fresh_step(&mut state, &mut ring, &mut link, &mut controller, true);
+        assert!(sink.0.borrow().last().unwrap().peak() >= 2);
+        assert_eq!(state.notices, 1);
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    /// Off changes only the light (#8696): the worker keeps running dark and
+    /// tells the wait exactly what it tells it in red, a lost LOW blanking
+    /// and a Stop's shutdown receipt among it, so the one-writer handoff and
+    /// everything the mute decides are the same in all three looks.
+    #[test]
+    fn the_look_never_changes_what_the_worker_tells_the_wait() {
+        use lamp_msgs::privacy_light::Look;
+        let told = |look: Look| {
+            let path = kept("tells", look);
+            let (mut state, mut ring, _sink, mut link, mut controller) = live();
+            state.looks = Some(LookWatch::start(path.clone(), LOOK_EVERY).unwrap());
+            let mut stopped = Vec::new();
+            for low in [true, true, true, false, false, true, true] {
+                stopped.push(fresh_step(
+                    &mut state,
+                    &mut ring,
+                    &mut link,
+                    &mut controller,
+                    low,
+                ));
+                std::thread::sleep(Duration::from_millis(3));
+            }
+            link.controls.push_back(Control::Stop);
+            stopped.push(state.step(&mut link, &mut ring, &mut || Ok(None)).unwrap());
+            let _ = std::fs::remove_dir_all(path.parent().unwrap());
+            let events: Vec<String> = link
+                .published
+                .iter()
+                .map(|event| match event {
+                    WorkerEvent::Ring {
+                        report: RingFeedback::Blanked { reason, .. },
+                    } => format!("blanked {reason:?}"),
+                    other => format!("{other:?}"),
+                })
+                .collect();
+            (stopped, events, ring.is_stopped(), state.notices)
+        };
+        let red = told(Look::Red);
+        assert_eq!(red.0.last(), Some(&true));
+        assert!(red.2);
+        assert!(red.1.iter().any(|event| event.contains("Shutdown")));
+        assert_eq!(told(Look::Dim), red);
+        assert_eq!(told(Look::Off), red);
+    }
+
+    /// The first builder's binding rule (#8696): nothing on the mute's path
+    /// reads the person's look. The look lives only in the ring's frames,
+    /// this worker, the kept file's reader, root's change helper and the
+    /// app's two kinds.
+    #[test]
+    fn nothing_on_the_mute_path_reads_the_privacy_look() {
+        let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let mut files = Vec::new();
+        for name in [
+            "privacy.rs",
+            "privacy_bus.rs",
+            "physical_privacy.rs",
+            "service_privacy.rs",
+            "service_privacy_controls.rs",
+            "hand_controls.rs",
+            "coordinator.rs",
+            "slide_wake.rs",
+        ] {
+            let path = crates.join("voice/src").join(name);
+            assert!(
+                path.is_file(),
+                "{} is gone: update this scan",
+                path.display()
+            );
+            files.push(path);
+        }
+        for folder in ["controls/src", "ears/src", "turn-owner/src"] {
+            let mut left = vec![crates.join(folder)];
+            while let Some(folder) = left.pop() {
+                for entry in std::fs::read_dir(&folder).unwrap() {
+                    let path = entry.unwrap().path();
+                    if path.is_dir() {
+                        left.push(path);
+                    } else if path.extension().is_some_and(|kind| kind == "rs") {
+                        files.push(path);
+                    }
+                }
+            }
+        }
+        assert!(files.len() > 12, "{files:?}");
+        for path in files {
+            let text = std::fs::read_to_string(&path).unwrap();
+            for name in [
+                "privacy_light",
+                "PrivacyLook",
+                "show_privacy_look",
+                "LAMP_PRIVACY_LIGHT",
+                "privacy.json",
+                "LookWatch",
+                "LOOK_FLAG",
+            ] {
+                assert!(
+                    !text.contains(name),
+                    "{} names {name}: the mute's path must not read the look",
+                    path.display()
+                );
+            }
+        }
     }
 }
