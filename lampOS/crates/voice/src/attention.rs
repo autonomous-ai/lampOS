@@ -1066,6 +1066,28 @@ pub(crate) fn opens_with_hey(heard: &str) -> bool {
     })
 }
 
+/// Whether `heard`'s opening greeting, past one filler, stands alone in its
+/// sentence: a stop, a question mark or an exclamation right after it ("Hello?
+/// Do you know my face?", "Hey! What time is it?"). Speech to text swallowed
+/// the name, and the hearing is all there is of it. Not a comma: "Hey, Mark,
+/// …" is said to Mark.
+fn greeting_set_off(heard: &str) -> bool {
+    let Some(greeting) = past_a_filler(heard).next() else {
+        return false;
+    };
+    // The greeting's own place: the first word past the filler.
+    let Some(at) = heard
+        .match_indices(greeting)
+        .map(|(at, _)| at)
+        .find(|at| past_a_filler(&heard[*at..]).next() == Some(greeting))
+    else {
+        return false;
+    };
+    heard[at + greeting.len()..]
+        .trim_start()
+        .starts_with(['?', '.', '!'])
+}
+
 /// Whether the word after `heard`'s opening greeting is the lamp's name, or
 /// a word written or sounding like it: "Hey, Lamp.", "Hey man", "Hi, Lynn".
 /// Not "Hi Mark, the lamp is …": there the name comes later, in a sentence.
@@ -2632,8 +2654,11 @@ impl Attention {
             && self.hey_only
             && !in_conversation
             && opens_with_hey(&self.heard)
-            && (self.named_at_start
-                || self.named_near_the_start && greeted_word_like_the_name(&self.heard))
+            && self.named_near_the_start
+            // The word after the greeting is the name or like it, or the
+            // greeting stands alone: "Hi Mark, did you move the lamp?" heard
+            // at its start on lamp-74ff (26 Nov, 20:51) is no call.
+            && (greeted_word_like_the_name(&self.heard) || greeting_set_off(&self.heard))
             && !self.name_anothers_dropped;
         self.name_unhey_dropped = weighed && self.hey_only && !in_conversation && !self.hey_kept;
         if self.hey_kept {
@@ -8378,6 +8403,26 @@ mod tests {
             (true, false, true),
             "the name heard late in a sentence"
         );
+        // lamp-74ff, 26 Nov 20:51: "Hi Mark, …" heard at its start woke the
+        // lamp; a greeting with another word after it is no call, nor one
+        // that runs on into the sentence.
+        assert_eq!(
+            weigh(
+                "Hi Mark, did you move the lamp this morning?",
+                start,
+                true,
+                false
+            ),
+            (true, false, true)
+        );
+        assert_eq!(
+            weigh("Hey what time is it?", start, true, false),
+            (true, false, true)
+        );
+        assert!(super::greeting_set_off("Hello? Do you know my face?"));
+        assert!(super::greeting_set_off("Um, hey! What time is it?"));
+        assert!(!super::greeting_set_off("Hey, Mark, come here."));
+        assert!(!super::greeting_set_off("Hey what time is it?"));
         // "Hey, ... Lamp." with a pause: heard 1.93 s in on lamp-74ff, kept
         // when the word after the greeting is like the name; past
         // HEY_AT_THE_START_US, or with another word there, not.
