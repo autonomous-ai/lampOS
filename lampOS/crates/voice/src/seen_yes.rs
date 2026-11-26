@@ -305,10 +305,14 @@ pub fn names_the_looking(heard: &str) -> bool {
 
 /// The words that bring the desk noticing's state into a heard line's
 /// notes ([`state_note`]): the looking's ([`LOOKING_WORDS`]), their past,
-/// and the desk's ("keep an eye on my desk").
-pub const STATE_WORDS: [&str; 11] = [
+/// seeing, the camera, the eyes and the desk's ("keep an eye on my desk").
+/// Widened on lamp-06c1's third re-row of #8674 (26 Nov, Q3): a line a
+/// person says of the looking is told the state even with the lamp's name
+/// and half its words lost to the speech-to-text ("Now stop watching the").
+/// It matches too often rather than too rarely: the note is a few words.
+pub const STATE_WORDS: [&str; 15] = [
     "looking", "look", "looked", "watching", "watch", "watched", "noticing", "notice", "noticed",
-    "desk", "eye",
+    "see", "seeing", "camera", "desk", "eye", "eyes",
 ];
 
 /// Whether `heard` names the lamp's looking or the desk, any one of
@@ -378,6 +382,186 @@ pub fn state_note_at(path: &Path, by_default: bool) -> String {
              looking again, call {LOOK}.)"
         )
     }
+}
+
+/// The words of a reply that say the lamp has stopped, by themselves: with
+/// a word of the looking in the reply ([`STATE_WORDS`]) or in the person's
+/// line ([`names_the_noticing`]), a claim to have stopped looking
+/// ([`claims_stopped`]).
+const STOPPED_WORDS: [&str; 8] = [
+    "stopped", "stopping", "quit", "quitting", "paused", "pausing", "halted", "ended",
+];
+
+/// The words that, directly before "stop" ("I'll stop", "I will stop"),
+/// make it a promise, which [`claims_stopped`] takes as a claim as well, as
+/// "going to stop"; never "tell me to stop", the way the lamp offers one.
+const STOP_PROMISED: [&str; 2] = ["i'll", "will"];
+
+/// The words of a sentence that offers a way off rather than saying it is
+/// off ("you can turn it off any time"): with one, "off" is no claim.
+const OFFERING_WORDS: [&str; 6] = ["can", "could", "if", "whenever", "anytime", "any"];
+
+/// The words that, one or two words before a looking verb
+/// ([`LOOKING_VERBS`]), say the lamp isn't looking: "I'm not watching",
+/// "I won't be looking", "no longer noticing".
+const NOT_WORDS: [&str; 7] = ["not", "won't", "wont", "never", "isn't", "aren't", "longer"];
+
+/// The looking's verbs and the camera, for [`NOT_WORDS`] and "off": not
+/// "see" or "desk", which a reply describing the desk says with a "not"
+/// ("I don't see your keys", "that's not your desk").
+const LOOKING_VERBS: [&str; 11] = [
+    "looking", "look", "watching", "watch", "noticing", "notice", "camera", "peeking", "peek",
+    "pictures", "eyes",
+];
+
+/// Whether the reply `reply` (all of it said so far) says the lamp stopped
+/// looking, or isn't looking, where `heard` is the person's line: in any of
+/// its sentences that is not a question,
+///
+/// - one of [`STOPPED_WORDS`], or "stop" after one of [`STOP_PROMISED`],
+///   with a word of the looking in that sentence or in `heard` ("I've
+///   stopped." to "stop looking at my desk");
+/// - one of [`NOT_WORDS`] one or two words before one of [`LOOKING_VERBS`];
+/// - "off" with one of [`LOOKING_VERBS`] ("desk noticing is off now"), in a sentence with none of [`OFFERING_WORDS`].
+///
+/// Whole words, any case, English only, as [`names_the_looking`]. A cheap
+/// word check, wrong on the side of a claim: a reply taken for one costs
+/// one stop the person can undo, and a claim missed is the lamp saying it
+/// stopped looking while it looks (lamp-06c1's third re-row of #8674, 26
+/// Nov, Q3).
+pub fn claims_stopped(reply: &str, heard: Option<&str>) -> bool {
+    let heard_names = heard.is_some_and(names_the_noticing);
+    reply
+        .split_inclusive(['.', '!', '?', ';', '\n'])
+        .filter(|sentence| !sentence.trim_end().ends_with('?'))
+        .any(|sentence| {
+            let words = words(sentence);
+            let has = |set: &[&str], word: &String| set.contains(&word.as_str());
+            let looking = heard_names || words.iter().any(|word| has(&STATE_WORDS, word));
+            let stopped = words.iter().enumerate().any(|(at, word)| {
+                let before = |back: usize| at.checked_sub(back).map(|at| words[at].as_str());
+                has(&STOPPED_WORDS, word)
+                    || (word == "stop"
+                        && (before(1).is_some_and(|word| STOP_PROMISED.contains(&word))
+                            || (before(2) == Some("going") && before(1) == Some("to"))))
+            });
+            let not_looking = words.iter().enumerate().any(|(at, word)| {
+                has(&NOT_WORDS, word)
+                    && (word != "longer" || at > 0 && words[at - 1] == "no")
+                    && words
+                        .iter()
+                        .skip(at + 1)
+                        .take(2)
+                        .any(|next| has(&LOOKING_VERBS, next))
+            });
+            let off = words.iter().any(|word| word == "off")
+                && !words.iter().any(|word| has(&OFFERING_WORDS, word))
+                && words.iter().any(|word| has(&LOOKING_VERBS, word));
+            (stopped && looking) || not_looking || off
+        })
+}
+
+/// A reply's claim to have stopped looking, watched over its pieces as they
+/// are said ([`ClaimWatch::piece`]): the second route's sentences, Live's
+/// output transcript.
+#[derive(Debug, Default)]
+pub struct ClaimWatch {
+    /// The reply said so far, and whether its claim was acted on already.
+    said: String,
+    acted: bool,
+}
+
+impl ClaimWatch {
+    /// With `path` (seen activity's file: `LAMP_NOTICING_BY_DEFAULT` on and
+    /// the functions declared), `piece`, the next of the reply to request
+    /// `request` to be said, to the person's line `heard`: once the reply
+    /// so far claims a stop ([`claims_stopped`]) while desk noticing is
+    /// still on, the stop is run as [`STOP`] runs it ([`stop_claimed`]), so
+    /// the claim is true as it is said. Once a turn. Whether it ran.
+    pub fn piece(
+        &mut self,
+        path: Option<&Path>,
+        request: u64,
+        piece: &str,
+        heard: Option<&str>,
+    ) -> bool {
+        let Some(path) = path.filter(|_| !self.acted) else {
+            return false;
+        };
+        if self.said.len() < SPOKEN_MOST {
+            self.said.push(' ');
+            self.said.push_str(piece);
+        }
+        if !claims_stopped(&self.said, heard) {
+            return false;
+        }
+        self.acted = true;
+        stop_claimed(path, request)
+    }
+}
+
+/// The reply to `request` claimed a stop with desk noticing on at `path`
+/// and no stop called before it: the stop's own kept no
+/// ([`run_by_default`], the [`STOP`] call's path, anyone's), one journal
+/// line saying so. Nothing when both are off already (the stop was called
+/// first, or it was off): the claim is true. Whether it ran.
+pub fn stop_claimed(path: &Path, request: u64) -> bool {
+    use lamp_msgs::consent::{FACE_EXPRESSIONS, SEEN_ACTIVITY, allowed, file_in};
+    let face_on = path
+        .parent()
+        .and_then(|folder| file_in(folder, FACE_EXPRESSIONS))
+        .is_some_and(|face| allowed(&face, FACE_EXPRESSIONS, true));
+    if !allowed(path, SEEN_ACTIVITY, true) && !face_on {
+        return false;
+    }
+    eprintln!(
+        "lamp-voice: request {request}: the reply says it stopped looking with desk noticing on and no stop called, so the stop is run as {STOP}"
+    );
+    run_by_default(
+        path,
+        STOP,
+        false,
+        now_unix_s(),
+        crate::onboarding::consent_group,
+    );
+    true
+}
+
+/// Live's watch ([`arm_live`], [`live_piece`]): seen activity's file when
+/// armed, and the reply being said, by request.
+static LIVE_WATCH: Mutex<Option<(PathBuf, u64, ClaimWatch)>> = Mutex::new(None);
+
+/// The Live route's start (`provider_worker`): with `on` (seen activity
+/// declared and `LAMP_NOTICING_BY_DEFAULT` on), its output transcript is
+/// watched for a claimed stop ([`live_piece`]).
+pub fn arm_live(on: bool) {
+    if let Ok(mut watch) = LIVE_WATCH.lock() {
+        *watch = on.then(|| (path(), 0, ClaimWatch::default()));
+    }
+    if on {
+        eprintln!(
+            "lamp-voice provider: a reply saying it stopped looking with no stop called runs the stop (LAMP_NOTICING_BY_DEFAULT)"
+        );
+    }
+}
+
+/// A piece `text` of Live's output transcript for `request`: watched as
+/// [`ClaimWatch::piece`], to the person's line as the thread keeps it.
+/// Nothing unless [`arm_live`] armed it.
+pub fn live_piece(request: u64, text: &str) -> bool {
+    let Ok(mut watch) = LIVE_WATCH.lock() else {
+        return false;
+    };
+    let Some((path, at, claim)) = watch.as_mut() else {
+        return false;
+    };
+    if *at != request {
+        *at = request;
+        *claim = ClaimWatch::default();
+    }
+    let heard = crate::stop_scope::heard_words(request, true);
+    let path = path.clone();
+    claim.piece(Some(&path), request, text, heard.as_deref())
 }
 
 /// The stop of the desk noticing itself ([`STOP`], with the call's id), for
@@ -1463,6 +1647,124 @@ mod tests {
             run_at(&path, LOOK, false, false, true, 9, || panic!("no write")),
             json!({"ok": false, "note": APP_FIRST})
         );
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// lamp-06c1's third re-row of #8674 (26 Nov, Q3): the speech-to-text
+    /// lost the lamp's name and half the line ("Now stop watching the"),
+    /// and a person names the looking with seeing, the camera and the eyes
+    /// too: each such line is told the state.
+    #[test]
+    fn a_line_with_any_word_of_the_looking_is_told_the_state() {
+        for heard in [
+            "Now stop watching the",
+            "Lamp, can you see me?",
+            "Are you seeing what I'm doing?",
+            "Turn off your camera.",
+            "Close your eyes.",
+            "Keep your eye off me.",
+        ] {
+            assert!(names_the_noticing(heard), "{heard}");
+        }
+        for heard in ["What's the weather in Hanoi?", "Play some music.", "Stop."] {
+            assert!(!names_the_noticing(heard), "{heard}");
+        }
+    }
+
+    /// The replies that claim a stop of the looking, and the ones that
+    /// don't: Q3's own ("I've stopped watching your desk") with its heard
+    /// line, a bare "I've stopped." to a line naming the looking, the
+    /// promises and the "not"s; never the lamp saying it is on, describing
+    /// the desk, asking, or offering a way off.
+    #[test]
+    fn a_reply_claiming_a_stop_is_told_apart() {
+        for (reply, heard) in [
+            (
+                "I've stopped watching your desk and noticing what you're doing.",
+                Some("Now stop watching the"),
+            ),
+            ("I've stopped watching your desk.", None),
+            ("I've stopped.", Some("Lamp, stop looking at my gaze.")),
+            ("Okay, stopping now.", Some("Lamp, stop watching me.")),
+            ("I've stopped looking at your desk.", None),
+            ("I won't look at your desk anymore.", None),
+            ("Okay. I'm no longer watching.", None),
+            ("Sure, I'm not watching your desk now.", None),
+            ("I'll stop noticing what you do.", None),
+            ("I'm going to stop looking now.", None),
+            ("Desk noticing is off now.", None),
+            ("Done, my camera is off.", None),
+        ] {
+            assert!(claims_stopped(reply, heard), "{reply} to {heard:?}");
+        }
+        for (reply, heard) in [
+            ("Yes, it's on.", Some("Lamp, are you watching my desk?")),
+            (
+                "Yes — I'm noticing what goes on at your desk now.",
+                Some("Lamp, can you keep an eye on my desk?"),
+            ),
+            ("I don't see your keys on the desk.", None),
+            ("That's not your desk, it's a table.", None),
+            ("Do you want me to stop looking?", None),
+            (
+                "It's on already, and you can tell me to stop looking any time.",
+                None,
+            ),
+            ("You can turn desk noticing off any time.", None),
+            ("I stopped the timer.", Some("Stop the timer.")),
+            ("Your desk looks tidy.", None),
+            (SEEN_DISCLOSURE, None),
+        ] {
+            assert!(!claims_stopped(reply, heard), "{reply} to {heard:?}");
+        }
+    }
+
+    /// Q3's case whole: desk noticing on by default, heard "Now stop
+    /// watching the", the reply "I've stopped watching your desk" and no
+    /// call. The claim runs the stop once, so the kept state is no for both
+    /// (`"by":"voice"`, as the [`STOP`] call keeps it); once both are off (a
+    /// stop called first), a claim runs nothing; without the switch, nothing
+    /// is watched.
+    #[test]
+    fn a_claimed_stop_with_no_call_runs_the_stop() {
+        use lamp_msgs::consent::{FACE_EXPRESSIONS, SEEN_ACTIVITY, allowed};
+        let folder = folder("claimed-stop");
+        let path = file_in(&folder);
+        let face = crate::onboarding::face_expressions_beside(&folder.join("room-sounds.json"));
+        assert!(allowed(&path, SEEN_ACTIVITY, true));
+        let mut watch = ClaimWatch::default();
+        let heard = Some("Now stop watching the");
+        assert!(watch.piece(
+            Some(&path),
+            3,
+            "I've stopped watching your desk and noticing what you're doing.",
+            heard
+        ));
+        assert!(!allowed(&path, SEEN_ACTIVITY, true));
+        assert!(!allowed(&face, FACE_EXPRESSIONS, true));
+        assert!(
+            std::fs::read_to_string(&path)
+                .unwrap()
+                .contains("\"by\":\"voice\"")
+        );
+        // Once a turn.
+        assert!(!watch.piece(Some(&path), 3, "I've stopped.", heard));
+        // Off already (the stop called before the words): the claim is true.
+        assert!(!stop_claimed(&path, 4));
+        // Pieces as said: no claim until the piece that makes one.
+        std::fs::remove_file(&path).unwrap();
+        std::fs::remove_file(&face).unwrap();
+        let mut watch = ClaimWatch::default();
+        assert!(!watch.piece(Some(&path), 5, "Sure.", Some("Lamp, stop looking.")));
+        assert!(allowed(&path, SEEN_ACTIVITY, true));
+        assert!(watch.piece(Some(&path), 5, "I've stopped.", Some("Lamp, stop looking.")));
+        assert!(!allowed(&path, SEEN_ACTIVITY, true));
+        // The switch off (no path): nothing watched, nothing written.
+        std::fs::remove_file(&path).unwrap();
+        std::fs::remove_file(&face).unwrap();
+        let mut watch = ClaimWatch::default();
+        assert!(!watch.piece(None, 6, "I've stopped watching your desk.", heard));
+        assert!(!path.exists() && !face.exists());
         let _ = std::fs::remove_dir_all(folder);
     }
 
