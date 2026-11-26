@@ -3417,6 +3417,8 @@ fn second_route_worker_environment(
         crate::remember::heard::NEAR_ENVIRONMENT,
         // An unsure line is not kept, and nothing is asked (#7739).
         crate::remember::doubted::UNSURE_ENVIRONMENT,
+        // A visitor is never the owner: the private room yields (#8639).
+        crate::remember::visitor::ENVIRONMENT,
         // A remember that kept nothing gives its line back to the journal.
         crate::tools::REFUSED_KEEP_ENVIRONMENT,
         crate::second_provider::SKILL_LOOK_ENVIRONMENT,
@@ -3853,6 +3855,7 @@ mod tests {
             crate::remember::doubted::UNDOES_ENVIRONMENT,
             crate::remember::heard::NEAR_ENVIRONMENT,
             crate::remember::doubted::UNSURE_ENVIRONMENT,
+            crate::remember::visitor::ENVIRONMENT,
             crate::tools::REFUSED_KEEP_ENVIRONMENT,
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
@@ -5127,6 +5130,7 @@ mod tests {
                     || name == crate::remember::doubted::UNDOES_ENVIRONMENT
                     || name == crate::remember::heard::NEAR_ENVIRONMENT
                     || name == crate::remember::doubted::UNSURE_ENVIRONMENT
+                    || name == crate::remember::visitor::ENVIRONMENT
                     || name == crate::tools::REFUSED_KEEP_ENVIRONMENT
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
                     || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
@@ -5434,6 +5438,7 @@ mod tests {
                     "LAMP_MEMORY_STRENGTH=on",
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_MEMORY_UNSURE_NOT_KEPT=on",
+                    "LAMP_MEMORY_VISITOR_NOT_KEPT=on",
                     "LAMP_MEMORY_WEEKLY_CHAPTERS=on",
                     "LAMP_NAMED_AGENT_TAKES_LINE=on",
                     "LAMP_NAMED_ALWAYS=on",
