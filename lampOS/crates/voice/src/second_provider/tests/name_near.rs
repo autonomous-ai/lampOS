@@ -226,6 +226,17 @@ const FACING_FACE: Face = Face {
 /// asked as, if it was. The rule holds a line whose words don't begin with
 /// the name.
 async fn asked_facing(heard: &str, near: Option<f32>, face: Face, on: bool) -> Option<String> {
+    asked_facing_in(heard, near, face, on, false).await
+}
+
+/// [`asked_facing`], with `LAMP_NAME_AS_A_SENTENCE` `as_a_sentence` too.
+async fn asked_facing_in(
+    heard: &str,
+    near: Option<f32>,
+    face: Face,
+    on: bool,
+    as_a_sentence: bool,
+) -> Option<String> {
     let Face {
         turned,
         said_facing,
@@ -243,6 +254,7 @@ async fn asked_facing(heard: &str, near: Option<f32>, face: Face, on: bool) -> O
         }))
         .hearing_the_name_near(Arc::new(move |_: (u64, u64)| (near, turned)))
         .taking_a_stand_in_said_facing(on)
+        .taking_the_name_as_a_sentence(as_a_sentence)
         .seeing_the_line_said_facing(Arc::new(move |_: (u64, u64)| said_facing));
     engine.submit(start(1));
     engine.submit(ProviderInput::Audio {
@@ -349,6 +361,46 @@ async fn a_greeted_word_said_to_a_person_is_the_name_said_by_a_face_turned_to_th
             "{heard} ({why}): asked as {asked:?}"
         );
     }
+}
+
+/// The Reviewer-lead's P2 on #8763: with no face, the rule takes nothing,
+/// so the arms after it judge the line as before the switch. "Hey man.
+/// How's it going?", heard near at 0.95 with nobody turned to the lamp, is
+/// a sentence of its own (`LAMP_NAME_AS_A_SENTENCE`) and still answered
+/// as the name, with the switch on or off. With a face it is answered by
+/// the switch's own arm.
+#[tokio::test]
+async fn with_no_face_a_greeted_stand_in_falls_through_to_the_sentence_rule() {
+    let line = "Hey man. How's it going?";
+    for on in [true, false] {
+        assert_eq!(
+            asked_facing_in(line, Some(0.95), NO_FACE, on, true)
+                .await
+                .as_deref(),
+            Some("Hey Lamp. How's it going?"),
+            "switch {on}: answered as a sentence of its own"
+        );
+    }
+    assert_eq!(
+        asked_facing_in(line, Some(0.95), FACING_FACE, true, false)
+            .await
+            .as_deref(),
+        Some("Hey Lamp. How's it going?"),
+        "the switch's own arm, with the face"
+    );
+}
+
+/// The Reviewer-lead's second P2 on #8763: the face read speaking toward the
+/// lamp is this rule's face only with no second voice in the room lately,
+/// as `LAMP_SAID_TO_ME` refuses it after one (`Held::SecondVoice`, #7891:
+/// someone on a call, or talking to another person, while facing the lamp).
+#[test]
+fn a_face_read_speaking_facing_is_not_the_rules_after_a_second_voice() {
+    use super::super::worker::said_facing_alone;
+    let looks = crate::said_to_me::FACING_LOOKS;
+    assert!(said_facing_alone(looks, false));
+    assert!(!said_facing_alone(looks, true), "a second voice lately");
+    assert!(!said_facing_alone(looks - 1, false), "too few looks");
 }
 
 /// The greeted word, the list and the bar, by themselves.

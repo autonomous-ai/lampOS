@@ -3517,6 +3517,20 @@ fn named_near(
     let like = french_call.map_or_else(|| like_the_name(word), |(_, _, like)| like);
     let (heard, turned) = (heard_near, turned_near);
     let near_enough = heard.filter(|score| *score >= NAME_NEAR_LEAST);
+    // `LAMP_NAME_FACING_STAND_IN`: a greeted word said to a person, heard
+    // near enough, and whether a face turned to the lamp said it, read only
+    // for such a word. Without the face, the journal says why, and the rules
+    // after it judge the line as before the switch.
+    let facing_word = stand_in_said_facing
+        && like == LikeTheName::Not
+        && facing_stand_in(&text, (start, end), heard);
+    let facing_said =
+        facing_word && (turned || said_facing.is_some_and(|said_facing| said_facing(window)));
+    if facing_word && !facing_said {
+        eprintln!(
+            "lamp-voice second: request {request}: its first word past a greeting, set off, is one speech to text writes for the lamp's name though people say it to each other too (\"{word}\"), heard near, but no face turned to the lamp said it, or a second voice was heard in the room: not taken as the name by this rule (LAMP_NAME_FACING_STAND_IN)"
+        );
+    }
     let named = match (like, near_enough) {
         (LikeTheName::AsHeard, Some(score)) => Some(format!(
             "its first word, set off, is one written for the lamp's name, and lamp-name heard it near, at {score:.2}, by the line's start"
@@ -3542,20 +3556,12 @@ fn named_near(
         // `LAMP_NAME_FACING_STAND_IN`: "Hey man, …" said by a face turned to
         // the lamp, heard near at 0.9 or more (lamp-74ff, 26 Nov 15:01: the
         // owner's "Hey Lamp, how's it going?" at 0.996, held in a busy room).
-        (LikeTheName::Not, Some(score))
-            if stand_in_said_facing && facing_stand_in(&text, (start, end), heard) =>
-        {
-            if turned || said_facing.is_some_and(|said_facing| said_facing(window)) {
-                Some(format!(
-                    "its first word past a greeting, set off, is one speech to text writes for the lamp's name though people say it to each other too (\"{word}\"), lamp-name heard it near, at {score:.2}, by the line's start, and a face turned to the lamp said it (LAMP_NAME_FACING_STAND_IN)"
-                ))
-            } else {
-                eprintln!(
-                    "lamp-voice second: request {request}: its first word past a greeting, set off, is one speech to text writes for the lamp's name though people say it to each other too (\"{word}\"), and lamp-name heard it near, at {score:.2}, but no face turned to the lamp said it: not the name (LAMP_NAME_FACING_STAND_IN)"
-                );
-                None
-            }
-        }
+        // With no such face the line falls through to the arms below, as
+        // before the switch: "Hey man. How's it going?" is still a sentence
+        // of its own (the Reviewer-lead's P2 on #8763).
+        (LikeTheName::Not, Some(score)) if facing_word && facing_said => Some(format!(
+            "its first word past a greeting, set off, is one speech to text writes for the lamp's name though people say it to each other too (\"{word}\"), lamp-name heard it near, at {score:.2}, by the line's start, and a face turned to the lamp said it (LAMP_NAME_FACING_STAND_IN)"
+        )),
         (LikeTheName::Not, Some(score))
             if as_a_sentence && a_sentence_of_its_own(&text, start, end) =>
         {

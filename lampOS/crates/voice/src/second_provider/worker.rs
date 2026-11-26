@@ -9385,6 +9385,13 @@ fn speakers_between(
 }
 
 /// `began_us..ended_us`, by this process's monotonic clock, as instants.
+/// `LAMP_NAME_FACING_STAND_IN`'s face, from the line's looks: read speaking
+/// while facing the lamp in [`crate::said_to_me::FACING_LOOKS`] looks or more,
+/// and no second voice in the room lately (`Heeding::said_facing`).
+pub(crate) fn said_facing_alone(facing_looks: usize, second_voice: bool) -> bool {
+    !second_voice && facing_looks >= crate::said_to_me::FACING_LOOKS
+}
+
 fn line_between(began_us: u64, ended_us: u64) -> Option<(Instant, Instant)> {
     let (now, now_us) = (Instant::now(), monotonic_us());
     let at = |us: u64| {
@@ -11188,13 +11195,25 @@ impl Heeding {
     /// [`crate::said_to_me::FACING_LOOKS`] looks from `began_us` to `ended_us`,
     /// as `LAMP_SAID_TO_ME` reads a line said to the lamp on its face alone
     /// (`speaking_faces::SpeakingFaces::turned_speaking_facing_looks`), close
-    /// or not. No eyes: no.
+    /// or not, and never after a second voice in the room since the lamp last
+    /// spoke, as `LAMP_SAID_TO_ME` refuses it too (`said_to_me::Held::SecondVoice`,
+    /// #7891: someone facing the lamp while on a call or talking to another
+    /// person; the Reviewer-lead's second P2 on #8763). No eyes: no.
     pub(crate) fn said_facing(&self, (began_us, ended_us): (u64, u64)) -> bool {
         let Some((eyes, _)) = self.eyes.as_ref() else {
             return false;
         };
-        line_between(began_us, ended_us).is_some_and(|(from, to)| {
-            eyes.turned_speaking_facing_looks(from, to) >= crate::said_to_me::FACING_LOOKS
+        let facing_looks = line_between(began_us, ended_us)
+            .map_or(0, |(from, to)| eyes.turned_speaking_facing_looks(from, to));
+        said_facing_alone(facing_looks, self.second_voice_lately())
+    }
+
+    /// An earlier line's second voice, since the lamp last spoke and within
+    /// the busy room's span, as the said-to-me line reads it (#7891).
+    fn second_voice_lately(&self) -> bool {
+        self.second_voice_at.is_some_and(|at| {
+            at > self.said_until_us.unwrap_or_default()
+                && monotonic_us().saturating_sub(at) <= crate::room_told::BUSY_ENDS_AFTER_US
         })
     }
 
@@ -12614,10 +12633,7 @@ impl Heeding {
             turned,
             // An earlier line's second voice, since the lamp last spoke and
             // within the busy room's span (#7891).
-            second_voice: self.second_voice_at.is_some_and(|at| {
-                at > self.said_until_us.unwrap_or_default()
-                    && monotonic_us().saturating_sub(at) <= crate::room_told::BUSY_ENDS_AFTER_US
-            }),
+            second_voice: self.second_voice_lately(),
             looks_needed,
             look_free_answered: self.look_free_used,
             // Begun over the lamp's own answer, which it cut (#8205). With

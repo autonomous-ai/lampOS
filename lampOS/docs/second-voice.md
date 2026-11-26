@@ -5948,15 +5948,23 @@ after a take-over, but now for every turn:
     (0.9) or more by the line's start and a face turned to the lamp said
     the line: a close one (`Heeding::turned_to_the_lamp`, the near
     hearing's own sign) or one read speaking it while facing the lamp in
-    `said_to_me::FACING_LOOKS` (2) looks, close or not
-    (`Heeding::said_facing`). The journal says `its first word past a
+    `said_to_me::FACING_LOOKS` (2) looks, close or not, never after a
+    second voice in the room since the lamp last spoke, which
+    `LAMP_SAID_TO_ME` refuses too (`Heeding::said_facing`,
+    `said_to_me::Held::SecondVoice`, #7891: someone facing the lamp on a
+    call or talking to another person). The greeting is "hey", "hi", "ok"
+    or "okay", as `first_word_set_off` passes them. The journal says `its first word past a
     greeting, set off, is one speech to text writes for the lamp's name
     though people say it to each other too ("man"), … (LAMP_NAME_FACING_STAND_IN)`,
-    and, with no such face, `… but no face turned to the lamp said it: not
-    the name (LAMP_NAME_FACING_STAND_IN)`. No greeting before the word
-    ("Man, that was close.", "Thanks, man."), the word not set off ("Hey
-    man how's it going?", which `named_near` never rules), a near hearing
-    under 0.9 or none, or no such face: as before. Known cost: a colleague
+    and, with no such face, `… but no face turned to the lamp said it, or
+    a second voice was heard in the room: not taken as the name by this
+    rule (LAMP_NAME_FACING_STAND_IN)`, and the line goes on to the
+    rules after it. No greeting before the word ("Man, that was close.",
+    "Thanks, man."), the word not set off ("Hey man how's it going?",
+    which `named_near` never rules), a near hearing under 0.9 or none, or
+    no such face: this rule takes nothing, and the line is judged as
+    before ("Hey man. How's it going?" with no face is still a sentence of
+    its own under `LAMP_NAME_AS_A_SENTENCE`, the Reviewer-lead's P2). Known cost: a colleague
     saying "Hey man, …" to someone else while facing the lamp and heard as
     its name near at 0.9 is answered.
   - **A short line without the name is not answered on its sound**
