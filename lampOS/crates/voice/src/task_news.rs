@@ -2236,7 +2236,12 @@ fn engine_of(task: &Value) -> &Value {
 /// What a note of work done on the lamp itself adds (#5978): the person
 /// hears that the lamp did it, here, and never which agent ran it (the
 /// owner, #7930, [`crate::agent_tasks::NO_AGENT_NAME`]).
-const ON_THE_LAMP: &str = " It was done here on the lamp itself, not on their computer: say so in the same breath (\"I did it here on the lamp\"). Never tell the person which agent runs their work; say what is being done or what was found.";
+static ON_THE_LAMP: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+    format!(
+        " It was done here on the lamp itself, not on their computer: say so in the same breath (\"I did it here on the lamp\"). {}",
+        crate::agent_tasks::NO_AGENT_NAME
+    )
+});
 
 /// At most `most` characters of `text` on one line, with no double quotes
 /// to end the note's quotation early.
@@ -2331,7 +2336,7 @@ fn note(words: &NewsWords, task: &Value, data: &Value, age_ms: u64) -> Option<St
             ],
         );
         if lamp {
-            unprompted(&format!("{filled}{ON_THE_LAMP}"))
+            unprompted(&format!("{filled}{}", *ON_THE_LAMP))
         } else {
             unprompted(&filled)
         }
@@ -5711,7 +5716,7 @@ mod tests {
         let on = |alias: &str, engine: &str| json!({"text":"Write a poem","target":{"engine":engine},"target_alias":alias});
         let lamp = note(&own(), &on("lamp", "hermes"), &done, 0).unwrap();
         assert!(!lamp.contains("Hermes"), "{lamp}");
-        assert!(lamp.ends_with(&format!("{ON_THE_LAMP})")), "{lamp}");
+        assert!(lamp.ends_with(&format!("{})", *ON_THE_LAMP)), "{lamp}");
         assert_eq!(their_computer(&on("lamp", "hermes")), "the lamp");
         let office = note(&own(), &on("office", "claude"), &done, 0).unwrap();
         assert!(!office.contains("on the lamp"), "{office}");
@@ -5733,7 +5738,7 @@ mod tests {
         assert_eq!(their_computer(&on), "the lamp");
         let lamp = note(&own(), &on, &done, 0).unwrap();
         assert!(!lamp.contains("OpenClaw"), "{lamp}");
-        assert!(lamp.ends_with(&format!("{ON_THE_LAMP})")), "{lamp}");
+        assert!(lamp.ends_with(&format!("{})", *ON_THE_LAMP)), "{lamp}");
         let office =
             json!({"text":"Write a poem","target":{"engine":"openclaw"},"target_alias":"office"});
         assert!(!on_the_lamp(&office));
