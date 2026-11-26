@@ -11,7 +11,7 @@ Written by the first builder from the team's review page at 2026-11-25 13:10 (+0
 1. **Function:** the fix works and does no harm, as before.
 2. **Quality:** the same thing done the way a customer does it, at least 10 times, with numbers against its quality item's threshold: the success rate, the median and p90 latency, every miss with its raw journal lines, and, for anything that moves, lights or speaks on its own, whether it looks alive and not mechanical.
 
-The quality part's kit becomes that item's gate test, so it is written once and every build is measured again. Each quality item's threshold is stated in numbers with its test (#8567); until an item has one, the quality part posts its numbers and the item's owner proposes the threshold for the lead's yes. Hotfixes, CI, docs and internal fixes keep a single row, as before. **An issue closes** when its fix is promoted, its function part passed, and its quality part is at or above the threshold.
+Each quality item's threshold is stated in numbers with its test (#8567); until an item has one, the quality part posts its numbers and the item's owner proposes the threshold for the lead's yes. Hotfixes, CI, docs and internal fixes keep a single row, as before. **An issue closes** on its row's PASS, the function and quality parts in the same kit run, as rows always have, once its fix is promoted (the lead, 26 Nov: the row is enough to close the issue, and no gate test is made from its kit).
 
 **Mood, for later:** the mood rows stay in V2 but out of the build figure, which counts the rows that ship. No day slot or new work goes into them until those reach 100% (the lead, 23 Oct on #1711). On 22 Oct the first builder had kept them in the figure as rows that aren't ship gates.
 
