@@ -11606,30 +11606,83 @@ pub const TOLD_ONLY_TRY: &str = "That one would speak on its own; I can only kee
 /// What a repair is told of a skill refused as [`SPEAKS_ON_ITS_OWN`], as
 /// the try's failure: the told answer's form.
 pub const TOLD_ONLY_REPAIR: &str = "When the lamp tried the skill once, it would speak on its \
-     own: a skill a time, an event or a repeat starts (any [trigger]) tells the person only \
-     through the lamp's told answer, said when they are there. Make its [[do]] a task step \
-     (task = { task, run }), never a run step; take speak and speaker out of its grants; have \
-     its scripts print what they found and never call lamp.say, lamp.sound, the speaker or \
-     control.sock; and end the agent's answer with the short spoken summary, never a dash.";
+     own: a skill a time, an event or a repeat starts (any [trigger] but a touch or a press) \
+     tells the person only through the lamp's told answer, said when they are there. Make its \
+     [[do]] a task step (task = { task, run }), never a run step; take speak and speaker out of \
+     its grants; have its scripts print what they found and never call lamp.say, lamp.sound, \
+     the speaker or control.sock; and end the agent's answer with the short spoken summary, \
+     never a dash.";
+
+/// The topics a hand on the lamp says (#8651): a touch on the pads or the
+/// strip (`controls/touch`), a pat on the head (`controls/pet`), and a tap,
+/// a pet or a long press of the button, the base or a head pad
+/// (`controls/gesture`). Not `controls/state` or `controls/touch_state`,
+/// the controls' standing state, said with no hand at all.
+const HAND_TOPICS: [&str; 3] = [
+    lamp_msgs::TouchEvent::TOPIC,
+    lamp_msgs::HeadPet::TOPIC,
+    lamp_msgs::ControlGesture::TOPIC,
+];
+
+/// Whether a skill's `trigger` (one `[trigger]` or several `[[trigger]]`)
+/// is only ever a hand on the lamp: each of them on one of [`HAND_TOPICS`].
+/// One on a time, an event or any other sensor makes it not.
+fn started_by_a_hand_alone(trigger: &toml::Value) -> bool {
+    let on_a_hand = |trigger: &toml::Value| {
+        trigger
+            .get("topic")
+            .and_then(toml::Value::as_str)
+            .is_some_and(|topic| HAND_TOPICS.contains(&topic))
+    };
+    match trigger {
+        toml::Value::Array(triggers) => !triggers.is_empty() && triggers.iter().all(on_a_hand),
+        trigger => on_a_hand(trigger),
+    }
+}
 
 /// The grants that let a skill's code speak through lamp-control: `say`,
 /// `sound` and `turn.start` need `speak`, a speaker stream `speaker`.
 const SPEAKING_GRANTS: [&str; 2] = ["speak", "speaker"];
 
 /// #8610: a made skill a time, an event or a repeat starts (any
-/// `[trigger]`) speaks only through the lamp's told answer, which waits
-/// for the owner alone in view and a quiet minute. Refused for a repair
+/// `[trigger]` but a hand's, below) speaks only through the lamp's told
+/// answer, which waits for the owner alone in view and a quiet minute. Refused for a repair
 /// ([`SPEAKS_ON_ITS_OWN`], [`TOLD_ONLY_REPAIR`]) when such a skill has a
 /// `run` step (which succeeds only by speaking) or a code step whose
 /// `grants` name `speak` or `speaker` (lamp-control's grants for every op
 /// that sounds, so the rule holds at each run too). A skill only the
 /// person's words start, and fixed `say` and `remind` steps, are as before.
+/// So is a skill only a hand on the lamp starts ([`HAND_TOPICS`], the first
+/// builder's ruling on #8651): every one of its triggers is a touch, a pat
+/// or a press, the person at the lamp asking, whom the told answer's quiet
+/// minute would answer a minute late.
 fn told_only(toml: &str) -> Result<(), Refused> {
-    let Ok(table) = toml::from_str::<toml::Table>(toml) else {
+    let Some(how) = speaks_on_its_own(toml) else {
         return Ok(());
     };
-    if !table.contains_key("trigger") {
-        return Ok(());
+    // The journal names which it was (El's P3 on #8688); the refusal's
+    // words, and so the repair's and the person's, are the same for both.
+    eprintln!(
+        "lamp-voice: a made skill was not kept: a trigger starts it and its code would speak \
+         on its own ({how})"
+    );
+    Err(Refused(
+        SPEAKS_ON_ITS_OWN.into(),
+        Some(TOLD_ONLY_REPAIR.into()),
+    ))
+}
+
+/// Why [`told_only`] refuses `toml`, for its journal line: `"a run step"`
+/// or `"a speaking grant"`; `None` when it is kept.
+fn speaks_on_its_own(toml: &str) -> Option<&'static str> {
+    // A skill.toml that doesn't parse is let through here only because the
+    // pack refuses it later (`lamp-skills pack`), before any try or keep.
+    let Ok(table) = toml::from_str::<toml::Table>(toml) else {
+        return None;
+    };
+    let trigger = table.get("trigger")?;
+    if started_by_a_hand_alone(trigger) {
+        return None;
     }
     let steps: Vec<&toml::Value> = table
         .get("do")
@@ -11648,22 +11701,13 @@ fn told_only(toml: &str) -> Result<(), Refused> {
         .flatten()
         .filter_map(toml::Value::as_str)
         .any(|grant| SPEAKING_GRANTS.contains(&grant));
-    if runs || (tasks && speaking) {
-        eprintln!(
-            "lamp-voice: a made skill was not kept: a trigger starts it and its code would speak \
-             on its own ({})",
-            if runs {
-                "a run step"
-            } else {
-                "a speaking grant"
-            }
-        );
-        return Err(Refused(
-            SPEAKS_ON_ITS_OWN.into(),
-            Some(TOLD_ONLY_REPAIR.into()),
-        ));
+    if runs {
+        Some("a run step")
+    } else if tasks && speaking {
+        Some("a speaking grant")
+    } else {
+        None
     }
-    Ok(())
 }
 
 /// The sections a `SKILL.md` the lamp's agent made with code has (#8157),
@@ -20111,6 +20155,53 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
         set_asks_here(None);
         set_scripts_here(None);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The first builder's ruling on #8651: a touch or a press is the
+    /// person at the lamp asking, so a skill only a hand starts may say its
+    /// line from a `run` step at once; the same skill a time starts, or a
+    /// touch and a time both start, is refused as speaking on its own.
+    #[test]
+    fn a_skill_a_touch_or_a_press_starts_may_say_its_line_and_a_timed_one_may_not() {
+        const RUN: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\
+            grants = [\"speak\"]\n\n[[do]]\nrun = \"scripts/main.py\"\n";
+        let touch = "[trigger]\ntopic = \"controls/touch\"\nfield = \"enabled\"\n\
+            equals = true\n";
+        let pet = "[trigger]\ntopic = \"controls/pet\"\nfield = \"enabled\"\n\
+            equals = true\n";
+        let press = "[trigger]\ntopic = \"controls/gesture\"\nfield = \"source\"\n\
+            equals = \"button\"\n";
+        let timed = "[trigger]\ntopic = \"clock/local\"\nfield = \"known\"\nequals = true\n\
+            rearm = \"ends\"\nduring = { from = \"08:00\", to = \"08:01\" }\n";
+        let hands = "[[trigger]]\ntopic = \"controls/touch\"\nfield = \"enabled\"\n\
+            equals = true\n\n[[trigger]]\ntopic = \"controls/gesture\"\n\
+            field = \"source\"\nequals = \"button\"\n";
+        let touch_and_time = "[[trigger]]\ntopic = \"controls/touch\"\nfield = \"enabled\"\n\
+            equals = true\n\n[[trigger]]\ntopic = \"clock/local\"\nfield = \"known\"\n\
+            equals = true\nrearm = \"ends\"\n";
+        // The controls' standing state is said with no hand: not exempt.
+        let touch_state = "[trigger]\ntopic = \"controls/touch_state\"\n\
+            field = \"enabled\"\nequals = true\n";
+        for kept in [touch, pet, press, hands] {
+            let toml = format!("{RUN}\n{kept}");
+            assert_eq!(told_only(&toml), Ok(()), "{toml}");
+            // A task granted speak, too.
+            let task = toml.replace(
+                "run = \"scripts/main.py\"",
+                "task = { task = \"say the price\", run = \"scripts/main.py\" }",
+            );
+            assert_eq!(told_only(&task), Ok(()), "{task}");
+        }
+        for refused in [timed, touch_and_time, touch_state] {
+            let toml = format!("{RUN}\n{refused}");
+            assert_eq!(told_only(&toml).unwrap_err().0, SPEAKS_ON_ITS_OWN, "{toml}");
+            assert_eq!(speaks_on_its_own(&toml), Some("a run step"), "{toml}");
+            let task = toml.replace(
+                "run = \"scripts/main.py\"",
+                "task = { task = \"say the price\", run = \"scripts/main.py\" }",
+            );
+            assert_eq!(speaks_on_its_own(&task), Some("a speaking grant"), "{task}");
+        }
     }
 
     /// The script lamp-9adf's model wrote (#6749 E, 13 Nov): `for` is a

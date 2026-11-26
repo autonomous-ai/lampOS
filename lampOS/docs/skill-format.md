@@ -68,8 +68,8 @@ that does the whole job and says its own lines, run with no agent (the key
 is #8158's), or `task = { task, run }` when each start needs the agent to
 sum up.
 
-**A made skill a time, an event or a repeat starts (any `[trigger]`)
-speaks only through the lamp's told answer** (#8610): its `[[do]]` is a
+**A made skill a time, an event or a repeat starts (any `[trigger]` but a
+hand's) speaks only through the lamp's told answer** (#8610): its `[[do]]` is a
 `task` step, its scripts print what they found and never call `lamp.say`,
 `lamp.sound`, the speaker or `control.sock`, and its `grants` never name
 `speak` or `speaker`. Its agent's last answer is what the lamp tells the
@@ -83,7 +83,10 @@ refuses its say at each run. Known limit: lamp-control's volume op needs
 `speak` too, so a trigger skill that only sets the volume is refused as
 well (a follow-up). A `run` step,
 and code that says its own line, are only for a skill the person's own
-words start. Fixed `say` and `remind` steps are as before.
+words start, or one only a hand on the lamp starts: every trigger on
+`controls/touch`, `controls/pet` or `controls/gesture` (a touch, a pat, a
+button press), the person at the lamp asking, whom the told answer would
+answer a minute late (#8651). A pet or a bump starts such a skill too. Fixed `say` and `remind` steps are as before.
 
 Other front-matter lines and the body are for people.
 
@@ -251,7 +254,7 @@ it) or `if_choice` (the tool's values it runs for).
 | (none) | `stand = N`: a percent of the lamp's own stand, 1 to 100, kept until the next ask; tool only | `body` |
 | (none) | `rest = { op = "rest"\|"wake"\|"cancel", during, resettle }` | `body` |
 | (none) | `remind = { in = "25m", words = "…" }`, `remind = { at = "22:00", words = "…" }` or `remind = { every = "30m", words = "…" }`: one timer, reminder or repeating reminder (every 15 m to 24 h, until cancelled by voice) set in the lamp's schedule, said when due; its words fixed (at most 120 characters, one or two sentences); at most 3 a day, none stacked; never in a skill with a tool | `actions = ["set_timer"]` for `in`, `["set_reminder"]` for `at`, `["repeat_reminder"]` for `every` |
-| (none) | `run = "scripts/main.py"`: the skill's own Python script, a plain file in its `scripts/`, run by lamp-tasks with no agent in its own fence for at most 30 s; it succeeds when it exits 0 and something it asked `lamp.say` for was said, and a failure started by the person's words says "<name> couldn't finish this time."; alone in its `[[do]]`, the skill's one task, never beside a `task` (#8158; skills.md, "A skill's `run` step"); a made skill has one only when the person's words alone start it, never with a trigger (#8610) | the top-level `grants`, as a `task`'s |
+| (none) | `run = "scripts/main.py"`: the skill's own Python script, a plain file in its `scripts/`, run by lamp-tasks with no agent in its own fence for at most 30 s; it succeeds when it exits 0 and something it asked `lamp.say` for was said, and a failure started by the person's words says "<name> couldn't finish this time."; alone in its `[[do]]`, the skill's one task, never beside a `task` (#8158; skills.md, "A skill's `run` step"); a made skill has one only when the person's words alone start it, never with a trigger but a hand's (#8610; a touch, a pat or a button press, #8651) | the top-level `grants`, as a `task`'s |
 | (none) | `read = { service, what, ... }`: a read of one of the owner's linked services, said to them alone behind its gate; the skill's only step, alone, from a trigger, no tool or `each`; only with `LAMP_SKILL_READS=on` ("Reading a linked service", below) | `speak` and `services = { <service> = "read" }` |
 
 Light values are the protocol's: colours `yellow`, `red`, `green`,
