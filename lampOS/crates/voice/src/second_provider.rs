@@ -163,12 +163,13 @@ pub const BEGIN_WITHIN: Duration = Duration::from_secs(3);
 /// on 2026-10-16, 9 of 10 backup turns waited past 1.5 s.
 pub const CUE_AFTER: Duration = Duration::from_millis(1_500);
 /// With `LAMP_SECOND_WAIT_CUE=on` (#8615 item 2, a customer: "speech
-/// pauses at random"): a spoken turn that has said a lead-in, and whose
-/// next chat round (its calls running, or a round asked whose words have
-/// not begun) is still out this long after the lead-in's audio ended,
-/// makes the wait sound once: never twice in a reply, never over a newer
-/// line, never right after another wait sound, and not once the next
-/// round's words have begun to come. On 70 journals of 24-25 Nov, 113 of
+/// pauses at random"): a spoken turn that has said a lead-in and asked a
+/// further chat round (its calls running, or a round asked), and whose
+/// next audio has not begun this long after the lead-in's audio ended,
+/// makes the wait sound once, whether or not that round's words came
+/// (row-8646: words in time, first audio 1.3 s late): never twice in a
+/// reply, never over a newer line, never right after another wait sound.
+/// On 70 journals of 24-25 Nov, 113 of
 /// 122 sentence boundaries had no gap; those of 300 ms or more were nearly
 /// all such a round (7 cases, p50 1.4 s, p90 4.0 s), each of its waits
 /// under [`CUE_AFTER`].
@@ -18471,9 +18472,10 @@ fn piece_audio_line(request: u64, piece: usize, samples: usize) -> String {
     )
 }
 
-/// Ready once `due` has passed with a further chat round out
+/// Ready once `due` has passed with a further chat round asked
 /// (`round_out` true, [`GAP_CUE_AFTER`]); never once the answer's writing
-/// is over.
+/// is over. Raced against the next audio: the next piece, then its first
+/// packet.
 async fn round_still_out(
     due: tokio::time::Instant,
     round_out: &mut tokio::sync::watch::Receiver<bool>,
@@ -19623,8 +19625,9 @@ async fn answer(
     // round 1's words are not said before it is known whether it handed
     // the work over.
     let mut decline_held = (round_one_held || named_agent.is_some()).then(String::new);
-    // Whether a further chat round is out, its calls running or its words
-    // not begun, for the gap's wait sound ([`GAP_CUE_AFTER`]).
+    // Whether a further chat round was asked after a lead-in, for the gap's
+    // wait sound ([`GAP_CUE_AFTER`]): it is timed by the next audio, not by
+    // the round's words (row-8646: words in time, audio 1.3 s late).
     let (round_out, mut round_waited) = tokio::sync::watch::channel(false);
     let writing = async move {
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
@@ -21109,10 +21112,6 @@ async fn answer(
                 match event {
                     ChatEvent::Calling(_) | ChatEvent::Argued(..) => {}
                     ChatEvent::Text(piece) => {
-                        // Its words begun: the next audio is near.
-                        if piece.chars().any(char::is_alphanumeric) {
-                            round_out.send_replace(false);
-                        }
                         let piece = match silent_after.as_mut() {
                             Some(silent) => silent.piece(piece),
                             None => piece,
@@ -24328,7 +24327,24 @@ async fn answer(
             };
             let mut played = false;
             let mut piece_samples = 0;
-            while let Some(packet) = packets.next().await {
+            loop {
+                // Its first audio, too, is the next audio the gap's sound
+                // waits for: the piece's words may come in time and its
+                // audio not (row-8646).
+                let packet = match (gap_cues, audio_end.filter(|_| !gap_spent && !played)) {
+                    (Some(cues), Some(end)) => tokio::select! {
+                        packet = packets.next() => packet,
+                        () = round_still_out(end + GAP_CUE_AFTER, &mut round_waited) => {
+                            gap_spent = true;
+                            gap_cue(shared, request, cues).await?;
+                            continue;
+                        }
+                    },
+                    _ => packets.next().await,
+                };
+                let Some(packet) = packet else {
+                    break;
+                };
                 let samples = match packet {
                     // Not started twice, and none of it played: kept for the
                     // next piece (#4338). The announcement is never carried.

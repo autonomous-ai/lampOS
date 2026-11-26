@@ -583,12 +583,15 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   turn never makes one. On lamp-4ace on 2026-10-16, 9 of 10 backup turns
   waited past 1.5 s.
   After a lead-in (#8615 item 2, a customer: "speech pauses at random"):
-  a spoken turn that has said some words and whose next chat round is
-  still out `GAP_CUE_AFTER` (1 s) after the audio given so far ends (its
-  calls running, or a round asked, an ask again included, whose words
-  have not begun) makes the same sound once. Never twice in a reply,
-  never over a newer line, never right after another wait sound with no
-  words between, and not once the next round's words begin to come. It
+  a spoken turn that has said some words, has asked a further chat round
+  (its calls running, or a round asked, an ask again included), and whose
+  next audio has not begun `GAP_CUE_AFTER` (1 s) after the audio given so
+  far ends (no next piece handed on, or one whose first audio byte has not
+  come) makes the same sound once, whether or not the next round's words
+  have come: row-8646 (26 Nov) had round 2's words in time and its first
+  audio 1.3 s after the lead-in's ended. Never twice in a reply, never over
+  a newer line, never right after another wait sound with no words
+  between. It
   marks the request cued, so neither `LAMP_BUSY_FOLLOW_UP_RENEWS`'s sound
   nor a connected service's follows it in the same wait. On 70 journals
   of 24-25 Nov, 113 of 122 sentence boundaries had no gap; those of
@@ -597,7 +600,7 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   figure 3.5 to 4 s, make_skill 82 s), each of its waits under 1.5 s.
   The audio's end is when the pieces handed on would have played, as
   `Shared::said_through` counts it. Nothing waits for it: it races the next
-  piece in the saying half. Journal: `made a sound: its next chat round
+  piece, then that piece's first audio packet, in the saying half. Journal: `made a sound: its next chat round
   was still out 1000 ms after its lead-in's audio ended`. Each piece of
   the answer is journalled once all its audio went to the speaker:
   `request N piece K handed to the speaker: M ms of audio`; each playback
