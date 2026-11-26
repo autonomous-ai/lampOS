@@ -6690,6 +6690,16 @@ pub fn serve(
         );
         runtime.spawn(task);
     }
+    // Whether the body moves now, for a history that kept a move refused
+    // while it was down (#8640, `MOVES_AGAIN_NOTE`).
+    if keeps_calls
+        && let Some(bus) = files
+            .bus_root
+            .as_deref()
+            .and_then(|root| lamp_bus::Bus::new(root).ok())
+    {
+        runtime.spawn(body_task(bus));
+    }
     if let Some((bus, told)) = air {
         eprintln!(
             "lamp-voice second: a stuffy room is told beside what a person says (LAMP_AIR_FACTS)"
@@ -15976,8 +15986,65 @@ fn thread_and_history_summed(
         history_told(
             recent,
             HISTORY_KEEPS_CALLS.load(std::sync::atomic::Ordering::Acquire),
+            BODY_MOVES.load(std::sync::atomic::Ordering::Acquire),
         ),
     )
+}
+
+/// Whether the body can move now, as lamp-skills judges it before a move
+/// (`lamp_skills::body_down`, #6834): `lamp/health` said within 15 s with
+/// the body neither missing nor at error or stale, and `body/limits`, if
+/// said within 30 s, not saying it can't stand. Read every second by
+/// [`body_task`] (`LAMP_HISTORY_KEEPS_CALLS=on` and the bus); false while
+/// unread or unknown, so [`MOVES_AGAIN_NOTE`](crate::second_provider::MOVES_AGAIN_NOTE)
+/// is told only when the body is known to be up.
+pub(crate) static BODY_MOVES: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// lamp-skills' `body_down` is none, for a health that was read (the
+/// voice does not build on lamp-skills; keep the two the same).
+fn body_moves(health: Option<&lamp_msgs::Health>, stands: Option<bool>) -> bool {
+    let Some(health) = health else {
+        return false;
+    };
+    !health.missing.iter().any(|part| part == "body")
+        && health
+            .items
+            .iter()
+            .find(|item| item.name == "body")
+            .is_none_or(|body| matches!(body.level, lamp_msgs::Level::Ok | lamp_msgs::Level::Warn))
+        && stands != Some(false)
+}
+
+/// [`BODY_MOVES`] from the bus, every second: the latest kept reports
+/// only, no wait on the reply's path.
+async fn body_task(bus: lamp_bus::Bus) {
+    fn said_within<T: serde::de::DeserializeOwned>(
+        bus: &lamp_bus::Bus,
+        topic: &str,
+        most_ms: u64,
+    ) -> Option<T> {
+        let message = bus.latest(topic).ok()??;
+        let now_ms = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_millis() as u64);
+        (now_ms.saturating_sub(message.header.at_unix_ms) <= most_ms)
+            .then(|| message.parse().ok())
+            .flatten()
+    }
+    let mut every = tokio::time::interval(Duration::from_secs(1));
+    every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    loop {
+        every.tick().await;
+        let health = said_within::<lamp_msgs::Health>(&bus, lamp_msgs::Health::TOPIC, 15_000);
+        let stands =
+            said_within::<lamp_msgs::BodyLimits>(&bus, lamp_msgs::BodyLimits::TOPIC, 30_000)
+                .map(|limits| limits.stands);
+        BODY_MOVES.store(
+            body_moves(health.as_ref(), stands),
+            std::sync::atomic::Ordering::Release,
+        );
+    }
 }
 
 /// `recent` (oldest first) as messages ([`messages_told`]). A down spell
@@ -15988,11 +16055,23 @@ fn thread_and_history_summed(
 /// `second_provider::MOVE_THEN_NOTE` after its words too, as the refused
 /// one is. #8640's row on lamp 16345: after a few such refusals the model
 /// copied the words-only answers and never called `dance` again once the
-/// body was up (0 of 20 dances).
-fn history_told(recent: Vec<crate::thread::Recent>, keeps_calls: bool) -> Vec<Message> {
-    use crate::second_provider::{COULD_NOT_MOVE_THEN, FAILED_THEN, MOVE_THEN_NOTE};
+/// body was up (0 of 20 dances). With such a refusal kept and the body
+/// able to move now (`moves_now`, [`BODY_MOVES`]), the history ends with
+/// `second_provider::MOVES_AGAIN_NOTE`, on each request while it is kept,
+/// as the move-then notes are: the row's next run still got 0 of 10, the
+/// model answering "my arm and head are stuck" with nothing telling it the
+/// body was back.
+fn history_told(
+    recent: Vec<crate::thread::Recent>,
+    keeps_calls: bool,
+    moves_now: bool,
+) -> Vec<Message> {
+    use crate::second_provider::{
+        COULD_NOT_MOVE_THEN, FAILED_THEN, MOVE_THEN_NOTE, MOVES_AGAIN_NOTE,
+    };
     let mut down = false;
-    recent
+    let mut was_down = false;
+    let mut told: Vec<Message> = recent
         .into_iter()
         .flat_map(|exchange| {
             let words_only = exchange.calls.is_empty();
@@ -16008,9 +16087,14 @@ fn history_told(recent: Vec<crate::thread::Recent>, keeps_calls: bool) -> Vec<Me
                 told.push(Message::system(MOVE_THEN_NOTE.to_owned()));
             }
             down = refused || (down && !ran);
+            was_down |= refused;
             told
         })
-        .collect()
+        .collect();
+    if keeps_calls && was_down && moves_now {
+        told.push(Message::system(MOVES_AGAIN_NOTE.to_owned()));
+    }
+    told
 }
 
 /// What a text's answer (#1673) is told, and how its functions run. It is
@@ -26745,16 +26829,89 @@ mod tests {
                 expected.push(note.clone());
             }
         }
-        let told = history_told(spell(), true);
+        let told = history_told(spell(), true, false);
         assert_eq!(told, expected);
         assert_eq!(told.iter().filter(|message| **message == note).count(), 3);
         assert_eq!(
-            history_told(spell(), false),
+            history_told(spell(), false, false),
             spell()
                 .into_iter()
                 .flat_map(|exchange| messages_told(exchange, false))
                 .collect::<Vec<_>>()
         );
+    }
+
+    /// #8640's second row on lamp 16345: with the body back up the model
+    /// still said its arm and head were stuck (0 of 10 dances). A history
+    /// that kept a move refused while the body was down ends with the
+    /// moves-again note when the body moves now; with the body still down,
+    /// with no refusal kept, or without kept calls, it does not.
+    #[test]
+    fn a_kept_down_spell_with_the_body_up_now_is_told_it_moves_again() {
+        let exchange = |lamp: &str, result: Option<&'static str>| crate::thread::Recent {
+            person: "Lamp, dance.".into(),
+            lamp: lamp.into(),
+            calls: vec![crate::thread::KeptCall {
+                id: "kept-1-0".into(),
+                name: crate::use_skill::NAME.into(),
+                args: serde_json::json!({}),
+                result,
+            }],
+            ..crate::thread::Recent::default()
+        };
+        let again = Message::system(crate::second_provider::MOVES_AGAIN_NOTE.to_owned());
+        let spell = || {
+            vec![
+                exchange(
+                    "I can't move right now.",
+                    Some(crate::second_provider::COULD_NOT_MOVE_THEN),
+                ),
+                crate::thread::Recent {
+                    person: "Dance, please.".into(),
+                    lamp: "My arm and head are stuck.".into(),
+                    ..crate::thread::Recent::default()
+                },
+            ]
+        };
+        let up = history_told(spell(), true, true);
+        assert_eq!(up.last(), Some(&again));
+        assert_eq!(up[..up.len() - 1], history_told(spell(), true, false)[..]);
+        assert!(!history_told(spell(), true, false).contains(&again));
+        assert!(!history_told(spell(), false, true).contains(&again));
+        let danced = || vec![exchange("Here I go!", None)];
+        assert!(!history_told(danced(), true, true).contains(&again));
+        assert!(!history_told(Vec::new(), true, true).contains(&again));
+    }
+
+    /// The body moves as lamp-skills' `body_down` judges it: a health read,
+    /// the body neither missing nor at error or stale, and not unable to
+    /// stand.
+    #[test]
+    fn the_body_moves_only_when_its_health_says_so() {
+        use lamp_msgs::{Health, HealthItem, Level};
+        let health = |level: Level, missing: bool| Health {
+            level,
+            message: String::new(),
+            items: vec![HealthItem {
+                name: "body".into(),
+                level,
+                message: String::new(),
+                age_ms: 0,
+            }],
+            missing: if missing {
+                vec!["body".into()]
+            } else {
+                Vec::new()
+            },
+            quiet_ms: 0,
+        };
+        assert!(body_moves(Some(&health(Level::Ok, false)), None));
+        assert!(body_moves(Some(&health(Level::Warn, false)), Some(true)));
+        assert!(!body_moves(None, None), "unknown is not up");
+        assert!(!body_moves(Some(&health(Level::Error, false)), None));
+        assert!(!body_moves(Some(&health(Level::Stale, false)), None));
+        assert!(!body_moves(Some(&health(Level::Ok, true)), None));
+        assert!(!body_moves(Some(&health(Level::Ok, false)), Some(false)));
     }
 
     /// lamp-9adf at 13929 (17 Nov 23:20): a lookup that failed earlier was

@@ -2495,7 +2495,18 @@ order is kept. A written turn is the same from the chat on.
   until one with a call that ran, are the same down spell and are told
   the same note after their words (`worker::history_told`; #8640's row on
   lamp 16345: the model copied those words-only answers and called no
-  dance once the body was up, 0 of 20). The calls go with
+  dance once the body was up, 0 of 20). While such a refusal is kept and
+  the body can move now, the history ends with
+  `second_provider::MOVES_AGAIN_NOTE` ("your body can move again now ...
+  true then, not now"), on each request, as the move-then notes are: the
+  row's next run, with only those notes, still got 0 of 10 ("my arm and
+  head are stuck"). Whether the body moves is read every second from the
+  bus's kept `lamp/health` (said within 15 s: the body neither missing nor
+  at error or stale) and `body/limits` (within 30 s: not unable to stand),
+  as lamp-skills judges a move (`lamp_skills::body_down`), by
+  `worker::body_task` into `worker::BODY_MOVES` with
+  `LAMP_HISTORY_KEEPS_CALLS=on` and the bus; unread or unknown, it is not
+  told. The calls go with
   the exchange the lamp's words were filed under, so they are told only
   to that scope's turns; a request with no kept words keeps none, and a
   forget drops them. They are not written to the thread file (an older
