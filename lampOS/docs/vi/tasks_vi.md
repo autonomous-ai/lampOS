@@ -3546,10 +3546,13 @@ một câu cố định khi việc chuyển bắt đầu, "Switching to OpenClaw
 "OpenClaw is ready." hay "Hermes is ready.", chỉ khi đang trong một cuộc trò
 chuyện: một lượt đang mở (một câu trả lời trong tay, hay một luồng người dùng
 đang giữ), hoặc cuộc trò chuyện của thread còn đang diễn ra (lời của đèn trong
-`thread::GOING_ON_FOR`, 45 s, chưa đóng từ đó). Việc chuyển được yêu cầu bằng
-giọng nói thì tự nó đã ở trong một cuộc trò chuyện. Việc chuyển làm trong app
-khi phòng im lặng thì không bao giờ được nói: nó chỉ hiện trong app và trên
-đèn. Cách đọc: khi có cuộc trò chuyện đang mở, và chỉ khi đó, một luồng riêng
+`thread::GOING_ON_FOR`, 45 s, chưa đóng từ đó) khi có người ở bên đèn
+(`reminders::someone_here`: một khuôn mặt trong tầm nhìn, hoặc một người được
+nghe thấy trong hai phút vừa qua), nên lời không ai hỏi của chính đèn, như tin
+việc (task news), nói với phòng trống không mở cuộc trò chuyện nào. Việc chuyển
+được yêu cầu bằng giọng nói thì tự nó đã ở trong một cuộc trò chuyện. Việc
+chuyển làm trong app khi phòng im lặng hoặc trống thì không bao giờ được nói: nó
+chỉ hiện trong app và trên đèn. Cách đọc: khi có cuộc trò chuyện đang mở, và chỉ khi đó, một luồng riêng
 của lamp-voice đọc `targets` của lamp-tasks trên socket request của nó mỗi
 `agent_switch_told::READ_EVERY` (1 s); `engine` của target của đèn đổi trong
 cùng một cuộc trò chuyện là một lần chuyển (cuộc trò chuyện mở sau một lần
@@ -3571,8 +3574,8 @@ Việc bị việc chuyển kết thúc được Task news nói bằng một câ
 stopped because I switched to another agent. Please ask me again." Đó là câu
 cố định của chính đèn, bằng ngôn ngữ của chủ sở hữu
 (`agent_switch_told::ended_note`, nói đúng như đã viết giống các câu chuyển
-agent), không bao giờ do model chat hay news agent diễn đạt lại; prompt
-`stopped_switched` của skill không còn được dùng.
+agent), không bao giờ do model chat hay news agent diễn đạt lại; skill không có
+prompt nào cho câu này.
 
 Hermes nói thẳng hoạt động giống hệt OpenClaw nói thẳng (tiêu chí nghiệm thu
 của chủ sở hữu, 23/11): việc của đèn chạy, và "tới đâu rồi?" cùng các dòng

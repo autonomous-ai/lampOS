@@ -295,7 +295,16 @@ fn the_handle_says_a_conversations_line_once_and_none_after_it_ends() {
 
 #[test]
 fn in_a_conversation_is_a_turn_open_or_the_thread_going_on() {
-    assert!(in_conversation(true, || false));
-    assert!(in_conversation(false, || true));
-    assert!(!in_conversation(false, || false));
+    assert!(in_conversation(true, true, || false));
+    assert!(in_conversation(false, true, || true));
+    assert!(!in_conversation(false, true, || false));
+}
+
+/// The thread going on with nobody at the lamp (its last words its own
+/// unasked task news to an empty room) is no conversation: an app switch
+/// then is never spoken. A turn open is one whoever the eyes see.
+#[test]
+fn the_thread_going_on_to_an_empty_room_is_no_conversation() {
+    assert!(!in_conversation(false, false, || true));
+    assert!(in_conversation(true, false, || false));
 }

@@ -265,12 +265,6 @@ pub struct NewsWords {
     /// words.
     #[serde(default = "failed_not_default")]
     pub failed_not_default: String,
-    /// Stopped, as the lamp switched to another agent (the task's last
-    /// words are lamp-tasks' `direct::SWITCHED`): told in
-    /// [`SWITCHED_LINE`]'s words, not as a plain stop: `{asked}`. A
-    /// skill without it says the built-in words.
-    #[serde(default = "stopped_switched")]
-    pub stopped_switched: String,
     /// A new start that timed out, being checked (lamp-tasks'
     /// `start_checking`, #8170): `{asked}` and `{who}`. Never said as
     /// failed, and no retry offered. A skill without it says the built-in
@@ -437,13 +431,6 @@ fn failed_not_default() -> String {
 pub const SWITCHED_LINE: &str =
     "That stopped because I switched to another agent. Please ask me again.";
 
-/// [`NewsWords::stopped_switched`]'s words, built in.
-fn stopped_switched() -> String {
-    format!(
-        "News from work you handed over for the person: the task they gave, \"{{asked}}\", stopped because the lamp switched to another agent. Tell them in these words, and nothing more: \"{SWITCHED_LINE}\""
-    )
-}
-
 /// [`NewsWords::checking`]'s words, built in (#8170).
 fn checking() -> String {
     "The work the person asked you to hand over, \"{asked}\", was slow to start with {who}, and you are not sure yet whether it started: it can still begin there in the next few minutes. Tell them that honestly in one or two plain, light sentences with no technical words, such as \"I'm not sure it started yet. I'll tell you if it does.\": never that it did not start or failed, and do not offer to start it again.".into()
@@ -528,7 +515,6 @@ impl NewsWords {
             failed_not_ready: failed_not_ready(),
             failed_stuck: failed_stuck(),
             failed_not_default: failed_not_default(),
-            stopped_switched: stopped_switched(),
             checking: checking(),
             failed_not_started: failed_not_started(),
             start_unsure: start_unsure(),
@@ -631,7 +617,6 @@ impl NewsWords {
                 ),
                 ("failed_stuck", &self.failed_stuck, &["asked", "who"]),
                 ("failed_not_default", &self.failed_not_default, &["asked"]),
-                ("stopped_switched", &self.stopped_switched, &["asked"]),
                 ("checking", &self.checking, &["asked", "who"]),
                 (
                     "failed_not_started",
@@ -732,7 +717,6 @@ impl NewsWords {
                 ("failed_not_ready", note(&self.failed_not_ready, &[])),
                 ("failed_stuck", note(&self.failed_stuck, &[])),
                 ("failed_not_default", note(&self.failed_not_default, &[])),
-                ("stopped_switched", note(&self.stopped_switched, &[])),
                 ("checking", note(&self.checking, &[])),
                 ("failed_not_started", note(&self.failed_not_started, &[])),
                 ("start_unsure", note(&self.start_unsure, &[])),
@@ -943,7 +927,6 @@ mod tests {
                     "failed_not_ready = ",
                     "failed_stuck = ",
                     "failed_not_default = ",
-                    "stopped_switched = ",
                     "joined_reopened = ",
                     "joined_fresh = ",
                     "answered = ",
@@ -971,7 +954,6 @@ mod tests {
         assert_eq!(read.failed_not_ready, failed_not_ready());
         assert_eq!(read.failed_stuck, failed_stuck());
         assert_eq!(read.failed_not_default, failed_not_default());
-        assert_eq!(read.stopped_switched, stopped_switched());
         assert_eq!(read.joined_reopened, joined_reopened());
         assert_eq!(read.joined_fresh, joined_fresh());
         assert_eq!(NewsWords::in_dir(&skills()).failed_closed, failed_closed());
@@ -982,7 +964,6 @@ mod tests {
         assert_eq!(installed.failed_not_ready, failed_not_ready());
         assert_eq!(installed.failed_stuck, failed_stuck());
         assert_eq!(installed.failed_not_default, failed_not_default());
-        assert_eq!(installed.stopped_switched, stopped_switched());
         assert_eq!(read.answered, answered());
         assert_eq!(read.answered_cut, answered_cut());
         let installed = NewsWords::in_dir(&skills());

@@ -228,6 +228,9 @@ struct Runs {
     restart_at_add: RefCell<u32>,
     /// How many of the next `systemctl is-active` looks find it inactive.
     inactive: RefCell<u32>,
+    /// Hermes's gateway's `ActiveState`: `inactive` unless a test says
+    /// otherwise.
+    hermes: &'static str,
 }
 
 impl Runs {
@@ -244,6 +247,7 @@ impl Runs {
             began: RefCell::default(),
             restart_at_add: RefCell::new(0),
             inactive: RefCell::new(0),
+            hermes: "inactive",
         }
     }
     fn runner(&self) -> impl FnMut(&[String]) -> Result<String, String> + '_ {
@@ -273,6 +277,13 @@ impl Runs {
             let (uid, gid) = own_ids();
             if line == format!("systemctl show -p MainPID --value -- {UNIT}") {
                 Ok(format!("{}\n", self.main_pid))
+            } else if line
+                == format!(
+                    "systemctl show -p ActiveState --value -- {}",
+                    hermes_gateway::UNIT
+                )
+            {
+                Ok(format!("{}\n", self.hermes))
             } else if line == "id -g lampos" {
                 Ok(format!("{gid}\n"))
             } else if argv[0] == "id" {
@@ -4590,6 +4601,104 @@ fn an_install_starts_the_gateway_only_while_openclaw_is_wanted() {
             runs.lines()
         );
     }
+}
+
+/// One agent gateway at a time (#8693's P2-1): a one-shot asked while a
+/// round held OpenClaw's start behind Hermes's gateway (not down yet: a
+/// stop that failed or lags) never restarts OpenClaw's beside it, though
+/// lamp-tasks says OpenClaw; it says why, once.
+#[test]
+fn an_install_restarts_no_gateway_while_hermes_runs() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    after_round_with(
+        lamp.root(),
+        &lamp.records(),
+        sk(true),
+        Gateway::Unknown,
+        true,
+        &mut systemd,
+        &mut Runs::new(&lamp).runner(),
+        1,
+        Ok(crate::hermes_schedule::Window::Reached),
+        &mut quiet(),
+    );
+    assert!(lamp.asked().is_some_and(|ask| ask.by_default));
+    let runs = Runs {
+        hermes: "active",
+        ..Runs::new(&lamp)
+    };
+    let mut said = Vec::new();
+    let done = install_said(
+        lamp.root(),
+        &lamp.records(),
+        &mut runs.runner(),
+        &mut || 2,
+        &mut |line: &str| said.push(line.to_owned()),
+        &kit(),
+        &mut || said_is("openclaw"),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(done.install, "installed", "{said:#?}");
+    assert_eq!(gateway_starts(&runs), Vec::<String>::new(), "{said:#?}");
+    let why: Vec<_> = said
+        .iter()
+        .filter(|line| line.contains(hermes_gateway::UNIT) && line.contains("not restarted"))
+        .collect();
+    assert_eq!(why.len(), 1, "{said:#?}");
+}
+
+/// One agent gateway at a time (#8693's P2-2): the default read as
+/// OpenClaw before `settled`'s wait and switched to Hermes during it, the
+/// one-shot reads it again and never restarts OpenClaw's gateway.
+#[test]
+fn an_install_restarts_no_gateway_switched_away_during_its_wait() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let mut systemd = Fake::default();
+    after_round_with(
+        lamp.root(),
+        &lamp.records(),
+        sk(true),
+        Gateway::Wanted,
+        true,
+        &mut systemd,
+        &mut Runs::new(&lamp).runner(),
+        1,
+        Ok(crate::hermes_schedule::Window::Reached),
+        &mut quiet(),
+    );
+    let runs = Runs::new(&lamp);
+    // The switch lands once `settled` has looked at the gateway's listen.
+    let switched = |runs: &Runs| runs.lines().iter().any(|line| line.starts_with("ss "));
+    let mut said = Vec::new();
+    let done = install_said(
+        lamp.root(),
+        &lamp.records(),
+        &mut runs.runner(),
+        &mut || 2,
+        &mut |line: &str| said.push(line.to_owned()),
+        &kit(),
+        &mut || {
+            said_is(if switched(&runs) {
+                "hermes"
+            } else {
+                "openclaw"
+            })
+        },
+    )
+    .unwrap()
+    .unwrap();
+    assert!(switched(&runs), "settled looked: {:#?}", runs.lines());
+    assert_eq!(done.install, "installed", "{said:#?}");
+    assert_eq!(gateway_starts(&runs), Vec::<String>::new(), "{said:#?}");
+    assert!(
+        said.iter()
+            .any(|line| line.contains("not restarted") && line.contains("no longer")),
+        "{said:#?}"
+    );
 }
 
 /// One agent gateway at a time, an OpenClaw there: a round that doesn't

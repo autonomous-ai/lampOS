@@ -6614,9 +6614,11 @@ says one fixed line when a switch starts, "Switching to OpenClaw." or
 "OpenClaw is ready." or "Hermes is ready.", only in a conversation: a turn
 open (a reply in hand, or a stream the person owns), or the thread's
 conversation going on (the lamp's words within `thread::GOING_ON_FOR`, 45 s,
-not closed since). A switch asked by voice is in one by its nature. A switch
-made in the app while the room is quiet is never spoken: it shows in the app
-and on the light alone. How it is read: while a conversation is open, and
+not closed since) with someone at the lamp (`reminders::someone_here`: a face
+in view, or a person heard within the last two minutes), so the lamp's own
+unasked words, such as task news, to an empty room open none. A switch asked
+by voice is in one by its nature. A switch made in the app while the room is
+quiet or empty is never spoken: it shows in the app and on the light alone. How it is read: while a conversation is open, and
 only then, a thread of lamp-voice's own reads lamp-tasks' `targets` on its
 request socket every `agent_switch_told::READ_EVERY` (1 s); the lamp target's
 `engine` changing within one conversation is a switch (a conversation that
@@ -6638,7 +6640,7 @@ is. Work the switch ended is told by Task news in one short line: "That
 stopped because I switched to another agent. Please ask me again." It is the
 lamp's exact line in the owner's language (`agent_switch_told::ended_note`,
 said as written like the switch's own lines), never worded by the chat model
-or the news agent; the skill's `stopped_switched` prompt is no longer used.
+or the news agent; the skill has no prompt for it.
 
 Hermes direct behaves the same as OpenClaw direct (the owner's acceptance, 23
 Nov): lamp tasks run, and "how far along?" and the status rows are answered

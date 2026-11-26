@@ -110,7 +110,8 @@ use std::time::{Duration, Instant, SystemTime};
 /// OpenClaw's switch, in lamp-tasks' own environment: `on` exactly ([`on`]).
 pub const SWITCH: &str = "LAMP_TASKS_OPENCLAW_DIRECT";
 /// Hermes's switch, in lamp-tasks' own environment: `on` exactly ([`on`]).
-/// Set in no unit yet: off until a Hermes lamp's row passes.
+/// On in the product (`deploy/product/lamp-tasks.service`), with
+/// lamp-update's `LAMP_HERMES_GATEWAY`.
 pub const HERMES_SWITCH: &str = "LAMP_TASKS_HERMES_DIRECT";
 
 /// A switch's value: `on` exactly; anything else (unset too) is off.

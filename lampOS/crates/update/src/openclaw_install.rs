@@ -65,7 +65,7 @@
 //! scripts: OpenClaw finishes its own package step at its first run (the
 //! install's `openclaw --version`, in the namespace too).
 use crate::{
-    agent_ns, harness_install,
+    agent_ns, harness_install, hermes_gateway,
     hermes_install::{
         self, NEEDS_AVAILABLE_KB, RETRY_IN_NEXT_WINDOW, Shown, available_kb, free_kb, gid_of,
         holds, lock_named, on, owner, userns_argv,
@@ -1848,7 +1848,10 @@ fn remove_entry_points(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str))
 ///
 /// One agent gateway at a time: `wanted` ([`gateway_wanted`], read right
 /// before) says whether the gateway may be (re)started. Wanted (always with
-/// [`BY_DEFAULT_SWITCH`] off), as above. Not wanted (another engine the
+/// [`BY_DEFAULT_SWITCH`] off), as above, `wanted` read again right before
+/// the restart, after [`settled`]'s wait, and Hermes's gateway down then
+/// ([`hermes_gateway::down`]): else it is not restarted, said once, and
+/// [`crate::gateway_keeper`] starts it once both hold. Not wanted (another engine the
 /// lamp's default), it is neither started nor restarted: OpenClaw's files
 /// are installed, its allow-list waits for a gateway that runs, and
 /// [`crate::gateway_keeper`] stops one still running. Unknown (lamp-tasks
@@ -2139,7 +2142,19 @@ fn steps(
                 say(&format!("{UNIT} not reset-failed: {why}"));
             }
             settled(root, run, say, false);
-            if let Err(why) = run(&["systemctl", "restart", UNIT].map(str::to_owned)) {
+            // Looked at again after `settled`'s wait (up to SETTLE_AT_MOST):
+            // a switch meanwhile, or Hermes's gateway not down (a round
+            // holding OpenClaw's start behind it), and it is not restarted.
+            if wanted() != Gateway::Wanted {
+                say(&format!(
+                    "{UNIT} not restarted: OpenClaw is no longer the lamp's agent; lamp-update starts it once it is"
+                ));
+            } else if !hermes_down(run) {
+                say(&format!(
+                    "{UNIT} not restarted: {} is not down, and one agent gateway runs at a time; lamp-update starts it once it is",
+                    hermes_gateway::UNIT
+                ));
+            } else if let Err(why) = run(&["systemctl", "restart", UNIT].map(str::to_owned)) {
                 return fail("gateway", format!("systemctl restart {UNIT}: {why}"), say);
             }
         }
@@ -2334,6 +2349,23 @@ const GATEWAY_WAITS: [Duration; 8] = if cfg!(test) {
 } else {
     lamp_checked_replace::GATEWAY_WAITS
 };
+
+/// Whether Hermes's gateway is down, as [`hermes_gateway::gateway_down`]
+/// says it, read through `run`: a state not read is not down.
+fn hermes_down(run: &mut Runner) -> bool {
+    let state = run(&[
+        "systemctl",
+        "show",
+        "-p",
+        "ActiveState",
+        "--value",
+        "--",
+        hermes_gateway::UNIT,
+    ]
+    .map(str::to_owned))
+    .ok();
+    hermes_gateway::down(state.as_deref().map(str::trim))
+}
 
 /// Whether the gateway's unit is active (`systemctl is-active`).
 fn gateway_active(run: &mut Runner) -> bool {
