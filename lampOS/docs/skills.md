@@ -7950,12 +7950,25 @@ forces one), a skill it makes is made whole, with everything a run needs:
   starts a touch-triggered skill, so its line plays then too. `told_only`
   lets a `skill.toml` that doesn't parse through, as the pack refuses it. `lamp-skills pack`, the agent's own check mid-make,
   refuses by the same rule (`made_skill::told_only`, called from
-  `package::pack_signed_by`), saying `SPEAKS_ON_ITS_OWN` and the told
+  `package::pack_signed_by`), saying `not packed: told_only: `
+  (`package::TOLD_ONLY_REFUSED`), `SPEAKS_ON_ITS_OWN` and the told
   answer's form (`made_skill::TOLD_ONLY_SHAPE`), so a make learns the shape
   before the keep; it holds every package, as `Skill::made_refuses` does.
-  Tests: `pack_refuses_a_trigger_skill_that_would_speak_and_packs_a_told_only_one`,
-  `volume_needs_its_own_grant_or_speak`. A never-the-same-twice check is a
-  follow-up.
+  So a skill kept before #8651 that a trigger starts and whose code would
+  speak still runs, but the Store's share and its preview
+  (`cloud::share::pack`, `seen`), which pack it too, refuse it (the first
+  builder's call 2 on #8688). The owner is told a plain line, never the
+  agent's repair text: the refusal is told by its marker
+  (`package::refused_told_only`), and the app shows
+  `cloud::share::SPEAKS_ON_ITS_OWN`, "This skill speaks when it starts on
+  its own, so it can't be shared yet." `lamp-skills pack` keeps the repair
+  text. Tests:
+  `pack_refuses_a_trigger_skill_that_would_speak_and_packs_a_told_only_one`,
+  `a_kept_trigger_skill_that_would_speak_is_refused_in_a_plain_line`,
+  `volume_needs_its_own_grant_or_speak`,
+  `volume_changed_goes_with_volume_or_speak` (a computer granted only
+  `speak` still receives `volume.changed`). A never-the-same-twice check is
+  a follow-up.
 - **The voice reads a `run` step as it reads a `task` step**: code of its
   own, held to its grants and its script among the files written
   (`made_skill::code_step`, `task_run`), and read back for the yes plainly,
