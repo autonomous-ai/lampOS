@@ -62,14 +62,15 @@ The contract posted on #2094 (11:13, with its additions after), which
 
 | Kind | Asked | Success `data` |
 |---|---|---|
-| `keys.set` | `{"service": "deepseek" \| "deepgram" \| "elevenlabs", "key"?, "base_url"?, "voice_id"?, "request_id"?}` (`key` only absent for ElevenLabs' voice alone) | `{"service", "uses": "own", "code": "works" \| "works_no_tools", "answer"}` (#8735, below) |
+| `keys.set` | `{"service": "deepseek" \| "deepgram" \| "elevenlabs" \| "gemini_voice", "key"?, "base_url"?, "voice_id"?, "request_id"?}` (`key` only absent for a voice alone, ElevenLabs' or Gemini's, #8754) | `{"service", "uses": "own", "code": "works" \| "works_no_tools", "answer"}` (#8735, below) |
 | `keys.remove` | `{"service", "request_id"?}` | `{"service", "uses": "lamp"}` |
-| `keys.get` | `{"request_id"?}` | `{"deepseek": "own" \| "lamp", "deepgram": "own" \| "lamp", "elevenlabs": "own" \| "lamp", "since": {"deepseek": RFC 3339 \| null, "deepgram": …, "elevenlabs": …}, "deepseek_host": host \| null, "voice_id": {"elevenlabs": id \| null}, "offers": [...]}` (#8367, below; `in_use` and each offer's `agent`, #8735 below) |
+| `keys.get` | `{"request_id"?}` | `{"deepseek": "own" \| "lamp", "deepgram": "own" \| "lamp", "elevenlabs": "own" \| "lamp", "gemini_voice": "own" \| "lamp", "since": {"deepseek": RFC 3339 \| null, "deepgram": …, "elevenlabs": …, "gemini_voice": …}, "deepseek_host": host \| null, "voice_id": {"elevenlabs": id \| null, "gemini_voice": name \| null}, "in_use": {"model", "agent", "agent_why", "voice"}, "offers": [...]}` (#8367, #8754, below; `in_use`'s `agent` and each offer's `agent`, #8735 below) |
 
 Each is `starting` at once, then one `success` or `failure` of the same kind
 within 15 s; `request_id` comes back in `data` on each. A `failure` has the
 person's words in `error` and `data.code`: `refused`, `voice_refused`
-(ElevenLabs' voice ID not on that account), `unreached`,
+(ElevenLabs' voice ID not on that account, or a Gemini voice name Google
+doesn't have), `unreached`,
 `not_kept` (the key worked but couldn't be written: the lamp uses its own),
 `bad_field` (the field named), `busy` (one key request at a time),
 `not_allowed` (a peer other than `lamp-cloud`) or `unavailable` (the helper
@@ -352,6 +353,120 @@ a 429, a 503 and a 401;
 test (#8367): a real key and voice ID entered from the app by that lamp's
 person, a few turns in that voice, a bad key told plainly, and a remove
 giving the lamp's own voice back.
+
+## Your own voice: Gemini (#8754, built, under `LAMP_OWN_KEYS`)
+
+The person's own Gemini API key and one of Gemini's prebuilt voices, set
+from the app on the same `keys.*` path, speak the lamp's live speech in
+that voice, as their ElevenLabs voice does, and the lamp's own voice comes
+back when it stops working. A service of its own, `gemini_voice`, apart
+from `gemini` (the model, #8420), so a key for one never removes the
+other. The same switch, `LAMP_OWN_KEYS`, and nothing new with it off. Not
+yet run on a lamp.
+
+- **The messages:** `keys.get`'s `offers` gains
+  `{"service": "gemini_voice", "name": "Gemini", "kind": "voice", "models": [], "base_url": false, "fields": ["voice_id"], "voices": [...]}`,
+  `voices` the 30 prebuilt voice names of Google's speech-generation guide
+  ("Voice options", read 26 Nov 2026: Zephyr, Puck, Charon, Kore, Fenrir,
+  Leda, Orus, Aoede, Callirrhoe, Autonoe, Enceladus, Iapetus, Umbriel,
+  Algieba, Despina, Erinome, Algenib, Rasalgethi, Laomedeia, Achernar,
+  Alnilam, Schedar, Gacrux, Pulcherrima, Achird, Zubenelgenubi,
+  Vindemiatrix, Sadachbia, Sadaltager, Sulafat; `lamp_msgs::own_voice::GEMINI_VOICES`).
+  ElevenLabs' offer is as it was, with no `voices`. It also gains
+  `"gemini_voice": "own" | "lamp"`, `since.gemini_voice`,
+  `voice_id.gemini_voice` (the name, not a secret) and `in_use.voice`
+  (`"elevenlabs"`, `"gemini_voice"` or `null`). `keys.set` takes
+  `{"service": "gemini_voice", "key"?, "voice_id"?, "request_id"?}` as
+  ElevenLabs' does: a key needs a voice name with it the first time
+  ("Gemini's voice needs a voice name with its key"), and later keeps the
+  voice kept; with no `key` only the voice changes, checked with the kept
+  key, and only beside one, otherwise `bad_field`, "a voice is changed
+  beside a kept Gemini voice key: give the key too". A voice name is 1 to
+  64 letters and digits; no endpoint and no model are taken. `keys.remove`
+  takes `gemini_voice`.
+- **One own voice at a time:** keeping Gemini's voice removes ElevenLabs'
+  files, and keeping ElevenLabs' removes Gemini's voice's, as one own
+  model is kept at a time; so the voice in use is never a guess.
+- **Where it's kept:** `gemini_voice.key`, `gemini_voice.voice` and
+  `gemini_voice.checked` in `/etc/lampOS/voice/own/`, root's, 0700, each
+  file 0600, which only lamp-voice loads (`LoadCredential=own:`), as
+  `own_gemini_voice.key` and `own_gemini_voice.voice`. No other unit names
+  the folder, so neither the agent runtimes nor any other part running as
+  `lampos` can read the key (the first builder's rule on #7814; test
+  `the_own_voice_keys_are_read_by_the_voice_alone`). Never in a reply, an
+  error, a journal line or a report.
+- **The check:** one request, at most 5 s, no redirect followed:
+  `POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-lite-tts:generateContent`
+  with `x-goog-api-key: <key>`, "Hi." said in the voice named
+  (`generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName`),
+  in the speech model the voice speaks in (`lamp_msgs::own_voice::GEMINI_SPEECH_MODEL`,
+  shared by the helper and the voice). 2xx: kept, "that key and voice work:
+  the lamp now speaks in your Gemini voice, and what it says goes to
+  Google's Gemini API under your account and its terms"; its audio is
+  never read. 401, 403, or a 400 whose body says the key (`API_KEY_INVALID`,
+  "valid API key"): "that key was refused". Any other 400: "that key
+  works, but Gemini has no voice by that name; nothing changed", code
+  `voice_refused`. 404, 429, 5xx, a redirect or a timeout: unreached,
+  nothing changed.
+- **The speech:** at the voice's next start, `with_own_keys` reads the
+  key and the name into `hosted.own_gemini_voice`, with one journal line,
+  "Gemini voice: the person's own key and voice, the lamp's own voice kept
+  for when it fails (LAMP_OWN_KEYS)", never the key or the name; no line
+  without the key. The configured voice is not touched, so it stays the
+  lamp's own, for the fallback, and a unit's `LAMP_SECOND_SPEECH` (which
+  clears a configured voice's name) leaves the person's Gemini voice as it
+  is. Every piece goes to Google's own API with their key, in
+  `gemini-3.8-flash-lite-tts` whatever `LAMP_SECOND_SPEECH_MODEL` says
+  (that switch names the configured voice's model), over the language's
+  and the chosen voice. It is never near (`relay_routable`'s speech is off
+  with it), and their key is never the relay's, Live's or the route's own
+  Gemini's. Were both own voices' files somehow there, Gemini's speaks and
+  ElevenLabs' is not put in the lamp's place (a fixed order).
+- **The fallback:** as ElevenLabs', through the same one-per-process state
+  (`net::tts::OwnVoiceLost`). A piece Google refuses for the person's key
+  (401, 403, or a 400 its body says is the key) is said in the lamp's own
+  voice after one line, "Your Gemini voice isn't working right now, so I'm
+  back to my own voice.", and every piece after goes to the lamp's voice
+  until the voice restarts; the journal says "Gemini refused the person's
+  own key or voice (HTTP <status>); the lamp's own voice from now on", and
+  `voice-keys` tells `lamp-health` "your Gemini voice key was refused,
+  using the lamp's own". Any other failure (a plain 400, a 429, a 5xx, a
+  first sound later than 4 s) is asked once more, then gives way the same
+  way, with "the person's own Gemini voice failed a sentence twice (<why>);
+  the lamp's own voice from now on". The lamp's own voice is its one
+  voice as configured: Gemini's own (`LAMP_SECOND_SPEECH=gemini`) or the
+  configured one.
+- **Off:** the kinds are "not on this lamp", the helper refuses, and the
+  voice reads neither file, so the route is as it was.
+
+**Tests:** `crates/setup/src/keys.rs`
+(`the_gemini_voice_check_says_one_word_in_the_voice_with_the_key_in_its_header`),
+`crates/msgs/src/own_voice.rs`
+(`the_gemini_voices_are_thirty_plain_names_once_each`),
+`crates/setup/tests/it/keys.rs`
+(`elevenlabs_is_offered_beside_the_model_services`,
+`a_gemini_voice_key_and_voice_are_checked_kept_and_never_said`,
+`a_gemini_voice_alone_changes_only_the_voice_beside_a_kept_key`,
+`a_refused_gemini_voice_or_key_is_not_kept`,
+`keeping_one_own_voice_removes_the_other`,
+`a_gemini_chat_key_and_a_gemini_voice_key_live_side_by_side`,
+`the_own_voice_keys_are_read_by_the_voice_alone`, and the pin
+`with_the_switch_off_a_gemini_voice_key_changes_nothing`),
+`crates/cloud/src/settings.rs`
+(`keys_line_passes_a_gemini_voice_key_and_voice_or_a_voice_alone`),
+`crates/voice/src/second_config.rs`
+(`the_persons_gemini_voice_key_and_voice_are_kept_beside_the_lamps_voice`,
+`with_both_own_voices_there_the_gemini_one_speaks`),
+`crates/voice/src/second_provider/net/gemini_tts.rs`
+(`the_persons_gemini_voice_reads_a_bad_keys_400_as_the_key_refused`),
+`crates/voice/src/second_provider/services.rs`
+(`the_persons_gemini_voice_failing_twice_or_refused_gives_way_to_the_lamps_own`,
+`the_persons_gemini_voice_is_never_near_and_keeps_the_lamps_voice_behind_it`),
+`crates/voice/src/second_provider/probe.rs`
+(`an_own_gemini_voice_key_is_never_sent_to_the_relay`) and
+`crates/voice/src/second_provider/worker.rs`
+(`the_persons_gemini_voice_survives_the_units_speech_route`,
+`a_refused_own_gemini_voice_is_warned_to_lamp_health`).
 
 ## An OpenAI-compatible model (#8362 step 1b, built, on in the product since #8367)
 

@@ -30,11 +30,14 @@ pub use stt::{
     take_sent_floor,
 };
 #[cfg(test)]
-pub(crate) use tts::{OWN_VOICE_LOST_LINE, OwnVoiceLost, SocketShape, socket_end, socket_opening};
-pub use tts::{
-    OWN_VOICE_REFUSED, PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream, Turn, default_model,
-    voice_name, voice_told,
+pub(crate) use tts::{
+    OWN_VOICE_LOST_LINE, SocketShape, own_voice_lost_line, socket_end, socket_opening,
 };
+pub use tts::{
+    OWN_VOICE_REFUSED, OWN_VOICE_REFUSED_GEMINI, PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream,
+    Turn, default_model, voice_name, voice_told,
+};
+pub(crate) use tts::{OwnVoiceLost, own_voice_lost};
 /// A piece of speech's request as `Tts` makes it, for `probe-cascade --wire
 /// --speech`.
 pub(crate) use tts::{
