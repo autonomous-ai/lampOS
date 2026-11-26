@@ -348,11 +348,17 @@ pub fn state_note_at(path: &Path, by_default: bool) -> String {
         .parent()
         .and_then(|folder| file_in(folder, FACE_EXPRESSIONS))
         .is_some_and(|face| allowed(&face, FACE_EXPRESSIONS, by_default));
+    state_words(seen.yes, seen.by_default, face)
+}
+
+/// [`state_note_at`]'s words for a state: seen activity on (`yes`), by
+/// default or by a kept yes, and face expressions on (`face`).
+fn state_words(yes: bool, by_default: bool, face: bool) -> String {
     let head = "(For you to know, read just now, not to answer: desk noticing is";
     let stands =
         "This is how it is now, whatever earlier turns said; say nothing of it unless they ask.";
-    if seen.yes {
-        let how = if seen.by_default {
+    if yes {
+        let how = if by_default {
             "on by default (nobody turned it off)"
         } else {
             "on (they said yes)"
@@ -381,6 +387,105 @@ pub fn state_note_at(path: &Path, by_default: bool) -> String {
              If they ask whether you are watching, say you are not. If they ask you to start \
              looking again, call {LOOK}.)"
         )
+    }
+}
+
+/// `text`, a request's note on Live, with the desk noticing's state taken
+/// out of it ([`LiveState`]), when it has it: so another note due in the
+/// same request still fits under the service's cap
+/// (`lamp_gemini::wire::MAX_NOTE_BYTES`), the state yielding its room.
+pub fn without_state_note(text: &str) -> Option<String> {
+    [true, false]
+        .into_iter()
+        .flat_map(|yes| [true, false].map(|by_default| (yes, by_default)))
+        .flat_map(|(yes, by_default)| [true, false].map(|face| state_words(yes, by_default, face)))
+        .find(|note| text.contains(note.as_str()))
+        .map(|note| {
+            text.replacen(note.as_str(), "", 1)
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+}
+
+/// The most of a request's heard words Live keeps for the state's match.
+const LIVE_WORDS_MOST: usize = 2_048;
+
+/// Live's state note (#7767, the Reviewer-lead's c7203343369, item 3): the
+/// words heard for the request whose input began last, matched as the
+/// second route matches a heard line ([`state_note`], [`names_the_noticing`])
+/// each time a piece of Live's input transcript comes, and told once. Live
+/// sends a request's note inside its activity just before its end
+/// (`Session::try_note`), and the model answers only after the end, so a
+/// note given while the input is open reaches the model before its reply
+/// starts; words that name the looking only after the input was closed are
+/// late, and nothing is told.
+#[derive(Debug, Default)]
+pub struct LiveState {
+    request: Option<u64>,
+    words: String,
+    /// Told, or found late: nothing more for this request.
+    done: bool,
+    /// A person's spoken line: not a reminder's turn, nor a written one.
+    heard: bool,
+}
+
+/// What a piece of Live's input transcript comes to ([`LiveState::piece`]).
+#[derive(Debug, PartialEq, Eq)]
+pub enum LiveTold {
+    /// Tell `request`, whose input is open, this note.
+    Tell(u64, String),
+    /// `request`'s words named the looking after its input was closed.
+    Late(u64),
+}
+
+impl LiveState {
+    /// `request`'s input began: what is heard from now is its. `heard`: a
+    /// person's spoken line (never a reminder's or a written turn).
+    pub fn began(&mut self, request: u64, heard: bool) {
+        *self = Self {
+            request: Some(request),
+            heard,
+            ..Self::default()
+        };
+    }
+
+    /// `request` goes on from the one before: its words are this one's too.
+    /// One cut off and given up took its note with it (`cut_off`), so it is
+    /// told afresh; otherwise what was told, or found late, stands.
+    pub fn went_on(&mut self, request: u64, cut_off: bool) {
+        self.request = Some(request);
+        if cut_off {
+            self.done = false;
+        }
+    }
+
+    /// A piece `text` of the input transcript, with seen activity's file
+    /// (`path`: `None` with `LAMP_NOTICING_BY_DEFAULT` off or seen activity
+    /// not declared) and the request whose input is open now (`open`).
+    /// The state is read (two small file reads, as [`state_note`]) once,
+    /// only on the piece that makes the words name the looking, and only
+    /// while `open` is the request's.
+    pub fn piece(
+        &mut self,
+        path: Option<&Path>,
+        text: &str,
+        open: Option<u64>,
+    ) -> Option<LiveTold> {
+        let path = path?;
+        let request = self.request.filter(|_| self.heard && !self.done)?;
+        if self.words.len() < LIVE_WORDS_MOST {
+            self.words.push_str(text);
+        }
+        if !names_the_noticing(&self.words) {
+            return None;
+        }
+        self.done = true;
+        Some(if open == Some(request) {
+            LiveTold::Tell(request, state_note_at(path, true))
+        } else {
+            LiveTold::Late(request)
+        })
     }
 }
 
@@ -2224,6 +2329,84 @@ mod tests {
             "{yes}"
         );
         let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// The Reviewer-lead's c7203343369, item 3: Live's heard line naming
+    /// the looking is told the state as it is (on, then off), once, while
+    /// its input is open; a line naming nothing is told nothing, nor a
+    /// reminder's or a written turn, nor anything with the switch off; words
+    /// naming it after the input closed are late.
+    #[test]
+    fn live_tells_a_line_naming_the_looking_the_state_once_while_its_input_is_open() {
+        use lamp_msgs::consent::{BY_VOICE, FACE_EXPRESSIONS, SEEN_ACTIVITY, no_bytes};
+        let folder = folder("live-state");
+        let path = file_in(&folder);
+        let face = crate::onboarding::face_expressions_beside(&folder.join("room-sounds.json"));
+        let mut live = LiveState::default();
+        live.began(4, true);
+        assert_eq!(live.piece(Some(&path), "Lamp, are you", Some(4)), None);
+        let Some(LiveTold::Tell(4, on)) = live.piece(Some(&path), " watching my desk?", Some(4))
+        else {
+            panic!("not told");
+        };
+        assert_eq!(on, state_note_at(&path, true));
+        assert!(on.contains("on by default"), "{on}");
+        assert_eq!(live.piece(Some(&path), " Stop looking.", Some(4)), None);
+        std::fs::write(&path, no_bytes(SEEN_ACTIVITY, 5, BY_VOICE)).unwrap();
+        std::fs::write(&face, no_bytes(FACE_EXPRESSIONS, 5, BY_VOICE)).unwrap();
+        live.began(5, true);
+        let Some(LiveTold::Tell(5, off)) = live.piece(Some(&path), "Are you looking?", Some(5))
+        else {
+            panic!("not told");
+        };
+        assert!(off.contains("is off") && off.contains(LOOK), "{off}");
+        live.began(6, true);
+        assert_eq!(
+            live.piece(Some(&path), "What's the weather in Hanoi?", Some(6)),
+            None
+        );
+        live.began(7, false);
+        assert_eq!(
+            live.piece(Some(&path), "Are you watching my desk?", Some(7)),
+            None
+        );
+        live.began(8, true);
+        assert_eq!(live.piece(None, "Are you watching my desk?", Some(8)), None);
+        live.began(9, true);
+        assert_eq!(live.piece(Some(&path), "What's on", Some(9)), None);
+        assert_eq!(
+            live.piece(Some(&path), " my desk?", None),
+            Some(LiveTold::Late(9))
+        );
+        assert_eq!(live.piece(Some(&path), " Are you watching?", Some(9)), None);
+        // Gone on from one cut off: told afresh; from one not, it stands.
+        live.went_on(10, true);
+        assert!(matches!(
+            live.piece(Some(&path), "", Some(10)),
+            Some(LiveTold::Tell(10, _))
+        ));
+        live.went_on(11, false);
+        assert_eq!(live.piece(Some(&path), "", Some(11)), None);
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// A note with the state in it gives the state's room up, the rest
+    /// kept; one without it has nothing to give.
+    #[test]
+    fn a_note_with_the_state_gives_its_room_up() {
+        for yes in [true, false] {
+            for by_default in [true, false] {
+                for face in [true, false] {
+                    let state = state_words(yes, by_default, face);
+                    let note = format!("(First.) {state} (Last.)");
+                    assert_eq!(
+                        without_state_note(&note).as_deref(),
+                        Some("(First.) (Last.)")
+                    );
+                }
+            }
+        }
+        assert_eq!(without_state_note("(First.) (Last.)"), None);
     }
 
     /// #7767: only the descriptions of the look and the stop change with

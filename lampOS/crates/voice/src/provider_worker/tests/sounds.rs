@@ -27,6 +27,7 @@ fn checked(on: bool) -> Options {
         follows_run: false,
         wait_for_room: false,
         staff_note: false,
+        desk_noticing: None,
         spoken_to: false,
         voices: None,
         catalog: None,
