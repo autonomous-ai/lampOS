@@ -135,3 +135,70 @@ fn other_lines_and_the_switch_off_are_told_nothing() {
     assert_eq!(notes, [Vec::<String>::new()]);
     let _ = std::fs::remove_dir_all(path.parent().unwrap());
 }
+
+/// `heard` in request 1, answered `reply` with no call, the state told
+/// from `path`: the chat's desk noticing notes.
+fn replied(path: &Path, heard: &str, reply: &str) -> Vec<String> {
+    let script = Arc::new(Script {
+        heard: Mutex::new(vec![Ok(heard.to_owned())].into()),
+        chats: Mutex::new(vec![vec![text(reply), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) })),
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .telling_desk_noticing(Some(path.to_path_buf()));
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            engine.submit(start(1));
+            engine.submit(audio(1, 1));
+            engine.submit(end(1));
+            turn_within(&mut engine, Duration::from_secs(5)).await;
+        });
+    let asked = script.asked.lock().unwrap();
+    asked
+        .iter()
+        .flatten()
+        .filter(|message| message.role == "system")
+        .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
+        .filter(|note| note.contains(NOTE))
+        .map(str::to_owned)
+        .collect()
+}
+
+/// lamp-06c1's third re-row of #8674 (26 Nov, Q3), whole: desk noticing on
+/// by default, the speech-to-text heard "Now stop watching the", and the
+/// model said "I've stopped watching your desk…" with `calls=none`, so the
+/// bursts went on. The line is told the state, and the reply's claim runs
+/// the stop as the call would before it is said: the kept state is no for
+/// both, by voice. A reply that says it is on changes nothing.
+#[test]
+fn a_reply_claiming_a_stop_with_no_call_keeps_the_no() {
+    use lamp_msgs::consent::{FACE_EXPRESSIONS, SEEN_ACTIVITY, allowed, file_in};
+    let path = consent("claimed");
+    let folder = path.parent().unwrap().to_path_buf();
+    let face = file_in(&folder, FACE_EXPRESSIONS).unwrap();
+    let notes = replied(
+        &path,
+        "Now stop watching the",
+        "I've stopped watching your desk and noticing what you're doing.",
+    );
+    assert_eq!(notes.len(), 1, "{notes:?}");
+    assert!(notes[0].contains("on by default"), "{notes:?}");
+    assert!(!allowed(&path, SEEN_ACTIVITY, true));
+    assert!(!allowed(&face, FACE_EXPRESSIONS, true));
+    let _ = std::fs::remove_dir_all(&folder);
+    let path = consent("claimed-on");
+    let folder = path.parent().unwrap().to_path_buf();
+    let face = file_in(&folder, FACE_EXPRESSIONS).unwrap();
+    replied(&path, "Lamp, are you watching my desk?", "Yes, it's on.");
+    assert!(allowed(&path, SEEN_ACTIVITY, true) && !path.exists() && !face.exists());
+    let _ = std::fs::remove_dir_all(folder);
+}

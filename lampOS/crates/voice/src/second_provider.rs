@@ -13294,10 +13294,13 @@ async fn spoken(
         // The desk noticing's state, read now, on a line naming the looking
         // (#7767): right before the quiet note, as the early words' chat
         // tells it, so a chat begun on them still fits.
-        .chain(crate::seen_yes::state_note(
-            shared.desk_noticing.as_deref(),
-            &text,
-        ))
+        .chain(
+            crate::seen_yes::state_note(shared.desk_noticing.as_deref(), &text).inspect(|_| {
+                eprintln!(
+                    "lamp-voice second: request {request}: told the desk noticing's state, read now"
+                );
+            }),
+        )
         // `LAMP_KEEP_QUIETLY`: a known person's own plain facts kept quietly,
         // on a line they were seen saying; never in the room's scope (the
         // Reviewer-lead's P2s on #5053).
@@ -19316,6 +19319,8 @@ async fn answer(
             Instant::now(),
         ),
         choice_held: None,
+        heard_line: said.clone(),
+        claimed_stop: crate::seen_yes::ClaimWatch::default(),
     };
     let began = Instant::now();
     // The bounds below are on the runtime's clock, which a test can step.
@@ -24946,6 +24951,12 @@ struct Queue<'a> {
     /// candidates wait for the model's choice (`LAMP_MADE_SKILL_OFF_SAID`,
     /// [`crate::made_turn::unchosen_note`]); `None`, said as they come.
     choice_held: Option<Vec<String>>,
+    /// The person's line, and the reply watched for a claim to have stopped
+    /// looking with desk noticing on and no stop called
+    /// ([`crate::seen_yes::ClaimWatch`], #7767): the stop is run before the
+    /// piece that claims it is said.
+    heard_line: String,
+    claimed_stop: crate::seen_yes::ClaimWatch,
 }
 impl Drop for Queue<'_> {
     /// The reply's tags in the journal, counts only, once it said something.
@@ -25013,6 +25024,15 @@ impl Queue<'_> {
             }
             return Ok(());
         }
+        // A claim to have stopped looking, with desk noticing still on and
+        // no stop called (lamp-06c1's third re-row of #8674, 26 Nov, Q3):
+        // the stop is run now, before the words are said, so they are true.
+        self.claimed_stop.piece(
+            self.shared.desk_noticing.as_deref(),
+            self.request,
+            &text,
+            Some(&self.heard_line),
+        );
         self.announce().await?;
         if !self.started {
             eprintln!(
