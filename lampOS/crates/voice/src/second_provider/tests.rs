@@ -98,6 +98,8 @@ struct Script {
     piece_gap: Option<Duration>,
     /// Speech of this sentence starts late.
     slow: Option<&'static str>,
+    /// How late `slow` starts: 30 ms unless set.
+    slow_by: Option<Duration>,
     /// This sentence's first audio waits for the test to release it.
     speech_hold: Mutex<Option<(&'static str, tokio::sync::oneshot::Receiver<()>)>>,
     /// Each sentence whose speech packet is ready, before it is yielded.
@@ -350,9 +352,9 @@ impl Services for Script {
             .boxed();
         }
         let delay = if self.slow == Some(text.as_str()) {
-            30
+            self.slow_by.unwrap_or(Duration::from_millis(30))
         } else {
-            0
+            Duration::ZERO
         };
         let hold = {
             let mut held = self.speech_hold.lock().unwrap();
@@ -368,7 +370,7 @@ impl Services for Script {
             if let Some(release) = hold {
                 let _ = release.await;
             }
-            tokio::time::sleep(Duration::from_millis(delay)).await;
+            tokio::time::sleep(delay).await;
             if let Some(after) = after {
                 tokio::time::sleep(after).await;
             }
@@ -5125,15 +5127,24 @@ async fn tool_round_past_cue_after_makes_one_sound() {
 /// #8615 item 2 (a customer: "speech pauses at random"): on 70 journals of
 /// 24-25 Nov the gaps of 300 ms or more were nearly all a new chat round
 /// after a lead-in the lamp had said (p50 1.4 s, p90 4.0 s), each of its
-/// waits under the wait sound's own 1.5 s. A lead-in whose next round is
-/// still out `GAP_CUE_AFTER` after its audio ended makes the wait sound
-/// once; a round back in time makes none, a long one never two, nor with
+/// waits under the wait sound's own 1.5 s. A lead-in whose next round's
+/// audio has not begun `GAP_CUE_AFTER` after its own audio ended makes the
+/// wait sound once, though that round's words came in time (row-8646, 26
+/// Nov: words in time, its audio 1.3 s after the lead-in's); audio back in
+/// time makes none, a long wait never two, nor with
 /// `LAMP_BUSY_FOLLOW_UP_RENEWS`'s own; with no lead-in, none of this.
 #[tokio::test(start_paused = true)]
 async fn a_lead_in_whose_next_round_is_out_makes_one_sound() {
     /// The wait sounds after the reply's first spoken audio: the tool runs
-    /// `tool_ms`, the round after it begins `round_ms` after it is asked.
-    async fn sounds(every: bool, lead_in: bool, tool_ms: u64, round_ms: u64) -> usize {
+    /// `tool_ms`, the round after it begins `round_ms` after it is asked,
+    /// and its words' first audio comes `speech_ms` after they do.
+    async fn sounds(
+        every: bool,
+        lead_in: bool,
+        tool_ms: u64,
+        round_ms: u64,
+        speech_ms: u64,
+    ) -> usize {
         let mut first = Vec::new();
         if lead_in {
             first.push(text("Let me check the news."));
@@ -5148,6 +5159,8 @@ async fn a_lead_in_whose_next_round_is_out_makes_one_sound() {
             heard: Mutex::new([Ok("What's in the news today?".to_owned())].into()),
             chats: Mutex::new([first, vec![text("Here is the news."), Ok(ChatEvent::Done)]].into()),
             round_after: Mutex::new([Duration::ZERO, Duration::from_millis(round_ms)].into()),
+            slow: Some("Here is the news."),
+            slow_by: Some(Duration::from_millis(speech_ms)),
             ..Script::default()
         });
         let tools: ToolRunner = Arc::new(move |_, _, _, _| {
@@ -5188,16 +5201,33 @@ async fn a_lead_in_whose_next_round_is_out_makes_one_sound() {
             }
         }
     }
-    assert_eq!(sounds(false, true, 3_000, 0).await, 1, "a slow tool");
-    assert_eq!(sounds(false, true, 0, 3_000).await, 1, "a slow round");
-    assert_eq!(sounds(false, true, 300, 300).await, 0, "back in time");
-    assert_eq!(sounds(false, true, 3_000, 3_000).await, 1, "never twice");
+    assert_eq!(sounds(false, true, 3_000, 0, 0).await, 1, "a slow tool");
+    assert_eq!(sounds(false, true, 0, 3_000, 0).await, 1, "a slow round");
+    assert_eq!(sounds(false, true, 300, 300, 0).await, 0, "back in time");
+    assert_eq!(sounds(false, true, 3_000, 3_000, 0).await, 1, "never twice");
     assert_eq!(
-        sounds(true, true, 3_000, 3_000).await,
+        sounds(true, true, 3_000, 3_000, 0).await,
         1,
         "with the busy room's sounds, never twice"
     );
-    assert_eq!(sounds(false, false, 3_000, 0).await, 0, "no lead-in");
+    assert_eq!(sounds(false, false, 3_000, 0, 0).await, 0, "no lead-in");
+    // The lead-in's audio is 1,500 samples (62.5 ms): its next words come
+    // at once, their audio 1.3 s after it ended, then 0.6 s.
+    assert_eq!(
+        sounds(false, true, 0, 0, 1_363).await,
+        1,
+        "words in time, their audio late"
+    );
+    assert_eq!(
+        sounds(false, true, 0, 0, 663).await,
+        0,
+        "words in time, their audio in time"
+    );
+    assert_eq!(
+        sounds(false, true, 3_000, 0, 1_363).await,
+        1,
+        "a slow tool, then late audio: never twice"
+    );
 }
 
 /// #8615 item 3: each spoken piece is journalled with its audio's length
