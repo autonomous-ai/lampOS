@@ -3678,6 +3678,56 @@ adds the key itself (`lamp_cloud::hermes_llm`).
   unreachable relay is 502. One request per connection.
 - **Logs:** one line when it starts listening, or why it couldn't (no state
   folder, the port taken); never a body, the token or the key.
+- **The person's own model** (#8735, with `LAMP_OWN_KEYS=on`, which the
+  product unit sets; docs/own-keys.md, "The lamp's agent"): when the person
+  has given their own model key, the agent's chat goes to their model, not
+  the relay.
+  - **Which key:** the one the voice uses, in the one order every reader of
+    the keys takes (`lamp_msgs::own_model::PRECEDENCE`): OpenAI-compatible,
+    then OpenRouter, Gemini, Anthropic, then DeepSeek. Each service's
+    endpoint is in the same place (`lamp_msgs::own_model`), for the keys
+    helper, the voice and this forwarder alike.
+  - **Only with tools:** only when that key's check at `keys.set` saw the
+    model make a tool call (the second line of its `.checked` record is
+    `tools`). Without it, OpenClaw and Hermes can't work, so the agent stays
+    on the relay. A hearing or voice key alone (Deepgram, ElevenLabs), or
+    no model key, is the relay too, as before.
+  - **What is sent:** the agent still asks for `deepseek-flash` (its
+    settings don't change, so no agent restart), and anything else is
+    still 400. `model` is changed to the person's model, and the chat goes
+    to `<their endpoint>/chat/completions` (Gemini's under `/openai`) with
+    their key as the bearer. The rest of the body and the answer pass as
+    they are, a stream too. `GET /v1/deepseek/models` is answered here,
+    with `deepseek-flash` alone.
+  - **Refused key:** if their endpoint refuses the key (401 or 403) before
+    anything is passed back, that chat goes to the relay, said once in the
+    journal. If it can't be reached, the answer is 502.
+  - **Not counted:** the relay's day used (`day-used.json`) is not counted
+    for these chats: the person pays for them.
+  - **Journal:** one line each time the route changes: `the agent's model:
+    own openrouter google/gemini-3.6-flash at openrouter.ai`, or `the
+    agent's model: relay (no model key of the person's)` with its reason.
+    Never a key.
+  - **Where it reads them:** `LoadCredential=own:/etc/lampOS/voice/own` on
+    `lamp-cloud.service` (a blank `SetCredential=own:\n` when the folder is
+    missing), read again at each request. systemd copies a credential once,
+    when the unit starts, so a key set or removed later is not in that copy.
+    A model key's `keys.set` or `keys.remove` that lamp-cloud relays to the
+    helper therefore puts the agent back on the relay until lamp-cloud's
+    next start (a reboot or an update), said as the route's reason. A key
+    the person removed is never used, and a new one takes effect at
+    lamp-cloud's next start. A live switch needs lamp-cloud to read root's
+    folder itself, which the folder's 0700 does not allow yet (a follow-up
+    on #8735).
+  - **Who can read the key:** lamp-cloud runs as `lampos`, which can read
+    that copy, and the agent runtimes run as `lampos` too. They could read
+    the person's key, as they can read the relay's key (`LoadCredential=key`)
+    today. Moving both keys out of the agent's reach is a follow-up (#8735).
+  - Tests: `hermes_llm::tests::an_own_model_takes_the_agents_chat_and_a_removed_one_gives_it_back`,
+    `an_own_401_falls_back_to_the_relay`,
+    `a_forged_model_is_still_a_400_on_the_own_route`,
+    `the_route_is_the_voices_model_and_only_with_its_tool_check`, and
+    `settings::tests::a_model_keys_change_marks_the_forwarders_copy`.
 
 ## Not yet known, for the backend (#1396)
 
