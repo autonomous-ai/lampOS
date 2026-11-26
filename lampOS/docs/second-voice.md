@@ -6152,8 +6152,13 @@ after a take-over, but now for every turn:
     `attention::HEY_AT_THE_START_US` (2.5 s) of a line's start, in a line
     whose first word, past one filler, is "hey", "hi" or "hello"
     (`opens_with_hey`), is the call whatever the rules above ruled of its
-    word: speech to text writes "Hey Lamp" as "Hey man", "Hey, Lynn." or
-    "Hello? …". Unless the words say otherwise (`words_rule_out_hey`): a word
+    word, when its words name the lamp ("Hey Lamp, …", "Hello, Lamp. …",
+    `greets_the_lamp_by_name`) or the hearing is at `NEAR_SCORE` (0.95) or
+    more: speech to text writes "Hey Lamp" as "Hey man", "Hey, Lynn." or
+    "Hello? …", but two people's "Hey man, what's up?" was heard at 0.905 on
+    lamp-74ff (26 Nov, the Reviewer-lead's P3 1 on #8781), and plain calls
+    written without the name at 0.980 to 0.997 (25 Nov). Unless the words
+    say otherwise (`words_rule_out_hey`): a word
     written as a name and set off right after the greeting ("Hi, Mark. Did
     you move the lamp?", "Hey John, …"; never "I", "Hey, I need a timer."),
     or another person's name as the call word (#8114). With no greeting in
@@ -6162,8 +6167,15 @@ after a take-over, but now for every turn:
     with every drop of theirs (#8136's 0.921 hearing in two people's talk,
     #3945's "Ma'am, …", #7891's short line, #8092's near ruling; the
     Reviewer-lead's P1 on #8781). The switch only adds drops: a hearing past
-    the 2.5 s, a line opening with the name itself (a bare "Lamp, …", which
-    `lamp-name`, trained on "Hey Lamp", seldom hears at all), and "OK Lamp".
+    the 2.5 s, a greeting whose words don't name the lamp heard under 0.95,
+    a line opening with the name itself heard under 0.95 (a bare "Lamp, …":
+    `lamp-name`, trained on "Hey Lamp", heard nothing of one on lamp-74ff on
+    26 Nov), and "OK Lamp". At 0.95 or more, a line opening with the name
+    itself is "Hey Lamp" with its greeting lost (`opens_with_the_name`),
+    kept as one: at 803ab07fbb lamp-74ff dropped "Lamp, how far is it from
+    London to Paris?" (0.99999), and a bare "Hey Lamp." answered as a call
+    after its wait, which is judged as `CALLED_WORDS`, "Lamp." (0.996), so
+    the question after it went unanswered.
     A line's words with no hearing call the lamp only when they open with
     such a greeting (`called_in_text`). In a conversation the name is not
     needed, and the rule holds nothing. Journal at start: `out of a
@@ -6172,7 +6184,8 @@ after a take-over, but now for every turn:
     (LAMP_NAME_HEY_ONLY)`, and a kept call's second sign is `"Hey Lamp" at
     the line's start`. Latency: none. Tests:
     `with_hey_only_a_call_is_hey_lamp_at_the_lines_start` (with the
-    product's switches too), `with_hey_only_words_call_the_lamp_only_after_a_greeting`.
+    product's switches too), `with_hey_only_a_call_whose_greeting_speech_to_text_lost_is_kept`
+    (lamp-74ff's switches), `with_hey_only_words_call_the_lamp_only_after_a_greeting`.
   - **One reply window, with `LAMP_ONE_REPLY_WINDOW=on`** (on in the
     product's lamp-voice.service; the product owner's ruling of 26 Nov 2026:
     "ok 20s make sense"). A reply to the lamp's own news (a turn it began

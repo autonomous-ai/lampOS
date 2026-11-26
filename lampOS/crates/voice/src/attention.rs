@@ -1070,6 +1070,28 @@ pub(crate) fn opens_with_hey(heard: &str) -> bool {
     })
 }
 
+/// Whether `heard` opens with the lamp's name itself, past one filler:
+/// "Lamp, how far …", "Lamp.", "Um, lamb, …". Not a word written for it.
+fn opens_with_the_name(heard: &str) -> bool {
+    past_a_filler(heard)
+        .next()
+        .is_some_and(|word| word.eq_ignore_ascii_case("lamp") || word.eq_ignore_ascii_case("lamb"))
+}
+
+/// Whether `heard` opens with one of [`HEY_GREETINGS`] and then the lamp's
+/// name itself, past one filler: "Hey Lamp, …", "Hello, Lamp. …", "Um, hi
+/// lamb". Not "Hey man, …" nor "Hey, Lynn.".
+fn greets_the_lamp_by_name(heard: &str) -> bool {
+    let mut words = past_a_filler(heard);
+    words.next().is_some_and(|word| {
+        HEY_GREETINGS
+            .iter()
+            .any(|greeting| word.eq_ignore_ascii_case(greeting))
+    }) && words
+        .next()
+        .is_some_and(|word| word.eq_ignore_ascii_case("lamp") || word.eq_ignore_ascii_case("lamb"))
+}
+
 /// Whether `heard`'s opening greeting, past one filler, stands alone in its
 /// sentence: a stop, a question mark or an exclamation right after it ("Hello?
 /// Do you know my face?", "Hey! What time is it?"). Speech to text swallowed
@@ -2717,11 +2739,32 @@ impl Attention {
         // above, with every drop of theirs; the switch only adds its own: a
         // late hearing, a line opening with the name itself (a bare "Lamp,
         // …"), "OK Lamp" or a greeting to someone named ("Hi, Mark. …").
+        // A line opening with the name itself and heard at [`NEAR_SCORE`] or
+        // more by its start is "Hey Lamp" with its greeting lost, kept as
+        // one (lamp-74ff, 26 Nov, the rule pass at 803ab07fbb): speech to
+        // text wrote "Hey Lamp, how far is it …" as "Lamp, how far …"
+        // (request 14, 0.99999), and a bare "Hey Lamp." answered as a call
+        // after its wait is judged as `CALLED_WORDS`, "Lamp." (request 11,
+        // 0.996), so its next line went unanswered. lamp-name is trained on
+        // "Hey Lamp" and heard nothing of a bare "Lamp, what time is it?"
+        // that night. A bare "Lamp" heard under it stays out.
+        let greeting_lost = self.named_near_the_start
+            && self.best_score >= NEAR_SCORE
+            && opens_with_the_name(&self.heard);
+        // A greeting whose words don't name the lamp ("Hey man, …", "Hey,
+        // Lynn.", "Hello?", "Hey, I need …") is "Hey Lamp" only on a hearing
+        // at [`NEAR_SCORE`] or more (the Reviewer-lead's P3 1 on #8781):
+        // lamp-74ff, 26 Nov, two people's "Hey man, what's up?" was heard at
+        // 0.905 and answered, and "Hey Lamp." written "Hey, man." at 0.996;
+        // plain calls written without the name were heard at 0.980 to 0.997
+        // (the P0 of 25 Nov). "Hey Lamp, …" and "Hello, Lamp. …" name it.
+        let greeted = opens_with_hey(&self.heard);
+        let greeted_sure = greets_the_lamp_by_name(&self.heard) || self.best_score >= NEAR_SCORE;
         self.hey_kept = weighed
             && self.hey_only
             && !in_conversation
             && self.named_near_the_start
-            && opens_with_hey(&self.heard)
+            && ((greeted && greeted_sure) || greeting_lost)
             && !words_rule_out_hey(&self.heard)
             && !self.name_anothers_dropped;
         self.name_unhey_dropped = weighed
@@ -2729,7 +2772,8 @@ impl Attention {
             && !in_conversation
             && !self.hey_kept
             && (!self.named_near_the_start
-                || begins_with_the_name(&self.heard)
+                || (begins_with_the_name(&self.heard) && !greeted)
+                || (greeted && !greeted_sure)
                 || words_rule_out_hey(&self.heard));
         if self.hey_kept {
             self.name_short_dropped = false;
@@ -8520,12 +8564,12 @@ mod tests {
                 "{heard}"
             );
         }
-        // Dropped by the rule: "OK Lamp", a bare "Lamp", a greeting to
-        // someone named.
+        // Dropped by the rule: "OK Lamp", a greeting to someone named. A
+        // bare "Lamp" heard under the near score, and its greeting lost at
+        // it or over, are in the next test.
         for heard in [
             "OK Lamp, what is two plus two?",
             "Okay. Fine. Exactly.",
-            "Lamp, what time is it?",
             "Hi, Mark. Did you move the lamp this morning?",
             "Hey John, come here.",
         ] {
@@ -8557,7 +8601,9 @@ mod tests {
         // With the product's switches (the Reviewer-lead's P1 on #8781): with
         // no greeting the older drops stand: #8136's 0.921 hearing in two
         // people's talk, #3945's "Ma'am, …", #7891's short "Yeah."; a greeted
-        // call is kept over them.
+        // call is kept over them. A greeting whose words don't name the lamp
+        // needs the near score (the Reviewer-lead's P3 1: lamp-74ff, 26 Nov,
+        // two people's "Hey man, what's up?" at 0.905, answered).
         let product = |heard: &str, score: f32| {
             let mut attention = Attention::default();
             attention.ask_a_second_sign_of_the_name(true);
@@ -8578,8 +8624,15 @@ mod tests {
             "#3945"
         );
         assert!(product("Yeah.", 0.97).0, "#7891");
-        assert_eq!(product("Hey man, what time is it?", 0.93), (false, true));
+        assert_eq!(product("Hey man, what time is it?", 0.97), (false, true));
         assert_eq!(product("Hey, I need a timer.", 0.97), (false, true));
+        assert_eq!(product("Hey man, what's up?", 0.905), (true, false), "P3 1");
+        assert_eq!(product("Hey, did you see that?", 0.92), (true, false));
+        assert_eq!(product("Hey Lamp, what time is it?", 0.93), (false, true));
+        assert_eq!(
+            product("Hello, Lamp. How many days are in a leap year?", 0.947),
+            (false, true)
+        );
         assert!(super::greeting_set_off("Hello? Do you know my face?"));
         assert!(super::greeting_set_off("Um, hey! What time is it?"));
         assert!(!super::greeting_set_off("Hey, Mark, come here."));
@@ -8592,6 +8645,89 @@ mod tests {
             weigh("Lamp, what time is it?", start, false, false),
             (false, false, false),
             "off: as before"
+        );
+    }
+
+    /// `LAMP_NAME_HEY_ONLY` with lamp-74ff's switches (26 Nov, the rule pass
+    /// at 803ab07fbb: `LAMP_NAME_SIGN_TIED` and the greeted stand-ins on,
+    /// `LAMP_NAME_FACE_OR_WORDS` off). Two plain "Hey Lamp" calls were
+    /// dropped there as no call: request 11, "Hey Lamp." written "Hey, man.",
+    /// lamp-name at 0.996 1.28 s in, `LAMP_NAME_NEAR` ruling its first word
+    /// not the name; and request 14, "Hey Lamp, how far is it from London to
+    /// Paris?" written without its "Hey", at 0.99999 1.20 s in. lamp-name is
+    /// trained on "Hey Lamp" and heard nothing of the bare "Lamp, what time
+    /// is it?" that night, so a line opening with the name itself and heard
+    /// at the near score or more by its start is "Hey Lamp" with its greeting
+    /// lost. A bare "Lamp" heard under it, and one with no hearing, stay out.
+    #[test]
+    fn with_hey_only_a_call_whose_greeting_speech_to_text_lost_is_kept() {
+        let lamp_74ff = |heard: &str, at_us: u64, score: f32, near_ruled: bool| {
+            let mut attention = Attention::default();
+            attention.ask_a_second_sign_of_the_name(true);
+            attention.tie_the_second_sign(true);
+            attention.keep_greeted_stand_ins(true);
+            attention.hold_anothers_name(true);
+            attention.hold_a_start_said_to_a_person(true);
+            attention.only_hey_lamp(true);
+            attention.began_at(1, 1, 10_000_000);
+            attention.name_heard_scored(at_us, score);
+            if near_ruled {
+                attention.near_not_the_name(1, score);
+            }
+            attention.heard(heard);
+            (
+                attention.weigh_the_name(None, false),
+                attention.name_kept_as_hey(),
+                attention.name_dropped_without_hey(),
+            )
+        };
+        // Request 11 as the lamp judged it: the name alone, after its wait,
+        // is `CALLED_WORDS`; and as speech to text wrote it.
+        assert_eq!(crate::second_provider::CALLED_WORDS, "Lamp.");
+        assert_eq!(
+            lamp_74ff("Lamp.", 11_282_000, 0.996, true),
+            (false, true, false),
+            "request 11"
+        );
+        assert_eq!(
+            lamp_74ff("Hey, man.", 11_282_000, 0.996, true),
+            (false, true, false),
+            "request 11's words"
+        );
+        assert_eq!(
+            lamp_74ff(
+                "Lamp, how far is it from London to Paris?",
+                11_202_000,
+                0.999_99,
+                false
+            ),
+            (false, true, false),
+            "request 14"
+        );
+        assert_eq!(
+            lamp_74ff("Lamp, what time is it?", 11_100_000, 0.6, false),
+            (true, false, true),
+            "a bare Lamp under the near score"
+        );
+        assert_eq!(
+            lamp_74ff("Lamp, what time is it?", 12_900_000, 0.99, false),
+            (true, false, true),
+            "heard late"
+        );
+        assert_eq!(
+            lamp_74ff("OK Lamp, what is two plus two?", 11_466_000, 0.99, false),
+            (true, false, true),
+            "OK Lamp"
+        );
+        assert_eq!(
+            lamp_74ff(
+                "Hi Mark, did you move the lamp this morning?",
+                11_495_000,
+                0.99,
+                false
+            ),
+            (true, false, true),
+            "a greeting to someone named"
         );
     }
 
