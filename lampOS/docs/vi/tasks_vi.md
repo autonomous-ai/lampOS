@@ -2547,10 +2547,12 @@ một byte (`crates/tasks/src/one_session.rs`).
   Khi lamp-tasks khởi động lại (một bản cập nhật khởi động lại cả
   lamp-tasks và lamp-voice), việc còn trong hàng đợi thành `invalidated`
   `restart`, kết thúc lúc khởi động mới. Việc đã được nói "có" trong lần
-  bật máy này được task news báo một lần trong mười phút sau đó, như một
+  bật máy này, không quá 40 phút trước đó (30 phút sống trong hàng đợi,
+  `QUEUED_MS`, cộng mười), được task news báo một lần trong mười phút sau đó, như một
   lần giao việc không tới agent, kèm đề nghị thử lại (lời `failed`); việc
   chưa được nói "có", hoặc được nói "có" trước một lần khởi động lại máy
-  (không biết đã bao lâu), vẫn im lặng. Những gì đã báo được giữ trong file
+  (không biết đã bao lâu), hoặc được nói "có" lâu hơn thế (lamp-tasks ngừng
+  quá giới hạn khởi động rồi vài giờ sau mới chạy lại), vẫn im lặng. Những gì đã báo được giữ trong file
   told của giọng nói, nên giọng nói khởi động lại không báo lần nữa, và
   lần khởi động lại sau của lamp-tasks không đổi lúc kết thúc của nó. Test:
   `engine::tests::a_queued_task_said_yes_to_ends_restart_with_its_yes_kept`,
