@@ -43,7 +43,13 @@ fn a_zone_restart_waits_for_no_update_and_holds_its_lock() {
         now: 0,
         at: resting(),
     };
-    let held = change::quiet_and_unlocked(&mut ears, &records, change::QUIET_MOST).unwrap();
+    let held = change::quiet_and_unlocked(
+        &mut ears,
+        &records,
+        lamp_update::quiet::QUIET,
+        change::QUIET_MOST,
+    )
+    .unwrap();
     assert_eq!(ears.now, 45 * S);
     assert!(records.lock().is_err());
     drop(held);
@@ -53,7 +59,12 @@ fn a_zone_restart_waits_for_no_update_and_holds_its_lock() {
         now: 0,
         at: resting(),
     };
-    let Err(why) = change::quiet_and_unlocked(&mut ears, &records, Duration::from_secs(120)) else {
+    let Err(why) = change::quiet_and_unlocked(
+        &mut ears,
+        &records,
+        lamp_update::quiet::QUIET,
+        Duration::from_secs(120),
+    ) else {
         panic!("taken while an update held it");
     };
     assert!(why.contains("update"), "{why}");
@@ -71,7 +82,13 @@ fn a_zone_restart_waits_for_no_update_and_holds_its_lock() {
             vec![Heard::State(Voice::Resting)]
         }),
     };
-    let held = change::quiet_and_unlocked(&mut ears, &records, change::QUIET_MOST).unwrap();
+    let held = change::quiet_and_unlocked(
+        &mut ears,
+        &records,
+        lamp_update::quiet::QUIET,
+        change::QUIET_MOST,
+    )
+    .unwrap();
     assert_eq!(ears.now, 100 * S);
     assert!(update.borrow().is_none());
     drop(held);
@@ -954,8 +971,8 @@ fn a_key_change_restarts_the_voice_after_one_second_of_quiet() {
         now: 0,
         at: Box::new(|now| match now {
             ..=5_000 => vec![Heard::State(Voice::Listening), Heard::Speech],
-            ..=9_000 => vec![Heard::State(Voice::Thinking)],
-            ..=20_000 => vec![Heard::State(Voice::Speaking), Heard::Speech],
+            5_001..=9_000 => vec![Heard::State(Voice::Thinking)],
+            9_001..=20_000 => vec![Heard::State(Voice::Speaking), Heard::Speech],
             _ => vec![Heard::State(Voice::Resting)],
         }),
     };

@@ -106,6 +106,13 @@ pub const LINE_MOST: usize = 4_096;
 /// How long a zone change waits for the lamp to be quiet before it leaves
 /// `lamp-schedule` on the old zone until its next start.
 pub const QUIET_MOST: Duration = Duration::from_secs(30 * 60);
+/// How long the voice rests, nobody heard and nothing said, before it is
+/// restarted to take a person's key saved or removed (`keys.set`,
+/// `keys.remove`): 1 s, not an update's [`QUIET`] (the lead's call on
+/// #8710, 26 Nov). A person who saves a key speaks next and expects the new
+/// route to answer; 45 s of quiet left that turn on the old one. A turn in
+/// flight is still waited out, so none is cut.
+pub const KEY_CHANGE_QUIET: Duration = Duration::from_secs(1);
 /// The unit restarted after a zone change.
 pub const SCHEDULE_UNIT: &str = "lamp-schedule.service";
 /// The unit restarted after a new room sounds yes from the app.
@@ -1043,7 +1050,9 @@ pub fn wait_for_quiet(ears: &mut impl Ears, most: Duration) -> Result<(), String
 /// lock again while an update holds it.
 pub const UPDATE_LOOK_EVERY: Duration = Duration::from_secs(10);
 
-/// [`wait_for_quiet`], and then lamp-update's lock, for the caller to hold
+/// The voice resting, nobody heard and nothing said, for `rest`
+/// ([`QUIET`], as [`wait_for_quiet`], or [`KEY_CHANGE_QUIET`] for a key),
+/// and then lamp-update's lock, for the caller to hold
 /// through a restart of its own: a round restarts and watches the lamp's
 /// units, and puts its build back when one it restarted changes process
 /// within its watch (`updates.md` step 9, `MainPID`), so a zone's
@@ -1053,13 +1062,14 @@ pub const UPDATE_LOOK_EVERY: Duration = Duration::from_secs(10);
 pub fn quiet_and_unlocked(
     ears: &mut impl Ears,
     records: &lamp_update::records::Records,
+    rest: Duration,
     most: Duration,
 ) -> Result<lamp_update::records::Lock, String> {
     let started = ears.now_ms();
     let mut installing = false;
     loop {
         let spent = Duration::from_millis(ears.now_ms().saturating_sub(started));
-        if let Err(why) = wait_for_quiet(ears, most.saturating_sub(spent)) {
+        if let Err(why) = wait_for_rest(ears, rest, most.saturating_sub(spent)) {
             return Err(if installing {
                 format!("an update was installing, and then {why}")
             } else {

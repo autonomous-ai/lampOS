@@ -824,7 +824,12 @@ fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::erro
     }
     // Quiet, and no update at work: held to the end, so no round's watch
     // sees lamp-schedule change process and puts its build back.
-    match change::quiet_and_unlocked(&mut ears, &records, change::QUIET_MOST) {
+    match change::quiet_and_unlocked(
+        &mut ears,
+        &records,
+        lamp_update::quiet::QUIET,
+        change::QUIET_MOST,
+    ) {
         Ok(_held) => {
             let status = std::process::Command::new("/usr/bin/systemctl")
                 .args(["try-restart", change::SCHEDULE_UNIT])
@@ -911,10 +916,16 @@ fn own_keys(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::er
         None => Bus::from_environment()?,
     };
     let mut ears = change::BusEars::new(&bus, &mut |line| eprintln!("lamp-setup: keys: {line}"));
-    // Quiet, and no update at work, held to the end: a round puts its build
-    // back when the voice it restarted changes process in its watch.
+    // 1 s of quiet, no turn in flight (#8710), and no update at work, held
+    // to the end: a round puts its build back when the voice it restarted
+    // changes process in its watch.
     let records = lamp_update::records::Records::new(PathBuf::from(lamp_update::install::RECORDS));
-    match change::quiet_and_unlocked(&mut ears, &records, change::QUIET_MOST) {
+    match change::quiet_and_unlocked(
+        &mut ears,
+        &records,
+        change::KEY_CHANGE_QUIET,
+        change::QUIET_MOST,
+    ) {
         Ok(_held) => match std::process::Command::new("/usr/bin/systemctl")
             .args(["try-restart", keys::VOICE_UNIT])
             .status()
