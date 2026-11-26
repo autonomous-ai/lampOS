@@ -8522,6 +8522,21 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let stretch = year_count("Time to stretch!", true, false);
         assert!(!made_skill::says_fixed_with_left_out(&stretch));
         assert_eq!(make_of("no-note", stretch), (1, 0, json!("year-count")));
+        // A say the model answers at run time (`say = { note }`, the
+        // Reviewer-lead's P3 on #8732) is no fixed say: the note changes
+        // nothing, the make goes as the same answer with no note goes.
+        let note_say = |note: bool| {
+            year_count(days, true, note).replace(
+                &format!("say = {{ text = \"{days}\" }}"),
+                "say = { note = \"Tell how many days are left in the year.\" }",
+            )
+        };
+        assert!(note_say(true).contains("say = { note ="));
+        assert!(!made_skill::says_fixed_with_left_out(&note_say(true)));
+        assert_eq!(
+            make_of("note-say-note", note_say(true)),
+            make_of("note-say", note_say(false))
+        );
         // Asked aloud, no trigger: the note changes nothing, the make goes
         // as the same answer with no note goes.
         let aloud = year_count(days, false, true);
@@ -10582,6 +10597,23 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                 // too (#8651).
                 let rules =
                     crate::make_skill_agent::rules_of(&system_net(reads, agent, net), &repair);
+                assert!(
+                    rules.len() <= lamp_tasks::skill_make::MOST_RULES_BYTES,
+                    "{} > {}",
+                    rules.len(),
+                    lamp_tasks::skill_make::MOST_RULES_BYTES
+                );
+                // The hand-over of a fixed say with its value left out
+                // (#8732): the brief with the longest note told beside it,
+                // cut to its cap however long the note.
+                let told = made_skill::value_left_out_told(&"\u{1F600}".repeat(5_000));
+                assert!(told.len() < 1_100, "{}", told.len());
+                let handed = format!(
+                    "{}\n\n{told}",
+                    made_skill::brief_for(&longest, reads, agent).unwrap()
+                );
+                let rules =
+                    crate::make_skill_agent::rules_of(&system_net(reads, agent, net), &handed);
                 assert!(
                     rules.len() <= lamp_tasks::skill_make::MOST_RULES_BYTES,
                     "{} > {}",
