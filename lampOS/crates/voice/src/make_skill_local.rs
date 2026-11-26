@@ -3924,13 +3924,18 @@ fn made_and_journaled_by(
     // with its value dropped while an agent can write it as a task step
     // ([`made_skill::says_fixed_with_left_out`]); with none, kept as
     // before, and journaled.
-    let value_left_out = matches!(&first, Ok(text) if made_skill::says_fixed_with_left_out(text));
+    // With no note, an ask for a value its fixed say dropped is held the
+    // same (#8732's row on lamp-ee17, 26 Nov), the ask's words its note.
+    let asked_words = match heard {
+        Some(heard) => format!("{request} {heard}"),
+        None => request.to_owned(),
+    };
     // Its note, quoted to the agent beside the brief.
     let left_out_note = first
         .as_ref()
         .ok()
-        .filter(|_| value_left_out)
-        .and_then(|text| made_skill::left_out_of(text));
+        .and_then(|text| made_skill::value_left_out(text, &asked_words));
+    let value_left_out = left_out_note.is_some();
     web_task_held.set(net_code);
     let mut made = match engine {
         Some(_) if value_left_out => Err(Refused(made_skill::VALUE_LEFT_OUT_HELD.into(), None)),
@@ -8545,6 +8550,122 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             make_of("aloud-note", aloud),
             make_of("aloud", year_count(days, false, false))
         );
+    }
+
+    /// #8732's row on lamp-ee17 (26 Nov, 17:03): DeepSeek kept "There are
+    /// days left in the year." for "how many days are left in the year"
+    /// with no `left out:` note. An ask for a value (English or
+    /// Vietnamese) whose timed fixed say carries no digit and doesn't
+    /// repeat the ask goes to the agent as a noted one does, the ask's
+    /// words its note; an ask for no value ("remind me to stretch") keeps
+    /// its fixed say, the agent never asked.
+    #[test]
+    fn a_timed_fixed_say_dropping_an_asked_value_goes_to_the_agent_with_no_note() {
+        let days = "There are days left in the year.";
+        let dropped = year_count(days, true, false);
+        let asked = "every day at 6 AM, tell me how many days are left in the year";
+        assert_eq!(
+            made_skill::value_left_out(&dropped, asked).as_deref(),
+            Some("how many days are left in the year")
+        );
+        // Vietnamese, and a time or a day as well as a count.
+        for (asked, value) in [
+            (
+                "6 giờ sáng mỗi ngày nói còn bao nhiêu ngày nữa hết năm",
+                "bao nhiêu ngày nữa hết năm",
+            ),
+            (
+                "every morning, tell me what day it is. Thanks",
+                "what day it is",
+            ),
+            ("each hour say how long until lunch", "how long until lunch"),
+        ] {
+            assert_eq!(
+                made_skill::value_left_out(&dropped, asked).as_deref(),
+                Some(value),
+                "{asked}"
+            );
+        }
+        // No value asked, a say with its digit (told_only's), a say that
+        // repeats the ask (a reminder), a word that only ends in an ask
+        // ("somehow many"), asked aloud, or a task step: none held.
+        assert_eq!(
+            made_skill::value_left_out(&dropped, "every day at 6, remind me to stretch"),
+            None
+        );
+        let counted = year_count("There are 35 days left in the year.", true, false);
+        assert_eq!(made_skill::value_left_out(&counted, asked), None);
+        let reminder = year_count("Time to check how much you spent today.", true, false);
+        assert_eq!(
+            made_skill::value_left_out(
+                &reminder,
+                "every night remind me to check how much I spent"
+            ),
+            None
+        );
+        assert_eq!(
+            made_skill::value_left_out(&dropped, "say somehow many thanks at 6"),
+            None
+        );
+        assert_eq!(
+            made_skill::value_left_out(&year_count(days, false, false), asked),
+            None
+        );
+        // Through the make: the hand-over quotes the ask's value, and the
+        // agent's task step is kept.
+        made_skill::set_scripts_here(Some(true));
+        let task = format!(
+            "```skill.toml\n{CODE_TOML}```\n\n```SKILL.md\n{AGENT_CODE_CARD}```\n\n\
+             ```scripts/main.py\nprint(\"There are 35 days left in the year.\")\n```\n"
+        );
+        let rules_seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let seen = std::sync::Arc::clone(&rules_seen);
+        let answers = std::sync::Mutex::new(vec![Some(task)].into_iter());
+        let tasks = crate::make_skill_agent::tests::stub(
+            Some("hermes"),
+            std::sync::Arc::new(move |rules: &str| {
+                seen.lock().unwrap().push(rules.to_owned());
+                answers.lock().unwrap().next().flatten()
+            }),
+        );
+        let (root, kept_in) = keeping("value-asked-no-note");
+        let (url, served) = service(vec![(200, dropped.clone())]);
+        let told = make_with_by(
+            0,
+            None,
+            asked,
+            &kept_in,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent()),
+        );
+        assert_eq!(told["made"], "photo-booth", "{told}");
+        assert_eq!((served.join().unwrap(), tasks.hand_overs()), (1, 1));
+        let rules = rules_seen.lock().unwrap().clone();
+        assert!(
+            rules[0].contains("left out \"how many days are left in the year\""),
+            "{rules:?}"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+        made_skill::set_scripts_here(None);
+        // "Remind me to stretch": its fixed say kept as DeepSeek's.
+        let (root, kept_in) = keeping("value-asked-stretch");
+        let tasks = agent_answering(vec![Some(good())]);
+        let (url, served) = service(vec![(200, year_count("Time to stretch!", true, false))]);
+        let told = make_with_by(
+            0,
+            None,
+            "every day at 6 AM, remind me to stretch",
+            &kept_in,
+            chat_at(url),
+            NOW,
+            || None,
+            Some(&tasks.agent()),
+        );
+        assert_eq!(told["made"], "year-count", "{told}");
+        assert_eq!((served.join().unwrap(), tasks.hand_overs()), (1, 0));
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// #7926's row on lamp-9adf (build bede187d81): "make a skill called

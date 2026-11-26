@@ -7901,10 +7901,23 @@ forces one), a skill it makes is made whole, with everything a run needs:
   asked aloud, or a `say = { note }`, is kept as before. The note quoted
   to the agent is cut at 120 characters. Limits: a `remind` step's words
   are the person's reminder (as told-only keeps them), so a reminder
-  beside a `left out:` note is never held; and an answer, DeepSeek's or
-  the agent's, that deletes only the note but keeps the fixed say is not
-  caught. Test
-  `a_timed_fixed_say_with_a_couldnt_do_note_goes_to_the_agent`.
+  beside a `left out:` note is never held. With no note, a person's ask
+  for a value only a run can know is held the same
+  (`made_skill::value_left_out`, #8732's row on lamp-ee17, 26 Nov:
+  DeepSeek kept "There are days left in the year." for "how many days are
+  left in the year" with no note): the ask names one of `VALUE_ASKS`
+  ("how many", "how much", "how long", "how far", "how old", "what time",
+  "what day", "what date", "which day", "days left", "days until", and in
+  Vietnamese "bao nhiêu", "bao lâu", "mấy giờ", "mấy ngày", "còn mấy",
+  "ngày nào", as a whole word), and every fixed say of the timed skill
+  has no digit and doesn't repeat that phrase. The agent is told the
+  ask's words from that phrase to the end of its sentence as the note. A
+  say with a digit is told-only's (`CHANGING_SAY_REPAIR`); one that
+  repeats the ask ("Time to check how much you spent today.") is a
+  reminder and kept; an ask for no value ("remind me to stretch") is kept
+  as before. Kept simple on purpose: a list of phrases, no model call.
+  Tests `a_timed_fixed_say_with_a_couldnt_do_note_goes_to_the_agent`,
+  `a_timed_fixed_say_dropping_an_asked_value_goes_to_the_agent_with_no_note`.
   The refusal goes to the writer first, as the
   try's failure (`made_skill::TOLD_ONLY_REPAIR`: a `task` step, no
   `speak`, scripts that print, the agent's answer the spoken summary), so
