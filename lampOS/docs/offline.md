@@ -363,19 +363,45 @@ for 409 s, then rang 5 s after the link came back. A ring is a model turn,
 and its gate needs a ready session.
 
 - **A due timer or reminder rings on time:** with the link down past its
-  5 s grace, from a clip in the speech cache, "Your timer is done." or "You
-  have a reminder." in the owner's language, warmed at start while the
-  internet answers ([schedule.md](schedule.md), "With no link"). Played
-  whole, the item is completed as said: nothing about it is said again
-  when the link returns. This is a known gap, not the intent: a reminder's own words are never told after its generic ring, so the switch stays off until the first builder's call 5 (c7183858037) lands with #8708: an offline ring is not the reminder told, and its words are told once the link is back. With no clip kept, it waits for the link as
-  before.
+  5 s grace. A timer rings "Your timer is done." from the speech cache, in
+  the owner's language, warmed at start while the internet answers
+  ([schedule.md](schedule.md), "With no link"); played whole, it is
+  completed as said.
+- **A reminder rings in its own words (#8708):** while the link is up, the
+  Schedule consumer renders each reminder (never a timer) into a clip of its
+  own, "You have a reminder." and its text, through the second route's
+  speech service, on a thread of its own. It is kept at
+  `/var/lib/lampOS/voice/ring-clips/<store_id>-<id>.wav` (0700) with a
+  sidecar of its words' hash and `voice|model|language`, and rendered again
+  when either changes. Offline, that clip plays; late ones joined into one
+  ring play each clip in turn. Played whole, the reminder is completed as
+  said. A clip goes at the next walk's end (about a second) once its id
+  leaves Schedule (said, cancelled, an edit's old id, its person forgotten),
+  and all of them for a new store. A failed render (the link down) is tried
+  again after 60 s, then twice as long each time, at most hourly.
+- **No clip of its own** (set offline, or its render failed): the generic
+  "You have a reminder." plays, and the item is marked "rung, not told" in
+  the consumer's ledger (`delivery::SCHEMA` 3, kept across a restart). It
+  is not rung offline again, and once the link is back it is said in its
+  own words, once, as a model ring; then the mark goes. With no clip kept at
+  all, it waits for the link as before.
+- **A bound on the clips (the first builder's add 2):** the folder holds at
+  most 122,918,400 bytes (`ring_clips::MOST_BYTES`, about 123 MB): a clip and
+  its sidecar for each of Schedule's 128 items at most, each clip at its
+  20 s cap at the speech service's 24 kHz, 16-bit (960,044 bytes). 300 bytes
+  of text and the prefix reach that cap at the speech's pace (about 15
+  characters a second), so it is the real worst case (at 16 kHz it would be
+  about 82 MB, not the 20 MB first estimated). Past it nothing more is
+  rendered, and the journal says so once.
+- **A factory reset takes them** (the first builder's add 1): the clips are
+  the person's reminders as sound, so `/var/lib/lampOS/voice/ring-clips` is
+  in the product reset plan ([setup.md](setup.md)).
 - **No second line for a scrap:** a follow-up with under 400 ms of speech,
   ending within 8 s of the outage's line, gets no line of its own
   ([failure-notices.md](failure-notices.md)).
-- **Clip C (the first builder, 26 Nov):** a reminder rings offline with the
-  generic line, never its own words. Its own words, rendered while online
-  and removed when its id leaves Schedule, are a later follow-up with their
-  own privacy read.
+- **Each pass reads nothing it needn't (Twelve's P3 1 on #8687):** with no
+  session seen yet, no clip is read; an item found waiting is not read again
+  on later passes, and its wait is said once.
 - **The link checked once before a ring:** the second route's link reads
   down only once a turn fails on the network, so a ring due in an outage
   nobody had spoken in was first tried as a model turn and rang late. Now,
@@ -384,7 +410,9 @@ and its gate needs a ready session.
   60 s (`LINK_CONFIRMED_WITHIN_US`) of a completed turn or a check that
   found a host. Read down, the ring plays from its clip at the due time
   ([schedule.md](schedule.md), "With no link"). Nothing is checked with no
-  ring due.
+  ring due, and nothing while the worker's renewals are being skipped (a
+  stall, #8204): it is asked once a renewal is taken again (Twelve's P3 2
+  on #8687).
 - **Limit:** a turn completed less than a minute before the due time skips
   the check. If the link went down after that turn, the ring is first tried
   as a model turn, as before, and may ring a few seconds past due.
