@@ -6326,6 +6326,26 @@ pub fn serve(
                     );
                     engine = engine.taking_the_name_as_a_sentence(true);
                 }
+                // "Hey man, …" said by a face turned to the lamp and heard
+                // near is "Hey Lamp, …" (`LAMP_NAME_FACING_STAND_IN`).
+                if std::env::var(crate::second_provider::NAME_FACING_STAND_IN_ENVIRONMENT)
+                    .is_ok_and(|value| value == "on")
+                {
+                    eprintln!(
+                        "lamp-voice second: a line's first word right after a greeting that speech to text writes for the lamp's name though people say it to each other too (\"man\", \"ma'am\") is the name when lamp-name heard it near at 0.9 or more by the line's start and a face turned to the lamp said it (LAMP_NAME_FACING_STAND_IN)"
+                    );
+                    // Close or not: the owner's face at 15:01 was read
+                    // speaking it, facing the lamp, in 2 looks, but was no
+                    // close face, so `turned_to_the_lamp` alone said no.
+                    let facing = heeding.clone();
+                    engine = engine
+                        .taking_a_stand_in_said_facing(true)
+                        .seeing_the_line_said_facing(Arc::new(move |window: (u64, u64)| {
+                            facing
+                                .lock()
+                                .is_ok_and(|heeding| heeding.said_facing(window))
+                        }));
+                }
             } else {
                 eprintln!(
                     "lamp-voice second: a first word like the lamp's name is never taken as it: no bus to read lamp-name's near hearings from (LAMP_NAME_NEAR)"
@@ -11161,6 +11181,21 @@ impl Heeding {
             !turned_speakers.is_empty()
         };
         facing && speaking && !self.turned_but_silent((began_us, ended_us))
+    }
+
+    /// `LAMP_NAME_FACING_STAND_IN`: whether a face turned to the lamp was
+    /// read speaking the line while it faced the lamp in at least
+    /// [`crate::said_to_me::FACING_LOOKS`] looks from `began_us` to `ended_us`,
+    /// as `LAMP_SAID_TO_ME` reads a line said to the lamp on its face alone
+    /// (`speaking_faces::SpeakingFaces::turned_speaking_facing_looks`), close
+    /// or not. No eyes: no.
+    pub(crate) fn said_facing(&self, (began_us, ended_us): (u64, u64)) -> bool {
+        let Some((eyes, _)) = self.eyes.as_ref() else {
+            return false;
+        };
+        line_between(began_us, ended_us).is_some_and(|(from, to)| {
+            eyes.turned_speaking_facing_looks(from, to) >= crate::said_to_me::FACING_LOOKS
+        })
     }
 
     /// The best score of lamp-name's near hearings (`name/near`) that

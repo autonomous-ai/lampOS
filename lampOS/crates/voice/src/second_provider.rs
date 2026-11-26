@@ -1098,6 +1098,15 @@ pub(crate) fn sure_over_a_person_word_on() -> bool {
     std::env::var(NAME_SURE_OVER_A_PERSON_WORD_ENVIRONMENT).is_ok_and(|value| value == "on")
 }
 
+/// `on` exactly, off unless set (the product owner's first rule of 25 Nov
+/// 2026: a clear "Hey Lamp" counts): with `LAMP_NAME_NEAR`, a word speech to
+/// text writes for "Lamp" that is also said to a person ([`FACING_STAND_INS`]:
+/// "Hey man, …"), set off right after a greeting, is the name when lamp-name
+/// heard the name near at [`FACING_STAND_IN_NEAR_LEAST`] or more by the
+/// line's start and a face turned to the lamp said the line
+/// ([`facing_stand_in`], [`Engine::taking_a_stand_in_said_facing`]).
+pub const NAME_FACING_STAND_IN_ENVIRONMENT: &str = "LAMP_NAME_FACING_STAND_IN";
+
 /// Where the worker reads whether a hearing of the lamp's name inside one
 /// line's sound stays with that line, never counting for the one begun
 /// after it (`on`, and nothing else;
@@ -2461,6 +2470,15 @@ struct Shared {
     /// ([`FRENCH_HEARD_FOR_THE_NAME`]) is read as [`named_near`] reads a
     /// first word (#8381; [`Engine::hearing_french_calls`]).
     french_calls: bool,
+    /// With `name_near`, a greeted word said to a person that speech to text
+    /// writes for "Lamp" is the name beside a near hearing of
+    /// [`FACING_STAND_IN_NEAR_LEAST`] and a face turned to the lamp
+    /// ([`Engine::taking_a_stand_in_said_facing`]).
+    facing_stand_in: bool,
+    /// With `facing_stand_in`, whether a face turned to the lamp was read
+    /// speaking a line's window while it faced the lamp, close or not
+    /// ([`Engine::seeing_the_line_said_facing`]).
+    said_facing: Option<SaidFacing>,
     /// A line of nothing but the lamp's own words heard back is held, and
     /// its own words at a line's start or end are taken out
     /// ([`Engine::holding_own_echo`]).
@@ -3234,6 +3252,26 @@ struct SaidBy {
 /// lamp said it (`worker::Heeding::turned_to_the_lamp`).
 pub type NameNear = Arc<dyn Fn((u64, u64)) -> (Option<f32>, bool) + Send + Sync>;
 
+/// Whether a face turned to the lamp was read speaking a line's window while
+/// it faced the lamp, close or not (`LAMP_NAME_FACING_STAND_IN`;
+/// `worker::Heeding::said_facing`).
+pub type SaidFacing = Arc<dyn Fn((u64, u64)) -> bool + Send + Sync>;
+
+/// The switches that widen how [`named_near`] reads a line's first word
+/// beside lamp-name's near hearing.
+#[derive(Clone, Copy, Default)]
+struct NearReading<'a> {
+    /// `LAMP_NAME_AS_A_SENTENCE` (#5277).
+    as_a_sentence: bool,
+    /// The owner's language is French (#8381).
+    french: bool,
+    /// `LAMP_NAME_FACING_STAND_IN`.
+    facing_stand_in: bool,
+    /// With it, whether a face turned to the lamp was read speaking the
+    /// line while it faced the lamp, asked only of a line it may take.
+    said_facing: Option<&'a SaidFacing>,
+}
+
 /// The least near score that, beside a first word set off and sounding
 /// like the name, makes it the name (`LAMP_NAME_NEAR`): lamp-name's own
 /// near bar. In the clean files of 22 Oct's played lines, a line with no
@@ -3244,6 +3282,35 @@ pub const NAME_NEAR_LEAST: f32 = 0.5;
 /// lamp-4ace in 22 Oct's played rounds that the shape in
 /// [`sounds_like_the_name`] misses (`LAMP_NAME_NEAR`).
 pub(crate) const HEARD_FOR_THE_NAME: [&str; 5] = ["louvre", "month", "life", "light", "length"];
+
+/// Words speech to text writes for "Lamp" after "Hey" that are also said to
+/// a person (`LAMP_NAME_FACING_STAND_IN`): "Hey man, how's it going?" for
+/// "Hey Lamp, how's it going?" on lamp-74ff on 26 Nov at 15:01, and "Hey,
+/// ma'am. Good morning." for "Hey Lamp, good morning!" there on 25 Nov
+/// (#8681). Said so to a colleague too, so each is the name only beside
+/// both other signs ([`facing_stand_in`]).
+pub(crate) const FACING_STAND_INS: [&str; 2] = ["man", "ma'am"];
+
+/// The least near score that, beside a greeted [`FACING_STAND_INS`] word and
+/// a face turned to the lamp saying the line, makes the word the name:
+/// lamp-name's own hearing bar, well over [`NAME_NEAR_LEAST`], since these
+/// words are everyday ones. The owner's call on lamp-74ff on 26 Nov at
+/// 15:01 was heard near at 0.996 and heard at 0.973.
+pub const FACING_STAND_IN_NEAR_LEAST: f32 = 0.9;
+
+/// `LAMP_NAME_FACING_STAND_IN`: whether `text`'s first word set off, at
+/// `start..end` ([`first_word_set_off`]), is one of [`FACING_STAND_INS`]
+/// right after a greeting ("Hey man, …", "Hi, ma'am. …"; never "Man, that
+/// was close." or "Thanks, man."), and lamp-name heard the name near at
+/// [`FACING_STAND_IN_NEAR_LEAST`] or more (`near`). Whether a face turned to
+/// the lamp said the line is [`named_near`]'s to read.
+pub(crate) fn facing_stand_in(text: &str, (start, end): (usize, usize), near: Option<f32>) -> bool {
+    let before = text[..start].trim_matches(|c: char| !c.is_alphanumeric());
+    !before.is_empty()
+        && crate::attention::is_greeting(before)
+        && FACING_STAND_INS.contains(&text[start..end].to_lowercase().as_str())
+        && near.is_some_and(|score| score >= FACING_STAND_IN_NEAR_LEAST)
+}
 
 /// People's names of the name's shape, that a colleague may call at a desk
 /// ("Lynn, pass me that"), English and Vietnamese: never the lamp's
@@ -3399,14 +3466,26 @@ pub(crate) fn first_word_set_off(text: &str) -> Option<(usize, usize)> {
 /// with what French speech to text writes for "Hey Lamp," set off by a
 /// comma ([`french_call_set_off`]) is read the same way, the whole opening
 /// as the first word.
+///
+/// With `facing_stand_in` (`LAMP_NAME_FACING_STAND_IN=on`), a first word
+/// right after a greeting that speech to text writes for "Lamp" though it
+/// is said to a person too ([`FACING_STAND_INS`]: "Hey man, …") is the name
+/// when lamp-name heard it near at [`FACING_STAND_IN_NEAR_LEAST`] or more
+/// and a face turned to the lamp said the line ([`facing_stand_in`]). With
+/// no face, it is ruled not the name as before.
 fn named_near(
     request: u64,
     text: String,
     window: (u64, u64),
     near: &NameNear,
-    as_a_sentence: bool,
-    french: bool,
+    reading: NearReading<'_>,
 ) -> (String, Option<f32>) {
+    let NearReading {
+        as_a_sentence,
+        french,
+        facing_stand_in: stand_in_said_facing,
+        said_facing,
+    } = reading;
     let french_call = french.then(|| french_call_set_off(&text)).flatten();
     let Some((start, end)) = french_call
         .map(|(start, end, _)| (start, end))
@@ -3459,6 +3538,23 @@ fn named_near(
                 ))
             );
             None
+        }
+        // `LAMP_NAME_FACING_STAND_IN`: "Hey man, …" said by a face turned to
+        // the lamp, heard near at 0.9 or more (lamp-74ff, 26 Nov 15:01: the
+        // owner's "Hey Lamp, how's it going?" at 0.996, held in a busy room).
+        (LikeTheName::Not, Some(score))
+            if stand_in_said_facing && facing_stand_in(&text, (start, end), heard) =>
+        {
+            if turned || said_facing.is_some_and(|said_facing| said_facing(window)) {
+                Some(format!(
+                    "its first word past a greeting, set off, is one speech to text writes for the lamp's name though people say it to each other too (\"{word}\"), lamp-name heard it near, at {score:.2}, by the line's start, and a face turned to the lamp said it (LAMP_NAME_FACING_STAND_IN)"
+                ))
+            } else {
+                eprintln!(
+                    "lamp-voice second: request {request}: its first word past a greeting, set off, is one speech to text writes for the lamp's name though people say it to each other too (\"{word}\"), and lamp-name heard it near, at {score:.2}, but no face turned to the lamp said it: not the name (LAMP_NAME_FACING_STAND_IN)"
+                );
+                None
+            }
         }
         (LikeTheName::Not, Some(score))
             if as_a_sentence && a_sentence_of_its_own(&text, start, end) =>
@@ -5665,6 +5761,8 @@ impl Engine {
                 name_as_a_sentence: false,
                 french_calls: crate::language::at_start()
                     == Some(crate::language::Language::French),
+                facing_stand_in: false,
+                said_facing: None,
                 own_echo: false,
                 care: None,
                 spare: Mutex::new(None),
@@ -6942,6 +7040,32 @@ impl Engine {
     pub fn taking_the_name_as_a_sentence(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.name_as_a_sentence = on;
+        }
+        self
+    }
+
+    /// `LAMP_NAME_FACING_STAND_IN=on`, with [`Self::hearing_the_name_near`]:
+    /// a line's first word set off right after a greeting, one speech to
+    /// text writes for "Lamp" that is also said to a person
+    /// ([`FACING_STAND_INS`]: "Hey man, how's it going?"), is the name when
+    /// lamp-name heard it near at [`FACING_STAND_IN_NEAR_LEAST`] or more by
+    /// the line's start and a face turned to the lamp said the line
+    /// ([`facing_stand_in`]). Without it, as before. Before any turn only.
+    pub fn taking_a_stand_in_said_facing(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.facing_stand_in = on;
+        }
+        self
+    }
+
+    /// With [`Self::taking_a_stand_in_said_facing`]: `said_facing` tells
+    /// whether a face turned to the lamp was read speaking a line's window
+    /// (its first and last sound's read times) while it faced the lamp, close
+    /// or not, which is a face for that rule as well as the near hearing's
+    /// own ([`NameNear`]). Before any turn only.
+    pub fn seeing_the_line_said_facing(mut self, said_facing: SaidFacing) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.said_facing = Some(said_facing);
         }
         self
     }
@@ -11627,8 +11751,12 @@ async fn spoken(
                 text,
                 said.lock().map_or((0, 0), |said| *said),
                 near,
-                shared.name_as_a_sentence,
-                shared.french_calls,
+                NearReading {
+                    as_a_sentence: shared.name_as_a_sentence,
+                    french: shared.french_calls,
+                    facing_stand_in: shared.facing_stand_in,
+                    said_facing: shared.said_facing.as_ref(),
+                },
             );
             // The rule counts no second sign for that hearing
             // (`LAMP_NAME_SIGN_TIED`, #8092).

@@ -5931,6 +5931,34 @@ after a take-over, but now for every turn:
     name said close to it", "said to the lamp from close to it", "its
     words calling it", "a conversation going on" and "its hearing at the
     line's start" that held (`Attention::second_signs`), never the words.
+  - **"Hey man, …" said facing the lamp is "Hey Lamp, …"**
+    (`LAMP_NAME_FACING_STAND_IN=on`, off unless set, on in the product
+    since 26 Nov 2026; with `LAMP_NAME_NEAR`). On lamp-74ff on 26 Nov at
+    15:01 the product owner faced the lamp and said "Hey Lamp, how's it
+    going?". Speech to text wrote "Hey man, …", lamp-name heard the name at
+    0.973 and near at 0.996 by the line's start, and the owner's face was
+    read speaking the line while it faced the lamp in 2 looks, though it
+    was no close face. `named_near` ruled "man" not the name, since it
+    doesn't sound like it, and that ruling wins over every second sign, so
+    the line was held as a busy room's. With the switch, a first word set
+    off right after a greeting (`first_word_set_off`), one speech to text
+    writes for "Lamp" that people also say to each other
+    (`FACING_STAND_INS`: "man", "ma'am"), is the name, put in its place,
+    when lamp-name heard the name near at `FACING_STAND_IN_NEAR_LEAST`
+    (0.9) or more by the line's start and a face turned to the lamp said
+    the line: a close one (`Heeding::turned_to_the_lamp`, the near
+    hearing's own sign) or one read speaking it while facing the lamp in
+    `said_to_me::FACING_LOOKS` (2) looks, close or not
+    (`Heeding::said_facing`). The journal says `its first word past a
+    greeting, set off, is one speech to text writes for the lamp's name
+    though people say it to each other too ("man"), … (LAMP_NAME_FACING_STAND_IN)`,
+    and, with no such face, `… but no face turned to the lamp said it: not
+    the name (LAMP_NAME_FACING_STAND_IN)`. No greeting before the word
+    ("Man, that was close.", "Thanks, man."), the word not set off ("Hey
+    man how's it going?", which `named_near` never rules), a near hearing
+    under 0.9 or none, or no such face: as before. Known cost: a colleague
+    saying "Hey man, …" to someone else while facing the lamp and heard as
+    its name near at 0.9 is answered.
   - **A short line without the name is not answered on its sound**
     (#7891, the first builder at 11:16). On lamp-74ff on 19 Nov, in a
     meeting, "Yeah." (heard as the name at 0.939, "the name said close to
