@@ -7884,7 +7884,13 @@ forces one), a skill it makes is made whole, with everything a run needs:
   step) and which carries a `left out:` line
   (`made_skill::says_fixed_with_left_out`) is never kept. It is handed to
   the lamp's agent, as a make that needs the internet is, to write as a
-  task step whose script prints the line, its answer told; the journal
+  task step whose script prints the line, its answer told. The agent is
+  told so beside the brief, the maker's note quoted
+  (`made_skill::value_left_out_told`), and its own answer is held to the
+  same check: an agent's fixed `say` with a `left out:` note on such a
+  skill is refused with those words as its repair, so it is repaired into
+  a task step or nothing is kept. With no answer from the agent the person
+  hears the agent's own reason, never DeepSeek's say kept. The journal
   says "a skill made here: DeepSeek couldn't work out what it says: handed
   to the agent (<engine>) to write as a task step". With no agent engine
   set it is kept as before, journaled "… no agent to hand it to: kept as

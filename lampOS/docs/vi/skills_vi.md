@@ -4274,7 +4274,14 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   `run` hay `task`) và có dòng `left out:`
   (`made_skill::says_fixed_with_left_out`) không bao giờ được giữ. Nó được
   giao cho agent của đèn, như một lần tạo cần internet, để viết thành một
-  bước task có script in ra câu đó, câu trả lời được kể lại; nhật ký ghi
+  bước task có script in ra câu đó, câu trả lời được kể lại. Agent được
+  nói điều này bên cạnh brief, kèm ghi chú của người viết được trích nguyên
+  (`made_skill::value_left_out_told`), và câu trả lời của chính agent cũng
+  qua cùng phép kiểm tra: một `say` cố định của agent có ghi chú `left out:`
+  trên kỹ năng như vậy bị từ chối, với chính những lời đó làm lời sửa, nên
+  nó được sửa thành một bước task hoặc không có gì được giữ. Khi agent không
+  trả lời, người dùng nghe lý do của chính agent, không bao giờ giữ câu
+  `say` của DeepSeek. Nhật ký ghi
   "a skill made here: DeepSeek couldn't work out what it says: handed to
   the agent (<engine>) to write as a task step". Khi không có engine agent
   nào được đặt, nó được giữ như trước, nhật ký ghi "… no agent to hand it

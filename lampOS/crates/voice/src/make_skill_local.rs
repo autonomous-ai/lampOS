@@ -3925,6 +3925,12 @@ fn made_and_journaled_by(
     // ([`made_skill::says_fixed_with_left_out`]); with none, kept as
     // before, and journaled.
     let value_left_out = matches!(&first, Ok(text) if made_skill::says_fixed_with_left_out(text));
+    // Its note, quoted to the agent beside the brief.
+    let left_out_note = first
+        .as_ref()
+        .ok()
+        .filter(|_| value_left_out)
+        .and_then(|text| made_skill::left_out_of(text));
     web_task_held.set(net_code);
     let mut made = match engine {
         Some(_) if value_left_out => Err(Refused(made_skill::VALUE_LEFT_OUT_HELD.into(), None)),
@@ -3988,10 +3994,13 @@ fn made_and_journaled_by(
                 "lamp-voice: a skill made here: DeepSeek couldn't work out what it says: handed \
                  to the agent ({engine}) to write as a task step"
             );
+            // Told what was left out and the task step, as the internet's
+            // hand-over tells the agent its own (El's P2 on #8732).
+            let told = made_skill::value_left_out_told(left_out_note.as_deref().unwrap_or(""));
             handed_to_agent(
                 Before::Asked(Box::new(made)),
                 request,
-                &brief,
+                &format!("{brief}\n\n{told}"),
                 (agent, engine),
                 &agent_kept,
                 &models_cannot,
@@ -8410,15 +8419,83 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let days = "There are days left in the year.";
         let dropped = year_count(days, true, true);
         assert!(made_skill::says_fixed_with_left_out(&dropped), "{dropped}");
+        // El's P2 on #8732: the agent is told what was left out and the
+        // task step; its own fixed say with the value left out again is
+        // refused, and repaired into a task step, which is kept.
+        made_skill::set_scripts_here(Some(true));
+        let task = format!(
+            "```skill.toml\n{CODE_TOML}```\n\n```SKILL.md\n{AGENT_CODE_CARD}```\n\n\
+             ```scripts/main.py\nprint(\"There are 35 days left in the year.\")\n```\n"
+        );
+        let told_note = "the exact count of days left spoken";
+        let rules_seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let agent_with = |answers: Vec<Option<String>>| {
+            let answers = std::sync::Mutex::new(answers.into_iter());
+            let seen = std::sync::Arc::clone(&rules_seen);
+            crate::make_skill_agent::tests::stub(
+                Some("hermes"),
+                std::sync::Arc::new(move |rules: &str| {
+                    seen.lock().unwrap().push(rules.to_owned());
+                    answers.lock().unwrap().next().flatten()
+                }),
+            )
+        };
         let (root, kept_in) = keeping("value-left-out");
-        let tasks = agent_answering(vec![Some(good())]);
-        let (url, served) = service(vec![(200, dropped)]);
+        let tasks = agent_with(vec![Some(dropped.clone()), Some(task.clone())]);
+        let (url, served) = service(vec![(200, dropped.clone())]);
         let told = made_by(&kept_in, url, Some(&tasks.agent()), NOW);
-        assert_eq!(told["made"], "evening-dim", "{told}");
-        assert_eq!((served.join().unwrap(), tasks.hand_overs()), (1, 1));
+        assert_eq!(told["made"], "photo-booth", "{told}");
+        assert_eq!((served.join().unwrap(), tasks.hand_overs()), (1, 2));
         let entries = made_skill::entries(&kept_in.directory);
         assert_eq!(entries.len(), 1, "{entries:?}");
+        let rules = rules_seen.lock().unwrap().clone();
+        let [first, repair] = rules.as_slice() else {
+            panic!("{rules:?}")
+        };
+        // The hand-over quotes the note and asks for the task step; the
+        // repair of the agent's same answer says it again.
+        for said in [first, repair] {
+            assert!(said.contains(&format!("left out \"{told_note}")), "{said}");
+            assert!(
+                said.contains("a task step (task = { task, run })"),
+                "{said}"
+            );
+        }
+        assert!(repair.starts_with("FIX THIS FIRST. "), "{repair}");
         let _ = std::fs::remove_dir_all(&root);
+        rules_seen.lock().unwrap().clear();
+        // Answering a task step at once: kept, one hand-over.
+        let (root, kept_in) = keeping("value-left-out-task");
+        let tasks = agent_with(vec![Some(task.clone())]);
+        let (url, served) = service(vec![(200, dropped.clone())]);
+        let told = made_by(&kept_in, url, Some(&tasks.agent()), NOW);
+        assert_eq!(told["made"], "photo-booth", "{told}");
+        assert_eq!((served.join().unwrap(), tasks.hand_overs()), (1, 1));
+        let _ = std::fs::remove_dir_all(&root);
+        // The agent answering the dropped value every time: nothing kept.
+        let (root, kept_in) = keeping("value-left-out-again");
+        let tasks = agent_with(vec![Some(dropped.clone()); 8]);
+        let (url, served) = service(vec![(200, dropped.clone())]);
+        let told = made_by(&kept_in, url, Some(&tasks.agent()), NOW);
+        assert!(told.get("made").is_none(), "{told}");
+        assert!(made_skill::entries(&kept_in.directory).is_empty());
+        let _ = served.join();
+        let _ = std::fs::remove_dir_all(&root);
+        // El's P3: the agent giving no answer, the person hears the
+        // agent's own reason, never DeepSeek's dropped say kept.
+        let (root, kept_in) = keeping("value-left-out-silent");
+        let tasks = agent_with(vec![None]);
+        let (url, served) = service(vec![(200, dropped.clone())]);
+        let told = made_by(&kept_in, url, Some(&tasks.agent()), NOW);
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::AGENT_LATE_TRY),
+            "{told}"
+        );
+        assert_eq!((served.join().unwrap(), tasks.hand_overs()), (1, 1));
+        assert!(made_skill::entries(&kept_in.directory).is_empty());
+        let _ = std::fs::remove_dir_all(&root);
+        made_skill::set_scripts_here(None);
         // With no agent to hand it to: kept as DeepSeek's, as before.
         let (root, kept_in) = keeping("value-left-out-no-agent");
         let (url, served) = service(vec![(200, year_count(days, true, true))]);
