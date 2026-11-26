@@ -2249,9 +2249,10 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     3. **The computer named with an agent on it** (`where` `"computer"`,
        `who` an agent in that computer's `agents` that is not one of the
        staff): there with that `engine`, as 2a; one of the staff, as before.
-    The tasks part's `targets` answer carries, per computer, `agents` (all
-    engines its engines look says installed, Hermes and OpenClaw among
-    them), `status` (`online`/`offline`) and `used` (its last task id), and
+    The tasks part's `targets` answer carries, per computer, `agents` (the
+    engines its engines look says installed and not known signed out, Hermes
+    and OpenClaw among them; one whose install is unknown is not listed),
+    `status` (`online`/`offline`) and `used` (its last task id), and
     Harness's `signed_in`; the voice keeps them (`computers_in`) and adds one
     line to the session note while the lamp has its own target
     (`computers_note`): "Your computers: macbook-air (online: Claude Code,

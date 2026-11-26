@@ -4319,8 +4319,10 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   `{"error":"Nothing was handed over: <Name> isn't available (<why>). ...",
   "code":"agent_not_available","reason":<reason>}` (`not_available`), lý do
   `none`, `computer_offline` hoặc `harness_signed_out`, và không chuẩn bị gì.
-  Câu trả lời `targets` của phần tasks mang theo từng máy tính `agents` (mọi
-  engine lần xem engine nói đã cài, gồm cả Hermes và OpenClaw), `status`
+  Câu trả lời `targets` của phần tasks mang theo từng máy tính `agents` (các
+  engine lần xem engine nói đã cài và không được biết là đã đăng xuất, gồm cả
+  Hermes và OpenClaw; engine chưa rõ đã cài hay chưa thì không được liệt kê),
+  `status`
   (`online`/`offline`) và `used` (id việc gần nhất), cùng `signed_in` của
   Harness; voice giữ chúng (`computers_in`) và thêm một dòng vào ghi chú phiên
   khi đèn có target riêng (`computers_note`): "Your computers: macbook-air
