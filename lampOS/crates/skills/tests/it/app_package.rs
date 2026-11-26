@@ -723,10 +723,10 @@ fn the_name_rules_are_the_texts_and_a_clip_may_be_quiet() {
     assert!(!app_package::app_name_ok(&"a".repeat(25)));
     assert!(!app_package::app_name_ok("-a"));
     assert!(!app_package::app_name_ok("a_b"));
-    assert_eq!(app_package::GRANTS.len(), 15);
+    assert_eq!(app_package::GRANTS.len(), 16);
     // `remember` is an app's own grant (apps.remember), never the door's plain
     // one a computer is paired with: the last in the list.
-    assert_eq!(app_package::GRANTS[14], app_package::REMEMBER_GRANT);
+    assert_eq!(app_package::GRANTS[15], app_package::REMEMBER_GRANT);
 }
 
 #[test]
