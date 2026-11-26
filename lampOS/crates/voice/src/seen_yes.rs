@@ -1884,6 +1884,32 @@ mod tests {
             ("Done, my camera is off.", None),
             ("Got it, I'm not watching anymore.", None),
             ("I'm not looking at your desk anymore.", None),
+            // The Reviewer-lead's must-fix on #8780 (c7195457427): a claim
+            // followed by an offer to undo it is still a claim.
+            (
+                "I've stopped watching your desk, but you can turn it back on any time.",
+                None,
+            ),
+            (
+                "Done, my camera is off \u{2014} you can turn it back on whenever you like.",
+                None,
+            ),
+            (
+                "Okay, I've stopped noticing, just ask if you want it back.",
+                None,
+            ),
+            ("Don't worry, I've stopped watching.", None),
+            // Friday's re-read on #8780 (c7195959981): an offer governs only
+            // its own clause and the ones after it.
+            (
+                "I've stopped watching your desk, you can ask me to start again anytime.",
+                None,
+            ),
+            (
+                "Okay, I've stopped watching, and if you want me back just say so.",
+                Some("stop watching my desk"),
+            ),
+            ("Noticing is off, you can turn it on any time.", None),
         ] {
             assert!(claims_stopped(reply, heard), "{reply} to {heard:?}");
         }
