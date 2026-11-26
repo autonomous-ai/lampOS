@@ -2118,6 +2118,8 @@ struct Shared {
     worded_claims: bool,
     /// [`Engine::telling_made_not_on`] (#7270).
     made_not_on: bool,
+    /// [`Engine::telling_desk_noticing`] (#7767): seen activity's file.
+    desk_noticing: Option<std::path::PathBuf>,
     /// [`Engine::checking_doing_claims`] (#7285).
     doing_claims: bool,
     /// [`Engine::checking_keep_claims_whole`] (#7878).
@@ -5568,6 +5570,7 @@ impl Engine {
                 action_claims: false,
                 worded_claims: false,
                 made_not_on: false,
+                desk_noticing: None,
                 doing_claims: false,
                 keep_whole: false,
                 nudge_claims: false,
@@ -7289,6 +7292,19 @@ impl Engine {
     pub fn telling_made_not_on(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.made_not_on = on;
+        }
+        self
+    }
+
+    /// With `LAMP_NOTICING_BY_DEFAULT` on and seen activity declared
+    /// (#7767), `path`, seen activity's file: a heard line naming the
+    /// looking is told the desk noticing's state read just then
+    /// ([`crate::seen_yes::state_note`]), so the model never answers it
+    /// from earlier turns (lamp-06c1's re-row of #8674, 26 Nov). `None`:
+    /// nothing told. Before any turn only.
+    pub fn telling_desk_noticing(mut self, path: Option<std::path::PathBuf>) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.desk_noticing = path;
         }
         self
     }
@@ -13337,6 +13353,13 @@ async fn spoken(
         .chain(air)
         .chain(seems)
         .chain(doing)
+        // The desk noticing's state, read now, on a line naming the looking
+        // (#7767): right before the quiet note, as the early words' chat
+        // tells it, so a chat begun on them still fits.
+        .chain(crate::seen_yes::state_note(
+            shared.desk_noticing.as_deref(),
+            &text,
+        ))
         // `LAMP_KEEP_QUIETLY`: a known person's own plain facts kept quietly,
         // on a line they were seen saying; never in the room's scope (the
         // Reviewer-lead's P2s on #5053).
@@ -15505,15 +15528,17 @@ fn prepared_on(
             // Its notes as round 1 tells them: the quiet note
             // (`LAMP_KEEP_QUIETLY`) before the cut-in's, the opening last.
             // The cut-in's note as these words choose it (#7285).
-            let notes: Vec<String> = crate::keep_quietly::note_for(scope, request)
-                .into_iter()
-                .chain(
-                    notes
-                        .iter()
-                        .map(|_| crate::cut_in_told::note(&words).to_owned()),
-                )
-                .chain(opens)
-                .collect();
+            let notes: Vec<String> =
+                crate::seen_yes::state_note(shared.desk_noticing.as_deref(), &words)
+                    .into_iter()
+                    .chain(crate::keep_quietly::note_for(scope, request))
+                    .chain(
+                        notes
+                            .iter()
+                            .map(|_| crate::cut_in_told::note(&words).to_owned()),
+                    )
+                    .chain(opens)
+                    .collect();
             Some(Prepared::begin(shared, scope, words, &notes, remembered))
         }
         net::Early::Resumed => {

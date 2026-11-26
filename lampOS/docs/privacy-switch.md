@@ -577,7 +577,8 @@ classified by default, while a kept `{"face_expressions":"no",...}` or
 answers exactly as described above. With the switch on, the voice's "stop
 looking" (`stop_looking_at_my_desk`) keeps a face-expressions no as well as
 seen activity's (`"by":"voice"`), and "start looking again" turns both back
-to a yes for the owner's own line; forget everything removes only a kept
+to a yes for the owner's own line (with both on already, anyone's ask is
+told it is on already, nothing written); forget everything removes only a kept
 yes, so a kept face-expressions or room-sounds no stays (told to the model
 as `"kept as a no"`) and the forget never turns either on. The voice's
 start and every progress write of setup's walk leave a kept no in place,

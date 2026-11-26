@@ -52,7 +52,21 @@ lamp also says once when the opt-in is turned off.
    activity's change). `look_at_my_desk` ("start looking again") keeps the
    owner's own spoken yes with no offer and no "turn it on in the app",
    turning a no in either file back to a yes, and says it is on already
-   only when both were (`LOOKING_FACES` when only faces come back); the
+   only when both were (`LOOKING_FACES` when only faces come back). With
+   both on already, anyone's ask is told it is on already and nothing is
+   written, never "only the owner can turn this on": nothing is turned on
+   (lamp-06c1's re-row of #8674, 26 Nov, Q9); a guest's ask with either a
+   kept no is still refused, and anyone's stop still keeps a no. On the
+   second route, a heard line naming the looking or the desk
+   (`seen_yes::STATE_WORDS`: "look", "watching", "notice", "desk", "eye"
+   and the like) is told the state read just then by the same rule
+   (`seen_yes::state_note`: on by default, on by a yes, faces only, or
+   off), with the function to call and that it stands whatever earlier
+   turns said, so the model never answers "are you watching my desk?" or
+   a stop from the conversation's history (the same row: 0 of 4 state
+   answers right, and two stops said with no call). The two consent files
+   are read on that line only, never cached, so a change to them between
+   turns reaches the next one; the Live route has no such note yet. The
    model judges the phrase from the two descriptions, and no function is
    added. A forget removes only a kept yes and keeps a no, so it never
    turns noticing on, and lamp-seen's forget latch holds only an explicit
