@@ -4177,7 +4177,7 @@ mod tests {
         let voice = unit("lamp-voice.service");
         for line in [
             "ConfigurationDirectory=lampOS/voice/own",
-            "ConfigurationDirectoryMode=0750",
+            "ConfigurationDirectoryMode=0700",
             "LoadCredential=own:/etc/lampOS/voice/own",
         ] {
             assert!(voice.lines().any(|have| have == line), "{line}");
