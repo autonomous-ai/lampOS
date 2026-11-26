@@ -2479,7 +2479,13 @@ order is kept. A written turn is the same from the chat on.
   asks in a row, sunrise in Hanoi, VnExpress's headlines and Apple's
   stock, got `calls=none` and "I couldn't reach … just now", the
   weather's own failure words carried in the history as the lamp's words
-  alone, a search never tried included. The calls go with
+  alone, a search never tried included. A move refused because the body
+  was down (lamp-skills' `CANNOT_MOVE`, "I can't move right now ...") is
+  kept as could not move then (`second_provider::COULD_NOT_MOVE_THEN`) and
+  told after the words as `second_provider::MOVE_THEN_NOTE`: that moment
+  only, call it again when asked (#8640: on lamp-52e6, 26 Nov 07:51, after
+  ten such refusals and the body back, seven "dance" asks got
+  `calls=none`). The calls go with
   the exchange the lamp's words were filed under, so they are told only
   to that scope's turns; a request with no kept words keeps none, and a
   forget drops them. They are not written to the thread file (an older

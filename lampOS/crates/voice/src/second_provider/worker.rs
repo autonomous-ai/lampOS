@@ -16107,11 +16107,20 @@ fn messages_marked(
     // (`second_provider::failed_then_note`), never as calls.
     let (failed, calls): (Vec<_>, Vec<_>) = std::mem::take(&mut exchange.calls)
         .into_iter()
-        .partition(|call| call.result == Some(crate::second_provider::FAILED_THEN));
+        .partition(|call| {
+            call.result == Some(crate::second_provider::FAILED_THEN)
+                || call.result == Some(crate::second_provider::COULD_NOT_MOVE_THEN)
+        });
+    // A move the body was down for is told as that moment only (#8640).
+    let (moved, failed): (Vec<_>, Vec<_>) = failed
+        .into_iter()
+        .partition(|call| call.result == Some(crate::second_provider::COULD_NOT_MOVE_THEN));
     let failed_note = (keeps_calls && !failed.is_empty()).then(|| {
         let names: Vec<&str> = failed.iter().map(|call| call.name.as_str()).collect();
         crate::second_provider::failed_then_note(&names)
     });
+    let moved_note = (keeps_calls && !moved.is_empty())
+        .then(|| crate::second_provider::MOVE_THEN_NOTE.to_owned());
     exchange.calls = calls;
     if keeps_calls && !exchange.calls.is_empty() {
         let results: Vec<&str> = exchange
@@ -16142,6 +16151,7 @@ fn messages_marked(
     // up from there (`LAMP_CUT_IN_TOLD`).
     messages.extend(cut.map(Message::system));
     messages.extend(failed_note.map(Message::system));
+    messages.extend(moved_note.map(Message::system));
     messages
 }
 
@@ -26503,6 +26513,37 @@ mod tests {
         assert_eq!(
             messages_marked(plain(), None, true),
             [Message::user("Hi."), Message::assistant("Hello.")]
+        );
+    }
+
+    /// #8640 (lamp-52e6, 26 Nov 07:51): ten "dance" asks refused while the
+    /// body was down, then lamp-body back, and seven asks in a row got
+    /// `calls=none`: the history told only "I can't move right now". A call
+    /// kept as could not move then is told as a note after the words that
+    /// it was that moment only, to call it again; never as a call, and not as
+    /// the failed-then note.
+    #[test]
+    fn a_move_refused_while_the_body_was_down_is_told_as_that_moment_only() {
+        let refused = crate::thread::Recent {
+            person: "Hey Lamp, dance.".into(),
+            lamp: "I can't move right now.".into(),
+            calls: vec![crate::thread::KeptCall {
+                id: "kept-5-0".into(),
+                name: crate::use_skill::NAME.into(),
+                args: serde_json::json!({}),
+                result: Some(crate::second_provider::COULD_NOT_MOVE_THEN),
+            }],
+            ..crate::thread::Recent::default()
+        };
+        let note = crate::second_provider::MOVE_THEN_NOTE;
+        assert!(note.contains("call it again") && note.contains("at that moment only"));
+        assert_eq!(
+            messages_marked(refused, None, true),
+            [
+                Message::user("Hey Lamp, dance."),
+                Message::assistant("I can't move right now."),
+                Message::system(note.to_owned()),
+            ]
         );
     }
 

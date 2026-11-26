@@ -647,6 +647,21 @@ pub(crate) const MADE_TURNED: &str = "(done earlier: done; what the lamp said ne
 /// (`worker::messages_marked`).
 pub(crate) const FAILED_THEN: &str = "(failed then)";
 
+/// A call refused because the body could not move then (lamp-skills'
+/// `CANNOT_MOVE`, #6834), kept as [`FAILED_THEN`] is but told later as
+/// [`MOVE_THEN_NOTE`] (#8640).
+pub(crate) const COULD_NOT_MOVE_THEN: &str = "(could not move then)";
+
+/// How lamp-skills' refusal of a move while the body is down begins
+/// (`lamp_skills::CANNOT_MOVE`; the voice does not build on lamp-skills).
+pub(crate) const CANNOT_MOVE_SAID: &str = "I can't move right now";
+
+/// Told after the lamp's words of an earlier turn whose move was refused
+/// because the body was down (#8640: on lamp-52e6, 26 Nov 07:51, after ten
+/// such refusals and lamp-body back, seven "dance" asks in a row got
+/// `calls=none` and no dance).
+pub(crate) const MOVE_THEN_NOTE: &str = "(For you to know: in that turn your body couldn't move, at that moment only. It may move again now: when they ask you to dance, move or make a gesture, call it again; you are told if it still can't. Never say you can't move unless a call in your own turn just said so.)";
+
 /// Told after the lamp's words of an earlier turn in which `names` were
 /// answered with an error: that failure was that one try, never how things
 /// stand now. On lamp-9adf at 13929 (17 Nov 23:20) "what time is sunrise
@@ -24276,15 +24291,22 @@ async fn answer(
                 // ([`failed_then_note`]), never as a lasting state
                 // (lamp-9adf at 13929, 17 Nov: "I couldn't reach … just
                 // now" with `calls=none`, three asks in a row).
-                if answer.told.get("error").is_some()
+                if let Some(error) = answer.told.get("error")
                     && call.name != worker::MORE
                     && let Some(keep) = &shared.keeps_calls
                 {
+                    let moved = error
+                        .as_str()
+                        .is_some_and(|error| error.starts_with(CANNOT_MOVE_SAID));
                     keep(
                         request,
                         &call.name,
                         &serde_json::Value::Object(serde_json::Map::new()),
-                        Some(FAILED_THEN),
+                        Some(if moved {
+                            COULD_NOT_MOVE_THEN
+                        } else {
+                            FAILED_THEN
+                        }),
                     );
                 }
                 if their_ask_told.is_none()
