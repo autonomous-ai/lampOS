@@ -398,8 +398,11 @@ const STOP_PROMISED: [&str; 2] = ["i'll", "will"];
 
 /// The words of a sentence that offers a way off rather than saying it is
 /// off ("you can turn it off any time", "If you ask, my camera goes off",
-/// "I'll stop watching if you'd like"): with one anywhere in the sentence,
-/// not only in the clause, neither "off" nor a stop word is a claim.
+/// "I'll stop watching if you'd like"): with one in an earlier clause of
+/// the sentence, or earlier in the claim's own clause, neither "off" nor a
+/// stop word is a claim, nor a promised "I'll stop" with one after it in
+/// its clause; one after the claim's clause is an offer to undo it ("I've
+/// stopped watching, but you can turn it back on any time"), still a claim.
 const OFFERING_WORDS: [&str; 6] = ["can", "could", "if", "whenever", "anytime", "any"];
 
 /// The words that, directly before a looking verb ([`LOOKING_VERBS`]) or
@@ -480,15 +483,16 @@ const CLAUSE_BREAKS: [&str; 6] = ["and", "but", "so", "while", "because", "then"
 ///   word later ("I've stopped watching", "I'll stop noticing", "stopped my
 ///   camera"), the lamp as subject ([`LAMP_SUBJECT`] before it, or none),
 ///   no negation before it ([`STOP_NOT_WORDS`]: "I haven't stopped
-///   watching") and none of [`OFFERING_WORDS`] in the sentence ("I'll stop
-///   watching if you'd like");
+///   watching") and none of [`OFFERING_WORDS`] before it in the sentence,
+///   nor after a promised "stop" in its clause ("I'll stop watching if
+///   you'd like");
 /// - one of [`NOT_WORDS`] directly before one of [`LOOKING_VERBS`], or with
 ///   one of [`NOT_GAP`] between, the lamp as subject before it ("I'm not
 ///   looking at your desk", "I won't watch", "I'm no longer watching");
 /// - "off" with one of [`OFF_LOOKING`], said of the lamp ([`LAMP_SUBJECT`],
 ///   or an "is"/"are"/"'s"), none of [`PERSON_WORDS`] in the clause and
-///   none of [`OFFERING_WORDS`] in the sentence ("noticing is off", "my
-///   camera is off"; never "If you ask, my camera goes off");
+///   none of [`OFFERING_WORDS`] before it in the sentence ("noticing is
+///   off", "my camera is off"; never "If you ask, my camera goes off");
 /// - a stop word alone ("I've stopped.", "Okay, stopping now."), only to a
 ///   person's line asking to stop the looking ([`names_the_looking`]).
 ///
@@ -505,15 +509,20 @@ pub fn claims_stopped(reply: &str, heard: Option<&str>) -> bool {
         .filter(|sentence| !sentence.trim_end().ends_with('?'))
         .filter(|sentence| !opens_a_question(&words(sentence)))
         .any(|sentence| {
-            // An offer anywhere in the sentence makes its "off" and its stop
-            // no claim (Friday's P2-a and P3 on #8780, c7194711313).
-            let offering = words(sentence)
-                .iter()
-                .any(|word| OFFERING_WORDS.contains(&word.as_str()));
+            // An offer governs its own clause and the ones after it, never
+            // a claim before it (Friday's P2-a and P3 on #8780, c7194711313;
+            // the Reviewer-lead's c7195457427 and Friday's c7195959981).
+            let mut offered = false;
             sentence
                 .split([',', ':', '\u{2014}', '\u{2013}'])
                 .flat_map(|part| clauses(words(part)))
-                .any(|clause| clause_claims(&clause, asked_to_stop, offering))
+                .any(|clause| {
+                    let claims = clause_claims(&clause, asked_to_stop, offered);
+                    offered |= clause
+                        .iter()
+                        .any(|word| OFFERING_WORDS.contains(&word.as_str()));
+                    claims
+                })
         })
 }
 
@@ -542,9 +551,13 @@ fn clauses(words: Vec<String>) -> Vec<Vec<String>> {
 
 /// One clause of [`claims_stopped`]'s: whether it claims the lamp stopped
 /// looking, `asked_to_stop` where the person's line asked it to,
-/// `offering` where its sentence has one of [`OFFERING_WORDS`].
-fn clause_claims(words: &[String], asked_to_stop: bool, offering: bool) -> bool {
+/// `offered` where an earlier clause of its sentence has one of
+/// [`OFFERING_WORDS`].
+fn clause_claims(words: &[String], asked_to_stop: bool, offered: bool) -> bool {
     let has = |set: &[&str], word: &str| set.contains(&word);
+    // An offer before `at` in the sentence governs the word there.
+    let offer_before =
+        |at: usize| offered || words[..at].iter().any(|word| has(&OFFERING_WORDS, word));
     let lamp_before = |at: usize| words[..at].iter().any(|word| has(&LAMP_SUBJECT, word));
     let looking_at = |at: usize| words.get(at).is_some_and(|word| has(&LOOKING_VERBS, word));
     let stop_at = |at: usize| {
@@ -565,13 +578,22 @@ fn clause_claims(words: &[String], asked_to_stop: bool, offering: bool) -> bool 
             .find(|word| !has(&LAMP_SUBJECT, word) && !has(&STOP_NOT_GAP, word))
             .is_some_and(|word| has(&STOP_NOT_WORDS, word))
     };
-    let stopped = !offering
-        && (0..words.len()).any(|at| {
-            stop_at(at)
-                && !negated(at)
-                && (looking_at(at + 1) || looking_at(at + 2))
-                && (at == 0 || lamp_before(at))
-        });
+    // A promised stop with an offer after it in its clause ("I'll stop
+    // watching if you'd like") is offered, not said.
+    let promise_offered = |at: usize| {
+        words[at] == "stop"
+            && words[at + 1..]
+                .iter()
+                .any(|word| has(&OFFERING_WORDS, word))
+    };
+    let stopped = (0..words.len()).any(|at| {
+        stop_at(at)
+            && !offer_before(at)
+            && !promise_offered(at)
+            && !negated(at)
+            && (looking_at(at + 1) || looking_at(at + 2))
+            && (at == 0 || lamp_before(at))
+    });
     let not_looking = (0..words.len()).any(|at| {
         let word = words[at].as_str();
         has(&NOT_WORDS, word)
@@ -581,8 +603,10 @@ fn clause_claims(words: &[String], asked_to_stop: bool, offering: bool) -> bool 
                     && looking_at(at + 2)))
             && (lamp_before(at) || (word == "longer" && at == 1))
     });
-    let off = !offering
-        && words.iter().any(|word| word == "off")
+    let off = words
+        .iter()
+        .position(|word| word == "off")
+        .is_some_and(|at| !offer_before(at))
         && words.iter().any(|word| has(&OFF_LOOKING, word))
         && !words.iter().any(|word| has(&PERSON_WORDS, word))
         && words.iter().any(|word| {
