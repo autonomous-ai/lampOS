@@ -7363,11 +7363,17 @@ the same code for both writers.
   then stop for the day), no `rearm`, `during` or `days`, `net`
   among its grants; its one task checks the condition at each run and
   speaks only when it holds. The model judges by meaning which a request
-  is; the lamp holds no list of words. Two structural repairs back it: a
-  trigger on a topic no part of the lamp carries
-  (`made_skill::topic_lamp_lacks`) is refused with the check's lines and
-  `WATCH_REPAIR` (it runs on the clock, the check inside the task, never
-  `cannot:`); and a `cannot:` reminder after such a trigger of the model's
+  is; the lamp holds no list of words (the example answers grant `net`
+  alone: a task a trigger starts speaks through the lamp's told answer,
+  #8651). Two structural repairs back it: a trigger on a topic no part of
+  the lamp carries (`made_skill::topic_lamp_lacks`) is refused with the
+  check's lines and `WATCH_REPAIR`, which is conditional in words the
+  model judges: if only the internet can tell it, it runs on the clock,
+  the check inside the task, never `cannot:`; otherwise (a sensor or a
+  device the lamp doesn't have, "tell me when my phone battery is low",
+  `phone/battery`) the answer is `needs:` as before, so no clock watch is
+  kept for what no run could ever check, and the person hears the check's
+  own line; and a `cannot:` reminder after such a trigger of the model's
   own is asked again once as a watch (journal: `the model's cannot was a
   reminder after its trigger on what the lamp has no topic for: asked
   again as a watch on the clock`), refused as the lamp's timer only when

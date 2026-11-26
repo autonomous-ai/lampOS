@@ -3776,11 +3776,17 @@ cả hai người viết.
   dùng hết 20 lần trong năm giờ rồi dừng cả ngày), không `rearm`,
   `during` hay `days`, có `net` trong grants; task duy nhất kiểm tra điều
   kiện mỗi lần chạy và chỉ nói khi điều kiện đúng. Mô hình phán theo
-  nghĩa; đèn không giữ danh sách từ nào. Hai lần sửa theo cấu trúc đi kèm:
-  trigger trên topic không bộ phận nào của đèn mang
-  (`made_skill::topic_lamp_lacks`) bị từ chối với các dòng của phép kiểm
-  và `WATCH_REPAIR` (chạy theo đồng hồ, việc kiểm tra nằm trong task, không
-  bao giờ `cannot:`); và `cannot:` nhắc việc sau một trigger như thế của
+  nghĩa; đèn không giữ danh sách từ nào (các câu trả lời mẫu chỉ cấp
+  `net`: task do trigger khởi động nói qua câu told của đèn, #8651). Hai
+  lần sửa theo cấu trúc đi kèm: trigger trên topic không bộ phận nào của
+  đèn mang (`made_skill::topic_lamp_lacks`) bị từ chối với các dòng của
+  phép kiểm và `WATCH_REPAIR`, có điều kiện bằng lời để mô hình phán: nếu
+  chỉ internet mới biết được, nó chạy theo đồng hồ, việc kiểm tra nằm
+  trong task, không bao giờ `cannot:`; còn không (cảm biến hay thiết bị
+  đèn không có, "tell me when my phone battery is low", `phone/battery`)
+  thì trả lời `needs:` như trước, nên không giữ việc theo dõi theo đồng hồ
+  cho điều không lần chạy nào kiểm được, và người nghe chính dòng của phép
+  kiểm; và `cannot:` nhắc việc sau một trigger như thế của
   chính mô hình được hỏi lại một lần như việc theo dõi (nhật ký: `the
   model's cannot was a reminder after its trigger on what the lamp has no
   topic for: asked again as a watch on the clock`), chỉ bị từ chối là bộ

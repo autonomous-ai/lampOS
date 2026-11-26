@@ -8382,14 +8382,37 @@ fn net_granted(table: &toml::Table) -> bool {
         })
 }
 
+/// Whether `table`, a made skill's, does one task for the lamp's agent and
+/// nothing else: one `do` step, a `task` running the lamp's own
+/// [`crate::make_no_cannot::RUN`]. Read from the table alone, so a
+/// read-back outside a keep (where [`AGENT_SCRIPT`] is unset) agrees with
+/// the keep: a code skill of the model's own on the clock is never read as
+/// a watch (the second read's P3 on #8079).
+fn agent_task_alone(table: &toml::Table) -> bool {
+    table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .is_some_and(|steps| {
+            matches!(
+                steps.as_slice(),
+                [step] if step
+                    .get("task")
+                    .and_then(|task| task.get("run"))
+                    .and_then(toml::Value::as_str)
+                    == Some(crate::make_no_cannot::RUN)
+            )
+        })
+}
+
 /// Whether `table`'s clock trigger may be said and kept as a watch on
-/// outside data ([`clock_watch`]): said here at all ([`watch_here`]) and
-/// granted `net` ([`net_granted`]), as a watch checks what only the
-/// internet tells. A clock task every while without `net` ("every 2
-/// hours remind me to stretch") is a repeating reminder, the lamp's own
-/// timer, refused as before (the review's P2 on #8079).
+/// outside data ([`clock_watch`]): said here at all ([`watch_here`]),
+/// one task for the lamp's agent ([`agent_task_alone`]) and granted `net`
+/// ([`net_granted`]), as a watch checks what only the internet tells. A
+/// clock task every while without `net` ("every 2 hours remind me to
+/// stretch") is a repeating reminder, the lamp's own timer, refused as
+/// before (the review's P2 on #8079).
 fn watch_said(table: &toml::Table) -> bool {
-    watch_here() && net_granted(table)
+    watch_here() && agent_task_alone(table) && net_granted(table)
 }
 
 /// Whether `topic` is one no part of the lamp carries (#7357, [`unread`]):

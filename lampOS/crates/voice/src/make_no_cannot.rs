@@ -480,9 +480,11 @@ const TELL_LINE: &str = "tell:";
 pub const TELL_ONCE: &str = "once_while_holding";
 
 /// One whole answer for a watch on outside data ([`WATCH`]), shown to the
-/// model with the watch taught ([`watch_taught`]).
+/// model with the watch taught ([`watch_taught`]): `net` alone, as a task
+/// a trigger starts speaks through the lamp's told answer, never a
+/// `speak` of its own (#8651; the second read's P3 on #8079).
 const WATCH_EXAMPLE: &str = "name: rain-watch
-grants: net, speak
+grants: net
 tell: once_while_holding
 ```skill.toml
 [permissions]
@@ -499,9 +501,10 @@ cooldown = \"90m\"
 const WATCH_EXAMPLE_ASKED: &str = "if it starts raining in Hanoi, tell me";
 
 /// One whole answer for a plain report every while ([`WATCH`]): no
-/// [`TELL_LINE`], so every run's words are said.
+/// [`TELL_LINE`], so every run's words are said; `net` alone, as
+/// [`WATCH_EXAMPLE`].
 const REPORT_EXAMPLE: &str = "name: headlines
-grants: net, speak
+grants: net
 ```skill.toml
 [permissions]
 topics = [\"clock/local\"]
@@ -519,14 +522,21 @@ const REPORT_EXAMPLE_ASKED: &str = "every 2 hours, tell me the headlines";
 /// What a repair is told with the watch taught ([`watch_taught`]) when
 /// the last answer's trigger was on a topic no part of the lamp carries
 /// (`made_skill::topic_lamp_lacks`), and again when a `cannot:` reminder
-/// follows such a trigger ([`made`], #8079): the condition is a watch on
-/// outside data, on the lamp's clock, the check inside the task, told once
-/// while it holds ([`TELL_LINE`]).
-const WATCH_REPAIR: &str = "No topic of the lamp's carries that, so it is a watch on outside \
-data: answer its one [trigger] on the lamp's clock, topic = \"clock/local\", field = \"known\", \
+/// follows such a trigger ([`made`], #8079): only if the internet alone
+/// can tell the condition is it a watch on outside data, on the lamp's
+/// clock, the check inside the task, told once while it holds
+/// ([`TELL_LINE`]); a sensor or a device the lamp doesn't have ("tell me
+/// when my phone battery is low", the second read's P2 on #8079) is
+/// `needs:` as before. The model judges which by meaning; the lamp holds
+/// no list of words, and the check's own lines come first either way.
+const WATCH_REPAIR: &str = "No topic of the lamp's carries that. If only the internet can tell \
+it (a price, the weather, a web page, a count on a service), it is a watch on outside data: \
+answer its one [trigger] on the lamp's clock, topic = \"clock/local\", field = \"known\", \
 equals = true, cooldown = \"90m\", no rearm, during or days, topics = [\"clock/local\"], net \
 among its grants, and a line tell: once_while_holding; the task checks the condition each time \
-and speaks only when it holds. A watch is never a reminder, so never cannot:.";
+and speaks only when it holds. A watch is never a reminder, so never cannot:. Otherwise, when \
+only a sensor or a device the lamp doesn't have could tell it, answer only the line needs: and \
+what, as told above.";
 
 /// Whether `answer` holds, outside a fenced block, the line
 /// [`TELL_LINE`] [`TELL_ONCE`] ([`WATCH`]): the model judged the request a
