@@ -473,11 +473,18 @@ the groups:
 | `busy`, `room`, `room-2`, `two-people` | Colleagues' talk, phone calls, TV, greetings to people, another person's name, and two people at the lamp |
 | `noise` | A call and its follow-up over make_noise.py's beds (babble, TV, a fan, music, typing) at two levels, with someone else's line in the noise |
 | `day` | The day from `day.sh`, its memory lines and computer task swapped for lines of the same kind, at day.sh's gaps (`october-day`) and as a person paces it (`paced-day`) |
+| `r-calls`, `r-not-calls`, `r-follow-ups`, `r-game`, `r-short`, `r-stop`, `r-greeted` | The product owner's rules of 26 Nov: "Hey Lamp" at a line's start starts a conversation; follow-ups carry 20 s, a word or two included; room talk that opens with a greeting is left alone |
+| `clear-calls`, `calls-3`, `name-at-end`, `repeat-call`, `quiet-voices`, `accents-talk`, `kids` | More calls: clear and quiet ones, the name at a line's end, a call said again, children's and accented voices |
+| `follow-ups-2`, `follow-ons`, `two-asks`, `long-chat`, `multi-talk`, `math-hard-5`, `questions-2`, `delivery-2`, `pauses`, `repeat`, `repeats-3` | Longer conversations, two asks in a line, pauses inside a line, and the same question asked again |
+| `stops`, `talk-over`, `overlap`, `thanks`, `after-quiet`, `handover` | Stopping the lamp, talking over it, thanks at the end, a line after a quiet spell, and asks for a computer's work (`handover`: only on a lamp with no computer paired, or with its person's yes) |
+| `alone`, `alone-2`, `person-words`, `greetings`, `phone`, `tv`, `meeting`, `family`, `about-lamp` | Talk not for the lamp: someone alone thinking aloud, words said to a person, greetings by name, phone calls, TV, a meeting, a family at dinner, and talk about the lamp |
 
 ```sh
 export LAMP_HOST=<your lamp's address> LAMP_SSH_KEY=<your key file>
 lampOS/tools/played/make_noise.py              # once: the noise beds
-lampOS/tools/played/voiceset.py v1125          # every group, about three hours
+lampOS/tools/played/voiceset.py v1125          # every group (59, 432 scenes, 711 lines), about seven hours
+VOICESET_GAP=22 lampOS/tools/played/voiceset.py v1126 r-calls r-not-calls r-greeted   # the rule groups, about 30 minutes
+VOICESET_HEY_ONLY=1 lampOS/tools/played/voiceset.py v1126b calls calls-2            # older groups scored by "Hey Lamp" only
 lampOS/tools/played/voiceset.py d1125 day/october-day calls room
 ```
 
