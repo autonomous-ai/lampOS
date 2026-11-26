@@ -12201,6 +12201,8 @@ impl Heeding {
             crate::second_provider::Did::Worked(at_us) => self.attention.worked(at_us),
             crate::second_provider::Did::Spoke(at_us) => self.attention.news_told(at_us),
             crate::second_provider::Did::Said(request, until_us) => {
+                // `LAMP_ONE_REPLY_WINDOW`: its news's reply window from its end.
+                self.attention.lamp_words_until(until_us);
                 if self.carries && self.carrying && !self.chain.contains(&request) {
                     self.carry_window.answered(request, until_us);
                 }

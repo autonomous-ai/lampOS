@@ -1087,6 +1087,19 @@ pub const ONE_REPLY_WINDOW_ENVIRONMENT: &str = "LAMP_ONE_REPLY_WINDOW";
 /// does, never held as stray words (`second_provider::worker::LONE_WORDS`).
 pub const SHORT_REPLIES_CARRY_ENVIRONMENT: &str = "LAMP_SHORT_REPLIES_CARRY";
 
+/// Whether `text` is only fillers ("Uh.", "Hmm, um."): a noise written with
+/// letters, never carried as a reply (`LAMP_SHORT_REPLIES_CARRY`).
+pub(crate) fn filler_only(text: &str) -> bool {
+    const FILLERS: [&str; 10] = [
+        "uh", "um", "umm", "uhm", "er", "erm", "hmm", "hm", "mm", "mhm",
+    ];
+    let mut words = text
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty())
+        .peekable();
+    words.peek().is_some() && words.all(|word| FILLERS.iter().any(|f| word.eq_ignore_ascii_case(f)))
+}
+
 /// [`SHORT_REPLIES_CARRY_ENVIRONMENT`] from this worker's environment.
 pub(crate) fn short_replies_carry_on() -> bool {
     std::env::var(SHORT_REPLIES_CARRY_ENVIRONMENT).is_ok_and(|value| value == "on")
@@ -11954,9 +11967,18 @@ async fn spoken(
     // `LAMP_SHORT_REPLIES_CARRY` (#8772): in a conversation going on, a sound
     // with a word in it is judged as a line, the lamp's last words a question
     // or not.
+    // Only within the conversation's 20 s after the lamp's words, and never a
+    // filler: "Uh." is a noise written with a letter (the Reviewer-lead's
+    // P2s on #8781).
+    let began_us = said.lock().map_or(0, |said| said.0);
+    let until_us = shared.said_until_us.load(Ordering::Relaxed);
+    let in_the_window =
+        until_us > 0 && began_us.saturating_sub(until_us) <= crate::follows_on::WITHIN_US;
     let carried_sound = marked
         && !asked_by_the_lamp
         && text.chars().any(char::is_alphanumeric)
+        && !filler_only(&text)
+        && in_the_window
         && shared
             .sound_carries
             .as_ref()
