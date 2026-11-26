@@ -398,12 +398,10 @@ and so are `LAMP_TASKS_WHO` and `LAMP_SPOKEN_TO`, so each is counted `on`.
 
 Not switches: the bounds `LAMP_PRIVACY_RIDES_STALL` rides inside, listed for review (no self-defined limits).
 
-| Limit | Value | Where | Why |
-|---|---|---|---|
-| Authority lease (`MAX_AUTHORITY_LEASE_US`) | 250 ms | `crates/turn-owner/src/types.rs` | how long one published authority grants anything |
-| Lapse ride (`DENIED_LAPSE_MOST_US`) | 1.5 s from the lease's expiry | `crates/voice/src/privacy_bus.rs` | the longest a lapsed authority is ridden closed (#4332); past it the worker ends |
-| Authority renewal (`AUTHORITY_RENEW_US`) | 20 ms | `crates/voice/src/coordinator.rs` | how often the voice renews every worker's authority when nothing else published one; a worker stalled alone finds one queued per renewal |
-| Authority drain (`AUTHORITY_DRAIN_MOST`) | 352 | `crates/voice/src/privacy_bus.rs` | a named backstop, 4 × (1.5 s + 250 ms) / 20 ms (#8466): unreachable while the socket holds about 118; past it the switch is unreadable (microphones closed, a fresh worker), never an exit |
+- **Authority lease** (`MAX_AUTHORITY_LEASE_US`, `crates/turn-owner/src/types.rs`): 250 ms. How long one published authority grants anything.
+- **Lapse ride** (`DENIED_LAPSE_MOST_US`, `crates/voice/src/privacy_bus.rs`): 1.5 s from the lease's expiry. The longest a lapsed authority is ridden closed (#4332); past it the worker ends.
+- **Authority renewal** (`AUTHORITY_RENEW_US`, `crates/voice/src/coordinator.rs`): 20 ms. How often the voice renews every worker's authority when nothing else published one; a worker stalled alone finds one queued per renewal.
+- **Authority drain** (`AUTHORITY_DRAIN_MOST`, `crates/voice/src/privacy_bus.rs`): 352. A named backstop, 4 × (1.5 s + 250 ms) / 20 ms (#8466): unreachable while the socket holds about 118; past it the switch is unreadable (microphones closed, a fresh worker), never an exit.
 
 ## The voice: tasks, memory, schedule, skills and looks
 

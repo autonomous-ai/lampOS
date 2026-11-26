@@ -4878,7 +4878,7 @@ fn pulse(
         startup.poll(&mut worker.channels, &worker.role)?;
     }
     let time = monotonic_us();
-    if time.saturating_sub(*last) >= 20_000 {
+    if time.saturating_sub(*last) >= AUTHORITY_RENEW_US {
         let snapshot = owner
             .snapshot(MonoTime::from_micros(time))
             .map_err(io::Error::other)?;
