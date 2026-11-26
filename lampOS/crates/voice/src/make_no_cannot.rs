@@ -2709,7 +2709,9 @@ equals = true
             panic!("{WATCH_EXAMPLE}")
         };
         assert_eq!(name, "rain-watch");
-        assert_eq!(grants, ["net", "speak"]);
+        // `net` alone: a task a trigger starts speaks through the told
+        // answer, never a `speak` of its own (#8651).
+        assert_eq!(grants, ["net"]);
         let block = block_kept(&block).unwrap();
         assert!(on_the_clock(&block), "{block}");
         middle_on(Some(true));
@@ -2754,6 +2756,32 @@ equals = true
         set_on_here(Some(false));
         crate::skill_task_yes::set_net_here(Some(false));
         assert_eq!(heard(&block), None);
+        middle_on(None);
+    }
+
+    /// The second read's P3 on #8079: a read-back outside a keep (a kept
+    /// skill's `skill.toml` alone, `AGENT_SCRIPT` unset) says "Every N"
+    /// only for a task for the lamp's agent, one `do.task` running the
+    /// lamp's own [`RUN`], as the keep does; a code skill of the model's
+    /// own on a clock every 90 minutes, granted `net`, is read as before.
+    #[test]
+    fn a_read_back_says_a_watch_only_for_the_agents_own_task() {
+        middle_on(Some(true));
+        let skill = |run: &str| {
+            format!(
+                "kind = \"installable\"\nversion = \"1.0.0\"\ngrants = [\"net\", \"speak\"]\n\n\
+                 [permissions]\ntopics = [\"clock/local\"]\n\n[trigger]\ntopic = \"clock/local\"\n\
+                 field = \"known\"\nequals = true\ncooldown = \"90m\"\n\n[ask]\npolicy = \
+                 \"nudge\"\n\n[[do]]\ntask = {{ task = \"check the price\", run = \"{run}\" }}\n"
+            )
+        };
+        let agents = made_skill::plainly(&skill(RUN)).unwrap();
+        assert!(agents.starts_with("Every 90 minutes"), "{agents}");
+        let code = made_skill::plainly(&skill("scripts/main.py"));
+        assert!(
+            !code.as_deref().is_ok_and(|said| said.starts_with("Every")),
+            "the model's own code, read as a watch: {code:?}"
+        );
         middle_on(None);
     }
 

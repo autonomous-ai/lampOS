@@ -14297,6 +14297,60 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// The second read's P2 on #8079: a trigger on a sensor the lamp lacks
+    /// ("tell me when my phone battery is low", `phone/battery`) is no
+    /// watch on outside data. The repair tells the model the watch only if
+    /// the internet alone can tell it, else `needs:` as before, in words it
+    /// judges, no word list; a model that keeps answering the sensor's
+    /// trigger is refused with the check's own line at every repair, nothing
+    /// kept, no clock watch, and the person hears that the lamp has nothing
+    /// that reads it.
+    #[test]
+    fn with_the_middle_form_on_a_sensor_the_lamp_lacks_is_no_watch_and_the_check_is_heard() {
+        made_skill::set_reactions_here(None);
+        made_skill::set_loose_here(Some(true));
+        net_make_here(Some(true));
+        crate::make_no_cannot::set_on_here(Some(true));
+        let (root, keeping) = keeping("lacking-sensor-no-watch");
+        const BATTERY: &str = "tell me when my phone battery is low";
+        let battery = trigger_answer(
+            "battery-low",
+            "speak",
+            "phone/battery",
+            "field = \"percent\"\nbelow = 20\n",
+        );
+        let mut answers = vec![(
+            200,
+            "cannot: a skill can't see a phone's battery.".to_owned(),
+        )];
+        answers.extend((0..=MOST_REPAIRS).map(|_| (200, battery.clone())));
+        let (url, served) = service_sent(answers);
+        let told = make(BATTERY, &keeping, chat_at(url), NOW);
+        let sent = served.join().unwrap();
+        assert_eq!(sent.len(), MOST_REPAIRS + 2, "{told}");
+        for repair in &sent[2..] {
+            assert!(
+                repair.contains("phone/battery is not one the lamp has")
+                    && repair.contains("If only the internet can tell it")
+                    && repair.contains("Otherwise")
+                    && repair.contains("needs:"),
+                "the check's line, then the watch only for the internet: {repair}"
+            );
+        }
+        assert!(told.get("made").is_none(), "{told}");
+        let error = told["error"].as_str().unwrap_or_default();
+        assert!(
+            error.contains(made_skill::NOTHING_READS),
+            "the check's line heard: {told}"
+        );
+        assert!(!told.to_string().contains("Every "), "{told}");
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        crate::make_no_cannot::set_on_here(None);
+        net_make_here(None);
+        made_skill::set_loose_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// The Reviewer-lead's P2 on #7764: judged a quick reaction, a first
     /// draft that can't be read gets DeepSeek's repairs, each held to
     /// [`made_skill::quick_reaction`] as the first draft is: a repair on
