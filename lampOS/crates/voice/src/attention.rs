@@ -2707,6 +2707,20 @@ impl Attention {
         self.name_unsure_dropped
     }
 
+    /// Whether the lamp's name was heard for the line last weighed at all,
+    /// kept or dropped after (`LAMP_ONE_VOICE_NOT_BUSY`, #8771): a run in one
+    /// voice is one person trying to reach the lamp only when its name was
+    /// heard in it; one voice talking to someone else, a phone call's near
+    /// side, is talk as before (the Reviewer-lead's P2 on #8777).
+    pub fn name_heard_for_the_line(&self) -> bool {
+        self.named
+            || self.name_dropped_by_near()
+            || self.name_dropped_as_short()
+            || self.name_dropped_as_anothers()
+            || self.name_dropped_as_unsure()
+            || self.ruled_not_the_name()
+    }
+
     /// Whether the name heard for the line last weighed, though dropped, is
     /// still told to the model: its words call the lamp (the verdict's "the
     /// text shows it was called"; [`Self::need_a_face_or_words`], #8136).

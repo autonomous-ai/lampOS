@@ -3544,6 +3544,8 @@ fn second_route_worker_environment(
         crate::second_provider::NO_FACE_FOLLOW_UP_BY_VOICE_ENVIRONMENT,
         // Held desk talk makes a busy room (#7332).
         crate::second_provider::ROOM_HELD_TALK_ENVIRONMENT,
+        // A run in one voice never makes it busy (#8771).
+        crate::second_provider::ONE_VOICE_NOT_BUSY_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
         crate::speaking_faces::EYES_ENVIRONMENT,
         crate::speaking_faces::READ_LOOKS_ENVIRONMENT,
@@ -3955,6 +3957,7 @@ mod tests {
             crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT,
             crate::second_provider::NO_FACE_FOLLOW_UP_BY_VOICE_ENVIRONMENT,
             crate::second_provider::ROOM_HELD_TALK_ENVIRONMENT,
+            crate::second_provider::ONE_VOICE_NOT_BUSY_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
             crate::speaking_faces::EYES_ENVIRONMENT,
             crate::speaking_faces::READ_LOOKS_ENVIRONMENT,
@@ -5269,6 +5272,7 @@ mod tests {
                     || name == crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT
                     || name == crate::second_provider::NO_FACE_FOLLOW_UP_BY_VOICE_ENVIRONMENT
                     || name == crate::second_provider::ROOM_HELD_TALK_ENVIRONMENT
+                    || name == crate::second_provider::ONE_VOICE_NOT_BUSY_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
                     || name == crate::speaking_faces::EYES_ENVIRONMENT
                     || name == crate::speaking_faces::READ_LOOKS_ENVIRONMENT
@@ -5529,6 +5533,7 @@ mod tests {
                     "LAMP_NUDGE_CLAIM_CHECKED=on",
                     "LAMP_ONE_AS_LAMP=on",
                     "LAMP_ONE_FACE_REMINDERS=on",
+                    "LAMP_ONE_VOICE_NOT_BUSY=on",
                     "LAMP_OPENS_FURTHER=on",
                     "LAMP_OWNER_LINK=on",
                     "LAMP_OWNER_PLACE=on",

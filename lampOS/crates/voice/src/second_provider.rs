@@ -1144,6 +1144,17 @@ pub(crate) fn no_face_follow_up_by_voice_on() -> bool {
 /// [`crate::room_told::RoomTold::count_held_not_spoken_to`], #7332).
 pub const ROOM_HELD_TALK_ENVIRONMENT: &str = "LAMP_ROOM_HELD_TALK";
 
+/// `on` exactly, off unless set (#8771): a run of lines the lamp said
+/// nothing to turns the room busy only when they are not all one voice, by
+/// the window's prints ([`crate::room_told::RoomTold::count_one_voice`]). One
+/// person trying to reach the lamp is never a busy room's talk.
+pub const ONE_VOICE_NOT_BUSY_ENVIRONMENT: &str = "LAMP_ONE_VOICE_NOT_BUSY";
+
+/// [`ONE_VOICE_NOT_BUSY_ENVIRONMENT`] from this worker's environment.
+pub(crate) fn one_voice_not_busy_on() -> bool {
+    std::env::var(ONE_VOICE_NOT_BUSY_ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
 /// A held rename's one- or two-word yes read by the short-line rule, with
 /// `LAMP_NAME_LEARN_FIX` (`LAMP_RENAME_SHORT_YES=on`, #7419,
 /// [`held_rename::SHORT_YES_ENVIRONMENT`]).
