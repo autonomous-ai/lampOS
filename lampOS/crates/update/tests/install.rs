@@ -4240,7 +4240,10 @@ fn the_product_sees_who_speaks() {
 /// speaking switch (a held forget's yes is a plain yes; every room's
 /// "forget my face" is told NOT_THEIRS, #3038), nor the eyes' pitch and
 /// gaze. The eyes still read each face's speaking: a line seen spoken is
-/// still kept as that person's.
+/// still kept as that person's. `LAMP_NAME_FACE_OR_WORDS` stays on: it holds
+/// an unsure hearing on lamp-name's own score, a measured hearing, and a face
+/// only helps a line through (the Reviewer-lead's P2 on #8791: off, #8136's
+/// 0.921 start hearing in two people's talk is a call again).
 #[test]
 fn the_product_holds_no_line_on_an_unmeasured_sensor() {
     let set = |name: &str, switch: &str| {
@@ -4254,7 +4257,6 @@ fn the_product_holds_no_line_on_an_unmeasured_sensor() {
             .any(|line| line.starts_with(&format!("Environment={switch}=")))
     };
     for (name, switch) in [
-        ("lamp-voice.service", "LAMP_NAME_FACE_OR_WORDS"),
         ("lamp-voice.service", "LAMP_ROOM_HELD_TALK"),
         ("lamp-voice.service", "LAMP_NO_FACE_FOLLOW_UP_BY_VOICE"),
         ("lamp-voice.service", "LAMP_TURNED_FACE_SPEAKS"),
@@ -4264,6 +4266,7 @@ fn the_product_holds_no_line_on_an_unmeasured_sensor() {
         assert!(!set(name, switch), "{name} sets {switch}");
     }
     assert!(set("lamp-eyes.service", "LAMP_EYES_SPEAKING"));
+    assert!(set("lamp-voice.service", "LAMP_NAME_FACE_OR_WORDS"));
 }
 
 /// #4710: the memory owner's yes (4 Nov), after Sixth's lamp-52e6 check,

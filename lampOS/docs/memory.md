@@ -974,6 +974,13 @@ of the journal as every keep's is, so the line that holds the words is the
 answer after it. A memory that refuses the fields (an older one, or a
 current one refusing that keeper) gets the line once more without them, kept
 as before.
+With the voice's own copy of `LAMP_EYES_SPEAKING` off (the product since
+#8791, the product owner's ruling of 26 Nov 2026 that no sensor holds a line
+until it is measured), the worker's sight check on a held forget's yes
+(`confirming_forgets_by_sight`, #2377) is off: the yes is judged as a plain
+yes, within this page's other rules, such as the one-face rule below. The
+forget line itself still reaches a person's scope only when they were seen
+saying it, as above: the eyes' own `LAMP_EYES_SPEAKING` stays on.
 `forget_everything` on such a line still runs in the room's scope, and **a yes said on such a line never runs a held forget**
 (`ScopeLease::by_one_face`, `take_held_forget`; the model is told the yes
 did not count): the yes still needs their face seen saying it. Risk left: a
