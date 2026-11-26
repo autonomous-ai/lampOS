@@ -6,8 +6,13 @@
 use super::{Error, Result, tts::without_tags};
 use futures_util::stream::{self, BoxStream, StreamExt};
 use lamp_msgs::phonon::{Head, head, request};
-use std::{path::PathBuf, time::Duration};
-use tokio::{io::AsyncReadExt, io::AsyncWriteExt, net::UnixStream};
+use std::{path::PathBuf, sync::Arc, time::Duration};
+use tokio::{
+    io::AsyncReadExt,
+    io::AsyncWriteExt,
+    net::UnixStream,
+    sync::{Mutex, OwnedMutexGuard},
+};
 
 use super::PACKET_SAMPLES;
 
@@ -19,7 +24,16 @@ pub const STALL: Duration = Duration::from_secs(4);
 pub struct PhononTts {
     socket: PathBuf,
     voice: &'static str,
+    /// One sentence at a time, as `lamp-phonon` makes them (lamp-6377, 26
+    /// Nov: the voice asks a reply's pieces together, and a second piece
+    /// waiting behind the first's making ran out its first-sound window and
+    /// was said in the lamp's voice). A piece takes its turn before its
+    /// window starts and gives it back when its sentence has been made.
+    turn: Arc<Mutex<()>>,
 }
+
+/// A piece's turn at `lamp-phonon` ([`PhononTts::turn`]).
+pub type Turn = OwnedMutexGuard<()>;
 
 impl PhononTts {
     /// The service at `socket`, speaking in `voice` (a name
@@ -28,6 +42,7 @@ impl PhononTts {
         Self {
             socket: socket.into(),
             voice: voice.name,
+            turn: Arc::new(Mutex::new(())),
         }
     }
 
@@ -40,6 +55,24 @@ impl PhononTts {
     /// service (not chosen, still fetching, stopped), a refusal, or a
     /// first packet later than [`STALL`].
     pub async fn speak(&self, text: &str) -> Result<BoxStream<'static, Result<Vec<i16>>>> {
+        let turn = self.turn().await;
+        self.speak_in_turn(text, turn).await
+    }
+
+    /// This voice's turn: waits while another piece's sentence is being
+    /// made, in the order the pieces asked. Not counted in a piece's
+    /// first-sound window.
+    pub async fn turn(&self) -> Turn {
+        self.turn.clone().lock_owned().await
+    }
+
+    /// [`PhononTts::speak`] once `turn` is held; the turn is given back when
+    /// the sentence has been made, fails or its speech is dropped.
+    pub async fn speak_in_turn(
+        &self,
+        text: &str,
+        turn: Turn,
+    ) -> Result<BoxStream<'static, Result<Vec<i16>>>> {
         let text = without_tags(text);
         let mut connection = UnixStream::connect(&self.socket)
             .await
@@ -52,6 +85,7 @@ impl PhononTts {
             connection,
             held: Vec::new(),
             ended: false,
+            turn: Some(turn),
         };
         let first = reader.packet().await?;
         let rest = stream::try_unfold(reader, |mut reader| async move {
@@ -66,6 +100,8 @@ struct Reader {
     connection: UnixStream,
     held: Vec<i16>,
     ended: bool,
+    /// Given back at the end: the service is free for the next sentence.
+    turn: Option<Turn>,
 }
 
 impl Reader {
@@ -75,7 +111,10 @@ impl Reader {
             let mut bytes = [0; 4];
             read_within(&mut self.connection, &mut bytes).await?;
             match head(bytes) {
-                Head::End => self.ended = true,
+                Head::End => {
+                    self.ended = true;
+                    self.turn = None;
+                }
                 Head::Failed => return Err(Error::Protocol("the lamp's voice's failure")),
                 Head::Samples(n) => {
                     let mut pcm = vec![0; n * 2];

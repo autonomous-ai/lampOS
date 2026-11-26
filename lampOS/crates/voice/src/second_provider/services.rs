@@ -1097,6 +1097,25 @@ impl Voice {
         text: &str,
         turn: Option<net::Turn>,
     ) -> net::Result<BoxStream<'static, net::Result<Vec<i16>>>> {
+        self.first_held(text, turn, None).await
+    }
+
+    /// Phonon's turn ([`net::PhononTts::turn`]), taken before a piece's
+    /// first-sound window starts; `None` for any other voice.
+    async fn phonon_turn(&self) -> Option<net::PhononTurn> {
+        match self {
+            Self::Phonon(phonon, _) => Some(phonon.turn().await),
+            _ => None,
+        }
+    }
+
+    /// [`Voice::first`], with Phonon's turn already `held` if taken.
+    async fn first_held(
+        &self,
+        text: &str,
+        turn: Option<net::Turn>,
+        held: Option<net::PhononTurn>,
+    ) -> net::Result<BoxStream<'static, net::Result<Vec<i16>>>> {
         match self {
             Self::Gemini(gemini) => gemini_first(gemini, text).await,
             // #8754: a piece Google refuses for the person's key (401, 403,
@@ -1124,7 +1143,10 @@ impl Voice {
             }
             // #8754: Phonon says it if it can start; else the lamp's one
             // voice does, with no notice (the model may still be fetching).
-            Self::Phonon(phonon, lamps) => match phonon.speak(text).await {
+            Self::Phonon(phonon, lamps) => match match held {
+                Some(held) => phonon.speak_in_turn(text, held).await,
+                None => phonon.speak(text).await,
+            } {
                 Ok(speech) => Ok(speech),
                 Err(why) => {
                     if !PHONON_PASSED.swap(true, std::sync::atomic::Ordering::Relaxed) {
@@ -1265,7 +1287,10 @@ fn in_one_voice_near(
             let text = text.clone();
             let voice = voice.clone();
             async move {
-                tokio::time::timeout(START_WITHIN, voice.first(&text, turn))
+                // #8754: Phonon makes one sentence at a time; a piece's
+                // window starts once its turn comes, not while it waits.
+                let held = voice.phonon_turn().await;
+                tokio::time::timeout(START_WITHIN, voice.first_held(&text, turn, held))
                     .await
                     .unwrap_or(Err(net::Error::Timeout("speech's first sound")))
             }
@@ -1274,6 +1299,14 @@ fn in_one_voice_near(
             let text = text.clone();
             let voice = voice.clone();
             async move {
+                if let Some(held) = voice.phonon_turn().await {
+                    return tokio::time::timeout(
+                        START_WITHIN,
+                        voice.first_held(&text, turn, Some(held)),
+                    )
+                    .await
+                    .unwrap_or(Err(net::Error::Timeout("speech's first sound")));
+                }
                 tokio::time::timeout(START_WITHIN, voice.first_fresh(&text, turn))
                     .await
                     .unwrap_or(Err(net::Error::Timeout("speech's first sound")))
@@ -2593,6 +2626,64 @@ pub(crate) mod tests {
                 ("And again.".to_owned(), "Toby")
             ]
         );
+        assert!(lamps_asked.lock().unwrap().is_empty());
+    }
+
+    /// #8754, lamp-6377 on 26 Nov: a reply's pieces are asked together, and
+    /// `lamp-phonon` makes one sentence at a time. A second piece waiting
+    /// behind a first that takes longer than [`START_WITHIN`] to make is
+    /// still Phonon's: its window starts with its turn, so the lamp's voice
+    /// is never asked.
+    #[tokio::test]
+    async fn a_piece_waiting_for_phonons_turn_is_not_timed_out() {
+        use tokio::io::AsyncBufReadExt;
+        let folder = PhononFolder::new();
+        let listener = tokio::net::UnixListener::bind(folder.socket()).unwrap();
+        // One sentence at a time, as lamp-phonon: the first frame at once,
+        // then the rest over START_WITHIN + 1 s, then the end.
+        tokio::spawn(async move {
+            while let Ok((connection, _)) = listener.accept().await {
+                let mut connection = tokio::io::BufReader::new(connection);
+                let mut line = String::new();
+                connection.read_line(&mut line).await.unwrap();
+                let mut connection = connection.into_inner();
+                let slow = line.contains("First");
+                let first = vec![1; net::PACKET_SAMPLES];
+                let _ = connection
+                    .write_all(&lamp_msgs::phonon::frame(&first))
+                    .await;
+                // The first sentence's making runs past START_WITHIN in
+                // all, each frame well inside the read's own stall.
+                for _ in 0..if slow { 4 } else { 0 } {
+                    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+                    let _ = connection.write_all(&lamp_msgs::phonon::frame(&[3])).await;
+                }
+                let _ = connection.write_all(&lamp_msgs::phonon::frame(&[2])).await;
+                let _ = connection.write_all(&lamp_msgs::phonon::END).await;
+            }
+        });
+        let (lamps_url, lamps_asked) = recording(
+            answer_head(200, 4),
+            bytes(&[5, 6]),
+            LAMPS_KEY,
+            std::time::Duration::ZERO,
+        )
+        .await;
+        let lamps = Tts::with(TtsProvider::ElevenLabs, &lamps_url, LAMPS_KEY, None).unwrap();
+        let voice = Voice::Phonon(
+            Arc::new(net::PhononTts::new(
+                folder.socket(),
+                lamp_msgs::phonon::voice("Freya").unwrap(),
+            )),
+            Box::new(Voice::Configured(Arc::new(lamps), "ElevenLabs")),
+        );
+        let first = in_one_voice(voice.clone(), "First sentence.".into(), turn_of(8754));
+        let second = in_one_voice(voice, "Second sentence.".into(), turn_of(8754));
+        let (first, second) = tokio::join!(spoken(first), spoken(second));
+        let first_whole: Vec<i16> = [vec![1; net::PACKET_SAMPLES], vec![3; 4], vec![2]].concat();
+        let second_whole: Vec<i16> = [vec![1; net::PACKET_SAMPLES], vec![2]].concat();
+        assert_eq!(first, Ok(first_whole));
+        assert_eq!(second, Ok(second_whole));
         assert!(lamps_asked.lock().unwrap().is_empty());
     }
 
