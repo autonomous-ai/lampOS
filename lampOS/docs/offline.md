@@ -383,8 +383,12 @@ and its gate needs a ready session.
   "You have a reminder." plays, and the item is marked "rung, not told" in
   the consumer's ledger (`delivery::SCHEMA` 3, kept across a restart). It
   is not rung offline again, and once the link is back it is said in its
-  own words, once, as a model ring; then the mark goes. With no clip kept at
-  all, it waits for the link as before.
+  own words, once, as a model ring; then the mark goes. While it waits it
+  holds up nothing: the consumer passes it over, so a timer or reminder due
+  later in the same outage still rings on time, and nothing is joined into
+  it; the voice tells the consumer when the link is back (`LinkBack`, the
+  Reviewer-lead's P2 on #8800). With no clip kept at all, it waits for the
+  link as before.
 - **A bound on the clips (the first builder's add 2):** the folder holds at
   most 122,918,400 bytes (`ring_clips::MOST_BYTES`, about 123 MB): a clip and
   its sidecar for each of Schedule's 128 items at most, each clip at its

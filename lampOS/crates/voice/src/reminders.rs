@@ -546,6 +546,10 @@ pub(crate) enum ToWorker {
     /// (`LAMP_OFFLINE_RINGS`, #8708): it is kept "rung, not told" and
     /// offered again, said in its words once the link is back.
     RungOffline { token: PreparedToken },
+    /// The link is back after a ring was sent as [`Self::RungOffline`]: the
+    /// rings waiting for it are offered again, said in their words (the
+    /// Reviewer-lead's P2 on #8800).
+    LinkBack {},
 }
 /// The soonest ring not yet due (`LAMP_OFFLINE_RINGS`, #8632): its Schedule
 /// identity and when it is due on the machine's monotonic clock, as the
@@ -880,6 +884,11 @@ pub(crate) struct Reminders {
     /// The soonest ring not yet due, as the consumer last told it
     /// (`LAMP_OFFLINE_RINGS`, #8632).
     upcoming: Option<Upcoming>,
+    /// A ring was sent as [`ToWorker::RungOffline`]: the consumer is told
+    /// once the link is back ([`Self::link_ready`]), and whether that is
+    /// still to be sent.
+    link_waits: bool,
+    link_back_owed: bool,
 }
 impl Reminders {
     pub fn from_environment() -> io::Result<Option<Self>> {
@@ -905,6 +914,8 @@ impl Reminders {
             cut_last: None,
             stop_owed: None,
             upcoming: None,
+            link_waits: false,
+            link_back_owed: false,
         }))
     }
 
@@ -1021,7 +1032,8 @@ impl Reminders {
                         .unadmitted
                         .as_ref()
                         .is_some_and(|command| match command {
-                            ToWorker::Retire { token: pending, .. } => pending == &token,
+                            ToWorker::Retire { token: pending, .. }
+                            | ToWorker::RungOffline { token: pending } => pending == &token,
                             _ => false,
                         })
                     {
@@ -1051,6 +1063,9 @@ impl Reminders {
                 && let Some(settlement) = &state.settlement
             {
                 self.sent = self.transport.send(settlement)?;
+                if self.sent && matches!(settlement, ToWorker::RungOffline { .. }) {
+                    self.link_waits = true;
+                }
                 if self.sent && matches!(settlement, ToWorker::Complete { .. }) {
                     self.said_at_us = Some(now_us);
                 }
@@ -1075,8 +1090,38 @@ impl Reminders {
             && let Some(settlement) = &self.unadmitted
         {
             self.sent = self.transport.send(settlement)?;
+            if self.sent && matches!(settlement, ToWorker::RungOffline { .. }) {
+                self.link_waits = true;
+            }
+        }
+        if self.link_back_owed && self.transport.send(&ToWorker::LinkBack {})? {
+            self.link_back_owed = false;
         }
         Ok(())
+    }
+    /// `offer`, rung offline before from the generic line
+    /// ([`Offer::rung_offline`]), is due with no link (after a restart): it
+    /// is sent back as rung offline, so the consumer passes it over until
+    /// the link is back and later rings go on (the Reviewer-lead's P2 on
+    /// #8800).
+    pub fn wait_for_link(&mut self, offer: &Offer) {
+        if !offer.rung_offline || self.active.is_some() || self.unadmitted.is_some() {
+            return;
+        }
+        if self.offer.as_ref().is_some_and(|o| o.token == offer.token) {
+            self.offer = None;
+        }
+        self.unadmitted = Some(ToWorker::RungOffline {
+            token: offer.token.clone(),
+        });
+        self.sent = false;
+    }
+    /// The link is ready: if a ring was sent as rung offline, the consumer
+    /// is told, once, so the rings waiting for it are offered again.
+    pub fn link_ready(&mut self) {
+        if std::mem::take(&mut self.link_waits) {
+            self.link_back_owed = true;
+        }
     }
     /// The soonest ring not yet due (`LAMP_OFFLINE_RINGS`, #8632), none
     /// once the consumer failed.
