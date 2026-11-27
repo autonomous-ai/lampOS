@@ -217,7 +217,7 @@ pub struct Config {
 }
 
 /// The configuration's fields, as [`read`] knows them.
-pub const FIELDS: [&str; 29] = [
+pub const FIELDS: [&str; 30] = [
     "listen",
     "marker",
     "credential",
