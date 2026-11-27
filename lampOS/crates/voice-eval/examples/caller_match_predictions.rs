@@ -26,6 +26,7 @@ struct Session {
     id: String,
     split: String,
     clock_id: String,
+    sync_error_us: u64,
     consent: bool,
     delete_after_unix_s: u64,
 }
@@ -33,6 +34,8 @@ struct Session {
 struct Trial {
     id: String,
     session_id: String,
+    start_us: u64,
+    end_us: u64,
 }
 #[derive(Deserialize)]
 struct Case {
@@ -135,6 +138,7 @@ struct Observation {
 #[derive(Default)]
 struct Sample {
     decision: Option<(u64, u64)>,
+    submitted: Option<u64>,
     result: Option<(Class, u64, u64)>,
     admitted: Option<u64>,
 }
@@ -142,6 +146,7 @@ struct Sample {
 struct Bound<'a> {
     entry: &'a Entry,
     audit: &'a Audit,
+    trial: &'a Trial,
     session: &'a Session,
     reference: &'a Session,
 }
@@ -189,7 +194,7 @@ fn bind<'a>(
         let case = cases
             .get(e.case_id.as_str())
             .ok_or("unknown sidecar case")?;
-        let trial = trials.get(e.trial_id.as_str()).ok_or("unknown trial")?;
+        let trial = *trials.get(e.trial_id.as_str()).ok_or("unknown trial")?;
         let session = *sessions
             .get(trial.session_id.as_str())
             .ok_or("unknown session")?;
@@ -202,6 +207,9 @@ fn bind<'a>(
         }
         if case.sensor != "voice_match" {
             continue;
+        }
+        if trial.start_us >= trial.end_us {
+            return Err("invalid voice trial interval".into());
         }
         let id = e
             .reference_trial_id
@@ -225,6 +233,7 @@ fn bind<'a>(
             output.push(Bound {
                 entry: e,
                 audit,
+                trial,
                 session,
                 reference,
             });
@@ -234,6 +243,29 @@ fn bind<'a>(
 }
 
 impl Bound<'_> {
+    fn check_live_times(&self, r: &Observation) -> Result<()> {
+        let tolerance = self.session.sync_error_us;
+        if r.line_end_us.abs_diff(self.trial.end_us) > tolerance || r.decision_us < r.line_end_us {
+            return Err("journal line end or decision outside the labelled trial".into());
+        }
+        if self
+            .audit
+            .input_end_us
+            .is_some_and(|at| r.input_end_us != Some(at))
+        {
+            return Err("observed submission differs from the journal".into());
+        }
+        if r.input_end_us.is_some_and(|at| {
+            at < self.trial.start_us.saturating_sub(tolerance) || at > r.decision_us
+        }) || (r.ready_us.is_some() && r.input_end_us.is_none())
+            || (r.ready_us.is_none() && r.output != Class::Unknown)
+            || (r.phase == "admission" && r.ready_us.is_some_and(|at| at > r.decision_us))
+        {
+            return Err("inconsistent submission or readiness for this trial".into());
+        }
+        Ok(())
+    }
+
     fn prediction(&self, output: Class, input_end_us: u64) -> Prediction {
         Prediction {
             case_id: self.entry.case_id.clone(),
@@ -277,6 +309,7 @@ fn live(bound: &[Bound<'_>], journal: impl BufRead) -> Result<Vec<Prediction>> {
         {
             return Err("capture clock or observed opening request mismatch".into());
         }
+        b.check_live_times(&r)?;
         let s = &mut samples[i];
         let times = (r.line_end_us, r.decision_us);
         match r.phase.as_str() {
@@ -291,6 +324,13 @@ fn live(bound: &[Bound<'_>], journal: impl BufRead) -> Result<Vec<Prediction>> {
                 _ => {}
             },
             _ => return Err("unknown caller-match phase".into()),
+        }
+        if let Some(input) = r.input_end_us
+            && s.submitted
+                .replace(input)
+                .is_some_and(|before| before != input)
+        {
+            return Err("clip submission changed between phases".into());
         }
         if let Some(a) = r.first_admission_us {
             if a < r.decision_us || s.admitted.is_some_and(|v| v != a) {
@@ -363,6 +403,9 @@ fn replay(
         let Some(input_end) = b.audit.input_end_us else {
             continue;
         };
+        if input_end < b.trial.start_us.saturating_sub(b.session.sync_error_us) {
+            return Err("replay submission predates the labelled trial".into());
+        }
         let (Some(candidate), Some(reference)) = (
             b.entry.input.audio_relpath.as_deref(),
             b.entry.input.reference_audio_relpath.as_deref(),
@@ -463,9 +506,10 @@ mod tests {
     fn fixture() -> (Manifest, Sidecar, Vec<Audit>) {
         let manifest = json!({"version":1,
             "sessions":[
-                {"id":"s1","split":"holdout","clock_id":"one","consent":true,"delete_after_unix_s":9000},
-                {"id":"s2","split":"holdout","clock_id":"two","consent":true,"delete_after_unix_s":9000}],
-            "trials":[{"id":"c","session_id":"s1"},{"id":"v","session_id":"s2"}],
+                {"id":"s1","split":"holdout","clock_id":"one","sync_error_us":1000,"consent":true,"delete_after_unix_s":9000},
+                {"id":"s2","split":"holdout","clock_id":"two","sync_error_us":1000,"consent":true,"delete_after_unix_s":9000}],
+            "trials":[{"id":"c","session_id":"s1","start_us":100000,"end_us":900000},
+                      {"id":"v","session_id":"s2","start_us":3000000,"end_us":4000000}],
             "cases":[{"id":"pair","sensor":"voice_match","trial_id":"v","reference_trial_id":"c"}]});
         let sidecar = json!({"version":1,"manifest_sha256":"hash","entries":[
             {"case_id":"pair","trial_id":"v","reference_trial_id":"c","clock_id":"two",
@@ -540,6 +584,61 @@ mod tests {
                     .as_bytes()
             )
             .is_err()
+        );
+    }
+
+    #[test]
+    fn live_binds_the_capture_to_the_labelled_interval_and_recorded_submission() {
+        let (m, s, mut a) = fixture();
+        let bound = bind(&m, &s, &a, "hash").unwrap();
+        let journal = row("admission", None, None)
+            + &row("admitted", None, Some(4_050_000))
+            + &row("available", Some(4_080_000), Some(4_050_000));
+        let shifted = journal
+            .lines()
+            .map(|line| {
+                let (prefix, json) = line.split_once(": ").unwrap();
+                let mut row: Value = serde_json::from_str(json).unwrap();
+                for field in [
+                    "line_end_us",
+                    "decision_us",
+                    "input_end_us",
+                    "ready_us",
+                    "first_admission_us",
+                ] {
+                    if let Some(at) = row[field].as_u64() {
+                        row[field] = (at + 60_000_000).into();
+                    }
+                }
+                format!("{prefix}: {row}\n")
+            })
+            .collect::<String>();
+        assert!(
+            live(&bound, shifted.as_bytes()).is_err(),
+            "different trial, same clock and request"
+        );
+        let with_end =
+            |end| journal.replace("\"line_end_us\":4000000", &format!("\"line_end_us\":{end}"));
+        assert_eq!(
+            live(&bound, with_end(4_001_000).as_bytes()).unwrap().len(),
+            1
+        );
+        assert!(live(&bound, with_end(4_001_001).as_bytes()).is_err());
+        for wrong in [2_998_999, 4_049_001] {
+            assert!(
+                live(
+                    &bound,
+                    journal.replace("4010000", &wrong.to_string()).as_bytes()
+                )
+                .is_err()
+            );
+        }
+        assert!(live(&bound, journal.replacen("4010000", "4011000", 1).as_bytes()).is_err());
+        a[0].input_end_us = Some(4_020_000);
+        let bound = bind(&m, &s, &a, "hash").unwrap();
+        assert!(
+            live(&bound, journal.as_bytes()).is_err(),
+            "audit and journal must agree"
         );
     }
 }

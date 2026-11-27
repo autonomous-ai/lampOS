@@ -2,9 +2,12 @@
 //! The opening call supplies the only reference. All times use the audio clock.
 
 use super::{DIFFERENT_BELOW, SAME_FROM, cosine};
+use crate::follows_on::WITHIN_US;
 
 pub(crate) const SWITCH: &str = "LAMP_FOLLOW_UP_CALLER_MATCH";
 const TIMELY_US: u64 = 100_000;
+const MAX_CAPTURE_US: u64 =
+    crate::activity::MAX_UTTERANCE_BLOCKS as u64 * lamp_audio::BLOCK_MS as u64 * 1_000;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 // The second worker's existing memory/forgot subscriber advances this even
@@ -34,6 +37,7 @@ struct Caller {
 
 struct Heard {
     request: u64,
+    eligible_caller: Option<u64>,
     clean: bool,
     ended: bool,
     touched_us: u64,
@@ -83,18 +87,29 @@ impl CallerMatch {
             self.reset();
             self.generation = generation;
         }
-        if self.caller.as_ref().is_some_and(|c| {
-            now.saturating_sub(c.answered_until_us.unwrap_or(c.opened_us))
-                > crate::follows_on::WITHIN_US
+        if self.line.as_ref().is_some_and(|line| {
+            let limit = if line.ended {
+                WITHIN_US
+            } else {
+                MAX_CAPTURE_US
+            };
+            now.saturating_sub(line.touched_us) > limit
+        }) {
+            self.line = None;
+        }
+        if self.caller.as_ref().is_some_and(|caller| {
+            let last_answer = caller.answered_until_us.unwrap_or(caller.opened_us);
+            let pending = self.line.as_ref().is_some_and(|line| {
+                line.clean
+                    && line.eligible_caller == Some(caller.request)
+                    && line
+                        .trial
+                        .as_ref()
+                        .is_none_or(|trial| trial.renewed.is_none())
+            });
+            now.saturating_sub(last_answer) > WITHIN_US && !pending
         }) {
             self.caller = None;
-        }
-        if self
-            .line
-            .as_ref()
-            .is_some_and(|l| now.saturating_sub(l.touched_us) > crate::follows_on::WITHIN_US)
-        {
-            self.line = None;
         }
     }
 
@@ -129,9 +144,18 @@ impl CallerMatch {
 
     /// A new recording retires every pending vote from the previous line.
     pub(super) fn began(&mut self, request: u64, clean: bool, now_us: u64) {
+        // Only the already-started line can carry its reference across the
+        // old deadline. A newer line must qualify against the answer afresh.
+        self.line = None;
         self.maintain(now_us);
+        let eligible_caller = self.caller.as_ref().and_then(|caller| {
+            let end = caller.answered_until_us?;
+            (clean && (end..=end.saturating_add(WITHIN_US)).contains(&now_us))
+                .then_some(caller.request)
+        });
         self.line = Some(Heard {
             request,
+            eligible_caller,
             clean,
             ended: false,
             touched_us: now_us,
@@ -282,16 +306,16 @@ impl CallerMatch {
         let Some(caller) = self.caller.as_ref().map(|c| c.request) else {
             return;
         };
-        let Some(trial) = self
-            .line
-            .as_mut()
-            .filter(|l| l.request == request)
-            .and_then(|l| l.trial.as_mut())
-        else {
+        let Some(line) = self.line.as_mut().filter(|l| l.request == request) else {
+            return;
+        };
+        let Some(trial) = line.trial.as_mut() else {
             return;
         };
         if admitted && trial.first_admission_us.is_none() {
-            trial.first_admission_us = Some(monotonic_us());
+            let now = monotonic_us();
+            trial.first_admission_us = Some(now);
+            line.touched_us = now;
             let ended_us = trial.ended_us;
             self.report(
                 caller,
@@ -315,6 +339,7 @@ impl CallerMatch {
         renews: bool,
         untied_only: bool,
     ) -> bool {
+        self.maintain(now_us);
         if let Some(line) = self
             .line
             .as_mut()
@@ -344,10 +369,7 @@ impl CallerMatch {
         let Some(end) = caller.answered_until_us else {
             return false;
         };
-        if until_us < end || now_us.saturating_sub(end) > crate::follows_on::WITHIN_US {
-            return false;
-        }
-        if until_us < trial.ended_us {
+        if until_us < end.max(trial.ended_us) {
             return false;
         }
         if let Some(renewed) = trial.renewed {
@@ -558,6 +580,27 @@ mod tests {
             sensor.received(1, &[1., 0.], LINE.1);
             sensor.received(3, &[1., 0.], LINE.1);
             assert!(!sensor.admission(3, LINE), "{clear}");
+        }
+    }
+
+    #[test]
+    fn caller_match_in_flight_retention_ends_on_replacement_or_phase_timeout() {
+        let deadline = END + WITHIN_US;
+        let start = deadline - 1_000_000;
+        for reason in ["newer line", "missing end", "missing decision"] {
+            let mut sensor = with_call();
+            sensor.began(2, true, start);
+            sensor.maintain(deadline + 1);
+            assert!(sensor.caller.is_some());
+            match reason {
+                "newer line" => sensor.began(3, true, deadline + 2),
+                "missing end" => sensor.maintain(start + MAX_CAPTURE_US + 1),
+                _ => {
+                    sensor.ended(2, deadline + 2);
+                    sensor.maintain(deadline + 2 + WITHIN_US + 1);
+                }
+            }
+            assert!(sensor.caller.is_none(), "{reason}");
         }
     }
 
