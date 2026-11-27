@@ -183,8 +183,11 @@ impl Moment {
     /// and the lamp's own words [`AFTER_LAMP_US`] behind.
     pub fn talk_paused(&self) -> bool {
         let unresolved = self.last_speech_us > self.last_resolved_us;
-        !self.heard_within(UNDER_WAY_US)
-            && !(unresolved && self.heard_within(TALK_PAUSE_US))
+        // Speech under way, worded or not, holds it: heard just now, or
+        // not resolved yet and within the old pause.
+        let under_way =
+            self.heard_within(UNDER_WAY_US) || (unresolved && self.heard_within(TALK_PAUSE_US));
+        !under_way
             && (self.last_words_us == 0
                 || self.now_us.saturating_sub(self.last_words_us) >= TALK_PAUSE_US)
             && self
