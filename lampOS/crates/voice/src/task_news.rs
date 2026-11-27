@@ -6018,4 +6018,79 @@ mod tests {
         assert!(note("stopped", "").unwrap().contains(SHORT_STOPPED));
         assert_eq!(note("idle", "Three names: Lumi, Sunny and Archie."), None);
     }
+
+    /// #8783 (a), the product owner's rule of 26 Nov (the lamp never talks
+    /// into people's talk): while people keep talking, a result waits about
+    /// ten minutes, not one; past that it is its short line only.
+    #[test]
+    fn news_waits_through_talk_for_ten_minutes_then_is_its_short_line() {
+        for minutes in [1, 5, 9] {
+            let news = TaskNews::waiting_for_test(
+                settled_news(Some("short")),
+                Duration::from_secs(minutes * 60 + 1),
+            );
+            assert_eq!(news.overdue(None), None, "talk holds it at {minutes} min");
+        }
+        let ten = TaskNews::waiting_for_test(
+            settled_news(Some("short")),
+            Duration::from_secs(10 * 60 + 1),
+        );
+        assert_eq!(ten.overdue(None), Some(Overdue::Short("short".into())));
+    }
+
+    /// #8783 (b): the lamp answering someone ("Hey Lamp, ...") while a
+    /// result waits tells it right after, long before ten minutes, as
+    /// "By the way, ...", never as words for a room still talking.
+    #[test]
+    fn a_hey_lamp_while_news_waits_tells_it_by_the_way() {
+        let long = "word ".repeat(40);
+        let note = short_note(&json!({"state": "idle", "answer": long})).unwrap();
+        let news = TaskNews::waiting_for_test(settled_news(Some(&note)), Duration::from_secs(30));
+        assert_eq!(news.overdue(None), None, "nobody asked the lamp yet");
+        let Some(Overdue::Short(said)) = news.overdue(Some(1_000)) else {
+            panic!(
+                "a Hey Lamp tells the waiting news: {:?}",
+                news.overdue(Some(1_000))
+            );
+        };
+        assert!(
+            said.contains("By the way, the work you handed over is done."),
+            "{said}"
+        );
+        assert!(!said.contains("still talking"), "{said}");
+        assert!(!said.contains("word word"), "{said}");
+    }
+
+    /// #8783 (c), the product owner's rule of 26 Nov (no sensor holds a
+    /// person): a result is told only with someone there now, a face in
+    /// view or speech within about 15 s (`now - HEARD_WITHIN_US`); speech
+    /// 16 s ago, or two minutes ago, is an empty desk. It is not taken: it
+    /// still waits, to be told once someone is there.
+    #[test]
+    fn news_is_told_only_with_someone_there_now() {
+        let now: u64 = 1_000_000_000;
+        let since = now - HEARD_WITHIN_US;
+        for ago in [16_000_000, 110_000_000] {
+            assert!(
+                !someone_since(since, false, now - ago, Some(now - ago)),
+                "nobody seen, heard {ago} us ago"
+            );
+        }
+        assert!(someone_since(since, true, 0, None), "a face");
+        assert!(
+            someone_since(since, false, now - 10_000_000, None),
+            "speech 10 s ago"
+        );
+        assert!(
+            someone_since(since, false, 0, Some(now - 10_000_000)),
+            "a line 10 s ago"
+        );
+        let mut news = TaskNews::waiting_for_test(settled_news(None), Duration::from_secs(11 * 60));
+        assert_eq!(news.overdue(None), Some(Overdue::Whole));
+        assert_eq!(
+            news.waiting().map(|news| news.key.clone()),
+            Some("s1:2:4".into()),
+            "untold, it waits"
+        );
+    }
 }
