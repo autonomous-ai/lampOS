@@ -2200,7 +2200,10 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     computers' 8.4 s or so are gone. A session only on the Mac costs the
     lamp's list plus the Mac's (about 4 s), the offline ones' 4.4 s gone.
   - **New work goes to the lamp.** A new task naming nothing goes to the
-    lamp's Hermes, and so does one naming Hermes or the lamp as `who`;
+    lamp's default agent (OpenClaw or Hermes, the first engine of
+    lamp-tasks' `lamp` target; Hermes until the targets are read), one
+    naming Hermes or OpenClaw as `who` to that agent on the lamp, and one
+    naming the lamp to its default agent;
     one naming their computer (`where` `"computer"`) or an agent there
     goes to the computer, and a computer known `offline` is
     refused `computer_offline`, never moved to the lamp quietly. The task
