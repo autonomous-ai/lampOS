@@ -597,6 +597,8 @@ Environment=LAMP_PERSON_SCOPE_ONE_FACE=on
 Environment=LAMP_ONE_FACE_REMINDERS=on
 # LAMP_PERSON_SCOPE_ONE_FACE_READS: its why and rules are its row in docs/switches.md (#5385).
 Environment=LAMP_PERSON_SCOPE_ONE_FACE_READS=on
+# LAMP_ONE_FACE_FORGETS_ON_YES: its why and rules are its row in docs/switches.md (#8570, #8654; the memory owner, 27 Nov 14:11).
+Environment=LAMP_ONE_FACE_FORGETS_ON_YES=on
 # LAMP_SECOND_NAME_ONE_FACE: its why and rules are its row in docs/switches.md.
 Environment=LAMP_SECOND_NAME_ONE_FACE=on
 # LAMP_CONVERSATION_CARRIES: its why and rules are its row in docs/switches.md (#4339, #4479).

@@ -7373,7 +7373,7 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   Known risk, accepted by the memory owner on 4 Nov: a voice not seen saying
   it, with the person's face alone in view, hears their reminders and may
   cancel or snooze them ([schedule.md](schedule.md), [switches.md](switches.md)).
-- **A one-face line is read as its person's; its forgets need the mouth**
+- **A one-face line is read as its person's; its forgets need the mouth only with `LAMP_ONE_FACE_FORGETS_ON_YES` off**
   (`LAMP_PERSON_SCOPE_ONE_FACE_READS=on`, on in the product since 10 Nov, #5522; with
   `LAMP_PERSON_SCOPE_ONE_FACE` acted on, `Engine::reading_by_one_face`). A
   line the one-face rule takes is not narrowed at admission
@@ -7415,10 +7415,13 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   round, in the owner's language only from its clip rendered ahead
   (`kept_line_clip`), else the model is told it is kept (#8185). A
   privacy switch change drops the held question (`Engine::privacy`).
-  With `LAMP_ONE_FACE_FORGETS_ON_YES` (off by default, #8570), before
+  With `LAMP_ONE_FACE_FORGETS_ON_YES` (#8570; on in the product since
+  #8654, the memory owner's call of 27 Nov 14:11 that the mouth is not used
+  for a forget or a correction), before
   `ask_once_forget`, `hold_on_face_yes` holds for one yes, on a line theirs
-  by their face alone in view (`ScopeLease::in_view_by_one_face`) with the
-  eyes reading who speaks: `forget_everything` (unless these words ask for
+  by their face alone in view (`ScopeLease::in_view_by_one_face`), with or
+  without the voice's own copy of the eyes' speaking (`forget_sight`, off
+  in the product since #8791): `forget_everything` (unless these words ask for
   less), `forget_my_face`, a correction (`remember` with `replaces`) and a
   bare forget after their one-face keep, on a later line of theirs in the
   session within 60 s, as the forget of the kept id
@@ -7432,12 +7435,14 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   `remember::pick_forget`: an `about` of `""`, `[]` or a guess not heard is
   bare; row 8654 L2 at 6c76c3257f). With the switch on, a forget of any kind
   or a correction not held journals which check let it go, in machine words
-  only (`face-hold: refused: no_scope | not_heard | no_sight | gap_held |
+  only (`face-hold: refused: no_scope | not_heard | gap_held |
   not_one_face | named | not_bare | everything_refused | no_mark |
   other_person | not_later | too_old | no_id | one_waits | stale (<call>)`),
   `face-hold: own_mark` when the own mark held it, and `face-hold: dropped:
   no_ask | unfinished (<call>)` when a hold is dropped for an answer that
-  asked nothing (row 8654 L4). Each is told the held notes in use or
+  asked nothing (row 8654 L4), and `face-hold: dropped: unfinished | on_line
+  (<call>)` when a later line drops it in `take_held_forget`, `unfinished`
+  for one never asked (its turn cut before the ask). Each is told the held notes in use or
   `remember::HELD_CORRECTION_ASKS` (`HeldForget::face_yes`); a held
   correction's round drops the quiet note and its ask is said
   (`Quiet::held_keep`). A bare forget called on a line that is only a yes
@@ -7450,7 +7455,8 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   and no request between the keep and the yes called anything
   (`HeldForgets::called`); otherwise it is held and asked. In
   `take_held_forget` (`YesLine`), their plain yes within 60 s on such a
-  line, no face seen speaking it, runs it, its person the line's own
+  line, no other face seen speaking it, runs it with no `forget_sight`
+  needed, its person the line's own
   (`keep_asker`); a carried, sticky or gap-held yes line drops it as unseen,
   and `LAMP_KEEP_QUIETLY_ONE_FACE`'s carried keep yes never lets it go. The
   held run marks it (`ScopeLease::mark_held_yes`, `mark_forget_agreed`), so
