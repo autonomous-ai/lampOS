@@ -31638,11 +31638,12 @@ mod tests {
     /// services' alone (`LAMP_SAME_VOICE_FOR=services`), and `LAMP_FOLLOW_UPS`
     /// read none, so TV and a third voice right after an answer were answered
     /// as follow-ups. With the join's prints read in the window
-    /// ([`super::Heeding::window_voices`]): a line in another voice than the
-    /// conversation's is judged by its signs as before (no look: held), one
-    /// in the conversation's own voice is a follow-up, looking or not, and so
-    /// is one too short for a print. Without `LAMP_FOLLOW_UPS` the window
-    /// reads no such print, and no look holds the line, as before.
+    /// ([`super::Heeding::window_voices`]): since #8839 (the product owner's
+    /// rule of 26 Nov: no unmeasured sensor holds a person) a line in another
+    /// voice than the conversation's is a follow-up too, as is one in the
+    /// conversation's own voice, looking or not, and one too short for a
+    /// print; the print may only help. Without `LAMP_FOLLOW_UPS` the window
+    /// takes no follow-up pass, and no look holds the line, as before.
     #[test]
     fn with_follow_ups_the_joins_prints_tell_another_voice_in_the_window() {
         let _one = crate::provider_worker::tests::one_thread();
@@ -31709,7 +31710,10 @@ mod tests {
             answered(true, 1, 48_000),
             "the conversation's own voice, no look"
         );
-        assert!(!answered(true, -1, 48_000), "another voice, no look");
+        assert!(
+            answered(true, -1, 48_000),
+            "another voice, no look: the print only helps (#8839)"
+        );
         assert!(
             answered(true, -1, 8_000),
             "too short for a print: no other voice"
