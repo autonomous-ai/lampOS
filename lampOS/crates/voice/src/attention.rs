@@ -1110,6 +1110,23 @@ pub(crate) fn opens_with_hey_lamp_in(heard: &str, language: Option<Language>) ->
     opens_with_hey_lamp(heard) || greeted_as_written(heard, language)
 }
 
+/// Whether `heard`'s words open with one of [`HEY_GREETINGS`], past one
+/// filler, or with one of the greetings of `language` as its speech to text
+/// writes them ([`written`]), whatever word follows. With
+/// `LAMP_SIMPLE_CALL_HEARD`, the words' half of a call heard
+/// ([`Attention::simple_calls_heard`]).
+pub(crate) fn opens_with_a_greeting_in(heard: &str, language: Option<Language>) -> bool {
+    past_a_filler(heard).next().is_some_and(|word| {
+        HEY_GREETINGS
+            .iter()
+            .any(|greeting| word.eq_ignore_ascii_case(greeting))
+    }) || language.map(written).is_some_and(|written| {
+        clauses(heard)
+            .next()
+            .is_some_and(|first| past_greetings(first, &written).1)
+    })
+}
+
 /// The greeted call of [`opens_with_hey_lamp_in`] for a language other than
 /// English.
 fn greeted_as_written(heard: &str, language: Option<Language>) -> bool {
@@ -2336,6 +2353,8 @@ pub struct Attention {
     /// hearing was kept as one, or dropped for want of it.
     hey_only: bool,
     hey_kept: bool,
+    /// `LAMP_SIMPLE_CALL_HEARD` ([`Attention::simple_calls_heard`]).
+    simple_heard: bool,
     name_unhey_dropped: bool,
     /// A hearing that counts for the request in hand began within
     /// [`HEY_AT_THE_START_US`] of the line's start.
@@ -3039,9 +3058,26 @@ impl Attention {
     /// `turn.start`, `control_turn`). A hearing of the name by lamp-name never
     /// counts, at any score; nor does a face, closeness or any other sign.
     pub fn simple_called(&self) -> bool {
+        let language = crate::language::at_start();
         self.tapped
             || self.opened
-            || opens_with_hey_lamp_in(&self.heard, crate::language::at_start())
+            || opens_with_hey_lamp_in(&self.heard, language)
+            || self.simple_heard
+                && self.named_near_the_start
+                && self.start_score >= NEAR_SCORE
+                && opens_with_a_greeting_in(&self.heard, language)
+    }
+
+    /// With [`Self::simple_called`], `LAMP_SIMPLE_CALL_HEARD=on` (in no
+    /// product unit): a line also calls when its words open with a greeting
+    /// ([`opens_with_a_greeting_in`]), whatever word follows ("Hey, Lynn.",
+    /// "Hello, ma'am.", "Hey, man.": lamp-dbda, 27 Nov), and lamp-name's
+    /// hearing for that line's own sound ([`hearing_counts_for_line`]) began
+    /// within [`HEY_AT_THE_START_US`] of its start at [`NEAR_SCORE`] (0.95)
+    /// or more, as `LAMP_NAME_HEY_ONLY` bounds a start hearing. No greeting,
+    /// no call, at any score: a bare "Lamp, …", "OK Lamp" or a lookalike.
+    pub fn simple_calls_heard(&mut self, on: bool) {
+        self.simple_heard = on;
     }
 
     /// Whether the line last judged was a turn the lamp began itself.

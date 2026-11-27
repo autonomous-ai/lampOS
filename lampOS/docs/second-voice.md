@@ -6336,6 +6336,14 @@ after a take-over, but now for every turn:
     - **Unchanged**: endpointing, the echo strip, a spoken stop while the lamp
       speaks, privacy and mute, quiet hours, the tools, memory, the body and
       `lamp-name` itself.
+    - **With `LAMP_SIMPLE_CALL_HEARD=on`** (off, in no product unit; its ROW
+      is lamp-dbda's round 2): a line also calls when its words open with a
+      greeting, whatever word follows ("Hey, Lynn.", "Hello, ma'am.", "Hey,
+      man."), and lamp-name's hearing of that line's own start
+      (`HEY_AT_THE_START_US`, `hearing_counts_for_line`) scored 0.95 or more
+      (`Attention::simple_calls_heard`). On lamp-dbda on 27 Nov strict words
+      held 10 of 10 such calls while lamp-name heard 8 of 9 at 0.92 to 1.00.
+      No greeting, no call, at any score; "Hey man" under 0.95 is none.
     Journal at start: `a conversation opens only with "Hey Lamp" at a line's
     start, a tap or the lamp's own turn; …(LAMP_SIMPLE_CALL)`. A line let out
     says `its answer is played: "Hey Lamp", or a tap, called it` or `begun
