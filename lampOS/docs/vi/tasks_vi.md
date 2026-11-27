@@ -332,10 +332,17 @@ người dùng nghe được:
   cùng phép thử "có" của bước xác nhận), hoặc bất kỳ câu trả lời nào có một
   từ đăng nhập hay ghép đôi ("Yeah, sign it in.", "Sure, sign it in.").
 
-Một câu có từ từ chối (`sign_in::refuses`: "no", "don't", "dont", "not",
-"never", "later", "wait", "cancel", "stop", "không", "đừng", "chưa", "để
-sau") không phải lời nhờ cũng không phải lời đồng ý: "No, don't sign it in"
-sau lời đề nghị bị từ chối.
+Một lời từ chối chỉ tính khi nó chi phối từ đăng nhập (P2 của Twelve trên
+#8808): một từ từ chối (`sign_in::refusal_word`: "no", "not", "never",
+"don't", "dont", "cancel", "stop", mọi từ "…n't", "không", "đừng", "chưa")
+nằm tối đa hai từ trước từ đăng nhập, trong cùng mệnh đề (tách ở `,` `.` `?`
+`!` `;` `:` và gạch ngang; `sign_in::free_sign_in_words`), hoặc cả câu trả
+lời là lời từ chối hay hoãn (`sign_in::refuses_whole`: bắt đầu bằng "no",
+"nope", "nah", "không", "chưa" hoặc "đừng", hoặc có "not now", "not yet",
+"later" hay "để sau"). Vì vậy "No, don't sign it in", "Yes, but not now",
+"Sign it in later" và "I'd rather you didn't sign it in" bị từ chối; còn
+"It's not signed in, can you sign it in?", "Don't forget to sign me in to my
+computer" và "Sign me in, I can't wait" thì không.
 
 Bộ từ, dùng chung cho cả hai phía (`sign_in::sign_in_word`): từ đăng nhập là
 "sign … in/into/onto" hoặc "signed … in/into/onto" (trong vòng ba từ),
@@ -363,6 +370,10 @@ Test: `a_sign_in_starts_only_on_the_persons_ask_or_yes_to_the_offer`,
 `a_yes_to_an_offer_in_any_sign_in_words_starts`,
 `a_sign_in_said_with_into_or_signed_starts`,
 `a_yes_with_the_offers_verb_starts_and_a_no_never`,
+`a_refusal_counts_only_where_it_governs_the_sign_in`,
+`the_blind_table_of_asks_yeses_and_refusals` (39 dòng viết chỉ từ đặc tả;
+một ngoại lệ có tên: "đừng đăng nhập" từ chủ dùng tiếng Việt được cho qua
+trong lúc phép kiểm tra tắt với tiếng Việt),
 `a_vietnamese_owners_ask_code_again_and_yes_are_never_refused`.
 
 ### Giữ trong bộ nhớ của người dùng (bản ghi liên kết, lát 3, `LAMP_SERVICE_RECORDS_TASKS`, bật trong sản phẩm)
