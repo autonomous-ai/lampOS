@@ -47,8 +47,9 @@ pub fn topic(fd_channel: &str) -> String {
 /// [`MOST_BYTES`].
 pub const ID_MOST: usize = 128;
 
-/// The room `due` needs for the id: `,"id":"…"` at its longest.
-const ID_ROOM: usize = ID_MOST + r#","id":"""#.len();
+/// The room `due` needs for the id: `,"id":"…"` at its longest. Every
+/// permitted graphic ASCII byte takes at most two JSON bytes (`"` and `\`).
+const ID_ROOM: usize = 2 * ID_MOST + r#","id":"""#.len();
 
 /// Whether `report`, with the longest id, is within [`MOST_BYTES`].
 fn fits(report: &Report) -> bool {
@@ -1847,25 +1848,45 @@ impl Reports {
     /// What is due to be handed to the connection, in order, each marked
     /// handed, each with the device's `id` as `info` carries it (the
     /// backend drops a message without one). Nothing without the person's
-    /// yes but the last `stopped`; nothing for an id that is not one.
+    /// yes but the last `stopped`; nothing for an id that is not one. Check
+    /// the final bytes too: an older build's queue bypassed today's `put`.
     pub fn due(&mut self, id: &str) -> Vec<(u64, String)> {
         if id.is_empty() || id.len() > ID_MOST || !id.bytes().all(|b| b.is_ascii_graphic()) {
             return Vec::new();
         }
         let share = self.consent().share;
-        self.queue
-            .iter_mut()
-            .filter(|entry| {
-                !entry.handed && !entry.once_more && (share || entry.kind == Kind::Stopped)
-            })
-            .filter_map(|entry| {
-                let mut report: serde_json::Map<String, Value> =
-                    serde_json::from_str(&entry.bytes).ok()?;
-                report.insert("id".into(), json!(id));
-                entry.handed = true;
-                Some((entry.seq, Value::Object(report).to_string()))
-            })
-            .collect()
+        let mut due = Vec::new();
+        let mut oversized = Vec::new();
+        self.queue.retain_mut(|entry| {
+            if entry.handed || entry.once_more || (!share && entry.kind != Kind::Stopped) {
+                return true;
+            }
+            let Ok(mut report) =
+                serde_json::from_str::<serde_json::Map<String, Value>>(&entry.bytes)
+            else {
+                return true;
+            };
+            report.insert("id".into(), json!(id));
+            let bytes = Value::Object(report).to_string();
+            if bytes.len() > MOST_BYTES {
+                oversized.push(entry.seq);
+                return false;
+            }
+            entry.handed = true;
+            due.push((entry.seq, bytes));
+            true
+        });
+        if !oversized.is_empty() {
+            for seq in oversized {
+                // As with the other queue bounds, removal and the count's
+                // save are best effort, not a filesystem transaction. This
+                // is not an ack: skill days and report counts stay pending.
+                let _ = fs::remove_file(self.places.queue.join(format!("{seq}.json")));
+                self.kept.dropped.too_big = self.kept.dropped.too_big.saturating_add(1);
+            }
+            self.keep();
+        }
+        due
     }
 
     /// The broker acknowledged `seq`: it goes. A `stopped` goes after its
@@ -3584,7 +3605,7 @@ pub(crate) mod tests {
             })
             .collect();
         let seq = reports.health(NOW, None, &seen).unwrap();
-        let sent = reports.due(&"d".repeat(ID_MOST));
+        let sent = reports.due(&"\\".repeat(ID_MOST));
         assert_eq!(sent.len(), 1);
         assert!(sent[0].1.len() <= MOST_BYTES);
         let value: Value = serde_json::from_str(&sent[0].1).unwrap();
@@ -3968,7 +3989,7 @@ pub(crate) mod tests {
         let mut seen = planted();
         seen.skills = Some(reading(&|n| n as u64 + 1));
         reports.health(NOW, None, &seen).unwrap();
-        let id = "x".repeat(ID_MOST);
+        let id = "\\".repeat(ID_MOST);
         let bytes = reports.due(&id).remove(0).1;
         assert!(bytes.len() <= MOST_BYTES, "{}", bytes.len());
         // Cut to the limit, not below it by more than one package.
@@ -4580,6 +4601,339 @@ pub(crate) mod tests {
         assert_eq!(reports.health(NOW + 1, None, &seen), None);
         assert_eq!(reports.dropped().too_big, 1);
         assert!(reports.due(ID).is_empty());
+    }
+
+    #[test]
+    fn escaped_device_ids_are_reserved_before_a_report_is_queued() {
+        // The public API reproduction: all names were already in the legacy
+        // list. A raw 128-byte reservation fits the plain id but not its
+        // equally valid, JSON-escaped counterpart.
+        let places = places("escaped-id-reservation");
+        yes(&places);
+        let mut reports = Reports::open(places);
+        let mut seen = Seen {
+            selftest: planted().selftest,
+            ..Seen::default()
+        };
+        seen.selftest.as_mut().unwrap().parts =
+            vec![PartResult::new("voice_mic", Verdict::Fail, SECRETS[0]); 282];
+        assert_eq!(reports.health(NOW, None, &seen), None);
+        assert_eq!(reports.dropped().too_big, 1);
+        assert!(reports.due(&"\\".repeat(ID_MOST)).is_empty());
+
+        for byte in b'!'..=b'~' {
+            let id = char::from(byte).to_string().repeat(ID_MOST);
+            let added = json!({"id": id}).to_string().len() - 1;
+            assert!(added <= ID_ROOM, "id byte {byte} exceeds the reservation");
+        }
+    }
+
+    /// A forward-compatible, numeric-only queue fixture of an exact size.
+    /// It bypasses today's admission, as a report saved by an older build did.
+    fn queued_of_size(seq: u64, kind: &str, bytes: usize) -> String {
+        let mut report = json!({
+            "type": "report", "schema": SCHEMA, "device": DEVICE,
+            "seq": seq, "sent_at": "2026-10-18T04:00:00Z", "kind": kind,
+            "future_counts": [],
+        });
+        let extra = bytes - report.to_string().len();
+        assert!(extra > 0);
+        let mut counts = vec![0_u8; extra.div_ceil(2)];
+        if extra.is_multiple_of(2) {
+            counts[0] = 10;
+        }
+        report["future_counts"] = json!(counts);
+        let report = report.to_string();
+        assert_eq!(report.len(), bytes);
+        report
+    }
+
+    #[test]
+    fn due_checks_the_final_bytes_of_old_queued_reports_once() {
+        let ids = [
+            "d".repeat(ID_MOST),
+            "\"".repeat(ID_MOST),
+            "\\".repeat(ID_MOST),
+            "d\"\\!".repeat(ID_MOST / 4),
+        ];
+        for (case, id) in ids.iter().enumerate() {
+            let id_room = json!({"id": id}).to_string().len() - 1;
+            for extra in [-1_isize, 0, 1] {
+                let places = places(&format!("old-queue-size-{case}-{extra}"));
+                yes(&places);
+                let bytes = (MOST_BYTES - id_room).checked_add_signed(extra).unwrap();
+                let original = queued_of_size(1, "crash", bytes);
+                queued_file(&places, 1, &original);
+                let mut reports = Reports::open(places.clone());
+                let due = reports.due(id);
+                if extra <= 0 {
+                    assert_eq!(due.len(), 1);
+                    assert_eq!(
+                        due[0].1.len(),
+                        MOST_BYTES.checked_add_signed(extra).unwrap()
+                    );
+                    let mut expected: Value = serde_json::from_str(&original).unwrap();
+                    expected["id"] = json!(id);
+                    assert_eq!(serde_json::from_str::<Value>(&due[0].1).unwrap(), expected);
+                    reports.unhand(None);
+                    assert_eq!(
+                        reports.due(id),
+                        due,
+                        "identity and source fields survive retry"
+                    );
+                    reports.acked(1);
+                    assert_eq!(reports.dropped().too_big, 0);
+                } else {
+                    assert!(
+                        due.is_empty(),
+                        "an oversized wire report must not be handed"
+                    );
+                    assert_eq!(reports.dropped().too_big, 1);
+                    reports.unhand(None);
+                    reports.connected();
+                    reports.acked(1);
+                    assert!(reports.due(id).is_empty());
+                    assert_eq!(reports.dropped().too_big, 1);
+                }
+                assert_eq!(reports.queued(), 0);
+                assert!(!places.queue.join("1.json").exists());
+                let mut reopened = Reports::open(places.clone());
+                assert!(reopened.due(id).is_empty());
+                assert_eq!(reopened.dropped().too_big, u32::from(extra > 0));
+                let _ = fs::remove_dir_all(places.own.parent().unwrap());
+            }
+        }
+        let places = places("old-queue-size-counter-full");
+        yes(&places);
+        queued_file(
+            &places,
+            1,
+            &queued_of_size(1, "crash", MOST_BYTES - ID_ROOM + 1),
+        );
+        fs::write(
+            places.queue.join("state.json"),
+            json!({"dropped": {"too_big": u32::MAX}}).to_string(),
+        )
+        .unwrap();
+        let mut reports = Reports::open(places.clone());
+        assert!(reports.due(&"\\".repeat(ID_MOST)).is_empty());
+        assert_eq!(
+            reports.dropped().too_big,
+            u32::MAX,
+            "a persisted count never wraps"
+        );
+        assert_eq!(reports.queued(), 0);
+        let reopened = Reports::open(places.clone());
+        assert_eq!(reopened.dropped().too_big, u32::MAX);
+        assert_eq!(reopened.queued(), 0);
+        let _ = fs::remove_dir_all(places.own.parent().unwrap());
+    }
+
+    #[test]
+    fn oversized_queue_cleanup_keeps_consent_and_newer_reports_intact() {
+        let places = places("oversized-queue-consent");
+        no(&places);
+        let id = "\\".repeat(ID_MOST);
+        let oversized = queued_of_size(1, "crash", MOST_BYTES - ID_ROOM + 1);
+        queued_file(&places, 1, &oversized);
+        let fitting = queued_of_size(2, "crash", MOST_BYTES - ID_ROOM);
+        queued_file(&places, 2, &fitting);
+        let newer_schema =
+            queued_of_size(3, "crash", MOST_BYTES).replace("lamp-report/1", "lamp-report/2");
+        queued_file(&places, 3, &newer_schema);
+        let newer_kind = queued_of_size(4, "future_kind", MOST_BYTES);
+        queued_file(&places, 4, &newer_kind);
+        let mut reports = Reports::open(places.clone());
+        assert!(
+            reports.due(&id).is_empty(),
+            "a kept no still gates crash reports"
+        );
+        assert_eq!(reports.dropped().too_big, 0);
+        assert_eq!(
+            fs::read_to_string(places.queue.join("1.json")).unwrap(),
+            oversized
+        );
+
+        yes(&places);
+        for invalid in [
+            String::new(),
+            "\\".repeat(ID_MOST + 1),
+            "id with space".into(),
+        ] {
+            assert!(reports.due(&invalid).is_empty());
+            assert_eq!(reports.dropped().too_big, 0);
+        }
+        let due = reports.due(&id);
+        assert_eq!(due.len(), 1);
+        assert_eq!(due[0].0, 2);
+        assert_eq!(due[0].1.len(), MOST_BYTES);
+        assert_eq!(reports.dropped().too_big, 1);
+        reports.acked(2);
+        drop(reports);
+        let mut reports = Reports::open(places.clone());
+        assert!(reports.due(&id).is_empty());
+        assert_eq!(reports.dropped().too_big, 1);
+        assert_eq!(
+            fs::read_to_string(places.queue.join("3.json")).unwrap(),
+            newer_schema
+        );
+        assert_eq!(
+            fs::read_to_string(places.queue.join("4.json")).unwrap(),
+            newer_kind
+        );
+        reports.set(false, NOW + 1).unwrap();
+        assert!(!places.queue.join("3.json").exists());
+        assert!(!places.queue.join("4.json").exists());
+        assert_eq!(
+            reports.due(&id).len(),
+            1,
+            "the normal stopped report still goes"
+        );
+        let _ = fs::remove_dir_all(places.own.parent().unwrap());
+    }
+
+    #[test]
+    fn rejecting_an_oversized_row_is_not_a_counter_or_skill_ack() {
+        let places = places("oversized-queue-counts");
+        yes(&places);
+        let mut reports = Reports::open(places.clone()).counting(Some(wifi_file(&places)));
+        reports.voice_turn(900);
+        let mut reading = skills::Reading {
+            runs: Some(skills::Runs {
+                by_source: [(skills::Source::Core, 0)].into(),
+                ..skills::Runs::default()
+            }),
+            ..skills::Reading::default()
+        };
+        reports.kept.skills.add(NOW - 86_460, &reading);
+        reading
+            .runs
+            .as_mut()
+            .unwrap()
+            .by_source
+            .insert(skills::Source::Core, 7);
+        reports.kept.skills.add(NOW - 86_400, &reading);
+        let mut seen = planted();
+        seen.skills = Some(reading);
+        let seq = reports.health(NOW, None, &seen).unwrap();
+        let counts = reports.kept.counts;
+        let days = reports.kept.skills.clone();
+        let entry = reports
+            .queue
+            .iter_mut()
+            .find(|entry| entry.seq == seq)
+            .unwrap();
+        assert_ne!(entry.carried, counters::Counts::default());
+        assert!(entry.skill_day.is_some());
+        // Simulate a retained in-memory row made before the final-wire check.
+        entry.bytes = queued_of_size(seq, "health", MOST_BYTES - ID_ROOM + 1);
+        let id = "\\".repeat(ID_MOST);
+        assert!(reports.due(&id).is_empty());
+        assert_eq!(reports.queued(), 0);
+        assert_eq!(reports.dropped().too_big, 1);
+        reports.acked(seq);
+        assert_eq!(reports.kept.counts, counts);
+        assert_eq!(reports.kept.skills, days);
+        let next = reports.health(NOW + 1, None, &seen).unwrap();
+        let due = reports.due(&id);
+        let sent: Value = serde_json::from_str(&due[0].1).unwrap();
+        assert_eq!(
+            sent["metrics"]["voice_turn_ms"]["counts"],
+            json!([0, 1, 0, 0, 0, 0, 0])
+        );
+        assert!(sent["skills"]["day"].is_object());
+        reports.acked(next);
+        assert_eq!(reports.kept.counts, counters::Counts::default());
+        assert!(reports.kept.skills.oldest(NOW + 1).is_none());
+        let _ = fs::remove_dir_all(places.own.parent().unwrap());
+    }
+
+    /// Host-only timing of the existing send preparation, with setup/capture
+    /// outside the timer. Target: no more than 20% median regression against
+    /// the old implementation on fitting single-health and full-queue inputs.
+    /// This does not measure MQTT, a voice callback or slow filesystem stalls.
+    #[test]
+    #[ignore = "host measurement: run explicitly with --ignored --nocapture"]
+    fn measure_due_size_guard() {
+        fn previous_due(reports: &mut Reports, id: &str) -> Vec<(u64, String)> {
+            if id.is_empty() || id.len() > ID_MOST || !id.bytes().all(|b| b.is_ascii_graphic()) {
+                return Vec::new();
+            }
+            let share = reports.consent().share;
+            reports
+                .queue
+                .iter_mut()
+                .filter(|entry| {
+                    !entry.handed && !entry.once_more && (share || entry.kind == Kind::Stopped)
+                })
+                .filter_map(|entry| {
+                    let mut report: serde_json::Map<String, Value> =
+                        serde_json::from_str(&entry.bytes).ok()?;
+                    report.insert("id".into(), json!(id));
+                    entry.handed = true;
+                    Some((entry.seq, Value::Object(report).to_string()))
+                })
+                .collect()
+        }
+        let places = places("due-size-measure");
+        yes(&places);
+        let mut reports = Reports::open(places.clone());
+        reports.health(NOW, None, &planted()).unwrap();
+        let health = reports.queue.clone();
+        let full: Vec<Entry> = (1..=QUEUE_MOST)
+            .map(|seq| Entry {
+                seq: seq as u64,
+                kind: Kind::Crash,
+                at_s: NOW,
+                bytes: queued_of_size(seq as u64, "crash", MOST_BYTES - ID_ROOM),
+                handed: false,
+                once_more: false,
+                acks: 0,
+                skill_day: None,
+                carried: counters::Counts::default(),
+            })
+            .collect();
+        let id = "\\".repeat(ID_MOST);
+        for (case, queue) in [("one_health", health), ("64_near_limit", full)] {
+            let mut before = Vec::new();
+            let mut after = Vec::new();
+            for iteration in 0..=128 {
+                for use_guard in if iteration % 2 == 0 {
+                    [false, true]
+                } else {
+                    [true, false]
+                } {
+                    reports.queue = queue.clone();
+                    let start = Instant::now();
+                    let due = if use_guard {
+                        reports.due(&id)
+                    } else {
+                        previous_due(&mut reports, &id)
+                    };
+                    let us = start.elapsed().as_nanos() as f64 / 1_000.0;
+                    assert_eq!(due.len(), queue.len());
+                    assert!(due.iter().all(|(_, bytes)| bytes.len() <= MOST_BYTES));
+                    if use_guard {
+                        after.push(us);
+                    } else {
+                        before.push(us);
+                    }
+                }
+            }
+            for (method, mut samples) in [("before", before), ("guard", after)] {
+                let first = samples.remove(0);
+                samples.sort_by(f64::total_cmp);
+                eprintln!(
+                    "due_size_guard case={case} method={method} reports={} iterations={} first_us={first:.2} median_us={:.2} p95_us={:.2} max_us={:.2}",
+                    queue.len(),
+                    samples.len(),
+                    samples[samples.len() / 2],
+                    samples[(samples.len() * 95).div_ceil(100) - 1],
+                    samples[samples.len() - 1]
+                );
+            }
+        }
+        let _ = fs::remove_dir_all(places.own.parent().unwrap());
     }
 
     #[test]
