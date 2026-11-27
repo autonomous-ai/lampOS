@@ -586,7 +586,7 @@ pub fn persons_light(bus: &lamp_bus::Bus) -> Option<crate::ring_face::Lit> {
     let light = message.parse::<lamp_msgs::Light>().ok()?;
     light
         .on
-        .then(|| crate::ring_face::Lit::of(true, &light.colour, light.level))
+        .then(|| crate::ring_face::Lit::from_light(&light))
         .flatten()
 }
 
@@ -1344,6 +1344,8 @@ mod tests {
             on,
             colour: colour.into(),
             level,
+            tint: None,
+            step: None,
         };
         let mut ring = bus
             .publisher_declared(
@@ -1388,6 +1390,8 @@ mod tests {
             on,
             colour: "warm".into(),
             level: 1,
+            tint: None,
+            step: None,
         };
         let bus = lamp_bus::Bus::new(&root).unwrap();
         assert!(!persons_light_off(Some(&bus), &kept), "never said");

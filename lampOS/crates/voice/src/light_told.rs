@@ -8,7 +8,8 @@
 //! setters) and no turn was told it, so the model guessed. With the switch,
 //! each second-route turn is told the light as the ring says it shows it
 //! now (`light/state`, [`crate::ring_light`]), in one short line: on or off,
-//! and when on its colour by name and its level of [`Light::BRIGHTEST`].
+//! and when on its colour by name and its level of [`Light::STEPS`] (a
+//! colour of the person's own is said as theirs, near a name).
 //! Never a function: past 32 the voice silently drops tools.
 //!
 //! The light is read from the bus's kept latest value as the turn's system
@@ -37,22 +38,24 @@ fn on(value: Option<&str>) -> bool {
 }
 
 /// What the model is told of `light`: off, or on with its colour and its
-/// level; nothing for one that is no light there is (a colour not in
-/// [`Light::COLOURS`], a level outside 1 to [`Light::BRIGHTEST`]).
+/// level of ten; nothing for one that is no light there is (a colour not in
+/// [`Light::COLOURS`] or [`Light::SOFT_COLOURS`], a level outside 1 to
+/// [`Light::BRIGHTEST`], a step outside 1 to [`Light::STEPS`]). A light kept
+/// at one of the five levels is told at its step of ten, the one the ring
+/// draws, so that "a step brighter" is told in the same words.
 pub fn line(light: &Light) -> Option<String> {
     if !light.on {
         return Some(OFF.to_owned());
     }
-    if !Light::COLOURS.contains(&light.colour.as_str())
-        || !(1..=Light::BRIGHTEST).contains(&light.level)
-    {
-        return None;
-    }
+    light.check().ok()?;
+    let colour = match light.tint {
+        Some(_) => format!("a colour of your own, near {}", light.colour),
+        None => light.colour.clone(),
+    };
     Some(format!(
-        "Your light now: on, {}, level {} of {}.",
-        light.colour,
-        light.level,
-        Light::BRIGHTEST
+        "Your light now: on, {colour}, level {} of {}.",
+        light.step_now(),
+        Light::STEPS
     ))
 }
 
@@ -100,6 +103,8 @@ mod tests {
             on,
             colour: colour.into(),
             level,
+            tint: None,
+            step: None,
         }
     }
 
@@ -125,11 +130,11 @@ mod tests {
         let bus = said(&root, &light(true, "warm", 1), LASTS);
         assert_eq!(
             now(&bus).as_deref(),
-            Some("Your light now: on, warm, level 1 of 5.")
+            Some("Your light now: on, warm, level 2 of 10.")
         );
         assert_eq!(
             fact(Some(&bus)),
-            "\n\nYour light now: on, warm, level 1 of 5."
+            "\n\nYour light now: on, warm, level 2 of 10."
         );
     }
 
@@ -181,5 +186,28 @@ mod tests {
         for level in 1..=Light::BRIGHTEST {
             assert!(line(&light(true, "blue", level)).is_some());
         }
+    }
+
+    /// A step of ten, a soft colour and a colour of the person's own are
+    /// told as they are, and none is told as more than the light is.
+    #[test]
+    fn a_step_a_soft_colour_and_the_persons_own_colour_are_told_as_they_are() {
+        assert_eq!(
+            line(&light(true, "candle", 1).at_step(1)).as_deref(),
+            Some("Your light now: on, candle, level 1 of 10.")
+        );
+        let own = Light {
+            tint: Some([255, 128, 0]),
+            ..light(true, "warm", 1).at_step(4)
+        };
+        assert_eq!(
+            line(&own).as_deref(),
+            Some("Your light now: on, a colour of your own, near warm, level 4 of 10.")
+        );
+        let over = Light {
+            step: Some(11),
+            ..light(true, "warm", 1)
+        };
+        assert_eq!(line(&over), None);
     }
 }

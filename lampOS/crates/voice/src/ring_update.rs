@@ -272,7 +272,9 @@ fn ease(share: f32) -> f32 {
 /// of each channel, so there nothing is dimmed (it would break into the
 /// ember's patchwork): its breath slows, and the dip holds it out.
 pub fn shaped(look: Look, lit: Lit) -> (Option<(f64, f32)>, f32) {
-    let dims = lit.level() > 1;
+    // At or under the first of the five levels (step 2) nothing is dimmed,
+    // and the new step 1 under it is as low.
+    let dims = lit.level() > lamp_msgs::Light::LEGACY_STEPS[0];
     match look {
         Look::Plain => (None, 1.0),
         Look::Updating { phase } => {

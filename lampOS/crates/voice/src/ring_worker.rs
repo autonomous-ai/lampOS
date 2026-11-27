@@ -874,6 +874,7 @@ fn service(
             face.fade(light.fade(), at);
             face.tints_speaking(light.tints_speaking());
             face.skill_light(light.held());
+            face.faces(crate::ring_face::Looks::from_faces(&light.faces()));
             face.pixels(light.pixels());
         }
         let breath = mood.as_mut().and_then(|mood| mood.tick(at));

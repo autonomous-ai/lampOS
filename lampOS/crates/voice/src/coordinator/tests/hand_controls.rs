@@ -2616,6 +2616,8 @@ fn a_hands_sleep_takes_the_persons_light_from_the_bus() {
             on: true,
             colour: "warm".into(),
             level: 3,
+            tint: None,
+            step: None,
         },
     )
     .unwrap();

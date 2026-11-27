@@ -92,8 +92,7 @@ pub(crate) fn matched(said: &str) -> Option<(&'static str, Value)> {
             } else {
                 colour
             };
-            lamp_msgs::Light::COLOURS
-                .contains(&colour)
+            lamp_msgs::Light::is_colour(colour)
                 .then(|| ("light_colour", json!({ "colour": colour })))
         }
         _ => None,

@@ -813,14 +813,16 @@ once).
 The resting face is also the lamp's light: a colour and a level that
 someone can ask for ("make your light blue", "a bit brighter") and that
 stays until it is asked for again. The faces of listening, thinking and
-speaking are the lamp's expression and do not change with it; when a turn
-is over the ring eases back into its light.
+speaking are the lamp's expression and do not change with it, unless the
+owner has coloured or softened them ("The faces of a turn", below); when a
+turn is over the ring eases back into its light.
 
 | | |
 |---|---|
-| Colours | Ten, by name: yellow, red, green, blue, cyan, purple, orange, pink, white, warm. `warm` is the amber the lamp has always rested in |
-| Levels | 1 to 5: about 7, 24, 44, 68 and 90 hundredths of the ceiling, each with a slow breath of 6 to 10 more on top. The fifth reaches the ceiling at the top of a breath |
-| Before anyone asks | On, warm, level 1: exactly the resting face described above |
+| Colours | Ten, by name: yellow, red, green, blue, cyan, purple, orange, pink, white, warm. `warm` is the amber the lamp has always rested in. Seven soft ones beside them, low in saturation, that the person's light and its voice may name: candle, amber, peach, rose, lavender, mint, sky. And any colour of the owner's own from the app, kept as sent (the light's `tint`): the nearest name is only said beside it |
+| Steps | 10, `Light::STEPS`: about 4, 7, 12, 17, 24, 33, 44, 55, 68 and 90 hundredths of the ceiling, each with a slow breath of 5 to 10 more on top. Step 10 reaches the ceiling at the top of a breath, so nothing is brighter than it was. Steps 2, 5, 7, 9 and 10 are the five levels of before to the digit (`Light::LEGACY_STEPS`), so a light kept or asked for at a level looks exactly as it did; 1, 3, 4, 6 and 8 are new. Step 1 is the softest the ring shows without breaking into single steps (the ember's note below); at the night's ceiling of 24 its brightest channel is one step |
+| Levels | 1 to 5 is what a skill, a paired computer or an older part asks for, and still is; the light's `level` is the highest of the five at or under its step, so a part that reads levels never shows a light brighter than the person's |
+| Before anyone asks | On, warm, level 1 (step 2): exactly the resting face described above |
 | Off | Not dark. An ember: one pixel in four at three steps of red and one of green, the faintest amber the ring can show, and the others dark. About a quarter of the lowest light in all |
 
 The ember is a few lit pixels and not the whole ring glowing fainter,
@@ -846,8 +848,8 @@ that takes the light (`src/ring_light.rs`). Started with
 - looks for a light asked for on `light/command` (`lamp_msgs/Light`)
   on about every pass of its 2 ms loop (every 50 ms before #1806, which
   the person heard on each light call), and eases the ring into it. A request that is not a
-  light there is (a colour that does not exist, a level outside 1 to 5,
-  something that is not a `Light`) is passed over;
+  light there is (a colour that does not exist, a level outside 1 to 5, a
+  step outside 1 to 10, something that is not a `Light`) is passed over;
 - says what it shows on `light/state` when that changes and once a
   second, each good for three seconds, so that a ring that has stopped is
   not a light that can be asked for.
@@ -1078,6 +1080,32 @@ social understanding: the directed voice harness still has false interruptions
 from playback and does not know whether ambient speech addresses Lamp.
 ALSA acceptance/retirement are software/driver boundaries, not optical or
 acoustic measurements. Stillness, silence and an unlit ring are valid behavior.
+
+### The faces of a turn (#8864)
+
+The owner may give the faces of listening, thinking and speaking a colour
+and a brightness of their own, beside the resting light (`lamp_msgs::LightFaces`,
+asked on `light/faces/command`, said on `light/faces/state`, kept in the same
+file as the light with `LAMP_LIGHT_KEEP`). The ring worker takes it as it
+takes the light (`ring_light::RingLight::faces`, `ring_face::Looks`).
+
+- A face with no look is the lamp's own, byte for byte as before.
+- Colour and brightness only. How a face moves (the voice's loudness, the
+  circling point, the shimmer) is always the lamp's own: a look replaces the
+  face's colour and multiplies its glow, nothing else.
+- A look's `level` (1 to 10) is a share of the face's own brightness, the
+  glow of that step over the glow of step 10 (0.04 to 1), so 10 is the
+  lamp's own and none is brighter. Every channel is still a share of the
+  ring's ceiling, so the night's cap and the ceiling the lamp runs under
+  stay over it.
+- A face with a look goes through the three-flashes-a-second bound
+  (`FLASHES_A_SECOND`, `Face::flash_safe`) as the resting light does, a
+  saturated red included; the lamp's own faces are not held, as they never
+  were.
+- Not settable: the offline breath, the update and error signals, the
+  hand's warm glow, the reset's red, the privacy light and the camera mark.
+  The Speaking face's colour is also what a skill's light held over it
+  (`LAMP_SKILL_LIGHT_SPEAKING`) mixes into.
 
 ### A computer's mark: seeing or hearing through the lamp
 

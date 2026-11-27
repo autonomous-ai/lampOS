@@ -43,12 +43,21 @@
 //! kept one, then the first. Only the person's light is kept: a test, a
 //! request or a turn's face never is.
 //!
+//! The person's colour and brightness for the faces of a turn
+//! ([`lamp_msgs::LightFaces`]) are taken the same way, on
+//! `light/faces/command`, said on `light/faces/state` and kept in the same
+//! file beside the light: a face with none is the lamp's own. A file kept
+//! before faces and tints is the light in its old words and loads as it
+//! always did.
+//!
 //! Nothing here can stop the ring. A bus that cannot be used leaves the
 //! lamp with the light it has, and a request that is not a light there is
 //! (a colour that does not exist, a level outside 1 to 5) is passed over.
 use crate::{ring_face::Lit, ring_requests::Requests};
 use lamp_bus::{Bus, Publisher, Subscriber};
-use lamp_msgs::{Light, LightOutranked, LightPattern, LightReached, LightRequest, PatternKind};
+use lamp_msgs::{
+    Light, LightFaces, LightOutranked, LightPattern, LightReached, LightRequest, PatternKind,
+};
 use std::{io, path::Path, time::Duration};
 
 /// The name the ring's owner publishes under.
@@ -230,22 +239,55 @@ fn while_muted(
     }
 }
 
-/// The light kept at `path`, if it is one there is.
-pub(crate) fn kept_on_disk(path: &Path) -> Option<Light> {
-    let text = std::fs::read_to_string(path).ok()?;
-    serde_json::from_str::<Light>(&text)
-        .ok()
-        .filter(|light| lit(light).is_some())
+/// What is kept on disk: the person's light as a message, and beside it
+/// their faces. A file from before faces is the light alone, and the same
+/// words read as the light they always were.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct Person {
+    #[serde(flatten)]
+    light: Light,
+    /// Read loosely: faces that are no looks there are leave the light
+    /// begun with and the faces the lamp's own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    faces: Option<serde_json::Value>,
 }
 
-/// Write `light` to `path` whole: a file beside it, then a rename.
-fn keep_on_disk(path: &Path, light: &Light) -> io::Result<()> {
+/// The light and the faces kept at `path`, the light only if it is one
+/// there is.
+fn kept_person(path: &Path) -> Option<(Light, LightFaces)> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let person = serde_json::from_str::<Person>(&text).ok()?;
+    lit(&person.light)?;
+    let faces = person
+        .faces
+        .and_then(|faces| serde_json::from_value::<LightFaces>(faces).ok())
+        .filter(|faces| faces.check().is_ok())
+        .unwrap_or_default();
+    Some((person.light, faces))
+}
+
+/// The light kept at `path`, if it is one there is.
+pub(crate) fn kept_on_disk(path: &Path) -> Option<Light> {
+    kept_person(path).map(|(light, _)| light)
+}
+
+/// Write `light` and `faces` to `path` whole: a file beside it, then a
+/// rename. A lamp with no faces set writes the light alone, as it always
+/// did.
+fn keep_on_disk(path: &Path, light: &Light, faces: &LightFaces) -> io::Result<()> {
     let mut beside = path.as_os_str().to_owned();
     beside.push(".new");
     let beside = std::path::PathBuf::from(beside);
+    let person = Person {
+        light: light.clone(),
+        faces: (*faces != LightFaces::default())
+            .then(|| serde_json::to_value(faces))
+            .transpose()
+            .map_err(io::Error::other)?,
+    };
     std::fs::write(
         &beside,
-        serde_json::to_vec(light).map_err(io::Error::other)?,
+        serde_json::to_vec(&person).map_err(io::Error::other)?,
     )?;
     std::fs::rename(&beside, path)
 }
@@ -254,7 +296,7 @@ fn keep_on_disk(path: &Path, light: &Light) -> io::Result<()> {
 /// whether the last write failed (said once until one succeeds).
 struct Keep {
     path: std::path::PathBuf,
-    written: Option<Light>,
+    written: Option<(Light, LightFaces)>,
     written_at_us: Option<u64>,
     failing: bool,
 }
@@ -272,13 +314,14 @@ pub fn first() -> Light {
         on: true,
         colour: "warm".into(),
         level: 1,
+        tint: None,
+        step: None,
     }
 }
 
 /// A message as the face's own light, if it is one there is.
 pub fn lit(light: &Light) -> Option<Lit> {
-    light.check().ok()?;
-    Lit::of(light.on, &light.colour, light.level)
+    Lit::from_light(light)
 }
 
 pub struct RingLight {
@@ -287,6 +330,12 @@ pub struct RingLight {
     tests: Subscriber,
     drawn: Publisher,
     now: Light,
+    /// The person's colour and brightness for the faces of a turn, asked
+    /// for on `light/faces/command` and said on `light/faces/state`.
+    faces: LightFaces,
+    faces_asked: Subscriber,
+    faces_shown: Publisher,
+    faces_said_at_us: Option<u64>,
     /// A self-test's colour and until when it is shown.
     testing: Option<(Light, u64)>,
     /// When the newest light the person asked for was asked (wall clock,
@@ -379,10 +428,26 @@ impl RingLight {
             .flatten()
             .and_then(|message| message.parse::<Light>().ok())
             .filter(|light| lit(light).is_some());
-        let on_disk = keep.and_then(kept_on_disk);
-        // What is on disk is already kept; a light from the bus is written.
-        let written = kept.is_none().then(|| on_disk.clone()).flatten();
-        let now = kept.or(on_disk).unwrap_or_else(first);
+        let [faces_wanted, faces_state] = LightFaces::TOPICS;
+        let faces_asked = bus.subscribe_typed(faces_wanted, SOURCE, LightFaces::TYPE)?;
+        let mut faces_shown =
+            bus.publisher_declared(faces_state, &LightFaces::declaration(), SOURCE)?;
+        faces_shown.expires_after(Some(STATE_LASTS));
+        let faces_kept = bus
+            .latest(faces_wanted)
+            .ok()
+            .flatten()
+            .and_then(|message| message.parse::<LightFaces>().ok())
+            .filter(|faces| faces.check().is_ok());
+        let on_disk = keep.and_then(kept_person);
+        // What is on disk is already kept; a light or faces from the bus
+        // are written.
+        let written = (kept.is_none() && faces_kept.is_none())
+            .then(|| on_disk.clone())
+            .flatten();
+        let (disk_light, disk_faces) = on_disk.unzip();
+        let now = kept.or(disk_light).unwrap_or_else(first);
+        let faces = faces_kept.or(disk_faces).unwrap_or_default();
         let begins = lit(&now).unwrap_or(Lit::first());
         Ok((
             Self {
@@ -391,6 +456,10 @@ impl RingLight {
                 tests,
                 drawn,
                 now,
+                faces,
+                faces_asked,
+                faces_shown,
+                faces_said_at_us: None,
                 testing: None,
                 asked_at_ms: 0,
                 looked_at_us: 0,
@@ -425,7 +494,8 @@ impl RingLight {
         let Some(keep) = self.keep.as_mut() else {
             return;
         };
-        if keep.written.as_ref() == Some(&self.now)
+        let kept = (self.now.clone(), self.faces);
+        if keep.written.as_ref() == Some(&kept)
             || keep
                 .written_at_us
                 .is_some_and(|at| now_us.saturating_sub(at) < KEEP_EVERY_US)
@@ -433,9 +503,9 @@ impl RingLight {
             return;
         }
         keep.written_at_us = Some(now_us);
-        match keep_on_disk(&keep.path, &self.now) {
+        match keep_on_disk(&keep.path, &kept.0, &kept.1) {
             Ok(()) => {
-                keep.written = Some(self.now.clone());
+                keep.written = Some(kept);
                 keep.failing = false;
             }
             Err(error) => {
@@ -474,6 +544,7 @@ impl RingLight {
         self.keep(now_us);
         let mut changed = None;
         let mut requested_changed = false;
+        let mut faces_changed = false;
         if now_us.saturating_sub(self.looked_at_us) >= LOOK_EVERY_US {
             self.looked_at_us = now_us;
             // The newest wall-clock stamp of a person's light read in this
@@ -561,6 +632,7 @@ impl RingLight {
                     changed = Some(face);
                 }
             }
+            faces_changed = self.read_faces();
         }
         if let Some((_, until)) = self.testing
             && now_us >= until
@@ -643,7 +715,38 @@ impl RingLight {
             self.said_at_us = Some(now_us);
             let _ = self.shown.publish_json(now_us, &self.now);
         }
+        let faces_due = self
+            .faces_said_at_us
+            .is_none_or(|at| now_us.saturating_sub(at) >= SAY_EVERY_US);
+        if faces_changed || faces_due {
+            self.faces_said_at_us = Some(now_us);
+            let _ = self.faces_shown.publish_json(now_us, &self.faces);
+        }
         changed
+    }
+
+    /// The newest faces asked for that are looks there are, taken: read in
+    /// the look the light is read in.
+    fn read_faces(&mut self) -> bool {
+        let mut changed = false;
+        for _ in 0..MOST_AT_ONCE {
+            let Ok(Some(message)) = self.faces_asked.recv(Duration::ZERO) else {
+                break;
+            };
+            let Ok(asked) = message.parse::<LightFaces>() else {
+                continue;
+            };
+            if asked.check().is_ok() {
+                changed |= asked != self.faces;
+                self.faces = asked;
+            }
+        }
+        changed
+    }
+
+    /// The person's faces, as the ring shows them.
+    pub fn faces(&self) -> LightFaces {
+        self.faces
     }
 
     /// The light the ring is showing, as it says it.
@@ -827,6 +930,8 @@ mod tests {
             on,
             colour: colour.into(),
             level,
+            tint: None,
+            step: None,
         }
     }
 
@@ -1876,6 +1981,151 @@ mod tests {
                 RingLight::on_keeping(&root.0, Some(&path)).unwrap().1,
                 Lit::first()
             );
+        }
+    }
+
+    /// The faces the person set are taken on `light/faces/command`, said on
+    /// `light/faces/state`, kept beside the light and begun with after a
+    /// restart; one that is no look there is, is passed over.
+    #[test]
+    fn the_faces_are_taken_said_and_kept_across_a_restart() {
+        let disk = Root::new("faces-keep-disk");
+        let path = disk.0.join("person.json");
+        let speaking = lamp_msgs::FaceLook {
+            tint: [255, 140, 0],
+            level: 4,
+        };
+        let faces = lamp_msgs::LightFaces {
+            speaking: Some(speaking),
+            ..Default::default()
+        };
+        let mut at = 0u64;
+        {
+            let root = Root::new("faces-keep-1");
+            let (mut ring, _) = RingLight::on_keeping(&root.0, Some(&path)).unwrap();
+            assert_eq!(ring.faces(), lamp_msgs::LightFaces::default());
+            let bus = Bus::new(&root.0).unwrap();
+            let mut asks = bus
+                .publisher_declared(
+                    lamp_msgs::LightFaces::TOPICS[0],
+                    &lamp_msgs::LightFaces::declaration(),
+                    "cloud",
+                )
+                .unwrap();
+            // A level there is not: passed over.
+            let bad = lamp_msgs::LightFaces {
+                thinking: Some(lamp_msgs::FaceLook {
+                    tint: [255, 0, 0],
+                    level: 11,
+                }),
+                ..Default::default()
+            };
+            asks.publish_json(1, &bad).unwrap();
+            std::thread::sleep(Duration::from_millis(5));
+            for _ in 0..3 {
+                at += STEP_US;
+                ring.tick(at);
+            }
+            assert_eq!(ring.faces(), lamp_msgs::LightFaces::default());
+            asks.publish_json(2, &faces).unwrap();
+            let started = std::time::Instant::now();
+            while ring.faces() != faces && started.elapsed() < Duration::from_secs(5) {
+                at += STEP_US;
+                ring.tick(at);
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            assert_eq!(ring.faces(), faces);
+            // Said as what is shown.
+            let said: Option<lamp_msgs::LightFaces> = bus
+                .latest(lamp_msgs::LightFaces::TOPICS[1])
+                .unwrap()
+                .map(|message| message.parse().unwrap());
+            assert_eq!(said, Some(faces));
+            // Kept a second after the last write, beside the light.
+            at += KEEP_EVERY_US;
+            ring.tick(at);
+            let text = std::fs::read_to_string(&path).unwrap();
+            assert!(text.contains("\"speaking\""), "{text}");
+            assert_eq!(kept(&path), Some(first()), "still the person's light");
+        }
+        let root = Root::new("faces-keep-2");
+        let (ring, _) = RingLight::on_keeping(&root.0, Some(&path)).unwrap();
+        assert_eq!(ring.faces(), faces);
+    }
+
+    /// A file kept before faces and tints were there is a light in the old
+    /// words, and begins the ring exactly as it did: level 3 is the glow it
+    /// always was, no faces are set, and the file is left as it is until
+    /// something changes.
+    #[test]
+    fn a_person_file_from_before_faces_still_loads_and_looks_the_same() {
+        let disk = Root::new("faces-migrate-disk");
+        let path = disk.0.join("person.json");
+        let old = r#"{"on":true,"colour":"blue","level":3}"#;
+        std::fs::write(&path, old).unwrap();
+        let root = Root::new("faces-migrate");
+        let (mut ring, begins) = RingLight::on_keeping(&root.0, Some(&path)).unwrap();
+        assert_eq!(begins, Lit::of(true, "blue", 3).unwrap());
+        assert_eq!(begins.level(), Light::LEGACY_STEPS[2]);
+        assert_eq!(ring.now(), &light(true, "blue", 3));
+        assert_eq!(ring.faces(), lamp_msgs::LightFaces::default());
+        ring.tick(STEP_US);
+        ring.tick(KEEP_EVERY_US * 3);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), old);
+        // The same file with the new fields beside the old ones.
+        let new = r#"{"on":true,"colour":"blue","level":3,"tint":[13,255,115],"step":6,"faces":{"listening":{"tint":[255,0,0],"level":2}}}"#;
+        std::fs::write(&path, new).unwrap();
+        let root = Root::new("faces-migrate-new");
+        let (ring, begins) = RingLight::on_keeping(&root.0, Some(&path)).unwrap();
+        assert_eq!(ring.now().tint, Some([13, 255, 115]));
+        assert_eq!(begins.level(), 6);
+        assert_eq!(
+            ring.faces().listening,
+            Some(lamp_msgs::FaceLook {
+                tint: [255, 0, 0],
+                level: 2
+            })
+        );
+        // Faces that are no looks there are: the light is still begun with.
+        let bad = r#"{"on":true,"colour":"blue","level":3,"faces":{"listening":{"tint":[1,2,3],"level":2}}}"#;
+        std::fs::write(&path, bad).unwrap();
+        let root = Root::new("faces-migrate-bad");
+        let (ring, begins) = RingLight::on_keeping(&root.0, Some(&path)).unwrap();
+        assert_eq!(begins, Lit::of(true, "blue", 3).unwrap());
+        assert_eq!(ring.faces(), lamp_msgs::LightFaces::default());
+    }
+
+    /// A light with a colour of its own and a finer step is the face's
+    /// light as it says, and one that is not a light there is, is not.
+    #[test]
+    fn a_light_with_its_own_tint_and_step_is_the_face_it_says() {
+        let own = Light {
+            tint: Some([255, 128, 0]),
+            ..light(true, "warm", 1).at_step(1)
+        };
+        let drawn = lit(&own).unwrap();
+        assert_eq!(drawn.level(), 1);
+        let reference = Lit::at_step(true, "warm", 1).unwrap();
+        assert_ne!(drawn, reference, "its own colour, not the named one");
+        let mut named = own.clone();
+        named.tint = None;
+        assert_eq!(lit(&named), Some(reference));
+        let mint = Light {
+            colour: "mint".into(),
+            ..light(true, "warm", 1)
+        };
+        assert_eq!(crate::ring_light::lit(&mint), Lit::of(true, "mint", 1));
+        for bad in [
+            Light {
+                step: Some(11),
+                ..light(true, "warm", 1)
+            },
+            Light {
+                tint: Some([200, 0, 0]),
+                ..light(true, "warm", 1)
+            },
+        ] {
+            assert_eq!(crate::ring_light::lit(&bad), None);
         }
     }
 

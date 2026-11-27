@@ -663,6 +663,8 @@ fn the_persons_light_is_said_and_taken_while_the_switch_is_closed() {
         on: true,
         colour: "blue".into(),
         level: 2,
+        tint: None,
+        step: None,
     };
     let controls = RefCell::new(None);
     let reminders = RefCell::new(None);
