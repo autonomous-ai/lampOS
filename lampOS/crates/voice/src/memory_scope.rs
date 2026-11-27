@@ -736,6 +736,15 @@ struct RequestContext {
     /// line, the lamp having asked them once (#5627), 0 for none
     /// ([`ScopeLease::mark_forget_agreed`]).
     forget_agreed: AtomicU64,
+    /// The `forget_everything` (bit 1) or `forget_my_face` (bit 2) a line
+    /// theirs by their face alone in view agreed to on this line, held for
+    /// that yes (`LAMP_ONE_FACE_FORGETS_ON_YES`), 0 for none
+    /// ([`ScopeLease::mark_held_yes`]).
+    held_yes: std::sync::atomic::AtomicU8,
+    /// The kept id a correction (`remember` with `replaces`) agreed to on
+    /// this line retires, held for that yes (`LAMP_ONE_FACE_FORGETS_ON_YES`),
+    /// 0 for none ([`ScopeLease::mark_held_yes`]).
+    correction_agreed: AtomicU64,
     /// Narrowed to the room, its reply still told the admitted person's
     /// name ([`ScopeLease::name_for_reply`]).
     named: AtomicBool,
@@ -995,6 +1004,8 @@ impl RequestScope {
                 everything: AtomicBool::new(false),
                 own_keep_undone: AtomicU64::new(0),
                 forget_agreed: AtomicU64::new(0),
+                held_yes: std::sync::atomic::AtomicU8::new(0),
+                correction_agreed: AtomicU64::new(0),
                 named: AtomicBool::new(false),
                 named_by_one_face: AtomicBool::new(false),
                 named_conversation: AtomicBool::new(false),
@@ -1053,6 +1064,8 @@ impl RequestScope {
                 everything: AtomicBool::new(false),
                 own_keep_undone: AtomicU64::new(0),
                 forget_agreed: AtomicU64::new(0),
+                held_yes: std::sync::atomic::AtomicU8::new(0),
+                correction_agreed: AtomicU64::new(0),
                 named: AtomicBool::new(false),
                 named_by_one_face: AtomicBool::new(false),
                 named_conversation: AtomicBool::new(false),
@@ -1578,6 +1591,24 @@ impl ScopeLease {
         one_face.is_some() && self.context.one_face_reads.load(Ordering::Acquire)
     }
 
+    /// Whether this line is its person's by their own known face alone in
+    /// view, the mouth not seen saying it ([`Self::forgets_need_mouth`]),
+    /// and nothing else: not carried in their conversation, not from a name
+    /// the eyes hold ([`Self::sticky_held`]), not held by a face's gap, not
+    /// narrowed, and not answering words seen said. With
+    /// `LAMP_ONE_FACE_FORGETS_ON_YES` (the memory owner's ruling on #8570),
+    /// such a line's forget or correction is held for their yes, and their
+    /// yes on such a line runs it (`second_provider::hold_on_face_yes`).
+    pub fn in_view_by_one_face(&self) -> bool {
+        self.forgets_need_mouth()
+            && !self.sticky_held()
+            && !self.context.narrowed.load(Ordering::Acquire)
+            && self.context.carried.get().is_none()
+            && self.context.seen_words.get().is_none()
+            && !self.context.scope.held
+            && self.context.scope.person().is_some()
+    }
+
     /// Whether this line was admitted from a name the eyes hold, not match
     /// ([`ScopeSnapshot::sticky`]), while current and no narrow came after:
     /// no forget of any kind, no correction, rule or yes runs on it, the
@@ -1735,6 +1766,52 @@ impl ScopeLease {
                 args.iter()
                     .all(|(key, value)| key == "source_id" || (key == "about" && value.is_string()))
             })
+    }
+
+    /// The `forget_everything`, `forget_my_face` or correction (`remember`
+    /// with `replaces`) `name` with `args` that their yes on this line
+    /// agreed to, held for it on a line theirs by their face alone in view
+    /// (`LAMP_ONE_FACE_FORGETS_ON_YES`, the memory owner's ruling on #8570):
+    /// it runs on this line though it is theirs by one face too
+    /// ([`Self::forgets_need_mouth`]). Only the second route's held run
+    /// makes the [`crate::second_provider::OneFaceForgetYes`] it needs. Any
+    /// other call marks nothing. It lives with the request.
+    pub(crate) fn mark_held_yes(
+        &self,
+        _agreed: &crate::second_provider::OneFaceForgetYes,
+        name: &str,
+        args: &serde_json::Value,
+    ) {
+        match name {
+            crate::remember::FORGET_EVERYTHING => {
+                self.context.held_yes.fetch_or(1, Ordering::AcqRel);
+            }
+            crate::known_faces::FORGET => {
+                self.context.held_yes.fetch_or(2, Ordering::AcqRel);
+            }
+            _ if crate::remember::corrects(name, args) => {
+                if let Some(id) = args["replaces"].as_u64() {
+                    self.context.correction_agreed.store(id, Ordering::Release);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Whether `name` with `args` is what [`Self::mark_held_yes`] marked: a
+    /// `forget_everything` or `forget_my_face` marked, or a correction of
+    /// exactly the kept id marked.
+    pub(crate) fn held_yes_agreed(&self, name: &str, args: &serde_json::Value) -> bool {
+        let marked = self.context.held_yes.load(Ordering::Acquire);
+        match name {
+            crate::remember::FORGET_EVERYTHING => marked & 1 != 0,
+            crate::known_faces::FORGET => marked & 2 != 0,
+            _ if crate::remember::corrects(name, args) => {
+                let id = self.context.correction_agreed.load(Ordering::Acquire);
+                id != 0 && args["replaces"].as_u64() == Some(id)
+            }
+            _ => false,
+        }
     }
 
     /// Whether [`Self::mark_everything_asked`] was marked for this request.
@@ -2037,6 +2114,48 @@ mod tests {
         revoked.revoke();
         assert!(!lease.read_by_one_face(), "revoked");
     }
+    /// #8570 (`LAMP_ONE_FACE_FORGETS_ON_YES`): only a line theirs by their
+    /// own face alone in view is one their forget or correction is held on
+    /// and their yes runs on; a carried, sticky, gap-held or narrowed line,
+    /// one not read by one face, and the room's never are.
+    #[test]
+    fn in_view_by_one_face_is_false_on_carried_sticky_held_and_narrowed_lines() {
+        let key = RequestKey {
+            worker: lamp_turn_owner::BootId::new([0x86; 16]).unwrap(),
+            session: 1,
+            request: 1,
+        };
+        let a_id = crate::remember::person_id("A");
+        let lone = RequestScope::new(key, ScopeSnapshot::of("A"));
+        assert!(!lone.lease().in_view_by_one_face(), "not read by one face");
+        assert!(lone.lease().read_by_one_face());
+        assert!(
+            lone.lease().in_view_by_one_face(),
+            "their face alone in view"
+        );
+        lone.lease().narrow_to_room();
+        assert!(!lone.lease().in_view_by_one_face(), "narrowed");
+        let carried = RequestScope::new(key, ScopeSnapshot::of("A"));
+        assert!(carried.lease().carry_conversation(&a_id));
+        assert!(carried.lease().read_carried());
+        assert!(carried.lease().forgets_need_mouth());
+        assert!(!carried.lease().in_view_by_one_face(), "carried");
+        let sticky = RequestScope::new(key, ScopeSnapshot::sticky_of("A"));
+        assert!(sticky.lease().read_by_one_face());
+        assert!(sticky.lease().forgets_need_mouth());
+        assert!(!sticky.lease().in_view_by_one_face(), "sticky");
+        let held = RequestScope::new(key, ScopeSnapshot::held_of("A"));
+        assert!(!held.lease().read_by_one_face());
+        assert!(!held.lease().in_view_by_one_face(), "held by a gap");
+        let room = RequestScope::new(key, ScopeSnapshot::room());
+        assert!(room.lease().keep_for_one_face_recorded(&a_id));
+        assert!(room.lease().forgets_need_mouth());
+        assert!(
+            !room.lease().in_view_by_one_face(),
+            "the room's, named late"
+        );
+    }
+
     /// `LAMP_PERSON_SCOPE_ONE_FACE` (reviewer-three's P1 on #4584, option
     /// 2): a line A's only by the one-face rule reads the room's, and only
     /// its keep is A's. A narrow after it ends the keep; a revoked line, or

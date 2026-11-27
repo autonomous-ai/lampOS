@@ -7392,7 +7392,10 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   the subject in their words, never the kept text (the Reviewer-lead's P2
   on #6673). Their
   yes on a later line within 30 s, the same session's same person
-  (`keep_asker`), seen saying it or in the private room on a one-face line,
+  (`keep_asker`), seen saying it or in the private room on a one-face line
+  (or, with `LAMP_ONE_FACE_FORGETS_ON_YES`, on a line theirs by their face
+  alone in view, `ScopeLease::in_view_by_one_face`, no face seen speaking
+  it),
   judged by the model with no yes word list (its `forget` on that line,
   naming nothing else, `agree_held_forget`; the first builder's ruling on
   leg (e) of #7960's ROW) runs that forget by id, exactly as held, in
@@ -7411,7 +7414,48 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   answered "Okay, I'll keep it." (`remember::KEPT_IT_LINE`) with no model
   round, in the owner's language only from its clip rendered ahead
   (`kept_line_clip`), else the model is told it is kept (#8185). A
-  privacy switch change drops the held question (`Engine::privacy`). So are a correction
+  privacy switch change drops the held question (`Engine::privacy`).
+  With `LAMP_ONE_FACE_FORGETS_ON_YES` (off by default, #8570), before
+  `ask_once_forget`, `hold_on_face_yes` holds for one yes, on a line theirs
+  by their face alone in view (`ScopeLease::in_view_by_one_face`) with the
+  eyes reading who speaks: `forget_everything` (unless these words ask for
+  less), `forget_my_face`, a correction (`remember` with `replaces`) and a
+  bare forget after their one-face keep, on a later line of theirs in the
+  session within 60 s, as the forget of the kept id
+  (`face_kept_id`: the memory route's `ONE_FACE_KEPT` mark, or else the
+  second route's own, `HeldForgets::kept`, set by `mark_kept_by_face` from a
+  plain keep's told id on a line by their face alone in view and ended by
+  any memory call but a bare forget, the keep's own request included, as
+  the memory route's mark is; row 8654 L2 at 2c7cdd0d21). A
+  forget is bare with no `source_id` and either no `about` or one bare as
+  `ask_once_forget` reads it (`bare_forget`,
+  `remember::pick_forget`: an `about` of `""`, `[]` or a guess not heard is
+  bare; row 8654 L2 at 6c76c3257f). With the switch on, a forget of any kind
+  or a correction not held journals which check let it go, in machine words
+  only (`face-hold: refused: no_scope | not_heard | no_sight | gap_held |
+  not_one_face | named | not_bare | everything_refused | no_mark |
+  other_person | not_later | too_old | no_id | one_waits | stale (<call>)`),
+  `face-hold: own_mark` when the own mark held it, and `face-hold: dropped:
+  no_ask | unfinished (<call>)` when a hold is dropped for an answer that
+  asked nothing (row 8654 L4). Each is told the held notes in use or
+  `remember::HELD_CORRECTION_ASKS` (`HeldForget::face_yes`); a held
+  correction's round drops the quiet note and its ask is said
+  (`Quiet::held_keep`). A bare forget called on a line that is only a yes
+  (`remember::heard::only_a_yes`), a line after the keep's next one, theirs
+  by their face alone in view, runs at once as the forget of the kept id,
+  marked agreed, and is not asked again (`agreed_on_face_yes`), only when
+  the lamp's last answer after the keep asked about forgetting
+  (`remember::asks_about_forgetting`, `Shared::lamp_said`), the line it
+  answered named nothing (`HeldForgets::prior`, `remember::named_subject`)
+  and no request between the keep and the yes called anything
+  (`HeldForgets::called`); otherwise it is held and asked. In
+  `take_held_forget` (`YesLine`), their plain yes within 60 s on such a
+  line, no face seen speaking it, runs it, its person the line's own
+  (`keep_asker`); a carried, sticky or gap-held yes line drops it as unseen,
+  and `LAMP_KEEP_QUIETLY_ONE_FACE`'s carried keep yes never lets it go. The
+  held run marks it (`ScopeLease::mark_held_yes`, `mark_forget_agreed`), so
+  that call alone passes `one_face_refused` and the memory route's
+  correction check. Otherwise refused, as before: a correction
   (`remember` with `replaces`), `keep_rule`, `list_rules`, `set_role` and
   `end_role` (the privacy read on #5385, also in
   `remember::role_for_guarded`), and
