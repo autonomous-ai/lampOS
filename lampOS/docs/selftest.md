@@ -73,7 +73,7 @@ owner already has.
 | touch pads, button | lamp-controls | `controls/touch_state` ready, no fault, nothing held 10 s or more, and the head's `head pads` item in the lamp's health, when fresh, not a fault: a pad left out since the head was first read, or no pad on any of its lines, fails as a pad held 10 s does, since a stuck pad is left out and never held (#1798; lines only not probed pass, said as `head_pads`); and at the factory only, `touch_by_hand`: the person is asked on the console to swipe the strip, touch the head and press the button, and all 20 s are watched (a swipe is read to its end) for each source to feel the hand; the electrodes each felt are listed, the strip's from the bits of its `active_mask` (`E0` to `E11`), the head's by pad name, so one that never fires shows; a source not felt is `not_checked` and named, but a head not felt while lamp-controls' `head pads` item in the lamp's health isn't well (no pad on the lines the pins name, or a pad left out since Controls started; [controls.md](controls.md), "Said when no pad is there") is a `fail` that gives the item's words: pads that don't read are said, not taken for nobody touching (#1798, `hand::head_unread`). Lines the item says were only `not probed` (another program held them) are an unknown: still `not_checked`, with its words. The item is taken only while fresh, its health and its own age together within 3 s (`HEALTH_FRESH`), so an old warning never fails a head fixed since. `lamp/health` keeps an item's words and not its values, so the kind is read from the words lamp-controls uses, which the test pins against its own `HeadLines::health`. Each source is one `controls/touch_state` lists: with the base strip off (unless `LAMP_CONTROLS_STRIP=on`, [controls.md](controls.md), "The base strip is off"), there is no strip source, so the head and the button are judged. The console's prompt still asks for a swipe, which nothing reads; changing that prompt is the self-test owner's, left as it is here | idle done; by hand done |
 | air | lamp-air | `air/state` fresh (15 s) and in range; one that read this boot and has gone stale fails (lamp-4ace on 17 Oct: its sensor answered, then 20–30 reads a minute failed). With no reading since boot (the bus is under `/run`), `lamp-air`'s own word decides: a sensor that never answered since `lamp-air` started, which `lamp-air` reports at `ok` as "not fitted: no air sensor has answered since start" after three misses (its journal says "no air sensor answers on I2C bus N"), is `not_fitted` (the sensor is optional; lamp-06c1 and lamp-cb94 have none, the first builder on 17 Oct); "the sensor does not answer", in those first looks, is `not_checked`; "the air sensor answered but gives no reading", said instead once it has answered by name or with a reading that failed its CRC, fails (lamp-4ace after a reboot: a fitted sensor that is faulty or unseated, the Seventh and the reviewer on #1324), as does any other warning, such as a bus that cannot be opened. The words are `lamp-air`'s own constants (`watch::LOOKING`, `NOT_FITTED`, `ABSENT`, `NO_READING`), and a test runs `lamp-air`'s loop against both kinds of sensor | done |
 | board | (none) | `board/state` from `lamp-health`: hottest under 85 °C, 3% of the disk free or more | done |
-| storage | (none) | `/dev/kmsg`, read to its end. Fails only on what hurts the SD card, since boot, and only on a line naming the card (`mmcblk`): an I/O error (`blk_update_request: I/O error, dev mmcblk1, …`, `Buffer I/O error on dev mmcblk1p1, …`), an ext4 error (`EXT4-fs error (device mmcblk1p1): …`), its filesystem remounted read-only (`EXT4-fs (mmcblk1p1): Remounting filesystem read-only`), or a task blocked on it (`INFO: task jbd2/mmcblk1p1-8:187 blocked for more than 120 seconds.`). The same lines for another device (a USB stick's `sda1`) pass, and a hung task that does not name the card (`INFO: task lamp-voice:812 blocked …`) passes, counted as `blocked_other`. The SD/MMC hosts' re-tune (`sunxi_mmc_host-4021000.sdmmc:[INFO]: start tuning, …`, often followed by `[ERR]: wait dma hold bit clear timeout`) passes. Every board does it about hourly: lamp-52e6 every 3,670 s for each host, lamp-4ace every 61 minutes, and lamp-75c9 shows the same lines with its period not measured (#784). The parts ride it out since #791 and #911. Re-tunes (`start tuning` lines) and DMA timeouts are counted. Two re-tunes of one host under 3,000 s apart still pass, and the reason says "more often than hourly" with the gap. That reason is only in the run's JSON: `lamp-health` reads only failed parts' reasons, so its item says "passed". These pass too, because they hurt only once an I/O or ext4 error follows: `mmc1: tuning execution failed: -5`, `mmcblk1: error -84 transferring data …` (a CRC error, retried), `mmc1: card … removed`, and `Aborting journal on device mmcblk1p1-8.`. Not read: a root mounted `ro` from boot with no remount line. The kernel's log cannot say that a stall ended a part, so a part a short stall ended shows in its own item; unreadable (no `CAP_SYSLOG` under `dmesg_restrict`) is `not_checked`, and so is a log that no longer holds the whole boot (its first record kept is not sequence 0, or records were overwritten while read) with no fault in what is left; a fault kept still fails | done |
+| storage | (none) | `/dev/kmsg`, read within the bounded scan described below. Fails only on what hurts the SD card, since boot, and only on a line naming the card (`mmcblk`): an I/O error (`blk_update_request: I/O error, dev mmcblk1, …`, `Buffer I/O error on dev mmcblk1p1, …`), an ext4 error (`EXT4-fs error (device mmcblk1p1): …`), its filesystem remounted read-only (`EXT4-fs (mmcblk1p1): Remounting filesystem read-only`), or a task blocked on it (`INFO: task jbd2/mmcblk1p1-8:187 blocked for more than 120 seconds.`). The same lines for another device (a USB stick's `sda1`) pass, and a hung task that does not name the card (`INFO: task lamp-voice:812 blocked …`) passes, counted as `blocked_other`. The SD/MMC hosts' re-tune (`sunxi_mmc_host-4021000.sdmmc:[INFO]: start tuning, …`, often followed by `[ERR]: wait dma hold bit clear timeout`) passes. Every board does it about hourly: lamp-52e6 every 3,670 s for each host, lamp-4ace every 61 minutes, and lamp-75c9 shows the same lines with its period not measured (#784). The parts ride it out since #791 and #911. Re-tunes (`start tuning` lines) and DMA timeouts are counted. Two re-tunes of one host under 3,000 s apart still pass, and the reason says "more often than hourly" with the gap. That reason is only in the run's JSON: `lamp-health` reads only failed parts' reasons, so its item says "passed". These pass too, because they hurt only once an I/O or ext4 error follows: `mmc1: tuning execution failed: -5`, `mmcblk1: error -84 transferring data …` (a CRC error, retried), `mmc1: card … removed`, and `Aborting journal on device mmcblk1p1-8.`. Not read: a root mounted `ro` from boot with no remount line. The kernel's log cannot say that a stall ended a part, so a part a short stall ended shows in its own item; unreadable (no `CAP_SYSLOG` under `dmesg_restrict`) is `not_checked`, and so is a log that no longer holds the whole boot (its first record kept is not sequence 0, or records were overwritten while read) with no fault in what is left; a fault kept still fails | done |
 | voice route | lamp-voice | With `LAMP_VOICE_ROUTE=second` in the voice's unit (`/etc/systemd/system/lamp-voice.service` and its drop-ins, read as systemd reads them), whether the files the voice needs are there: `LAMP_VOICE_SECOND_CONFIG`'s configuration, every key file it names (each `*_credential_file`) and every `LoadCredential=` source. A source that is a folder passes, empty or not, as systemd loads it file by file: the person's own keys' folder (`lamp-voice.service`'s since #8367, a test lamp's `own-keys-voice.conf` before, #2094), which the voice reads only if it holds keys and otherwise uses the relay's; one the unit's `ConfigurationDirectory=` names passes even before it is there, since systemd makes it at start (lamp-06c1 on 21 Oct, its voice folder opened, was a false `fail`, "the unit's credential own /etc/lampOS/voice/own is not a file", from a build before folders were taken). A key is never read: each file is only looked at, as there, a regular file and not empty. Run as `lampos` (the timer's), root's configuration can't be read, so its key is taken as the relay key install places, `/etc/lampOS/voice/credential`, and the reason says so. One missing, empty or not a file fails, naming each ("the second route's configuration /etc/lampOS/voice/second.json is missing: the voice does not start on the second route"), since the voice then does not start and never falls back to Live (#1712). `second` without a configuration fails. A file that can't be looked at at all (its folder closed to `lampos`, as lamp-06c1's `/etc/lampOS/voice`, root's 0700, on 21 Oct) is not missing: the voice runs as root and may have it, so with nothing else wrong the part is `not_checked`, naming each file, and never `fail`; the lamp's health is not made `error` for it. Gemini Live (any other route) is `not_fitted`, and a unit that can't be read is `not_checked` | run on lamp-06c1 on 21 Oct: a false `fail` there (its voice folder closed); the `not_checked` for it is not yet run on a lamp |
 
 A reading never given is `not_checked` (its owner may not run on this
@@ -96,6 +96,95 @@ The storage part reads `/dev/kmsg`, which a lamp with `kernel.dmesg_restrict = 1
 journal is no substitute there (two kernel lines for the whole boot). A unit
 that runs the self-test gives it `AmbientCapabilities=CAP_SYSLOG`; run by
 hand without it, storage is `not_checked`.
+
+Each kernel-log scan, including the voice microphone's USB scan, stops at
+the earlier of the caller's deadline and 100 ms from its start. It reads at
+most 1 MiB, makes at most 4,096 read attempts (including interrupted reads
+and overwritten-record errors), and delivers at most 4,096 record lines
+to its counters, including continuation lines. Before another read, the
+reader reserves its full fixed 8 KiB buffer against the byte allowance, so
+it may stop just short of the byte limit. This buffer size is a reader limit,
+not a universal kernel record maximum. A read error because a record cannot
+fit leaves the scan incomplete with `read_error`; the buffer is not enlarged.
+These bounds apply at every occasion; they
+do not add a nightly schedule or change which checks may play, light or move.
+
+The storage result carries `scan_stop` (`complete`, `deadline`,
+`byte_limit`, `record_limit`, `attempt_limit` or `read_error`),
+`scan_bytes` and `scan_attempts` when a scan was attempted. `complete`
+means the retained ring reached EOF or would-block, not that it held all
+of this boot: `oldest_lost` still records a wrapped ring. A scan stopped by
+a bound or a later read error keeps its earlier counts. An observed SD
+fault still fails; without one, incomplete evidence is `not_checked`,
+never a clean pass. Its counts are lower bounds, not totals for the boot.
+`scan_order: oldest_first` makes the direction explicit: opening
+`/dev/kmsg` starts at its oldest retained record. A capped scan observes a
+prefix and can miss the newest faults; overwritten records can leave gaps
+in that prefix too. It does not drain past the bounds to reach the end.
+
+The microphone carries the same fixed stop reason as `usb_log_scan`.
+Its `usb_log_order: oldest_first` has the same coverage limitation.
+Observed microphone and hub disconnects survive a partial scan and are
+reported as "at least"; with no records read their counts stay unknown.
+These are separate total microphone and hub counts. An incomplete scan
+does not attribute microphone drops to the microphone "alone": an unread
+later hub event can still match an already observed microphone drop within
+the existing one-second association window. Subtracting the two observed
+counts would not establish a lower bound for independent microphone drops.
+An otherwise passing microphone result becomes `not_checked` when this
+scan is incomplete, while a measured audio fault or a known missing USB
+microphone still fails. Its audio measurements remain in the result.
+Existing wrapped-ring handling is unchanged.
+
+Fault retention here is per scan, not a change to whole-run retry merging.
+The existing `again()` replaces a first-pass failure with the retry's result,
+which can be `not_checked`. The separate passive-retry change in #8837 handles
+retry admission; this bounded reader does not change that coordinator policy.
+
+The 100 ms limit is cooperative: the reader checks between nonblocking
+reads and record callbacks, including after EOF, and does not open a log
+after an already expired deadline. It cannot interrupt a syscall or a
+counter callback already in progress. It does not bound the separate
+sysfs lookup, USB summary, microphone listening, report writes or fsync, and does not
+yet provide cancellation on speech or presence. The shared runtime reader
+has deterministic host tests for continuous input, limits, interrupted and
+overwritten error storms, deadlines and preservation of partial faults;
+Linux tests also exercise the real file-opening path with synthetic files.
+The proposed caps have not been sized on hardware. No device latency or
+full self-test cancellation guarantee is implied.
+
+The ignored `measure_bounded_kernel_scan_host` test measures the same reader
+with real `Instant` samples and `Storage::count`, against the previous
+finite-drain success path with coverage counters added. It starts before
+constructing `Storage` and ends when the reader returns: copying synthetic
+in-memory records, decoding lines and counting are included; generating the
+input, opening or reading a kernel device, formatting the result and dropping
+the storage aggregate are excluded. The continuous input is never given to
+the unbounded comparison. Run explicitly from `lampOS/`:
+
+```sh
+CARGO_BUILD_JOBS=2 cargo test --offline -q -p lamp-selftest --lib kernel::tests::measure_bounded_kernel_scan_host -- --ignored --exact --nocapture --test-threads=1
+```
+
+On 27 November 2026, x86_64 macOS 26.6.2, Rust 1.96.0, the unoptimized test
+profile measured the following. The first timing column is the first measured call
+per case, not a cold-process or cold-device test; median, p95 (nearest rank)
+and maximum are from 31 subsequent calls. The synthetic inputs mix ordinary
+status, re-tune and DMA-timeout records. All repeats had the coverage and stop
+reason shown. These host timings do not establish kernel-I/O or lamp latency.
+
+| Input and reader | First, ms | Repeat median / p95 / max, ms | Observed records / bytes | Stop |
+|---|---:|---:|---:|---|
+| 128 × 256-byte records, old finite drain | 1.045 | 0.597 / 0.815 / 0.869 | 128 / 32,768 | complete |
+| Same small input, bounded | 0.638 | 0.687 / 0.968 / 1.241 | 128 / 32,768 | complete |
+| 16,384 × 1,024-byte records, old finite drain | 286.716 | 276.017 / 325.619 / 335.472 | 16,384 / 16,777,216 | complete |
+| Same finite burst, bounded | 17.253 | 17.032 / 18.996 / 19.130 | 1,017 / 1,041,408 | byte_limit |
+| Continuous 128-byte records, bounded | 11.102 | 10.898 / 12.469 / 13.179 | 4,096 / 524,288 | record_limit |
+
+The burst timings compare different coverage: the bounded reader observes
+only the prefix and reports incomplete evidence. Its 8 KiB reservation stops
+before the 1 MiB ceiling. The small-input comparison covers the same records
+and includes the added clock and limit checks. Neither is a timing gate.
 
 On lamp-4ace the unit is `deploy/lamp-4ace/lamp-selftest.service`: a
 oneshot, started only by hand (`sudo systemctl start lamp-selftest`), never

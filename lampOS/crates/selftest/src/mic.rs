@@ -44,11 +44,14 @@ pub struct Usb {
     /// if the log could not be read or no port is known.
     pub drops: Option<usize>,
     /// The log reaches back to boot: its first record is the boot's first,
-    /// and none was overwritten while it was read. Otherwise the drops are
-    /// "at least".
+    /// and the scan reached its end without any overwrite. Otherwise the
+    /// observed drops are "at least".
     pub since_boot: bool,
-    /// The kernel's log could be read (the self-test has `CAP_SYSLOG`).
+    /// The kernel's log was drained, or at least one record was observed.
     pub log_read: bool,
+    /// Why the scan ended, absent when the log could not be opened. A partial
+    /// scan never makes an otherwise passing microphone check a clean pass.
+    pub scan_stop: Option<kernel::ScanStop>,
     /// The USB hub the mic hangs from, when the kernel saw it go: on
     /// lamp-4ace at 17:12 on 17 Oct the inner hub `3-1.1` dropped twice and
     /// took the mic, the speaker, the body's servo port and the camera with
@@ -98,6 +101,11 @@ impl Usb {
         let times = if drops == 1 { "time" } else { "times" };
         if self.since_boot {
             format!("{drops} {times} since boot")
+        } else if self
+            .scan_stop
+            .is_some_and(|stop| stop != kernel::ScanStop::Complete)
+        {
+            format!("at least {drops} {times} since boot (the kernel log scan was incomplete)")
         } else {
             format!(
                 "at least {drops} {times} since boot (the kernel's log no longer reaches back to boot)"
@@ -141,8 +149,16 @@ impl Usb {
         Some((said, hub))
     }
 
-    /// The mic's own drops, apart from those that came with its hub's.
+    /// The mic's own drops, apart from those that came with its hub's. An
+    /// incomplete suffix may contain a matching hub event, so subtracting two
+    /// partial counts cannot establish an "alone" lower bound.
     fn alone_said(&self) -> Option<String> {
+        if self
+            .scan_stop
+            .is_some_and(|stop| stop != kernel::ScanStop::Complete)
+        {
+            return None;
+        }
         let with_hub = self.hub.as_ref().map_or(0, |hub| hub.mic_with_it);
         let alone = self.drops?.saturating_sub(with_hub);
         (alone > 0).then(|| {
@@ -280,7 +296,7 @@ impl UsbRecords {
 
 /// Reads whether the card is there and its port (from `sound`), and the
 /// drops since boot (from the kernel's log at `kmsg`).
-pub fn usb(sound: &std::path::Path, kmsg: &str) -> Usb {
+pub fn usb(sound: &std::path::Path, kmsg: &str, deadline: Instant) -> Usb {
     let card_port = std::fs::read_dir(sound).ok().and_then(|cards| {
         cards.flatten().find_map(|card| {
             let id = std::fs::read_to_string(card.path().join("id")).ok()?;
@@ -291,10 +307,20 @@ pub fn usb(sound: &std::path::Path, kmsg: &str) -> Usb {
             })
         })
     });
-    let present = card_port.is_some();
     let mut records = UsbRecords::default();
-    let overwritten = kernel::each_record(kmsg, |line| records.count(line));
-    let read = overwritten.is_ok();
+    let scan = kernel::each_record(kmsg, deadline, |line| records.count(line)).ok();
+    usb_from_records(card_port, &records, scan)
+}
+
+/// Fold a complete or partial scan without throwing away observed drops or
+/// device evidence when a later read fails or reaches a bound.
+fn usb_from_records(
+    card_port: Option<Option<String>>,
+    records: &UsbRecords,
+    scan: Option<kernel::Scan>,
+) -> Usb {
+    let present = card_port.is_some();
+    let read = scan.is_some_and(|scan| scan.complete() || scan.records > 0);
     let port = card_port
         .flatten()
         .or_else(|| records.jieli_ports.last().cloned());
@@ -312,8 +338,10 @@ pub fn usb(sound: &std::path::Path, kmsg: &str) -> Usb {
         jieli: present || !records.jieli_ports.is_empty(),
         port,
         drops,
-        since_boot: overwritten == Ok(false) && records.first_sequence == Some(0),
+        since_boot: scan.is_some_and(|scan| scan.complete() && !scan.overwritten)
+            && records.first_sequence == Some(0),
         log_read: read,
+        scan_stop: scan.map(|scan| scan.stop),
         hub,
     }
 }
@@ -362,13 +390,34 @@ impl Heard {
 pub fn voice_mic(declared: bool, heard: &Result<Heard, String>, usb: Option<&Usb>) -> PartResult {
     let mut result = judged(declared, heard, usb);
     if let Some(usb) = usb {
+        if let Some(stop) = usb.scan_stop {
+            result = result
+                .with("usb_log_scan", stop.code())
+                .with("usb_log_order", "oldest_first");
+            if stop != kernel::ScanStop::Complete {
+                if result.verdict == Verdict::Pass {
+                    result.verdict = Verdict::NotChecked;
+                }
+                let note = format!("the kernel log scan was incomplete ({})", stop.code());
+                result.reason = if result.reason.is_empty() {
+                    note
+                } else {
+                    format!("{}; {note}", result.reason)
+                };
+            }
+        }
         if let Some(port) = &usb.port {
             result = result.with("usb_port", port);
         }
         if !usb.jieli {
             // No Jieli on this lamp, or none the log still holds: nothing
             // to say of its USB.
-            let why = if !usb.log_read {
+            let why = if usb
+                .scan_stop
+                .is_some_and(|stop| stop != kernel::ScanStop::Complete)
+            {
+                "unknown: no Jieli card here, and the kernel log scan was incomplete"
+            } else if !usb.log_read {
                 "unknown: no Jieli card here, and the kernel's log could not be read (it needs CAP_SYSLOG)"
             } else if !usb.since_boot {
                 "unknown: no Jieli card here, and the kernel's log no longer reaches back to boot"
@@ -383,7 +432,14 @@ pub fn voice_mic(declared: bool, heard: &Result<Heard, String>, usb: Option<&Usb
             Some(drops) => result.with("usb_drops", format!("at least {drops}")),
             None => result.with(
                 "usb_drops",
-                "unknown: the kernel's log could not be read (it needs CAP_SYSLOG), or the port is not known",
+                if usb
+                    .scan_stop
+                    .is_some_and(|stop| stop != kernel::ScanStop::Complete)
+                {
+                    "unknown: the kernel log scan was incomplete, or the port is not known"
+                } else {
+                    "unknown: the kernel's log could not be read (it needs CAP_SYSLOG), or the port is not known"
+                },
             ),
         };
         if let Some(hub) = &usb.hub {
@@ -527,7 +583,8 @@ impl Check for VoiceMic<'_> {
     fn run(&mut self, deadline: Instant) -> PartResult {
         let declared = self.bus.declaration(TOPIC).ok().flatten().is_some();
         let heard = self.listen(deadline);
-        let usb = cfg!(target_os = "linux").then(|| usb(std::path::Path::new(SOUND), kernel::KMSG));
+        let usb = cfg!(target_os = "linux")
+            .then(|| usb(std::path::Path::new(SOUND), kernel::KMSG, deadline));
         voice_mic(declared, &heard, usb.as_ref())
     }
 }
@@ -535,6 +592,192 @@ impl Check for VoiceMic<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_incomplete_kernel_scan_keeps_usb_drops_and_real_microphone_faults() {
+        let start = Instant::now();
+        let mut records = UsbRecords::default();
+        let mut first = true;
+        let scan = kernel::scan_records(
+            |buffer| {
+                if std::mem::take(&mut first) {
+                    let bytes = b"6,0,0,-;Booting\n6,1,1,-;usb 3-1.1.1: Manufacturer: Jieli\n6,2,2,-;usb 3-1.1: USB disconnect\n6,3,3,-;usb 3-1.1.1: USB disconnect\n";
+                    buffer[..bytes.len()].copy_from_slice(bytes);
+                    Ok(bytes.len())
+                } else {
+                    Err(std::io::Error::other("PRIVATE_CANARY"))
+                }
+            },
+            start + kernel::SCAN_BUDGET,
+            || start,
+            |line| records.count(line),
+        );
+        assert_eq!(scan.stop, kernel::ScanStop::ReadError);
+        let gone = usb_from_records(None, &records, Some(scan));
+        assert!(gone.jieli && gone.log_read && !gone.since_boot);
+        assert_eq!(gone.drops, Some(1));
+        assert_eq!(gone.hub.as_ref().map(|hub| hub.drops), Some(1));
+        let failed = voice_mic(true, &Ok(Heard::default()), Some(&gone));
+        assert_eq!(failed.verdict, Verdict::Fail);
+        assert!(failed.reason.contains("not on USB now"));
+        assert!(
+            failed
+                .values
+                .iter()
+                .any(|value| value.key == "usb_drops" && value.value == "at least 1")
+        );
+        assert!(
+            !serde_json::to_string(&failed)
+                .unwrap()
+                .contains("PRIVATE_CANARY")
+        );
+
+        let present = usb_from_records(Some(Some("3-1.1.1".into())), &records, Some(scan));
+        let mut heard = Heard::default();
+        heard.add(&block(1, 300)).unwrap();
+        let partial = voice_mic(true, &Ok(heard), Some(&present));
+        assert_eq!(partial.verdict, Verdict::NotChecked);
+        assert!(partial.reason.contains("incomplete (read_error)"));
+        assert!(
+            partial
+                .values
+                .iter()
+                .any(|value| value.key == "blocks" && value.value == "1")
+        );
+        assert!(
+            partial
+                .values
+                .iter()
+                .any(|value| value.key == "usb_hub_drops" && value.value == "at least 1")
+        );
+
+        let mut silent = Heard::default();
+        silent.add(&block(1, 0)).unwrap();
+        assert_eq!(
+            voice_mic(true, &Ok(silent), Some(&present)).verdict,
+            Verdict::Fail
+        );
+    }
+
+    #[test]
+    fn a_partial_suffix_cannot_establish_that_a_microphone_dropped_alone() {
+        // The second hub drop arrives after its microphone drop. Cutting
+        // before it makes the observed total minus observed associations one,
+        // although the complete input proves both mic drops accompanied a hub.
+        let lines: [&[u8]; 6] = [
+            b"6,0,0,-;Booting\n",
+            b"6,1,1,-;usb 3-1.1.1: Manufacturer: Jieli\n",
+            b"6,2,2000000,-;usb 3-1.1: USB disconnect\n",
+            b"6,3,2010000,-;usb 3-1.1.1: USB disconnect\n",
+            b"6,4,5000000,-;usb 3-1.1.1: USB disconnect\n",
+            b"6,5,5010000,-;usb 3-1.1: USB disconnect\n",
+        ];
+        for complete in [false, true] {
+            let start = Instant::now();
+            let now = std::cell::Cell::new(start);
+            let mut next = 0;
+            let mut records = UsbRecords::default();
+            let scan = kernel::scan_records(
+                |buffer| {
+                    let Some(line) = lines.get(next) else {
+                        return Err(std::io::ErrorKind::WouldBlock.into());
+                    };
+                    next += 1;
+                    buffer[..line.len()].copy_from_slice(line);
+                    Ok(line.len())
+                },
+                start + kernel::SCAN_BUDGET,
+                || now.get(),
+                |line| {
+                    records.count(line);
+                    if !complete && records.records == 5 {
+                        now.set(start + kernel::SCAN_BUDGET);
+                    }
+                },
+            );
+            assert_eq!(
+                scan.stop,
+                if complete {
+                    kernel::ScanStop::Complete
+                } else {
+                    kernel::ScanStop::Deadline
+                }
+            );
+            let present = usb_from_records(Some(Some("3-1.1.1".into())), &records, Some(scan));
+            assert_eq!(present.drops, Some(2));
+            let hub = present.hub.as_ref().unwrap();
+            assert_eq!(hub.drops, if complete { 2 } else { 1 });
+            assert_eq!(hub.mic_with_it, if complete { 2 } else { 1 });
+            assert!(present.alone_said().is_none());
+
+            let mut heard = Heard::default();
+            heard.add(&block(1, 300)).unwrap();
+            let running = voice_mic(true, &Ok(heard), Some(&present));
+            assert_eq!(
+                running.verdict,
+                if complete {
+                    Verdict::Pass
+                } else {
+                    Verdict::NotChecked
+                }
+            );
+            let gone = Usb {
+                present: false,
+                ..present
+            };
+            let missing = voice_mic(true, &Ok(Heard::default()), Some(&gone));
+            assert_eq!(missing.verdict, Verdict::Fail);
+            for result in [running, missing] {
+                assert!(!result.reason.contains("alone"));
+                let value = |key: &str| {
+                    result
+                        .values
+                        .iter()
+                        .find(|value| value.key == key)
+                        .map(|value| value.value.as_str())
+                };
+                assert_eq!(
+                    value("usb_drops"),
+                    Some(if complete { "2" } else { "at least 2" })
+                );
+                assert_eq!(
+                    value("usb_hub_drops"),
+                    Some(if complete { "2" } else { "at least 1" })
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn an_expired_kernel_scan_has_no_drop_count_or_claim_of_a_full_boot() {
+        let start = Instant::now();
+        let scan = kernel::scan_records(
+            |_| panic!("no read after deadline"),
+            start,
+            || start,
+            |_| panic!("no record after deadline"),
+        );
+        let usb = usb_from_records(
+            Some(Some("3-1.1.1".into())),
+            &UsbRecords::default(),
+            Some(scan),
+        );
+        assert!(usb.present && usb.jieli);
+        assert!(!usb.log_read && !usb.since_boot);
+        assert_eq!(usb.drops, None);
+        assert_eq!(usb.hub, None);
+        let mut heard = Heard::default();
+        heard.add(&block(1, 300)).unwrap();
+        let result = voice_mic(true, &Ok(heard), Some(&usb));
+        assert_eq!(result.verdict, Verdict::NotChecked);
+        assert!(result.reason.contains("incomplete (deadline)"));
+        assert!(
+            result
+                .values
+                .iter()
+                .any(|value| value.key == "usb_drops" && value.value.starts_with("unknown"))
+        );
+    }
 
     fn block(sequence: u64, amplitude: i16) -> Vec<u8> {
         let samples: Vec<u8> = (0..320)
@@ -681,7 +924,7 @@ mod tests {
         )
         .unwrap();
         let kmsg = kmsg.to_str().unwrap();
-        let there = usb(&sound, kmsg);
+        let there = usb(&sound, kmsg, Instant::now() + Duration::from_secs(1));
         assert_eq!(
             there,
             Usb {
@@ -691,6 +934,7 @@ mod tests {
                 drops: Some(1),
                 since_boot: true,
                 log_read: true,
+                scan_stop: Some(kernel::ScanStop::Complete),
                 hub: Some(Hub {
                     port: "3-1.1".into(),
                     ..Hub::default()
@@ -698,13 +942,17 @@ mod tests {
             }
         );
         std::fs::remove_dir_all(sound.join("card4")).unwrap();
-        let gone = usb(&sound, kmsg);
+        let gone = usb(&sound, kmsg, Instant::now() + Duration::from_secs(1));
         assert_eq!(
             (gone.present, gone.port.as_deref(), gone.drops),
             (false, Some("3-1.1.1"), Some(1))
         );
         assert!(gone.jieli && gone.since_boot);
-        let unread = usb(&sound, "/nonexistent/kmsg");
+        let unread = usb(
+            &sound,
+            "/nonexistent/kmsg",
+            Instant::now() + Duration::from_secs(1),
+        );
         assert_eq!(
             (unread.present, unread.jieli, unread.drops),
             (false, false, None)
@@ -717,7 +965,11 @@ mod tests {
             "6,5000,9,-;usb 3-1.1.1: Manufacturer: Jieli Technology\n6,5001,10,-;usb 3-1.1.1: USB disconnect, device number 9\n",
         )
         .unwrap();
-        let late = usb(&sound, wrapped.to_str().unwrap());
+        let late = usb(
+            &sound,
+            wrapped.to_str().unwrap(),
+            Instant::now() + Duration::from_secs(1),
+        );
         assert_eq!(
             (late.jieli, late.drops, late.since_boot),
             (true, Some(1), false)
@@ -730,7 +982,11 @@ mod tests {
             "6,0,0,-;Booting\n6,1,1,-;usb 3-1.1.1: Manufacturer: Seeed\n",
         )
         .unwrap();
-        let none = usb(&sound, other.to_str().unwrap());
+        let none = usb(
+            &sound,
+            other.to_str().unwrap(),
+            Instant::now() + Duration::from_secs(1),
+        );
         assert_eq!(
             (none.present, none.jieli, none.port, none.drops),
             (false, false, None, None)
@@ -791,6 +1047,7 @@ mod tests {
             drops: Some(records.drops("3-1.1.1")),
             since_boot: true,
             log_read: true,
+            scan_stop: Some(kernel::ScanStop::Complete),
             hub: Some(hub),
         };
         let mut room = Heard::default();
@@ -875,6 +1132,7 @@ mod tests {
             drops: Some(2),
             since_boot: true,
             log_read: true,
+            scan_stop: Some(kernel::ScanStop::Complete),
             hub: None,
         };
         let off = voice_mic(true, &Ok(Heard::default()), Some(&gone));
@@ -927,6 +1185,7 @@ mod tests {
                 drops: None,
                 since_boot: true,
                 log_read: true,
+                scan_stop: Some(kernel::ScanStop::Complete),
                 hub: None,
             }),
         );
@@ -987,6 +1246,7 @@ mod tests {
             drops: Some(2),
             since_boot: false,
             log_read: true,
+            scan_stop: Some(kernel::ScanStop::Complete),
             hub: None,
         };
         let off = voice_mic(true, &Ok(Heard::default()), Some(&wrapped));
