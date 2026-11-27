@@ -30,8 +30,8 @@ What it says and when:
   10 seconds of the lamp speaking. Others in view, late at night or early
   in the morning, it still says it.
 - It is not one of the wellbeing nudges' hour: it neither waits for nor
-  spends it. Still sitting badly, it says so again at most once every 15
-  minutes, whichever part.
+  spends it. Still sitting badly the same way, it says so again at most
+  once every 15 minutes; a different part is a new word.
 - "Stop the posture reminders" (or "the slouch ones") to the lamp snoozes
   it until tomorrow morning or turns it off until you ask again. The
   wellbeing nudges share that one function.

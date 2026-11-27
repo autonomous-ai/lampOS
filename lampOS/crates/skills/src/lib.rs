@@ -453,10 +453,10 @@ pub struct Stop {
     /// `[stop.done]`: its own way, beside [`STOP_WAYS`].
     pub done: Option<StopDone>,
     /// `[stop] group` (#7401): the skills under the skills folder that name
-    /// it share the function as a `[budget]` group's do (the seen
-    /// reactions, with no limit of their own), and with the skills of the
-    /// `[budget]` group of that name (#8377: Posture keeps the wellbeing
-    /// nudges' stop without their hour, in a `[budget]` group of its own).
+    /// it share the function as a `[budget]` group's do, in a skill with no
+    /// `[budget]` (the seen reactions, with no limit of their own), and
+    /// with the skills of the `[budget]` group of that name (#8377: Posture
+    /// keeps the wellbeing nudges' stop without their hour).
     pub group: Option<String>,
     /// The word a call of a shared stop may name this skill by, beside its
     /// name, as [`STOP_KIND`] (#6543): "drinks" for "stop telling me about
@@ -5280,12 +5280,18 @@ fn manifest(
                     })
                 }
             };
-            if let Some(group) = &stop.group
-                && (!plain_name(group) || group.contains('_'))
-            {
-                return Err(format!(
-                    "[stop] group {group:?}: lowercase letters, digits and hyphens"
-                ));
+            if let Some(group) = &stop.group {
+                if budget.is_some() {
+                    return Err(
+                        "[stop] group is for a skill in no [budget] group: its group shares it already"
+                            .into(),
+                    );
+                }
+                if !plain_name(group) || group.contains('_') {
+                    return Err(format!(
+                        "[stop] group {group:?}: lowercase letters, digits and hyphens"
+                    ));
+                }
             }
             Some(Stop {
                 tool: stop.tool,
