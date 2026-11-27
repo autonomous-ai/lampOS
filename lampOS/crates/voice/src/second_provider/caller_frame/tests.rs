@@ -276,9 +276,10 @@ async fn prewarm_and_inflight_pair_are_reaped_and_the_next_caller_has_its_own_by
     std::fs::create_dir(&dir).unwrap();
     let first_gate = dir.join("first-gate");
     let second_gate = dir.join("second-gate");
+    let pair_gate = dir.join("pair-gate");
     assert!(
         std::process::Command::new("mkfifo")
-            .args([&first_gate, &second_gate])
+            .args([&first_gate, &second_gate, &pair_gate])
             .status()
             .unwrap()
             .success()
@@ -300,8 +301,10 @@ while read -r tag caller request refs samples; do
     if [ "$tag" != pair ]; then exit 2; fi
     if [ "$request" = 2 ]; then
         printf '%s\n' "$$" > "$2/started"
-        # Wait on our closed input rather than creating any grandchildren.
-        exec dd bs=1 of=/dev/null 2>/dev/null
+        # Keep the reply pipe open until cancellation. GNU dd with of=/dev/null
+        # replaces stdout and would tell the parent EOF while still running.
+        IFS= read -r ignored < "$2/pair-gate"
+        exit 5
     fi
     got=$(dd bs=1 count=$(((refs + samples) * 2)) 2>/dev/null | od -An -tx1 | tr -d ' \n')
     if [ "$caller" = 7 ] && [ "$request" = 8 ] && [ "$got" = 0100feff0300 ]; then
@@ -363,6 +366,7 @@ done
         second,
         "reuse the prewarmed child"
     );
+    assert!(results.try_recv().is_err(), "the stalled pair has no reply");
     generation.send_replace(2);
     jobs.send(send(7, 8, 2)).await.unwrap();
     let row = timeout(Duration::from_secs(3), results.recv())
@@ -381,7 +385,13 @@ done
         .unwrap()
         .unwrap();
     std::fs::remove_file(started).unwrap();
-    for name in ["first-pid", "second-pid", "first-gate", "second-gate"] {
+    for name in [
+        "first-pid",
+        "second-pid",
+        "first-gate",
+        "second-gate",
+        "pair-gate",
+    ] {
         std::fs::remove_file(dir.join(name)).unwrap();
     }
     std::fs::remove_file(program).unwrap();
