@@ -469,6 +469,14 @@ impl News {
         }
     }
 
+    /// `keep`, with a beat not kept journaled as dropped, and `why`.
+    fn kept(&self, keep: bool, why: &str) -> bool {
+        if !keep {
+            self.journal_beat("dropped", &format!(", {why}"));
+        }
+        keep
+    }
+
     /// [`Self::task`], of a key.
     fn task_of(key: &str) -> Option<u64> {
         let mut fields = key.rsplitn(3, ':');
@@ -503,6 +511,11 @@ pub struct ProgressOf {
     /// A still-working beat's number: current while its task works,
     /// whatever its progress line does.
     pub beat: Option<u32>,
+}
+
+/// Whether `status` shows `task`'s agent at work.
+fn still_working(status: &TaskStatus, task: u64) -> bool {
+    (status.tasks.iter()).any(|entry| entry.task == task && entry.state == AgentState::Working)
 }
 
 /// Whether `of` is still the newest change of a task whose agent works,
@@ -1330,43 +1343,31 @@ impl TaskNews {
         // Progress not told in time is old news, and progress whose task
         // has finished, gone or moved on would say what is no longer so:
         // let go. The status is looked at only if it is free this tick.
+        // A beat is let go, too, once its task's own news waits.
         let now = Instant::now();
+        let settled: BTreeSet<_> = (self.waiting.iter())
+            .filter(|news| news.progress.is_none())
+            .filter_map(News::task)
+            .collect();
         self.waiting.retain(|news| {
-            let kept = news.until.is_none_or(|until| now < until);
-            if !kept {
-                news.journal_beat("dropped", ", slot passed");
-            }
-            kept
+            news.kept(news.until.is_none_or(|until| now < until), "slot passed")
+                && news.kept(
+                    news.beat().is_none()
+                        || !news.task().is_some_and(|task| settled.contains(&task)),
+                    "task settled",
+                )
         });
         if self.waiting.iter().any(|news| news.progress.is_some())
             && let Ok(status) = self.status.try_lock()
         {
             self.waiting.retain(|news| {
-                let kept = news
-                    .progress
-                    .as_ref()
-                    .is_none_or(|of| still_current(status.as_ref(), of));
-                if !kept {
-                    news.journal_beat("dropped", ", task settled");
-                }
-                kept
+                let current = news.progress.as_ref();
+                news.kept(
+                    current.is_none_or(|of| still_current(status.as_ref(), of)),
+                    "task settled",
+                )
             });
         }
-        // Nor a beat whose task's own news waits.
-        let settled: BTreeSet<_> = self
-            .waiting
-            .iter()
-            .filter(|news| news.progress.is_none())
-            .filter_map(News::task)
-            .collect();
-        self.waiting.retain(|news| {
-            let kept =
-                news.beat().is_none() || !news.task().is_some_and(|task| settled.contains(&task));
-            if !kept {
-                news.journal_beat("dropped", ", task settled");
-            }
-            kept
-        });
         // Only what still waits keeps when it came in, and whether its
         // short line was said.
         let waiting = &self.waiting;
@@ -1506,14 +1507,7 @@ impl TaskNews {
         self.taken(&news.key);
         self.held_said = None;
         if past || moved_on {
-            news.journal_beat(
-                "dropped",
-                if past {
-                    ", slot passed"
-                } else {
-                    ", task settled"
-                },
-            );
+            news.kept(false, if past { "slot passed" } else { "task settled" });
             return None;
         }
         news.journal_beat("told", "");
@@ -2953,21 +2947,11 @@ fn beats_due(
         beats.clear();
         return Vec::new();
     };
-    let working = |task: u64| {
-        status
-            .tasks
-            .iter()
-            .any(|entry| entry.task == task && entry.state == AgentState::Working)
-    };
     beats.retain(|(store, run, task), _| {
-        *store == status.store_id && *run == status.run && working(*task)
+        *store == status.store_id && *run == status.run && still_working(status, *task)
     });
     let mut due = Vec::new();
-    for entry in status
-        .tasks
-        .iter()
-        .filter(|entry| entry.state == AgentState::Working)
-    {
+    for entry in (status.tasks.iter()).filter(|entry| still_working(status, entry.task)) {
         let (handed, next, last) = beats
             .entry((status.store_id.clone(), status.run, entry.task))
             .or_insert_with(|| {
@@ -2995,6 +2979,14 @@ fn beats_due(
             continue;
         }
         *next = slot + 1;
+        let until = *handed + still.first + still.every * slot + BEAT_LATE.min(still.every);
+        if now >= until {
+            eprintln!(
+                "lamp-voice: task news still beat dropped: task {} b{slot}, slot passed",
+                entry.task
+            );
+            continue;
+        }
         let rose = entry.changes > *last;
         *last = entry.changes;
         due.push((
@@ -3005,12 +2997,28 @@ fn beats_due(
                 run: status.run,
                 beat: Some(slot),
             },
-            *handed + still.first + still.every * (slot + 1),
+            until,
             since,
             rose,
         ));
     }
     due
+}
+
+/// A beat not said within this of its time is dropped, not said late: on
+/// lamp-ee17 (27 Nov) a beat held 12 s was said 4 s before its task's
+/// result, and cut.
+const BEAT_LATE: Duration = Duration::from_secs(10);
+
+/// Whether an agent's line reads as what it is doing, not the tail of its
+/// answer (OpenClaw on lamp-ee17, 27 Nov: "se:** Rewrite the frequency
+/// counter to return `Result<(), MyError>` …"): it begins with a capital
+/// letter and has no markdown or code marks.
+fn reads_as_progress(about: &str) -> bool {
+    about.chars().next().is_some_and(char::is_uppercase)
+        && !["`", "**", "#", "](", "\n"]
+            .iter()
+            .any(|mark| about.contains(mark))
 }
 
 /// Added to the progress note for a beat that tells the agent's line.
@@ -3028,7 +3036,7 @@ fn beat_words(
     at: Duration,
 ) -> (String, Option<usize>) {
     if let Some((task, about)) = told.map(|(task, about)| (task, about.trim()))
-        && !about.is_empty()
+        && reads_as_progress(about)
         && let Some(note) = note_progress(
             &NewsWords {
                 progress: format!("{} {BEAT_ABOUT}", words.progress),
@@ -3043,18 +3051,6 @@ fn beat_words(
         return (note, Some(about.chars().count()));
     }
     (note_beat(words, beat, most), None)
-}
-
-/// What a beat is kept as told by: its change's progress key, with `-b<n>`.
-fn beat_key(of: &ProgressOf) -> String {
-    format!(
-        "{}:{}:progress-{}-{}-b{}",
-        of.store,
-        of.task,
-        of.run,
-        of.change,
-        of.beat.unwrap_or_default()
-    )
 }
 
 /// Beat `beat` of `most`'s fixed line: `still_0`, then `still_1` and
@@ -3161,45 +3157,33 @@ impl ProgressReader {
         }
     }
 
-    /// A beat's words ([`beat_words`]), with the agent's progress line
-    /// and its task fetched only when the line changed since the last beat
-    /// (`rose`) and the agent is still at it.
-    fn beat_note(
-        &self,
-        of: &ProgressOf,
-        rose: bool,
-        at: Duration,
-        most: u32,
-    ) -> (String, Option<usize>) {
-        let ask_for = |op| ask(&self.socket, &json!({"op":op,"id":of.task}));
-        let progress = rose
-            .then(|| ask_for("get_progress"))
-            .flatten()
-            .filter(|progress| {
-                progress["store_id"].as_str() == Some(of.store.as_str())
-                    && progress["progress"]["state"].as_str() == Some("working")
-            });
-        let about = progress
-            .as_ref()
-            .and_then(|progress| progress["progress"]["about"].as_str());
-        let task = about.and_then(|_| ask_for("get_task"));
-        beat_words(
-            &NewsWords::installed(),
-            of.beat.unwrap_or_default(),
-            most,
-            task.as_ref().zip(about),
-            at,
-        )
-    }
-
-    /// Offer each beat due now and not told: false once nobody takes news.
+    /// Offer each beat due now and not told, the agent's line and task
+    /// fetched only when the line changed since the last beat (`rose`):
+    /// false once nobody takes news.
     fn beat(&self, still: &Still, status: Option<&TaskStatus>, beats: &mut Beats) -> bool {
         for (of, until, at, rose) in beats_due(still, status, beats, Instant::now()) {
-            let key = beat_key(&of);
+            let (task, beat) = (of.task, of.beat.unwrap_or_default());
+            let key = format!(
+                "{}:{task}:progress-{}-{}-b{beat}",
+                of.store, of.run, of.change
+            );
             if self.told.lock().is_ok_and(|told| told.contains(&key)) {
                 continue;
             }
-            let (note, about) = self.beat_note(&of, rose, at, still.most);
+            let ask_for = |op| ask(&self.socket, &json!({"op":op,"id":task}));
+            let progress = rose
+                .then(|| ask_for("get_progress"))
+                .flatten()
+                .filter(|progress| {
+                    progress["store_id"].as_str() == Some(of.store.as_str())
+                        && progress["progress"]["state"].as_str() == Some("working")
+                });
+            let about = progress
+                .as_ref()
+                .and_then(|progress| progress["progress"]["about"].as_str());
+            let task = about.and_then(|_| ask_for("get_task"));
+            let words = NewsWords::installed();
+            let (note, about) = beat_words(&words, beat, still.most, task.as_ref().zip(about), at);
             let news = News {
                 key,
                 note,
@@ -6634,29 +6618,20 @@ mod tests {
         };
         assert_eq!(due(0, &mut beats), []);
         assert_eq!(due(29, &mut beats), []);
-        assert_eq!(due(30, &mut beats), [(0, at(90))]);
+        assert_eq!(due(30, &mut beats), [(0, at(40))]);
         assert_eq!(due(31, &mut beats), [], "once");
         assert_eq!(due(89, &mut beats), []);
-        assert_eq!(due(90, &mut beats), [(1, at(150))]);
-        assert_eq!(due(150, &mut beats), [(2, at(210))]);
-        assert_eq!(due(210, &mut beats), [(3, at(270))]);
+        assert_eq!(due(90, &mut beats), [(1, at(100))]);
+        assert_eq!(due(150, &mut beats), [(2, at(160))]);
+        assert_eq!(due(210, &mut beats), [(3, at(220))]);
         assert_eq!(due(270, &mut beats), [], "at most four");
         assert_eq!(due(400, &mut beats), []);
         // Looked at late: beat 1's slot is past, so beat 2 comes in it.
         let mut late = Beats::new();
         assert_eq!(due(0, &mut late), []);
-        assert_eq!(due(30, &mut late), [(0, at(90))]);
-        assert_eq!(due(155, &mut late), [(2, at(210))]);
-        // The key keeps the progress prefix, with the beat's number.
-        let (of, _, _, _) = beats_due(
-            &still,
-            Some(&status_of(AgentState::Working, 1, Some(30))),
-            &mut Beats::new(),
-            at(3_600),
-        )
-        .remove(0);
-        assert_eq!(beat_key(&of), "s1:2:progress-1-1-b0");
-        assert!(!retellable(&beat_key(&of)));
+        assert_eq!(due(30, &mut late), [(0, at(40))]);
+        assert_eq!(due(155, &mut late), [(2, at(160))]);
+        assert!(!retellable("s1:2:progress-1-1-b0"));
         // Each line other than the one before; the last one last.
         let words = own();
         let lines: Vec<String> = (0..4).map(|n| note_beat(&words, n, 4)).collect();
@@ -6676,8 +6651,8 @@ mod tests {
     }
 
     /// The hand-over is when the task was first seen at work less its
-    /// `working_s`: seen 45 s in, its first beat is due at once; seen 10
-    /// minutes in, none.
+    /// `working_s`: seen 35 s in, its first beat is due at once, let go
+    /// `BEAT_LATE` after its time; seen 45 s or 10 minutes in, none.
     #[test]
     fn a_beat_counts_from_the_hand_over_by_working_s() {
         let still = still();
@@ -6693,7 +6668,8 @@ mod tests {
             .map(|(of, until, _, _)| (of.beat, until))
             .collect::<Vec<_>>()
         };
-        assert_eq!(seen(45), [(Some(0), now + Duration::from_secs(45))]);
+        assert_eq!(seen(35), [(Some(0), now + Duration::from_secs(5))]);
+        assert_eq!(seen(45), [], "more than BEAT_LATE past its time");
         assert_eq!(seen(600), []);
     }
 
@@ -6942,12 +6918,9 @@ mod tests {
         );
         assert_eq!(
             beats_of("person talking 78-85 s"),
-            [(0, 30), (1, 100), (2, 150), (3, 210)]
+            [(0, 30), (2, 150), (3, 210)]
         );
-        assert_eq!(
-            beats_of("person talking 85-160 s"),
-            [(0, 30), (2, 175), (3, 210)]
-        );
+        assert_eq!(beats_of("person talking 85-160 s"), [(0, 30), (3, 210)]);
         assert_eq!(beats_of("task settles at 100 s"), [(0, 30), (1, 90)]);
         let changing = &told_all
             .iter()
@@ -6962,5 +6935,25 @@ mod tests {
         );
         let notes: Vec<&String> = changing.iter().map(|(_, _, note, _)| note).collect();
         assert!(notes.windows(2).all(|pair| pair[0] != pair[1]), "{notes:?}");
+    }
+
+    /// OpenClaw gives no line while it works, then the tail of its answer
+    /// (lamp-ee17, 27 Nov): a line that reads as answer text is no news,
+    /// and the beat is its fixed line; a line of what it is doing is told.
+    #[test]
+    fn an_agent_line_like_answer_text_is_no_news() {
+        let words = own();
+        let task = json!({"text":"Fix the frequency counter","target":{"engine":"openclaw"}});
+        let kind =
+            |about: &str| beat_words(&words, 1, 4, Some((&task, about)), Duration::from_secs(90)).1;
+        for answer in [
+            "se:** Rewrite the frequency counter to return `Result<(), MyError>` with an enum error type",
+            "k OpenClaw, or `openclaw configure --section web`) and ask me again",
+            "## Summary",
+            "",
+        ] {
+            assert_eq!(kind(answer), None, "{answer:?}");
+        }
+        assert_eq!(kind("Running the tests after fixing the parser"), Some(41));
     }
 }

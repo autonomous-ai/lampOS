@@ -5454,9 +5454,12 @@ trừ `working_s` khi đó (không biết thì từ lúc thấy lần đầu). N
 `LAMP_PROGRESS_STILL_FIRST_S` (30, 1 đến 3600),
 `LAMP_PROGRESS_STILL_EVERY_S` (60, 10 đến 3600), `LAMP_PROGRESS_STILL_MOST`
 (4, 1 đến 20); giá trị sai thì dùng mặc định, có một dòng nhật ký. Mỗi nhịp
-bị bỏ ở thời điểm của nhịp sau, nên không bao giờ nói muộn hay nói hai lần.
+không được nói trong 10 s sau thời điểm của nó (`BEAT_LATE`) thì bị bỏ, không bao
+giờ nói muộn hay nói hai lần.
 Nếu số lần đổi của dòng tiến độ tăng từ nhịp trước và `get_progress` cho một
-dòng không rỗng, nhịp là ghi chú tiến độ (`note_progress`) thêm một yêu cầu:
+dòng đọc như việc agent đang làm (`reads_as_progress`: chữ đầu viết hoa, không
+có backtick, `**`, `#`, liên kết hay xuống dòng; OpenClaw không cho dòng nào
+khi đang làm, rồi đuôi câu trả lời), nhịp là ghi chú tiến độ (`note_progress`) thêm một yêu cầu:
 một câu ngắn nói agent đang làm gì, không đọc URL, tham số thô hay đường dẫn
 tệp, không nói đã xong. Nếu không, lời là `still_0` đến `still_3` của Task
 news (sẵn trong mã và trong `skills/task-news/skill.toml`), mỗi lần một câu

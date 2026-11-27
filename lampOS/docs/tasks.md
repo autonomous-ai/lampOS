@@ -10631,12 +10631,16 @@ policy decision is asked: the same progress thread reads `tasks/status`
   `LAMP_PROGRESS_STILL_FIRST_S` (30, 1 to 3600),
   `LAMP_PROGRESS_STILL_EVERY_S` (60, 10 to 3600) and
   `LAMP_PROGRESS_STILL_MOST` (4, 1 to 20); a value out of range or not a
-  whole number is its default, with a journal line. Each beat is let go at
-  the next one's time, so one held past its slot is dropped, never said
-  twice or late; a slot already past when looked at is skipped.
+  whole number is its default, with a journal line. A beat not said within
+  10 s of its time (`BEAT_LATE`, or `EVERY` if shorter) is dropped, never
+  said late or twice: on lamp-ee17 (27 Nov) one held 12 s was said 4 s
+  before its task's result, and cut. A slot already past when looked at
+  is skipped.
 - **What.** When the task's change count rose since its last beat (since
-  it was first seen, for beat 0) and `get_progress` gives a non-empty line
-  of the agent still working, the beat is the progress note
+  it was first seen, for beat 0) and `get_progress` gives a line of the
+  agent still working that reads as what it is doing (`reads_as_progress`:
+  a capital first letter, no backticks, `**`, `#`, links or new lines;
+  OpenClaw gives none while it works, then the tail of its answer), the beat is the progress note
   (`note_progress`, Task news' `progress` words, no signs, the time since
   the hand-over) with one more instruction: one short sentence on what it
   is doing now, no URLs, raw arguments or file paths, never that it is
@@ -10662,8 +10666,8 @@ policy decision is asked: the same progress thread reads `tasks/status`
   the hand-over, C the length of the agent's line); `... held: task N
   bK, REASON` (the first gate shut, as for `task news held`, once a reason:
   `speech_not_paused` while not quiet, `nobody_there`, `room_busy`, …);
-  `... told: task N bK`; `... dropped: task N bK, slot passed` (let go at
-  the next beat's time, or a slot past before it was looked at) or
+  `... told: task N bK`; `... dropped: task N bK, slot passed` (not said
+  within `BEAT_LATE` of its time, or a slot past before it was looked at) or
   `, task settled` (not at work, moved off `tasks/status`, or its own news
   waits).
 
