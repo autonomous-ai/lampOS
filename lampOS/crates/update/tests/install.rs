@@ -1898,6 +1898,45 @@ fn the_product_rides_a_short_privacy_gap() {
     }
 }
 
+/// The privacy light's look from the app (`LAMP_PRIVACY_LIGHT`, #8696) is
+/// on in the product by the lead's call of 27 Nov: the voice's ring worker
+/// paints the kept look, and lamp-cloud answers `led.privacy.get`/`set`
+/// beside `LAMP_CLOUD` and `LAMP_SETTINGS_CHANGE`, each exactly `on`.
+#[test]
+fn the_product_lets_the_app_pick_the_privacy_lights_look() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1
+    };
+    let voice = section(unit("lamp-voice.service"), "Service");
+    assert_eq!(
+        voice
+            .iter()
+            .filter(|line| line.starts_with("Environment=LAMP_PRIVACY_LIGHT="))
+            .collect::<Vec<_>>(),
+        [&"Environment=LAMP_PRIVACY_LIGHT=on"],
+        "the voice sets LAMP_PRIVACY_LIGHT=on once"
+    );
+    let cloud = section(unit("lamp-cloud.service"), "Service");
+    for line in [
+        "Environment=LAMP_CLOUD=on",
+        "Environment=LAMP_SETTINGS_CHANGE=on",
+    ] {
+        assert!(cloud.contains(&line), "lamp-cloud lacks {line}");
+    }
+    assert_eq!(
+        cloud
+            .iter()
+            .filter(|line| line.starts_with("Environment=LAMP_PRIVACY_LIGHT="))
+            .collect::<Vec<_>>(),
+        [&"Environment=LAMP_PRIVACY_LIGHT=on"],
+        "lamp-cloud sets LAMP_PRIVACY_LIGHT=on once"
+    );
+}
+
 /// CAM++ one way only (`LAMP_SAME_VOICE_CONFIRMS`, the memory owner's
 /// decision of 4 Nov) stays off in the product: the lead's ruling of 11 Nov
 /// (#1711) keeps the lead's 20 Oct ruling, as CAM++'s weights are trained on
