@@ -7093,6 +7093,10 @@ fn conversation_with_gate_inner(
     // when: someone was there then.
     let mut said_turn: Option<u64> = None;
     let mut said_at_us: Option<u64> = None;
+    // When the lamp last answered someone's line (a turn it did not begin
+    // itself, heard with audio): "Hey Lamp, ..." while task news waits
+    // tells it right after (#8783).
+    let mut answered_at_us: Option<u64> = None;
     // The overdue reminder last said to be waiting for someone.
     let mut overdue_wait = crate::reminders::OverdueWait::default();
     // The late reminder waiting for a pause in the talk (29e7, 2 Nov).
@@ -12654,6 +12658,11 @@ fn conversation_with_gate_inner(
             let turn = current.owner.turn();
             if current.had_audio {
                 lamp_words_ended_us = Some(monotonic_us());
+                if current.local_only.is_none()
+                    && own_turn().load(std::sync::atomic::Ordering::Acquire) != turn
+                {
+                    answered_at_us = lamp_words_ended_us;
+                }
             }
             owner.complete_turn(now(), current.owner)?;
             current.complete_requested_audio(monotonic_us());
@@ -14910,7 +14919,7 @@ fn conversation_with_gate_inner(
                 .as_ref()
                 .is_some_and(|presence| presence.present(clock))
                 || said_at_us
-                    .is_some_and(|at| clock.saturating_sub(at) < crate::task_news::HEARD_WITHIN_US))
+                    .is_some_and(|at| clock.saturating_sub(at) < crate::reminders::HEARD_WITHIN_US))
             && !room.busy()
             && reply.is_none()
             && provider_queue.is_empty()
@@ -15045,13 +15054,16 @@ fn conversation_with_gate_inner(
             _ => crate::news_agent::Step::Tell,
         };
         // News of a settled agent that has waited
-        // `task_news::WAITS_AT_MOST` (#8240): told at the next pause of a
-        // second in anyone's speech, never over the lamp's own words, a
-        // busy room no longer holding it; a room still talking hears its
-        // one short line first, the whole news once the person answers or
-        // asks. Into a room nobody was seen or heard in since it came in,
-        // it waits as before. And why news waiting is held this tick,
-        // journaled once a reason, deciding nothing.
+        // `task_news::WAITS_AT_MOST` (#8240, ten minutes since #8783): its
+        // one short line only, at the first pause of
+        // `task_news::LONG_PAUSE_US` in anyone's speech, never over the
+        // lamp's own words, a busy room no longer holding it; the whole
+        // news once the lamp answers someone after it. The lamp answering
+        // someone ("Hey Lamp, ...") since it came in tells it before that,
+        // "By the way, ...", at the voice's pause for news. Only with
+        // someone there now (`task_news::someone_there`: a face, or speech
+        // within about 15 s); else it waits, untold. And why news waiting
+        // is held this tick, journaled once a reason, deciding nothing.
         let paused_for_news = crate::task_news::quiet_for_news(
             true,
             clock,
@@ -15073,7 +15085,9 @@ fn conversation_with_gate_inner(
         if let Some(news) = task_news.as_mut() {
             news.waiting();
         }
-        let (overdue_whole, overdue_short) =
+        // `overdue_pause`: people's talk leaves room for news
+        // (`task_news::talk_paused`, #8783), for all news waiting.
+        let (overdue_whole, overdue_short, overdue_pause) =
             match task_news.as_mut().filter(|news| news.has_waiting()) {
                 Some(news) => {
                     let quiet = crate::task_news::quiet_for_news(
@@ -15092,28 +15106,33 @@ fn conversation_with_gate_inner(
                     let present = presence
                         .as_ref()
                         .is_some_and(|presence| presence.present(clock));
-                    let someone_since = news.landed_us(clock).is_some_and(|landed| {
-                        crate::task_news::someone_since(landed, present, last_speech_us, said_at_us)
-                    });
-                    // Talking still: not quiet as news waits for, or a busy room.
-                    // Quiet, it is told whole as before.
-                    let (whole, short) = match news.overdue(said_at_us).filter(|_| someone_since) {
-                        Some(crate::task_news::Overdue::Short(note)) if !quiet || room_busy => {
-                            (false, Some(note))
-                        }
-                        Some(_) => (true, None),
+                    let there =
+                        crate::task_news::someone_there(clock, present, last_speech_us, said_at_us);
+                    // The lamp answered someone since the news came in.
+                    let answered = answered_at_us
+                        .filter(|at| news.landed_us(clock).is_some_and(|landed| *at >= landed));
+                    // Past its wait, its short line only, whatever the room.
+                    // After an answer, to a busy room, short; to one not
+                    // busy, told as any news is, by the gates below.
+                    let (whole, short) = match news.overdue(answered).filter(|_| there) {
+                        Some(_) if answered.is_some() && !room_busy => (false, None),
+                        Some(crate::task_news::Overdue::Short(note)) => (false, Some(note)),
+                        Some(crate::task_news::Overdue::Whole) => (true, None),
                         None => (false, None),
                     };
+                    let pause = crate::task_news::talk_paused(
+                        paused_for_news,
+                        answered.is_some(),
+                        clock,
+                        last_turn_us,
+                        last_speech_us,
+                    ) || news.sign_in_waits();
                     let past = whole || short.is_some();
                     news.held(crate::task_news::Gates {
                         reminder: reminder_waiting,
                         wording: !past && news_step == crate::news_agent::Step::Wait,
-                        not_quiet: if past { !paused_for_news } else { !quiet },
-                        nobody: !past
-                            && !present
-                            && !said_at_us.is_some_and(|at| {
-                                clock.saturating_sub(at) < crate::task_news::HEARD_WITHIN_US
-                            }),
+                        not_quiet: !pause || (!past && !quiet),
+                        nobody: !there,
                         room_busy: !past && room_busy,
                         replying: reply.is_some(),
                         turn_open: !provider_queue.is_empty()
@@ -15122,16 +15141,16 @@ fn conversation_with_gate_inner(
                         not_ready: !snapshot.listening_ready(now())
                             || unasked_session(&cloud, unasked_paused).is_none(),
                     });
-                    (whole, short)
+                    (whole, short, pause)
                 }
-                _ => (false, None),
+                _ => (false, None, false),
             };
         // The short line: the lamp's own turn, said once; the news stays
         // first in line, never handed on as heard (#8240).
         if let Some(note) = overdue_short.as_ref()
             && let Some(news) = task_news.as_mut()
             && !reminder_waiting
-            && paused_for_news
+            && overdue_pause
             && reply.is_none()
             && provider_queue.is_empty()
             && !admission.owns_stream()
@@ -15169,6 +15188,7 @@ fn conversation_with_gate_inner(
             && !reminder_waiting
             && news.waiting().is_some()
             && (overdue_whole || news_step != crate::news_agent::Step::Wait)
+            && overdue_pause
             && crate::task_news::quiet_for_news(
                 (news.sign_in_first() || news_at_pause || overdue_whole)
                     && !news.retelling_first(),
@@ -15183,12 +15203,14 @@ fn conversation_with_gate_inner(
                     last_capture,
                 ),
             )
-            && (presence
-                .as_ref()
-                .is_some_and(|presence| presence.present(clock))
-                || said_at_us
-                    .is_some_and(|at| clock.saturating_sub(at) < crate::task_news::HEARD_WITHIN_US)
-                || overdue_whole)
+            && crate::task_news::someone_there(
+                clock,
+                presence
+                    .as_ref()
+                    .is_some_and(|presence| presence.present(clock)),
+                last_speech_us,
+                said_at_us,
+            )
             && (overdue_whole || !room_busy)
             && reply.is_none()
             && provider_queue.is_empty()
