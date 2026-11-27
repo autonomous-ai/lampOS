@@ -104,21 +104,20 @@ pub(crate) fn extend(definition: &mut super::skill::Definition) {
 }
 
 // The owner's short lines for the file's steps (#8871).
-pub(crate) const SIT_FIRST: &str =
-    "(Say only this, nothing before or after it: \"Sit where you usually do and look at me.\")";
+pub(crate) const SIT_FIRST: &str = "(Say only this, nothing before or after it: \"Sit where you usually do and look at me, so I always know where to find you.\")";
 pub(crate) const SIT_DONE: &str = "(Say only this, nothing before or after it: \"There you are.\")";
-pub(crate) const TOUCH_FIRST: &str = "(Say only this, nothing before or after it: \"Pet my head. That's how you say hi without talking.\")";
+pub(crate) const TOUCH_FIRST: &str = "(Say only this, nothing before or after it: \"Pet my head. That's how you can say hi or hush me without a word.\")";
 pub(crate) const TOUCH_DONE: &str = "(Say only this, nothing before or after it: \"Mmm, nice.\")";
 /// The face question (#8871), asked in place of `skill::FACE_ASK`: a
 /// question the worker's setup save still takes a yes to
 /// (`known_faces::asks_for_the_face`).
-pub(crate) const FACE_ASK: &str = "(Say only this, nothing before or after it: \"Can I remember your face, so I know it's you? It stays on this lamp.\")";
+pub(crate) const FACE_ASK: &str = "(Say only this, nothing before or after it: \"Can I remember your face? Then I'll know it's you, not a guest. It stays on this lamp.\")";
 pub(crate) const LATER: &str =
     "(Say only this, nothing before or after it: \"We'll do this later.\")";
 
 // "Try a skill". The ask is a note for the model, so its answer to "turn
 // blue" knows why; the rest are the walk's own lines.
-pub(crate) const TRY_FIRST: &str = "(Nobody has spoken. Say exactly this: \"Say 'turn blue'.\" When they ask for a light, in any words, set it at once with your light functions. Never call setup_step for this, except skipped if they ask to skip it: the lamp sees the light change itself.)";
+pub(crate) const TRY_FIRST: &str = "(Nobody has spoken. Say exactly this: \"Say 'Hey Lamp, turn blue.' See how easy asking is.\" When they ask for a light, in any words, set it at once with your light functions. Never call setup_step for this, except skipped if they ask to skip it: the lamp sees the light change itself.)";
 pub(crate) const TRY_REMIND: &str =
     "(Say only this, nothing before or after it: \"Just say: turn blue.\")";
 pub(crate) const TRY_DONE: &str = "(Say only this, nothing before or after it: \"See? Just ask.\")";
@@ -127,7 +126,7 @@ const TRY_SKIPPED: &str =
 const TRY_LATER: &str = "(Say only this, nothing before or after it: \"Earlier we skipped trying a skill. Let's try it now.\")";
 
 // "Make a skill".
-pub(crate) const MAKE_FIRST: &str = "(Nobody has spoken. Say exactly this: \"Teach me something simple, like 'remind me to drink water every 30 minutes'.\" Any skill they ask for counts, in their own words: call make_skill with their words. If what they ask is too vague to make, ask them one short question about what it should do and when. If they ask for ideas, say only: \"Or: turn the light warm at 8 pm, or tell me to stand up every hour.\" Never call setup_step for this, except skipped if they ask to skip it.)";
+pub(crate) const MAKE_FIRST: &str = "(Nobody has spoken. Say exactly this: \"Teach me something you'd like, for example 'remind me to drink water every 30 minutes'.\" Any skill they ask for counts, in their own words: call make_skill with their words. If what they ask is too vague to make, ask them one short question about what it should do and when. If they ask for ideas, say only: \"Or: turn the light warm at 8 pm, or tell me to stand up every hour.\" Never call setup_step for this, except skipped if they ask to skip it.)";
 pub(crate) const MAKE_IDEAS: &str = "(Say only this, nothing before or after it: \"Or: turn the light warm at 8 pm, or tell me to stand up every hour.\")";
 /// The read-back, the walk's own once the skill is on: `{skill}` is its
 /// name and what it does ([`read_back`]).
@@ -232,9 +231,9 @@ pub(crate) fn read_back(name: &str, does: &str, language: Option<Language>) -> O
 }
 
 const DONE_OPENING: &str = "(Say only this, nothing before or after it: \"All set! ";
-const STORE: &str = "Find more skills in the Store, in the app.";
+const STORE: &str = "Thanks for your patience. Find more skills in the Store, in the app.";
 #[cfg(test)]
-const DONE_STORE: &str = "(Say only this, nothing before or after it: \"All set! Find more skills in the Store, in the app.\")";
+const DONE_STORE: &str = "(Say only this, nothing before or after it: \"All set! Thanks for your patience. Find more skills in the Store, in the app.\")";
 
 /// The most characters of a name the done line says (#8871: the name only
 /// if it is short to say), one word.
@@ -252,11 +251,17 @@ pub(super) fn short_name(name: &str) -> bool {
 fn store_sentence(language: Option<Language>) -> &'static str {
     match language {
         None => STORE,
-        Some(Language::Vietnamese) => "Mở app để tìm thêm kỹ năng trong Store nhé.",
-        Some(Language::Japanese) => "アプリのStoreで、もっとスキルを見つけてください。",
-        Some(Language::Chinese) => "在 App 的 Store 里找更多技能吧。",
-        Some(Language::Korean) => "앱의 Store에서 스킬을 더 찾아보세요.",
-        Some(Language::French) => "Trouvez d'autres compétences dans le Store, dans l'app.",
+        Some(Language::Vietnamese) => {
+            "Cảm ơn bạn đã kiên nhẫn. Mở app để tìm thêm kỹ năng trong Store nhé."
+        }
+        Some(Language::Japanese) => {
+            "お付き合いありがとうございました。アプリのStoreで、もっとスキルを見つけてください。"
+        }
+        Some(Language::Chinese) => "谢谢你的耐心。在 App 的 Store 里找更多技能吧。",
+        Some(Language::Korean) => "기다려 줘서 고마워요. 앱의 Store에서 스킬을 더 찾아보세요.",
+        Some(Language::French) => {
+            "Merci de votre patience. Trouvez d'autres compétences dans le Store, dans l'app."
+        }
     }
 }
 
@@ -362,7 +367,7 @@ fn step_ask(step: Step, language: Option<Language>) -> &'static str {
             "tell me what to call you.",
             "pet my head.",
             "say 'Hey Lamp' when I stop talking.",
-            "say 'turn blue'.",
+            "say 'Hey Lamp, turn blue.'",
             "say 'remind me to drink water every 30 minutes'.",
         ],
         Some(Language::Vietnamese) => [
@@ -774,7 +779,7 @@ mod tests {
         assert_eq!(done_line(), DONE_STORE);
         assert_eq!(
             super::super::in_language::with_name(&done_line(), Some("Mia")),
-            "(Say only this, nothing before or after it: \"All set, Mia! Find more skills in the Store, in the app.\")"
+            "(Say only this, nothing before or after it: \"All set, Mia! Thanks for your patience. Find more skills in the Store, in the app.\")"
         );
         for long in ["Maximiliana", "Anna Maria"] {
             assert_eq!(

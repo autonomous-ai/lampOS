@@ -1190,12 +1190,12 @@ type Line = (&'static str, [&'static str; 5]);
 #[rustfmt::skip]
 pub(super) const LINES: &[Line] = &[
     // The walk Lamp leads by voice (#8871, `onboarding::walk_v2`).
-    ("Sit where you usually do and look at me.", [
-        "Bạn ngồi chỗ quen thuộc và nhìn mình nhé.",
-        "いつもの場所に座って、私を見てください。",
-        "坐在你平时坐的地方，看着我。",
-        "평소 앉는 자리에 앉아서 저를 봐 주세요.",
-        "Asseyez-vous à votre place habituelle et regardez-moi.",
+    ("Sit where you usually do and look at me, so I always know where to find you.", [
+        "Bạn ngồi chỗ quen thuộc và nhìn mình nhé, để mình luôn biết tìm bạn ở đâu.",
+        "いつもの場所に座って、私を見てください。いつでもあなたを見つけられるように。",
+        "坐在你平时坐的地方，看着我，这样我总能找到你。",
+        "평소 앉는 자리에 앉아서 저를 봐 주세요. 그래야 늘 당신을 찾을 수 있어요.",
+        "Asseyez-vous à votre place habituelle et regardez-moi, pour que je sache toujours où vous trouver.",
     ]),
     ("There you are.", [
         "Thấy bạn rồi.",
@@ -1204,12 +1204,12 @@ pub(super) const LINES: &[Line] = &[
         "보여요.",
         "Vous voilà.",
     ]),
-    ("Pet my head. That's how you say hi without talking.", [
-        "Vuốt đầu mình nhé. Đó là cách chào mình mà không cần nói.",
-        "頭をなでてください。話さずにあいさつする方法です。",
-        "摸摸我的头。这样不用说话也能跟我打招呼。",
-        "제 머리를 쓰다듬어 주세요. 말없이 인사하는 방법이에요.",
-        "Caressez-moi la tête. C'est dire bonjour sans parler.",
+    ("Pet my head. That's how you can say hi or hush me without a word.", [
+        "Vuốt đầu mình nhé. Vậy là bạn chào hay bảo mình im mà không cần nói.",
+        "頭をなでてください。言葉なしで、あいさつしたり静かにさせたりできます。",
+        "摸摸我的头。这样不用说话就能跟我打招呼，或让我安静。",
+        "제 머리를 쓰다듬어 주세요. 말없이 인사하거나 조용히 시킬 수 있어요.",
+        "Caressez-moi la tête. C'est dire bonjour ou me faire taire sans un mot.",
     ]),
     ("Mmm, nice.", [
         "Ưm, dễ chịu quá.",
@@ -1218,12 +1218,12 @@ pub(super) const LINES: &[Line] = &[
         "음, 좋아요.",
         "Mmm, agréable.",
     ]),
-    ("Can I remember your face, so I know it's you? It stays on this lamp.", [
-        "Mình nhớ khuôn mặt bạn được không, để biết là bạn? Nó chỉ ở trên đèn này.",
-        "あなただとわかるように、お顔を覚えてもいいですか？このLampの中だけに残ります。",
-        "我可以记住你的脸吗？这样我就知道是你。它只留在这盏灯上。",
-        "당신인 걸 알 수 있게 얼굴을 기억해도 될까요? 이 램프에만 남아요.",
-        "Puis-je retenir votre visage, pour savoir que c'est vous ? Il reste sur cette lampe.",
+    ("Can I remember your face? Then I'll know it's you, not a guest. It stays on this lamp.", [
+        "Mình nhớ khuôn mặt bạn được không? Vậy mình sẽ biết là bạn, không phải khách. Nó chỉ ở trên đèn này.",
+        "お顔を覚えてもいいですか？お客さんではなく、あなただとわかります。このLampの中だけに残ります。",
+        "我可以记住你的脸吗？这样我就知道是你，不是客人。它只留在这盏灯上。",
+        "얼굴을 기억해도 될까요? 손님이 아니라 당신인 걸 알 수 있어요. 이 램프에만 남아요.",
+        "Puis-je retenir votre visage ? Je saurai que c'est vous, pas un invité. Il reste sur cette lampe.",
     ]),
     ("We'll do this later.", [
         "Mình làm phần này sau nhé.",
@@ -1232,12 +1232,12 @@ pub(super) const LINES: &[Line] = &[
         "이건 나중에 해요.",
         "On fera ça plus tard.",
     ]),
-    ("Say 'turn blue'.", [
-        "Hãy nói 'đổi sang màu xanh dương'.",
-        "「青にして」と言ってください。",
-        "说'变成蓝色'。",
-        "'파란색으로 바꿔 줘'라고 말해 보세요.",
-        "Dites « passe au bleu ».",
+    ("Say 'Hey Lamp, turn blue.' See how easy asking is.", [
+        "Hãy nói 'Hey Lamp, đổi sang màu xanh dương.' Xem nhờ mình dễ thế nào.",
+        "「Hey Lamp、青にして」と言ってください。頼むのがどれだけ簡単かわかります。",
+        "说'Hey Lamp，变成蓝色。'看看请我帮忙有多简单。",
+        "'Hey Lamp, 파란색으로 바꿔 줘'라고 말해 보세요. 부탁이 얼마나 쉬운지 보세요.",
+        "Dites « Hey Lamp, passe au bleu. » Vous verrez comme c'est simple.",
     ]),
     ("Just say: turn blue.", [
         "Chỉ cần nói: đổi sang màu xanh dương.",
@@ -1267,12 +1267,12 @@ pub(super) const LINES: &[Line] = &[
         "아까 스킬 써 보기를 건너뛰었어요. 지금 해 봐요.",
         "Tout à l'heure, on a passé l'essai d'une compétence. Essayons maintenant.",
     ]),
-    ("Teach me something simple, like 'remind me to drink water every 30 minutes'.", [
-        "Dạy mình một điều đơn giản, như 'nhắc tôi uống nước mỗi 30 phút'.",
-        "かんたんなことを教えてください。たとえば「30分ごとに水を飲むよう知らせて」。",
-        "教我一件简单的事，比如'每 30 分钟提醒我喝水'。",
-        "간단한 걸 가르쳐 주세요. 예를 들면 '30분마다 물 마시라고 알려 줘'.",
-        "Apprenez-moi quelque chose de simple, comme « rappelle-moi de boire de l'eau toutes les 30 minutes ».",
+    ("Teach me something you'd like, for example 'remind me to drink water every 30 minutes'.", [
+        "Dạy mình một điều bạn thích, ví dụ 'nhắc tôi uống nước mỗi 30 phút'.",
+        "やってほしいことを教えてください。たとえば「30分ごとに水を飲むよう知らせて」。",
+        "教我一件你想让我做的事，比如'每 30 分钟提醒我喝水'。",
+        "원하는 걸 가르쳐 주세요. 예를 들면 '30분마다 물 마시라고 알려 줘'.",
+        "Apprenez-moi une chose que vous aimeriez, par exemple « rappelle-moi de boire de l'eau toutes les 30 minutes ».",
     ]),
     ("Or: turn the light warm at 8 pm, or tell me to stand up every hour.", [
         "Hoặc: bật đèn vàng ấm lúc 8 giờ tối, hay nhắc tôi đứng dậy mỗi giờ.",

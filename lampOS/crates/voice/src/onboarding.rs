@@ -14829,7 +14829,7 @@ mod tests {
             notes,
             [
                 "(Say only this, nothing before or after it: \"I made stand up hourly: it tells you to stand up every hour. Change it any time in the app.\")",
-                "(Say only this, nothing before or after it: \"All set, Mia! Find more skills in the Store, in the app.\")",
+                "(Say only this, nothing before or after it: \"All set, Mia! Thanks for your patience. Find more skills in the Store, in the app.\")",
             ],
             "{notes:?}"
         );
@@ -14929,7 +14929,7 @@ mod tests {
         assert_eq!(
             notes.last().map(String::as_str),
             Some(
-                "(Say only this, nothing before or after it: \"All set! Find more skills in the Store, in the app.\")"
+                "(Say only this, nothing before or after it: \"All set! Thanks for your patience. Find more skills in the Store, in the app.\")"
             ),
             "{notes:?}"
         );
@@ -14970,7 +14970,7 @@ mod tests {
         room.walk.set_near_available(true);
         // No Controls on this walk's bus: touch is not offered.
         assert_eq!(room.walk.step_count(Step::MakeSkill), Some((5, 5)));
-        let opener = "(Say only this, nothing before or after it: \"Hi! Let's get to know each other. It takes a few minutes, but it helps me work well for you. We have six steps. Wi-Fi is done. Now step two: sit where you usually do and look at me.\")";
+        let opener = "(Say only this, nothing before or after it: \"Hi! Let's get to know each other. It takes a few minutes, but it helps me work well for you. We have six steps. Wi-Fi is done. Now step two: sit where you usually do and look at me, so I always know where to find you.\")";
         assert_eq!(room.wait(4 * S, Some(SIDE)), [opener]);
         let said = in_language::said(
             opener.to_owned(),
@@ -14978,7 +14978,7 @@ mod tests {
         );
         assert_eq!(
             said,
-            "(Say only this, nothing before or after it: \"Chào bạn! Mình làm quen nhau nhé. Mất vài phút thôi, nhưng giúp mình hiểu bạn hơn. Mình có sáu bước. Wi-Fi xong rồi. Giờ là bước hai: bạn ngồi chỗ quen thuộc và nhìn mình nhé.\")"
+            "(Say only this, nothing before or after it: \"Chào bạn! Mình làm quen nhau nhé. Mất vài phút thôi, nhưng giúp mình hiểu bạn hơn. Mình có sáu bước. Wi-Fi xong rồi. Giờ là bước hai: bạn ngồi chỗ quen thuộc và nhìn mình nhé, để mình luôn biết tìm bạn ở đâu.\")"
         );
         // The last step says it is the last.
         let last = in_language::with_counter(
@@ -14990,7 +14990,7 @@ mod tests {
             },
         );
         assert!(
-            last.contains("\"Step 6 of 6, the last one: teach me something simple"),
+            last.contains("\"Step 6 of 6, the last one: teach me something you'd like"),
             "{last}"
         );
         assert!(

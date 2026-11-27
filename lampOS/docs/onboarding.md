@@ -906,23 +906,25 @@ switch off, nothing below changes anything.
   only with `LAMP_MAKE_SKILL=on`; without it the walk has five steps.
 - **Short lines.** The owner's rule: one sentence an opener, about 12
   words at most, the why only where it isn't obvious. With the switch on,
-  in memory only (`walk_v2::extend`): where you sit asks "Sit where you
-  usually do and look at me." and ends "There you are."; touch asks "Pet
-  my head. That's how you say hi without talking." and ends "Mmm, nice.";
-  the walk's own face question is "Can I remember your face, so I know
-  it's you? It stays on this lamp." (`walk_v2::FACE_ASK`, a question the
+  in memory only (`walk_v2::extend`): each ask carries a short, warm
+  benefit for the person (the owner: Lamp wins them over). Where you sit
+  asks "Sit where you usually do and look at me, so I always know where to
+  find you." and ends "There you are."; touch asks "Pet my head. That's
+  how you can say hi or hush me without a word." and ends "Mmm, nice.";
+  the walk's own face question is "Can I remember your face? Then I'll
+  know it's you, not a guest. It stays on this lamp." (`walk_v2::FACE_ASK`, a question the
   worker's setup save takes a yes to); a step left for later says "We'll
   do this later.". Who you are keeps the file's "What should I call you?"
   and its consent clauses; how you sound keeps its lines for now.
 - **Try a skill.** Asked as a note for the model, in its step word: "Say
-  'turn blue'." No "Hey Lamp" is needed during the walk. Done only when a light call (`light_colour`, `light_scene`, any
+  'Hey Lamp, turn blue.' See how easy asking is." No "Hey Lamp" is needed during the walk. Done only when a light call (`light_colour`, `light_scene`, any
   `light_*`) answered without an error in a turn of the person's own line
   (`heard`), whatever the words ("make it blue" too): the worker posts
   `{"step":"try_skill","outcome":"done","by":<call>}` to the mailbox
   (`walk_v2::tool_ran`, from `tools::walk_evidence`), and the runner takes it
   only while it has asked that step. Then the walk says "See? Just ask."
-- **Make a skill.** Asked as a note: "Teach me something simple, like
-  'remind me to drink water every 30 minutes'." Any skill counts, in any
+- **Make a skill.** Asked as a note: "Teach me something you'd like, for
+  example 'remind me to drink water every 30 minutes'." Any skill counts, in any
   words. Done only when `make_skill`, from the person's own line, made a
   skill and put it on (`made`, `on: true`): the worker posts its name and
   description, and the walk reads it back itself, "I made <name>: it <what
@@ -973,8 +975,8 @@ switch off, nothing below changes anything.
   Vietnamese ones) is answered with that line as it is, no chat asked, the
   step's ask inside it. The model is never told the steps (#5499). Not on
   the Live route.
-- **The done line.** "All set, <Name>! Find more skills in the Store, in
-  the app." (`walk_v2::done_line`); the name only when it is short to say
+- **The done line.** "All set, <Name>! Thanks for your patience. Find
+  more skills in the Store, in the app." (`walk_v2::done_line`); the name only when it is short to say
   (one word, at most 10 letters, `walk_v2::short_name`), otherwise "All
   set! ...".
 - **For the app.** The heartbeat's `walk_steps` names the walk's steps after
