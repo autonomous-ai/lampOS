@@ -150,8 +150,10 @@ The Python SDK checks and packs an app, and submits it to the Store
 `submitApp`, `submissions`, `requestPublic`). The developer's folder holds
 `app.json` (the manifest above without `format`, `kind` and `files`) beside
 `src/`, `assets/` and `skills/`; `pack` adds those three and writes the tar
-unsigned, and the Store signs it at approval. **Live on production** since
-20 Nov (#7415): the CLI's default hosts are production's
+unsigned, and the Store signs it at approval. The SDK READMEs' "Publish your
+app" has the commands and the Store's refusals. Staged: tested against a fake
+Store only until 20 Nov; **live on production** since then (#7415): the CLI's
+default hosts are production's
 (`apiv2.autonomous.ai` for the sign-in, `campaign-api.autonomous.ai` for the
 Store), and apps have been submitted from it. Every SDK app goes to the Store
 this way: `lamp login` (the developer's Autonomous account, an emailed code;
