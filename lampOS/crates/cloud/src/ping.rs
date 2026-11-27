@@ -122,7 +122,29 @@ impl Payload {
     /// with the switch `on` and `kept`, lamp-update's kept `update/status`,
     /// fresh and readable as [`crate::update_events::read`] has it. Off, or
     /// with no such status, the payload is left as it was.
-    pub fn with_engines(self, _on: bool, _kept: Option<lamp_bus::Message>) -> Self {
+    pub fn with_engines(mut self, on: bool, kept: Option<lamp_bus::Message>) -> Self {
+        let Some(status) = on.then(|| crate::update_events::read(kept)).flatten() else {
+            return self;
+        };
+        let engine = |name: &str| {
+            let said = status.engines.as_ref()?.get(name)?;
+            said.check().then(|| Part {
+                version: said.version.clone(),
+                installed: said.state == "installed",
+            })
+        };
+        let engines = Engines {
+            openclaw: engine("openclaw"),
+            hermes: engine("hermes"),
+        };
+        self.engines = (engines != Engines::default()).then_some(engines);
+        self.harness = status
+            .harness
+            .filter(lamp_msgs::HarnessInstall::check)
+            .map(|harness| Part {
+                installed: harness.install == "installed",
+                version: harness.version,
+            });
         self
     }
 }
