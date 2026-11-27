@@ -3754,6 +3754,48 @@ adds the key itself (`lamp_cloud::hermes_llm`).
     `a_forged_model_is_still_a_400_on_the_own_route`,
     `the_route_is_the_voices_model_and_only_with_its_tool_check` and
     `the_unit_hands_in_only_the_model_keys_each_with_a_blank_fallback`.
+- **The web search** (`hermes_llm::search`), for OpenClaw and Hermes on the
+  lamp through their own SearXNG clients, with the base
+  `http://127.0.0.1:7741/v1/search/<search token>`:
+  `GET /v1/search/<search token>/search?q=<query>&format=json`
+  (`pageno`, `language` and other fields taken but not used; every search
+  is the first page). SearXNG's clients send no header, so the token is in
+  the path: its own token, `search-token` beside `hermes-token` in the same
+  folder, made the same way (0600, kept; one equal to the chat's token is
+  made anew), so the chat's token is never in a URL. A client that sends a
+  header may instead ask `GET /v1/search/search?q=…` with
+  `Authorization: Bearer <search token>`. The chat's token in the search's
+  path or as its bearer, or the search's token as the chat's or the
+  models' bearer, is 401. The search token is made safe to leak (Hermes
+  shows a tool's endpoint to its model on an error): it opens only the
+  search, only from loopback, and only within the search's own bounds
+  below.
+  The answer is SearXNG's JSON: `{"query", "number_of_results", "results":
+  [{"title", "url", "content", "publishedDate"?, "engine"}], "answers": [],
+  "suggestions": [], "infoboxes": [], "unresponsive_engines": [[engine,
+  reason], …]}`. No `q` (or a blank one), or a `format` but `json`, is 400;
+  another method 405; a query is cut to 256 characters.
+  - **DeepSeek first:** `POST <relay>/v1/tools/search` `{"query", "count":
+    5}` with the voice's key, the same search the voice's second route uses
+    (`second_provider::net::search`), so the person needs no key of their
+    own; `summary` is given as `content`, `date` as `publishedDate`. Within
+    6 s, its answer at most 512 KiB.
+  - **DuckDuckGo after:** when DeepSeek times out, answers 429, 5xx or
+    something unreadable, or the lamp's budget for it is used, the search
+    goes to DuckDuckGo's page without scripts
+    (`https://html.duckduckgo.com/html/?q=`), read into the same results
+    (`engine` `duckduckgo`, ads left out), within 6 s, at most 1 MiB; it is
+    free and needs no key, but is unofficial and rate-limited, so only a
+    best-effort fallback (its challenge page, a 202, counts as failed).
+    Both failing is 502 with no results and both engines named, each with
+    its reason.
+  - **Bounds:** DeepSeek allows 5 calls a second an account, so each lamp
+    keeps each engine to one call a second (one more waits its turn, up to
+    1 s; past that the engine is passed over) and 30 a minute, a budget of
+    its own beside the chat's 60, which the search never uses; at most 2
+    searches at once (429 past that), not among the chat's 4.
+  - **Logs:** one line a search, of the engine, the count and why an
+    engine failed; never the query, the token or the key.
 
 ## Not yet known, for the backend (#1396)
 
