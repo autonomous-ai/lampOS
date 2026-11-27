@@ -1776,6 +1776,20 @@ pub(crate) const BY_NAME_NOTE: &str =
 /// where Gemini declined).
 pub(crate) const DECLINE_NOTE: &str = "(For you to know, not to answer: much of what reaches you is not said to you. When this line is plainly people talking to each other, a remark to the room, someone on a call, a video or a noise, call not_for_me and say nothing; leaving it alone is right, not rude, and a person who wants you says so.)";
 
+/// With `LAMP_SIMPLE_CALL` ([`Heeding::taking_simple_calls`]), told beside
+/// every line let out: it was said to the lamp, and the model may not
+/// decline it.
+pub(crate) const SIMPLE_NOTE: &str =
+    "(For you to know, not to answer: this was said to you: answer it.)";
+
+/// Why a line is let out with `LAMP_SIMPLE_CALL`: it called the lamp.
+pub(crate) const SIMPLE_CALLED: &str = "\"Hey Lamp\", or a tap, called it";
+
+/// Why a line is let out with `LAMP_SIMPLE_CALL`: begun within 20 s of the
+/// end of the lamp's last words.
+pub(crate) const SIMPLE_GOING_ON: &str =
+    "begun within 20 s of the end of the lamp's last words (LAMP_SIMPLE_CALL)";
+
 /// The note for a spoken line: [`BY_NAME_NOTE`] when it called the lamp by
 /// name, else [`DECLINE_NOTE`].
 pub(crate) fn call_note(by_name: bool) -> &'static str {
@@ -5703,6 +5717,18 @@ pub fn serve(
                 heeding.attention.only_hey_lamp(true);
             }
         }
+        // One simple rule (`LAMP_SIMPLE_CALL=on`, the product owner on 27 Nov
+        // 2026: "a simple 'hey lamp' + 20s renewing").
+        if std::env::var(crate::second_provider::SIMPLE_CALL_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a conversation opens only with \"Hey Lamp\" at a line's start, a tap or the lamp's own turn; a line begun within 20 s of the end of the lamp's last words is answered, every answer renewing it; no camera, voice print, room or words rule holds or lets out a line, and the model is offered no decline (LAMP_SIMPLE_CALL)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.taking_simple_calls();
+            }
+        }
         // Short replies carry (`LAMP_SHORT_REPLIES_CARRY=on`, #8772, the
         // product owner's rule of 26 Nov 2026).
         if std::env::var(crate::second_provider::SHORT_REPLIES_CARRY_ENVIRONMENT)
@@ -9020,6 +9046,8 @@ pub(crate) struct Heeding {
     asked_first: Option<u64>,
     /// `LAMP_NAME_OR_FOLLOW_UP=on` ([`Self::needing_name_or_follow_up`]).
     name_or_follow_up: bool,
+    /// `LAMP_SIMPLE_CALL=on` ([`Self::taking_simple_calls`]).
+    simple_call: bool,
     /// `LAMP_TWO_FACES_HELD=on` ([`Self::holding_two_faces`]): the eyes'
     /// last looks, so two faces make the room busy only when they stay.
     faces_held: Option<Arc<Mutex<FacesHeld>>>,
@@ -9948,6 +9976,8 @@ pub(crate) const AFTER_NEWS_NOTE: &str = "(For you to know, not to answer: this 
 /// How the rule saw a line when it judged it, kept for a verdict given
 /// once the Policy decides ([`Heeding::policy_now`]).
 struct Seen {
+    /// Where the line began, by this process's clock.
+    began_us: u64,
     room: crate::room_told::Room,
     going_on: bool,
     turned: Option<bool>,
@@ -10314,6 +10344,7 @@ impl Heeding {
             asked_first: None,
             face_not_speaking: None,
             name_or_follow_up: false,
+            simple_call: false,
             faces_held: None,
             name_stays: false,
             from_start: false,
@@ -10776,6 +10807,43 @@ impl Heeding {
     /// [`Self::not_said_to_me`]).
     pub(crate) fn hearing_only_said_to_me(&mut self) {
         self.said_to_me = true;
+    }
+
+    /// `LAMP_SIMPLE_CALL=on` (the product owner, 27 Nov 2026: "we just start
+    /// with a simple 'hey lamp' + 20s renewing. then we'll slowly add one
+    /// thing at a time and always make sure the quality is good."): one rule
+    /// decides whether a line is the lamp's ([`Self::simple_verdict`]), and
+    /// no camera, voice print, room or words rule holds or lets out a line.
+    /// A call is strictly "Hey Lamp" in the line's words
+    /// ([`crate::attention::opens_with_hey_lamp`]); a hearing of the name
+    /// alone never is ("keep it strictly 'Hey Lamp'. reason: false
+    /// positive.").
+    pub(crate) fn taking_simple_calls(&mut self) {
+        self.simple_call = true;
+        self.attention.only_hey_lamp(true);
+    }
+
+    /// With [`Self::taking_simple_calls`], the verdict on a line begun at
+    /// `began_us`: let out when it calls the lamp (its words open with "Hey
+    /// Lamp", a tap, a turn a computer opened), is the lamp's own turn, or
+    /// begins within [`crate::follows_on::WITHIN_US`]
+    /// (20 s) of the end of the lamp's last words, measured to its start, as
+    /// every answer's words move it on; held otherwise, and never answered.
+    fn simple_verdict(
+        attention: &crate::attention::Attention,
+        said_until_us: Option<u64>,
+        began_us: u64,
+    ) -> crate::attention::Verdict {
+        use crate::attention::Verdict;
+        if attention.simple_called() {
+            Verdict::Play(SIMPLE_CALLED)
+        } else if attention.judged_own() {
+            Verdict::Play("the lamp began this turn itself")
+        } else if crate::follows_on::due(true, false, said_until_us, began_us) {
+            Verdict::Play(SIMPLE_GOING_ON)
+        } else {
+            Verdict::Hold(crate::second_provider::SIMPLE_HELD)
+        }
     }
 
     /// With [`Self::hearing_only_said_to_me`], a line is named for
@@ -13739,6 +13807,7 @@ impl Heeding {
         );
         let attention = &mut self.attention;
         let seen = Seen {
+            began_us,
             room,
             going_on,
             other_voice,
@@ -23586,6 +23655,7 @@ mod tests {
     fn someone_else_by_voice_only_under_0_30() {
         let heeding = Heeding::new(true, true, None, None);
         let seen = |likeness| Seen {
+            began_us: 0,
             room: crate::room_told::Room::Quiet,
             going_on: true,
             turned: None,
@@ -38326,3 +38396,7 @@ mod near_lamp_name;
 #[cfg(test)]
 #[path = "worker/cut_in_said_to_me_tests.rs"]
 mod cut_in_said_to_me;
+
+#[cfg(test)]
+#[path = "worker/simple_call_tests.rs"]
+mod simple_call;
