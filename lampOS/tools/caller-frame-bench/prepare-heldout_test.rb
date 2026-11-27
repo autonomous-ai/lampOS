@@ -16,7 +16,7 @@ class CallerHeldoutPreparationTest < Minitest::Test
   def test_only_independent_bare_calls_and_ordinary_test_voices
     voices = [%w[provider voice split], %w[ElevenLabs a test], ["Gemini Live", "a", "train"], %w[OpenAI a test]]
     manifest = [%w[file provider voice style text label split],
-                ["bare", "elevenlabs", "a", "normal", "Hey, Lamp!", "call", "test"],
+                ["bare", "elevenlabs", "a", "whispered", "Hey, Lamp!", "call", "test"],
                 ["ask", "elevenlabs", "a", "normal", "Hey Lamp, what time is it?", "call", "test"],
                 ["like", "elevenlabs", "a", "fast", "Hey Mom!", "not-call", "test"],
                 ["ok", "elevenlabs", "a", "normal", "Okay, Lamp, stop", "not-call", "test"],
@@ -34,6 +34,7 @@ class CallerHeldoutPreparationTest < Minitest::Test
     inventory = Hash.new(0)
     rows = CallerHeldout.read_clips(m, declared, @dir, inventory)
     assert_equal [["bare", "wake", 2], ["mid", "followup", 4]], rows.map { |c| [c.file, c.label, c.words] }
+    assert_equal "whispered", rows.first.effective_style
     assert_equal 2, inventory.fetch(["openai", "a", "test", "excluded_provider"])
     assert File.file?(File.join(@dir, "excluded-wake"))
     manifest.last[-1] = "test"

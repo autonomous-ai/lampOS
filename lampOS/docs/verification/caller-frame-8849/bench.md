@@ -25,6 +25,16 @@ The open-source checkpoint publisher drew its English training speakers from Lib
 
 Both development sets use mono 16 kHz PCM and digitally mixed stationary noise at +5 dB referenced to active speech. Neither is a recording through the team lamp. All 144 noisy other-caller trials across the two sets received a false same-caller classification. On each of the 144 noisy follow-up WAVs, substituting the impostor reference for the true reference produced the same maximum target-frame fraction of 1.00. A threshold on this fraction cannot separate these pairs. In quiet, the true reference ranked higher on 56/72 synthetic and 46/72 public follow-ups. The candidate stays out of the combined judge.
 
+### What the model did before the speaker started
+
+We kept each enrollment and submitted just the first 300 ms of its follow-up. In both corpora the quiet prefix contained 4,800 zero PCM samples. Every corresponding noisy prefix matched the saved additive noise samples byte for byte. The frozen native child returned unknown on all 288 silent requests. It classified all 144 distinct noise clips as the caller with both the true and impostor enrollments, for 288/288 same-caller results with a target-frame fraction of 1.00. An independent check reconciled every prefix and response. These are speech-free controls and contribute zero trials to the accuracy table. The local archive inventory SHA-256 is `62a8fa9d836e31a47d7dcf831d8b09abf8b1996a9f54fc63ac05d23e3239c16b`.
+
+### Whole-line control with a longer opening
+
+To measure how much the 1.5-second guard affected the comparison, a separate replay kept all 288 LibriSpeech probes, pair labels and conditions. It extended each two-word enrollment through the end of the same recorded utterance when more speech was available. Eight of the twelve enrollments contained further speech. In total, 118 pairs met the duration minimum for both inputs.
+
+Guarded CAM++ correctly kept 0/144 same-caller pairs and rejected 56/144 other-caller pairs (38.9%). It classified 14 same-caller pairs as other. The remaining 130 same-caller and 88 other-caller pairs were unknown. Other voices rejected in the short quiet, short noisy, long quiet and long noisy cells were 5/36, 5/36, 23/36 and 23/36. The Mac took 78.081 ms for the first eligible pair and 78.031/80.413 ms at warm p50/p95, including two uncached embedding requests and comparison. The primary frame and whole-line results above still use the two-word enrollment.
+
 ## Latency and parity
 
 | Local paired replay | First frame decision | Warm frame p50 / p95 | Warm unguarded CAM++ p50 / p95 |

@@ -150,8 +150,6 @@ module CallerHeldout
       text = r.fetch("text").strip
       words = tokens(text)
       style = r.fetch("style").strip.downcase
-      effective = style
-      effective = "normal" if provider == "elevenlabs" && style.match?(/whisper/)
       label = r.fetch("label").strip.downcase.tr("_", "-")
       if label == "call" && words == %w[hey lamp]
         role = "wake"
@@ -160,7 +158,7 @@ module CallerHeldout
       else
         next
       end
-      clips << Clip.new(file, provider, voice, style, effective, text, words.length, role)
+      clips << Clip.new(file, provider, voice, style, style, text, words.length, role)
     end
     clips
   end
@@ -485,7 +483,7 @@ module CallerHeldout
 
       Source splits come from `voices.tsv` and must agree with any per-clip split. Identities are (provider, voice). Of #{coverage.size} eligible declared test voices, #{selected.map(&:speaker).uniq.size} supplied follow-ups paired with an independent, separately rendered call whose entire normalized text is “Hey Lamp”. `test-voice-coverage.tsv` records eligible test voices, including unrepresented ones. `duplicate-wakes.tsv` in `provenance/` lists wake waveforms that were identical under different voice identities. No model output enters the selection.
 
-      The #{truth.size} comparisons reuse #{selected.size} original follow-ups and #{(selected_clips - selected).size} original wake files. Each ordinary follow-up is paired with the caller and a different speaker on the identical follow-up waveform in each condition. Selection aims for #{per_length} unique texts per length per test voice on average, with equal provider targets and round-robin coverage within each provider. Short texts have 1–3 words, long texts have 4 or more. The picker spreads eligible word counts and speaking styles. Calls, greetings and assistant look-alike wake phrases are excluded from ordinary lines. For impostors it targets equal within-provider and across-provider examples per length and originating provider, preferring matching enrollment styles and balancing enrollment use. When a stratum is unavailable it uses an available impostor. `pair-provenance.tsv` discloses each choice. The publisher reports only Gemini supplied genuine whispered speech; voiced ElevenLabs “whispered” renders count as normal for enrollment matching.
+      The #{truth.size} comparisons reuse #{selected.size} original follow-ups and #{(selected_clips - selected).size} original wake files. Each ordinary follow-up is paired with the caller and a different speaker on the identical follow-up waveform in each condition. Selection aims for #{per_length} unique texts per length per test voice on average, with equal provider targets and round-robin coverage within each provider. Short texts have 1–3 words, long texts have 4 or more. The picker spreads eligible word counts and speaking styles. Calls, greetings and assistant look-alike wake phrases are excluded from ordinary lines. For impostors it targets equal within-provider and across-provider examples per length and originating provider, preferring matching enrollment styles and balancing enrollment use. When a stratum is unavailable it uses an available impostor. `pair-provenance.tsv` discloses each choice. Style matching uses the release manifest. The [publisher’s release notes](https://github.com/autonomous-ai/lampOS/issues/8907#issuecomment-7224058425) confirm ElevenLabs supplied whispered speech and describe variation by Gemini voice. All OpenAI clips are excluded.
 
       The channel is **#{kind}**. Sources are signed 16-bit mono PCM at 16 kHz. The capture-input derivatives keep the active span and prepend 300 ms. The 10 ms activity blocks must exceed 20 PCM units RMS and −40 dB relative to the highest block power. The repository's `microphone.clip_onsets` models onset attenuation per source. With the simulated room, `microphone.loudspeaker` also models the playback band. A measured channel already includes the source loudspeaker. `channel.py apply` convolves every clip with the saved impulse response and adds its shaped floor at −60 dBFS. Quiet clips contain this floor. Noisy clips add separately seeded `channel.pink` noise at +5 dB measured on active blocks. Both use the same headroom adjustment and `noise/` retains the exact additive PCM. Per-file seeds, acoustic bounds, measured SNRs, source digests and gain are in `clips.tsv`. This is a simulated input path. Physical acoustic and device latency require microphone captures.
 
