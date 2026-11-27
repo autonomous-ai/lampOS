@@ -2691,6 +2691,36 @@ until the body restarts; past 64 replacements in a run (each replaced move
 stays in memory, as it may still be playing), a changed move is dropped the
 same way, and the kept ones still play.
 
+### A move that waits for the one playing (`LAMP_BODY_MOVE_QUEUE=on`)
+
+A paired computer's dance longer than 10 s is several moves, and today each join
+stalls: a move asked over one playing ends it and eases it back to the stand
+(`EASE_OUT`, 700 ms or more) before it starts, and one sent on the first's `done`
+waits a round trip (about 0.25 s still on lamp-75c9, 27 Nov, `measure-join`). With
+`LAMP_BODY_MOVE_QUEUE=on` (off in the product until its row; `moves::MOVE_QUEUE`)
+a sent move may say `"queue": true`:
+`{"move":{...},"source":"control:c_1","replace":true,"queue":true}`.
+
+- **Honoured only behind the same asker's move:** from lamp-control (`control:<client>`, as `replace`), while that
+  client's own move plays at the same priority, nothing eases out and no gesture is paused. Then the move playing is
+  not ended: the new one waits and starts on the step it ends (`Asked::queue`), so the two meet at the stand with
+  nothing between. A dance that crosses the stand with speed there (every joint at 0 at the same instant) passes
+  through it without a stop; one that lands still lands still, with no stall after it.
+- **Otherwise it is asked as unqueued**, exactly as today: behind another asker's motion, with nothing playing, or with
+  the switch off (`queue` is not read), a replace ends what plays and eases it back, and the person still wins.
+- **One waits at a time:** a newer queued move takes its place, and the one waiting is dropped, "dropped: another was
+  asked after it".
+- **Anything that ends the first drops it:** a hand, a stop, a higher ask, a replace, the lease lost, a sit-down: the
+  waiting move never plays, said "dropped: the move it waited for did not play out" (`moves::QUEUED_FIRST_ENDED`). A
+  pause (#2602) holds both, and it starts when the first plays out after it; a lamp not standing when its turn comes
+  drops it, "dropped: it did not stand when its turn came".
+- **The same checks as any gesture:** it begins where a gesture waiting begins, so the app's reach and V1's anti-tip
+  rule judge it from the pose it begins in, and `LAMP_BODY_ENERGY` plays it livelier as any sent move. The moves
+  check is unchanged: it still begins and ends at nothing.
+- **Said as two gestures:** every computer move is named `control`, so `body/gesture` uses `Glimpse::gesture_began` to
+  say the first `over` and the second `began` on the join's step, though the name reads the same.
+- **Not the voice's gestures:** only a sent move from lamp-control may wait (the first builder, 27 Nov, #7814).
+
 ### Who may ask over whom (#940)
 
 A gesture or a move on the mood socket may say who asks: `{"gesture":"nod","source":"voice","priority":"conversation"}`,

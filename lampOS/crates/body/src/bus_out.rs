@@ -696,7 +696,9 @@ impl GestureSaid {
             })
             .map(|((name, why), told)| ((name, GestureState::Dropped, Some(why)), told))
             .collect();
-        if glimpse.gesture != self.making {
+        // A queued move of the same name begins as the one before it ends:
+        // a new gesture, though the name reads the same.
+        if glimpse.gesture != self.making || (glimpse.gesture_began && glimpse.gesture.is_some()) {
             if let Some(name) = self.making
                 && !ended(name)
             {
@@ -1182,6 +1184,7 @@ mod tests {
 
     fn glimpse(step: u64) -> Glimpse {
         Glimpse {
+            gesture_began: false,
             unplug_safe: false,
             unplug_unsafe: None,
             unplug_gap: false,
@@ -1821,6 +1824,27 @@ mod tests {
         assert_eq!(last.message, "stopped: shoulder is too warm (it reads 69)");
         assert_eq!(last.values[0].value, "stopping");
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// A queued move of the same name as the one before it (every computer's move is `control`) begins on the step that one
+    /// ends: the first is said `over` and the second `began`, though `gesture` reads the same.
+    #[test]
+    fn a_queued_move_of_the_same_name_says_the_first_over_and_itself_begun() {
+        let mut said = GestureSaid::default();
+        let mut seen = glimpse(1);
+        seen.gesture = Some("control");
+        seen.gesture_began = true;
+        assert_eq!(said.step(&seen), [("control", GestureState::Began, None)]);
+        seen.gesture_began = false;
+        assert_eq!(said.step(&seen), []);
+        seen.gesture_began = true;
+        assert_eq!(
+            said.step(&seen),
+            [
+                ("control", GestureState::Over, None),
+                ("control", GestureState::Began, None)
+            ]
+        );
     }
 
     #[test]
