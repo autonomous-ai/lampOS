@@ -418,7 +418,11 @@ until a reviewer approves them, and public only after a separate ask.
 An app's folder holds `app.json` (the manifest without `format`, `kind` and
 `files`), `src/` (its Python), `assets/` (WAV clips) and `skills/` (its
 companion skills). `name` defaults to the folder's; `skills` and `assets` to
-what is there.
+what is there. `tools` (optional, #8386) names the app's tools file for Lamp's
+model: `tools.json` beside `app.json`, the one file at the folder's top that is
+packed, and only when `tools` names it, or a `.json` file under `src/`. The
+check holds the path to the lamp's reader; the file's contents are the lamp's
+to read when the app runs (docs/app-tools.md).
 
 ```sh
 lamp app check gym-coach            # as the Store's reader checks it, less the signature
