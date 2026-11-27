@@ -4070,7 +4070,7 @@ runs its script itself: no agent, no Harness, no prompt
   owner's kept yes naming `net` for the folder as it is, or, with
   `LAMP_MADE_CODE_ON_AT_ONCE` on (the product's lamp-control unit), for a
   skill made on the lamp with no yes (#8180, below), or, with
-  `LAMP_TASK_NO_YES` on (#8475, off in the product until #8535), for any
+  `LAMP_TASK_NO_YES` on (#8475, the product's four units), for any
   skill's folder as it is with no yes; not agreed, refused
   `no_token` (`skill_run::NO_NET_YES`), no token and no egress socket.
   With `LAMP_TASK_NET` on, `DirectRunner::egress` makes the run's own egress
@@ -4899,7 +4899,7 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   `net` asks nothing. A Store, pushed or other skill still needs its kept
   yes, and with the switch off so does a made one, exactly as before.
   With `LAMP_TASK_NO_YES` on in lamp-control (#8475,
-  `lamp_skills::task_no_yes_on`; off in the product until #8535), the source no longer
+  `lamp_skills::task_no_yes_on`; on in the product's lamp-control unit), the source no longer
   counts: a pushed, Store, hand-added or made skill alike is minted its
   folder's declared grants and its check agreed for its folder as it is,
   whoever started the run (the voice, a trigger, a schedule;
@@ -5899,7 +5899,7 @@ and the run's folder `skill-<run id>` is removed, so a later turn in the
 same session holds no pass. A write to a linked service still waits for
 the owner's spoken yes: lamp-services sends only what the owner said yes
 to, once a run. The one exception (#8475, `LAMP_TASK_NO_YES` on in
-lamp-services; off in the product until #8475's part 2, #8535, lands): the
+lamp-services, on in the product's unit since #8475's switch-on): the
 run the owner asked for aloud just now, and only that run. Two things must
 agree. The origin: lamp-skills marks the hand-over of the voice's named
 call alone (`"asked_aloud": true`); lamp-tasks mints the run so

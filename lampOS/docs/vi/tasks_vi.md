@@ -1097,8 +1097,8 @@ lamp-tasks tự chạy script: không agent, không Harness, không prompt
   lamp-control đồng ý khi lời đồng ý đã giữ của chủ đèn có `net` cho thư mục
   đúng như hiện tại, hoặc, khi `LAMP_MADE_CODE_ON_AT_ONCE` bật (trong unit
   lamp-control của sản phẩm), cho kỹ năng được tạo trên đèn mà không cần lời
-  đồng ý (#8180, ở dưới), hoặc, khi `LAMP_TASK_NO_YES` bật (#8475, tắt
-  trong sản phẩm tới khi có #8535), cho thư mục đúng như hiện tại của bất kỳ
+  đồng ý (#8180, ở dưới), hoặc, khi `LAMP_TASK_NO_YES` bật (#8475, bật
+  trong bốn unit của sản phẩm), cho thư mục đúng như hiện tại của bất kỳ
   kỹ năng nào mà không cần lời đồng ý; không đồng ý thì bị từ chối `no_token`
   (`skill_run::NO_NET_YES`), không token và không socket egress. Khi `LAMP_TASK_NET` bật, `DirectRunner::egress` tạo socket egress
   riêng của lần chạy `skill-<run id>` (`egress::Grant::lamp`: chỉ web công
@@ -1870,7 +1870,7 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   `net` của nó không hỏi gì. Kỹ năng từ Store, được đẩy lên hay khác vẫn
   cần lời đồng ý đã giữ, và khi tắt công tắc thì kỹ năng được tạo cũng vậy,
   đúng như trước. Khi `LAMP_TASK_NO_YES` bật trong lamp-control (#8475,
-  `lamp_skills::task_no_yes_on`; tắt trong sản phẩm tới khi có #8535), nguồn không còn tính:
+  `lamp_skills::task_no_yes_on`; bật trong unit lamp-control của sản phẩm), nguồn không còn tính:
   kỹ năng được đẩy lên, từ Store, thêm bằng tay hay được tạo trên đèn đều
   được tạo token từ các quyền khai báo trong thư mục và được đồng ý kiểm tra
   cho thư mục đúng như hiện tại, dù ai bắt đầu lần chạy (giọng nói,
@@ -2823,8 +2823,8 @@ launcher, và thư mục `skill-<run id>` của lần chạy bị xoá, nên m�
 sau trong cùng phiên không còn giữ pass nào. Một lần ghi vào dịch vụ liên
 kết vẫn chờ lời đồng ý nói ra của chủ đèn: lamp-services chỉ gửi đúng thứ
 chủ đèn đã đồng ý, một lần mỗi lần chạy. Ngoại lệ duy nhất (#8475,
-`LAMP_TASK_NO_YES` bật trong lamp-services; tắt trong sản phẩm cho tới khi
-phần 2 của #8475, #8535, được merge): đúng lần chạy mà chủ đèn vừa yêu cầu
+`LAMP_TASK_NO_YES` bật trong lamp-services, bật trong unit của sản phẩm từ
+lần bật công tắc của #8475): đúng lần chạy mà chủ đèn vừa yêu cầu
 bằng giọng nói, và chỉ lần chạy đó. Hai điều phải khớp. Nguồn gốc:
 lamp-skills chỉ đánh dấu lần giao của lời gọi đúng tên từ giọng nói
 (`"asked_aloud": true`); lamp-tasks tạo token cho lần chạy như vậy
