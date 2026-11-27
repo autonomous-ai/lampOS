@@ -1157,7 +1157,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_ONBOARDING_NUDGE` | During setup, the lamp moves through the steps more reliably, catching your name and where you sit. |
 | `LAMP_ONBOARDING_FIRST_TRIES` | At the end of setup, the lamp suggests a few things to try first, such as a timer or the weather, once. |
 | `LAMP_ONBOARDING_HARNESS_LINE` | At the end of setup, the lamp says once, in its closing words, how to let it take on tasks from your computer. |
-| `LAMP_ONBOARDING_WALK_V2` | During setup, Lamp leads the whole walk by voice: you also try a skill and make one, Lamp tells you where you are when you ask, and it ends with what it learned and the Store. |
+| `LAMP_ONBOARDING_WALK_V2` | During setup, Lamp leads every step by voice, says where you are, and ends with the Store. |
 | `LAMP_FACE_EXPRESSIONS_ASK` | During setup, the lamp asks once if it may notice whether people look happy or upset, to answer more warmly. |
 | `LAMP_PLACE` | Set for one lamp, it knows the town it's in, so weather and nearby questions are answered for there. |
 | `LAMP_PERSON_NAME_OWNER_ONLY` | The lamp uses the owner's name only when it sees the owner alone, so visitors aren't called by it. |
