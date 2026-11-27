@@ -1117,10 +1117,10 @@ fn a_new_flag_a_moved_elbow_or_a_hot_joint_stops_it() {
         }
     );
     assert_eq!(
-        ended(PITCH, Event::Heat(63)),
+        ended(PITCH, Event::Heat(70)),
         Stop::Temperature {
             joint: 5,
-            temperature: 63
+            temperature: 70
         }
     );
 }
@@ -2922,9 +2922,10 @@ fn under_the_strain_guard_an_elbow_that_cannot_lift_is_said_at_once_and_seats_on
 /// and whether it ends by itself.
 type SeatSeen = Vec<(Duration, f32, Option<(&'static str, &'static str)>, bool)>;
 
-/// The elbow warmed from 45 to 63 a degree each 0.1 s from `from`.
+/// The elbow warmed from 52 to 70 a degree each 0.1 s from `from`, one
+/// over the heat stop (69).
 fn warms(from: Duration) -> impl Iterator<Item = (Duration, usize, u8)> {
-    (46..=63u8)
+    (53..=70u8)
         .zip(0u64..)
         .map(move |(to, n)| (from + Duration::from_millis(100 * n), 2, to))
 }
@@ -2938,7 +2939,7 @@ fn cools(from: Duration) -> impl Iterator<Item = (Duration, usize, u8)> {
         .map(move |(to, n)| (from + Duration::from_secs(n), 2, to))
 }
 
-/// Under the strain guard (#7281), standing with the elbow at 63 from 6 s:
+/// Under the strain guard (#7281), standing with the elbow at 70 from 6 s:
 /// it sits down hot, cools from 12 s and stands again after its minute,
 /// and hot again from 80 s, the second sit-down seats it at about 83 s.
 /// `heats` follow; it is never touched.
@@ -3018,7 +3019,7 @@ fn a_hot_seat_stands_again_after_five_cool_minutes() {
         report
             .retreats
             .iter()
-            .all(|why| why.contains("elbow_pitch at 63 degrees")),
+            .all(|why| why.contains("elbow_pitch at 70 degrees")),
         "{:?}",
         report.retreats
     );
@@ -3193,41 +3194,68 @@ const LAMP_74FF_WARMTH: &[(u64, u8, u8)] = &[
     (64518, 48, 51),
 ];
 
+/// How far [`lamp_74ff_replay`] lifts 74ff's elbow (#8828): its journal sat
+/// it down at 62, the stop then; lifted by the stop's rise, the seat tests
+/// that replay it still meet the stop (69) where 74ff met its own.
+const LAMP_74FF_LIFT: u8 = Standing::TEMPERATURE - 62;
+
 /// [`LAMP_74FF_WARMTH`] played from `from` (a step is 20 ms), shoulder and
-/// elbow. Its last read, 51, never gets under [`StrainGuard::COOL`] (50):
-/// SYNTHETIC from there, the elbow cools a degree a minute as 74ff's did
-/// (62 to 51 in 12 min), 50 one minute on and 49 two minutes on, then 48.
-/// The heats, and when the elbow first reads under 50.
+/// elbow, the elbow SYNTHETICALLY [`LAMP_74FF_LIFT`] warmer. Its last read,
+/// 51 and so 58, never gets under [`StrainGuard::COOL`] (50): SYNTHETIC from
+/// there, the elbow cools a degree a minute as 74ff's did (62 to 51 in 12
+/// min) down to 48. The heats, and when the elbow first reads under 50.
 fn lamp_74ff_replay(from: Duration) -> (Vec<(Duration, usize, u8)>, Duration) {
+    lamp_74ff_replay_lifted(from, LAMP_74FF_LIFT)
+}
+
+/// [`LAMP_74FF_WARMTH`] played from `from` with the elbow `lift` warmer, and
+/// the cooling tail after it (as [`lamp_74ff_replay`]).
+fn lamp_74ff_replay_lifted(from: Duration, lift: u8) -> (Vec<(Duration, usize, u8)>, Duration) {
     let mut heats: Vec<_> = LAMP_74FF_WARMTH
         .iter()
         .flat_map(|(step, shoulder, elbow)| {
             let at = from + TICK * *step as u32;
-            [(at, 1, *shoulder), (at, 2, *elbow)]
+            [(at, 1, *shoulder), (at, 2, *elbow + lift)]
         })
         .collect();
     let last = from + TICK * LAMP_74FF_WARMTH.last().unwrap().0 as u32;
     // Synthetic cooling tail, past the journal's end.
-    for (minutes, to) in [(1, 50), (2, 49), (3, 48)] {
-        heats.push((last + Duration::from_secs(60 * minutes), 2, to));
+    let last_elbow = LAMP_74FF_WARMTH.last().unwrap().2 + lift;
+    let mut under = None;
+    for (to, minutes) in (48..last_elbow).rev().zip(1u64..) {
+        let at = last + Duration::from_secs(60 * minutes);
+        heats.push((at, 2, to));
+        if to < StrainGuard::COOL && under.is_none() {
+            under = Some(at);
+        }
     }
-    (heats, last + Duration::from_secs(120))
+    (heats, under.expect("cools under COOL"))
 }
 
 /// lamp-74ff's elbow standing as it did on 16 Nov (`LAMP_74FF_WARMTH` from
 /// 6 s on, and `then`), under the strain guard with `LAMP_BODY_SEAT_COOLS`:
 /// what each step said, and each line its seat would say (`SeatSay`, out
-/// of the quiet hours).
+/// of the quiet hours). The elbow is [`LAMP_74FF_LIFT`] warmer, as
+/// [`lamp_74ff_replay`] plays it.
 fn lamp_74ff(
+    then: Vec<(Duration, usize, u8)>,
+    ends: Duration,
+) -> (BodyReport, SeatSeen, Vec<&'static str>) {
+    lamp_74ff_lifted(LAMP_74FF_LIFT, then, ends)
+}
+
+/// [`lamp_74ff`] with the elbow `lift` warmer: 0 is 74ff's own journal.
+fn lamp_74ff_lifted(
+    lift: u8,
     then: Vec<(Duration, usize, u8)>,
     ends: Duration,
 ) -> (BodyReport, SeatSeen, Vec<&'static str>) {
     let (mut lamp, mut clock) = folded(ends);
     lamp.arm_moves = true;
     lamp.overload_clears = 3;
-    let (first, second) = (LAMP_74FF_WARMTH[0].1, LAMP_74FF_WARMTH[0].2);
+    let (first, second) = (LAMP_74FF_WARMTH[0].1, LAMP_74FF_WARMTH[0].2 + lift);
     (lamp.servos[1].temperature, lamp.servos[2].temperature) = (first, second);
-    lamp.heats = lamp_74ff_replay(Duration::from_secs(6))
+    lamp.heats = lamp_74ff_replay_lifted(Duration::from_secs(6), lift)
         .0
         .into_iter()
         .chain(then)
@@ -3267,6 +3295,19 @@ fn lamp_74ff(
     (report, seen, lines)
 }
 
+/// #8828: lamp-74ff's own journal of 16 Nov, standing at 61 to 63, sat it
+/// down hot twice under the stop at 62; under 69 it stands through the
+/// whole journal and is never seated.
+#[test]
+fn lamp_74ff_standing_at_61_to_63_is_never_sat_down_hot() {
+    let (_, under) = lamp_74ff_replay_lifted(Duration::from_secs(6), 0);
+    let (report, seen, lines) = lamp_74ff_lifted(0, Vec::new(), under);
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.retreats.is_empty(), "{:?}", report.retreats);
+    assert!(seen.iter().all(|(_, _, seated, _)| seated.is_none()));
+    assert!(lines.is_empty(), "{lines:?}");
+}
+
 /// #7281, lamp-74ff's seat at 16:22:19 replayed: seated hot, it says it
 /// will rest, once, stays down through the journal's whole cooling (62 to
 /// 51 in 12 min), and stands again by itself five minutes after the elbow
@@ -3281,7 +3322,7 @@ fn lamp_74ff_hot_seat_at_16_22_stands_again_after_five_cool_minutes() {
         report
             .retreats
             .iter()
-            .all(|why| why.contains("elbow_pitch at 62 degrees")),
+            .all(|why| why.contains("elbow_pitch at 69 degrees")),
         "{:?}",
         report.retreats
     );
@@ -3313,7 +3354,7 @@ fn lamp_74ff_hot_seat_at_16_22_stands_again_after_five_cool_minutes() {
 fn a_hot_seat_after_standing_by_itself_within_the_hour_stays_seated() {
     let (_, under) = lamp_74ff_replay(Duration::from_secs(6));
     let stands = under + StrainGuard::COOL_FOR;
-    let warm: Vec<_> = (49..=61u8)
+    let warm: Vec<_> = (49..=61u8 + LAMP_74FF_LIFT)
         .zip(1u32..)
         .map(|(to, n)| (stands + Duration::from_secs(10) * n, 2, to))
         .collect();
@@ -12546,19 +12587,19 @@ fn heated_pitch(start: u8, glitch: Option<u8>, heats: Vec<(Duration, usize, u8)>
     run(&mut lamp, &mut clock, Limits::FOLDED, None, news, |_| {})
 }
 
-/// Real heat still stops it: a head that warms from 58 to 63 a degree
+/// Real heat still stops it: a head that warms from 65 to 70 a degree
 /// each 0.1 s, a rise `judge_temperatures` lets in, ends the run after `temperature_steps`
 /// hot steps.
 #[test]
 fn a_joint_that_really_warms_still_stops_after_its_hot_steps() {
-    let ramp = (59..=63)
+    let ramp = (66..=70)
         .zip(0..)
         .map(|(to, n)| (Duration::from_millis(1_500 + 100 * n), PITCH, to))
         .collect();
-    let report = heated_pitch(58, None, ramp);
+    let report = heated_pitch(65, None, ramp);
     let hot = Stop::Temperature {
         joint: 5,
-        temperature: 63,
+        temperature: 70,
     };
     assert_eq!(report.stop, hot, "{report:?}");
     assert_eq!(report.bad_temperatures, [0; 5]);
@@ -13280,17 +13321,17 @@ fn a_lamp_found_standing_whose_start_is_refused_folds_then_lets_go() {
 }
 
 /// A first read at the limit with a cool read agreeing after it is not
-/// heat: both agreeing reads must be hot. 62, then 61, starts as usual
+/// heat: both agreeing reads must be hot. 69, then 68, starts as usual
 /// (70 and 70: `a_hot_first_read_that_repeats_is_refused_as_before`).
 #[test]
 fn a_first_read_at_the_limit_then_one_below_starts_as_usual() {
     let (mut lamp, mut clock) = folded(Duration::from_secs(4));
-    lamp.servos[PITCH].temperature = 61;
-    lamp.flicker = Some((Duration::ZERO, PITCH, vec![Some(62)], 0));
+    lamp.servos[PITCH].temperature = 68;
+    lamp.flicker = Some((Duration::ZERO, PITCH, vec![Some(69)], 0));
     let news = script(&clock.time);
     let report = run(&mut lamp, &mut clock, Limits::FOLDED, None, news, |_| {});
     assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
-    assert_eq!(report.hot_rereads, vec![[45, 45, 45, 45, 61]]);
+    assert_eq!(report.hot_rereads, vec![[45, 45, 45, 45, 68]]);
     assert!(report.moved, "{report:?}");
 }
 
@@ -21256,7 +21297,7 @@ fn a_held_arm_that_heats_is_let_down_slowly() {
     let found = [2_035, 3_441, 218, 2_035, 2_478];
     let powered = powered_up(found, |lamp| {
         lamp.servos[Joint::ElbowPitch.index()].position += 4_096.0;
-        lamp.heats.push((Duration::from_secs(5), 2, 63));
+        lamp.heats.push((Duration::from_secs(5), 2, 70));
     });
     let lamp = &powered.lamp;
     assert!(held_with_torque_on(lamp));
@@ -22449,7 +22490,7 @@ fn a_lamp_folded_for_a_strain_with_someone_in_front_of_it_stays_down() {
 }
 
 /// #7344, the first builder's rule: a lamp that sat down hot cools first,
-/// then a person. The elbow reads 63 from about 8 s and sits it down (down
+/// then a person. The elbow reads 70 from about 8 s and sits it down (down
 /// by 15 s), then cools from 12 s to 45 at 29 s (under 50 from 25 s). With
 /// a 600 s window from talk at 0 s, off it stands again after its minute;
 /// on, a line at 120 s, still in its five cool minutes, leaves it down, and
@@ -22460,7 +22501,7 @@ fn a_lamp_folded_hot_stays_down_until_cool_and_then_a_new_line() {
         let (mut lamp, mut clock) = folded(Duration::from_secs(360));
         lamp.arm_moves = true;
         lamp.overload_clears = 3;
-        lamp.heats = (46..=63u8)
+        lamp.heats = (53..=70u8)
             .zip(0u64..)
             .map(|(to, n)| (Duration::from_millis(6_000 + 100 * n), 2, to))
             .chain(
@@ -22502,7 +22543,7 @@ fn a_lamp_folded_hot_stays_down_until_cool_and_then_a_new_line() {
         );
         assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
         assert!(
-            report.retreats.len() == 1 && report.retreats[0].contains("elbow_pitch at 63"),
+            report.retreats.len() == 1 && report.retreats[0].contains("elbow_pitch at 70"),
             "{:?}",
             report.retreats
         );
