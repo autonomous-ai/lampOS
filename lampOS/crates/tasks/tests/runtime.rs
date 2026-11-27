@@ -184,6 +184,9 @@ struct Counts {
     started_reads: AtomicUsize,
     /// How long that `ps` takes, in ms, unless told to yield.
     started_ms: AtomicUsize,
+    /// #8805: how long a sign-in read here takes, in ms, unless told to
+    /// yield, as one under load.
+    sign_in_ms: AtomicUsize,
 }
 
 /// In [`Counts::started`], the name the lamp gave its last launch.
@@ -499,6 +502,11 @@ impl Adapter for Script {
         })
     }
     fn signed_in_here(&self) -> Result<(SignIn, Option<String>), String> {
+        let took = Duration::from_millis(self.counts.sign_in_ms.load(Ordering::SeqCst) as u64);
+        let began = Instant::now();
+        while began.elapsed() < took && !self.stop.load(Ordering::Acquire) {
+            thread::sleep(Duration::from_millis(5));
+        }
         let sign_in = self.signed_in()?;
         Ok((sign_in, self.counts.computer.lock().unwrap().clone()))
     }
@@ -3594,6 +3602,9 @@ fn without_engines_from_machines_nothing_is_asked_or_refused() {
         assert!(start.elapsed() < Duration::from_secs(5), "no target");
         thread::sleep(Duration::from_millis(10));
     }
+    // #8805: from here a sign-in read takes longer than a look, as one on
+    // a loaded runner.
+    s.counts.sign_in_ms.store(25, Ordering::SeqCst);
     let asked = s.counts.machine_reads.load(Ordering::SeqCst);
     let start = Instant::now();
     while s.counts.machine_reads.load(Ordering::SeqCst) < asked + 2 {
