@@ -13,13 +13,13 @@ minutes after you go).
 
 Its bedtime is the end of its hours, 22:00 to 23:00 as it comes, for a
 bedtime at 23:00: its owner sets them to their own in its `skill.toml`
-(`[active]`, with `[quiet]` from the bedtime to the morning).
+(`[active]`).
 
 What it says and when:
 
 - It says one short, gentle line, worded by the voice the way a friend
   would: no lecture.
-- Once an evening, never while you read or write head down (with the
+- Once a sitting, never while you read or write head down (with the
   eyes' activity on), never in the middle of a conversation, and never from
   bedtime to the morning.
 - With the eyes' activity on, the sitting is yours: someone else sitting down in
@@ -27,16 +27,13 @@ What it says and when:
 - With Bedtime and Morning on the lamp, the night is Bedtime and Morning's:
   Wind down never starts from bedtime on, and gives its light back as you
   leave the desk, when Bedtime and Morning's night begins.
-- At most one of the wellbeing nudges (this, A sip of water, Rest your eyes
-  and Stand up) an hour between them; with the lamp's `LAMP_NUDGES_PRESENT`
-  switch on (#5207, set in the product's skills units), two an hour, never
-  within half an hour of each other.
+- No shared limit with the other wellbeing nudges, but never within a
+  minute of another one's line: it waits that minute, then speaks.
 - "Not tonight" or "stop the wind-down" to the lamp (one function for the
-  four wellbeing nudges: the one that came last, or all of them) snoozes it until
+  wellbeing nudges: the one that came last, or all of them) snoozes it until
   tomorrow morning or turns it off until you ask for it again.
 
-It keeps nothing about you: only, in memory, whether it went today and
-whether it is resting; off is one line with its name.
+It keeps nothing about you: only, in memory, when it last went; off is one line with its name.
 
 A core skill: it comes with the lamp, on, and can be turned off by voice
 or in the app.

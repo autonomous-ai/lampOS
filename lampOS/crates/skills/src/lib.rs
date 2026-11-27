@@ -424,6 +424,9 @@ struct StopFile {
     done: Option<StopDoneFile>,
     #[serde(default)]
     group: Option<String>,
+    /// Never within this of another member's line (the owner, 27 Nov).
+    #[serde(default)]
+    apart: Option<String>,
     /// The word a shared stop names this skill by (#6543), beside its name.
     #[serde(default)]
     kind: Option<String>,
@@ -454,10 +457,19 @@ pub struct Stop {
     pub done: Option<StopDone>,
     /// `[stop] group` (#7401): the skills under the skills folder that name
     /// it share the function as a `[budget]` group's do, in a skill with no
-    /// `[budget]` (the seen reactions, with no limit of their own), and
-    /// with the skills of the `[budget]` group of that name (#8377: Posture
-    /// keeps the wellbeing nudges' stop without their hour).
+    /// `[budget]` (the seen reactions and the wellbeing nudges, with no
+    /// limit of their own). Named as a `[budget]` group is, the function is
+    /// that group's too (#8377: Posture keeps the wellbeing nudges' stop
+    /// without their hour; the owner, 27 Nov: the wellbeing nudges in no
+    /// budget).
     pub group: Option<String>,
+    /// `[stop] apart` (the owner, 27 Nov: "it must not sound like a machine
+    /// reading out a list"): a member of the `[stop] group` never starts
+    /// within this of another member's start, by the largest any member
+    /// names; held back, its chance is kept and taken once it has passed,
+    /// if its trigger still holds. No count: no hour's, no day's. 0 when
+    /// not named.
+    pub apart_us: u64,
     /// The word a call of a shared stop may name this skill by, beside its
     /// name, as [`STOP_KIND`] (#6543): "drinks" for "stop telling me about
     /// drinks". Declared by any skill sharing the function, the function
@@ -5280,6 +5292,19 @@ fn manifest(
                     })
                 }
             };
+            let apart_us = match &stop.apart {
+                None => 0,
+                Some(apart) => {
+                    if stop.group.is_none() {
+                        return Err("[stop] apart goes with [stop] group".into());
+                    }
+                    let apart_us = duration_us(apart)?;
+                    if !(1_000_000..=HOUR_US).contains(&apart_us) {
+                        return Err("[stop] apart is 1s to 1h".into());
+                    }
+                    apart_us
+                }
+            };
             if let Some(group) = &stop.group {
                 if budget.is_some() {
                     return Err(
@@ -5299,6 +5324,7 @@ fn manifest(
                 when: checked_when(stop.when, "[stop]"),
                 done,
                 group: stop.group,
+                apart_us,
                 kind: stop.kind,
             })
         }
@@ -7519,6 +7545,9 @@ pub struct Engine {
     /// skills sharing a `[stop]`, the latest is what a call without `all`
     /// stops.
     group_ran: HashMap<String, u64>,
+    /// By `[stop] group` with an `apart`, the member that last started and
+    /// when ([`Stop::apart_us`]); given back with a line never heard.
+    apart_ran: HashMap<String, (String, u64)>,
     /// By skill, when its latest run began, while that run is a nudge that
     /// spent its group's hour: what [`Engine::unsaid`] may give back. A
     /// later run of the skill that spends nothing (a `follows` word, a
@@ -7880,6 +7909,7 @@ impl Engine {
             budget_waits: HashMap::new(),
             word_windows: HashMap::new(),
             group_ran: HashMap::new(),
+            apart_ran: HashMap::new(),
             unsaid_from: HashMap::new(),
             unwritten: HashMap::new(),
             privacy_told: None,
@@ -9147,6 +9177,16 @@ impl Engine {
                 .is_some_and(|trigger| {
                     trigger.for_us > 0 || (trigger.when == When::Present && !trigger.rearm)
                 });
+            // A line never heard keeps no other member a minute apart.
+            if let Some(spent) = self.unwritten.get(skill)
+                && let Some(group) = stop_group(known)
+                && self
+                    .apart_ran
+                    .get(group)
+                    .is_some_and(|(last, at)| last == skill && *at == spent.at_us)
+            {
+                self.apart_ran.remove(group);
+            }
             if self.give_back(skill, !held) {
                 eprintln!(
                     "lamp-skills: {skill}'s line was never heard: its cooldown is given back"
@@ -10989,6 +11029,23 @@ impl Engine {
                         let since = now_us.saturating_sub(*last);
                         (since < gap_us).then(|| gap_us - since)
                     });
+                // Within its `[stop] group`'s `apart` of another member's
+                // start (the owner, 27 Nov): held back as a group's gap is,
+                // with no count.
+                let apart_left = stop_group(skill).filter(|_| counted).and_then(|group| {
+                    let apart_us = self
+                        .skills
+                        .iter()
+                        .filter(|other| stop_group(other) == Some(group))
+                        .filter_map(|other| other.stop.as_ref())
+                        .map(|stop| stop.apart_us)
+                        .max()
+                        .unwrap_or(0);
+                    let (last, at) = self.apart_ran.get(group)?;
+                    let since = now_us.saturating_sub(*at);
+                    (*last != skill.name && since < apart_us).then(|| apart_us - since)
+                });
+                let gap_left = gap_left.or(apart_left);
                 let hour_spent = hour_spent || gap_left.is_some();
                 // First come, first served: with the hour free, a member
                 // that has waited for it longer, and still waits, goes first,
@@ -11029,7 +11086,9 @@ impl Engine {
                     let group = skill
                         .budget
                         .as_ref()
-                        .map_or("", |(group, _)| group.as_str());
+                        .map(|(group, _)| group.as_str())
+                        .or_else(|| stop_group(skill))
+                        .unwrap_or("");
                     // Each budget reason is its own gate, so a different
                     // one within 60 s is still said.
                     let (gate, why) = if outside {
@@ -11422,12 +11481,16 @@ impl Engine {
                                 now_us.saturating_sub(*last) < BUDGET_WAIT_LIVE_US
                             });
                         }
-                    } else if nudge && stop_group(skill).is_some() {
+                    } else if nudge && let Some(group) = stop_group(skill) {
                         // A `[stop] group`'s function (#7401) still stops
                         // the one that came last, and a run never heard is
                         // not that one ([`Engine::unsaid`]).
                         self.group_ran.insert(skill.name.clone(), now_us);
                         self.unsaid_from.insert(skill.name.clone(), now_us);
+                        if counted && skill.stop.as_ref().is_some_and(|stop| stop.apart_us > 0) {
+                            self.apart_ran
+                                .insert(group.to_owned(), (skill.name.clone(), now_us));
+                        }
                     }
                     // Asked of the Policy, a run is watched for once it is
                     // made ([`Engine::made`]): a no shows nothing to ignore.

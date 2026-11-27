@@ -66,6 +66,7 @@ unknown = "holds_stale"   # or has run out, and it runs as before.
 [stop]
 tool = "wellbeing_nudges"
 group = "wellbeing"
+apart = "1m"              # never within a minute of another wellbeing nudge's line (the owner, 27 Nov)
 kind = "water"
 about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. all = true for 'the nudges' with no kind named; leave both out for 'that one', the last. Never a reminder they set ('stop reminding me to drink water'): that is cancel_reminder."
 # In short, with LAMP_USE_SKILL_SUMMARY on (#6218); the same in every

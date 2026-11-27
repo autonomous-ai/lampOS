@@ -135,13 +135,14 @@ sau:
      không có `tool`) được đèn gán chừng mực mà các lời nhắc có sẵn từng có,
      không bao giờ bị từ chối vì thiếu chúng: `most_a_day = 3`, `[quiet]`
      22:00-08:00, `[budget] group = "wellbeing"` với `per_hour = 1`, nên nó
-     chia chung một lần mỗi giờ với các kỹ năng còn trong nhóm `[budget]`
-     đó (A meal check và Quiet focus, kỹ năng cài thêm), và
+     chỉ chia chung một lần mỗi giờ với các kỹ năng tự tạo khác trong nhóm
+     `[budget]` đó (không kỹ năng đi kèm nào còn ở nhóm này), và
      `[rest] after_ignored = 2` (nghỉ đến sáng sau hai lần chạy không ai để
      ý), như `skills/sip-of-water` trước ngày 27/11 (chủ sở hữu, 27/11:
-     bảy lời nhắc wellbeing lõi, Sip of water, Comfort break, Stand up,
-     Stretch break, Rest your eyes, Sit back và Wind down, không còn
-     `most_a_day`, `[budget]`, `[rest]` hay `[quiet]`; mẫu của
+     chín lời nhắc wellbeing, Sip of water, Comfort break, Stand up,
+     Stretch break, Rest your eyes, Sit back, Wind down, A meal check và
+     Quiet focus, không còn `most_a_day`, `[budget]`, `[rest]` hay
+     `[quiet]`; mẫu của
      `made_skill::BEHAVIOUR_TEMPLATE` vẫn giữ chúng). Mô hình được dặn không đặt cái nào trong
      số đó trừ khi yêu cầu tự nói muốn nhiều hơn; cái nó viết bị kẹp vào
      giới hạn, không bao giờ bị từ chối (P2 của Thirteen và App Only trên
@@ -6496,10 +6497,13 @@ trong lần ngồi.
   giờ hoặc khoảng cách của nhóm cản cũng giữ lần giữ của nó, và các giới
   hạn đã giữ cản nó sau lần khởi động lại đúng như trước: sau khi Rest your
   eyes chạy (30 phút), lần giữ của nó được giữ qua một bản cập nhật trong
-  `cooldown` 45 phút của nó, và nó vẫn chờ hết cooldown đó. Từ 27/11 các lời
-  nhắc wellbeing lõi không còn chung nhóm `[budget]` (chủ sở hữu, 27/11),
-  nên giờ và khoảng cách của nhóm chỉ còn cản A meal check và Quiet focus,
-  hai kỹ năng cài thêm còn ở nhóm `[budget]` "wellbeing". Chỉ một từ `stands_in_for_group` còn
+  `cooldown` 45 phút của nó, và nó vẫn chờ hết cooldown đó. Từ 27/11 cả chín
+  lời nhắc wellbeing, kể cả A meal check và Quiet focus, không còn chung
+  nhóm `[budget]` nào (chủ sở hữu, 27/11): không kỹ năng đi kèm nào còn ở
+  nhóm `[budget]` "wellbeing", nên giờ và khoảng cách của nhóm không cản lời
+  nhắc nào; chỉ `[stop] apart` giữ chúng cách nhau một phút (xem "Các lời
+  nhắc cách nhau"). Chỉ một từ `stands_in_for_group` (không kỹ năng đi kèm
+  nào còn dùng) còn
   chờ, hay một lần đọc dịch vụ đã liên kết còn đang chạy hoặc đã thực hiện
   trong ngày địa phương này (một lần mỗi ngày, #5288), vẫn khiến lần giữ
   của kỹ năng không được ghi, vì chúng không được giữ; nó bắt đầu lại sau
@@ -7018,14 +7022,18 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
 
 Các kỹ năng của một nhóm `[budget]`, hoặc của một `[stop] group` (#7401),
 dùng chung một hàm `[stop]` (như `wellbeing_nudges`). Từ 27/11 (chủ sở
-hữu, 27/11) các lời nhắc wellbeing lõi (Sip of water, Comfort break, Stand
-up, Rest your eyes, Sit back, Wind down) không còn ở nhóm `[budget]` nào: chúng
-ghi `[stop] group = "wellbeing"`, không có giới hạn nào. Một `[stop] group`
-cùng tên với một nhóm `[budget]` dùng chung hàm của nhóm đó
-(`lamp_skills::load_each_with`), nên A meal check và Quiet focus, vẫn ở
-nhóm `[budget]` "wellbeing", dùng chung `wellbeing_nudges` với chúng. Câu của
-một lời nhắc như vậy không ai nghe (`Engine::unsaid`) trả lại `cooldown` của
-trigger, như của các phản ứng với điều thấy được. Gọi không có `all` thì dừng kỹ năng chạy hoặc được hỏi
+hữu, 27/11) cả chín lời nhắc wellbeing (Sip of water, Comfort break, Stand
+up, Stretch break, Rest your eyes, Sit back, Wind down, A meal check và Quiet
+focus) không còn ở nhóm `[budget]` nào: chúng ghi `[stop] group =
+"wellbeing"` và `apart = "1m"`, không có giới hạn chung nào khác (xem "Các
+lời nhắc cách nhau" bên dưới). Stretch break mới có `[stop]` dùng chung này
+(`kind = "stretch"`). Một `[stop] group` cùng tên với một nhóm `[budget]`
+dùng chung hàm của nhóm đó (`lamp_skills::load_each_with`), nên một kỹ năng
+tự tạo còn ở nhóm `[budget]` "wellbeing" vẫn dùng chung `wellbeing_nudges`
+với chúng; không kỹ năng đi kèm nào còn ở nhóm đó. Câu của một lời nhắc như
+vậy không ai nghe (`Engine::unsaid`) trả lại `cooldown` của trigger, như của
+các phản ứng với điều thấy được; trigger có `for` còn giữ cả cơ hội của nó
+(xem bên dưới). Gọi không có `all` thì dừng kỹ năng chạy hoặc được hỏi
 sau cùng, có `all` (hoặc khi chưa kỹ năng nào chạy) thì dừng tất cả, như
 trước. Từ #7473, lời của `all` và `about` của các kỹ năng wellbeing nói với
 mô hình: "the nudges" (số nhiều, hoặc nói chung) là `all`, còn "that one"
@@ -7042,7 +7050,7 @@ nudge', 'no more eye nudges'), give that kind: never all, and never the one
 that came last.", và lời của `kind` bảo đưa loại mỗi khi người dùng gọi tên
 một loại, số ít hay số nhiều (#7473: trên lamp-06c1, chỉ được nghe `about`,
 mô hình dừng cái sau cùng cho "snooze only the eyes nudges", 3 trên 3);
-không có loại thì mô tả là `about`, từng byte. Chín kỹ năng wellbeing khai loại của mình (#7473, HOLD của Heron; `posture` từ khi quyết định của chủ sở hữu ngày 23/11 tách nó khỏi Sit back): `water`, `eyes`, `stand-up`, `break`, `meal`, `sit-back`, `posture`, `wind-down` và `focus`, nên trên sản phẩm hàm luôn có `kind`, và `about` của chúng nói `all` là cho "the nudges" khi không gọi tên loại nào, nên "no more eye nudges" chỉ dừng nhắc mắt.
+không có loại thì mô tả là `about`, từng byte. Mười kỹ năng wellbeing khai loại của mình (#7473, HOLD của Heron; `posture` từ khi quyết định của chủ sở hữu ngày 23/11 tách nó khỏi Sit back; `stretch` của Stretch break thêm vào theo chủ sở hữu, 27/11): `water`, `eyes`, `stand-up`, `break`, `meal`, `sit-back`, `posture`, `wind-down`, `focus` và `stretch`, nên trên sản phẩm hàm luôn có `kind`, và `about` của chúng nói `all` là cho "the nudges" khi không gọi tên loại nào, nên "no more eye nudges" chỉ dừng nhắc mắt.
 
 **Đèn đọc lời người nói** (#7473, quyết định của chủ sản phẩm, 19/11: trên
 lamp-06c1 mô hình không đưa `kind` lẫn `all`, 0 trên 7), đọc chặt để một câu
@@ -7132,6 +7140,55 @@ và `a_shared_stops_kind_is_passed_on_and_offered_only_when_taken`,
 `a_stray_key_on_a_kinded_skill_names_kind`
 (`lamp_voice::use_skill`). Bản đầy đủ ở [skills.md](../skills.md), hàng
 `[stop]`.
+
+## Các lời nhắc cách nhau (`[stop] apart`, chủ sở hữu, 27/11)
+
+Khóa mới `[stop] apart` (chủ sở hữu, 27/11: "it must not sound like a machine
+reading out a list"): một khoảng thời gian từ 1 giây tới 1 giờ, chỉ đi với
+`[stop] group` (thiếu `group` thì kỹ năng bị từ chối khi nạp, "[stop] apart
+goes with [stop] group"; ngoài 1s–1h, "[stop] apart is 1s to 1h"). Một thành
+viên của `[stop] group` không bao giờ bắt đầu trong khoảng `apart` lớn nhất
+mà một thành viên bất kỳ của nhóm ghi, tính từ lần bắt đầu của **một thành
+viên khác** (chính nó thì không bị cản). Bị giữ lại như khoảng `gap` của một
+nhóm `[budget]` (`Stop::apart_us`, `Engine::apart_ran`): cơ hội của nó được
+giữ và được lấy khi khoảng đó đã qua, nếu trigger vẫn còn giữ. Chỉ lần chạy
+được tính mới đặt và bị cản bởi mốc này (từ của `follows` thì không). Không
+có số đếm nào: không theo giờ, không theo ngày. Một câu không ai nghe
+(`Engine::unsaid`) xóa mốc của thành viên đó, nên nó không giữ thành viên
+khác cách một phút. Không có khóa thì là 0, như trước. Cả chín lời nhắc
+wellbeing (sip-of-water, comfort-break, stand-up, stretch-break,
+rest-your-eyes, sit-back, wind-down, meal-check, quiet-focus) ghi `group =
+"wellbeing"` và `apart = "1m"`: không lời nào trong vòng một phút sau câu
+của lời khác; lời đến sau chờ phút đó rồi nói.
+
+**Câu không ai nghe của một kỹ năng `[stop] group` không có `[budget]`**
+(`Engine::unsaid`, P2 của Reviewer-lead trên #8868): `cooldown` của trigger
+được trả lại như trước. Với trigger có `for` (lần ngồi của các lời nhắc
+wellbeing, cái nghiêng người của Sit back), cơ hội cũng được giữ: lời nhắc
+đến ở tin nhắn kế tiếp của trigger khi các `[[while]]` của nó đúng, không
+chỉ sau khi người đó rời đi rồi quay lại. Trigger không có `for` (các phản
+ứng với điều thấy được, trên một lần tăng) thì cơ hội đã dùng, như trước.
+Kiểm thử
+`with_the_switch_an_unsaid_nudge_gives_its_cooldown_back_and_comes_again_while_they_stay`
+(`crates/skills/tests/it/skills.rs`).
+
+**A meal check (1.2.0) và Quiet focus (1.1.0)** (chủ sở hữu, 27/11) bỏ
+`most_a_day`, `[[while]]` `faces_at_most` (có người khác trong khung hình vẫn
+nói), `[quiet]`, `[active]`, `[rest]`, `[budget]` và `[present.budget]`;
+`[[while]]` đèn không nói của chúng là 10 giây (trước là 30 giây). Thời gian
+không đổi: A meal check 11:30–13:30 và 18:30–20:30, ngồi 75 phút; Quiet
+focus 45 phút cúi đầu rồi lần ngẩng lên, `cooldown` 180 phút. Quiet focus
+không còn `stands_in_for_group`, nên lời của nó không còn giữ lại Rest your
+eyes hay Sip of water: lúc ngẩng lên, mỗi lời nhắc đến hạn đều nói, cách
+nhau một phút. Không kỹ năng đi kèm nào còn giữ một nhóm `[budget]`
+"wellbeing".
+
+**Comfort break** (chủ sở hữu, 27/11: "Again 75 min later") không còn
+`rearm` hay `wait`: nói ở phút 60, rồi mỗi 75 phút khi người đó vẫn ngồi
+(60, 135, 210); rời đi rồi quay lại thì bắt đầu đếm 60 phút mới. Ca mới:
+`again-75-minutes-later-while-they-stay`,
+`present-again-75-minutes-later-while-they-stay` và
+`a-new-sitting-counts-60-minutes-afresh`.
 
 ## Chủ đề người ở bàn đang làm gì (#6543, chưa có bên phát)
 
