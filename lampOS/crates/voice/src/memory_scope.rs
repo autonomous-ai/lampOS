@@ -1778,7 +1778,9 @@ impl ScopeLease {
     /// The `forget_everything`, `forget_my_face` or correction (`remember`
     /// with `replaces`) `name` with `args` that their yes on this line
     /// agreed to, held for it on a line theirs by their face alone in view
-    /// (`LAMP_ONE_FACE_FORGETS_ON_YES`, the memory owner's ruling on #8570):
+    /// (`LAMP_ONE_FACE_FORGETS_ON_YES`, the memory owner's ruling on #8570),
+    /// or a `set_role` or `end_role` run on the request on such a line (the
+    /// memory owner's calls of 27 Nov on #8654):
     /// it runs on this line though it is theirs by one face too
     /// ([`Self::forgets_need_mouth`]). Only the second route's held run
     /// makes the [`crate::second_provider::OneFaceForgetYes`] it needs. Any
@@ -1796,6 +1798,15 @@ impl ScopeLease {
             crate::known_faces::FORGET => {
                 self.context.held_yes.fetch_or(2, Ordering::AcqRel);
             }
+            // A role set or end run on the request by their face alone in
+            // view (the memory owner's "Run on the request", 27 Nov on
+            // #8654, `second_provider::role_on_request`): no yes, no hold.
+            crate::remember::role::SET_ROLE => {
+                self.context.held_yes.fetch_or(4, Ordering::AcqRel);
+            }
+            crate::remember::role::END_ROLE => {
+                self.context.held_yes.fetch_or(8, Ordering::AcqRel);
+            }
             _ if crate::remember::corrects(name, args) => {
                 if let Some(id) = args["replaces"].as_u64() {
                     self.context.correction_agreed.store(id, Ordering::Release);
@@ -1806,13 +1817,15 @@ impl ScopeLease {
     }
 
     /// Whether `name` with `args` is what [`Self::mark_held_yes`] marked: a
-    /// `forget_everything` or `forget_my_face` marked, or a correction of
-    /// exactly the kept id marked.
+    /// `forget_everything`, `forget_my_face`, `set_role` or `end_role`
+    /// marked, or a correction of exactly the kept id marked.
     pub(crate) fn held_yes_agreed(&self, name: &str, args: &serde_json::Value) -> bool {
         let marked = self.context.held_yes.load(Ordering::Acquire);
         match name {
             crate::remember::FORGET_EVERYTHING => marked & 1 != 0,
             crate::known_faces::FORGET => marked & 2 != 0,
+            crate::remember::role::SET_ROLE => marked & 4 != 0,
+            crate::remember::role::END_ROLE => marked & 8 != 0,
             _ if crate::remember::corrects(name, args) => {
                 let id = self.context.correction_agreed.load(Ordering::Acquire);
                 id != 0 && args["replaces"].as_u64() == Some(id)

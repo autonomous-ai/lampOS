@@ -19206,6 +19206,54 @@ fn hold_on_face_yes(
     }
 }
 
+/// With `LAMP_ONE_FACE_FORGETS_ON_YES`, the memory owner's calls of 27 Nov
+/// on #8654 ("yes-alone rule cover this too, like forgets and corrections",
+/// 17:34; "Run on the request", 17:5x): a `set_role` or `end_role` on a
+/// spoken line its person's by their own known face alone in view, the
+/// mouth not seen saying it (`ScopeLease::in_view_by_one_face`: not
+/// carried, sticky, narrowed or answering words seen said), the eyes
+/// reading who speaks, not held by a face's gap, and the private room on,
+/// runs on the request itself: no hold, no question, no new words. It marks
+/// the lease (`ScopeLease::mark_held_yes`), so [`one_face_refused`] and the
+/// memory's role gate (`remember::DaysClient::role_for_guarded`) let that
+/// one call by. Off, or any other call or line: nothing, as before.
+fn role_on_request(
+    shared: &Shared,
+    request: u64,
+    heard: bool,
+    call: &net::ToolCall,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+) {
+    if !one_face_forgets_on_yes()
+        || (call.name != crate::remember::role::SET_ROLE
+            && call.name != crate::remember::role::END_ROLE)
+    {
+        return;
+    }
+    let Some(lease) = scope else {
+        return;
+    };
+    if !heard
+        || shared.forget_sight.is_none()
+        || held_by_gap(scope)
+        || !lease.in_view_by_one_face()
+        || !crate::person::private_room()
+    {
+        return;
+    }
+    if keep_asker(scope)
+        .filter(|asker| lease.kept_by_one_face().as_deref() == Some(asker.1.as_str()))
+        .is_none()
+    {
+        return;
+    }
+    lease.mark_held_yes(&OneFaceForgetYes(()), &call.name, &call.args);
+    eprintln!(
+        "lamp-voice second: request {request}: {} on a line theirs by their face alone in view runs on the request (LAMP_ONE_FACE_FORGETS_ON_YES)",
+        call.name
+    );
+}
+
 /// The journal line for a forget on a one-face line [`ask_once_forget`]
 /// asks nothing about, saying why (Thirteen's row on #5627). Its words
 /// before the reason are the line's from before, so old greps still match.
@@ -24285,6 +24333,7 @@ async fn answer(
                     messages.push(Message::tool(call.id.clone(), told.to_string()));
                     continue;
                 }
+                role_on_request(shared, request, heard, call, scope.as_ref());
                 if one_face_refused(scope.as_ref(), call) {
                     eprintln!(
                         "lamp-voice second: request {request} chat round {round}: {} not run: nothing saw the mouth say it (LAMP_PERSON_SCOPE_ONE_FACE_READS)",

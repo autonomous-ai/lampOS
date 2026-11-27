@@ -13661,7 +13661,8 @@ impl DaysClient {
     /// written. Nor is anything set or ended on a line its person's only by
     /// their face alone in view (`ScopeLease::forgets_need_mouth`), as the
     /// runners refuse it too (`ONE_FACE_REFUSED`; the privacy read on
-    /// #5385). A set needs a short name ([`role::name_like`]), heard as one
+    /// #5385), unless the second route ran it on the request there with
+    /// `LAMP_ONE_FACE_FORGETS_ON_YES` (`ScopeLease::held_yes_agreed`). A set needs a short name ([`role::name_like`]), heard as one
     /// in the line ([`role::heard_sets`]). Done, the held role changes at
     /// once; an end the memory did not write keeps it and says so.
     fn role_for_guarded(
@@ -13674,7 +13675,15 @@ impl DaysClient {
         if !scope_current(lease) {
             return (gone(), false);
         }
-        if lease.is_some_and(crate::memory_scope::ScopeLease::forgets_need_mouth) {
+        // But a set or end the second route ran on the request, their face
+        // alone in view (`LAMP_ONE_FACE_FORGETS_ON_YES`, the memory owner's
+        // calls of 27 Nov on #8654, `second_provider::role_on_request`).
+        if lease.is_some_and(|lease| {
+            lease.forgets_need_mouth()
+                && !(crate::second_provider::one_face_forgets_on_yes()
+                    && lease.held_yes_agreed(&call.name, &call.args)
+                    && !lease.sticky_held())
+        }) {
             eprintln!(
                 "lamp-voice provider: a {} on a line whose mouth was not seen was not run (LAMP_MEMORY_ROLE)",
                 call.name
