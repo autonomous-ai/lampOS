@@ -611,9 +611,14 @@ pub fn capture_on<D: CaptureDevice>(
     // Kept here, not in the loop, so that a refused link can be read for
     // the speaker's own Stopped at the end (#7224).
     let mut link = None;
+    // Whether the last authority capture took denies the microphone: in a
+    // ridden gap it closes nothing, so nothing denied is left queued for
+    // the look at a refused link below (#7224).
+    let mut denied_taken = false;
     let result = capture_loop(
         &mut channels,
         &mut link,
+        &mut denied_taken,
         &mut microphone,
         worker,
         directory,
@@ -634,7 +639,10 @@ pub fn capture_on<D: CaptureDevice>(
     // that fails the voice's cleanup. A refused link with no Stop queued
     // still is one. So is a closed slide in a ridden gap (#7224): the
     // speaker ended on the denied authority and said Stopped; that, or the
-    // denied authority queued here, is the same clean end.
+    // denied authority queued here or already taken, is the same clean end.
+    // On Linux the refused send drops the Stopped queued on the link, and
+    // in a ridden gap capture has taken the denial before it, so the taken
+    // denial is what is left to read.
     let result = match result {
         Err(error)
             if peer_stop::stopped_with_peer(
@@ -642,7 +650,7 @@ pub fn capture_on<D: CaptureDevice>(
                 &mut held,
                 link.as_mut().map(|link| &mut link.control),
                 error.as_ref(),
-            ) =>
+            ) || (denied_taken && peer_stop::refused_by_reference_peer(error.as_ref())) =>
         {
             eprintln!(
                 "lamp-voice: capture: the speaker had gone at the voice's stop ({error}); capture ends stopped"
@@ -688,6 +696,8 @@ fn capture_loop<D: CaptureDevice>(
     channels: &mut WorkerChannels,
     // The reference link to the speaker, bound at ConnectReference.
     link: &mut Option<ReferenceChannels>,
+    // Set to whether each authority taken denies the microphone (#7224).
+    denied_taken: &mut bool,
     microphone: &mut MicrophoneOn<D>,
     worker: BootId,
     directory: &Path,
@@ -824,6 +834,7 @@ fn capture_loop<D: CaptureDevice>(
             match control {
                 Control::Authority { snapshot } => match microphone.install(snapshot) {
                     Ok(update) => {
+                        *denied_taken = snapshot.microphone_permission() == Permission::Denied;
                         if let Some(recording) = recording {
                             recording.observe_privacy(snapshot);
                         }
