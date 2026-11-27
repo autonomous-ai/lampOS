@@ -22,6 +22,7 @@
 //! faces and the voice's lines, on `room/presence` (#1677). With
 //! `LAMP_TURN_TO_ANSWERED=on`, [`answered`] picks the face seen asking as an
 //! answer begins, for the body to turn to while it lasts (#1810).
+pub mod active_speaker;
 pub mod activity;
 pub mod answered;
 pub mod away;

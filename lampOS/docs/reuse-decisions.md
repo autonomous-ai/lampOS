@@ -2398,3 +2398,30 @@ tests with a fake NPU, a fake Store and the service's own clock; the
 VIPLite struct's size; the ARM64 build; MoveNet converted and measured on
 the lamp by its own reference. Not yet proven: a run on the lamp's NPU
 through this service.
+
+## Speaking face: independent Light-ASD bench (#8848)
+
+Keep the current eyes' detector, tracker, detector-resolution mouth crop and mouth judge
+as the baseline: `faces::Detector`, `bus_out::Ids`, `mesh` and `speaking::Mouths`.
+The prior V1 tracking code in `hal/drivers/tracking/` supplies no active-speaker
+model to reuse; this is a separate component experiment, not a replacement of
+V1's control or callback ownership. No live privacy, admission or memory policy
+is changed. The simple-call base is pinned at `0dbbfc95bb`.
+Full-frame mouth cropping remains a separately labelled switch variant; it is
+not enabled for the current baseline.
+
+Reuse the [official Light-ASD model](https://github.com/Junhua-Liao/Light-ASD/tree/ed38c232de5efe0261dbd68627c0ade7cdfe14eb),
+including its trained classifier head, with verified ONNX conversion. Keep the
+existing `tract-onnx 0.23.8`, optional pinned ARM64 ONNX Runtime 1.30.0, and
+`rustfft 6.4.1`; the lock gains no new package. The Rust MFCC frontend is checked
+against the unchanged official loader's independent synthetic vectors. Model
+weights and raw public/real-person data stay local with hashes and provenance.
+
+Change only the bench's candidate input from visual mouth motion to synchronized
+audio and face windows. Bidirectional model context must be measured honestly:
+compare the newest result of trailing windows separately from full-track offline
+outputs. Two or more faces are required; missing data is an abstention. Model
+conversion parity and public accuracy do not prove desk-distance quality,
+live privacy/cancellation behavior or the lamp's latency. See the
+[candidate contract](speaking-face-light-asd.md); product integration waits for
+the independent sensor-quality result and the owner's no-merge/no-train hold.

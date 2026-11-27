@@ -8,6 +8,11 @@ The approved candidate switch is reserved for the later shadow implementation,
 not implemented by this reader. The team lead runs the lamp; the Reviewer owns
 the shared sessions and accuracy scorer in #8850.
 
+The subsequent [Light-ASD component candidate](speaking-face-light-asd.md) runs
+only in a separate offline bench on the pinned simple-call base. Its switch is
+off, and it changes no live sensor or voice behavior. The owner's evening scope
+limits speaking-face opportunities to two or more faces, last in rollout order.
+
 ## What exists and what this step reuses
 
 Reuse the exact `bus_out::MouthObservation` and `speaking::MouthDiagnostic`
