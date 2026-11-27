@@ -4306,6 +4306,38 @@ async fn the_armed_name_ask_reaches_the_greetings_request_and_its_answer() {
     crate::onboarding::learn_later::set_armed(false);
 }
 
+/// The memory owner's call on #8471 (27 Nov, 17:54): a held bystander line
+/// resets learn later's 60 s gap ("yes start over"). That is the walk's
+/// (`learn_later::Moment`), which hears the line's words from this route:
+/// a line the rule holds as not said to the lamp, armed or not, still gives
+/// them (`heard:`), and no chat is asked for it, so nothing of the ask is
+/// spent on it.
+#[tokio::test(start_paused = true)]
+async fn a_held_bystander_line_still_gives_the_walk_its_words() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Hi there.".to_owned())].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine.heeding(Arc::new(|_, _, _, _, _| Some("not said to the lamp")));
+    engine.submit(start(1));
+    engine.submit(ProviderInput::WalkUnderWay {
+        request: 1,
+        privacy_generation: 1,
+        on: false,
+        updating: None,
+        name_ask: true,
+    });
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(
+        turn(&mut engine).await,
+        ["started:1", "heard:Hi there.", "complete"]
+    );
+    assert!(script.asked.lock().unwrap().is_empty());
+    crate::onboarding::learn_later::set_armed(false);
+}
+
 /// #2510, `LAMP_MEMORY_REPLACES` (`Engine::noting_turn_tools`): each turn
 /// has one journal line, whether `remember` was among the functions its
 /// chat was given, how many calls of each function it made in any round,

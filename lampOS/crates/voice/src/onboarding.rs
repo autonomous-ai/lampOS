@@ -9296,6 +9296,39 @@ mod tests {
         assert_eq!(room.walk.kept().learn_later, learn_later::Kept::default());
     }
 
+    /// The memory owner's call on #8471 (27 Nov, 17:54): a bystander's line
+    /// held as not said to the lamp (`LAMP_SAID_TO_ME`) resets the 60 s gap,
+    /// "yes start over". The second route gives the walk every line's words
+    /// before it judges them, so a held line is heard here as any other: the
+    /// ask is armed only 60 s after the last one, never before. A sound with
+    /// no words resets nothing.
+    #[test]
+    fn a_held_bystander_line_starts_the_minute_over() {
+        let mut room = learning_later("learn-later-held");
+        assert!(armed(&mut room));
+        // A sound with no words: still armed.
+        room.walk.heard("...", room.at);
+        assert!(armed(&mut room), "no words, no reset");
+        // A bystander's line, held: the lamp says nothing back.
+        room.walk.heard("Control, are you there?", room.at);
+        assert!(!armed(&mut room));
+        room.wait(29 * S, Some(NEAR_MIDDLE));
+        assert!(!room.walk.name_ask());
+        // Another held line, 30 s in: the minute starts over from it.
+        room.walk.heard("Yeah, give me a second.", room.at);
+        room.wait(60 * S, Some(NEAR_MIDDLE));
+        assert!(
+            !room.walk.name_ask(),
+            "59.75 s after the last held line: not yet"
+        );
+        room.wait(S / 2, Some(NEAR_MIDDLE));
+        assert!(
+            room.walk.name_ask(),
+            "60 s after the last held line: a new conversation"
+        );
+        assert_eq!(room.walk.kept().learn_later, learn_later::Kept::default());
+    }
+
     /// Three asks left unanswered, on three days: never again. The model's
     /// decline of it (told by the mailbox), or "forget my face" at any time,
     /// stops it for good, kept in the file. No word of the line decides a
