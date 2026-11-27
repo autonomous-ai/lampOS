@@ -1103,6 +1103,7 @@ pub fn after_round_with(
         && shown.one_path
         && !allowlist_due
         && gateway != Gateway::NotWanted
+        && past_startup(root, run)
         && keep_run_entry(run, say) == Some(false)
         && let Some(mut said) = before.take()
     {
@@ -1332,17 +1333,15 @@ pub fn keep_gateway(
 /// steps run through the gateway), a wanted gateway is left to it, but an
 /// unwanted one is still stopped and kept disabled: the one-shot never
 /// starts one that isn't wanted (`steps`). A gateway started here with the
-/// one run path on (`one_path`) gets agent `main`'s allow-list entry tried
-/// once at once ([`run_entry_once`]), never waited for (Twelve's P2 on
-/// #8116): whether the entry is still owed (the gateway not ready yet) is
-/// returned (`Some(true)`; `Some(false)` taken, refused or not tried), or
-/// `None` when nothing was started or stopped.
+/// one run path on (`one_path`) owes agent `main`'s allow-list entry, never
+/// added in its startup ([`past_startup`]) and never waited for (Twelve's
+/// P2 on #8116): whether it is owed is returned (`Some(true)`;
+/// `Some(false)` not owed), or `None` when nothing was started or stopped.
 pub fn keep_between_rounds(
     root: &Path,
     systemd: &mut dyn Systemd,
     gateway: Gateway,
     one_path: bool,
-    run: &mut Runner,
     say: &mut dyn FnMut(&str),
 ) -> Option<bool> {
     let there = fs::symlink_metadata(on(root, WRAPPER)).is_ok()
@@ -1380,19 +1379,9 @@ pub fn keep_between_rounds(
         ));
     }
     keep_gateway(root, systemd, gateway, false, say);
-    if gateway != Gateway::Wanted || !one_path {
-        return Some(false);
-    }
-    match run_entry_once(run, say) {
-        Some(false) => {
-            say(&format!(
-                "agent {RUN_AGENT}'s allow-list entry not taken after the gateway started; the next round asks the one-shot"
-            ));
-            Some(false)
-        }
-        Some(true) => Some(false),
-        None => Some(true),
-    }
+    // No add now: a CLI joined to a gateway in its startup can stop it
+    // ([`past_startup`]). The entry is owed, tried at a later look.
+    Some(gateway == Gateway::Wanted && one_path)
 }
 
 /// Whether Harness's one-shot ([`harness_install::UNIT`]) is at work
@@ -2403,6 +2392,33 @@ const SETTLE_SLEEP: Duration = if cfg!(test) {
     SETTLE_EVERY
 };
 
+/// The time since the boot (`/proc/uptime` under `root`), as
+/// [`gateway_start`] counts it; none when it can't be read.
+fn uptime(root: &Path) -> Option<Duration> {
+    fs::read_to_string(on(root, crate::reset_hold::UPTIME))
+        .ok()
+        .and_then(|text| text.split_whitespace().next()?.parse::<f64>().ok())
+        .filter(|seconds| seconds.is_finite() && *seconds >= 0.0)
+        .map(Duration::from_secs_f64)
+}
+
+/// Whether the running gateway is past its startup, at one look, never
+/// waited for: listening on [`PORT`] and [`SETTLED_AFTER_START`] since
+/// systemd started it (its start or the uptime not read: by the listen
+/// alone), as [`settled`] judges it. An allow-list add before that joins a
+/// gateway still in its startup: on lamp-ee17 (27 Nov, 22:19) each add the
+/// keeper ran there met the gateway's own state maintenance, which then
+/// exited ("undergoing offline maintenance"), in lockstep until systemd's
+/// start limit.
+pub fn past_startup(root: &Path, run: &mut Runner) -> bool {
+    let listening = run(&["ss", "-Hltn", &format!("sport = :{PORT}")].map(str::to_owned))
+        .is_ok_and(|out| !out.trim().is_empty());
+    listening
+        && uptime(root)
+            .zip(gateway_start(run))
+            .is_none_or(|(uptime, start)| uptime.saturating_sub(start) >= SETTLED_AFTER_START)
+}
+
 /// #8324: before a restart of the gateway in Harness's one-shot (the
 /// install's in `steps`, the gateway block's in [`gateway_block`]), a
 /// running gateway still in its first start is waited for until it is past
@@ -2442,11 +2458,7 @@ fn settled(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str), retry: bool
     } else {
         ("restarted", "the restart")
     };
-    let uptime = fs::read_to_string(on(root, crate::reset_hold::UPTIME))
-        .ok()
-        .and_then(|text| text.split_whitespace().next()?.parse::<f64>().ok())
-        .filter(|seconds| seconds.is_finite() && *seconds >= 0.0)
-        .map(Duration::from_secs_f64);
+    let uptime = uptime(root);
     let sport = format!("sport = :{PORT}");
     let mut listen_seen: Option<Duration> = None;
     let mut quiet = false;
@@ -2574,17 +2586,7 @@ fn add_run_entry(run: &mut Runner, say: &mut dyn FnMut(&str), tries: u32) -> Opt
     }
     match ran {
         Ok(_) => Some(true),
-        // A look's one add that did not finish (lamp-ee17, 27 Nov: "Killed"
-        // 14 s into a 172 s cold start, the gateway it joined restarting
-        // under it; or past its bound) is not ready either: still owed, so
-        // the next look tries again, not the next round.
-        Err(why)
-            if tries <= 1
-                && (gateway_not_ready(&why)
-                    || lamp_checked_replace::check_did_not_finish(&why)) =>
-        {
-            None
-        }
+        Err(why) if tries <= 1 && gateway_not_ready(&why) => None,
         Err(why) if gateway_not_ready(&why) => {
             say(&format!(
                 "OpenClaw's gateway is not ready yet, so agent {RUN_AGENT}'s allow-list entry is not known: {why}; the next round checks again"

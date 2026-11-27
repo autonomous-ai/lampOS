@@ -19,8 +19,10 @@
 //! waited for a cold gateway to be ready would hold a stop of the other
 //! engine's behind it. So OpenClaw's agent `main` allow-list entry, owed
 //! once its gateway was started here with the one run path on, is tried
-//! once per look ([`openclaw_install::run_entry_once`]), remembered across
-//! looks while OpenClaw is still wanted, and forgotten once it is not.
+//! once per look ([`openclaw_install::run_entry_once`]) only once the
+//! gateway is past its startup ([`openclaw_install::past_startup`]), at
+//! most [`ADD_LOOKS`] looks per start, remembered across looks while
+//! OpenClaw is still wanted, and forgotten once it is not.
 //!
 //! An engine whose switch is off is not looked at: Hermes's gateway is
 //! then taken out by the round (`hermes_gateway::after_round_off`), and
@@ -44,6 +46,11 @@ pub struct Kept {
     pub hermes: bool,
 }
 
+/// The most looks that run the owed entry's add per gateway start: past
+/// them the entry is left to the next round's one-shot, so an add never
+/// loops against a gateway.
+pub const ADD_LOOKS: u32 = 3;
+
 /// The keeper's state across looks.
 #[derive(Debug, Default)]
 pub struct Keeper {
@@ -51,6 +58,8 @@ pub struct Keeper {
     /// OpenClaw's agent `main` entry owed: its gateway started here with the
     /// one run path on, and the add not known yet (the gateway not ready).
     entry_owed: bool,
+    /// The owed entry's adds run since its gateway started ([`ADD_LOOKS`]).
+    entry_tries: u32,
     /// The owed entry's wait said once.
     entry_said: bool,
     /// A start held behind the other gateway, said once.
@@ -91,14 +100,7 @@ impl Keeper {
             .then(|| hermes_gateway::gateway_wanted(said));
         // What is not wanted first: disabled and stopped.
         if openclaw == Some(Gateway::NotWanted) {
-            openclaw_install::keep_between_rounds(
-                root,
-                systemd,
-                Gateway::NotWanted,
-                one_path,
-                run,
-                say,
-            );
+            openclaw_install::keep_between_rounds(root, systemd, Gateway::NotWanted, one_path, say);
         }
         if hermes == Some(Gateway::NotWanted) {
             hermes_gateway::keep_between_rounds(root, systemd, Gateway::NotWanted, say);
@@ -122,16 +124,29 @@ impl Keeper {
                 systemd,
                 Gateway::Wanted,
                 one_path,
-                run,
                 say,
             ) {
-                Some(owed) => self.entry_owed = owed,
-                None if self.entry_owed && !openclaw_install::one_shot_at_work(systemd) => {
+                Some(owed) => {
+                    self.entry_owed = owed;
+                    self.entry_tries = 0;
+                }
+                None if self.entry_owed
+                    && !openclaw_install::one_shot_at_work(systemd)
+                    && openclaw_install::past_startup(root, run) =>
+                {
+                    self.entry_tries += 1;
                     match openclaw_install::run_entry_once(run, say) {
                         Some(true) => self.entry_owed = false,
                         Some(false) => {
                             say(&format!(
                                 "agent {}'s allow-list entry not taken once OpenClaw's gateway was ready; the next round asks the one-shot",
+                                openclaw_install::RUN_AGENT
+                            ));
+                            self.entry_owed = false;
+                        }
+                        None if self.entry_tries >= ADD_LOOKS => {
+                            say(&format!(
+                                "agent {}'s allow-list entry not taken in {ADD_LOOKS} looks past OpenClaw's gateway startup; the next round asks the one-shot",
                                 openclaw_install::RUN_AGENT
                             ));
                             self.entry_owed = false;
