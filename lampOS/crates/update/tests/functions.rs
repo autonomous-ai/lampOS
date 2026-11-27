@@ -73,20 +73,21 @@ const SERVICES: &str = "services";
 /// the product, #5750, and Harness's `harness_status` since
 /// `LAMP_TASKS_HARNESS_STATUS` is on in the product, #6061, and the asked
 /// sleep's `go_to_sleep` since `LAMP_SLEEP_ASKED` is on in the product,
-/// #6853), the
+/// #6853, and learn later's `not_telling_their_name` since
+/// `LAMP_FACE_LEARN_LATER` is on in the product, #7876), the
 /// actions part's 17 and the skills' 1: `use_skill`, which reaches every
 /// skill's function (`LAMP_USE_SKILL=on` since #2826; Dance's `dance`,
 /// Pose's `set_pose` and the wellbeing skills' `[stop]`, `wellbeing_nudges`,
 /// were 3 before it; the FAQ's `lamp_help` since #5790, Light show's
 /// `light_show` since #5745, Light scenes' `light_scene` and Point the
-/// light's `point_light` since #5744): 52, and 56 with the route's 4 (the
+/// light's `point_light` since #5744): 53, and 57 with the route's 4 (the
 /// search, its fetch, the weather and the look), within the bound of 64;
 /// 52 was past the bound of 48 it had until #7433, which left out the
 /// fetch, the time elsewhere, `reports_state` and the weather on every lamp. However many skills
 /// are installed, the skills' stay 1. The test prints this split. A change
 /// to it is a change to what every session is told: say in its pull
 /// request what is left out past the bound, if anything.
-const PRODUCT_FUNCTIONS: usize = 52;
+const PRODUCT_FUNCTIONS: usize = 53;
 
 /// The lamp's own with `LAMP_HARD_ASKS_TO_AGENT` on (off in the product, a
 /// lamp's drop-in): [`PRODUCT_FUNCTIONS`] and the lamp's agent's

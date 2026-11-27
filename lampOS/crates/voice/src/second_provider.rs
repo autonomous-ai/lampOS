@@ -9217,8 +9217,16 @@ impl Engine {
             }
             // The walk under way or not (#5931): this process's own, read
             // as the model's words are said ([`crate::onboarding::model_words`]).
-            ProviderInput::WalkUnderWay { on, updating, .. } => {
+            ProviderInput::WalkUnderWay {
+                on,
+                updating,
+                name_ask,
+                ..
+            } => {
                 crate::onboarding::set_under_way(on);
+                // The walk's ask armed for this line (#7876, #8471): its
+                // reply asks the name if it is a greeting.
+                crate::onboarding::learn_later::set_armed(name_ask);
                 // The first update's waiting line (#6284): this process's own.
                 crate::onboarding::set_updating(updating);
             }
@@ -9392,17 +9400,6 @@ impl Engine {
                     );
                     // Its exchange never reaches the memory's journal either.
                     crate::remember::keep_out(request);
-                    None
-                } else if crate::onboarding::learn_later::is_ask(&text) {
-                    // The walk's "What should I call you?" (#7876): its own
-                    // line, said with no chat; no one's memory is read for
-                    // it, and its exchange is kept out of memory.
-                    eprintln!(
-                        "lamp-voice second: request {request} is the walk's ask for a name: nothing read from memory, nothing kept (LAMP_FACE_LEARN_LATER)"
-                    );
-                    crate::remember::keep_out(request);
-                    // The next line is its answer, judged by the model.
-                    crate::onboarding::learn_later::asked_now();
                     None
                 } else if let Some(scope) = look_turn
                     .as_ref()
@@ -19618,6 +19615,13 @@ async fn answer(
     if heard && let Ok(mut thread) = crate::thread::THREAD.lock() {
         thread.line_of(request, &said);
     }
+    // What the line is to the walk's name ask (`LAMP_FACE_LEARN_LATER`,
+    // #7876, #8471): the armed greeting's reply asks it, the next line is
+    // its answer, a later one is told nothing was kept. Judged once per
+    // request, before any early end, so a line between counts.
+    // The ask counts, and its answer's window runs, only once its reply
+    // is heard ([`crate::onboarding::learn_later::sounded`]).
+    let learn_note = crate::onboarding::learn_later::turn(request, heard, &said).note();
     // A line the person said with words, answered: they went on from any
     // make whose turn was cut before it (`worker::made_running`).
     if heard && said.chars().any(char::is_alphanumeric) {
@@ -20030,6 +20034,7 @@ async fn answer(
                 && skill_named.is_none()
                 // Begun without the app's photo, which round 1 now carries.
                 && !attached
+                && learn_note.is_none()
         })
         .map(|prepared| (prepared, said.clone()));
     // Only a note for the model, no one's words (a wordless cut's ask to go
@@ -20167,10 +20172,11 @@ async fn answer(
         // section for it is cut unless that line only greeted
         // (reviewer-two's P2 on #3059).
         let mut notes = notes;
-        // The line after the walk's "What should I call you?" (#7876): the
-        // model judges whether it is a name or a decline.
-        if heard && crate::onboarding::learn_later::answering() {
-            notes.push(crate::onboarding::learn_later::ANSWER_NOTE.to_owned());
+        // The walk's name ask (#7876, #8471): asked in the greeting's own
+        // reply, its answer judged by the model, or the model told nothing
+        // was kept ([`crate::onboarding::learn_later::Turn::note`]).
+        if let Some(note) = learn_note {
+            notes.push(note.to_owned());
         }
         if heard && let Some(line) = event_line(shared, request, &event_words, scope.as_ref()).await
         {
@@ -24968,6 +24974,10 @@ async fn answer(
                         if let Ok(mut last) = shared.answered_request.lock() {
                             *last = Some(request);
                         }
+                        // The walk's name ask, if this reply carries it, is
+                        // heard now: counted, its answer's window begun
+                        // (El's P2 on #8471).
+                        crate::onboarding::learn_later::sounded(request);
                         // The air's note, if this request was given it, is
                         // spent now its answer is heard.
                         if let Some((_, heard)) = &shared.air {

@@ -87,6 +87,21 @@ pub(crate) enum NoAsk {
     Quiet,
 }
 
+/// The [`NoAsk`] for a name given while nobody is known: off without
+/// `LAMP_FACE_NO_ASK` (`face_no_ask`); with it, the face save at once where
+/// the memory route's face save is speaker-bound (`remember_speaker`, its
+/// [`crate::known_faces::FaceSwitches`], #7876: a worker's environment never
+/// holds `LAMP_REMEMBER_SPEAKER`), nothing kept and nothing asked elsewhere.
+pub(crate) fn no_ask(face_no_ask: bool, remember_speaker: bool) -> NoAsk {
+    if !face_no_ask {
+        NoAsk::Off
+    } else if remember_speaker {
+        NoAsk::Save
+    } else {
+        NoAsk::Quiet
+    }
+}
+
 /// [`withheld`], with `no_ask` (`LAMP_FACE_NO_ASK`): nothing asked
 /// ([`face_save_note`]).
 pub(crate) fn withheld_as(
@@ -254,7 +269,7 @@ mod tests {
             super::super::tests::memory("needs-face-again", 1, |_| json!({"ok":true,"id":1}));
         let deadline = std::time::Duration::from_secs(2);
         assert_eq!(
-            super::super::run_for(&socket, &call, deadline, Some(MINH)),
+            super::super::run_for(&socket, &call, deadline, Some(MINH), false),
             (
                 super::super::tests::theirs(json!({"remembered":true})),
                 true
@@ -416,5 +431,41 @@ mod tests {
             (proposals(), 0)
         );
         assert_eq!(kept_proposals(proposals(), None, false), (proposals(), 0));
+    }
+
+    /// #7876: in a provider or second-route worker the speaker-bound face
+    /// save arrives as `--remember-speaker` through `tools::take`, never as
+    /// `LAMP_REMEMBER_SPEAKER` (the worker's environment is cleared, the
+    /// switch census's `remember_speaker_arguments_survive_both_workers_
+    /// cleared_environments`). With `LAMP_FACE_NO_ASK` on, the needs-face
+    /// choice for a name given while nobody is known is the face save at
+    /// once (`NoAsk::Save`), read from the memory route's switches, never
+    /// `Quiet` for want of an environment variable the worker never has.
+    #[test]
+    fn a_worker_s_remember_speaker_flag_makes_the_needs_face_choice_save() {
+        let flags: Vec<String> = [
+            super::super::FLAG,
+            "/tmp/memory.sock",
+            "--who-socket",
+            "/tmp/eyes.sock",
+            crate::known_faces::NAMES_FLAG,
+            crate::remember_speaker::FLAG,
+        ]
+        .map(str::to_owned)
+        .into();
+        let (settings, rest) = crate::tools::take(&flags).unwrap();
+        assert!(rest.is_empty(), "{rest:?}");
+        assert!(settings.remember_speaker);
+        // The worker's environment, as the coordinator builds it.
+        assert!(std::env::var_os(crate::remember_speaker::ENVIRONMENT).is_none());
+        let crate::tools::Route::Memory(_, Some((_, switches)), ..) =
+            crate::tools::route(&settings, super::super::REMEMBER)
+        else {
+            panic!("remember is the memory's, with the eyes' switches");
+        };
+        // `LAMP_FACE_NO_ASK=on`, as the boolean the choice takes.
+        assert_eq!(no_ask(true, switches.remember_speaker), NoAsk::Save);
+        assert_eq!(no_ask(true, false), NoAsk::Quiet);
+        assert_eq!(no_ask(false, switches.remember_speaker), NoAsk::Off);
     }
 }

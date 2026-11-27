@@ -7063,7 +7063,22 @@ after a take-over, but now for every turn:
   way) loses the mark at the next refresh, so a later face saved under that
   name is never taken for the owner (the eyes' ids can't tell the two apart:
   a forgotten name gets the same id back); a whole redo or a reset drops it
-  too. A rename of the owner's own face is no forget: a `remember_my_face`
+  too. Eyes that answer they know nobody (an empty print store) drop
+  nothing: the owner is not named while they know nobody, but the mark
+  stays in the walk's file, through a restart too (#8471's lamp run, the
+  first builder's call of 24 Nov, a deliberate narrowing of #4290 to a list
+  the owner is not in). From then until the owner's face is seen again, the
+  walk's file keeps `owner_face_unseen` (posted once as `{"owner_face":
+  {"owner": …, "unseen": true}}`, and held in the voice's memory for that
+  owner until their face is seen again, so a refresh before the walk takes
+  its mailbox drops nothing), and a list without the owner, as after learn later's
+  first save of someone else, is not the owner gone either (the first
+  builder's 17:50 call, 06c1 at `c374700486`). A face kept under the
+  owner's own name is the owner again (named by default as before) and
+  clears it (`"unseen": false`); from then a list without them ends the
+  mark as #4290 has it. A redo, a reset, a new owner or the owner dropped
+  clears the walk's file mark; the voice's memory holds it only for the
+  owner it was posted for, so the next owner is as #4290 has it. A rename of the owner's own face is no forget: a `remember_my_face`
   with `replace` while an owner is kept (`known_faces::OwnerRename`) is
   counted in flight before the eyes are asked, and the owner moves to B
   only when the eyes answer that they kept the face under B and that the

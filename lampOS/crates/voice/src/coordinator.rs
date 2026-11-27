@@ -11676,6 +11676,9 @@ fn conversation_with_gate_inner(
                         snapshot.microphone_generation(),
                         onboarding.is_some(),
                         give_way.active_line(),
+                        onboarding
+                            .as_ref()
+                            .is_some_and(crate::onboarding::Onboarding::name_ask),
                     );
                     // A line begun in a computer's turn is a call, as a tap
                     // is: told to the worker's rule right after its Start.
@@ -11936,6 +11939,9 @@ fn conversation_with_gate_inner(
                                     snapshot.microphone_generation(),
                                     onboarding.is_some(),
                                     give_way.active_line(),
+                                    onboarding
+                                        .as_ref()
+                                        .is_some_and(crate::onboarding::Onboarding::name_ask),
                                 );
                                 if took_over {
                                     took_over_turn =
@@ -18536,6 +18542,7 @@ fn tell_walk(
     privacy_generation: u64,
     walk: bool,
     give_way: Option<String>,
+    name_ask: bool,
 ) {
     // A lamp with no walk at all (no onboarding) has nothing to tell, but
     // the owner's Update now's moment (#7517), told the same way.
@@ -18550,7 +18557,9 @@ fn tell_walk(
     // turn while it holds, and once as it ends.
     let on = crate::onboarding::under_way_now();
     let updating = crate::onboarding::updating_line().or(give_way);
-    let now = (current.owner.turn(), on || updating.is_some());
+    // The walk's name ask armed (#7876, #8471) is told as the walk is too:
+    // with each line while it is, and once as it goes.
+    let now = (current.owner.turn(), on || updating.is_some() || name_ask);
     if walk_to_tell(*told, now) {
         *told = Some(now);
         queue.push_back(ProviderInput::WalkUnderWay {
@@ -18558,6 +18567,7 @@ fn tell_walk(
             privacy_generation,
             on,
             updating,
+            name_ask,
         });
     }
 }

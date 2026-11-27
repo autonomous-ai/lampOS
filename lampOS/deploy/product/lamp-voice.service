@@ -333,6 +333,12 @@ Environment=LAMP_FACE_SAVE_KNOWN_ONLY=on
 # LAMP_FACE_QUESTION_NOT_ASK: "Do you remember my face?" is answered, not a face save, and a face already known by
 # the name asked for is told so (lamp-74ff, 19 Nov); its row in docs/switches.md.
 Environment=LAMP_FACE_QUESTION_NOT_ASK=on
+# LAMP_FACE_NO_ASK, LAMP_REMEMBER_SPEAKER and LAMP_FACE_LEARN_LATER go on together (#7876): a face is kept with
+# nothing asked only when the eyes see it saying its own name, and a lamp that knows nobody asks a greeting face's
+# name once; lamp-eyes sets the first two too. Their why and rules are their rows in docs/switches.md.
+Environment=LAMP_FACE_NO_ASK=on
+Environment=LAMP_REMEMBER_SPEAKER=on
+Environment=LAMP_FACE_LEARN_LATER=on
 Environment=LAMP_STAFF_NOTE=on
 Environment=LAMP_TASK_NEWS_AT_PAUSE=on
 Environment=LAMP_MEMORY_RULES=on

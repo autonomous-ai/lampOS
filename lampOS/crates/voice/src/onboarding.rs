@@ -527,6 +527,13 @@ pub struct Progress {
     /// An older voice ignores it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub owner: Option<String>,
+    /// The eyes knew nobody since [`Self::owner`] was kept (the prints
+    /// lost, #8471, the first builder's 17:50 call): until the owner's face
+    /// is seen again (`known_faces::refresh_owner`), a list without them is
+    /// not the owner gone. Gone with the owner and with a redo or a reset.
+    /// An older voice ignores it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub owner_face_unseen: bool,
     /// Giving-way invitations committed this setup/redo, before each is
     /// published (#1800): at most two, so a rebuilt walk cannot ask again.
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -1228,9 +1235,13 @@ pub struct Onboarding {
     face_no_ask: bool,
     /// [`Self::face_no_ask`] with `LAMP_FACE_LEARN_LATER` and
     /// `LAMP_REMEMBER_SPEAKER` on ([`learn_later::switched`], #7876): with
-    /// the eyes knowing nobody, "What should I call you?" once after a
-    /// conversation's greeting.
+    /// the eyes knowing nobody, "What should I call you?" once, in the reply
+    /// to a conversation's greeting.
     learn_later: bool,
+    /// [`Self::learn_later`]'s ask armed at the last tick
+    /// ([`Self::name_ask`]): told the second route's worker with a line's
+    /// Start, whose reply asks the name if the line is a greeting.
+    name_ask: bool,
     /// How many people the eyes know, read by its own thread, only with
     /// [`Self::learn_later`] ([`learn_later::start`]).
     learn_known: Option<learn_later::Known>,
@@ -1776,6 +1787,7 @@ impl Onboarding {
             face_kept: false,
             face_no_ask: false,
             learn_later: false,
+            name_ask: false,
             learn_known: None,
             moment: learn_later::Moment::default(),
             released: true,
@@ -3369,12 +3381,9 @@ impl Onboarding {
         match self.looked {
             Some((at, face)) if now_us.saturating_sub(at) < READ_EVERY_US / 2 => face,
             _ => {
-                let (face, faces, speaking) = self.look();
+                let (face, faces) = self.look();
                 self.looked = Some((now_us, face));
                 self.faces_in_view = faces;
-                if self.learn_later {
-                    self.moment.saw(now_us, faces, speaking);
-                }
                 face
             }
         }
@@ -3441,37 +3450,31 @@ impl Onboarding {
         head && released
     }
 
-    /// The near face on the eyes' topic now, how many faces they see (none
-    /// read fresh: `None`), and whether one reads speaking.
-    fn look(&self) -> (Option<Framing>, Option<usize>, bool) {
+    /// The near face on the eyes' topic now, and how many faces they see
+    /// (none read fresh: `None`).
+    fn look(&self) -> (Option<Framing>, Option<usize>) {
         let Some(message) = self
             .eyes
             .as_ref()
             .and_then(|eyes| eyes.latest(lamp_msgs::Faces::TOPIC).ok().flatten())
         else {
-            return (None, None, false);
+            return (None, None);
         };
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |since| since.as_millis() as u64);
         if message.expired || now_ms.saturating_sub(message.header.at_unix_ms) > FRESH_MS {
-            return (None, None, false);
+            return (None, None);
         }
         let Ok(faces) = message.parse::<lamp_msgs::Faces>() else {
-            return (None, None, false);
+            return (None, None);
         };
         let count = faces
             .faces
             .iter()
             .filter(|face| face.check().is_ok())
             .count();
-        let speaking = faces.faces.iter().any(|face| {
-            face.check().is_ok()
-                && face
-                    .speaking
-                    .is_some_and(|speaking| speaking.state == lamp_msgs::SpeakingState::Yes)
-        });
-        (nearest(&faces), Some(count), speaking)
+        (nearest(&faces), Some(count))
     }
 
     /// A line the person finished saying: with the nudge on, an answer to
@@ -3683,6 +3686,7 @@ impl Onboarding {
         still: bool,
     ) -> Option<String> {
         self.opener_said = false;
+        self.name_ask = self.learn_later_armed(now_us, face, paused);
         self.poll_storage(now_us);
         self.look_for_receipt_eyes();
         // Read every tick, so what came before the ask is never taken. One
@@ -3773,9 +3777,7 @@ impl Onboarding {
                 self.records
                     .push(json!({"kind":"onboarding_finished","at_us":now_us}));
             }
-            return self
-                .ask_face_again(now_us, quiet_us, can_speak, face)
-                .or_else(|| self.ask_learn_later(now_us, can_speak, face));
+            return self.ask_face_again(now_us, quiet_us, can_speak, face);
         };
         // The walk begins with its first step asked, or a redo's (#5979): its
         // id, kept till a redo of the whole walk. Not by a re-offer after it.
@@ -3800,6 +3802,7 @@ impl Onboarding {
             self.face_saved_unasked = false;
             if let Some(name) = self.face_saved_name.take() {
                 self.desired.owner = Some(name);
+                self.desired.owner_face_unseen = false;
             }
             self.records
                 .push(json!({"kind":"onboarding_face_saved","step":step.name(),
@@ -4799,9 +4802,23 @@ impl Onboarding {
         }
     }
 
-    /// The model's judgment of the ask's answer, from the mailbox: answered
-    /// gives the ask back; declined stops it for good.
-    fn learn_later_told(&mut self, told: &str) {
+    /// The second route's word, from the mailbox: asked (the greeting's
+    /// reply asked the name, counted in the bounds); answered gives the ask
+    /// back; declined stops it for good.
+    fn learn_later_told(&mut self, told: &str, now_us: u64) {
+        if told == "asked" {
+            let now_s = (self.unix_clock)() / 1_000;
+            self.name_ask = false;
+            self.desired.learn_later.asked(now_s);
+            self.save();
+            self.records
+                .push(json!({"kind":"onboarding_learn_later","asked":true,
+                    "unanswered":self.desired.learn_later.unanswered,"at_us":now_us}));
+            eprintln!(
+                "lamp-voice: onboarding: the eyes know nobody: \"What should I call you?\" asked in the greeting's reply (LAMP_FACE_LEARN_LATER)"
+            );
+            return;
+        }
         if self.desired.learn_later.asked_at_unix_s.is_none() {
             return;
         }
@@ -4827,49 +4844,40 @@ impl Onboarding {
         self.save();
     }
 
-    /// "What should I call you?" once (`LAMP_FACE_LEARN_LATER`, #7876),
-    /// the walk over and nothing of it led: the eyes know nobody, one face
-    /// in view, seen saying the conversation's first line, a greeting only,
-    /// the lamp's answer to it over a moment ago, and the bounds kept in the
-    /// file ([`learn_later::Kept::may_ask`]). English only, as the walk's
-    /// name reading is. Its own line: no chat, so nothing is read from
-    /// memory for it, and the second route keeps it out of memory
-    /// ([`learn_later::is_ask`]).
-    fn ask_learn_later(
-        &mut self,
-        now_us: u64,
-        can_speak: bool,
-        face: Option<Framing>,
-    ) -> Option<String> {
+    /// Whether a line begun at `now_us` may be asked its name in its own
+    /// reply (`LAMP_FACE_LEARN_LATER`, #7876), if the second route reads it
+    /// a greeting only ([`learn_later::turn`]): the walk over and nothing of
+    /// it led, the eyes know nobody, one face in view, the line opens a
+    /// conversation ([`learn_later::Moment::opens`]), and the bounds kept in
+    /// the file ([`learn_later::Kept::may_ask`]). English only, as the
+    /// walk's name reading is. Armed before the line, so its reply waits on
+    /// nothing; the speaker-bound route still proves who said the name.
+    fn learn_later_armed(&self, now_us: u64, face: Option<Framing>, paused: bool) -> bool {
         let knows_nobody = || {
             self.learn_known
                 .as_ref()
                 .and_then(|known| known.lock().ok().and_then(|known| *known))
                 == Some(0)
         };
-        let now_s = (self.unix_clock)() / 1_000;
-        let due = self.learn_later
-            && can_speak
+        self.learn_later
+            && !paused
             && self.led.is_none()
             && self.language.is_none()
             && face.is_some()
             && self.faces_in_view == Some(1)
-            && self.moment.is_now(now_us)
-            && self.desired.learn_later.may_ask(now_s)
-            && knows_nobody();
-        if !due {
-            return None;
-        }
-        self.moment.asked(now_us);
-        self.desired.learn_later.asked(now_s);
-        self.save();
-        self.records
-            .push(json!({"kind":"onboarding_learn_later","asked":true,
-                "unanswered":self.desired.learn_later.unanswered,"at_us":now_us}));
-        eprintln!(
-            "lamp-voice: onboarding: the eyes know nobody: \"What should I call you?\" asked after the greeting (LAMP_FACE_LEARN_LATER)"
-        );
-        Some(learn_later::ASK.to_owned())
+            && self.moment.opens(now_us)
+            && self
+                .desired
+                .learn_later
+                .may_ask((self.unix_clock)() / 1_000)
+            && knows_nobody()
+            && self.next_step().is_none()
+    }
+
+    /// [`Self::learn_later_armed`] at the last tick, for the coordinator to
+    /// tell the second route's worker with a line's Start.
+    pub fn name_ask(&self) -> bool {
+        self.name_ask
     }
 
     /// The face asked for once more ([`Progress::face_again`]), once the
@@ -5104,6 +5112,24 @@ impl Onboarding {
                 }
                 continue;
             }
+            // The owner's face unknown since the prints went, or seen
+            // again ([`owner_face`]): only while that owner is kept.
+            if let Some(face) = told.get("owner_face") {
+                let unseen = face.get("unseen").and_then(Value::as_bool);
+                let whose = face.get("owner").and_then(Value::as_str);
+                if let (Some(unseen), Some(whose)) = (unseen, whose)
+                    && self
+                        .desired
+                        .owner
+                        .as_ref()
+                        .is_some_and(|owner| same_owner(owner, whose))
+                    && self.desired.owner_face_unseen != unseen
+                {
+                    self.desired.owner_face_unseen = unseen;
+                    self.save();
+                }
+                continue;
+            }
             if told.get("face_forgotten").and_then(Value::as_bool) == Some(true) {
                 if let Some(gone) = told.get("owner").and_then(Value::as_str)
                     && !self
@@ -5116,6 +5142,7 @@ impl Onboarding {
                 }
                 self.face_saved_unasked = false;
                 self.face_saved_name = None;
+                self.desired.owner_face_unseen = false;
                 if self.desired.owner.take().is_some() {
                     self.save();
                 }
@@ -5139,6 +5166,7 @@ impl Onboarding {
                         .is_some_and(|owner| same_owner(owner, from))
                 {
                     self.desired.owner = Some(to.to_owned());
+                    self.desired.owner_face_unseen = false;
                     self.save();
                 }
                 continue;
@@ -5155,6 +5183,7 @@ impl Onboarding {
                     && self.desired.owner.is_none()
                 {
                     self.desired.owner = Some(name.to_owned());
+                    self.desired.owner_face_unseen = false;
                     self.save();
                     eprintln!(
                         "lamp-voice: onboarding: the owner's face linked to the typed name, kept as the owner"
@@ -5196,7 +5225,7 @@ impl Onboarding {
             // The model's judgment of "What should I call you?"'s answer
             // (`LAMP_FACE_LEARN_LATER`, #7876).
             if let Some(learn) = told.get("learn_later").and_then(Value::as_str) {
-                self.learn_later_told(learn);
+                self.learn_later_told(learn, now_us);
                 continue;
             }
             if let Some(step) = told
@@ -5320,6 +5349,7 @@ impl Onboarding {
                         });
                         if same {
                             self.desired.owner = saved_name.clone();
+                            self.desired.owner_face_unseen = false;
                         }
                         eprintln!(
                             "lamp-voice: onboarding: who_you_are: the face asked for once more was saved: {}",
@@ -5334,6 +5364,7 @@ impl Onboarding {
                         && saved_name.is_some()
                     {
                         self.desired.owner = saved_name.clone();
+                        self.desired.owner_face_unseen = false;
                     }
                 }
                 if step == Step::Privacy {
@@ -6709,6 +6740,27 @@ pub fn owner_gone(file: &Path, owner: &str) {
     if let Err(error) = post(file, &json!({"face_forgotten": true, "owner": owner})) {
         eprintln!("lamp-voice: onboarding: a face forgotten, not noted: {error}");
     }
+}
+
+/// The owner `owner`'s face unknown to the eyes since they knew nobody
+/// (`unseen`), or seen again (`known_faces::refresh_owner`, #8471): kept in
+/// the walk's file ([`Progress::owner_face_unseen`]) while that owner is.
+pub fn owner_face(file: &Path, owner: &str, unseen: bool) {
+    if let Err(error) = post(
+        file,
+        &json!({"owner_face": {"owner": owner, "unseen": unseen}}),
+    ) {
+        eprintln!("lamp-voice: onboarding: the owner's face unseen or seen, not noted: {error}");
+    }
+}
+
+/// Whether the walk's file at `file` keeps the owner's face unknown since
+/// the prints went ([`Progress::owner_face_unseen`]).
+pub fn owner_face_unseen(file: &Path) -> bool {
+    std::fs::read(file)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Progress>(&bytes).ok())
+        .is_some_and(|progress| progress.owner.is_some() && progress.owner_face_unseen)
 }
 
 /// The owner's face renamed by the person, from name `from` to name `to`
@@ -9168,34 +9220,39 @@ mod tests {
         room
     }
 
-    /// A new conversation's first line, a face read `speaking` as it is
-    /// said, the lamp's answer a second on; the notes of the next 4 s.
-    fn greeted(room: &mut Room, line: &str, speaking: bool) -> Vec<String> {
-        room.walk
-            .moment
-            .saw(room.at, room.walk.faces_in_view, speaking);
+    /// Whether the walk arms the ask for a line begun now, a tick on.
+    fn armed(room: &mut Room) -> bool {
+        room.wait(S, Some(NEAR_MIDDLE));
+        room.walk.name_ask()
+    }
+
+    /// The conversation's greeting heard and answered, as the second route
+    /// asks in that reply: the walk told so by its mailbox. The walk's own
+    /// notes of the next 4 s, none: the ask is never a line after it.
+    fn greeted(room: &mut Room, line: &str) -> Vec<String> {
         room.walk.heard(line, room.at);
+        post(&room.walk.file, &json!({"learn_later": "asked"})).unwrap();
         room.at += S;
         room.walk.lamp_said(room.at);
         room.wait(4 * S, Some(NEAR_MIDDLE))
     }
 
-    /// `LAMP_FACE_LEARN_LATER` (#7876): with the eyes knowing nobody, one
-    /// face in view seen saying a greeting, the lamp asks "What should I
-    /// call you?" once, as its own line, after its answer to the greeting;
-    /// not again in that conversation, nor again that day. The answer gives
-    /// the ask back; the save and its line are the speaker-bound route's
-    /// (`remember_speaker`'s tests).
+    /// `LAMP_FACE_LEARN_LATER` (#7876): with the eyes knowing nobody and
+    /// one face in view, the walk arms the ask for a line that opens a
+    /// conversation; the reply to that greeting asks (the second route's
+    /// `learn_later::turn`), and the walk says nothing after it (rule 8,
+    /// #8471). Counted when told, not again that day. The answer gives the
+    /// ask back; the save and its line are the speaker-bound route's.
     #[test]
     fn with_nobody_known_one_face_greeting_is_asked_its_name_once() {
         let mut room = learning_later("learn-later-asked");
-        assert_eq!(greeted(&mut room, "Hi lamp.", true), [learn_later::ASK]);
+        assert!(armed(&mut room));
+        assert_eq!(greeted(&mut room, "Hi lamp."), NONE);
+        assert!(!room.walk.name_ask());
         assert_eq!(room.walk.kept().learn_later.unanswered, 1);
         assert!(room.walk.kept().learn_later.asked_at_unix_s.is_some());
-        // Not twice in the conversation.
-        assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), NONE);
-        // A line alone decides nothing; the model's `remember_my_face` on
-        // it is the answer, told by the mailbox, and gives the ask back.
+        // Not again in the conversation, nor after it that day.
+        assert!(!armed(&mut room));
         room.walk.heard("Walter.", room.at);
         room.wait(S, Some(NEAR_MIDDLE));
         assert_eq!(room.walk.kept().learn_later.unanswered, 1);
@@ -9203,60 +9260,73 @@ mod tests {
         room.wait(S, Some(NEAR_MIDDLE));
         assert_eq!(room.walk.kept().learn_later.unanswered, 0);
         assert!(!room.walk.kept().learn_later.stopped);
-        // Asked today: a new conversation that day is not asked.
         room.wait(61 * S, Some(NEAR_MIDDLE));
-        assert_eq!(greeted(&mut room, "Hello.", true), NONE);
-        // A day on, asked again (the eyes still know nobody).
-        room.wait(61 * S, Some(NEAR_MIDDLE));
+        assert!(!armed(&mut room));
+        // A day on, armed again (the eyes still know nobody).
         room.walk.desired.learn_later.asked_at_unix_s =
             Some(unix_ms() / 1_000 - learn_later::DAY_S);
-        assert_eq!(greeted(&mut room, "Hello.", true), [learn_later::ASK]);
+        assert!(armed(&mut room));
         // Someone known now: never.
-        room.wait(61 * S, Some(NEAR_MIDDLE));
-        room.walk.desired.learn_later = learn_later::Kept::default();
         room.walk.learn_known = Some(Arc::new(std::sync::Mutex::new(Some(1))));
-        assert_eq!(greeted(&mut room, "Hello.", true), NONE);
+        assert!(!armed(&mut room));
         // The eyes not answering yet: no.
-        room.wait(61 * S, Some(NEAR_MIDDLE));
         room.walk.learn_known = Some(Arc::new(std::sync::Mutex::new(None)));
-        assert_eq!(greeted(&mut room, "Hello.", true), NONE);
+        assert!(!armed(&mut room));
     }
 
-    /// Never with a second face in view, at the ask or since the
-    /// conversation began; never with no face seen saying the greeting;
-    /// never on a first line that is a task, nor mid-conversation.
+    /// Never with a second face in view or none, never mid-conversation,
+    /// never paused.
     #[test]
     fn learn_later_is_never_asked_with_two_faces_unseen_or_mid_task() {
         let mut room = learning_later("learn-later-never");
-        // Two faces at the ask.
         room.walk.faces_in_view = Some(2);
-        assert_eq!(greeted(&mut room, "Hi lamp.", true), NONE);
-        // A second face since the greeting, one again at the ask.
-        room.wait(61 * S, Some(NEAR_MIDDLE));
+        assert!(!armed(&mut room));
         room.walk.faces_in_view = Some(1);
-        room.walk.heard("Hi lamp.", room.at);
-        room.walk.moment.saw(room.at, Some(2), true);
-        room.at += S;
+        assert!(armed(&mut room));
+        room.wait(S, None);
+        assert!(!room.walk.name_ask(), "no face in view");
+        // Mid-conversation: a line heard, then the lamp's answer.
+        room.walk.heard("Hi, set a timer for ten minutes.", room.at);
+        assert!(!armed(&mut room));
         room.walk.lamp_said(room.at);
-        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), NONE);
-        // No face seen saying it (a TV, a voice off camera).
-        room.wait(61 * S, Some(NEAR_MIDDLE));
-        assert_eq!(greeted(&mut room, "Hi lamp.", false), NONE);
-        // A task, not a greeting.
-        room.wait(61 * S, Some(NEAR_MIDDLE));
-        assert_eq!(
-            greeted(&mut room, "Hi, set a timer for ten minutes.", true),
-            NONE
-        );
-        // Mid-conversation: a greeting as its second line.
-        room.walk.heard("Hello.", room.at);
-        room.at += S;
-        room.walk.lamp_said(room.at);
-        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), NONE);
+        room.wait(59 * S, Some(NEAR_MIDDLE));
+        assert!(!room.walk.name_ask());
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        assert!(room.walk.name_ask(), "a minute of quiet opens a new one");
         assert_eq!(room.walk.kept().learn_later, learn_later::Kept::default());
-        // Then a plain greeting with one face: asked.
-        room.wait(61 * S, Some(NEAR_MIDDLE));
-        assert_eq!(greeted(&mut room, "Hi lamp.", true), [learn_later::ASK]);
+    }
+
+    /// The memory owner's call on #8471 (27 Nov, 17:54): a bystander's line
+    /// held as not said to the lamp (`LAMP_SAID_TO_ME`) resets the 60 s gap,
+    /// "yes start over". The second route gives the walk every line's words
+    /// before it judges them, so a held line is heard here as any other: the
+    /// ask is armed only 60 s after the last one, never before. A sound with
+    /// no words resets nothing.
+    #[test]
+    fn a_held_bystander_line_starts_the_minute_over() {
+        let mut room = learning_later("learn-later-held");
+        assert!(armed(&mut room));
+        // A sound with no words: still armed.
+        room.walk.heard("...", room.at);
+        assert!(armed(&mut room), "no words, no reset");
+        // A bystander's line, held: the lamp says nothing back.
+        room.walk.heard("Control, are you there?", room.at);
+        assert!(!armed(&mut room));
+        room.wait(29 * S, Some(NEAR_MIDDLE));
+        assert!(!room.walk.name_ask());
+        // Another held line, 30 s in: the minute starts over from it.
+        room.walk.heard("Yeah, give me a second.", room.at);
+        room.wait(60 * S, Some(NEAR_MIDDLE));
+        assert!(
+            !room.walk.name_ask(),
+            "59.75 s after the last held line: not yet"
+        );
+        room.wait(S / 2, Some(NEAR_MIDDLE));
+        assert!(
+            room.walk.name_ask(),
+            "60 s after the last held line: a new conversation"
+        );
+        assert_eq!(room.walk.kept().learn_later, learn_later::Kept::default());
     }
 
     /// Three asks left unanswered, on three days: never again. The model's
@@ -9269,20 +9339,17 @@ mod tests {
         for day in 0..3 {
             room.walk.desired.learn_later.asked_at_unix_s =
                 (day > 0).then(|| unix_ms() / 1_000 - learn_later::DAY_S);
-            assert_eq!(
-                greeted(&mut room, "Hi lamp.", true),
-                [learn_later::ASK],
-                "day {day}"
-            );
+            assert!(armed(&mut room), "day {day}");
+            greeted(&mut room, "Hi lamp.");
             room.wait(61 * S, Some(NEAR_MIDDLE));
         }
         assert_eq!(room.walk.kept().learn_later.unanswered, 3);
         room.walk.desired.learn_later.asked_at_unix_s =
             Some(unix_ms() / 1_000 - 30 * learn_later::DAY_S);
-        assert_eq!(greeted(&mut room, "Hi lamp.", true), NONE);
+        assert!(!armed(&mut room));
 
         let mut room = learning_later("learn-later-dont-mind");
-        assert_eq!(greeted(&mut room, "Hi lamp.", true), [learn_later::ASK]);
+        greeted(&mut room, "Hi lamp.");
         room.walk.heard("I don't mind, call me Sam.", room.at);
         room.wait(S, Some(NEAR_MIDDLE));
         assert!(!room.walk.kept().learn_later.stopped);
@@ -9292,7 +9359,7 @@ mod tests {
             ("learn-later-forget", "Forget my face.", false),
         ] {
             let mut room = learning_later(name);
-            assert_eq!(greeted(&mut room, "Hi lamp.", true), [learn_later::ASK]);
+            greeted(&mut room, "Hi lamp.");
             room.walk.heard(answer, room.at);
             room.wait(S, Some(NEAR_MIDDLE));
             if declined {
@@ -9312,7 +9379,7 @@ mod tests {
             room.wait(61 * S, Some(NEAR_MIDDLE));
             room.walk.desired.learn_later.asked_at_unix_s =
                 Some(unix_ms() / 1_000 - 2 * learn_later::DAY_S);
-            assert_eq!(greeted(&mut room, "Hi lamp.", true), NONE, "{answer}");
+            assert!(!armed(&mut room), "{answer}");
         }
     }
 
@@ -9321,7 +9388,7 @@ mod tests {
     fn learn_later_off_is_never_asked() {
         let mut room = learning_later("learn-later-off");
         room.walk.learn_later = false;
-        assert_eq!(greeted(&mut room, "Hi lamp.", true), NONE);
+        assert!(!armed(&mut room));
         assert_eq!(room.walk.kept().learn_later, learn_later::Kept::default());
         for (learn, no_ask, speaker) in [
             (None, true, Some("on")),
