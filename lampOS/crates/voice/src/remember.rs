@@ -33196,6 +33196,64 @@ mod tests {
         std::fs::remove_file(&socket).unwrap();
     }
 
+    /// The memory owner's calls on #8654, 27 Nov ("yes-alone rule cover this
+    /// too, like forgets and corrections", 17:34; "Run on the request",
+    /// 17:5x): with `LAMP_ONE_FACE_FORGETS_ON_YES`, a role set or end the
+    /// second route marked as run on a line theirs by their face alone in
+    /// view (`ScopeLease::mark_held_yes`) is written; one not marked, or with
+    /// the switch off, is refused as before and reaches no memory.
+    #[test]
+    fn with_the_face_switch_a_marked_one_face_role_is_set_and_ended() {
+        let _one = crate::provider_worker::tests::one_thread();
+        role::set_on_for_test(true);
+        let (socket, served) = memory("role-face-yes", 2, role_memory);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let name = "Olivia Role Face Yes";
+        let person = person_id(name);
+        adopt_role_fixture(&client, &person);
+        let lone = role_lease(907, crate::memory_scope::ScopeSnapshot::of(name));
+        let lease = lone.lease();
+        assert!(lease.forgets_need_mouth());
+        let set = call(role::SET_ROLE, json!({"name":"Harry Potter"}));
+        let end = call(role::END_ROLE, json!({}));
+        let agreed = crate::second_provider::one_face_forget_yes_for_test();
+        crate::second_provider::set_one_face_forgets_on_yes_for_test(Some(true));
+        heard_now("You are Harry Potter now");
+        let (told, _) = client.role_for_guarded(&set, FIRST_READ, Some(&person), Some(&lease));
+        assert_eq!(told, role::one_face_told(), "not marked: refused");
+        lease.mark_held_yes(&agreed, &set.name, &set.args);
+        let (told, _) = client.role_for_guarded(&set, FIRST_READ, Some(&person), Some(&lease));
+        assert_eq!(told, role::set_told("Harry Potter"));
+        assert_eq!(role::cached(&person).as_deref(), Some("Harry Potter"));
+        heard_now("Be yourself again");
+        let (told, _) = client.role_for_guarded(&end, FIRST_READ, Some(&person), Some(&lease));
+        assert_eq!(told, role::one_face_told(), "the set's mark is no end's");
+        lease.mark_held_yes(&agreed, &end.name, &end.args);
+        let (told, _) = client.role_for_guarded(&end, FIRST_READ, Some(&person), Some(&lease));
+        assert_eq!(told, role::ended_told());
+        assert_eq!(role::cached(&person), None);
+        // The switch off: a marked line is refused as stock.
+        crate::second_provider::set_one_face_forgets_on_yes_for_test(Some(false));
+        let off = role_lease(908, crate::memory_scope::ScopeSnapshot::of(name));
+        let off_lease = off.lease();
+        off_lease.mark_held_yes(&agreed, &set.name, &set.args);
+        heard_now("You are Harry Potter now");
+        let (told, _) = client.role_for_guarded(&set, FIRST_READ, Some(&person), Some(&off_lease));
+        assert_eq!(told, role::one_face_told(), "off: refused");
+        crate::second_provider::set_one_face_forgets_on_yes_for_test(None);
+        assert_eq!(
+            served.join().unwrap(),
+            [
+                json!({"op":"role_set_session","person":person,"name":"Harry Potter","session":format!("{}-1", client.prefix),"generation":2}),
+                json!({"op":"role_end_session","person":person,"session":format!("{}-1", client.prefix),"generation":2}),
+            ]
+        );
+        role::forgot(Some(&person));
+        role::set_on_for_test(false);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
     /// Nothing is written for a role asked by someone not placed (the
     /// room's line, a carried line, one held by a face's gap) nor for words
     /// that ask for none ("you are so funny"): no request reaches the

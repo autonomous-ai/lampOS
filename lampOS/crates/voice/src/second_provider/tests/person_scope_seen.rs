@@ -7383,6 +7383,151 @@ async fn a_carried_line_still_forgets_or_corrects_nothing_with_the_switch() {
     }
 }
 
+// The memory owner's calls on #8654, 27 Nov: "yes-alone rule cover this
+// too, like forgets and corrections" (17:34), then "Run on the request"
+// (17:5x): with `LAMP_ONE_FACE_FORGETS_ON_YES`, a `set_role` or `end_role`
+// on a line theirs by their face alone in view, the mouth not seen and the
+// private room on, runs on the request itself: no hold, no question, no new
+// words ([`role_on_request`]).
+
+/// The two role calls: case, words, call, arguments.
+fn role_cases() -> [(&'static str, &'static str, &'static str, Value); 2] {
+    [
+        (
+            "set",
+            "You are Harry Potter now.",
+            crate::remember::role::SET_ROLE,
+            json!({"name": "Harry Potter"}),
+        ),
+        (
+            "end",
+            "Be yourself again.",
+            crate::remember::role::END_ROLE,
+            json!({}),
+        ),
+    ]
+}
+
+/// A role call `name` with `args` on a line said `words`, `in_view` the
+/// faces through it (`f1` A's), the private room `room` and the switch `on`.
+async fn role_on_one_face(
+    what: &str,
+    (words, name, args): (&str, &str, Value),
+    in_view: Vec<(&'static str, bool)>,
+    room: bool,
+    on: bool,
+) -> Outcome {
+    crate::second_provider::set_one_face_forgets_on_yes_for_test(Some(on));
+    let got = asked_once_chats(
+        what,
+        vec![line(words, in_view, 0)],
+        one_call(name, args),
+        room,
+        None,
+    )
+    .await;
+    crate::second_provider::set_one_face_forgets_on_yes_for_test(None);
+    got
+}
+
+/// A's face alone in view, no mouth seen, the private room on: a role set
+/// and a role end each run once, on the request, in A's scope, never held
+/// or asked about and never refused.
+#[tokio::test]
+async fn a_one_face_role_set_or_end_runs_on_the_request_with_the_switch() {
+    let a = crate::remember::person_id("A");
+    for (case, words, name, args) in role_cases() {
+        let got = role_on_one_face(
+            &format!("role-face-{case}"),
+            (words, name, args.clone()),
+            vec![("f1", false)],
+            true,
+            true,
+        )
+        .await;
+        assert_eq!(ran_named(&got, name), [args], "{case}: run once");
+        assert_eq!(got.calls, [Some(a.clone())], "{case}: in A's scope");
+        assert!(!refused_by_one_face(&got), "{case}: not refused");
+        assert!(
+            !held_told(&got, "waits for their yes"),
+            "{case}: never held or asked"
+        );
+    }
+}
+
+/// The same calls with a second face in view, silent or seen speaking, are
+/// never A's; outside the private room A's one-face line refuses them as
+/// before (`ONE_FACE_FORGET`).
+#[tokio::test]
+async fn a_role_beside_a_second_face_or_outside_the_private_room_is_not_theirs() {
+    let a = crate::remember::person_id("A");
+    for (case, words, name, args) in role_cases() {
+        for (at, in_view, room) in [
+            ("second-face", vec![("f1", false), ("f2", false)], true),
+            ("other-speaking", vec![("f1", false), ("f2", true)], true),
+            ("not-private", vec![("f1", false)], false),
+        ] {
+            let got = role_on_one_face(
+                &format!("role-face-{case}-{at}"),
+                (words, name, args.clone()),
+                in_view,
+                room,
+                true,
+            )
+            .await;
+            assert!(
+                !got.calls.contains(&Some(a.clone())),
+                "{case} {at}: never A's: {:?}",
+                got.calls
+            );
+            if at == "not-private" {
+                assert!(refused_by_one_face(&got), "{case} {at}: refused");
+            }
+        }
+    }
+}
+
+/// A carried line (`LAMP_CONVERSATION_CARRIED_MEMORY`) with the switch and
+/// the private room on sets and ends no role.
+#[tokio::test]
+async fn a_carried_line_sets_or_ends_no_role_with_the_switch() {
+    for (case, words, name, args) in role_cases() {
+        crate::second_provider::set_one_face_forgets_on_yes_for_test(Some(true));
+        crate::person::set_private_room_for_test(Some(true));
+        let got = carried_line(
+            &format!("role-face-carried-{case}"),
+            words,
+            one_call(name, args),
+            vec![("f1", false)],
+            true,
+            true,
+            Voice::Judged,
+        )
+        .await;
+        crate::person::set_private_room_for_test(None);
+        crate::second_provider::set_one_face_forgets_on_yes_for_test(None);
+        assert!(got.calls.is_empty(), "{case}: never run: {:?}", got.calls);
+    }
+}
+
+/// The switch off: stock, the private room on too. A's one-face role set
+/// and end are refused as the mouth was not seen, and nothing runs.
+#[tokio::test]
+async fn with_the_switch_off_a_one_face_role_is_refused_as_before() {
+    for (case, words, name, args) in role_cases() {
+        let got = role_on_one_face(
+            &format!("role-face-off-{case}"),
+            (words, name, args),
+            vec![("f1", false)],
+            true,
+            false,
+        )
+        .await;
+        assert!(got.calls.is_empty(), "{case}: never run: {:?}", got.calls);
+        assert!(refused_by_one_face(&got), "{case}: refused as stock");
+    }
+}
+
 /// An engine whose eyes judge a held call's yes, and a held `name` call
 /// with `args` asked of A in session 7 for a yes by their face
 /// ([`HeldForget::face_yes`]), at `at`; `speakers` the faces seen saying
