@@ -293,3 +293,164 @@ fn simple_call_answers_the_line_after_a_bare_hey_lamp() {
         None
     );
 }
+
+/// The audit's #6: a face turned to the lamp opens no call. A facing
+/// question is held, and a line 5 s after it, with the lamp silent, is held
+/// too: no 15 s call was opened by the face.
+#[test]
+fn simple_call_a_face_opens_no_call() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    let mut heeding = heeding(true, None);
+    one_face(&mut heeding, Yes);
+    let now = monotonic_us();
+    let held = Some(crate::second_provider::SIMPLE_HELD);
+    let facing = || signs(Some(true), Room::Quiet, vec![]);
+    assert_eq!(
+        judged(&mut heeding, 9, now, "What time is it?", facing()),
+        held
+    );
+    assert_eq!(
+        judged(&mut heeding, 10, now + 5 * S, "And the weather?", facing()),
+        held
+    );
+}
+
+/// The call's 15 s (`CALL_CARRIES_FOR`, kept): a line 5 s after "Hey Lamp,
+/// …", the lamp still silent, is the call's; one 16 s after it is held.
+#[test]
+fn simple_call_carries_the_call_for_15_s() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    let none = || signs(None, Room::Unknown, vec![]);
+    let mut heeding = heeding(true, None);
+    let now = monotonic_us();
+    assert_eq!(
+        judged(&mut heeding, 9, now, "Hey Lamp, what's the weather", none()),
+        None
+    );
+    assert_eq!(
+        judged(&mut heeding, 10, now + 5 * S, "in Hanoi tomorrow?", none()),
+        None
+    );
+    let mut heeding = self::heeding(true, None);
+    let now = monotonic_us();
+    assert_eq!(
+        judged(&mut heeding, 9, now, "Hey Lamp, what's the weather", none()),
+        None
+    );
+    assert_eq!(
+        judged(&mut heeding, 10, now + 16 * S, "And in Hanoi?", none()),
+        Some(crate::second_provider::SIMPLE_HELD)
+    );
+}
+
+/// The audit's #11: a turn a computer opened is no call. A line in it,
+/// with no "Hey Lamp", is held; a tap still calls.
+#[test]
+fn simple_call_a_computers_turn_is_no_call_and_a_tap_is() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    let mut heeding = heeding(true, None);
+    heeding.attention.turn_opened(9);
+    let now = monotonic_us();
+    assert_eq!(
+        judged(
+            &mut heeding,
+            9,
+            now,
+            "What time is it?",
+            signs(None, Room::Unknown, vec![])
+        ),
+        Some(crate::second_provider::SIMPLE_HELD)
+    );
+    let mut heeding = self::heeding(true, None);
+    let now = monotonic_us();
+    heeding.attention.head_tapped(now + 100_000);
+    assert_eq!(
+        judged(
+            &mut heeding,
+            10,
+            now,
+            "What time is it?",
+            signs(None, Room::Unknown, vec![])
+        ),
+        None
+    );
+}
+
+/// The audit's #28 and #29: no other window keeps a line past 20 s. Said
+/// 30 s after the lamp's words, a "Yes." to its question with every other
+/// window's sign on (the thread's, a skill's yes, the caller's renewal:
+/// `going_on`, `lamp_asked`) is held.
+#[test]
+fn simple_call_no_other_window_keeps_a_line_past_20_s() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    let mut heeding = heeding(true, Some(30));
+    let now = monotonic_us();
+    let every_window = Signs {
+        going_on: true,
+        lamp_asked: true,
+        ..signs(None, Room::Quiet, vec![])
+    };
+    assert_eq!(
+        judged(&mut heeding, 9, now, "Yes.", every_window),
+        Some(crate::second_provider::SIMPLE_HELD)
+    );
+}
+
+/// "Stop" closes the window (kept): after a stop, a line 5 s after the
+/// lamp's words is held, and "Hey Lamp" opens again.
+#[test]
+fn simple_call_a_stop_closes_the_window() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    let none = || signs(None, Room::Unknown, vec![]);
+    let mut heeding = heeding(true, Some(5));
+    heeding.lamp_did(crate::second_provider::Did::Stopped);
+    let now = monotonic_us();
+    assert_eq!(
+        judged(&mut heeding, 9, now, "And tomorrow?", none()),
+        Some(crate::second_provider::SIMPLE_HELD)
+    );
+    assert_eq!(
+        judged(&mut heeding, 10, now + S, "Hey Lamp, and tomorrow?", none()),
+        None
+    );
+}
+
+/// A line with no words in it is never answered, in the window or out,
+/// but for a tap: room noise opens nothing (#8875).
+#[test]
+fn simple_call_a_line_with_no_words_is_never_answered() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    let mut heeding = heeding(true, Some(5));
+    let now = monotonic_us();
+    assert_eq!(
+        judged(
+            &mut heeding,
+            9,
+            now,
+            "",
+            signs(None, Room::Unknown, vec![(now + 100_000, 0.999)])
+        ),
+        Some(crate::second_provider::SIMPLE_NO_WORDS)
+    );
+}
+
+/// The audit's #10 and the switches read through
+/// [`crate::second_provider::unless_simple`] (the second look, the name
+/// note, the room's facts, the cut-in notes and asks, the other language):
+/// off with the rule, as set without it.
+#[test]
+fn simple_call_turns_the_switches_read_through_it_off() {
+    use crate::second_provider::unless_simple_with;
+    assert_eq!(unless_simple_with(Some("on".into()), true), None);
+    assert_eq!(
+        unless_simple_with(Some("on".into()), false).as_deref(),
+        Some("on")
+    );
+    assert_eq!(unless_simple_with(None, false), None);
+}
