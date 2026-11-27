@@ -500,9 +500,15 @@ pub const NOT_ASKED: &str = "Not started: the person did not ask to sign in or p
      nor say yes to your offer to. Answer what they asked; if a computer is needed, say it isn't \
      available, offer to sign it in, and call this only on their yes.";
 
-/// The words that sign in: "sign … in" (within three words: "sign the
-/// lamp in"), "signin", "login", "log … in/on".
-fn sign_at(words: &[String], at: usize) -> bool {
+/// The words that sign in, on both sides (#8700): the person's ask
+/// ([`asks_to_sign_in`]) and the lamp's offer ([`offers_sign_in`]).
+/// `Some(true)` for a sign-in word itself: "sign … in" or "signed … in"
+/// (within three words: "sign the lamp in", "get the lamp signed in";
+/// "into" or "onto" too: "sign into my computer"),
+/// "signing", "signin", "login", "log … in/on"; `Some(false)` for a word
+/// that signs in only with a computer named: "pair", "connect", "link",
+/// "set … up", "setup", "hook … up"; `None` for any other.
+fn sign_in_word(words: &[String], at: usize) -> Option<bool> {
     let within = |find: &[&str]| {
         words[at + 1..]
             .iter()
@@ -510,19 +516,36 @@ fn sign_at(words: &[String], at: usize) -> bool {
             .any(|word| find.contains(&word.as_str()))
     };
     match words[at].as_str() {
-        "signin" | "login" | "logon" => true,
-        "sign" => within(&["in"]),
-        "log" => within(&["in", "on"]),
-        _ => false,
+        "signin" | "login" | "logon" | "signing" => Some(true),
+        "sign" | "signed" if within(&["in", "into", "onto"]) => Some(true),
+        "log" | "logged" if within(&["in", "on", "into", "onto"]) => Some(true),
+        "pair" | "pairing" | "connect" | "connecting" | "link" | "linking" | "setup" => Some(false),
+        "set" | "hook" if within(&["up"]) => Some(false),
+        _ => None,
     }
 }
 
-/// Words that may say nothing beyond a bare "sign in": "please sign in",
-/// "can you sign me in now?", "okay, sign it in then".
-const ONLY_SIGN_IN: [&str; 24] = [
-    "sign", "signin", "login", "logon", "log", "in", "on", "please", "lamp", "hey", "ok", "okay",
-    "can", "could", "would", "you", "me", "it", "us", "now", "then", "just", "go", "yes",
-];
+/// The words that say no to a sign-in, or not now: "No, don't sign it
+/// in", "sign in later", "không", "đừng", "chưa", "để sau". A line with
+/// one is never taken as an ask or a yes to the lamp's offer.
+fn refuses(words: &[String]) -> bool {
+    words.iter().enumerate().any(|(at, word)| {
+        matches!(
+            word.as_str(),
+            "no" | "don't"
+                | "dont"
+                | "not"
+                | "never"
+                | "later"
+                | "wait"
+                | "cancel"
+                | "stop"
+                | "không"
+                | "đừng"
+                | "chưa"
+        ) || (word == "để" && words.get(at + 1).is_some_and(|next| next == "sau"))
+    })
+}
 
 /// The things a sign-in is for: the person's computer or Harness.
 const SIGN_IN_PLACES: [&str; 10] = [
@@ -539,13 +562,18 @@ const SIGN_IN_PLACES: [&str; 10] = [
 ];
 
 /// Whether the person's heard `words` ask, in English, for a sign-in
-/// (#8700): a sign-in word ([`sign_at`]) said alone ([`ONLY_SIGN_IN`]) or
-/// with a computer or Harness ([`SIGN_IN_PLACES`], "the lamp", "hand
-/// over"); "pair", "connect", "link", "set up" or "hook up" with one of
-/// those; or, while a sign-in's code is kept (`open`), the code asked
-/// again. "Ask Codex to sign in to GitHub" is none: an agent's work.
-pub(crate) fn asks_to_sign_in(words: &str, open: bool) -> bool {
+/// (#8700): a sign-in word ([`sign_in_word`]) with no agent named
+/// ([`crate::agent_tasks::names_an_agent`]: "I want to sign in", "help me
+/// sign in"), or with a computer or Harness ([`SIGN_IN_PLACES`], "the
+/// lamp", "hand over"); a word that signs in only with a computer ("pair",
+/// "connect", "set up" …) with one. "Ask Codex to sign in to GitHub" is
+/// none: an agent's work.
+pub(crate) fn asks_to_sign_in(words: &str) -> bool {
+    let agent = crate::agent_tasks::names_an_agent(words);
     let words = crate::agent_tasks::plain_words(words);
+    if refuses(&words) {
+        return false;
+    }
     let follows = |at: usize, next: &[&str]| {
         words[at + 1..]
             .iter()
@@ -560,26 +588,18 @@ pub(crate) fn asks_to_sign_in(words: &str, open: bool) -> bool {
                 && at > 0
                 && !matches!(words[at - 1].as_str(), "hey" | "hi" | "ok" | "okay"))
     });
-    let sign = (0..words.len()).any(|at| sign_at(&words, at));
-    let alone = words
-        .iter()
-        .all(|word| ONLY_SIGN_IN.contains(&word.as_str()));
-    let pair = words
-        .iter()
-        .enumerate()
-        .any(|(at, word)| match word.as_str() {
-            "pair" | "connect" | "link" | "setup" => true,
-            "set" | "hook" => follows(at, &["up"]),
-            _ => false,
-        });
-    (sign && (alone || place))
-        || (pair && place)
-        || (open && words.iter().any(|word| word == "code" || word == "codes"))
+    (0..words.len()).any(|at| match sign_in_word(&words, at) {
+        Some(true) => place || !agent,
+        Some(false) => place,
+        None => false,
+    })
 }
 
 /// Whether the lamp's `line` offers a sign-in in its question, the words
-/// after its last full stop: "… Harness isn't signed in. Shall I sign it
-/// in?" does, "… isn't signed in. Want Hermes instead?" does not.
+/// after its last full stop, by the same words as the person's ask
+/// ([`sign_in_word`]): "… Harness isn't signed in. Shall I sign it in?"
+/// and "Want me to set that up?" do, "… isn't signed in. Want Hermes
+/// instead?" does not.
 fn offers_sign_in(line: &str) -> bool {
     let line = line.trim_end_matches(|c: char| {
         c.is_whitespace() || matches!(c, '"' | '”' | '\'' | '’' | ')' | '?')
@@ -588,37 +608,71 @@ fn offers_sign_in(line: &str) -> bool {
         .rfind(['.', '!', '?'])
         .map_or(line, |at| &line[at + 1..]);
     let words = crate::agent_tasks::plain_words(question);
-    (0..words.len()).any(|at| {
-        sign_at(&words, at)
-            || matches!(
-                words[at].as_str(),
-                "signing" | "pair" | "pairing" | "connect" | "connecting"
-            )
-    })
+    (0..words.len()).any(|at| sign_in_word(&words, at).is_some())
 }
 
-/// Whether a [`START`] may run (#8700): the person's heard `words` ask for
-/// a sign-in ([`asks_to_sign_in`]), or are a plain yes to the lamp's
-/// `last` line, which asked within
+/// Whether a [`START`] may run (#8700): while a sign-in's code is kept
+/// (`open`), always, since a START then gives back the same code ("say
+/// it again", "what was the number?"); else the person's heard `words`
+/// ask for a sign-in ([`asks_to_sign_in`]), or are a plain yes to the
+/// lamp's `last` line, which asked within
 /// [`crate::agent_tasks::CONFIRM_WITHIN`], was not cut and offered a
 /// sign-in ([`crate::agent_tasks::yes_to_a_question`], [`offers_sign_in`]).
 /// Words not known are not refused: a false refusal of the person's own
 /// ask is worse than none (as `whole_ask`, #6537).
 fn may_start(words: Option<&str>, last: Option<(&str, Duration, bool)>, open: bool) -> bool {
+    if open {
+        return true;
+    }
     let Some(words) = words else {
         return true;
     };
-    asks_to_sign_in(words, open)
-        || (crate::agent_tasks::yes_to_a_question(true, Some(words), last)
-            && last.is_some_and(|(line, _, _)| offers_sign_in(line)))
+    asks_to_sign_in(words) || yes_to_the_offer(words, last)
+}
+
+/// Whether `words` say yes to the lamp's `last` line, which asked within
+/// [`crate::agent_tasks::CONFIRM_WITHIN`], was not cut and offered a
+/// sign-in ([`offers_sign_in`]): a plain yes
+/// ([`crate::agent_tasks::yes_to_a_question`]), or any reply with a
+/// sign-in word ([`sign_in_word`]: "Yeah, sign it in.", "Sure, go ahead
+/// and connect it") and no word that refuses it ([`refuses`]).
+fn yes_to_the_offer(words: &str, last: Option<(&str, Duration, bool)>) -> bool {
+    let Some((line, ago, cut)) = last else {
+        return false;
+    };
+    if ago > crate::agent_tasks::CONFIRM_WITHIN
+        || cut
+        || !crate::agent_tasks::asks(line)
+        || !offers_sign_in(line)
+    {
+        return false;
+    }
+    if crate::agent_tasks::yes_to_a_question(true, Some(words), last) {
+        return true;
+    }
+    let words = crate::agent_tasks::plain_words(words);
+    !refuses(&words) && (0..words.len()).any(|at| sign_in_word(&words, at).is_some())
+}
+
+/// The owner's language ([`crate::language::at_start`]); a test sets its
+/// own, on its own thread.
+fn owner_language() -> Option<crate::language::Language> {
+    #[cfg(test)]
+    {
+        tests::LANGUAGE_HERE.get()
+    }
+    #[cfg(not(test))]
+    {
+        crate::language::at_start()
+    }
 }
 
 /// [`may_start`] for `request`, with the person's words and the lamp's line
 /// before them as this process's thread has them. English words only, as
-/// the other English-only gates: in another language
-/// ([`crate::language::at_start`]) it is not refused.
+/// the other English-only gates and the confirm's yes: with the owner's
+/// language another ([`owner_language`]) it is not refused.
 fn asked_now(request: u64) -> bool {
-    if crate::language::at_start().is_some() {
+    if owner_language().is_some() {
         return true;
     }
     let words = crate::agent_tasks::heard_words(request, true);
@@ -1355,6 +1409,12 @@ pub(crate) fn ended_for_test(ago: Duration) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    std::thread_local! {
+        /// The owner's language, for a test on this thread only
+        /// ([`super::owner_language`], #8700).
+        pub(super) static LANGUAGE_HERE: std::cell::Cell<Option<crate::language::Language>> =
+            const { std::cell::Cell::new(None) };
+    }
 
     mod code_delivery {
         use super::*;
@@ -3362,6 +3422,178 @@ mod tests {
         ));
         // Words not known are not refused (#6537's rule).
         assert!(may_start(None, None, false));
+    }
+
+    /// The Reviewer-lead's P2-a on #8808: while a sign-in's code is kept,
+    /// any START is let through, since it only gives back the same code:
+    /// the code asked again without the word "code".
+    #[test]
+    fn the_code_asked_again_in_any_words_starts_while_one_is_kept() {
+        for words in ["Say it again", "What was the number?", "Repeat that"] {
+            assert!(may_start(Some(words), None, true), "{words}");
+            assert!(!may_start(Some(words), None, false), "{words}");
+        }
+    }
+
+    /// P2-b on #8808: a sign-in word with no agent named is the person's
+    /// own ask, whatever else is said; with an agent named, only with a
+    /// computer or Harness.
+    #[test]
+    fn a_sign_in_asked_in_plain_words_starts_unless_an_agent_is_named() {
+        for words in [
+            "I want to sign in",
+            "Let's sign in",
+            "Help me sign in",
+            "Can you sign in for me",
+            "Get me signed in again",
+            "Sign Codex in to my computer",
+        ] {
+            assert!(may_start(Some(words), None, false), "{words}");
+        }
+        for words in [
+            "Ask Codex to sign in to GitHub",
+            "Have the agent log in to the dashboard",
+            "Tell Claude Code to sign in to Jira",
+        ] {
+            assert!(!may_start(Some(words), None, false), "{words}");
+        }
+    }
+
+    /// P2-c on #8808: the lamp's offer is read by the same words as the
+    /// person's ask, "signed" too.
+    #[test]
+    fn a_yes_to_an_offer_in_any_sign_in_words_starts() {
+        let fresh = Duration::from_secs(5);
+        for offer in [
+            "Harness isn't signed in. Want me to set that up?",
+            "Codex isn't there. Shall I link your computer?",
+            "Codex isn't there. Shall I get the lamp signed in?",
+            "Codex isn't there. Shall I hook up your laptop?",
+        ] {
+            assert!(
+                may_start(Some("Yes."), Some((offer, fresh, false)), false),
+                "{offer}"
+            );
+        }
+    }
+
+    /// Twelve's read of #8808 (1): "into" and "onto" sign in as "in" does,
+    /// and "signed" on the person's side too.
+    #[test]
+    fn a_sign_in_said_with_into_or_signed_starts() {
+        for words in [
+            "Sign into my computer",
+            "Log into my Mac",
+            "Sign me into Harness",
+            "Get my computer signed in",
+        ] {
+            assert!(may_start(Some(words), None, false), "{words}");
+        }
+    }
+
+    /// Twelve's read of #8808 (2): a yes to the lamp's offer worded with
+    /// its own verb starts the sign-in; one that refuses it never does.
+    #[test]
+    fn a_yes_with_the_offers_verb_starts_and_a_no_never() {
+        let offer = Some((OFFER, Duration::from_secs(5), false));
+        for words in [
+            "Yeah, sign it in.",
+            "Sure, sign it in.",
+            "Okay, go ahead and sign it in",
+        ] {
+            assert!(yes_to_the_offer(words, offer), "{words}");
+            assert!(may_start(Some(words), offer, false), "{words}");
+        }
+        for words in [
+            "No, don't sign it in",
+            "Not now, sign in later",
+            "Wait, don't sign in yet",
+        ] {
+            assert!(!yes_to_the_offer(words, offer), "{words}");
+            assert!(!may_start(Some(words), offer, false), "{words}");
+        }
+        // Cut or too old: the verb is no yes to it either.
+        let late = crate::agent_tasks::CONFIRM_WITHIN + Duration::from_secs(1);
+        assert!(!yes_to_the_offer(
+            "Yeah, sign it in.",
+            Some((OFFER, Duration::from_secs(5), true))
+        ));
+        assert!(!yes_to_the_offer(
+            "Yeah, sign it in.",
+            Some((OFFER, late, false))
+        ));
+    }
+
+    /// A Vietnamese owner (the owner's language, `language.rs`): the
+    /// words are read in English only, as the confirm's yes, so the check
+    /// is off and their own ask, the code asked again and a yes to the
+    /// offer each start a sign-in.
+    #[test]
+    fn a_vietnamese_owners_ask_code_again_and_yes_are_never_refused() {
+        use crate::agent_tasks::tests::HEARD_HERE;
+        let _thread = crate::provider_worker::tests::one_thread();
+        let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        forget();
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        let directory =
+            std::env::temp_dir().join(format!("voice-sign-in-vi-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let capable = json!({"ok":true,"sign_in":"none","code_claims":1});
+        let code = |id: u64| json!({"ok":true,"sign_in":"code","id":id,"code":"12345678","expires_in":110,"code_told":true});
+        let replies = CodeReplies::new(
+            &directory,
+            vec![
+                capable.clone(),
+                code(7),
+                capable.clone(),
+                code(7),
+                capable,
+                code(8),
+            ],
+        );
+        let call = ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({}),
+        };
+        let deadline = crate::agent_tasks::DEADLINE;
+        let start = |request, words: &'static str| {
+            HEARD_HERE.with(|here| here.set(Some(words)));
+            let told = run(&directory, &call, request, true, deadline, false);
+            HEARD_HERE.with(|here| here.set(None));
+            told
+        };
+        LANGUAGE_HERE.set(Some(crate::language::Language::Vietnamese));
+        let (asked, _) = start(3, "Đăng nhập máy tính giúp tôi");
+        assert!(asked.get("error").is_none(), "{asked}");
+        // Its code is kept: asked again.
+        let (again, _) = start(4, "Nói lại mã đi");
+        assert!(again.get("error").is_none(), "{again}");
+        forget();
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            let now = Instant::now();
+            thread.person("Nhờ Codex cho biết thủ đô của Nhật", true, now);
+            thread.lamp(
+                5,
+                "Codex chưa sẵn sàng. Mình đăng nhập máy tính giúp bạn nhé?",
+                now,
+            );
+        }
+        let (yes, _) = start(6, "Ừ, làm đi");
+        assert!(yes.get("error").is_none(), "{yes}");
+        LANGUAGE_HERE.set(None);
+        // In English the same words are not a sign-in ask.
+        assert!(!may_start(Some("Đăng nhập máy tính giúp tôi"), None, false));
+        let ops = replies.seen.try_iter().count();
+        assert_eq!(ops, 6);
+        drop(replies);
+        forget();
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        let _ = std::fs::remove_dir_all(&directory);
     }
 
     /// #8700 in `run`: a plain ask of an unpaired agent is refused before
