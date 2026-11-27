@@ -33246,6 +33246,7 @@ mod tests {
         crate::second_provider::set_one_face_forgets_on_yes_for_test(Some(false));
         let off = role_lease(908, crate::memory_scope::ScopeSnapshot::of(name));
         let off_lease = off.lease();
+        assert!(off_lease.read_by_one_face());
         off_lease.mark_held_yes(&agreed, &set.name, &set.args);
         heard_now("You are Harry Potter now");
         let (told, _) = client.role_for_guarded(&set, FIRST_READ, Some(&person), Some(&off_lease));
