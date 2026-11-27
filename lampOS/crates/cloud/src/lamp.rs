@@ -341,6 +341,24 @@ pub fn build(state: &str) -> String {
     }
 }
 
+/// Looks at `lamp` again every `every` and sends its [`Real::identity`]
+/// on when it changed, for `info` and the ping; never ends.
+pub async fn look(
+    identity: tokio::sync::watch::Sender<crate::wire::Identity>,
+    lamp: Real,
+    every: Duration,
+) {
+    loop {
+        tokio::time::sleep(every).await;
+        identity.send_if_modified(|me| {
+            let now = lamp.identity();
+            let changed = *me != now;
+            *me = now;
+            changed
+        });
+    }
+}
+
 /// The default route's interface and gateway, from `/proc/net/route`.
 pub fn default_route(route: &str) -> Option<(String, Ipv4Addr)> {
     route.lines().skip(1).find_map(|line| {
@@ -427,6 +445,19 @@ fn read(path: &Path) -> String {
 }
 
 impl Real {
+    /// What every reply and the ping say of the lamp: its address and zone
+    /// as they are now.
+    pub fn identity(&self) -> crate::wire::Identity {
+        crate::wire::Identity {
+            device: "lamp".into(),
+            version: self.build.clone(),
+            id: self.device_id.clone(),
+            mac: self.hostname(),
+            timezone: self.timezone(),
+            local_ip: self.local_ip(),
+        }
+    }
+
     pub fn hostname(&self) -> String {
         read(&self.places.proc.join("sys/kernel/hostname"))
     }
