@@ -10857,7 +10857,9 @@ impl Heeding {
     /// With [`Self::taking_simple_calls`], `LAMP_SIMPLE_CALL_HEARD=on`: a
     /// greeting in the words and a sure hearing of the name at the line's
     /// start call too ([`crate::attention::Attention::simple_calls_heard`]).
-    pub(crate) fn taking_simple_calls_heard(&mut self) {}
+    pub(crate) fn taking_simple_calls_heard(&mut self) {
+        self.attention.simple_calls_heard(true);
+    }
 
     /// With [`Self::taking_simple_calls`], the verdict on a line begun at
     /// `began_us`: let out when it calls the lamp (its words open with "Hey
