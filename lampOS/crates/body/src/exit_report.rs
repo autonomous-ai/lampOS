@@ -11,7 +11,7 @@ use std::fmt::Write;
 /// added (`bad_temperatures` 2026-10-17 08:25, `temperature_settles` 10:34,
 /// `temperature_flaps` with this reader) prints "not in this report". A
 /// field renamed in `BodyReport` fails
-/// `a_joint_flapping_between_60_and_64_stops_on_heat`, which reads a real
+/// `a_joint_flapping_between_67_and_71_stops_on_heat`, which reads a real
 /// report back through [`summary`] and checks each line by name.
 #[derive(Deserialize)]
 struct Report {

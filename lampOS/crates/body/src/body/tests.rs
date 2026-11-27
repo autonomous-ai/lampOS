@@ -12633,7 +12633,8 @@ fn a_small_glitch_near_the_limit_then_a_flicker_down_is_not_heat() {
 
 /// The seventh's 5 degrees a second row: the first read 5, the servo
 /// rising from 45 at once. The rise settles a read at a time, so it is
-/// judged on it within a second and stops on heat near 62, not at 120.
+/// judged on it within a second and stops on heat near the stop (69), not
+/// at 120.
 #[test]
 fn a_fast_rise_after_a_low_first_read_still_stops_near_the_limit() {
     let (mut lamp, mut clock) = folded(Duration::from_secs(8));
@@ -12649,7 +12650,7 @@ fn a_fast_rise_after_a_low_first_read_still_stops_near_the_limit() {
             report.stop,
             Stop::Temperature {
                 joint: 5,
-                temperature: 62..=70
+                temperature: 69..=75
             }
         ),
         "{report:?}"
@@ -12994,7 +12995,7 @@ fn a_true_value_settles_through_glitches_after_a_low_first_read() {
             report.stop,
             Stop::Temperature {
                 joint: 5,
-                temperature: 62..=72
+                temperature: 69..=79
             }
         ),
         "{report:?}"
@@ -13435,15 +13436,15 @@ fn a_shoulder_flapping_between_55_and_61_runs_20_minutes_judged_at_61() {
     );
 }
 
-/// The same flap two degrees over the limit, 60 and 64 by turns, is heat:
-/// judged on 64, it stops on `Temperature`, not as unreadable.
+/// The same flap two degrees over the limit, 67 and 71 by turns, is heat:
+/// judged on 71, it stops on `Temperature`, not as unreadable.
 #[test]
-fn a_joint_flapping_between_60_and_64_stops_on_heat() {
+fn a_joint_flapping_between_67_and_71_stops_on_heat() {
     let readings = (0..3_000)
-        .map(|n| Some(if n % 2 == 0 { 64 } else { 60 }))
+        .map(|n| Some(if n % 2 == 0 { 71 } else { 67 }))
         .collect();
     let (report, _) = scripted_pitch(
-        60,
+        67,
         Vec::new(),
         Duration::from_millis(1_500),
         readings,
@@ -13454,7 +13455,7 @@ fn a_joint_flapping_between_60_and_64_stops_on_heat() {
             report.stop,
             Stop::Temperature {
                 joint: 5,
-                temperature: 62..
+                temperature: 69..
             }
         ),
         "{report:?}"

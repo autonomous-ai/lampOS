@@ -454,12 +454,12 @@ reviewer's case on #1347). So lamp-52e6's glitches, one read in 27 at random, ne
 into heat: a cool head at 56 whose glitches read 57 to 66 runs ten
 minutes (`a_cool_joint_glitching_within_the_flap_window_runs_ten_minutes`,
 the eighth's probe on #1347, which judging on the highest flap ever seen
-stopped on `Temperature` 65). A real flap over the limit, 60 and 64 by
-turns, is judged 64 and stops on `Temperature`, but its streak runs at
+stopped on `Temperature` 65). A real flap over the limit, 67 and 71 by
+turns, is judged 71 and stops on `Temperature`, but its streak runs at
 half rate (the flap reads hold), so the stop comes at about 100 reads
 rather than 50
 (`a_shoulder_flapping_between_55_and_61_runs_20_minutes_judged_at_61`,
-`a_joint_flapping_between_60_and_64_stops_on_heat`). A read over 100 or
+`a_joint_flapping_between_67_and_71_stops_on_heat`). A read over 100 or
 more than 10 from the good one is judged as before. With no good one yet (the first read) a reading is
 taken as it is: one over 100 is counted, and a hot one is read again before
 it is acted on (above). A glitch, or glitches between good reads however
@@ -3384,7 +3384,7 @@ body built before `bad_reads`/`bad_temperatures` (2026-10-17 08:25),
 `temperature_settles` (10:34) or `temperature_flaps` (#1364) still reads
 (`a_body_older_than_the_temperature_fields_still_reads`, a real lamp-52e6
 exit of 2026-10-14). A field renamed in `BodyReport` fails
-`a_joint_flapping_between_60_and_64_stops_on_heat`, which reads a real report
+`a_joint_flapping_between_67_and_71_stops_on_heat`, which reads a real report
 back and requires every line by name.
 
 ## On the bus
