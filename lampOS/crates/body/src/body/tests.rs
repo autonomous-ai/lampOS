@@ -8148,7 +8148,12 @@ fn a_run_that_will_not_stand_asks_the_owner_once_why() {
         Some(HOME),
         Some(standing(100, 60)),
         || None,
-        |glimpse| asks.push(crate::ask::asks(&crate::bus_out::health(glimpse, 0, Standing::TEMPERATURE)).is_some()),
+        |glimpse| {
+            asks.push(
+                crate::ask::asks(&crate::bus_out::health(glimpse, 0, Standing::TEMPERATURE))
+                    .is_some(),
+            )
+        },
     );
     assert!(report.standing.is_some(), "{report:?}");
     assert!(!asks.is_empty() && asks.iter().all(|asks| !asks));
