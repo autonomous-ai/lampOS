@@ -425,6 +425,69 @@ pub fn read_trusted(path: &Path, trusted_uid: u32) -> Result<String, String> {
     Ok(text)
 }
 
+/// `LAMP_BODY_REACH_MAP=shadow` (#7513): the body reads the lamp's own map and only SAYS, in its journal, when the pose it is about to
+/// write is outside the map's safe poses: nothing is held, nothing changes. Off (anything else) is the body as before.
+pub const REACH_MAP: &str = "LAMP_BODY_REACH_MAP";
+/// The per-lamp file (root's, read only: [`read_trusted`]); `LAMP_BODY_REACH_MAP_FILE` names another.
+pub const REACH_MAP_FILE: &str = "LAMP_BODY_REACH_MAP_FILE";
+pub const REACH_MAP_PATH: &str = "/var/lib/lampos-body/reach-map.json";
+/// Counts the shadow keeps off the map's edges (the page guard's margin).
+pub const SHADOW_MARGIN: f64 = 48.0;
+
+/// What a value of [`REACH_MAP`] asks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Mode {
+    Off,
+    Shadow,
+}
+
+pub fn mode_from(value: Option<&str>) -> Mode {
+    match value {
+        Some("shadow") => Mode::Shadow,
+        _ => Mode::Off,
+    }
+}
+
+impl ReachMap {
+    /// Whether a lamp pose (its own counts) is outside the map's safe poses, [`SHADOW_MARGIN`] counts in.
+    pub fn outside(&self, lamp: Pose) -> bool {
+        !self.is_safe(self.to_map_counts(lamp), SHADOW_MARGIN)
+    }
+
+    /// The map for lamp `unit`, or why not: the file names this lamp, and the stand pose is inside it.
+    pub fn for_lamp(text: &str, unit: &str, stand: Pose) -> Result<Self, String> {
+        let map = Self::parse(text)?;
+        if !map.for_unit(unit) {
+            return Err(format!(
+                "the map names {}, not this lamp ({unit})",
+                map.unit().unwrap_or("no lamp")
+            ));
+        }
+        if map.outside(stand) {
+            return Err("the lamp's stand pose is not inside the map".to_owned());
+        }
+        Ok(map)
+    }
+}
+
+/// The shadow's memory: it speaks on a change, never per step.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Shadow {
+    outside: bool,
+}
+
+impl Shadow {
+    /// Judges the pose about to be written; `Some(true)` when it has just gone outside the map, `Some(false)` when it is back
+    /// inside, `None` when nothing changed.
+    pub fn judge(&mut self, map: &ReachMap, pose: Pose) -> Option<bool> {
+        let outside = map.outside(pose);
+        (outside != self.outside).then(|| {
+            self.outside = outside;
+            outside
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -574,5 +637,39 @@ mod tests {
         assert!(read_trusted(&link, me).is_err(), "a link is not followed");
         assert!(read_trusted(&dir.join("none.json"), me).is_err());
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn the_shadow_speaks_on_a_change_only_and_the_mode_is_off_unless_shadow() {
+        assert_eq!(mode_from(Some("shadow")), Mode::Shadow);
+        for other in [None, Some(""), Some("on"), Some("Shadow"), Some("off")] {
+            assert_eq!(mode_from(other), Mode::Off, "{other:?}");
+        }
+        let map = ReachMap::parse(MAP).unwrap();
+        // lamp-4ace's own: the stand is inside, the folded pose (the head rests on its arm) is not.
+        let stand = Pose {
+            shoulder: 2_657.0,
+            elbow: 2_602.0,
+            pitch: 1_772.0,
+        };
+        let folded = Pose {
+            shoulder: 2_048.0,
+            elbow: 2_047.0,
+            pitch: 1_950.0,
+        };
+        assert!(!map.outside(stand));
+        assert!(map.outside(folded));
+        let mut shadow = Shadow::default();
+        assert_eq!(shadow.judge(&map, stand), None);
+        assert_eq!(shadow.judge(&map, folded), Some(true));
+        assert_eq!(shadow.judge(&map, folded), None);
+        assert_eq!(shadow.judge(&map, stand), Some(false));
+        assert_eq!(shadow.judge(&map, stand), None);
+        // A file with no lamp named is the page's map, not this lamp's.
+        assert!(
+            ReachMap::for_lamp(MAP, "lamp-75c9", stand)
+                .unwrap_err()
+                .contains("not this lamp")
+        );
     }
 }

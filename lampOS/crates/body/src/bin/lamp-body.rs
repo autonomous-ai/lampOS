@@ -160,6 +160,48 @@ struct StandingChoice {
     idle: bool,
 }
 
+#[cfg(unix)]
+/// `LAMP_BODY_REACH_MAP=shadow`: the lamp's own map, read once and kept for the run, or ONE line why not (the body is as before).
+fn reach_map_shadow_of(arguments: &Arguments) -> Option<&'static lamp_body::reach_map::ReachMap> {
+    use lamp_body::reach_map as map;
+    if map::mode_from(std::env::var(map::REACH_MAP).ok().as_deref()) != map::Mode::Shadow {
+        return None;
+    }
+    let Some(standing) = arguments.standing.as_ref() else {
+        eprintln!(
+            "lamp-body: LAMP_BODY_REACH_MAP=shadow but this lamp has no --stand: the map is not read"
+        );
+        return None;
+    };
+    let path =
+        std::env::var(map::REACH_MAP_FILE).unwrap_or_else(|_| map::REACH_MAP_PATH.to_owned());
+    // The file is root's: a body that can write it could widen its own reach.
+    let text = match map::read_trusted(std::path::Path::new(&path), 0) {
+        Ok(text) => text,
+        Err(why) => {
+            eprintln!("lamp-body: LAMP_BODY_REACH_MAP=shadow but the map is not used: {why}");
+            return None;
+        }
+    };
+    let stand = map::Pose {
+        shoulder: f64::from(standing.pose[3]),
+        elbow: f64::from(standing.pose[4]),
+        pitch: f64::from(standing.pose[0]),
+    };
+    match map::ReachMap::for_lamp(&text, arguments.unit_id.as_str(), stand) {
+        Ok(found) => {
+            eprintln!(
+                "lamp-body: LAMP_BODY_REACH_MAP=shadow: the map {path} is read; poses outside it are said, nothing is held"
+            );
+            Some(Box::leak(Box::new(found)))
+        }
+        Err(why) => {
+            eprintln!("lamp-body: LAMP_BODY_REACH_MAP=shadow but the map is not used: {why}");
+            None
+        }
+    }
+}
+
 /// Whole numbers separated by commas, exactly as many as asked for.
 fn counts_of<const N: usize>(value: &str) -> Option<[u16; N]> {
     let parts: Vec<u16> = value
@@ -1721,6 +1763,8 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
 /// the raw mode and the baud this sets on open are what make the port raw.
 #[cfg(unix)]
 fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
+    // The lamp's own reach map, for the shadow (`LAMP_BODY_REACH_MAP=shadow`), read before `arguments` is taken apart.
+    let reach_map = reach_map_shadow_of(&arguments);
     use lamp_body::stop_signal::StopSignal;
     use lamp_body::{
         body::{Limits, Stop, Tuning},
@@ -2132,6 +2176,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     })?;
     // The head's tilt, for a lamp that has stood up.
     let limits = Limits {
+        reach_map,
         yaw_unset: arguments.reach.is_none(),
         stand_roll: arguments.stand_roll.map_or(folded.stand_roll, f32::from),
         head_stall_load: arguments.head_stall_load.unwrap_or(limits.head_stall_load),
