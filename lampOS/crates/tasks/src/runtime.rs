@@ -5691,7 +5691,7 @@ pub fn serve<C: Clock>(
                     &home,
                     skills,
                     v1,
-                    Path::new(lamp_update::openclaw_install::SEARCH_TOKEN),
+                    Path::new(crate::hermes_config::SEARCH_TOKEN_PATH),
                 )
             )
         });

@@ -75,8 +75,9 @@ pub const TOKEN_ENV: &str = "LAMP_HERMES_TOKEN";
 /// lamp-tasks and handed to [`write`].
 pub const TOKEN_PATH: &str = "/var/lib/lampos-cloud/hermes-token";
 /// lamp-cloud's search-only token for its search route, beside
-/// [`TOKEN_PATH`]; read by lamp-tasks and handed to [`write`].
-pub const SEARCH_TOKEN_PATH: &str = "/var/lib/lampos-cloud/search-token";
+/// [`TOKEN_PATH`]; read by lamp-tasks and handed to [`write`], and by
+/// OpenClaw's wrapper, which lamp-update writes.
+pub const SEARCH_TOKEN_PATH: &str = lamp_update::openclaw_install::SEARCH_TOKEN;
 /// Where Hermes's bundled SearXNG provider reads its instance URL.
 pub const SEARCH_ENV: &str = "SEARXNG_URL";
 /// Hermes's page reader with a search URL set: Exa, keyless with no key,
