@@ -5,7 +5,9 @@ Bản tiếng Việt của mục "Timers and reminders with no link" trong
 [schedule.md](../schedule.md). Mã nguồn là nguồn sự thật duy nhất; tài liệu
 tiếng Anh là bản chính.
 
-Tắt trừ khi đặt đúng `on`. Phát hiện trên lamp-06c1 ngày 25/11 (hàng kiểm
+Tắt trừ khi đặt đúng `on`; bật trong lamp-voice của sản phẩm từ lần bật
+của #8708, được đọc bởi giọng nói và tiến trình con Schedule của nó (dùng
+chung môi trường của unit). Phát hiện trên lamp-06c1 ngày 25/11 (hàng kiểm
 tra của #8632): một hẹn giờ đặt trước khi mất mạng 10 phút đến hạn lúc mạng
 đang mất, im lặng 409 s, rồi chỉ reo 5 s sau khi mạng trở lại. Một lần reo
 vốn là một lượt của mô hình, và cổng của nó cần một phiên đám mây sẵn sàng.
@@ -52,6 +54,11 @@ vốn là một lượt của mô hình, và cổng của nó cần một phiên
 - **Khôi phục cài đặt gốc xoá chúng (điểm thêm 1):** các đoạn âm thanh là lời
   nhắc của người dùng dưới dạng âm thanh, nên
   `/var/lib/lampOS/voice/ring-clips` nằm trong kế hoạch reset của sản phẩm.
+- **Tắt công tắc thì không dọn gì (P3 2 của Reviewer-lead trên #8800):** các
+  đoạn âm thanh chỉ được dọn khi công tắc bật, nên nếu tắt công tắc, đoạn âm
+  thanh của một lời nhắc đã xoá (đã nói, bị huỷ, bị sửa, hoặc người đó bị
+  `Forget`) vẫn còn đến lần khôi phục cài đặt gốc. Khôi phục cài đặt gốc vẫn
+  xoá hết.
 - **Mỗi vòng không đọc đĩa vô ích (P3 1 của Twelve trên #8687):** chưa thấy
   phiên nào thì không đọc đoạn âm thanh nào; một mục đã thấy đang chờ thì
   không đọc lại ở các vòng sau, và việc chờ chỉ được ghi nhật ký một lần.
@@ -106,8 +113,8 @@ vốn là một lượt của mô hình, và cổng của nó cần một phiên
 
 ## Chạy lại hàng kiểm tra (lamp-06c1)
 
-Cần `LAMP_OFFLINE_RINGS=on` trong một drop-in thử nghiệm và bộ nhớ đệm giọng
-nói đã được tạo khi còn mạng. Đạt khi: một hẹn giờ và một lời nhắc đến hạn
+Cần `LAMP_OFFLINE_RINGS=on` (có sẵn trong unit lamp-voice của sản phẩm) và
+bộ nhớ đệm giọng nói đã được tạo khi còn mạng. Đạt khi: một hẹn giờ và một lời nhắc đến hạn
 trong lúc mất mạng mỗi cái reo trong vòng 5 s sau hạn, một lần; không nói lại
 gì sau khi mạng trở lại; 10 câu hỏi giữ giới hạn của chúng; không tiếng động
 ngắn nào nhận câu báo thứ hai. Thêm trường hợp "không ai nói gì trong lúc mất

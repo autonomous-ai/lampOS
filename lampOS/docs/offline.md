@@ -357,7 +357,9 @@ voice side, silent until the recordings exist.
 
 ## Timers and reminders with no link (`LAMP_OFFLINE_RINGS`, #8632)
 
-Off unless exactly `on`. Found on lamp-06c1 on 25 Nov (#8632's row): a
+Off unless exactly `on`; on in the product's lamp-voice since #8708's
+switch-on, read by the voice and by its Schedule consumer, a child with the
+unit's environment. Found on lamp-06c1 on 25 Nov (#8632's row): a
 timer set before a 10-minute cut came due with the link down and was silent
 for 409 s, then rang 5 s after the link came back. A ring is a model turn,
 and its gate needs a ready session.
@@ -400,6 +402,10 @@ and its gate needs a ready session.
 - **A factory reset takes them** (the first builder's add 1): the clips are
   the person's reminders as sound, so `/var/lib/lampOS/voice/ring-clips` is
   in the product reset plan ([setup.md](setup.md)).
+- **Turned off again, nothing is swept (the Reviewer-lead's P3 2 on #8800):**
+  clips are swept only while the switch is on, so a deleted reminder's clip
+  (said, cancelled, edited, or its person forgotten) stays until a reset if
+  the switch is turned off. A factory reset still removes them all.
 - **No second line for a scrap:** a follow-up with under 400 ms of speech,
   ending within 8 s of the outage's line, gets no line of its own
   ([failure-notices.md](failure-notices.md)).

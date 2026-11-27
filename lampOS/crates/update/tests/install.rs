@@ -2756,6 +2756,39 @@ fn the_product_turns_task_no_yes_on_in_the_four_units_that_read_it() {
     }
 }
 
+/// #8708 with #8632: `LAMP_OFFLINE_RINGS` is on in the product only in
+/// lamp-voice, once. Its readers are the voice (`coordinator`, its speech
+/// cache) and the voice's Schedule consumer (`reminders::consumer`,
+/// `ring_clips`), a child that keeps lamp-voice's environment; the second
+/// route's worker reads it in none of its own (it takes `CheckLink` either
+/// way). A later edit that drops it, sets it twice, or names it in another
+/// unit fails here.
+#[test]
+fn the_product_turns_offline_rings_on_only_in_lamp_voice() {
+    let name = lamp_voice::offline_rings::ENVIRONMENT;
+    assert_eq!(name, "LAMP_OFFLINE_RINGS");
+    let line = format!("Environment={name}=on");
+    let owners = ["lamp-voice.service"];
+    for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service")
+            .iter()
+            .filter(|set| **set == line)
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|set| !set.starts_with('#') && set.contains(name))
+            .count();
+        assert_eq!(on, usize::from(owners.contains(unit)), "{unit}: {line}");
+        assert_eq!(mentioned, on, "{unit}: {name}");
+    }
+    for owner in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner} is not a product unit"
+        );
+    }
+}
+
 /// #8839 (the lead's test on lamp-52e6 at stable 16443, 27 Nov): a line
 /// begun over the lamp's own answer is a follow-up like any line in the
 /// conversation's 20 s, with no look and no test of its words, by the

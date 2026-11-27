@@ -205,7 +205,7 @@ A turn still says one failure line at most (#4332). A sound let through still
 gets nothing. Off, every turn is as above, the release's files only.
 
 **A scrap just after the line gets no second one (#8632,
-`LAMP_OFFLINE_RINGS=on`, off unless set).** On lamp-06c1 on 25 Nov, about
+`LAMP_OFFLINE_RINGS=on`, off unless set, on in the product).** On lamp-06c1 on 25 Nov, about
 3 s after 6 of 10 offline lines, a 100 to 330 ms scrap (the lamp's own tail
 or the room, `silence_fallback` on a short endpoint) was admitted into the
 still-open conversation and said the internet line again. With the switch, a
