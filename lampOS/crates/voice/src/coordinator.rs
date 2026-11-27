@@ -18523,6 +18523,8 @@ fn tell_walk(
             privacy_generation,
             on,
             updating,
+            // The walk Lamp leads by voice's state lines (#8871).
+            state: crate::onboarding::walk_v2::state().filter(|_| on),
         });
     }
 }

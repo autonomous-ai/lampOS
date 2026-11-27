@@ -193,6 +193,9 @@ fn a_two_step_order_loads_and_a_repeated_or_unknown_step_is_refused() {
         "order = [\"where_you_sit\", \"who_you_are\", \"who_you_are\"]",
         "order = [\"where_you_sit\", \"who_you_are\", \"unknown\"]",
         "order = [\"where_you_sit\"]",
+        // #8871: the walk's own steps, never the file's.
+        "order = [\"where_you_sit\", \"who_you_are\", \"try_skill\"]",
+        "order = [\"where_you_sit\", \"who_you_are\", \"make_skill\"]",
     ] {
         assert!(parse(&two.replacen(TWO, bad, 1)).is_err(), "{bad}");
     }

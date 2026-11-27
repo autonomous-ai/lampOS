@@ -1189,6 +1189,119 @@ type Line = (&'static str, [&'static str; 5]);
 /// skill.toml`) and the code's (`skill.rs`).
 #[rustfmt::skip]
 pub(super) const LINES: &[Line] = &[
+    // The walk Lamp leads by voice (#8871, `onboarding::walk_v2`).
+    ("Sit where you usually do and look at me.", [
+        "Bạn ngồi chỗ quen thuộc và nhìn mình nhé.",
+        "いつもの場所に座って、私を見てください。",
+        "坐在你平时坐的地方，看着我。",
+        "평소 앉는 자리에 앉아서 저를 봐 주세요.",
+        "Asseyez-vous à votre place habituelle et regardez-moi.",
+    ]),
+    ("There you are.", [
+        "Thấy bạn rồi.",
+        "見えました。",
+        "看到你了。",
+        "보여요.",
+        "Vous voilà.",
+    ]),
+    ("Pet my head. That's how you say hi without talking.", [
+        "Vuốt đầu mình nhé. Đó là cách chào mình mà không cần nói.",
+        "頭をなでてください。話さずにあいさつする方法です。",
+        "摸摸我的头。这样不用说话也能跟我打招呼。",
+        "제 머리를 쓰다듬어 주세요. 말없이 인사하는 방법이에요.",
+        "Caressez-moi la tête. C'est dire bonjour sans parler.",
+    ]),
+    ("Mmm, nice.", [
+        "Ưm, dễ chịu quá.",
+        "うーん、気持ちいい。",
+        "嗯，真舒服。",
+        "음, 좋아요.",
+        "Mmm, agréable.",
+    ]),
+    ("Can I remember your face, so I know it's you? It stays on this lamp.", [
+        "Mình nhớ khuôn mặt bạn được không, để biết là bạn? Nó chỉ ở trên đèn này.",
+        "あなただとわかるように、お顔を覚えてもいいですか？このLampの中だけに残ります。",
+        "我可以记住你的脸吗？这样我就知道是你。它只留在这盏灯上。",
+        "당신인 걸 알 수 있게 얼굴을 기억해도 될까요? 이 램프에만 남아요.",
+        "Puis-je retenir votre visage, pour savoir que c'est vous ? Il reste sur cette lampe.",
+    ]),
+    ("We'll do this later.", [
+        "Mình làm phần này sau nhé.",
+        "これはあとでやりましょう。",
+        "这个我们稍后再做。",
+        "이건 나중에 해요.",
+        "On fera ça plus tard.",
+    ]),
+    ("Say 'turn blue'.", [
+        "Hãy nói 'đổi sang màu xanh dương'.",
+        "「青にして」と言ってください。",
+        "说'变成蓝色'。",
+        "'파란색으로 바꿔 줘'라고 말해 보세요.",
+        "Dites « passe au bleu ».",
+    ]),
+    ("Just say: turn blue.", [
+        "Chỉ cần nói: đổi sang màu xanh dương.",
+        "「青にして」と言うだけです。",
+        "只要说：变成蓝色。",
+        "그냥 '파란색으로 바꿔 줘'라고 하세요.",
+        "Dites simplement : passe au bleu.",
+    ]),
+    ("See? Just ask.", [
+        "Thấy chưa? Cứ nhờ là được.",
+        "ほらね？頼むだけです。",
+        "看到了吗？说一声就行。",
+        "봤죠? 말만 하면 돼요.",
+        "Vous voyez ? Il suffit de demander.",
+    ]),
+    ("Okay, we'll skip trying a skill for now.", [
+        "Được, mình bỏ qua phần thử kỹ năng lúc này nhé.",
+        "わかりました、スキルを試すのは今はやめておきましょう。",
+        "好的，试技能这一步先跳过。",
+        "알겠어요, 스킬 써 보기는 지금은 건너뛸게요.",
+        "D'accord, on passe l'essai d'une compétence pour l'instant.",
+    ]),
+    ("Earlier we skipped trying a skill. Let's try it now.", [
+        "Lúc nãy mình bỏ qua phần thử kỹ năng. Giờ thử nhé.",
+        "さっきはスキルを試すのを飛ばしました。今やってみましょう。",
+        "刚才我们跳过了试技能。现在试试吧。",
+        "아까 스킬 써 보기를 건너뛰었어요. 지금 해 봐요.",
+        "Tout à l'heure, on a passé l'essai d'une compétence. Essayons maintenant.",
+    ]),
+    ("Teach me something simple, like 'remind me to drink water every 30 minutes'.", [
+        "Dạy mình một điều đơn giản, như 'nhắc tôi uống nước mỗi 30 phút'.",
+        "かんたんなことを教えてください。たとえば「30分ごとに水を飲むよう知らせて」。",
+        "教我一件简单的事，比如'每 30 分钟提醒我喝水'。",
+        "간단한 걸 가르쳐 주세요. 예를 들면 '30분마다 물 마시라고 알려 줘'.",
+        "Apprenez-moi quelque chose de simple, comme « rappelle-moi de boire de l'eau toutes les 30 minutes ».",
+    ]),
+    ("Or: turn the light warm at 8 pm, or tell me to stand up every hour.", [
+        "Hoặc: bật đèn vàng ấm lúc 8 giờ tối, hay nhắc tôi đứng dậy mỗi giờ.",
+        "ほかにも「夜8時に明かりを暖かくして」や「1時間ごとに立つよう言って」もできます。",
+        "或者：晚上 8 点把灯调暖，或者每小时提醒我站起来。",
+        "아니면: 저녁 8시에 불빛을 따뜻하게 해 줘, 또는 한 시간마다 일어나라고 말해 줘.",
+        "Ou : passe la lumière en chaud à 20 h, ou dis-moi de me lever toutes les heures.",
+    ]),
+    ("I made {skill}. Change it any time in the app.", [
+        "Mình đã tạo {skill}. Bạn đổi được bất cứ lúc nào trong app.",
+        "{skill}を作りました。アプリでいつでも変えられます。",
+        "我做好了{skill}。随时可以在 App 里修改。",
+        "{skill}을(를) 만들었어요. 앱에서 언제든 바꿀 수 있어요.",
+        "J'ai créé {skill}. Modifiable à tout moment dans l'app.",
+    ]),
+    ("Okay, we'll skip making a skill for now.", [
+        "Được, mình bỏ qua phần tạo kỹ năng lúc này nhé.",
+        "わかりました、スキルを作るのは今はやめておきましょう。",
+        "好的，做技能这一步先跳过。",
+        "알겠어요, 스킬 만들기는 지금은 건너뛸게요.",
+        "D'accord, on passe la création d'une compétence pour l'instant.",
+    ]),
+    ("Earlier we skipped making a skill. Let's try it now.", [
+        "Lúc nãy mình bỏ qua phần tạo kỹ năng. Giờ thử nhé.",
+        "さっきはスキルを作るのを飛ばしました。今やってみましょう。",
+        "刚才我们跳过了做技能。现在试试吧。",
+        "아까 스킬 만들기를 건너뛰었어요. 지금 해 봐요.",
+        "Tout à l'heure, on a passé la création d'une compétence. Essayons maintenant.",
+    ]),
     ("Let's get set up first! It'll only take a few minutes. Please follow my instructions step-by-step, and once we're done, you can ask me anything. Sit where you usually sit and look at me. I'll tell you when I see you.", [
         "Mình cùng cài đặt trước nhé! Chỉ mất vài phút thôi. Bạn làm theo từng bước mình hướng dẫn, xong rồi thì hỏi mình gì cũng được. Bạn ngồi chỗ quen thuộc và nhìn về phía mình. Khi thấy bạn, mình sẽ báo.",
         "まずは設定をしましょう！数分で終わります。私の案内に沿って一つずつ進めてください。終わったら、何でも聞いてくださいね。いつも座る場所に座って、私の方を見てください。見えたらお知らせします。",
@@ -1891,6 +2004,14 @@ pub(super) fn said(note: String, language: Option<Language>) -> String {
                     },
                 );
             }
+            // The walk Lamp leads by voice (#8871): "All set!" and what it
+            // learned, said as its parts are.
+            if let Some((name, rest)) = find_all_set(part) {
+                return super::walk_v2::done_rest_in(rest, language).map_or_else(
+                    || part.to_owned(),
+                    |said| format!("{}{said}", super::walk_v2::all_set(language, name)),
+                );
+            }
             if let Some((name, rest)) = find_all_done(part) {
                 return line_in(rest, language).map_or_else(
                     || part.to_owned(),
@@ -1908,10 +2029,25 @@ pub(super) fn said(note: String, language: Option<Language>) -> String {
 /// opening before it ("... Four quick steps, just a few minutes. ").
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Counter {
-    Step { at: usize, of: usize, intro: bool },
+    Step {
+        at: usize,
+        of: usize,
+        intro: bool,
+    },
+    /// The walk Lamp leads by voice (#8871, `LAMP_ONBOARDING_WALK_V2`):
+    /// Wi-Fi counted as step one, so the walk's first ask is "Step 2 of
+    /// 7: " and its last "Step 7 of 7, the last one: ", after the opening
+    /// "Hi! Let's get to know each other. About three minutes. ".
+    Wifi {
+        at: usize,
+        of: usize,
+        intro: bool,
+    },
 }
 
 const EN_INTRO: &str = "Hi! I'm your lamp. Let's get to know each other. ";
+const EN_WIFI_INTRO: &str = "Hi! Let's get to know each other. It takes a few minutes, but it helps me work well for you. We have ";
+const EN_WIFI_DONE: &str = " steps. Wi-Fi is done. Now step ";
 const EN_NUMBERS: [&str; 9] = [
     "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
 ];
@@ -1943,7 +2079,16 @@ impl Counter {
     /// Its words in `language`, English with none, ending where the
     /// step's own line begins.
     fn said(self, language: Option<Language>) -> String {
-        let Self::Step { at, of, intro } = self;
+        let (at, of, intro) = match self {
+            Self::Step { at, of, intro } => (at, of, intro),
+            Self::Wifi { at, of, intro } => {
+                return if intro {
+                    wifi_opening(at, of, language)
+                } else {
+                    wifi_step(at, of, language)
+                };
+            }
+        };
         let last = at == of;
         let (opening, step) = match language {
             None => {
@@ -2024,6 +2169,9 @@ impl Counter {
     /// in upper case). `at` and `of` are read back only as far as the
     /// words say them: the last step is `at == of`.
     fn find(quoted: &str) -> Option<(Self, String)> {
+        if let Some(found) = Self::find_wifi(quoted) {
+            return Some(found);
+        }
         let (intro, of, rest) = match quoted.strip_prefix(EN_INTRO) {
             Some(rest) => {
                 let (count, rest) = rest.split_once(" quick step")?;
@@ -2055,6 +2203,98 @@ impl Counter {
             (None, None) => (1, 1),
         };
         Some((Self::Step { at, of, intro }, first_letter(line, true)))
+    }
+}
+
+impl Counter {
+    /// [`Self::find`] for the walk Lamp leads by voice's words: the
+    /// opening ("Hi! Let's get to know each other. We have seven steps.
+    /// Wi-Fi is done. Now step two: "), or "Step 3 of 7: " or "Step 7 of 7, the last one: ".
+    fn find_wifi(quoted: &str) -> Option<(Self, String)> {
+        if let Some(rest) = quoted.strip_prefix(EN_WIFI_INTRO) {
+            let (of, rest) = rest.split_once(EN_WIFI_DONE)?;
+            let (at, line) = rest.split_once(": ")?;
+            let word = |said: &str| Some(1 + EN_NUMBERS.iter().position(|number| *number == said)?);
+            let (of, at) = (word(of)?, word(at)?);
+            return (1..=of).contains(&at).then(|| {
+                (
+                    Self::Wifi {
+                        at,
+                        of,
+                        intro: true,
+                    },
+                    first_letter(line, true),
+                )
+            });
+        }
+        let (intro, rest) = (false, quoted);
+        let rest = rest.strip_prefix("Step ")?;
+        let (at, rest) = rest.split_once(" of ")?;
+        let at: usize = at.parse().ok()?;
+        let (of, line) = match rest.split_once(", the last one: ") {
+            Some((of, line)) if !of.contains(':') => (of, line),
+            _ => rest.split_once(": ")?,
+        };
+        let of: usize = of.parse().ok()?;
+        (1..=of)
+            .contains(&at)
+            .then(|| (Self::Wifi { at, of, intro }, first_letter(line, true)))
+    }
+}
+
+/// The walk Lamp leads by voice's step words (#8871, the owner: "saying
+/// the step matters"): "Step 2 of 7: ", the last "Step 7 of 7, the last
+/// one: ", in `language`.
+fn wifi_step(at: usize, of: usize, language: Option<Language>) -> String {
+    let last = at == of;
+    match (language, last) {
+        (None, false) => format!("Step {at} of {of}: "),
+        (None, true) => format!("Step {at} of {of}, the last one: "),
+        (Some(Language::Vietnamese), false) => format!("Bước {at} trên {of}: "),
+        (Some(Language::Vietnamese), true) => format!("Bước {at} trên {of}, bước cuối: "),
+        (Some(Language::Japanese), false) => format!("ステップ{at}/{of}："),
+        (Some(Language::Japanese), true) => format!("ステップ{at}/{of}、最後です："),
+        (Some(Language::Chinese), false) => format!("第{at}步，共{of}步："),
+        (Some(Language::Chinese), true) => format!("第{at}步，共{of}步，最后一步："),
+        (Some(Language::Korean), false) => format!("{of}단계 중 {at}단계: "),
+        (Some(Language::Korean), true) => format!("{of}단계 중 {at}단계, 마지막이에요: "),
+        (Some(Language::French), false) => format!("Étape {at} sur {of} : "),
+        (Some(Language::French), true) => format!("Étape {at} sur {of}, la dernière : "),
+    }
+}
+
+/// The walk's opening with Wi-Fi counted (#8871, the owner's words), `of`
+/// steps in all, the first ask step `at`: "Hi! Let's get to know each
+/// other. We have seven steps. Wi-Fi is done. Now step two: ", in
+/// `language`.
+fn wifi_opening(at: usize, of: usize, language: Option<Language>) -> String {
+    match language {
+        None => format!(
+            "{EN_WIFI_INTRO}{}{EN_WIFI_DONE}{}: ",
+            number(&EN_NUMBERS, of),
+            number(&EN_NUMBERS, at)
+        ),
+        Some(Language::Vietnamese) => format!(
+            "Chào bạn! Mình làm quen nhau nhé. Mất vài phút thôi, nhưng giúp mình hiểu bạn hơn. Mình có {} bước. Wi-Fi xong rồi. Giờ là bước {}: ",
+            number(&VI_NUMBERS, of),
+            number(&VI_NUMBERS, at)
+        ),
+        Some(Language::Japanese) => format!(
+            "こんにちは！仲良くなりましょう。数分かかりますが、あなたのお役に立つためです。全部で{of}ステップです。Wi-Fiは完了です。では、ステップ{at}："
+        ),
+        Some(Language::Chinese) => format!(
+            "你好！我们来认识一下吧。要花几分钟，但能让我更好地帮你。一共{}步。Wi-Fi 已经好了。现在第{}步：",
+            number(&ZH_NUMBERS, of),
+            number(&ZH_NUMBERS, at)
+        ),
+        Some(Language::Korean) => format!(
+            "안녕하세요! 서로 알아가 봐요. 몇 분 걸리지만, 제가 더 잘 도와드릴 수 있어요. 모두 {of}단계예요. Wi-Fi는 끝났어요. 이제 {at}단계: "
+        ),
+        Some(Language::French) => format!(
+            "Bonjour ! Faisons connaissance. Ça prend quelques minutes, mais ça m'aide à bien vous servir. Il y a {} étapes. Le Wi-Fi est fait. Maintenant, étape {} : ",
+            number(&FR_NUMBERS, of),
+            number(&FR_NUMBERS, at)
+        ),
     }
 }
 
@@ -2107,6 +2347,15 @@ fn step_words() -> Vec<String> {
                     of: 1,
                     intro: false,
                 }])
+                // The walk Lamp leads by voice's (#8871): "Step 2 of 7: "
+                // .. "Step 7 of 7, the last one: ".
+                .chain((2..=9).flat_map(|of| {
+                    (2..=of).map(move |at| Counter::Wifi {
+                        at,
+                        of,
+                        intro: false,
+                    })
+                }))
                 .map(move |counter| counter.said(language))
         })
         .collect()
@@ -2185,7 +2434,17 @@ fn without_other_asks(text: &str, step: &str, ask: &str) -> String {
 /// the walk knows it: "All done, Mia!" (#4080).
 pub(super) fn with_name(note: &str, name: Option<&str>) -> String {
     match name.filter(|name| !name.trim().is_empty()) {
-        Some(name) => note.replacen("\"All done! ", &format!("\"All done, {}! ", name.trim()), 1),
+        Some(name) => note
+            .replacen("\"All done! ", &format!("\"All done, {}! ", name.trim()), 1)
+            .replacen(
+                "\"All set! ",
+                &if super::walk_v2::short_name(name) {
+                    format!("\"All set, {}! ", name.trim())
+                } else {
+                    "\"All set! ".to_owned()
+                },
+                1,
+            ),
         None => note.to_owned(),
     }
 }
@@ -2208,6 +2467,15 @@ fn all_done(language: Language, name: Option<&str>) -> String {
 
 /// "All done!" or "All done, X!" at a quoted line's start: the name, and
 /// the rest of the line.
+fn find_all_set(quoted: &str) -> Option<(Option<&str>, &str)> {
+    if let Some(rest) = quoted.strip_prefix("All set! ") {
+        return Some((None, rest));
+    }
+    let rest = quoted.strip_prefix("All set, ")?;
+    let (name, rest) = rest.split_once("! ")?;
+    Some((Some(name), rest))
+}
+
 fn find_all_done(quoted: &str) -> Option<(Option<&str>, &str)> {
     if let Some(rest) = quoted.strip_prefix("All done! ") {
         return Some((None, rest));
@@ -2274,6 +2542,8 @@ mod tests {
             ]
             .map(str::to_owned),
         );
+        notes.extend(super::super::walk_v2::NOTES.map(str::to_owned));
+        notes.push(super::super::walk_v2::MAKE_DONE.replace("{skill}", "drink water"));
         assert!(notes.len() > 60, "{}", notes.len());
         notes
     }

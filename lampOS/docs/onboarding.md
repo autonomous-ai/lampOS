@@ -9,6 +9,8 @@ and rollout limitations are recorded with each PR.
 
 > **The walk, 9 Nov (#4080, the lead's call):** `order` in `skills/onboarding/skill.toml` is `where_you_sit`, `who_you_are`, `touch`, `how_you_sound`, about 2-3 minutes. Touch and how you sound come back after who you are (no step assumes an earlier place: each is measured on its own), touch first since a pet is quick and needs no quiet. Touch is taught as petting; how you sound only teaches the call: one accepted "Hey Lamp" ends it, a miss gets one reminder and the walk moves on, with no bar and no sentence. **PARKED (#4080):** the three-call bar and the sentence part stay in `crates/voice/src/onboarding/near.rs` behind `THREE_CALLS` (false); set it to true, with the old lines, to bring them back. The other steps stay out of `order` (#5499).
 
+> **The walk Lamp leads by voice (#8871, `LAMP_ONBOARDING_WALK_V2`, off unless set):** try a skill and make a skill after how you sound, Wi-Fi counted as step one ("Step 2 of 7: ..."), short lines, the walk's own answers to "which step are we on?", and a short done line with the Store. See "The walk Lamp leads by voice" below.
+
 > **The lead's lines, 9 Nov (#4080):** the walk opens "Hi! I'm your lamp. Let's get to know each other. Four quick steps, just a few minutes.", and each step's first ask opens with its step word: "Step one:", "Step two:", "Step three:", and "Last step:" for the last step offered. The count and the words come from the skill's `order` with each step's availability (`Onboarding::step_count`), so a step that is not available (no touch pads, no ears) is left out and the rest renumbered; a redo of one step (`redo_step`) says that step alone, with no step word. They are put in by the walk (`in_language::Counter`, `with_counter`) and said in the owner's language with the line. The walk ends "All done! You can add more skills in the Autonomous app. Now, ask me anything." (`skill::PREFERENCES_DONE`), "All done, {Name}!" when it kept the owner's name (`in_language::with_name`). A skip of the last step says its skip line and then that closing line (the Reviewer-lead's P2 on #5809). Steps and lines: where you sit, "Sit where you usually sit, and look at me." (`sit_done` "There you are. I can see you.", `sit_no_face` "I can't see you yet. Look at me for a moment.", `sit_failed` "No problem. You can turn me toward you any time."); who you are, "What should I call you?" with its read-back and face question as before; touch, "Pet the top of my head." (`touch_done` "Mmm, that feels nice.", `touch_remind` "Gently, on top of my head.", `touch_failed` "That's okay. You can pet my head any time."); how you sound, "When you want me, start with 'Hey Lamp'. When I stop talking, give it a try." (`near_done` "That's me! Say 'Hey Lamp' whenever you need me.", `near_missed` "I didn't catch that. Try once more when I stop talking.", `near_failed` "No worries. Just say 'Hey Lamp' whenever you need me."). These replace the lines quoted for these steps further down where they differ.
 
 > **A step word in the model's own reply (#5890, a #5809 follow-up):** on lamp-52e6 with 11091 (9 Nov, 21:46) the face-yes reply said "I'll know you now, Walter. Step three: tell me one thing you'd like me to keep in mind for you.", a made-up ask, 12 s before the walk said its own "Step three: pet the top of my head." While the walk is under way, `onboarding::model_words` (the clause check in `onboarding/in_language.rs`) keeps a step word the turn's line says only when the clause it opens is that line's ask, meaning at least half the clause's words are the ask's words, so the model's own wording of the real ask stays. Any other clause is dropped together with its step word, so that reply says only "I'll know you now, Walter." A step word the line doesn't say is dropped as before (`without_step_words`). Replies outside the walk and the walk's own lines are unchanged.
@@ -886,6 +888,120 @@ privacy or preferences. Only the giving-way step asks the body for one move, a `
 it is done, after the hand has let go. The step itself asks the body for
 nothing: the body gives way to a hand by its own rule (`--give-way`,
 [body.md](body.md)); ordinary safety and physical controls keep their reactions.
+
+## The walk Lamp leads by voice (#8871, `LAMP_ONBOARDING_WALK_V2`)
+
+Off unless `LAMP_ONBOARDING_WALK_V2=on` exactly, with `LAMP_ONBOARDING`
+(`onboarding::walk_v2`). The phone shows only the walk's progress, so Lamp
+leads every step by voice and tells the person where they are. With the
+switch off, nothing below changes anything.
+
+- **Two more steps, the walk's own.** After `how_you_sound`, `try_skill` and
+  then `make_skill` (`walk_v2::with_steps`). They are in code, never in the
+  skill file: `skills/onboarding/skill.toml`'s `order` stays the four steps,
+  since an older Voice or lamp-skills refuses a step it doesn't know there,
+  and a file that names either is refused here too. Voice puts them into the
+  order it snapshots at start (`Onboarding::set_walk_v2`), and the provider
+  worker reads the same order (`installed_order`). Make a skill is offered
+  only with `LAMP_MAKE_SKILL=on`; without it the walk has five steps.
+- **Short lines.** The owner's rule: one sentence an opener, about 12
+  words at most, the why only where it isn't obvious. With the switch on,
+  in memory only (`walk_v2::extend`): where you sit asks "Sit where you
+  usually do and look at me." and ends "There you are."; touch asks "Pet
+  my head. That's how you say hi without talking." and ends "Mmm, nice.";
+  the walk's own face question is "Can I remember your face, so I know
+  it's you? It stays on this lamp." (`walk_v2::FACE_ASK`, a question the
+  worker's setup save takes a yes to); a step left for later says "We'll
+  do this later.". Who you are keeps the file's "What should I call you?"
+  and its consent clauses; how you sound keeps its lines for now.
+- **Try a skill.** Asked as a note for the model, in its step word: "Say
+  'turn blue'." No "Hey Lamp" is needed during the walk. Done only when a light call (`light_colour`, `light_scene`, any
+  `light_*`) answered without an error in a turn of the person's own line
+  (`heard`), whatever the words ("make it blue" too): the worker posts
+  `{"step":"try_skill","outcome":"done","by":<call>}` to the mailbox
+  (`walk_v2::tool_ran`, from `tools::walk_evidence`), and the runner takes it
+  only while it has asked that step. Then the walk says "See? Just ask."
+- **Make a skill.** Asked as a note: "Teach me something simple, like
+  'remind me to drink water every 30 minutes'." Any skill counts, in any
+  words. Done only when `make_skill`, from the person's own line, made a
+  skill and put it on (`made`, `on: true`): the worker posts its name and
+  description, and the walk reads it back itself, "I made <name>: it <what
+  it does>. Change it any time in the app." (in another language, "<name>:
+  <what it does>"). While
+  the walk leads the step, the make's answer to the model says "The lamp
+  reads this skill back itself now. Say nothing more.", so it is said once;
+  a make refused gets "Say only this: "Let's start with something simpler,
+  like: remind me to drink water every 30 minutes."" in its place. A vague
+  ask gets one short question from the model (its note); asked for ideas,
+  "Or: turn the light warm at 8 pm, or tell me to stand up every hour."
+- **Quiet, then later.** For both: no words 10 s after the ask, with the room
+  quiet (`walk_v2::REMIND_QUIET_US`), one reminder: "Just say: turn blue." or
+  the ideas line. The give-up is `STEP_GIVE_UP_US` (90 s) from the ask or the
+  lamp's latest words, plus the longest make for make a skill
+  (`make_skill_local::longest_make`), once the room has been quiet 20 s: with
+  no words heard, asked once more; otherwise, or the second time, `later`,
+  said with the `later` line. The model may only skip them (`setup_step`
+  skipped, said "Okay, we'll skip trying a skill for now." / "… making a
+  skill …"); a model's done is refused.
+- **Tried and not done is later.** With the switch on, a walk step that ends
+  `failed` (who you are, touch, how you sound, try and make a skill; never
+  where you sit) is kept `later` instead (`Onboarding::finish`, the one
+  place), so it is offered again after the walk as a step nobody tried is,
+  and the app shows it as later.
+- **Wi-Fi is step one, and every opener says its step.** The counter
+  counts Wi-Fi, done by the time Lamp speaks (`in_language::Counter::Wifi`):
+  the walk opens "Hi! Let's get to know each other. It takes a few
+  minutes, but it helps me work well for you. We have seven steps. Wi-Fi
+  is done. Now step two: sit where you usually do and look at me.", each
+  step after opens "Step 3 of 7: ...", and the last "Step 7 of 7, the last
+  one: ...".
+  The count follows the steps this lamp offers: with no touch pads, "We
+  have six steps". Said in the
+  owner's language too.
+- **Where are we.** While the walk is under way, the runner keeps three fixed
+  lines from its real state (`walk_v2::state_lines`): the step led, or the
+  next one while none is (nobody there, a pause), its place n of 7 and its
+  ask: "We're on step 5 of 7, Call Lamp: say 'Hey Lamp' when I stop
+  talking." for "which step are we on?", "what were we doing?", "where are
+  we?"; "Three more, about two minutes. Right now, Call Lamp: …" for "how
+  many more?", "how much longer?"; "Almost! Wi-Fi's done, and we're at step
+  5 of 7, Call Lamp: …" for "is setup done?", "are we finished?". The step
+  names are the owner's: Where you sit, Who you are, Touch, Call Lamp, Try a
+  skill, Make a skill. They go to the second route's worker with the walk's
+  state (`ProviderInput::WalkUnderWay`'s `state`), and a person's line that
+  asks one of these plain phrases (`walk_v2::state_asked`, English and a few
+  Vietnamese ones) is answered with that line as it is, no chat asked, the
+  step's ask inside it. The model is never told the steps (#5499). Not on
+  the Live route.
+- **The done line.** "All set, <Name>! Find more skills in the Store, in
+  the app." (`walk_v2::done_line`); the name only when it is short to say
+  (one word, at most 10 letters, `walk_v2::short_name`), otherwise "All
+  set! ...".
+- **For the app.** The heartbeat's `walk_steps` names the walk's steps after
+  Wi-Fi this lamp offers, and `steps_ended` holds all of them, a step left
+  for later as `later`; lamp-cloud says `onboarding_walk_version: 2` and
+  `onboarding_walk_steps` in `system.info` and adds `steps` (each step's
+  outcome, no names, no words) to `onboarding.done` ([cloud.md](cloud.md)).
+  The `onboarding.step` ids are unchanged; the app counts Wi-Fi itself.
+- **The phone moves first.** The step Lamp asks is on the heartbeat
+  (`asking`) as soon as it is chosen, and lamp-cloud tells the app
+  (`onboarding.step`, outcome `asked`). The walk's first line waits 1.5 s
+  after it (`ASKED_LEAD_US`) and until the walk's id is committed, so the
+  phone leaves its update screen before Lamp speaks; later steps are told
+  as they are asked, with no wait.
+- **Older builds.** Progress files keep the new steps under their ids; an
+  older voice reads past a step it doesn't know (#2110), and lamp-update
+  still waits for the nine it knows. The heartbeat's and `onboarding.done`'s
+  new fields are only added, so an older app reads them as before.
+
+Tests: `onboarding::tests::a_light_call_and_a_skill_made_from_their_lines_end_the_walk_read_back`,
+`a_light_call_before_try_a_skill_or_a_models_done_ends_nothing`,
+`a_silent_try_is_reminded_once_then_left_for_later`,
+`with_the_walk_v2_a_failed_step_is_kept_for_later_only_with_its_switch`,
+`the_walk_v2_counts_wifi_as_step_one_and_tells_where_it_stands`,
+`with_the_walk_v2_off_the_walk_is_as_before`, `onboarding::walk_v2::tests`,
+`lamp_msgs` `walk_steps_only_add_a_field_and_the_old_shape_is_unchanged`, and
+lamp-cloud's `onboarding_done::tests::the_walks_outcomes_only_add_a_field`.
 
 ## A step that was not ready, offered later
 

@@ -2121,7 +2121,8 @@ fn run_spoken_call_inner(
             return ("the agent skill's yes", ToolAnswer::plain(told), true);
         }
         let call = stop_as_heard(directory, call, request, heard);
-        let (answer, answered) = ask_with_context(directory, &call, ASK_DEADLINE, context);
+        let (mut answer, answered) = ask_with_context(directory, &call, ASK_DEADLINE, context);
+        walk_evidence(&call.name, heard, &mut answer.told);
         ("the executive", answer, answered)
     } else {
         let (whom, (mut told, answered)) = run_call_with_scope(route, call, request, heard, lease);
@@ -2152,6 +2153,25 @@ fn face_gone_with_everything(settings: &Settings, route: &Route, told: &Value) {
     {
         crate::known_faces::owner_forgotten();
         crate::onboarding::face_forgotten(file);
+    }
+}
+
+/// A call run from a person's line, for the walk Lamp leads by voice
+/// (#8871, `LAMP_ONBOARDING_WALK_V2`): a light call or a skill made is its
+/// "try a skill" and "make a skill" evidence ([`crate::onboarding::walk_v2::tool_ran`]).
+/// Nothing with the switch or the walk off.
+fn walk_evidence(name: &str, heard: bool, told: &mut Value) {
+    if !heard || !crate::onboarding::walk_v2::on() {
+        return;
+    }
+    if let Some(file) = crate::onboarding::file_from_environment() {
+        crate::onboarding::walk_v2::tool_ran(
+            &file,
+            crate::onboarding::installed_order(),
+            name,
+            heard,
+            told,
+        );
     }
 }
 
@@ -2313,7 +2333,7 @@ fn run_call_with_scope(
         );
     }
     let deadline = ASK_DEADLINE;
-    let result = match route {
+    let mut result = match route {
         Route::Memory(socket, faces, reminders, tasks) => {
             if crate::remember::is_forget(&call.name) {
                 crate::remember_speaker::forget();
@@ -3135,6 +3155,9 @@ fn run_call_with_scope(
         | Route::DeskTime
         | Route::Nobody => ("nobody", (unavailable(), false)),
     };
+    if matches!(route, Route::Executive(_) | Route::MakeLocal(_)) {
+        walk_evidence(&call.name, heard, &mut result.1.0);
+    }
     if scope_current(lease, request) {
         result
     } else {

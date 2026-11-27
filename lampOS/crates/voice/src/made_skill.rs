@@ -13286,16 +13286,7 @@ pub fn on_line(made: &Made) -> String {
     let name = spoken_name(&made.name);
     // A task for the lamp's agent (`LAMP_MAKE_NO_CANNOT`, #7234): what the
     // agent will do and when, never said as made, its description whole.
-    let does = made.description.trim().trim_end_matches(['.', '!', '?']);
-    let mut letters = does.chars();
-    let does: String = match (letters.next(), letters.clone().next()) {
-        // "Dims the light" said after a colon as "dims the light", never
-        // a word all in capitals ("LED").
-        (Some(first), second) if !second.is_some_and(char::is_uppercase) => {
-            first.to_lowercase().chain(letters).collect()
-        }
-        _ => does.to_owned(),
-    };
+    let does = lowered_first(made.description.trim().trim_end_matches(['.', '!', '?']));
     // A task for the lamp's agent (`LAMP_MAKE_NO_CANNOT`, #7234): what the
     // agent will do and when, never said as made.
     if made.uses.agent_task {
@@ -13617,6 +13608,18 @@ pub fn not_on_line(why: &str) -> String {
 /// #7234), never said as made.
 pub fn agent_not_on_line(why: &str) -> String {
     format!("I couldn't set that up for the lamp's agent: {why}.")
+}
+
+/// What a skill does, said after a colon: "Dims the light" as "dims the
+/// light", never a word all in capitals ("LED").
+pub fn lowered_first(does: &str) -> String {
+    let mut letters = does.chars();
+    match (letters.next(), letters.clone().next()) {
+        (Some(first), second) if !second.is_some_and(char::is_uppercase) => {
+            first.to_lowercase().chain(letters).collect()
+        }
+        _ => does.to_owned(),
+    }
 }
 
 /// A skill's name as it is said: its dashes as spaces.

@@ -203,6 +203,19 @@ pub trait Lamp {
         None
     }
 
+    /// The walk Lamp leads by voice (#8871): its steps after Wi-Fi, from the
+    /// voice's heartbeat, while the voice's `LAMP_ONBOARDING_WALK_V2` is on;
+    /// empty otherwise.
+    fn onboarding_walk_steps(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The walk step Lamp asks now (#8871), from the voice's heartbeat,
+    /// with [`Self::onboarding_walk_steps`] only.
+    fn onboarding_asking(&self) -> Option<lamp_msgs::OnboardingStepAsked> {
+        None
+    }
+
     /// The app's open onboarding page (#6076, `crate::onboarding_page`).
     fn onboarding_page(&mut self, data: &Value) -> Result<Value, String> {
         crate::onboarding_page::PAGES
@@ -682,6 +695,13 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 info["onboarding_page_supported"] = json!(true);
                 // Which page contract (#6366): 2 is per-tap Add and `done`.
                 info["onboarding_page_version"] = json!(crate::onboarding_page::VERSION);
+                // The walk Lamp leads by voice (#8871): only while the
+                // voice's switch is on, with its steps after Wi-Fi.
+                let walk = lamp.onboarding_walk_steps();
+                if !walk.is_empty() {
+                    info["onboarding_walk_version"] = json!(crate::onboarding_done::WALK_VERSION);
+                    info["onboarding_walk_steps"] = json!(walk);
+                }
             }
             // `update_events_supported` (#6284): this lamp sends
             // `update.started` and `update.ended`, so the app may show
@@ -1254,6 +1274,7 @@ pub mod tests {
         /// What `onboarding` says, and the switch's file (#5812).
         pub onboarding: Option<u64>,
         pub onboarding_done: Option<std::path::PathBuf>,
+        pub onboarding_walk: Vec<String>,
         /// What `onboarding_steps` says (#5979).
         pub onboarding_steps: Option<(u64, Vec<lamp_msgs::OnboardingStepEnded>)>,
         /// The switch's file for the update's events (#6284), and the
@@ -1360,6 +1381,9 @@ pub mod tests {
         }
         fn onboarding_steps(&self) -> Option<(u64, Vec<lamp_msgs::OnboardingStepEnded>)> {
             self.onboarding_steps.clone()
+        }
+        fn onboarding_walk_steps(&self) -> Vec<String> {
+            self.onboarding_walk.clone()
         }
         fn make_skill(&self) -> Option<std::path::PathBuf> {
             self.make_skill.clone()
@@ -2018,6 +2042,23 @@ pub mod tests {
         // #6366: the page contract's version beside it, same switch.
         assert_eq!(told["onboarding_page_version"], 2);
         assert!(info.get("onboarding_page_version").is_none(), "{info}");
+        // #8871: the walk Lamp leads by voice only while the voice says it,
+        // its steps beside it.
+        assert!(told.get("onboarding_walk_version").is_none(), "{told}");
+        assert!(told.get("onboarding_walk_steps").is_none(), "{told}");
+        let mut walking = Fake {
+            onboarding_done: Some("/nonexistent/onboarding-done".into()),
+            onboarding_walk: vec!["where_you_sit".into(), "make_skill".into()],
+            ..Fake::default()
+        };
+        let told = answer(&mut walking, "system.info", &Value::Null)
+            .unwrap()
+            .unwrap();
+        assert_eq!(told["onboarding_walk_version"], 2);
+        assert_eq!(
+            told["onboarding_walk_steps"],
+            json!(["where_you_sit", "make_skill"])
+        );
         // #6284: `update_events_supported` only with its own switch.
         assert!(info.get("update_events_supported").is_none(), "{info}");
         assert!(told.get("update_events_supported").is_none(), "{told}");

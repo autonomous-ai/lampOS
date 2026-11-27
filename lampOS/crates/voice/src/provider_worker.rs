@@ -940,6 +940,12 @@ pub enum ProviderInput {
         /// line is answered with it, no chat. Absent otherwise.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         updating: Option<String>,
+        /// Where the walk Lamp leads by voice stands (#8871,
+        /// `onboarding::walk_v2`): its own lines for "which step?", "how
+        /// many more?" and "is setup done?", said as they are, no chat.
+        /// Absent with its switch off.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        state: Option<crate::onboarding::walk_v2::StateLines>,
     },
     /// A whole request in writing, for a turn the lamp begins itself: it is
     /// a start and an end at once and carries no sound.

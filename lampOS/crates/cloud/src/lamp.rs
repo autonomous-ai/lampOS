@@ -824,6 +824,20 @@ impl Lamp for Real {
         Some((pending.walk_id?, pending.steps_ended))
     }
 
+    fn onboarding_asking(&self) -> Option<lamp_msgs::OnboardingStepAsked> {
+        self.latest(lamp_msgs::OnboardingPending::TOPIC)
+            .and_then(|message| message.parse::<lamp_msgs::OnboardingPending>().ok())
+            .filter(|pending| !pending.walk_steps.is_empty())
+            .and_then(|pending| pending.asking)
+    }
+
+    fn onboarding_walk_steps(&self) -> Vec<String> {
+        self.latest(lamp_msgs::OnboardingPending::TOPIC)
+            .and_then(|message| message.parse::<lamp_msgs::OnboardingPending>().ok())
+            .map(|pending| pending.walk_steps)
+            .unwrap_or_default()
+    }
+
     fn onboarding_page(&mut self, data: &Value) -> Result<Value, String> {
         let light = self.light().ok();
         let run = self.skill_run();

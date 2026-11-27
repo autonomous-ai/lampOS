@@ -4,7 +4,9 @@
 //! `onboarding.done` is pushed. Only the four walk steps
 //! (`lamp_msgs::OnboardingPending::steps_ended`), each with the walk's own
 //! outcome (`done`, `skipped`, `failed` or `not_available`) and its end in
-//! Unix ms. No names, no words.
+//! Unix ms; with the voice's `LAMP_ONBOARDING_WALK_V2` on (#8871), also
+//! `try_skill` and `make_skill`, and a step left for later as `later`. No
+//! names, no words.
 //!
 //! Read off the voice's `onboarding/pending` heartbeat every
 //! [`crate::onboarding_done::EVERY`], only while connected. Each step's end,
@@ -16,6 +18,12 @@
 //! nothing waits for the broker's ack, and an end more than [`FOR`] old when
 //! first looked at (ended offline) is let go. Behind `onboarding.done`'s
 //! switch (`LAMP_APP_ONBOARDING_DONE`), and never holds `onboarding.done` up.
+//!
+//! With the voice's `LAMP_ONBOARDING_WALK_V2` on (#8871), the step Lamp
+//! asks is told too, once, as soon as it is on the heartbeat, with
+//! `outcome` `asked` and `at` when it was asked ([`with_asked`]): the voice
+//! holds the walk's first line until lamp-cloud can have looked, so the
+//! phone moves on before Lamp speaks.
 use lamp_msgs::OnboardingStepEnded;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -42,6 +50,24 @@ pub fn data(walk_id: u64, ended: &OnboardingStepEnded) -> Value {
     })
 }
 
+/// The heartbeat's walk with the step asked (#8871) after its ends, as
+/// `outcome` `asked`, for [`Steps::due`].
+pub fn with_asked(
+    walk: Option<(u64, Vec<OnboardingStepEnded>)>,
+    asking: Option<lamp_msgs::OnboardingStepAsked>,
+) -> Option<(u64, Vec<OnboardingStepEnded>)> {
+    let (walk_id, mut ended) = walk?;
+    ended.extend(asking.map(|asked| OnboardingStepEnded {
+        step: asked.step,
+        outcome: ASKED.into(),
+        at: asked.at,
+    }));
+    Some((walk_id, ended))
+}
+
+/// The outcome a step asked is told with (#8871).
+pub const ASKED: &str = "asked";
+
 /// What [`FILE`] keeps: the walk, and its steps' ends tried.
 #[derive(Default, Serialize, Deserialize)]
 struct Sent {
@@ -54,6 +80,24 @@ struct Sent {
 struct Tried {
     step: String,
     at: u64,
+    /// `asked` for a step asked (#8871); empty for an end, and in a file
+    /// from before it.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    asked: String,
+}
+
+impl Tried {
+    fn of(ended: &OnboardingStepEnded) -> Self {
+        Self {
+            step: ended.step.clone(),
+            at: ended.at,
+            asked: if ended.outcome == ASKED {
+                ASKED.into()
+            } else {
+                String::new()
+            },
+        }
+    }
 }
 
 /// What was told of the walk's steps.
@@ -105,11 +149,8 @@ impl Steps {
         let due: Vec<_> = ended
             .into_iter()
             .filter(|ended| {
-                let tried = Tried {
-                    step: ended.step.clone(),
-                    at: ended.at,
-                };
-                !self.sent.steps.contains(&tried) && now_ms <= ended.at.saturating_add(FOR)
+                !self.sent.steps.contains(&Tried::of(ended))
+                    && now_ms <= ended.at.saturating_add(FOR)
             })
             .collect();
         (!due.is_empty()).then_some((walk_id, due))
@@ -124,10 +165,7 @@ impl Steps {
     /// `ended`, of the walk `due` gave, was tried: `handed` to the client
     /// or not, never tried again. Kept in [`FILE`]. The journal's line.
     pub fn tried(&mut self, ended: &OnboardingStepEnded, handed: bool) -> String {
-        self.sent.steps.push(Tried {
-            step: ended.step.clone(),
-            at: ended.at,
-        });
+        self.sent.steps.push(Tried::of(ended));
         let walk = self.sent.walk_id;
         let step = &ended.step;
         let what = if handed {
@@ -150,6 +188,46 @@ impl Steps {
 mod tests {
     use super::*;
     use crate::onboarding_done::EVERY;
+
+    /// #8871: the step asked is told once, beside the ends, before any
+    /// end of it; without it the ends are as before.
+    #[test]
+    fn the_step_asked_is_told_once_as_asked() {
+        let dir =
+            std::env::temp_dir().join(format!("onboarding-step-asked-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut steps = Steps::new(dir.join("onboarding-done"));
+        let asked = lamp_msgs::OnboardingStepAsked {
+            step: "where_you_sit".into(),
+            at: WALK + 10,
+        };
+        let now = Instant::now();
+        let walk = || with_asked(Some((WALK, Vec::new())), Some(asked.clone()));
+        let (walk_id, due) = steps.due(now, WALK + 20, walk).unwrap();
+        assert_eq!(walk_id, WALK);
+        assert_eq!(due, [ended("where_you_sit", ASKED, WALK + 10)]);
+        assert_eq!(
+            data(WALK, &due[0]),
+            json!({"step": "where_you_sit", "outcome": "asked", "at": WALK + 10, "walk_id": WALK})
+        );
+        steps.tried(&due[0], true);
+        assert_eq!(steps.due(now + EVERY, WALK + 30, walk), None);
+        // Its end at the same moment is still its own event.
+        let both = || {
+            with_asked(
+                Some((WALK, vec![ended("where_you_sit", "done", WALK + 10)])),
+                Some(asked.clone()),
+            )
+        };
+        let (_, due) = steps.due(now + EVERY * 2, WALK + 40, both).unwrap();
+        assert_eq!(due, [ended("where_you_sit", "done", WALK + 10)]);
+        assert_eq!(
+            with_asked(Some((WALK, Vec::new())), None),
+            Some((WALK, Vec::new()))
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     const WALK: u64 = 1_762_675_100_000;
 
@@ -226,7 +304,8 @@ mod tests {
             kept.steps,
             [Tried {
                 step: "where_you_sit".into(),
-                at: redo + 5_000
+                at: redo + 5_000,
+                asked: String::new(),
             }]
         );
     }

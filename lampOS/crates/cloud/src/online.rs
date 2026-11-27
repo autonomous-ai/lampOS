@@ -882,7 +882,7 @@ async fn session(
                         let looked = std::time::Instant::now();
                         if connected
                             && let Some(steps) = onboarding_step.as_mut()
-                            && let Some((walk_id, ended)) = steps.due(looked, crate::chat::now_ms(), || lamp.onboarding_steps())
+                            && let Some((walk_id, ended)) = steps.due(looked, crate::chat::now_ms(), || crate::onboarding_step::with_asked(lamp.onboarding_steps(), lamp.onboarding_asking()))
                         {
                             for ended in ended {
                                 let event = me
@@ -911,7 +911,7 @@ async fn session(
                             && let Some(at) = done.due(looked, || lamp.onboarding())
                         {
                             let event = me
-                                .data(&now(), crate::onboarding_done::KIND, &Ok(Some(crate::onboarding_done::data(at))))
+                                .data(&now(), crate::onboarding_done::KIND, &Ok(Some(crate::onboarding_done::data_with_steps(at, &lamp.onboarding_walk_steps(), &lamp.onboarding_steps().map(|(_, ended)| ended).unwrap_or_default()))))
                                 .to_string();
                             let tag = Tagged::OnboardingDone(at);
                             if handed.publish_tagged(&client, account.fd_channel.as_str(), event, tag) {

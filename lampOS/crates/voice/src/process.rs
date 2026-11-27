@@ -3471,6 +3471,9 @@ fn second_route_worker_environment(
         // A skill made by this worker's own chat (Fourteen's proposal on #4710),
         // the only maker since 3 Nov.
         crate::made_skill::ENVIRONMENT,
+        // The walk Lamp leads by voice (#8871): its order and its try and
+        // make evidence are the worker's too.
+        crate::onboarding::walk_v2::ENVIRONMENT,
         // A recurring thing for the lamp to do told a skill, and listening
         // for a make's words (lamp-9adf, 17 Nov).
         crate::skill_recurring::ENVIRONMENT,
@@ -3909,6 +3912,7 @@ mod tests {
             crate::untied_going_on::GRACE_ENVIRONMENT,
             crate::untied_going_on::CALLER_SPEAKING_ENVIRONMENT,
             crate::made_skill::ENVIRONMENT,
+            crate::onboarding::walk_v2::ENVIRONMENT,
             crate::skill_recurring::ENVIRONMENT,
             crate::second_provider::net::key_terms::SKILL_ENVIRONMENT,
             crate::make_skill_agent::ENVIRONMENT,
@@ -5232,6 +5236,7 @@ mod tests {
                     || name == crate::untied_going_on::GRACE_ENVIRONMENT
                     || name == crate::untied_going_on::CALLER_SPEAKING_ENVIRONMENT
                     || name == crate::made_skill::ENVIRONMENT
+                    || name == crate::onboarding::walk_v2::ENVIRONMENT
                     || name == crate::skill_recurring::ENVIRONMENT
                     || name == crate::second_provider::net::key_terms::SKILL_ENVIRONMENT
                     || name == crate::make_skill_agent::ENVIRONMENT
@@ -5562,6 +5567,7 @@ mod tests {
                     "LAMP_NO_FACE_FOLLOW_UP_BY_VOICE=on",
                     "LAMP_NO_WORDS_AGAIN=on",
                     "LAMP_NUDGE_CLAIM_CHECKED=on",
+                    "LAMP_ONBOARDING_WALK_V2=on",
                     "LAMP_ONE_AS_LAMP=on",
                     "LAMP_ONE_FACE_REMINDERS=on",
                     "LAMP_ONE_REPLY_WINDOW=on",
