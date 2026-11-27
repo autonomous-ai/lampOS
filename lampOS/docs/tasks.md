@@ -8814,10 +8814,17 @@ never have asked or taken an answer on a lamp).
     yes test), or any reply with a sign-in or pairing word ("Yeah, sign it
     in.", "Sure, sign it in.").
 
-  A line with a word that refuses (`sign_in::refuses`: "no", "don't",
-  "dont", "not", "never", "later", "wait", "cancel", "stop", "không",
-  "đừng", "chưa", "để sau") is neither an ask nor a yes: "No, don't sign
-  it in" after the offer is refused.
+  A refusal counts only where it governs (Twelve's P2 on #8808): a
+  refusal word (`sign_in::refusal_word`: "no", "not", "never", "don't",
+  "dont", "cancel", "stop", any "…n't", "không", "đừng", "chưa") at most
+  two words before the sign-in word, in its clause (split at `,` `.` `?`
+  `!` `;` `:` and dashes; `sign_in::free_sign_in_words`), or a whole reply
+  that says no or not now (`sign_in::refuses_whole`: it begins with "no",
+  "nope", "nah", "không", "chưa" or "đừng", or says "not now", "not yet",
+  "later" or "để sau"). So "No, don't sign it in", "Yes, but not now",
+  "Sign it in later" and "I'd rather you didn't sign it in" are refused;
+  "It's not signed in, can you sign it in?", "Don't forget to sign me in
+  to my computer" and "Sign me in, I can't wait" are not.
 
   The words, one set for both sides (`sign_in::sign_in_word`): sign-in
   words are "sign … in/into/onto" or "signed … in/into/onto" (within three
@@ -8846,6 +8853,10 @@ never have asked or taken an answer on a lamp).
   `a_yes_to_an_offer_in_any_sign_in_words_starts`,
   `a_sign_in_said_with_into_or_signed_starts`,
   `a_yes_with_the_offers_verb_starts_and_a_no_never`,
+  `a_refusal_counts_only_where_it_governs_the_sign_in`,
+  `the_blind_table_of_asks_yeses_and_refusals` (39 rows written from the
+  spec alone; one named exception: "đừng đăng nhập" from a Vietnamese
+  owner is let through while the check is off in Vietnamese),
   `a_vietnamese_owners_ask_code_again_and_yes_are_never_refused`.
 - **The news, in the coordinator, from the tasks part**
   (`sign_in::news`, read every 2 s while a sign-in is open, every 10 s
