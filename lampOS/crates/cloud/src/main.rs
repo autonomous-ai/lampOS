@@ -14,7 +14,6 @@
 //! run by hand as root on the lamp (`lamp_cloud::face_remove`).
 use lamp_cloud::account::{self, Account};
 use lamp_cloud::lamp::{self, Places, Real, Ring, Texts, Wifi};
-use lamp_cloud::wire::Identity;
 use lamp_cloud::{beat, online, ping, reports, signed_out, skills, update_alerts};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -43,17 +42,6 @@ fn say(line: &str) {
 /// `LAMP_SIGNED_OUT` says); never without a login to reject.
 fn watches_login(telling: bool, services: bool, key: &str) -> bool {
     (telling || services) && !key.is_empty()
-}
-
-fn identity(lamp: &Real) -> Identity {
-    Identity {
-        device: "lamp".into(),
-        version: lamp.build.clone(),
-        id: lamp.device_id.clone(),
-        mac: lamp.hostname(),
-        timezone: lamp.timezone(),
-        local_ip: lamp.local_ip(),
-    }
 }
 
 /// `exit-note UNIT`: systemd's `$SERVICE_RESULT`, `$EXIT_CODE` and
@@ -423,7 +411,7 @@ fn main() -> ExitCode {
             alerts_state,
         )
     });
-    let (identity_tx, me) = watch::channel(identity(&lamp));
+    let (identity_tx, me) = watch::channel(lamp.identity());
     let looking = Real {
         places: lamp.places.clone(),
         bus: None,
@@ -459,17 +447,7 @@ fn main() -> ExitCode {
         shutdown: None,
     };
     let stopped = runtime.block_on(async move {
-        let looks = async move {
-            loop {
-                tokio::time::sleep(IDENTITY_EVERY).await;
-                identity_tx.send_if_modified(|me| {
-                    let now = identity(&looking);
-                    let changed = *me != now;
-                    *me = now;
-                    changed
-                });
-            }
-        };
+        let looks = lamp::look(identity_tx, looking, IDENTITY_EVERY);
         let mut said = |line: &str| say(line);
         let mut keep = |next: &Account| {
             if let Some(path) = &rotated
