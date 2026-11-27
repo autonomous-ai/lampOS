@@ -7465,10 +7465,16 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   and `LAMP_KEEP_QUIETLY_ONE_FACE`'s carried keep yes never lets it go. The
   held run marks it (`ScopeLease::mark_held_yes`, `mark_forget_agreed`), so
   that call alone passes `one_face_refused` and the memory route's
-  correction check. Otherwise refused, as before: a correction
-  (`remember` with `replaces`), `keep_rule`, `list_rules`, `set_role` and
-  `end_role` (the privacy read on #5385, also in
-  `remember::role_for_guarded`), and
+  correction check. A `set_role` or `end_role` on such a line, the mouth
+  not used, not gap-held and `LAMP_PRIVATE_ROOM` on, runs on the
+  request with no hold, no question and no new words: `role_on_request`
+  marks the lease (`ScopeLease::mark_held_yes`) before `one_face_refused`,
+  and `remember::role_for_guarded` lets that call by (the memory owner's
+  calls of 27 Nov on #8654: "yes-alone rule cover this too, like forgets
+  and corrections", 17:34; "Run on the request", 17:5x). Otherwise
+  refused, as before: a correction (`remember` with `replaces`),
+  `keep_rule`, `list_rules`, `set_role` and `end_role` (the privacy read
+  on #5385, also in `remember::role_for_guarded`), and
   `cancel_reminder` / `snooze_reminder` unless `LAMP_ONE_FACE_REMINDERS` is
   on, and the line has no services owner outside the private room
   (`services::owner_of`). The memory owner, 16:49 on

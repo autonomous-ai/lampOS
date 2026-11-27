@@ -1692,7 +1692,11 @@ row 8654 L4: 2 trên 2 lần không hỏi gì và bị bỏ). Đèn vẫn không
 nào: lệnh giữ mà câu trả lời không hỏi gì thì bị bỏ (`settle_held_forget`). Lời «có» rõ ràng của họ trong 60 giây ở một câu sau cũng
 là của họ vì chỉ mặt họ trong khung, không mặt nào khác được thấy nói câu ấy
 (phép thử một mặt của phạm vi, từ dấu của mắt, `LAMP_SECOND_SPEAKING_FACE`), chạy
-đúng lệnh ấy trong phạm vi của họ (`take_held_forget`, `HeldForget::face_yes`);
+đúng lệnh ấy trong phạm vi của họ (`take_held_forget`, `HeldForget::face_yes`).
+Một `set_role` hay `end_role` trên câu như vậy, trong phòng riêng, chạy ngay
+trên lượt ấy, không giữ chờ hay hỏi, không dùng miệng (các quyết định của chủ bộ nhớ ngày 27/11
+trên #8654, «yes-alone rule cover this too, like forgets and corrections» và
+«Run on the request»; `second_provider::role_on_request`);
 lần chạy giữ chờ đánh dấu nó đã được đồng ý (`ScopeLease::mark_held_yes`,
 `mark_forget_agreed`), nên chỉ lệnh ấy qua được lệnh từ chối một mặt và bước
 kiểm tra lệnh sửa của tuyến bộ nhớ. Tuyến provider không có giữ chờ và chỉ trả
@@ -1864,7 +1868,7 @@ id thì bộ so khớp lời sửa bị bỏ qua, nên điều mới được gi
 gì bị thay; `keep_rule`, `list_rules` và `forget_rule` bị từ chối;
 `set_role` và `end_role` cũng bị từ chối, cả trong
 `remember::role_for_guarded` (lần đọc riêng tư trên #5385), nên một vị khách
-ngoài khung hình không bỏ hay thay được vai của người chủ;
+ngoài khung hình không bỏ hay thay được vai của người chủ (Với `LAMP_ONE_FACE_FORGETS_ON_YES`, theo các quyết định của chủ bộ nhớ ngày 27/11 trên #8654 («yes-alone rule cover this too, like forgets and corrections», 17:34; rồi «Run on the request», 17:5x): một `set_role` hay `end_role` trên một câu nói là của họ vì chỉ mặt họ trong khung, không thấy miệng nói (`ScopeLease::in_view_by_one_face`: không mang tiếp, không sticky, không bị thu hẹp, không trả lời lời đã thấy nói), không dùng miệng, không bị giữ vì khoảng trống, và `LAMP_PRIVATE_ROOM` bật, thì chạy ngay trên chính lượt ấy: không giữ chờ, không hỏi, không thêm câu chữ mới (`second_provider::role_on_request`, đánh dấu lease bằng `ScopeLease::mark_held_yes`, nên chỉ lệnh ấy qua được `one_face_refused` và `remember::role_for_guarded`). Có mặt thứ hai trong khung, một mặt khác được thấy nói, câu mang tiếp, hay phòng riêng tắt: vẫn bị từ chối như trước. Công tắc tắt: giống hệt như trước.);
 `cancel_reminder` và `snooze_reminder` bị từ chối trừ khi
 `LAMP_ONE_FACE_REMINDERS` bật (điều chấp nhận ngày 4/11); và câu ấy không có
 chủ dịch vụ (`services::owner_of`), nên không `service_read` nào chạy cho nó,

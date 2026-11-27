@@ -989,7 +989,11 @@ dropped (`settle_held_forget`). Their
 plain yes within 60 s on a later line theirs by their face alone in view,
 no other face seen speaking it (the scope's one-face test from the eyes'
 marks, `LAMP_SECOND_SPEAKING_FACE`), runs exactly that call in their scope
-(`take_held_forget`, `HeldForget::face_yes`); its held run marks it agreed
+(`take_held_forget`, `HeldForget::face_yes`). A `set_role` or `end_role` on
+such a line, in the private room, runs on the request with no hold or
+question, the mouth not used (the memory owner's calls of 27 Nov on #8654,
+"yes-alone rule cover this too, like forgets and corrections" and "Run on
+the request"; `second_provider::role_on_request`). Its held run marks it agreed
 (`ScopeLease::mark_held_yes`, `mark_forget_agreed`), so it alone passes the
 one-face refusal and the memory route's correction check. The provider
 route has no hold and answers `ONE_FACE_JUST_KEPT` ("when I can see you say
@@ -1256,7 +1260,9 @@ privacy read on #5592): a `remember` that corrects a kept thing by id
 (`replaces`, `remember::corrects`) is refused like a forget, and without an
 id the plain correction matcher is skipped, so the keep is kept plainly and
 nothing is replaced; `keep_rule`, `list_rules` and `forget_rule` are refused;
-`set_role` and `end_role` are refused too, leaving the held role unchanged;
+`set_role` and `end_role` are refused too, leaving the held role unchanged
+(but see `LAMP_ONE_FACE_FORGETS_ON_YES` above: in the private room they run on
+the request);
 `cancel_reminder` and `snooze_reminder` are refused unless
 `LAMP_ONE_FACE_REMINDERS` is on (the 4 Nov acceptance); and the line has no
 services owner (`services::owner_of`), so no `service_read` runs for it,
@@ -3229,7 +3235,7 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   `set_role` and `end_role` are in `ONE_FACE_REFUSED`, refused by both
   runners and again by `remember::role_for_guarded`, so a guest off camera
   with the owner's face silent in view ends or replaces no role; seen
-  speaking, they run as theirs. A role asked by someone not
+  speaking, they run as theirs. With `LAMP_ONE_FACE_FORGETS_ON_YES`, the memory owner's calls of 27 Nov on #8654 ("yes-alone rule cover this too, like forgets and corrections", 17:34; then "Run on the request", 17:5x): a `set_role` or `end_role` on a spoken line theirs by their own face alone in view, the mouth not seen (`ScopeLease::in_view_by_one_face`: not carried, sticky, narrowed or answering words seen said), the mouth not used, not held by a face's gap, and `LAMP_PRIVATE_ROOM` on, runs on the request itself: no hold, no question and no new words (`second_provider::role_on_request`, which marks the lease, `ScopeLease::mark_held_yes`, so that call alone passes `one_face_refused` and `remember::role_for_guarded`). A second face in view, another face seen speaking, a carried line or the private room off: refused as before. Off: byte for byte as before. A role asked by someone not
   placed is told for that conversation only and never written; an unplaced
   `end_role` changes no one's kept role. An end the memory did not write
   keeps the role held and tells the model it failed, so it never says
