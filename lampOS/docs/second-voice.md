@@ -6285,20 +6285,33 @@ after a take-over, but now for every turn:
       "hi" or "hello" and then "Lamp" written as such, in any case and with
       any punctuation (`attention::opens_with_hey_lamp`: "Hey Lamp, …",
       "Hey, lamp.", "Hi Lamp"; never "Hey man", "Hey Lynn", "Hey lamb" or a
-      bare "Lamp, …"), or a line whose head was tapped
-      (`Attention::simple_called`); a turn a computer opened is no call. A
+      bare "Lamp, …"; nor "Okay hey Lamp", "Hey there Lamp" or "Hey
+      Lampshade"). On a lamp in another language (`LAMP_LANGUAGE_FILE`) its
+      call is also the greeting and the name as its speech to text writes
+      them (`attention::opens_with_hey_lamp_in`, `written`: "ヘイ、ランプ",
+      "嘿兰普", "헤이 램프", "Hây lăm", French "Hey man", Deepgram's for "Hey
+      Lamp", #8517), still with the greeting first. A head tap is a call, and
+      so is a turn a computer opened within 8 s of its `turn.start`
+      (`Attention::simple_called`, `control_turn`, `docs/control.md`). A
       line going on from a call keeps its words, so "Hey Lamp." and the
       question said after it are one call, and a line begun within
-      `CALL_CARRIES_FOR` (15 s) of a call, before the lamp said anything
-      back, is the call's. A hearing of the name by `lamp-name` never
-      counts, at any score.
+      `CALL_CARRIES_FOR` (15 s) of a call (`called_at`, which an answer
+      doesn't clear) is the call's. A hearing of the name by `lamp-name`
+      never counts, at any score. **Its known costs**, the price of no false
+      wakes: a call whose "Hey" speech to text dropped ("Lamp, how far …",
+      heard at 0.99999 on lamp-74ff on 26 Nov) is held, and so is a key-word
+      wake whose transcript came back empty.
     - **The window**: a line begun within `follows_on::WITHIN_US` (20 s) of
       the end of the lamp's last words, measured to the line's start
       (`said_until_us`), is answered, whatever the camera, the room, the
       voices or its length. Every answer's words move that end on, the lamp's
       own news's too, so the window renews; a stop closes it. A line with no
       words in it (a sound, a cough, room noise) is never answered, but for a
-      tap: `no words heard in it (LAMP_SIMPLE_CALL)`.
+      tap or a computer's turn: `no words heard in it (LAMP_SIMPLE_CALL)`. A
+      checked short sound with a word in it, not a filler, is the rule's to
+      judge (`simple_judges` in the route), never the thread's 45 s
+      (`sound_carries`), which a long answer or a late transcript outlasts
+      (#8892, Reviewer-three's P2).
     - **Anything else** is held, `not "Hey Lamp", and no conversation going
       on (LAMP_SIMPLE_CALL)`, and never answered.
     - **Set aside**: `said_to_me` and the turned-silent rules
@@ -6316,7 +6329,10 @@ after a take-over, but now for every turn:
       words, the cut ask, the cut-word joins, the first seconds' quiet, and
       the busy room's floor hold. Every short utterance goes to the worker in
       any room for the rule to judge. `LAMP_WAIT_KEEPS_ANSWER` stays: it keeps
-      a waiting answer from a short noise and decides no line.
+      a waiting answer from a short noise and decides no line. The
+      coordinator reads the switch on either route (the floor hold, short
+      sounds, talk over the lamp's own line); the rule itself is the second
+      route's.
     - **Unchanged**: endpointing, the echo strip, a spoken stop while the lamp
       speaks, privacy and mute, quiet hours, the tools, memory, the body and
       `lamp-name` itself.
