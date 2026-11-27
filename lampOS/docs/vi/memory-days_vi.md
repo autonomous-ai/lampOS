@@ -2328,6 +2328,69 @@ người đó, không bị giữ (`ScopeLease::answer_words_seen`): đọc bộ 
 ngay, sửa hoặc quên đều chạy, như ở câu gốc. Chi tiết ở
 [memory.md](../memory.md).
 
+## Lời của khách trong ký ức của phòng (#8639, `LAMP_MEMORY_GUEST_MARKED` của voice)
+
+Các quyết định của người phụ trách ký ức (hỏi trong phiên này, đăng trên #8639):
+
+- **27/11/2026, 17:42:** khách chỉ là một khuôn mặt lạ: có khuôn mặt lạ trong
+  khung hình, không có khuôn mặt quen nào được thấy trong 2 phút gần nhất và
+  không có người của phiên. Khi không có ai trong khung hình, hoặc sau một
+  lần nhận nhầm một lượt, câu nói vẫn là của chủ. Lời của khách: "go to the
+  room memory or something, like if owner/enrolled user want to ask about
+  visitor converstaion, we can tell them". Chỗ rò của phòng riêng (bản ghi
+  dịch vụ kể cho bất kỳ ai nói): "Keep as today".
+- **27/11/2026, 17:58:** "use guest, W1-W3 ok, expire after 30 days": các câu
+  cho mô hình dùng chữ *guest*; điều khách nhờ giữ hết hạn sau 30 ngày, như
+  các lượt trao đổi của họ. Khách vẫn nghe các ghi chú của phòng như hôm nay.
+  "Quên những gì khách tôi nói" chưa được làm.
+
+**Ai là khách.** Một câu nghe được, nhận vào là của phòng khi camera được
+phép, có ít nhất một khuôn mặt trong khung hình ở lần làm mới gần nhất, không
+có khuôn mặt quen nào được thấy trong `NO_FACE_QUIET` (120 giây), và không bị
+giữ vì khoảng trống (`FaceCache::guest`; `remember::guest::mark_line` giữ 16
+câu khách mới nhất theo mã yêu cầu). Không có ai trong khung hình, một khuôn
+mặt quen trong khung hình, hoặc một khuôn mặt quen vừa thấy trong 120 giây
+(nhận nhầm một lượt) không bao giờ là khách.
+
+**Điều được giữ.** Lời của khách vẫn được giữ trong ký ức của phòng như trước
+(lượt trao đổi 30 ngày, và điều phòng nhờ giữ), nay có đánh dấu: `append_linked`
+và `remember` của phòng mang `"speaker":"guest"`, một hàng của bảng
+`speakers` sẵn có: không thêm cột, bảng hay migration, `user_version` không
+đổi, và không bao giờ là mã của một người, nên `forget_said` từ chối và không
+bao giờ xoá nó. Hàng đi theo mục của nó khi quên và khi hết hạn. Điều khách
+nhờ giữ hết hạn cùng ngày với các lượt trao đổi, sau `--keep-days` (30 trong
+sản phẩm) (`Days::maintain`); điều của gia đình không bao giờ hết hạn, như
+trước.
+
+**Điều được kể.** `recall`, `search` và `kept` của phòng ghi
+`"said_by":"guest"` trên mục của khách, và `session_open` của phòng thêm
+`guest_ids`. `guest:true` chỉ cho những gì khách đã nói, trong cùng 6 mục và
+2.400 byte; trên phạm vi riêng của một người thì bị bỏ qua. Voice kể một mục
+là `"said_by":"a guest"` và thêm vào phạm vi câu W1 ("Items with said_by were
+said by a guest, someone the lamp did not know: tell them as the guest's,
+never as the asker's or the household's."); recall nhận `guest` (W2: "true
+for only what a guest, someone the lamp did not know, said here."; nửa còn lại
+của W2, "For what a guest said, give guest true." trong mô tả của recall, bị
+bỏ ra vì với các công tắc của sản phẩm mô tả đã dùng 1.020 trên 1.024 byte, và
+thêm nó thành 1.060 byte, khiến recall bị loại); một recall có `guest` chỉ hỏi ký
+ức của phòng, cho bất kỳ ai hỏi, không có ghi chú cuộc trò chuyện. Điều khách
+nhờ giữ được kể là "A guest said: …" (W3) trong ghi chú phiên và trong các
+gợi ý, nên không bao giờ được kể như của gia đình.
+
+**Điều không đổi.** Bản ghi dịch vụ, lời nhắc và dòng ứng dụng của phòng
+riêng như hôm nay. Bộ nhớ cũ từ chối `speaker` thì giữ câu không có nó (ghi
+nhật ký một lần); bộ nhớ cũ từ chối `guest` trong recall thì được hỏi lại
+không có nó. Tắt công tắc, không có gì được đánh dấu và mọi chữ như trước.
+
+| Giới hạn | Giá trị | Ở đâu |
+|---|---|---|
+| Khuôn mặt quen thấy gần đây (2 phút của quyết định 1) | 120 giây | `memory_scope::NO_FACE_QUIET` |
+| Khuôn mặt trong khung hình để là khách | ít nhất 1 ở lần làm mới gần nhất | `FaceCache::guest` |
+| Câu khách giữ theo mã yêu cầu | 16 câu mới nhất | `remember::guest::LINES_HELD` |
+| Lượt trao đổi của khách | 30 ngày | `--keep-days 30`, `lamp-memory.service` |
+| Điều khách nhờ giữ | 30 ngày, cùng ngày với lượt trao đổi | `Days::maintain` |
+| Recall, kể cả bộ lọc khách | 6 mục, 2.400 byte | `remember::RECALL_ENTRIES`, `RECALL_BYTES` |
+
 ## Không bao giờ nói đã quên khi chưa quên (C88, B-G23)
 
 Trên lamp-06c1 (10/11, bản 11091, yêu cầu 30), câu «Lamp, forget that.» khi
