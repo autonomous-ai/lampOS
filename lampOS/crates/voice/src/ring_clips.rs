@@ -186,6 +186,22 @@ impl Clips {
         gone
     }
 
+    /// Every file in the folder removed, whatever its name (#8894): with
+    /// the switch off nothing renders or sweeps them, so a start clears
+    /// them all. One directory read; nothing rendered, nothing sent. How
+    /// many files went; none, with no error, for a folder that is absent.
+    /// The caller says it in the journal, with its own name.
+    pub fn clear(&self) -> usize {
+        let Ok(entries) = fs::read_dir(&self.dir) else {
+            return 0;
+        };
+        entries
+            .flatten()
+            .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+            .filter(|entry| fs::remove_file(entry.path()).is_ok())
+            .count()
+    }
+
     /// The bytes the folder holds now.
     pub fn used_bytes(&self) -> u64 {
         fs::read_dir(&self.dir)

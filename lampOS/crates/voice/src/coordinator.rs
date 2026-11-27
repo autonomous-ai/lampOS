@@ -3532,6 +3532,16 @@ fn run_source(
     let controls = RefCell::new(HandControls::restore(controls_options)?);
     // One optional storage/IPC process across every privacy cycle. Its failure
     // only withdraws reminder authority; healthy capture and conversation stay.
+    // With Schedule speech off the consumer never starts, so its start
+    // never clears the reminders' clips: the voice's start does (#8894).
+    if lifetime.continuous() {
+        crate::reminders::clear_clips_without_speech(
+            std::env::var(crate::reminders::SPEAK_VARIABLE)
+                .ok()
+                .as_deref(),
+            &crate::ring_clips::Clips::at_dir(),
+        );
+    }
     let reminders = RefCell::new(match crate::reminders::Reminders::from_environment() {
         Ok(reminders) => reminders,
         Err(error) => {

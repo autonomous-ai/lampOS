@@ -76,8 +76,16 @@ pub(crate) fn clear_clips_without_speech(
     value: Option<&str>,
     clips: &crate::ring_clips::Clips,
 ) -> usize {
-    let _ = (value, clips);
-    0
+    if speaks(value) {
+        return 0;
+    }
+    let gone = clips.clear();
+    if gone > 0 {
+        eprintln!(
+            "lamp-voice: the offline ring clips were cleared ({gone} files): Schedule speech is off"
+        );
+    }
+    gone
 }
 pub const LEDGER_VARIABLE: &str = "LAMP_SCHEDULE_DELIVERY_DIR";
 /// `on` exactly (#5560): a delivery ledger fenced ahead of the store is
