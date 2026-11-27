@@ -15211,7 +15211,9 @@ fn conversation_with_gate_inner(
             match task_news.as_mut().filter(|news| news.has_waiting()) {
                 Some(news) => {
                     let quiet = crate::task_news::quiet_for_news(
-                        (news.sign_in_waits() || news_at_pause) && !news.retelling_first(),
+                        (news.sign_in_waits() || news_at_pause)
+                            && !news.retelling_first()
+                            && !news.beat_first(),
                         clock,
                         last_turn_us,
                         last_spoke_us,
@@ -15317,8 +15319,10 @@ fn conversation_with_gate_inner(
             && (overdue_whole || news_step != crate::news_agent::Step::Wait)
             && overdue_pause
             && crate::task_news::quiet_for_news(
+                // A still-working beat too: never over anyone.
                 (news.sign_in_first() || news_at_pause || overdue_whole)
-                    && !news.retelling_first(),
+                    && !news.retelling_first()
+                    && !news.beat_first(),
                 clock,
                 last_turn_us,
                 last_spoke_us,

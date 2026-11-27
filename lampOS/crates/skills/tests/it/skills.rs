@@ -557,13 +557,14 @@ fn every_skill_folder_says_its_kind_and_version() {
     // Meal check is 1.0.1 for its `[present.budget]` (#5207), and 1.1.0 for
     // its `[[while]]` on humans/doing (#6543), so the Store's package reaches
     // a lamp that has the one before. Task news is 1.1.0 for its
-    // `checking`, `failed_not_started` and `start_unsure` words (#8170).
-    // Meal check is 1.2.0 and Quiet focus 1.1.0 for the owner's 27 Nov
-    // drops (no daily most, budget, rest, hours or others-in-view rule).
+    // `checking`, `failed_not_started` and `start_unsure` words (#8170),
+    // and 1.2.0 for its still-working beats' words. Meal check is 1.2.0
+    // and Quiet focus 1.1.0 for the owner's 27 Nov drops (no daily most,
+    // budget, rest, hours or others-in-view rule).
     for skill in &skills {
         let version = match skill.name.as_str() {
-            "meal-check" => "1.2.0",
-            "task-news" | "quiet-focus" => "1.1.0",
+            "meal-check" | "task-news" => "1.2.0",
+            "quiet-focus" => "1.1.0",
             _ => "1.0.0",
         };
         assert_eq!(skill.version.as_deref(), Some(version), "{}", skill.name);

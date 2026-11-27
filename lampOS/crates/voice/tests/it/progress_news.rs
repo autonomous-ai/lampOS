@@ -12,7 +12,7 @@ use lamp_policy::{
     policy::{self, Options},
     progress,
 };
-use lamp_voice::task_news::{BootClock, News, TaskNews, progress_on};
+use lamp_voice::task_news::{BootClock, News, Progress, Still, TaskNews, progress_on, still_on};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
@@ -136,6 +136,11 @@ impl Place {
 
     /// The tasks part says task 3 is `state`, at `changes`.
     fn work_as(&mut self, state: AgentState, changes: u32) {
+        self.work_for(state, changes, Some(600));
+    }
+
+    /// ...at it for `working_s`, if known.
+    fn work_for(&mut self, state: AgentState, changes: u32, working_s: Option<u64>) {
         let run = self.snapshot.lock().unwrap().run;
         let status = TaskStatus {
             store_id: STORE.into(),
@@ -146,7 +151,7 @@ impl Place {
                 task: 3,
                 engine: "claude".into(),
                 state,
-                working_s: Some(600),
+                working_s,
                 last_active_unix_ms: None,
                 read_unix_ms: 1_792_022_712_345,
                 changes,
@@ -573,6 +578,87 @@ fn after_a_restart_another_line_at_the_same_count_is_fetched_and_offered() {
     place.decide("say_now", false, &format!("{STORE}:3:2@{RUN_A}"));
     thread::sleep(ms(400));
     assert_eq!(place.asked("get_progress"), 2);
+}
+
+/// `LAMP_PROGRESS_NEWS=still`: a task at work has its still-working beats
+/// with no policy decision: the first at `first` after the hand-over, a
+/// fixed line; the next `every` later, from the agent's line since it
+/// changed; at most `most`, and none once the task settled.
+#[test]
+fn still_alone_beats_a_task_at_work_at_most_most_times_with_no_decision() {
+    assert!(still_on(Some("still")) && !progress_on(Some("still")));
+    assert!(still_on(Some("on,still")) && progress_on(Some("on,still")));
+    assert!(!still_on(Some("on")) && !still_on(None) && !still_on(Some("STILL")));
+    let mut place = Place::new("still");
+    let still = Still {
+        first: ms(300),
+        every: ms(700),
+        most: 2,
+    };
+    let mut news = TaskNews::start(
+        &place.root.join("tasks"),
+        place.told.clone(),
+        Some(&place.bus),
+        Progress {
+            policy: false,
+            still: Some(still),
+        },
+    )
+    .unwrap();
+    let handed = Instant::now();
+    place.work_for(AgentState::Working, 1, None);
+    let first = offered(&mut news, WAIT).expect("beat 0");
+    assert!(handed.elapsed() >= ms(300), "{:?}", handed.elapsed());
+    assert_eq!(first.key, format!("{STORE}:3:progress-{RUN_A}-1-b0"));
+    assert!(first.note.contains("Still on it"), "{}", first.note);
+    assert_eq!(news.tell().map(|told| told.key), Some(first.key.clone()));
+    // The progress line changed since: the next beat tells what the agent
+    // is doing, from its line, in a short sentence.
+    place.words("working", 2);
+    place.work_for(AgentState::Working, 2, None);
+    let second = offered(&mut news, WAIT).expect("beat 1");
+    assert!(handed.elapsed() >= ms(1_000), "{:?}", handed.elapsed());
+    assert_eq!(second.key, format!("{STORE}:3:progress-{RUN_A}-2-b1"));
+    assert_ne!(second.note, first.note);
+    for part in [ABOUT, "what it is doing now", "do not say it is finished"] {
+        assert!(
+            second.note.contains(part),
+            "{part:?} not in {}",
+            second.note
+        );
+    }
+    assert_eq!(news.tell().map(|told| told.key), Some(second.key.clone()));
+    // At most `most`.
+    assert!(offered(&mut news, ms(1_600)).is_none());
+    // No decision listened to; words asked for only for the changed line.
+    let voice = |topic: &str| {
+        place
+            .bus
+            .subscribers(topic)
+            .unwrap_or_default()
+            .iter()
+            .filter(|listener| listener.socket.starts_with("voice."))
+            .count()
+    };
+    assert_eq!(voice(Decision::TOPIC), 0);
+    assert_eq!(voice(TaskStatus::TOPIC), 2);
+    assert_eq!(place.asked("get_progress"), 1);
+    // Another task at work, then settled before its first beat: none.
+    let mut other = Place::new("still-settled");
+    let mut news = TaskNews::start(
+        &other.root.join("tasks"),
+        other.told.clone(),
+        Some(&other.bus),
+        Progress {
+            policy: false,
+            still: Some(still),
+        },
+    )
+    .unwrap();
+    other.work_for(AgentState::Working, 1, None);
+    thread::sleep(ms(100));
+    other.work_for(AgentState::Idle, 1, None);
+    assert!(offered(&mut news, ms(1_200)).is_none());
 }
 
 #[test]
