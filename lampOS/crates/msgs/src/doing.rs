@@ -217,9 +217,9 @@ pub enum PostureRegion {
     Nothing,
 }
 
-/// How the person has sat over the current window: its length so far, the
+/// How the person has sat over the current window: the time it stands for, the
 /// share of its samples read as bad, and the region that was most often
-/// bad. `window_s` is always in a value said, 0 at the window's start, so a
+/// bad. `window_s` is always in a value said, so a
 /// skill's `[[while]] above` on it is never blocked by a missing field.
 ///
 /// Not said while the window holds fewer than 2 samples (frames not going
@@ -231,7 +231,8 @@ pub enum PostureRegion {
 /// says `window_s` 60, a full minute (the owner, #8377).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HumanPosture {
-    /// How long the window has run, in whole seconds, at most an hour.
+    /// The time the window stands for, in whole seconds, at most an hour:
+    /// lamp-seen's is its oldest kept sample's age plus 30 s, at most 60.
     pub window_s: u32,
     /// The share of the window's samples read as bad, 0 to 1.
     pub bad_share: f32,

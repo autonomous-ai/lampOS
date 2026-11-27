@@ -34,5 +34,5 @@ from Sit back is Sit back's `a-bad-posture-alone-is-let-be`.
 | `held-while-they-talk` | Both checks bad from 9m30, a conversation from 9 to 12 minutes | Pass: held, said at 12 and a half, the voice resting 5 s and the lamp quiet 10 s |
 | `a-word-late-at-night` | 22:00, bad neck to 10 minutes | Pass: the neck's line at 30 s (no `[quiet]`, the owner, 27 Nov) |
 | `off-when-asked` | `wellbeing_nudges(how = "off")` at 10 s, bad neck all through | Pass: nothing (`[stop]`; its kind, `posture`, is taken only where the function is shared, as on a product lamp) |
-| `one-word-a-quarter-hour-whatever-the-region` | Bad neck to 8 minutes, then bad back to 25 | Pass: the neck's line at 30 s, nothing at the change, the back's at 15m30 (the skill's own `[budget]` gap of 15 minutes between any two words) |
+| `a-new-word-when-the-slump-moves` | Bad neck to 8 minutes, then bad back to 20 | Pass: the neck's line at 30 s, the back's at 8m30, at once: each region its own 15m cooldown (the owner, 27 Nov: "neck slump and back slump is two different thing") |
 | `a-second-word-a-quarter-hour-on` | Bad neck for 25 minutes | Pass: the neck's line at 30 s and again at 15m30, not before: the 15m cooldown (the owner, 27 Nov: "only 15m cooldown, not 60m") |
