@@ -2623,6 +2623,16 @@ impl Attention {
         turned == Some(true) && !(self.name_or_follow_up && room == Room::Busy)
     }
 
+    /// Whether a face turned to the lamp lets a line out of its own: as
+    /// [`Self::face_shows`] says, but with [`Self::face_not_a_call`] only in a
+    /// conversation going on (`going_on`). Out of one, "Hey Lamp" starts it
+    /// (the product owner's rule of 26 Nov 2026). Only the admissions read
+    /// this; the face as the name's second sign, the conversation's own
+    /// signs and the journal's sign read [`Self::face_shows`] as before.
+    fn face_calls(&self, room: Room, turned: Option<bool>, going_on: bool) -> bool {
+        self.face_shows(room, turned) && (going_on || !self.face_not_a_call)
+    }
+
     /// With [`Self::ask_a_second_sign_of_the_name`]: the name heard for the
     /// request in hand only in the room's sound counts for nothing alone,
     /// at any score, [`SURE_SCORE`] too. It counts with a second sign: a
@@ -3822,9 +3832,11 @@ impl Attention {
                 Verdict::Play(SOUND_A_WORD)
             } else if self.near {
                 Verdict::Play(SOUND_NEAR)
-            } else if self.face_shows(room, turned) || turned == Some(true) && self.named {
+            } else if self.face_calls(room, turned, going_on) || turned == Some(true) && self.named
+            {
                 // With `LAMP_NAME_OR_FOLLOW_UP`, the face counts only with
-                // the name heard in the sound.
+                // the name heard in the sound; with `LAMP_FACE_NOT_A_CALL`,
+                // out of a conversation, the same.
                 Verdict::Play(SOUND_TURNED)
             } else if self.lamp_asked && going_on && self.heard.chars().any(char::is_alphanumeric) {
                 // On lamp-4ace on 2026-10-17 at 16:11, "Yes. Please start
@@ -3939,7 +3951,7 @@ impl Attention {
             self.named,
             strict,
             turned,
-            self.face_shows(room, Some(true)),
+            self.face_calls(room, Some(true), going_on),
         ) {
             Verdict::Hold(_) if room == Room::Busy && self.addressed => Verdict::Play(ADDRESSED),
             verdict => verdict,
@@ -3959,7 +3971,7 @@ impl Attention {
             own || going_on
                 || called_in_text
                 || self.named
-                || self.face_shows(room, turned)
+                || self.face_calls(room, turned, going_on)
                 || self.addressed
         };
         let going_on_unsigned = !answering_another

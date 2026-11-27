@@ -3322,6 +3322,8 @@ fn second_route_worker_environment(
         crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT,
         // A call is "Hey Lamp" at a line's start (the product owner, 26 Nov).
         crate::second_provider::NAME_HEY_ONLY_ENVIRONMENT,
+        // A face turned to the lamp starts no conversation (the same rule).
+        crate::second_provider::FACE_NOT_A_CALL_ENVIRONMENT,
         // The lamp's own news gets the conversation's 20 s (the same day).
         crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT,
         // Short replies carry in a conversation (#8772).
@@ -3842,6 +3844,7 @@ mod tests {
             crate::second_provider::NEWS_REPLY_HEEDS_HELD_ENVIRONMENT,
             crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT,
             crate::second_provider::NAME_HEY_ONLY_ENVIRONMENT,
+            crate::second_provider::FACE_NOT_A_CALL_ENVIRONMENT,
             crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT,
             crate::second_provider::SHORT_REPLIES_CARRY_ENVIRONMENT,
             crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT,
@@ -5149,6 +5152,7 @@ mod tests {
                     || name == crate::second_provider::NEWS_REPLY_HEEDS_HELD_ENVIRONMENT
                     || name == crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT
                     || name == crate::second_provider::NAME_HEY_ONLY_ENVIRONMENT
+                    || name == crate::second_provider::FACE_NOT_A_CALL_ENVIRONMENT
                     || name == crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT
                     || name == crate::second_provider::SHORT_REPLIES_CARRY_ENVIRONMENT
                     || name == crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT
@@ -5435,6 +5439,7 @@ mod tests {
                     "LAMP_FACES_AT_DESK_ONLY=on",
                     "LAMP_FACE_GAP_HOLD=on",
                     "LAMP_FACE_LEARN_LATER=on",
+                    "LAMP_FACE_NOT_A_CALL=on",
                     "LAMP_FACE_NO_ASK=on",
                     "LAMP_FACE_NO_FACE_HOLD=on",
                     "LAMP_FACE_QUESTION_NOT_ASK=on",
