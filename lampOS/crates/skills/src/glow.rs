@@ -474,13 +474,21 @@ pub fn asked(call: &Call, from: Option<&Light>) -> Option<Light> {
             tint: None,
             step: None,
         }),
-        Call::Dim { steps, .. } => from.filter(|from| from.on).map(|from| Light {
-            on: true,
-            colour: from.colour.clone(),
-            level: from.level.saturating_sub(*steps).max(1),
-            // A dim keeps the colour the person chose, and asks in levels.
-            tint: from.tint,
-            step: None,
+        Call::Dim { steps, .. } => from.filter(|from| from.on).map(|from| {
+            let level = from.level.saturating_sub(*steps).max(1);
+            // A dim keeps the colour the person chose, and asks in levels;
+            // but a light already under that level's step (the owner's step
+            // 1, under level 1's step 2) stays at its own step, so a dim
+            // never draws brighter (the Reviewer-lead's P3 on #8870).
+            let step = (Light::LEGACY_STEPS[usize::from(level) - 1] > from.step_now())
+                .then(|| from.step_now());
+            Light {
+                on: true,
+                colour: from.colour.clone(),
+                level,
+                tint: from.tint,
+                step,
+            }
         }),
         Call::Out { .. } => from.filter(|from| from.on).map(|from| Light {
             on: false,
@@ -574,6 +582,16 @@ mod tests {
         );
         assert_eq!(asked(&dim(1), Some(&blue)), Some(light(true, "blue", 2)));
         assert_eq!(asked(&dim(4), Some(&blue)), Some(light(true, "blue", 1)));
+        // An owner's light at step 1, under level 1's step: a dim stays at
+        // step 1 and never draws brighter (the Reviewer-lead's P3 on #8870);
+        // one at step 3 steps down to level 1's step as ever.
+        for (from, to) in [(1, 1), (2, 2), (3, 2), (4, 2), (6, 2)] {
+            let lit = light(true, "sky", 1).at_step(from);
+            let dimmed = asked(&dim(1), Some(&lit)).unwrap();
+            assert_eq!(dimmed.step_now(), to, "step {from}");
+            assert!(dimmed.step_now() <= lit.step_now(), "step {from}");
+            assert!(dimmed.check().is_ok(), "step {from}");
+        }
         // Nothing on to dim, or not known: left alone.
         assert_eq!(asked(&dim(1), Some(&light(false, "blue", 3))), None);
         assert_eq!(asked(&dim(1), None), None);
